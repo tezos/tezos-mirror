@@ -8,10 +8,10 @@
  (libraries
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
- (modules Environment))
+ (modules Tezos_protocol_environment_003_PsddFKi3))
 
 (rule
- (targets environment.ml)
+ (targets tezos_protocol_environment_003_PsddFKi3.ml)
  (action
   (write-file
    %{targets}
@@ -29,9 +29,9 @@
   -w -6-7-9-16-29-32-51-68
   -nostdlib
   -nopervasives
-  -open Tezos_protocol_environment_003_PsddFKi3.Environment
-  -open Tezos_protocol_environment_003_PsddFKi3.Environment.Pervasives
-  -open Tezos_protocol_environment_003_PsddFKi3.Environment.Error_monad)
+  -open Tezos_protocol_environment_003_PsddFKi3
+  -open Tezos_protocol_environment_003_PsddFKi3.Pervasives
+  -open Tezos_protocol_environment_003_PsddFKi3.Error_monad)
  (modules
   Misc
   Storage_description
@@ -126,14 +126,14 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP\"\nlet name = Tezos_protocol_environment_003_PsddFKi3.Environment.Name.name\ninclude Tezos_raw_protocol_003_PsddFKi3\ninclude Tezos_raw_protocol_003_PsddFKi3.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP\"\nlet name = Tezos_protocol_environment_003_PsddFKi3.Name.name\ninclude Tezos_raw_protocol_003_PsddFKi3\ninclude Tezos_raw_protocol_003_PsddFKi3.Main\n")))
 
 (rule
  (targets tezos_protocol_003_PsddFKi3.ml)
  (action
   (write-file
    %{targets}
-   "\nmodule Environment = Tezos_protocol_environment_003_PsddFKi3.Environment\nmodule Protocol = Protocol\n")))
+   "\nmodule Environment = Tezos_protocol_environment_003_PsddFKi3\nmodule Protocol = Protocol\n")))
 
 (rule
  (alias runtest_compile_protocol)

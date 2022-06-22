@@ -8,10 +8,10 @@
  (libraries
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
- (modules Environment))
+ (modules Tezos_protocol_environment_004_Pt24m4xi))
 
 (rule
- (targets environment.ml)
+ (targets tezos_protocol_environment_004_Pt24m4xi.ml)
  (action
   (write-file
    %{targets}
@@ -29,9 +29,9 @@
   -w -6-7-9-16-29-32-51-68
   -nostdlib
   -nopervasives
-  -open Tezos_protocol_environment_004_Pt24m4xi.Environment
-  -open Tezos_protocol_environment_004_Pt24m4xi.Environment.Pervasives
-  -open Tezos_protocol_environment_004_Pt24m4xi.Environment.Error_monad)
+  -open Tezos_protocol_environment_004_Pt24m4xi
+  -open Tezos_protocol_environment_004_Pt24m4xi.Pervasives
+  -open Tezos_protocol_environment_004_Pt24m4xi.Error_monad)
  (modules
   Misc
   Storage_description
@@ -126,14 +126,14 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"Pt24m4xiPbLDhVgVfABUjirbmda3yohdN82Sp9FeuAXJ4eV9otd\"\nlet name = Tezos_protocol_environment_004_Pt24m4xi.Environment.Name.name\ninclude Tezos_raw_protocol_004_Pt24m4xi\ninclude Tezos_raw_protocol_004_Pt24m4xi.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"Pt24m4xiPbLDhVgVfABUjirbmda3yohdN82Sp9FeuAXJ4eV9otd\"\nlet name = Tezos_protocol_environment_004_Pt24m4xi.Name.name\ninclude Tezos_raw_protocol_004_Pt24m4xi\ninclude Tezos_raw_protocol_004_Pt24m4xi.Main\n")))
 
 (rule
  (targets tezos_protocol_004_Pt24m4xi.ml)
  (action
   (write-file
    %{targets}
-   "\nmodule Environment = Tezos_protocol_environment_004_Pt24m4xi.Environment\nmodule Protocol = Protocol\n")))
+   "\nmodule Environment = Tezos_protocol_environment_004_Pt24m4xi\nmodule Protocol = Protocol\n")))
 
 (rule
  (alias runtest_compile_protocol)

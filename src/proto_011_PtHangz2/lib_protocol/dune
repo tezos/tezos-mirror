@@ -8,10 +8,10 @@
  (libraries
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
- (modules Environment))
+ (modules Tezos_protocol_environment_011_PtHangz2))
 
 (rule
- (targets environment.ml)
+ (targets tezos_protocol_environment_011_PtHangz2.ml)
  (action
   (write-file
    %{targets}
@@ -29,9 +29,9 @@
   -w -51
   -nostdlib
   -nopervasives
-  -open Tezos_protocol_environment_011_PtHangz2.Environment
-  -open Tezos_protocol_environment_011_PtHangz2.Environment.Pervasives
-  -open Tezos_protocol_environment_011_PtHangz2.Environment.Error_monad)
+  -open Tezos_protocol_environment_011_PtHangz2
+  -open Tezos_protocol_environment_011_PtHangz2.Pervasives
+  -open Tezos_protocol_environment_011_PtHangz2.Error_monad)
  (modules
   Misc
   Path_encoding
@@ -155,14 +155,14 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx\"\nlet name = Tezos_protocol_environment_011_PtHangz2.Environment.Name.name\ninclude Tezos_raw_protocol_011_PtHangz2\ninclude Tezos_raw_protocol_011_PtHangz2.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx\"\nlet name = Tezos_protocol_environment_011_PtHangz2.Name.name\ninclude Tezos_raw_protocol_011_PtHangz2\ninclude Tezos_raw_protocol_011_PtHangz2.Main\n")))
 
 (rule
  (targets tezos_protocol_011_PtHangz2.ml)
  (action
   (write-file
    %{targets}
-   "\nmodule Environment = Tezos_protocol_environment_011_PtHangz2.Environment\nmodule Protocol = Protocol\n")))
+   "\nmodule Environment = Tezos_protocol_environment_011_PtHangz2\nmodule Protocol = Protocol\n")))
 
 (rule
  (alias runtest_compile_protocol)

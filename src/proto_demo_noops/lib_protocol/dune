@@ -8,10 +8,10 @@
  (libraries
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
- (modules Environment))
+ (modules Tezos_protocol_environment_demo_noops))
 
 (rule
- (targets environment.ml)
+ (targets tezos_protocol_environment_demo_noops.ml)
  (action
   (write-file
    %{targets}
@@ -28,9 +28,9 @@
   (:standard)
   -nostdlib
   -nopervasives
-  -open Tezos_protocol_environment_demo_noops.Environment
-  -open Tezos_protocol_environment_demo_noops.Environment.Pervasives
-  -open Tezos_protocol_environment_demo_noops.Environment.Error_monad)
+  -open Tezos_protocol_environment_demo_noops
+  -open Tezos_protocol_environment_demo_noops.Pervasives
+  -open Tezos_protocol_environment_demo_noops.Error_monad)
  (modules Main))
 
 (library
@@ -56,14 +56,14 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp\"\nlet name = Tezos_protocol_environment_demo_noops.Environment.Name.name\ninclude Tezos_raw_protocol_demo_noops\ninclude Tezos_raw_protocol_demo_noops.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp\"\nlet name = Tezos_protocol_environment_demo_noops.Name.name\ninclude Tezos_raw_protocol_demo_noops\ninclude Tezos_raw_protocol_demo_noops.Main\n")))
 
 (rule
  (targets tezos_protocol_demo_noops.ml)
  (action
   (write-file
    %{targets}
-   "\nmodule Environment = Tezos_protocol_environment_demo_noops.Environment\nmodule Protocol = Protocol\n")))
+   "\nmodule Environment = Tezos_protocol_environment_demo_noops\nmodule Protocol = Protocol\n")))
 
 (rule
  (alias runtest_compile_protocol)

@@ -8,10 +8,10 @@
  (libraries
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
- (modules Environment))
+ (modules Tezos_protocol_environment_013_PtJakart))
 
 (rule
- (targets environment.ml)
+ (targets tezos_protocol_environment_013_PtJakart.ml)
  (action
   (write-file
    %{targets}
@@ -29,9 +29,9 @@
   -w -51
   -nostdlib
   -nopervasives
-  -open Tezos_protocol_environment_013_PtJakart.Environment
-  -open Tezos_protocol_environment_013_PtJakart.Environment.Pervasives
-  -open Tezos_protocol_environment_013_PtJakart.Environment.Error_monad)
+  -open Tezos_protocol_environment_013_PtJakart
+  -open Tezos_protocol_environment_013_PtJakart.Pervasives
+  -open Tezos_protocol_environment_013_PtJakart.Error_monad)
  (modules
   Misc
   Non_empty_string
@@ -237,14 +237,14 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY\"\nlet name = Tezos_protocol_environment_013_PtJakart.Environment.Name.name\ninclude Tezos_raw_protocol_013_PtJakart\ninclude Tezos_raw_protocol_013_PtJakart.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY\"\nlet name = Tezos_protocol_environment_013_PtJakart.Name.name\ninclude Tezos_raw_protocol_013_PtJakart\ninclude Tezos_raw_protocol_013_PtJakart.Main\n")))
 
 (rule
  (targets tezos_protocol_013_PtJakart.ml)
  (action
   (write-file
    %{targets}
-   "\nmodule Environment = Tezos_protocol_environment_013_PtJakart.Environment\nmodule Protocol = Protocol\n")))
+   "\nmodule Environment = Tezos_protocol_environment_013_PtJakart\nmodule Protocol = Protocol\n")))
 
 (rule
  (alias runtest_compile_protocol)

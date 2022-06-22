@@ -8,10 +8,10 @@
  (libraries
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
- (modules Environment))
+ (modules Tezos_protocol_environment_000_Ps9mPmXa))
 
 (rule
- (targets environment.ml)
+ (targets tezos_protocol_environment_000_Ps9mPmXa.ml)
  (action
   (write-file
    %{targets}
@@ -29,9 +29,9 @@
   -w -6-7-9-16-29-32-51-68
   -nostdlib
   -nopervasives
-  -open Tezos_protocol_environment_000_Ps9mPmXa.Environment
-  -open Tezos_protocol_environment_000_Ps9mPmXa.Environment.Pervasives
-  -open Tezos_protocol_environment_000_Ps9mPmXa.Environment.Error_monad)
+  -open Tezos_protocol_environment_000_Ps9mPmXa
+  -open Tezos_protocol_environment_000_Ps9mPmXa.Pervasives
+  -open Tezos_protocol_environment_000_Ps9mPmXa.Error_monad)
  (modules Data Services Main))
 
 (library
@@ -58,14 +58,14 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P\"\nlet name = Tezos_protocol_environment_000_Ps9mPmXa.Environment.Name.name\ninclude Tezos_raw_protocol_000_Ps9mPmXa\ninclude Tezos_raw_protocol_000_Ps9mPmXa.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P\"\nlet name = Tezos_protocol_environment_000_Ps9mPmXa.Name.name\ninclude Tezos_raw_protocol_000_Ps9mPmXa\ninclude Tezos_raw_protocol_000_Ps9mPmXa.Main\n")))
 
 (rule
  (targets tezos_protocol_000_Ps9mPmXa.ml)
  (action
   (write-file
    %{targets}
-   "\nmodule Environment = Tezos_protocol_environment_000_Ps9mPmXa.Environment\nmodule Protocol = Protocol\n")))
+   "\nmodule Environment = Tezos_protocol_environment_000_Ps9mPmXa\nmodule Protocol = Protocol\n")))
 
 (rule
  (alias runtest_compile_protocol)

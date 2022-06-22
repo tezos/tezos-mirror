@@ -8,10 +8,10 @@
  (libraries
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
- (modules Environment))
+ (modules Tezos_protocol_environment_002_PsYLVpVv))
 
 (rule
- (targets environment.ml)
+ (targets tezos_protocol_environment_002_PsYLVpVv.ml)
  (action
   (write-file
    %{targets}
@@ -29,9 +29,9 @@
   -w -6-7-9-16-29-32-51-68
   -nostdlib
   -nopervasives
-  -open Tezos_protocol_environment_002_PsYLVpVv.Environment
-  -open Tezos_protocol_environment_002_PsYLVpVv.Environment.Pervasives
-  -open Tezos_protocol_environment_002_PsYLVpVv.Environment.Error_monad)
+  -open Tezos_protocol_environment_002_PsYLVpVv
+  -open Tezos_protocol_environment_002_PsYLVpVv.Pervasives
+  -open Tezos_protocol_environment_002_PsYLVpVv.Error_monad)
  (modules
   Misc
   Storage_description
@@ -125,14 +125,14 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt\"\nlet name = Tezos_protocol_environment_002_PsYLVpVv.Environment.Name.name\ninclude Tezos_raw_protocol_002_PsYLVpVv\ninclude Tezos_raw_protocol_002_PsYLVpVv.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt\"\nlet name = Tezos_protocol_environment_002_PsYLVpVv.Name.name\ninclude Tezos_raw_protocol_002_PsYLVpVv\ninclude Tezos_raw_protocol_002_PsYLVpVv.Main\n")))
 
 (rule
  (targets tezos_protocol_002_PsYLVpVv.ml)
  (action
   (write-file
    %{targets}
-   "\nmodule Environment = Tezos_protocol_environment_002_PsYLVpVv.Environment\nmodule Protocol = Protocol\n")))
+   "\nmodule Environment = Tezos_protocol_environment_002_PsYLVpVv\nmodule Protocol = Protocol\n")))
 
 (rule
  (alias runtest_compile_protocol)
