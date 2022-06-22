@@ -250,6 +250,7 @@ let run ~readonly input output =
           predecessor_ops_metadata_hash;
           operations;
           max_operations_ttl;
+          simulate;
         } ->
         let*! () = Events.(emit validation_request block_header) in
         let*! block_application_result =
@@ -289,6 +290,7 @@ let run ~readonly input output =
           in
           with_retry_to_load_protocol protocol_root (fun () ->
               Block_validation.apply
+                ~simulate
                 ?cached_result
                 env
                 block_header

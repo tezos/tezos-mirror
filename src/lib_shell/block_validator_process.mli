@@ -71,9 +71,14 @@ val close : t -> unit Lwt.t
 val reconfigure_event_logging :
   t -> Internal_event_unix.Configuration.t -> unit tzresult Lwt.t
 
-(** [apply_block bvp predecessor header os] checks the liveness of
-    the operations and then call [Block_validation.apply] *)
+(** [apply_block bvp predecessor header os] checks the liveness of the
+    operations and then call [Block_validation.apply]
+
+    If [simulate] is true, the context resulting from the application
+    will not be committed to disk. Set to false by default.
+*)
 val apply_block :
+  ?simulate:bool ->
   t ->
   Store.chain_store ->
   predecessor:Store.Block.t ->

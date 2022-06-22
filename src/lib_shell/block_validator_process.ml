@@ -51,6 +51,7 @@ module type S = sig
   val close : t -> unit Lwt.t
 
   val apply_block :
+    simulate:bool ->
     t ->
     Store.chain_store ->
     predecessor:Store.Block.t ->
@@ -222,8 +223,8 @@ module Internal_validator_process = struct
         operation_metadata_size_limit;
       }
 
-  let apply_block validator chain_store ~predecessor ~max_operations_ttl
-      block_header operations =
+  let apply_block ~simulate validator chain_store ~predecessor
+      ~max_operations_ttl block_header operations =
     let open Lwt_result_syntax in
     let* env =
       make_apply_environment
@@ -243,6 +244,7 @@ module Internal_validator_process = struct
     in
     let* {result; cache} =
       Block_validation.apply
+        ~simulate
         ?cached_result:validator.preapply_result
         env
         block_header
@@ -743,8 +745,8 @@ module External_validator_process = struct
     in
     return validator
 
-  let apply_block validator chain_store ~predecessor ~max_operations_ttl
-      block_header operations =
+  let apply_block ~simulate validator chain_store ~predecessor
+      ~max_operations_ttl block_header operations =
     let chain_id = Store.Chain.chain_id chain_store in
     let predecessor_block_header = Store.Block.header predecessor in
     let predecessor_block_metadata_hash =
@@ -763,6 +765,7 @@ module External_validator_process = struct
           predecessor_ops_metadata_hash;
           operations;
           max_operations_ttl;
+          simulate;
         }
     in
     send_request validator request Block_validation.result_encoding
@@ -918,8 +921,9 @@ let reconfigure_event_logging (E {validator_process = (module VP); validator})
     config =
   VP.reconfigure_event_logging validator config
 
-let apply_block (E {validator_process = (module VP); validator}) chain_store
-    ~predecessor header operations =
+let apply_block ?(simulate = false)
+    (E {validator_process = (module VP); validator}) chain_store ~predecessor
+    header operations =
   let open Lwt_result_syntax in
   let* metadata = Store.Block.get_block_metadata chain_store predecessor in
   let max_operations_ttl = Store.Block.max_operations_ttl metadata in
@@ -935,6 +939,7 @@ let apply_block (E {validator_process = (module VP); validator}) chain_store
       operations
   in
   VP.apply_block
+    ~simulate
     validator
     chain_store
     ~predecessor
