@@ -763,6 +763,12 @@ let register state =
       Monitor.build_directory;
     ]
 
+let sanitize_cors_headers ~default headers =
+  List.map String.lowercase_ascii headers
+  |> String.Set.of_list
+  |> String.Set.(union (of_list default))
+  |> String.Set.elements
+
 let start_server configuration state =
   let open Lwt_result_syntax in
   let Node_config.{rpc_addr; cors_origins; cors_headers; _} = configuration in
@@ -771,6 +777,9 @@ let start_server configuration state =
   let dir = register state in
   let node = `TCP (`Port rpc_port) in
   let acl = RPC_server.Acl.allow_all in
+  let cors_headers =
+    sanitize_cors_headers ~default:["Content-Type"] cors_headers
+  in
   Lwt.catch
     (fun () ->
       let*! rpc_server =
