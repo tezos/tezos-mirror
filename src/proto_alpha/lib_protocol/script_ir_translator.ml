@@ -1058,7 +1058,7 @@ let parse_storage_ty :
   | _ -> (parse_normal_storage_ty [@tailcall]) ctxt ~stack_depth ~legacy node
 
 (* check_packable: determine if a `ty` is packable into Michelson *)
-let check_packable ~legacy loc root =
+let check_packable ~allow_contract loc root =
   let rec check : type t tc. (t, tc) ty -> unit tzresult = function
     (* /!\ When adding new lazy storage kinds, be sure to return an error. /!\
        Lazy storage should not be packable. *)
@@ -1091,7 +1091,7 @@ let check_packable ~legacy loc root =
     | Option_t (v_ty, _, _) -> check v_ty
     | List_t (elt_ty, _) -> check elt_ty
     | Map_t (_, elt_ty, _) -> check elt_ty
-    | Contract_t (_, _) when legacy -> Result.return_unit
+    | Contract_t (_, _) when allow_contract -> Result.return_unit
     | Contract_t (_, _) -> error (Unexpected_contract loc)
     | Sapling_transaction_t _ -> ok ()
     | Sapling_transaction_deprecated_t _ -> ok ()
@@ -3471,7 +3471,7 @@ and parse_instr :
         ( capture,
           Item_t (Lambda_t (Pair_t (capture_ty, arg_ty, _, _), ret, _), rest) )
     ) ->
-      check_packable ~legacy:false loc capture_ty >>?= fun () ->
+      check_packable ~allow_contract:false loc capture_ty >>?= fun () ->
       check_item_ty ctxt capture capture_ty loc I_APPLY 1 2
       >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
@@ -3545,7 +3545,7 @@ and parse_instr :
       Lwt.return
         ( error_unexpected_annot loc annot >>? fun () ->
           (if legacy then Result.return_unit
-          else check_packable ~legacy:false loc v)
+          else check_packable ~allow_contract:false loc v)
           >|? fun () ->
           let instr = {apply = (fun _k -> IFailwith (loc, v))} in
           let descr aft = {loc; instr; bef = stack_ty; aft} in
@@ -3933,7 +3933,7 @@ and parse_instr :
   (* packing *)
   | Prim (loc, I_PACK, [], annot), Item_t (t, rest) ->
       check_packable
-        ~legacy:true
+        ~allow_contract:true
         (* allow to pack contracts for hash/signature checks *) loc
         t
       >>?= fun () ->
@@ -4339,7 +4339,7 @@ and parse_instr :
       typed ctxt loc instr (Item_t (or_bytes_bool_t, rest))
   (* Events *)
   | Prim (loc, I_EMIT, [], annot), Item_t (data, rest) ->
-      check_packable ~legacy loc data >>?= fun () ->
+      check_packable ~allow_contract:legacy loc data >>?= fun () ->
       parse_entrypoint_annot_strict loc annot >>?= fun tag ->
       unparse_ty ~loc:() ctxt data >>?= fun (unparsed_ty, ctxt) ->
       Gas.consume ctxt (Script.strip_locations_cost unparsed_ty)
