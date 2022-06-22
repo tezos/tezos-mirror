@@ -1641,6 +1641,50 @@ module Sc_rollup = struct
     in
     Process.check process
 
+  let publish_commitment ?hooks ?(wait = "none") ?burn_cap ~src ~sc_rollup
+      ~compressed_state ~inbox_level ~predecessor ~number_of_messages
+      ~number_of_ticks client =
+    let process =
+      spawn_command
+        ?hooks
+        client
+        (["--wait"; wait]
+        @ [
+            "publish";
+            "commitment";
+            "from";
+            src;
+            "for";
+            "sc";
+            "rollup";
+            sc_rollup;
+            "with";
+            "compressed";
+            "state";
+            compressed_state;
+            "at";
+            "inbox";
+            "level";
+            string_of_int inbox_level;
+            "and";
+            "predecessor";
+            predecessor;
+            "and";
+            "number";
+            "of";
+            "messages";
+            string_of_int number_of_messages;
+            "and";
+            "number";
+            "of";
+            "ticks";
+            string_of_int number_of_ticks;
+          ]
+        @ optional_arg "burn-cap" Tez.to_string burn_cap)
+    in
+    let parse process = Process.check process in
+    {value = process; run = parse}
+
   let spawn_cement_commitment ?hooks ?(wait = "none") ?burn_cap ~hash ~src ~dst
       client =
     spawn_command
