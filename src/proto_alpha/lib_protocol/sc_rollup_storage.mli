@@ -38,11 +38,10 @@ val originate :
   parameters_ty:Script_repr.lazy_expr ->
   (Sc_rollup_repr.Address.t * Z.t * Raw_context.t) tzresult Lwt.t
 
-(** [kind context address] returns [Some kind] iff [address] is an
-    existing rollup of some [kind]. Returns [None] if [address] is
-    not the address of an existing rollup. *)
-val kind :
-  Raw_context.t -> Sc_rollup_repr.t -> Sc_rollups.Kind.t option tzresult Lwt.t
+(** [kind context address] returns the kind of the given rollup [address] iff
+    [address] is an existing rollup. Fails with an [Sc_rollup_does_not_exist]
+    error in case the rollup does not exist. *)
+val kind : Raw_context.t -> Sc_rollup_repr.t -> Sc_rollups.Kind.t tzresult Lwt.t
 
 val list : Raw_context.t -> Sc_rollup_repr.t list tzresult Lwt.t
 

@@ -57,7 +57,12 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty =
   in
   return (address, size, ctxt)
 
-let kind ctxt address = Store.PVM_kind.find ctxt address
+let kind ctxt address =
+  let open Lwt_tzresult_syntax in
+  let* kind_opt = Store.PVM_kind.find ctxt address in
+  match kind_opt with
+  | Some k -> return k
+  | None -> fail (Sc_rollup_errors.Sc_rollup_does_not_exist address)
 
 let list ctxt = Store.PVM_kind.keys ctxt >|= Result.return
 

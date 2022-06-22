@@ -3150,7 +3150,7 @@ module Sc_rollup : sig
   val parameters_type :
     context -> t -> (Script.lazy_expr option * context) tzresult Lwt.t
 
-  val kind : context -> t -> Kind.t option tzresult Lwt.t
+  val kind : context -> t -> Kind.t tzresult Lwt.t
 
   module Errors : sig
     type error += Sc_rollup_does_not_exist of t

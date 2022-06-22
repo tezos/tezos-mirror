@@ -1904,7 +1904,7 @@ module Sc_rollup = struct
 
   let register_kind () =
     Registration.opt_register1 ~chunked:true S.kind @@ fun ctxt address () () ->
-    Alpha_context.Sc_rollup.kind ctxt address
+    Alpha_context.Sc_rollup.kind ctxt address >|=? Option.some
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2688 *)
   let register_initial_level () =
