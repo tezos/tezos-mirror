@@ -110,3 +110,9 @@ For example, when ``b`` is ``0x000c48656c6c6f20576f726c6421``, ``tag`` is ``0x00
 (so the byte length of ``length`` is 1), ``length`` is ``0x0c`` (so the
 byte length of ``content`` is 12) and ``content`` is
 ``0x48656c6c6f20576f726c6421``
+
+See also
+--------
+
+Another implementation of the encoder for the Merkle proofs, written in the Rust language,
+is available `here <https://gitlab.com/dailambda/merkle-proof-encoder/>`__.
