@@ -609,63 +609,6 @@ module Baking_forge = struct
       ("time", Alpha_context.Timestamp.encoding)
       ~pp2:Format.pp_print_int
       ("power", Data_encoding.int31)
-
-  let reading_per_block =
-    declare_1
-      ~section
-      ~name:"reading_per_block"
-      ~level:Notice
-      ~msg:"reading per block vote file path: {path}"
-      ("path", Data_encoding.string)
-
-  let per_block_vote_file_notice =
-    declare_1
-      ~section
-      ~name:"per_block_vote_file_notice"
-      ~level:Notice
-      ~msg:"per block vote file {event}"
-      ("event", Data_encoding.string)
-
-  let reading_liquidity_baking =
-    declare_0
-      ~section
-      ~name:"reading_liquidity_baking"
-      ~level:Notice
-      ~msg:"reading liquidity baking toggle vote"
-      ()
-
-  let liquidity_baking_toggle_vote =
-    declare_1
-      ~section
-      ~name:"liquidity_baking_toggle_vote"
-      ~level:Notice
-      ~msg:"liquidity baking toggle vote = {value}"
-      ("value", Data_encoding.bool)
-
-  let per_block_vote_file_fail =
-    declare_1
-      ~section
-      ~name:"per_block_vote_file_error"
-      ~level:Notice
-      ~msg:"Error reading the block vote file: {errors}"
-      ~pp1:pp_print_top_error_of_trace
-      ("errors", Error_monad.(TzTrace.encoding error_encoding))
-
-  let liquidity_baking_off =
-    declare_0
-      ~section
-      ~name:"liquidity_baking_off"
-      ~level:Notice
-      ~msg:"Will vote to stop Liquidity Baking"
-      ()
-
-  let liquidity_baking_on =
-    declare_0
-      ~section
-      ~name:"liquidity_baking_on"
-      ~level:Notice
-      ~msg:"Will vote to continue or restart Liquidity Baking"
-      ()
 end
 
 module Endorsement = struct
