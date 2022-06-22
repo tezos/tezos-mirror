@@ -25,24 +25,4 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_micheline)
- (wrapped false)
- (modules
-  Tezos_protocol_environment
-  Environment_V0
-  Environment_V1
-  Environment_V2
-  Environment_V3
-  Environment_V4
-  Environment_V5
-  Environment_V6
-  Environment_cache
-  Environment_context
-  Environment_context_intf
-  Environment_protocol_T
-  Environment_protocol_T_V0
-  Environment_protocol_T_V3
-  Environment_protocol_T_V6
-  Environment_protocol_T_test
-  Memory_context
-  Proxy_context
-  Proxy_delegate))
+ (wrapped false))
