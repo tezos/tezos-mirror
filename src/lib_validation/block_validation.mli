@@ -125,8 +125,13 @@ val default_operation_metadata_size_limit : int option
     1. [P.begin_application]
     2. [P.apply]
     3. [P.finalize_block]
+
+    If [simulate] is true, the context resulting from the application
+    is not committed to disk using `Context.commit`, only the commit
+    hash is computed, using `Context.hash`. Set to false by default.
 *)
 val apply :
+  ?simulate:bool ->
   ?cached_result:apply_result * Tezos_protocol_environment.Context.t ->
   apply_environment ->
   cache:Tezos_protocol_environment.Context.source_of_cache ->
