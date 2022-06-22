@@ -5131,6 +5131,7 @@ let () =
       [
         tezt_lib |> open_ |> open_ ~m:"Base";
         str;
+        bls12_381;
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         data_encoding;
         tezos_base;

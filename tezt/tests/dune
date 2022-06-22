@@ -6,6 +6,7 @@
  (libraries
   tezt
   str
+  bls12-381
   tezt-tezos
   data-encoding
   tezos-base
