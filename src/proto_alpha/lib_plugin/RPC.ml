@@ -836,13 +836,8 @@ module Scripts = struct
   let run_operation_service ctxt ()
       ({shell; protocol_data = Operation_data protocol_data}, chain_id) =
     (* this code is a duplicate of Apply without signature check *)
-    let ret contents =
-      (Operation_data protocol_data, Apply_results.Operation_metadata {contents})
-    in
     let operation : _ operation = {shell; protocol_data} in
-    let hash = Operation.hash {shell; protocol_data} in
-    let ctxt = Origination_nonce.init ctxt hash in
-    let payload_producer = Signature.Public_key_hash.zero in
+    let hash = Operation.hash operation in
     Validate_operation.TMP_for_plugin
     .precheck_manager__do_nothing_on_non_manager_op
       ctxt
@@ -850,48 +845,32 @@ module Scripts = struct
       protocol_data.contents
       Skip_signature_check
     >>=? fun op_validated_stamp ->
-    match protocol_data.contents with
+    (match protocol_data.contents with
     | Single (Preendorsement _)
     | Single (Endorsement _)
     | Single (Dal_slot_availability _) ->
-        fail Run_operation_does_not_support_consensus_operations
-    | Single (Manager_operation _) as op ->
-        Apply.apply_manager_operations
-          ctxt
-          ~payload_producer
-          chain_id
-          ~mempool_mode:true
-          op_validated_stamp
-          op
-        >|=? fun (_ctxt, result) -> ret result
-    | Cons (Manager_operation _, _) as op ->
-        Apply.apply_manager_operations
-          ctxt
-          ~payload_producer
-          chain_id
-          ~mempool_mode:true
-          op_validated_stamp
-          op
-        >|=? fun (_ctxt, result) -> ret result
-    | _ ->
-        let apply_mode =
-          (* To simulate the injection of an operation in the mempool,
-             we want a mode that behaves similarly to
-             {!Apply.Partial_construction}. However, we don't have
-             access to information such as the [predecessor_round]. So
-             we use a mode that doesn't need this information, and
-             consequently doesn't support consensus operations. *)
-          Apply.Mempool_no_consensus_op
-        in
-        Apply.apply_contents_list
-          ctxt
-          chain_id
-          apply_mode
-          ~payload_producer
-          op_validated_stamp
-          operation
-          operation.protocol_data.contents
-        >|=? fun (_ctxt, result) -> ret result
+        error Run_operation_does_not_support_consensus_operations
+    | _ -> ok ())
+    >>?= fun () ->
+    let apply_mode =
+      (* To simulate the injection of an operation in the mempool,
+         we want a mode that behaves similarly to
+         {!Apply.Partial_construction}. However, we don't have
+         access to information such as the [predecessor_round]. So
+         we use a mode that doesn't need this information, and
+         consequently doesn't support consensus operations. *)
+      Apply.Mempool_no_consensus_op
+    in
+    Apply.apply_operation
+      ctxt
+      chain_id
+      apply_mode
+      ~payload_producer:Signature.Public_key_hash.zero
+      op_validated_stamp
+      hash
+      operation
+    >|=? fun (_ctxt, op_metadata) ->
+    (Operation_data protocol_data, Apply_results.Operation_metadata op_metadata)
 
   (*
 
