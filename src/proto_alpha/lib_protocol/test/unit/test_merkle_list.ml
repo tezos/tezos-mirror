@@ -31,7 +31,6 @@
     Subject:    test the ad-hoc merkle tree structure implemented to encode lists
 *)
 
-open Protocol
 open Merkle_list_helper
 
 let assert_invalid_pos : 'a Environment.Error_monad.tzresult -> _ = function

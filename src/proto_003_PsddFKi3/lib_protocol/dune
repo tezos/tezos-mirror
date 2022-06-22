@@ -126,7 +126,7 @@
  (action
   (write-file
    %{targets}
-   "module Environment = Tezos_protocol_environment_003_PsddFKi3.Environment\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP\"\nlet name = Environment.Name.name\ninclude Tezos_raw_protocol_003_PsddFKi3\ninclude Tezos_raw_protocol_003_PsddFKi3.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PsddFKi32cMJ2qPjf43Qv5GDWLDPZb3T3bF6fLKiF5HtvHNU7aP\"\nlet name = Tezos_protocol_environment_003_PsddFKi3.Environment.Name.name\ninclude Tezos_raw_protocol_003_PsddFKi3\ninclude Tezos_raw_protocol_003_PsddFKi3.Main\n")))
 
 (rule
  (targets tezos_protocol_003_PsddFKi3.ml)

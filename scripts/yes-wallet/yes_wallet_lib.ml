@@ -198,7 +198,8 @@ let get_delegates (proto : protocol) context
   let fitness = header.fitness in
   match proto with
   | Florence ->
-      let open Tezos_protocol_009_PsFLoren.Protocol in
+      let open Tezos_protocol_009_PsFLoren in
+      let open Protocol in
       let* ctxt, _ =
         let*! r =
           Alpha_context.prepare
@@ -258,7 +259,8 @@ let get_delegates (proto : protocol) context
         (fun (_, _, x) (_, _, y) -> Alpha_context.Tez.compare y x)
         delegates
   | Granada ->
-      let open Tezos_protocol_010_PtGRANAD.Protocol in
+      let open Tezos_protocol_010_PtGRANAD in
+      let open Protocol in
       let* ctxt, _, _ =
         let*! r =
           Alpha_context.prepare
@@ -318,7 +320,8 @@ let get_delegates (proto : protocol) context
         (fun (_, _, x) (_, _, y) -> Alpha_context.Tez.compare y x)
         delegates
   | Hangzhou ->
-      let open Tezos_protocol_011_PtHangz2.Protocol in
+      let open Tezos_protocol_011_PtHangz2 in
+      let open Protocol in
       let* ctxt, _, _ =
         let*! r =
           Alpha_context.prepare
@@ -378,7 +381,8 @@ let get_delegates (proto : protocol) context
         (fun (_, _, x) (_, _, y) -> Alpha_context.Tez.compare y x)
         delegates
   | Ithaca ->
-      let open Tezos_protocol_012_Psithaca.Protocol in
+      let open Tezos_protocol_012_Psithaca in
+      let open Protocol in
       let* ctxt, _, _ =
         let*! r =
           Alpha_context.prepare context ~level ~predecessor_timestamp ~timestamp
@@ -434,7 +438,8 @@ let get_delegates (proto : protocol) context
         (fun (_, _, x) (_, _, y) -> Alpha_context.Tez.compare y x)
         delegates
   | Alpha ->
-      let open Tezos_protocol_alpha.Protocol in
+      let open Tezos_protocol_alpha in
+      let open Protocol in
       let* ctxt, _, _ =
         let*! r =
           Alpha_context.prepare context ~level ~predecessor_timestamp ~timestamp

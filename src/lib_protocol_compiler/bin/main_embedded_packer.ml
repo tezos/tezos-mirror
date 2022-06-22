@@ -60,7 +60,7 @@ let () =
     {|
 module Registered =
   Tezos_protocol_updater.Registered_protocol.Register_embedded_%s
-    (Tezos_protocol_%s.Protocol.Environment)
+    (Tezos_protocol_%s.Environment)
     (Tezos_protocol_%s.Protocol.Main)
     (Source)
 @.|}

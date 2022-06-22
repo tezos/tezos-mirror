@@ -56,7 +56,7 @@
  (action
   (write-file
    %{targets}
-   "module Environment = Tezos_protocol_environment_demo_noops.Environment\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp\"\nlet name = Environment.Name.name\ninclude Tezos_raw_protocol_demo_noops\ninclude Tezos_raw_protocol_demo_noops.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp\"\nlet name = Tezos_protocol_environment_demo_noops.Environment.Name.name\ninclude Tezos_raw_protocol_demo_noops\ninclude Tezos_raw_protocol_demo_noops.Main\n")))
 
 (rule
  (targets tezos_protocol_demo_noops.ml)

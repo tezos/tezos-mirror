@@ -50,7 +50,6 @@ let parse_tx_rollup_l2_address :
       error (Error.Tx_rollup_invalid_l2_address loc)
 
 let parse_ticketer : Script.node -> Contract.t tzresult =
-  let open Protocol in
   let open Micheline in
   function
   | Bytes (_loc, bytes) (* As unparsed with [Optimized]. *) ->

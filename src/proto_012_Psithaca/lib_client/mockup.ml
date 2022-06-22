@@ -856,7 +856,7 @@ type block = {
   hash : Block_hash.t;
   header : Block_header.t;
   operations : Operation.packed list;
-  context : Protocol.Environment.Context.t;
+  context : Environment.Context.t;
 }
 
 module Forge = struct
@@ -911,8 +911,8 @@ let initial_context chain_id (header : Block_header.shell_header)
     add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
     add ctxt ["protocol_parameters"] proto_params)
   >>= fun ctxt ->
-  Protocol.Environment.Updater.activate ctxt Protocol.hash >>= fun ctxt ->
-  Protocol.Main.init ctxt header >|= Protocol.Environment.wrap_tzresult
+  Environment.Updater.activate ctxt Protocol.hash >>= fun ctxt ->
+  Protocol.Main.init ctxt header >|= Environment.wrap_tzresult
   >>=? fun {context; _} ->
   let ({
          timestamp = predecessor_timestamp;
@@ -942,7 +942,7 @@ let initial_context chain_id (header : Block_header.shell_header)
     ~predecessor_fitness
     ~predecessor
     ~timestamp
-  >|= Protocol.Environment.wrap_tzresult
+  >|= Environment.wrap_tzresult
   >>=? fun value_of_key ->
   (*
       In the mockup mode, reactivity is important and there are
@@ -954,7 +954,7 @@ let initial_context chain_id (header : Block_header.shell_header)
     predecessor
     context
     `Lazy
-    (fun key -> value_of_key key >|= Protocol.Environment.wrap_tzresult)
+    (fun key -> value_of_key key >|= Environment.wrap_tzresult)
   >>=? fun context -> return context
 
 let mem_init :
@@ -1106,8 +1106,8 @@ let migrate :
   let Tezos_protocol_environment.{block_hash; context; block_header} =
     rpc_context
   in
-  Protocol.Environment.Updater.activate context Protocol.hash >>= fun context ->
-  Protocol.Main.init context block_header >|= Protocol.Environment.wrap_tzresult
+  Environment.Updater.activate context Protocol.hash >>= fun context ->
+  Protocol.Main.init context block_header >|= Environment.wrap_tzresult
   >>=? fun {context; _} ->
   let rpc_context =
     Tezos_protocol_environment.{block_hash; block_header; context}

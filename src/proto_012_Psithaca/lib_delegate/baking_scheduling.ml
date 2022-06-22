@@ -359,7 +359,7 @@ let compute_next_potential_baking_time_at_next_level state =
                  possibly means the baker has been late. *)
               (if Time.Protocol.(now < min_possible_time) then ok Round.zero
               else
-                Protocol.Environment.wrap_tzresult
+                Environment.wrap_tzresult
                 @@ Round.round_of_timestamp
                      round_durations
                      ~predecessor_timestamp
@@ -582,7 +582,7 @@ let create_round_durations constants =
   let delay_increment_per_round =
     constants.parametric.delay_increment_per_round
   in
-  Protocol.Environment.wrap_tzresult
+  Environment.wrap_tzresult
     (Round.Durations.create ~first_round_duration ~delay_increment_per_round)
 
 let create_initial_state cctxt ?(synchronize = true) ~chain config
@@ -683,8 +683,7 @@ let compute_bootstrap_event state =
   else
     (* Otherwise, trigger the end of round to check whether we
        need to propose at this level or not *)
-    Protocol.Environment.wrap_tzresult
-    @@ Round.pred state.round_state.current_round
+    Environment.wrap_tzresult @@ Round.pred state.round_state.current_round
     >>? fun ending_round ->
     ok @@ Baking_state.Timeout (End_of_round {ending_round})
 

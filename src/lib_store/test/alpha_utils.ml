@@ -24,7 +24,8 @@
 (*****************************************************************************)
 
 module Assert = Lib_test.Assert
-open Tezos_protocol_alpha.Protocol
+open Tezos_protocol_alpha
+open Protocol
 open Alpha_context
 open Tezos_context
 open Tezos_shell_context
@@ -162,7 +163,7 @@ let make_rpc_context ~chain_id ctxt block =
       ~timestamp
   in
   let*? value_of_key =
-    Tezos_protocol_alpha.Protocol.Environment.wrap_tzresult value_of_key
+    Tezos_protocol_alpha.Environment.wrap_tzresult value_of_key
   in
   let* ctxt =
     Tezos_protocol_environment.Context.load_cache
@@ -171,9 +172,7 @@ let make_rpc_context ~chain_id ctxt block =
       `Lazy
       (fun key ->
         let*! value = value_of_key key in
-        let*? value =
-          Tezos_protocol_alpha.Protocol.Environment.wrap_tzresult value
-        in
+        let*? value = Tezos_protocol_alpha.Environment.wrap_tzresult value in
         return value)
   in
   return

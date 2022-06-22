@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module Lifted_protocol = struct
-  include Protocol.Environment.Lift (Protocol)
+  include Environment.Lift (Protocol)
 
   let hash = Protocol.hash
 end
@@ -38,8 +38,7 @@ class type rpc_context =
     inherit RPC_context.generic
 
     inherit
-      [Shell_services.chain * Shell_services.block] Protocol.Environment
-                                                    .RPC_context
+      [Shell_services.chain * Shell_services.block] Environment.RPC_context
                                                     .simple
   end
 
@@ -76,8 +75,7 @@ class wrap_rpc_context (t : RPC_context.generic) : rpc_context =
     (** Abstracts variables <chain_id> and <block_id> in protocol RPCs
         prefixed by "/chains/<chain_id>/blocks/<block_id>/...". *)
     inherit
-      [Shell_services.chain, Shell_services.block] Protocol.Environment
-                                                   .proto_rpc_context
+      [Shell_services.chain, Shell_services.block] Environment.proto_rpc_context
         (t :> RPC_context.t)
         Shell_services.Blocks.path
   end
@@ -98,15 +96,13 @@ class type full =
         with the node. A client context is defined by mapping all
         RPCs protocol-generic to a specific protocol. *)
     inherit
-      [Shell_services.chain * Shell_services.block] Protocol.Environment
-                                                    .RPC_context
+      [Shell_services.chain * Shell_services.block] Environment.RPC_context
                                                     .simple
 
     (** Protocol RPCs exposed through the environment (using
         an additional chainpath). *)
     inherit
-      [Shell_services.chain, Shell_services.block] Protocol.Environment
-                                                   .proto_rpc_context
+      [Shell_services.chain, Shell_services.block] Environment.proto_rpc_context
   end
 
 (** From a [Client_context.full], the class allows to call RPCs from
@@ -116,8 +112,7 @@ class wrap_full (t : Client_context.full) : full =
     inherit Client_context.proxy_context t
 
     inherit
-      [Shell_services.chain, Shell_services.block] Protocol.Environment
-                                                   .proto_rpc_context
+      [Shell_services.chain, Shell_services.block] Environment.proto_rpc_context
         (t :> RPC_context.t)
         Shell_services.Blocks.path
   end

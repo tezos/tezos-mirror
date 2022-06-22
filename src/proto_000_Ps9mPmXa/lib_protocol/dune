@@ -58,7 +58,7 @@
  (action
   (write-file
    %{targets}
-   "module Environment = Tezos_protocol_environment_000_Ps9mPmXa.Environment\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P\"\nlet name = Environment.Name.name\ninclude Tezos_raw_protocol_000_Ps9mPmXa\ninclude Tezos_raw_protocol_000_Ps9mPmXa.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P\"\nlet name = Tezos_protocol_environment_000_Ps9mPmXa.Environment.Name.name\ninclude Tezos_raw_protocol_000_Ps9mPmXa\ninclude Tezos_raw_protocol_000_Ps9mPmXa.Main\n")))
 
 (rule
  (targets tezos_protocol_000_Ps9mPmXa.ml)

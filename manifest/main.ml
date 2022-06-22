@@ -3432,14 +3432,14 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
                       S "%{targets}";
                       S
                         (sf
-                           {|module Environment = Tezos_protocol_environment_%s.Environment
+                           {|
 let hash = Tezos_crypto.Protocol_hash.of_b58check_exn "%s"
-let name = Environment.Name.name
+let name = Tezos_protocol_environment_%s.Environment.Name.name
 include Tezos_raw_protocol_%s
 include Tezos_raw_protocol_%s.Main
 |}
-                           name_underscore
                            tezos_protocol.hash
+                           name_underscore
                            name_underscore
                            name_underscore);
                     ];

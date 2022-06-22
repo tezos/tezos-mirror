@@ -134,7 +134,7 @@
  (action
   (write-file
    %{targets}
-   "module Environment = Tezos_protocol_environment_008_PtEdoTez.Environment\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq\"\nlet name = Environment.Name.name\ninclude Tezos_raw_protocol_008_PtEdoTez\ninclude Tezos_raw_protocol_008_PtEdoTez.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq\"\nlet name = Tezos_protocol_environment_008_PtEdoTez.Environment.Name.name\ninclude Tezos_raw_protocol_008_PtEdoTez\ninclude Tezos_raw_protocol_008_PtEdoTez.Main\n")))
 
 (rule
  (targets tezos_protocol_008_PtEdoTez.ml)
