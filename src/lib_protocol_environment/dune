@@ -46,16 +46,3 @@
   Memory_context
   Proxy_context
   Proxy_delegate))
-
-(library
- (name tezos_shell_context)
- (public_name tezos-shell-context)
- (instrumentation (backend bisect_ppx))
- (libraries
-  tezos-base
-  tezos-protocol-environment
-  tezos-context)
- (flags
-  (:standard)
-  -open Tezos_base.TzPervasives)
- (modules Proxy_delegate_maker Shell_context))

@@ -1856,7 +1856,7 @@ protocols.|}
 let octez_shell_context =
   public_lib
     "tezos-shell-context"
-    ~path:"src/lib_protocol_environment"
+    ~path:"src/lib_protocol_environment/shell_context"
     ~synopsis:
       "Tezos: economic-protocols environment implementation for `tezos-node`"
     ~deps:
@@ -1865,7 +1865,6 @@ let octez_shell_context =
         octez_protocol_environment;
         octez_context;
       ]
-    ~modules:["Proxy_delegate_maker"; "Shell_context"]
 
 let _octez_protocol_environment_tests =
   tests
