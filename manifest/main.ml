@@ -1886,7 +1886,7 @@ let _octez_protocol_environment_tests =
 let octez_context_ops =
   public_lib
     "tezos-context-ops"
-    ~path:"src/lib_protocol_environment"
+    ~path:"src/lib_protocol_environment/context_ops"
     ~synopsis:"Tezos: backend-agnostic operations on contexts"
     ~deps:
       [
@@ -1896,7 +1896,6 @@ let octez_context_ops =
         octez_context |> open_;
         octez_shell_context |> open_;
       ]
-    ~modules:["Context_ops"]
 
 let _octez_protocol_shell_context_tests =
   tests

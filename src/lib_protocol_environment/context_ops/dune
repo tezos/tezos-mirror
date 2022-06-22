@@ -1,0 +1,19 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_context_ops)
+ (public_name tezos-context-ops)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-error-monad
+  tezos-protocol-environment
+  tezos-context
+  tezos-shell-context)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_error_monad
+  -open Tezos_context
+  -open Tezos_shell_context))
