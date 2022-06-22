@@ -797,16 +797,21 @@ module Make (Context : P) :
 
   let get_is_stuck = result_of ~default:None @@ is_stuck
 
-  let set_input_monadic input =
-    let open PS in
-    let {inbox_level; message_counter; payload} = input in
+  let set_input_monadic {PS.inbox_level; message_counter; payload} =
     let open Monad.Syntax in
-    let* boot_sector = Boot_sector.get in
-    let msg = boot_sector ^ payload in
-    let* () = CurrentLevel.set inbox_level in
-    let* () = MessageCounter.set (Some message_counter) in
-    let* () = NextMessage.set (Some msg) in
-    return ()
+    match Sc_rollup_inbox_message_repr.of_bytes payload with
+    | Ok (External payload) ->
+        let* boot_sector = Boot_sector.get in
+        let msg = boot_sector ^ payload in
+        let* () = CurrentLevel.set inbox_level in
+        let* () = MessageCounter.set (Some message_counter) in
+        let* () = NextMessage.set (Some msg) in
+        return ()
+    | Error _ | Ok (Internal _) ->
+        let* () = CurrentLevel.set inbox_level in
+        let* () = MessageCounter.set (Some message_counter) in
+        let* () = Status.set WaitingForInputMessage in
+        return ()
 
   let set_input input = state_of @@ set_input_monadic input
 

@@ -160,4 +160,19 @@ module Local = struct
       ~query:RPC_query.empty
       ~output:(Data_encoding.option commitment_with_hash_and_level_encoding)
       (prefix / "last_published_commitment")
+
+  type state_value_query = {key : string}
+
+  let state_value_query : state_value_query RPC_query.t =
+    let open RPC_query in
+    query (fun key -> {key})
+    |+ field "key" RPC_arg.string "" (fun t -> t.key)
+    |> seal
+
+  let current_state_value () =
+    RPC_service.get_service
+      ~description:"Current state value"
+      ~query:state_value_query
+      ~output:Data_encoding.bytes
+      RPC_path.(open_root / "state")
 end

@@ -102,5 +102,6 @@ module Internal_for_tests : sig
 
   (** [inbox_message_of_bytes bs] decodes an inbox message from the given bytes
       [bs]. *)
-  val inbox_message_of_bytes : string -> Sc_rollup.Inbox.Message.t tzresult
+  val inbox_message_of_bytes :
+    Sc_rollup.Inbox.Message.serialized -> Sc_rollup.Inbox.Message.t tzresult
 end

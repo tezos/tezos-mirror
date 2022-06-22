@@ -50,19 +50,24 @@
 open Sc_rollup_repr
 
 (** An input to a PVM is the [message_counter] element of an inbox at
-    a given [inbox_level] and contains a given [payload]. *)
+   a given [inbox_level] and contains a given [payload].
+
+   According the rollup management protocol, the payload must be
+   obtained through {!Sc_rollup_inbox_message_repr.to_bytes} which
+   follows a documented format. *)
 type input = {
   inbox_level : Raw_level_repr.t;
   message_counter : Z.t;
-  payload : string;
+  payload : Sc_rollup_inbox_message_repr.serialized;
 }
 
 let input_encoding =
   let open Data_encoding in
   conv
     (fun {inbox_level; message_counter; payload} ->
-      (inbox_level, message_counter, payload))
+      (inbox_level, message_counter, (payload :> string)))
     (fun (inbox_level, message_counter, payload) ->
+      let payload = Sc_rollup_inbox_message_repr.unsafe_of_string payload in
       {inbox_level; message_counter; payload})
     (obj3
        (req "inbox_level" Raw_level_repr.encoding)
@@ -74,7 +79,7 @@ let input_equal (a : input) (b : input) : bool =
   (* To be robust to the addition of fields in [input] *)
   Raw_level_repr.equal inbox_level b.inbox_level
   && Z.equal message_counter b.message_counter
-  && String.equal payload b.payload
+  && String.equal (payload :> string) (b.payload :> string)
 
 (** The PVM's current input expectations. [No_input_required] is if the
     machine is busy and has no need for new input. [Initial] will be if

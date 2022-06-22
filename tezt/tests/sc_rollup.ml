@@ -981,12 +981,30 @@ let test_rollup_node_advances_pvm_state =
         Sc_rollup_client.state_hash ~hooks sc_rollup_client
       in
       let* prev_ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
-
-      let x = Int.to_string i in
-      let y = Int.to_string ((i + 2) * 2) in
-      let* () = send_text_messages client sc_rollup_address [x; y; "+"] in
+      let* () =
+        send_message
+          client
+          sc_rollup_address
+          (Printf.sprintf "[\"%d %d + value\"]" i ((i + 2) * 2))
+      in
       let* _ = Sc_rollup_node.wait_for_level sc_rollup_node (level + i) in
-
+      let* encoded_value =
+        Sc_rollup_client.state_value ~hooks sc_rollup_client ~key:"vars/value"
+      in
+      let value =
+        match Data_encoding.(Binary.of_bytes int31) @@ encoded_value with
+        | Error error ->
+            failwith
+              (Format.asprintf
+                 "The arithmetic PVM has an unexpected state: %a"
+                 Data_encoding.Binary.pp_read_error
+                 error)
+        | Ok x -> x
+      in
+      Check.(
+        (value = i + ((i + 2) * 2))
+          int
+          ~error_msg:"Invalid value in rollup state (%L <> %R)") ;
       let* state_hash = Sc_rollup_client.state_hash ~hooks sc_rollup_client in
       Check.(state_hash <> prev_state_hash)
         Check.string

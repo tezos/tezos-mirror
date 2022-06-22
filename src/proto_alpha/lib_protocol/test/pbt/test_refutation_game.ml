@@ -412,6 +412,11 @@ end) : TestPVM = struct
   let init_context = Tezos_context_memory.make_empty_context ()
 
   module Utils = struct
+    let make_external_inbox_message str =
+      WithExceptions.Result.get_ok
+        ~loc:__LOC__
+        Inbox.Message.(External str |> to_bytes)
+
     let default_state =
       let promise =
         let* boot = initial_state init_context "" >>= eval in
@@ -419,7 +424,7 @@ end) : TestPVM = struct
           {
             inbox_level = Raw_level.root;
             message_counter = Z.zero;
-            payload = P.inputs;
+            payload = make_external_inbox_message P.inputs;
           }
         in
         let prelim = set_input input boot in
@@ -434,7 +439,7 @@ end) : TestPVM = struct
         {
           inbox_level = Raw_level.root;
           message_counter = Z.zero;
-          payload = String.concat " " program;
+          payload = make_external_inbox_message @@ String.concat " " program;
         }
       in
       let prelim = set_input input state in

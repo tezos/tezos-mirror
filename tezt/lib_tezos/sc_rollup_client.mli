@@ -62,6 +62,10 @@ val ticks : ?hooks:Process.hooks -> t -> int Lwt.t
 (** [state_hash client] gets the corresponding PVM state hash for the current head block. *)
 val state_hash : ?hooks:Process.hooks -> t -> string Lwt.t
 
+(** [state_value client key] gets the corresponding PVM state value
+   mapped to [key] for the current head block. *)
+val state_value : ?hooks:Process.hooks -> t -> key:string -> bytes Lwt.t
+
 (** [status client] gets the corresponding PVM status for the current head block. *)
 val status : ?hooks:Process.hooks -> t -> string Lwt.t
 

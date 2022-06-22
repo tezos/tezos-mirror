@@ -163,6 +163,21 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         let*! hash = PVM.state_hash state in
         return hash)
 
+  let register_current_state_value store dir =
+    RPC_directory.register0
+      dir
+      (Sc_rollup_services.Local.current_state_value ())
+      (fun {key} () ->
+        let open Lwt_result_syntax in
+        let* state = get_state_exn store in
+        let path = String.split_on_char '/' key in
+        let*! value = Store.IStoreTree.find state path in
+        match value with
+        | None -> failwith "No such key in PVM state"
+        | Some value ->
+            Format.eprintf "Encoded %S\n@.%!" (Bytes.to_string value) ;
+            return value)
+
   let register_last_stored_commitment store dir =
     RPC_directory.register0
       dir
@@ -225,6 +240,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     |> register_current_total_ticks store
     |> register_current_num_messages store
     |> register_current_state_hash store
+    |> register_current_state_value store
     |> register_current_status store
     |> register_last_stored_commitment store
     |> register_last_published_commitment store

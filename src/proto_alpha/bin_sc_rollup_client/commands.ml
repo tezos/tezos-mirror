@@ -36,6 +36,17 @@ let get_sc_rollup_addresses_command () =
       RPC.get_sc_rollup_addresses_command cctxt >>=? fun addr ->
       cctxt#message "@[%a@]" Sc_rollup.Address.pp addr >>= fun () -> return_unit)
 
+let get_state_value_command () =
+  command
+    ~desc:"Observe a key in the PVM state."
+    no_options
+    (prefixes ["get"; "state"; "value"; "for"]
+    @@ string ~name:"key" ~desc:"The key of the state value"
+    @@ stop)
+    (fun () key (cctxt : #Configuration.sc_client_context) ->
+      RPC.get_state_value_command cctxt key >>=? fun bytes ->
+      cctxt#message "@[%S@]" (String.of_bytes bytes) >>= fun () -> return_unit)
+
 (** [display_answer cctxt answer] prints an RPC answer. *)
 let display_answer (cctxt : #Configuration.sc_client_context) :
     RPC_context.generic_call_result -> unit Lwt.t = function
@@ -143,6 +154,7 @@ end
 let all () =
   [
     get_sc_rollup_addresses_command ();
+    get_state_value_command ();
     rpc_get_command;
     Keys.generate_keys ();
     Keys.list_keys ();

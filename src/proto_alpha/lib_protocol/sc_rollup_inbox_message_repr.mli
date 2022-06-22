@@ -61,14 +61,12 @@ type internal_inbox_message = {
     an external manager operation. *)
 type t = Internal of internal_inbox_message | External of string
 
-(** A typed version of a message serialized in binary format. *)
 type serialized = private string
+
+val unsafe_of_string : string -> serialized
 
 (** [to_bytes msg] encodes the inbox message [msg] in binary format. *)
 val to_bytes : t -> serialized tzresult
 
-(** Module containing functions exposed so they can be used in test. *)
-module Internal_for_tests : sig
-  (** [of_bytes bs] decodes [bs] as an [inbox_message]. *)
-  val of_bytes : string -> t tzresult
-end
+(** [of_bytes bs] decodes [bs] as an [inbox_message]. *)
+val of_bytes : serialized -> t tzresult
