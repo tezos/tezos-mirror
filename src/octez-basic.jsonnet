@@ -71,7 +71,7 @@ dashboard.new(
     node.invalidBlocksHistory { gridPos: { h: 9, w: 10, x: 14, y: 1 } },
     node.roundHistory { gridPos: { h: 9, w: 10, x: 14, y: 10 } },
     node.writtenBlockSize { gridPos: { h: 10, w: 10, x: 14, y: 19 } },
-    node.storeMergeTime { gridPos: { h: 9, w: 10, x: 14, y: 29 } },
+    node.storeMergeTimeGraph { gridPos: { h: 9, w: 10, x: 14, y: 29 } },
 
     //#######
     row.new(
