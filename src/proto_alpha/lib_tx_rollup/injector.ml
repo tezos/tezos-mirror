@@ -44,6 +44,10 @@ module Parameters = struct
 
     let compare = Stdlib.compare
 
+    let equal = Stdlib.( = )
+
+    let hash = Hashtbl.hash
+
     let string_of_tag : t -> string = function
       | Submit_batch -> "submit_batch"
       | Commitment -> "commitment"
@@ -165,6 +169,16 @@ module Parameters = struct
               Tx_rollup_commitment_hash.(
                 l2_block.L2block.header.commitment = commit_hash))
     | _ -> return_true
+
+  let operation_tag (type kind) (operation : kind manager_operation) =
+    match operation with
+    | Tx_rollup_rejection _ -> Some Rejection
+    | Tx_rollup_commit _ -> Some Commitment
+    | Tx_rollup_submit_batch _ -> Some Submit_batch
+    | Tx_rollup_finalize_commitment _ -> Some Finalize_commitment
+    | Tx_rollup_remove_commitment _ -> Some Remove_commitment
+    | Tx_rollup_dispatch_tickets _ -> Some Dispatch_withdrawals
+    | _ -> None
 end
 
 include Injector_functor.Make (Parameters)

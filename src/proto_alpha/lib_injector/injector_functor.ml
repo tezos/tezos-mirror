@@ -59,6 +59,7 @@ let injector_context (cctxt : #Protocol_client_context.full) =
 
 module Make (Rollup : PARAMETERS) = struct
   module Tags = Injector_tags.Make (Rollup.Tag)
+  module Tags_table = Hashtbl.Make (Rollup.Tag)
 
   module Op_queue =
     Disk_persistence.Make_queue
@@ -831,6 +832,10 @@ module Make (Rollup : PARAMETERS) = struct
   (* The queue for the requests to the injector worker is infinite. *)
   type worker = Worker.infinite Worker.queue Worker.t
 
+  let table = Worker.create_table Queue
+
+  let tags_table = Tags_table.create 7
+
   module Handlers = struct
     type self = worker
 
@@ -881,10 +886,11 @@ module Make (Rollup : PARAMETERS) = struct
 
     let on_no_request _ = Lwt.return_unit
 
-    let on_close _w = Lwt.return_unit
+    let on_close w =
+      let state = Worker.state w in
+      Tags.iter (Tags_table.remove tags_table) state.tags ;
+      Lwt.return_unit
   end
-
-  let table = Worker.create_table Queue
 
   (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2754
      Injector worker in a separate process *)
@@ -940,10 +946,27 @@ module Make (Rollup : PARAMETERS) = struct
         error (No_worker_for_source signer_pkh)
     | Some worker -> ok worker
 
-  let add_pending_operation ~source op =
+  let worker_of_tag tag =
+    match Tags_table.find_opt tags_table tag with
+    | None ->
+        Format.kasprintf
+          (fun s -> error (No_worker_for_tag s))
+          "%a"
+          Rollup.Tag.pp
+          tag
+    | Some worker -> ok worker
+
+  let add_pending_operation ?source op =
     let open Lwt_result_syntax in
-    let*? w = worker_of_signer source in
     let l1_operation = L1_operation.make op in
+    let*? w =
+      match source with
+      | Some source -> worker_of_signer source
+      | None -> (
+          match Rollup.operation_tag op with
+          | None -> error (No_worker_for_operation l1_operation)
+          | Some tag -> worker_of_tag tag)
+    in
     let*! (_pushed : bool) =
       Worker.Queue.push_request w (Request.Add_pending l1_operation)
     in

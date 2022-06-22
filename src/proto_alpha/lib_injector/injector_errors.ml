@@ -41,3 +41,33 @@ let () =
     Data_encoding.(obj1 (req "source" Signature.Public_key_hash.encoding))
     (function No_worker_for_source s -> Some s | _ -> None)
     (fun s -> No_worker_for_source s)
+
+type error += No_worker_for_tag of string
+
+let () =
+  register_error_kind
+    ~id:"rollups.injector.no_worker_for_tag"
+    ~title:"No injecting queue for tag"
+    ~description:
+      "An L1 operation could not be queued because its tag has no worker."
+    ~pp:(fun ppf t -> Format.fprintf ppf "No worker for tag %s" t)
+    `Permanent
+    Data_encoding.(obj1 (req "tag" Data_encoding.string))
+    (function No_worker_for_tag t -> Some t | _ -> None)
+    (fun t -> No_worker_for_tag t)
+
+type error += No_worker_for_operation of L1_operation.t
+
+let () =
+  register_error_kind
+    ~id:"rollups.injector.no_worker_for_operation"
+    ~title:"This operation is not supported by injector"
+    ~description:
+      "An L1 operation could not be queued because the injector does not \
+       handle it."
+    ~pp:(fun ppf op ->
+      Format.fprintf ppf "No worker for operation %a" L1_operation.pp op)
+    `Permanent
+    Data_encoding.(obj1 (req "operation" L1_operation.encoding))
+    (function No_worker_for_operation op -> Some op | _ -> None)
+    (fun op -> No_worker_for_operation op)
