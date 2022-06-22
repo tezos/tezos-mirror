@@ -971,7 +971,7 @@ let parse_packable_ty ctxt ~stack_depth ~legacy node =
     ~legacy
     ~allow_lazy_storage:false
     ~allow_operation:false
-    ~allow_contract:legacy
+    ~allow_contract:false
       (* type contract is forbidden in UNPACK because of
          https://gitlab.com/tezos/tezos/-/issues/301 *)
     ~allow_ticket:false
