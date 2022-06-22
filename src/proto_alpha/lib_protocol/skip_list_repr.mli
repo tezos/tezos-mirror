@@ -51,6 +51,13 @@ module type S = sig
      pointers of type ['ptr]. *)
   type ('content, 'ptr) cell
 
+  val pp :
+    pp_content:(Format.formatter -> 'content -> unit) ->
+    pp_ptr:(Format.formatter -> 'ptr -> unit) ->
+    Format.formatter ->
+    ('content, 'ptr) cell ->
+    unit
+
   val equal :
     ('content -> 'content -> bool) ->
     ('ptr -> 'ptr -> bool) ->
@@ -82,7 +89,7 @@ module type S = sig
   val genesis : 'content -> ('content, 'ptr) cell
 
   (** [next ~prev_cell ~prev_cell_ptr content] creates a new cell
-     that carries some [content], that follows [prev_cell]. *)
+      that carries some [content], that follows [prev_cell]. *)
   val next :
     prev_cell:('content, 'ptr) cell ->
     prev_cell_ptr:'ptr ->
