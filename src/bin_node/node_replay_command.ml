@@ -263,6 +263,7 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                 in
                 let* result =
                   Block_validator_process.apply_block
+                    ~simulate:true
                     validator_process
                     main_chain_store
                     ~predecessor
