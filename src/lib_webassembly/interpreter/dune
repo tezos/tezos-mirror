@@ -6,8 +6,7 @@
  (public_name tezos-webassembly-interpreter)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-lwt-result-stdlib
-  lwt.unix)
+  tezos-lwt-result-stdlib)
  (modules (:standard \ main)))
 
 (include dune.inc)
@@ -16,7 +15,8 @@
  (name main)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-webassembly-interpreter)
+  tezos-webassembly-interpreter
+  lwt.unix)
  (flags
   (:standard)
   -open Tezos_webassembly_interpreter)

@@ -583,7 +583,7 @@ let tezos_webassembly_interpreter =
     ~synopsis:"WebAssembly reference interpreter with tweaks for Tezos"
     ~all_modules_except:["main"]
     ~dune:Dune.[[S "include"; S "dune.inc"]]
-    ~deps:[tezos_lwt_result_stdlib; lwt_unix]
+    ~deps:[tezos_lwt_result_stdlib]
 
 let _tezos_webassembly_repl =
   private_exe
@@ -591,7 +591,7 @@ let _tezos_webassembly_repl =
     ~path:"src/lib_webassembly/interpreter"
     ~modules:["main"]
     ~opam:""
-    ~deps:[tezos_webassembly_interpreter |> open_]
+    ~deps:[tezos_webassembly_interpreter |> open_; lwt_unix]
 
 let _tezos_webassembly_test =
   test
