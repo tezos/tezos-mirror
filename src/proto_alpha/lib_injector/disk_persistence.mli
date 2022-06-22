@@ -70,6 +70,9 @@ module Make_table (H : H) : sig
   (** Same as {!H.find} *)
   val find : t -> key -> value option
 
+  (** Same as {!H.mem} *)
+  val mem : t -> key -> bool
+
   (** Same as {!H.iter_s} *)
   val iter_s : (key -> value -> unit Lwt.t) -> t -> unit Lwt.t
 
@@ -85,8 +88,13 @@ module Make_table (H : H) : sig
 
   (** [load_from_disk ~initial_size ~data_dir] creates a hash table of size
       [initial_size]. The hash table is populated by persistent elements present
-      in [data_dir/H.name] (the directory is created if it does not exist). *)
-  val load_from_disk : initial_size:int -> data_dir:string -> t tzresult Lwt.t
+      in [data_dir/H.name] which pass the [filter] (the directory is created if
+      it does not exist). *)
+  val load_from_disk :
+    initial_size:int ->
+    data_dir:string ->
+    filter:(value -> bool) ->
+    t tzresult Lwt.t
 end
 
 (** Create an on-disk persistent version of the {!Hash_queue} data structure. *)
@@ -119,8 +127,10 @@ end) : sig
   (** [length q] is the number of bindings held by [q]. *)
   val length : t -> int
 
-  (** [load_from_disk ~capacity ~data_dir] creates a bounded hash queue of
-      capacity [capacity]. The queue is populated by persistent elements present
-      in [data_dir/N.name] (the directory is created if it does not exist). *)
-  val load_from_disk : capacity:int -> data_dir:string -> t tzresult Lwt.t
+  (** [load_from_disk ~capacity ~data_dir ~filter] creates a bounded hash queue
+      of capacity [capacity]. The queue is populated by persistent elements
+      present in [data_dir/N.name] which pass the [filter] (the directory is
+      created if it does not exist). *)
+  val load_from_disk :
+    capacity:int -> data_dir:string -> filter:(V.t -> bool) -> t tzresult Lwt.t
 end

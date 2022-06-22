@@ -217,14 +217,20 @@ module Make (Rollup : PARAMETERS) = struct
   let init_injector cctxt ~data_dir rollup_node_state ~signer strategy tags =
     let open Lwt_result_syntax in
     let* signer = get_signer cctxt signer in
-    let data_dir0 = Filename.concat data_dir "injector" in
-    let data_dir =
-      Filename.concat data_dir0
-      @@ Signature.Public_key_hash.to_b58check signer.pkh
-    in
-    let*! () = Lwt_utils_unix.create_dir data_dir0 in
+    let data_dir = Filename.concat data_dir "injector" in
     let*! () = Lwt_utils_unix.create_dir data_dir in
-    let* queue = Op_queue.load_from_disk ~capacity:50_000 ~data_dir in
+    let filter op_proj op =
+      let {L1_operation.manager_operation = Manager op; _} = op_proj op in
+      match Rollup.operation_tag op with
+      | None -> false
+      | Some t -> Tags.mem t tags
+    in
+    let* queue =
+      Op_queue.load_from_disk
+        ~capacity:50_000
+        ~data_dir
+        ~filter:(filter (fun op -> op))
+    in
     let*! () =
       Event.(emit loaded_from_disk)
         (signer.pkh, tags, Op_queue.length queue, "operations_queue")
@@ -235,7 +241,10 @@ module Make (Rollup : PARAMETERS) = struct
       Tags.fold (fun t acc -> acc + Rollup.table_estimated_size t) tags 0
     in
     let* injected_operations =
-      Injected_operations.load_from_disk ~initial_size:n ~data_dir
+      Injected_operations.load_from_disk
+        ~initial_size:n
+        ~data_dir
+        ~filter:(filter (fun (i : injected_info) -> i.op))
     in
     let*! () =
       Event.(emit loaded_from_disk)
@@ -244,17 +253,11 @@ module Make (Rollup : PARAMETERS) = struct
           Injected_operations.length injected_operations,
           "injected_operations" )
     in
-    let* injected_ophs =
-      Injected_ophs.load_from_disk ~initial_size:n ~data_dir
-    in
-    let*! () =
-      Event.(emit loaded_from_disk)
-        (signer.pkh, tags, Injected_ophs.length injected_ophs, "injected_ophs")
-    in
     let* included_operations =
       Included_operations.load_from_disk
         ~initial_size:(confirmations * n)
         ~data_dir
+        ~filter:(filter (fun (i : included_info) -> i.op))
     in
     let*! () =
       Event.(emit loaded_from_disk)
@@ -263,10 +266,22 @@ module Make (Rollup : PARAMETERS) = struct
           Included_operations.length included_operations,
           "included_operations" )
     in
+    let* injected_ophs =
+      Injected_ophs.load_from_disk
+        ~initial_size:n
+        ~data_dir
+        ~filter:(List.exists (Injected_operations.mem injected_operations))
+    in
+    let*! () =
+      Event.(emit loaded_from_disk)
+        (signer.pkh, tags, Injected_ophs.length injected_ophs, "injected_ophs")
+    in
     let* included_in_blocks =
       Included_in_blocks.load_from_disk
         ~initial_size:(confirmations * n)
         ~data_dir
+        ~filter:(fun (_, ops) ->
+          List.exists (Included_operations.mem included_operations) ops)
     in
     let*! () =
       Event.(emit loaded_from_disk)

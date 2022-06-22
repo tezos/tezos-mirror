@@ -209,6 +209,8 @@ module Make_table (H : H) = struct
 
   let find t k = H.find t.table k
 
+  let mem t k = H.mem t.table k
+
   let iter_s f t = H.iter_s f t.table
 
   let iter_es f t = H.iter_es f t.table
@@ -221,7 +223,7 @@ module Make_table (H : H) = struct
       (fun (k, v) -> write_value (filedata t k) H.value_encoding v)
       seq
 
-  let load_from_disk ~initial_size ~data_dir =
+  let load_from_disk ~initial_size ~data_dir ~filter =
     let open Lwt_result_syntax in
     let* t = create ~data_dir initial_size in
     let*! d = Lwt_unix.opendir t.path in
@@ -242,7 +244,7 @@ module Make_table (H : H) = struct
             | None -> return_unit
             | Some k ->
                 let+ v = read_value (filedata t k) H.value_encoding in
-                H.add t.table k v
+                if filter v then H.add t.table k v
           in
           browse ()
     in
@@ -312,7 +314,7 @@ struct
 
   let length q = Q.length q.queue
 
-  let load_from_disk ~capacity ~data_dir =
+  let load_from_disk ~capacity ~data_dir ~filter =
     let open Lwt_result_syntax in
     let* q = create ~data_dir capacity in
     let*! d = Lwt_unix.opendir q.path in
@@ -334,7 +336,7 @@ struct
             | Some k ->
                 let* v = read_value (filedata q k) V.encoding
                 and* meta = read_value (filemetadata q k) metadata_encoding in
-                return ((k, v, meta) :: acc)
+                return (if filter v then (k, v, meta) :: acc else acc)
           in
           browse acc
     in
