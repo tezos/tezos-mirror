@@ -1,3 +1,5 @@
+module TzStdLib = Tezos_lwt_result_stdlib.Lwtreslib.Bare
+
 type sexpr = Atom of string | Node of string * sexpr list
 
 type rope = Leaf of string | Concat of rope list
@@ -6,7 +8,7 @@ let (+^) r s = Concat [r; Leaf s]
 
 let rec iter f = function
   | Leaf s -> f s
-  | Concat rs -> List.iter (iter f) rs
+  | Concat rs -> TzStdLib.List.iter_s (iter f) rs
 
 let rec concat = function
   | Leaf s -> s
@@ -23,10 +25,11 @@ let rec pp off width = function
     in len, "(" ^+ s ^+ Concat (List.map (fun r -> sep ^+ r) rs) +^ fin +^ ")"
 
 let output oc width x =
-  iter (output_string oc) (snd (pp 0 width x));
-  output_string oc "\n";
-  flush oc
+  let open Lwt.Syntax in
+  let* () = iter (Lwt_io.write oc) (snd (pp 0 width x)) in
+  let* () = Lwt_io.write oc "\n" in
+  Lwt_io.flush oc
 
-let print = output stdout
+let print = output Lwt_io.stdout
 
 let to_string width x = concat (snd (pp 0 width x)) ^ "\n"
