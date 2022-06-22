@@ -80,7 +80,7 @@ module Sc_rollup = struct
   include Sc_rollups
 
   module Outbox = struct
-    include Sc_rollup_storage.Outbox
+    include Sc_rollup_outbox_storage
     module Message = Sc_rollup_outbox_message_repr
   end
 
