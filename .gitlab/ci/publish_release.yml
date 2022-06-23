@@ -31,7 +31,7 @@ opam:release:
     - gitlab:release
   script:
     # create opam release and push to github
-    - ./scripts/opam-release.sh 
+    - ./scripts/ci/opam-release.sh 
 
 # Note: here we rely on $IMAGE_ARCH_PREFIX to be empty.
 # Otherwise, $DOCKER_IMAGE_TAG would contain $IMAGE_ARCH_PREFIX too.
@@ -58,7 +58,3 @@ docker:promote_to_latest:
     # Environment variables from before_script
     - . ./scripts/ci/docker.env
     - ./scripts/ci/docker_promote_to_latest.sh
-
-opam:release:
-  extends:
-    - .rules_template__latest_release
