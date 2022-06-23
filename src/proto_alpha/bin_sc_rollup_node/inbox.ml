@@ -70,14 +70,13 @@ module State = struct
   let set_message_tree = Store.MessageTrees.set
 end
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3199
-   For the moment, the rollup node ignores L1 to L2 messages.
-*)
 let get_messages Node_context.{l1_ctxt; rollup_address; _} head =
   let open Lwt_result_syntax in
   let* block = Layer1.fetch_tezos_block l1_ctxt head in
   let apply (type kind) accu ~source:_ (operation : kind manager_operation)
       _result =
+    let open Result_syntax in
+    let+ accu = accu in
     match operation with
     | Sc_rollup_add_messages {rollup; messages}
       when Sc_rollup.Address.(rollup = rollup_address) ->
@@ -89,16 +88,31 @@ let get_messages Node_context.{l1_ctxt; rollup_address; _} head =
         List.rev_append messages accu
     | _ -> accu
   in
-  let apply_internal (type kind) accu ~source:_
-      (_operation : kind Apply_internal_results.internal_operation_contents)
-      (_result :
+  let apply_internal (type kind) accu ~source
+      (operation : kind Apply_internal_results.internal_operation)
+      (result :
         kind Apply_internal_results.successful_internal_operation_result) =
-    accu
+    let open Result_syntax in
+    let* accu = accu in
+    match (operation, result) with
+    | ( {
+          operation = Transaction {destination = Sc_rollup rollup; parameters; _};
+          source = Originated sender;
+          _;
+        },
+        ITransaction_result (Transaction_to_sc_rollup_result _) )
+      when Sc_rollup.Address.(rollup = rollup_address) ->
+        let+ payload =
+          Environment.wrap_tzresult @@ Script_repr.force_decode parameters
+        in
+        let message = Store.Inbox.Message.{payload; sender; source} in
+        Store.Inbox.Message.Internal message :: accu
+    | _ -> return accu
   in
-  let messages =
+  let*? messages =
     Layer1_services.(
       process_applied_manager_operations
-        []
+        (Ok [])
         block.operations
         {apply; apply_internal})
   in
