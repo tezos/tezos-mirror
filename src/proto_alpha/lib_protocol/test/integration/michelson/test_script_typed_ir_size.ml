@@ -659,49 +659,45 @@ let check_ty_size () =
   in
   List.iter_es (fun _ -> check ()) (1 -- nsample)
 
-let check_size ~name ~tolerance ~expected ~actual item =
+let check_size ?(tolerance = 0) ~name ~expected item =
   let open Lwt_result_syntax in
-  let exp = expected item in
-  let act = actual item in
-  let overapprox = 1_000_000 * (exp - act) / act in
+  let _, e = expected item in
+  let exp = Saturation_repr.to_int e in
+  let actual = 8 * Obj.(reachable_words @@ repr item) in
+  let overapprox = 1_000_000 * (exp - actual) / actual in
   let msg verb =
     Printf.sprintf
       "For %s model predicts the size of %d bytes; while actual measured size \
        is %d bytes. The model %s %d.%04d%%"
-      (name item)
+      name
       exp
-      act
+      actual
       verb
       (abs @@ (overapprox / 10_000))
       (abs @@ (overapprox mod 10_000))
   in
-  let* () = fail_when (overapprox < 0) (err @@ msg "underapproximates by") in
-  (* We expected the model to never underapproximate. *)
+  let* () = fail_when (overapprox < 0) (err @@ msg "under-approximates by") in
+  (* We expected the model to never under-approximate. *)
   fail_when
-    (overapprox > tolerance item * 10_000)
-    (err @@ msg "overapproximates by too much:")
-(* We expect the overapproximation to be bounded by tollerance. *)
+    (overapprox > tolerance * 10_000)
+    (err @@ msg "over-approximates by too much:")
+(* We expect the over-approximation to be bounded by [tolerance]. *)
 
 (* Test that the model accurately predicts instruction sizes. It tests each
    type of instruction separately as much as possible. Tested values are
    specifically tailored so that they can't be shared (in particular all
-   reused values are wrapped in functions to force recomputation). Thanks
+   reused values are wrapped in functions to discourage sharing). Thanks
    to this the model gives precise predictions for each instruction. In real
    life the model will over-approximate due to sharing. It should never under-
    approximate though. *)
 let check_kinstr_size () =
   let open Lwt_result_syntax in
-  let check =
+  let check (Kinstr (name, instr, tolerance)) =
     check_size
-      ~name:(fun (Kinstr (name, _, _)) -> name)
-      ~tolerance:(fun (Kinstr (_, _, tolerance)) -> tolerance)
-      ~expected:(fun (Kinstr (_, instr, _)) ->
-        let _, expected =
-          Script_typed_ir_size.Internal_for_tests.kinstr_size instr
-        in
-        Saturation_repr.to_int expected)
-      ~actual:(fun (Kinstr (_, instr, _)) ->
-        8 * Obj.(reachable_words @@ repr instr))
+      ~name
+      ~tolerance
+      ~expected:Script_typed_ir_size.Internal_for_tests.kinstr_size
+      instr
   in
   (* Location is an immediate value, so we don't care if it's shared. *)
   let loc = Micheline.dummy_location in
@@ -715,8 +711,8 @@ let check_kinstr_size () =
   let entrypoint name =
     Entrypoint.of_string_strict_exn @@ String.uppercase_ascii name
   in
-  (* Constants below are wrapped in functions to force recomputation and make sharing
-     impossible. *)
+  (* Constants below are wrapped in functions to force recomputation and
+     discourage sharing. *)
   let halt () = IHalt loc in
   let drop () = IDrop (loc, halt ()) in
   let cdr = ICdr (loc, halt ()) in
@@ -735,7 +731,7 @@ let check_kinstr_size () =
         },
         Micheline.Seq (loc, []) )
   in
-  (* Following constants are used at most once. *)
+  (* Following constants are used but once. *)
   let* str_list_t =
     Lwt.return @@ Environment.wrap_tzresult @@ list_t loc String_t
   in
@@ -752,12 +748,8 @@ let check_kinstr_size () =
   (* Check size of the lambda alone. *)
   let* () =
     check_size
-      ~tolerance:(fun _ -> 0)
-      ~name:(fun _ -> "id lambda")
-      ~expected:(fun lam ->
-        let _, expected = Script_typed_ir_size.lambda_size lam in
-        Saturation_repr.to_int expected)
-      ~actual:(fun lam -> 8 * Obj.(reachable_words @@ repr lam))
+      ~name:"id lambda"
+      ~expected:Script_typed_ir_size.lambda_size
       (id_lambda ())
   in
   (* Testing individual instructions. *)
@@ -1006,10 +998,42 @@ let check_kinstr_size () =
       Kinstr ("IHalt ()", halt (), 0);
     ]
 
+let check_witness_sizes () =
+  let loc = Micheline.dummy_location in
+  let stack_prefix_preservation =
+    KPrefix
+      ( loc,
+        Unit_t,
+        KPrefix
+          ( loc,
+            Unit_t,
+            KPrefix
+              ( loc,
+                Unit_t,
+                KPrefix
+                  ( loc,
+                    Unit_t,
+                    KPrefix
+                      ( loc,
+                        Unit_t,
+                        KPrefix
+                          ( loc,
+                            Unit_t,
+                            KPrefix (loc, Unit_t, KPrefix (loc, Unit_t, KRest))
+                          ) ) ) ) ) )
+  in
+  check_size
+    ~name:"stack_prefix_preservation_witness"
+    ~expected:
+      Script_typed_ir_size.Internal_for_tests
+      .stack_prefix_preservation_witness_size
+    stack_prefix_preservation
+
 let tests =
   let open Tztest in
   [
     tztest "check value size" `Quick check_value_size;
     tztest "check ty size" `Quick check_ty_size;
     tztest "check kinstr size" `Quick check_kinstr_size;
+    tztest "check witness sizes" `Quick check_witness_sizes;
   ]
