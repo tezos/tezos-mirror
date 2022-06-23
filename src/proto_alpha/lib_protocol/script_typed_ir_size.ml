@@ -472,7 +472,8 @@ and kinstr_size :
         ret_succ_adding accu (base +! (word_size *? 2))
     | ILoop (_, _, _) -> ret_succ_adding accu (base +! word_size)
     | ILoop_left (_, _, _) -> ret_succ_adding accu (base +! word_size)
-    | IDip (_, _, _, _) -> ret_succ_adding accu (base +! word_size)
+    | IDip (_, _, ty, _) ->
+        ret_succ_adding (accu ++ ty_size ty) (base +! (word_size *? 2))
     | IExec (_, sty, _) ->
         ret_succ_adding (accu ++ stack_ty_size sty) (base +! (word_size *? 2))
     | IApply (_, ty, _) ->
