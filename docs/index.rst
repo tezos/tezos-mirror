@@ -143,6 +143,7 @@ in the :ref:`introduction <howtoget>`.
    shell/sync
    shell/p2p
    shell/p2p_api
+   shell/protocol_environment
    shell/micheline
    shell/cli-commands
    shell/rpc
@@ -190,7 +191,6 @@ in the :ref:`introduction <howtoget>`.
    developer/entering_alpha
    developer/protocol_release_checklist
    developer/howto-freeze-protocols
-   developer/protocol_environment
    developer/protocol_environment_upgrade
    developer/event_logging_framework
    developer/testing_index
