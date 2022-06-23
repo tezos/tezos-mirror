@@ -73,14 +73,14 @@ end
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3199
    For the moment, the rollup node ignores L1 to L2 messages.
 *)
-let get_messages l1_ctxt head rollup =
+let get_messages Node_context.{l1_ctxt; rollup_address; _} head =
   let open Lwt_result_syntax in
   let* block = Layer1.fetch_tezos_block l1_ctxt head in
   let apply (type kind) accu ~source:_ (operation : kind manager_operation)
       _result =
     match operation with
-    | Sc_rollup_add_messages {rollup = rollup'; messages}
-      when Sc_rollup.Address.(rollup' = rollup) ->
+    | Sc_rollup_add_messages {rollup; messages}
+      when Sc_rollup.Address.(rollup = rollup_address) ->
         List.rev_append messages accu
     | _ -> accu
   in
@@ -99,10 +99,10 @@ let get_messages l1_ctxt head rollup =
   in
   return (List.rev messages)
 
-let process_head Node_context.({l1_ctxt; rollup_address; _} as node_ctxt) store
-    Layer1.(Head {level; hash = head_hash} as head) =
+let process_head node_ctxt store Layer1.(Head {level; hash = head_hash} as head)
+    =
   let open Lwt_result_syntax in
-  let*! res = get_messages l1_ctxt head_hash rollup_address in
+  let*! res = get_messages node_ctxt head_hash in
   match res with
   | Error e -> head_processing_failure e
   | Ok [] -> return_unit
