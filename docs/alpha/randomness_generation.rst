@@ -39,7 +39,7 @@ commitment publication. In the case of a rolling RANDAO, the previous seed may
 be used to initilialise the hash.
 
 We make the assumption that at least one participant is honest, that is, it
-has indeed chosen a random value and this values was revealed. This is a
+has indeed chosen a random value and this value was revealed. This is a
 necessary condition for the seed to be random. The randomness could however be
 biased as this protocol suffers from the following low-impact weakness:
 if a malicious participant can make sure she is the last revealer, then she
