@@ -100,9 +100,9 @@ functions that are also provided and which you can combine to fit your
 needs. And of course you can contribute to improve them.
 
 Automated long tezts logs are available in `Nomadic Labs' public S3 bucket browser
-<https://logs.nomadic-labs.cloud/#PRT/master/>`_. In case of InfluxDB issues, you can
-also inspect the time series stored with `Nomadic Labs' private Chronograf
-<https://chronograf.nomadic-labs.cloud/>`_, but access is restricted to administrators.
+<https://logs.nomadic-labs.cloud/#PRT/master/>`_. In case of InfluxDB issues, you can inspect
+metrics in the `InfluxDB dashboard <https://grafana.nomadic-labs.cloud/d/influxdb/>`_.
+InfluxDB itself is private and direct access via CLI is restricted to administrators.
 
 Example
 -------
