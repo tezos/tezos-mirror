@@ -503,7 +503,7 @@ and kinstr_size :
     | ICreate_contract {loc = _; storage_type; code; k = _} ->
         ret_succ_adding
           (accu ++ ty_size storage_type ++ expr_size code)
-          (word_size *? 2)
+          (base +! (word_size *? 2))
     | ISet_delegate (_, _) -> ret_succ_adding accu base
     | INow (_, _) -> ret_succ_adding accu base
     | IMin_block_time (_, _) -> ret_succ_adding accu base
