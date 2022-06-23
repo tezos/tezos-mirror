@@ -143,10 +143,6 @@ let view_signature_size (View_signature {name; input_ty; output_ty}) =
 
 let script_expr_hash_size = !!64
 
-let peano_shape_proof =
-  let scale = header_size +! h1w in
-  fun k -> scale *? k
-
 (* Note: this function is NOT tail-recursive, but that's okay, since
    the recursion is bound by the size of the witness, which is an
    11-bit unsigned integer, i.e. at most 2048. This is enough to
@@ -161,15 +157,27 @@ let rec stack_prefix_preservation_witness_size :
         h3w
   | KRest -> zero
 
-let comb_gadt_witness_size = peano_shape_proof
+let stack_prefix_preservation_witness_size (_n : int) w =
+  stack_prefix_preservation_witness_size w
 
-let uncomb_gadt_witness_size = peano_shape_proof
+let peano_shape_proof =
+  let scale = header_size +! h1w in
+  fun k -> scale *? k
 
-let comb_get_gadt_witness_size = peano_shape_proof
+let comb_gadt_witness_size n (_w : (_, _, _, _, _, _) comb_gadt_witness) =
+  peano_shape_proof n
 
-let comb_set_gadt_witness_size = peano_shape_proof
+let uncomb_gadt_witness_size n (_w : (_, _, _, _, _, _) uncomb_gadt_witness) =
+  peano_shape_proof n
 
-let dup_n_gadt_witness_size = peano_shape_proof
+let comb_get_gadt_witness_size n (_w : (_, _) comb_get_gadt_witness) =
+  peano_shape_proof n
+
+let comb_set_gadt_witness_size n (_w : (_, _, _) comb_set_gadt_witness) =
+  peano_shape_proof n
+
+let dup_n_gadt_witness_size n (_w : (_, _, _, _) dup_n_gadt_witness) =
+  peano_shape_proof n
 
 let contract_size (Typed_contract {arg_ty; address}) =
   ret_adding (ty_size arg_ty) (h2w +! address_size address)
@@ -524,21 +532,21 @@ and kinstr_size :
           (base +! word_size +! Sapling.Memo_size.in_memory_size m)
     | ISapling_verify_update (_, _) -> ret_succ_adding accu base
     | ISapling_verify_update_deprecated (_, _) -> ret_succ_adding accu base
-    | IDig (_loc, _n, w, _k) ->
+    | IDig (_loc, n, w, _k) ->
         ret_succ_adding
-          (accu ++ stack_prefix_preservation_witness_size w)
+          (accu ++ stack_prefix_preservation_witness_size n w)
           (base +! (word_size *? 2))
-    | IDug (_loc, _n, w, _k) ->
+    | IDug (_loc, n, w, _k) ->
         ret_succ_adding
-          (accu ++ stack_prefix_preservation_witness_size w)
+          (accu ++ stack_prefix_preservation_witness_size n w)
           (base +! (word_size *? 2))
-    | IDipn (_loc, _n, w, _k1, _k2) ->
+    | IDipn (_loc, n, w, _k1, _k2) ->
         ret_succ_adding
-          (accu ++ stack_prefix_preservation_witness_size w)
+          (accu ++ stack_prefix_preservation_witness_size n w)
           (base +! (word_size *? 3))
-    | IDropn (_loc, _n, w, _k) ->
+    | IDropn (_loc, n, w, _k) ->
         ret_succ_adding
-          (accu ++ stack_prefix_preservation_witness_size w)
+          (accu ++ stack_prefix_preservation_witness_size n w)
           (base +! (word_size *? 2))
     | IChainId (_, _) -> ret_succ_adding accu base
     | INever _loc -> ret_succ_adding accu h1w
@@ -559,26 +567,26 @@ and kinstr_size :
     | INeg_bls12_381_g2 (_, _) -> ret_succ_adding accu base
     | INeg_bls12_381_fr (_, _) -> ret_succ_adding accu base
     | IPairing_check_bls12_381 (_, _) -> ret_succ_adding accu base
-    | IComb (_, n, _, _) ->
+    | IComb (_, n, w, _) ->
         ret_succ_adding
           accu
-          (base +! (word_size *? 2) +! comb_gadt_witness_size n)
-    | IUncomb (_, n, _, _) ->
+          (base +! (word_size *? 2) +! comb_gadt_witness_size n w)
+    | IUncomb (_, n, w, _) ->
         ret_succ_adding
           accu
-          (base +! (word_size *? 2) +! uncomb_gadt_witness_size n)
-    | IComb_get (_, n, _, _) ->
+          (base +! (word_size *? 2) +! uncomb_gadt_witness_size n w)
+    | IComb_get (_, n, w, _) ->
         ret_succ_adding
           accu
-          (base +! (word_size *? 2) +! comb_get_gadt_witness_size n)
-    | IComb_set (_, n, _, _) ->
+          (base +! (word_size *? 2) +! comb_get_gadt_witness_size n w)
+    | IComb_set (_, n, w, _) ->
         ret_succ_adding
           accu
-          (base +! (word_size *? 2) +! comb_set_gadt_witness_size n)
-    | IDup_n (_, n, _, _) ->
+          (base +! (word_size *? 2) +! comb_set_gadt_witness_size n w)
+    | IDup_n (_, n, w, _) ->
         ret_succ_adding
           accu
-          (base +! (word_size *? 2) +! dup_n_gadt_witness_size n)
+          (base +! (word_size *? 2) +! dup_n_gadt_witness_size n w)
     | ITicket (_, cty, _) ->
         ret_succ_adding (accu ++ ty_size cty) (base +! word_size)
     | IRead_ticket (_, ty, _) ->
