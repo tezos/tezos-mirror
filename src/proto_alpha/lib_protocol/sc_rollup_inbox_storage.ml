@@ -132,8 +132,11 @@ let add_messages ctxt rollup messages =
       node to produce inclusion proofs when needed.
   *)
   let* current_messages, inbox =
-    Sc_rollup_inbox_repr.(
-      add_messages_no_history inbox level messages current_messages)
+    Sc_rollup_inbox_repr.add_messages_no_history
+      inbox
+      level
+      messages
+      current_messages
   in
   let*? ctxt =
     Sc_rollup_in_memory_inbox.set_current_messages ctxt rollup current_messages
@@ -141,29 +144,41 @@ let add_messages ctxt rollup messages =
   let* ctxt, size = Store.Inbox.update ctxt rollup inbox in
   return (inbox, Z.of_int size, ctxt)
 
-let add_external_messages ctxt rollup external_messages =
-  let open Lwt_result_syntax in
-  let*? messages =
-    List.map_e
-      (fun message ->
-        Sc_rollup_inbox_message_repr.(to_bytes @@ External message))
-      external_messages
-  in
-  add_messages ctxt rollup messages
+(** TODO #3292
+    We should carbonate this function.
+    The cost of [to_bytes] is cheap but traversing the list should still be
+    accounted for.
+  *)
+let serialize_external_messages external_messages =
+  List.map_e
+    (fun message -> Sc_rollup_inbox_message_repr.(to_bytes @@ External message))
+    external_messages
 
-let add_internal_message ctxt rollup ~payload ~sender ~source =
-  let open Lwt_result_syntax in
+let serialize_internal_message ctxt ~payload ~sender ~source =
+  let open Result_syntax in
   let internal_message =
     {Sc_rollup_inbox_message_repr.payload; sender; source}
   in
   (* Pay gas for serializing an internal message. *)
-  let*? ctxt =
+  let* ctxt =
     Raw_context.consume_gas
       ctxt
       (Sc_rollup_costs.cost_serialize_internal_inbox_message internal_message)
   in
-  let*? message =
+  let* message =
     Sc_rollup_inbox_message_repr.(to_bytes @@ Internal internal_message)
+  in
+  return (message, ctxt)
+
+let add_external_messages ctxt rollup external_messages =
+  let open Lwt_result_syntax in
+  let*? messages = serialize_external_messages external_messages in
+  add_messages ctxt rollup messages
+
+let add_internal_message ctxt rollup ~payload ~sender ~source =
+  let open Lwt_result_syntax in
+  let*? message, ctxt =
+    serialize_internal_message ctxt ~payload ~sender ~source
   in
   add_messages ctxt rollup [message]
 
