@@ -42,6 +42,12 @@ let save_tx_rollup ~force (cctxt : #Client_context.full) alias_name rollup
   let*! () = cctxt#message "Transaction rollup memorized as %s" alias_name in
   return_unit
 
+let save_zk_rollup ~force (cctxt : #Client_context.full) alias_name rollup =
+  let open Lwt_result_syntax in
+  let* () = EpoxyAlias.add ~force cctxt alias_name rollup in
+  let*! () = cctxt#message "Epoxy rollup memorized as %s" alias_name in
+  return_unit
+
 let encrypted_switch =
   Tezos_clic.switch ~long:"encrypted" ~doc:"encrypt the key on-disk" ()
 
@@ -1464,6 +1470,239 @@ let commands_rw () =
                   exn
                   Data_encoding.Json.pp
                   operations_json));
+    command
+      ~group
+      ~desc:"Execute an Epoxy origination operation.\n"
+      (args13
+         force_switch
+         default_fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         default_gas_limit_arg
+         default_storage_limit_arg
+         counter_arg
+         default_arg_arg
+         no_print_source_flag
+         fee_parameter_args
+         default_entrypoint_arg
+         replace_by_fees_arg)
+      (prefixes ["originate"; "epoxy"]
+      @@ EpoxyAlias.fresh_alias_param
+           ~name:"epoxy"
+           ~desc:"Fresh name for an Epoxy rollup"
+      @@ prefix "from"
+      @@ Client_keys.Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"name of the source contract"
+      @@ prefix "public_parameters"
+      @@ param
+           ~name:"public_parameters"
+           ~desc:"public_parameters"
+           Zk_rollup_params.plonk_public_parameters_parameter
+      @@ prefix "init_state"
+      @@ param
+           ~name:"init_state"
+           ~desc:"init_state"
+           Zk_rollup_params.state_parameter
+      @@ prefix "circuits_info"
+      @@ param
+           ~name:"circuits_info"
+           ~desc:"circuits_info"
+           Zk_rollup_params.circuits_info_parameter
+      @@ prefix "nb_ops"
+      @@ param ~name:"nb_ops" ~desc:"nb_ops" int_parameter
+      @@ stop)
+      (fun ( force,
+             fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             gas_limit,
+             storage_limit,
+             counter,
+             _arg,
+             _no_print_source,
+             fee_parameter,
+             _entrypoint,
+             _replace_by_fees )
+           alias
+           source
+           public_parameters
+           init_state
+           circuits_info
+           nb_ops
+           cctxt ->
+        let open Lwt_result_syntax in
+        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _, _, res =
+          zk_rollup_originate
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~dry_run
+            ~verbose_signing
+            ?fee
+            ?gas_limit
+            ?storage_limit
+            ?counter
+            ?confirmations:cctxt#confirmations
+            ~simulation
+            ~source
+            ~src_pk
+            ~src_sk
+            ~fee_parameter
+            ~public_parameters
+            ~circuits_info
+            ~init_state
+            ~nb_ops
+            ()
+        in
+        let*? res =
+          match res with
+          | Apply_results.Manager_operation_result
+              {
+                operation_result =
+                  Apply_operation_result.Applied
+                    (Apply_results.Zk_rollup_origination_result
+                      {originated_zk_rollup; _});
+                _;
+              } ->
+              Ok originated_zk_rollup
+          | _ -> error_with "Epoxy rollup was not correctly originated"
+        in
+        let* alias_name = EpoxyAlias.of_fresh cctxt force alias in
+        save_zk_rollup ~force cctxt alias_name res);
+    command
+      ~group
+      ~desc:"Execute an Epoxy publish operation.\n"
+      (args12
+         default_fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         default_gas_limit_arg
+         default_storage_limit_arg
+         counter_arg
+         default_arg_arg
+         no_print_source_flag
+         fee_parameter_args
+         default_entrypoint_arg
+         replace_by_fees_arg)
+      (prefixes ["epoxy"; "publish"; "from"]
+      @@ Client_keys.Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"name of the source contract"
+      @@ prefix "rollup"
+      @@ param ~name:"rollup" ~desc:"rollup" Zk_rollup_params.address_parameter
+      @@ prefix "ops"
+      @@ param ~name:"ops" ~desc:"ops" Zk_rollup_params.operations_parameter
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             gas_limit,
+             storage_limit,
+             counter,
+             _arg,
+             _no_print_source,
+             fee_parameter,
+             _entrypoint,
+             _replace_by_fees )
+           source
+           zk_rollup
+           ops
+           cctxt ->
+        let open Lwt_result_syntax in
+        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _res =
+          zk_rollup_publish
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~dry_run
+            ~verbose_signing
+            ?fee
+            ?gas_limit
+            ?storage_limit
+            ?counter
+            ?confirmations:cctxt#confirmations
+            ~simulation
+            ~source
+            ~src_pk
+            ~src_sk
+            ~fee_parameter
+            ~zk_rollup
+            ~ops
+            ()
+        in
+        return_unit);
+    command
+      ~group
+      ~desc:"Execute an Epoxy update operation.\n"
+      (args12
+         default_fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         default_gas_limit_arg
+         default_storage_limit_arg
+         counter_arg
+         default_arg_arg
+         no_print_source_flag
+         fee_parameter_args
+         default_entrypoint_arg
+         replace_by_fees_arg)
+      (prefixes ["epoxy"; "update"; "from"]
+      @@ Client_keys.Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"name of the source contract"
+      @@ prefix "rollup"
+      @@ param ~name:"rollup" ~desc:"rollup" Zk_rollup_params.address_parameter
+      @@ prefix "update"
+      @@ param ~name:"update" ~desc:"update" Zk_rollup_params.update_parameter
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             gas_limit,
+             storage_limit,
+             counter,
+             _arg,
+             _no_print_source,
+             fee_parameter,
+             _entrypoint,
+             _replace_by_fees )
+           source
+           zk_rollup
+           update
+           cctxt ->
+        let open Lwt_result_syntax in
+        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _res =
+          zk_rollup_update
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~dry_run
+            ~verbose_signing
+            ?fee
+            ?gas_limit
+            ?storage_limit
+            ?counter
+            ?confirmations:cctxt#confirmations
+            ~simulation
+            ~source
+            ~src_pk
+            ~src_sk
+            ~fee_parameter
+            ~zk_rollup
+            ~update
+            ()
+        in
+        return_unit);
     command
       ~group
       ~desc:"Transfer tokens / call a smart contract."
