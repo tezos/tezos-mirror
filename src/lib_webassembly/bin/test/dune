@@ -16,3 +16,5 @@
  (alias runtest)
  (package tezos-webassembly-interpreter)
  (action (run %{dep:./main.exe})))
+
+(include_subdirs no)

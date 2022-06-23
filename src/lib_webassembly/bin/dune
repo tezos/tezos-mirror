@@ -1,0 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-webassembly-interpreter
+  lwt.unix)
+ (flags
+  (:standard)
+  -w -27
+  -open Tezos_webassembly_interpreter))
+
+(include dune.inc)

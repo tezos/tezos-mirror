@@ -581,27 +581,29 @@ let octez_error_monad =
 let octez_webassembly_interpreter =
   public_lib
     "tezos-webassembly-interpreter"
-    ~path:"src/lib_webassembly/interpreter"
+    ~path:"src/lib_webassembly"
     ~license:"Apache License 2.0"
     ~extra_authors:["WebAssembly Authors"]
     ~synopsis:"WebAssembly reference interpreter with tweaks for Tezos"
-    ~all_modules_except:["main"]
-    ~dune:Dune.[[S "include"; S "dune.inc"]]
+    ~flags:(Flags.standard ~disable_warnings:[27] ())
+    ~dune:Dune.[[S "include_subdirs"; S "unqualified"]]
     ~deps:[octez_lwt_result_stdlib]
 
 let _octez_webassembly_repl =
   private_exe
     "main"
-    ~path:"src/lib_webassembly/interpreter"
-    ~modules:["main"]
+    ~path:"src/lib_webassembly/bin"
     ~opam:""
+    ~flags:(Flags.standard ~disable_warnings:[27] ())
+    ~dune:Dune.[[S "include"; S "dune.inc"]]
     ~deps:[octez_webassembly_interpreter |> open_; lwt_unix]
 
 let _octez_webassembly_test =
   test
     "main"
-    ~path:"src/lib_webassembly/test"
+    ~path:"src/lib_webassembly/bin/test"
     ~opam:"tezos-webassembly-interpreter"
+    ~dune:Dune.[[S "include_subdirs"; S "no"]]
     ~deps:
       [
         octez_webassembly_interpreter |> open_;

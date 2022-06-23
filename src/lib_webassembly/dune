@@ -7,17 +7,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-lwt-result-stdlib)
- (modules (:standard \ main)))
-
-(include dune.inc)
-
-(executable
- (name main)
- (instrumentation (backend bisect_ppx))
- (libraries
-  tezos-webassembly-interpreter
-  lwt.unix)
  (flags
   (:standard)
-  -open Tezos_webassembly_interpreter)
- (modules main))
+  -w -27))
+
+(include_subdirs unqualified)
