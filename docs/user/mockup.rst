@@ -9,28 +9,89 @@ connecting to a node. For the moment, its features are more
 limited than the default mode (see the :doc:`proxy mode<proxy>`
 for an intermediate mode between default and mockup).
 
-In mockup mode, the client uses some dummy values for initial parameters that
+Motivation
+==========
+
+The main motivation for implementing the mockup mode is to provide developers of Tezos smart contracts with an easy local environment, offering a fast development cycle, which uses only lightweight local files for keeping the state, and which does not require a running blockchain.
+
+Overview
+========
+
+In mockup mode, the client uses some dummy values for the initial parameters that
 are usually gathered from a node, such as the head of the chain or the network
 identifier. Then the mockup client simulates activation from genesis and runs
 local implementations of the RPCs itself.
 
-The mockup mode can either use a volatile, in-memory environment or work
-on a persistent state when ``--base-dir`` is specified at creation.
+Modes of operation
+------------------
 
-In the current state the mockup mode can:
+Mockup mode can run in three ways:
+
+- Stateless mode.
+
+  In this mode, tezos-client operates on its inputs and returns a value. Nothing is written to disk, and no state is preserved between calls to the client. This is the default.
+- Stateful mode.
+
+  In this mode, tezos-client creates or manipulates a state on disk. The switch for this is ``--base-dir <directory_name>``.
+- Stateful asynchronous mode.
+
+  This mode adds baking. The command-line switch for this is ``--base-dir <directory_name> --asynchronous``.
+
+Supported features
+------------------
+
+Currently, depending on the way it is run, the mockup mode can:
 
 * typecheck, serialize, sign and evaluate a contract -- without a node.
+
   These features do not require a persistent state.
 * perform transactions, originations, contract calls in a purely local fashion;
-  mimicking the sandboxed mode but without a node. These features
-  require a persistent state.
-* Perform some RPCs locally via `tezos-client rpc {get,post}`.
+  mimicking the sandboxed mode but without a node.
 
-We recommend that beginners *always* use the persistent state, for simplicity.
+  These features require a persistent state.
+* perform some RPCs locally via the command line.
+
+  These features work in stateful asynchronous mode.
+
+We recommend that beginners use the persistent state, as it represents a suitable tradeoff between simplicity and supported features.
+
+Nevertheless, the modes of operation are shown in the order above.
+
+Run a mockup client without persistent state
+============================================
+
+Without persistent state, the mockup mode is already able to
+typecheck scripts. Let's typecheck for example the script :src:`tests_python/contracts_alpha/mini_scenarios/hardlimit.tz`:
+
+.. code-block:: shell-session
+
+    $ tezos-client --mode mockup typecheck script tests_python/contracts_alpha/mini_scenarios/hardlimit.tz
+
+The script can also be executed:
+
+.. code-block:: shell-session
+
+   $ tezos-client --mode mockup run script <filename> on storage <storage> and input <input>
+
+where ``<storage>`` and ``<input>`` are some :ref:`Michelson expression
+<michelson_type_system>` describing the contract's storage and script input
+respectively. A ``--trace-stack`` option can be added in the end to output the
+state of the stack after each step of script's execution.
+
+For example:
+
+.. code-block:: shell-session
+
+  $ tezos-client --mode mockup run script tests_python/contracts_alpha/attic/id.tz on storage '"hello"' and input '"world"'
+  # Ignore warnings about the missing/wrong base directory, they do not apply to "run script"
+  storage
+    "world"
+  [...]
 
 Run a mockup client with persistent state
 =========================================
 
+Setting up a mockup state requires to choose a protocol.
 To see the list of supported protocols in mockup mode, issue the
 following command:
 
@@ -38,7 +99,7 @@ following command:
 
     $ tezos-client list mockup protocols
 
-At any given time, it should return ``Alpha`` and the two protocols before that.
+At any given time, it should return ``Alpha`` and at least the two protocols before that.
 
 To create the mockup client state, issue the following command:
 
@@ -129,42 +190,14 @@ The RPC mechanism can also be conveniently used to access the state of the contr
     $ mockup-client rpc get /chains/main/blocks/head/context/contracts/KT1DieU51jzXLerQx5AqMCiLC1SsCeM8yRat/storage
     { "prim": "Unit" }
 
-Run a mockup client without persistent state
-============================================
-
-Without persistent state, the mockup mode is still able to
-typecheck scripts:
-
-.. code-block:: shell-session
-
-    $ tezos-client --mode mockup typecheck script ./tests_python/contracts_alpha/mini_scenarios/hardlimit.tz
-
-The script can also be executed:
-
-.. code-block:: shell-session
-
-   $ tezos-client --mode mockup run script <filename> on storage <storage> and input <input>
-
-where ``<storage>`` and ``<input>`` are some :ref:`Michelson expression
-<michelson_type_system>` describing contract's storage and script input
-respectively. A ``--trace-stack`` option can be added in the end to output the
-state of the stack after each step of script's execution.
-
-For example:
-
-.. code-block:: shell-session
-
-  $ tezos-client --mode mockup run script tests_python/contracts_alpha/attic/id.tz on storage '"hello"' and input '"world"'
-  # Ignore warnings about the missing/wrong base directory, they do not apply to "run script"
-  storage
-    "world"
-  [...]
-
+The stateful mockup mode stores state data in a single ``context.json`` file, located under the ``mockup`` subdirectory of the base directory. In our running example, its absolute file name is ``/tmp/mockup/mockup/context.json``.
 
 Tune mockup parameters
 ======================
 
-To keep it simple, the mockup mode - like the sandboxed mode - uses
+The examples so far have used mockup mode’s default settings. Some use cases need a custom setup, so mockup mode lets us configure some initial parameters.
+
+For simplicity, the mockup mode - like the sandboxed mode - uses
 default values for the :ref:`protocol constants <protocol_constants>`. Such values are visible as follows (we recall
 that ``mockup-client`` is an alias for ``tezos-client``, see previous
 section):
@@ -297,7 +330,12 @@ successful baking, the mempool is emptied from any outstanding operations, which
 are appended to a so-called *trashpool* containing the list of all refused
 transactions at any point.
 
-Let us make that clearer with an example. We will start by creating a mockup
+Let us make that clearer with an example.
+
+Run a mockup client with asynchronous state
+===========================================
+
+We will start by creating a mockup
 directory supporting *asynchronous* transfers, i.e., where transfers do not
 immediately bake the block.
 
@@ -319,7 +357,7 @@ Now, let us add 2 transactions, that we will label respectively ``t1`` and
    $ mockup-client transfer 2 from bootstrap2 to bootstrap3 --fee 0.5
 
 You can check that it is indeed the
-case by visiting ``mockup/mempool.json``. This should look like
+case by visiting ``mockup/mempool.json``. This should look like this
 
 .. code-block:: JSON
 
@@ -386,7 +424,7 @@ And bake once more selectively
 
 Then, once again, the first transaction, with a fee of 1, will make it as part
 of the new head whereas the second will be appended to the trashpool, which now
-looks like.
+looks like this
 
 .. code-block:: JSON
 
@@ -414,7 +452,7 @@ looks like.
           "sigeFcabZTE8Y2LXv19Fe7TbRtkjzVpBy2qhABp263Xnj8TJtA6XpRRMfGeD5YxwCJiTr9r6ZFGBdLnpxL9Y9CG3bpbXmu7E" } } ]
 
 Performing protocol migrations of persistent mockup states
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+==========================================================
 
 The persistent state of the mockup mode is highly protocol-dependent.
 But Tezos is self-amending: protocols regularly evolve from one to the next.
@@ -429,4 +467,10 @@ A command is provided to do the same on the persistent mockup state:
 
 The protocol corresponding to the hash must know how to migrate from the current protocol.
 
-This is mostly useful for protocol developers, but also for other developers, e.g., wanting to check the robustness of their application with respect to protocol changes, including new features or breaking changes.
+This is mostly useful for protocol developers, but also for other developers, e.g., those wanting to check the robustness of their application with respect to protocol changes, including new features or breaking changes.
+
+See also
+========
+
+This tutorial has also served as a base for `a nice blog post <https://research-development.nomadic-labs.com/introducing-mockup-mode-for-tezos-client.html>`__, written in a more casual way and intended for a larger audience of application developers.
+Of course, some aspects may gradually become outdated in the blog version.
