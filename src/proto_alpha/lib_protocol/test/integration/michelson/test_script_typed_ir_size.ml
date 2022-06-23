@@ -659,6 +659,29 @@ let check_ty_size () =
   in
   List.iter_es (fun _ -> check ()) (1 -- nsample)
 
+let check_size ~name ~tolerance ~expected ~actual item =
+  let open Lwt_result_syntax in
+  let exp = expected item in
+  let act = actual item in
+  let overapprox = 1_000_000 * (exp - act) / act in
+  let msg verb =
+    Printf.sprintf
+      "For %s model predicts the size of %d bytes; while actual measured size \
+       is %d bytes. The model %s %d.%04d%%"
+      (name item)
+      exp
+      act
+      verb
+      (abs @@ (overapprox / 10_000))
+      (abs @@ (overapprox mod 10_000))
+  in
+  let* () = fail_when (overapprox < 0) (err @@ msg "underapproximates by") in
+  (* We expected the model to never underapproximate. *)
+  fail_when
+    (overapprox > tolerance item * 10_000)
+    (err @@ msg "overapproximates by too much:")
+(* We expect the overapproximation to be bounded by tollerance. *)
+
 (* Test that the model accurately predicts instruction sizes. It tests each
    type of instruction separately as much as possible. Tested values are
    specifically tailored so that they can't be shared (in particular all
@@ -668,29 +691,17 @@ let check_ty_size () =
    approximate though. *)
 let check_kinstr_size () =
   let open Lwt_result_syntax in
-  let check (Kinstr (name, kinstr, tolerance)) =
-    let open Lwt_result_syntax in
-    let _, ex = Script_typed_ir_size.Internal_for_tests.kinstr_size kinstr in
-    let expected = Saturation_repr.to_int ex in
-    let actual = 8 * Obj.(reachable_words @@ repr kinstr) in
-    let overapprox = 1_000_000 * (expected - actual) / actual in
-    let msg verb =
-      Printf.sprintf
-        "For %s model predicts the size of %d bytes; while actual measured \
-         size is %d bytes. The model %s %d.%04d%%"
-        name
-        expected
-        actual
-        verb
-        (abs @@ (overapprox / 10_000))
-        (abs @@ (overapprox mod 10_000))
-    in
-    let* () = fail_when (overapprox < 0) (err @@ msg "underapproximates by") in
-    (* We expected the model to never underapproximate. *)
-    fail_when
-      (overapprox > tolerance * 10_000)
-      (err @@ msg "overapproximates by too much:")
-    (* We expect the overapproximation to be bounded by tollerance. *)
+  let check =
+    check_size
+      ~name:(fun (Kinstr (name, _, _)) -> name)
+      ~tolerance:(fun (Kinstr (_, _, tolerance)) -> tolerance)
+      ~expected:(fun (Kinstr (_, instr, _)) ->
+        let _, expected =
+          Script_typed_ir_size.Internal_for_tests.kinstr_size instr
+        in
+        Saturation_repr.to_int expected)
+      ~actual:(fun (Kinstr (_, instr, _)) ->
+        8 * Obj.(reachable_words @@ repr instr))
   in
   (* Location is an immediate value, so we don't care if it's shared. *)
   let loc = Micheline.dummy_location in
@@ -737,6 +748,17 @@ let check_kinstr_size () =
   let zero_memo_size =
     WithExceptions.Result.get_ok ~loc:__LOC__
     @@ Alpha_context.Sapling.Memo_size.parse_z Z.zero
+  in
+  (* Check size of the lambda alone. *)
+  let* () =
+    check_size
+      ~tolerance:(fun _ -> 0)
+      ~name:(fun _ -> "id lambda")
+      ~expected:(fun lam ->
+        let _, expected = Script_typed_ir_size.lambda_size lam in
+        Saturation_repr.to_int expected)
+      ~actual:(fun lam -> 8 * Obj.(reachable_words @@ repr lam))
+      (id_lambda ())
   in
   (* Testing individual instructions. *)
   List.iter_es
