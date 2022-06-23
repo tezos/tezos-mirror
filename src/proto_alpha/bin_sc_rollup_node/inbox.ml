@@ -75,7 +75,7 @@ let get_messages cctxt head rollup =
   let open Lwt_result_syntax in
   let open Block_services in
   let+ operations =
-    Operations.operations cctxt ~chain:`Main ~block:(`Level (snd head)) ()
+    Operations.operations cctxt ~chain:`Main ~block:(`Hash (fst head, 0)) ()
   in
   let is_add_message = function
     | Contents
