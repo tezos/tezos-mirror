@@ -2412,7 +2412,7 @@ let test_limit_on_number_of_messages_during_commitment_period with_gap () =
     | _ -> false
 
 let record ctxt rollup level message_index =
-  Sc_rollup_storage.Outbox.record_applied_message
+  Sc_rollup_outbox_storage.record_applied_message
     ctxt
     rollup
     (Raw_level_repr.of_int32_exn @@ Int32.of_int level)

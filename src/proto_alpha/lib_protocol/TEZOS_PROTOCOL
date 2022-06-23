@@ -150,6 +150,7 @@
         "Sc_rollup_errors",
         "Sc_rollup_commitment_storage",
         "Sc_rollup_inbox_storage",
+        "Sc_rollup_outbox_storage",
         "Sc_rollup_stake_storage",
         "Sc_rollup_refutation_storage",
         "Sc_rollup_storage",

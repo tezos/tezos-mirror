@@ -60,28 +60,6 @@ val parameters_type :
   Sc_rollup_repr.t ->
   (Script_repr.lazy_expr option * Raw_context.t) tzresult Lwt.t
 
-(** A module for managing state concerning a rollup's outbox. *)
-module Outbox : sig
-  (** [record_applied_message ctxt rollup level ~message_index] marks the
-      message in the outbox of rollup [rollup] at level [level] and position
-      [message_index] as processed. Returns the size diff resulting from
-      adding an entry. The size diff may be 0 if an entry already exists, or
-      negative if an index is replaced with a new level.
-
-      An attempt to apply an old level that has already been replaced
-      fails with an [Sc_rollup_outbox_level_expired] error.
-
-      In case a message has already been applied for the given level and message
-      index, the function fails with an
-      [Sc_rollup_outbox_message_already_applied]  error.  *)
-  val record_applied_message :
-    Raw_context.t ->
-    Sc_rollup_repr.t ->
-    Raw_level_repr.t ->
-    message_index:int ->
-    (Z.t * Raw_context.t) tzresult Lwt.t
-end
-
 module Dal_slot : sig
   (** [subscribe ctxt rollup slot_index] marks the [rollup] as subscribed to
       [slot_index] at the level indicated by [Raw_context.current_level ctxt].

@@ -85,65 +85,6 @@ let parameters_type ctxt rollup =
   let+ ctxt, res = Store.Parameters_type.find ctxt rollup in
   (res, ctxt)
 
-module Outbox = struct
-  let level_index ctxt level =
-    let max_active_levels =
-      Constants_storage.sc_rollup_max_active_outbox_levels ctxt
-    in
-    Int32.rem (Raw_level_repr.to_int32 level) max_active_levels
-
-  let record_applied_message ctxt rollup level ~message_index =
-    let open Lwt_tzresult_syntax in
-    (* Check that the 0 <= message index < maximum number of outbox messages per
-       level. *)
-    let*? () =
-      let max_outbox_messages_per_level =
-        Constants_storage.sc_rollup_max_outbox_messages_per_level ctxt
-      in
-      error_unless
-        Compare.Int.(
-          0 <= message_index && message_index < max_outbox_messages_per_level)
-        Sc_rollup_invalid_outbox_message_index
-    in
-    let level_index = level_index ctxt level in
-    let* ctxt, level_and_bitset_opt =
-      Store.Applied_outbox_messages.find (ctxt, rollup) level_index
-    in
-    let*? bitset, ctxt =
-      let open Tzresult_syntax in
-      let* bitset, ctxt =
-        match level_and_bitset_opt with
-        | Some (existing_level, bitset)
-          when Raw_level_repr.(existing_level = level) ->
-            (* The level at the index is the same as requested. Fail if the
-               message has been applied already. *)
-            let* already_applied = Bitset.mem bitset message_index in
-            let* () =
-              error_when
-                already_applied
-                Sc_rollup_outbox_message_already_applied
-            in
-            return (bitset, ctxt)
-        | Some (existing_level, _bitset)
-          when Raw_level_repr.(level < existing_level) ->
-            fail Sc_rollup_outbox_level_expired
-        | Some _ | None ->
-            (* The old level is outdated or there is no previous bitset at
-               this index. *)
-            return (Bitset.empty, ctxt)
-      in
-      let* bitset = Bitset.add bitset message_index in
-      return (bitset, ctxt)
-    in
-    let+ ctxt, size_diff, _is_new =
-      Store.Applied_outbox_messages.add
-        (ctxt, rollup)
-        level_index
-        (level, bitset)
-    in
-    (Z.of_int size_diff, ctxt)
-end
-
 module Dal_slot = struct
   let slot_of_int_e n =
     let open Tzresult_syntax in
