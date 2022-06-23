@@ -673,6 +673,7 @@ module Make (Context : P) :
       let* vars_pp = Vars.pp in
       let* output_pp = Output.pp in
       let* stack = Stack.to_list in
+      let* current_tick_pp = CurrentTick.pp in
       return @@ fun fmt () ->
       Format.fprintf
         fmt
@@ -684,6 +685,7 @@ module Make (Context : P) :
          %a@;\
          %a@;\
          %a@;\
+         tick : %a@;\
          vars : %a@;\
          output :%a@;\
          stack : %a@;\
@@ -701,6 +703,8 @@ module Make (Context : P) :
         lexer_state_pp
         ()
         evaluation_result_pp
+        ()
+        current_tick_pp
         ()
         vars_pp
         ()
