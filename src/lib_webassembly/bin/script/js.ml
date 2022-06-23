@@ -537,7 +537,9 @@ let of_string_with iter add_char s =
 
 let of_bytes = of_string_with String.iter add_hex_char
 
-let of_name = of_string_with List.iter add_unicode_char
+let of_name n =
+  let n = Lazy_vector.LwtInt32Vector.loaded_bindings n in
+  of_string_with List.iter (fun buf (_, uc) -> add_unicode_char buf uc) n
 
 let of_float z =
   match string_of_float z with

@@ -3,10 +3,12 @@ let name = "wasm"
 let version = "2.0"
 
 let configure () =
-  Import.register (Utf8.decode "spectest") (fun name type_ ->
-      Lwt.return (Spectest.lookup name type_)) ;
-  Import.register (Utf8.decode "env") (fun name type_ ->
-      Lwt.return (Env.lookup name type_))
+  let open Lwt.Syntax in
+  let* () =
+    Import.register (Utf8.decode "spectest") (fun name type_ ->
+        Spectest.lookup name type_)
+  in
+  Import.register (Utf8.decode "env") (fun name type_ -> Env.lookup name type_)
 
 let banner () = print_endline (name ^ " " ^ version ^ " reference interpreter")
 
@@ -45,15 +47,17 @@ let argspec =
 let () =
   let open Lwt.Syntax in
   Printexc.record_backtrace true ;
-  try
-    configure () ;
+  let run () =
+    let* () = configure () in
     Arg.parse argspec (fun file -> add_arg ("(input " ^ quote file ^ ")")) usage ;
-    Lwt_main.run
-      (Lwt_list.iter_s
-         (fun arg ->
-           let+ res = Run.run_string arg in
-           if not res then exit 1)
-         !args) ;
+    Lwt_list.iter_s
+      (fun arg ->
+        let+ res = Run.run_string arg in
+        if not res then exit 1)
+      !args
+  in
+  try
+    Lwt_main.run (run ()) ;
     if !args = [] then Flags.interactive := true ;
     if !Flags.interactive then (
       Flags.print_sig := true ;

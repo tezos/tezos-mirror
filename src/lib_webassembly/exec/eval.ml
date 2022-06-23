@@ -885,18 +885,20 @@ let create_data (inst : module_inst) (seg : data_segment) : data_inst Lwt.t =
 
 let add_import (m : module_) (ext : extern) (im : import) (inst : module_inst) :
     module_inst Lwt.t =
-  let+ t = import_type m im in
-  if not (match_extern_type (extern_type_of ext) t) then
-    Link.error
-      im.at
-      ("incompatible import type for " ^ "\""
-      ^ Utf8.encode im.it.module_name
-      ^ "\" " ^ "\""
-      ^ Utf8.encode im.it.item_name
-      ^ "\": " ^ "expected "
-      ^ Types.string_of_extern_type t
-      ^ ", got "
-      ^ Types.string_of_extern_type (extern_type_of ext)) ;
+  let* t = import_type m im in
+  let+ () =
+    if not (match_extern_type (extern_type_of ext) t) then
+      let* module_name = Utf8.encode im.it.module_name in
+      let+ item_name = Utf8.encode im.it.item_name in
+      Link.error
+        im.at
+        ("incompatible import type for " ^ "\"" ^ module_name ^ "\" " ^ "\""
+       ^ item_name ^ "\": " ^ "expected "
+        ^ Types.string_of_extern_type t
+        ^ ", got "
+        ^ Types.string_of_extern_type (extern_type_of ext))
+    else Lwt.return_unit
+  in
   match ext with
   | ExternFunc func -> {inst with funcs = Vector.cons func inst.funcs}
   | ExternTable tab -> {inst with tables = Vector.cons tab inst.tables}
@@ -1040,16 +1042,20 @@ let init (m : module_) (exts : extern list) : module_inst Lwt.t =
   let* new_exports = TzStdLib.List.map_s (create_export inst2) exports in
   let* new_elems = TzStdLib.List.map_s (create_elem inst2) elems in
   let* new_datas = TzStdLib.List.map_s (create_data inst2) datas in
+  let* exports =
+    (* TODO: #3076
+       [new_exports]/[exports] should be lazy structures. *)
+    TzStdLib.List.fold_left_s
+      (fun exports (k, v) ->
+        let+ k = Instance.Vector.to_list k in
+        NameMap.set k v exports)
+      (NameMap.create ~produce_value:(fun _ -> Lwt.fail Not_found) ())
+      new_exports
+  in
   let inst =
     {
       inst2 with
-      exports =
-        (* TODO: #3076
-           [new_exports]/[exports] should be lazy structures. *)
-        List.fold_left
-          (fun exports (k, v) -> NameMap.set k v exports)
-          (NameMap.create ~produce_value:(fun _ -> Lwt.fail Not_found) ())
-          new_exports;
+      exports;
       elems =
         (* TODO: #3076
            [new_elems]/[elems] should be lazy structures. *)

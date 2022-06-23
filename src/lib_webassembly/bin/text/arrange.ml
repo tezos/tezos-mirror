@@ -37,7 +37,9 @@ let bytes = string_with String.iter add_hex_char
 
 let string = string_with String.iter add_char
 
-let name = string_with List.iter add_unicode_char
+let name n =
+  let n = Lazy_vector.LwtInt32Vector.loaded_bindings n in
+  string_with List.iter (fun buf (_, uc) -> add_unicode_char buf uc) n
 
 let list_of_opt = function None -> [] | Some x -> [x]
 

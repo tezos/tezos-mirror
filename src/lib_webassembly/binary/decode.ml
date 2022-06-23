@@ -975,23 +975,22 @@ let check_size {size; start} s =
 
 type name_step =
   | NKStart  (** UTF8 name starting point. *)
-  | NKParse of pos * (int, int) vec_map_kont  (** UTF8 char parsing. *)
-  | NKStop of int list  (** UTF8 name final step.*)
+  | NKParse of pos * int lazy_vec_kont * int  (** UTF8 char parsing. *)
+  | NKStop of int Vector.t  (** UTF8 name final step.*)
 
 let name_step s = function
   | NKStart ->
       let pos = pos s in
       let len = len32 s in
-      NKParse (pos, Collect (len, []))
-  | NKParse (pos, Collect (i, l)) when i <= 0 -> NKParse (pos, Rev (l, [], 0))
-  | NKParse (pos, Collect (n, l)) ->
+      NKParse (pos, init_lazy_vec 0l, len)
+  | NKParse (pos, Lazy_vec {vector; _}, 0) -> NKStop vector
+  | NKParse (pos, Lazy_vec lv, len) ->
       let d, offset =
         try Utf8.decode_step get s
         with Utf8 -> error s pos "malformed UTF-8 encoding"
       in
-      NKParse (pos, Collect (n - offset, d :: l))
-  | NKParse (pos, Rev ([], l, _)) -> NKStop l
-  | NKParse (pos, Rev (c :: l, l', n)) -> NKParse (pos, Rev (l, c :: l', n + 1))
+      let vec = Lazy_vec {lv with vector = Vector.grow 1l lv.vector} in
+      NKParse (pos, lazy_vec_step d vec, len - offset)
   | NKStop l -> assert false (* final step, cannot reduce. *)
 
 let name s =
@@ -1059,13 +1058,11 @@ let import_desc s =
   | 0x03 -> GlobalImport (global_type s)
   | _ -> error s (pos s - 1) "malformed import kind"
 
-type utf8 = int list
-
 type import_kont =
   | ImpKStart  (** Import parsing starting point. *)
   | ImpKModuleName of name_step
       (** Import module name parsing UTF8 char per char step. *)
-  | ImpKItemName of utf8 * name_step
+  | ImpKItemName of Ast.name * name_step
       (** Import item name parsing UTF8 char per char step. *)
   | ImpKStop of import'  (** Import final step. *)
 

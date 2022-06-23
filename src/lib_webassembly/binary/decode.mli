@@ -45,16 +45,14 @@ type byte_vector_kont =
 
 type name_step =
   | NKStart  (** UTF8 name starting point. *)
-  | NKParse of pos * (int, int) vec_map_kont  (** UTF8 char parsing. *)
-  | NKStop of int list  (** UTF8 name final step.*)
-
-type utf8 = int list
+  | NKParse of pos * int lazy_vec_kont * int  (** UTF8 char parsing. *)
+  | NKStop of Ast.name  (** UTF8 name final step.*)
 
 type import_kont =
   | ImpKStart  (** Import parsing starting point. *)
   | ImpKModuleName of name_step
       (** Import module name parsing UTF8 char per char step. *)
-  | ImpKItemName of utf8 * name_step
+  | ImpKItemName of Ast.name * name_step
       (** Import item name parsing UTF8 char per char step. *)
   | ImpKStop of Ast.import'  (** Import final step. *)
 

@@ -40,7 +40,9 @@ let print (FuncType (_, out)) _m _v vs =
   Lwt.return @@ List.map default_value out
 
 let lookup name t =
-  match (Utf8.encode name, t) with
+  let open Lwt.Syntax in
+  let+ name = Utf8.encode name in
+  match (name, t) with
   | "print", _ -> ExternFunc (func print (FuncType ([], [])))
   | "print_i32", _ -> ExternFunc (func print (FuncType ([NumType I32Type], [])))
   | "print_i64", _ -> ExternFunc (func print (FuncType ([NumType I64Type], [])))

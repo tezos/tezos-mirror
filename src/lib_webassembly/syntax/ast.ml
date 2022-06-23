@@ -256,7 +256,9 @@ type num = Values.num Source.phrase
 
 type vec = Values.vec Source.phrase
 
-type name = int list
+type name = int Vector.t
+
+type name_list = int list
 
 type block_type = VarBlockType of var | ValBlockType of value_type option
 
@@ -494,8 +496,9 @@ let export_type (m : module_) (ex : export) : extern_type Lwt.t =
       ExternGlobalType (nth gts x.it)
 
 let string_of_name n =
+  let n = Vector.loaded_bindings n in
   let b = Buffer.create 16 in
-  let escape uc =
+  let escape (_, uc) =
     if uc < 0x20 || uc >= 0x7f then
       Buffer.add_string b (Printf.sprintf "\\u{%02x}" uc)
     else
