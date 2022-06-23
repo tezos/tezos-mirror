@@ -723,8 +723,10 @@ let pp_manager_operation_contents_result ppf op_result =
     pp_consumed_gas ppf consumed_gas ;
     pp_inbox_after ppf inbox_after
   in
-  let pp_sc_rollup_cement_result (Sc_rollup_cement_result {consumed_gas}) =
-    pp_consumed_gas ppf consumed_gas
+  let pp_sc_rollup_cement_result
+      (Sc_rollup_cement_result {consumed_gas; inbox_level}) =
+    pp_consumed_gas ppf consumed_gas ;
+    Format.fprintf ppf "@,Inbox level: %a" Raw_level.pp inbox_level
   in
   let pp_sc_rollup_publish_result
       (Sc_rollup_publish_result

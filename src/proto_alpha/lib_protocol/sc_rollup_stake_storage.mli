@@ -81,7 +81,7 @@ val publish_commitment :
   Lwt.t
 
 (** [cement_commitment context rollup commitment] cements the given
-    commitment.
+    commitment whose hash is given (and returns the corresponding commitment).
 
     Subsequent calls to [refine_stake] and [cement_commitment] must use
     a [context] with greater level, or behavior is undefined.
@@ -111,7 +111,7 @@ val cement_commitment :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   Sc_rollup_commitment_repr.Hash.t ->
-  Raw_context.t tzresult Lwt.t
+  (Raw_context.t * Sc_rollup_commitment_repr.t) tzresult Lwt.t
 
 (** [find_staker_unsafe ctxt rollup staker] returns the branch on which the stake
     is deposited for the [rollup]'s [staker].

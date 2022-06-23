@@ -1810,9 +1810,12 @@ let apply_manager_operation :
       return (ctxt, result, [])
   | Sc_rollup_cement {rollup; commitment} ->
       Sc_rollup.Stake_storage.cement_commitment ctxt rollup commitment
-      >>=? fun ctxt ->
+      >>=? fun (ctxt, commitment) ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
-      let result = Sc_rollup_cement_result {consumed_gas} in
+      let result =
+        Sc_rollup_cement_result
+          {consumed_gas; inbox_level = commitment.inbox_level}
+      in
       return (ctxt, result, [])
   | Sc_rollup_publish {rollup; commitment} ->
       Sc_rollup.Stake_storage.publish_commitment ctxt rollup source commitment

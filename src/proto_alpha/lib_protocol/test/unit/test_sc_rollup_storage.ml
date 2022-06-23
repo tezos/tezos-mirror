@@ -816,9 +816,9 @@ let test_cement_three_commitments () =
       commitment
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
-  let* ctxt = Sc_rollup_stake_storage.cement_commitment ctxt rollup c1 in
-  let* ctxt = Sc_rollup_stake_storage.cement_commitment ctxt rollup c2 in
-  let* ctxt = Sc_rollup_stake_storage.cement_commitment ctxt rollup c3 in
+  let* ctxt, _ = Sc_rollup_stake_storage.cement_commitment ctxt rollup c1 in
+  let* ctxt, _ = Sc_rollup_stake_storage.cement_commitment ctxt rollup c2 in
+  let* ctxt, _ = Sc_rollup_stake_storage.cement_commitment ctxt rollup c3 in
   assert_true ctxt
 
 let test_cement_then_remove () =
@@ -849,7 +849,7 @@ let test_cement_then_remove () =
          commitment
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
-  let* ctxt =
+  let* ctxt, _ =
     lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
   in
   assert_fails_with
@@ -1027,7 +1027,7 @@ let test_last_cemented_commitment_hash_with_level () =
          commitment
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
-  let* ctxt =
+  let* ctxt, _ =
     lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
   in
   let* c1', inbox_level', ctxt =
@@ -1817,7 +1817,7 @@ let test_no_conflict_point_one_staker_at_lcc () =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
-  let* ctxt =
+  let* ctxt, _ =
     lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
   in
   assert_fails_with
@@ -1862,7 +1862,7 @@ let test_no_conflict_point_both_stakers_at_lcc () =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
-  let* ctxt =
+  let* ctxt, _ =
     lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
   in
   assert_fails_with
@@ -2194,7 +2194,9 @@ let test_concurrent_refinement_cement () =
        let ctxt =
          Raw_context.Internal_for_tests.add_level ctxt challenge_window
        in
-       let* ctxt = Sc_rollup_stake_storage.cement_commitment ctxt rollup c1 in
+       let* ctxt, _ =
+         Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
+       in
        Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
   in
   let* c2, ctxt =
@@ -2219,7 +2221,9 @@ let test_concurrent_refinement_cement () =
        let ctxt =
          Raw_context.Internal_for_tests.add_level ctxt challenge_window
        in
-       let* ctxt = Sc_rollup_stake_storage.cement_commitment ctxt rollup c2 in
+       let* ctxt, _ =
+         Sc_rollup_stake_storage.cement_commitment ctxt rollup c2
+       in
        Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
   in
   assert_commitment_hash_equal ~loc:__LOC__ ctxt c1 c2
