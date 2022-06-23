@@ -54,21 +54,30 @@ let test_empty () =
     (err "An empty inbox should have no available message.")
 
 let setup_inbox_with_messages list_of_payloads f =
-  create_context () >>=? fun ctxt ->
+  let open Lwt_result_syntax in
+  let* ctxt = create_context () in
   let empty_messages = Environment.Context.Tree.empty ctxt in
   let inbox = empty rollup level in
   let history = history_at_genesis ~bound:10000L in
   let rec aux level history inbox inboxes messages = function
     | [] -> return (messages, history, inbox, inboxes)
     | payloads :: ps ->
-        add_external_messages history inbox level payloads messages
-        >>=? fun (messages, history, inbox') ->
+        let*? payloads =
+          List.map_e
+            (fun payload ->
+              Sc_rollup_inbox_message_repr.(to_bytes @@ External payload))
+            payloads
+        in
+        let* messages, history, inbox' =
+          add_messages history inbox level payloads messages
+        in
         let level = Raw_level_repr.succ level in
         aux level history inbox' (inbox :: inboxes) messages ps
   in
-  aux level history inbox [] empty_messages list_of_payloads
-  >|= Environment.wrap_tzresult
-  >>=? fun (messages, history, inbox, inboxes) ->
+  let* messages, history, inbox, inboxes =
+    aux level history inbox [] empty_messages list_of_payloads
+    >|= Environment.wrap_tzresult
+  in
   f messages history inbox inboxes
 
 let test_add_messages payloads =
