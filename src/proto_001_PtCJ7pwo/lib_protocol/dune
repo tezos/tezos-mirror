@@ -209,8 +209,7 @@
  (name tezos_protocol_001_PtCJ7pwo_functor)
  (libraries
   tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-001-PtCJ7pwo.raw)
+  tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68

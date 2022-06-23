@@ -298,8 +298,7 @@
  (name tezos_protocol_012_Psithaca_functor)
  (libraries
   tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-012-Psithaca.raw)
+  tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -w -51

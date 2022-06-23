@@ -67,8 +67,7 @@
  (name tezos_protocol_demo_noops_functor)
  (libraries
   tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-demo-noops.raw)
+  tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -nopervasives)

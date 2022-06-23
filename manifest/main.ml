@@ -3497,12 +3497,7 @@ include Tezos_raw_protocol_%s.Main
           ~bisect_ppx:false
           ~flags:(Flags.standard ~nopervasives:true ~disable_warnings ())
           ~opam_only_deps:[octez_protocol_compiler_tezos_protocol_packer]
-          ~deps:
-            [
-              octez_protocol_environment;
-              tezos_protocol_environment_sigs;
-              raw_protocol;
-            ]
+          ~deps:[octez_protocol_environment; tezos_protocol_environment_sigs]
           ~dune:
             Dune.
               [

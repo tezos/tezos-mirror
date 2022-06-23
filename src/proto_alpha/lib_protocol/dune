@@ -480,8 +480,7 @@
  (name tezos_protocol_alpha_functor)
  (libraries
   tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-alpha.raw)
+  tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -nopervasives)

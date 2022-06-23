@@ -429,8 +429,7 @@
  (name tezos_protocol_013_PtJakart_functor)
  (libraries
   tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-013-PtJakart.raw)
+  tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -w -51

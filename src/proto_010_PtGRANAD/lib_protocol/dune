@@ -243,8 +243,7 @@
  (name tezos_protocol_010_PtGRANAD_functor)
  (libraries
   tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-010-PtGRANAD.raw)
+  tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68

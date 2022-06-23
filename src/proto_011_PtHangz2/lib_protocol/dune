@@ -264,8 +264,7 @@
  (name tezos_protocol_011_PtHangz2_functor)
  (libraries
   tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-011-PtHangz2.raw)
+  tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -w -51

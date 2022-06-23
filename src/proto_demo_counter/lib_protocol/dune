@@ -86,8 +86,7 @@
  (name tezos_protocol_demo_counter_functor)
  (libraries
   tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-demo-counter.raw)
+  tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -nopervasives)

@@ -213,8 +213,7 @@
  (name tezos_protocol_005_PsBabyM1_functor)
  (libraries
   tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-005-PsBabyM1.raw)
+  tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68

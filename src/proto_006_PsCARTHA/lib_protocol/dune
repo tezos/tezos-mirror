@@ -213,8 +213,7 @@
  (name tezos_protocol_006_PsCARTHA_functor)
  (libraries
   tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-006-PsCARTHA.raw)
+  tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68

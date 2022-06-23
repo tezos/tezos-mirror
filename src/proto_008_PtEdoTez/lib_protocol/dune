@@ -227,8 +227,7 @@
  (name tezos_protocol_008_PtEdoTez_functor)
  (libraries
   tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-008-PtEdoTez.raw)
+  tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68

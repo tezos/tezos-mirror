@@ -76,8 +76,7 @@
  (name tezos_protocol_000_Ps9mPmXa_functor)
  (libraries
   tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-000-Ps9mPmXa.raw)
+  tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
