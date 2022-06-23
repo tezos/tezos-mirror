@@ -177,6 +177,8 @@ module V1 : sig
     (Sc_rollup_repr.State_hash.t option * Sc_rollup_tick_repr.t) list ->
     unit
 
+  val player_equal : player -> player -> bool
+
   val pp : Format.formatter -> t -> unit
 end
 

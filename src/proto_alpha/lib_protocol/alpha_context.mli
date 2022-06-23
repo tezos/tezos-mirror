@@ -3196,6 +3196,8 @@ module Sc_rollup : sig
   module Game : sig
     type player = Alice | Bob
 
+    val player_equal : player -> player -> bool
+
     type t = {
       turn : player;
       inbox_snapshot : Inbox.t;

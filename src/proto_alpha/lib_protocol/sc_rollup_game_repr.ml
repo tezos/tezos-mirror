@@ -56,6 +56,12 @@ module V1 = struct
           (fun () -> Bob);
       ]
 
+  let player_equal p1 p2 =
+    match (p1, p2) with
+    | Alice, Alice -> true
+    | Bob, Bob -> true
+    | _, _ -> false
+
   let string_of_player = function Alice -> "alice" | Bob -> "bob"
 
   let pp_player ppf player = Format.fprintf ppf "%s" (string_of_player player)
