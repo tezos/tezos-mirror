@@ -81,6 +81,11 @@ let get_messages Node_context.{l1_ctxt; rollup_address; _} head =
     match operation with
     | Sc_rollup_add_messages {rollup; messages}
       when Sc_rollup.Address.(rollup = rollup_address) ->
+        let messages =
+          List.map
+            (fun message -> Store.Inbox.Message.External message)
+            messages
+        in
         List.rev_append messages accu
     | _ -> accu
   in
@@ -124,12 +129,7 @@ let process_head node_ctxt store Layer1.(Head {level; hash = head_hash} as head)
       @@ let*! history = State.history_of_hash store predecessor in
          let*! messages_tree = State.find_message_tree store predecessor in
          let*? level = Raw_level.of_int32 level in
-         let*? messages =
-           List.map_e
-             (fun message ->
-               Sc_rollup.Inbox.Message.(serialize @@ External message))
-             messages
-         in
+         let*? messages = List.map_e Store.Inbox.Message.serialize messages in
          let* messages_tree, history, inbox =
            Store.Inbox.add_messages
              store
