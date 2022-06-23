@@ -2764,7 +2764,11 @@ module Sc_rollup : sig
   module Staker :
     S.SIGNATURE_PUBLIC_KEY_HASH with type t = Signature.Public_key_hash.t
 
-  module State_hash : S.HASH
+  module State_hash : sig
+    include S.HASH
+
+    val context_hash_to_state_hash : Context_hash.t -> t
+  end
 
   module Inbox : sig
     type t
@@ -3031,6 +3035,8 @@ module Sc_rollup : sig
         Context.TREE with type key = string list and type value = bytes
 
       type tree = Tree.tree
+
+      val hash_tree : tree -> State_hash.t
 
       type proof
 

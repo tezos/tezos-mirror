@@ -31,6 +31,8 @@ module type P = sig
 
   type tree = Tree.tree
 
+  val hash_tree : tree -> State_hash.t
+
   type proof
 
   val proof_encoding : proof Data_encoding.t
@@ -739,9 +741,7 @@ module Make (Context : P) :
       let* status = Status.get in
       match status with
       | Halted -> return State_hash.zero
-      | _ ->
-          Context_hash.to_bytes @@ Tree.hash state |> fun h ->
-          return @@ State_hash.hash_bytes [h]
+      | _ -> return @@ Context.hash_tree state
     in
     let open Lwt_syntax in
     let* state = Monad.run m state in
@@ -1134,6 +1134,8 @@ module ProtocolImplementation = Make (struct
 
   type tree = Context.tree
 
+  let hash_tree t = State_hash.context_hash_to_state_hash (Tree.hash t)
+
   type proof = Context.Proof.tree Context.Proof.t
 
   let verify_proof p f =
@@ -1144,8 +1146,7 @@ module ProtocolImplementation = Make (struct
     Lwt.return None
 
   let kinded_hash_to_state_hash = function
-    | `Value hash | `Node hash ->
-        State_hash.hash_bytes [Context_hash.to_bytes hash]
+    | `Value hash | `Node hash -> State_hash.context_hash_to_state_hash hash
 
   let proof_before proof = kinded_hash_to_state_hash proof.Context.Proof.before
 

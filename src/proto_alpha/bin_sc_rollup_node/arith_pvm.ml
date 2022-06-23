@@ -36,6 +36,11 @@ module Arith_proof_format = struct
 
   type proof = IStoreProof.Proof.tree IStoreProof.Proof.t
 
+  let context_hash_to_state_hash h =
+    Sc_rollup.State_hash.hash_bytes [Context_hash.to_bytes h]
+
+  let hash_tree tree = context_hash_to_state_hash (IStoreTree.hash tree)
+
   let verify_proof proof step =
     (* The rollup node is not supposed to verify proof. We keep
        this part in case this changes in the future. *)
@@ -58,8 +63,7 @@ module Arith_proof_format = struct
 
   let kinded_hash_to_state_hash :
       IStoreProof.Proof.kinded_hash -> Sc_rollup.State_hash.t = function
-    | `Value hash | `Node hash ->
-        Sc_rollup.State_hash.hash_bytes [Context_hash.to_bytes hash]
+    | `Value hash | `Node hash -> context_hash_to_state_hash hash
 
   let proof_before proof =
     kinded_hash_to_state_hash proof.IStoreProof.Proof.before

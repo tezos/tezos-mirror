@@ -109,6 +109,8 @@ module State_hash = struct
   let () = Base58.check_encoded_prefix b58check_encoding prefix encoded_size
 
   include Path_encoding.Make_hex (H)
+
+  let context_hash_to_state_hash h = hash_bytes [Context_hash.to_bytes h]
 end
 
 type t = Address.t

@@ -133,6 +133,8 @@ module type P = sig
 
   type tree = Tree.tree
 
+  val hash_tree : tree -> Sc_rollup_repr.State_hash.t
+
   type proof
 
   val proof_encoding : proof Data_encoding.t
