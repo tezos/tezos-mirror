@@ -26,6 +26,13 @@
 module type S = sig
   type ('content, 'ptr) cell
 
+  val pp :
+    pp_content:(Format.formatter -> 'content -> unit) ->
+    pp_ptr:(Format.formatter -> 'ptr -> unit) ->
+    Format.formatter ->
+    ('content, 'ptr) cell ->
+    unit
+
   val equal :
     ('content -> 'content -> bool) ->
     ('ptr -> 'ptr -> bool) ->
@@ -135,6 +142,20 @@ end) : S = struct
       a
       []
     |> List.rev
+
+  let pp ~pp_content ~pp_ptr fmt {content; back_pointers; index} =
+    Format.fprintf
+      fmt
+      {|
+       content = %a
+       index = %d
+       back_pointers = %a
+    |}
+      pp_content
+      content
+      index
+      (Format.pp_print_list pp_ptr)
+      (back_pointers_to_list back_pointers)
 
   let encoding ptr_encoding content_encoding =
     let of_list =

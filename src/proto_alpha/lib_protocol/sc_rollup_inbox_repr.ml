@@ -135,19 +135,7 @@ let equal_history_proof = Skip_list.equal Hash.equal Hash.equal
 let history_proof_encoding : history_proof Data_encoding.t =
   Skip_list.encoding Hash.encoding Hash.encoding
 
-let pp_history_proof fmt cell =
-  Format.fprintf
-    fmt
-    {|
-       content = %a
-       index = %d
-       back_pointers = %a
-    |}
-    Hash.pp
-    (Skip_list.content cell)
-    (Skip_list.index cell)
-    (Format.pp_print_list Hash.pp)
-    (Skip_list.back_pointers cell)
+let pp_history_proof = Skip_list.pp ~pp_content:Hash.pp ~pp_ptr:Hash.pp
 
 module V1 = struct
   (*
