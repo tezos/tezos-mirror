@@ -582,13 +582,13 @@ and kinstr_size :
     | IJoin_tickets (_, cty, _) ->
         ret_succ_adding (accu ++ ty_size cty) (base +! word_size)
     | IOpen_chest (_, _) -> ret_succ_adding accu base
-    | IEmit {loc = _; tag; ty; addr = _; k = _} ->
+    | IEmit {loc = _; tag; ty; addr; k = _} ->
         ret_succ_adding
           (accu ++ ty_size ty)
           (base
           +! Entrypoint.in_memory_size tag
           +! (word_size *? 3)
-          +! Saturation_repr.safe_int Contract_event.Hash.size)
+          +! Contract_event.in_memory_size addr)
     | IHalt _ -> ret_succ_adding accu h1w
     | ILog _ ->
         (* This instruction is ignored because it is only used for testing. *)
