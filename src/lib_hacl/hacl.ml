@@ -38,7 +38,7 @@ module Rand = struct
 end
 
 module Hash = struct
-  open Hacl_star__SharedDefs
+  open Hacl_star.SharedDefs
 
   module type HASH_ALG = sig
     val alg : HashDefs.alg

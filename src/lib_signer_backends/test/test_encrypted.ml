@@ -87,7 +87,7 @@ let fake_ctx () : Client_context.io_wallet =
           string ->
           default:'a ->
           'a Data_encoding.t ->
-          'a Tezos_base__TzPervasives.tzresult Lwt.t =
+          'a Tezos_base.TzPervasives.tzresult Lwt.t =
       fun _ ~default _ -> Lwt.return_ok default
 
     method load_passwords = None
@@ -101,7 +101,7 @@ let fake_ctx () : Client_context.io_wallet =
           string ->
           'a ->
           'a Data_encoding.t ->
-          unit Tezos_base__TzPervasives.tzresult Lwt.t =
+          unit Tezos_base.TzPervasives.tzresult Lwt.t =
       fun _ _ _ -> Lwt.return_ok ()
 
     method last_modification_time : string -> float option tzresult Lwt.t =
