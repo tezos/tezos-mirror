@@ -29,8 +29,8 @@ module Test = struct
     let slot_segment_size = 4096 in
     let msg_size = slot_size in
     let msg = Bytes.create msg_size in
-    for i = 0 to (msg_size / 64) - 1 do
-      Bytes.set_int64_le msg i (Random.int64 Int64.max_int)
+    for i = 0 to (msg_size / 8) - 1 do
+      Bytes.set_int64_le msg (i * 8) (Random.int64 Int64.max_int)
     done ;
     let open Tezos_error_monad.Error_monad.Result_syntax in
     List.iter
