@@ -86,8 +86,8 @@ module type S = sig
       @raises Memory_exn.Bounds when trying to set an invalid key *)
   val set : key -> 'a -> 'a t -> 'a t
 
-  (** [cons value vector] prepends a value to the front. That value can then be
-      accessed using the [zero] key.
+  (** [cons value vector] prepends a value to the front and grows the vector by
+      one. That value can then be accessed using the [zero] key.
 
       Time complexity: O(log(instantiated_elements_in_vector)) *)
   val cons : 'a -> 'a t -> 'a t
@@ -104,6 +104,11 @@ module type S = sig
   (** [to_list vector] extracts all values of the given [vector] and
       collects them in a list.  *)
   val to_list : 'a t -> 'a list effect
+
+  (** [loaded_bindings vector] returns the [(key * 'a) list] representation of
+      the vector [vector] containing only the loaded values, in order of
+      increasing keys. This function is a witness of internal mutations. *)
+  val loaded_bindings : 'a t -> (key * 'a) list
 end
 
 module Make (Effect : Effect.S) (Key : KeyS) :

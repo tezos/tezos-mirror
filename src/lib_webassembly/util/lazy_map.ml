@@ -59,6 +59,8 @@ module type S = sig
     'a t
 
   val with_producer : ('a producer -> 'a producer) -> 'a t -> 'a t
+
+  val loaded_bindings : 'a t -> (key * 'a) list
 end
 
 exception UnexpectedAccess
@@ -127,6 +129,8 @@ module Make (Effect : Effect.S) (Key : KeyS) :
 
   let with_producer morph map =
     {map with produce_value = morph map.produce_value}
+
+  let loaded_bindings m = Map.bindings m.values
 end
 
 module IntMap = Make (Effect.Identity) (Int)
