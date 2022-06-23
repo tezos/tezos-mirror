@@ -49,17 +49,9 @@ open Environment_context
    environment ([module type Vx_T]).
 
    If you want to mock this module type, see {!Environment_protocol_T_test}. *)
-module type T = sig
-  (* Documentation for this interface may be found in
-     module type [PROTOCOL] of [sigs/v3/updater.mli]. *)
-
-  include Environment_protocol_T_V6.T
-
-  val set_log_message_consumer :
-    (Internal_event.level -> string -> unit) -> unit
-
-  val environment_version : Protocol.env_version
-end
+module type T = Environment_protocol_T_V6.T
+(* Documentation for this interface may be found in
+   module type [PROTOCOL] of [sigs/v6/updater.mli]. *)
 
 module V0toV6
     (E : Environment_protocol_T_V0.T
@@ -120,6 +112,9 @@ module type PROTOCOL = sig
        and type 'a tzresult := 'a Error_monad.tzresult
        and type cache_key := Context.Cache.key
        and type cache_value := Context.Cache.value
+
+  val set_log_message_consumer :
+    (Internal_event.level -> string -> unit) -> unit
 
   val environment_version : Protocol.env_version
 
