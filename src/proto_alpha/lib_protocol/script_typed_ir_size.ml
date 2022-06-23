@@ -29,9 +29,6 @@ include Cache_memory_helpers
 
 let script_string_size s = Script_string.to_string s |> string_size
 
-(* Memo-sizes are 16-bit integers *)
-let sapling_memo_size_size = !!0
-
 let ty_traverse_f =
   let base_basic =
     !!0
@@ -81,15 +78,21 @@ let ty_traverse_f =
         ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
     | Contract_t (_ty, a) ->
         ret_succ_adding accu @@ (base_compound a +! word_size)
-    | Sapling_transaction_t _m ->
+    | Sapling_transaction_t m ->
         ret_succ_adding accu
-        @@ (base_compound_no_meta +! sapling_memo_size_size +! word_size)
-    | Sapling_transaction_deprecated_t _m ->
+        @@ base_compound_no_meta
+           +! Sapling.Memo_size.in_memory_size m
+           +! word_size
+    | Sapling_transaction_deprecated_t m ->
         ret_succ_adding accu
-        @@ (base_compound_no_meta +! sapling_memo_size_size +! word_size)
-    | Sapling_state_t _m ->
+        @@ base_compound_no_meta
+           +! Sapling.Memo_size.in_memory_size m
+           +! word_size
+    | Sapling_state_t m ->
         ret_succ_adding accu
-        @@ (base_compound_no_meta +! sapling_memo_size_size +! word_size)
+        @@ base_compound_no_meta
+           +! Sapling.Memo_size.in_memory_size m
+           +! word_size
     | Ticket_t (_cty, a) ->
         ret_succ_adding accu @@ (base_compound a +! word_size)
   in
@@ -171,11 +174,11 @@ let dup_n_gadt_witness_size = peano_shape_proof
 let contract_size (Typed_contract {arg_ty; address}) =
   ret_adding (ty_size arg_ty) (h2w +! address_size address)
 
-let sapling_state_size {Sapling.id; diff; memo_size = _} =
+let sapling_state_size {Sapling.id; diff; memo_size} =
   h3w
   +! option_size (fun x -> z_size (Sapling.Id.unparse_to_z x)) id
   +! Sapling.diff_in_memory_size diff
-  +! sapling_memo_size_size
+  +! Sapling.Memo_size.in_memory_size memo_size
 
 let chain_id_size = !!16 (* by Obj.reachable_words. *)
 
@@ -515,8 +518,10 @@ and kinstr_size :
           (base +! (word_size *? 2) +! Entrypoint.in_memory_size s)
     | ISelf_address (_, _) -> ret_succ_adding accu base
     | IAmount (_, _) -> ret_succ_adding accu base
-    | ISapling_empty_state (_, _m, _) ->
-        ret_succ_adding accu (base +! word_size +! sapling_memo_size_size)
+    | ISapling_empty_state (_, m, _) ->
+        ret_succ_adding
+          accu
+          (base +! word_size +! Sapling.Memo_size.in_memory_size m)
     | ISapling_verify_update (_, _) -> ret_succ_adding accu base
     | ISapling_verify_update_deprecated (_, _) -> ret_succ_adding accu base
     | IDig (_loc, _n, w, _k) ->

@@ -85,6 +85,10 @@ module Memo_size = struct
     else err
 
   let unparse_to_z = Z.of_int
+
+  let in_memory_size (_ : t) =
+    let open Cache_memory_helpers in
+    !!0
 end
 
 let transaction_get_memo_size (transaction : Sapling.UTXO.transaction) =
