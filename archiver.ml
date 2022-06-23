@@ -26,146 +26,6 @@ open Lwt_result_syntax
 
 let levels_per_folder = 4096l
 
-module Delegate_operations = struct
-  type operation = {
-    kind : Consensus_ops.operation_kind;
-    round : Int32.t option;
-    reception_time : Time.System.t option;
-    errors : error list option;
-    block_inclusion : Block_hash.t list;
-  }
-
-  let operation_encoding =
-    let open Data_encoding in
-    conv
-      (fun {kind; round; reception_time; errors; block_inclusion} ->
-        (kind, round, reception_time, errors, block_inclusion))
-      (fun (kind, round, reception_time, errors, block_inclusion) ->
-        {kind; round; reception_time; errors; block_inclusion})
-      (obj5
-         (dft
-            "kind"
-            Consensus_ops.operation_kind_encoding
-            Consensus_ops.Endorsement)
-         (opt "round" int32)
-         (req "reception_time" (option Time.System.encoding))
-         (opt "errors" (list error_encoding))
-         (dft "included_in_blocks" (list Block_hash.encoding) []))
-
-  type t = {
-    delegate : Signature.public_key_hash;
-    delegate_alias : string option;
-    operations : operation list;
-  }
-
-  let legacy_encoding =
-    let open Data_encoding in
-    conv
-      (fun _ -> assert false)
-      (fun (delegate, delegate_alias, reception_time, errors, block_inclusion) ->
-        match (reception_time, block_inclusion) with
-        | (None, []) -> {delegate; delegate_alias; operations = []}
-        | (_, _) ->
-            {
-              delegate;
-              delegate_alias;
-              operations =
-                [
-                  {
-                    kind = Endorsement;
-                    reception_time;
-                    errors;
-                    round = None;
-                    block_inclusion;
-                  };
-                ];
-            })
-      (obj5
-         (req "delegate" Signature.Public_key_hash.encoding)
-         (opt "delegate_alias" string)
-         (opt "reception_time" Time.System.encoding)
-         (opt "errors" (list error_encoding))
-         (dft "included_in_blocks" (list Block_hash.encoding) []))
-
-  let encoding =
-    let open Data_encoding in
-    conv
-      (fun {delegate; delegate_alias; operations} ->
-        (delegate, delegate_alias, operations))
-      (fun (delegate, delegate_alias, operations) ->
-        {delegate; delegate_alias; operations})
-      (obj3
-         (req "delegate" Signature.Public_key_hash.encoding)
-         (opt "delegate_alias" string)
-         (dft "operations" (list operation_encoding) []))
-
-  let encoding =
-    let open Data_encoding in
-    splitted
-      ~json:
-        (union
-           [
-             case ~title:"current" Json_only encoding Option.some (fun x -> x);
-             case
-               ~title:"legacy"
-               Json_only
-               legacy_encoding
-               (fun _ -> None)
-               (fun x -> x);
-           ])
-      ~binary:encoding
-end
-
-module Block = struct
-  type t = {
-    hash : Block_hash.t;
-    delegate : Signature.public_key_hash;
-    delegate_alias : string option;
-    round : Int32.t;
-    timestamp : Time.Protocol.t;
-    reception_time : Time.System.t;
-    nonce : unit option;
-  }
-
-  let encoding =
-    let open Data_encoding in
-    conv
-      (fun {
-             hash;
-             delegate;
-             delegate_alias;
-             round;
-             reception_time;
-             timestamp;
-             nonce;
-           } ->
-        (hash, delegate, delegate_alias, round, reception_time, timestamp, nonce))
-      (fun ( hash,
-             delegate,
-             delegate_alias,
-             round,
-             reception_time,
-             timestamp,
-             nonce ) ->
-        {
-          hash;
-          delegate;
-          delegate_alias;
-          round;
-          reception_time;
-          timestamp;
-          nonce;
-        })
-      (obj7
-         (req "hash" Block_hash.encoding)
-         (req "delegate" Signature.Public_key_hash.encoding)
-         (opt "delegate_alias" string)
-         (dft "round" int32 0l)
-         (req "reception_time" Time.System.encoding)
-         (req "timestamp" Time.Protocol.encoding)
-         (opt "nonce" unit))
-end
-
 module Anomaly = struct
   (* only anomalies related to endorsements are considered for now *)
   type problem = Missed | Forgotten | Sequestered | Incorrect
@@ -211,27 +71,6 @@ module Anomaly = struct
         then if head.problem = Missed then anomaly :: tail else l
         else head :: insert_in_ordered_list anomaly tail
 end
-
-type t = {
-  blocks : Block.t list;
-  delegate_operations : Delegate_operations.t list;
-  unaccurate : bool;
-}
-
-let encoding =
-  let open Data_encoding in
-  conv
-    (fun {blocks; delegate_operations; unaccurate} ->
-      (blocks, delegate_operations, unaccurate))
-    (fun (blocks, delegate_operations, unaccurate) ->
-      {blocks; delegate_operations; unaccurate})
-    (obj3
-       (dft "blocks" (list Block.encoding) [])
-       (* TODO: change name? *)
-       (dft "endorsements" (list Delegate_operations.encoding) [])
-       (dft "unaccurate" bool false))
-
-let empty = {blocks = []; delegate_operations = []; unaccurate = true}
 
 let dirname_of_level prefix level =
   let base = Int32.mul (Int32.div level levels_per_folder) levels_per_folder in
@@ -303,14 +142,14 @@ let dump_anomalies path level anomalies =
   Lwt.return out
 
 let extract_anomalies path level infos =
-  if infos.unaccurate then return_unit
+  if infos.Data.unaccurate then return_unit
   else
     let anomalies =
       List.fold_left
-        (fun acc Delegate_operations.{delegate; delegate_alias; operations} ->
+        (fun acc Data.Delegate_operations.{delegate; delegate_alias; operations} ->
           List.fold_left
             (fun acc
-                 Delegate_operations.
+                 Data.Delegate_operations.
                    {kind; round; reception_time; errors; block_inclusion} ->
               match errors with
               | Some (_ :: _) ->
@@ -360,7 +199,7 @@ let extract_anomalies path level infos =
             acc
             operations)
         []
-        infos.delegate_operations
+        infos.Data.delegate_operations
     in
     match anomalies with
     | [] -> return_unit
@@ -373,7 +212,7 @@ let extract_anomalies path level infos =
 let add_to_operations block_hash ops_kind ?ops_round operations =
   match
     List.partition
-      (fun Delegate_operations.{kind; round; _} ->
+      (fun Data.Delegate_operations.{kind; round; _} ->
         kind = ops_kind
         &&
         match (round, ops_round) with
@@ -382,11 +221,11 @@ let add_to_operations block_hash ops_kind ?ops_round operations =
         | _ -> assert false)
       operations
   with
-  | ( Delegate_operations.
+  | ( Data.Delegate_operations.
         {kind; round = _; errors; reception_time; block_inclusion}
       :: _,
       operations' ) ->
-      Delegate_operations.
+      Data.Delegate_operations.
         {
           kind;
           round = ops_round;
@@ -412,7 +251,7 @@ let add_inclusion_in_block aliases block_hash ops_kind ops_round validators
   let (updated_known, unknown) =
     List.fold_left
       (fun (acc, missing)
-           Delegate_operations.(
+           Data.Delegate_operations.(
              {delegate; delegate_alias; operations} as delegate_ops) ->
         match
           List.partition
@@ -421,7 +260,7 @@ let add_inclusion_in_block aliases block_hash ops_kind ops_round validators
             missing
         with
         | (_ :: _, missing') ->
-            ( Delegate_operations.
+            ( Data.Delegate_operations.
                 {
                   delegate;
                   delegate_alias;
@@ -440,7 +279,7 @@ let add_inclusion_in_block aliases block_hash ops_kind ops_round validators
       List.fold_left
         (fun acc op ->
           let delegate = op.Consensus_ops.delegate in
-          Delegate_operations.
+          Data.Delegate_operations.
             {
               delegate;
               delegate_alias = Wallet.alias_of_pkh aliases delegate;
@@ -474,7 +313,7 @@ let dump_included_in_block cctxt path block_level block_hash block_round
    let filename = filename_of_level path endorsements_level in
    let mutex = get_file_mutex filename in
    Lwt_mutex.with_lock mutex (fun () ->
-       let* infos = load filename encoding empty in
+       let* infos = load filename Data.encoding Data.empty in
        let delegate_operations' =
          match consensus_ops_info.Consensus_ops.preendorsements with
          | Some validators ->
@@ -484,8 +323,8 @@ let dump_included_in_block cctxt path block_level block_hash block_round
                Consensus_ops.Preendorsement
                consensus_ops_info.preendorsements_round
                validators
-               infos.delegate_operations
-         | None -> infos.delegate_operations
+               infos.Data.delegate_operations
+         | None -> infos.Data.delegate_operations
        in
        let delegate_operations =
          add_inclusion_in_block
@@ -497,13 +336,14 @@ let dump_included_in_block cctxt path block_level block_hash block_round
            delegate_operations'
        in
        let out_infos =
-         {
-           blocks = infos.blocks;
-           delegate_operations;
-           unaccurate = infos.unaccurate;
-         }
+         Data.
+           {
+             blocks = infos.blocks;
+             delegate_operations;
+             unaccurate = infos.unaccurate;
+           }
        in
-       let* () = write filename encoding out_infos in
+       let* () = write filename Data.encoding out_infos in
        extract_anomalies path endorsements_level out_infos)
    >>= fun out ->
    let () = drop_file_mutex filename in
@@ -523,9 +363,9 @@ let dump_included_in_block cctxt path block_level block_hash block_round
   let filename = filename_of_level path block_level in
   let mutex = get_file_mutex filename in
   Lwt_mutex.with_lock mutex (fun () ->
-      let* infos = load filename encoding empty in
+      let* infos = load filename Data.encoding Data.empty in
       let blocks =
-        Block.
+        Data.Block.
           {
             hash = block_hash;
             delegate = baker;
@@ -535,16 +375,17 @@ let dump_included_in_block cctxt path block_level block_hash block_round
             timestamp;
             nonce = None;
           }
-        :: infos.blocks
+        :: infos.Data.blocks
       in
       write
         filename
-        encoding
-        {
-          blocks;
-          delegate_operations = infos.delegate_operations;
-          unaccurate = infos.unaccurate;
-        })
+        Data.encoding
+        Data.
+          {
+            blocks;
+            delegate_operations = infos.delegate_operations;
+            unaccurate = infos.unaccurate;
+          })
   >>= fun out ->
   let () = drop_file_mutex filename in
   match out with
@@ -566,13 +407,14 @@ let merge_operations =
     (fun acc Consensus_ops.{hash = _; kind; round; errors; reception_time} ->
       match
         List.partition
-          (fun Delegate_operations.{round = r; kind = k; _} ->
+          (fun Data.Delegate_operations.{round = r; kind = k; _} ->
             Option.equal Int32.equal r round && kind = k)
           acc
       with
-      | ( Delegate_operations.{block_inclusion; reception_time = None; _} :: _,
+      | ( Data.Delegate_operations.{block_inclusion; reception_time = None; _}
+          :: _,
           acc' ) ->
-          Delegate_operations.
+          Data.Delegate_operations.
             {
               kind;
               round;
@@ -597,11 +439,11 @@ let dump_received cctxt path ?unaccurate level received_ops =
   let mutex = get_file_mutex filename in
   let*! out =
     Lwt_mutex.with_lock mutex (fun () ->
-        let* infos = load filename encoding empty in
+        let* infos = load filename Data.encoding Data.empty in
         let (updated_known, unknown) =
           List.fold_left
             (fun (acc, missing)
-                 Delegate_operations.(
+                 Data.Delegate_operations.(
                    {delegate; delegate_alias; operations} as delegate_ops) ->
               match
                 List.partition
@@ -609,7 +451,7 @@ let dump_received cctxt path ?unaccurate level received_ops =
                   missing
               with
               | ((_, new_operations) :: _, missing') ->
-                  ( Delegate_operations.
+                  ( Data.Delegate_operations.
                       {
                         delegate;
                         delegate_alias;
@@ -619,7 +461,7 @@ let dump_received cctxt path ?unaccurate level received_ops =
                     missing' )
               | ([], _) -> (delegate_ops :: acc, missing))
             ([], received_ops)
-            infos.delegate_operations
+            infos.Data.delegate_operations
         in
         let* delegate_operations =
           match unknown with
@@ -629,7 +471,7 @@ let dump_received cctxt path ?unaccurate level received_ops =
               return
                 (List.fold_left
                    (fun acc (delegate, ops) ->
-                     Delegate_operations.
+                     Data.Delegate_operations.
                        {
                          delegate;
                          delegate_alias = Wallet.alias_of_pkh aliases delegate;
@@ -658,9 +500,9 @@ let dump_received cctxt path ?unaccurate level received_ops =
         in
         let unaccurate = Option.value ~default:infos.unaccurate unaccurate in
         let out_infos =
-          {blocks = infos.blocks; delegate_operations; unaccurate}
+          Data.{blocks = infos.blocks; delegate_operations; unaccurate}
         in
-        let* () = write filename encoding out_infos in
+        let* () = write filename Data.encoding out_infos in
         if infos.unaccurate then return_unit
         else extract_anomalies path level out_infos)
   in
