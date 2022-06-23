@@ -181,7 +181,7 @@ let main_promise (config_file : string option)
               (Tezos_shell_context.Proxy_delegate_maker.make_index
                  ~context_path))
           (function
-            | Index_unix__Raw.Not_written ->
+            | Index_unix.Private.Raw.Not_written ->
                 failwith
                   "error reading data-dir: %s is not a valid context directory"
                   context_path
