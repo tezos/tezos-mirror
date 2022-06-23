@@ -30,8 +30,8 @@
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_011_PtHangz2.Environment
-  -open Pervasives
-  -open Error_monad)
+  -open Tezos_protocol_environment_011_PtHangz2.Environment.Pervasives
+  -open Tezos_protocol_environment_011_PtHangz2.Environment.Error_monad)
  (modules
   Misc
   Path_encoding

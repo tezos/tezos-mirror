@@ -29,8 +29,8 @@
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_genesis.Environment
-  -open Pervasives
-  -open Error_monad)
+  -open Tezos_protocol_environment_genesis.Environment.Pervasives
+  -open Tezos_protocol_environment_genesis.Environment.Error_monad)
  (modules Data Services Main))
 
 (library

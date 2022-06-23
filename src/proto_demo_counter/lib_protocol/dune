@@ -29,8 +29,8 @@
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_demo_counter.Environment
-  -open Pervasives
-  -open Error_monad)
+  -open Tezos_protocol_environment_demo_counter.Environment.Pervasives
+  -open Tezos_protocol_environment_demo_counter.Environment.Error_monad)
  (modules
   Error
   Proto_params

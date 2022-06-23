@@ -30,8 +30,8 @@
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_000_Ps9mPmXa.Environment
-  -open Pervasives
-  -open Error_monad)
+  -open Tezos_protocol_environment_000_Ps9mPmXa.Environment.Pervasives
+  -open Tezos_protocol_environment_000_Ps9mPmXa.Environment.Error_monad)
  (modules Data Services Main))
 
 (library

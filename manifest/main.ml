@@ -2232,16 +2232,14 @@ let _tezos_context_merkle_proof_tests =
     ~opam:"tezos-context"
     ~deps:
       [
-        tezos_base;
+        tezos_base |> open_ ~m:"TzPervasives";
         tezos_base_unix;
-        tezos_context_disk;
+        tezos_context_disk |> open_;
         tezos_context_encoding;
-        tezos_stdlib_unix;
+        tezos_stdlib_unix |> open_;
         qcheck_alcotest;
         tezos_test_helpers;
       ]
-    ~opens:
-      ["Tezos_base__TzPervasives"; "Tezos_context_disk"; "Tezos_stdlib_unix"]
     ~modules:["test_merkle_proof"]
 
 let tezos_validator_lib =
@@ -3420,8 +3418,12 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
                ~nostdlib:true
                ~disable_warnings
                ())
-          ~deps:[environment |> open_ ~m:"Environment"]
-          ~opens:["Pervasives"; "Error_monad"]
+          ~deps:
+            [
+              environment |> open_ ~m:"Environment"
+              |> open_ ~m:"Environment.Pervasives"
+              |> open_ ~m:"Environment.Error_monad";
+            ]
       in
       let main =
         public_lib
@@ -4045,7 +4047,7 @@ include Tezos_raw_protocol_%s.Main
             [
               tezos_base |> open_ ~m:"TzPervasives"
               |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
-              main |> open_;
+              main |> open_ |> open_ ~m:"Protocol";
               client |> if_some |> open_;
               tezos_client_commands |> open_;
               baking |> open_;
@@ -4057,7 +4059,6 @@ include Tezos_raw_protocol_%s.Main
               tezos_mockup_commands;
               tenderbrute |> if_some |> if_ N.(number >= 013) |> open_;
             ]
-          ~opens:[sf "Tezos_protocol_%s.Protocol" name_underscore]
           ~bisect_ppx:false
       in
       test
@@ -4693,9 +4694,15 @@ let get_contracts_lib =
     ~path:"devtools/get_contracts"
     ~synopsis:"Generic tool to extract smart contracts from node's context."
     ~opam:""
-    ~deps:[tezos_client_base_unix; tezos_store]
+    ~deps:
+      [
+        tezos_micheline |> open_;
+        tezos_base |> open_ ~m:"TzPervasives";
+        tezos_stdlib_unix |> open_;
+        tezos_client_base_unix;
+        tezos_store;
+      ]
     ~modules:["get_contracts"; "sigs"; "storage_helpers"]
-    ~opens:["Tezos_micheline"; "Tezos_base__TzPervasives"; "Tezos_stdlib_unix"]
     ~static:false
     ~release:false
     ~bisect_ppx:false
@@ -4727,15 +4734,14 @@ let _get_contracts =
                  ~path
                  ~synopsis:"A script to extract smart contracts from a node."
                  ~opam:""
-                 ~deps:[main; client; get_contracts_lib]
-                 ~modules:[name]
-                 ~opens:
+                 ~deps:
                    [
-                     "Tezos_base__TzPervasives";
-                     "Tezos_raw_protocol_" ^ proto_version;
-                     "Tezos_protocol_environment_" ^ proto_version;
-                     "Tezos_client_" ^ proto_version;
+                     tezos_base |> open_ ~m:"TzPervasives";
+                     main |> open_ ~m:"Protocol";
+                     client |> open_;
+                     get_contracts_lib;
                    ]
+                 ~modules:[name]
                  ~static:false
                  ~release:false
                  ~bisect_ppx:false)

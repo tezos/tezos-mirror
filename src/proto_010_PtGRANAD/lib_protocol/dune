@@ -30,8 +30,8 @@
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_010_PtGRANAD.Environment
-  -open Pervasives
-  -open Error_monad)
+  -open Tezos_protocol_environment_010_PtGRANAD.Environment.Pervasives
+  -open Tezos_protocol_environment_010_PtGRANAD.Environment.Error_monad)
  (modules
   Misc
   Storage_description

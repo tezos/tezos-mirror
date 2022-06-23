@@ -30,8 +30,8 @@
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_013_PtJakart.Environment
-  -open Pervasives
-  -open Error_monad)
+  -open Tezos_protocol_environment_013_PtJakart.Environment.Pervasives
+  -open Tezos_protocol_environment_013_PtJakart.Environment.Error_monad)
  (modules
   Misc
   Non_empty_string
