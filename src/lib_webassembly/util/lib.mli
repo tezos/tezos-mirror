@@ -33,6 +33,8 @@ module List : sig
 
   val concat_map : ('a -> 'b list) -> 'a list -> 'b list
 
+  val concat_map_s : ('a -> 'b list Lwt.t) -> 'a list -> 'b list Lwt.t
+
   val pairwise : ('a -> 'a -> 'b) -> 'a list -> 'b list
 end
 

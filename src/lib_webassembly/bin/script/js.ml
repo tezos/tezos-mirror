@@ -2,6 +2,7 @@ open Types
 open Ast
 open Script
 open Source
+module TzStdLib = Tezos_lwt_result_stdlib.Lwtreslib.Bare
 
 (* Harness *)
 
@@ -199,11 +200,14 @@ type exports = extern_type NameMap.t
 
 type modules = {mutable env : exports Map.t; mutable current : int}
 
-let exports m : exports =
-  List.fold_left
-    (fun map exp -> NameMap.add exp.it.name (export_type m exp) map)
+let exports m : exports Lwt.t =
+  let open Lwt.Syntax in
+  TzStdLib.List.fold_left_s
+    (fun map (_, exp) ->
+      let+ t = export_type m exp in
+      NameMap.add exp.it.name t map)
     NameMap.empty
-    m.it.exports
+    (Lazy_vector.LwtInt32Vector.loaded_bindings m.it.exports)
 
 let modules () : modules = {env = Map.empty; current = 0}
 
@@ -214,7 +218,8 @@ let of_var_opt (mods : modules) = function
   | Some x -> x.it
 
 let bind (mods : modules) x_opt m =
-  let exports = exports m in
+  let open Lwt.Syntax in
+  let+ exports = exports m in
   mods.current <- mods.current + 1 ;
   mods.env <- Map.add (of_var_opt mods x_opt) exports mods.env ;
   if x_opt <> None then mods.env <- Map.add (current_var mods) exports mods.env
@@ -430,8 +435,9 @@ let wrap item_name wrap_action wrap_assertion at =
     :: (FuncType ([RefType FuncRefType; RefType FuncRefType], [NumType I32Type])
        @@ at)
     :: itypes
+    |> Lazy_vector.LwtInt32Vector.of_list
   in
-  let imports =
+  let imports_list =
     [
       {module_name = Utf8.decode "module"; item_name; idesc} @@ at;
       {
@@ -471,18 +477,25 @@ let wrap item_name wrap_action wrap_assertion at =
       (fun i im ->
         match im.it.idesc.it with FuncImport _ -> Int32.add i 1l | _ -> i)
       0l
-      imports
+      imports_list
     @@ at
   in
+  let imports = imports_list |> Lazy_vector.LwtInt32Vector.of_list in
   let edesc = FuncExport item @@ at in
-  let exports = [{name = Utf8.decode "run"; edesc} @@ at] in
+  let exports =
+    [{name = Utf8.decode "run"; edesc} @@ at]
+    |> Lazy_vector.LwtInt32Vector.of_list
+  in
   let body =
     [
       Block (ValBlockType None, action @ assertion @ [Return @@ at]) @@ at;
       Unreachable @@ at;
     ]
   in
-  let funcs = [{ftype = 0l @@ at; locals; body} @@ at] in
+  let funcs =
+    [{ftype = 0l @@ at; locals; body} @@ at]
+    |> Lazy_vector.LwtInt32Vector.of_list
+  in
   let m = {empty_module with types; funcs; imports; exports} @@ at in
   Encode.encode m
 
@@ -585,16 +598,23 @@ let of_result res =
   | RefResult rp -> of_ref_pat rp
 
 let rec of_definition def =
+  let open Lwt.Syntax in
   match def.it with
-  | Textual m -> of_bytes (Encode.encode m)
-  | Encoded (_, bs) -> of_bytes bs
-  | Quoted (_, s) -> (
-      try of_definition (Parse.string_to_module s)
-      with Parse.Syntax _ -> of_bytes "<malformed quote>")
+  | Textual m ->
+      let+ m = Encode.encode m in
+      of_bytes m
+  | Encoded (_, bs) -> of_bytes bs |> Lwt.return
+  | Quoted (_, s) ->
+      Lwt.catch
+        (fun () -> of_definition (Parse.string_to_module s))
+        (function
+          | Parse.Syntax _ -> of_bytes "<malformed quote>" |> Lwt.return
+          | e -> Lwt.fail e)
 
 let of_wrapper mods x_opt name wrap_action wrap_assertion at =
+  let open Lwt.Syntax in
   let x = of_var_opt mods x_opt in
-  let bs = wrap name wrap_action wrap_assertion at in
+  let+ bs = wrap name wrap_action wrap_assertion at in
   "call(instance(" ^ of_bytes bs ^ ", " ^ "exports(" ^ x ^ ")), "
   ^ " \"run\", [])"
 
@@ -618,25 +638,35 @@ let of_action mods act =
         | _ -> None ))
 
 let of_assertion' mods act name args wrapper_opt =
+  let open Lwt.Syntax in
   let act_js, act_wrapper_opt = of_action mods act in
   let js = name ^ "(() => " ^ act_js ^ String.concat ", " ("" :: args) ^ ")" in
   match act_wrapper_opt with
-  | None -> js ^ ";"
+  | None -> Lwt.return (js ^ ";")
   | Some (act_wrapper, out) ->
       let run_name, wrapper =
         match wrapper_opt with
         | None -> (name, run)
         | Some wrapper -> ("run", wrapper)
       in
-      run_name ^ "(() => " ^ act_wrapper (wrapper out) act.at ^ ");  // " ^ js
+      let+ res = act_wrapper (wrapper out) act.at in
+      run_name ^ "(() => " ^ res ^ ");  // " ^ js
 
 let of_assertion mods ass =
+  let open Lwt.Syntax in
   match ass.it with
-  | AssertMalformed (def, _) -> "assert_malformed(" ^ of_definition def ^ ");"
-  | AssertInvalid (def, _) -> "assert_invalid(" ^ of_definition def ^ ");"
-  | AssertUnlinkable (def, _) -> "assert_unlinkable(" ^ of_definition def ^ ");"
+  | AssertMalformed (def, _) ->
+      let+ def = of_definition def in
+      "assert_malformed(" ^ def ^ ");"
+  | AssertInvalid (def, _) ->
+      let+ def = of_definition def in
+      "assert_invalid(" ^ def ^ ");"
+  | AssertUnlinkable (def, _) ->
+      let+ def = of_definition def in
+      "assert_unlinkable(" ^ def ^ ");"
   | AssertUninstantiable (def, _) ->
-      "assert_uninstantiable(" ^ of_definition def ^ ");"
+      let+ def = of_definition def in
+      "assert_uninstantiable(" ^ def ^ ");"
   | AssertReturn (act, ress) ->
       of_assertion'
         mods
@@ -649,31 +679,42 @@ let of_assertion mods ass =
       of_assertion' mods act "assert_exhaustion" [] None
 
 let of_command mods cmd =
+  let open Lwt.Syntax in
+  let+ cmd_s =
+    match cmd.it with
+    | Module (x_opt, def) ->
+        let rec unquote def =
+          match def.it with
+          | Textual m -> Lwt.return m
+          | Encoded (_, bytes) ->
+              Decode.decode ~name:"binary" ~bytes |> Lwt.return
+          | Quoted (_, s) -> unquote (Parse.string_to_module s)
+        in
+        let* unquoted = unquote def in
+        let* () = bind mods x_opt unquoted in
+        let+ def = of_definition def in
+        "let " ^ current_var mods ^ " = instance(" ^ def ^ ");\n"
+        ^
+        if x_opt = None then ""
+        else "let " ^ of_var_opt mods x_opt ^ " = " ^ current_var mods ^ ";\n"
+    | Register (name, x_opt) ->
+        "register(" ^ of_name name ^ ", " ^ of_var_opt mods x_opt ^ ")\n"
+        |> Lwt.return
+    | Action act ->
+        let+ cmd = of_assertion' mods act "run" [] None in
+        cmd ^ "\n"
+    | Assertion ass ->
+        let+ cmd = of_assertion mods ass in
+        cmd ^ "\n"
+    | Meta _ -> assert false
+  in
   "\n// "
   ^ Filename.basename cmd.at.left.file
   ^ ":"
   ^ string_of_int cmd.at.left.line
-  ^ "\n"
-  ^
-  match cmd.it with
-  | Module (x_opt, def) ->
-      let rec unquote def =
-        match def.it with
-        | Textual m -> m
-        | Encoded (_, bytes) -> Decode.decode ~name:"binary" ~bytes
-        | Quoted (_, s) -> unquote (Parse.string_to_module s)
-      in
-      bind mods x_opt (unquote def) ;
-      "let " ^ current_var mods ^ " = instance(" ^ of_definition def ^ ");\n"
-      ^
-      if x_opt = None then ""
-      else "let " ^ of_var_opt mods x_opt ^ " = " ^ current_var mods ^ ";\n"
-  | Register (name, x_opt) ->
-      "register(" ^ of_name name ^ ", " ^ of_var_opt mods x_opt ^ ")\n"
-  | Action act -> of_assertion' mods act "run" [] None ^ "\n"
-  | Assertion ass -> of_assertion mods ass ^ "\n"
-  | Meta _ -> assert false
+  ^ "\n" ^ cmd_s
 
 let of_script scr =
-  (if !Flags.harness then harness else "")
-  ^ String.concat "" (List.map (of_command (modules ())) scr)
+  let open Lwt.Syntax in
+  let+ cmds = TzStdLib.List.map_s (of_command (modules ())) scr in
+  (if !Flags.harness then harness else "") ^ String.concat "" cmds

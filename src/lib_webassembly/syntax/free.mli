@@ -42,6 +42,6 @@ val import : Ast.import -> t
 
 val start : Ast.start -> t
 
-val module_ : Ast.module_ -> t
+val module_ : Ast.module_ -> t Lwt.t
 
 val list : ('a -> t) -> 'a list -> t

@@ -202,6 +202,63 @@ let inline_type_explicit (c : context) x ft at =
     error at "inline function type does not match explicit type";
   x
 
+(** Intermediate module using the string representation. *)
+type parsed_module =
+{
+  p_types : type_ list;
+  p_globals : global list;
+  p_tables : table list;
+  p_memories : memory list;
+  p_funcs : func list;
+  p_start : start option;
+  p_elems : elem_segment list;
+  p_datas : data_segment list;
+  p_imports : import list;
+  p_exports : export list;
+}
+
+(* Auxiliary functions *)
+
+let empty_parsed_module =
+{
+  p_types = [];
+  p_globals = [];
+  p_tables = [];
+  p_memories = [];
+  p_funcs = [];
+  p_start = None;
+  p_elems = [];
+  p_datas = [];
+  p_imports = [];
+  p_exports = [];
+}
+
+let to_module_ pm =
+  let
+    { p_types; p_imports; p_tables; p_memories; p_globals; p_funcs; p_start; p_elems; p_datas;
+      p_exports } = pm.it
+  in
+  let types = Lazy_vector.LwtInt32Vector.of_list p_types in
+  let imports = Lazy_vector.LwtInt32Vector.of_list p_imports in
+  let tables = Lazy_vector.LwtInt32Vector.of_list p_tables in
+  let memories = Lazy_vector.LwtInt32Vector.of_list p_memories in
+  let globals = Lazy_vector.LwtInt32Vector.of_list p_globals in
+  let funcs = Lazy_vector.LwtInt32Vector.of_list p_funcs in
+  let elems = Lazy_vector.LwtInt32Vector.of_list p_elems in
+  let datas = Lazy_vector.LwtInt32Vector.of_list p_datas in
+  let exports = Lazy_vector.LwtInt32Vector.of_list p_exports in
+  {
+    types;
+    tables;
+    memories;
+    globals;
+    funcs;
+    imports;
+    exports;
+    elems;
+    datas;
+    start = p_start;
+  } @@ pm.at
 %}
 
 %token LPAR RPAR
@@ -999,7 +1056,7 @@ start :
 
 module_fields :
   | /* empty */
-    { fun (c : context) () -> {empty_module with types = c.types.list} }
+    { fun (c : context) () -> {empty_parsed_module with p_types = c.types.list} }
   | module_fields1 { $1 }
 
 module_fields1 :
@@ -1008,53 +1065,54 @@ module_fields1 :
   | global module_fields
     { fun c -> let gf = $1 c in let mf = $2 c in
       fun () -> let globs, ims, exs = gf () in let m = mf () in
-      if globs <> [] && m.imports <> [] then
-        error (List.hd m.imports).at "import after global definition";
-      { m with globals = globs @ m.globals;
-        imports = ims @ m.imports; exports = exs @ m.exports } }
+      if globs <> [] && m.p_imports <> [] then
+        (* There's no reasons 0l is inaccessible from the text parser, since it has been built from a list *)
+        error (List.hd m.p_imports).at "import after global definition";
+      { m with p_globals = globs @ m.p_globals;
+        p_imports = ims @ m.p_imports; p_exports = exs @ m.p_exports } }
   | table module_fields
     { fun c -> let tf = $1 c in let mf = $2 c in
       fun () -> let tabs, elems, ims, exs = tf () in let m = mf () in
-      if tabs <> [] && m.imports <> [] then
-        error (List.hd m.imports).at "import after table definition";
-      { m with tables = tabs @ m.tables; elems = elems @ m.elems;
-        imports = ims @ m.imports; exports = exs @ m.exports } }
+      if tabs <> [] && m.p_imports <> [] then
+        error (List.hd m.p_imports).at "import after table definition";
+      { m with p_tables = tabs @ m.p_tables; p_elems = elems @ m.p_elems;
+        p_imports = ims @ m.p_imports; p_exports = exs @ m.p_exports } }
   | memory module_fields
     { fun c -> let mmf = $1 c in let mf = $2 c in
       fun () -> let mems, data, ims, exs = mmf () in let m = mf () in
-      if mems <> [] && m.imports <> [] then
-        error (List.hd m.imports).at "import after memory definition";
-      { m with memories = mems @ m.memories; datas = data @ m.datas;
-        imports = ims @ m.imports; exports = exs @ m.exports } }
+      if mems <> [] && m.p_imports <> [] then
+        error (List.hd m.p_imports).at "import after memory definition";
+      { m with p_memories = mems @ m.p_memories; p_datas = data @ m.p_datas;
+        p_imports = ims @ m.p_imports; p_exports = exs @ m.p_exports } }
   | func module_fields
     { fun c -> let ff = $1 c in let mf = $2 c in
       fun () -> let funcs, ims, exs = ff () in let m = mf () in
-      if funcs <> [] && m.imports <> [] then
-        error (List.hd m.imports).at "import after function definition";
-      { m with funcs = funcs @ m.funcs;
-        imports = ims @ m.imports; exports = exs @ m.exports } }
+      if funcs <> [] && m.p_imports <> [] then
+        error (List.hd m.p_imports).at "import after function definition";
+      { m with p_funcs = funcs @ m.p_funcs;
+        p_imports = ims @ m.p_imports; p_exports = exs @ m.p_exports } }
   | elem module_fields
     { fun c -> let ef = $1 c in let mf = $2 c in
       fun () -> let elems = ef () in let m = mf () in
-      {m with elems = elems :: m.elems} }
+      {m with p_elems = elems :: m.p_elems} }
   | data module_fields
     { fun c -> let df = $1 c in let mf = $2 c in
       fun () -> let data = df () in let m = mf () in
-      {m with datas = data :: m.datas} }
+      {m with p_datas = data :: m.p_datas} }
   | start module_fields
     { fun c -> let mf = $2 c in
       fun () -> let m = mf () in let x = $1 c in
-      match m.start with
+      match m.p_start with
       | Some _ -> error x.at "multiple start sections"
-      | None -> {m with start = Some x} }
+      | None -> {m with p_start = Some x} }
   | import module_fields
     { fun c -> let imf = $1 c in let mf = $2 c in
       fun () -> let im = imf () in let m = mf () in
-      {m with imports = im :: m.imports} }
+      {m with p_imports = im :: m.p_imports} }
   | export module_fields
     { fun c -> let mf = $2 c in
       fun () -> let m = mf () in
-      {m with exports = $1 c :: m.exports} }
+      {m with p_exports = $1 c :: m.p_exports} }
 
 module_var_opt :
   | /* empty */ { None }
@@ -1062,13 +1120,13 @@ module_var_opt :
 
 module_ :
   | LPAR MODULE module_var_opt module_fields RPAR
-    { $3, Textual ($4 (empty_context ()) () @@ at ()) @@ at () }
+    { $3, Textual (($4 (empty_context ()) () @@ at ()) |> to_module_) @@ at () }
 
 inline_module :  /* Sugar */
-  | module_fields { Textual ($1 (empty_context ()) () @@ at ()) @@ at () }
+  | module_fields { Textual (($1 (empty_context ()) () @@ at ()) |> to_module_) @@ at () }
 
 inline_module1 :  /* Sugar */
-  | module_fields1 { Textual ($1 (empty_context ()) () @@ at ()) @@ at () }
+  | module_fields1 { Textual (($1 (empty_context ()) () @@ at ()) |> to_module_) @@ at () }
 
 
 /* Scripts */

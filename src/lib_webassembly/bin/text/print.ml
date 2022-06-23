@@ -7,5 +7,6 @@ let func oc width f = Sexpr.output oc width (Arrange.func f)
 let module_ oc width m = Sexpr.output oc width (Arrange.module_ m)
 
 let script oc width mode s =
-  let script = Arrange.script mode s in
+  let open Lwt.Syntax in
+  let* script = Arrange.script mode s in
   TzStdLib.List.iter_s (Sexpr.output oc width) script

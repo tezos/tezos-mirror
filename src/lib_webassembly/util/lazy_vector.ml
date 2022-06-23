@@ -185,6 +185,7 @@ module Make (Effect : Effect.S) (Key : KeyS) :
   let to_list map =
     let open Effect in
     let rec unroll acc index =
+      Format.printf "index: %s\n%!" (Key.to_string index) ;
       if Key.unsigned_compare index Key.zero > 0 then
         let* prefix = get index map in
         (unroll [@ocaml.tailcall]) (prefix :: acc) (Key.pred index)

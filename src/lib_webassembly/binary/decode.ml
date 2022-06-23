@@ -1,6 +1,7 @@
 (* Decoding stream *)
 
 open Binary_exn
+module Vector = Lazy_vector.LwtInt32Vector
 
 type stream = {name : string; bytes : string; pos : int ref}
 
@@ -1874,15 +1875,16 @@ let module_step state =
         module_kont =
           MKStop
             {
-              types;
-              tables;
-              memories;
-              globals;
-              funcs;
-              imports;
-              exports;
-              elems;
-              datas;
+              (* Parse directly into the Lazy_maps *)
+              types = types |> Vector.of_list;
+              tables = tables |> Vector.of_list;
+              memories = memories |> Vector.of_list;
+              globals = globals |> Vector.of_list;
+              funcs = funcs |> Vector.of_list;
+              imports = imports |> Vector.of_list;
+              exports = exports |> Vector.of_list;
+              elems = elems |> Vector.of_list;
+              datas = datas |> Vector.of_list;
               start;
             };
       }

@@ -49,7 +49,7 @@ let dispatch_file_ext on_binary on_sexpr on_script_binary on_script on_js file =
 
 let create_binary_file file _ get_module =
   let* () = trace_lwt ("Encoding (" ^ file ^ ")...") in
-  let s = Encode.encode (get_module ()) in
+  let* s = Encode.encode (get_module ()) in
   Lwt_io.(
     with_file ~mode:Output file (fun oc ->
         let* () = trace_lwt "Writing..." in
@@ -68,7 +68,7 @@ let create_script_file mode file get_script _ =
 
 let create_js_file file get_script _ =
   let* () = trace_lwt ("Converting (" ^ file ^ ")...") in
-  let js = Js.of_script (get_script ()) in
+  let* js = Js.of_script (get_script ()) in
   Lwt_io.(
     with_file ~mode:Output file (fun oc ->
         let* () = trace_lwt "Writing..." in
@@ -213,10 +213,14 @@ let input_stdin run =
 
 (* Printing *)
 
+let map_to_list m = List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings m)
+
 let print_import m im =
   let open Types in
-  let category, annotation =
-    match Ast.import_type m im with
+  let open Lwt.Syntax in
+  let+ category, annotation =
+    let+ t = Ast.import_type m im in
+    match t with
     | ExternFuncType t -> ("func", string_of_func_type t)
     | ExternTableType t -> ("table", string_of_table_type t)
     | ExternMemoryType t -> ("memory", string_of_memory_type t)
@@ -231,8 +235,10 @@ let print_import m im =
 
 let print_export m ex =
   let open Types in
-  let category, annotation =
-    match Ast.export_type m ex with
+  let open Lwt.Syntax in
+  let+ category, annotation =
+    let+ t = Ast.export_type m ex in
+    match t with
     | ExternFuncType t -> ("func", string_of_func_type t)
     | ExternTableType t -> ("table", string_of_table_type t)
     | ExternMemoryType t -> ("memory", string_of_memory_type t)
@@ -248,8 +254,12 @@ let print_module x_opt m =
   Printf.printf
     "module%s :\n"
     (match x_opt with None -> "" | Some x -> " " ^ x.it) ;
-  List.iter (print_import m) m.it.Ast.imports ;
-  List.iter (print_export m) m.it.Ast.exports ;
+  let* () =
+    TzStdLib.List.iter_s (print_import m) (map_to_list m.it.Ast.imports)
+  in
+  let+ () =
+    TzStdLib.List.iter_s (print_export m) (map_to_list m.it.Ast.exports)
+  in
   flush_all ()
 
 let print_values vs =
@@ -480,7 +490,7 @@ let run_assertion ass : unit Lwt.t =
       let* () = trace_lwt "Asserting invalid..." in
       Lwt.try_bind
         (fun () ->
-          let+ m = run_definition def in
+          let* m = run_definition def in
           Valid.check_module m)
         (fun _ -> Assert.error ass.at "expected validation error")
         (function
@@ -489,7 +499,9 @@ let run_assertion ass : unit Lwt.t =
   | AssertUnlinkable (def, re) ->
       let* () = trace_lwt "Asserting unlinkable..." in
       let* m = run_definition def in
-      if not !Flags.unchecked then Valid.check_module m ;
+      let* () =
+        if not !Flags.unchecked then Valid.check_module m else Lwt.return_unit
+      in
       Lwt.try_bind
         (fun () ->
           let* imports = Import.link m in
@@ -502,7 +514,9 @@ let run_assertion ass : unit Lwt.t =
   | AssertUninstantiable (def, re) ->
       let* () = trace_lwt "Asserting trap..." in
       let* m = run_definition def in
-      if not !Flags.unchecked then Valid.check_module m ;
+      let* () =
+        if not !Flags.unchecked then Valid.check_module m else Lwt.return_unit
+      in
       Lwt.try_bind
         (fun () ->
           let* imports = Import.link m in
@@ -540,13 +554,13 @@ let rec run_command cmd : unit Lwt.t =
       quote := cmd :: !quote ;
       let* m = run_definition def in
       let* () =
-        if not !Flags.unchecked then (
+        if not !Flags.unchecked then
           let* () = trace_lwt "Checking..." in
-          Valid.check_module m ;
+          let* () = Valid.check_module m in
           if !Flags.print_sig then
-            let+ () = trace_lwt "Signature:" in
+            let* () = trace_lwt "Signature:" in
             print_module x_opt m
-          else Lwt.return_unit)
+          else Lwt.return_unit
         else Lwt.return_unit
       in
       bind scripts x_opt [cmd] ;
