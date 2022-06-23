@@ -57,7 +57,12 @@ let check_encode_decode_outbox_message ctxt message =
     Environment.wrap_tzresult
     @@ Internal_for_tests.bytes_of_outbox_message message
   in
-  let* message', _ctxt = wrap @@ outbox_message_of_bytes ctxt bytes in
+  let* message', _ctxt =
+    let*? message_repr =
+      Environment.wrap_tzresult @@ Sc_rollup.Outbox.Message.of_bytes bytes
+    in
+    wrap @@ outbox_message_of_outbox_message_repr ctxt message_repr
+  in
   let*? bytes' =
     Environment.wrap_tzresult
     @@ Internal_for_tests.bytes_of_outbox_message message'

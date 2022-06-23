@@ -611,10 +611,7 @@ let mk_sc_rollup_execute_outbox_message ?counter ?fee ?gas_limit ?storage_limit
     source
     infos.sc_rollup
     (Sc_rollup.Commitment.hash sc_dummy_commitment)
-    ~outbox_level:Raw_level.root
-    ~message_index:0
-    ~inclusion_proof:""
-    ~message:""
+    ~output_proof:""
 
 let mk_sc_rollup_return_bond ?counter ?fee ?gas_limit ?storage_limit
     ?force_reveal ~source (infos : infos) =

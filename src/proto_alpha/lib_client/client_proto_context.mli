@@ -781,10 +781,7 @@ val sc_rollup_execute_outbox_message :
   source:public_key_hash ->
   rollup:Sc_rollup.t ->
   cemented_commitment:Sc_rollup.Commitment.Hash.t ->
-  outbox_level:Raw_level.t ->
-  message_index:int ->
-  inclusion_proof:string ->
-  message:string ->
+  output_proof:string ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->

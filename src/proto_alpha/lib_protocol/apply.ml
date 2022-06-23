@@ -1843,26 +1843,22 @@ let apply_external_manager_operation_content :
         Sc_rollup_timeout_result {status; consumed_gas; balance_updates}
       in
       return (ctxt, result, [])
-  | Sc_rollup_execute_outbox_message
-      {
-        rollup;
-        cemented_commitment;
-        outbox_level;
-        message_index;
-        inclusion_proof;
-        message;
-      } ->
+  | Sc_rollup_execute_outbox_message {rollup; cemented_commitment; output_proof}
+    ->
       Sc_rollup_operations.execute_outbox_message
         ctxt
         rollup
-        cemented_commitment
-        ~outbox_level
-        ~message_index
-        ~inclusion_proof
-        ~message
-      >>=? fun _ctxt ->
-      failwith
-        "Sc_rollup_execute_outbox_message operation is not yet supported."
+        ~cemented_commitment
+        ~source
+        ~output_proof
+      >|=? fun ({Sc_rollup_operations.paid_storage_size_diff; operations}, ctxt)
+        ->
+      let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
+      let result =
+        Sc_rollup_execute_outbox_message_result
+          {paid_storage_size_diff; balance_updates = []; consumed_gas}
+      in
+      (ctxt, result, operations)
   | Sc_rollup_recover_bond {sc_rollup} ->
       Sc_rollup.Stake_storage.withdraw_stake ctxt sc_rollup source
       >>=? fun (ctxt, balance_updates) ->

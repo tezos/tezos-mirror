@@ -2841,25 +2841,11 @@ let commands_rw () =
            ~name:"cemented commitment"
            ~desc:"The hash of the cemented commitment of the rollup."
            Sc_rollup_params.commitment_hash_parameter
-      @@ prefixes ["for"; "the"; "outbox"; "level"]
+      @@ prefixes ["and"; "output"; "proof"]
       @@ param
-           ~name:"outbox level"
-           ~desc:"The level of the rollup's outbox."
-           raw_level_parameter
-      @@ prefixes ["for"; "the"; "message"; "at"; "index"]
-      @@ param
-           ~name:"message index"
-           ~desc:"The index of the rollup's outbox containing the message."
-           non_negative_parameter
-      @@ prefixes ["and"; "inclusion"; "proof"]
-      @@ param
-           ~name:"inclusion proof"
-           ~desc:"The inclusion proof for the message."
-           Sc_rollup_params.unchecked_payload_parameter
-      @@ prefixes ["and"; "message"]
-      @@ param
-           ~name:"message"
-           ~desc:"The message to be executed."
+           ~name:"output proof"
+           ~desc:
+             "The output proof containing the outbox level, index and message."
            Sc_rollup_params.unchecked_payload_parameter
       @@ stop)
       (fun ( fee,
@@ -2872,10 +2858,7 @@ let commands_rw () =
            rollup
            source
            cemented_commitment
-           outbox_level
-           message_index
-           inclusion_proof
-           message
+           output_proof
            cctxt ->
         (match source with
         | Originated _ ->
@@ -2899,10 +2882,7 @@ let commands_rw () =
           ~source
           ~rollup
           ~cemented_commitment
-          ~outbox_level
-          ~message_index
-          ~inclusion_proof
-          ~message
+          ~output_proof
           ~src_pk
           ~src_sk
           ~fee_parameter

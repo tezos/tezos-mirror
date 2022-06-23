@@ -2085,10 +2085,9 @@ let test_staker_cannot_change_branch () =
     Sc_rollup_errors.Sc_rollup_staker_backtracked
 
 let test_kind_of_missing_rollup () =
-  let* ctxt = new_context () in
   let rollup = Sc_rollup_repr.Address.hash_bytes [] in
-  let* kind = lift @@ Sc_rollup_storage.kind ctxt rollup in
-  assert_kinds_are_equal ~loc:__LOC__ Option.None kind
+  assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt _ ->
+      Sc_rollup_storage.kind ctxt rollup)
 
 let test_add_messages_from_missing_rollup () =
   assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->

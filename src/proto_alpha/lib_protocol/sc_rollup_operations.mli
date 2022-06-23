@@ -28,9 +28,17 @@ open Alpha_context
 
 type error +=
   | (* Permanent *) Sc_rollup_invalid_parameters_type
-  | (* Permanent *) Sc_rollup_invalid_atomic_batch
+  | (* Permanent *) Sc_rollup_invalid_last_cemented_commitment
+  | (* Permanent *) Sc_rollup_invalid_output_proof
+  | (* Permanent *) Sc_rollup_invalid_outbox_level
 
-type origination_result = private {address : Sc_rollup.Address.t; size : Z.t}
+(** Result of calling the {!execute_outbox_message} function. *)
+type execute_outbox_message_result = {
+  paid_storage_size_diff : Z.t;
+  operations : Script_typed_ir.packed_internal_operation list;
+}
+
+type origination_result = {address : Sc_rollup.Address.t; size : Z.t}
 
 (** [originate context ~kind ~boot_sector] adds a new rollup running in a
     given [kind] initialized with a [boot_sector]. *)
@@ -41,12 +49,32 @@ val originate :
   parameters_ty:Script_repr.lazy_expr ->
   (origination_result * context) tzresult Lwt.t
 
+(** [execute_outbox_message ctxt rollup ~cemented_commitment ~source
+      ~output_proof] validates the given outbox message and prepares a set of
+      resulting operations. *)
 val execute_outbox_message :
   context ->
   Sc_rollup.t ->
-  Sc_rollup.Commitment.Hash.t ->
-  outbox_level:Raw_level.t ->
-  message_index:int ->
-  inclusion_proof:string ->
-  message:string ->
-  context tzresult Lwt.t
+  cemented_commitment:Sc_rollup.Commitment.Hash.t ->
+  source:public_key_hash ->
+  output_proof:string ->
+  (execute_outbox_message_result * context) tzresult Lwt.t
+
+(** A module used for testing purposes only. *)
+module Internal_for_tests : sig
+  (** Same as {!execute_outbox_message} but allows overriding the extraction
+      and validation of output proofs. *)
+  val execute_outbox_message :
+    context ->
+    validate_and_decode_output_proof:
+      (context ->
+      cemented_commitment:Sc_rollup.Commitment.Hash.t ->
+      Sc_rollup.t ->
+      output_proof:string ->
+      (Sc_rollup.output * context) tzresult Lwt.t) ->
+    Sc_rollup.t ->
+    cemented_commitment:Sc_rollup.Commitment.Hash.t ->
+    source:public_key_hash ->
+    output_proof:string ->
+    (execute_outbox_message_result * context) tzresult Lwt.t
+end

@@ -988,6 +988,10 @@ module Constants : sig
 
   val sc_rollup_max_lookahead_in_blocks : Raw_context.t -> int32
 
+  val sc_rollup_max_active_outbox_levels : context -> int32
+
+  val sc_rollup_max_outbox_messages_per_level : context -> int
+
   (** All constants: fixed and parametric *)
   type t = private {fixed : fixed; parametric : Parametric.t}
 
@@ -3146,7 +3150,7 @@ module Sc_rollup : sig
   val parameters_type :
     context -> t -> (Script.lazy_expr option * context) tzresult Lwt.t
 
-  val kind : context -> t -> Kind.t option tzresult Lwt.t
+  val kind : context -> t -> Kind.t tzresult Lwt.t
 
   module Errors : sig
     type error += Sc_rollup_does_not_exist of t
@@ -3798,10 +3802,7 @@ and _ manager_operation =
   | Sc_rollup_execute_outbox_message : {
       rollup : Sc_rollup.t;
       cemented_commitment : Sc_rollup.Commitment.Hash.t;
-      outbox_level : Raw_level.t;
-      message_index : int;
-      inclusion_proof : string;
-      message : string;
+      output_proof : string;
     }
       -> Kind.sc_rollup_execute_outbox_message manager_operation
   | Sc_rollup_recover_bond : {

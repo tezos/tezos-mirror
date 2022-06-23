@@ -503,14 +503,9 @@ and _ manager_operation =
       rollup : Sc_rollup_repr.t;  (** The smart-contract rollup. *)
       cemented_commitment : Sc_rollup_commitment_repr.Hash.t;
           (** The hash of the last cemented commitment that the proof refers to. *)
-      outbox_level : Raw_level_repr.t;
-          (** The level of the outbox containing transaction batch message. *)
-      message_index : int;
-          (** The index of the message in the outbox at that level. *)
-      inclusion_proof : string;
-          (** A proof that the message is included in the outbox. *)
-      message : string;
-          (** The bytes corresponding to a serialized batch of transactions. *)
+      output_proof : string;
+          (** A message along with a proof that it is included in the outbox
+              at a given outbox level and message index.*)
     }
       -> Kind.sc_rollup_execute_outbox_message manager_operation
   | Sc_rollup_recover_bond : {
