@@ -143,6 +143,9 @@ let exs ?(error = 0) n show ty ?(sample = fun () -> sample_value ty) label =
 
 let nsample = 100
 
+type ex_kinstr = Kinstr : string * ('a, 'b, 'c, 'd) kinstr * int -> ex_kinstr
+[@@boxed]
+
 (** [check_value_size ()] covers a finite number of cases of Michelson
    values, checking that the cost model is sound with respect to their
    memory footprint.
@@ -656,9 +659,335 @@ let check_ty_size () =
   in
   List.iter_es (fun _ -> check ()) (1 -- nsample)
 
+(* Test that the model accurately predicts instruction sizes. It tests each
+   type of instruction separately as much as possible. Tested values are
+   specifically tailored so that they can't be shared (in particular all
+   reused values are wrapped in functions to force recomputation). Thanks
+   to this the model gives precise predictions for each instruction. In real
+   life the model will over-approximate due to sharing. It should never under-
+   approximate though. *)
+let check_kinstr_size () =
+  let open Lwt_result_syntax in
+  let check (Kinstr (name, kinstr, tolerance)) =
+    let open Lwt_result_syntax in
+    let _, ex = Script_typed_ir_size.Internal_for_tests.kinstr_size kinstr in
+    let expected = Saturation_repr.to_int ex in
+    let actual = 8 * Obj.(reachable_words @@ repr kinstr) in
+    let overapprox = 1_000_000 * (expected - actual) / actual in
+    let msg verb =
+      Printf.sprintf
+        "For %s model predicts the size of %d bytes; while actual measured \
+         size is %d bytes. The model %s %d.%04d%%"
+        name
+        expected
+        actual
+        verb
+        (abs @@ (overapprox / 10_000))
+        (abs @@ (overapprox mod 10_000))
+    in
+    let* () = fail_when (overapprox < 0) (err @@ msg "underapproximates by") in
+    (* We expected the model to never underapproximate. *)
+    fail_when
+      (overapprox > tolerance * 10_000)
+      (err @@ msg "overapproximates by too much:")
+    (* We expect the overapproximation to be bounded by tollerance. *)
+  in
+  (* Location is an immediate value, so we don't care if it's shared. *)
+  let loc = Micheline.dummy_location in
+  let str s =
+    (* It's important to transform the string somehow, or else it will be shared
+       and thus not reached by Obj.reachable_words. *)
+    match Script_string.of_string @@ String.uppercase_ascii s with
+    | Ok ss -> ss
+    | Error _ -> assert false
+  in
+  let entrypoint name =
+    Entrypoint.of_string_strict_exn @@ String.uppercase_ascii name
+  in
+  (* Constants below are wrapped in functions to force recomputation and make sharing
+     impossible. *)
+  let halt () = IHalt loc in
+  let drop () = IDrop (loc, halt ()) in
+  let cdr = ICdr (loc, halt ()) in
+  let const ty v = IConst (loc, ty, v, halt ()) in
+  let unit_option_t () =
+    WithExceptions.Result.get_ok ~loc:__LOC__ @@ option_t loc Unit_t
+  in
+  let stack_type () = Item_t (unit_option_t (), Bot_t) in
+  let id_lambda () =
+    Lam
+      ( {
+          kloc = loc;
+          kbef = stack_type ();
+          kaft = stack_type ();
+          kinstr = halt ();
+        },
+        Micheline.Seq (loc, []) )
+  in
+  (* Following constants are used at most once. *)
+  let* str_list_t =
+    Lwt.return @@ Environment.wrap_tzresult @@ list_t loc String_t
+  in
+  let* nat_str_map_t =
+    Lwt.return @@ Environment.wrap_tzresult @@ map_t loc Nat_t String_t
+  in
+  let* (Ty_ex_c nat_str_pair_t) =
+    Lwt.return @@ Environment.wrap_tzresult @@ pair_t loc Nat_t String_t
+  in
+  let zero_memo_size =
+    WithExceptions.Result.get_ok ~loc:__LOC__
+    @@ Alpha_context.Sapling.Memo_size.parse_z Z.zero
+  in
+  (* Testing individual instructions. *)
+  List.iter_es
+    check
+    [
+      Kinstr ("IDrop", drop (), 0);
+      Kinstr ("IDup", IDup (loc, halt ()), 0);
+      Kinstr ("ISwap", ISwap (loc, halt ()), 0);
+      Kinstr ("IConst", const String_t @@ str "tezos", 0);
+      Kinstr ("ICons_pair", ICons_pair (loc, halt ()), 0);
+      Kinstr ("ICar", ICar (loc, halt ()), 0);
+      Kinstr ("ICdr", cdr, 0);
+      Kinstr ("IUnpair", IUnpair (loc, halt ()), 0);
+      Kinstr ("ICons_some", ICons_some (loc, halt ()), 0);
+      Kinstr ("ICons_none", ICons_none (loc, Int_t, halt ()), 0);
+      Kinstr
+        ( "IIf_none",
+          IIf_none
+            {
+              loc;
+              branch_if_some = drop ();
+              branch_if_none = halt ();
+              k = halt ();
+            },
+          0 );
+      Kinstr ("IOpt_map", IOpt_map {loc; body = halt (); k = halt ()}, 0);
+      Kinstr ("ICons_left", ICons_left (loc, Nat_t, halt ()), 0);
+      Kinstr ("ICons_right", ICons_right (loc, Int_t, halt ()), 0);
+      Kinstr
+        ( "IIf_left",
+          IIf_left
+            {
+              loc;
+              branch_if_left = drop ();
+              branch_if_right = drop ();
+              k = halt ();
+            },
+          0 );
+      Kinstr ("ICons_list", ICons_list (loc, halt ()), 0);
+      Kinstr ("INil", INil (loc, Bytes_t, halt ()), 0);
+      Kinstr
+        ( "IIf_cons",
+          IIf_cons
+            {
+              loc;
+              branch_if_cons = IDrop (loc, drop ());
+              branch_if_nil = halt ();
+              k = halt ();
+            },
+          0 );
+      Kinstr ("IList_map", IList_map (loc, halt (), str_list_t, halt ()), 0);
+      Kinstr ("IList_iter", IList_iter (loc, str_list_t, drop (), halt ()), 0);
+      Kinstr ("IList_size", IList_size (loc, halt ()), 0);
+      Kinstr ("IEmpty_set", IEmpty_set (loc, String_t, halt ()), 0);
+      Kinstr ("ISet_iter", ISet_iter (loc, String_t, drop (), halt ()), 0);
+      Kinstr ("ISet_mem", ISet_mem (loc, halt ()), 0);
+      Kinstr ("ISet_update", ISet_update (loc, halt ()), 0);
+      Kinstr ("ISet_size", ISet_size (loc, halt ()), 0);
+      Kinstr ("IEmpty_map", IEmpty_map (loc, Nat_t, String_t, halt ()), 0);
+      Kinstr ("IMap_map", IMap_map (loc, nat_str_map_t, cdr, halt ()), 0);
+      Kinstr ("IMap_iter", IMap_iter (loc, nat_str_pair_t, drop (), halt ()), 0);
+      Kinstr ("IMap_mem", IMap_mem (loc, halt ()), 0);
+      Kinstr ("IMap_get", IMap_get (loc, halt ()), 0);
+      Kinstr ("IMap_update", IMap_update (loc, halt ()), 0);
+      Kinstr ("IMap_get_and_update", IMap_get_and_update (loc, halt ()), 0);
+      Kinstr ("IMap_size", IMap_size (loc, halt ()), 0);
+      Kinstr
+        ("IEmpty_big_map", IEmpty_big_map (loc, Nat_t, String_t, halt ()), 0);
+      Kinstr ("IBig_map_mem", IBig_map_mem (loc, halt ()), 0);
+      Kinstr ("IBig_map_get", IBig_map_get (loc, halt ()), 0);
+      Kinstr ("IBig_map_update", IBig_map_update (loc, halt ()), 0);
+      Kinstr
+        ("IBig_map_get_and_update", IBig_map_get_and_update (loc, halt ()), 0);
+      Kinstr ("IConcat_string", IConcat_string (loc, halt ()), 0);
+      Kinstr ("IConcat_string_pair", IConcat_string_pair (loc, halt ()), 0);
+      Kinstr ("ISlice_string", ISlice_string (loc, halt ()), 0);
+      Kinstr ("IString_size", IString_size (loc, halt ()), 0);
+      Kinstr ("IConcat_bytes", IConcat_bytes (loc, halt ()), 0);
+      Kinstr ("IConcat_bytes_pair", IConcat_bytes_pair (loc, halt ()), 0);
+      Kinstr ("ISlice_bytes", ISlice_bytes (loc, halt ()), 0);
+      Kinstr ("IBytes_size", IBytes_size (loc, halt ()), 0);
+      Kinstr
+        ( "IAdd_seconds_to_timestamp ",
+          IAdd_seconds_to_timestamp (loc, halt ()),
+          0 );
+      Kinstr
+        ( "IAdd_timestamp_to_seconds",
+          IAdd_timestamp_to_seconds (loc, halt ()),
+          0 );
+      Kinstr ("ISub_timestamp_seconds", ISub_timestamp_seconds (loc, halt ()), 0);
+      Kinstr ("IDiff_timestamps", IDiff_timestamps (loc, halt ()), 0);
+      Kinstr ("IAdd_tez", IAdd_tez (loc, halt ()), 0);
+      Kinstr ("ISub_tez", ISub_tez (loc, halt ()), 0);
+      Kinstr ("ISub_tez_legacy", ISub_tez_legacy (loc, halt ()), 0);
+      Kinstr ("IMul_tez_nat", IMul_teznat (loc, halt ()), 0);
+      Kinstr ("IMul_nattez", IMul_nattez (loc, halt ()), 0);
+      Kinstr ("IEdiv_teznat", IEdiv_teznat (loc, halt ()), 0);
+      Kinstr ("IEdiv_nattez", IEdiv_tez (loc, halt ()), 0);
+      Kinstr ("IOr", IOr (loc, halt ()), 0);
+      Kinstr ("IAnd", IAnd (loc, halt ()), 0);
+      Kinstr ("IXor", IXor (loc, halt ()), 0);
+      Kinstr ("INot", INot (loc, halt ()), 0);
+      Kinstr ("IIs_nat", IIs_nat (loc, halt ()), 0);
+      Kinstr ("INeg", INeg (loc, halt ()), 0);
+      Kinstr ("IAbs_int", IAbs_int (loc, halt ()), 0);
+      Kinstr ("IInt_nat", IInt_nat (loc, halt ()), 0);
+      Kinstr ("IAdd_int", IAdd_int (loc, halt ()), 0);
+      Kinstr ("IAdd_nat", IAdd_nat (loc, halt ()), 0);
+      Kinstr ("ISub_int", ISub_int (loc, halt ()), 0);
+      Kinstr ("IMul_int", IMul_int (loc, halt ()), 0);
+      Kinstr ("IMul_nat", IMul_nat (loc, halt ()), 0);
+      Kinstr ("IEdiv_int", IEdiv_int (loc, halt ()), 0);
+      Kinstr ("IEdiv_nat", IEdiv_nat (loc, halt ()), 0);
+      Kinstr ("ILsl_nat", ILsl_nat (loc, halt ()), 0);
+      Kinstr ("ILsr_nat", ILsr_nat (loc, halt ()), 0);
+      Kinstr ("IOr_nat", IOr_nat (loc, halt ()), 0);
+      Kinstr ("IAnd_nat", IAnd_nat (loc, halt ()), 0);
+      Kinstr ("IAnd_int_nat", IAnd_int_nat (loc, halt ()), 0);
+      Kinstr ("IXor_nat", IXor_nat (loc, halt ()), 0);
+      Kinstr ("INot_int", INot_int (loc, halt ()), 0);
+      Kinstr
+        ( "IIf",
+          IIf
+            {
+              loc;
+              branch_if_true = halt ();
+              branch_if_false = halt ();
+              k = halt ();
+            },
+          0 );
+      Kinstr ("ILoop", ILoop (loc, const Bool_t true, halt ()), 0);
+      Kinstr ("ILoop_left", ILoop_left (loc, INever loc, halt ()), 0);
+      Kinstr ("IDip", IDip (loc, halt (), String_t, halt ()), 0);
+      Kinstr ("IExec", IExec (loc, Bot_t, halt ()), 0);
+      Kinstr ("IApply", IApply (loc, String_t, halt ()), 0);
+      Kinstr ("ILambda", ILambda (loc, id_lambda (), halt ()), 0);
+      Kinstr ("IFailwith", IFailwith (loc, String_t), 0);
+      Kinstr ("ICompare", ICompare (loc, String_t, halt ()), 0);
+      Kinstr ("IEq", IEq (loc, halt ()), 0);
+      Kinstr ("INeq", INeq (loc, halt ()), 0);
+      Kinstr ("ILt", ILt (loc, halt ()), 0);
+      Kinstr ("IGt", IGt (loc, halt ()), 0);
+      Kinstr ("ILe", ILe (loc, halt ()), 0);
+      Kinstr ("IGe", IGe (loc, halt ()), 0);
+      Kinstr ("IAddress", IAddress (loc, halt ()), 0);
+      Kinstr
+        ("IContract", IContract (loc, Unit_t, entrypoint "entry", halt ()), 0);
+      Kinstr
+        ( "IView",
+          IView
+            ( loc,
+              View_signature
+                {
+                  name = str "myview";
+                  input_ty = unit_option_t ();
+                  output_ty = unit_option_t ();
+                },
+              stack_type (),
+              halt () ),
+          0 );
+      Kinstr ("ITransfer_tokens", ITransfer_tokens (loc, halt ()), 0);
+      Kinstr ("IImplicit_account", IImplicit_account (loc, halt ()), 0);
+      Kinstr
+        ( "ICreate_contract",
+          ICreate_contract
+            {
+              loc;
+              storage_type = Unit_t;
+              code = Micheline.(strip_locations @@ Seq (loc, []));
+              k = halt ();
+            },
+          0 );
+      Kinstr ("ISet_delegate", ISet_delegate (loc, halt ()), 0);
+      Kinstr ("INow", INow (loc, halt ()), 0);
+      Kinstr ("IMin_block_time", IMin_block_time (loc, halt ()), 0);
+      Kinstr ("IBalance", IBalance (loc, halt ()), 0);
+      Kinstr ("ILevel", ILevel (loc, halt ()), 0);
+      Kinstr ("ICheck_signature", ICheck_signature (loc, halt ()), 0);
+      Kinstr ("IHash_key", IHash_key (loc, halt ()), 0);
+      Kinstr ("IPack", IPack (loc, Int_t, halt ()), 0);
+      Kinstr ("IUnpack", IUnpack (loc, Int_t, halt ()), 0);
+      Kinstr ("IBlake2b", IBlake2b (loc, halt ()), 0);
+      Kinstr ("ISha_256", ISha256 (loc, halt ()), 0);
+      Kinstr ("ISha512", ISha512 (loc, halt ()), 0);
+      Kinstr ("ISource", ISource (loc, halt ()), 0);
+      Kinstr ("ISender", ISender (loc, halt ()), 0);
+      Kinstr ("ISelf", ISelf (loc, Unit_t, entrypoint "entry", halt ()), 0);
+      Kinstr ("ISelf_address", ISelf_address (loc, halt ()), 0);
+      Kinstr ("IAmount", IAmount (loc, halt ()), 0);
+      Kinstr
+        ( "ISapling_empty_state",
+          ISapling_empty_state (loc, zero_memo_size, halt ()),
+          0 );
+      Kinstr ("ISapling_verify_update", ISapling_verify_update (loc, halt ()), 0);
+      Kinstr
+        ( "ISapling_verify_update_deprecated",
+          ISapling_verify_update_deprecated (loc, halt ()),
+          0 );
+      Kinstr ("IDig", IDig (loc, 0, KRest, halt ()), 0);
+      Kinstr ("IDug", IDug (loc, 0, KRest, halt ()), 0);
+      Kinstr ("IDipn", IDipn (loc, 0, KRest, halt (), halt ()), 0);
+      Kinstr ("IDropn", IDropn (loc, 0, KRest, halt ()), 0);
+      Kinstr ("IChainId", IChainId (loc, halt ()), 0);
+      Kinstr ("INever", INever loc, 0);
+      Kinstr ("IVoting_power", IVoting_power (loc, halt ()), 0);
+      Kinstr ("ITotal_voting_power", ITotal_voting_power (loc, halt ()), 0);
+      Kinstr ("IKeccak", IKeccak (loc, halt ()), 0);
+      Kinstr ("ISha3", ISha3 (loc, halt ()), 0);
+      Kinstr ("IAdd_bls12_381_g1", IAdd_bls12_381_g1 (loc, halt ()), 0);
+      Kinstr ("IAdd_bls12_381_2g", IAdd_bls12_381_g2 (loc, halt ()), 0);
+      Kinstr ("IAdd_bls12_381_fr", IAdd_bls12_381_fr (loc, halt ()), 0);
+      Kinstr ("IMul_bls12_381_g1", IMul_bls12_381_g1 (loc, halt ()), 0);
+      Kinstr ("IMul_bls12_381_g2", IMul_bls12_381_g2 (loc, halt ()), 0);
+      Kinstr ("IMul_bls12_381_fr", IMul_bls12_381_fr (loc, halt ()), 0);
+      Kinstr ("IMul_bls12_381_z_fr", IMul_bls12_381_z_fr (loc, halt ()), 0);
+      Kinstr ("IMul_bls12_381_fr_z", IMul_bls12_381_fr_z (loc, halt ()), 0);
+      Kinstr ("IMul_bls12_381_fr_z", IMul_bls12_381_fr_z (loc, halt ()), 0);
+      Kinstr ("IInt_bls12_381_fr", IInt_bls12_381_fr (loc, halt ()), 0);
+      Kinstr ("INeg_bls12_381_g1", INeg_bls12_381_g1 (loc, halt ()), 0);
+      Kinstr ("INeg_bls12_381_g2", INeg_bls12_381_g2 (loc, halt ()), 0);
+      Kinstr ("INeg_bls12_381_fr", INeg_bls12_381_fr (loc, halt ()), 0);
+      Kinstr
+        ("IPairing_check_bls12_381", IPairing_check_bls12_381 (loc, halt ()), 0);
+      Kinstr ("IComb", IComb (loc, 0, Comb_one, halt ()), 0);
+      Kinstr ("IUncomb", IUncomb (loc, 0, Uncomb_one, halt ()), 0);
+      Kinstr ("IComb_get", IComb_get (loc, 0, Comb_get_zero, halt ()), 0);
+      Kinstr ("IComb_set", IComb_set (loc, 0, Comb_set_zero, halt ()), 0);
+      Kinstr ("IDup_n", IDup_n (loc, 0, Dup_n_zero, halt ()), 0);
+      Kinstr ("ITicket", ITicket (loc, Nat_t, halt ()), 0);
+      Kinstr ("IRead_ticket", IRead_ticket (loc, Unit_t, halt ()), 0);
+      Kinstr ("ISplit_ticket", ISplit_ticket (loc, halt ()), 0);
+      Kinstr ("IJoin_tickets", IJoin_tickets (loc, Unit_t, halt ()), 0);
+      Kinstr ("IOpen_chest", IOpen_chest (loc, halt ()), 0);
+      Kinstr
+        ( "IEmit",
+          IEmit
+            {
+              loc;
+              addr = Contract_event_repr.Hash.zero;
+              tag = entrypoint "entry";
+              ty = Unit_t;
+              k = halt ();
+            },
+          0 );
+      Kinstr ("IHalt ()", halt (), 0);
+    ]
+
 let tests =
   let open Tztest in
   [
     tztest "check value size" `Quick check_value_size;
     tztest "check ty size" `Quick check_ty_size;
+    tztest "check kinstr size" `Quick check_kinstr_size;
   ]
