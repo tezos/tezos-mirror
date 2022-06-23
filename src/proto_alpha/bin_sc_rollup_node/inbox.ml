@@ -72,7 +72,7 @@ end
 *)
 let get_messages l1_ctxt head rollup =
   let open Lwt_result_syntax in
-  let+ block = Layer1.fetch_tezos_block l1_ctxt head in
+  let* block = Layer1.fetch_tezos_block l1_ctxt head in
   let apply (type kind) accu ~source:_ (operation : kind manager_operation)
       _result =
     match operation with
