@@ -79,6 +79,12 @@ let init_ctxt () =
   let+ incr = Incremental.begin_construction block in
   Incremental.alpha_ctxt incr
 
+let assert_encoding_failure ~loc res =
+  Assert.proto_error_with_info
+    ~loc
+    res
+    "Failed to encode a rollup management protocol inbox message value"
+
 let test_encode_decode_internal_inbox_message () =
   let open WithExceptions in
   let open Lwt_result_syntax in
@@ -103,7 +109,7 @@ let test_encode_decode_internal_inbox_message () =
     ( Script_int.(abs @@ of_int 42),
       string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1 )
   in
-  let* deposit, _ctxt =
+  let* deposit, ctxt =
     wrap
     @@ Sc_rollup_management_protocol.make_internal_inbox_message
          ctxt
@@ -112,67 +118,59 @@ let test_encode_decode_internal_inbox_message () =
          ~sender
          ~source
   in
-  check_encode_decode_inbox_message deposit
+  let* () = check_encode_decode_inbox_message deposit in
+  (* Check that the size of messages that can be encoded is bounded. *)
+  let msg = String.make 4050 'c' in
+  let*? payload = Environment.wrap_tzresult (Script_string.of_string msg) in
+  let* deposit, _ctxt =
+    let open Script_typed_ir in
+    wrap
+    @@ Sc_rollup_management_protocol.make_internal_inbox_message
+         ctxt
+         String_t
+         ~payload
+         ~sender
+         ~source
+  in
+  let*! res = check_encode_decode_inbox_message deposit in
+  assert_encoding_failure ~loc:__LOC__ res
 
 let test_encode_decode_external_inbox_message () =
   let open Lwt_result_syntax in
-  let assert_prefix message ~prefix =
+  let assert_prefix message =
     let inbox_message = Sc_rollup.Inbox.Message.External message in
     let*? real_encoding =
       Environment.wrap_tzresult
       @@ Sc_rollup.Inbox.Message.to_bytes inbox_message
     in
     let real_encoding = (real_encoding :> string) in
-    (* The prefix consists of 5 bytes:
-       - Byte 0 is the tag (0 for internal, 1 for external).
-       - Bytes 1-4 is the length of the message encoded as:
-          [ prefix[1] * 256^3 + prefix[2] * 256^2 prefix[3] * 256^1 prefix[4]]
-    *)
-    let real_prefix =
-      String.sub real_encoding 0 5
-      |> String.to_seq |> List.of_seq |> List.map Char.code
-    in
-    let expected_encoding =
-      Printf.sprintf
-        "%s%s"
-        (List.map Char.chr prefix |> List.to_seq |> String.of_seq)
-        message
-    in
+    (* The prefix consists of a tag (0 for internal, 1 for external). *)
+    let real_prefix = String.get real_encoding 0 in
+    let expected_prefix = '\001' in
+    let expected_encoding = Printf.sprintf "%c%s" expected_prefix message in
     (* Check that the encode/decode matches. *)
     let* () = check_encode_decode_inbox_message inbox_message in
     (* Check that the prefix match. *)
-    let* () =
-      Assert.assert_equal_list
-        ~loc:__LOC__
-        Int.equal
-        "Compare encoded prefix"
-        Format.pp_print_int
-        real_prefix
-        prefix
-    in
+    let* () = Assert.equal_char ~loc:__LOC__ real_prefix expected_prefix in
     (* Check that the encoded string consists of the prefix followed by the
        original message. *)
     Assert.equal_string ~loc:__LOC__ real_encoding expected_encoding
   in
-  let* () = assert_prefix "" ~prefix:[1; 0; 0; 0; 0] in
-  let* () = assert_prefix "A" ~prefix:[1; 0; 0; 0; 1] in
-  let* () = assert_prefix "0123456789" ~prefix:[1; 0; 0; 0; 10] in
-  let* () =
-    assert_prefix (String.init 256 (Fun.const 'A')) ~prefix:[1; 0; 0; 1; 0]
+  let* () = assert_prefix "" in
+  let* () = assert_prefix "A" in
+  let* () = assert_prefix "0123456789" in
+  let* () = assert_prefix (String.init 256 (Fun.const 'A')) in
+  let assert_encoding_failure message =
+    let inbox_message = Sc_rollup.Inbox.Message.External message in
+    let*! res = check_encode_decode_inbox_message inbox_message in
+    assert_encoding_failure ~loc:__LOC__ res
   in
-  (* Length 1234567 = 18*256^2 + 214*256 + 135 *)
-  let* () =
-    assert_prefix
-      (String.init 1234567 (Fun.const 'A'))
-      ~prefix:[1; 0; 18; 214; 135]
-  in
-  (* The content of the string should not impact the prefix.*)
-  let* () =
-    assert_prefix
-      (String.init 1234567 (Fun.const 'b'))
-      ~prefix:[1; 0; 18; 214; 135]
-  in
-  return_unit
+  let max_msg_size = Constants_repr.sc_rollup_message_size_limit in
+  let message = String.init max_msg_size (Fun.const 'A') in
+  let* () = assert_encoding_failure message in
+  let message = String.init max_msg_size (Fun.const 'b') in
+  let* () = assert_encoding_failure message in
+  assert_encoding_failure message
 
 let init_env () =
   let open Lwt_result_syntax in

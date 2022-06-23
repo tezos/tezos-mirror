@@ -77,6 +77,11 @@ val michelson_maximum_type_size : int
 (** A size limit for {!Sc_rollups.wrapped_proof} binary encoding. *)
 val sc_max_wrapped_proof_binary_size : int
 
+(** A limit on the size of the binary encoding for sc rollup messages:
+    {!Sc_rollup_inbox_message_repr.t} and {!Sc_rollup_outbox_message_repr.t}
+*)
+val sc_rollup_message_size_limit : int
+
 type fixed
 
 val fixed_encoding : fixed Data_encoding.encoding

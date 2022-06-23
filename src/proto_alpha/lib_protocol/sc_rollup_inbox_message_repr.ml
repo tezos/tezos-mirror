@@ -64,30 +64,29 @@ type t = Internal of internal_inbox_message | External of string
 
 let encoding =
   let open Data_encoding in
-  Data_encoding.union
-    [
-      case
-        (Tag 0)
-        ~title:"Internal"
-        (obj3
-           (req "payload" Script_repr.expr_encoding)
-           (req "sender" Contract_hash.encoding)
-           (req "source" Signature.Public_key_hash.encoding))
-        (function
-          | Internal {payload; sender; source} -> Some (payload, sender, source)
-          | External _ -> None)
-        (fun (payload, sender, source) -> Internal {payload; sender; source});
-      case
-        (Tag 1)
-        ~title:"External"
-        (* TODO: #3116
-           Add size limit to constrain the maximum size of the string.
-           The exact limit is yet to be decided. Could be added as a constant.
-        *)
-        string
-        (function External msg -> Some msg | Internal _ -> None)
-        (fun msg -> External msg);
-    ]
+  check_size
+    Constants_repr.sc_rollup_message_size_limit
+    (union
+       [
+         case
+           (Tag 0)
+           ~title:"Internal"
+           (obj3
+              (req "payload" Script_repr.expr_encoding)
+              (req "sender" Contract_hash.encoding)
+              (req "source" Signature.Public_key_hash.encoding))
+           (function
+             | Internal {payload; sender; source} ->
+                 Some (payload, sender, source)
+             | External _ -> None)
+           (fun (payload, sender, source) -> Internal {payload; sender; source});
+         case
+           (Tag 1)
+           ~title:"External"
+           Variable.string
+           (function External msg -> Some msg | Internal _ -> None)
+           (fun msg -> External msg);
+       ])
 
 type serialized = string
 
