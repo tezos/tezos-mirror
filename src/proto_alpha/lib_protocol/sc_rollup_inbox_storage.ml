@@ -144,14 +144,21 @@ let add_messages ctxt rollup messages =
   let* ctxt, size = Store.Inbox.update ctxt rollup inbox in
   return (inbox, Z.of_int size, ctxt)
 
-(** TODO #3292
-    We should carbonate this function.
-    The cost of [to_bytes] is cheap but traversing the list should still be
-    accounted for.
-  *)
-let serialize_external_messages external_messages =
-  List.map_e
-    (fun message -> Sc_rollup_inbox_message_repr.(to_bytes @@ External message))
+let serialize_external_messages ctxt external_messages =
+  let open Sc_rollup_inbox_message_repr in
+  List.fold_left_map_e
+    (fun ctxt message ->
+      let open Tzresult_syntax in
+      (* Pay gas for serializing an external message. *)
+      let* ctxt =
+        let bytes_len = String.length message in
+        Raw_context.consume_gas
+          ctxt
+          (Sc_rollup_costs.cost_serialize_external_inbox_message ~bytes_len)
+      in
+      let* serialized_message = to_bytes @@ External message in
+      return (ctxt, serialized_message))
+    ctxt
     external_messages
 
 let serialize_internal_message ctxt ~payload ~sender ~source =
@@ -172,7 +179,7 @@ let serialize_internal_message ctxt ~payload ~sender ~source =
 
 let add_external_messages ctxt rollup external_messages =
   let open Lwt_result_syntax in
-  let*? messages = serialize_external_messages external_messages in
+  let*? ctxt, messages = serialize_external_messages ctxt external_messages in
   add_messages ctxt rollup messages
 
 let add_internal_message ctxt rollup ~payload ~sender ~source =

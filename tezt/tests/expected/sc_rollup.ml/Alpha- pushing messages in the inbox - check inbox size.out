@@ -31,7 +31,7 @@ This sequence of operations was run:
 
 ./tezos-client --wait none send sc rollup message 'text:["CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
-Estimated gas: 1651.682 units (will add 100 for safety)
+Estimated gas: 1651.698 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -51,7 +51,7 @@ This sequence of operations was run:
       payload fees(the block proposer) ....... +ꜩ0.000457
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
-      Consumed gas: 1651.810
+      Consumed gas: 1651.826
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]
          level = 3
@@ -70,7 +70,7 @@ This sequence of operations was run:
 
 ./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
-Estimated gas: 1652.484 units (will add 100 for safety)
+Estimated gas: 1652.516 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -90,7 +90,7 @@ This sequence of operations was run:
       payload fees(the block proposer) ....... +ꜩ0.000469
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
-      Consumed gas: 1652.612
+      Consumed gas: 1652.644
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]
          level = 4
@@ -110,7 +110,7 @@ This sequence of operations was run:
 
 ./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
-Estimated gas: 1653.271 units (will add 100 for safety)
+Estimated gas: 1653.319 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -130,7 +130,7 @@ This sequence of operations was run:
       payload fees(the block proposer) ....... +ꜩ0.000481
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
-      Consumed gas: 1653.271
+      Consumed gas: 1653.319
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]
          level = 5
@@ -150,7 +150,7 @@ This sequence of operations was run:
 
 ./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
-Estimated gas: 1653.851 units (will add 100 for safety)
+Estimated gas: 1653.915 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -170,7 +170,7 @@ This sequence of operations was run:
       payload fees(the block proposer) ....... +ꜩ0.000493
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
-      Consumed gas: 1653.979
+      Consumed gas: 1654.043
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]
          level = 6
@@ -191,7 +191,7 @@ This sequence of operations was run:
 
 ./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
-Estimated gas: 1654.638 units (will add 100 for safety)
+Estimated gas: 1654.718 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -211,7 +211,7 @@ This sequence of operations was run:
       payload fees(the block proposer) ....... +ꜩ0.000505
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
-      Consumed gas: 1654.638
+      Consumed gas: 1654.718
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]
          level = 7
@@ -232,7 +232,7 @@ This sequence of operations was run:
 
 ./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
-Estimated gas: 1655.218 units (will add 100 for safety)
+Estimated gas: 1655.314 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -252,7 +252,7 @@ This sequence of operations was run:
       payload fees(the block proposer) ....... +ꜩ0.000517
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
-      Consumed gas: 1655.218
+      Consumed gas: 1655.314
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]
          level = 8
@@ -273,7 +273,7 @@ This sequence of operations was run:
 
 ./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
-Estimated gas: 1655.798 units (will add 100 for safety)
+Estimated gas: 1655.910 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -293,7 +293,7 @@ This sequence of operations was run:
       payload fees(the block proposer) ....... +ꜩ0.000529
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
-      Consumed gas: 1655.798
+      Consumed gas: 1655.910
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]
          level = 9
@@ -314,7 +314,7 @@ This sequence of operations was run:
 
 ./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
-Estimated gas: 1656.378 units (will add 100 for safety)
+Estimated gas: 1656.506 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -334,7 +334,7 @@ This sequence of operations was run:
       payload fees(the block proposer) ....... +ꜩ0.000541
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
-      Consumed gas: 1656.506
+      Consumed gas: 1656.634
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]
          level = 10
@@ -356,7 +356,7 @@ This sequence of operations was run:
 
 ./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
-Estimated gas: 1657.165 units (will add 100 for safety)
+Estimated gas: 1657.309 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -376,7 +376,7 @@ This sequence of operations was run:
       payload fees(the block proposer) ....... +ꜩ0.000553
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
-      Consumed gas: 1657.165
+      Consumed gas: 1657.309
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]
          level = 11
@@ -398,7 +398,7 @@ This sequence of operations was run:
 
 ./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
-Estimated gas: 1657.745 units (will add 100 for safety)
+Estimated gas: 1657.905 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -418,7 +418,7 @@ This sequence of operations was run:
       payload fees(the block proposer) ....... +ꜩ0.000565
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
-      Consumed gas: 1657.745
+      Consumed gas: 1657.905
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]
          level = 12

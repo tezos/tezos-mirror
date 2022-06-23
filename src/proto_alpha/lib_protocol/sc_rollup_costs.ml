@@ -51,6 +51,11 @@ module Constants = struct
 
   (* equal to Michelson_v1_gas.Cost_of.Unparsing.key_hash_optimized *)
   let cost_decoding_key_hash_optimized = S.safe_int 50
+
+  (* Set to the cost of encoding a pkh defined in {!Michelson_v1_gas} divided
+     by the number of characters of a pkh, i.e. 70/35. To be updated when
+     benchmarking is completed. *)
+  let cost_encode_string_per_byte = S.safe_int 2
 end
 
 (* We assume that the gas cost of adding messages [[ m_1; ... ; m_n]] at level
@@ -94,3 +99,7 @@ let cost_serialize_internal_inbox_message
   *)
 let cost_deserialize_output_proof ~bytes_len =
   Script_repr.deserialization_cost_estimated_from_bytes bytes_len
+
+let cost_serialize_external_inbox_message ~bytes_len =
+  let len = S.safe_int bytes_len in
+  S_syntax.(Constants.cost_encode_string_per_byte * len)
