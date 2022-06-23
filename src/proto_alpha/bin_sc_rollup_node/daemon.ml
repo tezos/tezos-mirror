@@ -214,17 +214,16 @@ module Make (PVM : Pvm.S) = struct
       let* rpc_server =
         Components.RPC_server.start node_ctxt store configuration
       in
-      let* l1_ctxt = Layer1.start configuration node_ctxt.cctxt store in
       let*! () = Inbox.start () in
       let*! () = Components.Commitment.start () in
 
-      let _ = install_finalizer store rpc_server l1_ctxt in
+      let _ = install_finalizer store rpc_server node_ctxt.l1_ctxt in
       let*! () =
         Event.node_is_ready
           ~rpc_addr:configuration.rpc_addr
           ~rpc_port:configuration.rpc_port
       in
-      daemonize node_ctxt store l1_ctxt
+      daemonize node_ctxt store node_ctxt.l1_ctxt
     in
     start ()
 end
@@ -238,9 +237,11 @@ let run ~data_dir (cctxt : Protocol_client_context.full) =
     configuration
   in
   let*! store = Store.load configuration in
+  let* l1_ctxt = Layer1.start configuration cctxt store in
   let* node_ctxt =
     Node_context.init
       cctxt
+      l1_ctxt
       sc_rollup_address
       sc_rollup_node_operator
       fee_parameter

@@ -75,7 +75,7 @@ let get_messages cctxt head rollup =
   let open Lwt_result_syntax in
   let open Block_services in
   let+ operations =
-    Operations.operations cctxt ~chain:`Main ~block:(`Hash (fst head, 0)) ()
+    Operations.operations cctxt ~chain:`Main ~block:(`Hash (head, 0)) ()
   in
   let is_add_message = function
     | Contents
@@ -97,7 +97,7 @@ let get_messages cctxt head rollup =
 let process_head Node_context.({cctxt; rollup_address; _} as node_ctxt) store
     Layer1.(Head {level; hash = head_hash} as head) =
   let open Lwt_result_syntax in
-  let*! res = get_messages cctxt (head_hash, level) rollup_address in
+  let*! res = get_messages cctxt head_hash rollup_address in
   match res with
   | Error e -> head_processing_failure e
   | Ok messages ->

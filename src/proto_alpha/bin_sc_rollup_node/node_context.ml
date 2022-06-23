@@ -28,6 +28,7 @@ open Alpha_context
 
 type t = {
   cctxt : Protocol_client_context.full;
+  l1_ctxt : Layer1.t;
   rollup_address : Sc_rollup.t;
   operator : Signature.Public_key_hash.t;
   initial_level : Raw_level.t;
@@ -41,7 +42,7 @@ let get_operator_keys node_ctxt =
   let+ _, pk, sk = Client_keys.get_key node_ctxt.cctxt node_ctxt.operator in
   (node_ctxt.operator, pk, sk)
 
-let init (cctxt : Protocol_client_context.full) rollup_address operator
+let init (cctxt : Protocol_client_context.full) l1_ctxt rollup_address operator
     fee_parameter =
   let open Lwt_result_syntax in
   let* initial_level =
@@ -55,6 +56,7 @@ let init (cctxt : Protocol_client_context.full) rollup_address operator
   in
   {
     cctxt;
+    l1_ctxt;
     rollup_address;
     operator;
     initial_level;
