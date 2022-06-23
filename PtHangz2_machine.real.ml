@@ -154,9 +154,9 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         ~block:(`Hash (hash, 0))
         0
     in
-    let pks =
+    let endorsements =
       List.filter_map
-        (fun Block_services.{receipt; _} ->
+        (fun Block_services.{hash; receipt; _} ->
           match receipt with
           | Receipt
               (Protocol.Apply_results.Operation_metadata
@@ -167,16 +167,16 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                         (Tezos_raw_protocol_011_PtHangz2.Apply_results
                          .Endorsement_result {delegate; _}));
                 }) ->
-              Some delegate
+              Some Consensus_ops.{hash; delegate}
           | _ -> None)
         ops
     in
     return
       Consensus_ops.
         {
-          endorsers = pks;
+          endorsements;
           endorsements_round = None;
-          preendorsers = None;
+          preendorsements = None;
           preendorsements_round = None;
         }
 end

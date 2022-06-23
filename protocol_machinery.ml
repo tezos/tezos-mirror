@@ -104,7 +104,7 @@ module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
     in
     let*! out =
       Lwt_stream.fold
-        (fun ((_hash, ((block, level, kind, round), slot)), errors) acc ->
+        (fun ((hash, ((block, level, kind, round), slot)), errors) acc ->
           let reception_time = Time.System.now () in
           Protocol_services.BlockIdMap.update
             block
@@ -114,15 +114,18 @@ module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
                     ( level,
                       pack_by_slot
                         slot
-                        Consensus_ops.{kind; round; errors; reception_time}
+                        Consensus_ops.
+                          {hash; kind; round; errors; reception_time}
                         l )
               | None ->
                   Some
                     ( level,
                       [
                         ( slot,
-                          [Consensus_ops.{kind; round; errors; reception_time}]
-                        );
+                          [
+                            Consensus_ops.
+                              {hash; kind; round; errors; reception_time};
+                          ] );
                       ] ))
             acc)
         op_stream

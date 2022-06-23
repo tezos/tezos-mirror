@@ -186,10 +186,10 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     in
     let preendorsements_round = ref None in
     let endorsements_round = ref None in
-    let (preendorsers, endorsers) =
+    let (preendorsements, endorsements) =
       List.fold_left
-        (fun (preendorsers, endorsers)
-             Block_services.{receipt; protocol_data; _} ->
+        (fun (preendorsements, endorsements)
+             Block_services.{hash; receipt; protocol_data; _} ->
           match receipt with
           | Receipt
               (Protocol.Apply_results.Operation_metadata
@@ -201,7 +201,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                 }) ->
               preendorsements_round :=
                 Some (get_preendorsement_round protocol_data) ;
-              (delegate :: preendorsers, endorsers)
+              (Consensus_ops.{hash; delegate} :: preendorsements, endorsements)
           | Receipt
               (Protocol.Apply_results.Operation_metadata
                 {
@@ -210,16 +210,17 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                       (Protocol.Apply_results.Endorsement_result {delegate; _});
                 }) ->
               endorsements_round := Some (get_endorsement_round protocol_data) ;
-              (preendorsers, delegate :: endorsers)
-          | _ -> (preendorsers, endorsers))
+              (preendorsements, Consensus_ops.{hash; delegate} :: endorsements)
+          | _ -> (preendorsements, endorsements))
         ([], [])
         ops
     in
     return
       Consensus_ops.
         {
-          endorsers;
-          preendorsers = (if preendorsers = [] then None else Some preendorsers);
+          endorsements;
+          preendorsements =
+            (if preendorsements = [] then None else Some preendorsements);
           endorsements_round =
             Option.map Protocol.Alpha_context.Round.to_int32 !endorsements_round;
           preendorsements_round =

@@ -416,7 +416,8 @@ let add_inclusion_in_block aliases block_hash ops_kind ops_round validators
              {delegate; delegate_alias; operations} as delegate_ops) ->
         match
           List.partition
-            (fun pkh -> Signature.Public_key_hash.equal pkh delegate)
+            (fun op ->
+              Signature.Public_key_hash.equal op.Consensus_ops.delegate delegate)
             missing
         with
         | (_ :: _, missing') ->
@@ -437,7 +438,8 @@ let add_inclusion_in_block aliases block_hash ops_kind ops_round validators
   | [] -> updated_known
   | _ :: _ ->
       List.fold_left
-        (fun acc delegate ->
+        (fun acc op ->
+          let delegate = op.Consensus_ops.delegate in
           Delegate_operations.
             {
               delegate;
@@ -474,7 +476,7 @@ let dump_included_in_block cctxt path block_level block_hash block_round
    Lwt_mutex.with_lock mutex (fun () ->
        let* infos = load filename encoding empty in
        let delegate_operations' =
-         match consensus_ops_info.Consensus_ops.preendorsers with
+         match consensus_ops_info.Consensus_ops.preendorsements with
          | Some validators ->
              add_inclusion_in_block
                aliases
@@ -491,7 +493,7 @@ let dump_included_in_block cctxt path block_level block_hash block_round
            block_hash
            Consensus_ops.Endorsement
            consensus_ops_info.endorsements_round
-           consensus_ops_info.endorsers
+           consensus_ops_info.endorsements
            delegate_operations'
        in
        let out_infos =
@@ -560,7 +562,8 @@ let dump_included_in_block cctxt path block_level block_hash block_round
 (* NB: the same operation may be received several times; we only record the
    first reception time. *)
 let merge_operations =
-  List.fold_left (fun acc Consensus_ops.{kind; round; errors; reception_time} ->
+  List.fold_left
+    (fun acc Consensus_ops.{hash = _; kind; round; errors; reception_time} ->
       match
         List.partition
           (fun Delegate_operations.{round = r; kind = k; _} ->
@@ -633,7 +636,13 @@ let dump_received cctxt path ?unaccurate level received_ops =
                          operations =
                            List.rev_map
                              (fun Consensus_ops.
-                                    {kind; round; errors; reception_time} ->
+                                    {
+                                      hash = _;
+                                      kind;
+                                      round;
+                                      errors;
+                                      reception_time;
+                                    } ->
                                {
                                  kind;
                                  round;

@@ -25,16 +25,12 @@
 
 type operation_kind = Endorsement | Preendorsement
 
-let operation_kind_encoding =
-  let open Data_encoding in
-  string_enum [("Endorsement", Endorsement); ("Preendorsement", Preendorsement)]
+val operation_kind_encoding : operation_kind Data_encoding.encoding
 
-let pp_operation_kind ppf kind =
-  match kind with
-  | Endorsement -> Format.fprintf ppf "Endorsement"
-  | Preendorsement -> Format.fprintf ppf "Preendorsement"
+val pp_operation_kind : Format.formatter -> operation_kind -> unit
 
 type received_operation = {
+  hash : Operation_hash.t;
   kind : operation_kind;
   round : Int32.t option;
   reception_time : Time.System.t;
@@ -43,9 +39,20 @@ type received_operation = {
 
 type delegate_ops = (Signature.Public_key_hash.t * received_operation list) list
 
+type block_op = {hash : Operation_hash.t; delegate : Signature.public_key_hash}
+
 type block_info = {
-  endorsers : Signature.public_key_hash list;
+  endorsements : block_op list;
   endorsements_round : Int32.t option;
-  preendorsers : Signature.public_key_hash list option;
+  preendorsements : block_op list option;
   preendorsements_round : Int32.t option;
 }
+
+type right = {
+  level : Int32.t;
+  address : Signature.Public_key_hash.t;
+  first_slot : int;
+  power : int;
+}
+
+type rights = right list

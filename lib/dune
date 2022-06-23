@@ -1,0 +1,6 @@
+(library
+ (name teztale_lib)
+ (public_name teztale.lib)
+ (libraries tezos-base)
+ (flags
+  (:standard -open Tezos_base.TzPervasives -open Tezos_base)))
