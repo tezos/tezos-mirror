@@ -38,7 +38,7 @@ type canonical_location = int
 
 let dummy_location = -1
 
-type 'p canonical = Canonical of (canonical_location, 'p) node
+type 'p canonical = Canonical of (canonical_location, 'p) node [@@unboxed]
 
 let location = function
   | Int (loc, _) -> loc
