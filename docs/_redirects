@@ -48,6 +48,7 @@
 /api/cli-commands.html /shell/cli-commands.html 301
 /api/rpc.html /shell/rpc.html 301
 /developer/sapling.html /active/sapling.html 301
+/developer/protocol_environment.html /shell/protocol_environment.html 301
 /user/glossary.html /active/glossary.html 301
 /whitedoc/micheline.html /shell/micheline.html 301
 /whitedoc/michelson.html /active/michelson.html 301

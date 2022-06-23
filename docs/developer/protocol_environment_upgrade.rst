@@ -1,7 +1,10 @@
-Add new environment
-===================
+Adding a new protocol environment
+=================================
 
-The economic protocols of Tezos are compiled against a restricted set of libraries. This is for security reasons (so that, e.g., the protocol can never be leveraged for accessing files of the host machine) and safety reasons (so that, e.g., the protocol is immune to some categories of errors).
+The economic protocols of Tezos are compiled against a restricted set of libraries.
+This is for security reasons (so that, e.g., the protocol can never be leveraged for accessing files
+of the host machine) and safety reasons (so that, e.g., the protocol is immune to some categories of errors).
+See the general overview in :doc:`Protocol environment <../shell/protocol_environment>`.
 
 The set of libraries a protocol is compiled against is called the *protocol environment*, or simply, the *environment*.
 
@@ -132,4 +135,3 @@ You can make changes to the newly created environment until it is released. For 
   * Replace some of the environment modules with a new one (remove old files)
 
   * Remove struct compatibility module (the new interface is identical to the one in the most recent library)
-
