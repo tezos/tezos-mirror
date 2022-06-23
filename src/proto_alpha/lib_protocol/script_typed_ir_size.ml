@@ -475,7 +475,7 @@ and kinstr_size :
     | IDip (_, _, ty, _) ->
         ret_succ_adding (accu ++ ty_size ty) (base +! (word_size *? 2))
     | IExec (_, sty, _) ->
-        ret_succ_adding (accu ++ stack_ty_size sty) (base +! (word_size *? 2))
+        ret_succ_adding (accu ++ stack_ty_size sty) (base +! word_size)
     | IApply (_, ty, _) ->
         ret_succ_adding (accu ++ ty_size ty) (base +! word_size)
     | ILambda (_, lambda, _) ->
