@@ -1144,6 +1144,10 @@ let tezos_version =
     ~synopsis:"Tezos: version information generated from Git"
     ~deps:[tezos_base |> open_ ~m:"TzPervasives"; tezos_version_parser]
     ~js_compatible:true
+      (* We want generated_git_info.cmi to be compiled with -opaque so
+         that a change in the implementation doesn't force rebuilding all
+         the reverse dependencies. *)
+    ~flags:(Flags.standard ~opaque:true ())
     ~dune:
       Dune.
         [
