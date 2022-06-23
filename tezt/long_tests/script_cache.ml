@@ -186,7 +186,7 @@ let call_contract contract_id k client =
       ~arg:k
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* gas = get_consumed_gas client in
   Lwt.return gas
 
@@ -202,7 +202,7 @@ let call_contracts calls client =
       ~json_batch:calls
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* gas = get_consumed_gas_for_block client in
   Lwt.return gas
 
@@ -379,7 +379,7 @@ let check_block_impact_on_cache ~protocol =
   if not List.(reds = []) then
     Test.fail "The cache should be full of green contracts." ;
   Log.info "The cache is full with green contracts." ;
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
 
   let* gas = call_contracts (str_id_calls red_contracts) client in
 
@@ -393,7 +393,7 @@ let check_block_impact_on_cache ~protocol =
     Test.fail "The green contracts should have been removed from the cache.") ;
   Log.info "It took %d unit of gas to replace the cache entirely." gas ;
 
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* size = get_size client in
   Log.info "Cache size after baking: %d\n" size ;
 
@@ -475,7 +475,7 @@ let check_cache_backtracking_during_chain_reorganization ~protocol =
     let* _ = call_contract contract_id "Left 2" clientB in
     let* _ = Node.wait_for_level nodeB 3 in
     Log.info "Node B is at level 3" ;
-    let* () = Client.bake_for clientB in
+    let* () = Client.bake_for_and_wait clientB in
     let* _ = Node.wait_for_level nodeB 4 in
     Log.info "Node B is at level 4" ;
     (* At this point, [nodeB] has a chain of length 4 with storage xxxx. *)
@@ -492,7 +492,7 @@ let check_cache_backtracking_during_chain_reorganization ~protocol =
   let check () =
     let* () = expected_storage clientA "xxxx" in
     let* _ = call_contract contract_id "Left 1" clientA in
-    let* () = Client.bake_for clientA in
+    let* () = Client.bake_for_and_wait clientA in
     let* () = expected_storage clientA "xxxxxxxx" in
     return ()
   in
@@ -519,7 +519,7 @@ let check_cache_backtracking_during_chain_reorganization ~protocol =
 let check_reloading_efficiency ~protocol body =
   let* nodeA, clientA = init1 ~protocol in
   let* _ = body clientA in
-  let* () = Client.bake_for clientA in
+  let* () = Client.bake_for_and_wait clientA in
   Log.info "Contracts are in the cache" ;
   let* size = get_size clientA in
   Log.info "Cache size after baking: %d\n" size ;
@@ -529,7 +529,7 @@ let check_reloading_efficiency ~protocol body =
   let* () = Node.run nodeA [Synchronisation_threshold 0] in
   let* () = Node.wait_for_ready nodeA in
   let* _ = RPC.Client.call clientA @@ RPC.get_chain_is_bootstrapped () in
-  let* _ = Client.bake_for clientA in
+  let* _ = Client.bake_for_and_wait clientA in
   let stop = Unix.gettimeofday () in
   let* cached_contracts' = get_cached_contracts clientA in
   let duration = stop -. start in
@@ -563,7 +563,7 @@ let check_cache_reloading_is_not_too_slow ~protocol =
   repeat 1000 @@ fun () ->
   let ncontracts = 5 in
   let* contracts = originate_very_small_contracts client ncontracts in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* _ = call_contracts (very_small_calls contracts) client in
   return ()
 
@@ -620,7 +620,7 @@ let check_simulation_takes_cache_into_account ~protocol =
   let* _, client = init1 ~protocol in
   let* chain_id = RPC.Client.call client @@ RPC.get_chain_chain_id () in
   let* contract_id = originate_very_small_contract client in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
 
   let check simulation_gas real_gas =
     if simulation_gas <> real_gas then
@@ -635,7 +635,7 @@ let check_simulation_takes_cache_into_account ~protocol =
   let* real_gas_consumption = call_contract contract_id "Unit" client in
   Log.info "real gas consumption with no cache: %d" real_gas_consumption ;
   check gas_no_cache real_gas_consumption ;
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* gas_with_cache = gas_from_simulation client chain_id contract_id 3 arg in
   Log.info "with cache: %d" gas_with_cache ;
   let* real_gas_consumption = call_contract contract_id "Unit" client in
@@ -692,7 +692,7 @@ let check_simulation_close_to_protocol_user_activation ~executors ~migrate_from
   (* At level 2, the cache is empty. *)
   let* gas_prediction_no_cache = simulate ~blocks_before_activation:5 2 in
   let* gas_no_cache = call_contract contract_id "Unit" client in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* _ = Node.wait_for_level node 3 in
 
   Log.info
@@ -702,7 +702,7 @@ let check_simulation_close_to_protocol_user_activation ~executors ~migrate_from
 
   (* At level 3, the cache contains the contract. *)
   let* gas_with_cache = call_contract contract_id "Unit" client in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* _ = Node.wait_for_level node 4 in
 
   Log.info "Gas required with a cache: %d" gas_with_cache ;
@@ -715,7 +715,7 @@ let check_simulation_close_to_protocol_user_activation ~executors ~migrate_from
 
   (* At level 4, a simulation considers there will be cache hit in 3 blocks. *)
   let* gas_prediction_with_cache = simulate ~blocks_before_activation:4 4 in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* _ = Node.wait_for_level node 5 in
 
   Log.info
@@ -782,10 +782,10 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
   let* () =
     Client.activate_protocol ~protocol:migrate_from ~parameter_file client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let migrate_to_hash = Protocol.hash migrate_to in
   let* () = Client.submit_proposals ~proto_hashes:[migrate_to_hash] client in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
 
   let* () =
     Client.submit_proposals
@@ -794,7 +794,7 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
       client
   in
 
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
 
   let vote (account : Account.key) ballot =
     Client.submit_ballot
@@ -803,7 +803,7 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
       ballot
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* final_period =
     let get_period () =
       let* json = RPC.Votes.get_current_period client in
@@ -827,7 +827,7 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
               else return ())
             else return ()
           in
-          Client.bake_for client)
+          Client.bake_for_and_wait client)
     in
     get_period ()
   in
@@ -875,7 +875,7 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
       ~error_msg:"Expecting %R, got %L") ;
 
   let* _json = RPC.Votes.get_current_period client in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* predicted_gas_in_simulation = simulate 4 in
   Log.info
     "Since we are now too close to activation (less than 3 blocks), the \
