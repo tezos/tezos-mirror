@@ -44,7 +44,7 @@ let select_commands ctxt Client_config.{protocol; chain; block; _} =
           return [])
 
 let () =
-  let () = PtGRANAD_machine.register_commands () in
-  let () = PtHangz2_machine.register_commands () in
-  let () = Psithaca_machine.register_commands () in
+  let () = Teztale_archiver.PtGRANAD_machine.register_commands () in
+  let () = Teztale_archiver.PtHangz2_machine.register_commands () in
+  let () = Teztale_archiver.Psithaca_machine.register_commands () in
   Client_main_run.run (module Client_config) ~select_commands

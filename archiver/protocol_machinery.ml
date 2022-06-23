@@ -90,7 +90,7 @@ module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
       else items
     in
     let unaccurate = if full then Some false else None in
-    let () = Archiver.add_received ?unaccurate level endorsements in
+    let () = Json_archiver.add_received ?unaccurate level endorsements in
     return_unit
 
   let rec pack_by_slot i e = function
@@ -175,7 +175,7 @@ module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
                         let timestamp =
                           header.Block_header.shell.Block_header.timestamp
                         in
-                        Archiver.add_block
+                        Json_archiver.add_block
                           ~level:block_level
                           hash
                           ~round:(Int32.of_int round)
@@ -201,10 +201,10 @@ module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
           head_stream
 
   let main cctxt prefix =
-    let dumper = Archiver.launch cctxt prefix in
+    let dumper = Json_archiver.launch cctxt prefix in
     let main =
       let*! () = Lwt.Infix.(blocks_loop cctxt <&> endorsements_loop cctxt) in
-      let () = Archiver.stop () in
+      let () = Json_archiver.stop () in
       Lwt.return_unit
     in
     let*! out = Lwt.join [dumper; main] in
