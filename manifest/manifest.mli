@@ -595,9 +595,6 @@ type with_test = Always | Never | Only_on_64_arch
     - [opam_with_test]: whether to add the [dune runtest] command.
       Note that for a given package all targets must have the same value of [opam_with_test].
 
-    - [opens]: list of module names to open when compiling.
-      They are passed as [-open] flags to the OCaml compiler (in the [(flags ...)] stanza).
-
     - [path]: path of the directory in which to generate the [dune] file for this target.
 
     - [preprocess]: preprocessor directives to add using the [(preprocess ...)] stanza.
@@ -665,7 +662,6 @@ type 'a maker =
   ?ocaml:Version.constraints ->
   ?opam:string ->
   ?opam_with_test:with_test ->
-  ?opens:string list ->
   ?preprocess:preprocessor list ->
   ?preprocessor_deps:preprocessor_dep list ->
   ?private_modules:string list ->
@@ -958,11 +954,11 @@ val optional : target -> target
     If [m] is specified, open this submodule instead of the main module.
 
     When such targets appear in [?deps] of a target [maker], they are
-    automatically prepended to [?opens] in the order of declaration in [?deps].
+    converted into [-open] in the order of declaration in [?deps].
     If you use [open_] on an [open_], the innermost [open_]s is opened first;
     For instance, [tezos_base |> open_ |> open_ ~m: "TzPervasives"]
-    is target [tezos_base], but when used in [?deps], this automatically prepend
-    ["Tezos_base"], followed by ["Tezos_base__TzPervasives"], to [?opens].
+    is target [tezos_base], but when used in [?deps], this automatically opens
+    ["Tezos_base"], followed by ["Tezos_base.TzPervasives"].
 
     Can only be used on internal libraries and on external or vendored
     libraries for which a [main_module] was specified. *)
