@@ -19,8 +19,12 @@ fi
 
 IMAGE=$1
 shift
-SHA=${1:-$(git rev-parse --short=8 HEAD)}
-shift
+if [ $# != 0 ]; then
+    SHA=$1
+    shift
+else
+    SHA=$(git rev-parse --short=8 HEAD)
+fi
 TESTS=${*:-version node_run}
 
 test_version() {
@@ -37,20 +41,23 @@ test_version() {
     done
 
     for binary in $(echo "$binaries" | grep tezos-); do
-        printf "Checking version of %s..." "$binary"
+        printf "Checking version of %s: " "$binary"
 
         cmd="docker run --entrypoint $binary $IMAGE --version"
-        node_sha_in_docker=$($cmd | cut -d' ' -f 1)
+        version=$($cmd)
+        node_sha_in_docker=$(echo "$version" | cut -d' ' -f 1)
 
         if [ "$node_sha_in_docker" != "$SHA" ]; then
             echo "NOK"
             echo
-            echo "Expected the version of Docker tezos-node to reference commit $SHA, got $node_sha_in_docker"
+            echo "Expected the version of Docker $binary:"
+            echo "  $version"
+            echo "to reference commit $SHA, found $node_sha_in_docker instead,"
             echo "when executing '$cmd'"
             exit 1
+        else
+            echo "'$version', OK!"
         fi
-
-        echo " OK!"
     done
 }
 
