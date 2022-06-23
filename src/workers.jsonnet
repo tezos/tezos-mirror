@@ -12,27 +12,60 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
 //##
 {
   requests:
-    local blockvalidator = 'Block validator';
-    local chainvalidators = 'Chain validators';
+    local blockRequests = 'Block validator request count';
+    local blockCompletions = 'Block validator completion count';
+    local blockErrors = 'Block validator error count';
+    local chainRequests = 'Chain validator request count';
+    local chainCompletions = 'Chain validator completion count';
+    local chainErrors = 'Chain validator error count';
+    local prevalidatorRequests = 'Prevalidator validator request count';
+    local prevalidatorCompletions = 'Prevalidator validator completion count';
+    local prevalidatorErrors = 'Prevalidator validator error count';
     graphPanel.new(
-      title='Pending workers requests',
+      title='Validation workers requests',
       datasource='Prometheus',
       linewidth=1,
       format='none',
       legend_alignAsTable=true,
-      legend_avg=true,
-      aliasColors={
-        [blockvalidator]: 'light-green',
-        [chainvalidators]: 'light-blue',
-      },
+      legend_rightSide=true,
+      legend_current=true,
+      legend_values=true,
     ).addTargets([
       prometheus.target(
-        namespace + '_validator_block_pending_requests' + node_instance,
-        legendFormat=blockvalidator,
+        namespace + '_validator_block_worker_request_count' + node_instance,
+        legendFormat=blockRequests,
       ),
       prometheus.target(
-        namespace + '_validator_chain_pending_requests' + node_instance,
-        legendFormat=chainvalidators,
+        namespace + '_validator_block_worker_completion_count' + node_instance,
+        legendFormat=blockCompletions,
+      ),
+      prometheus.target(
+        namespace + '_validator_block_worker_request_error_count' + node_instance,
+        legendFormat=blockErrors,
+      ),
+      prometheus.target(
+        namespace + '_validator_chain_worker_request_count' + node_instance,
+        legendFormat=chainRequests,
+      ),
+      prometheus.target(
+        namespace + '_validator_chain_worker_completion_count' + node_instance,
+        legendFormat=chainCompletions,
+      ),
+      prometheus.target(
+        namespace + '_validator_chain_worker_error_count' + node_instance,
+        legendFormat=chainErrors,
+      ),
+      prometheus.target(
+        namespace + '_mempool_worker_request_count' + node_instance,
+        legendFormat=prevalidatorRequests,
+      ),
+      prometheus.target(
+        namespace + '_mempool_worker_completion_count' + node_instance,
+        legendFormat=prevalidatorCompletions,
+      ),
+      prometheus.target(
+        namespace + '_mempool_worker_error_count' + node_instance,
+        legendFormat=prevalidatorErrors,
       ),
     ]),
 
