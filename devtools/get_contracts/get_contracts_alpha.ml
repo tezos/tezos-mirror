@@ -138,8 +138,13 @@ module Proto = struct
     let id_to_z = Lazy_storage_kind.Big_map.Id.unparse_to_z
 
     let list_values ?offset ?length (ctxt, id) =
-      Lwt.map wrap_tzresult
-      @@ Storage.Big_map.Contents.list_values ?offset ?length (ctxt, id)
+      let open Lwt_result_syntax in
+      let* ctxt, key_values =
+        Lwt.map wrap_tzresult
+        @@ Storage.Big_map.Contents.list_key_values ?offset ?length (ctxt, id)
+      in
+      let values = List.map snd key_values in
+      return (ctxt, values)
 
     let get ctxt id =
       Lwt.map wrap_tzresult @@ Storage.Big_map.Value_type.get ctxt id
