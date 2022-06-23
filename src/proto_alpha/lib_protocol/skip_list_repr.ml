@@ -91,7 +91,7 @@ end) : S = struct
 
   (*
 
-      A cell of a skip list with some [`content] and backpointers of
+      A cell of a skip list with some [`content] and back pointers of
       type [`ptr].
 
       Invariants
@@ -219,19 +219,55 @@ end) : S = struct
     in
     {index; content; back_pointers}
 
-  let best_skip cell target_index =
-    let index = cell.index in
-    let rec aux idx pow best_idx =
-      if Compare.Int.(idx >= FallbackArray.length cell.back_pointers) then
-        best_idx
-      else
-        let idx_index = index - (index mod pow) - 1 in
-        if Compare.Int.(idx_index < target_index) then best_idx
-        else aux (idx + 1) (basis * pow) (Some idx)
+  (* returns the array of [basis^i] forall [i < len (back_pointers cell)] *)
+  let list_powers cell =
+    let rec aux n prev p =
+      if Compare.Int.(n <= 0) then List.rev p
+      else aux (n - 1) (basis * prev) (prev :: p)
     in
-    aux 0 1 None
+    FallbackArray.of_list
+      ~fallback:0
+      ~proj:(fun x -> x)
+      (aux (FallbackArray.length cell.back_pointers) 1 [])
+
+  (*
+    [back_pointers] are sorted in decreasing order of their pointing cell index
+    in the list. So we can do a [binary_search] to find the [cell] with the
+    smallest index that is greater than [target] in the list. 
+
+    More formally, min({c : cell | c.index >= target.index}) where [c] is one of
+    the pointed cells in the array of back pointers of the [cell] parameter.
+  *)
+  let best_skip cell target_index powers =
+    let open FallbackArray in
+    let pointed_cell_index i = cell.index - (cell.index mod get powers i) - 1 in
+    let rec binary_search start_idx end_idx =
+      if Compare.Int.(start_idx >= end_idx) then Some start_idx
+      else
+        let mid_idx = start_idx + ((end_idx - start_idx) / 2) in
+        let mid_cell_index = pointed_cell_index mid_idx in
+        if Compare.Int.(mid_cell_index = target_index) then Some mid_idx
+        else if Compare.Int.(mid_cell_index < target_index) then
+          binary_search start_idx (mid_idx - 1)
+        else
+          let prev_mid_cell_index = pointed_cell_index (mid_idx + 1) in
+          if Compare.Int.(prev_mid_cell_index = target_index) then
+            Some (mid_idx + 1)
+          else if Compare.Int.(prev_mid_cell_index < target_index) then
+            (*
+              If (mid_cell_index > target_index) &&
+                 (prev_mid_cell_index < target_index) 
+              then we found the closest cell to the target, which is mid_cell. 
+              so we return its index [mid_idx] in the array of back_pointers. 
+            *)
+            Some mid_idx
+          else binary_search (mid_idx + 1) end_idx
+    in
+    binary_search 0 (length cell.back_pointers - 1)
 
   let back_path ~deref ~cell_ptr ~target_index =
+    Option.bind (deref cell_ptr) @@ fun cell ->
+    let powers = list_powers cell in
     let rec aux path ptr =
       let path = ptr :: path in
       Option.bind (deref ptr) @@ fun cell ->
@@ -239,7 +275,7 @@ end) : S = struct
       if Compare.Int.(target_index = index) then Some (List.rev path)
       else if Compare.Int.(target_index > index) then None
       else
-        Option.bind (best_skip cell target_index) @@ fun best_idx ->
+        Option.bind (best_skip cell target_index powers) @@ fun best_idx ->
         Option.bind (back_pointer cell best_idx) @@ fun ptr -> aux path ptr
     in
     aux [] cell_ptr
@@ -250,7 +286,7 @@ end) : S = struct
     let rec aux idx =
       if Compare.Int.(idx >= n) then false
       else
-        match FallbackArray.get l idx with
+        match get l idx with
         | None -> aux (idx + 1)
         | Some y -> if equal x y then true else aux (idx + 1)
     in
@@ -261,7 +297,9 @@ end) : S = struct
   let valid_back_path ~equal_ptr ~deref ~cell_ptr ~target_ptr path =
     assume_some (deref target_ptr) @@ fun target ->
     assume_some (deref cell_ptr) @@ fun cell ->
-    let target_index = index target and cell_index = index cell in
+    let target_index = index target
+    and cell_index = index cell
+    and powers = list_powers cell in
     let rec valid_path index cell_ptr path =
       match (cell_ptr, path) with
       | final_cell, [] ->
@@ -270,7 +308,7 @@ end) : S = struct
           assume_some (deref cell_ptr) @@ fun cell ->
           assume_some (deref cell_ptr') @@ fun cell' ->
           mem equal_ptr cell_ptr' cell.back_pointers
-          && assume_some (best_skip cell target_index) @@ fun best_idx ->
+          && assume_some (best_skip cell target_index powers) @@ fun best_idx ->
              assume_some (back_pointer cell best_idx) @@ fun best_ptr ->
              let minimal = equal_ptr best_ptr cell_ptr' in
              let index' = cell'.index in
