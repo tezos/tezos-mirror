@@ -867,15 +867,14 @@ module Make (Context : P) :
     let* () = ParsingResult.set None in
     let* () = ParserState.set SkipLayout in
     let* () = LexerState.set (0, 0) in
-    let* () = Status.set Parsing in
     let* () = Code.clear in
     return ()
 
   let start_evaluating : unit t =
     let open Monad.Syntax in
+    let* () = Status.set Evaluating in
     let* () = EvaluationResult.set None in
     let* () = Stack.clear in
-    let* () = Status.set Evaluating in
     return ()
 
   let stop_parsing outcome =
