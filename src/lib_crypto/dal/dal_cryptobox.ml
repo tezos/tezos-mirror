@@ -58,6 +58,10 @@ module type DAL_cryptobox_sig = sig
   (** Collection of shards. *)
   type shards_map = share IntMap.t
 
+  type shards_proofs_precomputation
+
+  type slot_segments_proofs_precomputation
+
   module Encoding : sig
     val commitment_encoding : commitment Data_encoding.t
 
@@ -119,8 +123,14 @@ module type DAL_cryptobox_sig = sig
     int ->
     (bool, [> `Degree_exceeds_srs_length of string]) Result.t
 
-  (** [prove_shards p] creates a proof of evaluation for each shard. *)
-  val prove_shards : polynomial -> proof_shards array
+  (** [precompute_shards_proofs ()] returns the precomputation used to prove
+      shards. *)
+  val precompute_shards_proofs : unit -> shards_proofs_precomputation
+
+  (** [prove_shards preprocess p] creates a proof of evaluation for each
+      shard. *)
+  val prove_shards :
+    polynomial -> preprocess:shards_proofs_precomputation -> proof_shards array
 
   (** [verify_shard commitment shard proof] returns true if and only if the
       shard is consistent with the [commitment] and [proof]. *)
@@ -137,9 +147,17 @@ module type DAL_cryptobox_sig = sig
   val verify_single :
     commitment -> point:Scalar.t -> evaluation:Scalar.t -> proof_single -> bool
 
-  (** [prove_slot_segment p] where [p] is the output of
+  (** [precompute_slot_segments_proofs ()] returns the precomputation used to
+      prove slot segments. *)
+  val precompute_slot_segments_proofs :
+    unit -> slot_segments_proofs_precomputation
+
+  (** [prove_slot_segments p preprocess] where [p] is the output of
       [polynomial_from_bytes slot], returns proofs for all slot segments. *)
-  val prove_slot_segments : polynomial -> proof_slot_segment array
+  val prove_slot_segments :
+    polynomial ->
+    preprocess:slot_segments_proofs_precomputation ->
+    proof_slot_segment array
 
   (** [verify_slot_segment cm ~slot_segment ~slot_segment_index proof] returns
       true if the [slot_segment] whose index is [slot_segment_index] is
@@ -198,6 +216,12 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
   type shards_map = share IntMap.t
 
   type shard = int * share
+
+  type shards_proofs_precomputation =
+    Scalar.t array * proof_slot_segment array array
+
+  type slot_segments_proofs_precomputation =
+    Scalar.t array * proof_slot_segment array array
 
   module Encoding = struct
     open Data_encoding
@@ -545,12 +569,6 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
 
   let kzg_srs = create_srs (module Bls12_381.G1) kzg_srs_size secret
 
-  let preprocess_shards_proofs =
-    Kate_amortized.preprocess_multi_reveals
-      ~chunk_len:evaluations_per_proof_log
-      ~degree:k
-      (kate_amortized_srs_g1, kate_amortized_srs_g2_shards)
-
   let commit' :
       type t.
       (module Bls12_381.CURVE with type t = t) ->
@@ -603,12 +621,18 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
     Ok
       (Pairing.pairing_check [(cm, commit_xk); (proof, G2.(negate (copy one)))])
 
-  let prove_shards p =
+  let precompute_shards_proofs () =
+    Kate_amortized.preprocess_multi_reveals
+      ~chunk_len:evaluations_per_proof_log
+      ~degree:k
+      (kate_amortized_srs_g1, kate_amortized_srs_g2_shards)
+
+  let prove_shards p ~preprocess =
     Kate_amortized.multiple_multi_reveals
       ~chunk_len:evaluations_per_proof_log
       ~chunk_count:proofs_log
       ~degree:k
-      ~preprocess:preprocess_shards_proofs
+      ~preprocess
       (Polynomial.to_dense_coefficients p |> Array.to_list)
 
   let verify_shard ct (shard_index, shard_evaluations) proof =
@@ -635,18 +659,18 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
           (proof, G2.(add h_secret (negate (mul (copy one) point))));
         ])
 
-  let preprocess_segments_proofs =
+  let precompute_slot_segments_proofs () =
     Kate_amortized.preprocess_multi_reveals
       ~chunk_len:Z.(log2up (of_int segment_len))
       ~degree:k
       (kate_amortized_srs_g1, kate_amortized_srs_g2_segments)
 
-  let prove_slot_segments p =
+  let prove_slot_segments p ~preprocess =
     Kate_amortized.multiple_multi_reveals
       ~chunk_len:Z.(log2up (of_int segment_len))
       ~chunk_count:Z.(log2 (of_int nb_segments))
       ~degree:k
-      ~preprocess:preprocess_segments_proofs
+      ~preprocess
       (Polynomial.to_dense_coefficients p |> Array.to_list)
 
   (* Parses the [slot_segment] to get the evaluations that it contains. The

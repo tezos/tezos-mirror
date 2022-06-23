@@ -48,8 +48,12 @@ module Test = struct
           let* p = DAL_crypto.polynomial_from_bytes msg in
 
           let* cm = DAL_crypto.commit p in
-
-          let pis = DAL_crypto.prove_slot_segments p in
+          let precompute_pi_segments =
+            DAL_crypto.precompute_slot_segments_proofs ()
+          in
+          let pis =
+            DAL_crypto.prove_slot_segments p ~preprocess:precompute_pi_segments
+          in
 
           let slot_segment = Bytes.sub msg 0 slot_segment_size in
           assert (
@@ -83,7 +87,10 @@ module Test = struct
 
           let* comm = DAL_crypto.commit p in
 
-          let shard_proofs = DAL_crypto.prove_shards p in
+          let precompute_pi_shards = DAL_crypto.precompute_shards_proofs () in
+          let shard_proofs =
+            DAL_crypto.prove_shards p ~preprocess:precompute_pi_shards
+          in
           match DAL_crypto.IntMap.find 0 enc_shards with
           | None -> Ok ()
           | Some eval ->
