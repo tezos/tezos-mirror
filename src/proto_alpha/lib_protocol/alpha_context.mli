@@ -1429,6 +1429,8 @@ module Sapling : sig
     val parse_z : Z.t -> (t, string) result
 
     val unparse_to_z : t -> Z.t
+
+    val in_memory_size : t -> Cache_memory_helpers.sint
   end
 
   type state = private {id : Id.t option; diff : diff; memo_size : Memo_size.t}
