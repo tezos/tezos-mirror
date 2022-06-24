@@ -36,6 +36,10 @@ type t = {
 (** [default_data_dir] is the default value for [data_dir]. *)
 val default_data_dir : string
 
+(** [default_storage_dir] returns the default value of the storage dir
+    given a [data_dir]. *)
+val default_storage_dir : string -> string
+
 (** [default_rpc_addr] is the default value for [rpc_addr]. *)
 val default_rpc_addr : string
 

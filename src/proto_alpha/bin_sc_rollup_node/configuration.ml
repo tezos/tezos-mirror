@@ -38,6 +38,10 @@ type t = {
 let default_data_dir =
   Filename.concat (Sys.getenv "HOME") ".tezos-sc-rollup-node"
 
+let storage_dir = "storage"
+
+let default_storage_dir data_dir = Filename.concat data_dir storage_dir
+
 let relative_filename data_dir = Filename.concat data_dir "config.json"
 
 let filename config = relative_filename config.data_dir
