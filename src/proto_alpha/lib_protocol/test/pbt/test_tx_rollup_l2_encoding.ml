@@ -31,7 +31,6 @@
     Subject:      Tx rollup l2 encoding
 *)
 
-open Lib_test
 open Lib_test.Qcheck2_helpers
 open Protocol.Indexable
 open Protocol.Tx_rollup_l2_batch
@@ -274,33 +273,6 @@ let test_quantity ~count =
   in
   QCheck2.Test.make ~count ~print ~name:"quantity operation" test_gen test
 
-let test_roundtrip ~count title arb equ encoding =
-  let pp fmt x =
-    Data_encoding.Json.construct encoding x
-    |> Data_encoding.Json.to_string |> Format.pp_print_string fmt
-  in
-  let test rdt input =
-    let output = Roundtrip.make encoding rdt input in
-    let success = equ input output in
-    if not success then
-      QCheck2.Test.fail_reportf
-        "%s %s roundtrip error: %a became %a"
-        title
-        (Roundtrip.target rdt)
-        pp
-        input
-        pp
-        output
-  in
-  QCheck2.Test.make
-    ~count
-    ~name:(Format.asprintf "roundtrip %s" title)
-    arb
-    (fun input ->
-      test Roundtrip.binary input ;
-      test Roundtrip.json input ;
-      true)
-
 let () =
   let qcheck_wrap = qcheck_wrap ~rand:(Random.State.make_self_init ()) in
   Alcotest.run
@@ -312,15 +284,15 @@ let () =
           [
             test_roundtrip
               ~count:100
-              "batch"
-              batch
-              ( = )
+              ~title:"batch"
+              ~gen:batch
+              ~eq:( = )
               Protocol.Tx_rollup_l2_batch.encoding;
             test_roundtrip
               ~count:100
-              "message_result"
-              message_result_withdrawal
-              ( = )
+              ~title:"message_result"
+              ~gen:message_result_withdrawal
+              ~eq:( = )
               Protocol.Tx_rollup_l2_apply.Message_result.encoding;
           ] );
     ]

@@ -55,7 +55,7 @@ let test_distance_from_self =
       Z.(equal (Tick.distance x x) zero))
 
 (** Distance from non-self is non-zero. *)
-let tets_distance_from_non_self =
+let test_distance_from_non_self =
   Test.make
     ~name:"distance from non-self is non-zero"
     (Gen.pair tick tick)
@@ -96,7 +96,7 @@ let tests =
     test_next_is_monotonic;
     test_initial_is_bottom;
     test_distance_from_self;
-    tets_distance_from_non_self;
+    test_distance_from_non_self;
     test_distance_symmetry;
     test_distance_triangle_inequality;
     test_of_int;

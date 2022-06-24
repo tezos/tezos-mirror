@@ -123,16 +123,34 @@ let qcheck_cond ?pp ~cond e () =
     | Some pp ->
         QCheck.Test.fail_reportf "@[<v 2>The condition check failed!@,%a@]" pp e
 
-let int64_range_gen a b =
+let intX_range_gen ~sub ~add ~gen ~shrink a b =
   let gen a b st =
-    let range = Int64.sub b a in
-    let raw_val = Random.State.int64 st range in
-    let res = Int64.add a raw_val in
+    let range = sub b a in
+    let raw_val = gen st range in
+    let res = add a raw_val in
     assert (a <= res && res <= b) ;
     res
   in
-  let shrink b () = QCheck2.Shrink.int64_towards a b () in
+  let shrink b () = shrink a b () in
   QCheck2.Gen.make_primitive ~gen:(gen a b) ~shrink
+
+let int64_range_gen a b =
+  intX_range_gen
+    ~sub:Int64.sub
+    ~add:Int64.add
+    ~gen:Random.State.int64
+    ~shrink:QCheck2.Shrink.int64_towards
+    a
+    b
+
+let int32_range_gen a b =
+  intX_range_gen
+    ~sub:Int32.sub
+    ~add:Int32.add
+    ~gen:Random.State.int32
+    ~shrink:QCheck2.Shrink.int32_towards
+    a
+    b
 
 let int64_strictly_positive_gen = int64_range_gen 1L
 
@@ -229,3 +247,30 @@ struct
   let gen (key_gen : Map.key Gen.t) (val_gen : 'v Gen.t) : 'v Map.t Gen.t =
     gen_of_size Gen.small_nat key_gen val_gen
 end
+
+let test_roundtrip ~count ~title ~gen ~eq encoding =
+  let pp fmt x =
+    Data_encoding.Json.construct encoding x
+    |> Data_encoding.Json.to_string |> Format.pp_print_string fmt
+  in
+  let test rdt input =
+    let output = Roundtrip.make encoding rdt input in
+    let success = eq input output in
+    if not success then
+      QCheck2.Test.fail_reportf
+        "%s %s roundtrip error: %a became %a"
+        title
+        (Roundtrip.target rdt)
+        pp
+        input
+        pp
+        output
+  in
+  QCheck2.Test.make
+    ~count
+    ~name:(Format.asprintf "roundtrip %s" title)
+    gen
+    (fun input ->
+      test Roundtrip.binary input ;
+      test Roundtrip.json input ;
+      true)

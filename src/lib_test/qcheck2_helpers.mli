@@ -96,10 +96,15 @@ val qcheck_cond :
     and [b] inclusive.
 
     Poorman's implementation until
-    https://github.com/c-cube/qcheck/issues/105 is done.
-
-    This probably spectacularly crashes if [(b - a) > Int64.max_int]. *)
+    https://github.com/c-cube/qcheck/issues/105 is done. *)
 val int64_range_gen : int64 -> int64 -> int64 QCheck2.Gen.t
+
+(** [int32_range_gen a b] generates an [int32] between [a] inclusive
+    and [b] inclusive.
+
+    Poorman's implementation until
+    https://github.com/c-cube/qcheck/issues/105 is done. *)
+val int32_range_gen : int32 -> int32 -> int32 QCheck2.Gen.t
 
 (** [int64_strictly_positive_gen x] generates an [int64] between [1] inclusive
     and [x] inclusive.
@@ -179,3 +184,12 @@ end) : sig
       are generated with [key_gen] and the values with [val_gen]. *)
   val gen : Map.key QCheck2.Gen.t -> 'v QCheck2.Gen.t -> 'v Map.t QCheck2.Gen.t
 end
+
+(** Test the roundtripness of an encoding both in JSON and binary formats. *)
+val test_roundtrip :
+  count:int ->
+  title:string ->
+  gen:'a QCheck2.Gen.t ->
+  eq:('a -> 'a -> bool) ->
+  'a Data_encoding.t ->
+  QCheck2.Test.t
