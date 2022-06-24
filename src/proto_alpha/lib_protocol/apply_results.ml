@@ -2739,7 +2739,6 @@ let block_metadata_encoding =
              level_info,
              voting_period_info,
              nonce_hash,
-             consumed_gas,
              deactivated,
              balance_updates,
              liquidity_baking_toggle_ema,
@@ -2750,12 +2749,11 @@ let block_metadata_encoding =
                 level_info,
                 voting_period_info,
                 nonce_hash,
-                consumed_gas,
                 deactivated,
                 balance_updates,
                 liquidity_baking_toggle_ema,
                 implicit_operations_results ),
-              (_consumed_millgas, dal_slot_availability) ) ->
+              (consumed_gas, dal_slot_availability) ) ->
          {
            proposer;
            baker;
@@ -2770,13 +2768,12 @@ let block_metadata_encoding =
            dal_slot_availability;
          })
        (merge_objs
-          (obj10
+          (obj9
              (req "proposer" Signature.Public_key_hash.encoding)
              (req "baker" Signature.Public_key_hash.encoding)
              (req "level_info" Level.encoding)
              (req "voting_period_info" Voting_period.info_encoding)
              (req "nonce_hash" (option Nonce_hash.encoding))
-             (req "consumed_gas" Gas.Arith.n_fp_encoding)
              (req "deactivated" (list Signature.Public_key_hash.encoding))
              (dft "balance_updates" Receipt.balance_updates_encoding [])
              (req
