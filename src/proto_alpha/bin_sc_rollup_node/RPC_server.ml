@@ -207,12 +207,13 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
               (module Store.Last_published_commitment_level)
               store
           in
-          (* If the commitment has been published then the corresponding
-             level in Store.Commitments.published_at_level is available. *)
+          (* The corresponding level in Store.Commitments.published_at_level is
+             available only when the commitment has been published and included
+             in a block. *)
           let*! published_at_level =
-            Store.Commitments_published_at_level.get store hash
+            Store.Commitments_published_at_level.find store hash
           in
-          return (commitment, hash, Some published_at_level)
+          return (commitment, hash, published_at_level)
         in
         return result)
 
