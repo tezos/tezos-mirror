@@ -764,6 +764,8 @@ val private_exes : string list maker
 
     - [alias]: if non-empty, an alias is set up for the given test, named [alias].
       Default is ["runtest"]. Note that for JS tests, ["_js"] is appended to this alias.
+      Also note that if [alias] is non-empty, the target must belong to an opam package
+      (i.e. [~opam] must also be non-empty).
 
     - [dep_files]: a list of files to add as dependencies using [(deps (file ...))]
       in the [runtest] alias.

@@ -1198,7 +1198,7 @@ module Target = struct
               invalid_argf
                 "for targets which provide test executables such as %S, you \
                  must specify a non-empty ~opam or have it not run by default \
-                 with ~runtest:false"
+                 with ~alias:\"\""
                 name
           | Public_library {public_name; _} ->
               invalid_argf
