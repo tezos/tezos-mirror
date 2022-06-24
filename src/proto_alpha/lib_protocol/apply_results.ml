@@ -887,8 +887,7 @@ module Manager_result = struct
       ~op_case:
         Operation.Encoding.Manager_operations.sc_rollup_dal_slot_subscribe_case
       ~encoding:
-        (obj4
-           (req "consumed_gas" Gas.Arith.n_integral_encoding)
+        (obj3
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (req "slot_index" Dal.Slot_index.encoding)
            (req "level" Raw_level.encoding))
@@ -900,12 +899,10 @@ module Manager_result = struct
       ~proj:(function
         | Sc_rollup_dal_slot_subscribe_result {consumed_gas; slot_index; level}
           ->
-            (Gas.Arith.ceil consumed_gas, consumed_gas, slot_index, level))
+            (consumed_gas, slot_index, level))
       ~kind:Kind.Sc_rollup_dal_slot_subscribe_manager_kind
-      ~inj:(fun (consumed_gas, consumed_milligas, slot_index, level) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Sc_rollup_dal_slot_subscribe_result
-          {consumed_gas = consumed_milligas; slot_index; level})
+      ~inj:(fun (consumed_gas, slot_index, level) ->
+        Sc_rollup_dal_slot_subscribe_result {consumed_gas; slot_index; level})
 end
 
 let successful_manager_operation_result_encoding :
