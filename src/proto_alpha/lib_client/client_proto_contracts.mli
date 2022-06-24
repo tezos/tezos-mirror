@@ -80,10 +80,15 @@ module ContractAlias : sig
   val autocomplete : #Client_context.wallet -> string list tzresult Lwt.t
 end
 
+(** [list_contracts cctxt] returns the concatenation of [contracts] and [accounts]
+    where [contracts] is the result of [RawContractAlias.load cctxt]
+    and [accounts] the list of accounts (implicit contracts of identities)
+*)
 val list_contracts :
   #Client_context.wallet ->
   (string * string * RawContractAlias.t) list tzresult Lwt.t
 
+(** Calls {!Alpha_services.Contract.delegate_opt} *)
 val get_delegate :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->

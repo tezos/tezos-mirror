@@ -69,6 +69,7 @@ type run_params = {
   self : Contract_hash.t option;
 }
 
+(** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Scripts.run_tzip4_view} *)
 val run_view :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
@@ -76,8 +77,10 @@ val run_view :
   run_view_params ->
   Script.expr tzresult Lwt.t
 
-(** [run_script_view cctxt ~chain ~block params] executes the RPC to run a
-    Michelson view offchain and returns its value. *)
+(** [run_script_view cctxt ~chain ~block params]
+    executes {!Tezos_protocol_plugin_alpha.Plugin.RPC.Scripts.run_script_view},
+    the RPC to run a Michelson view offchain and returns its value.
+ *)
 val run_script_view :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
@@ -85,6 +88,7 @@ val run_script_view :
   run_script_view_params ->
   Script.expr tzresult Lwt.t
 
+(** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Scripts.run_code} *)
 val run :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
@@ -96,6 +100,7 @@ val run :
   tzresult
   Lwt.t
 
+(** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Scripts.trace_code} *)
 val trace :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
@@ -134,6 +139,7 @@ val print_trace_result :
   tzresult ->
   unit tzresult Lwt.t
 
+(** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Scripts.typecheck_data} *)
 val typecheck_data :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
@@ -145,6 +151,7 @@ val typecheck_data :
   unit ->
   Gas.t tzresult Lwt.t
 
+(** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Scripts.typecheck_code} *)
 val typecheck_program :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
@@ -164,6 +171,7 @@ val print_typecheck_result :
   #Client_context.printer ->
   unit tzresult Lwt.t
 
+(** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Scripts.script_size} *)
 val script_size :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
@@ -193,6 +201,7 @@ val print_entrypoint_type :
   Script_repr.expr option tzresult ->
   unit tzresult Lwt.t
 
+(** Calls {!Michelson_v1_entrypoints.list_entrypoints} *)
 val list_entrypoints :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
@@ -216,6 +225,7 @@ val list_unreachables :
   Michelson_v1_parser.parsed ->
   Michelson_v1_primitives.prim list list tzresult Lwt.t
 
+(** Calls {!Michelson_v1_entrypoints.print_unreachables} *)
 val print_unreachables :
   #Protocol_client_context.full ->
   emacs:bool ->
