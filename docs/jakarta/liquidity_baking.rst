@@ -44,13 +44,13 @@ mechanism called the Liquidity Baking Toggle Vote. At every block, the
 baker producing the block includes a flag that requests ending the
 subsidy or on the contrary continuing or restarting it. The context
 maintains an exponential moving average of that flag. The baker has
-three options for this flag: ``Off`` to request ending the subsidy,
-``On`` to request continuing or restarting the subsidy, and ``Pass``
+three options for this flag: ``off`` to request ending the subsidy,
+``on`` to request continuing or restarting the subsidy, and ``pass``
 to abstain.
 
-``e[n+1] = e[n]`` if the flag is set to ``Pass``.
-``e[n+1] = (1999 * e[n] // 2000) + 1_000_000`` if the flag is set to ``Off``.
-``e[n+1] = (1999 * e[n] // 2000)`` if the flag is set to ``On``.
+``e[n+1] = e[n]`` if the flag is set to ``pass``.
+``e[n+1] = (1999 * e[n] // 2000) + 1_000_000`` if the flag is set to ``off``.
+``e[n+1] = (1999 * e[n] // 2000)`` if the flag is set to ``on``.
 When computing ``e[n+1]``, the division is rounded toward ``1_000_000_000```.
 
 If at any block ``e[n] >= 1_000_000_000`` then it means that an

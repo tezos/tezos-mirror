@@ -175,7 +175,7 @@ Further External Resources
 
 The original design of the proof-of-stake mechanism in Tezos can be
 found in the `whitepaper
-<https://whitepaper.io/document/376/tezos-whitepaper>`_.
+<https://tezos.com/whitepaper.pdf>`_.
 
 Another presentation of the Tezos' proof-of-stake mechanism can be
 found in the `Tezos agora wiki entry

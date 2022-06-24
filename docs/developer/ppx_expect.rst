@@ -1,7 +1,7 @@
 Ppx_expect
 ==========
 
-`Ppx_expect :ref:<ppx_expect_section>` is a framework for writing tests for OCaml
+:ref:`Ppx_expect<ppx_expect_section>` is a framework for writing tests for OCaml
 code printing textual output.
 
 There is pretty comprehensive documentation about ``Inline expectation tests`` and the ``ppx_expect`` tool for writing them:
@@ -13,12 +13,12 @@ Here, we will just cover enough to get started using them inside the Tezos codeb
 How to run tests
 ----------------
 
-If you want to run tests and see whether they succeed, build the standard runtest alias ::
+If you want to run tests and see whether they succeed, build the standard ``runtest`` alias::
 
     dune runtest src/lib_stdlib
     # or dune build @@src/lib_stdlib/runtest
 
-The result would look like this ::
+The result would look like this::
 
     File "src/lib_stdlib/bloomer.ml", line 97, characters 0-817: random_read_writes (0.006 sec)
     File "src/lib_stdlib/bloomer.ml", line 123, characters 0-1339: peek and poke work with bits = [1 .. Sys.int_size - 7] (0.012 sec)
@@ -29,7 +29,7 @@ The result would look like this ::
     File "src/lib_stdlib/bloomer.ml", line 456, characters 4-137 (11.966 sec)
     File "src/lib_stdlib/bloomer.ml", line 461, characters 4-1695: <<match Sys.getenv_opt "BLOOMER_TEST_GNUPLOT_PA[...]>> (0.000 sec)
 
-A test can fail because it generates an output different from what is expeceted or because it raises an exception.
+A test can fail because it generates an output different from what is expected or because it raises an exception.
 Failures are reported as a diff in both cases.
 
 Different output::
@@ -120,7 +120,7 @@ In the manifest, just add the following argument to the library containing expec
 
     ~inline_tests:ppx_expect
 
-Adding new tests is then just a matter of adding ``let%expect_test`` at toplevel::
+Adding new tests is then just a matter of adding ``let%expect_test`` at top level::
 
     let%expect_test "optional name" =
       print_endline "hello world";
@@ -141,9 +141,9 @@ Where to put the tests
 ----------------------
 
 Expect tests can live next to the implementation or in a different library dedicated to tests
-(e.g. if you don't want to polute your source/binary or if your want to only test the exposed api).
+(e.g. if you don't want to polute your source/binary or if your want to only test the exposed API).
 
-Intergration with Lwt
+Integration with Lwt
 ---------------------
 
 Ppx_expect can be used in combination with Lwt, see the

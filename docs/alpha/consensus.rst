@@ -10,7 +10,7 @@ History
 Before Tenderbake, there was
 `Emmy* <https://gitlab.com/tezos/tzip/-/blob/master/drafts/current/draft_emmy-star.md>`_,
 a Nakamoto-style consensus consisting of a series of improvements of the one in
-the `Tezos whitepaper <https://whitepaper.io/document/376/tezos-whitepaper>`_.
+the `Tezos whitepaper <https://tezos.com/whitepaper.pdf>`_.
 
 Emmy*, like any Nakamoto-style consensus algorithm (such as `Bitcoin
 <https://bitcoin.org/bitcoin.pdf>`_ or `Ouroboros

@@ -83,8 +83,11 @@ odoc-lite: main docexes
 	@mkdir -p _build/api
 	@cp -r $(TMPDOCDIR)/_build/default/_doc _build/api/odoc
 
+.PHONY: linkcheck
 linkcheck: html
-	@$(SPHINXBUILD) -b linkcheck "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
+	@echo "Running linkcheck, outputs messages to $(BUILDDIR)/output.txt"
+	@$(SPHINXBUILD) -b linkcheck "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) >$@;\
+		RESULT=$$?; cat $(BUILDDIR)/output.txt; exit $$RESULT
 
 .PHONY: redirectcheck
 redirectcheck: html
@@ -192,6 +195,6 @@ pycodestyle:
 lint: pylint pycodestyle lint_black
 
 clean:
-	@-rm -Rf "$(BUILDDIR)"
+	@-rm -Rf "$(BUILDDIR)" linkcheck
 	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json active/rpc.rst ithaca/rpc.rst jakarta/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
 	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html ithaca/tezos-*.html jakarta/tezos-*.html alpha/tezos-*.html

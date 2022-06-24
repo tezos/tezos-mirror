@@ -150,7 +150,7 @@ sed -i.old -e "s,tezos\.gitlab\.io/alpha/,tezos.gitlab.io/${version}_${label}/,g
            -e "s/_alpha\b/_${version}/g" \
            -e "s/\balpha\b/${version}/g" \
     $(find . -name \*.py)
-echo "Fixing python regtests ouputs"
+echo "Fixing python regtests outputs"
 cd _regtest_outputs
 sed -i.old -e "s/_alpha\b/_${version}/g" *.out
 cd ../..

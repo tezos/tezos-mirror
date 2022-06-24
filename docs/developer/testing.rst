@@ -127,7 +127,7 @@ References:
  - `Alcotest README <https://github.com/mirage/alcotest>`_.
 
 .. _ppx_expect_section:
-   
+
 Ppx_expect
 ~~~~~~~~~~
 
@@ -136,8 +136,8 @@ framework for writing tests for OCaml code generating textual output, similar to
 `Cram <https://bitheap.org/cram/>`_ which is used for testing command line applications.
 
 Typical use cases:
- - Unit test, integration test leveraging existing printers instead of checking properties.
- - Test that change on purpose over time. One can easily make tests
+ - Unit tests and integration tests leveraging existing printers instead of checking properties.
+ - Tests that change on purpose over time. One can easily make tests
    pass again with a single dune invocation ``dune runtest --auto-promote``
 
 Example tests:
@@ -151,7 +151,7 @@ References:
  - `Ppx_expect README <https://github.com/janestreet/ppx_expect>`_.
  - `Dune documentation about inline expectation tests <https://dune.readthedocs.io/en/stable/tests.html#inline-expectation-tests>`_.
  - `Ppx_inline_test README <https://github.com/janestreet/ppx_inline_test>`_.
-  
+
 .. _property_based_test:
 
 QCheck
