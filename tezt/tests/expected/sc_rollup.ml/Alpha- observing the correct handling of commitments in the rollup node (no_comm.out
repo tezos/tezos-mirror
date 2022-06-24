@@ -53,8 +53,7 @@ This sequence of operations was run:
       "inbox_level": 32,
       "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
       "number_of_ticks": 0 },
-  "hash": "[SC_ROLLUP_COMMITMENT_HASH]",
-  "published_at_level": 35 }
+  "hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
 ./tezos-client rpc get /chains/main/blocks/head/context/constants
 { "proof_of_work_nonce_size": 8, "nonce_length": 32,
@@ -160,6 +159,7 @@ This sequence of operations was run:
       Commitment: [SC_ROLLUP_COMMITMENT_HASH]
       This smart contract rollup commitment cementing was successfully applied
       Consumed gas: 3625.362
+      Inbox level: 32
 
 
 ./tezos-client rpc get /chains/main/blocks/head/context/constants
