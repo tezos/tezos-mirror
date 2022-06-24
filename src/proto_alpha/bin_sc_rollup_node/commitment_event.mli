@@ -47,11 +47,11 @@ val publish_commitment_skipped : Sc_rollup.Commitment.t -> unit Lwt.t
 
 val publish_commitment_injected : Sc_rollup.Commitment.t -> unit Lwt.t
 
-val cement_commitment_failed : Sc_rollup.Commitment.t -> unit Lwt.t
+val cement_commitment_failed : Sc_rollup.Commitment.Hash.t -> unit Lwt.t
 
-val cement_commitment_backtracked : Sc_rollup.Commitment.t -> unit Lwt.t
+val cement_commitment_backtracked : Sc_rollup.Commitment.Hash.t -> unit Lwt.t
 
-val cement_commitment_skipped : Sc_rollup.Commitment.t -> unit Lwt.t
+val cement_commitment_skipped : Sc_rollup.Commitment.Hash.t -> unit Lwt.t
 
 val cement_commitment_injected : Sc_rollup.Commitment.t -> unit Lwt.t
 

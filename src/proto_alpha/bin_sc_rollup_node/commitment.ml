@@ -443,11 +443,11 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
               in
               Commitment_event.cement_commitment_injected commitment
           | Failed (Sc_rollup_cement_manager_kind, _errors) ->
-              Commitment_event.cement_commitment_failed commitment
+              Commitment_event.cement_commitment_failed commitment_hash
           | Backtracked (Sc_rollup_cement_result _, _errors) ->
-              Commitment_event.cement_commitment_backtracked commitment
+              Commitment_event.cement_commitment_backtracked commitment_hash
           | Skipped Sc_rollup_cement_manager_kind ->
-              Commitment_event.cement_commitment_skipped commitment
+              Commitment_event.cement_commitment_skipped commitment_hash
         in
         return_unit
 
