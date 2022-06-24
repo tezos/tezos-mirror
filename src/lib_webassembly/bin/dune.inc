@@ -3,6 +3,8 @@
 
 (include_subdirs unqualified)
 
+(data_only_dirs test)
+
 (subdir
  text
  (rule

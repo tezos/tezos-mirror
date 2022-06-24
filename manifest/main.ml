@@ -601,7 +601,7 @@ let _octez_webassembly_repl =
 let _octez_webassembly_test =
   test
     "main"
-    ~path:"src/lib_webassembly/bin/test"
+    ~path:"src/lib_webassembly/tests"
     ~opam:"tezos-webassembly-interpreter"
     ~dune:Dune.[[S "include_subdirs"; S "no"]]
     ~deps:
