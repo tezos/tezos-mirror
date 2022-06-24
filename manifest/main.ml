@@ -3458,7 +3458,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
                   ~section:"lib";
                 targets_rule
                   ["protocol.ml"]
-                  ~deps:[modules_as_deps]
                   ~action:
                     [
                       S "write-file";
