@@ -1187,6 +1187,8 @@ let commitment_stored _protocol sc_rollup_node sc_rollup _node client =
     (Check.option Check.int)
     ~error_msg:
       "Commitment has been stored at a level different than expected (%L = %R)" ;
+  (* Bake one level for commitment to be included *)
+  let* () = Client.bake_for_and_wait client in
   let* published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
@@ -1835,21 +1837,28 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup node
   let* rollup_node1_published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
-  let () =
-    Check.(
-      Option.map inbox_level rollup_node1_published_commitment
-      = Some commitment_inbox_level)
-      (Check.option Check.int)
-      ~error_msg:
-        "Commitment has been published at a level different than expected (%L \
-         = %R)" ;
-    Check.(
-      Option.bind rollup_node1_published_commitment first_published_at_level
-      <> None)
-      (Check.option Check.int)
-      ~error_msg:
-        "Level at which commitment has first been published is undefined"
+  Check.(
+    Option.map inbox_level rollup_node1_published_commitment
+    = Some commitment_inbox_level)
+    (Check.option Check.int)
+    ~error_msg:
+      "Commitment has been published at a level different than expected (%L = \
+       %R)" ;
+  (* Bake an additional block for the commitment to be included. *)
+  let* () = Client.bake_for_and_wait client in
+  let* commitment_publish_level =
+    Sc_rollup_node.wait_for_level sc_rollup_node (commitment_finalized_level + 1)
   in
+  let* rollup_node1_published_commitment =
+    Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
+  in
+  Check.(
+    Option.bind rollup_node1_published_commitment first_published_at_level
+    = Some commitment_publish_level)
+    (Check.option Check.int)
+    ~error_msg:
+      "Level at which commitment has first been published (%L) is wrong. \
+       Expected %R." ;
   let* () = Sc_rollup_node.terminate sc_rollup_node in
   (* Rollup node 2 starts and processes enough levels to publish a commitment.*)
   let bootstrap2_key = Constant.bootstrap2.public_key_hash in
