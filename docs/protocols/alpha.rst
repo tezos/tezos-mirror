@@ -8,14 +8,50 @@ The code can be found in the :src:`src/proto_alpha` directory of the
 ``master`` branch of Tezos.
 
 This page documents the changes brought by protocol Alpha with respect
-to Protocol J.
+to Jakarta.
 
 .. contents::
 
-Smart Contract Optimistic Rollups
+New Environment Version (V6)
+----------------------------
+
+This protocol requires a different protocol environment than Jakarta.
+It requires protocol environment V6, compared to V5 for Jakarta.
+(MR :gl:`!4961`)
+
+- Upgrade to OCaml 4.14. (MR :gl:`!4973`)
+
+- Remove unused modules from environment. (MR :gl:`!5177`)
+
+- Pass ``chain_id`` to ``Protocol.init``. (MR :gl:`!5284`)
+
+- WebAssembly integration. (MRs :gl:`!5529`, :gl:`!5482`, :gl:`!5563`)
+
+- Expose Plonk package. (MR :gl:`!5596`)
+
+- Add VDF library. (MR :gl:`!5064`)
+
+Smart Contract Optimistic Rollups (ongoing)
+-------------------------------------------
+
+Rollups supporting execution of smart contracts. (MRs :gl:`!4933`, :gl:`!4812`,
+:gl:`!4938`, :gl:`!4765`, :gl:`!4699`, :gl:`!4964`, :gl:`!5138`, :gl:`!5070`,
+:gl:`!5219`, :gl:`!5160`, :gl:`!5218`, :gl:`!5125`, :gl:`!4968`, :gl:`!5305`,
+:gl:`!5359`, :gl:`!5280`, :gl:`!5202`, :gl:`!5260`, :gl:`!5201`, :gl:`!5349`,
+:gl:`!5116`, :gl:`!5383`, :gl:`!5360`, :gl:`!5342`, :gl:`!5351`, :gl:`!5369`,
+:gl:`!5412`, :gl:`!5430`, :gl:`!5379`, :gl:`!5435`, :gl:`!5398`, :gl:`!5362`,
+:gl:`!5352`, :gl:`!5439`, :gl:`!5396`, :gl:`!5420`, :gl:`!5327`, :gl:`!5416`,
+:gl:`!5434`, :gl:`!5442`, :gl:`!5395`, :gl:`!5498`, :gl:`!5492`, :gl:`!5465`,
+:gl:`!5505`, :gl:`!5504`, :gl:`!5443`, :gl:`!5543`, :gl:`!5548`, :gl:`!5399`,
+:gl:`!5478`, :gl:`!5551`, :gl:`!5493`, :gl:`!5530`, :gl:`!5559`, :gl:`!5519`,
+:gl:`!5537`, :gl:`!5555`, :gl:`!5544`, :gl:`!5521`, :gl:`!5568`, :gl:`!5609`,
+:gl:`!5516`, :gl:`!5549`)
+
+Data Availability Layer (ongoing)
 ---------------------------------
 
-Rollups supporting execution of smart contracts. (MRs :gl:`!4933`, :gl:`!4812`)
+Distribution of rollup operations data off-chain.  (MRs :gl:`!5371`,
+:gl:`!5501`, :gl:`!5508`, :gl:`!5527`, :gl:`!5423`)
 
 Contract Event Logging
 ----------------------
@@ -35,6 +71,10 @@ Breaking Changes
 - Reveal operations can only occur at the head of a manager operation
   batch (MR :gl:`!5182`).
 
+- Restore *all-or-nothing* semantics of manager operation batches by
+  enforcing that failing reveal operations do not take effect (MR
+  :gl:`!5182`).
+
 - Operations with non-deserializable scripts may now be propagated and
   included in blocks. If such an operation is in a block, its
   application will fail so the operation will have no effect, but its
@@ -47,6 +87,8 @@ Breaking Changes
   in its own block. This is no longer possible: the application of a
   block containing more than one operation from the same manager will
   now fail. (MR :gl:`!5557`)
+
+- VDF phase added after RANDAO in randomness generation. (MR :gl:`!5064`)
 
 RPC Changes
 -----------
@@ -76,10 +118,6 @@ Operation receipts
 Bug Fixes
 ---------
 
-- Restore *all-or-nothing* semantics of manager operation batches by
-  enforcing that failing reveal operations do not take effect (MR
-  :gl:`!5182`).
-
 - Consume constant gas `Michelson_v1_gas.Cost_of.manager_operation`
   during precheck: this fixes some cases of operations passing
   precheck even though they obviously do not have enough gas to apply
@@ -94,8 +132,28 @@ Bug Fixes
 Minor Changes
 -------------
 
+- New error `Remove_commitment_too_early` in TORU. (MR :gl:`!4895`)
+
+- New error `Inconsistent_sources`. (MR :gl:`!5475`)
+
+- Fix name of encoding of round_overflow. (MR :gl:`!5089`)
+
+- Split internal transactions. (MR :gl:`!5195`)
+
+- Allow implicit accounts to delegate at bootstrap time. (MR :gl:`!5071`)
+
+- Fail when attempting to delegate from unrevealed key at bootstrap.
+  (MR :gl:`!5645`)
+
+- Allow to register a governance dictator for testnets and private chain.
+  (MR :gl:`!4547`)
+
 Internal
 --------
+
+- Update migration for Jakarta. (MR :gl:`!5059`)
+
+- Uncurry some functions in Michelson interpreter. (MR :gl:`!5406`)
 
 - Make carbonated maps available to the Raw context (MRs :gl:`!4815`, `!4891`)
 
@@ -103,10 +161,6 @@ Internal
   barrier. (MR :gl:`!4418`)
 
 - Further cleanup on Tenderbake code. (MR :gl:`!4513`)
-
-- Add Raw_carbonated_map. (MR :gl:`!4815`)
-
-- Other internal refactorings or documentation. (MRs :gl:`!4890`, :gl:`!4721`)
 
 - Rename `run_view` into `run_tzip4_view` for consistency with
   `run_script_view`. Does not affect the existing `run_view` RPC.
@@ -149,3 +203,27 @@ Internal
   value of this type may only be created in ``Validate_operation``,
   and is required by ``Apply.apply_operation`` and a few other
   functions in ``Apply``. (MR :gl:`!5557`)
+- Extract and split parametric constants. (MRs :gl:`!4798`, :gl:`!5246`)
+
+- Expose length function in raw-context. (MR :gl:`!4361`)
+
+- Optimize parsing of destination. (MR :gl:`!5317`)
+
+- Contract-compatible encodings for implicit and originated accounts.
+  (MR :gl:`!5222`)
+
+- CPMM address is a smart-contract. (MR :gl:`!5224`)
+
+- Improve gas cost of transfer to implicit account. (MR :gl:`!5261`)
+
+- Restrict external transfers to non-tx-rollups. (MR :gl:`!5326`)
+
+- Remove stack types from kinfo. (MR :gl:`!4731`)
+
+- Internal refactorings in Michelson typechecker and interpreter. (MRs
+  :gl:`!4722`, :gl:`!4723`, :gl:`!5077`, :gl:`!5104`, :gl:`!5474`)
+
+- Other internal refactorings or documentation. (MRs :gl:`!4890`, :gl:`!4721`,
+  :gl:`!5113`, :gl:`!5114`, :gl:`!5005`, :gl:`!5188`, :gl:`!5309`, :gl:`!5310`,
+  :gl:`!5308`, :gl:`!5312`, :gl:`!5313`, :gl:`!5298`, :gl:`!5374`, :gl:`!5381`,
+  :gl:`!5384`, :gl:`!5513`, :gl:`!5494`, :gl:`!5582`, :gl:`!5553`)
