@@ -65,7 +65,7 @@ type operation := t
    operation which is necessary for signing an operation. This type
    aims to be extended when other kinds of operations are added into
    this module. *)
-type kind = Consensus of {chain_id : string} | Manager
+type kind = Consensus of {chain_id : string} | Voting | Manager
 
 (** [make ~branch ~signer ~kind json client] builds the representation
    of an unsigned operation. *)
@@ -144,13 +144,29 @@ val inject_operations :
    The operation is signed with {!Tezos_crypto.Signature.zero},
    because the [run_operation] RPC skips signature checks anyway.
 
+   @param sign_correctly If [true], use the correct signature of the
+   operation instead of [Signature.zero]. Defaults to [false]. This
+   parameter is temporary until the [run_operation] RPC is fixed to
+   actually skip signature checks for non-manager operations (see
+   https://gitlab.com/tezos/tezos/-/issues/3401)
+
    @param chain_id Allows to manually provide the [chain_id]. If
    omitted, the [chain_id] is retrieved via RPC using the provided
    [client].
 
    @param client The {!Client.t} argument is used to retrieve the
    [chain_id] when it is not provided. *)
-val make_run_operation_input : ?chain_id:string -> t -> Client.t -> JSON.u Lwt.t
+val make_run_operation_input :
+  ?chain_id:string ->
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3401
+
+     Remove the [sign_correctly] argument once the [run_operation] RPC
+     is fixed to actually skip signature checks for non-manager
+     operations. *)
+  ?sign_correctly:bool ->
+  t ->
+  Client.t ->
+  JSON.u Lwt.t
 
 module Consensus : sig
   (** A representation of a consensus operation. *)
@@ -183,6 +199,66 @@ module Consensus : sig
     ?chain_id:string ->
     ?error:rex ->
     signer:Account.key ->
+    t ->
+    Client.t ->
+    [`OpHash of string] Lwt.t
+end
+
+(** Voting operations (validation pass [1]): [proposals] and [ballot].
+
+   Only the [proposals] operation is currently supported. Feel free to
+   add support for [ballot] as needed. *)
+module Voting : sig
+  (** A representation of a voting operation. *)
+  type t
+
+  (** [proposals source period protocol_hashes] crafts a [proposals]
+     operation, that is, an operation that submits candidate protocol
+     hashes for voting.
+
+     @param source The account that submits the proposals.
+
+     @param period An index that identifies the targeted voting
+     period.
+
+     @params protocol_hashes A list of candidate protocol hashes. *)
+  val proposals : Account.key -> int -> string list -> t
+
+  (** Contruct a voting operation from its representation.
+
+     @param branch Allows to manually provide the branch. If omitted,
+     the branch it retrieved via RPC using the given client.
+
+     @param client Used to retrieve the branch when it is not
+     provided.
+
+     @param signer Allows to manually set the signer of the operation,
+     e.g. to craft an operation with a wrong signature. If omitted,
+     the signer is the operation's source.
+
+     @raise Invalid_argument if neither the [branch] argument nor the
+     [client] one is provided. *)
+  val operation :
+    ?branch:string ->
+    ?client:Client.t ->
+    ?signer:Account.key ->
+    t ->
+    operation Lwt.t
+
+  (** A wrapper for {!inject}ing a voting operation.
+
+     See {!inject} for a description of arguments [request], [force],
+     [signature], and [error].
+
+     See [Voting.operation] right above for a description of arguments
+     [branch] and [signer]. *)
+  val inject :
+    ?request:[`Inject | `Notify] ->
+    ?force:bool ->
+    ?signature:Tezos_crypto.Signature.t ->
+    ?error:rex ->
+    ?branch:string ->
+    ?signer:Account.key ->
     t ->
     Client.t ->
     [`OpHash of string] Lwt.t
