@@ -147,18 +147,18 @@ let script_expr_hash_size = !!64
    the recursion is bound by the size of the witness, which is an
    11-bit unsigned integer, i.e. at most 2048. This is enough to
    guarantee there will be no stack overflow. *)
-let rec stack_prefix_preservation_witness_size :
+let rec stack_prefix_preservation_witness_size_internal :
     type a b c d e f g h.
     (a, b, c, d, e, f, g, h) stack_prefix_preservation_witness -> nodes_and_size
     = function
   | KPrefix (_loc, ty, w) ->
       ret_succ_adding
-        (ty_size ty ++ stack_prefix_preservation_witness_size w)
+        (ty_size ty ++ stack_prefix_preservation_witness_size_internal w)
         h3w
   | KRest -> zero
 
 let stack_prefix_preservation_witness_size (_n : int) w =
-  stack_prefix_preservation_witness_size w
+  stack_prefix_preservation_witness_size_internal w
 
 let peano_shape_proof =
   let scale = header_size +! h1w in
@@ -640,4 +640,7 @@ module Internal_for_tests = struct
   let ty_size = ty_size
 
   let kinstr_size = kinstr_size
+
+  let stack_prefix_preservation_witness_size =
+    stack_prefix_preservation_witness_size_internal
 end

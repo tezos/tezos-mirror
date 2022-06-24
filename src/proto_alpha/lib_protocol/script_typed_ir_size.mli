@@ -69,4 +69,16 @@ module Internal_for_tests : sig
   val kinstr_size :
     ('a, 's, 'r, 'f) Script_typed_ir.kinstr ->
     Cache_memory_helpers.nodes_and_size
+
+  val stack_prefix_preservation_witness_size :
+    ( 'a,
+      'b,
+      'c,
+      'd,
+      'e,
+      'f,
+      'g,
+      'h )
+    Script_typed_ir.stack_prefix_preservation_witness ->
+    Cache_memory_helpers.nodes_and_size
 end
