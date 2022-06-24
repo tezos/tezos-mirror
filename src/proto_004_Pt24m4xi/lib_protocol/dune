@@ -30,8 +30,8 @@
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_004_Pt24m4xi.Environment
-  -open Pervasives
-  -open Error_monad)
+  -open Tezos_protocol_environment_004_Pt24m4xi.Environment.Pervasives
+  -open Tezos_protocol_environment_004_Pt24m4xi.Environment.Error_monad)
  (modules
   Misc
   Storage_description

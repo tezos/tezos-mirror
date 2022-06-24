@@ -29,8 +29,8 @@
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_demo_noops.Environment
-  -open Pervasives
-  -open Error_monad)
+  -open Tezos_protocol_environment_demo_noops.Environment.Pervasives
+  -open Tezos_protocol_environment_demo_noops.Environment.Error_monad)
  (modules Main))
 
 (library

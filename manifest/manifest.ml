@@ -1070,7 +1070,6 @@ module Target = struct
     ?ocaml:Version.constraints ->
     ?opam:string ->
     ?opam_with_test:with_test ->
-    ?opens:string list ->
     ?preprocess:preprocessor list ->
     ?preprocessor_deps:preprocessor_dep list ->
     ?private_modules:string list ->
@@ -1144,7 +1143,7 @@ module Target = struct
       ?(dune = Dune.[]) ?flags ?foreign_stubs ?implements ?inline_tests
       ?js_compatible ?js_of_ocaml ?documentation ?(linkall = false) ?modes
       ?modules ?(modules_without_implementation = []) ?(npm_deps = []) ?ocaml
-      ?opam ?(opam_with_test = Always) ?(opens = []) ?(preprocess = [])
+      ?opam ?(opam_with_test = Always) ?(preprocess = [])
       ?(preprocessor_deps = []) ?(private_modules = []) ?(opam_only_deps = [])
       ?release ?static ?synopsis ?description ?(time_measurement_ppx = false)
       ?(virtual_modules = []) ?default_implementation ?(wrapped = true)
@@ -1165,7 +1164,7 @@ module Target = struct
         | Optional target | Select {package = target; _} -> get_opens acc target
         | Open (target, module_name) -> get_opens (module_name :: acc) target
       in
-      List.flatten (List.map (get_opens []) deps) @ opens
+      List.flatten (List.map (get_opens []) deps)
     in
     let js_compatible, js_of_ocaml =
       match (js_compatible, js_of_ocaml) with

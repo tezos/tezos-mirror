@@ -30,8 +30,8 @@
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_008_PtEdoTez.Environment
-  -open Pervasives
-  -open Error_monad)
+  -open Tezos_protocol_environment_008_PtEdoTez.Environment.Pervasives
+  -open Tezos_protocol_environment_008_PtEdoTez.Environment.Error_monad)
  (modules
   Misc
   Storage_description

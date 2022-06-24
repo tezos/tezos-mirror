@@ -29,8 +29,8 @@
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_alpha.Environment
-  -open Pervasives
-  -open Error_monad)
+  -open Tezos_protocol_environment_alpha.Environment.Pervasives
+  -open Tezos_protocol_environment_alpha.Environment.Error_monad)
  (modules
   Misc
   Non_empty_string

@@ -30,8 +30,8 @@
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_005_PsBABY5H.Environment
-  -open Pervasives
-  -open Error_monad)
+  -open Tezos_protocol_environment_005_PsBABY5H.Environment.Pervasives
+  -open Tezos_protocol_environment_005_PsBABY5H.Environment.Error_monad)
  (modules
   Misc
   Storage_description
