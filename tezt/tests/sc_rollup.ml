@@ -197,6 +197,14 @@ let last_cemented_commitment_hash_with_level json =
   let level = JSON.(json |-> "level" |> as_int) in
   (hash, level)
 
+let get_staked_on_commitment ~sc_rollup_address ~staker client =
+  let* json =
+    RPC.Client.call client
+    @@ RPC.Sc_rollup.get_staked_on_commitment ~sc_rollup_address staker
+  in
+  let hash = JSON.(json |-> "hash" |> as_string) in
+  return hash
+
 let hash (hash, (_ : Sc_rollup_client.commitment), _level) = hash
 
 let first_published_at_level (_hash, (_ : Sc_rollup_client.commitment), level) =
