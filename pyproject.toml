@@ -30,12 +30,10 @@ black = "22.3.0"
 pytest = "6.2.5"
 pytest-regtest = { "git" = "https://gitlab.com/nomadic-labs/pytest-regtest", branch="fc5bd9b2" }
 pytest-timeout = "1.4.2"
+# tests_python/tests_*/test_openapi.py dependencies
 requests = "2.26.0"
 types-requests = "^2.27.16"
-# Used to validate the OpenAPI spec.
 openapi-spec-validator = "0.2.9"
-# tests_python/tools/bls12_381.py dependencies
-py_ecc = "2.0.0"
 # tests_python/tests_*/test_crypto.py dependencies
 pycryptodome = "3.9.7"
 
