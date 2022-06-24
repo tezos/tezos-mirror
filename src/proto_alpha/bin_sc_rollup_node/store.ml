@@ -108,16 +108,13 @@ module Make_map (P : KeyValue) = struct
 
   let find store key =
     let open Lwt_syntax in
-    let* exists = mem store key in
-    if exists then
-      let+ value = get store key in
-      Some value
-    else return_none
+    let* value = IStore.find store (make_key key) in
+    Option.map_s decode_value value
 
   let find_with_default store key ~on_default =
     let open Lwt_syntax in
-    let* exists = mem store key in
-    if exists then get store key else return (on_default ())
+    let+ value = find store key in
+    Option.value_f value ~default:on_default
 end
 
 module Make_updatable_map (P : KeyValue) = struct
