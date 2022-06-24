@@ -287,7 +287,16 @@ let wrap_simple_store_init ?(patch_context = dummy_patch_context)
             Lwt.finalize
               (fun () -> k (store_dir, context_dir) store)
               (fun () ->
-                let*! _ = Store.close_store store in
+                let*! () =
+                  Lwt.catch
+                    (fun () -> Store.close_store store)
+                    (fun _ ->
+                      (* FIXME https://gitlab.com/tezos/tezos/-/issues/3305
+
+                         Avoid to re-raise Pack_error: "Double_close"
+                         when closing the Context multiple times.*)
+                      Lwt.return_unit)
+                in
                 Lwt.return_unit)))
   in
   match r with
