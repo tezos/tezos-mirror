@@ -32,6 +32,8 @@ module Kate_amortized = struct
   module G2 = Bls12_381.G2
   module GT = Bls12_381.GT
   module Pairing = Bls12_381.Pairing
+  module Domain = Bls12_381_polynomial.Domain
+  module Polynomial = Bls12_381_polynomial.Polynomial
 
   type proof = G1.t
 
@@ -80,23 +82,15 @@ module Kate_amortized = struct
     in
     commit_kate_amortized srs1 p
 
-  module Domain = struct
-    type t = Scalar.t array
-
-    let build log = Polynomial.Domain.(build ~log |> to_array)
-
-    let get = Array.get
-
-    let map = Array.map
-
-    let inverse domain =
-      let n = Array.length domain in
-      Array.init n (fun i ->
-          if i = 0 then Scalar.(copy one) else domain.(n - i))
-  end
+  let inverse domain =
+    let n = Array.length domain in
+    Array.init n (fun i ->
+        if i = 0 then Bls12_381.Fr.(copy one) else Array.get domain (n - i))
 
   (* First part of Toeplitz computing trick involving srs. *)
-  let build_srs_part_h_list srs domain2m = G1.fft ~domain:domain2m ~points:srs
+  let build_srs_part_h_list srs domain2m =
+    let domain2m = inverse (Domain.inverse domain2m) in
+    G1.fft ~domain:domain2m ~points:srs
 
   let build_h_list_with_precomputed_srs a_list (domain2m, precomputed_srs) =
     let y = precomputed_srs in
@@ -105,15 +99,17 @@ module Kate_amortized = struct
 
   (* Final ifft of Toeplitz computation. *)
   let build_h_list_final u domain2m =
-    let res = G1.ifft ~domain:(Domain.inverse domain2m) ~points:u in
+    let res = G1.ifft ~domain:(inverse domain2m) ~points:u in
     Array.sub res 0 (Array.length domain2m / 2)
 
   (* Complete Toeplitz computation. *)
-  let build_h_list_complete a_list srs domain2m m =
+  let build_h_list_complete a_list srs (domain2m : Domain.t) m =
+    let domain2m_inv = Domain.inverse domain2m in
+    let domain2m = inverse domain2m_inv in
     let y = G1.fft ~domain:domain2m ~points:srs in
     let v = Scalar.fft ~domain:domain2m ~points:a_list in
     let u = Array.map2 G1.mul y v in
-    let res = G1.ifft ~domain:(Domain.inverse domain2m) ~points:u in
+    let res = G1.ifft ~domain:domain2m_inv ~points:u in
     Array.sub res 0 m
 
   (* Part 2 *)
@@ -152,7 +148,8 @@ module Kate_amortized = struct
       in
       build_h_list_complete (Array.of_list a_list) y domain2m degree
     in
-    let domain = Domain.build nb_proofs in
+    let domain = Domain.build ~log:nb_proofs in
+    let domain = inverse (Domain.inverse domain) in
     G1.fft ~domain ~points:h_list
 
   (* part 3.2 *)
@@ -174,7 +171,7 @@ module Kate_amortized = struct
       let log_inf = Z.log2 (Z.of_int m_sur_l) in
       if 1 lsl log_inf < m_sur_l then log_inf else log_inf + 1
     in
-    let domain2m = Domain.build k in
+    let domain2m = Domain.build ~log:k in
     let srs = Array.of_list srs1 in
     let precompute_srsj j =
       let quotient = (degree - j) / l in
@@ -250,7 +247,8 @@ module Kate_amortized = struct
           sum_hj 1 ;
           build_h_list_final sum domain2m
     in
-    let phidomain = Domain.build chunk_count in
+    let phidomain = Domain.build ~log:chunk_count in
+    let phidomain = inverse (Domain.inverse phidomain) in
     G1.fft ~domain:phidomain ~points:hl
 
   (* Generate proofs of part 3.2. *)
@@ -289,7 +287,7 @@ module Kate_amortized = struct
   let verify cm_f (srs1, srs2l) domain (w, evaluations) proof =
     let h = interpolation_h_poly w domain evaluations in
     let cm_h = commit h (srs1, srs2l) in
-    let l = Array.length domain in
+    let l = Domain.length domain in
     let sl_min_yl =
       G2.(add srs2l (negate (mul (copy one) (Scalar.pow w (Z.of_int l)))))
     in

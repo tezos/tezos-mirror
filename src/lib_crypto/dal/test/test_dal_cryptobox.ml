@@ -22,6 +22,8 @@ module Test = struct
 
     aux [] k
 
+  let ( // ) = Filename.concat
+
   (* Encoding and decoding of Reed-Solomon codes on the erasure channel. *)
   let bench_DAL_crypto_params () =
     let shards_amount = 2048 in
@@ -49,16 +51,19 @@ module Test = struct
 
           let* cm = DAL_crypto.commit p in
           (*let precompute_pi_segments =
-            DAL_crypto.precompute_slot_segments_proofs ()
+              DAL_crypto.precompute_slot_segments_proofs ()
+            in
+            let () =
+              DAL_crypto.save_precompute_slot_segments_proofs
+                precompute_pi_segments
+                "slot_seg_proofs_precomp"
+            in*)
+          let filename =
+            Tezt.Base.project_root // Filename.dirname __FILE__
+            // "slot_seg_proofs_precomp"
           in
-          let () =
-            DAL_crypto.save_precompute_slot_segments_proofs
-              precompute_pi_segments
-              "slot_seg_proofs_precomp"
-          in*)
           let precompute_pi_segments =
-            DAL_crypto.load_precompute_slot_segments_proofs
-              "slot_seg_proofs_precomp"
+            DAL_crypto.load_precompute_slot_segments_proofs filename
           in
           let pis =
             DAL_crypto.prove_slot_segments p ~preprocess:precompute_pi_segments
@@ -97,13 +102,17 @@ module Test = struct
           let* comm = DAL_crypto.commit p in
 
           (*let precompute_pi_shards = DAL_crypto.precompute_shards_proofs () in
-          let () =
-            DAL_crypto.save_precompute_shards_proofs
-              precompute_pi_shards
-              "shard_proofs_precomp"
-          in*)
+            let () =
+              DAL_crypto.save_precompute_shards_proofs
+                precompute_pi_shards
+                "shard_proofs_precomp"
+            in*)
+          let filename =
+            Tezt.Base.project_root // Filename.dirname __FILE__
+            // "shard_proofs_precomp"
+          in
           let precompute_pi_shards =
-            DAL_crypto.load_precompute_shards_proofs "shard_proofs_precomp"
+            DAL_crypto.load_precompute_shards_proofs filename
           in
           let shard_proofs =
             DAL_crypto.prove_shards p ~preprocess:precompute_pi_shards

@@ -88,6 +88,10 @@ let bls12_381 =
     "bls12-381"
     version
 
+let bls12_381_polynomial =
+  let version = V.at_least "0.1.0" in
+  external_lib ~js_compatible:false "tezos-bls12-381-polynomial" version
+
 let camlzip = external_lib "camlzip" V.(at_least "1.11" && less_than "1.12")
 
 let caqti = external_lib "caqti" V.True
@@ -751,32 +755,6 @@ let octez_rpc =
       ]
     ~js_compatible:true
 
-let octez_polynomial =
-  public_lib
-    "tezos-polynomial"
-    ~path:"src/lib_polynomial"
-    ~synopsis:"Tezos: polynomials' library"
-    ~deps:[data_encoding |> open_; bls12_381]
-    ~modules:
-      [
-        "Carray";
-        "Fr_generation";
-        "Domain";
-        "Univariate";
-        "Multivariate";
-        "Evaluations_c";
-        "Polynomial_c";
-        "Polynomial";
-      ]
-    ~linkall:true
-    ~c_library_flags:["-lpthread"]
-    ~foreign_stubs:
-      {
-        language = C;
-        flags = [];
-        names = ["caml_polynomial_stubs"; "polynomial"];
-      }
-
 let octez_crypto =
   public_lib
     "tezos-crypto"
@@ -840,35 +818,6 @@ let _octez_crypto_tests_unix =
         lwt_unix;
         qcheck_alcotest;
         octez_test_helpers;
-      ]
-
-let octez_crypto_dal =
-  public_lib
-    "tezos-crypto.dal"
-    ~path:"src/lib_crypto/dal"
-    ~opam:"tezos-crypto"
-    ~deps:
-      [
-        octez_stdlib |> open_;
-        octez_error_monad |> open_;
-        data_encoding |> open_;
-        octez_polynomial |> open_;
-      ]
-
-let _octez_crypto_dal_tests =
-  tests
-    ["test_dal_cryptobox"]
-    ~path:"src/lib_crypto/dal/test"
-    ~opam:"tezos-crypto"
-    ~deps:
-      [
-        octez_stdlib |> open_;
-        octez_crypto_dal |> open_;
-        octez_error_monad |> open_;
-        data_encoding |> open_;
-        alcotest;
-        qcheck_alcotest;
-        octez_polynomial;
       ]
 
 let octez_event_logging =
@@ -4896,6 +4845,35 @@ let _octez_codec =
              if link then Protocol.client protocol else None);
          ])
     ~linkall:true
+
+let octez_crypto_dal =
+  public_lib
+    "tezos-crypto.dal"
+    ~path:"src/lib_crypto/dal"
+    ~opam:"tezos-crypto"
+    ~deps:
+      [
+        octez_stdlib |> open_;
+        octez_error_monad |> open_;
+        data_encoding |> open_;
+        bls12_381_polynomial;
+      ]
+
+let _octez_crypto_dal_tests =
+  tests
+    ["test_dal_cryptobox"]
+    ~path:"src/lib_crypto/dal/test"
+    ~opam:"tezos-crypto"
+    ~deps:
+      [
+        octez_stdlib |> open_;
+        octez_crypto_dal |> open_;
+        octez_error_monad |> open_;
+        data_encoding |> open_;
+        alcotest;
+        qcheck_alcotest;
+        bls12_381_polynomial;
+      ]
 
 let _octez_proxy_server =
   public_exe

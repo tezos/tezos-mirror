@@ -209,11 +209,11 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
   module Scalar = Bls12_381.Fr
 
   (* Operations on vector of scalars *)
-  module Evaluations = Polynomial.Evaluations
+  module Evaluations = Bls12_381_polynomial.Polynomial.Evaluations
 
   (* Domains for the Fast Fourier Transform (FTT). *)
-  module Domains = Polynomial.Domain
-  module Polynomial = Polynomial.Polynomial
+  module Domains = Bls12_381_polynomial.Polynomial.Domain
+  module Polynomial = Bls12_381_polynomial.Polynomial.Polynomial
   module IntMap = Tezos_error_monad.TzLwtreslib.Map.Make (Int)
 
   type polynomial = Polynomial.t
@@ -354,9 +354,7 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
 
   let fft_mul d ps =
     let open Evaluations in
-    let evaluations =
-      List.mapi (fun i p -> (Int.to_string i, evaluation_fft d p)) ps
-    in
+    let evaluations = List.map (evaluation_fft d) ps in
     interpolation_fft d (mul_c ~evaluations ())
 
   (* Divide & conquer polynomial multiplication with FFTs, assuming leaves are
@@ -545,12 +543,12 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
       let* n_poly = compute_n eval_a' shards in
       (* 5. Computing B(x). *)
       let b = Evaluations.interpolation_fft2 domain_n n_poly in
-      let b = Polynomial.copy_truncated b k in
-      Polynomial.mul_by_scalar_inplace (Scalar.of_int n) b ;
+      let b = Polynomial.copy ~len:k b in
+      Polynomial.mul_by_scalar_inplace b (Scalar.of_int n) b ;
 
       (* 6. Computing Lagrange interpolation polynomial P(x). *)
       let p = fft_mul domain_2k [a_poly; b] in
-      let p = Polynomial.copy_truncated p k in
+      let p = Polynomial.copy ~len:k p in
       Polynomial.opposite_inplace p ;
       Ok p
 
@@ -646,11 +644,18 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
     Ok
       (Pairing.pairing_check [(cm, commit_xk); (proof, G2.(negate (copy one)))])
 
+  let eval_to_array e =
+    let open Kate_amortized.Domain in
+    Array.init (length e) (get e)
+
   let precompute_shards_proofs () =
-    Kate_amortized.preprocess_multi_reveals
-      ~chunk_len:evaluations_per_proof_log
-      ~degree:k
-      (kate_amortized_srs_g1, kate_amortized_srs_g2_shards)
+    let eval, m =
+      Kate_amortized.preprocess_multi_reveals
+        ~chunk_len:evaluations_per_proof_log
+        ~degree:k
+        (kate_amortized_srs_g1, kate_amortized_srs_g2_shards)
+    in
+    (eval_to_array eval, m)
 
   let save_precompute_shards_proofs (preprocess : shards_proofs_precomputation)
       filename =
@@ -684,13 +689,13 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
       (Polynomial.to_dense_coefficients p |> Array.to_list)
 
   let verify_shard ct (shard_index, shard_evaluations) proof =
-    let d_n = Kate_amortized.Domain.build evaluations_log in
-    let domain = Kate_amortized.Domain.build evaluations_per_proof_log in
+    let d_n = Kate_amortized.Domain.build ~log:evaluations_log in
+    let domain = Kate_amortized.Domain.build ~log:evaluations_per_proof_log in
     Kate_amortized.verify
       ct
       (kate_amortized_srs_g1, kate_amortized_srs_g2_shards)
       domain
-      (d_n.(shard_index), shard_evaluations)
+      (Kate_amortized.Domain.get d_n shard_index, shard_evaluations)
       proof
 
   let prove_single p z =
@@ -708,10 +713,13 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
         ])
 
   let precompute_slot_segments_proofs () =
-    Kate_amortized.preprocess_multi_reveals
-      ~chunk_len:Z.(log2up (of_int segment_len))
-      ~degree:k
-      (kate_amortized_srs_g1, kate_amortized_srs_g2_segments)
+    let eval, m =
+      Kate_amortized.preprocess_multi_reveals
+        ~chunk_len:Z.(log2up (of_int segment_len))
+        ~degree:k
+        (kate_amortized_srs_g1, kate_amortized_srs_g2_segments)
+    in
+    (eval_to_array eval, m)
 
   let save_precompute_slot_segments_proofs
       (preprocess : slot_segments_proofs_precomputation) filename =
@@ -749,9 +757,11 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
   let verify_slot_segment ct ~slot_segment ~slot_segment_index proof =
     let segment_domain =
       Kate_amortized.Domain.build
-        (Z.log2 (Z.of_int (segment_len * nb_segments)))
+        ~log:(Z.log2 (Z.of_int (segment_len * nb_segments)))
     in
-    let domain = Kate_amortized.Domain.build Z.(log2up (of_int segment_len)) in
+    let domain =
+      Kate_amortized.Domain.build ~log:Z.(log2up (of_int segment_len))
+    in
     let slot_segment_evaluations =
       Array.init
         (1 lsl Z.(log2up (of_int segment_len)))
@@ -780,6 +790,7 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
       ct
       (kate_amortized_srs_g1, kate_amortized_srs_g2_segments)
       domain
-      (segment_domain.(slot_segment_index), slot_segment_evaluations)
+      ( Kate_amortized.Domain.get segment_domain slot_segment_index,
+        slot_segment_evaluations )
       proof
 end
