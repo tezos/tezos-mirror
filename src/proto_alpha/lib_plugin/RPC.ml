@@ -1862,6 +1862,17 @@ module Sc_rollup = struct
           path /: Sc_rollup.Address.rpc_arg
           / "last_cemented_commitment_hash_with_level")
 
+    let staked_on_commitment =
+      RPC_service.get_service
+        ~description:
+          "The hash of the commitment on which the operator has staked on for \
+           a smart-contract rollup"
+        ~query:RPC_query.empty
+        ~output:(obj1 (req "hash" Sc_rollup.Commitment.Hash.encoding))
+        RPC_path.(
+          path /: Sc_rollup.Address.rpc_arg / "staker"
+          /: Sc_rollup.Staker.rpc_arg / "staked_on_commitment")
+
     let commitment =
       RPC_service.get_service
         ~description:"Commitment for a smart contract rollup from its hash"
@@ -1931,6 +1942,15 @@ module Sc_rollup = struct
     in
     (last_cemented_commitment, level)
 
+  let register_staked_on_commitment () =
+    Registration.register2 ~chunked:false S.staked_on_commitment
+    @@ fun ctxt address staker () () ->
+    let open Lwt_tzresult_syntax in
+    let+ branch, _ctxt =
+      Alpha_context.Sc_rollup.Stake_storage.find_staker ctxt address staker
+    in
+    branch
+
   let register_commitment () =
     Registration.register2 ~chunked:false S.commitment
     @@ fun ctxt address commitment_hash () () ->
@@ -1958,6 +1978,7 @@ module Sc_rollup = struct
     register_initial_level () ;
     register_boot_sector () ;
     register_last_cemented_commitment_hash_with_level () ;
+    register_staked_on_commitment () ;
     register_commitment () ;
     register_dal_slot_subscriptions () ;
     register_root ()

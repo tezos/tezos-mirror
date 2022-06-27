@@ -335,7 +335,8 @@ let rollup_node_subscribes_to_dal_slots _protocol sc_rollup_node
      6. Fetch the list of subscribed slots, determine that it contains slots 0 and 1
   *)
   let* init_level =
-    RPC.Sc_rollup.get_initial_level ~hooks ~sc_rollup_address client
+    RPC.Client.call ~hooks client
+    @@ RPC.Sc_rollup.get_initial_level sc_rollup_address
   in
   let init_level = init_level |> JSON.as_int in
   let* () = Sc_rollup_node.run sc_rollup_node in

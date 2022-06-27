@@ -308,3 +308,39 @@ let get_fetch_protocol protocol_hash =
 let get_stats_gc = make GET ["stats"; "gc"] Fun.id
 
 let get_stats_memory = make GET ["stats"; "memory"] Fun.id
+
+module Sc_rollup = struct
+  let root_path ~chain ~block =
+    ["chains"; chain; "blocks"; block; "context"; "sc_rollup"]
+
+  let list ?(chain = "main") ?(block = "head") () =
+    make GET (root_path ~chain ~block) Fun.id
+
+  let path ~chain ~block sc_rollup_address =
+    root_path ~chain ~block @ [sc_rollup_address]
+
+  let get_inbox ?(chain = "main") ?(block = "head") sc_rollup_address =
+    make GET (path ~chain ~block sc_rollup_address @ ["inbox"]) Fun.id
+
+  let get_initial_level ?(chain = "main") ?(block = "head") sc_rollup_address =
+    make GET (path ~chain ~block sc_rollup_address @ ["initial_level"]) Fun.id
+
+  let get_boot_sector ?(chain = "main") ?(block = "head") sc_rollup_address =
+    make GET (path ~chain ~block sc_rollup_address @ ["boot_sector"]) Fun.id
+
+  let get_last_cemented_commitment_hash_with_level ?(chain = "main")
+      ?(block = "head") sc_rollup_address =
+    make
+      GET
+      (path ~chain ~block sc_rollup_address
+      @ ["last_cemented_commitment_hash_with_level"])
+      Fun.id
+
+  let get_staked_on_commitment ?(chain = "main") ?(block = "head")
+      ~sc_rollup_address staker =
+    make
+      GET
+      (path ~chain ~block sc_rollup_address
+      @ ["staker"; staker; "staked_on_commitment"])
+      Fun.id
+end

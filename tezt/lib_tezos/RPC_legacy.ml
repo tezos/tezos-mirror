@@ -689,41 +689,6 @@ module Tx_rollup = struct
   end
 end
 
-module Sc_rollup = struct
-  let root_path ~chain ~block =
-    ["chains"; chain; "blocks"; block; "context"; "sc_rollup"]
-
-  let list ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
-    let path = root_path ~chain ~block in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let path ~chain ~block ~sc_rollup_address =
-    root_path ~chain ~block @ [sc_rollup_address]
-
-  let get_inbox ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~sc_rollup_address client =
-    let path = path ~chain ~block ~sc_rollup_address @ ["inbox"] in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_initial_level ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~sc_rollup_address client =
-    let path = path ~chain ~block ~sc_rollup_address @ ["initial_level"] in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_boot_sector ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~sc_rollup_address client =
-    let path = path ~chain ~block ~sc_rollup_address @ ["boot_sector"] in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_last_cemented_commitment_hash_with_level ?endpoint ?hooks
-      ?(chain = "main") ?(block = "head") ~sc_rollup_address client =
-    let path =
-      path ~chain ~block ~sc_rollup_address
-      @ ["last_cemented_commitment_hash_with_level"]
-    in
-    Client.rpc ?endpoint ?hooks GET path client
-end
-
 let raw_bytes ?endpoint ?hooks ?(chain = "main") ?(block = "head") ?(path = [])
     client =
   let path =

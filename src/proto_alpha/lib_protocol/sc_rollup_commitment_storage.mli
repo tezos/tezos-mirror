@@ -161,7 +161,7 @@ val get_commitment :
 (** [get_commitment_unsafe context rollup commitment_hash] returns the commitment
     with the given hash.
     This function *must* be called only after they have checked for the existence
-    of the rollup, and therefore it is not ncessary for it to check for the
+    of the rollup, and therefore it is not necessary for it to check for the
     existence of the rollup again. Otherwise, use the safe function
     {!get_commitment}.
 

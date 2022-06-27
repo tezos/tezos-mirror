@@ -3257,6 +3257,9 @@ module Sc_rollup : sig
   end
 
   module Stake_storage : sig
+    val find_staker :
+      context -> t -> Staker.t -> (Commitment.Hash.t * context) tzresult Lwt.t
+
     val publish_commitment :
       context ->
       t ->

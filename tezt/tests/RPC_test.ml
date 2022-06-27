@@ -986,7 +986,7 @@ let test_chain _test_mode_tag protocol ?endpoint client =
     if Protocol.number protocol >= 013 then
       let* _ =
         (* Calls [/chains/main/blocks/head/context/sc_rollup] *)
-        RPC.Sc_rollup.list ?endpoint client
+        RPC.Client.call ?endpoint client @@ RPC.Sc_rollup.list ()
       in
       unit
     else unit

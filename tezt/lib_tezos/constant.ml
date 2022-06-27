@@ -102,6 +102,10 @@ let tx_rollup_proof_initial_state =
   "after": { "node": "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF" } ,
   "state": [] }|}
 
+(** A valid base58 encoded compressed state hash. *)
+let sc_rollup_compressed_state =
+  "scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf"
+
 (** A valid base58 encoded layer-2 account to be used to test transaction and
     smart contract rollups. *)
 let tz4_account : Account.aggregate_key =
