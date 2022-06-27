@@ -23,75 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Simple
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3208
+    put those types somewhere. Take them from:
+    - the protocol
+    - environment ?
+*)
 
-let section = ["dal"; "node"]
+type slot = bytes
 
-let starting_node =
-  declare_0
-    ~section
-    ~name:"starting_dal_node"
-    ~msg:"Starting the DAL node"
-    ~level:Notice
-    ()
+type slot_header = Cryptobox.commitment
 
-let shutdown_node =
-  declare_1
-    ~section
-    ~name:"stopping_dal_node"
-    ~msg:"Stopping DAL node"
-    ~level:Notice
-    ("exit_status", Data_encoding.int8)
-
-let store_is_ready =
-  declare_0
-    ~section
-    ~name:"dal_node_store_is_ready"
-    ~msg:"The DAL node store is ready"
-    ~level:Notice
-    ()
-
-let rpc_server_is_ready =
-  declare_2
-    ~section
-    ~name:"dal_node_rpc_server_is_ready"
-    ~msg:"The DAL node is listening to {addr}:{port}"
-    ~level:Notice
-    ("addr", Data_encoding.string)
-    ("port", Data_encoding.uint16)
-
-let node_is_ready =
-  declare_0
-    ~section
-    ~name:"dal_node_is_ready"
-    ~msg:"The DAL node is ready"
-    ~level:Notice
-    ()
-
-let data_dir_not_found =
-  declare_1
-    ~section
-    ~name:"dal_node_no_data_dir"
-    ~msg:
-      "The DAL node data directory {path} doesn't exists. Create using: \
-       init-config --data-dir={path} "
-    ~level:Error
-    ("path", Data_encoding.(string))
-
-let stored_slot =
-  declare_2
-    ~section
-    ~name:"stored_slot"
-    ~msg:"Slot stored: size {size}, shards {shards}"
-    ~level:Notice
-    ("size", Data_encoding.int31)
-    ("shards", Data_encoding.int31)
-
-let fetched_slot =
-  declare_2
-    ~section
-    ~name:"fetched_slot"
-    ~msg:"Slot fetched: size {size}, shards {shards}"
-    ~level:Notice
-    ("size", Data_encoding.int31)
-    ("shards", Data_encoding.int31)
+let slot_header_encoding = Cryptobox.Encoding.commitment_encoding

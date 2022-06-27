@@ -23,75 +23,57 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Internal_event.Simple
+let split_query =
+  let open RPC_query in
+  query (fun fill_x00 -> fill_x00)
+  |+ flag "fill" (fun fill_x00 -> fill_x00)
+  |> seal
 
-let section = ["dal"; "node"]
+let split_slot () =
+  RPC_service.post_service
+    ~description:"Split and store a slot"
+    ~query:split_query
+    ~input:Data_encoding.string
+    ~output:Cryptobox.Encoding.commitment_encoding
+    RPC_path.(open_root / "slot" / "split")
 
-let starting_node =
-  declare_0
-    ~section
-    ~name:"starting_dal_node"
-    ~msg:"Starting the DAL node"
-    ~level:Notice
-    ()
+let slot_header_arg = RPC_arg.string
 
-let shutdown_node =
-  declare_1
-    ~section
-    ~name:"stopping_dal_node"
-    ~msg:"Stopping DAL node"
-    ~level:Notice
-    ("exit_status", Data_encoding.int8)
+let slot_query =
+  let open RPC_query in
+  query (fun trim_x00 -> trim_x00)
+  |+ flag "trim" (fun trim_x00 -> trim_x00)
+  |> seal
 
-let store_is_ready =
-  declare_0
-    ~section
-    ~name:"dal_node_store_is_ready"
-    ~msg:"The DAL node store is ready"
-    ~level:Notice
-    ()
+let slot () =
+  RPC_service.get_service
+    ~description:"Show content of a slot"
+    ~query:slot_query
+    ~output:Data_encoding.string
+    RPC_path.(open_root / "slot" / "content" /: slot_header_arg)
 
-let rpc_server_is_ready =
-  declare_2
-    ~section
-    ~name:"dal_node_rpc_server_is_ready"
-    ~msg:"The DAL node is listening to {addr}:{port}"
-    ~level:Notice
-    ("addr", Data_encoding.string)
-    ("port", Data_encoding.uint16)
+let shard () =
+  let shard_arg = RPC_arg.int in
+  RPC_service.get_service
+    ~description:"Fetch shard as bytes"
+    ~query:RPC_query.empty
+    ~output:Cryptobox.Encoding.shard_encoding
+    RPC_path.(open_root / "shard" /: slot_header_arg /: shard_arg)
 
-let node_is_ready =
-  declare_0
-    ~section
-    ~name:"dal_node_is_ready"
-    ~msg:"The DAL node is ready"
-    ~level:Notice
-    ()
+let handle_split_slot cryptobox_setup store fill slot =
+  let slot = String.to_bytes slot in
+  let slot = if fill then Slot_manager.Utils.fill_x00 slot else slot in
+  Slot_manager.split_and_store cryptobox_setup store slot
 
-let data_dir_not_found =
-  declare_1
-    ~section
-    ~name:"dal_node_no_data_dir"
-    ~msg:
-      "The DAL node data directory {path} doesn't exists. Create using: \
-       init-config --data-dir={path} "
-    ~level:Error
-    ("path", Data_encoding.(string))
+let handle_slot store (_, slot_header) trim () =
+  let open Lwt_result_syntax in
+  let*? commitment = Slot_manager.slot_header_of_hex slot_header in
+  let* slot = Slot_manager.get_slot store commitment in
+  let slot = if trim then Slot_manager.Utils.trim_x00 slot else slot in
+  return (String.of_bytes slot)
 
-let stored_slot =
-  declare_2
-    ~section
-    ~name:"stored_slot"
-    ~msg:"Slot stored: size {size}, shards {shards}"
-    ~level:Notice
-    ("size", Data_encoding.int31)
-    ("shards", Data_encoding.int31)
-
-let fetched_slot =
-  declare_2
-    ~section
-    ~name:"fetched_slot"
-    ~msg:"Slot fetched: size {size}, shards {shards}"
-    ~level:Notice
-    ("size", Data_encoding.int31)
-    ("shards", Data_encoding.int31)
+let handle_shard store ((_, slot_header), shard) () () =
+  let open Lwt_result_syntax in
+  let*? commitment = Slot_manager.slot_header_of_hex slot_header in
+  let* shard = Slot_manager.get_shard store commitment shard in
+  return shard

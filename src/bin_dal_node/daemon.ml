@@ -29,7 +29,22 @@ type ctxt = {
 }
 
 module RPC_server = struct
-  let register _store _configuration = RPC_directory.empty
+  let register_split_slot ctxt store dir =
+    RPC_directory.register0
+      dir
+      (Services.split_slot ())
+      (Services.handle_split_slot ctxt store)
+
+  let register_show_slot store dir =
+    RPC_directory.register dir (Services.slot ()) (Services.handle_slot store)
+
+  let register_shard store dir =
+    RPC_directory.register dir (Services.shard ()) (Services.handle_shard store)
+
+  let register ctxt store =
+    RPC_directory.empty
+    |> register_split_slot ctxt.cryptobox_setup store
+    |> register_show_slot store |> register_shard store
 
   let start configuration dir =
     let open Lwt_syntax in
