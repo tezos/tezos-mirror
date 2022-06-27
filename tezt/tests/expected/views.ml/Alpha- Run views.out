@@ -171,7 +171,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: None
       Storage size: 208 bytes
-      Consumed gas: 4414.445
+      Consumed gas: 4414.559
       Balance updates:
         tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ1
         KT1NF5f9FWtVX4w23xt9hxvmyfa4gsbcQ8tX ... +ꜩ1
@@ -205,7 +205,7 @@ This sequence of operations was run:
       Updated storage: { 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78 }
       Storage size: 179 bytes
       Paid storage size diff: 27 bytes
-      Consumed gas: 2117.465
+      Consumed gas: 2117.579
       Balance updates:
         tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.00675
         storage fees ........................... +ꜩ0.00675
@@ -242,7 +242,7 @@ This sequence of operations was run:
       Updated storage: (Some 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78)
       Storage size: 235 bytes
       Paid storage size diff: 27 bytes
-      Consumed gas: 4417.702
+      Consumed gas: 4417.816
       Balance updates:
         tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.00675
         storage fees ........................... +ꜩ0.00675
