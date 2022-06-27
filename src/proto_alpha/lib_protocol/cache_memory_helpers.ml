@@ -156,6 +156,10 @@ let boxed_tup2 x y = header_size +! word_size +! word_size +! x +! y
 
 let node_size =
   let open Micheline in
+  (* An OCaml list item occupies 3 words of memory: one for the (::)
+     constructor, one for the item itself (head) and one for the
+     remainder of the list (tail). *)
+  let list_size sns = word_size *? (List.length sns * 3) in
   let annotation_size a =
     List.fold_left
       (fun accu s -> ret_succ_adding accu (h2w +! string_size s))
@@ -166,8 +170,9 @@ let node_size =
     | Int (_, z) -> (Nodes.one, h2w +! z_size z)
     | String (_, s) -> (Nodes.one, h2w +! string_size s)
     | Bytes (_, s) -> (Nodes.one, h2w +! bytes_size s)
-    | Prim (_, _, _, a) -> ret_succ_adding (annotation_size a) h4w
-    | Seq (_, _) -> (Nodes.one, h2w)
+    | Prim (_, _, args, a) ->
+        ret_succ_adding (annotation_size a) (list_size args +! h4w)
+    | Seq (_, terms) -> (Nodes.one, list_size terms +! h2w)
   in
   fun node ->
     Script_repr.fold node zero @@ fun accu node ->
