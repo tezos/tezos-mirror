@@ -853,7 +853,7 @@ let manager_content_infos op =
      that the application has succeeded,
    - its counter [c_in] increases by [probes.nb_counter], and
    - the available gas in the block in [i] decreases by [g_in].*)
-let observe ~only_validate contract b_in c_in g_in probes i =
+let observe ~only_validate ~mode contract b_in c_in g_in probes i =
   let open Lwt_result_syntax in
   let* b_out = Context.Contract.balance (I i) contract in
   let g_out = Gas.block_level (Incremental.alpha_ctxt i) in
@@ -863,7 +863,7 @@ let observe ~only_validate contract b_in c_in g_in probes i =
     Assert.equal
       ~loc:__LOC__
       (if only_validate then Tez.( = ) else Tez.( <= ))
-      "Balance update"
+      (if only_validate then "Balance update (=)" else "Balance update (<=)")
       Tez.pp
   in
   let* _ = b_cmp b_out b_expected in
@@ -877,14 +877,23 @@ let observe ~only_validate contract b_in c_in g_in probes i =
       c_out
       c_expected
   in
-  let g_expected = Gas.Arith.sub g_in (Gas.Arith.fp probes.gas_limit) in
-  Assert.equal
-    ~loc:__LOC__
-    Gas.Arith.equal
-    "Gas consumption"
-    Gas.Arith.pp
-    g_out
-    g_expected
+  let* g_expected =
+    match mode with
+    | Validate_operation.Block ->
+        return (Gas.Arith.sub g_in (Gas.Arith.fp probes.gas_limit))
+    | Validate_operation.Mempool ->
+        Context.get_constants (I i) >>=? fun c ->
+        return
+          (Gas.Arith.sub
+             (Gas.Arith.fp c.parametric.hard_gas_limit_per_block)
+             (Gas.Arith.fp probes.gas_limit))
+  in
+  let g_msg =
+    match mode with
+    | Validate_operation.Block -> "Gas consumption (block)"
+    | Validate_operation.Mempool -> "Gas consumption (mempool)"
+  in
+  Assert.equal ~loc:__LOC__ Gas.Arith.equal g_msg Gas.Arith.pp g_out g_expected
 
 let validate_with_diagnostic ~only_validate (infos : infos) op =
   let open Lwt_result_syntax in
@@ -896,7 +905,8 @@ let validate_with_diagnostic ~only_validate (infos : infos) op =
   let g_in = Gas.block_level (Incremental.alpha_ctxt i) in
   let* i = Incremental.validate_operation i op in
   let* _ = Incremental.finalize_block i in
-  observe ~only_validate contract b_in c_in g_in prbs i
+  let mode = Validate_operation.Block in
+  observe ~only_validate ~mode contract b_in c_in g_in prbs i
 
 (** If only the validate of an operation succeed; e.g. the rest
    of the application failed:

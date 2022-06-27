@@ -541,6 +541,23 @@ let generate_tests_emptying_undelegated_implicit () =
     "Validate and empties an undelegated source."
     subjects
 
+(** No gas consumer with the minimal gas limit for manager operations
+   passes validate. *)
+let test_low_gas_limit_no_consumer kind () =
+  let open Lwt_result_syntax in
+  let* infos = init_context () in
+  let gas_limit = Op.Low in
+  let* op =
+    select_op ~gas_limit ~force_reveal:true ~source:infos.contract1 kind infos
+  in
+  validate_diagnostic infos op
+
+let generate_low_gas_limit_no_consumer () =
+  create_Tztest
+    test_low_gas_limit
+    "passes validate with minimal gas limit for manager operations."
+    gas_consumer_in_validate_subjects
+
 (** Fee payment.*)
 let test_validate kind () =
   let open Lwt_result_syntax in
@@ -560,6 +577,7 @@ let gas_tests =
   generate_low_gas_limit () @ generate_high_gas_limit ()
   @ generate_tests_exceeding_block_gas ()
   @ generate_tests_exceeding_block_gas_mp_mode ()
+  @ generate_low_gas_limit_no_consumer ()
 
 let storage_tests = generate_high_storage_limit ()
 
