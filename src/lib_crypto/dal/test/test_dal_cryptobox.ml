@@ -79,8 +79,10 @@ module Test = struct
           let slot_segment =
             Bytes.sub msg slot_segment_size (2 * slot_segment_size)
           in
-          assert (
-            DAL_crypto.verify_slot_segment trusted_setup cm (1, slot_segment) pi) ;
+          let* check =
+            DAL_crypto.verify_slot_segment trusted_setup cm (1, slot_segment) pi
+          in
+          assert check ;
           let enc_shards = DAL_crypto.to_shards p in
 
           (* Only take half of the buckets *)

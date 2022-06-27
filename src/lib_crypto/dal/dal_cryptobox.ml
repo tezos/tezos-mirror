@@ -210,8 +210,6 @@ module type DAL_cryptobox_sig = sig
     proof_single ->
     bool
 
-  (* TODO: raise error if index i is incorrect *)
-
   (** [prove_slot_segments ts p slot_segment_index] where [p] is the output of
       [polynomial_from_bytes slot], returns proofs for the slot segment] whose
       index is [slot_segment_index], using the trusted setup [ts]. *)
@@ -219,13 +217,20 @@ module type DAL_cryptobox_sig = sig
     trusted_setup ->
     polynomial ->
     int ->
-    (proof_slot_segment, [> `Degree_exceeds_srs_length of string]) result
+    ( proof_slot_segment,
+      [> `Degree_exceeds_srs_length of string | `Slot_segment_index_out_of_range]
+    )
+    result
 
   (** [verify_slot_segment cm slot_segment proof] returns true if the [proof]
       certifies that the [slot_segment] is indeed included in the slot committed
       with commitment [cm],  using the trusted setup [ts]. *)
   val verify_slot_segment :
-    trusted_setup -> commitment -> slot_segment -> proof_slot_segment -> bool
+    trusted_setup ->
+    commitment ->
+    slot_segment ->
+    proof_slot_segment ->
+    (bool, [> `Slot_segment_index_out_of_range]) result
 end
 
 module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
@@ -825,58 +830,65 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
     fft_mul domain_2k [p; div] |> Polynomials.copy ~len:(k - l + 1)
 
   let prove_slot_segment trusted_setup p slot_segment_index =
-    let l = 1 lsl Z.(log2up (of_int segment_len)) in
-    let wi = Domains.get domain_k slot_segment_index in
-    let domain = Domains.build ~log:Z.(log2up (of_int segment_len)) in
-    let eval_p = Evaluations.evaluation_fft2 domain_k p in
-    let eval_coset = eval_coset_array eval_p slot_segment_index in
-    let remainder =
-      Kate_amortized.interpolation_h_poly wi domain eval_coset
-      |> Array.of_list |> Polynomials.of_dense
-    in
-    let quotient =
-      compute_quotient
-        (Polynomials.sub p remainder)
-        l
-        (Scalar.pow wi (Z.of_int l))
-    in
-    commit trusted_setup quotient
+    if slot_segment_index < 0 || slot_segment_index >= nb_segments then
+      Error `Slot_segment_index_out_of_range
+    else
+      let l = 1 lsl Z.(log2up (of_int segment_len)) in
+      let wi = Domains.get domain_k slot_segment_index in
+      let domain = Domains.build ~log:Z.(log2up (of_int segment_len)) in
+      let eval_p = Evaluations.evaluation_fft2 domain_k p in
+      let eval_coset = eval_coset_array eval_p slot_segment_index in
+      let remainder =
+        Kate_amortized.interpolation_h_poly wi domain eval_coset
+        |> Array.of_list |> Polynomials.of_dense
+      in
+      let quotient =
+        compute_quotient
+          (Polynomials.sub p remainder)
+          l
+          (Scalar.pow wi (Z.of_int l))
+      in
+      commit trusted_setup quotient
 
   (* Parses the [slot_segment] to get the evaluations that it contains. The
      evaluation points are given by the [slot_segment_index]. *)
   let verify_slot_segment trusted_setup cm (slot_segment_index, slot_segment)
       proof =
-    let domain =
-      Kate_amortized.Domain.build ~log:Z.(log2up (of_int segment_len))
-    in
-    let slot_segment_evaluations =
-      Array.init
-        (1 lsl Z.(log2up (of_int segment_len)))
-        (function
-          | i when i < segment_len - 1 ->
-              let dst = Bytes.create scalar_bytes_amount in
-              Bytes.blit
-                slot_segment
-                (i * scalar_bytes_amount)
-                dst
-                0
-                scalar_bytes_amount ;
-              Scalar.of_bytes_exn dst
-          | i when i = segment_len - 1 ->
-              let dst = Bytes.create remaining_bytes in
-              Bytes.blit
-                slot_segment
-                (i * scalar_bytes_amount)
-                dst
-                0
-                remaining_bytes ;
-              Scalar.of_bytes_exn dst
-          | _ -> Scalar.(copy zero))
-    in
-    Kate_amortized.verify
-      cm
-      (trusted_setup.srs_g1, trusted_setup.kate_amortized_srs_g2_segments)
-      domain
-      (Domains.get domain_k slot_segment_index, slot_segment_evaluations)
-      proof
+    if slot_segment_index < 0 || slot_segment_index >= nb_segments then
+      Error `Slot_segment_index_out_of_range
+    else
+      let domain =
+        Kate_amortized.Domain.build ~log:Z.(log2up (of_int segment_len))
+      in
+      let slot_segment_evaluations =
+        Array.init
+          (1 lsl Z.(log2up (of_int segment_len)))
+          (function
+            | i when i < segment_len - 1 ->
+                let dst = Bytes.create scalar_bytes_amount in
+                Bytes.blit
+                  slot_segment
+                  (i * scalar_bytes_amount)
+                  dst
+                  0
+                  scalar_bytes_amount ;
+                Scalar.of_bytes_exn dst
+            | i when i = segment_len - 1 ->
+                let dst = Bytes.create remaining_bytes in
+                Bytes.blit
+                  slot_segment
+                  (i * scalar_bytes_amount)
+                  dst
+                  0
+                  remaining_bytes ;
+                Scalar.of_bytes_exn dst
+            | _ -> Scalar.(copy zero))
+      in
+      Ok
+        (Kate_amortized.verify
+           cm
+           (trusted_setup.srs_g1, trusted_setup.kate_amortized_srs_g2_segments)
+           domain
+           (Domains.get domain_k slot_segment_index, slot_segment_evaluations)
+           proof)
 end
