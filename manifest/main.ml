@@ -3313,7 +3313,7 @@ end = struct
                       S
                         (sf
                            {|module Name = struct let name = "%s" end
-include Tezos_protocol_environment.MakeV%d(Name)()
+include Tezos_protocol_environment.V%d.Make(Name)()
 module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
 |}
                            name_dash
