@@ -71,7 +71,7 @@ module Proto = struct
 
     let expected_code_size Script_ir_translator.(Ex_code (Code {code_size; _}))
         =
-      Obj.magic code_size
+      (code_size :> int)
 
     let actual_code_size Script_ir_translator.(Ex_code (Code {code; _})) =
       8 * Obj.(reachable_words @@ repr code)
