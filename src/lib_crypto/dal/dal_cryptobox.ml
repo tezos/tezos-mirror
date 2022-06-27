@@ -26,7 +26,7 @@
 open Error_monad
 
 (** Parameters of the DAL relevant to the cryptographic primitives. *)
-module type Params_sig = sig
+module type CONFIGURATION = sig
   (** Redundancy factor of the erasure code. *)
   val redundancy_factor : int
 
@@ -123,7 +123,7 @@ module type DAL_cryptobox_sig = sig
 
   (** [polynomial_from_bytes slot] returns a polynomial from the input [slot].
       Errors with [`Slot_wrong_size] when the slot size is different from
-      [Params_sig.slot_size]. *)
+      [CONFIGURATION.slot_size]. *)
   val polynomial_from_bytes :
     bytes -> (polynomial, [> `Slot_wrong_size of string]) Result.t
 
@@ -226,7 +226,7 @@ module type DAL_cryptobox_sig = sig
     trusted_setup -> commitment -> slot_segment -> proof_slot_segment -> bool
 end
 
-module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
+module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
   open Kate_amortized
 
   (* Scalars are elements of the prime field Fr from BLS. *)
