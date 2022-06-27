@@ -40,67 +40,82 @@ open Manager_operation_helpers
 let create_Tztest ?hd_msg test tests_msg =
   let hd_msg k =
     let sk = kind_to_string k in
-    match hd_msg with
-    | None -> sk
-    | Some hd -> Format.sprintf "Batch: %s, %s" hd sk
+    match hd_msg with None -> sk | Some hd -> Format.sprintf "%s, %s" sk hd
   in
   let kind = K_Register_global_constant in
   Tztest.tztest
-    (Format.sprintf "%s: %s" (hd_msg kind) tests_msg)
+    (Format.sprintf "%s [%s]" tests_msg (hd_msg kind))
     `Quick
     (fun () -> test kind ())
 
 let generate_op ~fee ~reverse:_ kind infos =
   let open Lwt_result_syntax in
-  let* counter = Context.Contract.counter (B infos.block) infos.contract1 in
-  let source = infos.contract1 in
-  let* operation =
-    select_op ~fee ~counter ~force_reveal:true ~source kind infos
+  let* counter =
+    Context.Contract.counter
+      (B infos.ctxt.block)
+      (contract_of infos.accounts.source)
   in
-  let counter = Z.succ (Z.succ counter) in
+  let* operation =
+    select_op
+      {
+        (operation_req_default kind) with
+        force_reveal = Some true;
+        fee = Some fee;
+        counter = Some counter;
+      }
+      infos
+  in
   let+ operation2 =
-    select_op ~fee ~counter ~force_reveal:false ~source kind infos
+    select_op
+      {
+        (operation_req_default kind) with
+        force_reveal = Some false;
+        fee = Some fee;
+        counter = Some (Z.succ (Z.succ counter));
+      }
+      infos
   in
   (operation, operation2)
 
 let generate_op_diff_man ~fee ~reverse:_ kind infos =
   let open Lwt_result_syntax in
-  let* counter = Context.Contract.counter (B infos.block) infos.contract1 in
-  let source = infos.contract1 in
-  let* operation =
-    select_op ~fee ~counter ~force_reveal:true ~source kind infos
+  let source = contract_of infos.accounts.source in
+  let source2_account =
+    match infos.accounts.del with None -> assert false | Some s -> s
   in
-  let* counter = Context.Contract.counter (B infos.block) infos.contract2 in
-  let source = infos.contract2 in
+  let source2 = contract_of source2_account in
+  let* counter = Context.Contract.counter (B infos.ctxt.block) source in
+  let* operation =
+    select_op
+      {
+        (operation_req_default kind) with
+        force_reveal = Some true;
+        fee = Some fee;
+        counter = Some counter;
+      }
+      infos
+  in
+  let* counter = Context.Contract.counter (B infos.ctxt.block) source2 in
   let+ operation2 =
-    select_op ~fee ~counter ~force_reveal:true ~source kind infos
+    select_op
+      {
+        (operation_req_default kind) with
+        force_reveal = Some true;
+        fee = Some fee;
+        counter = Some counter;
+      }
+      {infos with accounts = {infos.accounts with source = source2_account}}
   in
   (operation, operation2)
-
-(* Helpers that should be included or replace existing helpers for
-   validate tests.*)
-let witness inc source =
-  let open Lwt_result_syntax in
-  let* b_in = Context.Contract.balance (I inc) source in
-  let+ c_in = Context.Contract.counter (I inc) source in
-  let g_in = Gas.block_level (Incremental.alpha_ctxt inc) in
-  (b_in, c_in, g_in)
-
-let observe ~mode inc_pre inc_post op =
-  let open Lwt_result_syntax in
-  let* prbs = manager_content_infos op in
-  let source = Contract.Implicit prbs.source in
-  let* b_in, c_in, g_in = witness inc_pre source in
-  observe ~only_validate:false ~mode source b_in c_in g_in prbs inc_post
 
 (** Under 1M restriction, neither a block nor a prevalidator's valid
     pool should contain two operations with the same manager. It raises
     a Manager_restriction error. *)
 let test_two_op_with_same_manager ~mempool_mode kind () =
   let open Lwt_result_syntax in
-  let* infos = init_context () in
+  let* infos = default_init_ctxt () in
   let* op1, op2 = generate_op ~fee:Tez.zero ~reverse:false kind infos in
-  let* inc = Incremental.begin_construction ~mempool_mode infos.block in
+  let* inc = Incremental.begin_construction ~mempool_mode infos.ctxt.block in
   let* inc = Incremental.validate_operation inc op1 in
   let* _inc =
     Incremental.validate_operation
@@ -126,20 +141,16 @@ let test_two_op_with_same_manager ~mempool_mode kind () =
     by two single operations. *)
 let test_batch_of_two_not_be_two_singles ~mempool_mode kind () =
   let open Lwt_result_syntax in
-  let mode =
-    if mempool_mode then Validate_operation.Mempool
-    else Validate_operation.Block
-  in
-  let* infos = init_context () in
-  let* inc = Incremental.begin_construction ~mempool_mode infos.block in
+  let mode = if mempool_mode then Mempool else Construction in
+  let* infos = default_init_ctxt () in
+  let source = contract_of infos.accounts.source in
+  let* inc = Incremental.begin_construction ~mempool_mode infos.ctxt.block in
   let* op1, op2 = generate_op ~fee:Tez.one_mutez ~reverse:false kind infos in
-  let* batch =
-    Op.batch_operations ~source:infos.contract1 (B infos.block) [op1; op2]
-  in
+  let* batch = Op.batch_operations ~source (B infos.ctxt.block) [op1; op2] in
   let* inc_batch = Incremental.validate_operation inc batch in
-  let* () = observe ~mode inc inc_batch batch in
+  let* () = observe ~only_validate:false ~mode (I inc) (I inc_batch) batch in
   let* inc1 = Incremental.validate_operation inc op1 in
-  let* () = observe ~mode inc inc1 op1 in
+  let* () = observe ~only_validate:false ~mode (I inc) (I inc1) op1 in
   let* _inc2 =
     Incremental.validate_operation
       ~expect_failure:(fun _ -> return_unit)
@@ -149,15 +160,15 @@ let test_batch_of_two_not_be_two_singles ~mempool_mode kind () =
   let* b1 = Incremental.finalize_block inc1 in
   let* inc1' = Incremental.begin_construction ~mempool_mode b1 in
   let* inc1_op2 = Incremental.validate_operation inc1' op2 in
-  let* () = observe ~mode inc1' inc1_op2 op2 in
+  let* () = observe ~only_validate:false ~mode (I inc1') (I inc1_op2) op2 in
   return_unit
 
 (** The application of a valid operation succeeds, at least, to perform
     the fee payment. *)
 let valid_validate ~mempool_mode kind () =
   let open Lwt_result_syntax in
-  let* infos = init_context () in
-  let* inc = Incremental.begin_construction ~mempool_mode infos.block in
+  let* infos = default_init_ctxt () in
+  let* inc = Incremental.begin_construction ~mempool_mode infos.ctxt.block in
   let* op, _ = generate_op ~fee:Tez.one_mutez ~reverse:false kind infos in
   let {shell; protocol_data = Operation_data protocol_data} = op in
   let operation : _ Alpha_context.operation = {shell; protocol_data} in
@@ -188,12 +199,10 @@ let valid_validate ~mempool_mode kind () =
     [generate_op_diff_man]. *)
 let valid_context_free ~mempool_mode kind () =
   let open Lwt_result_syntax in
-  let mode =
-    if mempool_mode then Validate_operation.Mempool
-    else Validate_operation.Block
-  in
-  let* infos = init_context () in
-  let* inc = Incremental.begin_construction ~mempool_mode infos.block in
+  let mode = if mempool_mode then Mempool else Construction in
+
+  let* infos = default_init_ctxt () in
+  let* inc = Incremental.begin_construction ~mempool_mode infos.ctxt.block in
   let* op1, op2 =
     generate_op_diff_man ~fee:Tez.one_mutez ~reverse:false kind infos
   in
@@ -230,63 +239,63 @@ let valid_context_free ~mempool_mode kind () =
     Lwt.return (Environment.wrap_tzresult res)
   in
   let* inc1 = Incremental.validate_operation inc op1 in
-  let* () = observe ~mode inc inc1 op1 in
+  let* () = observe ~only_validate:false ~mode (I inc) (I inc1) op1 in
   let* inc1' = Incremental.validate_operation inc1 op2 in
-  let* () = observe ~mode inc1 inc1' op2 in
+  let* () = observe ~only_validate:false ~mode (I inc1) (I inc1') op2 in
   let* inc2 = Incremental.validate_operation inc op2 in
-  let* () = observe ~mode inc inc2 op2 in
+  let* () = observe ~only_validate:false ~mode (I inc) (I inc2) op2 in
   let* inc2' = Incremental.validate_operation inc2 op1 in
-  let* () = observe ~mode inc2 inc2' op1 in
+  let* () = observe ~only_validate:false ~mode (I inc2) (I inc2') op1 in
   return_unit
 
 let generate_1m_conflit_mempool_mode () =
   create_Tztest
     (test_two_op_with_same_manager ~mempool_mode:true)
-    "1M restriction fails in mempool mode"
+    "At most one operation per manager in mempool mode"
 
 let generate_1m_conflit_construction_mode () =
   create_Tztest
     (test_two_op_with_same_manager ~mempool_mode:false)
-    "1M restriction fails in construction mode"
+    "At most one operation per manager in construction mode"
 
 let generate_batch_of_two_not_be_two_singles_construction_mode () =
   create_Tztest
     (test_batch_of_two_not_be_two_singles ~mempool_mode:false)
-    "1M restriction fails in construction mode"
+    "A batch differs from a sequence in construction mode"
 
 let generate_batch_of_two_not_be_two_singles_mempool_mode () =
   create_Tztest
     (test_batch_of_two_not_be_two_singles ~mempool_mode:true)
-    "1M restriction fails in mempool mode"
+    "A batch differs from a sequence in mempool mode"
 
-let generate_valid_precheck_mempool_mode () =
+let generate_valid_validate_mempool_mode () =
   create_Tztest
     (valid_validate ~mempool_mode:true)
-    "valid so fee payment in mempool mode"
+    "Valid implies fee payment in mempool mode"
 
-let generate_valid_precheck_construction_mode () =
+let generate_valid_validate_construction_mode () =
   create_Tztest
     (valid_validate ~mempool_mode:false)
-    "valid so fee payment in construction mode"
+    "Valid implies fee payment in construction mode"
 
 let generate_valid_context_free_mempool_mode () =
   create_Tztest
     (valid_context_free ~mempool_mode:true)
-    "two covalid so both pay fees commute under 1M in mempool mode"
+    "Fee payment of two covalid operations commute in mempool mode"
 
 let generate_valid_context_free_construction_mode () =
   create_Tztest
     (valid_context_free ~mempool_mode:false)
-    "two covalid so both pay fees commute under 1M in construction mode"
+    "Fee payment of two covalid operations commute in construction mode"
 
 let tests =
   [
     generate_1m_conflit_construction_mode ();
     generate_batch_of_two_not_be_two_singles_construction_mode ();
-    generate_valid_precheck_construction_mode ();
+    generate_valid_validate_construction_mode ();
     generate_valid_context_free_construction_mode ();
     generate_1m_conflit_mempool_mode ();
     generate_batch_of_two_not_be_two_singles_mempool_mode ();
-    generate_valid_precheck_mempool_mode ();
+    generate_valid_validate_mempool_mode ();
     generate_valid_context_free_mempool_mode ();
   ]

@@ -48,7 +48,11 @@ open Manager_operation_helpers
    operation kind. *)
 let ensure_kind infos kind =
   let open Lwt_result_syntax in
-  let* op = select_op kind infos ~force_reveal:false ~source:infos.contract1 in
+  let* op =
+    select_op
+      {(operation_req_default kind) with force_reveal = Some false}
+      infos
+  in
   let (Operation_data {contents; _}) = op.protocol_data in
   match contents with
   | Single (Manager_operation {operation; _}) -> (
@@ -99,7 +103,7 @@ let ensure_kind infos kind =
 
 let ensure_manager_operation_coverage () =
   let open Lwt_result_syntax in
-  let* infos = init_context () in
+  let* infos = default_init_ctxt () in
   List.iter_es (fun kind -> ensure_kind infos kind) subjects
 
 let test_ensure_manager_operation_coverage () =
@@ -136,12 +140,17 @@ let low_gas_limit_diagnostic (infos : infos) op =
 
 let test_low_gas_limit kind () =
   let open Lwt_result_syntax in
-  let* infos = init_context () in
-  let gas_limit = Op.Low in
+  let* infos = default_init_ctxt () in
   let* op =
-    select_op ~gas_limit ~force_reveal:true ~source:infos.contract1 kind infos
+    select_op
+      {
+        (operation_req_default kind) with
+        gas_limit = Some Op.Low;
+        force_reveal = Some true;
+      }
+      infos
   in
-  low_gas_limit_diagnostic infos op
+  low_gas_limit_diagnostic infos [op]
 
 let generate_low_gas_limit () =
   create_Tztest
@@ -168,12 +177,18 @@ let high_gas_limit_diagnostic (infos : infos) op =
 
 let test_high_gas_limit kind () =
   let open Lwt_result_syntax in
-  let* infos = init_context () in
-  let gas_limit = Op.Custom_gas (Gas.Arith.integral_of_int_exn 10_000_000) in
+  let* infos = default_init_ctxt () in
   let* op =
-    select_op ~gas_limit ~force_reveal:true ~source:infos.contract1 kind infos
+    select_op
+      {
+        (operation_req_default kind) with
+        force_reveal = Some true;
+        gas_limit =
+          Some (Op.Custom_gas (Gas.Arith.integral_of_int_exn 10_000_000));
+      }
+      infos
   in
-  high_gas_limit_diagnostic infos op
+  high_gas_limit_diagnostic infos [op]
 
 let generate_high_gas_limit () =
   create_Tztest test_high_gas_limit "Gas_limit too high." subjects
@@ -198,17 +213,17 @@ let high_storage_limit_diagnostic (infos : infos) op =
 
 let test_high_storage_limit kind () =
   let open Lwt_result_syntax in
-  let* infos = init_context () in
-  let storage_limit = Z.of_int max_int in
+  let* infos = default_init_ctxt () in
   let* op =
     select_op
-      ~storage_limit
-      ~force_reveal:true
-      ~source:infos.contract1
-      kind
+      {
+        (operation_req_default kind) with
+        force_reveal = Some true;
+        storage_limit = Some (Z.of_int max_int);
+      }
       infos
   in
-  high_storage_limit_diagnostic infos op
+  high_storage_limit_diagnostic infos [op]
 
 let generate_high_storage_limit () =
   create_Tztest test_high_gas_limit "Storage_limit too high." subjects
@@ -235,12 +250,17 @@ let high_counter_diagnostic (infos : infos) op =
 
 let test_high_counter kind () =
   let open Lwt_result_syntax in
-  let* infos = init_context () in
-  let counter = Z.of_int max_int in
+  let* infos = default_init_ctxt () in
   let* op =
-    select_op ~counter ~force_reveal:true ~source:infos.contract1 kind infos
+    select_op
+      {
+        (operation_req_default kind) with
+        force_reveal = Some true;
+        counter = Some (Z.of_int max_int);
+      }
+      infos
   in
-  high_counter_diagnostic infos op
+  high_counter_diagnostic infos [op]
 
 let generate_high_counter () =
   create_Tztest test_high_counter "Counter too high." subjects
@@ -267,15 +287,22 @@ let low_counter_diagnostic (infos : infos) op =
 
 let test_low_counter kind () =
   let open Lwt_result_syntax in
-  let* infos = init_context () in
+  let* infos = default_init_ctxt () in
   let* current_counter =
-    Context.Contract.counter (B infos.block) infos.contract1
+    Context.Contract.counter
+      (B infos.ctxt.block)
+      (contract_of infos.accounts.source)
   in
-  let counter = Z.sub current_counter Z.one in
   let* op =
-    select_op ~counter ~force_reveal:true ~source:infos.contract1 kind infos
+    select_op
+      {
+        (operation_req_default kind) with
+        force_reveal = Some true;
+        counter = Some (Z.sub current_counter Z.one);
+      }
+      infos
   in
-  low_counter_diagnostic infos op
+  low_counter_diagnostic infos [op]
 
 let generate_low_counter () =
   create_Tztest test_low_counter "Counter too low." subjects
@@ -302,11 +329,16 @@ let not_allocated_diagnostic (infos : infos) op =
 
 let test_not_allocated kind () =
   let open Lwt_result_syntax in
-  let* infos = init_context () in
+  let* infos = default_init_ctxt () in
   let* op =
-    select_op ~force_reveal:false ~source:(mk_fresh_contract ()) kind infos
+    select_op
+      {(operation_req_default kind) with force_reveal = Some false}
+      {
+        infos with
+        accounts = {infos.accounts with source = Account.(new_account ())};
+      }
   in
-  not_allocated_diagnostic infos op
+  not_allocated_diagnostic infos [op]
 
 let generate_not_allocated () =
   create_Tztest test_not_allocated "Not allocated source." subjects
@@ -334,9 +366,13 @@ let unrevealed_key_diagnostic (infos : infos) op =
 
 let test_unrevealed_key kind () =
   let open Lwt_result_syntax in
-  let* infos = init_context () in
-  let* op = select_op ~force_reveal:false ~source:infos.contract1 kind infos in
-  unrevealed_key_diagnostic infos op
+  let* infos = default_init_ctxt () in
+  let* op =
+    select_op
+      {(operation_req_default kind) with force_reveal = Some false}
+      infos
+  in
+  unrevealed_key_diagnostic infos [op]
 
 let generate_unrevealed_key () =
   create_Tztest
@@ -367,12 +403,18 @@ let high_fee_diagnostic (infos : infos) op =
 
 let test_high_fee kind () =
   let open Lwt_result_syntax in
-  let* infos = init_context () in
+  let* infos = default_init_ctxt () in
   let*? fee = Tez.(one +? one) |> Environment.wrap_tzresult in
   let* op =
-    select_op ~fee ~force_reveal:true ~source:infos.contract1 kind infos
+    select_op
+      {
+        (operation_req_default kind) with
+        force_reveal = Some true;
+        fee = Some fee;
+      }
+      infos
   in
-  high_fee_diagnostic infos op
+  high_fee_diagnostic infos [op]
 
 let generate_tests_high_fee () =
   create_Tztest test_high_fee "Balance too low for fee payment." subjects
@@ -403,12 +445,22 @@ let emptying_delegated_implicit_diagnostic (infos : infos) op =
 
 let test_emptying_delegated_implicit kind () =
   let open Lwt_result_syntax in
-  let* infos = init_delegated_implicit () in
-  let* fee = Context.Contract.balance (B infos.block) infos.contract1 in
-  let* op =
-    select_op ~fee ~force_reveal:false ~source:infos.contract1 kind infos
+  let* infos = default_ctxt_with_delegation () in
+  let* fee =
+    Context.Contract.balance
+      (B infos.ctxt.block)
+      (contract_of infos.accounts.source)
   in
-  emptying_delegated_implicit_diagnostic infos op
+  let* op =
+    select_op
+      {
+        (operation_req_default kind) with
+        force_reveal = Some false;
+        fee = Some fee;
+      }
+      infos
+  in
+  emptying_delegated_implicit_diagnostic infos [op]
 
 let generate_tests_emptying_delegated_implicit () =
   create_Tztest
@@ -423,51 +475,60 @@ let generate_tests_emptying_delegated_implicit () =
     - [Block_quota_exceeded] in other mode
     with gas limit exceeds the available gas in the block.
     It applies to every kind of manager operation. *)
-let exceeding_block_gas_diagnostic ~mempool_mode (infos : infos) op =
+let exceeding_block_gas_diagnostic ~mode (infos : infos) op =
   let expect_failure errs =
-    match errs with
-    | [Environment.Ecoproto_error Gas.Block_quota_exceeded]
-      when not mempool_mode ->
+    match (errs, mode) with
+    | ( [Environment.Ecoproto_error Gas.Block_quota_exceeded],
+        (Construction | Application) ) ->
         return_unit
-    | [
-     Environment.Ecoproto_error Gas.Gas_limit_too_high;
-     Environment.Ecoproto_error Gas.Block_quota_exceeded;
-    ]
-      when mempool_mode ->
+    | ( [
+          Environment.Ecoproto_error Gas.Gas_limit_too_high;
+          Environment.Ecoproto_error Gas.Block_quota_exceeded;
+        ],
+        Mempool ) ->
         (* In mempool_mode, batch that exceed [operation_gas_limit] needs
            to be refused. [Gas.Block_quota_exceeded] only return a
            temporary error. [Gas.Gas_limit_too_high], which is a
            permanent error, is added to the error trace to ensure that
            the batch is refused. *)
         return_unit
-    | err ->
+    | err, _ ->
         failwith
           "Error trace:@, %a does not match the expected one"
           Error_monad.pp_print_trace
           err
   in
-  validate_ko_diagnostic infos op expect_failure ~mempool_mode
+  validate_ko_diagnostic infos op expect_failure ~mode
 
-let test_exceeding_block_gas ~mempool_mode kind () =
+let test_exceeding_block_gas ~mode kind () =
   let open Lwt_result_syntax in
-  let* infos = init_context ~hard_gas_limit_per_block:gb_limit () in
-  let gas_limit =
-    Op.Custom_gas (Gas.Arith.add gb_limit Gas.Arith.(integral_of_int_exn 1))
+  let ctxt_req =
+    {ctxt_req_default with hard_gas_limit_per_block = Some gb_limit}
   in
+  let* infos = init_ctxt ctxt_req in
   let* operation =
-    select_op ~force_reveal:true ~source:infos.contract1 ~gas_limit kind infos
+    select_op
+      {
+        (operation_req_default kind) with
+        force_reveal = Some true;
+        gas_limit =
+          Some
+            (Op.Custom_gas
+               (Gas.Arith.add gb_limit Gas.Arith.(integral_of_int_exn 1)));
+      }
+      infos
   in
-  exceeding_block_gas_diagnostic ~mempool_mode infos operation
+  exceeding_block_gas_diagnostic ~mode infos [operation]
 
 let generate_tests_exceeding_block_gas () =
   create_Tztest
-    (test_exceeding_block_gas ~mempool_mode:false)
+    (test_exceeding_block_gas ~mode:Construction)
     "Too much gas consumption."
     subjects
 
 let generate_tests_exceeding_block_gas_mp_mode () =
   create_Tztest
-    (test_exceeding_block_gas ~mempool_mode:true)
+    (test_exceeding_block_gas ~mode:Mempool)
     "Too much gas consumption in mempool mode."
     subjects
 
@@ -499,12 +560,23 @@ let generate_tests_exceeding_block_gas_mp_mode () =
 (** Fee payment that emptying a self_delegated implicit. *)
 let test_emptying_self_delegated_implicit kind () =
   let open Lwt_result_syntax in
-  let* infos = init_self_delegated_implicit () in
-  let* fee = Context.Contract.balance (B infos.block) infos.contract1 in
-  let* op =
-    select_op ~fee ~force_reveal:false ~source:infos.contract1 kind infos
+  let* infos = default_ctxt_with_self_delegation () in
+  let* fee =
+    Context.Contract.balance
+      (B infos.ctxt.block)
+      (contract_of infos.accounts.source)
   in
-  only_validate_diagnostic infos op
+  let* op =
+    select_op
+      {
+        (operation_req_default kind) with
+        force_reveal = Some false;
+        fee = Some fee;
+      }
+      infos
+  in
+  let* _ = only_validate_diagnostic infos [op] in
+  return_unit
 
 let generate_tests_emptying_self_delegated_implicit () =
   create_Tztest
@@ -521,19 +593,24 @@ let empiric_minimal_gas_cost_for_validate =
 
 let test_emptying_undelegated_implicit kind () =
   let open Lwt_result_syntax in
-  let* infos = init_context () in
-  let gas_limit = Op.Custom_gas empiric_minimal_gas_cost_for_validate in
-  let* fee = Context.Contract.balance (B infos.block) infos.contract1 in
+  let* infos = default_init_ctxt () in
+  let* fee =
+    Context.Contract.balance
+      (B infos.ctxt.block)
+      (contract_of infos.accounts.source)
+  in
   let* op =
     select_op
-      ~fee
-      ~gas_limit
-      ~force_reveal:true
-      ~source:infos.contract1
-      kind
+      {
+        (operation_req_default kind) with
+        force_reveal = Some true;
+        fee = Some fee;
+        gas_limit = Some (Op.Custom_gas empiric_minimal_gas_cost_for_validate);
+      }
       infos
   in
-  only_validate_diagnostic infos op
+  let* _ = only_validate_diagnostic infos [op] in
+  return_unit
 
 let generate_tests_emptying_undelegated_implicit () =
   create_Tztest
@@ -545,12 +622,17 @@ let generate_tests_emptying_undelegated_implicit () =
    passes validate. *)
 let test_low_gas_limit_no_consumer kind () =
   let open Lwt_result_syntax in
-  let* infos = init_context () in
-  let gas_limit = Op.Low in
+  let* infos = default_init_ctxt () in
   let* op =
-    select_op ~gas_limit ~force_reveal:true ~source:infos.contract1 kind infos
+    select_op
+      {
+        (operation_req_default kind) with
+        force_reveal = Some true;
+        gas_limit = Some Op.Low;
+      }
+      infos
   in
-  validate_diagnostic infos op
+  validate_diagnostic infos [op]
 
 let generate_low_gas_limit_no_consumer () =
   create_Tztest
@@ -561,11 +643,23 @@ let generate_low_gas_limit_no_consumer () =
 (** Fee payment.*)
 let test_validate kind () =
   let open Lwt_result_syntax in
-  let* infos = init_context () in
-  let* counter = Context.Contract.counter (B infos.block) infos.contract1 in
-  let source = infos.contract1 in
-  let* operation = select_op ~counter ~force_reveal:true ~source kind infos in
-  validate_diagnostic infos operation
+  let* infos = default_init_ctxt () in
+  let* counter =
+    Context.Contract.counter
+      (B infos.ctxt.block)
+      (contract_of infos.accounts.source)
+  in
+  let* op =
+    select_op
+      {
+        (operation_req_default kind) with
+        force_reveal = Some true;
+        counter = Some counter;
+      }
+      infos
+  in
+  let* _ = validate_diagnostic infos [op] in
+  return_unit
 
 let generate_tests_validate () =
   create_Tztest test_validate "Validate." subjects
