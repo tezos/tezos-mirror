@@ -15,7 +15,11 @@
   (select
    Psithaca_machine.ml
    from
-   (tezos-client-012-Psithaca -> Psithaca_machine.real.ml)))
+   (tezos-client-012-Psithaca -> Psithaca_machine.real.ml))
+  (select
+   PtJakart_machine.ml
+   from
+   (tezos-client-013-PtJakart -> PtJakart_machine.real.ml)))
  (flags
   (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix -open
     Tezos_shell_services -open Tezos_client_base_unix -open
