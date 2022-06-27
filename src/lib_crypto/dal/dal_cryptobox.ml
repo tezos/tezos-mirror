@@ -233,17 +233,17 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
 
   (* Scalars are elements of the prime field Fr from BLS. *)
   module Scalar = Bls12_381.Fr
+  module Polynomial = Bls12_381_polynomial.Polynomial
 
   (* Operations on vector of scalars *)
-  module Evaluations = Bls12_381_polynomial.Polynomial.Evaluations
+  module Evaluations = Polynomial.Evaluations
 
   (* Domains for the Fast Fourier Transform (FTT). *)
-  module Domains = Bls12_381_polynomial.Polynomial.Domain
-  module Polynomial = Bls12_381_polynomial.Polynomial.Polynomial
+  module Domains = Polynomial.Domain
+  module Polynomials = Polynomial.Polynomial
   module IntMap = Tezos_error_monad.TzLwtreslib.Map.Make (Int)
-  module Carray = Bls12_381_polynomial.Carray
 
-  type polynomial = Polynomial.t
+  type polynomial = Polynomials.t
 
   type commitment = Kate_amortized.commitment
 
@@ -453,9 +453,9 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
             Array.get srs_g2 (1 lsl Z.(log2up (of_int segment_len)));
         }
 
-  let polynomial_degree = Polynomial.degree
+  let polynomial_degree = Polynomials.degree
 
-  let polynomial_evaluate = Polynomial.evaluate
+  let polynomial_evaluate = Polynomials.evaluate
 
   (* https://github.com/janestreet/base/blob/master/src/list.ml#L1117 *)
   let take n t_orig =
@@ -485,7 +485,7 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
           let a, b = split ps in
           let a = poly_mul_aux a in
           let b = poly_mul_aux b in
-          let deg = Polynomial.degree a + 1 (* deg a = deg b in our case. *) in
+          let deg = Polynomials.degree a + 1 (* deg a = deg b in our case. *) in
           (* Computes adequate domain for the FFTs. *)
           let d =
             match IntMap.find deg !intermediate_domains with
@@ -657,7 +657,7 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
         (* We always consider the first k codeword vector components. *)
         |> take (k / shard_size)
         |> List.rev_map (fun (i, _) ->
-               Polynomial.of_coefficients
+               Polynomials.of_coefficients
                  [
                    (Scalar.negate (Domains.get domain_n (i * shard_size)), 0);
                    (Scalar.(copy one), shard_size);
@@ -666,7 +666,7 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
       let a_poly = poly_mul factors in
 
       (* 2. Computing formal derivative of A(x). *)
-      let a' = Polynomial.derivative a_poly in
+      let a' = Polynomials.derivative a_poly in
 
       (* 3. Computing A'(w^i) = A_i(w^i). *)
       let eval_a' = Evaluations.evaluation_fft domain_n a' in
@@ -677,13 +677,13 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
 
       (* 5. Computing B(x). *)
       let b = Evaluations.interpolation_fft2 domain_n n_poly in
-      let b = Polynomial.copy ~len:k b in
-      Polynomial.mul_by_scalar_inplace b (Scalar.of_int n) b ;
+      let b = Polynomials.copy ~len:k b in
+      Polynomials.mul_by_scalar_inplace b (Scalar.of_int n) b ;
 
       (* 6. Computing Lagrange interpolation polynomial P(x). *)
       let p = fft_mul domain_2k [a_poly; b] in
-      let p = Polynomial.copy ~len:k p in
-      Polynomial.opposite_inplace p ;
+      let p = Polynomials.copy ~len:k p in
+      Polynomials.opposite_inplace p ;
       Ok p
 
   let commit' :
@@ -693,7 +693,7 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
       t array ->
       (t, [> `Degree_exceeds_srs_length of string]) Result.t =
    fun (module G) p srs ->
-    let p = Polynomial.to_dense_coefficients p in
+    let p = Polynomials.to_dense_coefficients p in
     if p = [||] then Ok G.(copy zero)
     else if Array.(length p > length srs) then
       Error
@@ -722,8 +722,8 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
     let d = k - 1 in
     commit'
       (module Bls12_381.G1)
-      (Polynomial.mul
-         (Polynomial.of_coefficients [(Scalar.(copy one), d - n)])
+      (Polynomials.mul
+         (Polynomials.of_coefficients [(Scalar.(copy one), d - n)])
          p)
       trusted_setup.srs_g1
 
@@ -734,7 +734,7 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
     let* commit_xk =
       commit'
         (module G2)
-        (Polynomial.of_coefficients [(Scalar.(copy one), d - n)])
+        (Polynomials.of_coefficients [(Scalar.(copy one), d - n)])
         trusted_setup.srs_g2
     in
     Ok
@@ -780,7 +780,7 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
       ~chunk_count:proofs_log
       ~degree:k
       ~preprocess
-      (Polynomial.to_dense_coefficients p |> Array.to_list)
+      (Polynomials.to_dense_coefficients p |> Array.to_list)
 
   let verify_shard trusted_setup cm (shard_index, shard_evaluations) proof =
     let d_n = Kate_amortized.Domain.build ~log:evaluations_log in
@@ -793,7 +793,7 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
       proof
 
   let prove_single trusted_setup p z =
-    let q = Polynomial.(division_x_z (p - constant (evaluate p z)) z) in
+    let q = Polynomials.(division_x_z (p - constant (evaluate p z)) z) in
     commit' (module Bls12_381.G1) q trusted_setup.srs_g1
 
   let verify_single trusted_setup cm ~point ~evaluation proof =
@@ -820,9 +820,9 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
         Scalar.negate (Scalar.inverse_exn (Scalar.pow z (Z.of_int (!i + 1)))) ;
       i := !i + 1
     done ;
-    let div = Polynomial.of_dense div in
+    let div = Polynomials.of_dense div in
     (* p(x) * 1/(x^l - z) mod x^{k - l + 1} = q(x) since deg q <= k - l. *)
-    fft_mul domain_2k [p; div] |> Polynomial.copy ~len:(k - l + 1)
+    fft_mul domain_2k [p; div] |> Polynomials.copy ~len:(k - l + 1)
 
   let prove_slot_segment trusted_setup p slot_segment_index =
     let l = 1 lsl Z.(log2up (of_int segment_len)) in
@@ -832,11 +832,11 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
     let eval_coset = eval_coset_array eval_p slot_segment_index in
     let remainder =
       Kate_amortized.interpolation_h_poly wi domain eval_coset
-      |> Array.of_list |> Polynomial.of_dense
+      |> Array.of_list |> Polynomials.of_dense
     in
     let quotient =
       compute_quotient
-        (Polynomial.sub p remainder)
+        (Polynomials.sub p remainder)
         l
         (Scalar.pow wi (Z.of_int l))
     in
