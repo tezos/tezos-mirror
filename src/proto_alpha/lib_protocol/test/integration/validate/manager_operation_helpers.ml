@@ -147,6 +147,99 @@ let operation_req_default kind =
     amount = None;
   }
 
+(** {2 String_of data} *)
+let kind_to_string = function
+  | K_Transaction -> "Transaction"
+  | K_Delegation -> "Delegation"
+  | K_Undelegation -> "Undelegation"
+  | K_Self_delegation -> "Self-delegation"
+  | K_Set_deposits_limit -> "Set deposits limit"
+  | K_Origination -> "Origination"
+  | K_Register_global_constant -> "Register global constant"
+  | K_Increase_paid_storage -> "Increase paid storage"
+  | K_Reveal -> "Revelation"
+  | K_Tx_rollup_origination -> "Tx_rollup_origination"
+  | K_Tx_rollup_submit_batch -> "Tx_rollup_submit_batch"
+  | K_Tx_rollup_commit -> "Tx_rollup_commit"
+  | K_Tx_rollup_return_bond -> "Tx_rollup_return_bond"
+  | K_Tx_rollup_finalize -> "Tx_rollup_finalize"
+  | K_Tx_rollup_remove_commitment -> "Tx_rollup_remove_commitment"
+  | K_Tx_rollup_dispatch_tickets -> "Tx_rollup_dispatch_tickets"
+  | K_Tx_rollup_reject -> "Tx_rollup_reject"
+  | K_Transfer_ticket -> "Transfer_ticket"
+  | K_Sc_rollup_origination -> "Sc_rollup_origination"
+  | K_Sc_rollup_publish -> "Sc_rollup_publish"
+  | K_Sc_rollup_cement -> "Sc_rollup_cement"
+  | K_Sc_rollup_timeout -> "Sc_rollup_timeout"
+  | K_Sc_rollup_refute -> "Sc_rollup_refute"
+  | K_Sc_rollup_add_messages -> "Sc_rollup_add_messages"
+  | K_Sc_rollup_execute_outbox_message -> "Sc_rollup_execute_outbox_message"
+  | K_Sc_rollup_recover_bond -> "Sc_rollup_recover_bond"
+  | K_Dal_publish_slot_header -> "Dal_publish_slot_header"
+
+(** {2 Pretty-printers} *)
+let pp_opt pp v =
+  let open Format in
+  pp_print_option ~none:(fun fmt () -> fprintf fmt "None") pp v
+
+let pp_operation_req pp
+    {kind; counter; fee; gas_limit; storage_limit; force_reveal; amount} =
+  Format.fprintf
+    pp
+    "@[<v 4>Operation_req:@,\
+     kind: %s@,\
+     counter: %a@,\
+     fee: %a@,\
+     gas_limit: %a@,\
+     storage_limit: %a@,\
+     force_reveal: %a@,\
+     amount: %a@,\
+     @]"
+    (kind_to_string kind)
+    (pp_opt Z.pp_print)
+    counter
+    (pp_opt Tez.pp)
+    fee
+    (pp_opt Op.pp_gas_limit)
+    gas_limit
+    (pp_opt Z.pp_print)
+    storage_limit
+    (pp_opt (fun fmt -> Format.fprintf fmt "%b"))
+    force_reveal
+    (pp_opt Tez.pp)
+    amount
+
+let pp_ctxt_req pp
+    {hard_gas_limit_per_block; fund_src; fund_dest; fund_del; fund_tx; fund_sc}
+    =
+  Format.fprintf
+    pp
+    "@[<v 4>Ctxt_req:@,\
+     hard_gas_limit_per_block:%a@,\
+     fund_src: %a tz@,\
+     fund_dest: %a tz@,\
+     fund_del: %a tz@,\
+     fund_tx: %a tz@,\
+     fund_sc: %a tz@,\
+     @]"
+    (pp_opt Gas.Arith.pp_integral)
+    hard_gas_limit_per_block
+    (pp_opt Tez.pp)
+    fund_src
+    (pp_opt Tez.pp)
+    fund_dest
+    (pp_opt Tez.pp)
+    fund_del
+    (pp_opt Tez.pp)
+    fund_tx
+    (pp_opt Tez.pp)
+    fund_sc
+
+let pp_mode pp = function
+  | Construction -> Format.fprintf pp "Construction"
+  | Mempool -> Format.fprintf pp "Mempool"
+  | Application -> Format.fprintf pp "Block"
+
 (** {2 Short-cuts} *)
 let contract_of (account : Account.t) = Contract.Implicit account.pkh
 
@@ -840,35 +933,6 @@ let mk_dal_publish_slot_header (oinfos : operation_req) (infos : infos) =
 
 (** {2 Helpers for generation of generic check tests by manager operation} *)
 
-let kind_to_string = function
-  | K_Transaction -> "Transaction"
-  | K_Delegation -> "Delegation"
-  | K_Undelegation -> "Undelegation"
-  | K_Self_delegation -> "Self-delegation"
-  | K_Set_deposits_limit -> "Set deposits limit"
-  | K_Origination -> "Origination"
-  | K_Register_global_constant -> "Register global constant"
-  | K_Increase_paid_storage -> "Increase paid storage"
-  | K_Reveal -> "Revelation"
-  | K_Tx_rollup_origination -> "Tx_rollup_origination"
-  | K_Tx_rollup_submit_batch -> "Tx_rollup_submit_batch"
-  | K_Tx_rollup_commit -> "Tx_rollup_commit"
-  | K_Tx_rollup_return_bond -> "Tx_rollup_return_bond"
-  | K_Tx_rollup_finalize -> "Tx_rollup_finalize"
-  | K_Tx_rollup_remove_commitment -> "Tx_rollup_remove_commitment"
-  | K_Tx_rollup_dispatch_tickets -> "Tx_rollup_dispatch_tickets"
-  | K_Tx_rollup_reject -> "Tx_rollup_reject"
-  | K_Transfer_ticket -> "Transfer_ticket"
-  | K_Sc_rollup_origination -> "Sc_rollup_origination"
-  | K_Sc_rollup_publish -> "Sc_rollup_publish"
-  | K_Sc_rollup_cement -> "Sc_rollup_cement"
-  | K_Sc_rollup_timeout -> "Sc_rollup_timeout"
-  | K_Sc_rollup_refute -> "Sc_rollup_refute"
-  | K_Sc_rollup_add_messages -> "Sc_rollup_add_messages"
-  | K_Sc_rollup_execute_outbox_message -> "Sc_rollup_execute_outbox_message"
-  | K_Sc_rollup_recover_bond -> "Sc_rollup_recover_bond"
-  | K_Dal_publish_slot_header -> "Dal_publish_slot_header"
-
 (** Generic forge for any kind of manager operation according to
    operation requirements in a specific test setting. *)
 let select_op (op_req : operation_req) (infos : infos) =
@@ -905,16 +969,14 @@ let select_op (op_req : operation_req) (infos : infos) =
   mk_op op_req infos
 
 let create_Tztest ?hd_msg test tests_msg operations =
-  let hd_msg k =
+  let tl_msg k =
     let sk = kind_to_string k in
-    match hd_msg with
-    | None -> sk
-    | Some hd -> Format.sprintf "Batch: %s, %s" hd sk
+    match hd_msg with None -> sk | Some hd -> Format.sprintf "%s, %s" hd sk
   in
   List.map
     (fun kind ->
       Tztest.tztest
-        (Format.sprintf "%s with %s" (hd_msg kind) tests_msg)
+        (Format.sprintf "%s [%s]" tests_msg (tl_msg kind))
         `Quick
         (fun () -> test kind ()))
     operations
