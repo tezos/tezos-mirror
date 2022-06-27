@@ -46,5 +46,6 @@ let () =
         Test_batched_manager_operation_validation.gas_tests );
       ( "Batched: fees checks",
         Test_batched_manager_operation_validation.fee_tests );
+      ("1M: 1m restriction", Test_1m_restriction.tests);
     ]
   |> Lwt_main.run
