@@ -83,6 +83,7 @@ module type DAL_cryptobox_sig = sig
 
   type trusted_setup
 
+  (** The path to the files of the SRS on G1 and G2 and the log of their size. *)
   type trusted_setup_files = {
     srs_g1_file : string;
     srs_g2_file : string;
