@@ -2815,11 +2815,11 @@ module Sc_rollup : sig
 
       val history_at_genesis : bound:int64 -> history
 
-      val add_external_messages :
+      val add_messages :
         history ->
         t ->
         Raw_level.t ->
-        string list ->
+        Message.serialized list ->
         messages ->
         (messages * history * t) tzresult Lwt.t
 

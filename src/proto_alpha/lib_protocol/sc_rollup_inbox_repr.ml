@@ -182,7 +182,7 @@ module V1 = struct
     nb_messages_in_commitment_period : int64;
     starting_level_of_current_commitment_period : Raw_level_repr.t;
     message_counter : Z.t;
-    (* Lazy to avoid hashing O(n^2) time in [add_external_messages] *)
+    (* Lazy to avoid hashing O(n^2) time in [add_messages] *)
     current_messages_hash : unit -> Hash.t;
     old_levels_messages : history_proof;
   }
@@ -388,11 +388,11 @@ module type MerkelizedOperations = sig
 
   val history_at_genesis : bound:int64 -> history
 
-  val add_external_messages :
+  val add_messages :
     history ->
     t ->
     Raw_level_repr.t ->
-    string list ->
+    Sc_rollup_inbox_message_repr.serialized list ->
     messages ->
     (messages * history * t) tzresult Lwt.t
 
@@ -643,14 +643,8 @@ module MakeHashingScheme (Tree : TREE) :
     let current_messages_hash () = hash_messages messages in
     return (messages, history, {inbox with current_messages_hash})
 
-  let add_external_messages history inbox level payloads messages =
+  let add_messages history inbox level payloads messages =
     let open Lwt_tzresult_syntax in
-    let*? payloads =
-      List.map_e
-        (fun payload ->
-          Sc_rollup_inbox_message_repr.(to_bytes @@ External payload))
-        payloads
-    in
     let* messages, With_history history, inbox =
       add_messages_aux (With_history history) inbox level payloads messages
     in
