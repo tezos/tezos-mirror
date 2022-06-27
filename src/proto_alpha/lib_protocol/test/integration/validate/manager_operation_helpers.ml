@@ -209,6 +209,15 @@ let pp_operation_req pp
     (pp_opt Tez.pp)
     amount
 
+let pp_2_operation_req pp (op_req1, op_req2) =
+  Format.fprintf
+    pp
+    "[<v 4> %a,@ and %a,@ @]"
+    pp_operation_req
+    op_req1
+    pp_operation_req
+    op_req2
+
 let pp_ctxt_req pp
     {hard_gas_limit_per_block; fund_src; fund_dest; fund_del; fund_tx; fund_sc}
     =

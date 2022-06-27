@@ -199,6 +199,27 @@ let gen_operation_req :
   let+ amount = gen_tez amount in
   {kind; counter; fee; gas_limit; storage_limit; force_reveal; amount}
 
+(** Generator for a pair of operations with the same source and
+   sequential counters.*)
+let gen_2_operation_req :
+    operation_cstrs ->
+    manager_operation_kind list ->
+    (operation_req * operation_req) QCheck2.Gen.t =
+ fun op_cstrs subjects ->
+  let open QCheck2.Gen in
+  let* op1 =
+    gen_operation_req {op_cstrs with force_reveal = Some true} subjects
+  in
+  let counter = match op1.counter with Some x -> Z.to_int x | None -> 1 in
+  let op_cstr =
+    {
+      {op_cstrs with counter = Pure (counter + 2)} with
+      force_reveal = Some false;
+    }
+  in
+  let+ op2 = gen_operation_req op_cstr subjects in
+  (op1, op2)
+
 (** Generator for context requirement. *)
 let gen_ctxt_req : ctxt_cstrs -> ctxt_req QCheck2.Gen.t =
  fun {
