@@ -87,7 +87,7 @@ module type DAL_cryptobox_sig = sig
   type trusted_setup_files = {
     srs_g1_file : string;
     srs_g2_file : string;
-    log_size : int;
+    logarithm_size : int;
   }
 
   module Encoding : sig
@@ -276,7 +276,7 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
   type trusted_setup_files = {
     srs_g1_file : string;
     srs_g2_file : string;
-    log_size : int;
+    logarithm_size : int;
   }
 
   module Encoding = struct
@@ -418,8 +418,8 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
               ~l:(1 lsl Z.(log2up (of_int segment_len)))
               secret;
         }
-    | `Files {srs_g1_file; srs_g2_file; log_size} ->
-        assert (k < 1 lsl log_size) ;
+    | `Files {srs_g1_file; srs_g2_file; logarithm_size} ->
+        assert (k < 1 lsl logarithm_size) ;
         let srs_g1 =
           Bls12_381_polynomial.Srs.M.(to_array (load_from_file srs_g1_file k))
         in
