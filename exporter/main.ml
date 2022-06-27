@@ -39,8 +39,15 @@ let anon_args _str =
   Format.eprintf "usage: %s" usage_msg ;
   exit 1
 
+let set_pragma_use_wal_mode db =
+  let cmd = "PRAGMA journal_mode = WAL" in
+  match Sqlite3.exec db cmd with
+  | Sqlite3.Rc.OK -> ()
+  | _ -> Format.eprintf "Failed to exec \'%s\': %s@." cmd (Sqlite3.errmsg db)
+
 let main () =
   let db = Sqlite3.db_open ~mode:`READONLY !db_path in
+  set_pragma_use_wal_mode db ;
   let () =
     Exporter.data_at_level db !level
     |> Data_encoding.Json.construct Data.encoding
