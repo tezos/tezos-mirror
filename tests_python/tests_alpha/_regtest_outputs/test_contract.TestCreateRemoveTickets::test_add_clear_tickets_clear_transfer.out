@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestCreateRemoveTickets::test_add_clear_tickets_clear_transfer
 
 Node is bootstrapped.
-Estimated gas: 1845.764 units (will add 100 for safety)
+Estimated gas: 1845.821 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -27,6 +27,6 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: {}
       Storage size: 115 bytes
-      Consumed gas: 1845.764
+      Consumed gas: 1845.821
 
 Injected block at minimal timestamp
