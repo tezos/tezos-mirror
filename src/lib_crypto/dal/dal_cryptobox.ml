@@ -71,6 +71,10 @@ module type DAL_cryptobox_sig = sig
   (** Proof of a slot segment. *)
   type proof_slot_segment
 
+  (** A slot segment is defined by its index and the associated part of the
+      slot. *)
+  type slot_segment = int * bytes
+
   (** A share is a part of the encoded data. *)
   type share = Scalar.t array
 
@@ -197,15 +201,11 @@ module type DAL_cryptobox_sig = sig
     int ->
     (proof_slot_segment, [> `Degree_exceeds_srs_length of string]) result
 
-  (** [verify_slot_segment cm ~slot_segment ~slot_segment_index proof] returns
-      true if the [slot_segment] whose index is [slot_segment_index] is
-      correct. *)
+  (** [verify_slot_segment cm slot_segment proof] returns true if the [proof]
+      certifies that the [slot_segment] is indeed included in the slot committed
+      with commitment [cm]. *)
   val verify_slot_segment :
-    commitment ->
-    slot_segment:bytes ->
-    slot_segment_index:int ->
-    proof_slot_segment ->
-    bool
+    commitment -> slot_segment -> proof_slot_segment -> bool
 end
 
 module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
@@ -234,6 +234,8 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
   type proof_single = Bls12_381.G1.t
 
   type proof_slot_segment = Bls12_381.G1.t
+
+  type slot_segment = int * bytes
 
   type share = Scalar.t array
 
@@ -818,7 +820,7 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
 
   (* Parses the [slot_segment] to get the evaluations that it contains. The
      evaluation points are given by the [slot_segment_index]. *)
-  let verify_slot_segment cm ~slot_segment ~slot_segment_index proof =
+  let verify_slot_segment cm (slot_segment_index, slot_segment) proof =
     let domain =
       Kate_amortized.Domain.build ~log:Z.(log2up (of_int segment_len))
     in

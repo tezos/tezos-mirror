@@ -101,8 +101,7 @@ module Test = struct
           assert (
             DAL_crypto.verify_slot_segment
               cm
-              ~slot_segment
-              ~slot_segment_index:1
+              (1, slot_segment)
               pi) ;
           let enc_shards = DAL_crypto.to_shards p in
 
