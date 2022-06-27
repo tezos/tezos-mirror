@@ -1373,21 +1373,20 @@ module Big_map : sig
     Id.t ->
     (context * (Script.expr * Script.expr) option) tzresult Lwt.t
 
-  (** [list_values ?offset ?length ctxt id] lists all values stored in big map [id].
+  (** [list_key_values ?offset ?length ctxt id] lists the key hash and value for
+      each entry in big map [id]. The first [offset] values are ignored (if
+      passed). Negative offsets are treated as [0]. There will be no more than
+      [length] values in the result list (if passed). Negative values are
+      treated as [0].
 
-      The first [offset] values are ignored (if passed). Negative offsets are treated as [0].
-
-      There will be no more than [length] values in the result list (if passed).
-      Negative values are treated as [0].
-
-      The returned {!context} takes into account gas consumption of loading values.
-  *)
-  val list_values :
+      The returned {!context} takes into account gas consumption of traversing
+      the keys and loading values. *)
+  val list_key_values :
     ?offset:int ->
     ?length:int ->
     context ->
     Id.t ->
-    (context * Script.expr list) tzresult Lwt.t
+    (context * (Script_expr_hash.t * Script.expr) list) tzresult Lwt.t
 
   type update = {
     key : Script_repr.expr;

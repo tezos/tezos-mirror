@@ -357,7 +357,7 @@ module Make_indexed_carbonated_data_storage_INTERNAL
     (C : Raw_context.T)
     (I : INDEX)
     (V : VALUE) :
-  Non_iterable_indexed_carbonated_data_storage_INTERNAL
+  Indexed_carbonated_data_storage_INTERNAL
     with type t = C.t
      and type key = I.t
      and type value = V.t = struct
@@ -472,7 +472,7 @@ module Make_indexed_carbonated_data_storage_INTERNAL
 
       Once https://gitlab.com/tezos/tezos/-/merge_requests/2771 which flattens paths is done,
       {!C.list} could be used instead here. *)
-  let list_values ?(offset = 0) ?(length = max_int) s =
+  let list_key_values ?(offset = 0) ?(length = max_int) s =
     let root = [] in
     let depth = `Eq I.path_length in
     C.fold
@@ -545,7 +545,7 @@ module Make_indexed_carbonated_data_storage : functor
   (I : INDEX)
   (V : VALUE)
   ->
-  Non_iterable_indexed_carbonated_data_storage_with_values
+  Indexed_carbonated_data_storage
     with type t = C.t
      and type key = I.t
      and type value = V.t =

@@ -213,9 +213,9 @@ let collect_token_diffs_of_big_map ctxt ~get_token_and_amount big_map_id acc =
          This is to make sure that we pay sufficient gas for traversing the
          values.
       *)
-      Big_map.list_values ctxt big_map_id >>=? fun (ctxt, exprs) ->
+      Big_map.list_key_values ctxt big_map_id >>=? fun (ctxt, exprs) ->
       List.fold_left_es
-        (fun (acc, ctxt) node ->
+        (fun (acc, ctxt) (_key_hash, node) ->
           collect_token_diffs_of_node
             ctxt
             has_tickets

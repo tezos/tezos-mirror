@@ -516,10 +516,7 @@ module Big_map = struct
 
     let add = I.add
 
-    let list_values ?offset ?length (ctxt, id) =
-      let open Lwt_tzresult_syntax in
-      let* ctxt, values = I.list_values ?offset ?length (ctxt, id) in
-      return (ctxt, List.map snd values)
+    let list_key_values = I.list_key_values
 
     let consume_deserialize_gas ctxt value =
       Raw_context.consume_gas ctxt (Script_repr.deserialized_cost value)
@@ -1679,7 +1676,7 @@ module Sc_rollup = struct
       end)
 
   let stakers (ctxt : Raw_context.t) (rollup : Sc_rollup_repr.t) =
-    Stakers.list_values (ctxt, rollup)
+    Stakers.list_key_values (ctxt, rollup)
 
   module Staker_count =
     Indexed_context.Make_carbonated_map

@@ -84,7 +84,7 @@ module Make_indexed_carbonated_data_storage
     (C : Raw_context.T)
     (I : INDEX)
     (V : VALUE) :
-  Non_iterable_indexed_carbonated_data_storage_with_values
+  Indexed_carbonated_data_storage
     with type t = C.t
      and type key = I.t
      and type value = V.t

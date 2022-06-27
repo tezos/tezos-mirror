@@ -366,9 +366,10 @@ let register () =
     | Some (_, value_type) ->
         parse_big_map_value_ty ctxt ~legacy:true (Micheline.root value_type)
         >>?= fun (Ex_ty value_type, ctxt) ->
-        Big_map.list_values ?offset ?length ctxt id >>=? fun (ctxt, values) ->
+        Big_map.list_key_values ?offset ?length ctxt id
+        >>=? fun (ctxt, key_values) ->
         List.fold_left_s
-          (fun acc value ->
+          (fun acc (_key_hash, value) ->
             acc >>?= fun (ctxt, rev_values) ->
             parse_data
               ctxt
@@ -381,7 +382,7 @@ let register () =
             >|=? fun (value, ctxt) ->
             (ctxt, Micheline.strip_locations value :: rev_values))
           (Ok (ctxt, []))
-          values
+          key_values
         >|=? fun (_ctxt, rev_values) -> List.rev rev_values
   in
   register_field ~chunked:false S.balance Contract.get_balance ;
