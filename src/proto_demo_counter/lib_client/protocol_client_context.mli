@@ -28,8 +28,7 @@ class type full =
     inherit Client_context.full
 
     inherit
-      [Shell_services.chain * Shell_services.block] Protocol.Environment
-                                                    .RPC_context
+      [Shell_services.chain * Shell_services.block] Environment.RPC_context
                                                     .simple
   end
 

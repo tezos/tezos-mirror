@@ -15,7 +15,6 @@
   tezos-benchmark-012-Psithaca
   tezos-benchmark-type-inference-012-Psithaca
   tezos-protocol-012-Psithaca
-  tezos-protocol-012-Psithaca.raw
   tezos-crypto
   tezos-shell-benchmarks
   tezos-micheline
@@ -35,7 +34,7 @@
   -open Tezos_benchmark_012_Psithaca
   -open Tezos_benchmark_type_inference_012_Psithaca
   -open Tezos_protocol_012_Psithaca
-  -open Tezos_raw_protocol_012_Psithaca
+  -open Tezos_protocol_012_Psithaca.Protocol
   -open Tezos_crypto
   -open Tezos_micheline
   -open Tezos_012_Psithaca_test_helpers

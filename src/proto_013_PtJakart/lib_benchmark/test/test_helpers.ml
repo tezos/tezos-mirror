@@ -85,5 +85,5 @@ let typecheck_by_tezos =
              ~legacy:false
              (Micheline.root node)
              bef
-           >|= Protocol.Environment.wrap_tzresult
+           >|= Environment.wrap_tzresult
            >>=? fun _ -> return_unit ))

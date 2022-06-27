@@ -17,7 +17,6 @@
   tezos-protocol-013-PtJakart.parameters
   tezos-protocol-environment
   tezos-protocol-plugin-013-PtJakart
-  tezos-protocol-013-PtJakart.environment
   tezos-shell-services)
  (flags
   (:standard)
@@ -28,5 +27,4 @@
   -open Tezos_protocol_013_PtJakart
   -open Tezos_client_013_PtJakart
   -open Tezos_protocol_plugin_013_PtJakart
-  -open Tezos_protocol_environment_013_PtJakart
   -open Tezos_shell_services))

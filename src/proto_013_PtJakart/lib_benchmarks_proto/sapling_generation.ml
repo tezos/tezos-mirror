@@ -189,7 +189,7 @@ let rec add_root nb_root ctxt id vk index size diff state =
     add_input Protocol.Sapling_storage.empty_diff vk index size 0L state
     >>=? fun (diff_to_add, {position = size; _}, new_idx) ->
     Protocol.Sapling_storage.apply_diff ctxt id diff_to_add
-    >|= Protocol.Environment.wrap_tzresult
+    >|= Environment.wrap_tzresult
     >>=? fun (ctxt, _) ->
     (* We call it nb_root -1 because one root is already present*)
     add_root
@@ -296,7 +296,7 @@ let make_inputs to_forge local_state proving_ctx sk vk root anti_replay =
     to_forge
 
 let init_fresh_sapling_state ctxt =
-  let open Protocol.Environment.Error_monad in
+  let open Environment.Error_monad in
   Protocol.Lazy_storage_diff.fresh
     Protocol.Lazy_storage_kind.Sapling_state
     ~temporary:false
@@ -323,7 +323,7 @@ let prepare_seeded_state_internal ~(nb_input : int) ~(nb_nf : int)
     * Protocol.Lazy_storage_kind.Sapling_state.Id.t)
     tzresult
     Lwt.t =
-  init_fresh_sapling_state ctxt >|= Protocol.Environment.wrap_tzresult
+  init_fresh_sapling_state ctxt >|= Environment.wrap_tzresult
   >>=? fun (ctxt, id) ->
   let index_start = Tezos_sapling.Core.Client.Viewing_key.default_index in
   let sk, vk = generate_spending_and_viewing_keys state in
@@ -336,8 +336,7 @@ let prepare_seeded_state_internal ~(nb_input : int) ~(nb_nf : int)
     ~index:index_start
     state
   >>=? fun (diff, to_forge) ->
-  Protocol.Sapling_storage.apply_diff ctxt id diff
-  >|= Protocol.Environment.wrap_tzresult
+  Protocol.Sapling_storage.apply_diff ctxt id diff >|= Environment.wrap_tzresult
   >>=? fun (ctxt, _size) -> return (diff, to_forge, sk, vk, ctxt, id)
 
 let prepare_seeded_state
@@ -561,6 +560,6 @@ let generate (save_to : string) (tx_count : int)
   match result with Ok txs -> save ~filename:save_to ~txs | Error _ -> ()
 
 let apply_diff ctxt id diff =
-  let open Protocol.Environment.Error_monad in
+  let open Environment.Error_monad in
   Sapling_storage.apply_diff (alpha_to_raw ctxt) id diff
   >>=? fun (ctxt, size) -> return (raw_to_alpha ctxt, size)

@@ -113,7 +113,7 @@
   (:standard)
   -w -6-7-9-16-29-32-51-68
   -nopervasives)
- (modules Protocol))
+ (modules Protocol Tezos_protocol_002_PsYLVpVv))
 
 (install
  (package tezos-protocol-002-PsYLVpVv)
@@ -125,7 +125,14 @@
  (action
   (write-file
    %{targets}
-   "module Environment = Tezos_protocol_environment_002_PsYLVpVv.Environment\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt\"\nlet name = Environment.Name.name\ninclude Tezos_raw_protocol_002_PsYLVpVv\ninclude Tezos_raw_protocol_002_PsYLVpVv.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PsYLVpVvgbLhAhoqAkMFUo6gudkJ9weNXhUYCiLDzcUpFpkk8Wt\"\nlet name = Tezos_protocol_environment_002_PsYLVpVv.Environment.Name.name\ninclude Tezos_raw_protocol_002_PsYLVpVv\ninclude Tezos_raw_protocol_002_PsYLVpVv.Main\n")))
+
+(rule
+ (targets tezos_protocol_002_PsYLVpVv.ml)
+ (action
+  (write-file
+   %{targets}
+   "\nmodule Environment = Tezos_protocol_environment_002_PsYLVpVv.Environment\nmodule Protocol = Protocol\n")))
 
 (rule
  (alias runtest_compile_protocol)
@@ -209,8 +216,7 @@
  (name tezos_protocol_002_PsYLVpVv_functor)
  (libraries
   tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-002-PsYLVpVv.raw)
+  tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68

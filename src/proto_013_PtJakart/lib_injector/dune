@@ -9,7 +9,6 @@
   tezos-base
   tezos-crypto
   tezos-protocol-013-PtJakart
-  tezos-protocol-013-PtJakart.environment
   tezos-micheline
   tezos-client-013-PtJakart
   tezos-client-base
@@ -25,7 +24,6 @@
   -open Tezos_base
   -open Tezos_crypto
   -open Tezos_protocol_013_PtJakart
-  -open Tezos_protocol_environment_013_PtJakart
   -open Tezos_micheline
   -open Tezos_client_013_PtJakart
   -open Tezos_client_base

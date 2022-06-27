@@ -1,5 +1,3 @@
-open Protocol
-
 let ( >>=?? ) x y =
   x >>= function
   | Ok s -> y s

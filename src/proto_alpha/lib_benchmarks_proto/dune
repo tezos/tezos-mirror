@@ -15,7 +15,6 @@
   tezos-benchmark-alpha
   tezos-benchmark-type-inference-alpha
   tezos-protocol-alpha
-  tezos-protocol-alpha.raw
   tezos-crypto
   tezos-shell-benchmarks
   tezos-micheline
@@ -35,7 +34,7 @@
   -open Tezos_benchmark_alpha
   -open Tezos_benchmark_type_inference_alpha
   -open Tezos_protocol_alpha
-  -open Tezos_raw_protocol_alpha
+  -open Tezos_protocol_alpha.Protocol
   -open Tezos_crypto
   -open Tezos_micheline
   -open Tezos_alpha_test_helpers

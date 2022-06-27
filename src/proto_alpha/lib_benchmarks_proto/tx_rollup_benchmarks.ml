@@ -182,7 +182,7 @@ end
 
 module Irmin_context = Tezos_context_memory.Context_binary
 
-exception Error of Protocol.Environment.Error_monad.error
+exception Error of Environment.Error_monad.error
 
 module Prover_storage :
   Tx_rollup_l2_storage_sig.STORAGE

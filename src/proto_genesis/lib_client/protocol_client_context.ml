@@ -26,7 +26,7 @@
 module Genesis_block_services = Block_services.Make (Protocol) (Protocol)
 
 module Lifted_protocol = struct
-  include Protocol.Environment.Lift (Protocol)
+  include Environment.Lift (Protocol)
 
   let hash = Protocol.hash
 end

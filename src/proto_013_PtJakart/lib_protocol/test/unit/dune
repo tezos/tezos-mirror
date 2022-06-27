@@ -13,7 +13,6 @@
   tezos-protocol-environment
   tezos-stdlib-unix
   tezos-protocol-013-PtJakart
-  tezos-protocol-013-PtJakart.environment
   tezos-013-PtJakart-test-helpers
   alcotest-lwt
   tezos-stdlib)
@@ -25,7 +24,6 @@
   -open Tezos_micheline
   -open Tezos_client_013_PtJakart
   -open Tezos_protocol_013_PtJakart
-  -open Tezos_protocol_environment_013_PtJakart
   -open Tezos_013_PtJakart_test_helpers
   -open Tezos_stdlib))
 

@@ -10,7 +10,6 @@
   tezos-base
   tezos-crypto
   tezos-protocol-alpha
-  tezos-protocol-alpha.environment
   tezos-client-alpha
   tezos-client-commands
   tezos-context.encoding
@@ -38,7 +37,6 @@
   -open Tezos_base
   -open Tezos_crypto
   -open Tezos_protocol_alpha
-  -open Tezos_protocol_environment_alpha
   -open Tezos_client_alpha
   -open Tezos_client_commands
   -open Tezos_baking_alpha_commands

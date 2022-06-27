@@ -130,7 +130,7 @@
   (:standard)
   -w -6-7-9-16-29-32-51-68
   -nopervasives)
- (modules Protocol))
+ (modules Protocol Tezos_protocol_010_PtGRANAD))
 
 (install
  (package tezos-protocol-010-PtGRANAD)
@@ -142,7 +142,14 @@
  (action
   (write-file
    %{targets}
-   "module Environment = Tezos_protocol_environment_010_PtGRANAD.Environment\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV\"\nlet name = Environment.Name.name\ninclude Tezos_raw_protocol_010_PtGRANAD\ninclude Tezos_raw_protocol_010_PtGRANAD.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV\"\nlet name = Tezos_protocol_environment_010_PtGRANAD.Environment.Name.name\ninclude Tezos_raw_protocol_010_PtGRANAD\ninclude Tezos_raw_protocol_010_PtGRANAD.Main\n")))
+
+(rule
+ (targets tezos_protocol_010_PtGRANAD.ml)
+ (action
+  (write-file
+   %{targets}
+   "\nmodule Environment = Tezos_protocol_environment_010_PtGRANAD.Environment\nmodule Protocol = Protocol\n")))
 
 (rule
  (alias runtest_compile_protocol)
@@ -243,8 +250,7 @@
  (name tezos_protocol_010_PtGRANAD_functor)
  (libraries
   tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-010-PtGRANAD.raw)
+  tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68

@@ -113,7 +113,7 @@
   (:standard)
   -w -6-7-9-16-29-32-51-68
   -nopervasives)
- (modules Protocol))
+ (modules Protocol Tezos_protocol_001_PtCJ7pwo))
 
 (install
  (package tezos-protocol-001-PtCJ7pwo)
@@ -125,7 +125,14 @@
  (action
   (write-file
    %{targets}
-   "module Environment = Tezos_protocol_environment_001_PtCJ7pwo.Environment\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY\"\nlet name = Environment.Name.name\ninclude Tezos_raw_protocol_001_PtCJ7pwo\ninclude Tezos_raw_protocol_001_PtCJ7pwo.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY\"\nlet name = Tezos_protocol_environment_001_PtCJ7pwo.Environment.Name.name\ninclude Tezos_raw_protocol_001_PtCJ7pwo\ninclude Tezos_raw_protocol_001_PtCJ7pwo.Main\n")))
+
+(rule
+ (targets tezos_protocol_001_PtCJ7pwo.ml)
+ (action
+  (write-file
+   %{targets}
+   "\nmodule Environment = Tezos_protocol_environment_001_PtCJ7pwo.Environment\nmodule Protocol = Protocol\n")))
 
 (rule
  (alias runtest_compile_protocol)
@@ -209,8 +216,7 @@
  (name tezos_protocol_001_PtCJ7pwo_functor)
  (libraries
   tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-001-PtCJ7pwo.raw)
+  tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68

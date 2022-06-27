@@ -15,7 +15,6 @@
   tezos-benchmark-013-PtJakart
   tezos-benchmark-type-inference-013-PtJakart
   tezos-protocol-013-PtJakart
-  tezos-protocol-013-PtJakart.raw
   tezos-crypto
   tezos-shell-benchmarks
   tezos-micheline
@@ -35,7 +34,7 @@
   -open Tezos_benchmark_013_PtJakart
   -open Tezos_benchmark_type_inference_013_PtJakart
   -open Tezos_protocol_013_PtJakart
-  -open Tezos_raw_protocol_013_PtJakart
+  -open Tezos_protocol_013_PtJakart.Protocol
   -open Tezos_crypto
   -open Tezos_micheline
   -open Tezos_013_PtJakart_test_helpers

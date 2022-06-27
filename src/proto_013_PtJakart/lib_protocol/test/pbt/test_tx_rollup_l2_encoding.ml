@@ -149,7 +149,7 @@ let v1_batch =
      tests here as the bytes length stays the same. *)
   let bytes = Bls12_381.G2.(to_compressed_bytes (random ())) in
   let aggregated_signature =
-    Protocol.Environment.Bls_signature.unsafe_signature_of_bytes bytes
+    Environment.Bls_signature.unsafe_signature_of_bytes bytes
   in
   V1.{aggregated_signature; contents}
 

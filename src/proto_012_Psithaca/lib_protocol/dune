@@ -160,7 +160,7 @@
   (:standard)
   -w -51
   -nopervasives)
- (modules Protocol))
+ (modules Protocol Tezos_protocol_012_Psithaca))
 
 (install
  (package tezos-protocol-012-Psithaca)
@@ -172,7 +172,14 @@
  (action
   (write-file
    %{targets}
-   "module Environment = Tezos_protocol_environment_012_Psithaca.Environment\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A\"\nlet name = Environment.Name.name\ninclude Tezos_raw_protocol_012_Psithaca\ninclude Tezos_raw_protocol_012_Psithaca.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A\"\nlet name = Tezos_protocol_environment_012_Psithaca.Environment.Name.name\ninclude Tezos_raw_protocol_012_Psithaca\ninclude Tezos_raw_protocol_012_Psithaca.Main\n")))
+
+(rule
+ (targets tezos_protocol_012_Psithaca.ml)
+ (action
+  (write-file
+   %{targets}
+   "\nmodule Environment = Tezos_protocol_environment_012_Psithaca.Environment\nmodule Protocol = Protocol\n")))
 
 (rule
  (alias runtest_compile_protocol)
@@ -298,8 +305,7 @@
  (name tezos_protocol_012_Psithaca_functor)
  (libraries
   tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-012-Psithaca.raw)
+  tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -w -51

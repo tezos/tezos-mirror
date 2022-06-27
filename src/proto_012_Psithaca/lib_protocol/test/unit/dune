@@ -13,7 +13,6 @@
   tezos-protocol-environment
   tezos-stdlib-unix
   tezos-protocol-012-Psithaca
-  tezos-protocol-012-Psithaca.environment
   tezos-012-Psithaca-test-helpers
   alcotest-lwt)
  (flags
@@ -24,7 +23,6 @@
   -open Tezos_micheline
   -open Tezos_client_012_Psithaca
   -open Tezos_protocol_012_Psithaca
-  -open Tezos_protocol_environment_012_Psithaca
   -open Tezos_012_Psithaca_test_helpers))
 
 (rule

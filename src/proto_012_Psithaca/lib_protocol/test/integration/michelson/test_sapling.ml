@@ -760,7 +760,7 @@ module Interpreter_tests = struct
           List.exists
             (function
               | Environment.Ecoproto_error
-                  (Tezos_raw_protocol_012_Psithaca.Script_tc_errors
+                  (Tezos_protocol_012_Psithaca.Protocol.Script_tc_errors
                    .Unexpected_forged_value _) ->
                   true
               | _ -> false)

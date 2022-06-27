@@ -8,7 +8,6 @@
   tezos-micheline
   tezos-client-012-Psithaca
   tezos-protocol-012-Psithaca
-  tezos-protocol-012-Psithaca.environment
   tezos-base-test-helpers
   tezos-baking-012-Psithaca.mockup-simulator
   tezos-baking-012-Psithaca
@@ -23,7 +22,6 @@
   -open Tezos_micheline
   -open Tezos_client_012_Psithaca
   -open Tezos_protocol_012_Psithaca
-  -open Tezos_protocol_environment_012_Psithaca
   -open Tezos_base_test_helpers
   -open Tezos_012_Psithaca_mockup_simulator
   -open Tezos_baking_012_Psithaca))

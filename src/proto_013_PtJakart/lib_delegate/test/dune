@@ -8,7 +8,6 @@
   tezos-micheline
   tezos-client-013-PtJakart
   tezos-protocol-013-PtJakart
-  tezos-protocol-013-PtJakart.environment
   tezos-base-test-helpers
   tezos-baking-013-PtJakart.mockup-simulator
   tezos-baking-013-PtJakart
@@ -23,7 +22,6 @@
   -open Tezos_micheline
   -open Tezos_client_013_PtJakart
   -open Tezos_protocol_013_PtJakart
-  -open Tezos_protocol_environment_013_PtJakart
   -open Tezos_base_test_helpers
   -open Tezos_013_PtJakart_mockup_simulator
   -open Tezos_baking_013_PtJakart))

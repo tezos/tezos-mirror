@@ -3079,15 +3079,10 @@ end = struct
     List.filter_map (fun (x, b) -> if b then Some x else None)
 
   module Lib_protocol = struct
-    type t = {
-      main : target;
-      embedded : target;
-      environment : target;
-      raw_protocol : target;
-    }
+    type t = {main : target; embedded : target}
 
     let make_tests ?test_helpers ?parameters ?plugin ?client ?benchmark
-        ?benchmark_type_inference ~main ~environment ~name () =
+        ?benchmark_type_inference ~main ~name () =
       let name_dash = Name.name_dash name in
       let number = Name.number name in
       let path = Name.base_path name in
@@ -3262,7 +3257,6 @@ end = struct
               octez_protocol_environment;
               octez_stdlib_unix;
               main |> open_;
-              environment |> open_;
               test_helpers |> if_some |> open_;
               alcotest_lwt;
               octez_stdlib |> if_ N.(number >= 013) |> open_;
@@ -3415,7 +3409,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
                   "Tezos/Protocol: %s economic-protocol definition"
                   name_underscore
             | Alpha | V _ -> "Tezos/Protocol: economic-protocol definition")
-          ~modules:["Protocol"]
+          ~modules:["Protocol"; sf "Tezos_protocol_%s" name_underscore]
           ~flags:(Flags.standard ~nopervasives:true ~disable_warnings ())
           ~deps:
             [
@@ -3438,15 +3432,29 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
                       S "%{targets}";
                       S
                         (sf
-                           {|module Environment = Tezos_protocol_environment_%s.Environment
+                           {|
 let hash = Tezos_crypto.Protocol_hash.of_b58check_exn "%s"
-let name = Environment.Name.name
+let name = Tezos_protocol_environment_%s.Environment.Name.name
 include Tezos_raw_protocol_%s
 include Tezos_raw_protocol_%s.Main
 |}
-                           name_underscore
                            tezos_protocol.hash
                            name_underscore
+                           name_underscore
+                           name_underscore);
+                    ];
+                targets_rule
+                  [sf "tezos_protocol_%s.ml" name_underscore]
+                  ~action:
+                    [
+                      S "write-file";
+                      S "%{targets}";
+                      S
+                        (sf
+                           {|
+module Environment = Tezos_protocol_environment_%s.Environment
+module Protocol = Protocol
+|}
                            name_underscore);
                     ];
                 alias_rule
@@ -3502,12 +3510,7 @@ include Tezos_raw_protocol_%s.Main
           ~bisect_ppx:false
           ~flags:(Flags.standard ~nopervasives:true ~disable_warnings ())
           ~opam_only_deps:[octez_protocol_compiler_tezos_protocol_packer]
-          ~deps:
-            [
-              octez_protocol_environment;
-              tezos_protocol_environment_sigs;
-              raw_protocol;
-            ]
+          ~deps:[octez_protocol_environment; tezos_protocol_environment_sigs]
           ~dune:
             Dune.
               [
@@ -3578,14 +3581,12 @@ include Tezos_raw_protocol_%s.Main
                     ];
               ]
       in
-      {main; embedded; environment; raw_protocol}
+      {main; embedded}
   end
 
   let genesis =
     let name = Name.other "genesis" in
-    let {Lib_protocol.main; embedded; environment = _; raw_protocol = _} =
-      Lib_protocol.make ~name
-    in
+    let {Lib_protocol.main; embedded} = Lib_protocol.make ~name in
     let client =
       public_lib
         (sf "tezos-client-%s" (Name.name_dash name))
@@ -3609,16 +3610,12 @@ include Tezos_raw_protocol_%s.Main
 
   let demo_noops =
     let name = Name.other "demo-noops" in
-    let {Lib_protocol.main; embedded; environment = _; raw_protocol = _} =
-      Lib_protocol.make ~name
-    in
+    let {Lib_protocol.main; embedded} = Lib_protocol.make ~name in
     register @@ make ~name ~status:Not_mainnet ~main ~embedded ()
 
   let _demo_counter =
     let name = Name.other "demo-counter" in
-    let {Lib_protocol.main; embedded; environment = _; raw_protocol = _} =
-      Lib_protocol.make ~name
-    in
+    let {Lib_protocol.main; embedded} = Lib_protocol.make ~name in
     let client =
       public_lib
         (sf "tezos-client-%s" (Name.name_dash name))
@@ -3656,9 +3653,7 @@ include Tezos_raw_protocol_%s.Main
     let both o1 o2 =
       match (o1, o2) with Some x, Some y -> Some (x, y) | _, _ -> None
     in
-    let {Lib_protocol.main; embedded; environment; raw_protocol} =
-      Lib_protocol.make ~name
-    in
+    let {Lib_protocol.main; embedded} = Lib_protocol.make ~name in
     let parameters =
       only_if (N.(number >= 011) && not_overridden) @@ fun () ->
       public_lib
@@ -3797,7 +3792,6 @@ include Tezos_raw_protocol_%s.Main
             parameters |> if_some;
             octez_protocol_environment;
             plugin |> if_some |> open_;
-            environment |> open_;
             octez_shell_services |> open_;
           ]
     in
@@ -3821,7 +3815,6 @@ include Tezos_raw_protocol_%s.Main
             octez_stdlib_unix;
             octez_micheline |> open_;
             plugin |> open_;
-            environment |> open_;
             main |> open_ |> open_ ~m:"Protocol";
             parameters |> if_some |> open_;
             test_helpers |> open_;
@@ -3898,7 +3891,6 @@ include Tezos_raw_protocol_%s.Main
             client |> if_some |> open_;
             client_commands |> if_some |> open_;
             main |> open_;
-            environment |> open_;
             plugin |> if_some |> if_ N.(number >= 013) |> open_;
           ]
         ~linkall:true
@@ -4047,7 +4039,6 @@ include Tezos_raw_protocol_%s.Main
             octez_micheline |> open_;
             client |> if_some |> open_;
             main |> open_;
-            environment |> open_;
             test_helpers |> if_ N.(number <= 011) |> open_;
             octez_base_test_helpers |> open_;
             mockup_simulator |> if_some |> open_;
@@ -4147,7 +4138,6 @@ include Tezos_raw_protocol_%s.Main
             |> open_;
             octez_crypto |> open_;
             main |> open_;
-            environment |> open_;
             octez_micheline |> open_;
             client |> if_some |> open_;
             octez_client_base |> open_;
@@ -4247,7 +4237,6 @@ include Tezos_raw_protocol_%s.Main
             |> open_;
             octez_crypto |> open_;
             main |> open_;
-            environment |> open_;
             client |> if_some |> open_;
             octez_client_commands |> open_;
             octez_context_encoding;
@@ -4280,13 +4269,12 @@ include Tezos_raw_protocol_%s.Main
           [
             octez_base |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
-            main |> open_;
+            main |> open_ |> open_ ~m:"Protocol";
             client |> if_some |> open_;
             client_commands |> if_some |> open_;
             octez_client_base_unix |> open_;
             octez_stdlib_unix |> open_;
             tx_rollup |> if_some |> open_;
-            raw_protocol |> open_;
             uri;
           ]
     in
@@ -4441,8 +4429,7 @@ include Tezos_raw_protocol_%s.Main
             octez_benchmark |> open_;
             benchmark |> if_some |> open_;
             benchmark_type_inference |> if_some |> open_;
-            main |> open_;
-            raw_protocol |> open_;
+            main |> open_ |> open_ ~m:"Protocol";
             octez_crypto |> open_;
             octez_shell_benchmarks;
             octez_micheline |> open_;
@@ -4463,7 +4450,6 @@ include Tezos_raw_protocol_%s.Main
           ?benchmark:(Option.bind benchmark Fun.id)
           ?benchmark_type_inference
           ~main
-          ~environment
           ~name
           ()
     in
@@ -4710,7 +4696,7 @@ let _get_contracts =
                  ~deps:
                    [
                      octez_base |> open_ ~m:"TzPervasives";
-                     main |> open_ ~m:"Protocol";
+                     main |> open_ |> open_ ~m:"Protocol";
                      client |> open_;
                      get_contracts_lib;
                    ]

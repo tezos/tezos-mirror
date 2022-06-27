@@ -122,7 +122,7 @@
   (:standard)
   -w -6-7-9-16-29-32-51-68
   -nopervasives)
- (modules Protocol))
+ (modules Protocol Tezos_protocol_008_PtEdoTez))
 
 (install
  (package tezos-protocol-008-PtEdoTez)
@@ -134,7 +134,14 @@
  (action
   (write-file
    %{targets}
-   "module Environment = Tezos_protocol_environment_008_PtEdoTez.Environment\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq\"\nlet name = Environment.Name.name\ninclude Tezos_raw_protocol_008_PtEdoTez\ninclude Tezos_raw_protocol_008_PtEdoTez.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq\"\nlet name = Tezos_protocol_environment_008_PtEdoTez.Environment.Name.name\ninclude Tezos_raw_protocol_008_PtEdoTez\ninclude Tezos_raw_protocol_008_PtEdoTez.Main\n")))
+
+(rule
+ (targets tezos_protocol_008_PtEdoTez.ml)
+ (action
+  (write-file
+   %{targets}
+   "\nmodule Environment = Tezos_protocol_environment_008_PtEdoTez.Environment\nmodule Protocol = Protocol\n")))
 
 (rule
  (alias runtest_compile_protocol)
@@ -227,8 +234,7 @@
  (name tezos_protocol_008_PtEdoTez_functor)
  (libraries
   tezos-protocol-environment
-  tezos-protocol-environment.sigs
-  tezos-protocol-008-PtEdoTez.raw)
+  tezos-protocol-environment.sigs)
  (flags
   (:standard)
   -w -6-7-9-16-29-32-51-68
