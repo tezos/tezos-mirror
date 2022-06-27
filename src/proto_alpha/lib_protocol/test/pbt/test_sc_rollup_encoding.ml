@@ -35,6 +35,8 @@ open Protocol
 open QCheck2
 open Lib_test.Qcheck2_helpers
 
+let lift k = Lwt.map Environment.wrap_tzresult k
+
 (** {2 Generators} *)
 
 let gen_state_hash =
@@ -86,6 +88,84 @@ let gen_versioned_commitment =
   let* commitment = gen_commitment in
   return (Sc_rollup_commitment_repr.to_versioned commitment)
 
+let gen_player = Gen.oneofl Sc_rollup_game_repr.[Alice; Bob]
+
+let gen_messages inbox level =
+  let open Gen in
+  let* payloads = small_list (small_string ~gen:printable) in
+  let messages =
+    let open Lwt_result_syntax in
+    let* ctxt = Context.default_raw_context () in
+    lift
+    @@ let*? input_messages =
+         List.map_e
+           (fun msg -> Sc_rollup_inbox_message_repr.(to_bytes (External msg)))
+           payloads
+       in
+       let messages =
+         Environment.Context.Tree.empty (Raw_context.recover ctxt)
+       in
+       Sc_rollup_inbox_repr.add_messages_no_history
+         inbox
+         level
+         input_messages
+         messages
+  in
+  return
+  @@ (Lwt_main.run messages |> function
+      | Ok v -> snd v
+      | Error e ->
+          Stdlib.failwith (Format.asprintf "%a" Error_monad.pp_print_trace e))
+
+let gen_inbox rollup level =
+  let open Gen in
+  let inbox = Sc_rollup_inbox_repr.empty rollup level in
+  let* inbox = gen_messages inbox level in
+  return inbox
+
+let gen_raw_level =
+  let open Gen in
+  let* level = small_nat in
+  return @@ Raw_level_repr.of_int32_exn (Int32.of_int level)
+
+let gen_pvm_name = Gen.string_printable
+
+let gen_tick =
+  let open Gen in
+  let* t = small_nat in
+  match Sc_rollup_tick_repr.of_int t with
+  | None -> assert false
+  | Some r -> return r
+
+let gen_dissection =
+  let open Gen in
+  small_list (pair (opt gen_state_hash) gen_tick)
+
+let gen_rollup =
+  let open Gen in
+  let* bytes = bytes_fixed_gen Sc_rollup_repr.Address.size in
+  return (Sc_rollup_repr.Address.hash_bytes [bytes])
+
+let gen_game =
+  let open Gen in
+  let* turn = gen_player in
+  let* level = gen_raw_level in
+  let* rollup = gen_rollup in
+  let* inbox_snapshot = gen_inbox rollup level in
+  let* pvm_name = gen_pvm_name in
+  let* dissection = gen_dissection in
+  return Sc_rollup_game_repr.{turn; inbox_snapshot; level; pvm_name; dissection}
+
+let gen_conflict =
+  let open Gen in
+  let other = Sc_rollup_repr.Staker.zero in
+  let* their_commitment = gen_commitment in
+  let* our_commitment = gen_commitment in
+  let* parent_commitment = gen_commitment_hash in
+  return
+    Sc_rollup_refutation_storage.
+      {other; their_commitment; our_commitment; parent_commitment}
+
 (** {2 Tests} *)
 
 let test_commitment =
@@ -104,6 +184,23 @@ let test_versioned_commitment =
     ~eq:( = )
     Sc_rollup_commitment_repr.versioned_encoding
 
-let tests = [test_commitment; test_versioned_commitment]
+let test_game =
+  test_roundtrip
+    ~count:1_000
+    ~title:"Sc_rollup_game.t"
+    ~gen:gen_game
+    ~eq:Sc_rollup_game_repr.equal
+    Sc_rollup_game_repr.encoding
+
+let test_conflict =
+  test_roundtrip
+    ~count:1_000
+    ~title:"Sc_rollup_refutation_storage.conflict"
+    ~gen:gen_conflict
+    ~eq:( = )
+    Sc_rollup_refutation_storage.conflict_encoding
+
+let tests =
+  [test_commitment; test_versioned_commitment; test_game; test_conflict]
 
 let () = Alcotest.run "SC rollup encoding" [("roundtrip", qcheck_wrap tests)]

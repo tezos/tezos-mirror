@@ -167,6 +167,9 @@ module V1 : sig
     dissection : (State_hash.t option * Sc_rollup_tick_repr.t) list;
   }
 
+  (** [equal g1 g2] returns [true] iff [g1] is equal to [g2]. *)
+  val equal : t -> t -> bool
+
   (** Return the other player *)
   val opponent : player -> player
 

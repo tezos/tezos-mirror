@@ -62,6 +62,32 @@ module V1 = struct
     | Bob, Bob -> true
     | _, _ -> false
 
+  let equal
+      {
+        turn = turn1;
+        inbox_snapshot = inbox_snapshot1;
+        level = level1;
+        pvm_name = pvm_name1;
+        dissection = dissection1;
+      }
+      {
+        turn = turn2;
+        inbox_snapshot = inbox_snapshot2;
+        level = level2;
+        pvm_name = pvm_name2;
+        dissection = dissection2;
+      } =
+    player_equal turn1 turn2
+    && Sc_rollup_inbox_repr.equal inbox_snapshot1 inbox_snapshot2
+    && Raw_level_repr.equal level1 level2
+    && String.equal pvm_name1 pvm_name2
+    && List.equal
+         (fun (h1, t1) (h2, t2) ->
+           Option.equal State_hash.equal h1 h2
+           && Sc_rollup_tick_repr.equal t1 t2)
+         dissection1
+         dissection2
+
   let string_of_player = function Alice -> "alice" | Bob -> "bob"
 
   let pp_player ppf player = Format.fprintf ppf "%s" (string_of_player player)
