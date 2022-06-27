@@ -331,9 +331,9 @@ let verify_execute_outbox_message_operations incr ~loc ~source ~operations
       (Expr.to_string p)
   in
   let transactions_data =
-    let data_of_transaction (ty, entrypoint, params) =
+    let data_of_transaction (contract, entrypoint, params) =
       let params = Expr.from_string params in
-      (ty, entrypoint, params)
+      (Contract.Originated contract, entrypoint, params)
     in
     List.map data_of_transaction expected_transactions
   in
@@ -350,12 +350,6 @@ let make_output ~outbox_level ~message_index transactions =
   let transactions =
     List.map
       (fun (destination, entrypoint, parameters) ->
-        let destination =
-          match destination with
-          | Contract.Originated ch -> ch
-          | Contract.Implicit _ ->
-              Stdlib.failwith "Expected an originated contract."
-        in
         let unparsed_parameters = Expr.from_string parameters in
         {Sc_rollup.Outbox.Message.unparsed_parameters; destination; entrypoint})
       transactions
@@ -381,7 +375,7 @@ let string_ticket_token ticketer content =
 let originate_contract incr ~script ~baker ~storage ~source_contract =
   let* block = Incremental.finalize_block incr in
   let* contract, _, block =
-    Contract_helpers.originate_contract_from_string
+    Contract_helpers.originate_contract_from_string_hash
       ~script
       ~storage
       ~source_contract
@@ -895,7 +889,7 @@ let test_single_transaction_batch () =
     ~loc:__LOC__
     incr
     red_token
-    (Destination.Contract ticket_receiver)
+    (Destination.Contract (Originated ticket_receiver))
     (Some 1)
 
 let test_multi_transaction_batch () =
@@ -981,7 +975,7 @@ let test_multi_transaction_batch () =
     ~loc:__LOC__
     incr
     red_token
-    (Destination.Contract ticket_receiver)
+    (Destination.Contract (Originated ticket_receiver))
     (Some 10)
 
 (** Test that executing an L2 to L1 transaction that involves an invalid
