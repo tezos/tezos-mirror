@@ -59,7 +59,13 @@ let check_reason ~loc (outcome : Sc_rollup_game_repr.outcome option) s =
 let tick_of_int_exn n =
   match Tick.of_int n with None -> assert false | Some t -> t
 
-let hash_int n = Sc_rollup_repr.State_hash.hash_string [Format.sprintf "%d" n]
+let context_hash_of_string s = Context_hash.hash_string [s]
+
+let hash_string s =
+  Sc_rollup_repr.State_hash.context_hash_to_state_hash
+  @@ context_hash_of_string s
+
+let hash_int n = hash_string (Format.sprintf "%d" n)
 
 let init_dissection ?(size = 32) ?init_tick start_hash =
   let default_init_tick i =
@@ -88,9 +94,9 @@ let two_stakers_in_conflict () =
   let* ctxt, rollup, refuter, defender =
     T.originate_rollup_and_deposit_with_two_stakers ()
   in
-  let hash1 = Sc_rollup_repr.State_hash.hash_string ["foo"] in
-  let hash2 = Sc_rollup_repr.State_hash.hash_string ["bar"] in
-  let hash3 = Sc_rollup_repr.State_hash.hash_string ["xyz"] in
+  let hash1 = hash_string "foo" in
+  let hash2 = hash_string "bar" in
+  let hash3 = hash_string "xyz" in
   let parent_commit =
     Commitment_repr.
       {
@@ -145,7 +151,7 @@ let two_stakers_in_conflict () =
     may not be more than half of the total tick-duration. *)
 let test_poorly_distributed_dissection () =
   let* ctxt, rollup, refuter, defender = two_stakers_in_conflict () in
-  let start_hash = Sc_rollup_repr.State_hash.hash_string ["foo"] in
+  let start_hash = hash_string "foo" in
   let init_tick size i =
     if i = size - 1 then (None, tick_of_int_exn 10000)
     else (Some (if i = 0 then start_hash else hash_int i), tick_of_int_exn i)
@@ -165,7 +171,7 @@ let test_poorly_distributed_dissection () =
 
 let test_single_valid_game_move () =
   let* ctxt, rollup, refuter, defender = two_stakers_in_conflict () in
-  let start_hash = Sc_rollup_repr.State_hash.hash_string ["foo"] in
+  let start_hash = hash_string "foo" in
   let dissection =
     Stdlib.List.init 32 (fun i ->
         if i = 0 then (Some start_hash, tick_of_int_exn 0)
@@ -214,10 +220,10 @@ let staker_injectivity_gen ~refuter2_plays =
        * [commit2]: published by [defender];
        * [commit3]: published by [refuter1];
        * [commit4]: published by [refuter2]. *)
-    let hash1 = Sc_rollup_repr.State_hash.hash_string ["foo"] in
-    let hash2 = Sc_rollup_repr.State_hash.hash_string ["bar"] in
-    let hash3 = Sc_rollup_repr.State_hash.hash_string ["xyz"] in
-    let hash4 = Sc_rollup_repr.State_hash.hash_string ["abc"] in
+    let hash1 = hash_string "foo" in
+    let hash2 = hash_string "bar" in
+    let hash3 = hash_string "xyz" in
+    let hash4 = hash_string "abc" in
     let refutation = init_refutation hash1 in
     let commit1 =
       Commitment_repr.

@@ -110,7 +110,12 @@ module State_hash = struct
 
   include Path_encoding.Make_hex (H)
 
-  let context_hash_to_state_hash h = hash_bytes [Context_hash.to_bytes h]
+  let context_hash_to_state_hash =
+    (* Both State_hash and Context_hash's hashes are supposed to have the
+       same size. This top-level check enforces this invariant, in which case,
+       no exception could be thrown by [of_bytes_exn] below *)
+    let () = assert (Compare.Int.equal size Context_hash.size) in
+    fun h -> of_bytes_exn @@ Context_hash.to_bytes h
 end
 
 type t = Address.t

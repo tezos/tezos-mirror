@@ -36,8 +36,8 @@ module Arith_proof_format = struct
 
   type proof = IStoreProof.Proof.tree IStoreProof.Proof.t
 
-  let context_hash_to_state_hash h =
-    Sc_rollup.State_hash.hash_bytes [Context_hash.to_bytes h]
+  let context_hash_to_state_hash =
+    Sc_rollup.State_hash.context_hash_to_state_hash
 
   let hash_tree tree = context_hash_to_state_hash (IStoreTree.hash tree)
 

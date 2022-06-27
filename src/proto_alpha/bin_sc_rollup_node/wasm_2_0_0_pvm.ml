@@ -59,7 +59,7 @@ module Wasm_2_0_0_proof_format = struct
   let kinded_hash_to_state_hash :
       IStoreProof.Proof.kinded_hash -> Sc_rollup.State_hash.t = function
     | `Value hash | `Node hash ->
-        Sc_rollup.State_hash.hash_bytes [Context_hash.to_bytes hash]
+        Sc_rollup.State_hash.context_hash_to_state_hash hash
 
   let proof_before proof =
     kinded_hash_to_state_hash proof.IStoreProof.Proof.before

@@ -188,8 +188,7 @@ module V2_0_0 = struct
 
     let state_hash state =
       let m =
-        Context_hash.to_bytes @@ Tree.hash state |> fun h ->
-        return @@ State_hash.hash_bytes [h]
+        return @@ State_hash.context_hash_to_state_hash (Tree.hash state)
       in
       let open Lwt_syntax in
       let* state = Monad.run m state in
@@ -405,8 +404,7 @@ module V2_0_0 = struct
       Lwt.return None
 
     let kinded_hash_to_state_hash = function
-      | `Value hash | `Node hash ->
-          State_hash.hash_bytes [Context_hash.to_bytes hash]
+      | `Value hash | `Node hash -> State_hash.context_hash_to_state_hash hash
 
     let proof_before proof =
       kinded_hash_to_state_hash proof.Context.Proof.before
