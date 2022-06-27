@@ -25,6 +25,29 @@
 
 open Error_monad
 
+(** Parameters of the DAL relevant to the cryptographic primitives. *)
+module type Params_sig = sig
+  (** Redundancy factor of the erasure code. *)
+  val redundancy_factor : int
+
+  (** Size in bytes of a slot, must be a power of two. *)
+  val slot_size : int
+
+  (** Size in bytes of a slot segment, must be a power of two. *)
+  val slot_segment_size : int
+
+  (** Each erasure-encoded slot splits evenly into the given amount of shards. *)
+  val shards_amount : int
+
+  (** The path to the SRS and their size. *)
+
+  type trusted_setup_files = {srs_g1 : string; srs_g2 : string; log_size : int}
+
+  (** Warning! If None, fallback to unsafe trusted setup.
+      None must be set for unit testing only! *)
+  val trusted_setup_files : trusted_setup_files option
+end
+
 (** The cryptographic primitives for the data availability layer (DAL). *)
 module type DAL_cryptobox_sig = sig
   module Scalar : Ff_sig.PRIME with type t = Bls12_381.Fr.t
@@ -36,10 +59,10 @@ module type DAL_cryptobox_sig = sig
   (** Commitment to a polynomial. *)
   type commitment
 
-  (** Proof of evaluations of shards. *)
-  type proof_shards
+  (** Proof of evaluations of a shard. *)
+  type proof_shard
 
-  (** Proof of degree. *)
+  (** Proof that a polynomial has degree less than some given bound. *)
   type proof_degree
 
   (** Proof of evaluation at a single point. *)
@@ -51,21 +74,21 @@ module type DAL_cryptobox_sig = sig
   (** A share is a part of the encoded data. *)
   type share = Scalar.t array
 
-  (** A shard is defined by its number and the part of the encoded data it
+  (** A shard is defined by its index and the part of the encoded data it
       contains. *)
   type shard = int * share
 
   (** Collection of shards. *)
   type shards_map = share IntMap.t
 
+  (** Preprocessing to compute shards' proofs that depends on the DAL cryptobox
+      parameters. *)
   type shards_proofs_precomputation
-
-  type slot_segments_proofs_precomputation
 
   module Encoding : sig
     val commitment_encoding : commitment Data_encoding.t
 
-    val proof_shards_encoding : proof_shards Data_encoding.t
+    val proof_shards_encoding : proof_shard Data_encoding.t
 
     val proof_degree_encoding : proof_degree Data_encoding.t
 
@@ -79,9 +102,6 @@ module type DAL_cryptobox_sig = sig
 
     val shards_proofs_precomputation_encoding :
       shards_proofs_precomputation Data_encoding.t
-
-    val slot_segments_proofs_precomputation_encoding :
-      slot_segments_proofs_precomputation Data_encoding.t
   end
 
   (** Length of the erasure-encoded slot in terms of scalar elements. *)
@@ -92,7 +112,9 @@ module type DAL_cryptobox_sig = sig
   (** [polynomial_evaluate p z] evaluates [p] in [z]. *)
   val polynomial_evaluate : polynomial -> Scalar.t -> Scalar.t
 
-  (** [polynomial_from_bytes slot] returns a polynomial from the input [slot]. *)
+  (** [polynomial_from_bytes slot] returns a polynomial from the input [slot].
+      Errors with [`Slot_wrong_size] when the slot size is different from
+      [Params_sig.slot_size]. *)
   val polynomial_from_bytes :
     bytes -> (polynomial, [> `Slot_wrong_size of string]) Result.t
 
@@ -109,13 +131,15 @@ module type DAL_cryptobox_sig = sig
       [> `Invert_zero of string | `Not_enough_shards of string] )
     Result.t
 
-  (** [commit p] is the commitment to [p]. *)
+  (** [commit p] returns the commitment to [p]. Errors with
+      [`Degree_exceeds_srs_length] if the degree of [p] exceeds the SRS size. *)
   val commit :
     polynomial ->
     (commitment, [> `Degree_exceeds_srs_length of string]) Result.t
 
   (** [prove_degree p n] produces a proof that [p] has degree less
-      than [n]. The algorithm fails if that is not the case. *)
+      than [n]. The function fails with [`Degree_exceeds_srs_length] if that is
+        not the case. *)
   val prove_degree :
     polynomial ->
     int ->
@@ -133,19 +157,24 @@ module type DAL_cryptobox_sig = sig
       shards. *)
   val precompute_shards_proofs : unit -> shards_proofs_precomputation
 
+  (** [save_precompute_shards_proofs precomputation filename ()] saves to file
+      [filename] the given [precomputation]. *)
   val save_precompute_shards_proofs :
     shards_proofs_precomputation -> string -> unit
 
+  (** [load_precompute_shards_proofs filename] loads to memory the shards'
+        proofs precomputation stored in file [filename]. *)
   val load_precompute_shards_proofs : string -> shards_proofs_precomputation
 
-  (** [prove_shards preprocess p] creates a proof of evaluation for each
+  (** [prove_shards p ~preprocess] creates a proof of evaluation for each
       shard. *)
   val prove_shards :
-    polynomial -> preprocess:shards_proofs_precomputation -> proof_shards array
+    polynomial -> preprocess:shards_proofs_precomputation -> proof_shard array
 
-  (** [verify_shard commitment shard proof] returns true if and only if the
-      shard is consistent with the [commitment] and [proof]. *)
-  val verify_shard : commitment -> shard -> proof_shards -> bool
+  (** [verify_shard cm shard proof] returns true if and only if the
+      [proof] certifies that the [shard] is comming from the erasure encoding
+      of the committed polynomial whose commitment is [cm]. *)
+  val verify_shard : commitment -> shard -> proof_shard -> bool
 
   (** [prove_single p z] returns a proof of evaluation of [p] at [z]. *)
   val prove_single :
@@ -153,26 +182,16 @@ module type DAL_cryptobox_sig = sig
     Scalar.t ->
     (proof_single, [> `Degree_exceeds_srs_length of string]) Result.t
 
-  (** [verify_single cm pi] returns true if the proof is correct with regard to
-      the opening. *)
+  (** [verify_single cm ~point ~evaluation pi] returns true if the proof [pi]
+    is correct with regard to the opening ([cm], [point], [evaluation]). *)
   val verify_single :
     commitment -> point:Scalar.t -> evaluation:Scalar.t -> proof_single -> bool
 
-  (** [precompute_slot_segments_proofs ()] returns the precomputation used to
-      prove slot segments. *)
-  (*val precompute_slot_segments_proofs :
-      unit -> slot_segments_proofs_precomputation
-
-    val save_precompute_slot_segments_proofs :
-      slot_segments_proofs_precomputation -> string -> unit
-
-    val load_precompute_slot_segments_proofs :
-      string -> slot_segments_proofs_precomputation*)
-
   (* TODO: raise error if index i is incorrect *)
 
-  (** [prove_slot_segments p i preprocess] where [p] is the output of
-      [polynomial_from_bytes slot], returns proofs for all slot segments. *)
+  (** [prove_slot_segments p slot_segment_index] where [p] is the output of
+      [polynomial_from_bytes slot], returns proofs for the slot segment] whose
+      index is [slot_segment_index] *)
   val prove_slot_segment :
     polynomial ->
     int ->
@@ -187,26 +206,6 @@ module type DAL_cryptobox_sig = sig
     slot_segment_index:int ->
     proof_slot_segment ->
     bool
-end
-
-(** Parameters of the DAL relevant to the cryptographic primitives. *)
-module type Params_sig = sig
-  (** Redundancy factor of the erasure code. *)
-  val redundancy_factor : int
-
-  (** Size in bytes of a slot, must be a power of two. *)
-  val slot_size : int
-
-  (** Size in bytes of a slot segment, must be a power of two. *)
-  val slot_segment_size : int
-
-  (** Each erasure-encoded slot splits evenly into the given amount of shards. *)
-  val shards_amount : int
-
-  type trusted_setup_files = {srs_g1 : string; srs_g2 : string; log_size : int}
-
-  (** If None, fallback to unsafe trusted setup. *)
-  val trusted_setup_files : trusted_setup_files option
 end
 
 module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
@@ -228,7 +227,7 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
 
   type commitment = Kate_amortized.commitment
 
-  type proof_shards = Kate_amortized.proof
+  type proof_shard = Kate_amortized.proof
 
   type proof_degree = Bls12_381.G1.t
 
@@ -243,9 +242,6 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
   type shard = int * share
 
   type shards_proofs_precomputation =
-    Scalar.t array * proof_slot_segment array array
-
-  type slot_segments_proofs_precomputation =
     Scalar.t array * proof_slot_segment array array
 
   type trusted_setup = {
@@ -286,9 +282,6 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
 
     let shards_proofs_precomputation_encoding =
       tup2 (array fr_encoding) (array (array g1_encoding))
-
-    let slot_segments_proofs_precomputation_encoding =
-      tup2 (array fr_encoding) (array (array g1_encoding))
   end
 
   (* Number of bytes fitting in a Scalar.t. Since scalars are integer modulo
@@ -299,7 +292,7 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
   let k =
     1 lsl Z.(log2up (of_int Params.slot_size / of_int scalar_bytes_amount))
 
-  let n = Params.(redundancy_factor * k)
+  let n = Params.redundancy_factor * k
 
   let erasure_encoding_length = n
 
@@ -309,29 +302,36 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
   (* Builds group of nth roots of unity, a valid domain for the FFT. *)
   let make_domain n = Domains.build ~log:Z.(log2up (of_int n))
 
+  (* Domain for the FFT on slots as polynomials to be erasure encoded. *)
   let domain_k = make_domain k
 
   let domain_2k = make_domain (2 * k)
 
+  (* Domain for the FFT on erasure encoded slots (as polynomials). *)
   let domain_n = make_domain n
 
   (* Length of a shard in terms of scalar elements. *)
   let shard_size = Params.(n / shards_amount)
 
+  (* Number of slot segments. *)
   let nb_segments = Params.(slot_size / slot_segment_size)
 
   let segment_len = Int.div Params.slot_segment_size scalar_bytes_amount + 1
 
   let remaining_bytes = Params.slot_segment_size mod scalar_bytes_amount
 
+  (* Log of the number of evaluations that constitute an erasure encoded
+     polynomial. *)
   let evaluations_log = Z.(log2 (of_int n))
 
+  (* Log of the number of evaluations contained in a shard. *)
   let evaluations_per_proof_log = Z.(log2 (of_int shard_size))
 
+  (* Log of th number of shards proofs. *)
   let proofs_log = evaluations_log - evaluations_per_proof_log
 
   (* Check code parameters. *)
-  let _ =
+  let () =
     let open Params in
     let is_pow_of_two x =
       let logx = Z.(log2 (of_int x)) in
@@ -474,7 +474,9 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
     in
     poly_mul_aux ps
 
-  (* We encode by segments of [slot_segment_size] bytes each. *)
+  (* We encode by segments of [slot_segment_size] bytes each.
+     The segments are arranged in cosets to evaluate in batch with Kate
+       amortized. *)
   let polynomial_from_bytes' slot =
     if Bytes.length slot <> Params.slot_size then
       Error
@@ -645,6 +647,7 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
       (* 4. Computing N(x). *)
       let open Result_syntax in
       let* n_poly = compute_n eval_a' shards in
+
       (* 5. Computing B(x). *)
       let b = Evaluations.interpolation_fft2 domain_n n_poly in
       let b = Polynomial.copy ~len:k b in
@@ -677,7 +680,8 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
   let commit p = commit' (module Bls12_381.G1) p trusted_setup_instance.srs_g1
 
   (* p(X) of degree n. Max degree that can be committed: d, which is also the
-     SRS's length - 1.
+     SRS's length - 1. We take d = k - 1 since we don't want to commit
+     polynomials with degree greater than polynomials to be erasure-encoded.
 
      We consider the bilinear groups (G_1, G_2, G_T) with G_1=<g> and G_2=<h>.
      - Commit (p X^{d-n}) such that deg (p X^{d-n}) = d the max degree
@@ -708,9 +712,7 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
     Ok
       (Pairing.pairing_check [(cm, commit_xk); (proof, G2.(negate (copy one)))])
 
-  let eval_to_array e =
-    let open Kate_amortized.Domain in
-    Array.init (length e) (get e)
+  let eval_to_array e = Array.init (Domains.length e) (Domains.get e)
 
   let precompute_shards_proofs () =
     let eval, m =
@@ -736,7 +738,7 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
     let chan = In_channel.open_bin filename in
     let len = Int64.to_int (In_channel.length chan) in
     let data = Bytes.create len in
-    let _ = In_channel.really_input chan data 0 len in
+    let (_ : unit option) = In_channel.really_input chan data 0 len in
     let precomp =
       Data_encoding.Binary.of_bytes_exn
         Encoding.shards_proofs_precomputation_encoding
@@ -753,11 +755,11 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
       ~preprocess
       (Polynomial.to_dense_coefficients p |> Array.to_list)
 
-  let verify_shard ct (shard_index, shard_evaluations) proof =
+  let verify_shard cm (shard_index, shard_evaluations) proof =
     let d_n = Kate_amortized.Domain.build ~log:evaluations_log in
     let domain = Kate_amortized.Domain.build ~log:evaluations_per_proof_log in
     Kate_amortized.verify
-      ct
+      cm
       ( trusted_setup_instance.srs_g1,
         trusted_setup_instance.kate_amortized_srs_g2_shards )
       domain
@@ -785,21 +787,21 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
   let compute_quotient p l z =
     let div = Array.init (k - l + 1) (fun _ -> Scalar.(copy zero)) in
     let i = ref 0 in
-    (* Computes 1/(x^l - z) mod x^(k - l) *)
+    (* Computes 1/(x^l - z) mod x^{k - l + 1}
+       = \sum_{i=0}^{+\infty} -z^{-1}^{i+1} X^{i\times l} mod x^{k - l + 1}. *)
     while !i * l < k - l + 1 do
       div.(!i * l) <-
         Scalar.negate (Scalar.inverse_exn (Scalar.pow z (Z.of_int (!i + 1)))) ;
       i := !i + 1
     done ;
     let div = Polynomial.of_dense div in
+    (* p(x) * 1/(x^l - z) mod x^{k - l + 1} = q(x) since deg q <= k - l. *)
     fft_mul domain_2k [p; div] |> Polynomial.copy ~len:(k - l + 1)
 
   let prove_slot_segment p slot_segment_index =
     let l = 1 lsl Z.(log2up (of_int segment_len)) in
     let wi = Domains.get domain_k slot_segment_index in
-    let domain =
-      Kate_amortized.Domain.build ~log:Z.(log2up (of_int segment_len))
-    in
+    let domain = Domains.build ~log:Z.(log2up (of_int segment_len)) in
     let eval_p = Evaluations.evaluation_fft2 domain_k p in
     let eval_coset = eval_coset_array eval_p slot_segment_index in
     let remainder =
@@ -816,7 +818,7 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
 
   (* Parses the [slot_segment] to get the evaluations that it contains. The
      evaluation points are given by the [slot_segment_index]. *)
-  let verify_slot_segment ct ~slot_segment ~slot_segment_index proof =
+  let verify_slot_segment cm ~slot_segment ~slot_segment_index proof =
     let domain =
       Kate_amortized.Domain.build ~log:Z.(log2up (of_int segment_len))
     in
@@ -845,7 +847,7 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
           | _ -> Scalar.(copy zero))
     in
     Kate_amortized.verify
-      ct
+      cm
       ( trusted_setup_instance.srs_g1,
         trusted_setup_instance.kate_amortized_srs_g2_segments )
       domain
