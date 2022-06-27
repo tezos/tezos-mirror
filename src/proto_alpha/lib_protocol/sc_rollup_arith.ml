@@ -803,7 +803,7 @@ module Make (Context : P) :
 
   let set_input_monadic {PS.inbox_level; message_counter; payload} =
     let open Monad.Syntax in
-    match Sc_rollup_inbox_message_repr.of_bytes payload with
+    match Sc_rollup_inbox_message_repr.deserialize payload with
     | Ok (External payload) ->
         let* boot_sector = Boot_sector.get in
         let msg = boot_sector ^ payload in

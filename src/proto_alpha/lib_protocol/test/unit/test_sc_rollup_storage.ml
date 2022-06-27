@@ -2352,7 +2352,7 @@ let test_carbonated_memory_inbox_set_messages () =
     Environment.wrap_tzresult
     @@ List.map_e
          (fun external_message ->
-           Sc_rollup_inbox_message_repr.(to_bytes @@ External external_message))
+           Sc_rollup_inbox_message_repr.(serialize @@ External external_message))
          ["CAFEBABE"; "CAFEBABE"; "CAFEBABE"]
   in
   let* current_messages, _ =

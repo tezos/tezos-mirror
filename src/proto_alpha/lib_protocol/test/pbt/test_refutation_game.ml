@@ -425,7 +425,7 @@ end) : TestPVM = struct
     let make_external_inbox_message str =
       WithExceptions.Result.get_ok
         ~loc:__LOC__
-        Inbox.Message.(External str |> to_bytes)
+        Inbox.Message.(External str |> serialize)
 
     let default_state =
       let promise =

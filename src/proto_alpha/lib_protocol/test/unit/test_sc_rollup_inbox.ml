@@ -65,7 +65,7 @@ let setup_inbox_with_messages list_of_payloads f =
         let*? payloads =
           List.map_e
             (fun payload ->
-              Sc_rollup_inbox_message_repr.(to_bytes @@ External payload))
+              Sc_rollup_inbox_message_repr.(serialize @@ External payload))
             payloads
         in
         let* messages, history, inbox' =

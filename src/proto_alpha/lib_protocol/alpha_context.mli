@@ -2793,9 +2793,9 @@ module Sc_rollup : sig
 
       val unsafe_of_string : string -> serialized
 
-      val to_bytes : t -> serialized tzresult
+      val serialize : t -> serialized tzresult
 
-      val of_bytes : serialized -> t tzresult
+      val deserialize : serialized -> t tzresult
     end
 
     val pp : Format.formatter -> t -> unit
@@ -2932,12 +2932,14 @@ module Sc_rollup : sig
 
       type t = Atomic_transaction_batch of {transactions : transaction list}
 
-      val of_bytes : string -> t tzresult
+      type serialized = private string
+
+      val deserialize : serialized -> t tzresult
 
       (** This module discloses definitions that are only useful for tests and
           must not be used otherwise. *)
       module Internal_for_tests : sig
-        val to_bytes : t -> string tzresult
+        val serialize : t -> serialized tzresult
       end
     end
 

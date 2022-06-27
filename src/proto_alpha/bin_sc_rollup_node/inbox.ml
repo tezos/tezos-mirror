@@ -119,7 +119,7 @@ let process_head Node_context.({l1_ctxt; rollup_address; _} as node_ctxt) store
          let*? messages =
            List.map_e
              (fun message ->
-               Sc_rollup.Inbox.Message.(to_bytes @@ External message))
+               Sc_rollup.Inbox.Message.(serialize @@ External message))
              messages
          in
          let* messages_tree, history, inbox =

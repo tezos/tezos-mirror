@@ -99,7 +99,7 @@ let gen_messages inbox level =
     lift
     @@ let*? input_messages =
          List.map_e
-           (fun msg -> Sc_rollup_inbox_message_repr.(to_bytes (External msg)))
+           (fun msg -> Sc_rollup_inbox_message_repr.(serialize (External msg)))
            payloads
        in
        let messages =

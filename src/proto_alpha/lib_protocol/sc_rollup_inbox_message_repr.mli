@@ -65,8 +65,8 @@ type serialized = private string
 
 val unsafe_of_string : string -> serialized
 
-(** [to_bytes msg] encodes the inbox message [msg] in binary format. *)
-val to_bytes : t -> serialized tzresult
+(** [serialize msg] encodes the inbox message [msg] in binary format. *)
+val serialize : t -> serialized tzresult
 
-(** [of_bytes bs] decodes [bs] as an [inbox_message]. *)
-val of_bytes : serialized -> t tzresult
+(** [deserialize bs] decodes [bs] as an inbox_message [t]. *)
+val deserialize : serialized -> t tzresult
