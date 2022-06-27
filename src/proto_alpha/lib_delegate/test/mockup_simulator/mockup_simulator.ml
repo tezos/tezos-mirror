@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 type block = {
-  rpc_context : Environment_context.rpc_context;
+  rpc_context : Tezos_protocol_environment.rpc_context;
   protocol_data : Protocol.Alpha_context.Block_header.protocol_data;
   raw_protocol_data : Bytes.t;
   operations : Mockup.M.Block_services.operation list list;
@@ -57,7 +57,7 @@ type state = {
      is used to find unknown predecessors. The real node can ask about an
      unknown block and receive it on request, this is supposed to emulate
      that functionality. *)
-  ctxt_table : Environment_context.rpc_context Context_hash.Table.t;
+  ctxt_table : Tezos_protocol_environment.rpc_context Context_hash.Table.t;
       (** The context table allows us to look up rpc_context by its hash. *)
   heads_pipe : (Block_hash.t * Block_header.t) Lwt_pipe.Unbounded.t;
       (** [heads_pipe] is used to implement the [monitor_heads] RPC. *)
@@ -176,7 +176,7 @@ let live_blocks (state : state) block =
   return
     (List.fold_left
        (fun set ({rpc_context; _} : block) ->
-         let hash = rpc_context.Environment_context.block_hash in
+         let hash = rpc_context.Tezos_protocol_environment.block_hash in
          Block_hash.Set.add hash set)
        (Block_hash.Set.singleton state.genesis_block_true_hash)
        segment)
@@ -627,7 +627,7 @@ let rec process_block state block_hash (block_header : Block_header.t)
       Block_hash.Table.replace state.global_chain_table block_hash new_block ;
       Context_hash.Table.replace
         state.ctxt_table
-        rpc_context.Environment_context.block_header.context
+        rpc_context.Tezos_protocol_environment.block_header.context
         rpc_context ;
       if
         Fitness.(
@@ -684,7 +684,7 @@ let rec listener ~(user_hooks : (module Hooks)) ~state ~broadcast_pipe =
 
 (** Create a fake node state. *)
 let create_fake_node_state ~i ~live_depth
-    ~(genesis_block : Block_header.t * Environment_context.rpc_context)
+    ~(genesis_block : Block_header.t * Tezos_protocol_environment.rpc_context)
     ~global_chain_table ~broadcast_pipes =
   let block_header0, rpc_context0 = genesis_block in
   parse_protocol_data block_header0.protocol_data >>=? fun protocol_data ->
@@ -726,7 +726,7 @@ let create_fake_node_state ~i ~live_depth
         Context_hash.Table.of_seq
           (List.to_seq
              [
-               ( rpc_context0.Environment_context.block_header
+               ( rpc_context0.Tezos_protocol_environment.block_header
                    .Block_header.context,
                  rpc_context0 );
              ]);
@@ -739,8 +739,8 @@ let create_fake_node_state ~i ~live_depth
 
 (** Start baker process. *)
 let baker_process ~(delegates : Baking_state.delegate list) ~base_dir
-    ~(genesis_block : Block_header.t * Environment_context.rpc_context) ~i
-    ~global_chain_table ~broadcast_pipes ~(user_hooks : (module Hooks)) =
+    ~(genesis_block : Block_header.t * Tezos_protocol_environment.rpc_context)
+    ~i ~global_chain_table ~broadcast_pipes ~(user_hooks : (module Hooks)) =
   let broadcast_pipe =
     List.nth broadcast_pipes i |> WithExceptions.Option.get ~loc:__LOC__
   in
@@ -784,7 +784,7 @@ let baker_process ~(delegates : Baking_state.delegate list) ~base_dir
       checkout_fun =
         (fun hash ->
           Context_hash.Table.find state.ctxt_table hash
-          |> Option.map (fun Environment_context.{context; _} -> context)
+          |> Option.map (fun Tezos_protocol_environment.{context; _} -> context)
           |> Lwt.return);
       finalize_fun = Lwt.return;
     }

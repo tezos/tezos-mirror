@@ -75,7 +75,8 @@ module type Mocked_services_hooks = sig
       RPCs (see local_services.ml). It should correspond to the
       rpc_context constructed from the context at the requested block. *)
   val rpc_context_callback :
-    Block_services.block -> Environment_context.rpc_context tzresult Lwt.t
+    Block_services.block ->
+    Tezos_protocol_environment.rpc_context tzresult Lwt.t
 
   (** Return raw protocol data as a block. *)
   val raw_protocol_data : Block_services.block -> Bytes.t tzresult Lwt.t

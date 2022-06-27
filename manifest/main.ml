@@ -1829,35 +1829,11 @@ protocols.|}
         octez_scoru_wasm;
         octez_event_logging;
       ]
-    ~wrapped:false
-    ~modules:
-      [
-        "Tezos_protocol_environment";
-        "Environment_V0";
-        "Environment_V1";
-        "Environment_V2";
-        "Environment_V3";
-        "Environment_V4";
-        "Environment_V5";
-        "Environment_V6";
-        "Environment_cache";
-        "Environment_context";
-        "Environment_context_intf";
-        "Environment_protocol_T";
-        "Environment_protocol_T_V0";
-        "Environment_protocol_T_V3";
-        "Environment_protocol_T_V6";
-        "Environment_protocol_T_test";
-        "Dummy_context";
-        "Memory_context";
-        "Proxy_context";
-        "Proxy_delegate";
-      ]
 
 let octez_shell_context =
   public_lib
     "tezos-shell-context"
-    ~path:"src/lib_protocol_environment"
+    ~path:"src/lib_protocol_environment/shell_context"
     ~synopsis:
       "Tezos: economic-protocols environment implementation for `tezos-node`"
     ~deps:
@@ -1866,7 +1842,6 @@ let octez_shell_context =
         octez_protocol_environment;
         octez_context;
       ]
-    ~modules:["Proxy_delegate_maker"; "Shell_context"]
 
 let _octez_protocol_environment_tests =
   tests
@@ -1887,7 +1862,7 @@ let _octez_protocol_environment_tests =
 let octez_context_ops =
   public_lib
     "tezos-context-ops"
-    ~path:"src/lib_protocol_environment"
+    ~path:"src/lib_protocol_environment/context_ops"
     ~synopsis:"Tezos: backend-agnostic operations on contexts"
     ~deps:
       [
@@ -1897,7 +1872,6 @@ let octez_context_ops =
         octez_context |> open_;
         octez_shell_context |> open_;
       ]
-    ~modules:["Context_ops"]
 
 let _octez_protocol_shell_context_tests =
   tests

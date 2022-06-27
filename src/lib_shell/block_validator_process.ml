@@ -152,9 +152,10 @@ module Internal_validator_process = struct
        validator process. For this reason, we maintain the collection
        of caches passed from one block to the next one here.
     *)
-    mutable cache : Environment_context.Context.block_cache option;
+    mutable cache : Tezos_protocol_environment.Context.block_cache option;
     mutable preapply_result :
-      (Block_validation.apply_result * Environment_context.Context.t) option;
+      (Block_validation.apply_result * Tezos_protocol_environment.Context.t)
+      option;
   }
 
   let init

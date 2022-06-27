@@ -189,7 +189,7 @@ let validate_operation inc op =
       | Some _b -> Lwt.return_some resulting_state)
 
 let filter_valid_operations_up_to_quota inc (ops, quota) =
-  let {Environment_context.max_size; max_op} = quota in
+  let {Tezos_protocol_environment.max_size; max_op} = quota in
   let exception Full of (Baking_simulator.incremental * packed_operation list)
   in
   try
@@ -262,7 +262,7 @@ let filter_operations_with_simulation initial_inc fees_config
   return {validation_result; block_header_metadata; operations; operations_hash}
 
 let filter_valid_operations_up_to_quota_without_simulation (ops, quota) =
-  let {Environment_context.max_size; max_op} = quota in
+  let {Tezos_protocol_environment.max_size; max_op} = quota in
   let exception Full of packed_operation list in
   try
     List.fold_left

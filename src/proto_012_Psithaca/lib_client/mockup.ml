@@ -907,7 +907,7 @@ let initial_context chain_id (header : Block_header.shell_header)
     Data_encoding.Binary.to_bytes_exn Data_encoding.json json
   in
   Tezos_protocol_environment.Context.(
-    let empty = Memory_context.empty in
+    let empty = Tezos_protocol_environment.Memory_context.empty in
     add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
     add ctxt ["protocol_parameters"] proto_params)
   >>= fun ctxt ->

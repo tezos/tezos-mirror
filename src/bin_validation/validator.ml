@@ -202,7 +202,7 @@ let run input output =
           operation_metadata_size_limit ) =
     init input
   in
-  let rec loop (cache : Environment_context.Context.block_cache option)
+  let rec loop (cache : Tezos_protocol_environment.Context.block_cache option)
       cached_result =
     let*! recved =
       External_validation.recv input External_validation.request_encoding

@@ -28,7 +28,7 @@
 module type PROTO_RPCS = sig
   val merkle_tree :
     Proxy.proxy_getter_input ->
-    Proxy_context.M.key ->
+    Tezos_protocol_environment.Proxy_context.M.key ->
     Tezos_shell_services.Block_services.merkle_leaf_kind ->
     Tezos_shell_services.Block_services.merkle_tree option tzresult Lwt.t
 end

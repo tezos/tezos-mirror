@@ -35,3 +35,12 @@ include module type of struct
   include Environment_V5
   include Environment_V6
 end
+
+module Memory_context = Memory_context
+module Proxy_context = Proxy_context
+module Proxy_delegate = Proxy_delegate
+
+module Internal_for_tests : sig
+  module Environment_protocol_T_test = Environment_protocol_T_test
+  module Environment_cache = Environment_cache
+end

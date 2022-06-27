@@ -55,19 +55,22 @@ module type PROTO_RPC = sig
   *)
   val split_key :
     Proxy.mode ->
-    Proxy_context.M.key ->
-    (Proxy_context.M.key * Proxy_context.M.key) option
+    Tezos_protocol_environment.Proxy_context.M.key ->
+    (Tezos_protocol_environment.Proxy_context.M.key
+    * Tezos_protocol_environment.Proxy_context.M.key)
+    option
 
   (** [failure_is_permanent key] means that, if the request 
       [rpc get /chains/<chain_id>/blocks/<block_id>/context/raw/bytes/key]
       fails once, then it should not be retried; because this key is known
       to be missing all the time. It is safe to return always [false].
       Returning [true] for some keys will reduce the number of RPC calls. *)
-  val failure_is_permanent : Proxy_context.M.key -> bool
+  val failure_is_permanent :
+    Tezos_protocol_environment.Proxy_context.M.key -> bool
 
   val do_rpc :
     Proxy.proxy_getter_input ->
-    Proxy_context.M.key ->
+    Tezos_protocol_environment.Proxy_context.M.key ->
     Tezos_shell_services.Block_services.raw_context tzresult Lwt.t
 end
 

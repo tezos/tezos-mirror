@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let of_memory_tree (t : Tezos_context_memory.Context.tree) : Proxy_delegate.t =
+let of_memory_tree (t : Tezos_context_memory.Context.tree) :
+    Tezos_protocol_environment.Proxy_delegate.t =
   (module struct
     let proxy_dir_mem key =
       let open Lwt_syntax in
@@ -39,9 +40,10 @@ let of_memory_tree (t : Tezos_context_memory.Context.tree) : Proxy_delegate.t =
       let open Lwt_syntax in
       let* v = Tezos_context_memory.Context.Tree.mem t key in
       return_ok v
-  end : Proxy_delegate.T)
+  end : Tezos_protocol_environment.Proxy_delegate.T)
 
-let of_memory_context (m : Tezos_context_memory.Context.t) : Proxy_delegate.t =
+let of_memory_context (m : Tezos_context_memory.Context.t) :
+    Tezos_protocol_environment.Proxy_delegate.t =
   (module struct
     let proxy_dir_mem key =
       let open Lwt_syntax in
@@ -57,20 +59,20 @@ let of_memory_context (m : Tezos_context_memory.Context.t) : Proxy_delegate.t =
       let open Lwt_syntax in
       let* v = Tezos_context_memory.Context.mem m key in
       return_ok v
-  end : Proxy_delegate.T)
+  end : Tezos_protocol_environment.Proxy_delegate.T)
 
 let make_index ~(context_path : string) : Tezos_context.Context.index Lwt.t =
   Tezos_context.Context.init ~readonly:true context_path
 
 let of_index ~(index : Tezos_context.Context.index) (hash : Context_hash.t) :
-    Proxy_delegate.t tzresult Lwt.t =
+    Tezos_protocol_environment.Proxy_delegate.t tzresult Lwt.t =
   let open Lwt_syntax in
   let* ctxt = Tezos_context.Context.checkout index hash in
   match ctxt with
   | None ->
       failwith "Couldn't check out the hash %s" (Context_hash.to_string hash)
   | Some ctxt ->
-      let proxy_data_dir : Proxy_delegate.t =
+      let proxy_data_dir : Tezos_protocol_environment.Proxy_delegate.t =
         (module struct
           let proxy_dir_mem (key : Tezos_context.Context.key) :
               bool tzresult Lwt.t =

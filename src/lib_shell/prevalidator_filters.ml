@@ -88,7 +88,8 @@ module type FILTER = sig
   end
 
   module RPC : sig
-    val rpc_services : Environment_context.rpc_context RPC_directory.directory
+    val rpc_services :
+      Tezos_protocol_environment.rpc_context RPC_directory.directory
   end
 end
 

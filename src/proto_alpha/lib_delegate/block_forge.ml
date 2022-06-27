@@ -125,7 +125,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
   in
   let chain = `Hash chain_id in
   let check_protocol_changed
-      ~(validation_result : Environment_context.validation_result) =
+      ~(validation_result : Tezos_protocol_environment.validation_result) =
     Context_ops.get_protocol validation_result.context >>= fun next_protocol ->
     let next_protocol =
       match

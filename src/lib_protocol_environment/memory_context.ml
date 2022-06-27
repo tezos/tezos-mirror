@@ -32,7 +32,7 @@ module M = struct
   let fork_test_chain c ~protocol:_ ~expiration:_ = Lwt.return c
 end
 
-open Tezos_protocol_environment
+open Environment_context
 
 type t = M.t
 

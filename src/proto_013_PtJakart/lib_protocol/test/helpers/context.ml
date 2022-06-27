@@ -490,7 +490,7 @@ let default_raw_context () =
   in
   let protocol_param_key = ["protocol_parameters"] in
   Tezos_protocol_environment.Context.(
-    let empty = Memory_context.empty in
+    let empty = Tezos_protocol_environment.Memory_context.empty in
     add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
     add ctxt protocol_param_key proto_params)
   >>= fun context ->

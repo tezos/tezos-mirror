@@ -23,19 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Environment_context = Tezos_protocol_environment.Context
+module Memory_context = Tezos_protocol_environment.Memory_context
+
+let err_implementation_mismatch =
+  Tezos_protocol_environment.err_implementation_mismatch
 (* Backend-agnostic operations on the context *)
 
-let mem (context : Environment_context.Context.t) key =
+let mem (context : Environment_context.t) key =
   match context with
   | Context {kind = Shell_context.Context; ctxt; _} -> Context.mem ctxt key
   | Context {kind = Memory_context.Context; ctxt; _} ->
       Tezos_context_memory.Context.mem ctxt key
   | Context t ->
-      Environment_context.err_implementation_mismatch
-        ~expected:"shell or memory"
-        ~got:t.impl_name
+      err_implementation_mismatch ~expected:"shell or memory" ~got:t.impl_name
 
-let add_protocol (context : Environment_context.Context.t) proto_hash =
+let add_protocol (context : Environment_context.t) proto_hash =
   let open Lwt_syntax in
   match context with
   | Context {kind = Shell_context.Context; ctxt; _} ->
@@ -45,22 +48,17 @@ let add_protocol (context : Environment_context.Context.t) proto_hash =
       let+ ctxt = Tezos_context_memory.Context.add_protocol ctxt proto_hash in
       Memory_context.wrap_memory_context ctxt
   | Context t ->
-      Environment_context.err_implementation_mismatch
-        ~expected:"shell or memory"
-        ~got:t.impl_name
+      err_implementation_mismatch ~expected:"shell or memory" ~got:t.impl_name
 
-let get_protocol (context : Environment_context.Context.t) =
+let get_protocol (context : Environment_context.t) =
   match context with
   | Context {kind = Shell_context.Context; ctxt; _} -> Context.get_protocol ctxt
   | Context {kind = Memory_context.Context; ctxt; _} ->
       Tezos_context_memory.Context.get_protocol ctxt
   | Context t ->
-      Environment_context.err_implementation_mismatch
-        ~expected:"shell or memory"
-        ~got:t.impl_name
+      err_implementation_mismatch ~expected:"shell or memory" ~got:t.impl_name
 
-let add_predecessor_block_metadata_hash
-    (context : Environment_context.Context.t) hash =
+let add_predecessor_block_metadata_hash (context : Environment_context.t) hash =
   let open Lwt_syntax in
   match context with
   | Context {kind = Shell_context.Context; ctxt; _} ->
@@ -74,12 +72,9 @@ let add_predecessor_block_metadata_hash
       in
       Memory_context.wrap_memory_context ctxt
   | Context t ->
-      Environment_context.err_implementation_mismatch
-        ~expected:"shell or memory"
-        ~got:t.impl_name
+      err_implementation_mismatch ~expected:"shell or memory" ~got:t.impl_name
 
-let add_predecessor_ops_metadata_hash (context : Environment_context.Context.t)
-    hash =
+let add_predecessor_ops_metadata_hash (context : Environment_context.t) hash =
   let open Lwt_syntax in
   match context with
   | Context {kind = Shell_context.Context; ctxt; _} ->
@@ -91,33 +86,27 @@ let add_predecessor_ops_metadata_hash (context : Environment_context.Context.t)
       in
       Memory_context.wrap_memory_context ctxt
   | Context t ->
-      Environment_context.err_implementation_mismatch
-        ~expected:"shell or memory"
-        ~got:t.impl_name
+      err_implementation_mismatch ~expected:"shell or memory" ~got:t.impl_name
 
-let hash ~time ?message (context : Environment_context.Context.t) =
+let hash ~time ?message (context : Environment_context.t) =
   match context with
   | Context {kind = Shell_context.Context; ctxt; _} ->
       Context.hash ~time ?message ctxt
   | Context {kind = Memory_context.Context; ctxt; _} ->
       Tezos_context_memory.Context.hash ~time ?message ctxt
   | Context t ->
-      Environment_context.err_implementation_mismatch
-        ~expected:"shell or memory"
-        ~got:t.impl_name
+      err_implementation_mismatch ~expected:"shell or memory" ~got:t.impl_name
 
-let get_test_chain (context : Environment_context.Context.t) =
+let get_test_chain (context : Environment_context.t) =
   match context with
   | Context {kind = Shell_context.Context; ctxt; _} ->
       Context.get_test_chain ctxt
   | Context {kind = Memory_context.Context; _} ->
       Lwt.return Test_chain_status.Not_running
   | Context t ->
-      Environment_context.err_implementation_mismatch
-        ~expected:"shell or memory"
-        ~got:t.impl_name
+      err_implementation_mismatch ~expected:"shell or memory" ~got:t.impl_name
 
-let add_test_chain (context : Environment_context.Context.t) status =
+let add_test_chain (context : Environment_context.t) status =
   let open Lwt_syntax in
   match context with
   | Context {kind = Shell_context.Context; ctxt; _} ->
@@ -127,41 +116,31 @@ let add_test_chain (context : Environment_context.Context.t) status =
       let+ ctxt = Tezos_context_memory.Context.add_test_chain ctxt status in
       Memory_context.wrap_memory_context ctxt
   | Context t ->
-      Environment_context.err_implementation_mismatch
-        ~expected:"shell or memory"
-        ~got:t.impl_name
+      err_implementation_mismatch ~expected:"shell or memory" ~got:t.impl_name
 
-let commit ~time ?message (context : Environment_context.Context.t) =
+let commit ~time ?message (context : Environment_context.t) =
   match context with
   | Context {kind = Shell_context.Context; ctxt; _} ->
       Context.commit ~time ?message ctxt
   | Context {kind = Memory_context.Context; ctxt; _} ->
       Tezos_context_memory.Context.commit ~time ?message ctxt
   | Context t ->
-      Environment_context.err_implementation_mismatch
-        ~expected:"shell or memory"
-        ~got:t.impl_name
+      err_implementation_mismatch ~expected:"shell or memory" ~got:t.impl_name
 
-let commit_test_chain_genesis (context : Environment_context.Context.t)
-    block_header =
+let commit_test_chain_genesis (context : Environment_context.t) block_header =
   match context with
   | Context {kind = Shell_context.Context; ctxt; _} ->
       Context.commit_test_chain_genesis ctxt block_header
   | Context {kind = Memory_context.Context; ctxt; _} ->
       Tezos_context_memory.Context.commit_test_chain_genesis ctxt block_header
   | Context t ->
-      Environment_context.err_implementation_mismatch
-        ~expected:"shell or memory"
-        ~got:t.impl_name
+      err_implementation_mismatch ~expected:"shell or memory" ~got:t.impl_name
 
-let compute_testchain_genesis (context : Environment_context.Context.t)
-    block_hash =
+let compute_testchain_genesis (context : Environment_context.t) block_hash =
   match context with
   | Context {kind = Shell_context.Context; _} ->
       Context.compute_testchain_genesis block_hash
   | Context {kind = Memory_context.Context; _} ->
       Tezos_context_memory.Context.compute_testchain_genesis block_hash
   | Context t ->
-      Environment_context.err_implementation_mismatch
-        ~expected:"shell or memory"
-        ~got:t.impl_name
+      err_implementation_mismatch ~expected:"shell or memory" ~got:t.impl_name

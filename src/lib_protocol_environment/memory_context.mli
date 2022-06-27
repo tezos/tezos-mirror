@@ -42,7 +42,7 @@
     are used by nodes), because they don't require access to a disk: they
     live completely in memory. That is why they are ideal for testing. *)
 
-open Tezos_protocol_environment
+open Environment_context
 
 (** The type of the context backing {!Memory_context}. Main use is
     the parameterization of {!Environment_context.Context.kind} below,

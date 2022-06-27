@@ -184,9 +184,9 @@ module Dune = struct
       ?library_flags ?link_flags ?(inline_tests = false)
       ?(preprocess = Stdlib.List.[]) ?(preprocessor_deps = Stdlib.List.[])
       ?(virtual_modules = Stdlib.List.[]) ?default_implementation ?implements
-      ?(wrapped = true) ?modules ?modules_without_implementation ?modes
-      ?foreign_stubs ?c_library_flags ?(private_modules = Stdlib.List.[])
-      ?js_of_ocaml (names : string list) =
+      ?modules ?modules_without_implementation ?modes ?foreign_stubs
+      ?c_library_flags ?(private_modules = Stdlib.List.[]) ?js_of_ocaml
+      (names : string list) =
     [
       V
         [
@@ -249,7 +249,6 @@ module Dune = struct
           opt library_flags (fun x -> [S "library_flags"; x]);
           opt link_flags (fun l -> [V (of_list (List.cons (S "link_flags") l))]);
           opt flags (fun l -> [V (of_list (List.cons (S "flags") l))]);
-          (if not wrapped then [S "wrapped"; S "false"] else E);
           (match virtual_modules with
           | [] -> E
           | _ -> S "virtual_modules" :: of_atom_list virtual_modules);
@@ -929,7 +928,6 @@ module Target = struct
     description : string option;
     virtual_modules : string list;
     default_implementation : string option;
-    wrapped : bool;
     npm_deps : Npm.t list;
     cram : bool;
     license : string option;
@@ -1097,7 +1095,6 @@ module Target = struct
        But that would be more complex to implement.
     *)
     ?default_implementation:string ->
-    ?wrapped:bool ->
     ?cram:bool ->
     ?license:string ->
     ?extra_authors:string list ->
@@ -1146,8 +1143,8 @@ module Target = struct
       ?opam ?(opam_with_test = Always) ?(preprocess = [])
       ?(preprocessor_deps = []) ?(private_modules = []) ?(opam_only_deps = [])
       ?release ?static ?synopsis ?description ?(time_measurement_ppx = false)
-      ?(virtual_modules = []) ?default_implementation ?(wrapped = true)
-      ?(cram = false) ?license ?(extra_authors = []) ~path names =
+      ?(virtual_modules = []) ?default_implementation ?(cram = false) ?license
+      ?(extra_authors = []) ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1453,7 +1450,6 @@ module Target = struct
         npm_deps;
         virtual_modules;
         default_implementation;
-        wrapped;
         cram;
         license;
         extra_authors;
@@ -1951,7 +1947,6 @@ let generate_dune (internal : Target.internal) =
       ~virtual_modules:internal.virtual_modules
       ?default_implementation:internal.default_implementation
       ?implements:(Option.map get_virtual_target_name internal.implements)
-      ~wrapped:internal.wrapped
       ?modules
       ?modules_without_implementation
       ?modes:internal.modes

@@ -40,10 +40,10 @@
     after having created an {!empty} value with an instance of [Proxy_Delegate.T],
     this value behaves as the distant endpoint it delegates to. *)
 
-open Tezos_protocol_environment
+open Environment_context
 
 (** The module by which to parameterize
-    {!Tezos_protocol_environment.Context.kind} below.
+    {!Environment_context.Context.kind} below.
 
     [Proxy_Delegate.T] is packed as the type [M.proxy_delegate],
     because it is used for obtaining pristine instances of [Proxy_context]
