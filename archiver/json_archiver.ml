@@ -314,26 +314,14 @@ let dump_included_in_block cctxt path block_level block_hash block_round
    let mutex = get_file_mutex filename in
    Lwt_mutex.with_lock mutex (fun () ->
        let* infos = load filename Data.encoding Data.empty in
-       let delegate_operations' =
-         match consensus_ops_info.Consensus_ops.preendorsements with
-         | Some validators ->
-             add_inclusion_in_block
-               aliases
-               block_hash
-               Consensus_ops.Preendorsement
-               consensus_ops_info.preendorsements_round
-               validators
-               infos.Data.delegate_operations
-         | None -> infos.Data.delegate_operations
-       in
        let delegate_operations =
          add_inclusion_in_block
            aliases
            block_hash
            Consensus_ops.Endorsement
-           consensus_ops_info.endorsements_round
+           consensus_ops_info.Consensus_ops.endorsements_round
            consensus_ops_info.endorsements
-           delegate_operations'
+           infos.Data.delegate_operations
        in
        let out_infos =
          Data.
@@ -364,6 +352,18 @@ let dump_included_in_block cctxt path block_level block_hash block_round
   let mutex = get_file_mutex filename in
   Lwt_mutex.with_lock mutex (fun () ->
       let* infos = load filename Data.encoding Data.empty in
+      let delegate_operations =
+        match consensus_ops_info.Consensus_ops.preendorsements with
+        | Some validators ->
+            add_inclusion_in_block
+              aliases
+              block_hash
+              Consensus_ops.Preendorsement
+              consensus_ops_info.preendorsements_round
+              validators
+              infos.Data.delegate_operations
+        | None -> infos.Data.delegate_operations
+      in
       let blocks =
         Data.Block.
           {
@@ -380,12 +380,7 @@ let dump_included_in_block cctxt path block_level block_hash block_round
       write
         filename
         Data.encoding
-        Data.
-          {
-            blocks;
-            delegate_operations = infos.delegate_operations;
-            unaccurate = infos.unaccurate;
-          })
+        Data.{blocks; delegate_operations; unaccurate = infos.unaccurate})
   >>= fun out ->
   let () = drop_file_mutex filename in
   match out with
