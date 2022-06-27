@@ -365,6 +365,17 @@ module Tx_rollup = struct
     Tx_rollup_services.commitment rpc_ctxt ctxt tx_rollup
 end
 
+module Sc_rollup = struct
+  let inbox ctxt sc_rollup =
+    Environment.RPC_context.make_call1
+      Plugin.RPC.Sc_rollup.S.inbox
+      rpc_ctxt
+      ctxt
+      sc_rollup
+      ()
+      ()
+end
+
 type (_, _) tup =
   | T1 : ('a, 'a) tup
   | T2 : ('a, 'a * 'a) tup

@@ -445,14 +445,7 @@ let assert_ticket_diffs ctxt ~loc ~arg_type ~storage_type ~arg ~old_storage
   in
   assert_equal_ticket_diffs ~loc ctxt ticket_diffs expected
 
-let assert_balance ctxt ~loc key expected =
-  let open Lwt_result_syntax in
-  let* balance, _ = wrap @@ Ticket_balance.get_balance ctxt key in
-  match (balance, expected) with
-  | Some b, Some eb -> Assert.equal_int ~loc (Z.to_int b) eb
-  | None, Some eb -> failwith "Expected balance %d" eb
-  | Some eb, None -> failwith "Expected None but got %d" (Z.to_int eb)
-  | None, None -> return ()
+let assert_balance = Ticket_helpers.assert_balance
 
 let string_ticket ticketer contents amount =
   let amount = Script_int.abs @@ Script_int.of_int amount in
@@ -466,16 +459,7 @@ let string_ticket ticketer contents amount =
   in
   Script_typed_ir.{ticketer; contents; amount}
 
-let string_ticket_token ticketer content =
-  let open Lwt_result_syntax in
-  let contents =
-    Result.value_f ~default:(fun _ -> assert false)
-    @@ Script_string.of_string content
-  in
-  let*? ticketer = Environment.wrap_tzresult @@ Contract.of_b58check ticketer in
-  return
-    (Ticket_token.Ex_token
-       {ticketer; contents_type = Script_typed_ir.string_t; contents})
+let string_ticket_token = Ticket_helpers.string_ticket_token
 
 let test_diffs_empty () =
   let open Lwt_result_syntax in

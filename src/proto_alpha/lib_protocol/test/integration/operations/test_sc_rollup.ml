@@ -135,7 +135,6 @@ let sc_originate block contract parameters_ty =
   let kind = Sc_rollup.Kind.Example_arith in
   let* operation, rollup =
     Op.sc_rollup_origination
-      ~counter:(Z.of_int 0)
       (B block)
       contract
       kind

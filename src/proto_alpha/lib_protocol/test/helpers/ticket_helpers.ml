@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -20,29 +20,28 @@
 (* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
 (* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
 (* DEALINGS IN THE SOFTWARE.                                                 *)
-(*                                                                           *)
-(*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/operations
-    Subject:      Entrypoint
-*)
+open Protocol
+open Alpha_context
 
-let () =
-  Alcotest_lwt.run
-    "protocol > integration > operations"
-    [
-      ("voting", Test_voting.tests);
-      ("origination", Test_origination.tests);
-      ("revelation", Test_reveal.tests);
-      ("transfer", Test_transfer.tests);
-      ("activation", Test_activation.tests);
-      ("combined", Test_combined_operations.tests);
-      ("failing_noop operation", Test_failing_noop.tests);
-      ("tx rollup", Test_tx_rollup.tests);
-      ("sc rollup", Test_sc_rollup.tests);
-      ("sc rollup transfer", Test_sc_rollup_transfer.tests);
-    ]
-  |> Lwt_main.run
+let assert_balance ctxt ~loc key expected =
+  let open Lwt_result_syntax in
+  let* balance, _ =
+    Ticket_balance.get_balance ctxt key >|= Environment.wrap_tzresult
+  in
+  match (balance, expected) with
+  | Some b, Some eb -> Assert.equal_int ~loc (Z.to_int b) eb
+  | None, Some eb -> failwith "Expected balance %d" eb
+  | Some eb, None -> failwith "Expected None but got %d" (Z.to_int eb)
+  | None, None -> return_unit
+
+let string_ticket_token ticketer content =
+  let open Lwt_result_syntax in
+  let contents =
+    Result.value_f ~default:(fun _ -> assert false)
+    @@ Script_string.of_string content
+  in
+  let*? ticketer = Environment.wrap_tzresult @@ Contract.of_b58check ticketer in
+  return
+    (Ticket_token.Ex_token
+       {ticketer; contents_type = Script_typed_ir.string_t; contents})

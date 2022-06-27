@@ -116,14 +116,14 @@ let run_script ctx ?logger ?(step_constants = default_step_constants)
     ~internal
   >>=?? fun res -> return res
 
-let originate_contract_from_string ~script ~storage ~source_contract ~baker
+let originate_contract_from_string_hash ~script ~storage ~source_contract ~baker
     block =
   let code = Expr.toplevel_from_string script in
   let storage = Expr.from_string storage in
   let script =
     Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
   in
-  Op.contract_origination
+  Op.contract_origination_hash
     (B block)
     source_contract
     ~fee:(Test_tez.of_int 10)
@@ -133,3 +133,13 @@ let originate_contract_from_string ~script ~storage ~source_contract ~baker
   >>=? fun incr ->
   Incremental.add_operation incr operation >>=? fun incr ->
   Incremental.finalize_block incr >|=? fun b -> (dst, script, b)
+
+let originate_contract_from_string ~script ~storage ~source_contract ~baker
+    block =
+  originate_contract_from_string_hash
+    ~script
+    ~storage
+    ~source_contract
+    ~baker
+    block
+  >|=? fun (dst, script, b) -> (Contract.Originated dst, script, b)
