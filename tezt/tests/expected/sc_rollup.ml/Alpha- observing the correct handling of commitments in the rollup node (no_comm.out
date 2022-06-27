@@ -103,7 +103,7 @@ This sequence of operations was run:
   "sc_rollup_origination_size": 6314,
   "sc_rollup_challenge_window_in_blocks": 1,
   "sc_rollup_max_available_messages": 1000000,
-  "sc_rollup_stake_amount": "32000000",
+  "sc_rollup_stake_amount": "10000000000",
   "sc_rollup_commitment_period_in_blocks": 30,
   "sc_rollup_max_lookahead_in_blocks": 30000,
   "sc_rollup_max_active_outbox_levels": 20160,
@@ -205,7 +205,7 @@ This sequence of operations was run:
   "sc_rollup_origination_size": 6314,
   "sc_rollup_challenge_window_in_blocks": 1,
   "sc_rollup_max_available_messages": 1000000,
-  "sc_rollup_stake_amount": "32000000",
+  "sc_rollup_stake_amount": "10000000000",
   "sc_rollup_commitment_period_in_blocks": 30,
   "sc_rollup_max_lookahead_in_blocks": 30000,
   "sc_rollup_max_active_outbox_levels": 20160,
@@ -213,7 +213,7 @@ This sequence of operations was run:
 
 ./tezos-client --wait none recover bond of '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' --fee 1
 Node is bootstrapped.
-Estimated gas: 3205.160 units (will add 100 for safety)
+Estimated gas: 3205.162 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -235,9 +235,9 @@ This sequence of operations was run:
       From: [PUBLIC_KEY_HASH]
       This smart contract bond retrieval was successfully applied
       Balance updates:
-        Frozen_bonds([PUBLIC_KEY_HASH],[SC_ROLLUP_HASH]) ... -ꜩ32
-        [PUBLIC_KEY_HASH] ....................................................... +ꜩ32
-      Consumed gas: 3205.160
+        Frozen_bonds([PUBLIC_KEY_HASH],[SC_ROLLUP_HASH]) ... -ꜩ10000
+        [PUBLIC_KEY_HASH] ....................................................... +ꜩ10000
+      Consumed gas: 3205.162
 
 
 ./tezos-sc-rollup-client-alpha rpc get /local/last_published_commitment

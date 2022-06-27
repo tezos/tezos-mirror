@@ -31,7 +31,7 @@ This sequence of operations was run:
 
 ./tezos-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf at inbox level 32 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of messages 0 and number of ticks 0
 Node is bootstrapped.
-Estimated gas: 5330.828 units (will add 100 for safety)
+Estimated gas: 5330.832 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -56,12 +56,12 @@ This sequence of operations was run:
                          number_of_messages: 0
                          number_of_ticks: 0 in the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup commitment publishing was successfully applied
-      Consumed gas: 5330.828
+      Consumed gas: 5330.832
       Hash of commit: [SC_ROLLUP_COMMITMENT_HASH]
       Commitment published at level: 3
       Balance updates:
-        [PUBLIC_KEY_HASH] ....................................................... -ꜩ32
-        Frozen_bonds([PUBLIC_KEY_HASH],[SC_ROLLUP_HASH]) ... +ꜩ32
+        [PUBLIC_KEY_HASH] ....................................................... -ꜩ10000
+        Frozen_bonds([PUBLIC_KEY_HASH],[SC_ROLLUP_HASH]) ... +ꜩ10000
 
 
 ./tezos-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf at inbox level 62 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of messages 0 and number of ticks 0
