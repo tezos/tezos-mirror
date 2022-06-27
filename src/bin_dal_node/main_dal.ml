@@ -38,14 +38,21 @@ let data_dir_arg =
     ~default
     (Client_config.string_parameter ())
 
+let no_trusted_setup_arg =
+  Clic.switch
+    ~long:"no-trusted-setup"
+    ~doc:(Format.sprintf "Allow the DAL Node to run without trusted setup")
+    ()
+
 let run_command =
   let open Clic in
   command
     ~group
     ~desc:"Run the DAL daemon."
-    (args1 data_dir_arg)
+    (args2 data_dir_arg no_trusted_setup_arg)
     (prefixes ["run"] @@ stop)
-    (fun data_dir cctxt -> Daemon.run ~data_dir cctxt)
+    (fun (data_dir, no_trusted_setup) cctxt ->
+      Daemon.run ~data_dir ~no_trusted_setup cctxt)
 
 let commands () = [run_command]
 

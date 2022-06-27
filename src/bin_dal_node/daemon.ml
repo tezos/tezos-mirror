@@ -23,6 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type ctxt = {
+  config : Configuration.t;
+  cryptobox_setup : Cryptobox.trusted_setup;
+}
+
 module RPC_server = struct
   let register _store _configuration = RPC_directory.empty
 
@@ -56,13 +61,15 @@ module RPC_server = struct
     Tezos_base_unix.Internal_event_unix.close ()
 end
 
-let run ~data_dir _ctxt =
+let run ~data_dir ~no_trusted_setup _ctxt =
   let open Lwt_result_syntax in
   let*! () = Event.(emit starting_node) () in
   let* config = Configuration.load ~data_dir in
   let config = {config with data_dir} in
   let*! store = Store.init config in
-  let* rpc_server = RPC_server.(start config (register config store)) in
+  let* cryptobox_setup = Cryptobox.init_setup ~no_trusted_setup () in
+  let ctxt = {config; cryptobox_setup} in
+  let* rpc_server = RPC_server.(start config (register ctxt store)) in
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () =
     Event.(emit rpc_server_is_ready (config.rpc_addr, config.rpc_port))
