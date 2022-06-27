@@ -109,9 +109,10 @@ module type DAL_cryptobox_sig = sig
   end
 
   (** [build_trusted_setup_instance files] builds a trusted setup from [files]
-      on disk. Warning: if [files] is [None] it triggers a computation of an
-      unsafe trusted setup! *)
-  val build_trusted_setup_instance : trusted_setup_files option -> trusted_setup
+      on disk. Warning: if [files] is [`Unsafe_for_test_only] it triggers a
+      computation of an unsafe trusted setup! *)
+  val build_trusted_setup_instance :
+    [`Unsafe_for_test_only | `Files of trusted_setup_files] -> trusted_setup
 
   (** Length of the erasure-encoded slot in terms of scalar elements. *)
   val erasure_encoding_length : int
@@ -382,9 +383,8 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
     (* Shards must contain at least two elements. *)
     assert (n > shards_amount)
 
-  let build_trusted_setup_instance files =
-    match files with
-    | None ->
+  let build_trusted_setup_instance = function
+    | `Unsafe_for_test_only ->
         let module Scalar = Bls12_381.Fr in
         let build_array init next len =
           let xi = ref init in
@@ -417,7 +417,7 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
               ~l:(1 lsl Z.(log2up (of_int segment_len)))
               secret;
         }
-    | Some {srs_g1_file; srs_g2_file; log_size} ->
+    | `Files {srs_g1_file; srs_g2_file; log_size} ->
         assert (k < 1 lsl log_size) ;
         let srs_g1 =
           Bls12_381_polynomial.Srs.M.(to_array (load_from_file srs_g1_file k))

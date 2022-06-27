@@ -66,8 +66,8 @@ module Test = struct
           let shards_amount = shards_amount
         end) in
         let trusted_setup =
-          DAL_crypto.build_trusted_setup_instance None
-          (*(Some {srs_g1_file; srs_g2_file; log_size = 21})*)
+          DAL_crypto.build_trusted_setup_instance `Unsafe_for_test_only
+          (*(`Files {srs_g1_file; srs_g2_file; log_size = 21})*)
         in
 
         match
