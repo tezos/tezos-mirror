@@ -45,13 +45,13 @@ module V1 = struct
         case
           ~title:"Alice"
           (Tag 0)
-          unit
+          (constant "alice")
           (function Alice -> Some () | _ -> None)
           (fun () -> Alice);
         case
           ~title:"Bob"
           (Tag 1)
-          unit
+          (constant "bob")
           (function Bob -> Some () | _ -> None)
           (fun () -> Bob);
       ]
