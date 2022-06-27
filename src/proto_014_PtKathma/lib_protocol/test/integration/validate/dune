@@ -7,6 +7,7 @@
   alcotest-lwt
   tezos-base
   tezos-protocol-014-PtKathma
+  qcheck-alcotest
   tezos-client-014-PtKathma
   tezos-014-PtKathma-test-helpers
   tezos-base-test-helpers)

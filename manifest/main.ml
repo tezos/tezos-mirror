@@ -3268,6 +3268,7 @@ end = struct
               octez_base |> open_ ~m:"TzPervasives"
               |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
               main |> open_;
+              qcheck_alcotest;
               client |> if_some |> open_;
               test_helpers |> if_some |> open_;
               octez_base_test_helpers |> open_;

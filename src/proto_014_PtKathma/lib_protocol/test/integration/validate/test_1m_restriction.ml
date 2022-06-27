@@ -299,3 +299,62 @@ let tests =
     generate_valid_validate_mempool_mode ();
     generate_valid_context_free_mempool_mode ();
   ]
+
+open Generators
+
+let contract_of (account : Account.t) = Contract.Implicit account.pkh
+
+let positive_validated_op () =
+  let op_cstrs =
+    {
+      default_operation_cstrs with
+      fee = Range {min = 0; max = 1_000; origin = 1_000};
+      force_reveal = Some true;
+      amount = Range {min = 0; max = 1_000; origin = 10_000};
+    }
+  in
+  let ctxt_cstrs =
+    {
+      default_ctxt_cstrs with
+      src_cstrs = Greater {n = 15_000; origin = 15_000};
+      dest_cstrs = Pure 15000;
+      del_cstrs = Pure 15000;
+      tx_cstrs = Pure 15000;
+      sc_cstrs = Pure 15000;
+    }
+  in
+  let gen =
+    QCheck2.Gen.triple
+      (Generators.gen_ctxt_req ctxt_cstrs)
+      (Generators.gen_operation_req op_cstrs subjects)
+      Generators.gen_mode
+  in
+  let print (ctxt_req, op_req, mode) =
+    Format.asprintf
+      "@[<v 2>Generator printer:@,%a@,%a@,%a@]"
+      pp_ctxt_req
+      ctxt_req
+      pp_operation_req
+      op_req
+      pp_mode
+      mode
+  in
+  wrap
+    ~count:1000
+    ~print
+    ~name:"Positive validated op"
+    ~gen
+    (fun (ctxt_req, operation_req, mode) ->
+      let open Lwt_result_syntax in
+      let* infos = init_ctxt ctxt_req in
+      let* op = select_op operation_req infos in
+      let* _infos = wrap_mode infos [op] mode in
+      return_true)
+
+open Lib_test.Qcheck2_helpers
+
+let positive_tests () = qcheck_wrap [positive_validated_op ()]
+
+let qcheck_tests () = ("Positive tests", positive_tests ())
+
+let () = Alcotest.run "1M QCheck" [qcheck_tests ()]

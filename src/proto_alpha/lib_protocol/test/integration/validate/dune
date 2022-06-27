@@ -7,6 +7,7 @@
   alcotest-lwt
   tezos-base
   tezos-protocol-alpha
+  qcheck-alcotest
   tezos-client-alpha
   tezos-alpha-test-helpers
   tezos-base-test-helpers)
