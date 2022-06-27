@@ -1022,13 +1022,13 @@ struct
       wrap_error r
   end
 
-  module Lift (P : Updater.PROTOCOL) = IgnoreCaches (struct
+  module Lift (P : Updater.PROTOCOL) = struct
+    include IgnoreCaches (Environment_protocol_T.V0toV6 (LiftV1 (P)))
+
     let set_log_message_consumer _ = ()
 
     let environment_version = Protocol.V1
-
-    include Environment_protocol_T.V0toV6 (LiftV1 (P))
-  end)
+  end
 
   class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.RPC_context.t)
     (prefix : (unit, (unit * 'chain) * 'block) RPC_path.t) =
