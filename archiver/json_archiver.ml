@@ -206,7 +206,7 @@ let extract_anomalies path level infos =
     | _ :: _ -> dump_anomalies path level anomalies
 
 (* [add_to_operations block_hash ops_kind ops_round ops] adds the
-   preendorsements or endorsements in ops that were included in block
+   preendorsements or endorsements in [ops] that were included in block
    [block_hash] to the list of operations already known for operation's
    producer. *)
 let add_to_operations block_hash ops_kind ?ops_round operations =
@@ -259,7 +259,8 @@ let add_inclusion_in_block aliases block_hash ops_kind ops_round validators
               Signature.Public_key_hash.equal op.Consensus_ops.delegate delegate)
             missing
         with
-        | (_ :: _, missing') ->
+        | (_ :: other_ops_by_same_delegate, missing') ->
+            assert (other_ops_by_same_delegate = []) ;
             ( Data.Delegate_operations.
                 {
                   delegate;
@@ -445,7 +446,8 @@ let dump_received cctxt path ?unaccurate level received_ops =
                   (fun (pkh, _) -> Signature.Public_key_hash.equal pkh delegate)
                   missing
               with
-              | ((_, new_operations) :: _, missing') ->
+              | ((_, new_operations) :: other_ops_by_same_delegate, missing') ->
+                  assert (other_ops_by_same_delegate = []) ;
                   ( Data.Delegate_operations.
                       {
                         delegate;
