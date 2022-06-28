@@ -32,7 +32,7 @@ This sequence of operations was run:
         Set map(0)[0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78] to 100000000
       Storage size: 1982 bytes
       Paid storage size diff: 71 bytes
-      Consumed gas: 3217.690
+      Consumed gas: 3217.747
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ0.01775
         storage fees ........................... +ꜩ0.01775

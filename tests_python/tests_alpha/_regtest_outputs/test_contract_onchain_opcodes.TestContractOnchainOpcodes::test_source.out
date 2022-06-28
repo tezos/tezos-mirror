@@ -46,7 +46,7 @@ New contract [CONTRACT_HASH] originated.
 Contract memorized as source.
 Injected block at minimal timestamp
 Node is bootstrapped.
-Estimated gas: 2110.535 units (will add 100 for safety)
+Estimated gas: 2110.649 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -71,14 +71,14 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: 0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c
       Storage size: 65 bytes
-      Consumed gas: 2110.535
+      Consumed gas: 2110.649
 
 Injected block at minimal timestamp
 "[CONTRACT_HASH]"
 [CONTRACT_HASH]
 
 Node is bootstrapped.
-Estimated gas: 3772.043 units (will add 100 for safety)
+Estimated gas: 3772.214 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -104,7 +104,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: Unit
       Storage size: 55 bytes
-      Consumed gas: 2568.898
+      Consumed gas: 2569.012
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
@@ -113,7 +113,7 @@ This sequence of operations was run:
           This transaction was successfully applied
           Updated storage: 0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c
           Storage size: 65 bytes
-          Consumed gas: 1203.145
+          Consumed gas: 1203.202
 
 Injected block at minimal timestamp
 "[CONTRACT_HASH]"

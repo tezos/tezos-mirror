@@ -1009,6 +1009,40 @@ let check_witness_sizes () =
       .stack_prefix_preservation_witness_size
     stack_prefix_preservation
 
+let check_micheline_sizes () =
+  let open Michelson_v1_primitives in
+  let check (name, micheline) =
+    check_size ~name ~expected:Cache_memory_helpers.node_size micheline
+  in
+  let int i = Micheline.(Int (dummy_loc, Z.of_int i)) in
+  let big_int z = Micheline.(Int (dummy_loc, z)) in
+  let str s = Micheline.(String (dummy_location, String.lowercase_ascii s)) in
+  let bytes b = Micheline.(Bytes (dummy_location, Bytes.of_string b)) in
+  let prim ?(annot = []) p args =
+    Micheline.(Prim (dummy_location, p, args, annot))
+  in
+  let seq xs = Micheline.(Seq (dummy_location, xs)) in
+  List.iter_es
+    check
+    [
+      ("empty micheline", seq []);
+      ("a single number", int 1024);
+      ("a large number", big_int Z.(of_int 3 * of_int max_int));
+      ("a short string", str "tezostezostezos");
+      ("a short bytestring", bytes "tezostezostezos");
+      ("a prim with no args", prim I_UNIT []);
+      ("a seq of prims", seq [prim I_DUP []; prim I_DROP []]);
+      ("a prim with arg", prim I_DIG [int 2]);
+      ( "combine everything together",
+        seq
+          [
+            prim I_UNIT [];
+            prim I_DUG [int 3] ~annot:[String.lowercase_ascii "@number"];
+            prim I_DIP [seq [prim I_DROP [int 2]]];
+            prim I_PUSH [prim T_string []; str "tezos"];
+          ] );
+    ]
+
 let tests =
   let open Tztest in
   [
@@ -1016,4 +1050,5 @@ let tests =
     tztest "check ty size" `Quick check_ty_size;
     tztest "check kinstr size" `Quick check_kinstr_size;
     tztest "check witness sizes" `Quick check_witness_sizes;
+    tztest "check micheline sizes" `Quick check_micheline_sizes;
   ]

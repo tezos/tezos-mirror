@@ -1509,7 +1509,7 @@ let test_deposit_withdraw_max_big_tickets =
 
        This value has been fetched from the failing test, and acts as a
        regression value. *)
-    let overhead = 232 in
+    let overhead = 256 in
     JSON.(constants |-> "tx_rollup_max_ticket_payload_size" |> as_int)
     - overhead
   in
