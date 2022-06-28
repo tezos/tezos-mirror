@@ -641,8 +641,7 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters
         ~amount
         ~entrypoint
         ~parameters_ty
-        ~parameters
-  | Event _ -> fail Event_invalid_destination)
+        ~parameters)
   >>=? fun (operation, ctxt) ->
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let iop = {source = Contract.Originated sc.self; operation; nonce} in
