@@ -85,53 +85,22 @@ let contract_test () =
                    Internal_manager_operation_result
                      ( {
                          operation =
-                           Transaction
-                             {
-                               entrypoint = tag1;
-                               parameters = data1;
-                               amount = amount1;
-                               destination = Destination.Event addr1;
-                             };
+                           Event {tag = tag1; payload = data1; addr = addr1};
                          _;
                        },
-                       Applied
-                         (ITransaction_result (Transaction_to_event_result _))
-                     );
+                       Applied (IEvent_result _) );
                    Internal_manager_operation_result
                      ( {
                          operation =
-                           Transaction
-                             {
-                               entrypoint = tag2;
-                               parameters = data2;
-                               amount = amount2;
-                               destination = Destination.Event addr2;
-                             };
+                           Event {tag = tag2; payload = data2; addr = addr2};
                          _;
                        },
-                       Applied
-                         (ITransaction_result (Transaction_to_event_result _))
-                     );
+                       Applied (IEvent_result _) );
                  ];
                _;
              });
      };
   ] ->
-      let ctxt = Gas.set_unlimited (Incremental.alpha_ctxt incr) in
-      let* data1, ctxt =
-        Lwt.return @@ Environment.wrap_tzresult
-        @@ Script.force_decode_in_context
-             ~consume_deserialization_gas:When_needed
-             ctxt
-             data1
-      in
-      let* data2, _ =
-        Lwt.return @@ Environment.wrap_tzresult
-        @@ Script.force_decode_in_context
-             ~consume_deserialization_gas:When_needed
-             ctxt
-             data2
-      in
       let open Micheline in
       ((match root data1 with
        | Prim (_, D_Right, [String (_, "right")], _) -> ()
@@ -146,8 +115,6 @@ let contract_test () =
       assert (Entrypoint.to_string tag2 = "tag2") ;
       assert (addr1 = "ev12m5E1yW14mc9rsrcdGAWVfDSdmRGuctykrVU55bHZBGv9kmdhW") ;
       assert (addr2 = "ev12m5E1yW14mc9rsrcdGAWVfDSdmRGuctykrVU55bHZBGv9kmdhW") ;
-      assert (Tez.(amount1 = zero)) ;
-      assert (Tez.(amount2 = zero)) ;
       return_unit
   | _ -> assert false
 
