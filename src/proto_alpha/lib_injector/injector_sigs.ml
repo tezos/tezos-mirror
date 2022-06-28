@@ -133,7 +133,8 @@ module type S = sig
       considered as {e confirmed}, it disappears from the injector. *)
   val new_tezos_head :
     Protocol_client_context.Alpha_block_services.block_info ->
-    Protocol_client_context.Alpha_block_services.block_info Common.reorg ->
+    Protocol_client_context.Alpha_block_services.block_info
+    Injector_common.reorg ->
     unit Lwt.t
 
   (** Trigger an injection of the pending operations for all workers. If [tags]

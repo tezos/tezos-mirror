@@ -112,5 +112,6 @@ val get_tezos_reorg_for_new_head :
   t ->
   Store.t ->
   Block_hash.t ->
-  Protocol_client_context.Alpha_block_services.block_info Common.reorg tzresult
+  Protocol_client_context.Alpha_block_services.block_info Injector_common.reorg
+  tzresult
   Lwt.t

@@ -27,7 +27,7 @@
 
 open Protocol.Alpha_context
 open Protocol_client_context
-open Common
+open Injector_common
 
 module Tezos_blocks_cache =
   Ringo_lwt.Functors.Make_opt

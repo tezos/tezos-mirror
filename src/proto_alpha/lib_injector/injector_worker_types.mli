@@ -26,7 +26,7 @@
 open Protocol_client_context
 open Protocol
 open Alpha_context
-open Common
+open Injector_common
 
 module Request : sig
   type ('a, 'b) t =

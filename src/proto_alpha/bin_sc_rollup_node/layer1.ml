@@ -26,7 +26,7 @@
 open Configuration
 open Protocol.Alpha_context
 open Plugin
-open Tezos_injector_alpha.Common
+open Injector_common
 
 (**
 
