@@ -40,7 +40,10 @@ type path = string list
 let load configuration =
   let open Lwt_syntax in
   let open Configuration in
-  let* repo = IStore.Repo.v (Irmin_pack.config configuration.data_dir) in
+  let* repo =
+    IStore.Repo.v
+      (Irmin_pack.config (default_storage_dir configuration.data_dir))
+  in
   IStore.main repo
 
 let flush store = IStore.flush (IStore.repo store)

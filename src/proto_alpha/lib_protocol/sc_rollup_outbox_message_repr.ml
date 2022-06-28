@@ -83,14 +83,19 @@ let encoding =
        (fun transactions -> Atomic_transaction_batch {transactions})
        (obj1 (req "transactions" (list transaction_encoding))))
 
-let pp_transaction fmt {destination; entrypoint; unparsed_parameters = _} =
+let pp_transaction fmt {destination; entrypoint; unparsed_parameters} =
+  let json =
+    Data_encoding.Json.construct Script_repr.expr_encoding unparsed_parameters
+  in
   Format.fprintf
     fmt
-    "@[%a@;%a@]"
+    "@[%a@;%a@;%a@]"
     Contract_hash.pp
     destination
     Entrypoint_repr.pp
     entrypoint
+    Data_encoding.Json.pp
+    json
 
 let pp fmt (Atomic_transaction_batch {transactions}) =
   Format.pp_print_list

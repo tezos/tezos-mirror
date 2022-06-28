@@ -214,7 +214,7 @@ let test_wrong_data_dir =
   let args = ["--data-dir"; wrong_data_dir] in
   let process = Proxy_server.spawn ~args node in
   let* stderr = Process.check_and_read_stderr ~expect_failure:true process in
-  let re_str = "error reading data-dir.*" in
+  let re_str = "No_such_file_or_directory" in
   let good_match = stderr =~ rex re_str in
   if not good_match then
     Test.fail

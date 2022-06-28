@@ -71,6 +71,15 @@ Node
 - Added metrics to track the pending requests of chain validator, block
   validator and prevalidator workers.
 
+- **Breaking change**: The node context storage format was
+  upgraded. To this end, a new storage version was introduced: 1.0
+  (previously 0.8). Backward compatibility is preserved: upgrading
+  from 0.6, 0.7 (Octez 12.x) or 0.8 (Octez 13.0) is done through the
+  ``tezos-node upgrade storage`` command. This upgrade is
+  instantaneous. However, be careful that there is no forward
+  compatibility: previous versions of Octez will refuse to run on an
+  upgraded data directory.
+
 Client
 ------
 

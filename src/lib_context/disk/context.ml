@@ -185,11 +185,11 @@ module Indexing_strategy : sig
 
   val get : unit -> t
 
-  type irmin_t := Irmin_pack.Pack_store.Indexing_strategy.t
+  type irmin_t := Irmin_pack.Indexing_strategy.t
 
   val to_irmin : t -> irmin_t
 end = struct
-  module I = Irmin_pack.Pack_store.Indexing_strategy
+  module I = Irmin_pack.Indexing_strategy
 
   let singleton = ref `Minimal
 
@@ -317,7 +317,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     ["predecessor_ops_metadata_hash"]
 
   let sync index =
-    if index.readonly then Store.sync index.repo ;
+    if index.readonly then Store.reload index.repo ;
     Lwt.return ()
 
   let exists index key =
@@ -1015,7 +1015,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
       let* key = Snapshot.Import.save_elt import snapshot in
       Store.Tree.of_key idx.repo (`Node key)
 
-    let close_import import = Snapshot.Import.close import
+    let close_import import index = Snapshot.Import.close import index.repo
 
     let make_context index = empty index
 
