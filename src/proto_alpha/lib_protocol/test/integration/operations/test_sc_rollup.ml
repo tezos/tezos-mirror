@@ -236,7 +236,7 @@ let verify_execute_outbox_message_operations incr ~loc ~source ~operations
         {
           source = op_source;
           operation =
-            Transaction_to_contract
+            Transaction_to_smart_contract
               {
                 destination;
                 amount;
@@ -264,13 +264,8 @@ let verify_execute_outbox_message_operations incr ~loc ~source ~operations
         (* Load the arg-type and entrypoints of the destination script. *)
         let* ( Script_ir_translator.Ex_script (Script {arg_type; entrypoints; _}),
                ctxt ) =
-          let* contract_hash =
-            match destination with
-            | Contract.Originated ch -> return ch
-            | _ -> failwith "Expected originated contract at %s" loc
-          in
           let* ctxt, _cache_key, cached =
-            wrap @@ Script_cache.find ctxt contract_hash
+            wrap @@ Script_cache.find ctxt destination
           in
           match cached with
           | Some (_script, ex_script) -> return (ex_script, ctxt)
@@ -309,14 +304,15 @@ let verify_execute_outbox_message_operations incr ~loc ~source ~operations
         return (ctxt, (destination, entrypoint, unparsed_parameters))
     | _ ->
         failwith
-          "Expected an internal transaction operation, called from %s"
+          "Expected an internal transaction operation to a smart-contract, \
+           called from %s"
           loc
   in
   let* _ctxt, operations_data =
     List.fold_left_map_es validate_and_extract_operation_params ctxt operations
   in
   let compare_data (d1, e1, p1) (d2, e2, p2) =
-    Contract.equal d1 d2
+    Contract_hash.equal d1 d2
     && Entrypoint_repr.(e1 = e2)
     && String.equal (Expr.to_string p1) (Expr.to_string p2)
   in
@@ -324,16 +320,16 @@ let verify_execute_outbox_message_operations incr ~loc ~source ~operations
     Format.fprintf
       fmt
       "(%a, %a, %s)"
-      Contract.pp
+      Contract_hash.pp
       d
       Entrypoint_repr.pp
       e
       (Expr.to_string p)
   in
   let transactions_data =
-    let data_of_transaction (ty, entrypoint, params) =
+    let data_of_transaction (contract, entrypoint, params) =
       let params = Expr.from_string params in
-      (ty, entrypoint, params)
+      (contract, entrypoint, params)
     in
     List.map data_of_transaction expected_transactions
   in
@@ -350,12 +346,6 @@ let make_output ~outbox_level ~message_index transactions =
   let transactions =
     List.map
       (fun (destination, entrypoint, parameters) ->
-        let destination =
-          match destination with
-          | Contract.Originated ch -> ch
-          | Contract.Implicit _ ->
-              Stdlib.failwith "Expected an originated contract."
-        in
         let unparsed_parameters = Expr.from_string parameters in
         {Sc_rollup.Outbox.Message.unparsed_parameters; destination; entrypoint})
       transactions
@@ -381,7 +371,7 @@ let string_ticket_token ticketer content =
 let originate_contract incr ~script ~baker ~storage ~source_contract =
   let* block = Incremental.finalize_block incr in
   let* contract, _, block =
-    Contract_helpers.originate_contract_from_string
+    Contract_helpers.originate_contract_from_string_hash
       ~script
       ~storage
       ~source_contract
@@ -895,7 +885,7 @@ let test_single_transaction_batch () =
     ~loc:__LOC__
     incr
     red_token
-    (Destination.Contract ticket_receiver)
+    (Destination.Contract (Originated ticket_receiver))
     (Some 1)
 
 let test_multi_transaction_batch () =
@@ -981,7 +971,7 @@ let test_multi_transaction_batch () =
     ~loc:__LOC__
     incr
     red_token
-    (Destination.Contract ticket_receiver)
+    (Destination.Contract (Originated ticket_receiver))
     (Some 10)
 
 (** Test that executing an L2 to L1 transaction that involves an invalid

@@ -220,9 +220,9 @@ let extract_parameter_from_operations entrypoint operations callback =
    Script_typed_ir.Internal_operation
      {
        operation =
-         Transaction_to_contract
+         Transaction_to_smart_contract
            {
-             destination = Originated destination;
+             destination;
              unparsed_parameters;
              entrypoint = _;
              amount = _;

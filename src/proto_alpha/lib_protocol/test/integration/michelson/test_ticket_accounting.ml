@@ -391,7 +391,7 @@ let transfer_operation ctxt ~src ~destination ~arg_type ~arg =
         {
           source = src;
           operation =
-            Transaction_to_contract
+            Transaction_to_smart_contract
               {
                 amount = Tez.zero;
                 unparsed_parameters = Micheline.strip_locations params_node;
@@ -882,7 +882,6 @@ let test_update_invalid_transfer () =
       ~storage:"{}"
       ~forges_tickets:false
   in
-  let destination = Contract.Originated destination in
   let ctxt = Incremental.alpha_ctxt incr in
   let arg_type = ticket_string_list_type in
   let arg =
@@ -954,7 +953,6 @@ let test_update_self_ticket_transfer () =
       ~storage:"{}"
       ~forges_tickets:false
   in
-  let ticket_receiver = Contract.Originated ticket_receiver in
   (* Ticket is self. That means we can transfer an unlimited amounts of such
      ticket-tokens. *)
   let ticketer = Contract.to_b58check self in
@@ -994,7 +992,7 @@ let test_update_self_ticket_transfer () =
       wrap
       @@ Ticket_balance_key.of_ex_token
            ctxt
-           ~owner:(Destination.Contract ticket_receiver)
+           ~owner:(Destination.Contract (Originated ticket_receiver))
            red_token
     in
     assert_balance ~loc:__LOC__ ctxt red_receiver_token_hash (Some 10)
@@ -1014,7 +1012,6 @@ let test_update_valid_transfer () =
       ~storage:"{}"
       ~forges_tickets:false
   in
-  let destination = Contract.Originated destination in
   let ticketer = "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" in
   assert (ticketer <> Contract.to_b58check self) ;
   let ctxt = Incremental.alpha_ctxt incr in
@@ -1030,7 +1027,7 @@ let test_update_valid_transfer () =
     wrap
     @@ Ticket_balance_key.of_ex_token
          ctxt
-         ~owner:(Destination.Contract destination)
+         ~owner:(Destination.Contract (Originated destination))
          red_token
   in
   (* Set up the balance so that the self contract owns one ticket. *)
@@ -1068,7 +1065,7 @@ let test_update_valid_transfer () =
 let test_update_transfer_tickets_to_self () =
   let open Lwt_result_syntax in
   let* baker, src, block = init_for_operation () in
-  let* self, _script, incr =
+  let* self_hash, _script, incr =
     originate
       block
       ~src
@@ -1078,8 +1075,8 @@ let test_update_transfer_tickets_to_self () =
       ~forges_tickets:false
   in
   let ticketer = "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" in
-  assert (ticketer <> Contract_hash.to_b58check self) ;
-  let self = Contract.Originated self in
+  assert (ticketer <> Contract_hash.to_b58check self_hash) ;
+  let self = Contract.Originated self_hash in
   let ctxt = Incremental.alpha_ctxt incr in
   let* red_token = string_ticket_token ticketer "red" in
   let* red_self_token_hash, ctxt =
@@ -1100,7 +1097,7 @@ let test_update_transfer_tickets_to_self () =
   let* operation, ctxt =
     let arg_type = ticket_string_list_type in
     let arg = boxed_list [string_ticket ticketer "red" 1] in
-    transfer_operation ctxt ~src:self ~destination:self ~arg_type ~arg
+    transfer_operation ctxt ~src:self ~destination:self_hash ~arg_type ~arg
   in
   let* _, ctxt =
     (* Ticket diff removes 5 tickets. *)
@@ -1128,7 +1125,7 @@ let test_update_transfer_tickets_to_self () =
 let test_update_invalid_origination () =
   let open Lwt_result_syntax in
   let* baker, src, block = init_for_operation () in
-  let* destination, script, incr =
+  let* orig_contract, script, incr =
     let storage =
       let ticketer = "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" in
       Printf.sprintf
@@ -1147,7 +1144,7 @@ let test_update_invalid_origination () =
   in
   let ctxt = Incremental.alpha_ctxt incr in
   let* operation, ctxt =
-    origination_operation ctxt ~src ~orig_contract:destination ~script
+    origination_operation ctxt ~src ~orig_contract ~script
   in
   assert_fail_with
     ~loc:__LOC__
@@ -1167,7 +1164,7 @@ let test_update_valid_origination () =
   let* baker, self, block = init_for_operation () in
   let ticketer = "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" in
   assert (ticketer <> Contract.to_b58check self) ;
-  let* originated, script, incr =
+  let* orig_contract, script, incr =
     let storage = Printf.sprintf {|{ Pair %S "red" 1; }|} ticketer in
     originate
       block
@@ -1191,7 +1188,7 @@ let test_update_valid_origination () =
     wrap @@ Ticket_balance.adjust_balance ctxt red_self_token_hash ~delta:Z.one
   in
   let* operation, ctxt =
-    origination_operation ctxt ~src:self ~orig_contract:originated ~script
+    origination_operation ctxt ~src:self ~orig_contract ~script
   in
   let* _, ctxt =
     let* ticket_diffs, ctxt =
@@ -1214,7 +1211,7 @@ let test_update_valid_origination () =
     wrap
     @@ Ticket_balance_key.of_ex_token
          ctxt
-         ~owner:(Destination.Contract (Originated originated))
+         ~owner:(Destination.Contract (Originated orig_contract))
          red_token
   in
   assert_balance ~loc:__LOC__ ctxt red_originated_token_hash (Some 1)
@@ -1223,7 +1220,7 @@ let test_update_self_origination () =
   let open Lwt_result_syntax in
   let* baker, self, block = init_for_operation () in
   let ticketer = Contract.to_b58check self in
-  let* originated, script, incr =
+  let* orig_contract, script, incr =
     let storage = Printf.sprintf {|{ Pair %S "red" 1; }|} ticketer in
     originate
       block
@@ -1239,11 +1236,11 @@ let test_update_self_origination () =
     wrap
     @@ Ticket_balance_key.of_ex_token
          ctxt
-         ~owner:(Destination.Contract (Originated originated))
+         ~owner:(Destination.Contract (Originated orig_contract))
          red_token
   in
   let* operation, ctxt =
-    origination_operation ctxt ~src:self ~orig_contract:originated ~script
+    origination_operation ctxt ~src:self ~orig_contract ~script
   in
   let* _, ctxt =
     wrap

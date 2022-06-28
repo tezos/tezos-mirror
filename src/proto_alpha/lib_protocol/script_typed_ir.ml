@@ -1340,8 +1340,18 @@ and ('input, 'output) view_signature =
       -> ('input, 'output) view_signature
 
 and 'kind manager_operation =
-  | Transaction_to_contract : {
-      destination : Contract.t;
+  | Transaction_to_implicit : {
+      destination : Signature.Public_key_hash.t;
+      amount : Tez.tez;
+      entrypoint : Entrypoint.t;
+      location : Script.location;
+      parameters_ty : ('a, _) ty;
+      parameters : 'a;
+      unparsed_parameters : Script.expr;
+    }
+      -> Kind.transaction manager_operation
+  | Transaction_to_smart_contract : {
+      destination : Contract_hash.t;
       amount : Tez.tez;
       entrypoint : Entrypoint.t;
       location : Script.location;
@@ -1424,7 +1434,8 @@ type packed_manager_operation =
 
 let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   function
-  | Transaction_to_contract _ -> Kind.Transaction_manager_kind
+  | Transaction_to_implicit _ -> Kind.Transaction_manager_kind
+  | Transaction_to_smart_contract _ -> Kind.Transaction_manager_kind
   | Transaction_to_tx_rollup _ -> Kind.Transaction_manager_kind
   | Transaction_to_sc_rollup _ -> Kind.Transaction_manager_kind
   | Transaction_to_event _ -> Kind.Transaction_manager_kind

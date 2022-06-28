@@ -1098,9 +1098,9 @@ let apply_internal_manager_operation_content :
      comparing it with the [ctxt] we will have at the end of the
      application). *)
   match operation with
-  | Transaction_to_contract
+  | Transaction_to_implicit
       {
-        destination = Implicit pkh;
+        destination = pkh;
         amount;
         unparsed_parameters = _;
         entrypoint;
@@ -1121,10 +1121,10 @@ let apply_internal_manager_operation_content :
         (ITransaction_result res
           : kind successful_internal_manager_operation_result),
         ops )
-  | Transaction_to_contract
+  | Transaction_to_smart_contract
       {
         amount;
-        destination = Originated contract_hash;
+        destination = contract_hash;
         entrypoint;
         location;
         parameters_ty;
@@ -1406,44 +1406,44 @@ let apply_external_manager_operation_content :
           }
       in
       return (ctxt, result, [])
-  | Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint} ->
+  | Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint}
+    -> (
       (* The encoding ensures that the amount is in a natural number. Here is
          mainly to check that it is non-zero.*)
       error_when
         Compare.Z.(amount <= Z.zero)
         Ticket_scanner.Forbidden_zero_ticket_quantity
       >>?= fun () ->
-      error_when
-        (match destination with Implicit _ -> true | Originated _ -> false)
-        Cannot_transfer_ticket_to_implicit
-      >>?= fun () ->
-      Tx_rollup_ticket.parse_ticket_and_operation
-        ~consume_deserialization_gas
-        ~ticketer
-        ~contents
-        ~ty
-        ~source:source_contract
-        ~destination
-        ~entrypoint
-        ~amount
-        ctxt
-      >>=? fun (ctxt, ticket_token, op) ->
-      Tx_rollup_ticket.transfer_ticket
-        ctxt
-        ~src:(Contract source_contract)
-        ~dst:(Contract destination)
-        ticket_token
-        amount
-      >>=? fun (ctxt, paid_storage_size_diff) ->
-      let result =
-        Transfer_ticket_result
-          {
-            balance_updates = [];
-            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
-            paid_storage_size_diff;
-          }
-      in
-      return (ctxt, result, [op])
+      match destination with
+      | Implicit _ -> fail Cannot_transfer_ticket_to_implicit
+      | Originated destination_hash ->
+          Tx_rollup_ticket.parse_ticket_and_operation
+            ~consume_deserialization_gas
+            ~ticketer
+            ~contents
+            ~ty
+            ~source:source_contract
+            ~destination:destination_hash
+            ~entrypoint
+            ~amount
+            ctxt
+          >>=? fun (ctxt, ticket_token, op) ->
+          Tx_rollup_ticket.transfer_ticket
+            ctxt
+            ~src:(Contract source_contract)
+            ~dst:(Contract destination)
+            ticket_token
+            amount
+          >>=? fun (ctxt, paid_storage_size_diff) ->
+          let result =
+            Transfer_ticket_result
+              {
+                balance_updates = [];
+                consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
+                paid_storage_size_diff;
+              }
+          in
+          return (ctxt, result, [op]))
   | Origination {delegate; script; credit} ->
       (* Internal originations have their address generated in the interpreter
          so that the script can use it immediately.
