@@ -24,17 +24,8 @@ module Test = struct
 
   let ( // ) = Filename.concat
 
-  (* Encoding and decoding of Reed-Solomon codes on the erasure channel. *)
-  let bench_DAL_crypto_params () =
-    let shards_amount = 2048 in
-    let slot_size = 1048576 in
-    let slot_segment_size = 4096 in
-    let msg_size = slot_size in
-    let msg = Bytes.create msg_size in
-    for i = 0 to (msg_size / 8) - 1 do
-      Bytes.set_int64_le msg (i * 8) (Random.int64 Int64.max_int)
-    done ;
-    let project_root =
+  (* Extracted from Tezt.Base. This is to avoid a dependency to Tezt. *)
+  let project_root =
       match Sys.getenv_opt "DUNE_SOURCEROOT" with
       | Some x -> x
       | None -> (
@@ -47,6 +38,17 @@ module Test = struct
                  executed, which is closer to what we want. *)
               Sys.getcwd ())
     in
+      
+  (* Encoding and decoding of Reed-Solomon codes on the erasure channel. *)
+  let bench_DAL_crypto_params () =
+    let shards_amount = 2048 in
+    let slot_size = 1048576 in
+    let slot_segment_size = 4096 in
+    let msg_size = slot_size in
+    let msg = Bytes.create msg_size in
+    for i = 0 to (msg_size / 8) - 1 do
+      Bytes.set_int64_le msg (i * 8) (Random.int64 Int64.max_int)
+    done ; 
     let open Tezos_error_monad.Error_monad.Result_syntax in
     List.iter
       (fun redundancy_factor ->
