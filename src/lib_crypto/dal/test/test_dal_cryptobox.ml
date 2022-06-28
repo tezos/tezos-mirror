@@ -81,29 +81,29 @@ module Test = struct
           (*let precompute_pi_segments =
               DAL_crypto.precompute_slot_segments_proofs ()
             in*)
-          let filename =
-            project_root // Filename.dirname __FILE__
-            // "slot_seg_proofs_precomp"
-          in
+          (*let filename =
+              project_root // Filename.dirname __FILE__
+              // "slot_seg_proofs_precomp"
+            in*)
           (*let () =
               DAL_crypto.save_precompute_slot_segments_proofs
                 precompute_pi_segments
                 filename
             in*)
-          let precompute_pi_segments =
-            DAL_crypto.load_precompute_slot_segments_proofs filename
-          in
-          let pis =
-            DAL_crypto.prove_slot_segments p ~preprocess:precompute_pi_segments
-          in
+          (*let precompute_pi_segments =
+              DAL_crypto.load_precompute_slot_segments_proofs filename
+            in*)
+          let* pi = DAL_crypto.prove_slot_segment p 1 in
 
-          let slot_segment = Bytes.sub msg 0 slot_segment_size in
+          let slot_segment =
+            Bytes.sub msg slot_segment_size (2 * slot_segment_size)
+          in
           assert (
             DAL_crypto.verify_slot_segment
               cm
               ~slot_segment
-              ~slot_segment_index:0
-              pis.(0)) ;
+              ~slot_segment_index:1
+              pi) ;
           let enc_shards = DAL_crypto.to_shards p in
 
           (* Only take half of the buckets *)
@@ -129,8 +129,7 @@ module Test = struct
 
           (*let precompute_pi_shards = DAL_crypto.precompute_shards_proofs () in*)
           let filename =
-            project_root // Filename.dirname __FILE__
-            // "shard_proofs_precomp"
+            project_root // Filename.dirname __FILE__ // "shard_proofs_precomp"
           in
           (*let () =
               DAL_crypto.save_precompute_shards_proofs

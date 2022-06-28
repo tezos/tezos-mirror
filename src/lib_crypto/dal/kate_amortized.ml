@@ -32,7 +32,7 @@ module Kate_amortized = struct
   module G2 = Bls12_381.G2
   module GT = Bls12_381.GT
   module Pairing = Bls12_381.Pairing
-  module Domain = Bls12_381_polynomial.Domain
+  module Domain = Bls12_381_polynomial.Polynomial.Domain
   module Polynomial = Bls12_381_polynomial.Polynomial
 
   type proof = G1.t
@@ -362,6 +362,10 @@ module type Kate_amortized_sig = sig
     preprocess:Scalar.t array * commitment array option array ->
     Scalar.t list ->
     proof array
+
+  (* h = polynomial such that h(y×domain[i]) = zi. *)
+  val interpolation_h_poly :
+    Scalar.t -> Domain.t -> Scalar.t array -> Scalar.t list
 
   (** [verify cm_f srs domain (w, evaluations) proof] returns true iff for all i,
      f(w×domain.(i) = evaluations.(i)). *)

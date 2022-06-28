@@ -160,21 +160,23 @@ module type DAL_cryptobox_sig = sig
 
   (** [precompute_slot_segments_proofs ()] returns the precomputation used to
       prove slot segments. *)
-  val precompute_slot_segments_proofs :
-    unit -> slot_segments_proofs_precomputation
+  (*val precompute_slot_segments_proofs :
+      unit -> slot_segments_proofs_precomputation
 
-  val save_precompute_slot_segments_proofs :
-    slot_segments_proofs_precomputation -> string -> unit
+    val save_precompute_slot_segments_proofs :
+      slot_segments_proofs_precomputation -> string -> unit
 
-  val load_precompute_slot_segments_proofs :
-    string -> slot_segments_proofs_precomputation
+    val load_precompute_slot_segments_proofs :
+      string -> slot_segments_proofs_precomputation*)
 
-  (** [prove_slot_segments p preprocess] where [p] is the output of
+  (* TODO: raise error if index i is incorrect *)
+
+  (** [prove_slot_segments p i preprocess] where [p] is the output of
       [polynomial_from_bytes slot], returns proofs for all slot segments. *)
-  val prove_slot_segments :
+  val prove_slot_segment :
     polynomial ->
-    preprocess:slot_segments_proofs_precomputation ->
-    proof_slot_segment array
+    int ->
+    (proof_slot_segment, [> `Degree_exceeds_srs_length of string]) result
 
   (** [verify_slot_segment cm ~slot_segment ~slot_segment_index proof] returns
       true if the [slot_segment] whose index is [slot_segment_index] is
@@ -503,23 +505,38 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
     let* data = polynomial_from_bytes' slot in
     Ok (Evaluations.interpolation_fft2 domain_k data)
 
+  let eval_coset_array eval segment =
+    let coset =
+      Array.init
+        (1 lsl Z.(log2up (of_int segment_len)))
+        (fun _ -> Scalar.(copy zero))
+    in
+    for elt = 0 to segment_len - 1 do
+      let idx = (elt * nb_segments) + segment in
+      coset.(elt) <- Array.get eval idx
+    done ;
+    coset
+
+  let eval_coset eval slot offset segment =
+    for elt = 0 to segment_len - 1 do
+      let idx = (elt * nb_segments) + segment in
+      let coeff = Scalar.to_bytes (Array.get eval idx) in
+      if elt = segment_len - 1 then (
+        Bytes.blit coeff 0 slot !offset remaining_bytes ;
+        offset := !offset + remaining_bytes)
+      else (
+        Bytes.blit coeff 0 slot !offset scalar_bytes_amount ;
+        offset := !offset + scalar_bytes_amount)
+    done
+
   (* The segments are arranged in cosets to evaluate in batch with Kate
      amortized. *)
   let polynomial_to_bytes p =
-    let p = Evaluations.evaluation_fft2 domain_k p in
+    let eval = Evaluations.evaluation_fft2 domain_k p in
     let slot = Bytes.init Params.slot_size (fun _ -> '0') in
     let offset = ref 0 in
     for segment = 0 to nb_segments - 1 do
-      for elt = 0 to segment_len - 1 do
-        let idx = (elt * nb_segments) + segment in
-        let coeff = Scalar.to_bytes (Array.get p idx) in
-        if elt = segment_len - 1 then (
-          Bytes.blit coeff 0 slot !offset remaining_bytes ;
-          offset := !offset + remaining_bytes)
-        else (
-          Bytes.blit coeff 0 slot !offset scalar_bytes_amount ;
-          offset := !offset + scalar_bytes_amount)
-      done
+      eval_coset eval slot offset segment
     done ;
     slot
 
@@ -679,7 +696,7 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
       trusted_setup_instance.srs_g1
 
   let verify_degree cm proof n =
-    let open Tezos_error_monad.TzMonad.Result_syntax in
+    let open Result_syntax in
     let open Bls12_381 in
     let d = k - 1 in
     let* commit_xk =
@@ -761,54 +778,45 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
           (proof, G2.(add h_secret (negate (mul (copy one) point))));
         ])
 
-  let precompute_slot_segments_proofs () =
-    let eval, m =
-      Kate_amortized.preprocess_multi_reveals
-        ~chunk_len:Z.(log2up (of_int segment_len))
-        ~degree:k
-        ( trusted_setup_instance.srs_g1,
-          trusted_setup_instance.kate_amortized_srs_g2_segments )
+  (* Assumptions:
+      - Polynomial.degree p = k
+      - (x^l - z) | p(x)
+     Computes the quotient of the division of p(x) by (x^l - z). *)
+  let compute_quotient p l z =
+    let div = Array.init (k - l + 1) (fun _ -> Scalar.(copy zero)) in
+    let i = ref 0 in
+    (* Computes 1/(x^l - z) mod x^(k - l) *)
+    while !i * l < k - l + 1 do
+      div.(!i * l) <-
+        Scalar.negate (Scalar.inverse_exn (Scalar.pow z (Z.of_int (!i + 1)))) ;
+      i := !i + 1
+    done ;
+    let div = Polynomial.of_dense div in
+    fft_mul domain_2k [p; div] |> Polynomial.copy ~len:(k - l + 1)
+
+  let prove_slot_segment p slot_segment_index =
+    let l = 1 lsl Z.(log2up (of_int segment_len)) in
+    let wi = Domains.get domain_k slot_segment_index in
+    let domain =
+      Kate_amortized.Domain.build ~log:Z.(log2up (of_int segment_len))
     in
-    (eval_to_array eval, m)
-
-  let save_precompute_slot_segments_proofs
-      (preprocess : slot_segments_proofs_precomputation) filename =
-    let chan = Out_channel.open_bin filename in
-    Out_channel.output_bytes
-      chan
-      (Data_encoding.Binary.to_bytes_exn
-         Encoding.slot_segments_proofs_precomputation_encoding
-         preprocess) ;
-    Out_channel.close_noerr chan
-
-  let load_precompute_slot_segments_proofs filename =
-    let chan = In_channel.open_bin filename in
-    let len = Int64.to_int (In_channel.length chan) in
-    let data = Bytes.create len in
-    let _ = In_channel.really_input chan data 0 len in
-    let precomp =
-      Data_encoding.Binary.of_bytes_exn
-        Encoding.slot_segments_proofs_precomputation_encoding
-        data
+    let eval_p = Evaluations.evaluation_fft2 domain_k p in
+    let eval_coset = eval_coset_array eval_p slot_segment_index in
+    let remainder =
+      Kate_amortized.interpolation_h_poly wi domain eval_coset
+      |> Array.of_list |> Polynomial.of_dense
     in
-    In_channel.close_noerr chan ;
-    precomp
-
-  let prove_slot_segments p ~preprocess =
-    Kate_amortized.multiple_multi_reveals
-      ~chunk_len:Z.(log2up (of_int segment_len))
-      ~chunk_count:Z.(log2 (of_int nb_segments))
-      ~degree:k
-      ~preprocess
-      (Polynomial.to_dense_coefficients p |> Array.to_list)
+    let quotient =
+      compute_quotient
+        (Polynomial.sub p remainder)
+        l
+        (Scalar.pow wi (Z.of_int l))
+    in
+    commit quotient
 
   (* Parses the [slot_segment] to get the evaluations that it contains. The
      evaluation points are given by the [slot_segment_index]. *)
   let verify_slot_segment ct ~slot_segment ~slot_segment_index proof =
-    let segment_domain =
-      Kate_amortized.Domain.build
-        ~log:(Z.log2 (Z.of_int (segment_len * nb_segments)))
-    in
     let domain =
       Kate_amortized.Domain.build ~log:Z.(log2up (of_int segment_len))
     in
@@ -841,7 +849,6 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
       ( trusted_setup_instance.srs_g1,
         trusted_setup_instance.kate_amortized_srs_g2_segments )
       domain
-      ( Kate_amortized.Domain.get segment_domain slot_segment_index,
-        slot_segment_evaluations )
+      (Domains.get domain_k slot_segment_index, slot_segment_evaluations)
       proof
 end
