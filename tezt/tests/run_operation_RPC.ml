@@ -147,6 +147,58 @@ let test_batch_inconsistent_sources protocols =
       unit)
     protocols
 
+(** This test checks that the [run_operation] RPC succeeds on a
+    well-formed batch containing a transaction, a delegation, and a
+    second transaction. *)
+let test_correct_batch =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Run_operation correct batch"
+    ~tags:
+      (run_operation_tags
+      @ ["manager"; "batch"; "transaction"; "delegation"; "correct_batch"])
+  @@ fun protocol ->
+  Log.info "Initialize a node and a client." ;
+  let* node, client =
+    Client.init_with_protocol
+      ~nodes_args:[Synchronisation_threshold 0]
+      ~protocol
+      `Client
+      ()
+  in
+  Log.info
+    "Craft a batch containing: a transaction, a delegation, and a second \
+     transaction." ;
+  let* batch =
+    let source = Constant.bootstrap1 in
+    let* counter = Operation.Manager.get_next_counter ~source client in
+    let transaction1_payload =
+      Operation.Manager.transfer ~dest:Constant.bootstrap2 ()
+    in
+    let delegation_payload =
+      Operation.Manager.delegation ~delegate:Constant.bootstrap3 ()
+    in
+    let transaction2_payload =
+      Operation.Manager.transfer ~dest:Constant.bootstrap4 ()
+    in
+    Operation.Manager.(
+      operation
+        (make_batch
+           ~source
+           ~counter
+           [transaction1_payload; delegation_payload; transaction2_payload])
+        client)
+  in
+  let* batch_json = Operation.make_run_operation_input batch client in
+  Log.info
+    "Crafted batch: %s"
+    (Ezjsonm.value_to_string ~minify:false batch_json) ;
+  Log.info "Call the [run_operation] RPC on the batch." ;
+  let* _output =
+    RPC.(call node (post_chain_block_helpers_scripts_run_operation batch_json))
+  in
+  unit
+
 (** This test creates a fresh account and calls the [run_operation]
     RPC on the revelation of its public key. Then it actually injects
     this revelation, and calls [run_operation] on a some other manager
@@ -233,4 +285,5 @@ let test_misc_manager_ops_from_fresh_account =
 
 let register ~protocols =
   test_batch_inconsistent_sources protocols ;
+  test_correct_batch protocols ;
   test_misc_manager_ops_from_fresh_account protocols
