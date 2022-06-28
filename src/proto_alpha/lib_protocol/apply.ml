@@ -1190,9 +1190,8 @@ let apply_internal_manager_operation_content :
   | Transaction_to_event {addr = _; unparsed_data = _; tag = _} ->
       return
         ( ctxt,
-          ITransaction_result
-            (Transaction_to_event_result
-               {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt}),
+          IEvent_result
+            {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt},
           [] )
   | Origination
       {

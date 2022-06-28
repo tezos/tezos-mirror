@@ -1521,7 +1521,7 @@ and 'kind manager_operation =
       tag : Entrypoint.t;
       unparsed_data : Script.expr;
     }
-      -> Kind.transaction manager_operation
+      -> Kind.event manager_operation
   | Origination : {
       delegate : Signature.Public_key_hash.t option;
       code : Script.expr;
