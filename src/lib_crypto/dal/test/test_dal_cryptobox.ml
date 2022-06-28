@@ -22,23 +22,6 @@ module Test = struct
 
     aux [] k
 
-  let ( // ) = Filename.concat
-
-  (* Extracted from Tezt.Base. This is to avoid a dependency to Tezt. *)
-  let project_root =
-      match Sys.getenv_opt "DUNE_SOURCEROOT" with
-      | Some x -> x
-      | None -> (
-          match Sys.getenv_opt "PWD" with
-          | Some x -> x
-          | None ->
-              (* For some reason, under [dune runtest], [PWD] and
-                 [getcwd] have different values. [getcwd] is in
-                 [_build/default], and [PWD] is where [dune runtest] was
-                 executed, which is closer to what we want. *)
-              Sys.getcwd ())
-    in
-      
   (* Encoding and decoding of Reed-Solomon codes on the erasure channel. *)
   let bench_DAL_crypto_params () =
     let shards_amount = 2048 in
@@ -48,7 +31,7 @@ module Test = struct
     let msg = Bytes.create msg_size in
     for i = 0 to (msg_size / 8) - 1 do
       Bytes.set_int64_le msg (i * 8) (Random.int64 Int64.max_int)
-    done ; 
+    done ;
     let open Tezos_error_monad.Error_monad.Result_syntax in
     List.iter
       (fun redundancy_factor ->
@@ -103,9 +86,7 @@ module Test = struct
           let* comm = DAL_crypto.commit trusted_setup p in
 
           (*let precompute_pi_shards = DAL_crypto.precompute_shards_proofs () in*)
-          let filename =
-            project_root // Filename.dirname __FILE__ // "shard_proofs_precomp"
-          in
+          let filename = "./shard_proofs_precomp" in
           (*let () =
               DAL_crypto.save_precompute_shards_proofs
                 precompute_pi_shards

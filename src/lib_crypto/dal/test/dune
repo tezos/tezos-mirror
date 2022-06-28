@@ -21,4 +21,5 @@
 (rule
  (alias runtest)
  (package tezos-crypto)
+ (deps shard_proofs_precomp)
  (action (run %{dep:./test_dal_cryptobox.exe})))
