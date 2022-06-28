@@ -3210,12 +3210,14 @@ module Sc_rollup : sig
 
     val player_equal : player -> player -> bool
 
+    type dissection_chunk = {state_hash : State_hash.t option; tick : Tick.t}
+
     type t = {
       turn : player;
       inbox_snapshot : Inbox.t;
       level : Raw_level.t;
       pvm_name : string;
-      dissection : (State_hash.t option * Tick.t) list;
+      dissection : dissection_chunk list;
     }
 
     val pp : Format.formatter -> t -> unit
@@ -3230,9 +3232,7 @@ module Sc_rollup : sig
 
     val opponent : player -> player
 
-    type step =
-      | Dissection of (State_hash.t option * Tick.t) list
-      | Proof of Proof.t
+    type step = Dissection of dissection_chunk list | Proof of Proof.t
 
     type refutation = {choice : Tick.t; step : step}
 
@@ -3270,7 +3270,7 @@ module Sc_rollup : sig
       Tick.t ->
       State_hash.t option ->
       Tick.t ->
-      (State_hash.t option * Tick.t) list ->
+      dissection_chunk list ->
       (unit, error) result Lwt.t
 
     val play : t -> refutation -> (outcome, t) Either.t Lwt.t

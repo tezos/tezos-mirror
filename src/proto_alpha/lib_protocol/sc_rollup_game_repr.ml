@@ -28,13 +28,18 @@ open Sc_rollup_repr
 
 type player = Alice | Bob
 
+type dissection_chunk = {
+  state_hash : State_hash.t option;
+  tick : Sc_rollup_tick_repr.t;
+}
+
 module V1 = struct
   type t = {
     turn : player;
     inbox_snapshot : Sc_rollup_inbox_repr.t;
     level : Raw_level_repr.t;
     pvm_name : string;
-    dissection : (State_hash.t option * Sc_rollup_tick_repr.t) list;
+    dissection : dissection_chunk list;
   }
 
   let player_encoding =
@@ -62,6 +67,10 @@ module V1 = struct
     | Bob, Bob -> true
     | _, _ -> false
 
+  let dissection_chunk_equal {state_hash; tick} chunk2 =
+    Option.equal State_hash.equal state_hash chunk2.state_hash
+    && Sc_rollup_tick_repr.equal tick chunk2.tick
+
   let equal
       {
         turn = turn1;
@@ -81,18 +90,23 @@ module V1 = struct
     && Sc_rollup_inbox_repr.equal inbox_snapshot1 inbox_snapshot2
     && Raw_level_repr.equal level1 level2
     && String.equal pvm_name1 pvm_name2
-    && List.equal
-         (fun (h1, t1) (h2, t2) ->
-           Option.equal State_hash.equal h1 h2
-           && Sc_rollup_tick_repr.equal t1 t2)
-         dissection1
-         dissection2
+    && List.equal dissection_chunk_equal dissection1 dissection2
 
   let string_of_player = function Alice -> "alice" | Bob -> "bob"
 
   let pp_player ppf player = Format.fprintf ppf "%s" (string_of_player player)
 
   let opponent = function Alice -> Bob | Bob -> Alice
+
+  let dissection_encoding =
+    let open Data_encoding in
+    list
+      (conv
+         (fun {state_hash; tick} -> (state_hash, tick))
+         (fun (state_hash, tick) -> {state_hash; tick})
+         (obj2
+            (req "state" (option State_hash.encoding))
+            (req "tick" Sc_rollup_tick_repr.encoding)))
 
   let encoding =
     let open Data_encoding in
@@ -106,20 +120,17 @@ module V1 = struct
          (req "inbox_snapshot" Sc_rollup_inbox_repr.encoding)
          (req "level" Raw_level_repr.encoding)
          (req "pvm_name" string)
-         (req
-            "dissection"
-            (list
-               (tup2 (option State_hash.encoding) Sc_rollup_tick_repr.encoding))))
+         (req "dissection" dissection_encoding))
 
   let pp_dissection ppf d =
     Format.pp_print_list
       ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ";\n")
-      (fun ppf (state, tick) ->
+      (fun ppf {state_hash; tick} ->
         Format.fprintf
           ppf
           "  %a @ %a"
           (Format.pp_print_option State_hash.pp)
-          state
+          state_hash
           Sc_rollup_tick_repr.pp
           tick)
       ppf
@@ -213,6 +224,8 @@ module Index = struct
   let staker {alice; bob} = function Alice -> alice | Bob -> bob
 end
 
+let make_chunk state_hash tick = {state_hash; tick}
+
 let initial inbox ~pvm_name ~(parent : Sc_rollup_commitment_repr.t)
     ~(child : Sc_rollup_commitment_repr.t) ~refuter ~defender =
   let ({alice; _} : Index.t) = Index.make refuter defender in
@@ -225,14 +238,14 @@ let initial inbox ~pvm_name ~(parent : Sc_rollup_commitment_repr.t)
     pvm_name;
     dissection =
       [
-        (Some parent.compressed_state, Sc_rollup_tick_repr.initial);
-        (Some child.compressed_state, tick);
-        (None, Sc_rollup_tick_repr.next tick);
+        make_chunk (Some parent.compressed_state) Sc_rollup_tick_repr.initial;
+        make_chunk (Some child.compressed_state) tick;
+        make_chunk None (Sc_rollup_tick_repr.next tick);
       ];
   }
 
 type step =
-  | Dissection of (State_hash.t option * Sc_rollup_tick_repr.t) list
+  | Dissection of dissection_chunk list
   | Proof of Sc_rollup_proof_repr.t
 
 let step_encoding =
@@ -243,7 +256,7 @@ let step_encoding =
       case
         ~title:"Dissection"
         (Tag 0)
-        (list (tup2 (option State_hash.encoding) Sc_rollup_tick_repr.encoding))
+        dissection_encoding
         (function Dissection d -> Some d | _ -> None)
         (fun d -> Dissection d);
       case
@@ -260,14 +273,14 @@ let pp_step ppf step =
       Format.fprintf ppf "dissection:\n" ;
       Format.pp_print_list
         ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ";\n\n")
-        (fun ppf (hash, t) ->
+        (fun ppf {state_hash; tick} ->
           Format.fprintf
             ppf
             "tick = %a, state = %a\n"
             Sc_rollup_tick_repr.pp
-            t
+            tick
             (Format.pp_print_option State_hash.pp)
-            hash)
+            state_hash)
         ppf
         states
   | Proof proof -> Format.fprintf ppf "proof: %a" Sc_rollup_proof_repr.pp proof
@@ -356,7 +369,7 @@ let status_encoding =
       case
         ~title:"Ended"
         (Tag 1)
-        (tup2 reason_encoding Staker.encoding)
+        (obj2 (req "reason" reason_encoding) (req "staker" Staker.encoding))
         (function Ended (r, s) -> Some (r, s) | _ -> None)
         (fun (r, s) -> Ended (r, s));
     ]
@@ -389,10 +402,12 @@ let find_choice game tick =
   let open Lwt_result_syntax in
   let rec traverse states =
     match states with
-    | (state, state_tick) :: (next_state, next_tick) :: others ->
+    | {state_hash = state; tick = state_tick}
+      :: ({state_hash = next_state; tick = next_tick} as next)
+      :: others ->
         if Sc_rollup_tick_repr.(tick = state_tick) then
           return (state, tick, next_state, next_tick)
-        else traverse ((next_state, next_tick) :: others)
+        else traverse (next :: others)
     | _ -> game_error "This choice was not proposed"
   in
   traverse game.dissection
@@ -419,7 +434,8 @@ let check_dissection start start_tick stop stop_tick dissection =
   in
   let* _ =
     match (List.hd dissection, List.last_opt dissection) with
-    | Some (a, a_tick), Some (b, b_tick) ->
+    | Some {state_hash = a; tick = a_tick}, Some {state_hash = b; tick = b_tick}
+      ->
         let* () =
           check
             (Option.equal State_hash.equal a start && not (Option.is_none a))
@@ -460,13 +476,12 @@ let check_dissection start start_tick stop stop_tick dissection =
   in
   let rec traverse states =
     match states with
-    | (None, _) :: (Some _, _) :: _ ->
+    | {state_hash = None; _} :: {state_hash = Some _; _} :: _ ->
         game_error "Cannot return to a Some state after being at a None state"
-    | (_, tick) :: (next_state, next_tick) :: others ->
+    | {tick; _} :: ({tick = next_tick; state_hash = _} as next) :: others ->
         if Sc_rollup_tick_repr.(tick < next_tick) then
           let incr = Sc_rollup_tick_repr.distance tick next_tick in
-          if Z.(leq incr (div dist (of_int 2))) then
-            traverse ((next_state, next_tick) :: others)
+          if Z.(leq incr (div dist (of_int 2))) then traverse (next :: others)
           else
             game_error
               "Maximum tick increment in dissection must be less than half \
