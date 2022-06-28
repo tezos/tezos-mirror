@@ -2787,6 +2787,8 @@ module Sc_rollup : sig
 
       type serialized = private string
 
+      val encoding : t Data_encoding.t
+
       val unsafe_of_string : string -> serialized
 
       val serialize : t -> serialized tzresult
