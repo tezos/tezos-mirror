@@ -114,29 +114,37 @@ module type S = sig
   val get_is_stuck : state -> string option Lwt.t
 end
 
+type 'a proof = {
+  tree_proof : 'a;
+  given : Sc_rollup_PVM_sem.input option;
+  requested : Sc_rollup_PVM_sem.input_request;
+}
+
+let proof_encoding : 'a Data_encoding.t -> 'a proof Data_encoding.t =
+ fun encoding ->
+  let open Data_encoding in
+  conv
+    (fun {tree_proof; given; requested} -> (tree_proof, given, requested))
+    (fun (tree_proof, given, requested) -> {tree_proof; given; requested})
+    (obj3
+       (req "tree_proof" encoding)
+       (req "given" (option PS.input_encoding))
+       (req "requested" PS.input_request_encoding))
+
 module Make (Context : P) :
-  S with type context = Context.Tree.t and type state = Context.tree = struct
+  S
+    with type context = Context.Tree.t
+     and type state = Context.tree
+     and type proof = Context.proof proof = struct
   module Tree = Context.Tree
 
   type context = Context.Tree.t
 
   type hash = State_hash.t
 
-  type proof = {
-    tree_proof : Context.proof;
-    given : PS.input option;
-    requested : PS.input_request;
-  }
+  type nonrec proof = Context.proof proof
 
-  let proof_encoding =
-    let open Data_encoding in
-    conv
-      (fun {tree_proof; given; requested} -> (tree_proof, given, requested))
-      (fun (tree_proof, given, requested) -> {tree_proof; given; requested})
-      (obj3
-         (req "tree_proof" Context.proof_encoding)
-         (req "given" (option PS.input_encoding))
-         (req "requested" PS.input_request_encoding))
+  let proof_encoding = proof_encoding Context.proof_encoding
 
   let proof_start_state p = Context.proof_before p.tree_proof
 

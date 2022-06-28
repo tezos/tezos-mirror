@@ -148,6 +148,12 @@ let wrapped_proof_module p =
         include P
       end : PVM_with_proof)
 
+let wrapped_proof_kind_exn : wrapped_proof -> Kind.t = function
+  | Unencodable _ ->
+      raise (Invalid_argument "wrapped_proof_kind_exn: Unencodable")
+  | Arith_pvm_with_proof _ -> Kind.Example_arith
+  | Wasm_2_0_0_pvm_with_proof _ -> Kind.Wasm_2_0_0
+
 let wrapped_proof_encoding =
   let open Data_encoding in
   let encoding =

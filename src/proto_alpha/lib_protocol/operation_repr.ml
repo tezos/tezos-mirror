@@ -412,6 +412,7 @@ and _ manager_operation =
   | Sc_rollup_originate : {
       kind : Sc_rollups.Kind.t;
       boot_sector : string;
+      origination_proof : Sc_rollups.wrapped_proof;
       parameters_ty : Script_repr.lazy_expr;
     }
       -> Kind.sc_rollup_originate manager_operation
@@ -1013,20 +1014,23 @@ module Encoding = struct
           tag = sc_rollup_operation_origination_tag;
           name = "sc_rollup_originate";
           encoding =
-            obj3
+            obj4
               (req "kind" Sc_rollups.Kind.encoding)
               (req "boot_sector" Data_encoding.string)
+              (req "origination_proof" Sc_rollups.wrapped_proof_encoding)
               (req "parameters_ty" Script_repr.lazy_expr_encoding);
           select =
             (function
             | Manager (Sc_rollup_originate _ as op) -> Some op | _ -> None);
           proj =
             (function
-            | Sc_rollup_originate {kind; boot_sector; parameters_ty} ->
-                (kind, boot_sector, parameters_ty));
+            | Sc_rollup_originate
+                {kind; boot_sector; origination_proof; parameters_ty} ->
+                (kind, boot_sector, origination_proof, parameters_ty));
           inj =
-            (fun (kind, boot_sector, parameters_ty) ->
-              Sc_rollup_originate {kind; boot_sector; parameters_ty});
+            (fun (kind, boot_sector, origination_proof, parameters_ty) ->
+              Sc_rollup_originate
+                {kind; boot_sector; origination_proof; parameters_ty});
         }
 
     let[@coq_axiom_with_reason "gadt"] dal_publish_slot_header_case =

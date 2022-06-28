@@ -80,7 +80,11 @@ let () =
     (function Sc_rollup_invalid_outbox_level -> Some () | _ -> None)
     (fun () -> Sc_rollup_invalid_outbox_level)
 
-type origination_result = {address : Sc_rollup.Address.t; size : Z.t}
+type origination_result = {
+  address : Sc_rollup.Address.t;
+  size : Z.t;
+  genesis_hash : Sc_rollup.State_hash.t;
+}
 
 type 'ret continuation = unit -> 'ret tzresult
 
@@ -168,7 +172,30 @@ let validate_untyped_parameters_ty ctxt parameters_ty =
   (* Check that the type is valid for rollups. *)
   validate_parameters_ty ctxt arg_type
 
-let originate ctxt ~kind ~boot_sector ~parameters_ty =
+let check_origination_proof kind boot_sector origination_proof =
+  let open Lwt_tzresult_syntax in
+  let (module PVM) = Sc_rollup.wrapped_proof_module origination_proof in
+  let kind' = Sc_rollup.wrapped_proof_kind_exn origination_proof in
+  let* () =
+    fail_when
+      Compare.String.(
+        Sc_rollup.Kind.name_of kind <> Sc_rollup.Kind.name_of kind')
+      (Sc_rollup_proof_repr.Sc_rollup_proof_check "incorrect kind proof")
+  in
+  let*! is_valid = PVM.verify_origination_proof PVM.proof boot_sector in
+  let* () =
+    fail_when
+      (not is_valid)
+      (Sc_rollup_proof_repr.Sc_rollup_proof_check "invalid origination proof")
+  in
+  match PVM.(proof_stop_state proof) with
+  | Some genesis_hash -> return genesis_hash
+  | None ->
+      fail
+        (Sc_rollup_proof_repr.Sc_rollup_proof_check
+           "invalid origination proof: cannot compute genesis hash")
+
+let originate ctxt ~kind ~boot_sector ~origination_proof ~parameters_ty =
   let open Lwt_tzresult_syntax in
   let*? ctxt =
     let open Tzresult_syntax in
@@ -180,10 +207,13 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty =
     in
     validate_untyped_parameters_ty ctxt parameters_ty
   in
+  let* genesis_hash =
+    check_origination_proof kind boot_sector origination_proof
+  in
   let+ address, size, ctxt =
     Sc_rollup.originate ctxt ~kind ~boot_sector ~parameters_ty
   in
-  ({address; size}, ctxt)
+  ({address; size; genesis_hash}, ctxt)
 
 let to_transaction_operation ctxt ~source
     (Sc_rollup_management_protocol.Transaction
