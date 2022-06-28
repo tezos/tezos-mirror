@@ -1375,7 +1375,7 @@ and 'kind manager_operation =
       unparsed_parameters : Script.expr;
     }
       -> Kind.transaction manager_operation
-  | Transaction_to_event : {
+  | Event : {
       addr : Contract_event.t;
       tag : Entrypoint.t;
       unparsed_data : Script.expr;
@@ -1438,7 +1438,7 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Transaction_to_smart_contract _ -> Kind.Transaction_manager_kind
   | Transaction_to_tx_rollup _ -> Kind.Transaction_manager_kind
   | Transaction_to_sc_rollup _ -> Kind.Transaction_manager_kind
-  | Transaction_to_event _ -> Kind.Event_manager_kind
+  | Event _ -> Kind.Event_manager_kind
   | Origination _ -> Kind.Origination_manager_kind
   | Delegation _ -> Kind.Delegation_manager_kind
 

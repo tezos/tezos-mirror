@@ -591,9 +591,7 @@ let emit_event (type t tc) (ctxt, sc) gas ~event_address
   Gas.consume ctxt (Script.strip_locations_cost unparsed_data) >>?= fun ctxt ->
   let unparsed_data = Micheline.strip_locations unparsed_data in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
-  let operation =
-    Transaction_to_event {addr = event_address; tag; unparsed_data}
-  in
+  let operation = Event {addr = event_address; tag; unparsed_data} in
   let iop = {source = Contract.Originated sc.self; operation; nonce} in
   let res = {piop = Internal_operation iop; lazy_storage_diff} in
   let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
