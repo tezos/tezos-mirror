@@ -126,7 +126,8 @@ module type S = sig
   val get_is_stuck : state -> string option Lwt.t
 end
 
-module ProtocolImplementation : S with type context = Context.t
+module ProtocolImplementation :
+  S with type context = Context.t and type state = Context.tree
 
 module type P = sig
   module Tree : Context.TREE with type key = string list and type value = bytes

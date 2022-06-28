@@ -982,11 +982,11 @@ module Constants : sig
 
   val sc_rollup_max_available_messages : context -> int
 
-  val sc_rollup_stake_amount : Raw_context.t -> Tez.t
+  val sc_rollup_stake_amount : t -> Tez.t
 
-  val sc_rollup_commitment_period_in_blocks : Raw_context.t -> int
+  val sc_rollup_commitment_period_in_blocks : t -> int
 
-  val sc_rollup_max_lookahead_in_blocks : Raw_context.t -> int32
+  val sc_rollup_max_lookahead_in_blocks : t -> int32
 
   val sc_rollup_max_active_outbox_levels : context -> int32
 
@@ -2909,7 +2909,7 @@ module Sc_rollup : sig
   type input_request =
     | No_input_required
     | Initial
-    | First_after of Raw_level_repr.t * Z.t
+    | First_after of Raw_level.t * Z.t
 
   val input_request_encoding : input_request Data_encoding.t
 
@@ -3185,7 +3185,7 @@ module Sc_rollup : sig
     type t = {pvm_step : wrapped_proof; inbox : Inbox.Proof.t option}
 
     module type PVM_with_context_and_state = sig
-      include Sc_rollups.PVM.S
+      include PVM.S
 
       val context : context
 

@@ -72,7 +72,7 @@ let check p reason =
 let valid snapshot commit_level ~pvm_name proof =
   let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
   let open Lwt_result_syntax in
-  let* _ = check (String.equal P.name pvm_name) "Incorrect PVM kind" in
+  let* () = check (String.equal P.name pvm_name) "Incorrect PVM kind" in
   let input_requested = P.proof_input_requested P.proof in
   let input_given = P.proof_input_given P.proof in
   let* input =
