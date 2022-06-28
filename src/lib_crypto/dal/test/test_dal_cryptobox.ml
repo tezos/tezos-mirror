@@ -78,31 +78,12 @@ module Test = struct
           let* p = DAL_crypto.polynomial_from_bytes msg in
 
           let* cm = DAL_crypto.commit p in
-          (*let precompute_pi_segments =
-              DAL_crypto.precompute_slot_segments_proofs ()
-            in*)
-          (*let filename =
-              project_root // Filename.dirname __FILE__
-              // "slot_seg_proofs_precomp"
-            in*)
-          (*let () =
-              DAL_crypto.save_precompute_slot_segments_proofs
-                precompute_pi_segments
-                filename
-            in*)
-          (*let precompute_pi_segments =
-              DAL_crypto.load_precompute_slot_segments_proofs filename
-            in*)
           let* pi = DAL_crypto.prove_slot_segment p 1 in
 
           let slot_segment =
             Bytes.sub msg slot_segment_size (2 * slot_segment_size)
           in
-          assert (
-            DAL_crypto.verify_slot_segment
-              cm
-              (1, slot_segment)
-              pi) ;
+          assert (DAL_crypto.verify_slot_segment cm (1, slot_segment) pi) ;
           let enc_shards = DAL_crypto.to_shards p in
 
           (* Only take half of the buckets *)
