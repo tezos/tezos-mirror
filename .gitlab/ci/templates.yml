@@ -14,6 +14,11 @@ variables:
   TEZOS_DEFAULT_BRANCH: "master"
   TEZOS_DEFAULT_NAMESPACE: "tezos"
 
+  # An addition to working around a bug in gitlab-runner's default
+  # unzipping implementation (https://gitlab.com/gitlab-org/gitlab-runner/-/issues/27496),
+  # this setting cuts cache creation time.
+  FF_USE_FASTZIP: "true"
+
 # Basic, specialised, minimal, orthogonal templates
 
 # Some settings we want by default on all jobs that cannot be set

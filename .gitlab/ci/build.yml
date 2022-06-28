@@ -5,6 +5,13 @@
   needs: []
   variables:
     ARCH: ""
+    # We fix the value of GIT_{SHORTREF,DATETIME,VERSION} (these are
+    # read by src/lib_version and output by the binaries `--version`
+    # option). Fixing these values on development builds improves
+    # cache usage.
+    GIT_SHORTREF: "00000000"
+    GIT_DATETIME: "1970-01-01 00:00:00 +0000%"
+    GIT_VERSION: "dev"
   script:
     # We remove protocols not needed for tests in order to speed up the CI.
     - ./scripts/remove-old-protocols.sh
