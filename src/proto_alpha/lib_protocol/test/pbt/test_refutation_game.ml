@@ -378,6 +378,9 @@ module ContextPVM = ArithPVM.Make (struct
 
   type tree = Tree.tree
 
+  let hash_tree tree =
+    Sc_rollup.State_hash.context_hash_to_state_hash (Tree.hash tree)
+
   type proof = Proof.tree Proof.t
 
   let verify_proof proof f =
@@ -390,8 +393,7 @@ module ContextPVM = ArithPVM.Make (struct
     return (Some proof)
 
   let kinded_hash_to_state_hash = function
-    | `Value hash | `Node hash ->
-        State_hash.hash_bytes [Context_hash.to_bytes hash]
+    | `Value hash | `Node hash -> State_hash.context_hash_to_state_hash hash
 
   let proof_before proof = kinded_hash_to_state_hash proof.Proof.before
 

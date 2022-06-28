@@ -31,6 +31,8 @@ module type P = sig
 
   type tree = Tree.tree
 
+  val hash_tree : tree -> State_hash.t
+
   type proof
 
   val proof_encoding : proof Data_encoding.t
@@ -671,6 +673,7 @@ module Make (Context : P) :
       let* vars_pp = Vars.pp in
       let* output_pp = Output.pp in
       let* stack = Stack.to_list in
+      let* current_tick_pp = CurrentTick.pp in
       return @@ fun fmt () ->
       Format.fprintf
         fmt
@@ -682,6 +685,7 @@ module Make (Context : P) :
          %a@;\
          %a@;\
          %a@;\
+         tick : %a@;\
          vars : %a@;\
          output :%a@;\
          stack : %a@;\
@@ -699,6 +703,8 @@ module Make (Context : P) :
         lexer_state_pp
         ()
         evaluation_result_pp
+        ()
+        current_tick_pp
         ()
         vars_pp
         ()
@@ -739,9 +745,7 @@ module Make (Context : P) :
       let* status = Status.get in
       match status with
       | Halted -> return State_hash.zero
-      | _ ->
-          Context_hash.to_bytes @@ Tree.hash state |> fun h ->
-          return @@ State_hash.hash_bytes [h]
+      | _ -> return @@ Context.hash_tree state
     in
     let open Lwt_syntax in
     let* state = Monad.run m state in
@@ -863,15 +867,14 @@ module Make (Context : P) :
     let* () = ParsingResult.set None in
     let* () = ParserState.set SkipLayout in
     let* () = LexerState.set (0, 0) in
-    let* () = Status.set Parsing in
     let* () = Code.clear in
     return ()
 
   let start_evaluating : unit t =
     let open Monad.Syntax in
+    let* () = Status.set Evaluating in
     let* () = EvaluationResult.set None in
     let* () = Stack.clear in
-    let* () = Status.set Evaluating in
     return ()
 
   let stop_parsing outcome =
@@ -1134,6 +1137,8 @@ module ProtocolImplementation = Make (struct
 
   type tree = Context.tree
 
+  let hash_tree t = State_hash.context_hash_to_state_hash (Tree.hash t)
+
   type proof = Context.Proof.tree Context.Proof.t
 
   let verify_proof p f =
@@ -1144,8 +1149,7 @@ module ProtocolImplementation = Make (struct
     Lwt.return None
 
   let kinded_hash_to_state_hash = function
-    | `Value hash | `Node hash ->
-        State_hash.hash_bytes [Context_hash.to_bytes hash]
+    | `Value hash | `Node hash -> State_hash.context_hash_to_state_hash hash
 
   let proof_before proof = kinded_hash_to_state_hash proof.Context.Proof.before
 

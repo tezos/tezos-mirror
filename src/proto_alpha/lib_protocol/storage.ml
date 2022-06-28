@@ -480,11 +480,7 @@ module Big_map = struct
         let encoding = Script_repr.expr_encoding
       end)
 
-  module Contents :
-    Non_iterable_indexed_carbonated_data_storage_with_values
-      with type key = Script_expr_hash.t
-       and type value = Script_repr.expr
-       and type t := key = struct
+  module Contents = struct
     module I =
       Storage_functors.Make_indexed_carbonated_data_storage
         (Make_subcontext (Registered) (Indexed_context.Raw_context)
@@ -518,7 +514,10 @@ module Big_map = struct
 
     let add = I.add
 
-    let list_values = I.list_values
+    let list_values ?offset ?length (ctxt, id) =
+      let open Lwt_tzresult_syntax in
+      let* ctxt, values = I.list_values ?offset ?length (ctxt, id) in
+      return (ctxt, List.map snd values)
 
     let consume_deserialize_gas ctxt value =
       Raw_context.consume_gas ctxt (Script_repr.deserialized_cost value)
@@ -1674,6 +1673,9 @@ module Sc_rollup = struct
 
         let encoding = Sc_rollup_commitment_repr.Hash.encoding
       end)
+
+  let stakers (ctxt : Raw_context.t) (rollup : Sc_rollup_repr.t) =
+    Stakers.list_values (ctxt, rollup)
 
   module Staker_count =
     Indexed_context.Make_carbonated_map

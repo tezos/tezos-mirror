@@ -57,6 +57,9 @@ module Arith_Context = struct
 
   type tree = Tree.tree
 
+  let hash_tree tree =
+    Sc_rollup_repr.State_hash.context_hash_to_state_hash (Tree.hash tree)
+
   type proof = Context_binary.Proof.tree Context_binary.Proof.t
 
   let proof_encoding =
@@ -64,7 +67,7 @@ module Arith_Context = struct
 
   let kinded_hash_to_state_hash = function
     | `Value hash | `Node hash ->
-        Sc_rollup_repr.State_hash.hash_bytes [Context_hash.to_bytes hash]
+        Sc_rollup_repr.State_hash.context_hash_to_state_hash hash
 
   let proof_before proof =
     kinded_hash_to_state_hash proof.Context_binary.Proof.before

@@ -987,7 +987,7 @@ let prepare_first_block ~level ~timestamp ctxt =
                 max_available_messages = 1_000_000;
                 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
                    The following constants need to be refined. *)
-                stake_amount = Tez_repr.of_mutez_exn 32_000_000L;
+                stake_amount = Tez_repr.of_mutez_exn 10_000_000_000L;
                 commitment_period_in_blocks = 30;
                 max_lookahead_in_blocks = 30_000l;
                 (* Number of active levels kept for executing outbox messages.

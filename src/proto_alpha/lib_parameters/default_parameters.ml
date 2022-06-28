@@ -206,7 +206,7 @@ let constants_mainnet =
         max_available_messages = 1_000_000;
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
            The following constants need to be refined. *)
-        stake_amount = Tez.of_mutez_exn 32_000_000L;
+        stake_amount = Tez.of_mutez_exn 10_000_000_000L;
         commitment_period_in_blocks = 30;
         max_lookahead_in_blocks = 30_000l;
         max_active_outbox_levels = sc_rollup_max_active_outbox_levels;

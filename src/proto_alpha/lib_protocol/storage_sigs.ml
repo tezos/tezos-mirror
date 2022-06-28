@@ -222,7 +222,7 @@ module type Non_iterable_indexed_carbonated_data_storage_with_values = sig
     ?offset:int ->
     ?length:int ->
     t ->
-    (Raw_context.t * value list) tzresult Lwt.t
+    (Raw_context.t * (key * value) list) tzresult Lwt.t
 end
 
 module type Non_iterable_indexed_carbonated_data_storage_INTERNAL = sig
