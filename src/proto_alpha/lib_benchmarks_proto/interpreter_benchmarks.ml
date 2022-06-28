@@ -3241,4 +3241,19 @@ module Registration_section = struct
             {stack = ((), ((), eos)); stack_type = unit @$ unit @$ bot; cont})
         ()
   end
+
+  let () =
+    simple_benchmark
+      ~name:Interpreter_workload.N_IEmit
+      ~stack_type:(unit_t @$ bot)
+      ~kinstr:
+        (IEmit
+           {
+             ty = unit_t;
+             k = halt;
+             loc = dummy_loc;
+             addr = Contract_event_repr.Hash.zero;
+             tag = Entrypoint_repr.default;
+           })
+      ()
 end
