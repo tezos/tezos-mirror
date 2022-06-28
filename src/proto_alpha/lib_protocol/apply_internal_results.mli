@@ -47,6 +47,12 @@ type 'kind internal_manager_operation =
   | Delegation :
       Signature.Public_key_hash.t option
       -> Kind.delegation internal_manager_operation
+  | Event : {
+      addr : Contract_event.t;
+      tag : Entrypoint.t;
+      payload : Script.expr;
+    }
+      -> Kind.event internal_manager_operation
 
 type 'kind internal_contents = {
   source : Contract.t;

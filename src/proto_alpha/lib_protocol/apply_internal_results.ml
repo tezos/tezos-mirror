@@ -44,6 +44,12 @@ type 'kind internal_manager_operation =
   | Delegation :
       Signature.Public_key_hash.t option
       -> Kind.delegation internal_manager_operation
+  | Event : {
+      addr : Contract_event.t;
+      tag : Entrypoint.t;
+      payload : Script.expr;
+    }
+      -> Kind.event internal_manager_operation
 
 type packed_internal_manager_operation =
   | Manager :
@@ -422,6 +428,40 @@ module Internal_result = struct
         inj = (fun key -> Delegation key);
       }
 
+  let[@coq_axiom_with_reason "gadt"] event_case =
+    MCase
+      {
+        (* This value should be changed with care: maybe receipts are read by
+           external tools such as indexers. *)
+        tag = 4;
+        name = "event";
+        encoding =
+          obj3
+            (req "addr" Contract_event.Hash.encoding)
+            (opt "tag" Entrypoint.smart_encoding)
+            (opt "payload" Script.expr_encoding);
+        iselect : Kind.event iselect =
+          (function
+          | Internal_manager_operation_result
+              (({operation = Event _; _} as op), res) ->
+              Some (op, res)
+          | _ -> None);
+        select = (function Manager (Event _ as op) -> Some op | _ -> None);
+        proj =
+          (function
+          | Event {addr; tag; payload} ->
+              let tag = if Entrypoint.is_default tag then None else Some tag in
+              let payload =
+                if Script_repr.is_unit payload then None else Some payload
+              in
+              (addr, tag, payload));
+        inj =
+          (fun (addr, tag, payload) ->
+            let tag = Option.value ~default:Entrypoint.default tag in
+            let payload = Option.value ~default:Script_repr.unit payload in
+            Event {addr; tag; payload});
+      }
+
   let case tag name args proj inj =
     case
       tag
@@ -441,7 +481,12 @@ module Internal_result = struct
     in
     union
       ~tag_size:`Uint8
-      [make transaction_case; make origination_case; make delegation_case]
+      [
+        make transaction_case;
+        make origination_case;
+        make delegation_case;
+        make event_case;
+      ]
 end
 
 let internal_contents_encoding : packed_internal_contents Data_encoding.t =
