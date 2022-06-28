@@ -487,10 +487,16 @@ and _ manager_operation =
   | Sc_rollup_refute : {
       rollup : Sc_rollup_repr.t;
       opponent : Sc_rollup_repr.Staker.t;
-      refutation : Sc_rollup_game_repr.refutation;
-      is_opening_move : bool;
+      refutation : Sc_rollup_game_repr.refutation option;
     }
       -> Kind.sc_rollup_refute manager_operation
+      (** [Sc_rollup_refute { rollup; opponent; refutation }] makes a move
+          in a refutation game between the source of the operation and the
+          [opponent] under the given [rollup]. Both players must be stakers
+          on commitments in conflict. When [refutation = None], the game is
+          initialized. Next, when [refutation = Some move], [move] is the
+          next play for the current player. See {!Sc_rollup_game_repr} for
+          details. **)
   | Sc_rollup_timeout : {
       rollup : Sc_rollup_repr.t;
       stakers : Sc_rollup_game_repr.Index.t;

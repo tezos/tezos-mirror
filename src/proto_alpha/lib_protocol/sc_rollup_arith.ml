@@ -745,7 +745,7 @@ module Make (Context : P) :
       let* status = Status.get in
       match status with
       | Halted -> return State_hash.zero
-      | _ -> return @@ Context.hash_tree state
+      | _ -> return @@ State_hash.context_hash_to_state_hash (Tree.hash state)
     in
     let open Lwt_syntax in
     let* state = Monad.run m state in

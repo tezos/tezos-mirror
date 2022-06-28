@@ -284,18 +284,18 @@ let pp_manager_operation_content (type kind) source ppf
         commitment
         Sc_rollup.Address.pp
         rollup
-  | Sc_rollup_refute {rollup; opponent; refutation; is_opening_move} ->
+  | Sc_rollup_refute {rollup; opponent; refutation} ->
       Format.fprintf
         ppf
-        "Refute staker %a in the smart contract rollup at address %a using \
-         refutation %a %s"
+        "Refute staker %a in the smart contract rollup at address %a using %a"
         Sc_rollup.Staker.pp
         opponent
         Sc_rollup.Address.pp
         rollup
-        Sc_rollup.Game.pp_refutation
+        (fun fmt -> function
+          | None -> Format.pp_print_string fmt "opening move of the game"
+          | Some refutation -> Sc_rollup.Game.pp_refutation fmt refutation)
         refutation
-        (if is_opening_move then "(opening move of game)" else "")
   | Sc_rollup_timeout {rollup; stakers = {alice; bob}} ->
       Format.fprintf
         ppf

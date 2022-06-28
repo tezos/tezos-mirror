@@ -244,20 +244,25 @@ let init_game ctxt rollup ~refuter ~defender =
       let* ctxt, _ = Store.Opponent.init (ctxt, rollup) defender refuter in
       return (game, ctxt)
 
-let game_move ctxt rollup ~player ~opponent refutation ~is_opening_move =
+let start_game ctxt rollup ~player ~opponent =
   let open Lwt_tzresult_syntax in
-  let ({alice; bob} as stakers : Sc_rollup_game_repr.Index.t) =
-    Sc_rollup_game_repr.Index.make player opponent
+  let idx = Sc_rollup_game_repr.Index.make player opponent in
+  let* game, ctxt = init_game ctxt rollup ~refuter:player ~defender:opponent in
+  let* ctxt, _ = Store.Game.update (ctxt, rollup) idx game in
+  let* ctxt, _ =
+    Store.Game_timeout.update (ctxt, rollup) idx (timeout_level ctxt)
   in
-  let* game, ctxt =
-    if is_opening_move then
-      init_game ctxt rollup ~refuter:player ~defender:opponent
-    else get_game ctxt rollup stakers
-  in
+  return ctxt
+
+let game_move ctxt rollup ~player ~opponent refutation =
+  let open Lwt_tzresult_syntax in
+  let idx = Sc_rollup_game_repr.Index.make player opponent in
+  let* game, ctxt = get_game ctxt rollup idx in
   let* () =
     fail_unless
-      (let turn = match game.turn with Alice -> alice | Bob -> bob in
-       Sc_rollup_repr.Staker.equal turn player)
+      (Sc_rollup_repr.Staker.equal
+         player
+         (Sc_rollup_game_repr.Index.staker idx game.turn))
       Sc_rollup_wrong_turn
   in
   let* move_result =
@@ -266,9 +271,9 @@ let game_move ctxt rollup ~player ~opponent refutation ~is_opening_move =
   match move_result with
   | Either.Left outcome -> return (Some outcome, ctxt)
   | Either.Right new_game ->
-      let* ctxt, _ = Store.Game.update (ctxt, rollup) stakers new_game in
+      let* ctxt, _ = Store.Game.update (ctxt, rollup) idx new_game in
       let* ctxt, _ =
-        Store.Game_timeout.update (ctxt, rollup) stakers (timeout_level ctxt)
+        Store.Game_timeout.update (ctxt, rollup) idx (timeout_level ctxt)
       in
       return (None, ctxt)
 

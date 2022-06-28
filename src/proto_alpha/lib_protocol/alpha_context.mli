@@ -3316,13 +3316,19 @@ module Sc_rollup : sig
       Staker.t ->
       ((Game.t * Game.Index.t) option * context) tzresult Lwt.t
 
+    val start_game :
+      context ->
+      t ->
+      player:Signature.public_key_hash ->
+      opponent:Signature.public_key_hash ->
+      context tzresult Lwt.t
+
     val game_move :
       context ->
       t ->
       player:Staker.t ->
       opponent:Staker.t ->
       Game.refutation ->
-      is_opening_move:bool ->
       (Game.outcome option * context) tzresult Lwt.t
 
     val timeout :
@@ -3827,8 +3833,7 @@ and _ manager_operation =
   | Sc_rollup_refute : {
       rollup : Sc_rollup.t;
       opponent : Sc_rollup.Staker.t;
-      refutation : Sc_rollup.Game.refutation;
-      is_opening_move : bool;
+      refutation : Sc_rollup.Game.refutation option;
     }
       -> Kind.sc_rollup_refute manager_operation
   | Sc_rollup_timeout : {

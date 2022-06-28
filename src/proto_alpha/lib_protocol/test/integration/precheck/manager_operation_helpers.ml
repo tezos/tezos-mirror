@@ -570,8 +570,7 @@ let mk_sc_rollup_refute ?counter ?fee ?gas_limit ?storage_limit ?force_reveal
     source
     infos.sc_rollup
     infos.account2.pkh
-    refutation
-    false
+    (Some refutation)
 
 let mk_sc_rollup_add_messages ?counter ?fee ?gas_limit ?storage_limit
     ?force_reveal ~source (infos : infos) =

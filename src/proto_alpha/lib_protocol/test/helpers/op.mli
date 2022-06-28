@@ -603,8 +603,7 @@ val sc_rollup_refute :
   Contract.t ->
   Sc_rollup.t ->
   public_key_hash ->
-  Sc_rollup.Game.refutation ->
-  bool ->
+  Sc_rollup.Game.refutation option ->
   Operation.packed tzresult Lwt.t
 
 val sc_rollup_timeout :

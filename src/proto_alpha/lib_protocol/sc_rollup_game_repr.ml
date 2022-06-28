@@ -311,7 +311,7 @@ let reason_encoding =
       case
         ~title:"Conflict_resolved"
         (Tag 0)
-        unit
+        (constant "conflict_resolved")
         (function Conflict_resolved -> Some () | _ -> None)
         (fun () -> Conflict_resolved);
       case
@@ -323,7 +323,7 @@ let reason_encoding =
       case
         ~title:"Timeout"
         (Tag 2)
-        unit
+        (constant "timeout")
         (function Timeout -> Some () | _ -> None)
         (fun () -> Timeout);
     ]
@@ -350,7 +350,7 @@ let status_encoding =
       case
         ~title:"Ongoing"
         (Tag 0)
-        unit
+        (constant "ongoing")
         (function Ongoing -> Some () | _ -> None)
         (fun () -> Ongoing);
       case
