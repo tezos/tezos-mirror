@@ -411,17 +411,15 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
           Scalar.of_string
             "20812168509434597367146703229805575690060615791308155437936410982393987532344"
         in
+        let srs_g1 = create_srs (module Bls12_381.G1) k secret in
+        let srs_g2 = create_srs (module Bls12_381.G2) k secret in
         {
-          srs_g1 = create_srs (module Bls12_381.G1) k secret;
-          srs_g2 = create_srs (module Bls12_381.G2) k secret;
+          srs_g1;
+          srs_g2;
           kate_amortized_srs_g2_shards =
-            Kate_amortized.gen_srs_g2
-              ~l:(1 lsl evaluations_per_proof_log)
-              secret;
+            Array.get srs_g2 (1 lsl evaluations_per_proof_log);
           kate_amortized_srs_g2_segments =
-            Kate_amortized.gen_srs_g2
-              ~l:(1 lsl Z.(log2up (of_int segment_len)))
-              secret;
+            Array.get srs_g2 (1 lsl Z.(log2up (of_int segment_len)));
         }
     | `Files {srs_g1_file; srs_g2_file; logarithm_size} ->
         assert (k < 1 lsl logarithm_size) ;
