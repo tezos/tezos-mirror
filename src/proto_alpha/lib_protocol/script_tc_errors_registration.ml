@@ -273,17 +273,6 @@ let () =
     (obj1 (req "location" Script.location_encoding))
     (function Sc_rollup_disabled loc -> Some loc | _ -> None)
     (fun loc -> Sc_rollup_disabled loc) ;
-  (* Event bad parameter *)
-  register_error_kind
-    `Permanent
-    ~id:"michelson_v1.event_invalid_destination"
-    ~title:"Event parameter is malformed"
-    ~description:
-      "An event address is not a valid destination to transfer any token to. \
-       Events should be sent with EMIT instructions."
-    (obj1 (req "location" Script.location_encoding))
-    (function Event_invalid_destination loc -> Some loc | _ -> None)
-    (fun loc -> Event_invalid_destination loc) ;
   (* Duplicate entrypoint *)
   register_error_kind
     `Permanent
