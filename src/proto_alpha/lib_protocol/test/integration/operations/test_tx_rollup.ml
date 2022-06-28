@@ -1347,7 +1347,7 @@ let test_valid_deposit_big_ticket () =
 
      This value has been fetched from the failing test, and acts as a
      regression value. *)
-  let overhead = 112 in
+  let overhead = 136 in
   context_init1 () >>=? fun (b, account) ->
   Context.get_constants (B b) >>=? fun constant ->
   let tx_rollup_max_ticket_payload_size =
