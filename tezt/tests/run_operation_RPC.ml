@@ -147,4 +147,90 @@ let test_batch_inconsistent_sources protocols =
       unit)
     protocols
 
-let register ~protocols = test_batch_inconsistent_sources protocols
+(** This test creates a fresh account and calls the [run_operation]
+    RPC on the revelation of its public key. Then it actually injects
+    this revelation, and calls [run_operation] on a some other manager
+    operations from this fresh account. *)
+let test_misc_manager_ops_from_fresh_account =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Run_operation misc manager ops from fresh account"
+    ~tags:
+      (run_operation_tags
+      @ ["fresh_account"; "manager"; "reveal"; "transaction"; "delegation"])
+  @@ fun protocol ->
+  Log.info "Initialize a node and a client." ;
+  let* node, client =
+    Client.init_with_protocol
+      ~nodes_args:[Synchronisation_threshold 0]
+      ~protocol
+      `Client
+      ()
+  in
+  let amount = 10_000_000 (* amount of the final transaction (in mutez) *) in
+  Log.info
+    "Create a fresh account by giving it [2 x amount] mutez, then baking a \
+     block to apply the transaction." ;
+  let* fresh_account = Client.gen_and_show_keys client in
+  let* _oph =
+    Operation.inject_transfer
+      client
+      ~source:Constant.bootstrap2
+      ~dest:fresh_account
+      ~gas_limit:1500
+      ~amount:(2 * amount)
+  in
+  let* () = Client.bake_for_and_wait ~node client in
+  Log.info
+    "Craft a revelation of the fresh account's key and call the \
+     [run_operation] RPC on it." ;
+  let* reveal_op =
+    let manager_op =
+      Operation.Manager.(make ~source:fresh_account (reveal fresh_account))
+    in
+    Operation.Manager.operation [manager_op] client
+  in
+  let* _run_operation_output =
+    let* op_json = Operation.make_run_operation_input reveal_op client in
+    RPC.(call node (post_chain_block_helpers_scripts_run_operation op_json))
+  in
+  Log.info "Inject the crafted revelation and bake a block to apply it." ;
+  let* _oph = Operation.inject reveal_op client in
+  let* () = Client.bake_for_and_wait ~node client in
+  Log.info
+    "Craft a transaction (of [amount] mutez) from the fresh account and call \
+     the [run_operation] RPC on it." ;
+  let* () =
+    let manager_op =
+      Operation.Manager.(
+        make
+          ~source:fresh_account
+          (transfer ~dest:Constant.bootstrap1 ~amount ()))
+    in
+    let* op = Operation.Manager.operation [manager_op] client in
+    let* op_json = Operation.make_run_operation_input op client in
+    let* _output =
+      RPC.(call node (post_chain_block_helpers_scripts_run_operation op_json))
+    in
+    unit
+  in
+  Log.info
+    "Craft a delegation from the fresh account and call the [run_operation] \
+     RPC on it." ;
+  let* () =
+    let manager_op =
+      Operation.Manager.(
+        make ~source:fresh_account (delegation ~delegate:Constant.bootstrap1 ()))
+    in
+    let* op = Operation.Manager.operation [manager_op] client in
+    let* op_json = Operation.make_run_operation_input op client in
+    let* _output =
+      RPC.(call node (post_chain_block_helpers_scripts_run_operation op_json))
+    in
+    unit
+  in
+  unit
+
+let register ~protocols =
+  test_batch_inconsistent_sources protocols ;
+  test_misc_manager_ops_from_fresh_account protocols

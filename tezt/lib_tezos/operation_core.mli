@@ -193,6 +193,12 @@ module Manager : sig
      common to all manager operations. See {!type:t}. *)
   type payload
 
+  (** Build a public key revelation.
+
+     The [Account.key] argument has no default value because it will
+     typically be a fresh account. *)
+  val reveal : Account.key -> payload
+
   (** [transfer ?(dest=Constant.bootstrap2) ~amount:1_000_000 ()]
      builds a transfer operation. Note that the amount is expressed in
      mutez. *)
