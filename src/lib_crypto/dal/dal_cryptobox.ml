@@ -201,9 +201,10 @@ module type Params_sig = sig
   (** Each erasure-encoded slot splits evenly into the given amount of shards. *)
   val shards_amount : int
 
-  val trusted_setup_g1_file : string
+  type trusted_setup_files = {srs_g1 : string; srs_g2 : string; log_size : int}
 
-  val trusted_setup_g2_file : string
+  (** If None, fallback to unsafe trusted setup. *)
+  val trusted_setup_files : trusted_setup_files option
 end
 
 module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
@@ -219,6 +220,7 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
   module Domains = Bls12_381_polynomial.Polynomial.Domain
   module Polynomial = Bls12_381_polynomial.Polynomial.Polynomial
   module IntMap = Tezos_error_monad.TzLwtreslib.Map.Make (Int)
+  module Carray = Bls12_381_polynomial.Carray
 
   type polynomial = Polynomial.t
 
@@ -243,6 +245,13 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
 
   type slot_segments_proofs_precomputation =
     Scalar.t array * proof_slot_segment array array
+
+  type trusted_setup = {
+    srs_g1 : Bls12_381.G1.t array;
+    srs_g2 : Bls12_381.G2.t array;
+    kate_amortized_srs_g2_shards : Bls12_381.G2.t;
+    kate_amortized_srs_g2_segments : Bls12_381.G2.t;
+  }
 
   module Encoding = struct
     open Data_encoding
@@ -292,6 +301,33 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
 
   let erasure_encoding_length = n
 
+  (* Memoize intermediate domains for the FFTs. *)
+  let intermediate_domains : Evaluations.domain IntMap.t ref = ref IntMap.empty
+
+  (* Builds group of nth roots of unity, a valid domain for the FFT. *)
+  let make_domain n = Domains.build ~log:Z.(log2up (of_int n))
+
+  let domain_k = make_domain k
+
+  let domain_2k = make_domain (2 * k)
+
+  let domain_n = make_domain n
+
+  (* Length of a shard in terms of scalar elements. *)
+  let shard_size = Params.(n / shards_amount)
+
+  let nb_segments = Params.(slot_size / slot_segment_size)
+
+  let segment_len = Int.div Params.slot_segment_size scalar_bytes_amount + 1
+
+  let remaining_bytes = Params.slot_segment_size mod scalar_bytes_amount
+
+  let evaluations_log = Z.(log2 (of_int n))
+
+  let evaluations_per_proof_log = Z.(log2 (of_int shard_size))
+
+  let proofs_log = evaluations_log - evaluations_per_proof_log
+
   (* Check code parameters. *)
   let _ =
     let open Params in
@@ -318,28 +354,75 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
     (* Shards must contain at least two elements. *)
     assert (n > shards_amount)
 
-  (* Memoize intermediate domains for the FFTs. *)
-  let intermediate_domains : Evaluations.domain IntMap.t ref = ref IntMap.empty
-
-  (* Builds group of nth roots of unity, a valid domain for the FFT. *)
-  let make_domain n = Domains.build ~log:Z.(log2up (of_int n))
-
-  let domain_k = make_domain k
-
-  let domain_2k = make_domain (2 * k)
-
-  let domain_n = make_domain n
-
-  (* Length of a shard in terms of scalar elements. *)
-  let shard_size = Params.(n / shards_amount)
-
-  let nb_segments = Params.(slot_size / slot_segment_size)
-
-  (* Since the remainder of the division of slot_segment_size (power of 2) by
-     scalar_bytes_amount (= 31) is non-zero. *)
-  let segment_len = Int.div Params.slot_segment_size scalar_bytes_amount + 1
-
-  let remaining_bytes = Params.slot_segment_size mod scalar_bytes_amount
+  let trusted_setup_instance : trusted_setup =
+    match Params.trusted_setup_files with
+    | None ->
+        let module Scalar = Bls12_381.Fr in
+        let build_array init next len =
+          let xi = ref init in
+          Array.init len (fun _ ->
+              let i = !xi in
+              xi := next !xi ;
+              i)
+        in
+        let create_srs :
+            type t.
+            (module Bls12_381.CURVE with type t = t) ->
+            int ->
+            Scalar.t ->
+            t array =
+         fun (module G) d x -> build_array G.(copy one) (fun g -> G.(mul g x)) d
+        in
+        let secret =
+          Scalar.of_string
+            "20812168509434597367146703229805575690060615791308155437936410982393987532344"
+        in
+        {
+          srs_g1 = create_srs (module Bls12_381.G1) k secret;
+          srs_g2 = create_srs (module Bls12_381.G2) k secret;
+          kate_amortized_srs_g2_shards =
+            Kate_amortized.gen_srs_g2
+              ~l:(1 lsl evaluations_per_proof_log)
+              secret;
+          kate_amortized_srs_g2_segments =
+            Kate_amortized.gen_srs_g2
+              ~l:(1 lsl Z.(log2up (of_int segment_len)))
+              secret;
+        }
+    | Some {srs_g1; srs_g2; log_size} ->
+        assert (k < 1 lsl log_size) ;
+        let srs_g1 =
+          Bls12_381_polynomial.Srs.M.(to_array (load_from_file srs_g1 k))
+        in
+        let import_srs_g2 d srsfile =
+          let g2_size_compressed = Bls12_381.G2.size_in_bytes / 2 in
+          let buf = Bytes.create g2_size_compressed in
+          let read ic =
+            Stdlib.really_input ic buf 0 g2_size_compressed ;
+            Bls12_381.G2.of_compressed_bytes_exn buf
+          in
+          let ic = open_in srsfile in
+          try
+            if in_channel_length ic < d * g2_size_compressed then
+              raise
+                (Failure
+                   (Printf.sprintf "SRS asked (%d) too big for %s" d srsfile)) ;
+            let res = Array.init d (fun _ -> read ic) in
+            close_in ic ;
+            res
+          with e ->
+            close_in ic ;
+            raise e
+        in
+        let srs_g2 = import_srs_g2 k srs_g2 in
+        {
+          srs_g1;
+          srs_g2;
+          kate_amortized_srs_g2_shards =
+            Array.get srs_g2 (1 lsl evaluations_per_proof_log);
+          kate_amortized_srs_g2_segments =
+            Array.get srs_g2 (1 lsl Z.(log2up (of_int segment_len)));
+        }
 
   let polynomial_degree = Polynomial.degree
 
@@ -556,56 +639,6 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
       Polynomial.opposite_inplace p ;
       Ok p
 
-  let shard_size = n / Params.shards_amount
-
-  let evaluations_log = Z.(log2 (of_int n))
-
-  let evaluations_per_proof_log = Z.(log2 (of_int shard_size))
-
-  let proofs_log = evaluations_log - evaluations_per_proof_log
-
-  let srs_g1 =
-    Bls12_381_polynomial.Srs.M.load_from_file
-      Params.trusted_setup_g1_file
-      (1 lsl 21)
-    |> Bls12_381_polynomial.Srs.M.to_array
-
-  let srs_g2 =
-    let import_srs_g2 d srsfile =
-      let g2_size_compressed = Bls12_381.G2.size_in_bytes / 2 in
-      let buf = Bytes.create g2_size_compressed in
-      let read ic =
-        Stdlib.really_input ic buf 0 g2_size_compressed ;
-        Bls12_381.G2.of_compressed_bytes_exn buf
-      in
-      let ic = open_in srsfile in
-      try
-        if in_channel_length ic < d * g2_size_compressed then
-          raise
-            (Failure (Printf.sprintf "SRS asked (%d) too big for %s" d srsfile)) ;
-        let res = Array.init d (fun _ -> read ic) in
-        close_in ic ;
-        res
-      with e ->
-        close_in ic ;
-        raise e
-    in
-    import_srs_g2 (1 lsl 16) Params.trusted_setup_g2_file
-
-  let kate_amortized_srs_g1 = Array.sub srs_g1 0 k
-
-  let kate_amortized_srs_g2_shards =
-    Array.get srs_g2 (1 lsl evaluations_per_proof_log)
-
-  let kate_amortized_srs_g2_segments =
-    Array.get srs_g2 (1 lsl Z.(log2up (of_int segment_len)))
-
-  let kzg_srs_size = k
-
-  let kzg_srs_g2 = Array.sub srs_g2 0 k
-
-  let kzg_srs = Array.sub srs_g1 0 k
-
   let commit' :
       type t.
       (module Bls12_381.CURVE with type t = t) ->
@@ -624,7 +657,7 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
              (Array.length srs)))
     else Ok (G.pippenger ~start:0 ~len:(Array.length p) srs p)
 
-  let commit p = commit' (module Bls12_381.G1) p kzg_srs
+  let commit p = commit' (module Bls12_381.G1) p trusted_setup_instance.srs_g1
 
   (* p(X) of degree n. Max degree that can be committed: d, which is also the
      SRS's length - 1.
@@ -637,23 +670,23 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
      X^{d-n} on G_2.*)
 
   let prove_degree p n =
-    let d = kzg_srs_size - 1 in
+    let d = k - 1 in
     commit'
       (module Bls12_381.G1)
       (Polynomial.mul
          (Polynomial.of_coefficients [(Scalar.(copy one), d - n)])
          p)
-      kzg_srs
+      trusted_setup_instance.srs_g1
 
   let verify_degree cm proof n =
     let open Tezos_error_monad.TzMonad.Result_syntax in
     let open Bls12_381 in
-    let d = kzg_srs_size - 1 in
+    let d = k - 1 in
     let* commit_xk =
       commit'
         (module G2)
         (Polynomial.of_coefficients [(Scalar.(copy one), d - n)])
-        kzg_srs_g2
+        trusted_setup_instance.srs_g2
     in
     Ok
       (Pairing.pairing_check [(cm, commit_xk); (proof, G2.(negate (copy one)))])
@@ -667,7 +700,8 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
       Kate_amortized.preprocess_multi_reveals
         ~chunk_len:evaluations_per_proof_log
         ~degree:k
-        (kate_amortized_srs_g1, kate_amortized_srs_g2_shards)
+        ( trusted_setup_instance.srs_g1,
+          trusted_setup_instance.kate_amortized_srs_g2_shards )
     in
     (eval_to_array eval, m)
 
@@ -707,17 +741,18 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
     let domain = Kate_amortized.Domain.build ~log:evaluations_per_proof_log in
     Kate_amortized.verify
       ct
-      (kate_amortized_srs_g1, kate_amortized_srs_g2_shards)
+      ( trusted_setup_instance.srs_g1,
+        trusted_setup_instance.kate_amortized_srs_g2_shards )
       domain
       (Kate_amortized.Domain.get d_n shard_index, shard_evaluations)
       proof
 
   let prove_single p z =
     let q = Polynomial.(division_x_z (p - constant (evaluate p z)) z) in
-    commit' (module Bls12_381.G1) q kzg_srs
+    commit' (module Bls12_381.G1) q trusted_setup_instance.srs_g1
 
   let verify_single cm ~point ~evaluation proof =
-    let h_secret = Array.get kzg_srs_g2 1 in
+    let h_secret = Array.get trusted_setup_instance.srs_g2 1 in
     Bls12_381.(
       Pairing.pairing_check
         [
@@ -731,7 +766,8 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
       Kate_amortized.preprocess_multi_reveals
         ~chunk_len:Z.(log2up (of_int segment_len))
         ~degree:k
-        (kate_amortized_srs_g1, kate_amortized_srs_g2_segments)
+        ( trusted_setup_instance.srs_g1,
+          trusted_setup_instance.kate_amortized_srs_g2_segments )
     in
     (eval_to_array eval, m)
 
@@ -802,7 +838,8 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
     in
     Kate_amortized.verify
       ct
-      (kate_amortized_srs_g1, kate_amortized_srs_g2_segments)
+      ( trusted_setup_instance.srs_g1,
+        trusted_setup_instance.kate_amortized_srs_g2_segments )
       domain
       ( Kate_amortized.Domain.get segment_domain slot_segment_index,
         slot_segment_evaluations )
