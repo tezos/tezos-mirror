@@ -27,6 +27,17 @@ let mkdir dirname =
   try Unix.mkdir dirname 0o775 with Unix.Unix_error (Unix.EEXIST, _, _) -> ()
 
 module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
+  module Storage_helpers = struct
+    include Storage_helpers
+
+    let get_lazy_expr ~what ~getter ~pp ctxt x =
+      let open Lwt_result_syntax in
+      let+ _, expr = get_value ~what ~getter ~pp ctxt x in
+      match Data_encoding.force_decode expr with
+      | Some expr -> expr
+      | None -> assert false
+  end
+
   module ExprMap = Map.Make (P.Script.Hash)
 
   type storage = {contract : P.Contract.repr; storage : P.Script.expr}

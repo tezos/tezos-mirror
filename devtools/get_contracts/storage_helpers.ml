@@ -39,10 +39,3 @@ let get_value ~what ~getter ~pp ctxt x =
         err ;
       assert (not Config.fatal) ;
       Error `AlreadyWarned
-
-let get_lazy_expr ~what ~getter ~pp ctxt x =
-  let open Lwt_result_syntax in
-  let+ _, expr = get_value ~what ~getter ~pp ctxt x in
-  match Data_encoding.force_decode expr with
-  | Some expr -> expr
-  | None -> assert false
