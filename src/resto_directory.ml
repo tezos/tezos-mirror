@@ -213,43 +213,59 @@ module Make (Encoding : ENCODING) = struct
 
   let conflict steps kind = raise (Conflict (steps, kind))
 
-  let rec merge : type p. step list -> p directory -> p directory -> p directory
-      =
-   fun path t1 t2 ->
-    match (t1, t2) with
+  (*********)
+  (* Merge *)
+  (*********)
+
+  let rec merge_loop :
+      type p.
+      [`Raise | `Pick_left | `Pick_right] ->
+      step list ->
+      p directory ->
+      p directory ->
+      p directory =
+   fun strategy path left right ->
+    match (left, right) with
     | Empty, t -> t
     | t, Empty -> t
-    | Static n1, Static n2 -> Static (merge_static_directory path n1 n2)
+    | Static l, Static r -> Static (merge_static_directory strategy path l r)
     | Dynamic _, _ | _, Dynamic _ -> conflict path CBuilder
     | DynamicTail _, _ | _, DynamicTail _ -> conflict path CTail
 
   and merge_static_directory :
       type p.
+      [`Raise | `Pick_left | `Pick_right] ->
       step list ->
       p static_directory ->
       p static_directory ->
       p static_directory =
-   fun path t1 t2 ->
+   fun strategy path left right ->
     let subdirs =
-      match (t1.subdirs, t2.subdirs) with
+      match (left.subdirs, right.subdirs) with
       | None, None -> None
       | None, Some dir | Some dir, None -> Some dir
-      | Some d1, Some d2 -> (
-          match (d1, d2) with
-          | Suffixes m1, Suffixes m2 ->
+      | Some dl, Some dr -> (
+          match (dl, dr) with
+          | Suffixes ml, Suffixes mr ->
               let merge =
-                StringMap.fold (fun n t m ->
-                    let st = try StringMap.find n m with Not_found -> empty in
-                    StringMap.add n (merge (Static n :: path) st t) m)
+                StringMap.union (fun name left_dir right_dir ->
+                    Option.some
+                    @@ merge_loop
+                         strategy
+                         (Static name :: path)
+                         left_dir
+                         right_dir)
               in
-              Some (Suffixes (merge m1 m2))
-          | Arg (arg1, subt1), Arg (arg2, subt2) -> (
+              Some (Suffixes (merge ml mr))
+          | Arg (argl, subtl), Arg (argr, subtr) -> (
               try
-                let Eq = Ty.eq arg1.id arg2.id in
-                let subt = merge (Dynamic arg1.descr :: path) subt1 subt2 in
-                Some (Arg (arg1, subt))
+                let Eq = Ty.eq argl.id argr.id in
+                let subt =
+                  merge_loop strategy (Dynamic argl.descr :: path) subtl subtr
+                in
+                Some (Arg (argl, subt))
               with Ty.Not_equal ->
-                conflict path (CTypes (arg1.descr, arg2.descr)))
+                conflict path (CTypes (argl.descr, argr.descr)))
           | Arg (arg, _), Suffixes m ->
               conflict
                 path
@@ -260,16 +276,22 @@ module Make (Encoding : ENCODING) = struct
                 (CType (arg.descr, List.map fst (StringMap.bindings m))))
     in
     let services =
-      MethMap.fold
-        (fun meth s map ->
-          if MethMap.mem meth map then conflict path (CService meth)
-          else MethMap.add meth s map)
-        t1.services
-        t2.services
+      MethMap.union
+        (fun meth left right ->
+          match strategy with
+          | `Raise -> conflict path (CService meth)
+          | `Pick_right -> Some right
+          | `Pick_left -> Some left)
+        left.services
+        right.services
     in
     {subdirs; services}
 
-  let merge x y = merge [] x y
+  let merge ?(strategy = `Raise) left right = merge_loop strategy [] left right
+
+  (*************************)
+  (* Directory description *)
+  (*************************)
 
   let rec describe_directory :
       type a.

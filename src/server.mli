@@ -128,7 +128,7 @@ module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
     val output_content_media_type :
       ?headers:Cohttp.Header.t ->
       medias ->
-      (string * Media_type.t, [> `Not_acceptable]) Result.result
+      (string * Media_type.t, [> `Not_acceptable]) Result.t
   end
 
   module Agent : sig
@@ -188,7 +188,7 @@ module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
       string list ->
       ( Cohttp.Response.t * Cohttp_lwt.Body.t,
         [> Directory.lookup_error] )
-      Result.result
+      Result.t
       Lwt.t
   end
 end

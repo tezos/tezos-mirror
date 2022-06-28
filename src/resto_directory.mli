@@ -169,12 +169,34 @@ module Make (Encoding : ENCODING) : sig
       @raise [Invalid_argument] if [p] is a dynamic path. *)
   val prefix : ('pr, 'p) Path.path -> 'p directory -> 'pr directory
 
-  (** [merge d1 d2] is a directory which includes all the services of [d1] and
-      [d2].
+  (** [merge ~strategy d1 d2] is a directory which includes all the
+      services of [d1] and [d2].
 
-      @raise [Conflict] if one or more service from [d1] conflicts with one or
-      more service from [d2]. *)
-  val merge : 'a directory -> 'a directory -> 'a directory
+      If one or more service from [d1] collides with one or more service from [d2],
+      the function will make a choice depending on the given merging [strategy]:
+      - [`Raise] will raise a [Conflict] exception. {b This is the default choice.}
+      - [`Pick_left] will pick the service from [d1] to be part of the resulting
+        directory.
+      - [`Pick_right] will pick the service from [d2] to be part of the resulting
+        directory.
+
+      Be careful, this function is only capable to merge static directory trees.
+      If a subtree of one of the given directory is dynamic, the function will
+      raise a [Conflict] exception.
+
+      @raise [Conflict] if:
+      - One or more service from [d1] collides with one or more service from [d2]
+        and the merging [strategy] is [`Raise] or unspecified.
+      - A [Dynamic] or [DynamicTail] directory can be found in [d1] or [d2] directories.
+      - Sub-directories can't be merged because of a structural conflict. For instance,
+        if a [path] leads from [d1] to a sub-directory [d1'] that is an URI parameter, but
+        [path] also leads from [d2] to a sub-directory [d2'] that is only a static segment
+        of the URI. *)
+  val merge :
+    ?strategy:[`Raise | `Pick_left | `Pick_right] ->
+    'a directory ->
+    'a directory ->
+    'a directory
 
   exception Conflict of step list * conflict
 

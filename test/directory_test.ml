@@ -23,11 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Directory = Resto_directory.Make (Resto_json.Encoding)
+module Service = Resto.MakeService (Resto_json.Encoding)
+
 let ( let* ) = Lwt.bind
 
-module Resolve_uri_desc = struct
-  include Resto_directory.Make (Resto_json.Encoding)
+let ( let*? ) = Lwt_result.bind
 
+let traverse = function
+  | Ok p ->
+      let* r = p in
+      Lwt.return @@ Ok r
+  | Error _ as err -> Lwt.return err
+
+module Resolve_uri_desc = struct
   let uri_desc_res_testable =
     let meth_pp fmt m = Fmt.pf fmt "%s" @@ Resto.string_of_meth m in
     let arg_descr_pp fmt Resto.Arg.{name; descr} =
@@ -78,7 +87,7 @@ module Resolve_uri_desc = struct
         fun () ->
           test
             ~exptd:(Ok "/bar/<int>/<float>/patch")
-            (lookup_uri_desc
+            (Directory.lookup_uri_desc
                Fixtures.Directory.dir
                ()
                `POST
@@ -87,7 +96,7 @@ module Resolve_uri_desc = struct
         fun () ->
           test
             ~exptd:(Ok "/tartine/<float>/chaussure/<int>/minus")
-            (lookup_uri_desc
+            (Directory.lookup_uri_desc
                Fixtures.Directory.dir
                ()
                `POST
@@ -96,7 +105,7 @@ module Resolve_uri_desc = struct
         fun () ->
           test
             ~exptd:(Ok "/foobar/<int>/<int>/<int>/<int>/<int>")
-            (lookup_uri_desc
+            (Directory.lookup_uri_desc
                Fixtures.Directory.dir
                ()
                `GET
@@ -105,7 +114,7 @@ module Resolve_uri_desc = struct
         fun () ->
           test
             ~exptd:(Error not_found_case)
-            (lookup_uri_desc
+            (Directory.lookup_uri_desc
                Fixtures.Directory.dir
                ()
                `GET
@@ -114,12 +123,13 @@ module Resolve_uri_desc = struct
         fun () ->
           test
             ~exptd:(Error not_found_case)
-            (lookup_uri_desc Fixtures.Directory.dir () `POST ["foo"]) );
+            (Directory.lookup_uri_desc Fixtures.Directory.dir () `POST ["foo"])
+      );
       ( "fail if an argument can't be serialized",
         fun () ->
           test
             ~exptd:(Error cannot_parse_case)
-            (lookup_uri_desc
+            (Directory.lookup_uri_desc
                Fixtures.Directory.dir
                ()
                `POST
@@ -128,7 +138,143 @@ module Resolve_uri_desc = struct
         fun () ->
           test
             ~exptd:(Error method_not_allowed_case)
-            (lookup_uri_desc Fixtures.Directory.dir () `GET ["foo"; "1"; "add"])
+            (Directory.lookup_uri_desc
+               Fixtures.Directory.dir
+               ()
+               `GET
+               ["foo"; "1"; "add"]) );
+    ]
+end
+
+module Merge = struct
+  let dir1 = Resto.Path.(root / "dir1")
+
+  let dir2 = Resto.Path.(root / "dir2")
+
+  let dir3 = Resto.Path.(dir1 / "dir3")
+
+  let dir4 = Resto.Path.(dir1 / "dir4")
+
+  let dir5 = Resto.Path.(dir3 / "dir5")
+
+  let s1 =
+    Service.get_service
+      ~query:Resto.Query.empty
+      ~output:Json_encoding.int
+      ~error:Json_encoding.empty
+      dir2
+
+  let s2 =
+    Service.get_service
+      ~query:Resto.Query.empty
+      ~output:Json_encoding.int
+      ~error:Json_encoding.empty
+      dir1
+
+  let s3 =
+    Service.get_service
+      ~query:Resto.Query.empty
+      ~output:Json_encoding.int
+      ~error:Json_encoding.empty
+      dir5
+
+  let s4 =
+    Service.get_service
+      ~query:Resto.Query.empty
+      ~output:Json_encoding.int
+      ~error:Json_encoding.empty
+      dir4
+
+  let register v services =
+    let do_register directory service =
+      Directory.register0 directory service (fun () () -> Lwt.return @@ `Ok v)
+    in
+    List.fold_left do_register Directory.empty services
+
+  (* root
+     ├── dir1
+     │   ├── dir3
+     │   │   └── dir5
+     │   │       └── s3 ----> 0
+     │   └── s2 ------------> 0
+     └── dir2
+         └── s1 ------------> 0 *)
+  let left_dir = register 0 [s1; s2; s3]
+
+  (* root
+     └── dir1
+         ├── dir3
+         │   └── dir5
+         │       └── s3 ----> 1
+         ├── dir4
+         │   └── s4 --------> 1
+         └── s2 ------------> 1 *)
+  let right_dir = register 1 [s2; s3; s4]
+
+  let check_call_result dir service expd msg =
+    let* answer = Directory.transparent_lookup dir service () () () in
+    let res =
+      match answer with
+      | `Ok i -> i
+      | _ ->
+          Alcotest.fail
+            (Format.sprintf
+               "The query for service %s must be successful by precondition."
+               msg)
+    in
+    Lwt.return @@ Alcotest.(check int) msg expd res
+
+  let check_raises f =
+    match f () with
+    | exception _ -> Lwt.return_unit
+    | _ -> Alcotest.fail "An exception was expected to raise"
+
+  let tests =
+    [
+      ( "succeed to pick left",
+        fun () ->
+          (* root
+             ├── dir1
+             │   ├── dir3
+             │   │   └── dir5
+             │   │       └── s3 ----> 0 (Already existing in left)
+             │   ├── dir4
+             │   │   └── s4 --------> 1 (Added from right)
+             │   └── s2 ------------> 0 (Already existing in left)
+             └── dir2
+                 └── s1 ------------> 0 (Already existing in left) *)
+          let merged =
+            Directory.merge ~strategy:`Pick_left left_dir right_dir
+          in
+          let* () = check_call_result merged s1 0 "s1" in
+          let* () = check_call_result merged s2 0 "s2" in
+          let* () = check_call_result merged s3 0 "s3" in
+          check_call_result merged s4 1 "s4" );
+      ( "succeed to pick right",
+        fun () ->
+          (* root
+             ├── dir1
+             │   ├── dir3
+             │   │   └── dir5
+             │   │       └── s3 ----> 1 (Already existing in right)
+             │   ├── dir4
+             │   │   └── s4 --------> 1 (Already existing in right)
+             │   └── s2 ------------> 1 (Already existing in right)
+             └── dir2
+                 └── s1 ------------> 0 (Added from left) *)
+          let merged =
+            Directory.merge ~strategy:`Pick_right left_dir right_dir
+          in
+          let* () = check_call_result merged s1 0 "s1" in
+          let* () = check_call_result merged s2 1 "s2" in
+          let* () = check_call_result merged s3 1 "s3" in
+          check_call_result merged s4 1 "s4" );
+      ( "fail with Conflict exception when requiring `Raise",
+        fun () ->
+          check_raises @@ fun () ->
+          Directory.merge ~strategy:`Raise left_dir right_dir );
+      ( "fail with Conflict exception by default",
+        fun () -> check_raises @@ fun () -> Directory.merge left_dir right_dir
       );
     ]
 end
@@ -137,4 +283,7 @@ let () =
   Lwt_main.run
   @@ Alcotest_lwt.run
        "directory"
-       [("resolve_uri_desc", Util.do_test_lwt Resolve_uri_desc.tests)]
+       [
+         ("resolve_uri_desc", Util.do_test_lwt Resolve_uri_desc.tests);
+         ("merge", Util.do_test_lwt Merge.tests);
+       ]
