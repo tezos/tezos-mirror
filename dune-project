@@ -95,7 +95,6 @@
 (package (name tezos-openapi))
 (package (name tezos-p2p))
 (package (name tezos-p2p-services))
-(package (name tezos-polynomial))
 (package (name tezos-protocol-000-Ps9mPmXa))
 (package (name tezos-protocol-001-PtCJ7pwo))
 (package (name tezos-protocol-002-PsYLVpVv))

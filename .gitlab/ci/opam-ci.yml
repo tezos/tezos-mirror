@@ -851,13 +851,6 @@ opam:tezos-p2p-services:
   variables:
     package: tezos-p2p-services
 
-opam:tezos-polynomial:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_6
-  variables:
-    package: tezos-polynomial
-
 opam:tezos-protocol-000-Ps9mPmXa:
   extends:
     - .opam_template

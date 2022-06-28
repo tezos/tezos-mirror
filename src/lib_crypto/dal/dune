@@ -9,10 +9,9 @@
   tezos-stdlib
   tezos-error-monad
   data-encoding
-  tezos-polynomial)
+  tezos-bls12-381-polynomial)
  (flags
   (:standard)
   -open Tezos_stdlib
   -open Tezos_error_monad
-  -open Data_encoding
-  -open Tezos_polynomial))
+  -open Data_encoding))
