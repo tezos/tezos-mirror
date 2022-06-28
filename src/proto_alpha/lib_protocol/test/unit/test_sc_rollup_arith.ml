@@ -106,7 +106,8 @@ let setup boot_sector f =
   let open Lwt_syntax in
   let* index = Context_binary.init "/tmp" in
   let ctxt = Context_binary.empty index in
-  let* state = initial_state ctxt boot_sector in
+  let* state = initial_state ctxt in
+  let* state = install_boot_sector state boot_sector in
   f ctxt state
 
 let pre_boot boot_sector f =

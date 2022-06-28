@@ -104,9 +104,16 @@ val pp_output : Format.formatter -> output -> unit
 module type S = sig
   (** The state of the PVM denotes a state of the rollup.
 
-      We classify states into two categories: "internal states" do not require
-      any external information to be executed while "input states" are waiting
-      for some information from the inbox to be executable. *)
+      The life cycle of the PVM is as follows. It starts its execution
+      from an {!initial_state}. The initial state is specialized at
+      origination with a [boot_sector], using the
+      {!install_boot_sector} function. The resulting state is call the
+      “genesis” of the rollup.
+
+      Afterwards, we classify states into two categories: "internal
+      states" do not require any external information to be executed
+      while "input states" are waiting for some information from the
+      inbox to be executable. *)
   type state
 
   (** A state is initialized in a given context. A [context]
@@ -193,12 +200,17 @@ module type S = sig
   (** [state_hash state] returns a compressed representation of [state]. *)
   val state_hash : state -> hash Lwt.t
 
-  (** [initial_state context boot_sector] is the initial state of the PVM,
-      which is a pure function of [boot_sector].
+  (** [initial_state context] is the initial state of the PVM, before
+      its specialization with a given [boot_sector].
 
       The [context] argument is required for technical reasons and does
       not impact the result. *)
-  val initial_state : context -> string -> state Lwt.t
+  val initial_state : context -> state Lwt.t
+
+  (** [install_boot_sector state boot_sector] specializes the initial
+      [state] of a PVM using a dedicated [boot_sector], submitted at
+      the origination of the rollup. *)
+  val install_boot_sector : state -> string -> state Lwt.t
 
   (** [is_input_state state] returns the input expectations of the
       [state]---does it need input, and if so, how far through the inbox

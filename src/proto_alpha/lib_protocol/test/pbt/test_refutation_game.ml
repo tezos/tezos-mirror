@@ -230,15 +230,18 @@ end) : TestPVM with type state = int = struct
 
   let proof_input_requested _ = No_input_required
 
-  let state_hash (x : state) =
-    return
-      (State_hash.context_hash_to_state_hash
-      @@ Context_hash.hash_string [Int.to_string x])
+  let state_hash_ (x : state) =
+    State_hash.context_hash_to_state_hash
+    @@ Context_hash.hash_string [Int.to_string x]
+
+  let state_hash (x : state) = return (state_hash_ x)
 
   let is_input_state x =
     if x >= P.target then return Initial else return No_input_required
 
-  let initial_state _ _ = return P.target
+  let initial_state _ = return 0
+
+  let install_boot_sector _ _ = return P.target
 
   let set_input _ s = return s
 
@@ -310,11 +313,15 @@ end) : TestPVM with type state = string * int list = struct
 
   let proof_input_requested _ = No_input_required
 
-  let state_hash (x : state) =
-    return @@ State_hash.context_hash_to_state_hash
+  let state_hash_ x =
+    State_hash.context_hash_to_state_hash
     @@ Context_hash.hash_string [to_string x]
 
-  let initial_state _ _ = return ("hello", P.initial_prog)
+  let state_hash (x : state) = return @@ state_hash_ x
+
+  let initial_state _ = return ("", [])
+
+  let install_boot_sector _ _ = return ("hello", P.initial_prog)
 
   let is_input_state (_, c) =
     match c with [] -> return Initial | _ -> return No_input_required
@@ -426,7 +433,9 @@ end) : TestPVM = struct
 
     let default_state =
       let promise =
-        let* boot = initial_state init_context "" >>= eval in
+        let* boot = initial_state init_context in
+        let* boot = install_boot_sector boot "" in
+        let* boot = eval boot in
         let input =
           {
             inbox_level = Raw_level.root;
@@ -459,7 +468,8 @@ end) : TestPVM = struct
       match proof_opt with Ok proof -> return proof | Error _ -> assert false
 
     let make_invalid_proof _ _ =
-      let* state = initial_state init_context "foooobaaar" in
+      let* state = initial_state init_context in
+      let* state = install_boot_sector state "foooobaaar" in
       let* proof_opt = produce_proof init_context None state in
       match proof_opt with Ok proof -> return proof | Error _ -> assert false
   end

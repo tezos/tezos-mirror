@@ -177,22 +177,18 @@ module V2_0_0 = struct
 
     open Monad
 
-    let initial_state ctxt boot_sector =
+    let initial_state ctxt =
       let open Lwt_syntax in
       let state = Tree.empty ctxt in
       let* state = Tree.add state ["wasm-version"] (Bytes.of_string "2.0.0") in
-      let* state =
-        Tree.add state ["boot-sector"] (Bytes.of_string boot_sector)
-      in
       Lwt.return state
 
+    let install_boot_sector state boot_sector =
+      Tree.add state ["boot-sector"] (Bytes.of_string boot_sector)
+
     let state_hash state =
-      let m =
-        return @@ State_hash.context_hash_to_state_hash (Tree.hash state)
-      in
-      let open Lwt_syntax in
-      let* state = Monad.run m state in
-      match state with _, hash -> return hash
+      let context_hash = Tree.hash state in
+      Lwt.return @@ State_hash.context_hash_to_state_hash context_hash
 
     let result_of m state =
       let open Lwt_syntax in

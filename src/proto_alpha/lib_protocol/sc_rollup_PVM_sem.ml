@@ -154,7 +154,9 @@ module type S = sig
 
   val state_hash : state -> hash Lwt.t
 
-  val initial_state : context -> string -> state Lwt.t
+  val initial_state : context -> state Lwt.t
+
+  val install_boot_sector : state -> string -> state Lwt.t
 
   val is_input_state : state -> input_request Lwt.t
 

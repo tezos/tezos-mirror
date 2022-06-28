@@ -727,11 +727,10 @@ module Make (Context : P) :
 
   open Monad
 
-  let initial_state ctxt boot_sector =
+  let initial_state ctxt =
     let state = Tree.empty ctxt in
     let m =
       let open Monad.Syntax in
-      let* () = Boot_sector.set boot_sector in
       let* () = Status.set Halted in
       return ()
     in
@@ -739,19 +738,19 @@ module Make (Context : P) :
     let* state, _ = run m state in
     return state
 
-  let state_hash state =
+  let install_boot_sector state boot_sector =
     let m =
       let open Monad.Syntax in
-      let* status = Status.get in
-      match status with
-      | Halted -> return State_hash.zero
-      | _ -> return @@ State_hash.context_hash_to_state_hash (Tree.hash state)
+      let* () = Boot_sector.set boot_sector in
+      return ()
     in
     let open Lwt_syntax in
-    let* state = Monad.run m state in
-    match state with
-    | _, Some hash -> return hash
-    | _ -> (* Hash computation always succeeds. *) assert false
+    let* state, _ = run m state in
+    return state
+
+  let state_hash state =
+    let context_hash = Tree.hash state in
+    Lwt.return @@ State_hash.context_hash_to_state_hash context_hash
 
   let boot =
     let open Monad.Syntax in
