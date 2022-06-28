@@ -1,8 +1,8 @@
 
 ./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type unit booting with  --burn-cap 9999999
 Node is bootstrapped.
-Estimated gas: 1800.800 units (will add 100 for safety)
-Estimated storage: 6541 bytes added (will add 20 for safety)
+Estimated gas: 2509.140 units (will add 100 for safety)
+Estimated storage: 6626 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
@@ -12,30 +12,32 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000428
+    Fee to the baker: ꜩ0.000614
     Expected counter: 1
-    Gas limit: 1901
-    Storage limit: 6561 bytes
+    Gas limit: 2610
+    Storage limit: 6646 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000428
-      payload fees(the block proposer) ....... +ꜩ0.000428
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000614
+      payload fees(the block proposer) ....... +ꜩ0.000614
     Originate smart contract rollup of kind arith and type unit with boot sector ''
       This smart contract rollup origination was successfully applied
-      Consumed gas: 1800.800
-      Storage size: 6541 bytes
+      Consumed gas: 2509.140
+      Storage size: 6626 bytes
       Address: [SC_ROLLUP_HASH]
+      Genesis commitment hash: [SC_ROLLUP_COMMITMENT_HASH]
       Balance updates:
-        [PUBLIC_KEY_HASH] ... -ꜩ1.63525
-        storage fees ........................... +ꜩ1.63525
+        [PUBLIC_KEY_HASH] ... -ꜩ1.6565
+        storage fees ........................... +ꜩ1.6565
 
 
-./tezos-client rpc get '/chains/main/blocks/head/context/sc_rollup/[SC_ROLLUP_HASH]/initial_level'
-2
+./tezos-client rpc get '/chains/main/blocks/head/context/sc_rollup/[SC_ROLLUP_HASH]/genesis_info'
+{ "level": 2,
+  "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
 ./tezos-sc-rollup-client-alpha rpc get /global/last_stored_commitment
 { "commitment":
     { "compressed_state":
-        "scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf",
+        "scs139rUcWoTB9MbNUEaWYn5RswKF7G2uENnRPq7Q9ByQRMahtB2NA",
       "inbox_level": 32,
       "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
       "number_of_messages": 0, "number_of_ticks": 0 },
@@ -44,7 +46,7 @@ This sequence of operations was run:
 ./tezos-sc-rollup-client-alpha rpc get /local/last_published_commitment
 { "commitment":
     { "compressed_state":
-        "scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf",
+        "scs139rUcWoTB9MbNUEaWYn5RswKF7G2uENnRPq7Q9ByQRMahtB2NA",
       "inbox_level": 32,
       "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
       "number_of_messages": 0, "number_of_ticks": 0 },
@@ -130,7 +132,7 @@ Error:
 
 ./tezos-client --wait none cement commitment '[SC_ROLLUP_COMMITMENT_HASH]' from bootstrap1 for sc rollup '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
-Estimated gas: 3451.204 units (will add 100 for safety)
+Estimated gas: 4051.204 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -141,16 +143,16 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000653
+    Fee to the baker: ꜩ0.000713
     Expected counter: 3
-    Gas limit: 3552
+    Gas limit: 4152
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000653
-      payload fees(the block proposer) ....... +ꜩ0.000653
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000713
+      payload fees(the block proposer) ....... +ꜩ0.000713
     Cement the commitment [SC_ROLLUP_COMMITMENT_HASH] in the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup commitment cementing was successfully applied
-      Consumed gas: 3451.204
+      Consumed gas: 4051.204
 
 
 ./tezos-client rpc get /chains/main/blocks/head/context/constants
@@ -246,7 +248,7 @@ null
 ./tezos-sc-rollup-client-alpha rpc get /global/last_stored_commitment
 { "commitment":
     { "compressed_state":
-        "scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf",
+        "scs139rUcWoTB9MbNUEaWYn5RswKF7G2uENnRPq7Q9ByQRMahtB2NA",
       "inbox_level": 32,
       "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
       "number_of_messages": 0, "number_of_ticks": 0 },
@@ -255,7 +257,7 @@ null
 ./tezos-sc-rollup-client-alpha rpc get /local/last_published_commitment
 { "commitment":
     { "compressed_state":
-        "scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf",
+        "scs139rUcWoTB9MbNUEaWYn5RswKF7G2uENnRPq7Q9ByQRMahtB2NA",
       "inbox_level": 62,
       "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
       "number_of_messages": 0, "number_of_ticks": 0 },
