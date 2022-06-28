@@ -50,10 +50,10 @@ module Test = struct
     let open Tezos_error_monad.Error_monad.Result_syntax in
     List.iter
       (fun redundancy_factor ->
-        (*let srs_g1 =
+        (*let srs_g1_file =
             project_root // Filename.dirname __FILE__ // "srs_zcash_g1"
           in
-          let srs_g2 =
+          let srs_g2_file =
             project_root // Filename.dirname __FILE__ // "srs_zcash_g2"
           in*)
         let module DAL_crypto = Dal_cryptobox.Make (struct
@@ -64,26 +64,23 @@ module Test = struct
           let slot_segment_size = slot_segment_size
 
           let shards_amount = shards_amount
-
-          type trusted_setup_files = {
-            srs_g1 : string;
-            srs_g2 : string;
-            log_size : int;
-          }
-
-          let trusted_setup_files = None
-          (*Some {srs_g1; srs_g2; log_size = 21}*)
         end) in
+        let trusted_setup =
+          DAL_crypto.build_trusted_setup_instance None
+          (*(Some {srs_g1_file; srs_g2_file; log_size = 21})*)
+        in
+
         match
           let* p = DAL_crypto.polynomial_from_bytes msg in
 
-          let* cm = DAL_crypto.commit p in
-          let* pi = DAL_crypto.prove_slot_segment p 1 in
+          let* cm = DAL_crypto.commit trusted_setup p in
+          let* pi = DAL_crypto.prove_slot_segment trusted_setup p 1 in
 
           let slot_segment =
             Bytes.sub msg slot_segment_size (2 * slot_segment_size)
           in
-          assert (DAL_crypto.verify_slot_segment cm (1, slot_segment) pi) ;
+          assert (
+            DAL_crypto.verify_slot_segment trusted_setup cm (1, slot_segment) pi) ;
           let enc_shards = DAL_crypto.to_shards p in
 
           (* Only take half of the buckets *)
@@ -105,7 +102,7 @@ module Test = struct
                  (min slot_size msg_size))
             = 0) ;
 
-          let* comm = DAL_crypto.commit p in
+          let* comm = DAL_crypto.commit trusted_setup p in
 
           (*let precompute_pi_shards = DAL_crypto.precompute_shards_proofs () in*)
           let filename =
@@ -125,14 +122,23 @@ module Test = struct
           match DAL_crypto.IntMap.find 0 enc_shards with
           | None -> Ok ()
           | Some eval ->
-              assert (DAL_crypto.verify_shard comm (0, eval) shard_proofs.(0)) ;
+              assert (
+                DAL_crypto.verify_shard
+                  trusted_setup
+                  comm
+                  (0, eval)
+                  shard_proofs.(0)) ;
 
               let* pi =
-                DAL_crypto.prove_degree p (DAL_crypto.polynomial_degree p)
+                DAL_crypto.prove_degree
+                  trusted_setup
+                  p
+                  (DAL_crypto.polynomial_degree p)
               in
 
               let* check =
                 DAL_crypto.verify_degree
+                  trusted_setup
                   comm
                   pi
                   (DAL_crypto.polynomial_degree p)
@@ -140,10 +146,11 @@ module Test = struct
               assert check ;
 
               let point = Scalar.random () in
-              let+ pi_slot = DAL_crypto.prove_single p point in
+              let+ pi_slot = DAL_crypto.prove_single trusted_setup p point in
 
               assert (
                 DAL_crypto.verify_single
+                  trusted_setup
                   comm
                   ~point
                   ~evaluation:(DAL_crypto.polynomial_evaluate p point)

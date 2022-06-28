@@ -38,14 +38,6 @@ module type Params_sig = sig
 
   (** Each erasure-encoded slot splits evenly into the given amount of shards. *)
   val shards_amount : int
-
-  (** The path to the SRS and their size. *)
-
-  type trusted_setup_files = {srs_g1 : string; srs_g2 : string; log_size : int}
-
-  (** Warning! If None, fallback to unsafe trusted setup.
-      None must be set for unit testing only! *)
-  val trusted_setup_files : trusted_setup_files option
 end
 
 (** The cryptographic primitives for the data availability layer (DAL). *)
@@ -89,6 +81,14 @@ module type DAL_cryptobox_sig = sig
       parameters. *)
   type shards_proofs_precomputation
 
+  type trusted_setup
+
+  type trusted_setup_files = {
+    srs_g1_file : string;
+    srs_g2_file : string;
+    log_size : int;
+  }
+
   module Encoding : sig
     val commitment_encoding : commitment Data_encoding.t
 
@@ -107,6 +107,11 @@ module type DAL_cryptobox_sig = sig
     val shards_proofs_precomputation_encoding :
       shards_proofs_precomputation Data_encoding.t
   end
+
+  (** [build_trusted_setup_instance files] builds a trusted setup from [files]
+      on disk. Warning: if [files] is [None] it triggers a computation of an
+      unsafe trusted setup! *)
+  val build_trusted_setup_instance : trusted_setup_files option -> trusted_setup
 
   (** Length of the erasure-encoded slot in terms of scalar elements. *)
   val erasure_encoding_length : int
@@ -138,6 +143,7 @@ module type DAL_cryptobox_sig = sig
   (** [commit p] returns the commitment to [p]. Errors with
       [`Degree_exceeds_srs_length] if the degree of [p] exceeds the SRS size. *)
   val commit :
+    trusted_setup ->
     polynomial ->
     (commitment, [> `Degree_exceeds_srs_length of string]) Result.t
 
@@ -145,21 +151,24 @@ module type DAL_cryptobox_sig = sig
       than [n]. The function fails with [`Degree_exceeds_srs_length] if that is
         not the case. *)
   val prove_degree :
+    trusted_setup ->
     polynomial ->
     int ->
     (proof_degree, [> `Degree_exceeds_srs_length of string]) Result.t
 
-  (** [verify_degree commitment proof n] returns true if and only if the
-      committed polynomial has degree less than [n]. *)
+  (** [verify_degree commitment ts proof n] returns true if and only if the
+      committed polynomial has degree less than [n], using trusted setup
+      [ts]. *)
   val verify_degree :
+    trusted_setup ->
     commitment ->
     proof_degree ->
     int ->
     (bool, [> `Degree_exceeds_srs_length of string]) Result.t
 
-  (** [precompute_shards_proofs ()] returns the precomputation used to prove
-      shards. *)
-  val precompute_shards_proofs : unit -> shards_proofs_precomputation
+  (** [precompute_shards_proofs ts] returns the precomputation used to prove
+      shards, using trusted setup [ts]. *)
+  val precompute_shards_proofs : trusted_setup -> shards_proofs_precomputation
 
   (** [save_precompute_shards_proofs precomputation filename ()] saves to file
       [filename] the given [precomputation]. *)
@@ -175,37 +184,46 @@ module type DAL_cryptobox_sig = sig
   val prove_shards :
     polynomial -> preprocess:shards_proofs_precomputation -> proof_shard array
 
-  (** [verify_shard cm shard proof] returns true if and only if the
+  (** [verify_shard ts cm shard proof] returns true if and only if the
       [proof] certifies that the [shard] is comming from the erasure encoding
       of the committed polynomial whose commitment is [cm]. *)
-  val verify_shard : commitment -> shard -> proof_shard -> bool
+  val verify_shard : trusted_setup -> commitment -> shard -> proof_shard -> bool
 
-  (** [prove_single p z] returns a proof of evaluation of [p] at [z]. *)
+  (** [prove_single ts p z] returns a proof of evaluation of [p] at [z], using
+      trusted setup [ts]. *)
   val prove_single :
+    trusted_setup ->
     polynomial ->
     Scalar.t ->
     (proof_single, [> `Degree_exceeds_srs_length of string]) Result.t
 
-  (** [verify_single cm ~point ~evaluation pi] returns true if the proof [pi]
-    is correct with regard to the opening ([cm], [point], [evaluation]). *)
+  (** [verify_single ts cm ~point ~evaluation pi] returns true if the proof [pi]
+    is correct with regard to the opening ([cm], [point], [evaluation]), using
+    the trusted setup [ts]. *)
   val verify_single :
-    commitment -> point:Scalar.t -> evaluation:Scalar.t -> proof_single -> bool
+    trusted_setup ->
+    commitment ->
+    point:Scalar.t ->
+    evaluation:Scalar.t ->
+    proof_single ->
+    bool
 
   (* TODO: raise error if index i is incorrect *)
 
-  (** [prove_slot_segments p slot_segment_index] where [p] is the output of
+  (** [prove_slot_segments ts p slot_segment_index] where [p] is the output of
       [polynomial_from_bytes slot], returns proofs for the slot segment] whose
-      index is [slot_segment_index] *)
+      index is [slot_segment_index], using the trusted setup [ts]. *)
   val prove_slot_segment :
+    trusted_setup ->
     polynomial ->
     int ->
     (proof_slot_segment, [> `Degree_exceeds_srs_length of string]) result
 
   (** [verify_slot_segment cm slot_segment proof] returns true if the [proof]
       certifies that the [slot_segment] is indeed included in the slot committed
-      with commitment [cm]. *)
+      with commitment [cm],  using the trusted setup [ts]. *)
   val verify_slot_segment :
-    commitment -> slot_segment -> proof_slot_segment -> bool
+    trusted_setup -> commitment -> slot_segment -> proof_slot_segment -> bool
 end
 
 module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
@@ -251,6 +269,12 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
     srs_g2 : Bls12_381.G2.t array;
     kate_amortized_srs_g2_shards : Bls12_381.G2.t;
     kate_amortized_srs_g2_segments : Bls12_381.G2.t;
+  }
+
+  type trusted_setup_files = {
+    srs_g1_file : string;
+    srs_g2_file : string;
+    log_size : int;
   }
 
   module Encoding = struct
@@ -358,8 +382,8 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
     (* Shards must contain at least two elements. *)
     assert (n > shards_amount)
 
-  let trusted_setup_instance : trusted_setup =
-    match Params.trusted_setup_files with
+  let build_trusted_setup_instance files =
+    match files with
     | None ->
         let module Scalar = Bls12_381.Fr in
         let build_array init next len =
@@ -393,10 +417,10 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
               ~l:(1 lsl Z.(log2up (of_int segment_len)))
               secret;
         }
-    | Some {srs_g1; srs_g2; log_size} ->
+    | Some {srs_g1_file; srs_g2_file; log_size} ->
         assert (k < 1 lsl log_size) ;
         let srs_g1 =
-          Bls12_381_polynomial.Srs.M.(to_array (load_from_file srs_g1 k))
+          Bls12_381_polynomial.Srs.M.(to_array (load_from_file srs_g1_file k))
         in
         let import_srs_g2 d srsfile =
           let g2_size_compressed = Bls12_381.G2.size_in_bytes / 2 in
@@ -418,7 +442,7 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
             close_in ic ;
             raise e
         in
-        let srs_g2 = import_srs_g2 k srs_g2 in
+        let srs_g2 = import_srs_g2 k srs_g2_file in
         {
           srs_g1;
           srs_g2;
@@ -679,7 +703,8 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
              (Array.length srs)))
     else Ok (G.pippenger ~start:0 ~len:(Array.length p) srs p)
 
-  let commit p = commit' (module Bls12_381.G1) p trusted_setup_instance.srs_g1
+  let commit trusted_setup p =
+    commit' (module Bls12_381.G1) p trusted_setup.srs_g1
 
   (* p(X) of degree n. Max degree that can be committed: d, which is also the
      SRS's length - 1. We take d = k - 1 since we don't want to commit
@@ -692,16 +717,16 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
      using the commitments for p and p X^{d-n}, and computing the commitment for
      X^{d-n} on G_2.*)
 
-  let prove_degree p n =
+  let prove_degree trusted_setup p n =
     let d = k - 1 in
     commit'
       (module Bls12_381.G1)
       (Polynomial.mul
          (Polynomial.of_coefficients [(Scalar.(copy one), d - n)])
          p)
-      trusted_setup_instance.srs_g1
+      trusted_setup.srs_g1
 
-  let verify_degree cm proof n =
+  let verify_degree trusted_setup cm proof n =
     let open Result_syntax in
     let open Bls12_381 in
     let d = k - 1 in
@@ -709,20 +734,19 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
       commit'
         (module G2)
         (Polynomial.of_coefficients [(Scalar.(copy one), d - n)])
-        trusted_setup_instance.srs_g2
+        trusted_setup.srs_g2
     in
     Ok
       (Pairing.pairing_check [(cm, commit_xk); (proof, G2.(negate (copy one)))])
 
   let eval_to_array e = Array.init (Domains.length e) (Domains.get e)
 
-  let precompute_shards_proofs () =
+  let precompute_shards_proofs trusted_setup =
     let eval, m =
       Kate_amortized.preprocess_multi_reveals
         ~chunk_len:evaluations_per_proof_log
         ~degree:k
-        ( trusted_setup_instance.srs_g1,
-          trusted_setup_instance.kate_amortized_srs_g2_shards )
+        (trusted_setup.srs_g1, trusted_setup.kate_amortized_srs_g2_shards)
     in
     (eval_to_array eval, m)
 
@@ -757,23 +781,22 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
       ~preprocess
       (Polynomial.to_dense_coefficients p |> Array.to_list)
 
-  let verify_shard cm (shard_index, shard_evaluations) proof =
+  let verify_shard trusted_setup cm (shard_index, shard_evaluations) proof =
     let d_n = Kate_amortized.Domain.build ~log:evaluations_log in
     let domain = Kate_amortized.Domain.build ~log:evaluations_per_proof_log in
     Kate_amortized.verify
       cm
-      ( trusted_setup_instance.srs_g1,
-        trusted_setup_instance.kate_amortized_srs_g2_shards )
+      (trusted_setup.srs_g1, trusted_setup.kate_amortized_srs_g2_shards)
       domain
       (Kate_amortized.Domain.get d_n shard_index, shard_evaluations)
       proof
 
-  let prove_single p z =
+  let prove_single trusted_setup p z =
     let q = Polynomial.(division_x_z (p - constant (evaluate p z)) z) in
-    commit' (module Bls12_381.G1) q trusted_setup_instance.srs_g1
+    commit' (module Bls12_381.G1) q trusted_setup.srs_g1
 
-  let verify_single cm ~point ~evaluation proof =
-    let h_secret = Array.get trusted_setup_instance.srs_g2 1 in
+  let verify_single trusted_setup cm ~point ~evaluation proof =
+    let h_secret = Array.get trusted_setup.srs_g2 1 in
     Bls12_381.(
       Pairing.pairing_check
         [
@@ -800,7 +823,7 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
     (* p(x) * 1/(x^l - z) mod x^{k - l + 1} = q(x) since deg q <= k - l. *)
     fft_mul domain_2k [p; div] |> Polynomial.copy ~len:(k - l + 1)
 
-  let prove_slot_segment p slot_segment_index =
+  let prove_slot_segment trusted_setup p slot_segment_index =
     let l = 1 lsl Z.(log2up (of_int segment_len)) in
     let wi = Domains.get domain_k slot_segment_index in
     let domain = Domains.build ~log:Z.(log2up (of_int segment_len)) in
@@ -816,11 +839,12 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
         l
         (Scalar.pow wi (Z.of_int l))
     in
-    commit quotient
+    commit trusted_setup quotient
 
   (* Parses the [slot_segment] to get the evaluations that it contains. The
      evaluation points are given by the [slot_segment_index]. *)
-  let verify_slot_segment cm (slot_segment_index, slot_segment) proof =
+  let verify_slot_segment trusted_setup cm (slot_segment_index, slot_segment)
+      proof =
     let domain =
       Kate_amortized.Domain.build ~log:Z.(log2up (of_int segment_len))
     in
@@ -850,8 +874,7 @@ module Make (Params : Params_sig) : DAL_cryptobox_sig = struct
     in
     Kate_amortized.verify
       cm
-      ( trusted_setup_instance.srs_g1,
-        trusted_setup_instance.kate_amortized_srs_g2_segments )
+      (trusted_setup.srs_g1, trusted_setup.kate_amortized_srs_g2_segments)
       domain
       (Domains.get domain_k slot_segment_index, slot_segment_evaluations)
       proof
