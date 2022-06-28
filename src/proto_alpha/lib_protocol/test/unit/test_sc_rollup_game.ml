@@ -93,7 +93,7 @@ let init_refutation ?size ?init_tick start_hash =
     }
 
 let two_stakers_in_conflict () =
-  let* ctxt, rollup, refuter, defender =
+  let* ctxt, rollup, genesis_hash, refuter, defender =
     T.originate_rollup_and_deposit_with_two_stakers ()
   in
   let hash1 = hash_string "foo" in
@@ -102,7 +102,7 @@ let two_stakers_in_conflict () =
   let parent_commit =
     Commitment_repr.
       {
-        predecessor = Commitment_repr.Hash.zero;
+        predecessor = genesis_hash;
         inbox_level = T.valid_inbox_level ctxt 1l;
         number_of_messages = T.number_of_messages_exn 5l;
         number_of_ticks = T.number_of_ticks_exn 152231l;
@@ -214,7 +214,7 @@ let test_single_valid_game_move () =
    [false] and then to [true]) in order to create the tests described above. *)
 let staker_injectivity_gen ~refuter2_plays =
   (* Create the defender and the two refuters. *)
-  let+ ctxt, rollup, refuter1, refuter2, defender =
+  let+ ctxt, rollup, genesis_hash, refuter1, refuter2, defender =
     T.originate_rollup_and_deposit_with_three_stakers ()
   in
   let res =
@@ -234,7 +234,7 @@ let staker_injectivity_gen ~refuter2_plays =
     let commit1 =
       Commitment_repr.
         {
-          predecessor = Commitment_repr.Hash.zero;
+          predecessor = genesis_hash;
           inbox_level = T.valid_inbox_level ctxt 1l;
           number_of_messages = T.number_of_messages_exn 5l;
           number_of_ticks = T.number_of_ticks_exn 152231l;

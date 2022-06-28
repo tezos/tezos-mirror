@@ -124,6 +124,30 @@ module V1 = struct
       Data_encoding.Binary.to_bytes_exn encoding commitment
     in
     Hash.hash_bytes [commitment_bytes]
+
+  (* For [number_of_messages] and [number_of_ticks] min_value is equal to zero. *)
+  let genesis_commitment ~origination_level ~genesis_state_hash =
+    let open Sc_rollup_repr in
+    let number_of_messages = Number_of_messages.zero in
+    let number_of_ticks = Number_of_ticks.zero in
+    {
+      compressed_state = genesis_state_hash;
+      inbox_level = origination_level;
+      predecessor = Hash.zero;
+      number_of_messages;
+      number_of_ticks;
+    }
+
+  type genesis_info = {level : Raw_level_repr.t; commitment_hash : Hash.t}
+
+  let genesis_info_encoding =
+    let open Data_encoding in
+    conv
+      (fun {level; commitment_hash} -> (level, commitment_hash))
+      (fun (level, commitment_hash) -> {level; commitment_hash})
+      (obj2
+         (req "level" Raw_level_repr.encoding)
+         (req "commitment_hash" Hash.encoding))
 end
 
 type versioned = V1 of V1.t

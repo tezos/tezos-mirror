@@ -83,7 +83,7 @@ let () =
 type origination_result = {
   address : Sc_rollup.Address.t;
   size : Z.t;
-  genesis_hash : Sc_rollup.State_hash.t;
+  genesis_commitment_hash : Sc_rollup.Commitment.Hash.t;
 }
 
 type 'ret continuation = unit -> 'ret tzresult
@@ -210,10 +210,20 @@ let originate ctxt ~kind ~boot_sector ~origination_proof ~parameters_ty =
   let* genesis_hash =
     check_origination_proof kind boot_sector origination_proof
   in
-  let+ address, size, ctxt =
-    Sc_rollup.originate ctxt ~kind ~boot_sector ~parameters_ty
+  let genesis_commitment =
+    Sc_rollup.Commitment.genesis_commitment
+      ~genesis_state_hash:genesis_hash
+      ~origination_level:(Level.current ctxt).level
   in
-  ({address; size; genesis_hash}, ctxt)
+  let+ address, size, genesis_commitment_hash, ctxt =
+    Sc_rollup.originate
+      ctxt
+      ~kind
+      ~boot_sector
+      ~parameters_ty
+      ~genesis_commitment
+  in
+  ({address; size; genesis_commitment_hash}, ctxt)
 
 let to_transaction_operation ctxt ~source
     (Sc_rollup_management_protocol.Transaction

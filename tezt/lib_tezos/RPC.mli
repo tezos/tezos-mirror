@@ -352,8 +352,8 @@ module Sc_rollup : sig
   (** RPC: [GET chain/[chain]/blocks/[block]/context/sc_rollup/<sc_rollup_address>/inbox] *)
   val get_inbox : ?chain:string -> ?block:string -> string -> JSON.t t
 
-  (** RPC: [GET chain/[chain]/blocks/[block]/context/sc_rollup/<sc_rollup_address>/initial_level] *)
-  val get_initial_level : ?chain:string -> ?block:string -> string -> JSON.t t
+  (** RPC: [GET chain/[chain]/blocks/[block]/context/sc_rollup/<sc_rollup_address>/genesis_info] *)
+  val get_genesis_info : ?chain:string -> ?block:string -> string -> JSON.t t
 
   (** RPC: [GET chain/[chain]/blocks/[block]/context/sc_rollup/<sc_rollup_address>/boot_sector] *)
   val get_boot_sector : ?chain:string -> ?block:string -> string -> JSON.t t

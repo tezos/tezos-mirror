@@ -31,7 +31,7 @@ type t = {
   l1_ctxt : Layer1.t;
   rollup_address : Sc_rollup.t;
   operator : Signature.Public_key_hash.t;
-  initial_level : Raw_level.t;
+  genesis_info : Sc_rollup.Commitment.genesis_info;
   block_finality_time : int;
   kind : Sc_rollup.Kind.t;
   fee_parameter : Injection.fee_parameter;
@@ -45,8 +45,8 @@ let get_operator_keys node_ctxt =
 let init (cctxt : Protocol_client_context.full) l1_ctxt rollup_address operator
     fee_parameter =
   let open Lwt_result_syntax in
-  let* initial_level =
-    Plugin.RPC.Sc_rollup.initial_level
+  let* genesis_info =
+    Plugin.RPC.Sc_rollup.genesis_info
       cctxt
       (cctxt#chain, cctxt#block)
       rollup_address
@@ -59,7 +59,7 @@ let init (cctxt : Protocol_client_context.full) l1_ctxt rollup_address operator
     l1_ctxt;
     rollup_address;
     operator;
-    initial_level;
+    genesis_info;
     kind;
     block_finality_time = 2;
     fee_parameter;

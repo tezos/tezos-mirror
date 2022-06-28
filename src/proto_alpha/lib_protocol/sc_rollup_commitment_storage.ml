@@ -52,14 +52,10 @@ let get_commitment ctxt rollup commitment =
 let last_cemented_commitment_hash_with_level ctxt rollup =
   let open Lwt_tzresult_syntax in
   let* commitment_hash, ctxt = last_cemented_commitment ctxt rollup in
-  if Commitment_hash.(commitment_hash = zero) then
-    let+ initial_level = Storage.Sc_rollup.Initial_level.get ctxt rollup in
-    (commitment_hash, initial_level, ctxt)
-  else
-    let+ {inbox_level; _}, ctxt =
-      get_commitment_unsafe ctxt rollup commitment_hash
-    in
-    (commitment_hash, inbox_level, ctxt)
+  let+ {inbox_level; _}, ctxt =
+    get_commitment_unsafe ctxt rollup commitment_hash
+  in
+  (commitment_hash, inbox_level, ctxt)
 
 let set_commitment_added ctxt rollup node new_value =
   let open Lwt_tzresult_syntax in

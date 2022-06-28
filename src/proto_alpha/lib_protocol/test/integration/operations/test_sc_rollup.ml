@@ -167,10 +167,15 @@ let number_of_ticks_exn n =
 
 let dummy_commitment ctxt rollup =
   let ctxt = Incremental.alpha_ctxt ctxt in
-  let*! root_level = Sc_rollup.initial_level ctxt rollup in
-  let root_level =
-    match root_level with Ok v -> v | Error _ -> assert false
+  let* genesis_info =
+    Sc_rollup.genesis_info ctxt rollup >|= Environment.wrap_tzresult
   in
+  let predecessor = genesis_info.commitment_hash in
+  let* {compressed_state; _}, ctxt =
+    Sc_rollup.Commitment.get_commitment ctxt rollup genesis_info.commitment_hash
+    >|= Environment.wrap_tzresult
+  in
+  let root_level = genesis_info.level in
   let inbox_level =
     let commitment_freq =
       Constants_storage.sc_rollup_commitment_period_in_blocks
@@ -182,11 +187,11 @@ let dummy_commitment ctxt rollup =
   return
     Sc_rollup.Commitment.
       {
-        predecessor = Sc_rollup.Commitment.Hash.zero;
+        predecessor;
         inbox_level;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 3000l;
-        compressed_state = Sc_rollup.State_hash.zero;
+        compressed_state;
       }
 
 (* Verify that parameters and unparsed parameters match. *)

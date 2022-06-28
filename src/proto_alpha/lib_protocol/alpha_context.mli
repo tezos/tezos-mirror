@@ -3195,9 +3195,17 @@ module Sc_rollup : sig
     val reference_initial_state_hash : State_hash.t
   end
 
-  module Number_of_messages : Bounded.Int32.S
+  module Number_of_messages : sig
+    include Bounded.Int32.S
 
-  module Number_of_ticks : Bounded.Int32.S
+    val zero : t
+  end
+
+  module Number_of_ticks : sig
+    include Bounded.Int32.S
+
+    val zero : t
+  end
 
   module Commitment : sig
     module Hash : S.HASH
@@ -3216,6 +3224,13 @@ module Sc_rollup : sig
 
     val hash : t -> Hash.t
 
+    val genesis_commitment :
+      origination_level:Raw_level.t -> genesis_state_hash:State_hash.t -> t
+
+    type genesis_info = {level : Raw_level.t; commitment_hash : Hash.t}
+
+    val genesis_info_encoding : genesis_info Data_encoding.t
+
     val get_commitment :
       context -> rollup -> Hash.t -> (t * context) tzresult Lwt.t
 
@@ -3228,7 +3243,8 @@ module Sc_rollup : sig
     kind:Kind.t ->
     boot_sector:string ->
     parameters_ty:Script.lazy_expr ->
-    (t * Z.t * context) tzresult Lwt.t
+    genesis_commitment:Commitment.t ->
+    (t * Z.t * Commitment.Hash.t * context) tzresult Lwt.t
 
   val parameters_type :
     context -> t -> (Script.lazy_expr option * context) tzresult Lwt.t
@@ -3427,7 +3443,7 @@ module Sc_rollup : sig
 
   val list : context -> t list tzresult Lwt.t
 
-  val initial_level : context -> t -> Raw_level.t tzresult Lwt.t
+  val genesis_info : context -> rollup -> Commitment.genesis_info tzresult Lwt.t
 
   val get_boot_sector : context -> t -> string tzresult Lwt.t
 

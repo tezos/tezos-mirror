@@ -381,13 +381,13 @@ type info = {origination_level : int32}
 
 let gather_info (cctxt : Protocol_client_context.full) sc_rollup_address =
   let open Lwt_result_syntax in
-  let* origination_level =
-    RPC.Sc_rollup.initial_level
+  let* genesis_info =
+    RPC.Sc_rollup.genesis_info
       cctxt
       (cctxt#chain, cctxt#block)
       sc_rollup_address
   in
-  return {origination_level = Raw_level.to_int32 origination_level}
+  return {origination_level = Raw_level.to_int32 genesis_info.level}
 
 (** [discard_pre_origination_blocks info chain_events] filters [chain_events] in order to
     discard all heads that occur before the SC rollup origination. *)

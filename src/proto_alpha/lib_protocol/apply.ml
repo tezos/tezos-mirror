@@ -1805,11 +1805,17 @@ let apply_external_manager_operation_content :
         ~boot_sector
         ~origination_proof
         ~parameters_ty
-      >>=? fun ({address; size; genesis_hash}, ctxt) ->
+      >>=? fun ({address; size; genesis_commitment_hash}, ctxt) ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result =
         Sc_rollup_originate_result
-          {address; genesis_hash; consumed_gas; size; balance_updates = []}
+          {
+            address;
+            genesis_commitment_hash;
+            consumed_gas;
+            size;
+            balance_updates = [];
+          }
       in
       return (ctxt, result, [])
   | Sc_rollup_add_messages {rollup; messages} ->

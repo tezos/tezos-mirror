@@ -41,7 +41,7 @@ type execute_outbox_message_result = {
 type origination_result = {
   address : Sc_rollup.Address.t;
   size : Z.t;
-  genesis_hash : Sc_rollup.State_hash.t;
+  genesis_commitment_hash : Sc_rollup.Commitment.Hash.t;
 }
 
 (** [originate context ~kind ~boot_sector ~origination_proof

@@ -117,16 +117,8 @@ let withdraw_stake ctxt rollup staker =
 
 let assert_commitment_not_too_far_ahead ctxt rollup lcc commitment =
   let open Lwt_tzresult_syntax in
-  let* ctxt, min_level =
-    if Commitment_hash.(lcc = zero) then
-      let* level = Store.Initial_level.get ctxt rollup in
-      return (ctxt, level)
-    else
-      let* lcc, ctxt =
-        Commitment_storage.get_commitment_unsafe ctxt rollup lcc
-      in
-      return (ctxt, Commitment.(lcc.inbox_level))
-  in
+  let* lcc, ctxt = Commitment_storage.get_commitment_unsafe ctxt rollup lcc in
+  let min_level = Commitment.(lcc.inbox_level) in
   let max_level = Commitment.(commitment.inbox_level) in
   let* () =
     fail_when
@@ -145,16 +137,10 @@ let assert_commitment_not_too_far_ahead ctxt rollup lcc commitment =
 let assert_commitment_period ctxt rollup commitment =
   let open Lwt_tzresult_syntax in
   let pred_hash = Commitment.(commitment.predecessor) in
-  let* ctxt, pred_level =
-    if Commitment_hash.(pred_hash = zero) then
-      let* level = Store.Initial_level.get ctxt rollup in
-      return (ctxt, level)
-    else
-      let* pred, ctxt =
-        Commitment_storage.get_commitment_unsafe ctxt rollup pred_hash
-      in
-      return (ctxt, Commitment.(pred.inbox_level))
+  let* pred, ctxt =
+    Commitment_storage.get_commitment_unsafe ctxt rollup pred_hash
   in
+  let pred_level = Commitment.(pred.inbox_level) in
   (* We want to check the following inequalities on [commitment.inbox_level],
      [commitment.predecessor.inbox_level] and the constant [sc_rollup_commitment_period].
 

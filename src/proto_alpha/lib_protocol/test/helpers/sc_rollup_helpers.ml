@@ -126,3 +126,47 @@ let origination_proof ~boot_sector = function
 
              let proof = proof
            end))
+
+let genesis_commitment ~boot_sector ~origination_level = function
+  | Sc_rollup.Kind.Example_arith ->
+      let open Lwt_syntax in
+      let context = Tezos_context_memory.make_empty_context () in
+      let* proof = Arith_pvm.produce_origination_proof context boot_sector in
+      let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
+      let genesis_state_hash =
+        WithExceptions.Option.get ~loc:__LOC__
+        @@ Arith_pvm.proof_stop_state proof
+      in
+      return
+        Sc_rollup.Commitment.(
+          genesis_commitment ~origination_level ~genesis_state_hash)
+  | Sc_rollup.Kind.Wasm_2_0_0 ->
+      let open Lwt_syntax in
+      let context = Tezos_context_memory.make_empty_context () in
+      let* proof = Wasm_pvm.produce_origination_proof context boot_sector in
+      let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
+      let genesis_state_hash =
+        WithExceptions.Option.get ~loc:__LOC__
+        @@ Wasm_pvm.proof_stop_state proof
+      in
+      return
+        Sc_rollup.Commitment.(
+          genesis_commitment ~origination_level ~genesis_state_hash)
+
+let genesis_commitment_raw ~boot_sector ~origination_level kind =
+  let open Lwt_syntax in
+  let origination_level =
+    Raw_level_repr.to_int32 origination_level
+    |> Alpha_context.Raw_level.of_int32_exn
+  in
+  let kind =
+    match kind with
+    | Sc_rollups.Kind.Example_arith -> Sc_rollup.Kind.Example_arith
+    | Sc_rollups.Kind.Wasm_2_0_0 -> Sc_rollup.Kind.Wasm_2_0_0
+  in
+  let* res = genesis_commitment ~boot_sector ~origination_level kind in
+  let res =
+    Data_encoding.Binary.to_bytes_exn Sc_rollup.Commitment.encoding res
+    |> Data_encoding.Binary.of_bytes_exn Sc_rollup_commitment_repr.encoding
+  in
+  return res

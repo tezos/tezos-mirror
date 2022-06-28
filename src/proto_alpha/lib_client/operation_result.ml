@@ -658,11 +658,16 @@ let pp_manager_operation_contents_result ppf op_result =
   in
   let pp_sc_rollup_originate_result
       (Sc_rollup_originate_result
-        {address; genesis_hash; consumed_gas; size; balance_updates}) =
+        {address; genesis_commitment_hash; consumed_gas; size; balance_updates})
+      =
     pp_consumed_gas ppf consumed_gas ;
     pp_storage_size ppf size ;
     Format.fprintf ppf "@,Address: %a" Sc_rollup.Address.pp address ;
-    Format.fprintf ppf "@,Genesis hash: %a" Sc_rollup.State_hash.pp genesis_hash ;
+    Format.fprintf
+      ppf
+      "@,Genesis commitment hash: %a"
+      Sc_rollup.Commitment.Hash.pp
+      genesis_commitment_hash ;
     pp_balance_updates ppf balance_updates
   in
   let pp_sc_rollup_add_messages_result

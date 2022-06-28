@@ -215,6 +215,12 @@ end
 
 module Sc_rollup : sig
   val inbox : t -> Sc_rollup.t -> Sc_rollup.Inbox.t tzresult Lwt.t
+
+  val commitment :
+    t ->
+    Sc_rollup.t ->
+    Sc_rollup.Commitment.Hash.t ->
+    Sc_rollup.Commitment.t tzresult Lwt.t
 end
 
 type (_, _) tup =

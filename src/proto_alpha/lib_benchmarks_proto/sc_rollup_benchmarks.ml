@@ -222,13 +222,22 @@ module Sc_rollup_add_external_messages_benchmark = struct
         Michelson_v1_parser.parse_expression "unit"
       in
       let parameters_ty = Alpha_context.Script.lazy_expr expanded in
-      let+ rollup, _size, ctxt =
+      let boot_sector = "" in
+      let kind = Sc_rollups.Kind.Example_arith in
+      let*! genesis_commitment =
+        Sc_rollup_helpers.genesis_commitment_raw
+          ~boot_sector
+          ~origination_level:(Raw_context.current_level ctxt).level
+          kind
+      in
+      let+ rollup, _size, _genesis_hash, ctxt =
         Lwt.map Environment.wrap_tzresult
         @@ Sc_rollup_storage.originate
              ctxt
-             ~kind:Example_arith
-             ~boot_sector:""
+             ~kind
+             ~boot_sector
              ~parameters_ty
+             ~genesis_commitment
       in
       (rollup, ctxt)
     in

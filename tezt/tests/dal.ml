@@ -334,11 +334,11 @@ let rollup_node_subscribes_to_dal_slots _protocol sc_rollup_node
      5. Execute a client command to subscribe the rollup to dal slot 1, bake one level
      6. Fetch the list of subscribed slots, determine that it contains slots 0 and 1
   *)
-  let* init_level =
+  let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.Sc_rollup.get_initial_level sc_rollup_address
+    @@ RPC.Sc_rollup.get_genesis_info sc_rollup_address
   in
-  let init_level = init_level |> JSON.as_int in
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
   let* () = Sc_rollup_node.run sc_rollup_node in
   let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
   let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in

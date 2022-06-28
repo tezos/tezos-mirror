@@ -374,6 +374,16 @@ module Sc_rollup = struct
       sc_rollup
       ()
       ()
+
+  let commitment ctxt sc_rollup hash =
+    Environment.RPC_context.make_call2
+      Plugin.RPC.Sc_rollup.S.commitment
+      rpc_ctxt
+      ctxt
+      sc_rollup
+      hash
+      ()
+      ()
 end
 
 type (_, _) tup =

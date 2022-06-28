@@ -1623,15 +1623,15 @@ module Sc_rollup = struct
         let encoding = Script_repr.lazy_expr_encoding
       end)
 
-  module Initial_level =
+  module Genesis_info =
     Indexed_context.Make_map
       (struct
-        let name = ["initial_level"]
+        let name = ["genesis_info"]
       end)
       (struct
-        type t = Raw_level_repr.t
+        type t = Sc_rollup_commitment_repr.genesis_info
 
-        let encoding = Raw_level_repr.encoding
+        let encoding = Sc_rollup_commitment_repr.genesis_info_encoding
       end)
 
   module Inbox_versioned =

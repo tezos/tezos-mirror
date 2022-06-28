@@ -120,20 +120,20 @@ let next_commitment_level (module Last_commitment_level : Mutable_level_store)
        (Raw_level.to_int32 last_commitment_level)
        sc_rollup_commitment_period
 
-let last_commitment_hash (module Last_commitment_level : Mutable_level_store)
-    store =
+let last_commitment_hash ~genesis_info
+    (module Last_commitment_level : Mutable_level_store) store =
   let open Lwt_syntax in
   let+ last_commitment = last_commitment (module Last_commitment_level) store in
   match last_commitment with
   | Some commitment -> Sc_rollup.Commitment.hash commitment
-  | None -> Sc_rollup.Commitment.Hash.zero
+  | None -> genesis_info.Sc_rollup.Commitment.commitment_hash
 
-let must_store_commitment ~origination_level current_level store =
+let must_store_commitment ~genesis_info current_level store =
   let open Lwt_result_syntax in
   let+ next_commitment_level =
     next_commitment_level
       (module Store.Last_stored_commitment_level)
-      ~origination_level
+      ~origination_level:genesis_info.Sc_rollup.Commitment.level
       store
   in
   Raw_level.equal current_level next_commitment_level
@@ -159,15 +159,15 @@ let update_last_stored_commitment store (commitment : Sc_rollup.Commitment.t) =
 module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
   module PVM = PVM
 
-  let build_commitment ~origination_level store block_hash =
+  let build_commitment ~genesis_info store block_hash =
     let open Lwt_result_syntax in
     let lsc =
       (module Store.Last_stored_commitment_level : Mutable_level_store)
     in
-    let*! predecessor = last_commitment_hash lsc store in
+    let*! predecessor = last_commitment_hash ~genesis_info lsc store in
     let* inbox_level =
       Lwt.map Environment.wrap_tzresult
-      @@ next_commitment_level ~origination_level lsc store
+      @@ next_commitment_level ~origination_level:genesis_info.level lsc store
     in
     let*! pvm_state = Store.PVMState.find store block_hash in
     let* compressed_state =
@@ -214,16 +214,16 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
         compressed_state;
       }
 
-  let store_commitment_if_necessary ~origination_level store current_level
-      block_hash =
+  let store_commitment_if_necessary ~genesis_info store current_level block_hash
+      =
     let open Lwt_result_syntax in
     let* must_store_commitment =
       Lwt.map Environment.wrap_tzresult
-      @@ must_store_commitment ~origination_level current_level store
+      @@ must_store_commitment ~genesis_info current_level store
     in
     if must_store_commitment then
       let*! () = Commitment_event.compute_commitment block_hash current_level in
-      let* commitment = build_commitment ~origination_level store block_hash in
+      let* commitment = build_commitment ~genesis_info store block_hash in
       let*! () = update_last_stored_commitment store commitment in
       return_unit
     else return_unit
@@ -238,9 +238,9 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       Layer1.(Head {level; hash}) =
     let open Lwt_result_syntax in
     let current_level = Raw_level.of_int32_exn level in
-    let origination_level = node_ctxt.initial_level in
+    let genesis_info = node_ctxt.genesis_info in
     let* () = update_ticks_and_messages store hash in
-    store_commitment_if_necessary ~origination_level store current_level hash
+    store_commitment_if_necessary ~genesis_info store current_level hash
 
   let sync_last_cemented_commitment_hash_with_level
       ({cctxt; rollup_address; _} : Node_context.t) store =
@@ -333,7 +333,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
   let publish_commitment node_ctxt store =
     let open Lwt_result_syntax in
     let open Node_context in
-    let origination_level = node_ctxt.initial_level in
+    let origination_level = node_ctxt.genesis_info.level in
     (* Check level of next publishable commitment and avoid publishing if it is
        on or before the last cemented commitment.
     *)
@@ -424,13 +424,13 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
   (* TODO:  https://gitlab.com/tezos/tezos/-/issues/3008
      Use the injector to cement commitments. *)
   let cement_commitment_if_possible
-      ({Node_context.initial_level = origination_level; _} as node_ctxt) store
+      ({Node_context.genesis_info; _} as node_ctxt) store
       (Layer1.Head {level = head_level; _}) =
     let open Lwt_result_syntax in
     let* next_level_to_cement =
       Lwt.map Environment.wrap_tzresult
       @@ next_commitment_level
-           ~origination_level
+           ~origination_level:genesis_info.level
            (module Store.Last_cemented_commitment_level)
            store
     in

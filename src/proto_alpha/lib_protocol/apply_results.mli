@@ -220,7 +220,7 @@ and _ successful_manager_operation_result =
   | Sc_rollup_originate_result : {
       balance_updates : Receipt.balance_updates;
       address : Sc_rollup.Address.t;
-      genesis_hash : Sc_rollup.State_hash.t;
+      genesis_commitment_hash : Sc_rollup.Commitment.Hash.t;
       consumed_gas : Gas.Arith.fp;
       size : Z.t;
     }
