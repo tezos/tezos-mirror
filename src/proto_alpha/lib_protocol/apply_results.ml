@@ -1027,6 +1027,8 @@ let equal_manager_kind :
   | ( Kind.Register_global_constant_manager_kind,
       Kind.Register_global_constant_manager_kind ) ->
       Some Eq
+  | Kind.Event_manager_kind, Kind.Event_manager_kind -> Some Eq
+  | Kind.Event_manager_kind, _ -> None
   | Kind.Register_global_constant_manager_kind, _ -> None
   | Kind.Set_deposits_limit_manager_kind, Kind.Set_deposits_limit_manager_kind
     ->
