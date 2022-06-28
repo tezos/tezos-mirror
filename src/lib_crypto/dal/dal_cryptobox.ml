@@ -462,17 +462,6 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
 
   let polynomial_evaluate = Polynomials.evaluate
 
-  (* https://github.com/janestreet/base/blob/master/src/list.ml#L1117 *)
-  let take n t_orig =
-    if n <= 0 then []
-    else
-      let rec loop n t accum =
-        if n = 0 then accum
-        else
-          match t with [] -> t_orig | hd :: tl -> loop (n - 1) tl (hd :: accum)
-      in
-      loop n t_orig []
-
   let fft_mul d ps =
     let open Evaluations in
     let evaluations = List.map (evaluation_fft d) ps in
@@ -660,7 +649,7 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
       let factors =
         IntMap.bindings shards
         (* We always consider the first k codeword vector components. *)
-        |> take (k / shard_size)
+        |> Tezos_stdlib.TzList.take_n (k / shard_size)
         |> List.rev_map (fun (i, _) ->
                Polynomials.of_coefficients
                  [
