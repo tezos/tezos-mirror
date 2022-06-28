@@ -165,6 +165,15 @@ let read_value file encoding =
        (function
          | Unix.Unix_error (e, _, _) -> fail (Unix_error e) | e -> fail (Exn e))
 
+let maybe_read_value ~warn file encoding =
+  let open Lwt_syntax in
+  let* v = read_value file encoding in
+  match v with
+  | Error e ->
+      let+ () = warn file e in
+      None
+  | Ok v -> return_some v
+
 let write_value file encoding value =
   trace (Cannot_write_file file)
   @@ protect
@@ -223,7 +232,7 @@ module Make_table (H : H) = struct
       (fun (k, v) -> write_value (filedata t k) H.value_encoding v)
       seq
 
-  let load_from_disk ~initial_size ~data_dir ~filter =
+  let load_from_disk ~warn_unreadable ~initial_size ~data_dir ~filter =
     let open Lwt_result_syntax in
     let* t = create ~data_dir initial_size in
     let*! d = Lwt_unix.opendir t.path in
@@ -242,9 +251,21 @@ module Make_table (H : H) = struct
           let* () =
             match H.key_of_string filename with
             | None -> return_unit
-            | Some k ->
-                let+ v = read_value (filedata t k) H.value_encoding in
-                if filter v then H.add t.table k v
+            | Some k -> (
+                let+ v =
+                  match warn_unreadable with
+                  | None ->
+                      let+ v = read_value (filedata t k) H.value_encoding in
+                      Some v
+                  | Some warn ->
+                      let*! v =
+                        maybe_read_value ~warn (filedata t k) H.value_encoding
+                      in
+                      return v
+                in
+                match v with
+                | None -> ()
+                | Some v -> if filter v then H.add t.table k v)
           in
           browse ()
     in
@@ -314,7 +335,7 @@ struct
 
   let length q = Q.length q.queue
 
-  let load_from_disk ~capacity ~data_dir ~filter =
+  let load_from_disk ~warn_unreadable ~capacity ~data_dir ~filter =
     let open Lwt_result_syntax in
     let* q = create ~data_dir capacity in
     let*! d = Lwt_unix.opendir q.path in
@@ -333,10 +354,31 @@ struct
           let* acc =
             match K.of_b58check_opt filename with
             | None -> return acc
-            | Some k ->
-                let* v = read_value (filedata q k) V.encoding
-                and* meta = read_value (filemetadata q k) metadata_encoding in
-                return (if filter v then (k, v, meta) :: acc else acc)
+            | Some k -> (
+                let+ v_meta =
+                  match warn_unreadable with
+                  | None ->
+                      let* v = read_value (filedata q k) V.encoding
+                      and* meta =
+                        read_value (filemetadata q k) metadata_encoding
+                      in
+                      return_some (v, meta)
+                  | Some warn ->
+                      let open Lwt_syntax in
+                      let* v = maybe_read_value ~warn (filedata q k) V.encoding
+                      and* meta =
+                        maybe_read_value
+                          ~warn
+                          (filemetadata q k)
+                          metadata_encoding
+                      in
+                      return_ok @@ Option.bind v
+                      @@ fun v -> Option.bind meta @@ fun meta -> Some (v, meta)
+                in
+                match v_meta with
+                | None -> acc
+                | Some (v, meta) ->
+                    if filter v then (k, v, meta) :: acc else acc)
           in
           browse acc
     in

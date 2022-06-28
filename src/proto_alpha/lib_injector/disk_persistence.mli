@@ -86,11 +86,14 @@ module Make_table (H : H) : sig
   (** Persistent version of {!H.replace_seq} *)
   val replace_seq : t -> (key * value) Seq.t -> unit tzresult Lwt.t
 
-  (** [load_from_disk ~initial_size ~data_dir] creates a hash table of size
-      [initial_size]. The hash table is populated by persistent elements present
-      in [data_dir/H.name] which pass the [filter] (the directory is created if
-      it does not exist). *)
+  (** [load_from_disk ~warn_unreadable ~initial_size ~data_dir] creates a hash
+      table of size [initial_size]. The hash table is populated by persistent
+      elements present in [data_dir/H.name] which pass the [filter] (the
+      directory is created if it does not exist). If [warn_unreadable] is [Some
+      warn], unreadable files are ignored but a warning is printed with [warn],
+      otherwise the loading fails on the first unreadable file. *)
   val load_from_disk :
+    warn_unreadable:(string -> error trace -> unit Lwt.t) option ->
     initial_size:int ->
     data_dir:string ->
     filter:(value -> bool) ->
@@ -127,10 +130,16 @@ end) : sig
   (** [length q] is the number of bindings held by [q]. *)
   val length : t -> int
 
-  (** [load_from_disk ~capacity ~data_dir ~filter] creates a bounded hash queue
-      of capacity [capacity]. The queue is populated by persistent elements
-      present in [data_dir/N.name] which pass the [filter] (the directory is
-      created if it does not exist). *)
+  (** [load_from_disk ~warn_unreadable ~capacity ~data_dir ~filter] creates a
+      bounded hash queue of capacity [capacity]. The queue is populated by
+      persistent elements present in [data_dir/N.name] which pass the [filter]
+      (the directory is created if it does not exist).  If [warn_unreadable] is
+      [Some warn], unreadable files are ignored but a warning is printed with
+      [warn], otherwise the loading fails on the first unreadable file.  *)
   val load_from_disk :
-    capacity:int -> data_dir:string -> filter:(V.t -> bool) -> t tzresult Lwt.t
+    warn_unreadable:(string -> error trace -> unit Lwt.t) option ->
+    capacity:int ->
+    data_dir:string ->
+    filter:(V.t -> bool) ->
+    t tzresult Lwt.t
 end

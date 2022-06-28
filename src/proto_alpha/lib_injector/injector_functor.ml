@@ -225,16 +225,24 @@ module Make (Rollup : PARAMETERS) = struct
       | None -> false
       | Some t -> Tags.mem t tags
     in
+    let warn_unreadable =
+      (* Warn of corrupted files but don't fail *)
+      Some
+        (fun file error ->
+          Event.(emit corrupted_operation_on_disk)
+            (signer.pkh, tags, file, error))
+    in
+    let emit_event_loaded kind nb =
+      Event.(emit loaded_from_disk) (signer.pkh, tags, nb, kind)
+    in
     let* queue =
       Op_queue.load_from_disk
+        ~warn_unreadable
         ~capacity:50_000
         ~data_dir
         ~filter:(filter (fun op -> op))
     in
-    let*! () =
-      Event.(emit loaded_from_disk)
-        (signer.pkh, tags, Op_queue.length queue, "operations_queue")
-    in
+    let*! () = emit_event_loaded "operations_queue" @@ Op_queue.length queue in
     (* Very coarse approximation for the number of operation we expect for each
        block *)
     let n =
@@ -242,54 +250,50 @@ module Make (Rollup : PARAMETERS) = struct
     in
     let* injected_operations =
       Injected_operations.load_from_disk
+        ~warn_unreadable
         ~initial_size:n
         ~data_dir
         ~filter:(filter (fun (i : injected_info) -> i.op))
     in
     let*! () =
-      Event.(emit loaded_from_disk)
-        ( signer.pkh,
-          tags,
-          Injected_operations.length injected_operations,
-          "injected_operations" )
+      emit_event_loaded "injected_operations"
+      @@ Injected_operations.length injected_operations
     in
+
     let* included_operations =
       Included_operations.load_from_disk
+        ~warn_unreadable
         ~initial_size:(confirmations * n)
         ~data_dir
         ~filter:(filter (fun (i : included_info) -> i.op))
     in
     let*! () =
-      Event.(emit loaded_from_disk)
-        ( signer.pkh,
-          tags,
-          Included_operations.length included_operations,
-          "included_operations" )
+      emit_event_loaded "included_operations"
+      @@ Included_operations.length included_operations
     in
     let* injected_ophs =
       Injected_ophs.load_from_disk
+        ~warn_unreadable
         ~initial_size:n
         ~data_dir
         ~filter:(List.exists (Injected_operations.mem injected_operations))
     in
     let*! () =
-      Event.(emit loaded_from_disk)
-        (signer.pkh, tags, Injected_ophs.length injected_ophs, "injected_ophs")
+      emit_event_loaded "injected_ophs" @@ Injected_ophs.length injected_ophs
     in
     let* included_in_blocks =
       Included_in_blocks.load_from_disk
+        ~warn_unreadable
         ~initial_size:(confirmations * n)
         ~data_dir
         ~filter:(fun (_, ops) ->
           List.exists (Included_operations.mem included_operations) ops)
     in
     let*! () =
-      Event.(emit loaded_from_disk)
-        ( signer.pkh,
-          tags,
-          Included_in_blocks.length included_in_blocks,
-          "included_in_blocks" )
+      emit_event_loaded "included_in_blocks"
+      @@ Included_in_blocks.length included_in_blocks
     in
+
     return
       {
         cctxt = injector_context (cctxt :> #Protocol_client_context.full);
