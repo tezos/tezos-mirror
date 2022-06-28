@@ -26,6 +26,33 @@
 open Sc_rollup_repr
 module PS = Sc_rollup_PVM_sem
 
+(*
+  This is the state hash of reference that both the prover of the node
+  and the verifier of the protocol {!ProtocolImplementation} have to
+  agree on (if they do, it means they are using the same tree
+  structure).
+
+  We have to hard-code this value because the Arith PVM uses Irmin as
+  its Merkle proof verification backend, and the economic protocol
+  cannot create an empty Irmin context. Such a context is required to
+  create an empty tree, itself required to create the initial state of
+  the Arith PVM.
+
+  Utlimately, the value of this constant is decided by the prover of
+  reference (the only need is for it to be compatible with
+  {!ProtocolImplementation}.)
+
+  Its value is the result of the following snippet
+
+  {|
+  let*! state = Prover.initial_state context in
+  Prover.state_hash state
+  |}
+*)
+let reference_initial_state_hash =
+  State_hash.of_b58check_exn
+    "scs11cXwQJJ5dkpEQGq3x2MJm3cM73cbEkHJqo5eDSoRpHUPyEQLB4"
+
 module type P = sig
   module Tree : Context.TREE with type key = string list and type value = bytes
 
@@ -1065,6 +1092,32 @@ module Make (Context : P) :
     match result with
     | Some (tree_proof, requested) ->
         return {tree_proof; given = input_given; requested}
+    | None -> fail Arith_proof_production_failed
+
+  let verify_origination_proof proof boot_sector =
+    let open Lwt_syntax in
+    let before = Context.proof_before proof.tree_proof in
+    if State_hash.(before <> reference_initial_state_hash) then return false
+    else
+      let* result =
+        Context.verify_proof proof.tree_proof (fun state ->
+            let* state = install_boot_sector state boot_sector in
+            return (state, ()))
+      in
+      match result with None -> return false | Some (_, ()) -> return true
+
+  let produce_origination_proof context boot_sector =
+    let open Lwt_result_syntax in
+    let*! state = initial_state context in
+    let*! result =
+      Context.produce_proof context state (fun state ->
+          let open Lwt_syntax in
+          let* state = install_boot_sector state boot_sector in
+          return (state, ()))
+    in
+    match result with
+    | Some (tree_proof, ()) ->
+        return {tree_proof; given = None; requested = No_input_required}
     | None -> fail Arith_proof_production_failed
 
   (* TEMPORARY: The following definitions will be extended in a future commit. *)

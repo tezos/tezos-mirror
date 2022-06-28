@@ -3040,6 +3040,11 @@ module Sc_rollup : sig
       val produce_proof :
         context -> input option -> state -> (proof, error) result Lwt.t
 
+      val verify_origination_proof : proof -> string -> bool Lwt.t
+
+      val produce_origination_proof :
+        context -> string -> (proof, error) result Lwt.t
+
       type output_proof
 
       val output_proof_encoding : output_proof Data_encoding.t
@@ -3113,6 +3118,8 @@ module Sc_rollup : sig
 
       val get_status : state -> status Lwt.t
     end
+
+    val reference_initial_state_hash : State_hash.t
   end
 
   module Wasm_2_0_0PVM : sig
@@ -3168,6 +3175,8 @@ module Sc_rollup : sig
         with type context = Context.t
          and type state = Context.tree
          and type proof = Context.Proof.tree Context.Proof.t proof
+
+    val reference_initial_state_hash : State_hash.t
   end
 
   module Number_of_messages : Bounded.Int32.S

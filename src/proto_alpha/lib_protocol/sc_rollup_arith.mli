@@ -129,6 +129,12 @@ end
 module ProtocolImplementation :
   S with type context = Context.t and type state = Context.tree
 
+(** This is the state hash of reference that both the prover of the
+    node and the verifier of the protocol {!ProtocolImplementation}
+    have to agree on (if they do, it means they are using the same
+    tree structure). *)
+val reference_initial_state_hash : Sc_rollup_repr.State_hash.t
+
 module type P = sig
   module Tree : Context.TREE with type key = string list and type value = bytes
 
