@@ -6,7 +6,6 @@ scripts/ci/docker_registry.inc.sh
 scripts/ci/docker_registry_read.sh
 scripts/ci/docker_registry_tag.sh
 scripts/create_docker_image.sh
-scripts/install_sapling_parameters.sh
 scripts/opam-check.sh
 scripts/snapshot_alpha_and_link.sh
 scripts/snapshot_alpha.sh
