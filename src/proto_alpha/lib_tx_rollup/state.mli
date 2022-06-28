@@ -26,7 +26,7 @@
 (*****************************************************************************)
 open Protocol.Alpha_context
 open Protocol_client_context
-open Common
+open Injector_common
 
 (** The RPC server and the Daemon main loop are sharing a variable of the
     type stored in the Irmin store. The [State] module allows access to this stored

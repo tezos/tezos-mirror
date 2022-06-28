@@ -31,6 +31,8 @@ open Alpha_context
 type t = {
   cctxt : Protocol_client_context.full;
       (** Client context used by the rollup node. *)
+  l1_ctxt : Layer1.t;
+      (** Layer 1 context to fetch blocks and monitor heads, etc.*)
   rollup_address : Sc_rollup.t;
       (** Smart contract rollup tracked by the rollup node. *)
   operator : Signature.Public_key_hash.t;
@@ -53,12 +55,13 @@ val get_operator_keys :
   tzresult
   Lwt.t
 
-(** [init cctxt sc_rollup operator_pkh] initialises the rollup representation.
-    The rollup origination level and kind are fetched via an RPC call to the
-    layer1 node that [cctxt] uses for RPC requests.
+(** [init cctxt l1_ctxt sc_rollup operator_pkh] initialises the rollup
+    representation.  The rollup origination level and kind are fetched via an
+    RPC call to the layer1 node that [cctxt] uses for RPC requests.
 *)
 val init :
   Protocol_client_context.full ->
+  Layer1.t ->
   Sc_rollup.t ->
   Signature.Public_key_hash.t ->
   Injection.fee_parameter ->

@@ -52,15 +52,34 @@ let reorg_encoding block_encoding =
 
 let fetch_tezos_block ~find_in_cache (cctxt : #full) hash :
     (Alpha_block_services.block_info, error trace) result Lwt.t =
+  let open Lwt_syntax in
+  let errors = ref None in
   let fetch hash =
-    Alpha_block_services.info
-      cctxt
-      ~chain:cctxt#chain
-      ~block:(`Hash (hash, 0))
-      ~metadata:`Always
-      ()
+    let* block =
+      Alpha_block_services.info
+        cctxt
+        ~chain:cctxt#chain
+        ~block:(`Hash (hash, 0))
+        ~metadata:`Always
+        ()
+    in
+    match block with
+    | Error errs ->
+        errors := Some errs ;
+        return_none
+    | Ok block -> return_some block
   in
-  find_in_cache hash fetch
+  let+ block = find_in_cache hash fetch in
+  match (block, !errors) with
+  | None, None ->
+      (* This should not happen if {!find_in_cache} behaves correctly,
+         i.e. calls {!fetch} for cache misses. *)
+      error_with
+        "Fetching Tezos block %a failed unexpectedly"
+        Block_hash.pp
+        hash
+  | None, Some errs -> Error errs
+  | Some block, _ -> Ok block
 
 (* Compute the reorganization of L1 blocks from the chain whose head is
    [old_head_hash] and the chain whose head [new_head_hash]. *)

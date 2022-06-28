@@ -27,7 +27,7 @@
 
 open Protocol.Alpha_context
 open Protocol_client_context
-open Common
+open Injector_common
 
 module Tezos_blocks_cache =
   Ringo_lwt.Functors.Make_opt
@@ -69,25 +69,12 @@ let rollup_operation_index = 3
 let get_head state = state.head
 
 let fetch_tezos_block state hash =
-  let open Lwt_syntax in
-  let errors = ref [] in
-  let find_in_cache hash fetch =
-    let fetch hash =
-      let* block = fetch hash in
-      match block with
-      | Error errs ->
-          errors := errs ;
-          return_none
-      | Ok block -> return_some block
-    in
-    let+ block =
-      Tezos_blocks_cache.find_or_replace state.tezos_blocks_cache hash fetch
-    in
-    Result.of_option ~error:!errors block
-    |> record_trace (Error.Tx_rollup_cannot_fetch_tezos_block hash)
-  in
-
-  fetch_tezos_block ~find_in_cache state.cctxt hash
+  trace (Error.Tx_rollup_cannot_fetch_tezos_block hash)
+  @@ fetch_tezos_block
+       state.cctxt
+       hash
+       ~find_in_cache:
+         (Tezos_blocks_cache.find_or_replace state.tezos_blocks_cache)
 
 let set_tezos_head state new_head_hash =
   let open Lwt_result_syntax in

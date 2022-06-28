@@ -4220,6 +4220,7 @@ module Protocol = Protocol
             irmin;
             ringo;
             ringo_lwt;
+            injector |> if_some |> open_;
           ]
     in
     let tx_rollup =

@@ -26,7 +26,7 @@
 open Protocol_client_context
 open Protocol
 open Alpha_context
-open Common
+open Injector_common
 open Injector_worker_types
 open Injector_sigs
 open Injector_errors

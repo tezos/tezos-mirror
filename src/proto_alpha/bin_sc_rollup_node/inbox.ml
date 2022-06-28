@@ -28,7 +28,6 @@
 *)
 open Protocol
 open Alpha_context
-module Block_services = Block_services.Make (Protocol) (Protocol)
 
 let lift = Lwt.map Environment.wrap_tzresult
 
@@ -71,12 +70,9 @@ end
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3199
    For the moment, the rollup node ignores L1 to L2 messages.
 *)
-let get_messages cctxt head rollup =
+let get_messages l1_ctxt head rollup =
   let open Lwt_result_syntax in
-  let open Block_services in
-  let+ operations =
-    Operations.operations cctxt ~chain:`Main ~block:(`Level (snd head)) ()
-  in
+  let+ block = Layer1.fetch_tezos_block l1_ctxt head in
   let is_add_message = function
     | Contents
         (Manager_operation
@@ -85,19 +81,21 @@ let get_messages cctxt head rollup =
         messages
     | _ -> []
   in
-  let process_contents {protocol_data = Operation_data {contents; _}; _} =
+  let process_contents
+      Protocol_client_context.Alpha_block_services.
+        {protocol_data = Operation_data {contents; _}; _} =
     let operations = Operation.to_list (Contents_list contents) in
     List.concat_map is_add_message operations
   in
   let process_operations operations =
     List.concat_map process_contents operations
   in
-  List.concat_map process_operations operations
+  List.concat_map process_operations block.operations
 
-let process_head Node_context.({cctxt; rollup_address; _} as node_ctxt) store
+let process_head Node_context.({l1_ctxt; rollup_address; _} as node_ctxt) store
     Layer1.(Head {level; hash = head_hash} as head) =
   let open Lwt_result_syntax in
-  let*! res = get_messages cctxt (head_hash, level) rollup_address in
+  let*! res = get_messages l1_ctxt head_hash rollup_address in
   match res with
   | Error e -> head_processing_failure e
   | Ok messages ->

@@ -770,13 +770,13 @@ let handle_l1_reorg state acc reorg =
     List.fold_left_es
       (handle_l1_block `Rollback state)
       acc
-      (List.rev reorg.Common.old_chain)
+      (List.rev reorg.Injector_common.old_chain)
   in
   let* acc =
     List.fold_left_es
       (handle_l1_block `Process state)
       acc
-      reorg.Common.new_chain
+      reorg.Injector_common.new_chain
   in
   return acc
 
