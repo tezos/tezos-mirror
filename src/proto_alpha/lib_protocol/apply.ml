@@ -2155,6 +2155,7 @@ let burn_internal_storage_fees :
       >|=? fun (ctxt, storage_limit, origination_result) ->
       (ctxt, storage_limit, IOrigination_result origination_result)
   | IDelegation_result _ -> return (ctxt, storage_limit, smopr)
+  | IEvent_result _ -> return (ctxt, storage_limit, smopr)
 
 let apply_manager_contents (type kind) ctxt mode chain_id
     (op : kind Kind.manager contents) :

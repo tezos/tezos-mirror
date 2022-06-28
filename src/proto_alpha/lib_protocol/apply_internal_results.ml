@@ -177,6 +177,10 @@ type _ successful_internal_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.delegation successful_internal_manager_operation_result
+  | IEvent_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.event successful_internal_manager_operation_result
 
 type packed_successful_internal_manager_operation_result =
   | Successful_internal_manager_result :
@@ -648,6 +652,20 @@ module Internal_manager_result = struct
       ~proj:(function[@coq_match_with_default]
         | IDelegation_result {consumed_gas} -> consumed_gas)
       ~inj:(fun consumed_gas -> IDelegation_result {consumed_gas})
+
+  let event_case =
+    make
+      ~op_case:Internal_result.event_case
+      ~encoding:
+        Data_encoding.(
+          obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+      ~select:(function
+        | Successful_internal_manager_result (IEvent_result _ as op) -> Some op
+        | _ -> None)
+      ~kind:Kind.Event_manager_kind
+      ~proj:(function[@coq_match_with_default]
+        | IEvent_result {consumed_gas} -> consumed_gas)
+      ~inj:(fun consumed_gas -> IEvent_result {consumed_gas})
 end
 
 let internal_manager_operation_result_encoding :
@@ -687,4 +705,5 @@ let internal_manager_operation_result_encoding :
          make
            Internal_manager_result.delegation_case
            Internal_result.delegation_case;
+         make Internal_manager_result.event_case Internal_result.event_case;
        ]

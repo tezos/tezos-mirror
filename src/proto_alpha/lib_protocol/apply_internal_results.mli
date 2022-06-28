@@ -116,6 +116,10 @@ type _ successful_internal_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.delegation successful_internal_manager_operation_result
+  | IEvent_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.event successful_internal_manager_operation_result
 
 type 'kind internal_manager_operation_result =
   ( 'kind,

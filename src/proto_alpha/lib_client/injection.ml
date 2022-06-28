@@ -355,10 +355,11 @@ let estimated_gas_single (type kind)
             ( Transaction_to_contract_result {consumed_gas; _}
             | Transaction_to_tx_rollup_result {consumed_gas; _}
             | Transaction_to_sc_rollup_result {consumed_gas; _}
-            | Transaction_to_event_result {consumed_gas; _} ) ->
-            Ok consumed_gas
-        | IOrigination_result {consumed_gas; _} -> Ok consumed_gas
-        | IDelegation_result {consumed_gas} -> Ok consumed_gas)
+            | Transaction_to_event_result {consumed_gas; _} )
+        | IOrigination_result {consumed_gas; _}
+        | IDelegation_result {consumed_gas}
+        | IEvent_result {consumed_gas} ->
+            Ok consumed_gas)
     | Skipped _ ->
         Ok Gas.Arith.zero (* there must be another error for this to happen *)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
@@ -457,7 +458,7 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
             Ok Z.zero
         | IOrigination_result {paid_storage_size_diff; _} ->
             Ok (Z.add paid_storage_size_diff origination_size)
-        | IDelegation_result _ -> Ok Z.zero)
+        | IDelegation_result _ | IEvent_result _ -> Ok Z.zero)
     | Skipped _ ->
         Ok Z.zero (* there must be another error for this to happen *)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
@@ -548,7 +549,7 @@ let originated_contracts_single (type kind)
             Ok []
         | IOrigination_result {originated_contracts; _} ->
             Ok originated_contracts
-        | IDelegation_result _ -> Ok [])
+        | IDelegation_result _ | IEvent_result _ -> Ok [])
     | Skipped _ -> Ok [] (* there must be another error for this to happen *)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
   in
