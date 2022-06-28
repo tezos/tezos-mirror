@@ -50,12 +50,6 @@ module Test = struct
     let open Tezos_error_monad.Error_monad.Result_syntax in
     List.iter
       (fun redundancy_factor ->
-        (*let srs_g1_file =
-            project_root // Filename.dirname __FILE__ // "srs_zcash_g1"
-          in
-          let srs_g2_file =
-            project_root // Filename.dirname __FILE__ // "srs_zcash_g2"
-          in*)
         let module DAL_crypto = Dal_cryptobox.Make (struct
           let redundancy_factor = redundancy_factor
 
