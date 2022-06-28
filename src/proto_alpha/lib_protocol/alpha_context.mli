@@ -2768,6 +2768,12 @@ module Sc_rollup : sig
     include S.HASH
 
     val context_hash_to_state_hash : Context_hash.t -> t
+
+    type unreachable = |
+
+    val hash_bytes : unreachable -> t
+
+    val hash_string : unreachable -> t
   end
 
   module Inbox : sig
