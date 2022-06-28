@@ -92,7 +92,6 @@ type successful_transaction_result =
       consumed_gas : Gas.Arith.fp;
       inbox_after : Sc_rollup.Inbox.t;
     }
-  | Transaction_to_event_result of {consumed_gas : Gas.Arith.fp}
 
 (** Result of applying an internal origination. *)
 type successful_origination_result = {

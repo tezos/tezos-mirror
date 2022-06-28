@@ -148,7 +148,6 @@ type successful_transaction_result =
       consumed_gas : Gas.Arith.fp;
       inbox_after : Sc_rollup.Inbox.t;
     }
-  | Transaction_to_event_result of {consumed_gas : Gas.Arith.fp}
 
 type successful_origination_result = {
   lazy_storage_diff : Lazy_storage.diffs option;
@@ -322,15 +321,6 @@ module Internal_result = struct
           (function
             | consumed_gas, inbox_after ->
                 Transaction_to_sc_rollup_result {consumed_gas; inbox_after});
-        case
-          ~title:"To_event"
-          (Tag 3)
-          (obj1
-             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
-          (function
-            | Transaction_to_event_result {consumed_gas} -> Some consumed_gas
-            | _ -> None)
-          (fun consumed_gas -> Transaction_to_event_result {consumed_gas});
       ]
 
   let[@coq_axiom_with_reason "gadt"] transaction_case =
