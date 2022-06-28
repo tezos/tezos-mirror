@@ -13,6 +13,7 @@ depopts: [
   "tezos-client-010-PtGRANAD"
   "tezos-client-011-PtHangz2"
   "tezos-client-012-Psithaca"
+  "tezos-client-013-PtJakart"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
