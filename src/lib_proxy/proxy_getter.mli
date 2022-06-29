@@ -24,9 +24,10 @@
 (*****************************************************************************)
 
 module Local := Local_context
+module Proof := Tezos_context_sigs.Context.Proof_types
 
 (** The size of a tree, for logging *)
-val raw_context_size : Tezos_shell_services.Block_services.raw_context -> int
+val raw_context_size : Proof.raw_context -> int
 
 module StringMap = String.Map
 
@@ -139,6 +140,5 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M
 module Internal : sig
   module Tree : Proxy.TREE with type t = Local.tree with type key = Local.key
 
-  val raw_context_to_tree :
-    Tezos_shell_services.Block_services.raw_context -> Local.tree option Lwt.t
+  val raw_context_to_tree : Proof.raw_context -> Local.tree option Lwt.t
 end

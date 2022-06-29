@@ -37,6 +37,7 @@
 module Internal = Tezos_proxy.Light_internal
 module Merkle = Internal.Merkle
 module Store = Tezos_proxy.Local_context
+module Proof = Tezos_context_sigs.Context.Proof_types
 open Lib_test.Qcheck2_helpers
 
 open Tezos_shell_services_test_helpers.Shell_services_test_helpers
@@ -97,7 +98,7 @@ let test_merkle_tree_to_irmin_tree_preserves_simple_tree =
 let filter_none : 'a option list -> 'a list = List.filter_map Fun.id
 
 let rec remove_data_in_node =
-  let open Tezos_shell_services.Block_services in
+  let open Proof in
   function
   | Hash _ as x -> Some x
   | Data _ -> None
@@ -185,7 +186,7 @@ let test_union_translation =
   Light_lib.check_irmin_tree_eq direct_tree id_union_tree
 
 let rec union_merkle_node n1 n2 =
-  let open Tezos_shell_services.Block_services in
+  let open Proof in
   match (n1, n2) with
   | Hash h1, Hash h2 when h1 = h2 -> Some n1
   | Data raw_context1, Data raw_context2 when raw_context1 = raw_context2 ->
@@ -314,7 +315,7 @@ let test_shape_ignores_key =
         quad print_merkle_tree (list string) print_merkle_node print_merkle_node)
     Gen.(quad merkle_tree_gen (list string) merkle_node_gen merkle_node_gen)
   @@ fun (tree, key, node1, node2) ->
-  let open Tezos_shell_services.Block_services in
+  let open Proof in
   let is_continue = function Continue _ -> true | _ -> false in
   (* If both are [Continue] then they are trees with child nodes, hence
      shape comparison will fail. *)
@@ -474,10 +475,9 @@ module Consensus = struct
         assert false
     end
 
-  let mk_rogue_tree (mtree : Tezos_shell_services.Block_services.merkle_tree)
-      (seed : int list) :
-      (Tezos_shell_services.Block_services.merkle_tree, string) result =
-    let merkle_tree_eq = Tezos_shell_services.Block_services.merkle_tree_eq in
+  let mk_rogue_tree (mtree : Proof.merkle_tree) (seed : int list) :
+      (Proof.merkle_tree, string) result =
+    let merkle_tree_eq = Proof.merkle_tree_eq in
     let rec gen_rec ~rand attempts_left =
       if attempts_left = 0 then Error "mk_rogue_tree: giving up"
       else

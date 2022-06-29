@@ -26,6 +26,7 @@
 module Internal = Light_internal
 module Store = Local_context
 module Merkle = Internal.Merkle
+module Proof = Tezos_context_sigs.Context.Proof_types
 
 type input = {
   printer : Tezos_client_base.Client_context.printer;
@@ -33,7 +34,7 @@ type input = {
   chain : Tezos_shell_services.Block_services.chain;
   block : Tezos_shell_services.Block_services.block;
   key : string list;
-  mtree : Tezos_shell_services.Block_services.merkle_tree;
+  mtree : Proof.merkle_tree;
   tree : Store.tree;
 }
 
@@ -49,10 +50,8 @@ module Make (Light_proto : Light_proto.PROTO_RPCS) = struct
       * Its shape matches the shape of the tree provided by the
         endpoint providing data ([data_tree])
       * It agrees with the tree at [key] in [store_tree]. *)
-  let validate uri key store_tree
-      (data_tree : Tezos_shell_services.Block_services.merkle_tree)
-      (incoming_mtree :
-        Tezos_shell_services.Block_services.merkle_tree option tzresult) =
+  let validate uri key store_tree (data_tree : Proof.merkle_tree)
+      (incoming_mtree : Proof.merkle_tree option tzresult) =
     match incoming_mtree with
     | Error trace ->
         Lwt.return
@@ -136,7 +135,7 @@ module Make (Light_proto : Light_proto.PROTO_RPCS) = struct
         Light_proto.merkle_tree
           {rpc_context; chain; block; mode = Client}
           key
-          Tezos_shell_services.Block_services.Hole
+          Proof.Hole
       in
       validate uri key tree mtree other_mtree
     in

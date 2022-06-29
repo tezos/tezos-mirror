@@ -88,13 +88,6 @@ module Crypto = struct
     Assert.equal ?loc ?msg ~pp ~eq bd1 bd2
 end
 
-module Shell_services = struct
-  let equal_history_mode ?loc ?msg hm1 hm2 =
-    let eq = ( = ) in
-    let pp = Tezos_shell_services.History_mode.pp in
-    Assert.equal ?loc ?msg ~pp ~eq hm1 hm2
-end
-
 module Raw_Tree = struct
   let equal ?loc ?msg r1 r2 =
     let rec aux r1 r2 =

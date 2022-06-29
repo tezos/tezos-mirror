@@ -24,11 +24,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Proof = Tezos_context_sigs.Context.Proof_types
+
 let read_partial_context =
   let open Lwt_syntax in
-  let init = Block_services.Dir String.Map.empty in
+  let init = Proof.Dir String.Map.empty in
   fun context path depth ->
-    if depth = 0 then Lwt.return Block_services.Cut
+    if depth = 0 then Lwt.return Proof.Cut
     else
       (* According to the documentation of Context.fold,
          "[f] is never called with an empty key for values; i.e.,
@@ -37,7 +39,7 @@ let read_partial_context =
       *)
       let* o = Context_ops.find context path in
       match o with
-      | Some v -> Lwt.return (Block_services.Key v)
+      | Some v -> Lwt.return (Proof.Key v)
       | None ->
           (* try to read as directory *)
           Context_ops.fold_value
@@ -532,7 +534,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
       | Some context ->
           let holey = Option.value ~default:false query#holey in
           let leaf_kind =
-            let open Tezos_shell_services.Block_services in
+            let open Proof in
             if holey then Hole else Raw_context
           in
           let*! v = Context_ops.merkle_tree context leaf_kind path in

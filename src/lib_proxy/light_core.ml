@@ -31,6 +31,7 @@ module Merkle = Internal.Merkle
 module Store = Local_context
 module Consensus = Light_consensus
 module Block_services = Tezos_shell_services.Block_services
+module Proof = Tezos_context_sigs.Context.Proof_types
 
 let key_to_string = Internal.key_to_string
 
@@ -184,8 +185,7 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
         If [Some (mtree, other_endpoints)] is returned, it is guaranteed that
         [List.length endpoints = List.length other_endpoints + 1] *)
     let get_first_merkle_tree chain block key leaf_kind :
-        (Block_services.merkle_tree * (Uri.t * RPC_context.simple) list) option
-        Lwt.t =
+        (Proof.merkle_tree * (Uri.t * RPC_context.simple) list) option Lwt.t =
       get_first_merkle_tree chain block key leaf_kind [] endpoints
 
     let get key =
@@ -205,7 +205,7 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
       in
       let*! () = Logger.(emit api_do_rpc @@ key_to_string key) in
       let*! mtree_and_i_opt =
-        get_first_merkle_tree chain block key Block_services.Raw_context
+        get_first_merkle_tree chain block key Proof.Raw_context
       in
       let nb_endpoints = List.length endpoints in
       match mtree_and_i_opt with

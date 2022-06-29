@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 module Local = Local_context
+module Proof = Tezos_context_sigs.Context.Proof_types
 
 (** The kind of RPC request: is it a GET (i.e. is it loading data?) or
     is it only a MEMbership request (i.e. is the key associated to data?). *)
@@ -83,13 +84,12 @@ module Events = struct
 end
 
 let rec raw_context_size = function
-  | Tezos_shell_services.Block_services.Key _ | Cut -> 0
+  | Proof.Key _ | Cut -> 0
   | Dir map ->
       String.Map.fold (fun _key v acc -> acc + 1 + raw_context_size v) map 0
 
-let rec raw_context_to_tree
-    (raw : Tezos_shell_services.Block_services.raw_context) :
-    Local.tree option Lwt.t =
+let rec raw_context_to_tree (raw : Proof.raw_context) : Local.tree option Lwt.t
+    =
   match raw with
   | Key (bytes : Bytes.t) ->
       Lwt.return (Some (Local.Tree.of_raw (`Value bytes)))

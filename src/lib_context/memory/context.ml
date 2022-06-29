@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Proof = Tezos_context_sigs.Context.Proof_types
+
 module type TEZOS_CONTEXT_MEMORY = sig
   type tree
 
@@ -255,7 +257,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     match Store.Tree.destruct tree with
     | `Contents (v, _) ->
         let+ v = Store.Tree.Contents.force_exn v in
-        Block_services.Key v
+        Proof.Key v
     | `Node _ ->
         let* kvs = Store.Tree.list tree [] in
         let f acc (key, _) =
@@ -265,18 +267,18 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
           String.Map.add key sub_raw_context acc
         in
         let+ res = List.fold_left_s f String.Map.empty kvs in
-        Block_services.Dir res
+        Proof.Dir res
 
   let to_memory_tree t key = find_tree t key
 
   let merkle_hash tree =
     let merkle_hash_kind =
       match Store.Tree.destruct tree with
-      | `Contents _ -> Block_services.Contents
-      | `Node _ -> Block_services.Node
+      | `Contents _ -> Proof.Contents
+      | `Node _ -> Proof.Node
     in
     let hash_str = Store.Tree.hash tree |> merkle_hash_to_string in
-    Block_services.Hash (merkle_hash_kind, hash_str)
+    Proof.Hash (merkle_hash_kind, hash_str)
 
   let merkle_tree t leaf_kind key =
     let open Lwt_syntax in
@@ -302,10 +304,10 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
                 if key = hd then
                   (* on the target path: the final leaf *)
                   match leaf_kind with
-                  | Block_services.Hole -> Lwt.return @@ merkle_hash tree
-                  | Block_services.Raw_context ->
+                  | Proof.Hole -> Lwt.return @@ merkle_hash tree
+                  | Proof.Raw_context ->
                       let+ raw_context = tree_to_raw_context tree in
-                      Block_services.Data raw_context
+                      Proof.Data raw_context
                 else
                   (* a sibling of the target path: return a hash *)
                   Lwt.return @@ merkle_hash tree
@@ -324,7 +326,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
                 if key = target_hd then
                   (* on the target path: recurse *)
                   let+ sub = key_to_merkle_tree tree target_tl in
-                  Block_services.Continue sub
+                  Proof.Continue sub
                 else
                   (* a sibling of the target path: return a hash *)
                   Lwt.return @@ merkle_hash tree

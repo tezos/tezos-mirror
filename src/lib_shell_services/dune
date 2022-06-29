@@ -10,7 +10,8 @@
  (libraries
   tezos-base
   tezos-p2p-services
-  tezos-version)
+  tezos-version
+  tezos-context.sigs)
  (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags

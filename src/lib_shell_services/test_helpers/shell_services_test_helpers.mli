@@ -23,19 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_shell_services
+open Tezos_context_sigs.Context.Proof_types
 
 (** [raw_context_gen] is a {!QCheck2.Gen.t} for [raw_context]. *)
-val raw_context_gen : Block_services.raw_context QCheck2.Gen.t
+val raw_context_gen : raw_context QCheck2.Gen.t
 
-val print_raw_context : Block_services.raw_context -> string
+val print_raw_context : raw_context -> string
 
 (** [merkle_node_gen] is a {!QCheck2.Gen.t} for [merkle_node]. *)
-val merkle_node_gen : Block_services.merkle_node QCheck2.Gen.t
+val merkle_node_gen : merkle_node QCheck2.Gen.t
 
-val print_merkle_node : Block_services.merkle_node -> string
+val print_merkle_node : merkle_node -> string
 
 (** [merkle_tree_gen] is a {!QCheck2.Gen.t} for [merkle_tree]. *)
-val merkle_tree_gen : Block_services.merkle_tree QCheck2.Gen.t
+val merkle_tree_gen : merkle_tree QCheck2.Gen.t
 
-val print_merkle_tree : Block_services.merkle_tree -> string
+val print_merkle_tree : merkle_tree -> string

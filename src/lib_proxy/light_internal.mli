@@ -23,13 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Proof := Tezos_context_sigs.Context.Proof_types
+
 (** Prints a key *)
 val key_to_string : string list -> string
 
 (** Translates a [raw_context], i.e. a tree sent by the [raw_bytes] RPC,
     to an Irmin tree that can be integrated in the light mode's store. *)
-val raw_context_to_irmin_tree :
-  Tezos_shell_services.Block_services.raw_context -> Local_context.tree Lwt.t
+val raw_context_to_irmin_tree : Proof.raw_context -> Local_context.tree Lwt.t
 
 (** Module containing operations of Merkle proofs used by the light mode *)
 module Merkle : sig
@@ -41,7 +42,7 @@ module Merkle : sig
       Returns: The Irmin tree obtained or an error message *)
   val merkle_tree_to_irmin_tree :
     Local_context.Tree.repo ->
-    Tezos_shell_services.Block_services.merkle_tree ->
+    Proof.merkle_tree ->
     (Local_context.tree, string) result Lwt.t
 
   (** Whether an Irmin tree contains a Merkle tree (in particular
@@ -49,9 +50,7 @@ module Merkle : sig
       contains the Merkle tree, otherwise a message explaining why it is
       not the case. *)
   val contains_merkle_tree :
-    Local_context.tree ->
-    Tezos_shell_services.Block_services.merkle_tree ->
-    (unit, string) result Lwt.t
+    Local_context.tree -> Proof.merkle_tree -> (unit, string) result Lwt.t
 
   (** Union an Irmin tree and a Merkle tree. Parameters are:
 
@@ -65,7 +64,7 @@ module Merkle : sig
   val union_irmin_tree_merkle_tree :
     Local_context.Tree.repo ->
     Local_context.tree ->
-    Tezos_shell_services.Block_services.merkle_tree ->
+    Proof.merkle_tree ->
     (Local_context.tree, string) result Lwt.t
 
   (** [trees_shape_match path t1 t2] returns [Ok ()] if [t1] and [t2] have the same shape
@@ -75,7 +74,7 @@ module Merkle : sig
       validating endpoints return a hash). *)
   val trees_shape_match :
     string list ->
-    Tezos_shell_services.Block_services.merkle_tree ->
-    Tezos_shell_services.Block_services.merkle_tree ->
+    Proof.merkle_tree ->
+    Proof.merkle_tree ->
     (unit, string list) result
 end
