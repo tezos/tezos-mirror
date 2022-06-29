@@ -38,6 +38,54 @@
 (** Tags shared by all tests in this file. *)
 let run_operation_tags = ["rpc"; "run_operation"]
 
+(** Check that the RPC [response]'s code is [500] (Internal Server
+    Error), and that its body has an "id" field that ends in
+    [expected_proto_error]. *)
+let check_response_contains_proto_error ~expected_proto_error
+    (response : JSON.t RPC.response) =
+  Log.info
+    "Checking RPC response:\n  code: %s\n  body: %s"
+    Cohttp.Code.(string_of_status (status_of_code response.code))
+    (JSON.encode response.body) ;
+  Check.(
+    (response.code = 500)
+      int
+      ~error_msg:"Expected response code %R, but got %L.") ;
+  let response_proto_error =
+    try
+      let id = JSON.(response.body |=> 0 |-> "id" |> as_string) in
+      List.(hd (rev (String.split_on_char '.' id)))
+    with exn ->
+      Test.fail
+        "Failed to parse the following RPC response body:\n\
+         %s.\n\
+         The following exception was raised:\n\
+         %s"
+        (JSON.encode response.body)
+        (Printexc.to_string exn)
+  in
+  Check.(
+    (response_proto_error = expected_proto_error)
+      string
+      ~error_msg:"Expected the %R protocol error, but got %L.")
+
+(** Craft a batch that contains the given individual manager
+    operation(s), call the [run_operation] RPC on it, and call
+    {!check_response_contains_proto_error} and the RPC response. *)
+let run_manager_operations_and_check_proto_error ~expected_proto_error
+    (manager_operations : Operation_core.Manager.t list) node client =
+  let* op = Operation.Manager.operation manager_operations client in
+  let* op_json = Operation.make_run_operation_input op client in
+  Log.debug
+    "Crafted operation: %s"
+    (Ezjsonm.value_to_string ~minify:false op_json) ;
+  let* response =
+    RPC.(
+      call_json node (post_chain_block_helpers_scripts_run_operation op_json))
+  in
+  check_response_contains_proto_error ~expected_proto_error response ;
+  unit
+
 (** This test checks that the [run_operation] RPC used to allow
     batches of manager operations containing different sources in
     protocol versions before Kathmandu (014), but rejects them from
@@ -111,41 +159,121 @@ let test_batch_inconsistent_sources protocols =
     ~supports:(Protocol.From_protocol 014)
     ~title:"Run_operation inconsistent sources ko"
     (fun node batch_json ->
+      let expected_proto_error = "inconsistent_sources" in
       Log.info
-        "Call the [run_operation] RPC on this batch and check that it fails \
-         with code [500 Internal Server Error] and protocol error \
-         [inconsistent_sources]." ;
+        "Call the [run_operation] RPC on this batch, and check that it fails \
+         with code [500] (Internal Server Error) and protocol error [%s]."
+        expected_proto_error ;
       let* response =
         RPC.call_json
           node
           (RPC.post_chain_block_helpers_scripts_run_operation batch_json)
       in
-      Log.info
-        "RPC response:\n  code: %d\n  body: %s"
-        response.code
-        (JSON.encode response.body) ;
-      Check.(
-        (response.code = 500)
-          int
-          ~error_msg:
-            "The RPC call was expected to fail with code 500 Internal Server \
-             Error, but it returned code %L.") ;
-      let id = JSON.(response.body |=> 0 |-> "id" |> as_string) in
-      let proto_error =
-        try List.(hd (rev (String.split_on_char '.' id)))
-        with exn ->
-          Test.fail
-            "Failed to parse the following RPC response body: %s. The \
-             following exception was raised: %s"
-            (JSON.encode response.body)
-            (Printexc.to_string exn)
-      in
-      Check.(
-        (proto_error = "inconsistent_sources")
-          string
-          ~error_msg:"Expected the [%R] protocol error, but got [%L].") ;
+      check_response_contains_proto_error ~expected_proto_error response ;
       unit)
     protocols
+
+(** This test calls the [run_operation] RPC on various operations with
+    unexpected or inconsistent counters, and checks that the
+    appropriate protocol error is returned. *)
+let test_inconsistent_counters =
+  Protocol.register_test
+    ~__FILE__
+    ~supports:Protocol.(From_protocol 013)
+    ~title:"Run_operation inconsistent counters"
+    ~tags:
+      (run_operation_tags
+      @ [
+          "manager";
+          "batch";
+          "counter";
+          "counter_in_the_past";
+          "counter_in_the_future";
+          "inconsistent_counters";
+        ])
+    (fun protocol ->
+      Log.info "Initialize a node and a client." ;
+      let* node, client =
+        Client.init_with_protocol
+          ~nodes_args:[Synchronisation_threshold 0]
+          ~protocol
+          `Client
+          ()
+      in
+      let run_manager_operations_and_check_proto_error ~expected_proto_error
+          manager_ops =
+        run_manager_operations_and_check_proto_error
+          ~expected_proto_error
+          manager_ops
+          node
+          client
+      in
+      let source = Constant.bootstrap1 in
+      let* next_counter = Operation.Manager.get_next_counter ~source client in
+      Log.info
+        "All the operations in this test will be from %s. The expected counter \
+         for the next manager operation from this source is %d."
+        source.alias
+        next_counter ;
+      let current_counter = next_counter - 1 in
+      Log.info
+        "Call [run_operation] on a transaction with counter %d."
+        current_counter ;
+      let* () =
+        let transaction =
+          Operation.Manager.(
+            make ~source ~counter:current_counter (transfer ()))
+        in
+        run_manager_operations_and_check_proto_error
+          ~expected_proto_error:"counter_in_the_past"
+          [transaction]
+      in
+      let next_plus_one = next_counter + 1 in
+      Log.info
+        "Call [run_operation] on a transaction with counter %d."
+        next_plus_one ;
+      let* () =
+        let transaction =
+          Operation.Manager.(make ~source ~counter:next_plus_one (transfer ()))
+        in
+        run_manager_operations_and_check_proto_error
+          ~expected_proto_error:"counter_in_the_future"
+          [transaction]
+      in
+      Log.info
+        "Call [run_operation] on a batch where the first operation has the \
+         expected counter %d, but the second operation also has the same \
+         counter %d."
+        next_counter
+        next_counter ;
+      let transaction_next_counter =
+        Operation.Manager.(
+          make
+            ~source
+            ~counter:next_counter
+            (transfer ~dest:Constant.bootstrap2 ()))
+      in
+      let* () =
+        run_manager_operations_and_check_proto_error
+          ~expected_proto_error:"inconsistent_counters"
+          [transaction_next_counter; transaction_next_counter]
+      in
+      let next_plus_two = next_counter + 2 in
+      Log.info
+        "Call [run_operation] on a batch where the first operation has the \
+         expected counter %d, but the second operation has the counter %d."
+        next_counter
+        next_plus_two ;
+      let transaction2 =
+        Operation.Manager.(
+          make
+            ~source
+            ~counter:next_plus_two
+            (transfer ~dest:Constant.bootstrap2 ()))
+      in
+      run_manager_operations_and_check_proto_error
+        ~expected_proto_error:"inconsistent_counters"
+        [transaction_next_counter; transaction2])
 
 (** This test checks that the [run_operation] RPC succeeds on a
     well-formed batch containing a transaction, a delegation, and a
@@ -285,5 +413,6 @@ let test_misc_manager_ops_from_fresh_account =
 
 let register ~protocols =
   test_batch_inconsistent_sources protocols ;
+  test_inconsistent_counters protocols ;
   test_correct_batch protocols ;
   test_misc_manager_ops_from_fresh_account protocols
