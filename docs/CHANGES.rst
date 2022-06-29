@@ -145,7 +145,8 @@ corresponding one for the the Ithaca 2 protocol,
   provided ``--votefile`` takes precedence and
   ``--liquidity-baking-toggle-vote`` is only used to define the
   default behavior of the daemon when an error occurs while reading
-  the vote file.
+  the vote file. Note that ``--liquidity-baking-toggle-vote`` must be placed
+  **after** ``run`` on the command-line.
 
 - **Breaking change**:
   The format of the vote file provided by the ``--votefile`` option

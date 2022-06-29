@@ -70,7 +70,9 @@ that assuming two blocks per minute there are 2880 blocks per day.
 When producing blocks using Octez baking daemon ``tezos-baker``, there
 are two command-line options affecting toggle vote. The mandatory
 ``--liquidity-baking-toggle-vote <on|off|pass>`` option sets the
-default value for the flag. Moreover, the path of a JSON file can be
+default value for the flag.
+Note that this option must be placed **after** ``run`` on the command-line.
+Moreover, the path of a JSON file can be
 given to the optional ``--votefile <path>`` option
 e.g. ``tezos-baker-<protocol codename> run with local node
 ~/.tezos-node alice --liquidity-baking-toggle-vote on --votefile

@@ -7,6 +7,9 @@ version is used by protocol Jakarta, which is a proposal for the
 successor of Ithaca. This release also contains Jakarta itself as well
 as its daemons.
 
+Note that starting from Jakarta, the baker requires you to specify
+your vote for the liquidity baking toggle, see :ref:`the changelog <changes_13_0_rc1_baker>`.
+
 Update Instructions
 -------------------
 
