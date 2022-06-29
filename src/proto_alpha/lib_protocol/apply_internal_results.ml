@@ -45,7 +45,7 @@ type 'kind internal_manager_operation =
       Signature.Public_key_hash.t option
       -> Kind.delegation internal_manager_operation
   | Event : {
-      addr : Contract_event.t;
+      ty : Script.expr;
       tag : Entrypoint.t;
       payload : Script.expr;
     }
@@ -106,8 +106,7 @@ let contents_of_internal_operation (type kind)
             entrypoint;
             parameters = Script.lazy_expr unparsed_parameters;
           }
-    | Event {addr; tag; unparsed_data} ->
-        Event {addr; tag; payload = unparsed_data}
+    | Event {ty; tag; unparsed_data} -> Event {ty; tag; payload = unparsed_data}
     | Origination {delegate; code; unparsed_storage; credit; _} ->
         let script =
           {
@@ -425,7 +424,7 @@ module Internal_result = struct
         name = "event";
         encoding =
           obj3
-            (req "addr" Contract_event.Hash.encoding)
+            (req "type" Script.expr_encoding)
             (opt "tag" Entrypoint.smart_encoding)
             (opt "payload" Script.expr_encoding);
         iselect : Kind.event iselect =
@@ -437,17 +436,17 @@ module Internal_result = struct
         select = (function Manager (Event _ as op) -> Some op | _ -> None);
         proj =
           (function
-          | Event {addr; tag; payload} ->
+          | Event {ty; tag; payload} ->
               let tag = if Entrypoint.is_default tag then None else Some tag in
               let payload =
                 if Script_repr.is_unit payload then None else Some payload
               in
-              (addr, tag, payload));
+              (ty, tag, payload));
         inj =
-          (fun (addr, tag, payload) ->
+          (fun (ty, tag, payload) ->
             let tag = Option.value ~default:Entrypoint.default tag in
             let payload = Option.value ~default:Script_repr.unit payload in
-            Event {addr; tag; payload});
+            Event {ty; tag; payload});
       }
 
   let case tag name args proj inj =
