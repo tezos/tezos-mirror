@@ -919,6 +919,28 @@ let unset_deposits_limit ?hooks ?endpoint ?(wait = "none") ~src client =
     (["--wait"; wait] @ ["unset"; "deposits"; "limit"; "for"; src])
   |> Process.check_and_read_stdout
 
+let increase_paid_storage ?hooks ?endpoint ?(wait = "none") ~contract ~amount
+    ~payer client =
+  spawn_command
+    ?hooks
+    ?endpoint
+    client
+    (["--wait"; wait]
+    @ [
+        "increase";
+        "the";
+        "paid";
+        "storage";
+        "of";
+        contract;
+        "by";
+        amount;
+        "bytes";
+        "from";
+        payer;
+      ])
+  |> Process.check_and_read_stdout
+
 let spawn_originate_contract ?hooks ?log_output ?endpoint ?(wait = "none") ?init
     ?burn_cap ?gas_limit ?(dry_run = false) ~alias ~amount ~src ~prg client =
   spawn_command

@@ -739,6 +739,17 @@ val unset_deposits_limit :
   t ->
   string Lwt.t
 
+(** Run [tezos-client increase the paid storage of <contract> by <amount> bytes from <payer>] *)
+val increase_paid_storage :
+  ?hooks:Process.hooks ->
+  ?endpoint:endpoint ->
+  ?wait:string ->
+  contract:string ->
+  amount:string ->
+  payer:string ->
+  t ->
+  string Lwt.t
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2336
    [amount] should be named [transferring] *)
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2336
