@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Ithaca | Jakarta | Alpha
+type t = Ithaca | Jakarta | Kathmandu | Alpha
 
 type constants = Constants_sandbox | Constants_mainnet | Constants_test
 
@@ -33,13 +33,19 @@ let name = function
   | Alpha -> "Alpha"
   | Ithaca -> "Ithaca"
   | Jakarta -> "Jakarta"
+  | Kathmandu -> "Kathmandu"
 
-let number = function Ithaca -> 012 | Jakarta -> 013 | Alpha -> 014
+let number = function
+  | Ithaca -> 012
+  | Jakarta -> 013
+  | Kathmandu -> 014
+  | Alpha -> 015
 
 let directory = function
   | Alpha -> "proto_alpha"
   | Ithaca -> "proto_012_Psithaca"
   | Jakarta -> "proto_013_PtJakart"
+  | Kathmandu -> "proto_014_PtKathma"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
@@ -48,6 +54,7 @@ let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | Ithaca -> "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
   | Jakarta -> "PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY"
+  | Kathmandu -> "PtKathmaHPSjL3WDmUCJP7iHBsUix65HdAgSeVacukogRK6hum6"
 
 let genesis_hash = "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
@@ -68,6 +75,7 @@ let daemon_name = function
   | Alpha -> "alpha"
   | Ithaca -> "012-Psithaca"
   | Jakarta -> "013-PtJakart"
+  | Kathmandu -> "014-PtKathma"
 
 let accuser proto = "./tezos-accuser-" ^ daemon_name proto
 
@@ -130,14 +138,16 @@ let write_parameter_file :
 let next_protocol = function
   | Ithaca -> Some Jakarta
   | Jakarta -> None
+  | Kathmandu -> None
   | Alpha -> None
 
 let previous_protocol = function
   | Alpha -> Some Jakarta
   | Jakarta -> Some Ithaca
+  | Kathmandu -> Some Jakarta
   | Ithaca -> None
 
-let all = [Alpha; Ithaca; Jakarta]
+let all = [Alpha; Ithaca; Jakarta; Kathmandu]
 
 type supported_protocols =
   | Any_protocol

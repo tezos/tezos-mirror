@@ -1,0 +1,46 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executables
+ (names
+  test_sampling_data
+  test_sampling_code
+  test_autocompletion
+  test_distribution)
+ (libraries
+  tezos-base
+  tezos-micheline
+  tezos-micheline-rewriting
+  tezos-protocol-014-PtKathma
+  tezos-benchmark
+  tezos-benchmark-type-inference-014-PtKathma
+  tezos-benchmark-014-PtKathma
+  tezos-014-PtKathma-test-helpers
+  tezos-error-monad
+  alcotest-lwt
+  prbnmcn-stats)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_micheline
+  -open Tezos_protocol_014_PtKathma
+  -open Tezos_benchmark
+  -open Tezos_benchmark_type_inference_014_PtKathma
+  -open Tezos_benchmark_014_PtKathma
+  -open Tezos_014_PtKathma_test_helpers))
+
+(rule
+ (alias runtest_micheline_rewriting_data)
+ (action (run %{exe:test_sampling_data.exe} 1234)))
+
+(rule
+ (alias runtest_micheline_rewriting_code)
+ (action (run %{exe:test_sampling_code.exe} 1234)))
+
+(rule
+ (alias runtest)
+ (package tezos-benchmark-014-PtKathma)
+ (deps
+  (alias runtest_micheline_rewriting_data)
+  (alias runtest_micheline_rewriting_code))
+ (action (progn)))

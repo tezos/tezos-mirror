@@ -99,6 +99,11 @@ JAKARTA_DAEMON = "013-PtJakart"
 JAKARTA_FOLDER = "proto_013_PtJakart"
 JAKARTA_PARAMETERS = get_parameters(JAKARTA_FOLDER)
 
+KATHMANDU = "PtKathmaHPSjL3WDmUCJP7iHBsUix65HdAgSeVacukogRK6hum6"
+KATHMANDU_DAEMON = "014-PtKathma"
+KATHMANDU_FOLDER = "proto_014_PtKathma"
+KATHMANDU_PARAMETERS = get_parameters(KATHMANDU_FOLDER)
+
 TEZOS_CRT = """
 Certificate:
     Data:

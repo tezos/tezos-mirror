@@ -90,6 +90,12 @@
   (select void_for_linking-tezos-protocol-plugin-013-PtJakart from
    (tezos-protocol-plugin-013-PtJakart -> void_for_linking-tezos-protocol-plugin-013-PtJakart.empty)
    (-> void_for_linking-tezos-protocol-plugin-013-PtJakart.empty))
+  (select void_for_linking-tezos-client-014-PtKathma from
+   (tezos-client-014-PtKathma -> void_for_linking-tezos-client-014-PtKathma.empty)
+   (-> void_for_linking-tezos-client-014-PtKathma.empty))
+  (select void_for_linking-tezos-protocol-plugin-014-PtKathma from
+   (tezos-protocol-plugin-014-PtKathma -> void_for_linking-tezos-protocol-plugin-014-PtKathma.empty)
+   (-> void_for_linking-tezos-protocol-plugin-014-PtKathma.empty))
   (select void_for_linking-tezos-client-alpha from
    (tezos-client-alpha -> void_for_linking-tezos-client-alpha.empty)
    (-> void_for_linking-tezos-client-alpha.empty))
@@ -131,5 +137,7 @@
    (write-file void_for_linking-tezos-protocol-plugin-012-Psithaca.empty "")
    (write-file void_for_linking-tezos-client-013-PtJakart.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-013-PtJakart.empty "")
+   (write-file void_for_linking-tezos-client-014-PtKathma.empty "")
+   (write-file void_for_linking-tezos-protocol-plugin-014-PtKathma.empty "")
    (write-file void_for_linking-tezos-client-alpha.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-alpha.empty ""))))

@@ -1,0 +1,52 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_protocol_014_PtKathma_parameters)
+ (public_name tezos-protocol-014-PtKathma.parameters)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-environment
+  tezos-protocol-014-PtKathma)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_014_PtKathma)
+ (modules (:standard \ gen)))
+
+(executable
+ (name gen)
+ (libraries
+  tezos-base
+  tezos-protocol-014-PtKathma.parameters
+  tezos-protocol-014-PtKathma)
+ (link_flags
+  (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_014_PtKathma_parameters
+  -open Tezos_protocol_014_PtKathma)
+ (modules gen))
+
+(rule
+ (targets sandbox-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --sandbox)))
+
+(rule
+ (targets test-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --test)))
+
+(rule
+ (targets mainnet-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --mainnet)))
+
+(install
+ (package tezos-protocol-014-PtKathma)
+ (section lib)
+ (files sandbox-parameters.json test-parameters.json mainnet-parameters.json))

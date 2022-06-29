@@ -3163,7 +3163,7 @@ end = struct
                ("test_tx_rollup_l2_withdraw_storage", N.(number <= 010));
                ("test_bitset", N.(number >= 013));
                ("test_sc_rollup_tick_repr", N.(number >= 013));
-               ("test_sc_rollup_encoding", N.(number >= 014));
+               ("test_sc_rollup_encoding", N.(number >= 015));
                ("refutation_game_pbt", N.(number == 013));
                ("test_refutation_game", N.(number >= 014));
                ("test_carbonated_map", N.(number >= 013));
@@ -4460,6 +4460,8 @@ module Protocol = Protocol
   let _012_Psithaca = active (Name.v "Psithaca" 012)
 
   let _013_PtJakart = active (Name.v "PtJakart" 013)
+
+  let _014_PtKathma = active (Name.v "PtKathma" 014)
 
   let alpha = active Name.alpha
 

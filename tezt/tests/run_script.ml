@@ -218,7 +218,8 @@ let make_for ~protocol () =
 let register ~protocols =
   List.iter
     (function
-      | (Protocol.Alpha | Protocol.Jakarta) as protocol -> make_for ~protocol ()
+      | (Protocol.Alpha | Protocol.Jakarta | Protocol.Kathmandu) as protocol ->
+          make_for ~protocol ()
       | Protocol.Ithaca -> ())
     (* Won't work prior to protocol J. *)
     protocols

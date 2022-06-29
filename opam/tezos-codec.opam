@@ -28,6 +28,7 @@ depopts: [
   "tezos-client-011-PtHangz2"
   "tezos-client-012-Psithaca"
   "tezos-client-013-PtJakart"
+  "tezos-client-014-PtKathma"
   "tezos-client-alpha"
 ]
 build: [

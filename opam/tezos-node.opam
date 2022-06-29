@@ -35,6 +35,8 @@ depends: [
   "tezos-protocol-plugin-012-Psithaca-registerer"
   "tezos-embedded-protocol-013-PtJakart"
   "tezos-protocol-plugin-013-PtJakart-registerer"
+  "tezos-embedded-protocol-014-PtKathma"
+  "tezos-protocol-plugin-014-PtKathma-registerer"
 ]
 depopts: [
   "tezos-embedded-protocol-genesis"

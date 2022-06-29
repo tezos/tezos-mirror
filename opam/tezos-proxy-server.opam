@@ -47,6 +47,8 @@ depopts: [
   "tezos-protocol-plugin-012-Psithaca"
   "tezos-client-013-PtJakart"
   "tezos-protocol-plugin-013-PtJakart"
+  "tezos-client-014-PtKathma"
+  "tezos-protocol-plugin-014-PtKathma"
   "tezos-client-alpha"
   "tezos-protocol-plugin-alpha"
 ]
