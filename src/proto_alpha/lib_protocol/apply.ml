@@ -2166,7 +2166,7 @@ let burn_internal_storage_fees :
   | IDelegation_result _ -> return (ctxt, storage_limit, smopr)
   | IEvent_result _ -> return (ctxt, storage_limit, smopr)
 
-let apply_manager_contents (type kind) ctxt mode chain_id
+let apply_manager_contents (type kind) ctxt chain_id
     (op : kind Kind.manager contents) :
     (success_or_failure
     * kind manager_operation_result
@@ -2185,12 +2185,17 @@ let apply_manager_contents (type kind) ctxt mode chain_id
   (* We do not expose the internal scaling to the users. Instead, we multiply
        the specified gas limit by the internal scaling. *)
   let ctxt = Gas.set_limit ctxt gas_limit in
-  apply_external_manager_operation_content ctxt mode ~source ~chain_id operation
+  apply_external_manager_operation_content
+    ctxt
+    Optimized
+    ~source
+    ~chain_id
+    operation
   >>= function
   | Ok (ctxt, operation_results, internal_operations) -> (
       apply_internal_manager_operations
         ctxt
-        mode
+        Optimized
         ~payer:source
         ~chain_id
         internal_operations
@@ -2345,7 +2350,7 @@ let rec apply_manager_contents_list_rec :
   let level = Level.current ctxt in
   match[@coq_match_with_default] fees_updated_contents_list with
   | FeesUpdatedSingle {contents = Manager_operation _ as op; balance_updates} ->
-      apply_manager_contents ctxt Optimized chain_id op
+      apply_manager_contents ctxt chain_id op
       >|= fun (ctxt_result, operation_result, internal_operation_results) ->
       let result =
         Manager_operation_result
@@ -2354,7 +2359,7 @@ let rec apply_manager_contents_list_rec :
       (ctxt_result, Single_result result)
   | FeesUpdatedCons
       ({contents = Manager_operation _ as op; balance_updates}, rest) -> (
-      apply_manager_contents ctxt Optimized chain_id op >>= function
+      apply_manager_contents ctxt chain_id op >>= function
       | Failure, operation_result, internal_operation_results ->
           let result =
             Manager_operation_result
