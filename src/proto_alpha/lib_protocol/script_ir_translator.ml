@@ -4645,10 +4645,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       >>?= fun (Ex_ty ty, ctxt) ->
       check_item_ty ctxt ty data loc I_EMIT 1 2 >>?= fun (Eq, ctxt) ->
       parse_entrypoint_annot_strict loc annot >>?= fun tag ->
-      unparse_ty ~loc:() ctxt data >>?= fun (unparsed_ty, ctxt) ->
-      Gas.consume ctxt (Script.strip_locations_cost unparsed_ty)
-      >>?= fun ctxt ->
-      let unparsed_ty = Micheline.strip_locations unparsed_ty in
+      Gas.consume ctxt (Script.strip_locations_cost ty_node) >>?= fun ctxt ->
+      let unparsed_ty = Micheline.strip_locations ty_node in
       let instr =
         {apply = (fun k -> IEmit {loc; tag; ty = data; unparsed_ty; k})}
       in
