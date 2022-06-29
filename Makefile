@@ -184,7 +184,7 @@ test-python-tenderbake: all
 # Disable verbose once the log file bug in Alcotest is fixed.
 .PHONY: test-js
 test-js:
-	@ALCOTEST_VERBOSE=yes dune build @runtest_js
+	@dune build @runtest_js
 
 .PHONY: build-tezt
 build-tezt:
