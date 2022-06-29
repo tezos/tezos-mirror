@@ -593,11 +593,6 @@ let hash_comparable_data ctxt ty data =
   pack_comparable_data ctxt ty data >>=? fun (bytes, ctxt) ->
   Lwt.return @@ hash_bytes ctxt bytes
 
-let hash_event_ty ctxt unparsed =
-  pack_node unparsed ctxt >>? fun (bytes, ctxt) ->
-  Gas.consume ctxt (Michelson_v1_gas.Cost_of.Interpreter.blake2b bytes)
-  >|? fun ctxt -> (Contract_event.Hash.hash_bytes [bytes], ctxt)
-
 (* ---- Tickets ------------------------------------------------------------ *)
 
 (*
