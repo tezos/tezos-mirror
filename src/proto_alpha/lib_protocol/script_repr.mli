@@ -99,7 +99,11 @@ val force_bytes_cost : lazy_expr -> Gas_limit_repr.cost
 
 val force_bytes : lazy_expr -> bytes tzresult
 
+val unit : expr
+
 val unit_parameter : lazy_expr
+
+val is_unit : expr -> bool
 
 val is_unit_parameter : lazy_expr -> bool
 

@@ -394,15 +394,6 @@ module Manager_result = struct
           (function
             | consumed_gas, inbox_after ->
                 Transaction_to_sc_rollup_result {consumed_gas; inbox_after});
-        case
-          ~title:"To_event"
-          (Tag 3)
-          (obj1
-             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
-          (function
-            | Transaction_to_event_result {consumed_gas} -> Some consumed_gas
-            | _ -> None)
-          (fun consumed_gas -> Transaction_to_event_result {consumed_gas});
       ]
 
   let[@coq_axiom_with_reason "gadt"] transaction_case =
@@ -1027,6 +1018,8 @@ let equal_manager_kind :
   | ( Kind.Register_global_constant_manager_kind,
       Kind.Register_global_constant_manager_kind ) ->
       Some Eq
+  | Kind.Event_manager_kind, Kind.Event_manager_kind -> Some Eq
+  | Kind.Event_manager_kind, _ -> None
   | Kind.Register_global_constant_manager_kind, _ -> None
   | Kind.Set_deposits_limit_manager_kind, Kind.Set_deposits_limit_manager_kind
     ->

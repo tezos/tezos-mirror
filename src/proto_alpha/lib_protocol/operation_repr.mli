@@ -99,6 +99,8 @@ module Kind : sig
 
   type delegation = Delegation_kind
 
+  type event = Event_kind
+
   type set_deposits_limit = Set_deposits_limit_kind
 
   type increase_paid_storage = Increase_paid_storage_kind
@@ -151,6 +153,7 @@ module Kind : sig
     | Transaction_manager_kind : transaction manager
     | Origination_manager_kind : origination manager
     | Delegation_manager_kind : delegation manager
+    | Event_manager_kind : event manager
     | Register_global_constant_manager_kind : register_global_constant manager
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Increase_paid_storage_manager_kind : increase_paid_storage manager

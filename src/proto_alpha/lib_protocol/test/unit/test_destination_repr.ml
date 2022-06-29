@@ -81,9 +81,6 @@ let tx_rollup_address = "txr1YNMEtkj5Vkqsbdmt7xaxBTMRZjzS96UAi"
 *)
 let sc_rollup_address = "scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF"
 
-(* The following address has been extracted from [../integration/michelson/test_emit.ml]. *)
-let event_address = "ev12m5E1yW14mc9rsrcdGAWVfDSdmRGuctykrVU55bHZBGv9kmdhW"
-
 let assert_compat contract destination =
   match destination with
   | Destination_repr.Contract contract'
@@ -183,13 +180,11 @@ let test_compare_destination () =
   let kt1 = !!(Destination_repr.of_b58check liquidity_baking_dex) in
   let txr1 = !!(Destination_repr.of_b58check tx_rollup_address) in
   let scr1 = !!(Destination_repr.of_b58check sc_rollup_address) in
-  let ev1 = !!(Destination_repr.of_b58check event_address) in
 
   assert (Destination_repr.(tz1 < kt1)) ;
   assert (Destination_repr.(kt1 < txr1)) ;
   assert (Destination_repr.(tz1 < txr1)) ;
   assert (Destination_repr.(txr1 < scr1)) ;
-  assert (Destination_repr.(scr1 < ev1)) ;
 
   return_unit
 

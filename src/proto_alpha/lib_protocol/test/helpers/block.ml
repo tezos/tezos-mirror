@@ -792,7 +792,6 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
               | Sc_rollup_timeout_result _
               | Sc_rollup_execute_outbox_message_result _
               | Sc_rollup_recover_bond_result _
-              | Transaction_result (Transaction_to_event_result _)
               | Sc_rollup_dal_slot_subscribe_result _ ->
                   balance_updates_rev
               | Transaction_result

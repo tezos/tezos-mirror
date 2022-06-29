@@ -32,13 +32,16 @@ open Apply_internal_results
 
 let tez_sym = "\xEA\x9C\xA9"
 
+let pp_micheline_expr ppf expr =
+  Format.fprintf ppf "@[<v 0>%a@]" Michelson_v1_printer.print_expr expr
+
 let pp_micheline_from_lazy_expr ppf expr =
   let expr =
     WithExceptions.Option.to_exn
       ~none:(Failure "ill-serialized micheline expression")
       (Data_encoding.force_decode expr)
   in
-  Format.fprintf ppf "@[<v 0>%a@]" Michelson_v1_printer.print_expr expr
+  pp_micheline_expr ppf expr
 
 let pp_internal_operation ppf (Internal_contents {operation; source; _}) =
   (* For now, try to use the same format as in [pp_manager_operation_content]. *)
@@ -99,7 +102,18 @@ let pp_internal_operation ppf (Internal_contents {operation; source; _}) =
       Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Contract.pp source ;
       match delegate_opt with
       | None -> Format.pp_print_string ppf "nobody"
-      | Some delegate -> Signature.Public_key_hash.pp ppf delegate)) ;
+      | Some delegate -> Signature.Public_key_hash.pp ppf delegate)
+  | Event {addr; tag; payload} ->
+      Format.fprintf
+        ppf
+        "Event:@,From: %a@,To: %a"
+        Contract.pp
+        source
+        Contract_event.pp
+        addr ;
+      if not (Entrypoint.is_default tag) then
+        Format.fprintf ppf "@,Tag: %a" Entrypoint.pp tag ;
+      Format.fprintf ppf "@,Payload: %a" pp_micheline_expr payload) ;
   Format.fprintf ppf "@]"
 
 let pp_manager_operation_content (type kind) source ppf
@@ -540,9 +554,6 @@ let pp_transaction_result ppf = function
   | Transaction_to_sc_rollup_result {consumed_gas; inbox_after} ->
       pp_consumed_gas ppf consumed_gas ;
       pp_inbox_after ppf inbox_after
-  | Transaction_to_event_result {consumed_gas} ->
-      pp_consumed_gas ppf consumed_gas ;
-      Format.fprintf ppf "@,@[<v 2>Event Applied]"
 
 let pp_operation_result ~operation_name pp_operation_result ppf = function
   | Skipped _ -> Format.fprintf ppf "This operation was skipped."
@@ -808,13 +819,15 @@ let pp_internal_operation_and_result ppf
     | ITransaction_result _ -> "transaction"
     | IOrigination_result _ -> "origination"
     | IDelegation_result _ -> "delegation"
+    | IEvent_result _ -> "event"
   in
   let pp_internal_operation_result (type kind) ppf
       (result : kind successful_internal_manager_operation_result) =
     match result with
     | ITransaction_result tx -> pp_transaction_result ppf tx
     | IOrigination_result op_res -> pp_origination_result ppf op_res
-    | IDelegation_result {consumed_gas} -> pp_consumed_gas ppf consumed_gas
+    | IDelegation_result {consumed_gas} | IEvent_result {consumed_gas} ->
+        pp_consumed_gas ppf consumed_gas
   in
   Format.fprintf
     ppf

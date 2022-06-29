@@ -47,6 +47,12 @@ type 'kind internal_manager_operation =
   | Delegation :
       Signature.Public_key_hash.t option
       -> Kind.delegation internal_manager_operation
+  | Event : {
+      addr : Contract_event.t;
+      tag : Entrypoint.t;
+      payload : Script.expr;
+    }
+      -> Kind.event internal_manager_operation
 
 type 'kind internal_contents = {
   source : Contract.t;
@@ -86,7 +92,6 @@ type successful_transaction_result =
       consumed_gas : Gas.Arith.fp;
       inbox_after : Sc_rollup.Inbox.t;
     }
-  | Transaction_to_event_result of {consumed_gas : Gas.Arith.fp}
 
 (** Result of applying an internal origination. *)
 type successful_origination_result = {
@@ -110,6 +115,10 @@ type _ successful_internal_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.delegation successful_internal_manager_operation_result
+  | IEvent_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.event successful_internal_manager_operation_result
 
 type 'kind internal_manager_operation_result =
   ( 'kind,

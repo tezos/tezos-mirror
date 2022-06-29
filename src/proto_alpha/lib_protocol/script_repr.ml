@@ -302,13 +302,15 @@ let unit =
 
 let unit_parameter = lazy_expr unit
 
+let is_unit v =
+  match Micheline.root v with
+  | Prim (_, Michelson_v1_primitives.D_Unit, [], []) -> true
+  | _ -> false
+
 let is_unit_parameter =
   let unit_bytes = Data_encoding.force_bytes unit_parameter in
   Data_encoding.apply_lazy
-    ~fun_value:(fun v ->
-      match Micheline.root v with
-      | Prim (_, Michelson_v1_primitives.D_Unit, [], []) -> true
-      | _ -> false)
+    ~fun_value:is_unit
     ~fun_bytes:(fun b -> Compare.Bytes.equal b unit_bytes)
     ~fun_combine:(fun res _ -> res)
 

@@ -73,21 +73,21 @@ let test_emit_event protocol =
   in
   let event = events |=> 0 in
   assert (
-    event |-> "destination" |> as_string
+    event |-> "addr" |> as_string
     = "ev12m5E1yW14mc9rsrcdGAWVfDSdmRGuctykrVU55bHZBGv9kmdhW") ;
-  let data = event |-> "parameters" |-> "value" in
+  let data = event |-> "payload" in
   assert (data |-> "prim" |> as_string = "Right") ;
   assert (data |-> "args" |=> 0 |-> "string" |> as_string = "right") ;
-  let tag = event |-> "parameters" |-> "entrypoint" |> as_string in
+  let tag = event |-> "tag" |> as_string in
   assert (tag = "tag1") ;
   let event = events |=> 1 in
   assert (
-    event |-> "destination" |> as_string
+    event |-> "addr" |> as_string
     = "ev12m5E1yW14mc9rsrcdGAWVfDSdmRGuctykrVU55bHZBGv9kmdhW") ;
-  let data = event |-> "parameters" |-> "value" in
+  let data = event |-> "payload" in
   assert (data |-> "prim" |> as_string = "Left") ;
   assert (data |-> "args" |=> 0 |-> "int" |> as_string = "2") ;
-  let tag = event |-> "parameters" |-> "entrypoint" |> as_string in
+  let tag = event |-> "tag" |> as_string in
   assert (tag = "tag2") ;
   return ()
 

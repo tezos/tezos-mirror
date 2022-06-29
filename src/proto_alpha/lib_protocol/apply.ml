@@ -1187,12 +1187,11 @@ let apply_internal_manager_operation_content :
         Transaction_to_sc_rollup_result {consumed_gas; inbox_after}
       in
       (ctxt, ITransaction_result result, [])
-  | Transaction_to_event {addr = _; unparsed_data = _; tag = _} ->
+  | Event {addr = _; unparsed_data = _; tag = _} ->
       return
         ( ctxt,
-          ITransaction_result
-            (Transaction_to_event_result
-               {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt}),
+          IEvent_result
+            {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt},
           [] )
   | Origination
       {
@@ -1981,8 +1980,6 @@ let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
           storage_limit,
           Transaction_to_tx_rollup_result {payload with balance_updates} )
   | Transaction_to_sc_rollup_result _ -> return (ctxt, storage_limit, trr)
-  | Transaction_to_event_result {consumed_gas} ->
-      return (ctxt, storage_limit, Transaction_to_event_result {consumed_gas})
 
 let burn_origination_storage_fees ctxt
     {
@@ -2155,6 +2152,7 @@ let burn_internal_storage_fees :
       >|=? fun (ctxt, storage_limit, origination_result) ->
       (ctxt, storage_limit, IOrigination_result origination_result)
   | IDelegation_result _ -> return (ctxt, storage_limit, smopr)
+  | IEvent_result _ -> return (ctxt, storage_limit, smopr)
 
 let apply_manager_contents (type kind) ctxt mode chain_id
     (op : kind Kind.manager contents) :
