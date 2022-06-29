@@ -48,21 +48,21 @@ module State = struct
   let inbox_of_hash node_ctxt store block_hash =
     let open Lwt_syntax in
     let open Node_context in
-    let+ possible_inbox = Store.Inboxes.find store block_hash in
+    let* possible_inbox = Store.Inboxes.find store block_hash in
     match possible_inbox with
     | None ->
         (* We won't find inboxes for blocks before the rollup origination level.
            Fortunately this case will only ever be called once when dealing with
            the rollup origination block. After that we would always find an
            inbox. *)
-        Sc_rollup.Inbox.empty node_ctxt.rollup_address node_ctxt.initial_level
-    | Some inbox -> inbox
+        Store.Inbox.empty store node_ctxt.rollup_address node_ctxt.initial_level
+    | Some inbox -> return inbox
 
   let history_of_hash store block_hash =
     Store.Histories.find_with_default store block_hash ~on_default:(fun () ->
         Store.Inbox.history_at_genesis ~bound:(Int64.of_int 60000))
 
-  let get_message_tree = Store.MessageTrees.get
+  let find_message_tree = Store.MessageTrees.find
 
   let set_message_tree = Store.MessageTrees.set
 end
@@ -103,6 +103,7 @@ let process_head Node_context.({l1_ctxt; rollup_address; _} as node_ctxt) store
   let*! res = get_messages l1_ctxt head_hash rollup_address in
   match res with
   | Error e -> head_processing_failure e
+  | Ok [] -> return_unit
   | Ok messages ->
       let*! () =
         Inbox_event.get_messages head_hash level (List.length messages)
@@ -119,7 +120,7 @@ let process_head Node_context.({l1_ctxt; rollup_address; _} as node_ctxt) store
       let*! inbox = State.inbox_of_hash node_ctxt store predecessor in
       lift
       @@ let*! history = State.history_of_hash store predecessor in
-         let*! messages_tree = State.get_message_tree store predecessor in
+         let*! messages_tree = State.find_message_tree store predecessor in
          let*? level = Raw_level.of_int32 level in
          let*? messages =
            List.map_e
@@ -128,7 +129,13 @@ let process_head Node_context.({l1_ctxt; rollup_address; _} as node_ctxt) store
              messages
          in
          let* messages_tree, history, inbox =
-           Store.Inbox.add_messages history inbox level messages messages_tree
+           Store.Inbox.add_messages
+             store
+             history
+             inbox
+             level
+             messages
+             messages_tree
          in
          let*! () = State.set_message_tree store head_hash messages_tree in
          let*! () = State.add_inbox store head_hash inbox in

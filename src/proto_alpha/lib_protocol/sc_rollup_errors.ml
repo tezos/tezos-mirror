@@ -52,6 +52,7 @@ type error +=
   | (* `Temporary *) Sc_rollup_timeout_level_not_reached
   | (* `Temporary *)
       Sc_rollup_max_number_of_messages_reached_for_commitment_period
+  | (* `Permanent *) Sc_rollup_add_zero_messages
   | (* `Temporary *) Sc_rollup_invalid_outbox_message_index
   | (* `Temporary *) Sc_rollup_outbox_level_expired
   | (* `Temporary *) Sc_rollup_outbox_message_already_applied
@@ -192,6 +193,16 @@ let () =
           Some ()
       | _ -> None)
     (fun () -> Sc_rollup_max_number_of_messages_reached_for_commitment_period) ;
+  let description = "Tried to add zero messages to a SC rollup" in
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup_errors.sc_rollup_add_zero_messages"
+    ~title:description
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    Data_encoding.unit
+    (function Sc_rollup_add_zero_messages -> Some () | _ -> None)
+    (fun () -> Sc_rollup_add_zero_messages) ;
   let description = "Attempted to cement a disputed commitment." in
   register_error_kind
     `Temporary

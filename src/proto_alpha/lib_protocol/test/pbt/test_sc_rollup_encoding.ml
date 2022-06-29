@@ -90,38 +90,40 @@ let gen_versioned_commitment =
 
 let gen_player = Gen.oneofl Sc_rollup_game_repr.[Alice; Bob]
 
-let gen_messages inbox level =
+let gen_inbox rollup level =
   let open Gen in
-  let* payloads = small_list (small_string ~gen:printable) in
-  let messages =
+  let gen_msg = small_string ~gen:printable in
+  let* hd = gen_msg in
+  let* tail = small_list gen_msg in
+  let payloads = hd :: tail in
+  let level_tree_and_inbox =
     let open Lwt_result_syntax in
     let* ctxt = Context.default_raw_context () in
+    let inbox_ctxt = Raw_context.recover ctxt in
+    let*! empty_inbox = Sc_rollup_inbox_repr.empty inbox_ctxt rollup level in
     lift
     @@ let*? input_messages =
          List.map_e
            (fun msg -> Sc_rollup_inbox_message_repr.(serialize (External msg)))
            payloads
        in
-       let messages =
-         Environment.Context.Tree.empty (Raw_context.recover ctxt)
-       in
        Sc_rollup_inbox_repr.add_messages_no_history
-         inbox
+         inbox_ctxt
+         empty_inbox
          level
          input_messages
-         messages
+         None
   in
   return
-  @@ (Lwt_main.run messages |> function
+  @@ (Lwt_main.run level_tree_and_inbox |> function
       | Ok v -> snd v
       | Error e ->
           Stdlib.failwith (Format.asprintf "%a" Error_monad.pp_print_trace e))
 
-let gen_inbox rollup level =
+let gen_inbox_history_proof rollup level =
   let open Gen in
-  let inbox = Sc_rollup_inbox_repr.empty rollup level in
-  let* inbox = gen_messages inbox level in
-  return inbox
+  let* inbox = gen_inbox rollup level in
+  return (Sc_rollup_inbox_repr.take_snapshot inbox)
 
 let gen_raw_level =
   let open Gen in
@@ -151,7 +153,7 @@ let gen_game =
   let* turn = gen_player in
   let* level = gen_raw_level in
   let* rollup = gen_rollup in
-  let* inbox_snapshot = gen_inbox rollup level in
+  let* inbox_snapshot = gen_inbox_history_proof rollup level in
   let* pvm_name = gen_pvm_name in
   let* dissection = gen_dissection in
   let dissection =

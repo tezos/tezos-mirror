@@ -209,7 +209,59 @@ module IStoreProof =
 
 module Inbox = struct
   include Sc_rollup.Inbox
-  include Sc_rollup.Inbox.MakeHashingScheme (IStoreTree)
+
+  include Sc_rollup.Inbox.MakeHashingScheme (struct
+    module Tree = IStoreTree
+
+    type t = IStore.t
+
+    type tree = Tree.tree
+
+    let commit_tree store key tree =
+      let open Lwt_syntax in
+      let info () = IStore.Info.v ~author:"Tezos" 0L ~message:"" in
+      let path = "inbox_internal_trees" :: key in
+      let* result = IStore.set_tree ~info store path tree in
+      match result with
+      | Ok () ->
+          let* (_ : IStore.commit) =
+            IStore.Commit.v (IStore.repo store) ~info:(info ()) ~parents:[] tree
+          in
+          return ()
+      | Error _ -> assert false
+
+    let to_inbox_hash kinded_hash =
+      match kinded_hash with
+      | `Value h | `Node h -> Hash.of_bytes_exn (Context_hash.to_bytes h)
+
+    let from_inbox_hash inbox_hash =
+      let ctxt_hash = Hash.to_context_hash inbox_hash in
+      let store_hash =
+        IStore.Hash.unsafe_of_raw_string (Context_hash.to_string ctxt_hash)
+      in
+      `Node store_hash
+
+    let lookup_tree store hash =
+      IStore.Tree.of_hash (IStore.repo store) (from_inbox_hash hash)
+
+    type proof = IStoreProof.Proof.tree IStoreProof.Proof.t
+
+    let verify_proof proof f =
+      Lwt.map Result.to_option (IStoreProof.verify_tree_proof proof f)
+
+    let produce_proof store tree f =
+      let open Lwt_syntax in
+      match IStoreTree.kinded_key tree with
+      | Some k ->
+          let* p = IStoreProof.produce_tree_proof (IStore.repo store) k f in
+          return (Some p)
+      | None -> return None
+
+    let proof_before proof = to_inbox_hash proof.IStoreProof.Proof.before
+
+    let proof_encoding =
+      Tezos_context_helpers.Merkle_proof_encoding.V1.Tree32.tree_proof_encoding
+  end)
 end
 
 (** State of the PVM that this rollup node deals with *)
@@ -243,10 +295,7 @@ module MessageTrees = struct
 
   (** [get store block_hash] retrieves the message tree for [block_hash]. If it is not present, an empty
       tree is returned. *)
-  let get store block_hash =
-    let open Lwt_syntax in
-    let+ tree = IStore.find_tree store (key block_hash) in
-    Option.value ~default:(IStoreTree.empty ()) tree
+  let find store block_hash = IStore.find_tree store (key block_hash)
 
   (** [set store block_hash message_tree] set the message tree for [block_hash]. *)
   let set store block_hash message_tree =

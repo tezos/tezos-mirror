@@ -38,7 +38,8 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty =
   Store.Boot_sector.add ctxt address boot_sector >>= fun ctxt ->
   Store.Parameters_type.add ctxt address parameters_ty
   >>=? fun (ctxt, param_ty_size_diff, _added) ->
-  let inbox = Sc_rollup_inbox_repr.empty address level.level in
+  Sc_rollup_inbox_repr.empty (Raw_context.recover ctxt) address level.level
+  >>= fun inbox ->
   Store.Inbox.init ctxt address inbox >>=? fun (ctxt, inbox_size_diff) ->
   Store.Last_cemented_commitment.init ctxt address Commitment_hash.zero
   >>=? fun (ctxt, lcc_size_diff) ->

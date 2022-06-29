@@ -103,3 +103,5 @@ let deserialize s =
   | Some msg -> return msg
 
 let unsafe_of_string s = s
+
+let unsafe_to_string s = s

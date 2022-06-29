@@ -548,6 +548,7 @@ let () =
     Data_encoding.unit
     (function Sc_rollup_feature_disabled -> Some () | _ -> None)
     (fun () -> Sc_rollup_feature_disabled) ;
+
   register_error_kind
     `Temporary
     ~id:"operation.wrong_voting_period"

@@ -406,6 +406,11 @@ module Manager = struct
   let assert_dal_feature_enabled vi =
     error_unless (Constants.dal_enable vi.ctxt) Dal_errors.Dal_feature_disabled
 
+  let assert_not_zero_messages messages =
+    match messages with
+    | [] -> error Sc_rollup_errors.Sc_rollup_add_zero_messages
+    | _ -> ok ()
+
   let consume_decoding_gas ctxt lexpr =
     record_trace Gas_quota_exceeded_init_deserialize
     @@ (* Fail early if the operation does not have enough gas to
@@ -560,10 +565,14 @@ module Manager = struct
       | Tx_rollup_rejection _ ->
           let* () = validate_tx_rollup_rejection vi operation in
           return remaining_gas
-      | Sc_rollup_originate _ | Sc_rollup_add_messages _ | Sc_rollup_cement _
-      | Sc_rollup_publish _ | Sc_rollup_refute _ | Sc_rollup_timeout _
+      | Sc_rollup_originate _ | Sc_rollup_cement _ | Sc_rollup_publish _
+      | Sc_rollup_refute _ | Sc_rollup_timeout _
       | Sc_rollup_execute_outbox_message _ ->
           let* () = assert_sc_rollup_feature_enabled vi in
+          return remaining_gas
+      | Sc_rollup_add_messages {messages; _} ->
+          let* () = assert_sc_rollup_feature_enabled vi in
+          let* () = assert_not_zero_messages messages in
           return remaining_gas
       | Sc_rollup_recover_bond _ ->
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/3063

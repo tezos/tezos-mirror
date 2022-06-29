@@ -529,7 +529,7 @@ let parse_inbox json =
   let go () =
     let inbox = JSON.as_object json in
     return
-      ( List.assoc "current_messages_hash" inbox |> JSON.as_string,
+      ( List.assoc "current_level_hash" inbox |> JSON.as_string,
         List.assoc "nb_available_messages" inbox |> JSON.as_int )
   in
   Lwt.catch go @@ fun exn ->
@@ -606,22 +606,28 @@ module Sc_rollup_inbox = struct
     | message :: rest ->
         let key = Data_encoding.Binary.to_string_exn Data_encoding.z counter in
         let payload = encode_external_message message in
-        let* tree = add tree [key; "payload"] payload in
+        let* tree = add tree ["message"; key] payload in
         build_current_messages_tree (Z.succ counter) tree rest
 
-  let predict_current_messages_hash =
-    Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup.(
-      function
-      | [] -> return @@ Inbox.Hash.hash_bytes []
-      | current_messages ->
-          let open Lwt.Syntax in
-          let* tree =
-            build_current_messages_tree Z.zero (empty ()) current_messages
-          in
-          let context_hash = hash tree in
-          Inbox.Hash.hash_bytes
-            [Tezos_crypto.Context_hash.to_bytes context_hash]
-          |> return)
+  module P = Tezos_protocol_alpha.Protocol
+
+  let predict_current_messages_hash level current_messages =
+    let open P.Alpha_context.Sc_rollup in
+    let open Lwt.Syntax in
+    let level_bytes =
+      Data_encoding.Binary.to_bytes_exn
+        P.Raw_level_repr.encoding
+        (P.Raw_level_repr.of_int32_exn level)
+    in
+    let* tree = add (empty ()) ["level"] level_bytes in
+    let* tree = build_current_messages_tree Z.zero tree current_messages in
+    let context_hash = hash tree in
+    let test =
+      Data_encoding.Binary.to_bytes_exn
+        Tezos_base.TzPervasives.Context_hash.encoding
+        context_hash
+    in
+    return (Inbox.Hash.of_bytes_exn test)
 end
 
 let fetch_messages_from_block sc_rollup_address client =
@@ -662,15 +668,19 @@ let test_rollup_inbox_current_messages_hash =
         in
         let open Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup in
         (* no messages have been sent *)
-        let* pristine_hash, _ =
+        let* pristine_hash, nb_available_messages =
           get_inbox_from_tezos_node sc_rollup_address client
         in
-        let* expected = Sc_rollup_inbox.predict_current_messages_hash [] in
+        let () =
+          Check.((nb_available_messages = 0) int)
+            ~error_msg:"0 messages expected in the inbox"
+        in
+        let* expected = Sc_rollup_inbox.predict_current_messages_hash 2l [] in
         let () =
           Check.(
             (Inbox.Hash.to_b58check expected = pristine_hash)
               string
-              ~error_msg:"expected pristine hash %L, got %R")
+              ~error_msg:"FIRST: expected pristine hash %L, got %R")
         in
         (*
            send messages, and assert that
@@ -692,13 +702,13 @@ let test_rollup_inbox_current_messages_hash =
                 "expected current messages hash to change when messages sent")
         in
         let* expected =
-          Sc_rollup_inbox.predict_current_messages_hash fst_batch
+          Sc_rollup_inbox.predict_current_messages_hash 3l fst_batch
         in
         let () =
           Check.(
             (Inbox.Hash.to_b58check expected = fst_batch_hash)
               string
-              ~error_msg:"expected first batch hash %L, got %R")
+              ~error_msg:"2 expected first batch hash %L, got %R")
         in
         (*
            send more messages, and assert that
@@ -720,7 +730,7 @@ let test_rollup_inbox_current_messages_hash =
           get_inbox_from_tezos_node sc_rollup_address client
         in
         let* expected =
-          Sc_rollup_inbox.predict_current_messages_hash snd_batch
+          Sc_rollup_inbox.predict_current_messages_hash 4l snd_batch
         in
         let () =
           Check.(
@@ -728,21 +738,7 @@ let test_rollup_inbox_current_messages_hash =
               string
               ~error_msg:"expected second batch hash %L, got %R")
         in
-        (*
-           send an empty list of messages, and assert that
-           - the hash matches the 'pristine' hash: a.k.a there are no 'current messages'
-        *)
-        let* () = send_message client sc_rollup_address @@ prepare_batch [] in
-        let* empty_batch_hash, _ =
-          get_inbox_from_tezos_node sc_rollup_address client
-        in
-        let () =
-          Check.(
-            (pristine_hash = empty_batch_hash)
-              string
-              ~error_msg:"expected empty batch hash %L, got %R")
-        in
-        return () )
+        unit )
         node
         client)
 
@@ -794,7 +790,10 @@ let basic_scenario _protocol sc_rollup_node sc_rollup_address _node client =
     4
   in
   let* () = Sc_rollup_node.run sc_rollup_node in
+  Log.info "before sending messages\n" ;
   let* () = send_messages num_messages sc_rollup_address client in
+  let* level = Client.level client in
+  Log.info "level: %d\n" level ;
   let* _ = Sc_rollup_node.wait_for_level sc_rollup_node expected_level in
   return ()
 
