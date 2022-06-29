@@ -26,3 +26,10 @@
 (** Error when the injector has no worker for the source which must inject an
     operation. *)
 type error += No_worker_for_source of Signature.Public_key_hash.t
+
+(** Error when the injector has no worker for the tag of the operation to be
+    injected. *)
+type error += No_worker_for_tag of string
+
+(** Error when the injector does not handle the operation. *)
+type error += No_worker_for_operation of L1_operation.t

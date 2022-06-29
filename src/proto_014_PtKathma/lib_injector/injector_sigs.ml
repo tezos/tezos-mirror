@@ -46,6 +46,8 @@ type injection_strategy =
 module type TAG = sig
   include Stdlib.Set.OrderedType
 
+  include Stdlib.Hashtbl.HashedType with type t := t
+
   val pp : Format.formatter -> t -> unit
 
   val encoding : t Data_encoding.t
@@ -85,6 +87,11 @@ module type PARAMETERS = sig
   val ignore_failing_operation :
     'a manager_operation -> [`Ignore_keep | `Ignore_drop | `Don't_ignore]
 
+  (** The tag of a manager operation. This is used to send operations to the
+      correct queue automatically (when signer is not provided) and to recover
+      persistent information. *)
+  val operation_tag : 'a manager_operation -> Tag.t option
+
   (** Returns the {e appoximate upper-bounds} for the fee and limits of an
       operation, used to compute an upper bound on the size (in bytes) for this
       operation. *)
@@ -119,13 +126,16 @@ module type S = sig
       queue of operations to inject. *)
   val init :
     #Protocol_client_context.full ->
+    data_dir:string ->
     rollup_node_state ->
     signers:(public_key_hash * injection_strategy * tag list) list ->
     unit tzresult Lwt.t
 
-  (** Add an operation as pending injection in the injector. *)
+  (** Add an operation as pending injection in the injector. If the source is
+      not provided, the operation is queued to the worker which handles the
+      corresponding tag. *)
   val add_pending_operation :
-    source:public_key_hash -> 'a manager_operation -> unit tzresult Lwt.t
+    ?source:public_key_hash -> 'a manager_operation -> unit tzresult Lwt.t
 
   (** Notify the injector of a new Tezos head. The injector marks the operations
       appropriately (for instance reverted operations that are part of a
@@ -142,4 +152,7 @@ module type S = sig
       inject their pending operations. *)
   val inject :
     ?tags:tag list -> ?strategy:injection_strategy -> unit -> unit Lwt.t
+
+  (** Shutdown the injectors, waiting for the ongoing request to be processed. *)
+  val shutdown : unit -> unit Lwt.t
 end
