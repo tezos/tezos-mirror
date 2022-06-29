@@ -24,15 +24,37 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Environment_context
-include Environment_protocol_T
-include Environment_V0
-include Environment_V1
-include Environment_V2
-include Environment_V3
-include Environment_V4
-include Environment_V5
-include Environment_V6
+module Context = Environment_context.Context
+module Register = Environment_context.Register
+
+let err_implementation_mismatch =
+  Environment_context.err_implementation_mismatch
+
+type validation_result = Environment_context.validation_result = {
+  context : Context.t;
+  fitness : Fitness.t;
+  message : string option;
+  max_operations_ttl : int;
+  last_allowed_fork_level : Int32.t;
+}
+
+type quota = Environment_context.quota = {max_size : int; max_op : int option}
+
+type rpc_context = Environment_context.rpc_context = {
+  block_hash : Block_hash.t;
+  block_header : Block_header.shell_header;
+  context : Context.t;
+}
+
+module type PROTOCOL = Environment_protocol_T.PROTOCOL
+
+module V0 = Environment_V0
+module V1 = Environment_V1
+module V2 = Environment_V2
+module V3 = Environment_V3
+module V4 = Environment_V4
+module V5 = Environment_V5
+module V6 = Environment_V6
 module Memory_context = Memory_context
 module Proxy_context = Proxy_context
 module Proxy_delegate = Proxy_delegate

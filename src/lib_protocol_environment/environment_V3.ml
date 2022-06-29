@@ -28,7 +28,7 @@
 open Environment_context
 open Environment_protocol_T
 
-module type V3 = sig
+module type T = sig
   include
     Tezos_protocol_environment_sigs.V3.T
       with type Format.formatter = Format.formatter
@@ -116,7 +116,7 @@ module type V3 = sig
     -> ['block] RPC_context.simple
 end
 
-module MakeV3 (Param : sig
+module Make (Param : sig
   val name : string
 end)
 () =

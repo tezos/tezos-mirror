@@ -32,7 +32,7 @@ type shell_error = error = ..
 open Environment_context
 open Environment_protocol_T
 
-module type V5 = sig
+module type T = sig
   include
     Tezos_protocol_environment_sigs.V5.T
       with type Format.formatter = Format.formatter
@@ -129,7 +129,7 @@ module type V5 = sig
     -> ['block] RPC_context.simple
 end
 
-module MakeV5 (Param : sig
+module Make (Param : sig
   val name : string
 end)
 () =
