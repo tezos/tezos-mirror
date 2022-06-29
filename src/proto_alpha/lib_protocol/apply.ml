@@ -2881,7 +2881,7 @@ let validate_grand_parent_endorsement ctxt chain_id
                    0 (* dummy endorsement power: this will never be used *);
                }) )
 
-let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
+let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
     ~payload_producer op_validated_stamp (operation : kind operation)
     (contents_list : kind contents_list) :
     (context * kind contents_result_list) tzresult Lwt.t =
@@ -3037,7 +3037,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
   | Single (Manager_operation _) ->
       apply_manager_operation
         ctxt
-        mode
+        Optimized
         ~payload_producer
         chain_id
         ~mempool_mode
@@ -3046,7 +3046,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
   | Cons (Manager_operation _, _) ->
       apply_manager_operation
         ctxt
-        mode
+        Optimized
         ~payload_producer
         chain_id
         ~mempool_mode
@@ -3061,7 +3061,6 @@ let apply_operation ctxt chain_id (apply_mode : apply_mode) ~payload_producer
     ctxt
     chain_id
     apply_mode
-    Optimized
     ~payload_producer
     op_validated_stamp
     operation

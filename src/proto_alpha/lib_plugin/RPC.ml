@@ -866,7 +866,6 @@ module Scripts = struct
                predecessor_round;
                grand_parent_round = Round.zero;
              })
-          Optimized
           ~payload_producer
           op_validated_stamp
           operation
