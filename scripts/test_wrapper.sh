@@ -27,7 +27,7 @@ EXITCODE=0
 # If set, COVERAGE_OPTIONS will typically contain "--instrument-with bisect_ppx".
 # We need this to be word split for the arguments to be properly parsed by dune.
 # shellcheck disable=SC2086
-dune build ${COVERAGE_OPTIONS:-} "$@" > "test_results/$name.log" 2>&1 \
+dune build --error-reporting=twice ${COVERAGE_OPTIONS:-} "$@" > "test_results/$name.log" 2>&1 \
     || EXITCODE=$?
 
 END=$(date +%s.%N)
