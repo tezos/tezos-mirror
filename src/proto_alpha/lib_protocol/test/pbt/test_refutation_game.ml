@@ -230,7 +230,10 @@ end) : TestPVM with type state = int = struct
 
   let proof_input_requested _ = No_input_required
 
-  let state_hash (x : state) = return (State_hash.hash_string [Int.to_string x])
+  let state_hash (x : state) =
+    return
+      (State_hash.context_hash_to_state_hash
+      @@ Context_hash.hash_string [Int.to_string x])
 
   let is_input_state x =
     if x >= P.target then return Initial else return No_input_required
@@ -307,7 +310,9 @@ end) : TestPVM with type state = string * int list = struct
 
   let proof_input_requested _ = No_input_required
 
-  let state_hash (x : state) = return @@ State_hash.hash_string [to_string x]
+  let state_hash (x : state) =
+    return @@ State_hash.context_hash_to_state_hash
+    @@ Context_hash.hash_string [to_string x]
 
   let initial_state _ _ = return ("hello", P.initial_prog)
 

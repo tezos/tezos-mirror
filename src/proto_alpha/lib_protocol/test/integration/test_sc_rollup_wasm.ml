@@ -73,7 +73,7 @@ module WASM_P :
   let kinded_hash_to_state_hash :
       Context_binary.Proof.kinded_hash -> Sc_rollup.State_hash.t = function
     | `Value hash | `Node hash ->
-        Sc_rollup.State_hash.hash_bytes [Context_hash.to_bytes hash]
+        Sc_rollup.State_hash.context_hash_to_state_hash hash
 
   let proof_before proof =
     kinded_hash_to_state_hash proof.Context_binary.Proof.before
