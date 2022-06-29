@@ -30,50 +30,60 @@ module Commitment = Sc_rollup_commitment_repr
 module Commitment_hash = Commitment.Hash
 
 let originate ctxt ~kind ~boot_sector ~parameters_ty ~genesis_commitment =
+  let open Lwt_tzresult_syntax in
   let genesis_commitment_hash =
     Sc_rollup_commitment_repr.hash genesis_commitment
   in
-  Raw_context.increment_origination_nonce ctxt >>?= fun (ctxt, nonce) ->
+  let*? ctxt, nonce = Raw_context.increment_origination_nonce ctxt in
   let level = Raw_context.current_level ctxt in
-  Sc_rollup_repr.Address.from_nonce nonce >>?= fun address ->
-  Store.PVM_kind.add ctxt address kind >>= fun ctxt ->
-  Store.Genesis_info.add
-    ctxt
-    address
-    {commitment_hash = genesis_commitment_hash; level = level.level}
-  >>= fun ctxt ->
-  Store.Boot_sector.add ctxt address boot_sector >>= fun ctxt ->
-  Store.Parameters_type.add ctxt address parameters_ty
-  >>=? fun (ctxt, param_ty_size_diff, _added) ->
-  Sc_rollup_inbox_repr.empty (Raw_context.recover ctxt) address level.level
-  >>= fun inbox ->
-  Store.Inbox.init ctxt address inbox >>=? fun (ctxt, inbox_size_diff) ->
-  Store.Last_cemented_commitment.init ctxt address genesis_commitment_hash
-  >>=? fun (ctxt, lcc_size_diff) ->
-  Store.Commitments.add
-    (ctxt, address)
-    genesis_commitment_hash
-    genesis_commitment
-  >>=? fun (ctxt, commitment_size_diff, _was_bound) ->
+  let*? address = Sc_rollup_repr.Address.from_nonce nonce in
+  let*! ctxt = Store.PVM_kind.add ctxt address kind in
+  let*! ctxt =
+    Store.Genesis_info.add
+      ctxt
+      address
+      {commitment_hash = genesis_commitment_hash; level = level.level}
+  in
+  let*! ctxt = Store.Boot_sector.add ctxt address boot_sector in
+  let* ctxt, param_ty_size_diff, _added =
+    Store.Parameters_type.add ctxt address parameters_ty
+  in
+  let*! inbox =
+    Sc_rollup_inbox_repr.empty (Raw_context.recover ctxt) address level.level
+  in
+  let* ctxt, inbox_size_diff = Store.Inbox.init ctxt address inbox in
+  let* ctxt, lcc_size_diff =
+    Store.Last_cemented_commitment.init ctxt address genesis_commitment_hash
+  in
+  let* ctxt, commitment_size_diff, _was_bound =
+    Store.Commitments.add
+      (ctxt, address)
+      genesis_commitment_hash
+      genesis_commitment
+  in
   (* This store [Store.Commitment_added] is going to be used to look this
      bootstrap commitment. This commitment is added here so the
      [sc_rollup_state_storage.deallocate] function does not have to handle a
      edge case. *)
-  Store.Commitment_added.add (ctxt, address) genesis_commitment_hash level.level
-  >>=? fun (ctxt, commitment_added_size_diff, _commitment_existed) ->
+  let* ctxt, commitment_added_size_diff, _commitment_existed =
+    Store.Commitment_added.add
+      (ctxt, address)
+      genesis_commitment_hash
+      level.level
+  in
   (* This store [Store.Commitment_added] is going to be used to look this
      bootstrap commitment. This commitment is added here so the
      [sc_rollup_state_storage.deallocate] function does not have to handle a
      edge case.
 
      There is no staker for the genesis_commitment. *)
-  Store.Commitment_stake_count.add
-    (ctxt, address)
-    genesis_commitment_hash
-    Int32.zero
-  >>=? fun (ctxt, commitment_staker_count_size_diff, _commitment_staker_existed)
-    ->
-  Store.Staker_count.init ctxt address 0l >>=? fun (ctxt, stakers_size_diff) ->
+  let* ctxt, commitment_staker_count_size_diff, _commitment_staker_existed =
+    Store.Commitment_stake_count.add
+      (ctxt, address)
+      genesis_commitment_hash
+      Int32.zero
+  in
+  let* ctxt, stakers_size_diff = Store.Staker_count.init ctxt address 0l in
   let addresses_size = 2 * Sc_rollup_repr.Address.size in
   let stored_kind_size = 2 (* because tag_size of kind encoding is 16bits. *) in
   let boot_sector_size =
@@ -96,7 +106,10 @@ let kind ctxt address =
   | Some k -> return k
   | None -> fail (Sc_rollup_errors.Sc_rollup_does_not_exist address)
 
-let list ctxt = Store.PVM_kind.keys ctxt >|= Result.return
+let list ctxt =
+  let open Lwt_syntax in
+  let+ res = Store.PVM_kind.keys ctxt in
+  Result.return res
 
 let genesis_info ctxt rollup =
   let open Lwt_tzresult_syntax in
