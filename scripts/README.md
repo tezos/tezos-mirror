@@ -7,7 +7,6 @@ In particular, this includes scripts for:
 * setting up environment variables for building or using Tezos (`env.sh`)
 * generating the Docker image used by the CI (`create_docker_image.sh`, `ci/`)
   or used by users and developers (`docker/`)
-* launching Tezos software using docker containers (`tezos-docker-manager.sh`, which may be renamed for different networks, e.g. `mainnet.sh`)
 * dune files instrumentation for computing test coverage (`instrument_dune_bisect.sh`)
 * maintaining a custom opam repository with all Tezos dependencies
  (`update_opam_repo.sh`, `opam-*.sh`)
@@ -24,6 +23,9 @@ In particular, this includes scripts for:
 * generating commitments (initial accounts) for test networks (`create_genesis/create_genesis_info.py`)
 * [obsolete] re-computing and updating the hashes of the genesis and alpha protocols (`update_hashes.sh`)
 
+This directory also includes an example docker-compose file to run a node
+with a baker and an accuser (`docker/docker-compose-generic.yml`).
+
 ## API
 <!-- For each script where this is possible, indicate how to obtain usage info
   (e.g. invoke with no args; or link to doc page where the tool is explained), and
@@ -31,7 +33,6 @@ In particular, this includes scripts for:
 
 Information about using some of the scripts above can be found as follows:
 
-* `tezos-docker-manager.sh` and aliases `mainnet.sh`, `carthagenet.sh`: See <https://tezos.gitlab.io/introduction/howtoget.html#using-docker-images>.
 * `instrument_dune_bisect.sh`: See <https://tezos.gitlab.io/developer/testing.html>.
 * `update_opam_repo.sh`: see <https://tezos.gitlab.io/developer/contributing-adding-a-new-opam-dependency.html>
 * `version.sh`: see <https://tezos.gitlab.io/introduction/howtoget.html> and <https://tezos.gitlab.io/developer/contributing-adding-a-new-opam-dependency.html>

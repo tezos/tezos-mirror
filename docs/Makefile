@@ -115,7 +115,6 @@ scriptsindoccheck:
 	scripts/test_doc_scripts.sh install-opam-bionic
 	scripts/test_doc_scripts.sh install-opam-focal
 	scripts/test_doc_scripts.sh compile-sources-buster
-	#scripts/test_doc_scripts.sh use-docker # returns 1 (and eats alot of disk)
 
 # build dune targets together to avoid concurrent dunes
 docexes: main

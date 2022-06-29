@@ -110,5 +110,10 @@ Codec
 Docker Images
 -------------
 
+- **Breaking change**: script ``tezos-docker-manager.sh``, also known as
+  ``alphanet.sh`` or ``mainnet.sh``, has been removed. It was deprecated
+  since version 13.0. It is recommended to write your own docker-compose file instead.
+  ``scripts/docker/docker-compose-generic.yml`` is an example of such file.
+
 Miscellaneous
 -------------

@@ -25,7 +25,6 @@ usage () {
 usage:
   $0 <test-name>
 where <test-name> can be:
-* use-docker
 * install-bin-bionic
 * install-bin-focal
 * install-bin-fedora34
@@ -52,10 +51,6 @@ fi
 
 for test_case in "$@"; do
     case "$test_case" in
-        "use-docker" )
-            # turn off variable expansion in here-script to protect $?:
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts --privileged $UBUNTU_FOCAL /Scripts/use-docker-ithacanet.sh
-            ;;
         "install-bin-bionic" )
             docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts $UBUNTU_BIONIC /Scripts/install-bin-ubuntu.sh
             ;;
