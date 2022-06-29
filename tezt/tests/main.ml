@@ -32,7 +32,8 @@
             other files.
 *)
 
-let protocols = [Protocol.Alpha; Protocol.Jakarta; Protocol.Ithaca]
+let protocols =
+  [Protocol.Alpha; Protocol.Kathmandu; Protocol.Jakarta; Protocol.Ithaca]
 
 let migrate_from = Protocol.Jakarta
 
@@ -57,7 +58,7 @@ let () =
   Normalize.register ~protocols:[Alpha] ;
   Double_bake.register ~protocols:[Alpha] ;
   Light.register ~protocols:[Alpha] ;
-  Mockup.register ~protocols:[Ithaca; Jakarta; Alpha] ;
+  Mockup.register ~protocols:[Ithaca; Jakarta; Kathmandu; Alpha] ;
   Mockup.register_constant_migration ~migrate_from ~migrate_to ;
   Mockup.register_global_constants ~protocols:[Alpha] ;
   Node_event_level.register ~protocols:[Alpha] ;
@@ -69,15 +70,15 @@ let () =
   User_activated_upgrade.register ~migrate_from ~migrate_to ;
   Rpc_config_logging.register ~protocols:[Alpha] ;
   Protocol_table_update.register ~migrate_from ~migrate_to ;
-  Cache_cache.register [Ithaca; Jakarta; Alpha] ;
-  Baking.register ~protocols:[Ithaca; Jakarta; Alpha] ;
-  Prevalidator.register ~protocols:[Ithaca; Jakarta; Alpha] ;
+  Cache_cache.register [Ithaca; Jakarta; Kathmandu; Alpha] ;
+  Baking.register ~protocols:[Ithaca; Jakarta; Kathmandu; Alpha] ;
+  Prevalidator.register ~protocols:[Ithaca; Jakarta; Kathmandu; Alpha] ;
   Dal.register ~protocols:[Alpha] ;
   Monitor_operations.register ~protocols:[Alpha] ;
   Stresstest_command.register ~protocols:[Alpha] ;
   (* Adding a new protocol would require adding samples at ./tezt/tests/encoding_samples directory*)
   Encoding.register ~protocols ;
-  Precheck.register ~protocols:[Ithaca; Jakarta; Alpha] ;
+  Precheck.register ~protocols:[Ithaca; Jakarta; Kathmandu; Alpha] ;
   Tenderbake.register ~protocols:[Alpha] ;
   Forge.register ~protocols:[Alpha] ;
   (* Tests that are protocol-independent.
@@ -91,7 +92,7 @@ let () =
   Client_keys.register_protocol_independent () ;
   (* Tests that are heavily protocol-dependent.
      Those modules define different tests for different protocols in their [register]. *)
-  RPC_test.register [Ithaca; Jakarta; Alpha] ;
+  RPC_test.register [Ithaca; Jakarta; Kathmandu; Alpha] ;
   Demo_counter.register () ;
   (* Alpha cannot stitch from Jakarta yet, but when it can, we can
      add a voting test from Jakarta to Alpha. *)
@@ -114,19 +115,19 @@ let () =
   (* This file tests an RPC added in protocol G *)
   Big_map_all.register () ;
   Reject_malformed_micheline.register ~protocols:[Alpha] ;
-  Tx_rollup.register ~protocols:[Alpha; Jakarta] ;
-  Tx_rollup_node.register ~protocols:[Alpha; Jakarta] ;
+  Tx_rollup.register ~protocols:[Alpha; Jakarta; Kathmandu] ;
+  Tx_rollup_node.register ~protocols:[Alpha; Jakarta; Kathmandu] ;
   Manager_operations.register ~protocols ;
-  Replace_by_fees.register ~protocols:[Ithaca; Jakarta; Alpha] ;
+  Replace_by_fees.register ~protocols:[Ithaca; Jakarta; Kathmandu; Alpha] ;
   Sc_rollup.register ~protocols:[Alpha] ;
   Views.register [Alpha] ;
   Runtime_script_failure.register ~protocols ;
-  Deposits_limit.register ~protocols:[Ithaca; Jakarta; Alpha] ;
+  Deposits_limit.register ~protocols:[Ithaca; Jakarta; Kathmandu; Alpha] ;
   Large_metadata.register ~protocols:[Alpha] ;
   (* Relies on a feature only available since J. *)
   Run_script.register ~protocols:[Alpha] ;
   Sapling.register ~protocols:[Alpha] ;
-  Client_run_view.register ~protocols:[Alpha; Jakarta] ;
+  Client_run_view.register ~protocols:[Alpha; Jakarta; Kathmandu] ;
   Multinode_snapshot.register ~protocols:[Alpha] ;
   (* Relies on a feature only available since K. *)
   Governance_dictator.register ~protocols:[Alpha] ;

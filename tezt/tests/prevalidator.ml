@@ -2397,7 +2397,8 @@ let get_endorsement_has_bytes ~protocol client =
   in
   let wrapped_bytes =
     match protocol with
-    | Protocol.Ithaca | Protocol.Jakarta | Protocol.Alpha ->
+    | Protocol.Ithaca | Protocol.Jakarta | Protocol.Kathmandu | Protocol.Alpha
+      ->
         let signature = get_signature op in
         let kind = JSON.get "kind" contents |> JSON.as_string in
         if not (kind = "endorsement") then
