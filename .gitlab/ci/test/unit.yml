@@ -136,11 +136,6 @@ unit:014_PtKathma:
           - proto_014_PtKathma
   script:
     - scripts/test_wrapper.sh $TEST_TARGETS ${!TEST_TARGETS}
-unit:non-proto-x86_64:
-  extends:
-  - .unit_test_template_x86_64_coverage
-  variables:
-    MAKE_TARGETS: test-nonproto-unit test-webassembly
 
 unit:alpha:
   extends:
