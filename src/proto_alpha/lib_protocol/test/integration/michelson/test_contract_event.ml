@@ -111,11 +111,8 @@ let contract_test () =
       assert (Entrypoint.to_string tag1 = "tag1") ;
       assert (Entrypoint.to_string tag2 = "tag2") ;
       (match root ty1 with
-      | Prim
-          ( _,
-            T_or,
-            [Prim (_, T_nat, [], ["%int"]); Prim (_, T_string, [], ["%str"])],
-            [] ) ->
+      | Prim (_, T_or, [Prim (_, T_nat, [], []); Prim (_, T_string, [], [])], [])
+        ->
           ()
       | _ -> assert false) ;
       (match root ty2 with
