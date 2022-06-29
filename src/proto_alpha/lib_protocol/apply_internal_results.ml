@@ -51,10 +51,10 @@ type 'kind internal_operation_contents =
     }
       -> Kind.event internal_operation_contents
 
-type packed_internal_manager_operation =
-  | Manager :
+type packed_internal_operation_contents =
+  | Internal_operation_contents :
       'kind internal_operation_contents
-      -> packed_internal_manager_operation
+      -> packed_internal_operation_contents
 
 type 'kind internal_contents = {
   source : Contract.t;
@@ -210,7 +210,7 @@ module Internal_result = struct
         encoding : 'a Data_encoding.t;
         iselect : 'kind iselect;
         select :
-          packed_internal_manager_operation ->
+          packed_internal_operation_contents ->
           'kind internal_operation_contents option;
         proj : 'kind internal_operation_contents -> 'a;
         inj : 'a -> 'kind internal_operation_contents;
@@ -345,7 +345,9 @@ module Internal_result = struct
               Some (op, res)
           | _ -> None);
         select =
-          (function Manager (Transaction _ as op) -> Some op | _ -> None);
+          (function
+          | Internal_operation_contents (Transaction _ as op) -> Some op
+          | _ -> None);
         proj =
           (function
           | Transaction {amount; destination; parameters; entrypoint} ->
@@ -386,7 +388,9 @@ module Internal_result = struct
               Some (op, res)
           | _ -> None);
         select =
-          (function Manager (Origination _ as op) -> Some op | _ -> None);
+          (function
+          | Internal_operation_contents (Origination _ as op) -> Some op
+          | _ -> None);
         proj =
           (function
           | Origination {credit; delegate; script} -> (credit, delegate, script));
@@ -410,7 +414,9 @@ module Internal_result = struct
               Some (op, res)
           | _ -> None);
         select =
-          (function Manager (Delegation _ as op) -> Some op | _ -> None);
+          (function
+          | Internal_operation_contents (Delegation _ as op) -> Some op
+          | _ -> None);
         proj = (function Delegation key -> key);
         inj = (fun key -> Delegation key);
       }
@@ -464,7 +470,7 @@ module Internal_result = struct
         name
         encoding
         (fun o -> match select o with None -> None | Some o -> Some (proj o))
-        (fun x -> Manager (inj x))
+        (fun x -> Internal_operation_contents (inj x))
     in
     union
       ~tag_size:`Uint8
@@ -480,8 +486,8 @@ let internal_contents_encoding : packed_internal_contents Data_encoding.t =
   def "apply_internal_results.alpha.operation_result"
   @@ conv
        (fun (Internal_contents {source; operation; nonce}) ->
-         ((source, nonce), Manager operation))
-       (fun ((source, nonce), Manager operation) ->
+         ((source, nonce), Internal_operation_contents operation))
+       (fun ((source, nonce), Internal_operation_contents operation) ->
          Internal_contents {source; operation; nonce})
        (merge_objs
           (obj2 (req "source" Contract.encoding) (req "nonce" uint16))
