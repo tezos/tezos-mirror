@@ -2,19 +2,18 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_tx_rollup_alpha)
- (public_name tezos-tx-rollup-alpha)
+ (name tezos_tx_rollup_014_PtKathma)
+ (public_name tezos-tx-rollup-014-PtKathma)
  (instrumentation (backend bisect_ppx))
  (libraries
   index
   tezos-base
   tezos-crypto
-  tezos-protocol-alpha
-  tezos-protocol-alpha.environment
-  tezos-client-alpha
+  tezos-protocol-014-PtKathma
+  tezos-client-014-PtKathma
   tezos-client-commands
   tezos-context.encoding
-  tezos-baking-alpha-commands
+  tezos-baking-014-PtKathma-commands
   tezos-stdlib-unix
   tezos-rpc
   tezos-rpc-http
@@ -26,8 +25,8 @@
   tezos-shell
   tezos-store
   tezos-workers
-  tezos-protocol-plugin-alpha
-  tezos-injector-alpha)
+  tezos-protocol-plugin-014-PtKathma
+  tezos-injector-014-PtKathma)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
@@ -37,11 +36,10 @@
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_base
   -open Tezos_crypto
-  -open Tezos_protocol_alpha
-  -open Tezos_protocol_environment_alpha
-  -open Tezos_client_alpha
+  -open Tezos_protocol_014_PtKathma
+  -open Tezos_client_014_PtKathma
   -open Tezos_client_commands
-  -open Tezos_baking_alpha_commands
+  -open Tezos_baking_014_PtKathma_commands
   -open Tezos_stdlib_unix
   -open Tezos_rpc
   -open Tezos_rpc_http
@@ -51,5 +49,5 @@
   -open Tezos_client_base
   -open Tezos_client_base_unix
   -open Tezos_workers
-  -open Tezos_protocol_plugin_alpha
-  -open Tezos_injector_alpha))
+  -open Tezos_protocol_plugin_014_PtKathma
+  -open Tezos_injector_014_PtKathma))

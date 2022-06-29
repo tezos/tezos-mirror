@@ -105,6 +105,43 @@ unit:013_PtJakart:
   script:
     - scripts/test_wrapper.sh $TEST_TARGETS ${!TEST_TARGETS}
 
+unit:014_PtKathma:
+  extends:
+  - .unit_test_template_x86_64_coverage
+  # We use an extra level of indirection for TEST_TARGETS, to avoid
+  # overly long job names causing GitLab CI to silently fail.
+  variables:
+    # Note the use of @ resp. @@ to select tests recursively resp. non-recursively
+    proto_014_PtKathma__lib_protocol__1: >
+        @@src/proto_014_PtKathma/lib_protocol/test/integration/runtest
+        @src/proto_014_PtKathma/lib_protocol/test/integration/consensus/runtest
+        @src/proto_014_PtKathma/lib_protocol/test/integration/gas/runtest
+    proto_014_PtKathma__lib_protocol__2: >
+        @src/proto_014_PtKathma/lib_protocol/test/integration/michelson/runtest
+        @src/proto_014_PtKathma/lib_protocol/test/integration/operations/runtest
+    proto_014_PtKathma__lib_protocol__3: >
+        @src/proto_014_PtKathma/lib_protocol/test/pbt/runtest
+        @src/proto_014_PtKathma/lib_protocol/test/unit/runtest
+    proto_014_PtKathma: >
+        @src/proto_014_PtKathma/lib_benchmark/runtest
+        @src/proto_014_PtKathma/lib_client/runtest
+        @src/proto_014_PtKathma/lib_plugin/runtest
+        @src/proto_014_PtKathma/lib_delegate/runtest
+  parallel:
+    matrix:
+      - TEST_TARGETS:
+          - proto_014_PtKathma__lib_protocol__1
+          - proto_014_PtKathma__lib_protocol__2
+          - proto_014_PtKathma__lib_protocol__3
+          - proto_014_PtKathma
+  script:
+    - scripts/test_wrapper.sh $TEST_TARGETS ${!TEST_TARGETS}
+unit:non-proto-x86_64:
+  extends:
+  - .unit_test_template_x86_64_coverage
+  variables:
+    MAKE_TARGETS: test-nonproto-unit test-webassembly
+
 unit:alpha:
   extends:
   - .unit_test_template_x86_64_coverage
@@ -141,7 +178,6 @@ unit:non-proto-x86_64:
   - .unit_test_template_x86_64_coverage
   variables:
     MAKE_TARGETS: test-nonproto-unit test-webassembly
-
 unit:non-proto-arm64:
   extends: .unit_test_template_arm64
   variables:

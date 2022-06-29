@@ -82,6 +82,9 @@
   tezos-client-013-PtJakart.commands-registration
   tezos-baking-013-PtJakart-commands.registration
   tezos-protocol-plugin-013-PtJakart
+  tezos-client-014-PtKathma.commands-registration
+  tezos-baking-014-PtKathma-commands.registration
+  tezos-protocol-plugin-014-PtKathma
   (select void_for_linking-tezos-client-alpha-commands-registration from
    (tezos-client-alpha.commands-registration -> void_for_linking-tezos-client-alpha-commands-registration.empty)
    (-> void_for_linking-tezos-client-alpha-commands-registration.empty))

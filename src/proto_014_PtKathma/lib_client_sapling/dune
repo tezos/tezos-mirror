@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_client_sapling_alpha)
- (public_name tezos-client-alpha.sapling)
+ (name tezos_client_sapling_014_PtKathma)
+ (public_name tezos-client-014-PtKathma.sapling)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -11,11 +11,10 @@
   tezos-stdlib-unix
   tezos-client-base
   tezos-signer-backends
-  tezos-client-alpha
-  tezos-client-alpha.commands
-  tezos-protocol-alpha
-  tezos-protocol-alpha.environment
-  tezos-protocol-plugin-alpha)
+  tezos-client-014-PtKathma
+  tezos-client-014-PtKathma.commands
+  tezos-protocol-014-PtKathma
+  tezos-protocol-plugin-014-PtKathma)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -23,8 +22,7 @@
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_stdlib_unix
   -open Tezos_client_base
-  -open Tezos_client_alpha
-  -open Tezos_client_alpha_commands
-  -open Tezos_protocol_alpha
-  -open Tezos_protocol_environment_alpha
-  -open Tezos_protocol_plugin_alpha))
+  -open Tezos_client_014_PtKathma
+  -open Tezos_client_014_PtKathma_commands
+  -open Tezos_protocol_014_PtKathma
+  -open Tezos_protocol_plugin_014_PtKathma))

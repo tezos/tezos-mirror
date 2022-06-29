@@ -6,21 +6,21 @@
  (libraries
   tezos-micheline
   tezos-micheline-rewriting
-  tezos-benchmark-type-inference-alpha
-  tezos-protocol-alpha
+  tezos-benchmark-type-inference-014-PtKathma
+  tezos-protocol-014-PtKathma
   tezos-error-monad
-  tezos-client-alpha)
+  tezos-client-014-PtKathma)
  (flags
   (:standard)
   -open Tezos_micheline
-  -open Tezos_benchmark_type_inference_alpha))
+  -open Tezos_benchmark_type_inference_014_PtKathma))
 
 (rule
  (alias runtest)
- (package tezos-benchmark-type-inference-alpha)
+ (package tezos-benchmark-type-inference-014-PtKathma)
  (action (run %{dep:./test_uf.exe})))
 
 (rule
  (alias runtest)
- (package tezos-benchmark-type-inference-alpha)
+ (package tezos-benchmark-type-inference-014-PtKathma)
  (action (run %{dep:./test_inference.exe})))

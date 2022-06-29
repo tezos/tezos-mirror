@@ -7,14 +7,14 @@
   alcotest-lwt
   tezos-base
   tezos-protocol-014-PtKathma
-  tezos-alpha-test-helpers
+  tezos-014-PtKathma-test-helpers
   tezos-base-test-helpers)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_protocol_014_PtKathma
-  -open Tezos_alpha_test_helpers
+  -open Tezos_014_PtKathma_test_helpers
   -open Tezos_base_test_helpers))
 
 (rule

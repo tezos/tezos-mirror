@@ -4461,6 +4461,8 @@ module Protocol = Protocol
 
   let _013_PtJakart = active (Name.v "PtJakart" 013)
 
+  let _014_PtKathma = active (Name.v "PtKathma" 014)
+
   let alpha = active Name.alpha
 
   let all = List.rev !all_rev

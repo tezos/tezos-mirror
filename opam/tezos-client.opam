@@ -26,6 +26,9 @@ depends: [
   "tezos-client-013-PtJakart"
   "tezos-baking-013-PtJakart-commands"
   "tezos-protocol-plugin-013-PtJakart"
+  "tezos-client-014-PtKathma"
+  "tezos-baking-014-PtKathma-commands"
+  "tezos-protocol-plugin-014-PtKathma"
 ]
 depopts: [
   "tezos-client-genesis"
