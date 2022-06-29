@@ -577,6 +577,10 @@ val restore_formatter : Format.formatter -> formatter_state -> unit
 
 (** {2 Parsing and error reporting} *)
 
+(* FIXME: #2935 Add documentation about failures in [Clic]
+   The documentation should mention what happens if the functions fail.
+*)
+
 (** Help error (not really an error), thrown by {!dispatch} and {!parse_global_options}. *)
 type error += Help : _ command option -> error
 
