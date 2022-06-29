@@ -3252,7 +3252,6 @@ module Registration_section = struct
              ty = unit_t;
              k = halt;
              loc = dummy_loc;
-             addr = Contract_event_repr.Hash.zero;
              tag = Entrypoint_repr.default;
            })
       ()

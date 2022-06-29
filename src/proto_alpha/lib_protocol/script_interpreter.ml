@@ -1532,7 +1532,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                 | Bogus_opening -> R true)
           in
           (step [@ocaml.tailcall]) g gas k ks accu stack
-      | IEmit {tag; ty = event_type; k; addr = _; loc} ->
+      | IEmit {tag; ty = event_type; k; loc} ->
           let event_data = accu in
           emit_event (ctxt, sc) gas ~loc ~event_type ~tag ~event_data
           >>=? fun (accu, ctxt, gas) ->

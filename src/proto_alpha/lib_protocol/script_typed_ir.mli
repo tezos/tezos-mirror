@@ -1082,7 +1082,6 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
          kinstr
   | IEmit : {
       loc : Script.location;
-      addr : Contract_event.t;
       tag : Entrypoint.t;
       ty : ('a, _) ty;
       k : (operation, 's, 'r, 'f) kinstr;
