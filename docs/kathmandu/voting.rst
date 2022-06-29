@@ -184,7 +184,7 @@ fails.
 
 A protocol is *invalid* if its code cannot be compiled (e.g., if the code is not
 valid source code), if its code uses functions not present in the
-:doc:`protocol environment <../developer/protocol_environment>`, or if it
+:doc:`protocol environment <../shell/protocol_environment>`, or if it
 downgrades the protocol environment version.
 
 If an invalid protocol is voted in, then the activation fails for all the nodes,

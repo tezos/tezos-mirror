@@ -6,7 +6,7 @@ This document describes the protocol plugins implemented in Octez.
 Protocol-specific shell plugins, simply called protocol plugins,
 implement extra APIs needed by the shell in order to interact with the
 economic protocol, beyond the one provided by the :doc:`protocol
-environment <../developer/protocol_environment>`.
+environment <../shell/protocol_environment>`.
 This code is not strictly speaking part of the protocol
 code base, so this is not subject to on-chain governance (see
 :doc:`voting procedure <voting>`), but it is still protocol-dependent,
