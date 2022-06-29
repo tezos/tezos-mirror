@@ -40,13 +40,14 @@ let check_encode_decode_inbox_message message =
   let open Lwt_result_syntax in
   let open Sc_rollup_management_protocol in
   let*? bytes =
-    Environment.wrap_tzresult @@ Sc_rollup.Inbox.Message.to_bytes message
+    Environment.wrap_tzresult @@ Sc_rollup.Inbox.Message.serialize message
   in
   let*? message' =
-    Environment.wrap_tzresult @@ Internal_for_tests.inbox_message_of_bytes bytes
+    Environment.wrap_tzresult
+    @@ Internal_for_tests.deserialize_inbox_message bytes
   in
   let*? bytes' =
-    Environment.wrap_tzresult @@ Sc_rollup.Inbox.Message.to_bytes message'
+    Environment.wrap_tzresult @@ Sc_rollup.Inbox.Message.serialize message'
   in
   Assert.equal_string ~loc:__LOC__ (bytes :> string) (bytes' :> string)
 
@@ -55,19 +56,19 @@ let check_encode_decode_outbox_message ctxt message =
   let open Sc_rollup_management_protocol in
   let*? bytes =
     Environment.wrap_tzresult
-    @@ Internal_for_tests.bytes_of_outbox_message message
+    @@ Internal_for_tests.serialize_outbox_message message
   in
   let* message', _ctxt =
     let*? message_repr =
-      Environment.wrap_tzresult @@ Sc_rollup.Outbox.Message.of_bytes bytes
+      Environment.wrap_tzresult @@ Sc_rollup.Outbox.Message.deserialize bytes
     in
     wrap @@ outbox_message_of_outbox_message_repr ctxt message_repr
   in
   let*? bytes' =
     Environment.wrap_tzresult
-    @@ Internal_for_tests.bytes_of_outbox_message message'
+    @@ Internal_for_tests.serialize_outbox_message message'
   in
-  Assert.equal_string ~loc:__LOC__ bytes bytes'
+  Assert.equal_string ~loc:__LOC__ (bytes :> string) (bytes' :> string)
 
 let string_ticket ticketer contents amount =
   let open WithExceptions in
@@ -146,7 +147,7 @@ let test_encode_decode_external_inbox_message () =
     let inbox_message = Sc_rollup.Inbox.Message.External message in
     let*? real_encoding =
       Environment.wrap_tzresult
-      @@ Sc_rollup.Inbox.Message.to_bytes inbox_message
+      @@ Sc_rollup.Inbox.Message.serialize inbox_message
     in
     let real_encoding = (real_encoding :> string) in
     (* The prefix consists of a tag (0 for internal, 1 for external). *)

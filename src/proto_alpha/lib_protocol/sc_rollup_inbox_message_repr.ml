@@ -90,15 +90,15 @@ let encoding =
 
 type serialized = string
 
-let to_bytes msg =
+let serialize msg =
   let open Tzresult_syntax in
   match Data_encoding.Binary.to_string_opt encoding msg with
   | None -> fail Error_encode_inbox_message
   | Some str -> return str
 
-let of_bytes bytes =
+let deserialize s =
   let open Tzresult_syntax in
-  match Data_encoding.Binary.of_string_opt encoding bytes with
+  match Data_encoding.Binary.of_string_opt encoding s with
   | None -> fail Error_decode_inbox_message
   | Some msg -> return msg
 

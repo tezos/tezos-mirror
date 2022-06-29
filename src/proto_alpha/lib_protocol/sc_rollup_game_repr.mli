@@ -85,7 +85,7 @@
     equipped with a perfect PVM to play an honest next move:
 
       The player with a perfect PVM can calculate honest hashes until
-      one disagrees with the [dissection], and challenge the dissection
+      one disagrees with the [dissection], and challenges the dissection
       at that point, publishing either an honest [dissection] or an
       honest [Proof].
 
@@ -129,6 +129,13 @@ open Sc_rollup_repr
     represent the first and second player in the pair respectively. *)
 type player = Alice | Bob
 
+(** A dissection chunk is made of a state hash (that could be [None], see
+    invariants below), and a tick count. *)
+type dissection_chunk = {
+  state_hash : State_hash.t option;
+  tick : Sc_rollup_tick_repr.t;
+}
+
 module V1 : sig
   (** A game state is characterized by:
 
@@ -164,7 +171,7 @@ module V1 : sig
     inbox_snapshot : Sc_rollup_inbox_repr.t;
     level : Raw_level_repr.t;
     pvm_name : string;
-    dissection : (State_hash.t option * Sc_rollup_tick_repr.t) list;
+    dissection : dissection_chunk list;
   }
 
   (** [equal g1 g2] returns [true] iff [g1] is equal to [g2]. *)
@@ -175,10 +182,7 @@ module V1 : sig
 
   val encoding : t Data_encoding.t
 
-  val pp_dissection :
-    Format.formatter ->
-    (Sc_rollup_repr.State_hash.t option * Sc_rollup_tick_repr.t) list ->
-    unit
+  val pp_dissection : Format.formatter -> dissection_chunk list -> unit
 
   val player_equal : player -> player -> bool
 
@@ -248,7 +252,7 @@ val initial :
 (** A [step] in the game is either a new dissection (if there are
     intermediate ticks remaining to put in it) or a proof. *)
 type step =
-  | Dissection of (State_hash.t option * Sc_rollup_tick_repr.t) list
+  | Dissection of dissection_chunk list
   | Proof of Sc_rollup_proof_repr.t
 
 (** A [refutation] is a move in the game. [choice] is the final tick
@@ -330,7 +334,7 @@ val check_dissection :
   Sc_rollup_tick_repr.t ->
   Sc_rollup_repr.State_hash.t option ->
   Sc_rollup_tick_repr.t ->
-  (Sc_rollup_repr.State_hash.t option * Sc_rollup_tick_repr.t) list ->
+  dissection_chunk list ->
   (unit, error) result Lwt.t
 
 (** Applies the move [refutation] to the game. Checks the move is

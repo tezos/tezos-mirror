@@ -99,7 +99,7 @@ let gen_messages inbox level =
     lift
     @@ let*? input_messages =
          List.map_e
-           (fun msg -> Sc_rollup_inbox_message_repr.(to_bytes (External msg)))
+           (fun msg -> Sc_rollup_inbox_message_repr.(serialize (External msg)))
            payloads
        in
        let messages =
@@ -154,6 +154,11 @@ let gen_game =
   let* inbox_snapshot = gen_inbox rollup level in
   let* pvm_name = gen_pvm_name in
   let* dissection = gen_dissection in
+  let dissection =
+    List.map
+      (fun (state_hash, tick) -> Sc_rollup_game_repr.{state_hash; tick})
+      dissection
+  in
   return Sc_rollup_game_repr.{turn; inbox_snapshot; level; pvm_name; dissection}
 
 let gen_conflict =

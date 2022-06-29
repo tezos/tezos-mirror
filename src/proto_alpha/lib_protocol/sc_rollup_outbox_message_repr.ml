@@ -104,14 +104,16 @@ let pp fmt (Atomic_transaction_batch {transactions}) =
     fmt
     transactions
 
-let of_bytes bytes =
+type serialized = string
+
+let deserialize data =
   let open Tzresult_syntax in
-  match Data_encoding.Binary.of_string_opt encoding bytes with
+  match Data_encoding.Binary.of_string_opt encoding data with
   | Some x -> return x
   | None -> fail Error_decode_outbox_message
 
 module Internal_for_tests = struct
-  let to_bytes outbox_message =
+  let serialize outbox_message =
     let open Tzresult_syntax in
     match Data_encoding.Binary.to_string_opt encoding outbox_message with
     | Some str -> return str

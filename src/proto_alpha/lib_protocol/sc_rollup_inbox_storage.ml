@@ -156,7 +156,7 @@ let serialize_external_messages ctxt external_messages =
           ctxt
           (Sc_rollup_costs.cost_serialize_external_inbox_message ~bytes_len)
       in
-      let* serialized_message = to_bytes @@ External message in
+      let* serialized_message = serialize @@ External message in
       return (ctxt, serialized_message))
     ctxt
     external_messages
@@ -173,7 +173,7 @@ let serialize_internal_message ctxt ~payload ~sender ~source =
       (Sc_rollup_costs.cost_serialize_internal_inbox_message internal_message)
   in
   let* message =
-    Sc_rollup_inbox_message_repr.(to_bytes @@ Internal internal_message)
+    Sc_rollup_inbox_message_repr.(serialize @@ Internal internal_message)
   in
   return (message, ctxt)
 

@@ -67,13 +67,15 @@ let hash_string s =
 
 let hash_int n = hash_string (Format.sprintf "%d" n)
 
+let mk_dissection_chunk (state_hash, tick) = G.{state_hash; tick}
+
 let init_dissection ?(size = 32) ?init_tick start_hash =
   let default_init_tick i =
     let hash =
       if i = size - 1 then None
       else Some (if i = 0 then start_hash else hash_int i)
     in
-    (hash, tick_of_int_exn i)
+    mk_dissection_chunk (hash, tick_of_int_exn i)
   in
   let init_tick =
     Option.fold
@@ -153,6 +155,8 @@ let test_poorly_distributed_dissection () =
   let* ctxt, rollup, refuter, defender = two_stakers_in_conflict () in
   let start_hash = hash_string "foo" in
   let init_tick size i =
+    mk_dissection_chunk
+    @@
     if i = size - 1 then (None, tick_of_int_exn 10000)
     else (Some (if i = 0 then start_hash else hash_int i), tick_of_int_exn i)
   in
@@ -174,6 +178,8 @@ let test_single_valid_game_move () =
   let start_hash = hash_string "foo" in
   let dissection =
     Stdlib.List.init 32 (fun i ->
+        mk_dissection_chunk
+        @@
         if i = 0 then (Some start_hash, tick_of_int_exn 0)
         else if i = 31 then (None, tick_of_int_exn 10000)
         else (Some (hash_int i), tick_of_int_exn (i * 200)))

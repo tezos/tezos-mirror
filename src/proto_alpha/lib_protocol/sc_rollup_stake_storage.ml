@@ -343,9 +343,6 @@ let cement_commitment ctxt rollup new_lcc =
   let* new_lcc_commitment, ctxt =
     Commitment_storage.get_commitment_unsafe ctxt rollup new_lcc
   in
-  let* ctxt, new_lcc_added =
-    Store.Commitment_added.get (ctxt, rollup) new_lcc
-  in
   let* () =
     fail_when
       Commitment_hash.(new_lcc_commitment.predecessor <> old_lcc)
@@ -358,6 +355,9 @@ let cement_commitment ctxt rollup new_lcc =
     fail_when
       Compare.Int32.(total_staker_count <> new_lcc_stake_count)
       Sc_rollup_disputed
+  in
+  let* ctxt, new_lcc_added =
+    Store.Commitment_added.get (ctxt, rollup) new_lcc
   in
   let* () =
     fail_when

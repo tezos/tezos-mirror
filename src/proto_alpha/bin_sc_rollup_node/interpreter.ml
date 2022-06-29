@@ -97,7 +97,8 @@ module Make (PVM : Pvm.S) : S = struct
         (fun message_counter state external_message ->
           let message = Sc_rollup.Inbox.Message.External external_message in
           let*? payload =
-            Environment.wrap_tzresult (Sc_rollup.Inbox.Message.to_bytes message)
+            Environment.wrap_tzresult
+              (Sc_rollup.Inbox.Message.serialize message)
           in
           let input =
             Sc_rollup.

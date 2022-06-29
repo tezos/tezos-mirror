@@ -105,7 +105,7 @@ module Sc_rollup_update_num_and_size_of_messages_benchmark = struct
     let new_message =
       WithExceptions.Result.get_ok ~loc:__LOC__
       @@ Sc_rollup_inbox_message_repr.(
-           to_bytes @@ External new_external_message)
+           serialize @@ External new_external_message)
     in
     let workload = () in
     let closure () =
@@ -190,7 +190,7 @@ module Sc_rollup_add_external_messages_benchmark = struct
     in
     let message =
       WithExceptions.Result.get_ok ~loc:__LOC__
-      @@ Sc_rollup_inbox_message_repr.(to_bytes @@ External external_message)
+      @@ Sc_rollup_inbox_message_repr.(serialize @@ External external_message)
     in
     let last_level_int =
       Base_samplers.sample_in_interval

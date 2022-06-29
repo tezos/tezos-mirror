@@ -100,8 +100,9 @@ let tick_of_int_exn n =
 let tick_to_int_exn t =
   match Tick.to_int t with None -> assert false | Some n -> n
 
-let random_dissection start_at start_hash stop_at stop_hash :
-    (State_hash.t option * Tick.t) list option Lwt.t =
+let mk_dissection_chunk (state_hash, tick) = Game.{state_hash; tick}
+
+let random_dissection start_at start_hash stop_at stop_hash =
   let start_int = tick_to_int_exn start_at in
   let stop_int = tick_to_int_exn stop_at in
   let dist = stop_int - start_int in
@@ -113,6 +114,8 @@ let random_dissection start_at start_hash stop_at stop_hash :
     return
     @@ Result.to_option
          (List.init branch ~when_negative_length:"error" (fun i ->
+              mk_dissection_chunk
+              @@
               if i = 0 then (Some start_hash, start_at)
               else if i = branch - 1 then (stop_hash, stop_at)
               else
@@ -422,7 +425,7 @@ end) : TestPVM = struct
     let make_external_inbox_message str =
       WithExceptions.Result.get_ok
         ~loc:__LOC__
-        Inbox.Message.(External str |> to_bytes)
+        Inbox.Message.(External str |> serialize)
 
     let default_state =
       let promise =
@@ -542,7 +545,7 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
                          let* h = PVM.state_hash s in
                          return (Some h)
                 in
-                (hash, tick))
+                mk_dissection_chunk (hash, tick))
               a)
           tick_list
       in
@@ -633,15 +636,17 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
   let random_decision d =
     let number_of_somes =
       List.length
-        (List.filter (function Some _, _ -> true | None, _ -> false) d)
+        (List.filter (fun {Game.state_hash; _} -> Option.is_some state_hash) d)
     in
     let x = Random.int (number_of_somes - 1) in
     let start_hash, start =
-      match List.nth d x with Some (Some s, t) -> (s, t) | _ -> assert false
+      match List.nth d x with
+      | Some Game.{state_hash = Some s; tick = t} -> (s, t)
+      | _ -> assert false
     in
     let _, stop =
       match List.nth d (x + 1) with
-      | Some (s, t) -> (s, t)
+      | Some Game.{state_hash; tick} -> (state_hash, tick)
       | None -> assert false
     in
     let stop_hash = Some (random_hash ()) in
@@ -676,7 +681,9 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
   let find_conflict dissection =
     let rec aux states =
       match states with
-      | (start_state, start_tick) :: (next_state, next_tick) :: rest ->
+      | start :: next :: rest ->
+          let Game.{state_hash = start_state; tick = start_tick} = start in
+          let Game.{state_hash = next_state; tick = next_tick} = next in
           let* c0 = conflicting_section start_tick start_state in
           let* c = conflicting_section next_tick next_state in
           if c0 then assert false
@@ -684,7 +691,7 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
             if next_state = None then return None
             else
               return (Some ((start_state, start_tick), (next_state, next_tick)))
-          else aux ((next_state, next_tick) :: rest)
+          else aux (next :: rest)
       | _ -> return None
     in
     aux dissection

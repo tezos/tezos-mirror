@@ -2793,9 +2793,9 @@ module Sc_rollup : sig
 
       val unsafe_of_string : string -> serialized
 
-      val to_bytes : t -> serialized tzresult
+      val serialize : t -> serialized tzresult
 
-      val of_bytes : serialized -> t tzresult
+      val deserialize : serialized -> t tzresult
     end
 
     val pp : Format.formatter -> t -> unit
@@ -2932,12 +2932,14 @@ module Sc_rollup : sig
 
       type t = Atomic_transaction_batch of {transactions : transaction list}
 
-      val of_bytes : string -> t tzresult
+      type serialized = private string
+
+      val deserialize : serialized -> t tzresult
 
       (** This module discloses definitions that are only useful for tests and
           must not be used otherwise. *)
       module Internal_for_tests : sig
-        val to_bytes : t -> string tzresult
+        val serialize : t -> serialized tzresult
       end
     end
 
@@ -3210,12 +3212,14 @@ module Sc_rollup : sig
 
     val player_equal : player -> player -> bool
 
+    type dissection_chunk = {state_hash : State_hash.t option; tick : Tick.t}
+
     type t = {
       turn : player;
       inbox_snapshot : Inbox.t;
       level : Raw_level.t;
       pvm_name : string;
-      dissection : (State_hash.t option * Tick.t) list;
+      dissection : dissection_chunk list;
     }
 
     val pp : Format.formatter -> t -> unit
@@ -3230,9 +3234,7 @@ module Sc_rollup : sig
 
     val opponent : player -> player
 
-    type step =
-      | Dissection of (State_hash.t option * Tick.t) list
-      | Proof of Proof.t
+    type step = Dissection of dissection_chunk list | Proof of Proof.t
 
     type refutation = {choice : Tick.t; step : step}
 
@@ -3270,7 +3272,7 @@ module Sc_rollup : sig
       Tick.t ->
       State_hash.t option ->
       Tick.t ->
-      (State_hash.t option * Tick.t) list ->
+      dissection_chunk list ->
       (unit, error) result Lwt.t
 
     val play : t -> refutation -> (outcome, t) Either.t Lwt.t

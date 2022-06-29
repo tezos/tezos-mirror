@@ -146,7 +146,7 @@ module Internal_for_tests = struct
 
   let make_atomic_batch transactions = Atomic_transaction_batch {transactions}
 
-  let bytes_of_outbox_message (Atomic_transaction_batch {transactions}) =
+  let serialize_outbox_message (Atomic_transaction_batch {transactions}) =
     let open Tzresult_syntax in
     let to_internal_transaction
         (Transaction
@@ -164,7 +164,8 @@ module Internal_for_tests = struct
     let output_message_internal =
       Sc_rollup.Outbox.Message.Atomic_transaction_batch {transactions}
     in
-    Sc_rollup.Outbox.Message.Internal_for_tests.to_bytes output_message_internal
+    Sc_rollup.Outbox.Message.Internal_for_tests.serialize
+      output_message_internal
 
-  let inbox_message_of_bytes = Sc_rollup.Inbox.Message.of_bytes
+  let deserialize_inbox_message = Sc_rollup.Inbox.Message.deserialize
 end

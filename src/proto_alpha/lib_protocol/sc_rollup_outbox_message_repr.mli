@@ -49,14 +49,15 @@ val encoding : t Data_encoding.t
 
 val pp : Format.formatter -> t -> unit
 
-(** [of_bytes ctxt bs] decodes an outbox message value from the
-    given bytes [bs]. The function involves parsing Micheline expressions to
-    typed values. *)
-val of_bytes : string -> t tzresult
+type serialized = private string
 
-(** Module containing functions exposed so they can be used in test. *)
+(** [deserialize ctxt bs] decodes an outbox message value from the
+    given data [bs]. The function involves parsing Micheline expressions to
+    typed values. *)
+val deserialize : serialized -> t tzresult
+
+(** Module containing functions exposed so they can be used in tests. *)
 module Internal_for_tests : sig
-  (** [to_bytes msg] returns the bytes of the given outbox
-        message [msg]. *)
-  val to_bytes : t -> string tzresult
+  (** [serialize msg] serializes the given outbox message [msg]. *)
+  val serialize : t -> serialized tzresult
 end

@@ -136,7 +136,7 @@ let test_boot () =
 let make_external_inbox_message str =
   WithExceptions.Result.get_ok
     ~loc:__LOC__
-    Sc_rollup_inbox_message_repr.(External str |> to_bytes)
+    Sc_rollup_inbox_message_repr.(External str |> serialize)
 
 let test_input_message () =
   let open Sc_rollup_PVM_sem in
