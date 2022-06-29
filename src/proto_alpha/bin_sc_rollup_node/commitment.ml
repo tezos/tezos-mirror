@@ -230,7 +230,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
 
   let update_ticks_and_messages store block_hash =
     let open Lwt_result_syntax in
-    let*! {num_messages; num_ticks} = Store.StateInfo.get store block_hash in
+    let*! {num_messages; num_ticks; _} = Store.StateInfo.get store block_hash in
     let () = Number_of_messages.add num_messages in
     return @@ Number_of_ticks.add num_ticks
 
@@ -269,21 +269,23 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       let*! commitment, commitment_hash =
         Store.Commitments.get store next_level_to_publish
       in
-      let*! () =
+      let* () =
         if check_lcc_hash then
-          let open Lwt_syntax in
-          let* lcc_hash = Store.Last_cemented_commitment_hash.get store in
+          let open Lwt_result_syntax in
+          let*! lcc_hash = Store.Last_cemented_commitment_hash.get store in
           if Sc_rollup.Commitment.Hash.equal lcc_hash commitment.predecessor
           then return ()
           else
-            let+ () =
+            let*! () =
               Commitment_event.commitment_parent_is_not_lcc
                 commitment.inbox_level
                 commitment.predecessor
                 lcc_hash
             in
-            exit 1
-        else Lwt.return ()
+            tzfail
+              (Sc_rollup_node_errors.Commitment_predecessor_should_be_LCC
+                 commitment)
+        else return_unit
       in
       let* source, src_pk, src_sk = Node_context.get_operator_keys node_ctxt in
       let* _, _, Manager_operation_result {operation_result; _} =
@@ -351,6 +353,20 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     in
     let check_lcc_hash, level_to_publish =
       if Raw_level.(next_publishable_level < next_lcc_level) then
+        (*
+
+           This situation can happen if the rollup node has been
+           shutdown and the rollup has been progressing in the
+           meantime. In that case, the rollup node must wait to reach
+           [lcc_level + commitment_frequency] to publish the
+           commitment. ([lcc_level] is a multiple of
+           commitment_frequency.)
+
+           We need to check that the published commitment comes
+           immediately after the last cemented commitment, otherwise
+           that's an invalid commitment.
+
+        *)
         (true, next_lcc_level)
       else (false, next_publishable_level)
     in

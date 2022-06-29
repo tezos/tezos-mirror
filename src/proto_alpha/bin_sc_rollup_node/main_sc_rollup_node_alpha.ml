@@ -24,20 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += Bad_minimal_fees of string
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"bad_minimal_fees_arg"
-    ~title:"Bad -minimal-fees arg"
-    ~description:"invalid fee threshold in -fee-threshold"
-    ~pp:(fun ppf literal ->
-      Format.fprintf ppf "invalid minimal fees '%s'" literal)
-    Data_encoding.(obj1 (req "parameter" string))
-    (function Bad_minimal_fees parameter -> Some parameter | _ -> None)
-    (fun parameter -> Bad_minimal_fees parameter)
-
 let sc_rollup_address_param =
   Clic.param
     ~name:"sc-rollup-address"
@@ -112,7 +98,7 @@ let minimal_fees_arg =
     (Clic.parameter (fun _ s ->
          match Tez.of_string s with
          | Some t -> return t
-         | None -> fail (Bad_minimal_fees s)))
+         | None -> fail (Sc_rollup_node_errors.Bad_minimal_fees s)))
 
 let minimal_nanotez_per_gas_unit_arg =
   let default =
@@ -127,7 +113,8 @@ let minimal_nanotez_per_gas_unit_arg =
        nanotez) when injecting."
     ~default
     (Clic.parameter (fun _ s ->
-         try return (Q.of_string s) with _ -> fail (Bad_minimal_fees s)))
+         try return (Q.of_string s)
+         with _ -> fail (Sc_rollup_node_errors.Bad_minimal_fees s)))
 
 let minimal_nanotez_per_byte_arg =
   let default =
@@ -141,7 +128,8 @@ let minimal_nanotez_per_byte_arg =
       "Exclude operations with fees per byte lower than this threshold (in \
        nanotez) when injecting."
     (Clic.parameter (fun _ s ->
-         try return (Q.of_string s) with _ -> fail (Bad_minimal_fees s)))
+         try return (Q.of_string s)
+         with _ -> fail (Sc_rollup_node_errors.Bad_minimal_fees s)))
 
 let force_low_fee_arg =
   Clic.switch

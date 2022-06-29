@@ -114,6 +114,20 @@ module State = struct
       let value_encoding = head_encoding
     end)
 
+    module Levels = Store.Make_updatable_map (struct
+      let path = ["tezos"; "levels"]
+
+      let keep_last_n_entries_in_memory = reorganization_window_length
+
+      type key = int32
+
+      let string_of_key = Int32.to_string
+
+      type value = block_hash
+
+      let value_encoding = Block_hash.encoding
+    end)
+
     module ProcessedHashes = Store.Make_append_only_map (struct
       let path = ["tezos"; "processed_blocks"]
 
@@ -159,6 +173,10 @@ module State = struct
   let is_processed = Store.ProcessedHashes.mem
 
   let last_processed_head = Store.LastProcessedHead.find
+
+  let hash_of_level = Store.Levels.get
+
+  let set_hash_of_level = Store.Levels.add
 end
 
 type blocks_cache =
@@ -225,7 +243,9 @@ let store_chain_event store base =
       let* () = Layer1_event.setting_new_head hash level in
       let* () = State.set_new_head store head in
       blocks_of_heads base (intermediate_heads @ [head])
-      |> List.iter_s (fun (hash, block) -> State.store_block store hash block)
+      |> List.iter_s (fun (hash, (Block {level; _} as block)) ->
+             let* () = State.store_block store hash block in
+             State.set_hash_of_level store level hash)
   | Rollback {new_head = Head {hash; level} as base} ->
       let* () = Layer1_event.rollback hash level in
       State.set_new_head store base
@@ -409,6 +429,8 @@ let current_level store =
   let open Lwt_syntax in
   let+ head = State.last_seen_head store in
   Option.map (fun (Head {level; _}) -> level) head
+
+let hash_of_level = State.hash_of_level
 
 let predecessor store (Head {hash; _}) =
   let open Lwt_syntax in

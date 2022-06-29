@@ -80,6 +80,10 @@ val current_head_hash : Store.t -> Block_hash.t option Lwt.t
    made. *)
 val current_level : Store.t -> int32 option Lwt.t
 
+(** [hash_of_level level] returns the current block hash for a given
+   [level]. *)
+val hash_of_level : Store.t -> int32 -> Block_hash.t Lwt.t
+
 (** [predecessor store head] returns the hash of the head's predecessor block] *)
 val predecessor : Store.t -> head -> Block_hash.t Lwt.t
 

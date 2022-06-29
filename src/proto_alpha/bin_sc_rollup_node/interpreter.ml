@@ -124,7 +124,9 @@ module Make (PVM : Pvm.S) : S = struct
        The length of messages here can potentially overflow the [int] returned from [List.length].
     *)
     let num_messages = Z.of_int (List.length messages) in
-    let*! () = Store.StateInfo.add store hash {num_messages; num_ticks} in
+    let*! () =
+      Store.StateInfo.add store hash {num_messages; num_ticks; initial_tick}
+    in
 
     (* Produce events. *)
     let*! () = Interpreter_event.transitioned_pvm state num_messages in

@@ -23,30 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The rollup node maintains an inbox of incoming messages.
-
-   The incoming messages for a rollup are published on the layer 1. To
-   maintain the state of its inbox, a rollup node retrieves these
-   messages each time the tezos blockchain is updated.
-
-   The inbox state is persistent.
-
-*)
 open Protocol
+open Alpha_context
+open Protocol_client_context.Alpha_block_services
 
-(** [process_head node_ctxt store head operations] changes the state
-   of the inbox to react to [head]. In particular, this process
-   filters the provided [operations] of the [head] block. *)
-val process_head :
-  Node_context.t -> Store.t -> Layer1.head -> unit tzresult Lwt.t
+type 'accu operation_processor = {
+  apply :
+    'kind.
+    'accu ->
+    source:public_key_hash ->
+    'kind manager_operation ->
+    'kind Apply_results.successful_manager_operation_result ->
+    'accu;
+  apply_internal :
+    'kind.
+    'accu ->
+    source:public_key_hash ->
+    'kind Apply_internal_results.internal_manager_operation ->
+    'kind Apply_internal_results.successful_internal_manager_operation_result ->
+    'accu;
+}
 
-(** [inbox_of_hash node_ctxt store block_hash] returns the rollup inbox at the end of the
-    given validation of [block_hash]. *)
-val inbox_of_hash :
-  Node_context.t ->
-  Store.t ->
-  Block_hash.t ->
-  Alpha_context.Sc_rollup.Inbox.t Lwt.t
-
-(** [start ()] initializes the inbox to track the messages being published. *)
-val start : unit -> unit Lwt.t
+(** [process_applied_manager_operations accu operations operator]
+    folds over the list of [operations] applying [operator] to
+    transform [accu] along the way. *)
+val process_applied_manager_operations :
+  'a -> operation trace trace -> 'a operation_processor -> 'a

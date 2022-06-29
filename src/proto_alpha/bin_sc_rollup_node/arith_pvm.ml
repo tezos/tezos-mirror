@@ -53,13 +53,23 @@ module Arith_proof_format = struct
            job for the rollup node. *)
         return None
 
+  let commit_info () = IStore.Info.v ~author:"Tezos" 0L ~message:""
+
   let produce_proof context tree step =
     let open Lwt_syntax in
-    match IStoreTree.kinded_key tree with
-    | Some k ->
-        let* p = IStoreProof.produce_tree_proof (IStore.repo context) k step in
-        return (Some p)
-    | None -> return None
+    let* res = IStore.set_tree ~info:commit_info context [] tree in
+    match res with
+    | Error _ -> return None
+    | Ok () -> (
+        (* Committing the context is required by Irmin to produce valid proofs. *)
+        let* _commit_key = Store.commit context in
+        match IStoreTree.kinded_key tree with
+        | Some k ->
+            let* p =
+              IStoreProof.produce_tree_proof (IStore.repo context) k step
+            in
+            return (Some p)
+        | None -> return None)
 
   let kinded_hash_to_state_hash :
       IStoreProof.Proof.kinded_hash -> Sc_rollup.State_hash.t = function

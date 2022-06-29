@@ -23,30 +23,39 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The rollup node maintains an inbox of incoming messages.
+open Protocol.Alpha_context
 
-   The incoming messages for a rollup are published on the layer 1. To
-   maintain the state of its inbox, a rollup node retrieves these
-   messages each time the tezos blockchain is updated.
+type error += Bad_minimal_fees of string
 
-   The inbox state is persistent.
+type error += Commitment_predecessor_should_be_LCC of Sc_rollup.Commitment.t
 
-*)
-open Protocol
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"bad_minimal_fees_arg"
+    ~title:"Bad -minimal-fees arg"
+    ~description:"invalid fee threshold in -fee-threshold"
+    ~pp:(fun ppf literal ->
+      Format.fprintf ppf "invalid minimal fees '%s'" literal)
+    Data_encoding.(obj1 (req "parameter" string))
+    (function Bad_minimal_fees parameter -> Some parameter | _ -> None)
+    (fun parameter -> Bad_minimal_fees parameter) ;
 
-(** [process_head node_ctxt store head operations] changes the state
-   of the inbox to react to [head]. In particular, this process
-   filters the provided [operations] of the [head] block. *)
-val process_head :
-  Node_context.t -> Store.t -> Layer1.head -> unit tzresult Lwt.t
-
-(** [inbox_of_hash node_ctxt store block_hash] returns the rollup inbox at the end of the
-    given validation of [block_hash]. *)
-val inbox_of_hash :
-  Node_context.t ->
-  Store.t ->
-  Block_hash.t ->
-  Alpha_context.Sc_rollup.Inbox.t Lwt.t
-
-(** [start ()] initializes the inbox to track the messages being published. *)
-val start : unit -> unit Lwt.t
+  register_error_kind
+    `Permanent
+    ~id:"internal.commitment_should_be_next_to_lcc"
+    ~title:
+      "Internal error: The next commitment should have the LCC as predecessor"
+    ~description:
+      "Internal error: The next commitment should have the LCC as predecessor"
+    ~pp:(fun ppf commitment ->
+      Format.fprintf
+        ppf
+        "invalid commitment '%a'"
+        Sc_rollup.Commitment.pp
+        commitment)
+    Data_encoding.(obj1 (req "commitment" Sc_rollup.Commitment.encoding))
+    (function
+      | Commitment_predecessor_should_be_LCC commitment -> Some commitment
+      | _ -> None)
+    (fun commitment -> Commitment_predecessor_should_be_LCC commitment)
