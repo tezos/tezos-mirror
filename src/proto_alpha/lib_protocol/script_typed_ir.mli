@@ -1563,10 +1563,6 @@ type ('arg, 'storage) script =
     }
       -> ('arg, 'storage) script
 
-type packed_manager_operation =
-  | Manager : 'kind internal_operation_contents -> packed_manager_operation
-[@@ocaml.unboxed]
-
 val manager_kind : 'kind internal_operation_contents -> 'kind Kind.manager
 
 val kinstr_location : (_, _, _, _) kinstr -> Script.location

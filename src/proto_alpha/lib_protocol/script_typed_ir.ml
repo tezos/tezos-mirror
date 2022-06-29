@@ -1427,10 +1427,6 @@ type ('arg, 'storage) script =
     }
       -> ('arg, 'storage) script
 
-type packed_manager_operation =
-  | Manager : 'kind internal_operation_contents -> packed_manager_operation
-[@@ocaml.unboxed]
-
 let manager_kind :
     type kind. kind internal_operation_contents -> kind Kind.manager = function
   | Transaction_to_implicit _ -> Kind.Transaction_manager_kind
