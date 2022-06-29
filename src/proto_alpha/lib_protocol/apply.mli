@@ -205,7 +205,6 @@ val apply_contents_list :
     above during the first phase. *)
 val apply_manager_operation :
   context ->
-  Script_ir_translator.unparsing_mode ->
   payload_producer:public_key_hash ->
   Chain_id.t ->
   mempool_mode:bool ->

@@ -2691,7 +2691,7 @@ let apply_manager_contents_list ctxt mode ~payload_producer chain_id
   | Success ctxt ->
       Lazy_storage.cleanup_temporaries ctxt >|= fun ctxt -> (ctxt, results)
 
-let apply_manager_operation ctxt mode ~payload_producer chain_id ~mempool_mode
+let apply_manager_operation ctxt ~payload_producer chain_id ~mempool_mode
     op_validated_stamp contents_list =
   let open Lwt_result_syntax in
   let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
@@ -2701,7 +2701,7 @@ let apply_manager_operation ctxt mode ~payload_producer chain_id ~mempool_mode
   let*! ctxt, contents_result_list =
     apply_manager_contents_list
       ctxt
-      mode
+      Optimized
       ~payload_producer
       chain_id
       fees_updated_contents_list
@@ -3037,7 +3037,6 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
   | Single (Manager_operation _) ->
       apply_manager_operation
         ctxt
-        Optimized
         ~payload_producer
         chain_id
         ~mempool_mode
@@ -3046,7 +3045,6 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
   | Cons (Manager_operation _, _) ->
       apply_manager_operation
         ctxt
-        Optimized
         ~payload_producer
         chain_id
         ~mempool_mode
