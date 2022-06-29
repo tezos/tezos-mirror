@@ -49,7 +49,7 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
   type storage = {
     contract : P.Contract.repr;
     storage : P.Script.expr;
-    gas : gas;
+    gas : gas option;
   }
 
   type contract = {
@@ -308,7 +308,7 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
         | Error `AlreadyWarned -> Lwt.return (m, i)
         | Ok (script, code_costs) ->
             let+ add_storage =
-              if Config.(collect_lambdas || collect_storage) then
+              if Config.(collect_lambdas || collect_storage || collect_gas) then
                 let+ storage_opt =
                   Storage_helpers.get_lazy_expr
                     ~what:"contract storage"
@@ -320,9 +320,13 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
                 match storage_opt with
                 | Error `AlreadyWarned -> fun x -> x
                 | Ok (storage, storage_costs) ->
+                    let gas =
+                      if Config.collect_gas then
+                        Some {code_costs; storage_costs}
+                      else None
+                    in
                     let key = hash_expr storage in
                     fun storages ->
-                      let gas = {code_costs; storage_costs} in
                       ExprMap.add key {contract; storage; gas} storages
               else Lwt.return (fun x -> x)
             in

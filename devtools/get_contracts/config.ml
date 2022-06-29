@@ -27,6 +27,8 @@ let collect_storage = true
 
 let collect_lambdas = true
 
+let collect_gas = true
+
 let measure_code_size = true
 
 let fatal = true
