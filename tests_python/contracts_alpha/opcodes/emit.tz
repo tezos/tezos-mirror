@@ -4,7 +4,7 @@
          UNIT ;
          PUSH nat 10 ;
          LEFT string ;
-         EMIT %event (or (nat %number) (string %words)) ;
+         EMIT %event ;
          PUSH string "lorem ipsum" ;
          RIGHT nat ;
          EMIT %event (or (nat %number) (string %words)) ;

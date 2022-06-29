@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/emit.tz]
 
 Well typed
-Gas remaining: 1039990.510 units remaining
+Gas remaining: 1039991.050 units remaining
 { parameter unit ;
   storage unit ;
   code { DROP
@@ -12,7 +12,7 @@ Gas remaining: 1039990.510 units remaining
          /* [ nat : unit ] */ ;
          LEFT string
          /* [ or nat string : unit ] */ ;
-         EMIT %event (or (nat %number) (string %words))
+         EMIT %event
          /* [ operation : unit ] */ ;
          PUSH string "lorem ipsum"
          /* [ string : operation : unit ] */ ;
