@@ -179,6 +179,8 @@ baking for user *bob*::
 Note that the baker needs direct access to
 the node data directory for performance reasons (to reduce the number of RPC calls to the node).
 Note also that since version 13.0, option ``--liquidity-baking-toggle-vote`` is mandatory, see :ref:`the changelog <changes_13_0_rc1_baker>`.
+Note that ``--liquidity-baking-toggle-vote`` must be placed
+**after** ``run`` on the command-line.
 
 .. warning::
 
