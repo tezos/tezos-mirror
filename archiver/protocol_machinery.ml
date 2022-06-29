@@ -194,7 +194,7 @@ module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
         Lwt.return_unit
     | Ok (head_stream, _stopper) ->
         let cctxt = Protocol_services.wrap_full cctxt in
-        Lwt_stream.iter_p
+        Lwt_stream.iter_s
           (fun (_hash, header) ->
             let block_level = header.Block_header.shell.Block_header.level in
             print_failures (endorsements_recorder cctxt block_level))
