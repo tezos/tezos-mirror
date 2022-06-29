@@ -573,7 +573,7 @@ Raw Script-expression-ID-Hash: 0x73bb27e87ad251d54484fc93a59fac977e3e1af83dfaaa3
 Ledger Blake2b hash: 8nmQbgYU3gU2uTXAoJ77miKgQicBLCYYWtnoLzvF5k7Q
 Raw Sha256 hash: 0x883ec8d70eeb0beb91bb34dbb5a9a49ffdbe79fd99d8a5fe2b5b508381597bce
 Raw Sha512 hash: 0x2b7e8c38c164c6fd93d454fc2ac07122c45616cc616e2789bfb77cc023ef005cf97c8fb8e7c38565d52d0a5fd941a5be0e26e0fd323261069445b89f7ba6086a
-Gas remaining: 1039998.651 units remaining
+Gas remaining: 1039999.373 units remaining
 
 ./tezos-client --mode mockup hash data 1571659294 of type timestamp
 Raw packed data: 0x05009ef8ecda0b
