@@ -38,7 +38,7 @@ open Apply_results
 open Apply_internal_results
 
 type error +=
-  | Internal_operation_replay of packed_internal_contents
+  | Internal_operation_replay of packed_internal_operation
   | Tx_rollup_feature_disabled
   | Tx_rollup_invalid_transaction_ticket_amount
   | Sc_rollup_feature_disabled

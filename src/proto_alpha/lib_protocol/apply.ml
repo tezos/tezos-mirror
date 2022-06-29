@@ -101,7 +101,8 @@ type error +=
   | Cannot_transfer_ticket_to_implicit
   | Sc_rollup_feature_disabled
   | Wrong_voting_period of {expected : int32; provided : int32}
-  | Internal_operation_replay of Apply_internal_results.packed_internal_contents
+  | Internal_operation_replay of
+      Apply_internal_results.packed_internal_operation
   | Invalid_denunciation of denunciation_kind
   | Inconsistent_denunciation of {
       kind : denunciation_kind;

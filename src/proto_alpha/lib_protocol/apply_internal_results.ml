@@ -62,8 +62,8 @@ type 'kind internal_operation = {
   nonce : int;
 }
 
-type packed_internal_contents =
-  | Internal_operation : 'kind internal_operation -> packed_internal_contents
+type packed_internal_operation =
+  | Internal_operation : 'kind internal_operation -> packed_internal_operation
 
 let internal_operation (type kind)
     ({source; operation; nonce} : kind Script_typed_ir.internal_operation) :
@@ -119,12 +119,10 @@ let internal_operation (type kind)
   in
   {source; operation; nonce}
 
-let contents_of_packed_internal_operation
-    (Script_typed_ir.Internal_operation op) =
+let packed_internal_operation (Script_typed_ir.Internal_operation op) =
   Internal_operation (internal_operation op)
 
-let contents_of_packed_internal_operations =
-  List.map contents_of_packed_internal_operation
+let packed_internal_operations = List.map packed_internal_operation
 
 type successful_transaction_result =
   | Transaction_to_contract_result of {
@@ -482,7 +480,7 @@ module Internal_result = struct
       ]
 end
 
-let internal_operation_encoding : packed_internal_contents Data_encoding.t =
+let internal_operation_encoding : packed_internal_operation Data_encoding.t =
   def "apply_internal_results.alpha.operation_result"
   @@ conv
        (fun (Internal_operation {source; operation; nonce}) ->

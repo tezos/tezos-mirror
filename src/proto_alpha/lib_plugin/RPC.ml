@@ -1050,8 +1050,7 @@ module Scripts = struct
                    },
                    _ ) ->
         ( storage,
-          Apply_internal_results.contents_of_packed_internal_operations
-            operations,
+          Apply_internal_results.packed_internal_operations operations,
           lazy_storage_diff )) ;
     Registration.register0
       ~chunked:true
@@ -1123,8 +1122,7 @@ module Scripts = struct
                      _ctxt ),
                    trace ) ->
         ( storage,
-          Apply_internal_results.contents_of_packed_internal_operations
-            operations,
+          Apply_internal_results.packed_internal_operations operations,
           trace,
           lazy_storage_diff )) ;
     Registration.register0

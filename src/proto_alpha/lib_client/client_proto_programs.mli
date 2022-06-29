@@ -95,7 +95,7 @@ val run :
   block:Shell_services.block ->
   run_params ->
   (Script.expr
-  * Apply_internal_results.packed_internal_contents list
+  * Apply_internal_results.packed_internal_operation list
   * Lazy_storage.diffs option)
   tzresult
   Lwt.t
@@ -107,7 +107,7 @@ val trace :
   block:Shell_services.block ->
   run_params ->
   (Script.expr
-  * Apply_internal_results.packed_internal_contents list
+  * Apply_internal_results.packed_internal_operation list
   * Script_typed_ir.execution_trace
   * Lazy_storage.diffs option)
   tzresult
@@ -123,7 +123,7 @@ val print_run_result :
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
   (Script_repr.expr
-  * Apply_internal_results.packed_internal_contents list
+  * Apply_internal_results.packed_internal_operation list
   * Lazy_storage.diffs option)
   tzresult ->
   unit tzresult Lwt.t
@@ -133,7 +133,7 @@ val print_trace_result :
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
   (Script_repr.expr
-  * Apply_internal_results.packed_internal_contents list
+  * Apply_internal_results.packed_internal_operation list
   * Script_typed_ir.execution_trace
   * Lazy_storage.diffs option)
   tzresult ->

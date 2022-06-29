@@ -65,15 +65,15 @@ type 'kind internal_operation = {
   nonce : int;
 }
 
-type packed_internal_contents =
-  | Internal_operation : 'kind internal_operation -> packed_internal_contents
+type packed_internal_operation =
+  | Internal_operation : 'kind internal_operation -> packed_internal_operation
 
-val contents_of_packed_internal_operation :
-  Script_typed_ir.packed_internal_operation -> packed_internal_contents
+val packed_internal_operation :
+  Script_typed_ir.packed_internal_operation -> packed_internal_operation
 
-val contents_of_packed_internal_operations :
+val packed_internal_operations :
   Script_typed_ir.packed_internal_operation list ->
-  packed_internal_contents list
+  packed_internal_operation list
 
 (** Result of applying an internal transaction. *)
 type successful_transaction_result =
@@ -144,7 +144,7 @@ val pack_internal_manager_operation_result :
   'kind internal_manager_operation_result ->
   packed_internal_manager_operation_result
 
-val internal_operation_encoding : packed_internal_contents Data_encoding.t
+val internal_operation_encoding : packed_internal_operation Data_encoding.t
 
 val internal_manager_operation_result_encoding :
   packed_internal_manager_operation_result Data_encoding.t
