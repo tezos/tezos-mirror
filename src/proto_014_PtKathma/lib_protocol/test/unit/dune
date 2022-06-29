@@ -1,0 +1,35 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name main)
+ (libraries
+  tezos-base
+  tezos-base-test-helpers
+  tezos-micheline
+  tezos-client-alpha
+  tezos-client-base
+  tezos-protocol-014-PtKathma.parameters
+  tezos-protocol-environment
+  tezos-stdlib-unix
+  tezos-protocol-014-PtKathma
+  tezos-protocol-014-PtKathma.environment
+  tezos-alpha-test-helpers
+  alcotest-lwt
+  tezos-stdlib)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_base_test_helpers
+  -open Tezos_micheline
+  -open Tezos_client_alpha
+  -open Tezos_protocol_014_PtKathma
+  -open Tezos_protocol_environment_alpha
+  -open Tezos_alpha_test_helpers
+  -open Tezos_stdlib))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-014-PtKathma-tests)
+ (action (run %{exe:main.exe} test Unit)))

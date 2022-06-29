@@ -1,0 +1,32 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_alpha_test_helpers)
+ (public_name tezos-alpha-test-helpers)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  alcotest-lwt
+  qcheck-alcotest
+  tezos-test-helpers
+  tezos-base
+  tezos-micheline
+  tezos-stdlib-unix
+  tezos-protocol-014-PtKathma
+  tezos-client-alpha
+  tezos-protocol-014-PtKathma.parameters
+  tezos-protocol-environment
+  tezos-protocol-plugin-alpha
+  tezos-protocol-014-PtKathma.environment
+  tezos-shell-services)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_micheline
+  -open Tezos_stdlib_unix
+  -open Tezos_protocol_014_PtKathma
+  -open Tezos_client_alpha
+  -open Tezos_protocol_plugin_alpha
+  -open Tezos_protocol_environment_alpha
+  -open Tezos_shell_services))
