@@ -72,12 +72,16 @@ let test_emit_event protocol =
     |-> "internal_operation_results"
   in
   let event = events |=> 0 in
+  let assert_prim ~prim ~annots json =
+    assert (json |-> "prim" |> as_string = prim) ;
+    assert (json |-> "annots" |> as_list |> List.map as_string = annots)
+  in
   let assert_type event =
     let ty = event |-> "type" in
-    assert (ty |-> "prim" |> as_string = "or") ;
+    assert_prim ty ~prim:"or" ~annots:[] ;
     let args = ty |-> "args" in
-    assert (args |=> 0 |-> "prim" |> as_string = "nat") ;
-    assert (args |=> 1 |-> "prim" |> as_string = "string")
+    assert_prim (args |=> 0) ~prim:"nat" ~annots:["%int"] ;
+    assert_prim (args |=> 1) ~prim:"string" ~annots:["%str"]
   in
   assert_type event ;
   let data = event |-> "payload" in
