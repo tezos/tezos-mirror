@@ -848,7 +848,7 @@ module Interpreter_tests = struct
           List.exists
             (function
               | Environment.Ecoproto_error
-                  (Tezos_raw_protocol_014_PtKathma.Script_tc_errors
+                  (Tezos_protocol_014_PtKathma.Protocol.Script_tc_errors
                    .Unexpected_forged_value _) ->
                   true
               | _ -> false)

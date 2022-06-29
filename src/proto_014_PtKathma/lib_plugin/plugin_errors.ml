@@ -25,8 +25,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-
 type Environment.Error_monad.error += Cannot_parse_operation (* `Branch *)
 
 type Environment.Error_monad.error += Cannot_serialize_log

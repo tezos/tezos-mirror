@@ -25,7 +25,7 @@
 
 open Protocol
 open Alpha_context
-open Environment_context
+open Tezos_protocol_environment
 
 type simulation_result = {
   validation_result : validation_result;

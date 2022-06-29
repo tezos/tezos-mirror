@@ -38,7 +38,7 @@ open Alpha_context
 module Context_binary = Tezos_context_memory.Context_binary
 
 module Tree :
-  Protocol.Environment.Context.TREE
+  Environment.Context.TREE
     with type t = Context_binary.t
      and type tree = Context_binary.tree
      and type key = string list
