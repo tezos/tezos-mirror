@@ -831,7 +831,7 @@ let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~parameter
       (ctxt, result, []) )
 
 let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
-    ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal ~parameter =
+    ~entrypoint ~before_operation ~payer ~chain_id ~internal ~parameter =
   let contract = Contract.Originated contract_hash in
   (* Since the contract is originated, nothing will be allocated or this
      transfer of tokens will fail.  [Token.transfer] will succeed even on
@@ -879,7 +879,7 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
       execute
         ctxt
         ~cached_script
-        mode
+        Optimized
         step_constants
         ~script
         ~entrypoint
@@ -1140,7 +1140,6 @@ let apply_internal_manager_operation_content :
         ~before_operation:ctxt_before_op
         ~payer
         ~chain_id
-        ~mode:Optimized
         ~internal:true
         ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
       >|=? fun (ctxt, res, ops) -> (ctxt, ITransaction_result res, ops)
@@ -1308,7 +1307,6 @@ let apply_external_manager_operation_content :
         ~before_operation:ctxt_before_op
         ~payer:source
         ~chain_id
-        ~mode:Optimized
         ~internal:false
         ~parameter:(Untyped_arg parameters)
       >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
