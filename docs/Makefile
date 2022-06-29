@@ -13,17 +13,19 @@ P2PDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/p2p_doc.exe
 RPCDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCERRORDIR)/error_doc.exe
 
-NAMED_PROTOS  = ithaca jakarta
+NAMED_PROTOS  = ithaca jakarta kathmandu
 PROTOCOLS     = $(NAMED_PROTOS) alpha
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
 ithaca_long   = Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
 jakarta_long  = PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
+kathmandu_long = PtKathmaHPSjL3WDmUCJP7iHBsUix65HdAgSeVacukogRK6hum6
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ithaca_short  = 012-Psithaca
 jakarta_short = 013-PtJakart
+kathmandu_short = 014-PtKathma
 alpha_short   = alpha
 
 SCRIPTSDIR    = scripts
@@ -99,6 +101,7 @@ redirectcheck: html
 xrefscheck:
 	$(CHECKXREFS) ithaca
 	$(CHECKXREFS) -l jakarta
+	$(CHECKXREFS) -l kathmandu
 	$(CHECKXREFS) -l alpha
 
 scriptsindoccheck:
@@ -196,5 +199,5 @@ lint: pylint pycodestyle lint_black
 
 clean:
 	@-rm -Rf "$(BUILDDIR)" linkcheck
-	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json active/rpc.rst ithaca/rpc.rst jakarta/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
-	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html ithaca/tezos-*.html jakarta/tezos-*.html alpha/tezos-*.html
+	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json active/rpc.rst ithaca/rpc.rst jakarta/rpc.rst kathmandu/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
+	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html ithaca/tezos-*.html jakarta/tezos-*.html kathmandu/tezos-*.html alpha/tezos-*.html
