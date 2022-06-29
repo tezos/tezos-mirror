@@ -2337,16 +2337,15 @@ let take_fees ctxt (_ : Validate_operation.stamp) contents_list =
 let rec apply_manager_contents_list_rec :
     type kind.
     context ->
-    Script_ir_translator.unparsing_mode ->
     payload_producer:public_key_hash ->
     Chain_id.t ->
     kind Kind.manager fees_updated_contents_list ->
     (success_or_failure * kind Kind.manager contents_result_list) Lwt.t =
- fun ctxt mode ~payload_producer chain_id fees_updated_contents_list ->
+ fun ctxt ~payload_producer chain_id fees_updated_contents_list ->
   let level = Level.current ctxt in
   match[@coq_match_with_default] fees_updated_contents_list with
   | FeesUpdatedSingle {contents = Manager_operation _ as op; balance_updates} ->
-      apply_manager_contents ctxt mode chain_id op
+      apply_manager_contents ctxt Optimized chain_id op
       >|= fun (ctxt_result, operation_result, internal_operation_results) ->
       let result =
         Manager_operation_result
@@ -2355,7 +2354,7 @@ let rec apply_manager_contents_list_rec :
       (ctxt_result, Single_result result)
   | FeesUpdatedCons
       ({contents = Manager_operation _ as op; balance_updates}, rest) -> (
-      apply_manager_contents ctxt mode chain_id op >>= function
+      apply_manager_contents ctxt Optimized chain_id op >>= function
       | Failure, operation_result, internal_operation_results ->
           let result =
             Manager_operation_result
@@ -2369,12 +2368,7 @@ let rec apply_manager_contents_list_rec :
             Manager_operation_result
               {balance_updates; operation_result; internal_operation_results}
           in
-          apply_manager_contents_list_rec
-            ctxt
-            mode
-            ~payload_producer
-            chain_id
-            rest
+          apply_manager_contents_list_rec ctxt ~payload_producer chain_id rest
           >|= fun (ctxt_result, results) ->
           (ctxt_result, Cons_result (result, results)))
 
@@ -2681,7 +2675,6 @@ let apply_manager_contents_list ctxt ~payload_producer chain_id
     fees_updated_contents_list =
   apply_manager_contents_list_rec
     ctxt
-    Optimized
     ~payload_producer
     chain_id
     fees_updated_contents_list
