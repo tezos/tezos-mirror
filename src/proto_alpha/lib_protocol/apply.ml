@@ -1083,7 +1083,7 @@ let apply_internal_manager_operation_content :
     payer:public_key_hash ->
     source:Contract.t ->
     chain_id:Chain_id.t ->
-    kind Script_typed_ir.manager_operation ->
+    kind Script_typed_ir.internal_operation_contents ->
     (context
     * kind successful_internal_manager_operation_result
     * Script_typed_ir.packed_internal_operation list)

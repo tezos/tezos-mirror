@@ -103,7 +103,7 @@ type successful_origination_result = {
   paid_storage_size_diff : Z.t;
 }
 
-(** Result of applying a {!Script_typed_ir.internal_operation}. *)
+(** Result of applying a {!Script_typed_ir.internal_operation_contents}. *)
 type _ successful_internal_manager_operation_result =
   | ITransaction_result :
       successful_transaction_result
