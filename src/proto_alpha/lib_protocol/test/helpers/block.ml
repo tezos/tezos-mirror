@@ -799,7 +799,8 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
                   ( Transaction_to_contract_result {balance_updates; _}
                   | Transaction_to_tx_rollup_result {balance_updates; _} )
               | Origination_result {balance_updates; _}
-              | Register_global_constant_result {balance_updates; _} ->
+              | Register_global_constant_result {balance_updates; _}
+              | Increase_paid_storage_result {balance_updates; _} ->
                   List.rev_append balance_updates balance_updates_rev)
           balance_updates_rev
           metadata.implicit_operations_results
@@ -823,6 +824,7 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
             | Successful_manager_result (Transaction_result _)
             | Successful_manager_result (Register_global_constant_result _)
             | Successful_manager_result (Set_deposits_limit_result _)
+            | Successful_manager_result (Increase_paid_storage_result _)
             | Successful_manager_result (Tx_rollup_origination_result _)
             | Successful_manager_result (Tx_rollup_submit_batch_result _)
             | Successful_manager_result (Tx_rollup_commit_result _)

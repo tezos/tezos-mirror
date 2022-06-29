@@ -1553,6 +1553,21 @@ let apply_external_manager_operation_content :
           Set_deposits_limit_result
             {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt},
           [] )
+  | Increase_paid_storage {amount_in_bytes; destination} ->
+      let contract = Contract.Originated destination in
+      Contract.increase_paid_storage ctxt contract ~amount_in_bytes
+      >>=? fun ctxt ->
+      let payer = `Contract (Contract.Implicit source) in
+      Fees.burn_storage_increase_fees ctxt ~payer amount_in_bytes
+      >|=? fun (ctxt, storage_bus) ->
+      let result =
+        Increase_paid_storage_result
+          {
+            balance_updates = storage_bus;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
+          }
+      in
+      (ctxt, result, [])
   | Tx_rollup_origination ->
       Tx_rollup.originate ctxt >>=? fun (ctxt, originated_tx_rollup) ->
       let result =
@@ -2043,6 +2058,7 @@ let burn_manager_storage_fees :
             global_address = payload.global_address;
           } )
   | Set_deposits_limit_result _ -> return (ctxt, storage_limit, smopr)
+  | Increase_paid_storage_result _ -> return (ctxt, storage_limit, smopr)
   | Tx_rollup_origination_result payload ->
       Fees.burn_tx_rollup_origination_fees ctxt ~storage_limit ~payer
       >|=? fun (ctxt, storage_limit, origination_bus) ->

@@ -189,6 +189,13 @@ val set_paid_storage_space_and_return_fees_to_pay :
   Z.t ->
   (Z.t * Raw_context.t) tzresult Lwt.t
 
+(** Enable a payer to increase the paid storage of a contract by some amount. *)
+val increase_paid_storage :
+  Raw_context.t ->
+  Contract_repr.t ->
+  amount_in_bytes:Z.t ->
+  Raw_context.t tzresult Lwt.t
+
 (** Increases the balance of a contract. Calling this function directly may
     break important invariants. Consider calling [credit] instead. *)
 val increase_balance_only_call_from_token :

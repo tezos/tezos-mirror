@@ -132,6 +132,18 @@ val set_deposits_limit :
   Tez.tez option ->
   Operation.packed tzresult Lwt.t
 
+val increase_paid_storage :
+  ?force_reveal:bool ->
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  source:Contract.t ->
+  destination:Contract_hash.t ->
+  Z.t ->
+  Operation.packed tzresult Lwt.t
+
 (** [revelation ?fee ?gas_limit ?forge_pkh ctxt pkh] Creates a new
     [Reveal] {!manager_operation} to reveal a public key [pkh]
     applying to current context [ctxt].

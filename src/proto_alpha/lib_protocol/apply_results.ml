@@ -61,6 +61,11 @@ type _ successful_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.set_deposits_limit successful_manager_operation_result
+  | Increase_paid_storage_result : {
+      balance_updates : Receipt.balance_updates;
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.increase_paid_storage successful_manager_operation_result
   | Tx_rollup_origination_result : {
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
@@ -517,6 +522,25 @@ module Manager_result = struct
         | Set_deposits_limit_result {consumed_gas} -> consumed_gas)
       ~inj:(fun consumed_gas -> Set_deposits_limit_result {consumed_gas})
 
+  let increase_paid_storage_case =
+    make
+      ~op_case:Operation.Encoding.Manager_operations.increase_paid_storage_case
+      ~encoding:
+        Data_encoding.(
+          obj2
+            (dft "balance_updates" Receipt.balance_updates_encoding [])
+            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+      ~select:(function
+        | Successful_manager_result (Increase_paid_storage_result _ as op) ->
+            Some op
+        | _ -> None)
+      ~kind:Kind.Increase_paid_storage_manager_kind
+      ~proj:(function
+        | Increase_paid_storage_result {balance_updates; consumed_gas} ->
+            (balance_updates, consumed_gas))
+      ~inj:(fun (balance_updates, consumed_gas) ->
+        Increase_paid_storage_result {balance_updates; consumed_gas})
+
   let[@coq_axiom_with_reason "gadt"] tx_rollup_origination_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.tx_rollup_origination_case
@@ -930,6 +954,7 @@ let successful_manager_operation_result_encoding :
          make Manager_result.origination_case;
          make Manager_result.delegation_case;
          make Manager_result.set_deposits_limit_case;
+         make Manager_result.increase_paid_storage_case;
          make Manager_result.sc_rollup_originate_case;
        ]
 
@@ -1007,6 +1032,10 @@ let equal_manager_kind :
     ->
       Some Eq
   | Kind.Set_deposits_limit_manager_kind, _ -> None
+  | ( Kind.Increase_paid_storage_manager_kind,
+      Kind.Increase_paid_storage_manager_kind ) ->
+      Some Eq
+  | Kind.Increase_paid_storage_manager_kind, _ -> None
   | ( Kind.Tx_rollup_origination_manager_kind,
       Kind.Tx_rollup_origination_manager_kind ) ->
       Some Eq
@@ -1466,6 +1495,17 @@ module Encoding = struct
             Some (op, res)
         | _ -> None)
 
+  let[@coq_axiom_with_reason "gadt"] increase_paid_storage_case =
+    make_manager_case
+      Operation.Encoding.increase_paid_storage_case
+      Manager_result.increase_paid_storage_case
+      (function
+        | Contents_and_result
+            ( (Manager_operation {operation = Increase_paid_storage _; _} as op),
+              res ) ->
+            Some (op, res)
+        | _ -> None)
+
   let[@coq_axiom_with_reason "gadt"] tx_rollup_origination_case =
     make_manager_case
       Operation.Encoding.tx_rollup_origination_case
@@ -1718,6 +1758,7 @@ let contents_result_encoding =
          make delegation_case;
          make register_global_constant_case;
          make set_deposits_limit_case;
+         make increase_paid_storage_case;
          make tx_rollup_origination_case;
          make tx_rollup_submit_batch_case;
          make tx_rollup_commit_case;
@@ -1780,6 +1821,7 @@ let contents_and_result_encoding =
          make delegation_case;
          make register_global_constant_case;
          make set_deposits_limit_case;
+         make increase_paid_storage_case;
          make tx_rollup_origination_case;
          make tx_rollup_submit_batch_case;
          make tx_rollup_commit_case;
@@ -2079,6 +2121,32 @@ let kind_equal :
         } ) ->
       Some Eq
   | Manager_operation {operation = Set_deposits_limit _; _}, _ -> None
+  | ( Manager_operation {operation = Increase_paid_storage _; _},
+      Manager_operation_result
+        {operation_result = Applied (Increase_paid_storage_result _); _} ) ->
+      Some Eq
+  | ( Manager_operation {operation = Increase_paid_storage _; _},
+      Manager_operation_result
+        {operation_result = Backtracked (Increase_paid_storage_result _, _); _}
+    ) ->
+      Some Eq
+  | ( Manager_operation {operation = Increase_paid_storage _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Failed (Alpha_context.Kind.Increase_paid_storage_manager_kind, _);
+          _;
+        } ) ->
+      Some Eq
+  | ( Manager_operation {operation = Increase_paid_storage _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Skipped Alpha_context.Kind.Increase_paid_storage_manager_kind;
+          _;
+        } ) ->
+      Some Eq
+  | Manager_operation {operation = Increase_paid_storage _; _}, _ -> None
   | ( Manager_operation {operation = Tx_rollup_origination; _},
       Manager_operation_result
         {operation_result = Applied (Tx_rollup_origination_result _); _} ) ->

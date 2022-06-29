@@ -157,6 +157,11 @@ and _ successful_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.set_deposits_limit successful_manager_operation_result
+  | Increase_paid_storage_result : {
+      balance_updates : Receipt.balance_updates;
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.increase_paid_storage successful_manager_operation_result
   | Tx_rollup_origination_result : {
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
