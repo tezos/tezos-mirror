@@ -1,13 +1,13 @@
 Protocol Alpha
 ==============
 
-This page contains all the relevant information for protocol Alpha
+This page contains all the relevant information for protocol Kathmandu
 (see :ref:`naming_convention`).
 
 The code can be found in the :src:`src/proto_014_PtKathma` directory of the
 ``master`` branch of Tezos.
 
-This page documents the changes brought by protocol Alpha with respect
+This page documents the changes brought by protocol Kathmandu with respect
 to Jakarta.
 
 .. contents::
