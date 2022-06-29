@@ -72,6 +72,8 @@ module Kind = struct
 
   type set_deposits_limit = Set_deposits_limit_kind
 
+  type increase_paid_storage = Increase_paid_storage_kind
+
   type failing_noop = Failing_noop_kind
 
   type register_global_constant = Register_global_constant_kind
@@ -122,6 +124,7 @@ module Kind = struct
     | Delegation_manager_kind : delegation manager
     | Register_global_constant_manager_kind : register_global_constant manager
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
+    | Increase_paid_storage_manager_kind : increase_paid_storage manager
     | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
     | Tx_rollup_submit_batch_manager_kind : tx_rollup_submit_batch manager
     | Tx_rollup_commit_manager_kind : tx_rollup_commit manager
@@ -339,6 +342,11 @@ and _ manager_operation =
   | Set_deposits_limit :
       Tez_repr.t option
       -> Kind.set_deposits_limit manager_operation
+  | Increase_paid_storage : {
+      amount_in_bytes : Z.t;
+      destination : Contract_hash.t;
+    }
+      -> Kind.increase_paid_storage manager_operation
   | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
   | Tx_rollup_submit_batch : {
       tx_rollup : Tx_rollup_repr.t;
@@ -456,6 +464,7 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Delegation _ -> Kind.Delegation_manager_kind
   | Register_global_constant _ -> Kind.Register_global_constant_manager_kind
   | Set_deposits_limit _ -> Kind.Set_deposits_limit_manager_kind
+  | Increase_paid_storage _ -> Kind.Increase_paid_storage_manager_kind
   | Tx_rollup_origination -> Kind.Tx_rollup_origination_manager_kind
   | Tx_rollup_submit_batch _ -> Kind.Tx_rollup_submit_batch_manager_kind
   | Tx_rollup_commit _ -> Kind.Tx_rollup_commit_manager_kind
@@ -706,6 +715,27 @@ module Encoding = struct
             | Manager (Set_deposits_limit _ as op) -> Some op | _ -> None);
           proj = (function Set_deposits_limit key -> key);
           inj = (fun key -> Set_deposits_limit key);
+        }
+
+    let[@coq_axiom_with_reason "gadt"] increase_paid_storage_case =
+      MCase
+        {
+          tag = 9;
+          name = "increase_paid_storage";
+          encoding =
+            obj2
+              (req "amount" Data_encoding.z)
+              (req "destination" Contract_repr.originated_encoding);
+          select =
+            (function
+            | Manager (Increase_paid_storage _ as op) -> Some op | _ -> None);
+          proj =
+            (function
+            | Increase_paid_storage {amount_in_bytes; destination} ->
+                (amount_in_bytes, destination));
+          inj =
+            (fun (amount_in_bytes, destination) ->
+              Increase_paid_storage {amount_in_bytes; destination});
         }
 
     let[@coq_axiom_with_reason "gadt"] tx_rollup_origination_case =
@@ -1500,6 +1530,9 @@ module Encoding = struct
   let set_deposits_limit_case =
     make_manager_case 112 Manager_operations.set_deposits_limit_case
 
+  let increase_paid_storage_case =
+    make_manager_case 113 Manager_operations.increase_paid_storage_case
+
   let tx_rollup_origination_case =
     make_manager_case
       tx_rollup_operation_tag_offset
@@ -1623,6 +1656,7 @@ module Encoding = struct
            make origination_case;
            make delegation_case;
            make set_deposits_limit_case;
+           make increase_paid_storage_case;
            make failing_noop_case;
            make register_global_constant_case;
            make tx_rollup_origination_case;
@@ -1837,6 +1871,8 @@ let equal_manager_operation_kind :
   | Register_global_constant _, _ -> None
   | Set_deposits_limit _, Set_deposits_limit _ -> Some Eq
   | Set_deposits_limit _, _ -> None
+  | Increase_paid_storage _, Increase_paid_storage _ -> Some Eq
+  | Increase_paid_storage _, _ -> None
   | Tx_rollup_origination, Tx_rollup_origination -> Some Eq
   | Tx_rollup_origination, _ -> None
   | Tx_rollup_submit_batch _, Tx_rollup_submit_batch _ -> Some Eq

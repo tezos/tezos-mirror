@@ -25,6 +25,8 @@
 
 type error += Cannot_pay_storage_fee (* `Temporary *)
 
+type error += Negative_storage_input (* `Temporary *)
+
 type error += Operation_quota_exceeded (* `Temporary *)
 
 type error += Storage_limit_too_high (* `Permanent *)
@@ -36,10 +38,19 @@ let () =
     ~id:"contract.cannot_pay_storage_fee"
     ~title:"Cannot pay storage fee"
     ~description:"The storage fee is higher than the contract balance"
-    ~pp:(fun ppf () -> Format.fprintf ppf "Cannot pay storage storage fee")
+    ~pp:(fun ppf () -> Format.fprintf ppf "Cannot pay storage fee")
     Data_encoding.empty
     (function Cannot_pay_storage_fee -> Some () | _ -> None)
     (fun () -> Cannot_pay_storage_fee) ;
+  register_error_kind
+    `Temporary
+    ~id:"contract.negative_storage_input"
+    ~title:"Negative storage input"
+    ~description:"The storage amount asked for an operation is null or negative"
+    ~pp:(fun ppf () -> Format.fprintf ppf "Null or negative storage input")
+    Data_encoding.empty
+    (function Negative_storage_input -> Some () | _ -> None)
+    (fun () -> Negative_storage_input) ;
   register_error_kind
     `Temporary
     ~id:"storage_exhausted.operation"
@@ -100,6 +111,18 @@ let burn_storage_fees ?(origin = Receipt_repr.Block_application) c
           Token.transfer ~origin c payer `Storage_fees to_burn
           >>=? fun (ctxt, balance_updates) ->
           return (ctxt, remaining, balance_updates) )
+
+let burn_storage_increase_fees ?(origin = Receipt_repr.Block_application) c
+    ~payer amount_in_bytes =
+  if Compare.Z.(amount_in_bytes <= Z.zero) then fail Negative_storage_input
+  else
+    let cost_per_byte = Constants_storage.cost_per_byte c in
+    Tez_repr.(cost_per_byte *? Z.to_int64 amount_in_bytes) >>?= fun to_burn ->
+    (* Burning the fees... *)
+    trace
+      Cannot_pay_storage_fee
+      ( source_must_exist c payer >>=? fun () ->
+        Token.transfer ~origin c payer `Storage_fees to_burn )
 
 let burn_origination_fees ?(origin = Receipt_repr.Block_application) c
     ~storage_limit ~payer =

@@ -27,6 +27,11 @@ RPC Changes
 Operation receipts
 ------------------
 
+Increase_paid_storage
+---------------------
+
+- Increase_paid_storage is a new operation that enable a payer to increase the paid storage of a smart contract by some bytes amount. (MR :gl:`!5605`)
+
 Bug Fixes
 ---------
 

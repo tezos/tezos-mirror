@@ -630,6 +630,12 @@ let set_paid_storage_space_and_return_fees_to_pay c contract new_storage_space =
     Storage.Contract.Paid_storage_space.update c contract new_storage_space
     >|=? fun c -> (to_pay, c)
 
+let increase_paid_storage c contract ~amount_in_bytes:storage_incr =
+  Storage.Contract.Paid_storage_space.get c contract
+  >>=? fun already_paid_space ->
+  let new_storage_space = Z.add already_paid_space storage_incr in
+  Storage.Contract.Paid_storage_space.update c contract new_storage_space
+
 let update_balance ctxt contract f amount =
   Storage.Contract.Spendable_balance.get ctxt contract >>=? fun balance ->
   f balance amount >>?= fun new_balance ->

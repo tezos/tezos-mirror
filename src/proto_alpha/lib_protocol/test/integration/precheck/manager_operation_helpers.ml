@@ -40,6 +40,7 @@ type infos = {
   contract2 : Contract.t;
   account3 : Account.t;
   contract3 : Contract.t;
+  contract_hash : Contract_hash.t;
   tx_rollup : Tx_rollup.t;
   sc_rollup : Sc_rollup.t;
 }
@@ -134,11 +135,18 @@ let init_context ?hard_gas_limit_per_block () =
       contract3
       Tez.one
   in
+  let* create_contract_hash, contract_hash =
+    Op.contract_origination_hash
+      (B b)
+      contract3
+      ~fee:Tez.zero
+      ~script:Op.dummy_script
+  in
   let* operation =
     Op.batch_operations
       ~source:bootstrap_contract
       (B b)
-      [fund_account1; fund_account2; fund_account3]
+      [fund_account1; fund_account2; fund_account3; create_contract_hash]
   in
   let+ block = Block.bake ~operation b in
   {
@@ -149,6 +157,7 @@ let init_context ?hard_gas_limit_per_block () =
     contract2;
     account3;
     contract3;
+    contract_hash;
     tx_rollup;
     sc_rollup;
   }
@@ -313,6 +322,19 @@ let mk_set_deposits_limit ?counter ?fee ?gas_limit ?storage_limit ?force_reveal
     (B infos.block)
     source
     None
+
+let mk_increase_paid_storage ?counter ?fee ?gas_limit ?storage_limit
+    ?force_reveal ~source (infos : infos) =
+  Op.increase_paid_storage
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    (B infos.block)
+    ~source
+    ~destination:infos.contract_hash
+    Z.one
 
 let mk_reveal ?counter ?fee ?gas_limit ?storage_limit ?force_reveal:_ ~source
     (infos : infos) =
@@ -663,6 +685,7 @@ type manager_operation_kind =
   | K_Undelegation
   | K_Self_delegation
   | K_Set_deposits_limit
+  | K_Increase_paid_storage
   | K_Reveal
   | K_Tx_rollup_origination
   | K_Tx_rollup_submit_batch
@@ -691,6 +714,7 @@ let select_op = function
   | K_Undelegation -> mk_undelegation
   | K_Self_delegation -> mk_self_delegation
   | K_Set_deposits_limit -> mk_set_deposits_limit
+  | K_Increase_paid_storage -> mk_increase_paid_storage
   | K_Reveal -> mk_reveal
   | K_Tx_rollup_origination -> mk_tx_rollup_origination
   | K_Tx_rollup_submit_batch -> mk_tx_rollup_submit_batch
@@ -719,6 +743,7 @@ let string_of_kind = function
   | K_Set_deposits_limit -> "Set deposits limit"
   | K_Origination -> "Origination"
   | K_Register_global_constant -> "Register global constant"
+  | K_Increase_paid_storage -> "Increase paid storage"
   | K_Reveal -> "Revelation"
   | K_Tx_rollup_origination -> "Tx_rollup_origination"
   | K_Tx_rollup_submit_batch -> "Tx_rollup_submit_batch"
@@ -896,6 +921,7 @@ let subjects =
     K_Undelegation;
     K_Self_delegation;
     K_Set_deposits_limit;
+    K_Increase_paid_storage;
     K_Reveal;
     K_Tx_rollup_origination;
     K_Tx_rollup_submit_batch;
@@ -918,10 +944,10 @@ let subjects =
   ]
 
 let is_consumer = function
-  | K_Set_deposits_limit | K_Reveal | K_Self_delegation | K_Delegation
-  | K_Undelegation | K_Tx_rollup_origination | K_Tx_rollup_submit_batch
-  | K_Tx_rollup_finalize | K_Tx_rollup_commit | K_Tx_rollup_return_bond
-  | K_Tx_rollup_remove_commitment | K_Tx_rollup_reject
+  | K_Set_deposits_limit | K_Increase_paid_storage | K_Reveal
+  | K_Self_delegation | K_Delegation | K_Undelegation | K_Tx_rollup_origination
+  | K_Tx_rollup_submit_batch | K_Tx_rollup_finalize | K_Tx_rollup_commit
+  | K_Tx_rollup_return_bond | K_Tx_rollup_remove_commitment | K_Tx_rollup_reject
   | K_Sc_rollup_add_messages | K_Sc_rollup_origination | K_Sc_rollup_refute
   | K_Sc_rollup_timeout | K_Sc_rollup_cement | K_Sc_rollup_publish
   | K_Sc_rollup_execute_outbox_message | K_Sc_rollup_recover_bond
