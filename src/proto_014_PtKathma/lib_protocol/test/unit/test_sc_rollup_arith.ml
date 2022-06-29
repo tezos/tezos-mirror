@@ -331,7 +331,13 @@ let test_output_messages_proofs ~valid ~inbox_level (source, expected_outputs) =
           let*! proof_is_valid = verify_output_proof proof in
           fail_when
             proof_is_valid
-            (Exn (Failure "A wrong output proof is valid."))
+            (Exn
+               (Failure
+                  (Format.asprintf
+                     "A wrong output proof is valid: %s -> %a"
+                     source
+                     Sc_rollup_PVM_sem.pp_output
+                     output)))
       | Error _ -> return ()
   in
   List.iter_es check_output expected_outputs
@@ -386,14 +392,14 @@ let test_invalid_output_messages () =
     ("1 out", [make_output ~outbox_level ~message_index:1 1]);
     ( "1 out 1 1 + out",
       [
-        make_output ~outbox_level ~message_index:0 1;
+        make_output ~outbox_level ~message_index:0 0;
         make_output ~outbox_level ~message_index:3 2;
       ] );
     ( "1 out 1 1 + out out",
       [
-        make_output ~outbox_level ~message_index:0 1;
-        make_output ~outbox_level ~message_index:1 2;
-        make_output ~outbox_level ~message_index:2 3;
+        make_output ~outbox_level ~message_index:0 42;
+        make_output ~outbox_level ~message_index:1 32;
+        make_output ~outbox_level ~message_index:2 13;
       ] );
   ]
   |> List.iter_es (test_output_messages_proofs ~valid:false ~inbox_level)
