@@ -3253,6 +3253,7 @@ module Registration_section = struct
              k = halt;
              loc = dummy_loc;
              tag = Entrypoint_repr.default;
+             unparsed_ty = Script_repr.unit;
            })
       ()
 end

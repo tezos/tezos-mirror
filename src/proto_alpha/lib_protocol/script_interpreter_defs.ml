@@ -566,8 +566,8 @@ let make_transaction_to_sc_rollup ctxt ~destination ~amount ~entrypoint
 
 (** [emit_event] generates an internal operation that will effect an event emission
     if the contract code returns this successfully. *)
-let emit_event (type t tc) (ctxt, sc) gas ~loc ~(event_type : (t, tc) ty) ~tag
-    ~(event_data : t) =
+let emit_event (type t tc) (ctxt, sc) gas ~(event_type : (t, tc) ty)
+    ~unparsed_ty ~tag ~(event_data : t) =
   let ctxt = update_context gas ctxt in
   (* No need to take care of lazy storage as only packable types are allowed *)
   let lazy_storage_diff = None in
@@ -576,9 +576,6 @@ let emit_event (type t tc) (ctxt, sc) gas ~loc ~(event_type : (t, tc) ty) ~tag
   Gas.consume ctxt (Script.strip_locations_cost unparsed_data) >>?= fun ctxt ->
   let unparsed_data = Micheline.strip_locations unparsed_data in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
-  unparse_ty ~loc ctxt event_type >>?= fun (unparsed_ty, ctxt) ->
-  Gas.consume ctxt (Script.strip_locations_cost unparsed_ty) >>?= fun ctxt ->
-  let unparsed_ty = Micheline.strip_locations unparsed_ty in
   let operation = Event {ty = unparsed_ty; tag; unparsed_data} in
   let iop = {source = Contract.Originated sc.self; operation; nonce} in
   let res = {piop = Internal_operation iop; lazy_storage_diff} in

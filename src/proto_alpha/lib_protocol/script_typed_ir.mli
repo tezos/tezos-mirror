@@ -1084,6 +1084,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       loc : Script.location;
       tag : Entrypoint.t;
       ty : ('a, _) ty;
+      unparsed_ty : Script.expr;
       k : (operation, 's, 'r, 'f) kinstr;
     }
       -> ('a, 's, 'r, 'f) kinstr
