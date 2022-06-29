@@ -4085,6 +4085,8 @@ module Protocol = Protocol
             octez_base |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals"
             |> open_;
+            octez_base_unix;
+            octez_stdlib_unix |> open_;
             octez_crypto |> open_;
             main |> open_;
             octez_micheline |> open_;

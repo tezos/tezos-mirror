@@ -373,3 +373,7 @@ let new_head b =
   let*? w = Lazy.force worker in
   let*! (_pushed : bool) = Worker.Queue.push_request w (Request.New_head b) in
   return_unit
+
+let shutdown () =
+  let w = Lazy.force worker in
+  match w with Error _ -> Lwt.return_unit | Ok w -> Worker.shutdown w

@@ -175,8 +175,28 @@ module Make (X : PARAMETERS) = struct
     | None | Some ([] | _ :: _ :: _) -> None
     | Some [(name, value)] -> Some {name; value}
 
-  let handle_raw_event daemon line =
-    let json = JSON.parse ~origin:("event from " ^ daemon.name) line in
+  let read_json_event daemon even_input =
+    let max_event_size = 1024 * 1024 (* 1MB *) in
+    let origin = "event from " ^ daemon.name in
+    let buff = Buffer.create 256 in
+    let rec loop () =
+      let* line = Lwt_io.read_line_opt even_input in
+      match line with
+      | None -> return None
+      | Some line -> (
+          Buffer.add_string buff line ;
+          match JSON.parse_opt ~origin (Buffer.contents buff) with
+          | None when Buffer.length buff >= max_event_size ->
+              Format.ksprintf
+                failwith
+                "Could not parse event after %d bytes."
+                max_event_size
+          | None -> loop ()
+          | Some json -> return (Some json))
+    in
+    loop ()
+
+  let handle_raw_event daemon json =
     match get_event_from_full_event json with
     | None -> ()
     | Some (raw_event : event) -> (
@@ -277,10 +297,10 @@ module Make (X : PARAMETERS) = struct
     daemon.status <- Running running_status ;
     let event_loop_promise =
       let rec event_loop () =
-        let* line = Lwt_io.read_line_opt event_input in
-        match line with
-        | Some line ->
-            handle_raw_event daemon line ;
+        let* json = read_json_event daemon event_input in
+        match json with
+        | Some json ->
+            handle_raw_event daemon json ;
             event_loop ()
         | None -> (
             match daemon.status with

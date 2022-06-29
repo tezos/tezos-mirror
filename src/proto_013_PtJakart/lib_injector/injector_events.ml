@@ -211,4 +211,22 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
       ("level", Data_encoding.int32)
       ("operations", Data_encoding.list L1_operation.Hash.encoding)
       ~pp2:pp_operations_hash_list
+
+  let loaded_from_disk =
+    declare_2
+      ~name:"loaded_from_disk"
+      ~msg:"Loaded {nb} elements in {kind} from disk"
+      ~level:Notice
+      ("nb", Data_encoding.int31)
+      ("kind", Data_encoding.string)
+
+  let corrupted_operation_on_disk =
+    declare_2
+      ~name:"corrupted_operation_on_disk"
+      ~msg:"Ignoring unreadable file {file} on disk: {error}"
+      ~level:Warning
+      ("file", Data_encoding.string)
+      ("error", Error_monad.trace_encoding)
+      ~pp1:Format.pp_print_string
+      ~pp2:Error_monad.pp_print_trace
 end

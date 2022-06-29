@@ -893,12 +893,18 @@ let check_operator_deposit state config =
           config.Node_config.allow_deposit
           Error.Tx_rollup_deposit_not_allowed
 
-let main_exit_callback state exit_status =
+let main_exit_callback state _exit_status =
   let open Lwt_syntax in
+  let* () = state.State.cctxt#message "Stopping injector ..." in
+  let* () = Injector.shutdown () in
+  let* () = state.State.cctxt#message "Stopping batcher ..." in
+  let* () = Batcher.shutdown () in
+  let* () = state.State.cctxt#message "Closing stores ..." in
   let* () = Stores.close state.State.stores in
+  let* () = state.State.cctxt#message "Closing context ..." in
   let* () = Context.close state.State.context_index in
-  let* () = Event.(emit node_is_shutting_down) exit_status in
-  Tezos_base_unix.Internal_event_unix.close ()
+  let* () = state.State.cctxt#message "Shutting down" in
+  return_unit
 
 let rec connect ~delay cctxt =
   let open Lwt_syntax in
@@ -932,6 +938,7 @@ let run configuration cctxt =
   let* () =
     Injector.init
       state.cctxt
+      ~data_dir:configuration.data_dir
       state
       ~signers:
         (List.filter_map
