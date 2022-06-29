@@ -1908,7 +1908,7 @@ let apply_external_manager_operation_content :
 
 type success_or_failure = Success of context | Failure
 
-let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
+let apply_internal_manager_operations ctxt ~payer ~chain_id ops =
   let[@coq_struct "ctxt"] rec apply ctxt applied worklist =
     match worklist with
     | [] -> Lwt.return (Success ctxt, List.rev applied)
@@ -1923,7 +1923,7 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
           let ctxt = record_internal_nonce ctxt nonce in
           apply_internal_manager_operation_content
             ctxt
-            mode
+            Optimized
             ~source
             ~payer
             ~chain_id
@@ -2189,7 +2189,6 @@ let apply_manager_contents (type kind) ctxt chain_id
   | Ok (ctxt, operation_results, internal_operations) -> (
       apply_internal_manager_operations
         ctxt
-        Optimized
         ~payer:source
         ~chain_id
         internal_operations
