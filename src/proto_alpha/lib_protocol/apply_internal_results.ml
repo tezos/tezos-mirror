@@ -56,18 +56,18 @@ type packed_internal_operation_contents =
       'kind internal_operation_contents
       -> packed_internal_operation_contents
 
-type 'kind internal_contents = {
+type 'kind internal_operation = {
   source : Contract.t;
   operation : 'kind internal_operation_contents;
   nonce : int;
 }
 
 type packed_internal_contents =
-  | Internal_contents : 'kind internal_contents -> packed_internal_contents
+  | Internal_operation : 'kind internal_operation -> packed_internal_contents
 
-let contents_of_internal_operation (type kind)
+let internal_operation (type kind)
     ({source; operation; nonce} : kind Script_typed_ir.internal_operation) :
-    kind internal_contents =
+    kind internal_operation =
   let operation : kind internal_operation_contents =
     match operation with
     | Transaction_to_implicit
@@ -121,7 +121,7 @@ let contents_of_internal_operation (type kind)
 
 let contents_of_packed_internal_operation
     (Script_typed_ir.Internal_operation op) =
-  Internal_contents (contents_of_internal_operation op)
+  Internal_operation (internal_operation op)
 
 let contents_of_packed_internal_operations =
   List.map contents_of_packed_internal_operation
@@ -187,18 +187,18 @@ type 'kind internal_manager_operation_result =
 
 type packed_internal_manager_operation_result =
   | Internal_manager_operation_result :
-      'kind internal_contents * 'kind internal_manager_operation_result
+      'kind internal_operation * 'kind internal_manager_operation_result
       -> packed_internal_manager_operation_result
 
 let pack_internal_manager_operation_result (type kind)
     (internal_op : kind Script_typed_ir.internal_operation)
     (manager_op : kind internal_manager_operation_result) =
-  let internal_op = contents_of_internal_operation internal_op in
+  let internal_op = internal_operation internal_op in
   Internal_manager_operation_result (internal_op, manager_op)
 
 type 'kind iselect =
   packed_internal_manager_operation_result ->
-  ('kind internal_contents * 'kind internal_manager_operation_result) option
+  ('kind internal_operation * 'kind internal_manager_operation_result) option
 
 module Internal_result = struct
   open Data_encoding
@@ -482,13 +482,13 @@ module Internal_result = struct
       ]
 end
 
-let internal_contents_encoding : packed_internal_contents Data_encoding.t =
+let internal_operation_encoding : packed_internal_contents Data_encoding.t =
   def "apply_internal_results.alpha.operation_result"
   @@ conv
-       (fun (Internal_contents {source; operation; nonce}) ->
+       (fun (Internal_operation {source; operation; nonce}) ->
          ((source, nonce), Internal_operation_contents operation))
        (fun ((source, nonce), Internal_operation_contents operation) ->
-         Internal_contents {source; operation; nonce})
+         Internal_operation {source; operation; nonce})
        (merge_objs
           (obj2 (req "source" Contract.encoding) (req "nonce" uint16))
           Internal_result.encoding)

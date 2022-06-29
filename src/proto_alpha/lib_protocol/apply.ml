@@ -568,12 +568,12 @@ let () =
     ~id:"internal_operation_replay"
     ~title:"Internal operation replay"
     ~description:"An internal operation was emitted twice by a script"
-    ~pp:(fun ppf (Apply_internal_results.Internal_contents {nonce; _}) ->
+    ~pp:(fun ppf (Apply_internal_results.Internal_operation {nonce; _}) ->
       Format.fprintf
         ppf
         "Internal operation %d was emitted twice by a script"
         nonce)
-    Apply_internal_results.internal_contents_encoding
+    Apply_internal_results.internal_operation_encoding
     (function Internal_operation_replay op -> Some op | _ -> None)
     (fun op -> Internal_operation_replay op) ;
   register_error_kind
@@ -1912,10 +1912,8 @@ let apply_internal_operations ctxt ~payer ~chain_id ops =
     | Script_typed_ir.Internal_operation ({source; operation; nonce} as op)
       :: rest -> (
         (if internal_nonce_already_recorded ctxt nonce then
-         let op_res =
-           Apply_internal_results.contents_of_internal_operation op
-         in
-         fail (Internal_operation_replay (Internal_contents op_res))
+         let op_res = Apply_internal_results.internal_operation op in
+         fail (Internal_operation_replay (Internal_operation op_res))
         else
           let ctxt = record_internal_nonce ctxt nonce in
           apply_internal_operation_contents

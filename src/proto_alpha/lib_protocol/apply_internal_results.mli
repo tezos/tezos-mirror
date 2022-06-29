@@ -59,14 +59,14 @@ type 'kind internal_operation_contents =
     }
       -> Kind.event internal_operation_contents
 
-type 'kind internal_contents = {
+type 'kind internal_operation = {
   source : Contract.t;
   operation : 'kind internal_operation_contents;
   nonce : int;
 }
 
 type packed_internal_contents =
-  | Internal_contents : 'kind internal_contents -> packed_internal_contents
+  | Internal_operation : 'kind internal_operation -> packed_internal_contents
 
 val contents_of_packed_internal_operation :
   Script_typed_ir.packed_internal_operation -> packed_internal_contents
@@ -133,18 +133,18 @@ type 'kind internal_manager_operation_result =
 
 type packed_internal_manager_operation_result =
   | Internal_manager_operation_result :
-      'kind internal_contents * 'kind internal_manager_operation_result
+      'kind internal_operation * 'kind internal_manager_operation_result
       -> packed_internal_manager_operation_result
 
-val contents_of_internal_operation :
-  'kind Script_typed_ir.internal_operation -> 'kind internal_contents
+val internal_operation :
+  'kind Script_typed_ir.internal_operation -> 'kind internal_operation
 
 val pack_internal_manager_operation_result :
   'kind Script_typed_ir.internal_operation ->
   'kind internal_manager_operation_result ->
   packed_internal_manager_operation_result
 
-val internal_contents_encoding : packed_internal_contents Data_encoding.t
+val internal_operation_encoding : packed_internal_contents Data_encoding.t
 
 val internal_manager_operation_result_encoding :
   packed_internal_manager_operation_result Data_encoding.t

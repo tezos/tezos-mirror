@@ -43,7 +43,7 @@ let pp_micheline_from_lazy_expr ppf expr =
   in
   pp_micheline_expr ppf expr
 
-let pp_internal_operation ppf (Internal_contents {operation; source; _}) =
+let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
   (* For now, try to use the same format as in [pp_manager_operation_content]. *)
   Format.fprintf ppf "@[<v 2>Internal " ;
   (match operation with
@@ -840,7 +840,7 @@ let pp_internal_operation_and_result ppf
     ppf
     "@[<v 2>%a@,%a@]"
     pp_internal_operation
-    (Internal_contents op)
+    (Internal_operation op)
     (pp_operation_result
        ~operation_name:internal_operation_name
        pp_internal_operation_result)

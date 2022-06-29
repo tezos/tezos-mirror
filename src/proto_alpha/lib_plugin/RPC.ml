@@ -183,7 +183,7 @@ module Scripts = struct
            (req "storage" Script.expr_encoding)
            (req
               "operations"
-              (list Apply_internal_results.internal_contents_encoding))
+              (list Apply_internal_results.internal_operation_encoding))
            (opt "lazy_storage_diff" Lazy_storage.encoding))
 
     let trace_code_input_encoding = run_code_input_encoding
@@ -205,7 +205,7 @@ module Scripts = struct
            (req "storage" Script.expr_encoding)
            (req
               "operations"
-              (list Apply_internal_results.internal_contents_encoding))
+              (list Apply_internal_results.internal_operation_encoding))
            (req "trace" trace_encoding)
            (opt "lazy_storage_diff" Lazy_storage.encoding))
 
