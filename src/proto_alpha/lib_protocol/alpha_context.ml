@@ -259,8 +259,6 @@ module Script = struct
     Gas.consume_from available_gas gas_cost
 end
 
-module Contract_event = Contract_event_repr
-
 module Level = struct
   include Level_repr
   include Level_storage
