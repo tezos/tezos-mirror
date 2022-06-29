@@ -1364,6 +1364,20 @@ and ('a, 's, 'r, 'f) klog =
   tzresult
   Lwt.t
 
+and ('a, 's, 'b, 't, 'r, 'f) step_type =
+  Local_gas_counter.outdated_context * step_constants ->
+  Local_gas_counter.local_gas_counter ->
+  ('a, 's, 'b, 't) kinstr ->
+  ('b, 't, 'r, 'f) continuation ->
+  'a ->
+  's ->
+  ('r
+  * 'f
+  * Local_gas_counter.outdated_context
+  * Local_gas_counter.local_gas_counter)
+  tzresult
+  Lwt.t
+
 (* ---- Auxiliary types -----------------------------------------------------*)
 and ('ty, 'comparable) ty =
   | Unit_t : (unit, yes) ty
