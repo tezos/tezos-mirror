@@ -327,21 +327,21 @@ let lookup_registry module_name item_name _t =
 
 (* Running *)
 
-let rec run_definition def : Ast.module_ =
+let rec run_definition def : Ast.module_ Lwt.t =
   match def.it with
-  | Textual m -> m
+  | Textual m -> Lwt.return m
   | Encoded (name, bs) ->
-    trace "Decoding...";
+    let+ () = trace_lwt "Decoding..." in
     Decode.decode name bs
   | Quoted (_, s) ->
-    trace "Parsing quote...";
+    let* () = trace_lwt "Parsing quote..." in
     let def' = Parse.string_to_module s in
     run_definition def'
 
 let run_action act : Values.value list Lwt.t =
   match act.it with
   | Invoke (x_opt, name, vs) ->
-    trace ("Invoking function \"" ^ Ast.string_of_name name ^ "\"...");
+    let* () = trace_lwt ("Invoking function \"" ^ Ast.string_of_name name ^ "\"...") in
     let inst = lookup_instance x_opt act.at in
     let* export = Instance.export inst name in
     (match export with
@@ -359,7 +359,7 @@ let run_action act : Values.value list Lwt.t =
     )
 
  | Get (x_opt, name) ->
-    trace ("Getting global \"" ^ Ast.string_of_name name ^ "\"...");
+    let* () = trace_lwt ("Getting global \"" ^ Ast.string_of_name name ^ "\"...") in
     let inst = lookup_instance x_opt act.at in
     let+ export = Instance.export inst name in
     (match export with
@@ -441,28 +441,31 @@ let assert_message at name msg re =
 let run_assertion ass : unit Lwt.t =
   match ass.it with
   | AssertMalformed (def, re) ->
-    trace "Asserting malformed...";
-    (match ignore (run_definition def : Ast.module_) with
-    | exception Decode.Code (_, msg) -> assert_message ass.at "decoding" msg re
-    | exception Parse.Syntax (_, msg) -> assert_message ass.at "parsing" msg re
-    | _ -> Assert.error ass.at "expected decoding/parsing error"
-    )
+    let* () = trace_lwt "Asserting malformed..." in
+    Lwt.try_bind
+      (fun () -> run_definition def)
+      (fun _ -> Assert.error ass.at "expected decoding/parsing error")
+      (function
+        | Decode.Code (_, msg) -> assert_message ass.at "decoding" msg re
+        | Parse.Syntax (_, msg) -> assert_message ass.at "parsing" msg re
+        | exn -> raise exn
+      )
 
   | AssertInvalid (def, re) ->
-    trace "Asserting invalid...";
-    (match
-      let m = run_definition def in
-      Valid.check_module m ;
-      Lwt.return_unit
-    with
-    | exception Valid.Invalid (_, msg) ->
-      assert_message ass.at "validation" msg re
-    | _ -> Assert.error ass.at "expected validation error"
-    )
+    let* () = trace_lwt "Asserting invalid..." in
+    Lwt.try_bind
+      (fun () ->
+         let+ m = run_definition def in
+         Valid.check_module m)
+      (fun _ -> Assert.error ass.at "expected validation error")
+    (function
+      | Valid.Invalid (_, msg) ->
+        assert_message ass.at "validation" msg re
+      | exn -> raise exn)
 
   | AssertUnlinkable (def, re) ->
-    trace "Asserting unlinkable...";
-    let m = run_definition def in
+    let* () = trace_lwt "Asserting unlinkable..." in
+    let* m = run_definition def in
     if not !Flags.unchecked then Valid.check_module m;
     Lwt.try_bind
       (fun () ->
@@ -475,8 +478,8 @@ let run_assertion ass : unit Lwt.t =
       | exn -> raise exn)
 
   | AssertUninstantiable (def, re) ->
-    trace "Asserting trap...";
-    let m = run_definition def in
+    let* () = trace_lwt "Asserting trap..." in
+    let* m = run_definition def in
     if not !Flags.unchecked then Valid.check_module m;
     Lwt.try_bind
       (fun () ->
@@ -489,13 +492,13 @@ let run_assertion ass : unit Lwt.t =
       | exn -> raise exn)
 
   | AssertReturn (act, rs) ->
-    trace ("Asserting return...");
+    let* () = trace_lwt ("Asserting return...") in
     let+ got_vs = run_action act in
     let expect_rs = List.map (fun r -> r.it) rs in
     assert_result ass.at got_vs expect_rs
 
   | AssertTrap (act, re) ->
-    trace ("Asserting trap...");
+    let* () = trace_lwt ("Asserting trap...") in
     Lwt.try_bind
       (fun () -> run_action act)
       (fun _ -> Assert.error ass.at "expected runtime error")
@@ -505,7 +508,7 @@ let run_assertion ass : unit Lwt.t =
       | exn -> raise exn)
 
   | AssertExhaustion (act, re) ->
-    trace ("Asserting exhaustion...");
+    let* () = trace_lwt ("Asserting exhaustion...") in
     Lwt.try_bind
       (fun () -> run_action act)
       (fun _ -> Assert.error ass.at "expected exhaustion error")
@@ -518,19 +521,23 @@ let rec run_command cmd : unit Lwt.t =
   match cmd.it with
   | Module (x_opt, def) ->
     quote := cmd :: !quote;
-    let m = run_definition def in
-    if not !Flags.unchecked then begin
-      trace "Checking...";
-      Valid.check_module m;
-      if !Flags.print_sig then begin
-        trace "Signature:";
-        print_module x_opt m
+    let* m = run_definition def in
+    let* () =
+      if not !Flags.unchecked then begin
+        let* () = trace_lwt "Checking..." in
+        Valid.check_module m;
+        if !Flags.print_sig then begin
+          let+ () = trace_lwt "Signature:" in
+          print_module x_opt m
+        end
+        else Lwt.return_unit
       end
-    end;
+      else Lwt.return_unit
+    in
     bind scripts x_opt [cmd];
     bind modules x_opt m;
     if not !Flags.dry then begin
-      trace "Initializing...";
+      let* () = trace_lwt "Initializing..." in
       let* imports = Import.link m in
       let+ inst = Eval.init m imports in
       bind instances x_opt inst
