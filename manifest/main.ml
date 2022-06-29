@@ -3163,7 +3163,7 @@ end = struct
                ("test_tx_rollup_l2_withdraw_storage", N.(number <= 010));
                ("test_bitset", N.(number >= 013));
                ("test_sc_rollup_tick_repr", N.(number >= 013));
-               ("test_sc_rollup_encoding", N.(number >= 014));
+               ("test_sc_rollup_encoding", N.(number >= 015));
                ("refutation_game_pbt", N.(number == 013));
                ("test_refutation_game", N.(number >= 014));
                ("test_carbonated_map", N.(number >= 013));

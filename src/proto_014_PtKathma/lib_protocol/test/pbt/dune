@@ -13,7 +13,6 @@
   test_tx_rollup_l2_encoding
   test_bitset
   test_sc_rollup_tick_repr
-  test_sc_rollup_encoding
   test_refutation_game
   test_carbonated_map)
  (libraries
@@ -88,11 +87,6 @@
  (alias runtest)
  (package tezos-protocol-014-PtKathma-tests)
  (action (run %{dep:./test_sc_rollup_tick_repr.exe})))
-
-(rule
- (alias runtest)
- (package tezos-protocol-014-PtKathma-tests)
- (action (run %{dep:./test_sc_rollup_encoding.exe})))
 
 (rule
  (alias runtest)
