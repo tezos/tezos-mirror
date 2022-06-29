@@ -385,7 +385,6 @@ let apply_operation_with_mode mode ctxt chain_id data op_count operation
     ctxt
     chain_id
     mode
-    Optimized
     ~payload_producer
     op_validated_stamp
     oph

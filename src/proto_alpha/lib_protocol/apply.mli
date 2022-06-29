@@ -135,7 +135,6 @@ val apply_operation :
   context ->
   Chain_id.t ->
   apply_mode ->
-  Script_ir_translator.unparsing_mode ->
   payload_producer:public_key_hash ->
   Validate_operation.stamp ->
   Operation_hash.t ->

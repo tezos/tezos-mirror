@@ -3053,15 +3053,15 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
         op_validated_stamp
         contents_list
 
-let apply_operation ctxt chain_id (apply_mode : apply_mode) mode
-    ~payload_producer op_validated_stamp hash operation =
+let apply_operation ctxt chain_id (apply_mode : apply_mode) ~payload_producer
+    op_validated_stamp hash operation =
   let ctxt = Origination_nonce.init ctxt hash in
   let ctxt = record_operation ctxt hash operation in
   apply_contents_list
     ctxt
     chain_id
     apply_mode
-    mode
+    Optimized
     ~payload_producer
     op_validated_stamp
     operation
