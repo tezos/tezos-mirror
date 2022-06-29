@@ -1080,7 +1080,6 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
 let apply_internal_manager_operation_content :
     type kind.
     context ->
-    Script_ir_translator.unparsing_mode ->
     payer:public_key_hash ->
     source:Contract.t ->
     chain_id:Chain_id.t ->
@@ -1090,7 +1089,7 @@ let apply_internal_manager_operation_content :
     * Script_typed_ir.packed_internal_operation list)
     tzresult
     Lwt.t =
- fun ctxt_before_op mode ~payer ~source ~chain_id operation ->
+ fun ctxt_before_op ~payer ~source ~chain_id operation ->
   Contract.must_exist ctxt_before_op source >>=? fun () ->
   Gas.consume ctxt_before_op Michelson_v1_gas.Cost_of.manager_operation
   >>?= fun ctxt ->
@@ -1141,7 +1140,7 @@ let apply_internal_manager_operation_content :
         ~before_operation:ctxt_before_op
         ~payer
         ~chain_id
-        ~mode
+        ~mode:Optimized
         ~internal:true
         ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
       >|=? fun (ctxt, res, ops) -> (ctxt, ITransaction_result res, ops)
@@ -1923,7 +1922,6 @@ let apply_internal_manager_operations ctxt ~payer ~chain_id ops =
           let ctxt = record_internal_nonce ctxt nonce in
           apply_internal_manager_operation_content
             ctxt
-            Optimized
             ~source
             ~payer
             ~chain_id
