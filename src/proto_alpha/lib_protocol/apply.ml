@@ -1077,7 +1077,7 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
 
 *)
 
-let apply_internal_manager_operation_content :
+let apply_internal_operation_contents :
     type kind.
     context ->
     payer:public_key_hash ->
@@ -1905,7 +1905,7 @@ let apply_external_manager_operation_content :
 
 type success_or_failure = Success of context | Failure
 
-let apply_internal_manager_operations ctxt ~payer ~chain_id ops =
+let apply_internal_operations ctxt ~payer ~chain_id ops =
   let[@coq_struct "ctxt"] rec apply ctxt applied worklist =
     match worklist with
     | [] -> Lwt.return (Success ctxt, List.rev applied)
@@ -1918,7 +1918,7 @@ let apply_internal_manager_operations ctxt ~payer ~chain_id ops =
          fail (Internal_operation_replay (Internal_contents op_res))
         else
           let ctxt = record_internal_nonce ctxt nonce in
-          apply_internal_manager_operation_content
+          apply_internal_operation_contents
             ctxt
             ~source
             ~payer
@@ -2183,11 +2183,7 @@ let apply_manager_contents (type kind) ctxt chain_id
   apply_external_manager_operation_content ctxt ~source ~chain_id operation
   >>= function
   | Ok (ctxt, operation_results, internal_operations) -> (
-      apply_internal_manager_operations
-        ctxt
-        ~payer:source
-        ~chain_id
-        internal_operations
+      apply_internal_operations ctxt ~payer:source ~chain_id internal_operations
       >>= function
       | Success ctxt, internal_operations_results -> (
           burn_manager_storage_fees

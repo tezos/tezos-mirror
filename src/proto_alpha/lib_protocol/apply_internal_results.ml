@@ -27,38 +27,38 @@ open Alpha_context
 open Data_encoding
 open Apply_operation_result
 
-type 'kind internal_manager_operation =
+type 'kind internal_operation_contents =
   | Transaction : {
       amount : Tez.tez;
       parameters : Script.lazy_expr;
       entrypoint : Entrypoint.t;
       destination : Destination.t;
     }
-      -> Kind.transaction internal_manager_operation
+      -> Kind.transaction internal_operation_contents
   | Origination : {
       delegate : Signature.Public_key_hash.t option;
       script : Script.t;
       credit : Tez.tez;
     }
-      -> Kind.origination internal_manager_operation
+      -> Kind.origination internal_operation_contents
   | Delegation :
       Signature.Public_key_hash.t option
-      -> Kind.delegation internal_manager_operation
+      -> Kind.delegation internal_operation_contents
   | Event : {
       ty : Script.expr;
       tag : Entrypoint.t;
       payload : Script.expr;
     }
-      -> Kind.event internal_manager_operation
+      -> Kind.event internal_operation_contents
 
 type packed_internal_manager_operation =
   | Manager :
-      'kind internal_manager_operation
+      'kind internal_operation_contents
       -> packed_internal_manager_operation
 
 type 'kind internal_contents = {
   source : Contract.t;
-  operation : 'kind internal_manager_operation;
+  operation : 'kind internal_operation_contents;
   nonce : int;
 }
 
@@ -68,7 +68,7 @@ type packed_internal_contents =
 let contents_of_internal_operation (type kind)
     ({source; operation; nonce} : kind Script_typed_ir.internal_operation) :
     kind internal_contents =
-  let operation : kind internal_manager_operation =
+  let operation : kind internal_operation_contents =
     match operation with
     | Transaction_to_implicit
         {destination; amount; entrypoint; unparsed_parameters; _} ->
@@ -211,9 +211,9 @@ module Internal_result = struct
         iselect : 'kind iselect;
         select :
           packed_internal_manager_operation ->
-          'kind internal_manager_operation option;
-        proj : 'kind internal_manager_operation -> 'a;
-        inj : 'a -> 'kind internal_manager_operation;
+          'kind internal_operation_contents option;
+        proj : 'kind internal_operation_contents -> 'a;
+        inj : 'a -> 'kind internal_operation_contents;
       }
         -> 'kind case
   [@@coq_force_gadt]

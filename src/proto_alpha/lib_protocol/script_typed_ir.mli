@@ -1475,7 +1475,7 @@ and 'kind internal_operation_contents =
          access to a typed version of the field (with [parameters_ty] and
          [parameters]), but we keep it so that we do not have to unparse the
          typed version in order to produce the receipt
-         ([Apply_results.internal_manager_operation]). *)
+         ([Apply_internal_results.internal_operation_contents]). *)
       destination : Signature.Public_key_hash.t;
       amount : Tez.tez;
       entrypoint : Entrypoint.t;
@@ -1490,7 +1490,7 @@ and 'kind internal_operation_contents =
          access to a typed version of the field (with [parameters_ty] and
          [parameters]), but we keep it so that we do not have to unparse the
          typed version in order to produce the receipt
-         ([Apply_results.internal_manager_operation]). *)
+         ([Apply_internal_results.internal_operation_contents]). *)
       destination : Contract_hash.t;
       amount : Tez.tez;
       entrypoint : Entrypoint.t;

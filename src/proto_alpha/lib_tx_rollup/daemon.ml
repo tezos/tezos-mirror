@@ -76,7 +76,7 @@ let parse_tx_rollup_deposit_parameters :
   let open Protocol in
   (* /!\ This pattern matching needs to remain in sync with the deposit
      parameters. See the transaction to Tx_rollup case in
-     Protocol.Apply.Apply.apply_internal_manager_operations *)
+     Protocol.Apply.Apply.apply_internal_operation_contents *)
   match root parameters with
   | Seq
       ( _,
