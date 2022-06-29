@@ -27,7 +27,7 @@
 (** Legacy node RPCs. *)
 
 (** THIS MODULE IS DEPRECATED: ITS FUNCTIONS SHOULD BE PORTED TO THE NEW RPC
-    ENGINE (IN [rpc.ml], USING MODULE [RPC_core]). *)
+    ENGINE (IN [RPC.ml], USING MODULE [RPC_core]). *)
 
 (** In all RPCs, default [chain] is "main" and default [block] is
    "head~2" to pick the finalized branch for Tenderbake. *)
@@ -167,16 +167,6 @@ val preapply_block :
 
 (** Call RPC /chain/[chain]/blocks/[block]/helpers/forge/operations *)
 val post_forge_operations :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/helpers/scripts/run_operation *)
-val post_run_operation :
   ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->

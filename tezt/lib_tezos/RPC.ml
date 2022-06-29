@@ -191,8 +191,8 @@ let post_private_injection_operation ?(async = false) data =
     ~data
     Fun.id
 
-let post_run_operation ?(chain = "main") ?(block = "head") ?(async = false) data
-    =
+let post_chain_block_helpers_scripts_run_operation ?(chain = "main")
+    ?(block = "head") ?(async = false) data =
   make
     POST
     ["chains"; chain; "blocks"; block; "helpers"; "scripts"; "run_operation"]

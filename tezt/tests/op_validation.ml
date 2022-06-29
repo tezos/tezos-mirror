@@ -95,8 +95,10 @@ let check_run_operation_illformed_batch ~supports check_answer =
 
   Log.info "Call the [run_operation] RPC with this JSON batch." ;
   let*? p =
-    RPC.Client.spawn client
-    @@ RPC.post_run_operation (Ezjsonm.from_string batch)
+    RPC.Client.spawn
+      client
+      (RPC.post_chain_block_helpers_scripts_run_operation
+         (Ezjsonm.from_string batch))
   in
   check_answer p
 
