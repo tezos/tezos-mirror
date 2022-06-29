@@ -1,0 +1,12 @@
+
+./tezos-codec encode 014-PtKathma.tez from '"7322135"'
+97f4be03
+
+./tezos-codec decode 014-PtKathma.tez from 97f4be03
+"7322135"
+
+./tezos-codec encode 014-PtKathma.tez from '"0"'
+00
+
+./tezos-codec decode 014-PtKathma.tez from 00
+"0"
