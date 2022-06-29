@@ -165,6 +165,28 @@ val set_deposits_limit :
   Tez.t option ->
   Kind.set_deposits_limit Kind.manager Injection.result tzresult Lwt.t
 
+(** Calls {!Injection.inject_manager_operation}
+    with {!Annotated_manager_operation.Single_manager} {!Alpha_context.Increase_paid_storage} 
+    [{amount_in_bytes; destination}] as operation. *)
+val increase_paid_storage :
+  #Protocol_client_context.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  ?force:bool ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?fee:Tez.tez ->
+  ?confirmations:int ->
+  ?simulation:bool ->
+  source:public_key_hash ->
+  destination:Contract_hash.t ->
+  src_pk:public_key ->
+  manager_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
+  amount_in_bytes:Z.t ->
+  unit ->
+  Kind.increase_paid_storage Kind.manager Injection.result tzresult Lwt.t
+
 (** Same as {!set_delegate} but the [~source] argument of {!Injection.inject_manager_operation}
     is {!Signature.Public_key.hash} [src_pk]. *)
 val register_as_delegate :

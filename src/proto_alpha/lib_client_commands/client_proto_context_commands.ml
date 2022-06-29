@@ -1833,6 +1833,51 @@ let commands_rw () =
             >>=? fun _ -> return_unit);
     command
       ~group
+      ~desc:"Increase the paid storage of a smart contract."
+      (args6
+         force_switch
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         fee_parameter_args)
+      (prefixes ["increase"; "the"; "paid"; "storage"; "of"]
+      @@ OriginatedContractAlias.destination_param
+           ~name:"contract"
+           ~desc:"name of the smart contract"
+      @@ prefix "by"
+      @@ non_negative_z_param ~name:"amount" ~desc:"amount of increase in bytes"
+      @@ prefixes ["bytes"; "from"]
+      @@ Public_key_hash.source_param
+           ~name:"payer"
+           ~desc:"payer of the storage increase"
+      @@ stop)
+      (fun (force, fee, dry_run, verbose_signing, simulation, fee_parameter)
+           contract
+           amount_in_bytes
+           payer
+           (cctxt : Protocol_client_context.full) ->
+        Client_keys.get_key cctxt payer >>=? fun (_, src_pk, manager_sk) ->
+        increase_paid_storage
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~force
+          ~dry_run
+          ~verbose_signing
+          ?fee
+          ?confirmations:cctxt#confirmations
+          ~simulation
+          ~source:payer
+          ~src_pk
+          ~manager_sk
+          ~destination:contract
+          ~fee_parameter
+          ~amount_in_bytes
+          ()
+        >>=? fun _ -> return_unit);
+    command
+      ~group
       ~desc:"Launch a new transaction rollup."
       (args8
          force_switch
