@@ -1187,7 +1187,7 @@ let apply_internal_manager_operation_content :
         Transaction_to_sc_rollup_result {consumed_gas; inbox_after}
       in
       (ctxt, ITransaction_result result, [])
-  | Event {addr = _; unparsed_data = _; tag = _} ->
+  | Event {ty = _; unparsed_data = _; tag = _} ->
       return
         ( ctxt,
           IEvent_result

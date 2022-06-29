@@ -1082,7 +1082,6 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
          kinstr
   | IEmit : {
       loc : Script.location;
-      addr : Contract_event.t;
       tag : Entrypoint.t;
       ty : ('a, _) ty;
       k : (operation, 's, 'r, 'f) kinstr;
@@ -1517,7 +1516,7 @@ and 'kind manager_operation =
     }
       -> Kind.transaction manager_operation
   | Event : {
-      addr : Contract_event.t;
+      ty : Script.expr;
       tag : Entrypoint.t;
       unparsed_data : Script.expr;
     }

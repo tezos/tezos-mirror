@@ -593,11 +593,6 @@ let hash_comparable_data ctxt ty data =
   pack_comparable_data ctxt ty data >>=? fun (bytes, ctxt) ->
   Lwt.return @@ hash_bytes ctxt bytes
 
-let hash_event_ty ctxt unparsed =
-  pack_node unparsed ctxt >>? fun (bytes, ctxt) ->
-  Gas.consume ctxt (Michelson_v1_gas.Cost_of.Interpreter.blake2b bytes)
-  >|? fun ctxt -> (Contract_event.Hash.hash_bytes [bytes], ctxt)
-
 (* ---- Tickets ------------------------------------------------------------ *)
 
 (*
@@ -4650,8 +4645,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       >>?= fun (Ex_ty ty, ctxt) ->
       check_item_ty ctxt ty data loc I_EMIT 1 2 >>?= fun (Eq, ctxt) ->
       parse_entrypoint_annot_strict loc annot >>?= fun tag ->
-      hash_event_ty ctxt ty_node >>?= fun (addr, ctxt) ->
-      let instr = {apply = (fun k -> IEmit {loc; tag; ty = data; addr; k})} in
+      let instr = {apply = (fun k -> IEmit {loc; tag; ty = data; k})} in
       typed ctxt loc instr (Item_t (Operation_t, rest))
   (* Primitive parsing errors *)
   | ( Prim

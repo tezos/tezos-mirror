@@ -967,14 +967,7 @@ let check_kinstr_size () =
       Kinstr ("IOpen_chest", IOpen_chest (loc, halt ()));
       Kinstr
         ( "IEmit",
-          IEmit
-            {
-              loc;
-              addr = Contract_event_repr.Hash.zero;
-              tag = entrypoint "entry";
-              ty = Unit_t;
-              k = halt ();
-            } );
+          IEmit {loc; tag = entrypoint "entry"; ty = Unit_t; k = halt ()} );
       Kinstr ("IHalt ()", halt ());
     ]
 

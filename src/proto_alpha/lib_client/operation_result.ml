@@ -103,14 +103,14 @@ let pp_internal_operation ppf (Internal_contents {operation; source; _}) =
       match delegate_opt with
       | None -> Format.pp_print_string ppf "nobody"
       | Some delegate -> Signature.Public_key_hash.pp ppf delegate)
-  | Event {addr; tag; payload} ->
+  | Event {ty; tag; payload} ->
       Format.fprintf
         ppf
-        "Event:@,From: %a@,To: %a"
+        "Event:@,From: %a@,Type: %a"
         Contract.pp
         source
-        Contract_event.pp
-        addr ;
+        pp_micheline_expr
+        ty ;
       if not (Entrypoint.is_default tag) then
         Format.fprintf ppf "@,Tag: %a" Entrypoint.pp tag ;
       Format.fprintf ppf "@,Payload: %a" pp_micheline_expr payload) ;

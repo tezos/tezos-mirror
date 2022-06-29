@@ -72,18 +72,21 @@ let test_emit_event protocol =
     |-> "internal_operation_results"
   in
   let event = events |=> 0 in
-  assert (
-    event |-> "addr" |> as_string
-    = "ev12m5E1yW14mc9rsrcdGAWVfDSdmRGuctykrVU55bHZBGv9kmdhW") ;
+  let assert_type event =
+    let ty = event |-> "type" in
+    assert (ty |-> "prim" |> as_string = "or") ;
+    let args = ty |-> "args" in
+    assert (args |=> 0 |-> "prim" |> as_string = "nat") ;
+    assert (args |=> 1 |-> "prim" |> as_string = "string")
+  in
+  assert_type event ;
   let data = event |-> "payload" in
   assert (data |-> "prim" |> as_string = "Right") ;
   assert (data |-> "args" |=> 0 |-> "string" |> as_string = "right") ;
   let tag = event |-> "tag" |> as_string in
   assert (tag = "tag1") ;
   let event = events |=> 1 in
-  assert (
-    event |-> "addr" |> as_string
-    = "ev12m5E1yW14mc9rsrcdGAWVfDSdmRGuctykrVU55bHZBGv9kmdhW") ;
+  assert_type event ;
   let data = event |-> "payload" in
   assert (data |-> "prim" |> as_string = "Left") ;
   assert (data |-> "args" |=> 0 |-> "int" |> as_string = "2") ;
