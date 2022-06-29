@@ -2677,11 +2677,11 @@ let validate_consensus_contents (type kind) ctxt chain_id
       Operation.check_signature delegate_pk chain_id operation >>?= fun () ->
       return (ctxt, delegate_pkh, voting_power)
 
-let apply_manager_contents_list ctxt mode ~payload_producer chain_id
+let apply_manager_contents_list ctxt ~payload_producer chain_id
     fees_updated_contents_list =
   apply_manager_contents_list_rec
     ctxt
-    mode
+    Optimized
     ~payload_producer
     chain_id
     fees_updated_contents_list
@@ -2701,7 +2701,6 @@ let apply_manager_operation ctxt ~payload_producer chain_id ~mempool_mode
   let*! ctxt, contents_result_list =
     apply_manager_contents_list
       ctxt
-      Optimized
       ~payload_producer
       chain_id
       fees_updated_contents_list
