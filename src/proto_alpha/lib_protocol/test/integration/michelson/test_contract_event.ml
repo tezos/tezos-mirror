@@ -30,9 +30,8 @@ open Lwt_result_syntax
 (** Testing
     -------
     Component:  Protocol (event logging)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
-                -- test '^event logging$'
+    Invocation: cd src/proto_alpha/lib_protocol/test/integration/michelson && \
+                dune exec ./main.exe -- test '^event logging$'
     Subject:  This module tests that the event logs can be written to the receipt
               in correct order and expected format.
 *)
@@ -112,13 +111,19 @@ let contract_test () =
       assert (Entrypoint.to_string tag1 = "tag1") ;
       assert (Entrypoint.to_string tag2 = "tag2") ;
       (match root ty1 with
-      | Prim (_, T_or, [Prim (_, T_nat, [], []); Prim (_, T_string, [], [])], [])
-        ->
+      | Prim
+          ( _,
+            T_or,
+            [Prim (_, T_nat, [], ["%int"]); Prim (_, T_string, [], ["%str"])],
+            [] ) ->
           ()
       | _ -> assert false) ;
       (match root ty2 with
-      | Prim (_, T_or, [Prim (_, T_nat, [], []); Prim (_, T_string, [], [])], [])
-        ->
+      | Prim
+          ( _,
+            T_or,
+            [Prim (_, T_nat, [], ["%int"]); Prim (_, T_string, [], ["%str"])],
+            [] ) ->
           ()
       | _ -> assert false) ;
       return_unit
