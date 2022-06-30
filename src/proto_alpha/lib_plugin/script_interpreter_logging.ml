@@ -102,6 +102,10 @@ type ('a, 's, 'r, 'f) ex_split_kinstr =
     }
       -> ('a, 's, 'r, 'f) ex_split_kinstr
 
+(** An existential container for an instruction paired with its
+    initial stack type. This is used internally to pack together
+    execution branches with different initial stack types but
+    the same final stack type (which we want to compute). *)
 type ('r, 'f) ex_init_stack_ty =
   | Ex_init_stack_ty :
       ('a, 's) stack_ty * ('a, 's, 'r, 'f) kinstr
@@ -1632,6 +1636,9 @@ let kinstr_split :
              reconstruct = (fun k -> ILog (loc, s, event, logger, k));
            }
 
+(* [kinstr_final_stack_type sty instr] computes the stack type after
+   [instr] has been executed, assuming [sty] is the type of the stack
+   prior to execution. *)
 let rec kinstr_final_stack_type :
     type a s r f.
     (a, s) stack_ty -> (a, s, r, f) kinstr -> (r, f) stack_ty option tzresult =
@@ -1670,6 +1677,10 @@ let rec kinstr_final_stack_type :
   | Ex_split_halt _ -> ok @@ Some s
   | Ex_split_failwith {cast = {cast = _}; _} -> ok None
 
+(* The same as [kinstr_final_stack_type], but selects from multiple
+   possible execution branches. If the first instr ends with FAILWITH,
+   it will try the next and so on. Note that all instructions must
+   result in the same stack type. *)
 let rec branched_final_stack_type :
     type r f. (r, f) ex_init_stack_ty list -> (r, f) stack_ty option tzresult =
   function
@@ -1735,14 +1746,26 @@ let kinstr_rewritek :
   | Ex_split_halt loc -> ok @@ IHalt loc
   | Ex_split_failwith {location; arg_ty; _} -> ok @@ IFailwith (location, arg_ty)
 
+(** [log_entry logger ctxt gas instr sty accu stack] simply calls
+    [logger.log_entry] function with the appropriate arguments. Note
+    that [logger] value is only available when logging is enables, so
+    the type system protects us from calling this by mistake.*)
 let log_entry logger ctxt gas k sty accu stack =
   let ctxt = Local_gas_counter.update_context gas ctxt in
   logger.log_entry k ctxt (kinstr_location k) sty (accu, stack)
 
+(** [log_exit logger ctxt gas loc instr sty accu stack] simply calls
+    [logger.log_exit] function with the appropriate arguments. Note
+    that [logger] value is only available when logging is enables, so
+    the type system protects us from calling this by mistake.*)
 let log_exit logger ctxt gas loc_prev k sty accu stack =
   let ctxt = Local_gas_counter.update_context gas ctxt in
   logger.log_exit k ctxt loc_prev sty (accu, stack)
 
+(** [log_control logger continuation] simply calls [logger.log_control]
+    function with the appropriate arguments. Note that [logger] value
+    is only available when logging is enables, so the type system
+    protects us from calling this by mistake.*)
 let log_control logger ks = logger.log_control ks
 
 (* [log_kinstr logger i] emits an instruction to instrument the
@@ -1750,7 +1773,12 @@ let log_control logger ks = logger.log_control ks
 let log_kinstr logger sty i = ILog (kinstr_location i, sty, LogEntry, logger, i)
 
 (* [log_next_kinstr logger i] instruments the next instruction of [i]
-   with the [logger].
+   with the [logger] with [ILog] instructions to make sure it will be logged.
+   This instrumentation has a performance cost, but importantly, it is
+   only ever paid when logging is enabled. Otherwise, the possibility
+   to instrument the script is costless. Note also that [logger] value
+   is only available when logging is enables, so the type system protects
+   us from calling this by mistake.
 
    Notice that the instrumentation breaks the sharing of continuations
    that is normally enforced between branches of conditionals. This
@@ -1772,6 +1800,10 @@ let log_next_kinstr logger sty i =
   in
   kinstr_rewritek sty i {apply}
 
+(** [instrument_cont logger sty] creates a function instrumenting
+    continuations starting from the stack type described by [sty].
+    Instrumentation consists in wrapping inner continuations in
+    [KLog] continuation so that logging continues. *)
 let instrument_cont :
     type a b c d.
     logger ->
@@ -1780,6 +1812,15 @@ let instrument_cont :
     (a, b, c, d) continuation =
  fun logger sty -> function KLog _ as k -> k | k -> KLog (k, sty, logger)
 
+(** [log_next_continuation logger sty cont] instruments the next
+    continuation in [cont] with [KLog] continuations to ensure
+    logging.
+
+    This instrumentation has a performance cost, but importantly, it
+    is only ever paid when logging is enabled. Otherwise, the
+    possibility to instrument the script is costless. Note also that
+    [logger] value is only available when logging is enabled, so the
+    type system protects us from calling this by mistake. *)
 let log_next_continuation :
     type a b c d.
     logger ->
@@ -1831,6 +1872,8 @@ let log_next_continuation :
   | KLog _ (* This case should never happen. *) | KNil ->
       ok cont
 
+(** [dipn_stack_ty witness stack_ty] returns the type of the stack
+    on which instructions inside dipped block will be operating. *)
 let rec dipn_stack_ty :
     type a s e z c u d w.
     (a, s, e, z, c, u, d, w) stack_prefix_preservation_witness ->
