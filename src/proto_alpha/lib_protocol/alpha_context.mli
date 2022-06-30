@@ -4677,9 +4677,15 @@ module Consensus : sig
        and type slot_set := Slot.Set.t
        and type round := Round.t
 
+  (** [store_endorsement_branch context branch] sets the "endorsement branch"
+      (see {!Storage.Tenderbake.Endorsement_branch} to [branch] in both the disk
+      storage and RAM. *)
   val store_endorsement_branch :
     context -> Block_hash.t * Block_payload_hash.t -> context Lwt.t
 
+  (** [store_grand_parent_branch context branch] sets the "grand-parent branch"
+      (see {!Storage.Tenderbake.Grand_parent_branch} to [branch] in both the
+      disk storage and RAM. *)
   val store_grand_parent_branch :
     context -> Block_hash.t * Block_payload_hash.t -> context Lwt.t
 end
