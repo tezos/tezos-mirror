@@ -153,7 +153,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         return (delegate, timestamp)
 
   let block_round (header : Block_header.t) =
-    let wrap = Protocol.Environment.wrap_tzresult in
+    let wrap = Environment.wrap_tzresult in
     let open Result_syntax in
     let* round =
       wrap
