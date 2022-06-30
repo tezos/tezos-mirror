@@ -136,6 +136,8 @@ let pp_output fmt {outbox_level; message_index; message} =
 module type S = sig
   type state
 
+  val pp : state -> (Format.formatter -> unit -> unit) Lwt.t
+
   type context
 
   type hash = Sc_rollup_repr.State_hash.t
@@ -186,4 +188,8 @@ module type S = sig
 
   val produce_output_proof :
     context -> state -> output -> (output_proof, error) result Lwt.t
+
+  module Internal_for_tests : sig
+    val insert_failure : state -> state Lwt.t
+  end
 end

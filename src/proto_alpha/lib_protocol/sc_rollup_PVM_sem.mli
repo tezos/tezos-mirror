@@ -116,6 +116,8 @@ module type S = sig
       inbox to be executable. *)
   type state
 
+  val pp : state -> (Format.formatter -> unit -> unit) Lwt.t
+
   (** A state is initialized in a given context. A [context]
       represents the executable environment needed by the state to
       exist. Typically, the rollup node storage can be part of this
@@ -274,4 +276,10 @@ module type S = sig
       the fact that [output] is part of [state]'s outbox. *)
   val produce_output_proof :
     context -> state -> output -> (output_proof, error) result Lwt.t
+
+  module Internal_for_tests : sig
+    (** [insert_failure state] corrupts the PVM state. This is used in
+        the loser mode of the rollup node. *)
+    val insert_failure : state -> state Lwt.t
+  end
 end

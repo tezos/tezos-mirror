@@ -753,13 +753,6 @@ module Make (Context : P) :
 
   type state = State.state
 
-  let pp state =
-    let open Lwt_syntax in
-    let* _, pp = Monad.run pp state in
-    match pp with
-    | None -> return @@ fun fmt _ -> Format.fprintf fmt "<opaque>"
-    | Some pp -> return pp
-
   open Monad
 
   let initial_state ctxt =
@@ -786,6 +779,16 @@ module Make (Context : P) :
   let state_hash state =
     let context_hash = Tree.hash state in
     Lwt.return @@ State_hash.context_hash_to_state_hash context_hash
+
+  let pp state =
+    let open Lwt_syntax in
+    let* _, pp = Monad.run pp state in
+    match pp with
+    | None -> return @@ fun fmt _ -> Format.fprintf fmt "<opaque>"
+    | Some pp ->
+        let* state_hash = state_hash state in
+        return (fun fmt () ->
+            Format.fprintf fmt "@[%a: %a@]" State_hash.pp state_hash pp ())
 
   let boot =
     let open Monad.Syntax in
@@ -1189,6 +1192,14 @@ module Make (Context : P) :
         return {output_proof; output_proof_state; output_proof_output}
     | Some (_, false) -> fail Arith_invalid_claim_about_outbox
     | None -> fail Arith_output_proof_production_failed
+
+  module Internal_for_tests = struct
+    let insert_failure state =
+      let add n = Tree.add state ["failures"; string_of_int n] Bytes.empty in
+      let open Lwt_syntax in
+      let* n = Tree.length state ["failures"] in
+      add n
+  end
 end
 
 module ProtocolImplementation = Make (struct
