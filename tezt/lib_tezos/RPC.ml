@@ -322,8 +322,8 @@ module Sc_rollup = struct
   let get_inbox ?(chain = "main") ?(block = "head") sc_rollup_address =
     make GET (path ~chain ~block sc_rollup_address @ ["inbox"]) Fun.id
 
-  let get_initial_level ?(chain = "main") ?(block = "head") sc_rollup_address =
-    make GET (path ~chain ~block sc_rollup_address @ ["initial_level"]) Fun.id
+  let get_genesis_info ?(chain = "main") ?(block = "head") sc_rollup_address =
+    make GET (path ~chain ~block sc_rollup_address @ ["genesis_info"]) Fun.id
 
   let get_boot_sector ?(chain = "main") ?(block = "head") sc_rollup_address =
     make GET (path ~chain ~block sc_rollup_address @ ["boot_sector"]) Fun.id

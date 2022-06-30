@@ -1820,12 +1820,14 @@ module Sc_rollup = struct
         ~output:Sc_rollup.Inbox.encoding
         RPC_path.(path /: Sc_rollup.Address.rpc_arg / "inbox")
 
-    let initial_level =
+    let genesis_info =
       RPC_service.get_service
-        ~description:"Initial level for a smart-contract rollup"
+        ~description:
+          "Genesis information (level and commitment hash) for a \
+           smart-contract rollup"
         ~query:RPC_query.empty
-        ~output:Raw_level.encoding
-        RPC_path.(path /: Sc_rollup.Address.rpc_arg / "initial_level")
+        ~output:Sc_rollup.Commitment.genesis_info_encoding
+        RPC_path.(path /: Sc_rollup.Address.rpc_arg / "genesis_info")
 
     let last_cemented_commitment_hash_with_level =
       RPC_service.get_service
@@ -1937,10 +1939,10 @@ module Sc_rollup = struct
     Alpha_context.Sc_rollup.kind ctxt address >|=? Option.some
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2688 *)
-  let register_initial_level () =
-    Registration.register1 ~chunked:true S.initial_level
+  let register_genesis_info () =
+    Registration.register1 ~chunked:true S.genesis_info
     @@ fun ctxt address () () ->
-    Alpha_context.Sc_rollup.initial_level ctxt address
+    Alpha_context.Sc_rollup.genesis_info ctxt address
 
   let register_boot_sector () =
     Registration.register1 ~chunked:true S.boot_sector
@@ -2018,7 +2020,7 @@ module Sc_rollup = struct
   let register () =
     register_kind () ;
     register_inbox () ;
-    register_initial_level () ;
+    register_genesis_info () ;
     register_boot_sector () ;
     register_last_cemented_commitment_hash_with_level () ;
     register_staked_on_commitment () ;
@@ -2030,8 +2032,8 @@ module Sc_rollup = struct
 
   let list ctxt block = RPC_context.make_call0 S.root ctxt block () ()
 
-  let initial_level ctxt block sc_rollup_address =
-    RPC_context.make_call1 S.initial_level ctxt block sc_rollup_address () ()
+  let genesis_info ctxt block sc_rollup_address =
+    RPC_context.make_call1 S.genesis_info ctxt block sc_rollup_address () ()
 
   let last_cemented_commitment_hash_with_level ctxt block sc_rollup_address =
     RPC_context.make_call1

@@ -412,11 +412,11 @@ let test_rollup_client_gets_address =
    We can fetch the level when a smart contract rollup was
    originated from the context.
 *)
-let test_rollup_get_initial_level =
+let test_rollup_get_genesis_info =
   regression_test
     ~__FILE__
-    ~tags:["initial_level"]
-    "get initial level of a sc rollup"
+    ~tags:["genesis_info"]
+    "get genesis info of a sc rollup"
     (fun protocol ->
       setup ~protocol @@ fun node client bootstrap ->
       let* current_level = RPC.get_current_level client in
@@ -424,14 +424,14 @@ let test_rollup_get_initial_level =
         (* Bake 10 blocks to be sure that the initial level of rollup is different
            from the current level. *)
         let* _ = repeat 10 (fun () -> Client.bake_for_and_wait client) in
-        let* initial_level =
+        let* genesis_info =
           RPC.Client.call client
-          @@ RPC.Sc_rollup.get_initial_level sc_rollup_address
+          @@ RPC.Sc_rollup.get_genesis_info sc_rollup_address
         in
         (* 1 Block for activating alpha + 1 block for originating the rollup
            the rollup initial level should be 2 *)
         Check.(
-          (JSON.as_int initial_level
+          (JSON.(genesis_info |-> "level" |> as_int)
           = JSON.as_int (JSON.get "level" current_level) + 1)
             int
             ~error_msg:"expected value %L, got %R") ;
@@ -465,12 +465,15 @@ let test_rollup_get_last_cemented_commitment_hash_with_level =
         let* hash, level =
           last_cemented_commitment_hash_with_level ~sc_rollup_address client
         in
-        (* The hardcoded value of `Sc_rollup.Commitment.zero` is
-           "scc12XhSULdV8bAav21e99VYLTpqAjTd7NU8Mn4zFdKPSA8auMbggG". *)
+        let* genesis_info =
+          RPC.Client.call client
+          @@ RPC.Sc_rollup.get_genesis_info sc_rollup_address
+        in
+        let genesis_hash =
+          JSON.(genesis_info |-> "commitment_hash" |> as_string)
+        in
         Check.(
-          (hash = "scc12XhSULdV8bAav21e99VYLTpqAjTd7NU8Mn4zFdKPSA8auMbggG")
-            string
-            ~error_msg:"expected value %L, got %R") ;
+          (hash = genesis_hash) string ~error_msg:"expected value %L, got %R") ;
         (* The level of the last cemented commitment should correspond to the
            rollup origination level. *)
         Check.(
@@ -934,11 +937,11 @@ let test_rollup_list =
 *)
 let test_rollup_node_boots_into_initial_state =
   let go client sc_rollup_address sc_rollup_node =
-    let* init_level =
+    let* genesis_info =
       RPC.Client.call ~hooks client
-      @@ RPC.Sc_rollup.get_initial_level sc_rollup_address
+      @@ RPC.Sc_rollup.get_genesis_info sc_rollup_address
     in
-    let init_level = init_level |> JSON.as_int in
+    let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
     let* () = Sc_rollup_node.run sc_rollup_node in
     let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
@@ -981,11 +984,11 @@ let test_rollup_node_boots_into_initial_state =
 *)
 let test_rollup_node_advances_pvm_state =
   let go client sc_rollup_address sc_rollup_node =
-    let* init_level =
+    let* genesis_info =
       RPC.Client.call ~hooks client
-      @@ RPC.Sc_rollup.get_initial_level sc_rollup_address
+      @@ RPC.Sc_rollup.get_genesis_info sc_rollup_address
     in
-    let init_level = init_level |> JSON.as_int in
+    let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
     let* () = Sc_rollup_node.run sc_rollup_node in
     let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
@@ -1142,12 +1145,12 @@ let commitment_stored _protocol sc_rollup_node sc_rollup_address _node client =
      `init_level + sc_rollup_commitment_period_in_blocks +
      levels_to_finalise`.
   *)
-  let* init_level =
+  let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.Sc_rollup.get_initial_level sc_rollup_address
+    @@ RPC.Sc_rollup.get_genesis_info sc_rollup_address
   in
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
-  let init_level = init_level |> JSON.as_int in
   let* levels_to_commitment =
     get_sc_rollup_commitment_period_in_blocks client
   in
@@ -1218,12 +1221,12 @@ let commitment_not_stored_if_non_final _protocol sc_rollup_node
      levels_to_finalise`. At the level before, the commitment will not be
      neither stored nor published.
   *)
-  let* init_level =
+  let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.Sc_rollup.get_initial_level sc_rollup_address
+    @@ RPC.Sc_rollup.get_genesis_info sc_rollup_address
   in
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
-  let init_level = init_level |> JSON.as_int in
   let* levels_to_commitment =
     get_sc_rollup_commitment_period_in_blocks client
   in
@@ -1277,12 +1280,12 @@ let commitments_messages_reset _protocol sc_rollup_node sc_rollup_address _node
      `block_finality_time` empty levels are baked which ensures that two
      commitments are stored and published by the rollup node.
   *)
-  let* init_level =
+  let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.Sc_rollup.get_initial_level sc_rollup_address
+    @@ RPC.Sc_rollup.get_genesis_info sc_rollup_address
   in
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
-  let init_level = init_level |> JSON.as_int in
   let* levels_to_commitment =
     get_sc_rollup_commitment_period_in_blocks client
   in
@@ -1353,12 +1356,12 @@ let commitments_reorgs protocol sc_rollup_node sc_rollup_address node client =
      publishes the commitment. The final commitment should have
      no messages and no ticks.
   *)
-  let* init_level =
+  let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.Sc_rollup.get_initial_level sc_rollup_address
+    @@ RPC.Sc_rollup.get_genesis_info sc_rollup_address
   in
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
-  let init_level = init_level |> JSON.as_int in
   let* levels_to_commitment =
     get_sc_rollup_commitment_period_in_blocks client
   in
@@ -1526,12 +1529,12 @@ let commitment_before_lcc_not_published _protocol sc_rollup_node
   let commitment_period = constants.commitment_period_in_blocks in
   let challenge_window = constants.challenge_window_in_blocks in
   (* Rollup node 1 processes messages, produces and publishes two commitments. *)
-  let* init_level =
+  let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.Sc_rollup.get_initial_level sc_rollup_address
+    @@ RPC.Sc_rollup.get_genesis_info sc_rollup_address
   in
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
-  let init_level = init_level |> JSON.as_int in
   let* () = Sc_rollup_node.run sc_rollup_node in
   let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
   let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
@@ -1691,12 +1694,12 @@ let commitment_before_lcc_not_published _protocol sc_rollup_node
 let first_published_level_is_global _protocol sc_rollup_node sc_rollup_address
     node client =
   (* Rollup node 1 processes messages, produces and publishes two commitments. *)
-  let* init_level =
+  let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.Sc_rollup.get_initial_level sc_rollup_address
+    @@ RPC.Sc_rollup.get_genesis_info sc_rollup_address
   in
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
   let* commitment_period = get_sc_rollup_commitment_period_in_blocks client in
-  let init_level = init_level |> JSON.as_int in
   let* () = Sc_rollup_node.run sc_rollup_node in
   let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
   let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
@@ -1816,11 +1819,11 @@ let test_rollup_origination_boot_sector =
 *)
 let test_rollup_node_uses_boot_sector =
   let go_boot client sc_rollup_address sc_rollup_node =
-    let* init_level =
+    let* genesis_info =
       RPC.Client.call ~hooks client
-      @@ RPC.Sc_rollup.get_initial_level sc_rollup_address
+      @@ RPC.Sc_rollup.get_genesis_info sc_rollup_address
     in
-    let init_level = init_level |> JSON.as_int in
+    let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
     let* () = Sc_rollup_node.run sc_rollup_node in
 
@@ -2038,7 +2041,7 @@ let register ~protocols =
   test_rollup_node_running protocols ;
   test_rollup_client_gets_address protocols ;
   test_rollup_list protocols ;
-  test_rollup_get_initial_level protocols ;
+  test_rollup_get_genesis_info protocols ;
   test_rollup_get_last_cemented_commitment_hash_with_level protocols ;
   test_rollup_inbox_size protocols ;
   test_rollup_inbox_current_messages_hash protocols ;

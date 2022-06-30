@@ -3025,7 +3025,9 @@ module Sc_rollup : sig
 
       val state_hash : state -> hash Lwt.t
 
-      val initial_state : context -> string -> state Lwt.t
+      val initial_state : context -> state Lwt.t
+
+      val install_boot_sector : state -> string -> state Lwt.t
 
       val is_input_state : state -> input_request Lwt.t
 
@@ -3037,6 +3039,11 @@ module Sc_rollup : sig
 
       val produce_proof :
         context -> input option -> state -> (proof, error) result Lwt.t
+
+      val verify_origination_proof : proof -> string -> bool Lwt.t
+
+      val produce_origination_proof :
+        context -> string -> (proof, error) result Lwt.t
 
       type output_proof
 
@@ -3102,8 +3109,18 @@ module Sc_rollup : sig
         (proof * 'a) option Lwt.t
     end
 
+    type 'a proof = {
+      tree_proof : 'a;
+      given : input option;
+      requested : input_request;
+    }
+
     module Make (C : P) : sig
-      include PVM.S with type context = C.Tree.t and type state = C.tree
+      include
+        PVM.S
+          with type context = C.Tree.t
+           and type state = C.tree
+           and type proof = C.proof proof
 
       val get_tick : state -> Tick.t Lwt.t
 
@@ -3111,6 +3128,14 @@ module Sc_rollup : sig
 
       val get_status : state -> status Lwt.t
     end
+
+    val reference_initial_state_hash : State_hash.t
+
+    module ProtocolImplementation :
+      PVM.S
+        with type context = Context.t
+         and type state = Context.tree
+         and type proof = Context.Proof.tree Context.Proof.t proof
   end
 
   module Wasm_2_0_0PVM : sig
@@ -3166,11 +3191,21 @@ module Sc_rollup : sig
         with type context = Context.t
          and type state = Context.tree
          and type proof = Context.Proof.tree Context.Proof.t proof
+
+    val reference_initial_state_hash : State_hash.t
   end
 
-  module Number_of_messages : Bounded.Int32.S
+  module Number_of_messages : sig
+    include Bounded.Int32.S
 
-  module Number_of_ticks : Bounded.Int32.S
+    val zero : t
+  end
+
+  module Number_of_ticks : sig
+    include Bounded.Int32.S
+
+    val zero : t
+  end
 
   module Commitment : sig
     module Hash : S.HASH
@@ -3189,6 +3224,13 @@ module Sc_rollup : sig
 
     val hash : t -> Hash.t
 
+    val genesis_commitment :
+      origination_level:Raw_level.t -> genesis_state_hash:State_hash.t -> t
+
+    type genesis_info = {level : Raw_level.t; commitment_hash : Hash.t}
+
+    val genesis_info_encoding : genesis_info Data_encoding.t
+
     val get_commitment :
       context -> rollup -> Hash.t -> (t * context) tzresult Lwt.t
 
@@ -3201,7 +3243,8 @@ module Sc_rollup : sig
     kind:Kind.t ->
     boot_sector:string ->
     parameters_ty:Script.lazy_expr ->
-    (t * Z.t * context) tzresult Lwt.t
+    genesis_commitment:Commitment.t ->
+    (t * Z.t * Commitment.Hash.t * context) tzresult Lwt.t
 
   val parameters_type :
     context -> t -> (Script.lazy_expr option * context) tzresult Lwt.t
@@ -3222,10 +3265,14 @@ module Sc_rollup : sig
     | Unencodable of (module PVM_with_proof)
     | Arith_pvm_with_proof of
         (module PVM_with_proof
-           with type proof = Sc_rollup_arith.ProtocolImplementation.proof)
+           with type proof = ArithPVM.ProtocolImplementation.proof)
     | Wasm_2_0_0_pvm_with_proof of
         (module PVM_with_proof
-           with type proof = Sc_rollup_wasm.V2_0_0.ProtocolImplementation.proof)
+           with type proof = Wasm_2_0_0PVM.ProtocolImplementation.proof)
+
+  val wrapped_proof_kind_exn : wrapped_proof -> Kind.t
+
+  val wrapped_proof_module : wrapped_proof -> (module PVM_with_proof)
 
   module Proof : sig
     type t = {pvm_step : wrapped_proof; inbox : Inbox.proof option}
@@ -3237,6 +3284,8 @@ module Sc_rollup : sig
 
       val state : state
     end
+
+    type error += Sc_rollup_proof_check of string
 
     val produce :
       (module PVM_with_context_and_state) ->
@@ -3394,7 +3443,7 @@ module Sc_rollup : sig
 
   val list : context -> t list tzresult Lwt.t
 
-  val initial_level : context -> t -> Raw_level.t tzresult Lwt.t
+  val genesis_info : context -> rollup -> Commitment.genesis_info tzresult Lwt.t
 
   val get_boot_sector : context -> t -> string tzresult Lwt.t
 
@@ -3870,6 +3919,7 @@ and _ manager_operation =
   | Sc_rollup_originate : {
       kind : Sc_rollup.Kind.t;
       boot_sector : string;
+      origination_proof : Sc_rollup.wrapped_proof;
       parameters_ty : Script.lazy_expr;
     }
       -> Kind.sc_rollup_originate manager_operation

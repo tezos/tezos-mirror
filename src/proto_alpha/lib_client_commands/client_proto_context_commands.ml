@@ -2541,7 +2541,7 @@ let commands_rw () =
               "Only implicit accounts can originate smart-contract rollups"
         | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            let (module R : Sc_rollup.PVM.S) = pvm in
+            let (module R : Alpha_context.Sc_rollup.PVM.S) = pvm in
             let Michelson_v1_parser.{expanded; _} = parameters_ty in
             let parameters_ty = Script.lazy_expr expanded in
             boot_sector pvm >>=? fun boot_sector ->

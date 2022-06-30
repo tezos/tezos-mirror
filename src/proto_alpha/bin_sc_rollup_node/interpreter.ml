@@ -81,8 +81,9 @@ module Make (PVM : Pvm.S) : S = struct
               (node_ctxt.cctxt#chain, node_ctxt.cctxt#block)
               node_ctxt.rollup_address
           in
-          let*! initial_state = PVM.initial_state store boot_sector in
-          return initial_state
+          let*! state = PVM.initial_state store in
+          let*! state = PVM.install_boot_sector state boot_sector in
+          return state
       | Some predecessor_state -> return predecessor_state
     in
 

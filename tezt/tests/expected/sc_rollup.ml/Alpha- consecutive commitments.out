@@ -1,8 +1,8 @@
 
 ./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type unit booting with  --burn-cap 9999999
 Node is bootstrapped.
-Estimated gas: 1800.800 units (will add 100 for safety)
-Estimated storage: 6541 bytes added (will add 20 for safety)
+Estimated gas: 2509.140 units (will add 100 for safety)
+Estimated storage: 6626 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
@@ -12,26 +12,27 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000428
+    Fee to the baker: ꜩ0.000614
     Expected counter: 1
-    Gas limit: 1901
-    Storage limit: 6561 bytes
+    Gas limit: 2610
+    Storage limit: 6646 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000428
-      payload fees(the block proposer) ....... +ꜩ0.000428
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000614
+      payload fees(the block proposer) ....... +ꜩ0.000614
     Originate smart contract rollup of kind arith and type unit with boot sector ''
       This smart contract rollup origination was successfully applied
-      Consumed gas: 1800.800
-      Storage size: 6541 bytes
+      Consumed gas: 2509.140
+      Storage size: 6626 bytes
       Address: [SC_ROLLUP_HASH]
+      Genesis commitment hash: [SC_ROLLUP_COMMITMENT_HASH]
       Balance updates:
-        [PUBLIC_KEY_HASH] ... -ꜩ1.63525
-        storage fees ........................... +ꜩ1.63525
+        [PUBLIC_KEY_HASH] ... -ꜩ1.6565
+        storage fees ........................... +ꜩ1.6565
 
 
 ./tezos-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf at inbox level 32 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of messages 0 and number of ticks 0
 Node is bootstrapped.
-Estimated gas: 5330.832 units (will add 100 for safety)
+Estimated gas: 6251.140 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -42,13 +43,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000885
+    Fee to the baker: ꜩ0.000977
     Expected counter: 2
-    Gas limit: 5431
+    Gas limit: 6352
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000885
-      payload fees(the block proposer) ....... +ꜩ0.000885
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000977
+      payload fees(the block proposer) ....... +ꜩ0.000977
     Publish commitment SCORU Commitment:
                          compressed_state: scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf
                          inbox_level: 32
@@ -56,7 +57,7 @@ This sequence of operations was run:
                          number_of_messages: 0
                          number_of_ticks: 0 in the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup commitment publishing was successfully applied
-      Consumed gas: 5330.832
+      Consumed gas: 6251.140
       Hash of commit: [SC_ROLLUP_COMMITMENT_HASH]
       Commitment published at level: 3
       Balance updates:
@@ -66,7 +67,7 @@ This sequence of operations was run:
 
 ./tezos-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf at inbox level 62 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of messages 0 and number of ticks 0
 Node is bootstrapped.
-Estimated gas: 4019.750 units (will add 100 for safety)
+Estimated gas: 4479.904 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -77,13 +78,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000753
+    Fee to the baker: ꜩ0.000799
     Expected counter: 3
-    Gas limit: 4120
+    Gas limit: 4580
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000753
-      payload fees(the block proposer) ....... +ꜩ0.000753
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000799
+      payload fees(the block proposer) ....... +ꜩ0.000799
     Publish commitment SCORU Commitment:
                          compressed_state: scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf
                          inbox_level: 62
@@ -91,7 +92,7 @@ This sequence of operations was run:
                          number_of_messages: 0
                          number_of_ticks: 0 in the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup commitment publishing was successfully applied
-      Consumed gas: 4019.750
+      Consumed gas: 4479.904
       Hash of commit: [SC_ROLLUP_COMMITMENT_HASH]
       Commitment published at level: 4
 

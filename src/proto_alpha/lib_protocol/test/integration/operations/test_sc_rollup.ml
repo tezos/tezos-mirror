@@ -131,14 +131,16 @@ let test_sc_rollups_all_well_defined () =
   all_names_are_valid ()
 
 (** Initializes the context and originates a SCORU. *)
-let sc_originate block contract parameters_ty =
+let sc_originate ?(boot_sector = "") ?origination_proof block contract
+    parameters_ty =
   let kind = Sc_rollup.Kind.Example_arith in
   let* operation, rollup =
     Op.sc_rollup_origination
+      ?origination_proof
       (B block)
       contract
       kind
-      ""
+      boot_sector
       (Script.lazy_expr @@ Expr.from_string parameters_ty)
   in
   let* incr = Incremental.begin_construction block in
@@ -147,12 +149,15 @@ let sc_originate block contract parameters_ty =
   return (block, rollup)
 
 (** Initializes the context and originates a SCORU. *)
-let init_and_originate ?sc_rollup_challenge_window_in_blocks tup parameters_ty =
+let init_and_originate ?boot_sector ?origination_proof
+    ?sc_rollup_challenge_window_in_blocks tup parameters_ty =
   let* block, contracts =
     context_init ?sc_rollup_challenge_window_in_blocks tup
   in
   let contract = Context.tup_hd tup contracts in
-  let* block, rollup = sc_originate block contract parameters_ty in
+  let* block, rollup =
+    sc_originate ?boot_sector ?origination_proof block contract parameters_ty
+  in
   return (block, contracts, rollup)
 
 let number_of_messages_exn n =
@@ -167,10 +172,15 @@ let number_of_ticks_exn n =
 
 let dummy_commitment ctxt rollup =
   let ctxt = Incremental.alpha_ctxt ctxt in
-  let*! root_level = Sc_rollup.initial_level ctxt rollup in
-  let root_level =
-    match root_level with Ok v -> v | Error _ -> assert false
+  let* genesis_info =
+    Sc_rollup.genesis_info ctxt rollup >|= Environment.wrap_tzresult
   in
+  let predecessor = genesis_info.commitment_hash in
+  let* {compressed_state; _}, ctxt =
+    Sc_rollup.Commitment.get_commitment ctxt rollup genesis_info.commitment_hash
+    >|= Environment.wrap_tzresult
+  in
+  let root_level = genesis_info.level in
   let inbox_level =
     let commitment_freq =
       Constants_storage.sc_rollup_commitment_period_in_blocks
@@ -182,11 +192,11 @@ let dummy_commitment ctxt rollup =
   return
     Sc_rollup.Commitment.
       {
-        predecessor = Sc_rollup.Commitment.Hash.zero;
+        predecessor;
         inbox_level;
         number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 3000l;
-        compressed_state = Sc_rollup.State_hash.zero;
+        compressed_state;
       }
 
 (* Verify that parameters and unparsed parameters match. *)
@@ -736,6 +746,48 @@ let test_originating_with_invalid_types () =
   in
   (* Operation fails with a different error as it's not "passable". *)
   assert_fails ~loc:__LOC__ (sc_originate block contract "operation")
+
+let test_originating_with_invalid_boot_sector_proof () =
+  let*! origination_proof =
+    Sc_rollup_helpers.origination_proof
+      ~boot_sector:"a boot sector"
+      Sc_rollup.Kind.Example_arith
+  in
+  let*! res =
+    init_and_originate
+      ~boot_sector:"another boot sector"
+      ~origination_proof
+      Context.T1
+      "unit"
+  in
+  match res with
+  | Error
+      (Environment.Ecoproto_error (Sc_rollup.Proof.Sc_rollup_proof_check _ as e)
+      :: _) ->
+      Assert.test_error_encodings e ;
+      return_unit
+  | _ -> failwith "It should have failed with [Sc_rollup_proof_check]"
+
+let test_originating_with_invalid_kind_proof () =
+  let*! origination_proof =
+    Sc_rollup_helpers.origination_proof
+      ~boot_sector:"a boot sector"
+      Sc_rollup.Kind.Wasm_2_0_0
+  in
+  let*! res =
+    init_and_originate
+      ~boot_sector:"a boot sector"
+      ~origination_proof
+      Context.T1
+      "unit"
+  in
+  match res with
+  | Error
+      (Environment.Ecoproto_error (Sc_rollup.Proof.Sc_rollup_proof_check _ as e)
+      :: _) ->
+      Assert.test_error_encodings e ;
+      return_unit
+  | _ -> failwith "It should have failed with [Sc_rollup_proof_check]"
 
 let assert_equal_expr ~loc e1 e2 =
   let s1 = Format.asprintf "%a" Michelson_v1_printer.print_expr e1 in
@@ -1369,6 +1421,14 @@ let tests =
       "originating with invalid types"
       `Quick
       test_originating_with_invalid_types;
+    Tztest.tztest
+      "originating with invalid boot sector proof"
+      `Quick
+      test_originating_with_invalid_boot_sector_proof;
+    Tztest.tztest
+      "originating with invalid kind proof"
+      `Quick
+      test_originating_with_invalid_kind_proof;
     Tztest.tztest
       "originating with valid type"
       `Quick

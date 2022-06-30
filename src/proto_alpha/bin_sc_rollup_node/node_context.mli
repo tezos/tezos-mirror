@@ -37,8 +37,8 @@ type t = {
       (** Smart contract rollup tracked by the rollup node. *)
   operator : Signature.Public_key_hash.t;
       (** Address of the rollup node operator. *)
-  initial_level : Raw_level.t;
-      (** Origination level of the smart contract rollup. *)
+  genesis_info : Sc_rollup.Commitment.genesis_info;
+      (** Origination information of the smart contract rollup. *)
   block_finality_time : int;
       (** Deterministic block finality time for the layer 1 protocol. *)
   kind : Sc_rollup.Kind.t;  (** Kind of the smart contract rollup. *)

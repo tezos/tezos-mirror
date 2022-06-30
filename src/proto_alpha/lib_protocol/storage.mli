@@ -715,10 +715,10 @@ module Sc_rollup : sig
        and type value = Script_repr.lazy_expr
        and type t := Raw_context.t
 
-  module Initial_level :
+  module Genesis_info :
     Indexed_data_storage
       with type key = Sc_rollup_repr.t
-       and type value = Raw_level_repr.t
+       and type value = Sc_rollup_commitment_repr.genesis_info
        and type t := Raw_context.t
 
   module Inbox :

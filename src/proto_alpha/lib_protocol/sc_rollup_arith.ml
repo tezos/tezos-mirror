@@ -26,6 +26,33 @@
 open Sc_rollup_repr
 module PS = Sc_rollup_PVM_sem
 
+(*
+  This is the state hash of reference that both the prover of the node
+  and the verifier of the protocol {!ProtocolImplementation} have to
+  agree on (if they do, it means they are using the same tree
+  structure).
+
+  We have to hard-code this value because the Arith PVM uses Irmin as
+  its Merkle proof verification backend, and the economic protocol
+  cannot create an empty Irmin context. Such a context is required to
+  create an empty tree, itself required to create the initial state of
+  the Arith PVM.
+
+  Utlimately, the value of this constant is decided by the prover of
+  reference (the only need is for it to be compatible with
+  {!ProtocolImplementation}.)
+
+  Its value is the result of the following snippet
+
+  {|
+  let*! state = Prover.initial_state context in
+  Prover.state_hash state
+  |}
+*)
+let reference_initial_state_hash =
+  State_hash.of_b58check_exn
+    "scs11cXwQJJ5dkpEQGq3x2MJm3cM73cbEkHJqo5eDSoRpHUPyEQLB4"
+
 module type P = sig
   module Tree : Context.TREE with type key = string list and type value = bytes
 
@@ -87,29 +114,37 @@ module type S = sig
   val get_is_stuck : state -> string option Lwt.t
 end
 
+type 'a proof = {
+  tree_proof : 'a;
+  given : Sc_rollup_PVM_sem.input option;
+  requested : Sc_rollup_PVM_sem.input_request;
+}
+
+let proof_encoding : 'a Data_encoding.t -> 'a proof Data_encoding.t =
+ fun encoding ->
+  let open Data_encoding in
+  conv
+    (fun {tree_proof; given; requested} -> (tree_proof, given, requested))
+    (fun (tree_proof, given, requested) -> {tree_proof; given; requested})
+    (obj3
+       (req "tree_proof" encoding)
+       (req "given" (option PS.input_encoding))
+       (req "requested" PS.input_request_encoding))
+
 module Make (Context : P) :
-  S with type context = Context.Tree.t and type state = Context.tree = struct
+  S
+    with type context = Context.Tree.t
+     and type state = Context.tree
+     and type proof = Context.proof proof = struct
   module Tree = Context.Tree
 
   type context = Context.Tree.t
 
   type hash = State_hash.t
 
-  type proof = {
-    tree_proof : Context.proof;
-    given : PS.input option;
-    requested : PS.input_request;
-  }
+  type nonrec proof = Context.proof proof
 
-  let proof_encoding =
-    let open Data_encoding in
-    conv
-      (fun {tree_proof; given; requested} -> (tree_proof, given, requested))
-      (fun (tree_proof, given, requested) -> {tree_proof; given; requested})
-      (obj3
-         (req "tree_proof" Context.proof_encoding)
-         (req "given" (option PS.input_encoding))
-         (req "requested" PS.input_request_encoding))
+  let proof_encoding = proof_encoding Context.proof_encoding
 
   let proof_start_state p = Context.proof_before p.tree_proof
 
@@ -727,11 +762,10 @@ module Make (Context : P) :
 
   open Monad
 
-  let initial_state ctxt boot_sector =
+  let initial_state ctxt =
     let state = Tree.empty ctxt in
     let m =
       let open Monad.Syntax in
-      let* () = Boot_sector.set boot_sector in
       let* () = Status.set Halted in
       return ()
     in
@@ -739,19 +773,19 @@ module Make (Context : P) :
     let* state, _ = run m state in
     return state
 
-  let state_hash state =
+  let install_boot_sector state boot_sector =
     let m =
       let open Monad.Syntax in
-      let* status = Status.get in
-      match status with
-      | Halted -> return State_hash.zero
-      | _ -> return @@ State_hash.context_hash_to_state_hash (Tree.hash state)
+      let* () = Boot_sector.set boot_sector in
+      return ()
     in
     let open Lwt_syntax in
-    let* state = Monad.run m state in
-    match state with
-    | _, Some hash -> return hash
-    | _ -> (* Hash computation always succeeds. *) assert false
+    let* state, _ = run m state in
+    return state
+
+  let state_hash state =
+    let context_hash = Tree.hash state in
+    Lwt.return @@ State_hash.context_hash_to_state_hash context_hash
 
   let boot =
     let open Monad.Syntax in
@@ -1066,6 +1100,32 @@ module Make (Context : P) :
     match result with
     | Some (tree_proof, requested) ->
         return {tree_proof; given = input_given; requested}
+    | None -> fail Arith_proof_production_failed
+
+  let verify_origination_proof proof boot_sector =
+    let open Lwt_syntax in
+    let before = Context.proof_before proof.tree_proof in
+    if State_hash.(before <> reference_initial_state_hash) then return false
+    else
+      let* result =
+        Context.verify_proof proof.tree_proof (fun state ->
+            let* state = install_boot_sector state boot_sector in
+            return (state, ()))
+      in
+      match result with None -> return false | Some (_, ()) -> return true
+
+  let produce_origination_proof context boot_sector =
+    let open Lwt_result_syntax in
+    let*! state = initial_state context in
+    let*! result =
+      Context.produce_proof context state (fun state ->
+          let open Lwt_syntax in
+          let* state = install_boot_sector state boot_sector in
+          return (state, ()))
+    in
+    match result with
+    | Some (tree_proof, ()) ->
+        return {tree_proof; given = None; requested = No_input_required}
     | None -> fail Arith_proof_production_failed
 
   (* TEMPORARY: The following definitions will be extended in a future commit. *)

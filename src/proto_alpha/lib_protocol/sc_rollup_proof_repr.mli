@@ -62,6 +62,8 @@ type t = {
   inbox : Sc_rollup_inbox_repr.proof option;
 }
 
+type error += Sc_rollup_proof_check of string
+
 val encoding : t Data_encoding.t
 
 val pp : Format.formatter -> t -> unit

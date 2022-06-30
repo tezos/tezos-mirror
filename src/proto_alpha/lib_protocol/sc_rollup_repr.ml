@@ -209,17 +209,31 @@ module Index = struct
   let compare = Address.compare
 end
 
-module Number_of_messages = Bounded.Int32.Make (struct
-  let min_int = 0l
+module Number_of_messages = struct
+  include Bounded.Int32.Make (struct
+    let min_int = 0l
 
-  let max_int = 4096l
-  (* TODO: check this is reasonable.
-     See https://gitlab.com/tezos/tezos/-/issues/2373
-  *)
-end)
+    let max_int = 4096l
+    (* TODO: check this is reasonable.
+       See https://gitlab.com/tezos/tezos/-/issues/2373
+    *)
+  end)
 
-module Number_of_ticks = Bounded.Int32.Make (struct
-  let min_int = 0l
+  let zero =
+    match of_int32 0l with
+    | Some zero -> zero
+    | None -> assert false (* unreachable case, since [min_int = 0l] *)
+end
 
-  let max_int = Int32.max_int
-end)
+module Number_of_ticks = struct
+  include Bounded.Int32.Make (struct
+    let min_int = 0l
+
+    let max_int = Int32.max_int
+  end)
+
+  let zero =
+    match of_int32 0l with
+    | Some zero -> zero
+    | None -> assert false (* unreachable case, since [min_int = 0l] *)
+end

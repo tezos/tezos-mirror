@@ -36,7 +36,13 @@ val originate :
   kind:Sc_rollups.Kind.t ->
   boot_sector:string ->
   parameters_ty:Script_repr.lazy_expr ->
-  (Sc_rollup_repr.Address.t * Z.t * Raw_context.t) tzresult Lwt.t
+  genesis_commitment:Sc_rollup_commitment_repr.t ->
+  (Sc_rollup_repr.Address.t
+  * Z.t
+  * Sc_rollup_commitment_repr.Hash.t
+  * Raw_context.t)
+  tzresult
+  Lwt.t
 
 (** [kind context address] returns the kind of the given rollup [address] iff
     [address] is an existing rollup. Fails with an [Sc_rollup_does_not_exist]
@@ -45,10 +51,12 @@ val kind : Raw_context.t -> Sc_rollup_repr.t -> Sc_rollups.Kind.t tzresult Lwt.t
 
 val list : Raw_context.t -> Sc_rollup_repr.t list tzresult Lwt.t
 
-(** [initial_level ctxt sc_rollup] returns the level at which a [sc_rollup] was
-   originated. *)
-val initial_level :
-  Raw_context.t -> Sc_rollup_repr.t -> Raw_level_repr.t tzresult Lwt.t
+(** [genesis_info ctxt sc_rollup] returns the level at which a [sc_rollup] was
+   originated, and its genesis commitment hash. *)
+val genesis_info :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  Sc_rollup_commitment_repr.genesis_info tzresult Lwt.t
 
 (** [get_boot_sector ctxt sc_rollup] retrieves the boot sector for [sc_rollup]. *)
 val get_boot_sector : Raw_context.t -> Sc_rollup_repr.t -> string tzresult Lwt.t

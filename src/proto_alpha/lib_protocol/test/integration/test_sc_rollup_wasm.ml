@@ -113,7 +113,8 @@ let should_boot () =
   let open Lwt_result_syntax in
   let*! index = Context_binary.init "/tmp" in
   let context = Context_binary.empty index in
-  let*! s = Prover.initial_state context "" in
+  let*! s = Prover.initial_state context in
+  let*! s = Prover.install_boot_sector s "" in
   let*! s = Prover.eval s in
   let*! p_res = Prover.produce_proof context None s in
   match p_res with

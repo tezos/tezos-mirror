@@ -520,6 +520,7 @@ val sc_rollup_origination :
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:counter ->
+  ?origination_proof:Sc_rollup.wrapped_proof ->
   Context.t ->
   Contract.t ->
   Sc_rollup.Kind.t ->

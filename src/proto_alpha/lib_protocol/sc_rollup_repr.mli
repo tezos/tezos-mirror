@@ -82,14 +82,22 @@ end
     dispute.
 
     See also {!Commitment_repr.}. *)
-module Number_of_messages : Bounded.Int32.S
+module Number_of_messages : sig
+  include Bounded.Int32.S
+
+  val zero : t
+end
 
 (** Number of ticks computed by a single commitment. This represents a claim
     about the state of the PVM, which can be disputed as part of a commitment
     dispute.
 
     See also {!Commitment_repr.}. *)
-module Number_of_ticks : Bounded.Int32.S
+module Number_of_ticks : sig
+  include Bounded.Int32.S
+
+  val zero : t
+end
 
 (** A smart contract rollup is identified by its address. *)
 type t = Address.t

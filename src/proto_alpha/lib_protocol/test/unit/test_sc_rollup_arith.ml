@@ -106,7 +106,8 @@ let setup boot_sector f =
   let open Lwt_syntax in
   let* index = Context_binary.init "/tmp" in
   let ctxt = Context_binary.empty index in
-  let* state = initial_state ctxt boot_sector in
+  let* state = initial_state ctxt in
+  let* state = install_boot_sector state boot_sector in
   f ctxt state
 
 let pre_boot boot_sector f =
@@ -426,6 +427,22 @@ let test_invalid_outbox_level () =
   ]
   |> List.iter_es (test_output_messages_proofs ~valid:false ~inbox_level)
 
+let test_initial_state_hash_arith_pvm () =
+  let open Alpha_context in
+  let open Lwt_result_syntax in
+  let context = Tezos_context_memory.make_empty_context () in
+  let*! state = Sc_rollup_helpers.Arith_pvm.initial_state context in
+  let*! hash = Sc_rollup_helpers.Arith_pvm.state_hash state in
+  let expected = Sc_rollup.ArithPVM.reference_initial_state_hash in
+  if Sc_rollup.State_hash.(hash = expected) then return_unit
+  else
+    failwith
+      "incorrect hash, expected %a, got %a"
+      Sc_rollup.State_hash.pp
+      expected
+      Sc_rollup.State_hash.pp
+      hash
+
 let tests =
   [
     Tztest.tztest "PreBoot" `Quick test_preboot;
@@ -436,4 +453,8 @@ let tests =
     Tztest.tztest "Valid output messages" `Quick test_valid_output_messages;
     Tztest.tztest "Invalid output messages" `Quick test_invalid_output_messages;
     Tztest.tztest "Invalid outbox level" `Quick test_invalid_outbox_level;
+    Tztest.tztest
+      "Initial state hash for Arith"
+      `Quick
+      test_initial_state_hash_arith_pvm;
   ]

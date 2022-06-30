@@ -126,8 +126,23 @@ module type S = sig
   val get_is_stuck : state -> string option Lwt.t
 end
 
+type 'a proof = {
+  tree_proof : 'a;
+  given : Sc_rollup_PVM_sem.input option;
+  requested : Sc_rollup_PVM_sem.input_request;
+}
+
 module ProtocolImplementation :
-  S with type context = Context.t and type state = Context.tree
+  S
+    with type context = Context.t
+     and type state = Context.tree
+     and type proof = Context.Proof.tree Context.Proof.t proof
+
+(** This is the state hash of reference that both the prover of the
+    node and the verifier of the protocol {!ProtocolImplementation}
+    have to agree on (if they do, it means they are using the same
+    tree structure). *)
+val reference_initial_state_hash : Sc_rollup_repr.State_hash.t
 
 module type P = sig
   module Tree : Context.TREE with type key = string list and type value = bytes
@@ -152,4 +167,7 @@ module type P = sig
 end
 
 module Make (Context : P) :
-  S with type context = Context.Tree.t and type state = Context.tree
+  S
+    with type context = Context.Tree.t
+     and type state = Context.tree
+     and type proof = Context.proof proof

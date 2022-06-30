@@ -124,6 +124,7 @@ type _ successful_manager_operation_result =
   | Sc_rollup_originate_result : {
       balance_updates : Receipt.balance_updates;
       address : Sc_rollup.Address.t;
+      genesis_commitment_hash : Sc_rollup.Commitment.Hash.t;
       consumed_gas : Gas.Arith.fp;
       size : Z.t;
     }
@@ -744,9 +745,10 @@ module Manager_result = struct
     make
       ~op_case:Operation.Encoding.Manager_operations.sc_rollup_originate_case
       ~encoding:
-        (obj4
+        (obj5
            (req "balance_updates" Receipt.balance_updates_encoding)
            (req "address" Sc_rollup.Address.encoding)
+           (req "genesis_commitment_hash" Sc_rollup.Commitment.Hash.encoding)
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (req "size" z))
       ~select:(function
@@ -755,12 +757,33 @@ module Manager_result = struct
         | _ -> None)
       ~proj:(function
         | Sc_rollup_originate_result
-            {balance_updates; address; consumed_gas; size} ->
-            (balance_updates, address, consumed_gas, size))
+            {
+              balance_updates;
+              address;
+              genesis_commitment_hash;
+              consumed_gas;
+              size;
+            } ->
+            ( balance_updates,
+              address,
+              genesis_commitment_hash,
+              consumed_gas,
+              size ))
       ~kind:Kind.Sc_rollup_originate_manager_kind
-      ~inj:(fun (balance_updates, address, consumed_gas, size) ->
+      ~inj:
+        (fun ( balance_updates,
+               address,
+               genesis_commitment_hash,
+               consumed_gas,
+               size ) ->
         Sc_rollup_originate_result
-          {balance_updates; address; consumed_gas; size})
+          {
+            balance_updates;
+            address;
+            genesis_commitment_hash;
+            consumed_gas;
+            size;
+          })
 
   let sc_rollup_add_messages_case =
     make

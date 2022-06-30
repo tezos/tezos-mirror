@@ -108,6 +108,12 @@ val wrapped_proof_module : wrapped_proof -> (module PVM_with_proof)
 
 val wrapped_proof_encoding : wrapped_proof Data_encoding.t
 
+(** [wrapped_proof_kind_exn p] returns the kind of the PVM capable of
+    interpreting [p]. Raises {!Invalid_argument} iff [p] is an
+    {!Unencodable} proof (which cannot happen if [p] is constructed by
+    [wrapped_proof_encoding]).  *)
+val wrapped_proof_kind_exn : wrapped_proof -> Kind.t
+
 (** Wrap a PVM module with proof into a [wrapped_proof]. This matches on
     the [name] in the module---if that is recognisable as a [Kind], this
     function will encode and decode to coerce the proof to a proof in

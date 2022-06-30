@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,53 +24,37 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Sc_rollup_errors
-module Store = Storage.Sc_rollup
-module Commitment = Sc_rollup_commitment_repr
-module Commitment_hash = Commitment.Hash
+(** Testing
+    -------
+    Component:    Rollup layer 1 logic
+    Invocation:   dune exec \
+                  src/proto_alpha/lib_protocol/test/unit/main.exe \
+                  -- test "^\[Unit\] sc rollup wasm$"
+    Subject:      Unit test for the Wasm PVM
+*)
 
-let get_commitment_unsafe ctxt rollup commitment =
-  let open Lwt_tzresult_syntax in
-  let* ctxt, res = Store.Commitments.find (ctxt, rollup) commitment in
-  match res with
-  | None -> fail (Sc_rollup_unknown_commitment commitment)
-  | Some commitment -> return (commitment, ctxt)
+open Protocol
+open Alpha_context
 
-let last_cemented_commitment ctxt rollup =
-  let open Lwt_tzresult_syntax in
-  let* ctxt, res = Store.Last_cemented_commitment.find ctxt rollup in
-  match res with
-  | None -> fail (Sc_rollup_does_not_exist rollup)
-  | Some lcc -> return (lcc, ctxt)
+let test_initial_state_hash_wasm_pvm () =
+  let open Lwt_result_syntax in
+  let context = Tezos_context_memory.make_empty_context () in
+  let*! state = Sc_rollup_helpers.Wasm_pvm.initial_state context in
+  let*! hash = Sc_rollup_helpers.Wasm_pvm.state_hash state in
+  let expected = Sc_rollup.Wasm_2_0_0PVM.reference_initial_state_hash in
+  if Sc_rollup.State_hash.(hash = expected) then return_unit
+  else
+    failwith
+      "incorrect hash, expected %a, got %a"
+      Sc_rollup.State_hash.pp
+      expected
+      Sc_rollup.State_hash.pp
+      hash
 
-let get_commitment ctxt rollup commitment =
-  let open Lwt_tzresult_syntax in
-  (* Assert that a last cemented commitment exists. *)
-  let* _lcc, ctxt = last_cemented_commitment ctxt rollup in
-  get_commitment_unsafe ctxt rollup commitment
-
-let last_cemented_commitment_hash_with_level ctxt rollup =
-  let open Lwt_tzresult_syntax in
-  let* commitment_hash, ctxt = last_cemented_commitment ctxt rollup in
-  let+ {inbox_level; _}, ctxt =
-    get_commitment_unsafe ctxt rollup commitment_hash
-  in
-  (commitment_hash, inbox_level, ctxt)
-
-let set_commitment_added ctxt rollup node new_value =
-  let open Lwt_tzresult_syntax in
-  let* ctxt, res = Store.Commitment_added.find (ctxt, rollup) node in
-  match res with
-  | Some old_value ->
-      (* No need to re-add the read value *)
-      return (0, old_value, ctxt)
-  | None ->
-      let* ctxt, size_diff, _was_bound =
-        Store.Commitment_added.add (ctxt, rollup) node new_value
-      in
-      return (size_diff, new_value, ctxt)
-
-let get_predecessor_unsafe ctxt rollup node =
-  let open Lwt_tzresult_syntax in
-  let* commitment, ctxt = get_commitment_unsafe ctxt rollup node in
-  return (commitment.predecessor, ctxt)
+let tests =
+  [
+    Tztest.tztest
+      "initial state hash for Wasm"
+      `Quick
+      test_initial_state_hash_wasm_pvm;
+  ]

@@ -154,7 +154,9 @@ module type S = sig
 
   val state_hash : state -> hash Lwt.t
 
-  val initial_state : context -> string -> state Lwt.t
+  val initial_state : context -> state Lwt.t
+
+  val install_boot_sector : state -> string -> state Lwt.t
 
   val is_input_state : state -> input_request Lwt.t
 
@@ -166,6 +168,11 @@ module type S = sig
 
   val produce_proof :
     context -> input option -> state -> (proof, error) result Lwt.t
+
+  val verify_origination_proof : proof -> string -> bool Lwt.t
+
+  val produce_origination_proof :
+    context -> string -> (proof, error) result Lwt.t
 
   type output_proof
 

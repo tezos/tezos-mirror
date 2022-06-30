@@ -24,6 +24,12 @@
 (*****************************************************************************)
 
 open Protocol
+open Alpha_context
 
 module TxRollupAlias :
   Client_aliases.Alias with type t = Alpha_context.Tx_rollup.t
+
+module ScRollup : sig
+  val origination_proof_exn :
+    boot_sector:string -> Sc_rollup.Kind.t -> Sc_rollup.wrapped_proof Lwt.t
+end

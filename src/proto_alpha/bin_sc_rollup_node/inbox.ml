@@ -55,7 +55,10 @@ module State = struct
            Fortunately this case will only ever be called once when dealing with
            the rollup origination block. After that we would always find an
            inbox. *)
-        Store.Inbox.empty store node_ctxt.rollup_address node_ctxt.initial_level
+        Store.Inbox.empty
+          store
+          node_ctxt.rollup_address
+          node_ctxt.genesis_info.level
     | Some inbox -> return inbox
 
   let history_of_hash store block_hash =
