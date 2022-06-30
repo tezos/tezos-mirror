@@ -1346,6 +1346,9 @@ and logger = {
   klog : 'a 's 'r 'f. ('a, 's, 'r, 'f) klog;
       (** [klog] is called on [KLog] inserted when instrumenting
           continuations. *)
+  ilog : 'a 's 'b 't 'r 'f. ('a, 's, 'b, 't, 'r, 'f) ilog;
+      (** [ilog] is called on [ILog] inserted when instrumenting
+          instructions. *)
 }
 
 and ('a, 's, 'r, 'f) klog =
@@ -1363,6 +1366,11 @@ and ('a, 's, 'r, 'f) klog =
   * Local_gas_counter.local_gas_counter)
   tzresult
   Lwt.t
+
+and ('a, 's, 'b, 't, 'r, 'f) ilog =
+  logger * logging_event ->
+  ('a, 's) stack_ty ->
+  ('a, 's, 'b, 't, 'r, 'f) step_type
 
 and ('a, 's, 'b, 't, 'r, 'f) step_type =
   Local_gas_counter.outdated_context * step_constants ->

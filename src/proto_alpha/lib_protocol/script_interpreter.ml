@@ -627,7 +627,15 @@ module Raw = struct
     | Some gas -> (
         match i with
         | ILog (_, sty, event, logger, k) ->
-            (ilog [@ocaml.tailcall]) (logger, event) sty g gas k ks accu stack
+            (logger.ilog [@ocaml.tailcall])
+              (logger, event)
+              sty
+              g
+              gas
+              k
+              ks
+              accu
+              stack
         | IHalt _ -> (next [@ocaml.tailcall]) g gas ks accu stack
         (* stack ops *)
         | IDrop (_, k) ->
@@ -1591,7 +1599,11 @@ module Raw = struct
             emit_event (ctxt, sc) gas ~event_type ~unparsed_ty ~tag ~event_data
             >>=? fun (accu, ctxt, gas) ->
             (step [@ocaml.tailcall]) (ctxt, sc) gas k ks accu stack)
+end
 
+open Raw
+
+module For_logging = struct
   (*
 
   Zero-cost logging
@@ -1617,7 +1629,7 @@ module Raw = struct
    that starts the evaluation.
 
 *)
-  and ilog :
+  let ilog :
       type a s b t r f.
       logger * logging_event -> (a, s) stack_ty -> (a, s, b, t, r, f) step_type
       =
@@ -1845,11 +1857,7 @@ module Raw = struct
           stack
     | _ -> (step [@ocaml.tailcall]) g gas k ks accu stack
    [@@inline]
-end
 
-open Raw
-
-module For_logging = struct
   let klog :
       type a s r f.
       logger ->

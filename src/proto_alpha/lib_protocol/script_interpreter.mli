@@ -200,5 +200,7 @@ module Internals : sig
 
   module For_logging : sig
     val klog : ('a, 's, 'r, 'f) klog
+
+    val ilog : ('a, 's, 'b, 't, 'r, 'f) ilog
   end
 end
