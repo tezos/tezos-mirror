@@ -505,8 +505,7 @@ module Raw = struct
       let body =
         match logger with
         | None -> b.kinstr
-        | Some logger ->
-            Script_interpreter_logging.log_kinstr logger b.kbef b.kinstr
+        | Some logger -> logger.log_kinstr logger b.kbef b.kinstr
       in
       let ks = instrument @@ KReturn (stack, cont_sty, KCons (k, ks)) in
       (body, ks)
