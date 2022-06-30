@@ -1365,12 +1365,19 @@ module Seed : sig
     context -> seed_computation_status tzresult Lwt.t
 end
 
+(** Big maps are a data structure storing key-value associations, just like
+    regular maps, but here the whole content of the structure is not loaded in
+    memory when interacting with it.
+    They are thus suitable for a Michelson contract, for instance, when there are a
+    lot of bindings, but only a few items are accessed at each contract call. *)
 module Big_map : sig
+  (** A big map is referenced in the storage by its identifier. *)
   module Id : sig
     type t = Lazy_storage_kind.Big_map.Id.t
 
     val encoding : t Data_encoding.t
 
+    (** Big map argument for a RPC call. *)
     val rpc_arg : t RPC_arg.arg
 
     (** In the protocol, to be used in parse_data only *)
@@ -1380,17 +1387,23 @@ module Big_map : sig
     val unparse_to_z : t -> Z.t
   end
 
+  (** Create a fresh big map in the context. *)
   val fresh : temporary:bool -> context -> (context * Id.t) tzresult Lwt.t
 
+  (** Carbonated membership of a key (from its hash) in a big map. *)
   val mem :
     context -> Id.t -> Script_expr_hash.t -> (context * bool) tzresult Lwt.t
 
+  (** Carbonated retrieval of the value associated to a key (from its hash) in
+      a big map, if any. *)
   val get_opt :
     context ->
     Id.t ->
     Script_expr_hash.t ->
     (context * Script.expr option) tzresult Lwt.t
 
+  (** Carbonated retrieval of the key and value types of the bindings in a big
+      map referenced by its identifier, if this identifier is actually bound to a big map in the context. *)
   val exists :
     context ->
     Id.t ->
@@ -1411,14 +1424,18 @@ module Big_map : sig
     Id.t ->
     (context * (Script_expr_hash.t * Script.expr) list) tzresult Lwt.t
 
+  (** The type of big map updates. When [value = None], the potential binding
+      associated to the [key] will be removed. *)
   type update = {
     key : Script_repr.expr;
+        (** The key is ignored by an update but is shown in the receipt. *)
     key_hash : Script_expr_hash.t;
     value : Script_repr.expr option;
   }
 
   type updates = update list
 
+  (** The types of keys and values in a big map. *)
   type alloc = {key_type : Script_repr.expr; value_type : Script_repr.expr}
 end
 
