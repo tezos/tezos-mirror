@@ -172,10 +172,10 @@ type _ successful_internal_operation_result =
     }
       -> Kind.event successful_internal_operation_result
 
-type packed_successful_internal_manager_operation_result =
+type packed_successful_internal_operation_result =
   | Successful_internal_operation_result :
       'kind successful_internal_operation_result
-      -> packed_successful_internal_manager_operation_result
+      -> packed_successful_internal_operation_result
 
 type 'kind internal_manager_operation_result =
   ( 'kind,
@@ -500,7 +500,7 @@ module Internal_manager_result = struct
         encoding : 'a Data_encoding.t;
         kind : 'kind Kind.manager;
         select :
-          packed_successful_internal_manager_operation_result ->
+          packed_successful_internal_operation_result ->
           'kind successful_internal_operation_result option;
         proj : 'kind successful_internal_operation_result -> 'a;
         inj : 'a -> 'kind successful_internal_operation_result;
