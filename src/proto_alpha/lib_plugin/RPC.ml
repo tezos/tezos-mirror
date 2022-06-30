@@ -522,7 +522,17 @@ module Scripts = struct
       in
       let klog = Script_interpreter.Internals.For_logging.klog in
       let ilog = Script_interpreter.Internals.For_logging.ilog in
-      {log_exit; log_entry; log_interp; get_log; log_control; klog; ilog}
+      let log_kinstr = Script_interpreter_logging.log_kinstr in
+      {
+        log_exit;
+        log_entry;
+        log_interp;
+        get_log;
+        log_control;
+        klog;
+        ilog;
+        log_kinstr;
+      }
 
     let execute ctxt step_constants ~script ~entrypoint ~parameter =
       let logger = trace_logger ctxt in

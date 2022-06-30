@@ -44,6 +44,7 @@ let test_context () =
 let logger =
   let klog = Script_interpreter.Internals.For_logging.klog in
   let ilog = Script_interpreter.Internals.For_logging.ilog in
+  let log_kinstr = Script_interpreter_logging.log_kinstr in
   Script_typed_ir.
     {
       log_interp = (fun _ _ _ _ _ -> ());
@@ -53,6 +54,7 @@ let logger =
       get_log = (fun () -> Lwt.return (Ok None));
       klog;
       ilog;
+      log_kinstr;
     }
 
 let run_step ctxt code accu stack =

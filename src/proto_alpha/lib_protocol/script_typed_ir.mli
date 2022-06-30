@@ -1349,6 +1349,8 @@ and logger = {
   ilog : 'a 's 'b 't 'r 'f. ('a, 's, 'b, 't, 'r, 'f) ilog;
       (** [ilog] is called on [ILog] inserted when instrumenting
           instructions. *)
+  log_kinstr : 'a 'b 'c 'd. ('a, 'b, 'c, 'd) log_kinstr;
+      (** [log_kinstr] instruments an instruction with [ILog]. *)
 }
 
 and ('a, 's, 'r, 'f) klog =
@@ -1385,6 +1387,12 @@ and ('a, 's, 'b, 't, 'r, 'f) step_type =
   * Local_gas_counter.local_gas_counter)
   tzresult
   Lwt.t
+
+and ('a, 'b, 'c, 'd) log_kinstr =
+  logger ->
+  ('a, 'b) stack_ty ->
+  ('a, 'b, 'c, 'd) kinstr ->
+  ('a, 'b, 'c, 'd) kinstr
 
 (* ---- Auxiliary types -----------------------------------------------------*)
 and ('ty, 'comparable) ty =
