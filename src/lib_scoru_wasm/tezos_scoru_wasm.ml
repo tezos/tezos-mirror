@@ -56,15 +56,14 @@ end
 module Make (T : Tree.S) : S with type tree = T.tree = struct
   type tree = T.tree
 
-  module Decodings = Decodings.Make (T)
+  module Decodings = Wasm_decodings.Make (T)
 
   let compute_step = Lwt.return
 
-  let set_input_step _ _ = Lwt.return
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3092
-
      Implement handling of input logic.
   *)
+  let set_input_step _ _ = Lwt.return
 
   let get_output _ _ = Lwt.return ""
 
@@ -77,8 +76,8 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
       }
 
   let _module_instance_of_tree modules =
-    Decodings.Tree.Decoding.run (Decodings.module_instance_decoding modules)
+    Decodings.run (Decodings.module_instance_decoding modules)
 
   let _module_instances_of_tree =
-    Decodings.Tree.Decoding.run Decodings.module_instances_decoding
+    Decodings.run Decodings.module_instances_decoding
 end

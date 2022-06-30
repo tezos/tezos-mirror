@@ -23,17 +23,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_webassembly_interpreter.Instance
 open Tezos_webassembly_interpreter
 open Types
 open Data_encoding_utils
 
-module Make (T : Tree.S) = struct
-  module Tree = struct
-    include T
-    module Decoding = Tree_decoding.Make (T)
-  end
+module type S = sig
+  type tree
 
-  open Tree.Decoding
+  type 'a t
+
+  val run : 'a t -> tree -> 'a Lwt.t
+
+  val module_instance_decoding : module_inst Vector.t -> module_inst t
+
+  val module_instances_decoding : module_inst Vector.t t
+end
+
+module Make (T : Tree.S) = struct
+  include Tree_decoding.Make (T)
 
   let list_decoding item_enc =
     let open Syntax in
