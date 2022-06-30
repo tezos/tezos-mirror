@@ -1792,33 +1792,27 @@ module type Logger_base = sig
   val get_log : unit -> execution_trace option tzresult Lwt.t
 end
 
-module Logger = struct
+module Logger (Base : Logger_base) = struct
   open Stack_utils
   open Local_gas_counter
   open Script_interpreter_defs
   open Script_interpreter.Internals.Raw
 
-  (** [log_entry logger ctxt gas instr sty accu stack] simply calls
-    [logger.log_entry] function with the appropriate arguments. Note
-    that [logger] value is only available when logging is enables, so
-    the type system protects us from calling this by mistake.*)
-  let log_entry logger ctxt gas k sty accu stack =
+  (** [log_entry ctxt gas instr sty accu stack] simply calls
+      [Base.log_entry] function with the appropriate arguments. *)
+  let log_entry ctxt gas k sty accu stack =
     let ctxt = Local_gas_counter.update_context gas ctxt in
-    logger.log_entry k ctxt (kinstr_location k) sty (accu, stack)
+    Base.log_entry k ctxt (kinstr_location k) sty (accu, stack)
 
-  (** [log_exit logger ctxt gas loc instr sty accu stack] simply calls
-    [logger.log_exit] function with the appropriate arguments. Note
-    that [logger] value is only available when logging is enables, so
-    the type system protects us from calling this by mistake.*)
-  let log_exit logger ctxt gas loc_prev k sty accu stack =
+  (** [log_exit ctxt gas loc instr sty accu stack] simply calls
+      [Base.log_exit] function with the appropriate arguments. *)
+  let log_exit ctxt gas loc_prev k sty accu stack =
     let ctxt = Local_gas_counter.update_context gas ctxt in
-    logger.log_exit k ctxt loc_prev sty (accu, stack)
+    Base.log_exit k ctxt loc_prev sty (accu, stack)
 
-  (** [log_control logger continuation] simply calls [logger.log_control]
-    function with the appropriate arguments. Note that [logger] value
-    is only available when logging is enables, so the type system
-    protects us from calling this by mistake.*)
-  let log_control logger ks = logger.log_control ks
+  (** [log_control continuation] simply calls [Base.log_control]
+      function with the appropriate arguments. *)
+  let log_control ks = Base.log_control ks
 
   (** [log_kinstr logger sty instr] returns [instr] prefixed by an
       [ILog] instruction to log the first instruction in [instr]. Note
@@ -1947,8 +1941,8 @@ module Logger = struct
    fun (logger, event) sty ((ctxt, _) as g) gas k ks accu stack ->
     (match (k, event) with
     | ILog _, LogEntry -> ()
-    | _, LogEntry -> log_entry logger ctxt gas k sty accu stack
-    | _, LogExit prev_loc -> log_exit logger ctxt gas prev_loc k sty accu stack) ;
+    | _, LogEntry -> log_entry ctxt gas k sty accu stack
+    | _, LogExit prev_loc -> log_exit ctxt gas prev_loc k sty accu stack) ;
     log_next_kinstr logger sty k >>?= fun k ->
     (* We need to match on instructions that create continuations so
        that we can instrument those continuations with [KLog] (see
@@ -2145,7 +2139,7 @@ module Logger = struct
       | None -> assert false
       | Some ty -> ty
     in
-    (match ks with KLog _ -> () | _ -> log_control logger ks) ;
+    (match ks with KLog _ -> () | _ -> log_control ks) ;
     log_next_continuation logger stack_ty ks >>?= function
     | KCons (ki, k) -> (step [@ocaml.tailcall]) g gas ki k accu stack
     | KLoop_in (ki, k) -> (kloop_in [@ocaml.tailcall]) g gas k0 ki k accu stack
@@ -2234,6 +2228,7 @@ module Logger = struct
 end
 
 let make (module Base : Logger_base) =
+  let module Logger = Logger (Base) in
   let open Logger in
   let open Base in
   {
