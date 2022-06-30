@@ -46,7 +46,7 @@ module Delegate_operations = struct
             Consensus_ops.Endorsement)
          (opt "round" int32)
          (req "reception_time" (option Time.System.encoding))
-         (opt "errors" (list error_encoding))
+         (dft "errors" RPC_error.opt_encoding None)
          (dft "included_in_blocks" (list Block_hash.encoding) []))
 
   type t = {
