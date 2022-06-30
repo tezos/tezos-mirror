@@ -1,5 +1,5 @@
 Protocol Jakarta
-==================
+================
 
 **Important**: revision `PtJakarta...nGw` of protocol Jakarta contains
 `two critical bugs <https://research-development.nomadic-labs.com/we-found-two-bugs-in-torus-jakarta.html>`_
