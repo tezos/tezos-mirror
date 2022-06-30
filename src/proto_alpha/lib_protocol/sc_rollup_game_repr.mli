@@ -160,6 +160,10 @@ module V1 : sig
       player will specify, in the next move, a tick count that
       indicates the last of these states that she agrees with.
 
+    - [default_number_of_sections] is the number of sections a bisection should
+      contain in the more general case where we still have sufficiently many
+      disputed ticks.
+
     Invariants:
     -----------
     - [dissection] must contain at least 2 values (normally it will be 32
@@ -175,6 +179,7 @@ module V1 : sig
     level : Raw_level_repr.t;
     pvm_name : string;
     dissection : dissection_chunk list;
+    default_number_of_sections : int;
   }
 
   (** [equal g1 g2] returns [true] iff [g1] is equal to [g2]. *)
@@ -250,6 +255,7 @@ val initial :
   child:Sc_rollup_commitment_repr.t ->
   refuter:Staker.t ->
   defender:Staker.t ->
+  default_number_of_sections:int ->
   t
 
 (** A [step] in the game is either a new dissection (if there are
@@ -300,25 +306,34 @@ val pp_outcome : Format.formatter -> outcome -> unit
 
 val outcome_encoding : outcome Data_encoding.t
 
-(** Checks that the tick count chosen by the current move is one of
+(** Applies the move [refutation] to the game. Checks the move is
+    valid and returns an [Invalid_move] outcome if not.
+
+    In the case of the game continuing, this swaps the current
+    player and updates the [dissection]. In the case of a [Proof]
+    being provided this returns an [outcome]. *)
+val play : t -> refutation -> (outcome, t) Either.t Lwt.t
+
+module Internal_for_tests : sig
+  (** Checks that the tick count chosen by the current move is one of
     the ones in the current dissection. Returns a tuple containing
     the current dissection interval (including the two states) between
     this tick and the next. *)
-val find_choice :
-  t ->
-  Sc_rollup_tick_repr.t ->
-  ( Sc_rollup_repr.State_hash.t option
-    * Sc_rollup_tick_repr.t
-    * Sc_rollup_repr.State_hash.t option
-    * Sc_rollup_tick_repr.t,
-    reason )
-  result
-  Lwt.t
+  val find_choice :
+    t ->
+    Sc_rollup_tick_repr.t ->
+    ( Sc_rollup_repr.State_hash.t option
+      * Sc_rollup_tick_repr.t
+      * Sc_rollup_repr.State_hash.t option
+      * Sc_rollup_tick_repr.t,
+      reason )
+    result
+    Lwt.t
 
-(** We check firstly that [dissection] is the correct length. It must be
-    32 values long, unless the distance between [start_tick] and
-    [stop_tick] is too small to make this possible, in which case it
-    should be as long as possible. (If the distance is one we fail
+  (** We check firstly that [dissection] is the correct length. It must be
+    [default_number_of_sections] values long, unless the distance between
+    [start_tick] and [stop_tick] is too small to make this possible, in which
+    case it should be as long as possible. (If the distance is one we fail
     immediately as there is no possible legal dissection).
 
     Then we check that [dissection] starts at the correct tick and state,
@@ -332,18 +347,12 @@ val find_choice :
     (which are necessary to prevent a 'linear-time game' attack) will
     mean that sometimes the honest play is a dissection with multiple
     [None] states. *)
-val check_dissection :
-  Sc_rollup_repr.State_hash.t option ->
-  Sc_rollup_tick_repr.t ->
-  Sc_rollup_repr.State_hash.t option ->
-  Sc_rollup_tick_repr.t ->
-  dissection_chunk list ->
-  (unit, reason) result Lwt.t
-
-(** Applies the move [refutation] to the game. Checks the move is
-    valid and returns an [Invalid_move] outcome if not.
-
-    In the case of the game continuing, this swaps the current
-    player and updates the [dissection]. In the case of a [Proof]
-    being provided this returns an [outcome]. *)
-val play : t -> refutation -> (outcome, t) Either.t Lwt.t
+  val check_dissection :
+    default_number_of_sections:int ->
+    Sc_rollup_repr.State_hash.t option ->
+    Sc_rollup_tick_repr.t ->
+    Sc_rollup_repr.State_hash.t option ->
+    Sc_rollup_tick_repr.t ->
+    dissection_chunk list ->
+    (unit, reason) result Lwt.t
+end

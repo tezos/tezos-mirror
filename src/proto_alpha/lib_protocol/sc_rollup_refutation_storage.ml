@@ -227,6 +227,10 @@ let init_game ctxt rollup ~refuter ~defender =
       in
       let* ctxt, inbox = Store.Inbox.get ctxt rollup in
       let* kind = Store.PVM_kind.get ctxt rollup in
+      let default_number_of_sections =
+        Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt
+      in
+
       let game =
         Sc_rollup_game_repr.initial
           (Sc_rollup_inbox_repr.take_snapshot inbox)
@@ -235,6 +239,7 @@ let init_game ctxt rollup ~refuter ~defender =
           ~child:child_info
           ~refuter
           ~defender
+          ~default_number_of_sections
       in
       let* ctxt, _ = Store.Game.init (ctxt, rollup) stakers game in
       let* ctxt, _ =

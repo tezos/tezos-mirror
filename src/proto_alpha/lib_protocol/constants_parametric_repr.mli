@@ -100,6 +100,8 @@ type sc_rollup = {
      if it has an associated record of applied messages. *)
   max_active_outbox_levels : int32;
   max_outbox_messages_per_level : int;
+  (* The default number of required sections in a dissection *)
+  number_of_sections_in_dissection : int;
 }
 
 type t = {

@@ -211,6 +211,7 @@ let constants_mainnet =
         max_lookahead_in_blocks = 30_000l;
         max_active_outbox_levels = sc_rollup_max_active_outbox_levels;
         max_outbox_messages_per_level = sc_rollup_max_outbox_messages_per_level;
+        number_of_sections_in_dissection = 32;
       };
   }
 

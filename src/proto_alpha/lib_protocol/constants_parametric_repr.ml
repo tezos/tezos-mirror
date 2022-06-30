@@ -104,6 +104,7 @@ type sc_rollup = {
   max_lookahead_in_blocks : int32;
   max_active_outbox_levels : int32;
   max_outbox_messages_per_level : int;
+  number_of_sections_in_dissection : int;
 }
 
 type t = {
@@ -235,7 +236,8 @@ let sc_rollup_encoding =
         c.commitment_period_in_blocks,
         c.max_lookahead_in_blocks,
         c.max_active_outbox_levels,
-        c.max_outbox_messages_per_level ))
+        c.max_outbox_messages_per_level,
+        c.number_of_sections_in_dissection ))
     (fun ( sc_rollup_enable,
            sc_rollup_origination_size,
            sc_rollup_challenge_window_in_blocks,
@@ -244,7 +246,8 @@ let sc_rollup_encoding =
            sc_rollup_commitment_period_in_blocks,
            sc_rollup_max_lookahead_in_blocks,
            sc_rollup_max_active_outbox_levels,
-           sc_rollup_max_outbox_messages_per_level ) ->
+           sc_rollup_max_outbox_messages_per_level,
+           sc_rollup_number_of_sections_in_dissection ) ->
       {
         enable = sc_rollup_enable;
         origination_size = sc_rollup_origination_size;
@@ -255,8 +258,10 @@ let sc_rollup_encoding =
         max_lookahead_in_blocks = sc_rollup_max_lookahead_in_blocks;
         max_active_outbox_levels = sc_rollup_max_active_outbox_levels;
         max_outbox_messages_per_level = sc_rollup_max_outbox_messages_per_level;
+        number_of_sections_in_dissection =
+          sc_rollup_number_of_sections_in_dissection;
       })
-    (obj9
+    (obj10
        (req "sc_rollup_enable" bool)
        (req "sc_rollup_origination_size" int31)
        (req "sc_rollup_challenge_window_in_blocks" int31)
@@ -265,7 +270,8 @@ let sc_rollup_encoding =
        (req "sc_rollup_commitment_period_in_blocks" int31)
        (req "sc_rollup_max_lookahead_in_blocks" int32)
        (req "sc_rollup_max_active_outbox_levels" int32)
-       (req "sc_rollup_max_outbox_messages_per_level" int31))
+       (req "sc_rollup_max_outbox_messages_per_level" int31)
+       (req "sc_rollup_number_of_sections_in_dissection" uint8))
 
 let encoding =
   let open Data_encoding in

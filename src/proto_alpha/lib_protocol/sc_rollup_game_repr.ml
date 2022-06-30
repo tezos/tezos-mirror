@@ -40,6 +40,7 @@ module V1 = struct
     level : Raw_level_repr.t;
     pvm_name : string;
     dissection : dissection_chunk list;
+    default_number_of_sections : int;
   }
 
   let player_encoding =
@@ -78,6 +79,7 @@ module V1 = struct
         level = level1;
         pvm_name = pvm_name1;
         dissection = dissection1;
+        default_number_of_sections = default_number_of_sections1;
       }
       {
         turn = turn2;
@@ -85,8 +87,10 @@ module V1 = struct
         level = level2;
         pvm_name = pvm_name2;
         dissection = dissection2;
+        default_number_of_sections = default_number_of_sections2;
       } =
     player_equal turn1 turn2
+    && Compare.Int.equal default_number_of_sections1 default_number_of_sections2
     && Sc_rollup_inbox_repr.equal_history_proof inbox_snapshot1 inbox_snapshot2
     && Raw_level_repr.equal level1 level2
     && String.equal pvm_name1 pvm_name2
@@ -111,16 +115,41 @@ module V1 = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {turn; inbox_snapshot; level; pvm_name; dissection} ->
-        (turn, inbox_snapshot, level, pvm_name, dissection))
-      (fun (turn, inbox_snapshot, level, pvm_name, dissection) ->
-        {turn; inbox_snapshot; level; pvm_name; dissection})
-      (obj5
+      (fun {
+             turn;
+             inbox_snapshot;
+             level;
+             pvm_name;
+             dissection;
+             default_number_of_sections;
+           } ->
+        ( turn,
+          inbox_snapshot,
+          level,
+          pvm_name,
+          dissection,
+          default_number_of_sections ))
+      (fun ( turn,
+             inbox_snapshot,
+             level,
+             pvm_name,
+             dissection,
+             default_number_of_sections ) ->
+        {
+          turn;
+          inbox_snapshot;
+          level;
+          pvm_name;
+          dissection;
+          default_number_of_sections;
+        })
+      (obj6
          (req "turn" player_encoding)
          (req "inbox_snapshot" Sc_rollup_inbox_repr.history_proof_encoding)
          (req "level" Raw_level_repr.encoding)
          (req "pvm_name" string)
-         (req "dissection" dissection_encoding))
+         (req "dissection" dissection_encoding)
+         (req "default_number_of_sections" uint8))
 
   let pp_dissection ppf d =
     Format.pp_print_list
@@ -227,7 +256,8 @@ end
 let make_chunk state_hash tick = {state_hash; tick}
 
 let initial inbox ~pvm_name ~(parent : Sc_rollup_commitment_repr.t)
-    ~(child : Sc_rollup_commitment_repr.t) ~refuter ~defender =
+    ~(child : Sc_rollup_commitment_repr.t) ~refuter ~defender
+    ~default_number_of_sections =
   let ({alice; _} : Index.t) = Index.make refuter defender in
   let alice_to_play = Staker.equal alice refuter in
   let open Sc_rollup_tick_repr in
@@ -249,6 +279,7 @@ let initial inbox ~pvm_name ~(parent : Sc_rollup_commitment_repr.t)
           make_chunk (Some child.compressed_state) tick;
           make_chunk None (next tick);
         ]);
+    default_number_of_sections;
   }
 
 type step =
@@ -421,16 +452,18 @@ let check pred reason =
   let open Lwt_result_syntax in
   if pred then return () else invalid_move reason
 
-let check_dissection start start_tick stop stop_tick dissection =
+let check_dissection ~default_number_of_sections start start_tick stop stop_tick
+    dissection =
   let open Lwt_result_syntax in
   let len = Z.of_int @@ List.length dissection in
   let dist = Sc_rollup_tick_repr.distance start_tick stop_tick in
   let should_be_equal_to what =
     Format.asprintf "The number of sections must be equal to %a" Z.pp_print what
   in
+  let num_sections = Z.of_int @@ default_number_of_sections in
   let* () =
-    if Z.(geq dist (of_int 32)) then
-      check Z.(equal len (of_int 32)) (should_be_equal_to (Z.of_int 32))
+    if Z.geq dist num_sections then
+      check Z.(equal len num_sections) (should_be_equal_to num_sections)
     else if Z.(gt dist one) then
       check Z.(equal len (succ dist)) (should_be_equal_to Z.(succ dist))
     else
@@ -545,7 +578,15 @@ let play game refutation =
     in
     match refutation.step with
     | Dissection states ->
-        let* () = check_dissection start start_tick stop stop_tick states in
+        let* () =
+          check_dissection
+            ~default_number_of_sections:game.default_number_of_sections
+            start
+            start_tick
+            stop
+            stop_tick
+            states
+        in
         return
           (Either.Right
              {
@@ -554,6 +595,7 @@ let play game refutation =
                level = game.level;
                pvm_name = game.pvm_name;
                dissection = states;
+               default_number_of_sections = game.default_number_of_sections;
              })
     | Proof proof ->
         let* () =
@@ -576,3 +618,9 @@ let play game refutation =
   match result with
   | Ok x -> Lwt.return x
   | Error reason -> Lwt.return @@ Either.Left {loser = game.turn; reason}
+
+module Internal_for_tests = struct
+  let find_choice = find_choice
+
+  let check_dissection = check_dissection
+end

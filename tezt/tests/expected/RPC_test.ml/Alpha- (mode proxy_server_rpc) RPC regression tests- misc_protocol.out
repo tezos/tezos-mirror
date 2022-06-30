@@ -55,7 +55,8 @@
   "sc_rollup_commitment_period_in_blocks": 30,
   "sc_rollup_max_lookahead_in_blocks": 30000,
   "sc_rollup_max_active_outbox_levels": 20160,
-  "sc_rollup_max_outbox_messages_per_level": 100 }
+  "sc_rollup_max_outbox_messages_per_level": 100,
+  "sc_rollup_number_of_sections_in_dissection": 32 }
 
 ./tezos-client rpc get /chains/main/blocks/head/helpers/baking_rights
 [ { "level": 3, "delegate": "[PUBLIC_KEY_HASH]",

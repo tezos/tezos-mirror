@@ -97,13 +97,29 @@ let tick_of_int_exn n =
 let tick_to_int_exn t =
   match Tick.to_int t with None -> assert false | Some n -> n
 
+(* Default number of sections in a dissection *)
+let gen_num_sections =
+  let open Tezos_protocol_alpha_parameters.Default_parameters in
+  let testnet = constants_test.sc_rollup.number_of_sections_in_dissection in
+  let mainnet = constants_mainnet.sc_rollup.number_of_sections_in_dissection in
+  let sandbox = constants_sandbox.sc_rollup.number_of_sections_in_dissection in
+  QCheck2.Gen.(
+    frequency
+      [
+        (5, pure mainnet);
+        (4, pure testnet);
+        (2, pure sandbox);
+        (1, int_range 4 100);
+      ])
+
 let mk_dissection_chunk (state_hash, tick) = Game.{state_hash; tick}
 
-let random_dissection start_at start_hash stop_at stop_hash =
+let random_dissection ~default_number_of_sections start_at start_hash stop_at
+    stop_hash =
   let start_int = tick_to_int_exn start_at in
   let stop_int = tick_to_int_exn stop_at in
   let dist = stop_int - start_int in
-  let branch = min (dist + 1) 32 in
+  let branch = min (dist + 1) default_number_of_sections in
   let size = (dist + 1) / (branch - 1) in
 
   if dist = 1 then return None
@@ -530,17 +546,19 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
     loop from_state from_tick
 
   (** [dissection_of_section start_tick start_state stop_tick] creates
-     a dissection with at most [32] pieces that are (roughly) equal
+     a dissection with at most {!default_number_of_sections} pieces
+     that are (roughly) equal
      spaced and whose states are computed by running the eval function
      until the correct tick. Note that the last piece can be as much
-     as 31 ticks longer than the others.  *)
-  let dissection_of_section start_tick start_state stop_tick =
+     as {!default_number_of_sections} - 1 ticks longer than the others. *)
+  let dissection_of_section ~default_number_of_sections start_tick start_state
+      stop_tick =
     let start_int = tick_to_int_exn start_tick in
     let stop_int = tick_to_int_exn stop_tick in
     let dist = stop_int - start_int in
     if dist = 1 then return None
     else
-      let branch = min (dist + 1) 32 in
+      let branch = min (dist + 1) default_number_of_sections in
       let size = (dist + 1) / (branch - 1) in
       let tick_list =
         Result.to_option
@@ -588,7 +606,7 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
     | Game.Bob -> if alice_is_refuter then Refuter_wins else Defender_wins
     | Game.Alice -> if alice_is_refuter then Defender_wins else Refuter_wins
 
-  let run ~inbox ~refuter_client ~defender_client =
+  let run ~default_number_of_sections ~inbox ~refuter_client ~defender_client =
     let refuter, (_ : public_key), (_ : Signature.secret_key) =
       Signature.generate_key ()
     in
@@ -608,7 +626,14 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
       get_comm Commitment.Hash.zero 0l 3l number_of_ticks initial_hash
     in
     let initial_game =
-      Game.initial inbox ~pvm_name:PVM.name ~parent ~child ~refuter ~defender
+      Game.initial
+        inbox
+        ~pvm_name:PVM.name
+        ~parent
+        ~child
+        ~refuter
+        ~defender
+        ~default_number_of_sections
     in
     let* outcome =
       let rec loop game refuter_move =
@@ -630,8 +655,9 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
     in
     return outcome
 
-  let random_tick ?(from = 0) () =
-    Option.value ~default:Tick.initial (Tick.of_int (from + Random.int 31))
+  let random_tick ?(from = 0) ~into () =
+    return
+    @@ Option.value ~default:Tick.initial (Tick.of_int (from + Random.int into))
 
   (**
   checks that the stop state of a section conflicts with the one computed by the
@@ -658,7 +684,7 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
     the given modified states.
     If the length is longer it creates a random decision and outputs a Refine
      decision with this dissection.*)
-  let random_decision d =
+  let random_decision ~default_number_of_sections d =
     let number_of_somes =
       List.length
         (List.filter (fun {Game.state_hash; _} -> Option.is_some state_hash) d)
@@ -676,7 +702,12 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
     in
     let stop_hash = Some (random_hash ()) in
     let* random_dissection =
-      random_dissection start start_hash stop stop_hash
+      random_dissection
+        ~default_number_of_sections
+        start
+        start_hash
+        stop
+        stop_hash
     in
 
     match random_dissection with
@@ -730,9 +761,8 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
   many pieces and returns
    a move with a Refine type conflict_resolution_step.
    *)
-  let next_move dissection =
+  let next_move ~default_number_of_sections dissection =
     let* conflict = find_conflict dissection in
-
     match conflict with
     | Some ((_, start_tick), (_, next_tick)) ->
         let* start_state, (_ : Tick.t) =
@@ -741,7 +771,12 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
         let* next_dissection =
           match start_state with
           | None -> return None
-          | Some s -> dissection_of_section start_tick s next_tick
+          | Some s ->
+              dissection_of_section
+                ~default_number_of_sections
+                start_tick
+                s
+                next_tick
         in
         let* stop_state, (_ : Tick.t) =
           match start_state with
@@ -792,7 +827,11 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
 
     let next_move (game : Game.t) =
       let dissection = game.dissection in
-      let* mv = next_move dissection in
+      let* mv =
+        next_move
+          ~default_number_of_sections:game.default_number_of_sections
+          dissection
+      in
       match mv with Some move -> return (Some move) | None -> return None
     in
     {initial; next_move}
@@ -801,24 +840,40 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
      MachineDirected it uses the above constructions.  If the strategy
      is random then it uses a random section for the initial
      commitments and the random decision for the next move. *)
-  let player_from_strategy = function
+  let player_from_strategy ~default_number_of_sections = function
     | Random ->
         let initial =
           let random_state = PVM.Utils.default_state in
           let* stop_hash = PVM.state_hash random_state in
-          let random_tick = random_tick ~from:1 () in
+          let* random_tick =
+            random_tick ~from:1 ~into:(default_number_of_sections - 1) ()
+          in
           return (Some (random_tick, stop_hash))
         in
-        {initial; next_move = (fun game -> random_decision game.dissection)}
+        {
+          initial;
+          next_move =
+            (fun game ->
+              random_decision
+                ~default_number_of_sections:game.default_number_of_sections
+                game.dissection);
+        }
     | MachineDirected -> machine_directed
 
   (** [test_strategies defender_strategy refuter_strategy expectation inbox]
       runs a game based oin the two given strategies and checks that the
       resulting outcome fits the expectations. *)
-  let test_strategies defender_strategy refuter_strategy expectation inbox =
-    let defender_client = player_from_strategy defender_strategy in
-    let refuter_client = player_from_strategy refuter_strategy in
-    let* outcome = run ~inbox ~defender_client ~refuter_client in
+  let test_strategies ~default_number_of_sections defender_strategy
+      refuter_strategy expectation inbox =
+    let defender_client =
+      player_from_strategy ~default_number_of_sections defender_strategy
+    in
+    let refuter_client =
+      player_from_strategy ~default_number_of_sections refuter_strategy
+    in
+    let* outcome =
+      run ~default_number_of_sections ~inbox ~defender_client ~refuter_client
+    in
     return (expectation outcome)
 
   (** the possible expectation functions *)
@@ -830,31 +885,50 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
 end
 
 (** The following are the possible combinations of strategies. *)
-let perfect_perfect (module P : TestPVM) inbox =
+let perfect_perfect (module P : TestPVM) inbox ~default_number_of_sections =
   let module R = Strategies (P) in
-  R.test_strategies MachineDirected MachineDirected R.defender_wins inbox
+  R.test_strategies
+    ~default_number_of_sections
+    MachineDirected
+    MachineDirected
+    R.defender_wins
+    inbox
 
-let random_random (module P : TestPVM) inbox =
+let random_random (module P : TestPVM) inbox ~default_number_of_sections =
   let module S = Strategies (P) in
-  S.test_strategies Random Random S.all_win inbox
+  S.test_strategies ~default_number_of_sections Random Random S.all_win inbox
 
-let random_perfect (module P : TestPVM) inbox =
+let random_perfect (module P : TestPVM) inbox ~default_number_of_sections =
   let module S = Strategies (P) in
-  S.test_strategies Random MachineDirected S.refuter_wins inbox
+  S.test_strategies
+    Random
+    MachineDirected
+    S.refuter_wins
+    inbox
+    ~default_number_of_sections
 
-let perfect_random (module P : TestPVM) inbox =
+let perfect_random (module P : TestPVM) inbox ~default_number_of_sections =
   let module S = Strategies (P) in
-  S.test_strategies MachineDirected Random S.defender_wins inbox
+  S.test_strategies
+    MachineDirected
+    Random
+    S.defender_wins
+    inbox
+    ~default_number_of_sections
 
 (** This assembles a test from a RandomPVM and a function that chooses the
     type of strategies. *)
 let testing_randomPVM
-    (f : (module TestPVM) -> Inbox.history_proof -> bool Lwt.t) name =
+    (f :
+      (module TestPVM) ->
+      Inbox.history_proof ->
+      default_number_of_sections:int ->
+      bool Lwt.t) name =
   let open QCheck2 in
   Test.make
     ~name
-    Gen.(list_size small_int (int_range 0 100))
-    (fun initial_prog ->
+    Gen.(pair (list_size small_int (int_range 0 100)) gen_num_sections)
+    (fun (initial_prog, default_number_of_sections) ->
       assume (initial_prog <> []) ;
       let rollup = Address.hash_string [""] in
       let level = Raw_level.root in
@@ -866,14 +940,22 @@ let testing_randomPVM
            (module MakeRandomPVM (struct
              let initial_prog = initial_prog
            end))
-           snapshot)
+           snapshot
+           ~default_number_of_sections)
 
 (** This assembles a test from a CountingPVM and a function that
    chooses the type of strategies *)
-let testing_countPVM (f : (module TestPVM) -> Inbox.history_proof -> bool Lwt.t)
-    name =
+let testing_countPVM
+    (f :
+      (module TestPVM) ->
+      Inbox.history_proof ->
+      default_number_of_sections:int ->
+      bool Lwt.t) name =
   let open QCheck2 in
-  Test.make ~name Gen.small_int (fun target ->
+  Test.make
+    ~name
+    Gen.(pair small_int gen_num_sections)
+    (fun (target, default_number_of_sections) ->
       assume (target > 200) ;
       let rollup = Address.hash_string [""] in
       let level = Raw_level.root in
@@ -885,15 +967,20 @@ let testing_countPVM (f : (module TestPVM) -> Inbox.history_proof -> bool Lwt.t)
            (module MakeCountingPVM (struct
              let target = target
            end))
-           snapshot)
+           snapshot
+           ~default_number_of_sections)
 
-let testing_arith (f : (module TestPVM) -> Inbox.history_proof -> bool Lwt.t)
-    name =
+let testing_arith
+    (f :
+      (module TestPVM) ->
+      Inbox.history_proof ->
+      default_number_of_sections:int ->
+      bool Lwt.t) name =
   let open QCheck2 in
   Test.make
     ~name
-    Gen.(pair gen_list small_int)
-    (fun (inputs, evals) ->
+    Gen.(triple gen_list small_int gen_num_sections)
+    (fun (inputs, evals, default_number_of_sections) ->
       assume (evals > 1 && evals < List.length inputs - 1) ;
       let rollup = Address.hash_string [""] in
       let level = Raw_level.root in
@@ -907,9 +994,11 @@ let testing_arith (f : (module TestPVM) -> Inbox.history_proof -> bool Lwt.t)
 
              let evals = evals
            end))
-           snapshot)
+           snapshot
+           ~default_number_of_sections)
 
-let test_random_dissection (module P : TestPVM) start_at length =
+let test_random_dissection (module P : TestPVM) start_at length
+    ~default_number_of_sections =
   let open P in
   let module S = Strategies (P) in
   let section_start_state = Utils.default_state in
@@ -926,7 +1015,11 @@ let test_random_dissection (module P : TestPVM) start_at length =
     match Tick.of_int start_at with None -> assert false | Some x -> x
   in
   let* option_dissection =
-    S.dissection_of_section section_start_at section_start_state section_stop_at
+    S.dissection_of_section
+      ~default_number_of_sections
+      section_start_at
+      section_start_state
+      section_stop_at
   in
   let dissection =
     match option_dissection with
@@ -936,7 +1029,8 @@ let test_random_dissection (module P : TestPVM) start_at length =
   let* start = state_hash section_start_state in
   let stop_hash = Some (aux start) in
   let* check =
-    Game.check_dissection
+    Game.Internal_for_tests.check_dissection
+      ~default_number_of_sections
       (Some start)
       section_start_at
       stop_hash
@@ -950,24 +1044,39 @@ let testDissection =
   [
     Test.make
       ~name:"randomVPN"
-      Gen.(triple (list_size small_int (int_range 0 100)) small_int small_int)
-      (fun (initial_prog, start_at, length) ->
+      Gen.(
+        quad
+          (list_size small_int (int_range 0 100))
+          small_int
+          small_int
+          gen_num_sections)
+      (fun (initial_prog, start_at, length, default_number_of_sections) ->
         assume
           (start_at >= 0 && length > 1
           && List.length initial_prog > start_at + length) ;
         let module P = MakeRandomPVM (struct
           let initial_prog = initial_prog
         end) in
-        Lwt_main.run @@ test_random_dissection (module P) start_at length);
+        Lwt_main.run
+        @@ test_random_dissection
+             (module P)
+             start_at
+             length
+             ~default_number_of_sections);
     Test.make
       ~name:"count"
-      Gen.(triple small_int small_int small_int)
-      (fun (target, start_at, length) ->
+      Gen.(quad small_int small_int small_int gen_num_sections)
+      (fun (target, start_at, length, default_number_of_sections) ->
         assume (start_at >= 0 && length > 1) ;
         let module P = MakeCountingPVM (struct
           let target = target
         end) in
-        Lwt_main.run @@ test_random_dissection (module P) start_at length);
+        Lwt_main.run
+        @@ test_random_dissection
+             (module P)
+             start_at
+             length
+             ~default_number_of_sections);
   ]
 
 let testRandomDissection =
@@ -975,8 +1084,8 @@ let testRandomDissection =
   [
     Test.make
       ~name:"randomdissection"
-      Gen.(pair small_int small_int)
-      (fun (start_int, length) ->
+      Gen.(triple small_int small_int gen_num_sections)
+      (fun (start_int, length, default_number_of_sections) ->
         assume (start_int > 0 && length >= 10) ;
         let testing_lwt =
           let start_at = tick_of_int_exn start_int in
@@ -985,7 +1094,12 @@ let testRandomDissection =
           let stop_hash = Some (random_hash ()) in
 
           let* dissection_opt =
-            random_dissection start_at start_hash stop_at stop_hash
+            random_dissection
+              ~default_number_of_sections
+              start_at
+              start_hash
+              stop_at
+              stop_hash
           in
           let dissection =
             match dissection_opt with None -> assert false | Some d -> d
@@ -996,7 +1110,8 @@ let testRandomDissection =
           in
           let new_hash = aux stop_hash in
           let* check =
-            Game.check_dissection
+            Game.Internal_for_tests.check_dissection
+              ~default_number_of_sections
               (Some start_hash)
               start_at
               new_hash

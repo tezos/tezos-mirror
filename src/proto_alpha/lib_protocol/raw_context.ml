@@ -999,6 +999,8 @@ let prepare_first_block ~level ~timestamp ctxt =
                    WARNING: changing this value impacts the storage cost charged
                    for applying messages from the outbox. *)
                 max_outbox_messages_per_level = 100;
+                (* The default number of required sections in a dissection *)
+                number_of_sections_in_dissection = 32;
               };
           }
       in
