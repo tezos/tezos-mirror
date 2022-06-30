@@ -197,4 +197,8 @@ module Internals : sig
     'a ->
     's ->
     ('r * 'f * context) tzresult Lwt.t
+
+  module For_logging : sig
+    val klog : ('a, 's, 'r, 'f) klog
+  end
 end

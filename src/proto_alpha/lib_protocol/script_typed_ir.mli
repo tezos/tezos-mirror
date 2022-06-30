@@ -1343,7 +1343,26 @@ and logger = {
   get_log : unit -> execution_trace option tzresult Lwt.t;
       (** [get_log] allows to obtain an execution trace, if any was
           produced. *)
+  klog : 'a 's 'r 'f. ('a, 's, 'r, 'f) klog;
+      (** [klog] is called on [KLog] inserted when instrumenting
+          continuations. *)
 }
+
+and ('a, 's, 'r, 'f) klog =
+  logger ->
+  Local_gas_counter.outdated_context * step_constants ->
+  Local_gas_counter.local_gas_counter ->
+  ('a, 's) stack_ty ->
+  ('a, 's, 'r, 'f) continuation ->
+  ('a, 's, 'r, 'f) continuation ->
+  'a ->
+  's ->
+  ('r
+  * 'f
+  * Local_gas_counter.outdated_context
+  * Local_gas_counter.local_gas_counter)
+  tzresult
+  Lwt.t
 
 (* ---- Auxiliary types -----------------------------------------------------*)
 and ('ty, 'comparable) ty =

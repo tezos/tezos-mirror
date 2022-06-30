@@ -156,6 +156,7 @@ let logger () :
   in
   let log_control cont = log := Ctrl cont :: !log in
   let get_log () = return_none in
+  let klog = Script_interpreter.Internals.For_logging.klog in
   let assemble_log () =
     let open Environment.Error_monad in
     let+ l =
@@ -172,7 +173,7 @@ let logger () :
     in
     List.rev l
   in
-  (assemble_log, {log_exit; log_entry; log_interp; get_log; log_control})
+  (assemble_log, {log_exit; log_entry; log_interp; get_log; log_control; klog})
 
 (* [with_logger ~mask f] creates a fresh logger and passes it to [f].
    After [f] finishes, logs are gathered and each occurrence of each

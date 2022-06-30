@@ -42,6 +42,7 @@ let test_context () =
   return (Incremental.alpha_ctxt v)
 
 let logger =
+  let klog = Script_interpreter.Internals.For_logging.klog in
   Script_typed_ir.
     {
       log_interp = (fun _ _ _ _ _ -> ());
@@ -49,6 +50,7 @@ let logger =
       log_exit = (fun _ _ _ _ _ -> ());
       log_control = (fun _ -> ());
       get_log = (fun () -> Lwt.return (Ok None));
+      klog;
     }
 
 let run_step ctxt code accu stack =

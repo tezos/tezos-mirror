@@ -1227,7 +1227,24 @@ and logger = {
   log_control : 'a 's 'b 'f. ('a, 's, 'b, 'f) continuation -> unit;
   log_exit : 'a 's 'b 'f 'c 'u. ('a, 's, 'b, 'f, 'c, 'u) logging_function;
   get_log : unit -> execution_trace option tzresult Lwt.t;
+  klog : 'a 's 'r 'f. ('a, 's, 'r, 'f) klog;
 }
+
+and ('a, 's, 'r, 'f) klog =
+  logger ->
+  Local_gas_counter.outdated_context * step_constants ->
+  Local_gas_counter.local_gas_counter ->
+  ('a, 's) stack_ty ->
+  ('a, 's, 'r, 'f) continuation ->
+  ('a, 's, 'r, 'f) continuation ->
+  'a ->
+  's ->
+  ('r
+  * 'f
+  * Local_gas_counter.outdated_context
+  * Local_gas_counter.local_gas_counter)
+  tzresult
+  Lwt.t
 
 (* ---- Auxiliary types -----------------------------------------------------*)
 and ('ty, 'comparable) ty =
