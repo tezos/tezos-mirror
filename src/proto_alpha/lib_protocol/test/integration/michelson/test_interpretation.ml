@@ -42,8 +42,8 @@ let test_context () =
   return (Incremental.alpha_ctxt v)
 
 let logger =
-  let klog = Script_interpreter.Internals.For_logging.klog in
-  let ilog = Script_interpreter.Internals.For_logging.ilog in
+  let klog = Script_interpreter_logging.klog in
+  let ilog = Script_interpreter_logging.ilog in
   let log_kinstr = Script_interpreter_logging.log_kinstr in
   Script_typed_ir.
     {

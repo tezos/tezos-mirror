@@ -1492,8 +1492,8 @@ let extract_deps (type bef_top bef aft_top aft) ctxt step_constants
   let log_control kont = trace := extract_control_trace kont :: !trace in
   let log_exit _instr _ctxt _log _stack_ty _stack = () in
   let get_log () = Environment.Error_monad.return_none in
-  let klog = Script_interpreter.Internals.For_logging.klog in
-  let ilog = Script_interpreter.Internals.For_logging.ilog in
+  let klog = Script_interpreter_logging.klog in
+  let ilog = Script_interpreter_logging.ilog in
   let log_kinstr = Script_interpreter_logging.log_kinstr in
   let logger =
     {
@@ -1544,8 +1544,8 @@ let extract_deps_continuation (type bef_top bef aft_top aft) ctxt step_constants
   let log_control kont = trace := extract_control_trace kont :: !trace in
   let log_exit _instr _ctxt _log _stack_ty _stack = () in
   let get_log () = Environment.Error_monad.return_none in
-  let klog = Script_interpreter.Internals.For_logging.klog in
-  let ilog = Script_interpreter.Internals.For_logging.ilog in
+  let klog = Script_interpreter_logging.klog in
+  let ilog = Script_interpreter_logging.ilog in
   let log_kinstr = Script_interpreter_logging.log_kinstr in
   let logger =
     {

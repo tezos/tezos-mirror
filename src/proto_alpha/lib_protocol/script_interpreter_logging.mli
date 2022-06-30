@@ -137,3 +137,7 @@ val dipn_stack_ty :
   ('a, 's, 'e, 'z, 'c, 'u, 'd, 'w) stack_prefix_preservation_witness ->
   ('c, 'u) stack_ty ->
   ('a, 's) stack_ty
+
+val klog : ('a, 's, 'r, 'f) klog
+
+val ilog : ('a, 's, 'b, 't, 'r, 'f) ilog

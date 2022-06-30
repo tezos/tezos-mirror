@@ -198,12 +198,6 @@ module Internals : sig
     's ->
     ('r * 'f * context) tzresult Lwt.t
 
-  module For_logging : sig
-    val klog : ('a, 's, 'r, 'f) klog
-
-    val ilog : ('a, 's, 'b, 't, 'r, 'f) ilog
-  end
-
   module Raw : sig
     open Local_gas_counter
     open Script_interpreter_defs
