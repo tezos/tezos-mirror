@@ -22,6 +22,7 @@ depends: [
   "tezos-014-PtKathma-test-helpers"
   "tezos-sapling"
   "tezos-client-014-PtKathma"
+  "tezos-protocol-plugin-014-PtKathma"
   "tezos-protocol-environment"
 ]
 build: [

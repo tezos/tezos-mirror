@@ -21,6 +21,7 @@
   tezos-015-PtLimaPt-test-helpers
   tezos-sapling
   tezos-client-015-PtLimaPt
+  tezos-protocol-plugin-015-PtLimaPt
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
  (flags
@@ -39,4 +40,5 @@
   -open Tezos_crypto
   -open Tezos_micheline
   -open Tezos_015_PtLimaPt_test_helpers
-  -open Tezos_client_015_PtLimaPt))
+  -open Tezos_client_015_PtLimaPt
+  -open Tezos_protocol_plugin_015_PtLimaPt))

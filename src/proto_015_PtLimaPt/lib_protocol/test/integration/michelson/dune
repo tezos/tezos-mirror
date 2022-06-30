@@ -14,6 +14,7 @@
   tezos-micheline
   tezos-benchmark-015-PtLimaPt
   tezos-benchmark-type-inference-015-PtLimaPt
+  tezos-protocol-plugin-015-PtLimaPt
   tezos-protocol-015-PtLimaPt.parameters)
  (flags
   (:standard)
@@ -25,7 +26,8 @@
   -open Tezos_client_015_PtLimaPt
   -open Tezos_micheline
   -open Tezos_benchmark_015_PtLimaPt
-  -open Tezos_benchmark_type_inference_015_PtLimaPt))
+  -open Tezos_benchmark_type_inference_015_PtLimaPt
+  -open Tezos_protocol_plugin_015_PtLimaPt))
 
 (rule
  (alias runtest)
