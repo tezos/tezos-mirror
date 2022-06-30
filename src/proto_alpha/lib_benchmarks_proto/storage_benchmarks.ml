@@ -133,7 +133,7 @@ module Table =
       let encoding = Data_encoding.string
     end)
 
-module List_key_values_benchmark = struct
+module List_key_values_benchmark_boilerplate = struct
   type config = {max_size : int}
 
   let name = "List_key_values"
@@ -162,13 +162,19 @@ module List_key_values_benchmark = struct
 
   let models =
     [
-      ( "list_key_values_step",
+      ( "list_key_values",
         Model.make
           ~conv:(fun {size} -> (size, ()))
           ~model:
-            (Model.linear
+            (Model.affine_split_const
+               ~intercept1:Builtin_benchmarks.timer_variable
+               ~intercept2:(Free_variable.of_string "list_key_values_intercept")
                ~coeff:(Free_variable.of_string "list_key_values_step")) );
     ]
+end
+
+module List_key_values_benchmark = struct
+  include List_key_values_benchmark_boilerplate
 
   let benchmark rng_state {max_size} () =
     let wrap m = m >|= Environment.wrap_tzresult in
@@ -203,13 +209,31 @@ module List_key_values_benchmark = struct
     List.repeat bench_num (benchmark rng_state config)
 end
 
-let register (module BM : Benchmark.S) =
-  Registration_helpers.register (module BM) ;
-  List.iter
-    (fun (_, model) ->
-      Registration_helpers.register_for_codegen
-        BM.name
-        (Model.For_codegen model))
-    BM.models
+module List_key_values_benchmark_intercept = struct
+  include List_key_values_benchmark_boilerplate
 
-let () = register (module List_key_values_benchmark)
+  let name = name ^ "_intercept"
+
+  let benchmark _rng_state _config () =
+    let ctxt =
+      match Lwt_main.run (default_raw_context ()) with
+      | Ok ctxt -> ctxt
+      | _ -> assert false
+    in
+    let workload = {size = 0} in
+    let closure () =
+      (* We pass length [0] so that none of the steps of the fold over the
+         key-value pairs load any values. That is isolate the cost of iterating
+         over the tree without loading values. *)
+      Table.list_key_values ~length:0 ctxt |> Lwt_main.run |> ignore
+    in
+    Generator.Plain {workload; closure}
+
+  let create_benchmarks ~rng_state ~bench_num config =
+    List.repeat bench_num (benchmark rng_state config)
+end
+
+let () = Registration_helpers.register (module List_key_values_benchmark)
+
+let () =
+  Registration_helpers.register (module List_key_values_benchmark_intercept)

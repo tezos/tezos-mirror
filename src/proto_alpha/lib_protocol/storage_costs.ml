@@ -48,5 +48,10 @@ let write_access ~written_bytes =
 *)
 let list_key_values_step_cost = Saturation_repr.safe_int 2
 
+let list_key_values_intercept = Saturation_repr.safe_int 20
+
 let list_key_values_traverse ~size =
-  Saturation_repr.(mul (safe_int size) list_key_values_step_cost)
+  Saturation_repr.(
+    add
+      list_key_values_intercept
+      (mul (safe_int size) list_key_values_step_cost))

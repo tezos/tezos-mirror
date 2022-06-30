@@ -137,6 +137,7 @@ type tag =
   | Carbonated_map
   | Tx_rollup
   | Tickets
+  | Big_map
 
 type list_mode = All | Any | Exactly
 
