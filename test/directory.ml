@@ -73,3 +73,11 @@ let dir = register_describe_directory_service dir describe_service
 let dir =
   register1 dir sum_service (fun xs () () ->
       Lwt.return (`Ok (List.fold_left ( + ) 0 xs)))
+
+let add_tail_conflict () =
+  ignore (register1 dir sum_service (fun _ () () -> assert false))
+
+let add_type_conflict () =
+  ignore
+    (register2 dir alternate_add_service_inverted (fun _ _ () () ->
+         assert false))

@@ -60,6 +60,13 @@ let alternate_add_service' =
     ~error:Json_encoding.empty
     Path.(root / "bar" /: Arg.int /: Arg.float / "add")
 
+let alternate_add_service_inverted =
+  get_service
+    ~query:Query.empty
+    ~output:Json_encoding.float
+    ~error:Json_encoding.empty
+    Path.(root / "bar" /: Arg.float /: Arg.int / "add")
+
 let alternate_add_service_patch =
   post_service
     ~query:Query.empty

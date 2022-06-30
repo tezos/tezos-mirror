@@ -817,6 +817,51 @@ module Make (Encoding : ENCODING) = struct
     !dir
 
   (****************************************************************************
+   * Pretty-printing conflicts
+   ****************************************************************************)
+
+  let string_of_step : step -> string = function
+    | Static s -> s
+    | Dynamic arg -> Format.sprintf "<%s>" arg.name
+    | DynamicTail arg -> Format.sprintf "<%s...>" arg.name
+
+  let string_of_conflict_kind = function
+    | CDir -> "Directory conflict"
+    | CBuilder -> "Builder conflict"
+    | CTail -> "Tail conflict"
+    | CService meth ->
+        Format.sprintf
+          "Service conflict for method %s"
+          (Resto.string_of_meth meth)
+    | CTypes (arg1, arg2) ->
+        Format.sprintf
+          "Type conflict between arguments: found type %s but type %s was \
+           expected"
+          arg2.name
+          arg1.name
+    | CType (arg, names) ->
+        Format.sprintf
+          "Type conflict for %s with argument %s"
+          (String.concat ", " names)
+          arg.name
+
+  let string_of_conflict (steps, kind) =
+    Format.sprintf
+      "%s in /%s"
+      (string_of_conflict_kind kind)
+      (String.concat "/" @@ List.map string_of_step steps)
+
+  (* Register a special printer for conflicts *)
+  let () =
+    Printexc.register_printer @@ function
+    | Conflict (steps, conflict) ->
+        Format.ksprintf
+          Option.some
+          "Conflict in registration of service: %s"
+          (string_of_conflict (steps, conflict))
+    | _ -> None
+
+  (****************************************************************************
    * Let's currify!
    ****************************************************************************)
 

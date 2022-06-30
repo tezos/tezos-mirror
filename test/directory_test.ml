@@ -279,6 +279,50 @@ module Merge = struct
     ]
 end
 
+module Conflicts = struct
+  let test_conflict () =
+    Lwt.return
+    @@ Alcotest.check_raises
+         "conflict is detected"
+         (Fixtures.Directory.Conflict
+            ([Static "foobar"; DynamicTail {name = "int"; descr = None}], CTail))
+         Fixtures.Directory.add_tail_conflict
+
+  let test_print_conflict () =
+    Lwt.return
+    @@
+    try Fixtures.Directory.add_tail_conflict ()
+    with exn ->
+      let exn_str = Stdlib.Printexc.to_string exn in
+      let exn_default_str = Stdlib.Printexc.to_string_default exn in
+      Alcotest.(check @@ neg string)
+        "exception string is not the default"
+        exn_str
+        exn_default_str
+
+  let test_print_conflict_explanation () =
+    Lwt.return
+    @@
+    try Fixtures.Directory.add_type_conflict ()
+    with exn ->
+      let exn_str = Stdlib.Printexc.to_string exn in
+      let expected_str =
+        "Conflict in registration of service: Type conflict between arguments: \
+         found type int but type float was expected in /bar/<float>"
+      in
+      Alcotest.(check @@ string)
+        "exception string is correct explanation"
+        exn_str
+        expected_str
+
+  let tests =
+    [
+      ("conflict is detected", test_conflict);
+      ("conflict is pretty-printed", test_print_conflict);
+      ("conflict is correctly pretty-printed", test_print_conflict_explanation);
+    ]
+end
+
 let () =
   Lwt_main.run
   @@ Alcotest_lwt.run
@@ -286,4 +330,5 @@ let () =
        [
          ("resolve_uri_desc", Util.do_test_lwt Resolve_uri_desc.tests);
          ("merge", Util.do_test_lwt Merge.tests);
+         ("conflicts", Util.do_test_lwt Conflicts.tests);
        ]

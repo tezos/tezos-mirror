@@ -78,8 +78,8 @@ module Make (Encoding : ENCODING) : sig
     | Dynamic of Arg.descr
         (** A chunk which describes a argument to a service *)
     | DynamicTail of Arg.descr
-        (** The remainder of the chunks are to be
-                                   interpreted as a list of arguments *)
+        (** The remainder of the chunks are to be interpreted
+            as a list of arguments *)
 
   (** Possible error while registring services. *)
   type conflict =
@@ -89,6 +89,8 @@ module Make (Encoding : ENCODING) : sig
     | CTail
     | CTypes of Arg.descr * Arg.descr
     | CType of Arg.descr * string list
+
+  exception Conflict of step list * conflict
 
   type ('query, 'input, 'output, 'error) types = {
     query : 'query Resto.Query.t;
@@ -113,6 +115,17 @@ module Make (Encoding : ENCODING) : sig
     [ `Not_found (* 404 *)
     | `Method_not_allowed of meth list (* 405 *)
     | `Cannot_parse_path of string list * Arg.descr * string (* 400 *) ]
+
+  (** [string_of_step step] converts the given [steps] into a string. *)
+  val string_of_step : step -> string
+
+  (** [string_of_conflict_kind conflict_kind] converts the given
+      [conflict_kind] into a string. *)
+  val string_of_conflict_kind : conflict -> string
+
+  (** [string_of_conflict conflict] converts the given [conflict] into
+      a string. *)
+  val string_of_conflict : step list * conflict -> string
 
   (** [lookup d m p] is [Ok (Service _)] if there is a service [s] registered in
       [d] and both the method of [s] is [m] and the path of [s] matches [p]. It is
@@ -197,8 +210,6 @@ module Make (Encoding : ENCODING) : sig
     'a directory ->
     'a directory ->
     'a directory
-
-  exception Conflict of step list * conflict
 
   (** [register d s h] is a directory that contains all the services registered
       in [d] plus the service [s]. Requests to the service [s] are handled by the
