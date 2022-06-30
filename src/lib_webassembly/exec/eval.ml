@@ -140,10 +140,12 @@ let func_type_of = function
   | Func.HostFunc (t, _) -> t
 
 let block_type inst bt =
+  let empty () = Lazy_vector.LwtInt32Vector.create 0l in
+  let singleton i = Lazy_vector.LwtInt32Vector.(create 1l |> set 0l i) in
   match bt with
   | VarBlockType x -> type_ inst x
-  | ValBlockType None -> Lwt.return (FuncType ([], []))
-  | ValBlockType (Some t) -> Lwt.return (FuncType ([], [t]))
+  | ValBlockType None -> FuncType (empty (), empty ()) |> Lwt.return
+  | ValBlockType (Some t) -> FuncType (empty (), singleton t) |> Lwt.return
 
 let take n (vs : 'a stack) at =
   try Lib.List32.take n vs with Failure _ -> Crash.error at "stack underflow"
@@ -198,13 +200,13 @@ let rec step (c : config) : config Lwt.t =
         | Nop, vs -> Lwt.return (vs, [])
         | Block (bt, es'), vs ->
             let+ (FuncType (ts1, ts2)) = block_type frame.inst bt in
-            let n1 = Lib.List32.length ts1 in
-            let n2 = Lib.List32.length ts2 in
+            let n1 = Lazy_vector.LwtInt32Vector.num_elements ts1 in
+            let n2 = Lazy_vector.LwtInt32Vector.num_elements ts2 in
             let args, vs' = (take n1 vs e.at, drop n1 vs e.at) in
             (vs', [Label (n2, [], (args, List.map plain es')) @@ e.at])
         | Loop (bt, es'), vs ->
             let+ (FuncType (ts1, ts2)) = block_type frame.inst bt in
-            let n1 = Lib.List32.length ts1 in
+            let n1 = Lazy_vector.LwtInt32Vector.num_elements ts1 in
             let args, vs' = (take n1 vs e.at, drop n1 vs e.at) in
             (vs', [Label (n1, [e' @@ e.at], (args, List.map plain es')) @@ e.at])
         | If (bt, es1, es2), Num (I32 i) :: vs' ->
@@ -225,9 +227,10 @@ let rec step (c : config) : config Lwt.t =
             let+ func = func frame.inst x in
             (vs, [Invoke func @@ e.at])
         | CallIndirect (x, y), Num (I32 i) :: vs ->
-            let+ func = func_ref frame.inst x i e.at
-            and+ type_ = type_ frame.inst y in
-            if type_ <> Func.type_of func then
+            let* func = func_ref frame.inst x i e.at
+            and* type_ = type_ frame.inst y in
+            let+ check_eq = Types.func_types_equal type_ (Func.type_of func) in
+            if not check_eq then
               (vs, [Trapping "indirect call type mismatch" @@ e.at])
             else (vs, [Invoke func @@ e.at])
         | Drop, v :: vs' -> Lwt.return (vs', [])
@@ -758,7 +761,9 @@ let rec step (c : config) : config Lwt.t =
         Exhaustion.error e.at "call stack exhausted"
     | Invoke func, vs -> (
         let (FuncType (ins, out)) = func_type_of func in
-        let n1, n2 = (Lib.List32.length ins, Lib.List32.length out) in
+        let n1, n2 =
+          (Instance.Vector.num_elements ins, Instance.Vector.num_elements out)
+        in
         let args, vs' = (take n1 vs e.at, drop n1 vs e.at) in
         match func with
         | Func.AstFunc (t, inst', f) ->
@@ -799,9 +804,13 @@ let invoke ?(module_inst = empty_module_inst) ?(input = Input_buffer.alloc ())
     (func : func_inst) (vs : value list) : (module_inst * value list) Lwt.t =
   let at = match func with Func.AstFunc (_, _, f) -> f.at | _ -> no_region in
   let (FuncType (ins, out)) = Func.type_of func in
-  if List.length vs <> List.length ins then
-    Crash.error at "wrong number of arguments" ;
-  if not (List.for_all2 (fun v -> ( = ) (type_of_value v)) vs ins) then
+  let* ins_l = Lazy_vector.LwtInt32Vector.to_list ins in
+  if
+    List.length vs
+    <> (Lazy_vector.LwtInt32Vector.num_elements ins |> Int32.to_int)
+  then Crash.error at "wrong number of arguments" ;
+  (* TODO: tickify? *)
+  if not (List.for_all2 (fun v -> ( = ) (type_of_value v)) vs ins_l) then
     Crash.error at "wrong types of arguments" ;
 
   let c = config ~input module_inst (List.rev vs) [Invoke func @@ at] in
@@ -886,8 +895,9 @@ let create_data (inst : module_inst) (seg : data_segment) : data_inst Lwt.t =
 let add_import (m : module_) (ext : extern) (im : import) (inst : module_inst) :
     module_inst Lwt.t =
   let* t = import_type m im in
+  let* type_match = match_extern_type (extern_type_of ext) t in
   let+ () =
-    if not (match_extern_type (extern_type_of ext) t) then
+    if not type_match then
       let* module_name = Utf8.encode im.it.module_name in
       let+ item_name = Utf8.encode im.it.item_name in
       Link.error

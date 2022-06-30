@@ -48,6 +48,12 @@ type name_step =
   | NKParse of pos * int lazy_vec_kont * int  (** UTF8 char parsing. *)
   | NKStop of Ast.name  (** UTF8 name final step.*)
 
+type func_type_kont =
+  | FKStart
+  | FKIns of Types.value_type lazy_vec_kont
+  | FKOut of Types.value_type Vector.t * Types.value_type lazy_vec_kont
+  | FKStop of Types.func_type
+
 type import_kont =
   | ImpKStart  (** Import parsing starting point. *)
   | ImpKModuleName of name_step
@@ -179,6 +185,8 @@ type module_kont =
       invariants. *)
   | MKStop of Ast.module_' (* TODO (#3120): actually, should be module_ *)
       (** Final step of the parsing, cannot reduce. *)
+  | MKTypes of func_type_kont * pos * size * Ast.type_ lazy_vec_kont
+      (** Function types section parsing. *)
   | MKImport of import_kont * pos * size * Ast.import lazy_vec_kont
       (** Import section parsing. *)
   | MKExport of export_kont * pos * size * Ast.export lazy_vec_kont

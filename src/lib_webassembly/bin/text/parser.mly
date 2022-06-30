@@ -191,18 +191,38 @@ let anon_data (c : context) = anon "data segment" c.datas 1l
 let anon_label (c : context) =
   {c with labels = VarMap.map (Int32.add 1l) c.labels}
 
+(* Lazy vectors construction and manipulation utilities *)
+
+module Vector = Lazy_vector.LwtInt32Vector
+
+let vec_to_list v =
+  (* This is completely safe since the parsed vectors are never partially
+     loaded. *)
+  Stdlib.List.map snd
+    (Vector.loaded_bindings v)
+
+let vec_first_value v =
+  (* This is obviously a nasty trick, but calling `Vector.get 0l` implies going
+     into the Lwt monad. This is safe in the text parser since there won't be
+     partial values that needs to be read fron the KV store. *)
+  Vector.loaded_bindings v |> List.hd |> snd
+
+let eq_ty (FuncType (ins, out)) (FuncType (ins', out')) =
+  vec_to_list ins = vec_to_list ins'
+  && vec_to_list out = vec_to_list out'
 
 let inline_type (c : context) ft at =
-  match Lib.List.index_where (fun ty -> ty.it = ft) c.types.list with
+  match Lib.List.index_where (fun ty -> eq_ty ty.it ft) c.types.list with
   | Some i -> Int32.of_int i @@ at
   | None -> anon_type c (ft @@ at) @@ at
 
 let inline_type_explicit (c : context) x ft at =
-  if ft = FuncType ([], []) then
+  if func_type_empty ft then
     (* Laziness ensures that type lookup is only triggered when
        symbolic identifiers are used, and not for desugared functions *)
-    anon_locals c (lazy (let FuncType (ts, _) = func_type c x in ts))
-  else if ft <> func_type c x then
+    anon_locals c
+      (lazy (let FuncType (ts, _) = func_type c x in vec_to_list ts))
+  else if not (eq_ty ft (func_type c x)) then
     error at "inline function type does not match explicit type";
   x
 
@@ -242,15 +262,15 @@ let to_module_ pm =
     { p_types; p_imports; p_tables; p_memories; p_globals; p_funcs; p_start; p_elems; p_datas;
       p_exports } = pm.it
   in
-  let types = Lazy_vector.LwtInt32Vector.of_list p_types in
-  let imports = Lazy_vector.LwtInt32Vector.of_list p_imports in
-  let tables = Lazy_vector.LwtInt32Vector.of_list p_tables in
-  let memories = Lazy_vector.LwtInt32Vector.of_list p_memories in
-  let globals = Lazy_vector.LwtInt32Vector.of_list p_globals in
-  let funcs = Lazy_vector.LwtInt32Vector.of_list p_funcs in
-  let elems = Lazy_vector.LwtInt32Vector.of_list p_elems in
-  let datas = Lazy_vector.LwtInt32Vector.of_list p_datas in
-  let exports = Lazy_vector.LwtInt32Vector.of_list p_exports in
+  let types = Vector.of_list p_types in
+  let imports = Vector.of_list p_imports in
+  let tables = Vector.of_list p_tables in
+  let memories = Vector.of_list p_memories in
+  let globals = Vector.of_list p_globals in
+  let funcs = Vector.of_list p_funcs in
+  let elems = Vector.of_list p_elems in
+  let datas = Vector.of_list p_datas in
+  let exports = Vector.of_list p_exports in
   {
     types;
     tables;
@@ -367,8 +387,9 @@ value_type_list :
   | value_type value_type_list { $1 :: $2 }
 
 value_type_vector :
-  | /* empty */ { Lazy_vector.LwtInt32Vector.create 0l }
-  | value_type value_type_vector { Lazy_vector.LwtInt32Vector.cons $1 $2 }
+  | /* empty */ { Vector.empty () }
+  | value_type value_type_vector { Vector.cons
+ $1 $2 }
 
 global_type :
   | value_type { GlobalType ($1, Immutable) }
@@ -379,17 +400,18 @@ def_type :
 
 func_type :
   | func_type_result
-    { FuncType ([], $1) }
-  | LPAR PARAM value_type_list RPAR func_type
-    { let FuncType (ins, out) = $5 in FuncType ($3 @ ins, out) }
+    { FuncType (Vector.empty (), $1) }
+  | LPAR PARAM value_type_vector RPAR func_type
+    { let FuncType (ins, out) = $5 in FuncType (Vector.concat $3 ins, out) }
   | LPAR PARAM bind_var value_type RPAR func_type  /* Sugar */
-    { let FuncType (ins, out) = $6 in FuncType ($4 :: ins, out) }
+    { let FuncType (ins, out) = $6 in FuncType (Vector.cons
+ $4 ins, out) }
 
 func_type_result :
   | /* empty */
-    { [] }
-  | LPAR RESULT value_type_list RPAR func_type_result
-    { $3 @ $5 }
+    { Vector.empty () }
+  | LPAR RESULT value_type_vector RPAR func_type_result
+    { Vector.concat $3 $5 }
 
 table_type :
   | limits ref_type { TableType ($1, $2) }
@@ -571,23 +593,24 @@ call_instr_type :
   | type_use call_instr_params
     { let at1 = ati 1 in
       fun c ->
-      match $2 c with
-      | FuncType ([], []) -> $1 c type_
-      | ft -> inline_type_explicit c ($1 c type_) ft at1 }
+      let ft = $2 c in
+      if func_type_empty ft then $1 c type_
+      else inline_type_explicit c ($1 c type_) ft at1 }
   | call_instr_params
     { let at = at () in fun c -> inline_type c ($1 c) at }
 
 call_instr_params :
-  | LPAR PARAM value_type_list RPAR call_instr_params
-    { fun c -> let FuncType (ts1, ts2) = $5 c in FuncType ($3 @ ts1, ts2) }
+  | LPAR PARAM value_type_vector RPAR call_instr_params
+    { fun c -> let FuncType (ts1, ts2) = $5 c in
+               FuncType (Vector.concat $3 ts1, ts2) }
   | call_instr_results
-    { fun c -> FuncType ([], $1 c) }
+    { fun c -> FuncType (Vector.empty (), $1 c) }
 
 call_instr_results :
-  | LPAR RESULT value_type_list RPAR call_instr_results
-    { fun c -> $3 @ $5 c }
+  | LPAR RESULT value_type_vector RPAR call_instr_results
+    { fun c -> Vector.concat $3 ($5 c) }
   | /* empty */
-    { fun c -> [] }
+    { fun c -> Vector.empty () }
 
 
 call_instr_instr :
@@ -602,25 +625,25 @@ call_instr_type_instr :
   | type_use call_instr_params_instr
     { let at1 = ati 1 in
       fun c ->
-      match $2 c with
-      | FuncType ([], []), es -> $1 c type_, es
-      | ft, es -> inline_type_explicit c ($1 c type_) ft at1, es }
+      let ft, es = $2 c in
+      if func_type_empty ft then $1 c type_, es
+      else inline_type_explicit c ($1 c type_) ft at1, es }
   | call_instr_params_instr
     { let at = at () in
       fun c -> let ft, es = $1 c in inline_type c ft at, es }
 
 call_instr_params_instr :
-  | LPAR PARAM value_type_list RPAR call_instr_params_instr
+  | LPAR PARAM value_type_vector RPAR call_instr_params_instr
     { fun c ->
-      let FuncType (ts1, ts2), es = $5 c in FuncType ($3 @ ts1, ts2), es }
+      let FuncType (ts1, ts2), es = $5 c in FuncType (Vector.concat $3 ts1, ts2), es }
   | call_instr_results_instr
-    { fun c -> let ts, es = $1 c in FuncType ([], ts), es }
+    { fun c -> let ts, es = $1 c in FuncType (Vector.empty (), ts), es }
 
 call_instr_results_instr :
-  | LPAR RESULT value_type_list RPAR call_instr_results_instr
-    { fun c -> let ts, es = $5 c in $3 @ ts, es }
+  | LPAR RESULT value_type_vector RPAR call_instr_results_instr
+    { fun c -> let ts, es = $5 c in Vector.concat $3 ts, es }
   | instr
-    { fun c -> [], $1 c }
+    { fun c -> Vector.empty (), $1 c }
 
 
 block_instr :
@@ -645,22 +668,26 @@ block :
       fun c ->
       let bt =
         match fst $1 with
-        | FuncType ([], []) -> ValBlockType None
-        | FuncType ([], [t]) -> ValBlockType (Some t)
+        | ft when func_type_empty ft ->
+           ValBlockType None
+        | FuncType (ins, out)
+             when Vector.num_elements ins = 0l && Vector.num_elements out = 1l ->
+           let t = vec_first_value out in
+           ValBlockType (Some t)
         | ft ->  VarBlockType (inline_type c ft at)
       in bt, snd $1 c }
 
 block_param_body :
   | block_result_body { $1 }
-  | LPAR PARAM value_type_list RPAR block_param_body
+  | LPAR PARAM value_type_vector RPAR block_param_body
     { let FuncType (ins, out) = fst $5 in
-      FuncType ($3 @ ins, out), snd $5 }
+      FuncType (Vector.concat $3 ins, out), snd $5 }
 
 block_result_body :
-  | instr_list { FuncType ([], []), $1 }
-  | LPAR RESULT value_type_list RPAR block_result_body
+  | instr_list { FuncType (Vector.empty (), Vector.empty ()), $1 }
+  | LPAR RESULT value_type_vector RPAR block_result_body
     { let FuncType (ins, out) = fst $5 in
-      FuncType (ins, $3 @ out), snd $5 }
+      FuncType (ins, Vector.concat $3 out), snd $5 }
 
 
 expr :  /* Sugar */
@@ -694,25 +721,26 @@ call_expr_type :
   | type_use call_expr_params
     { let at1 = ati 1 in
       fun c ->
-      match $2 c with
-      | FuncType ([], []), es -> $1 c type_, es
-      | ft, es -> inline_type_explicit c ($1 c type_) ft at1, es }
+      let ft, es = $2 c in
+      if func_type_empty ft then $1 c type_, es
+      else inline_type_explicit c ($1 c type_) ft at1, es }
   | call_expr_params
     { let at1 = ati 1 in
       fun c -> let ft, es = $1 c in inline_type c ft at1, es }
 
 call_expr_params :
-  | LPAR PARAM value_type_list RPAR call_expr_params
+  | LPAR PARAM value_type_vector RPAR call_expr_params
     { fun c ->
-      let FuncType (ts1, ts2), es = $5 c in FuncType ($3 @ ts1, ts2), es }
+      let FuncType (ts1, ts2), es = $5 c in
+      FuncType (Vector.concat $3 ts1, ts2), es }
   | call_expr_results
-    { fun c -> let ts, es = $1 c in FuncType ([], ts), es }
+    { fun c -> let ts, es = $1 c in FuncType (Vector.empty (), ts), es }
 
 call_expr_results :
-  | LPAR RESULT value_type_list RPAR call_expr_results
-    { fun c -> let ts, es = $5 c in $3 @ ts, es }
+  | LPAR RESULT value_type_vector RPAR call_expr_results
+    { fun c -> let ts, es = $5 c in Vector.concat $3 ts, es }
   | expr_list
-    { fun c -> [], $1 c }
+    { fun c -> Vector.empty (), $1 c }
 
 
 if_block :
@@ -726,22 +754,26 @@ if_block :
       fun c c' ->
       let bt =
         match fst $1 with
-        | FuncType ([], []) -> ValBlockType None
-        | FuncType ([], [t]) -> ValBlockType (Some t)
+        | ft when func_type_empty ft ->
+           ValBlockType None
+        | FuncType (ins, out)
+           when Vector.num_elements ins = 0l && Vector.num_elements out = 1l ->
+           let t = vec_first_value out in
+           ValBlockType (Some t)
         | ft ->  VarBlockType (inline_type c ft at)
       in bt, snd $1 c c' }
 
 if_block_param_body :
   | if_block_result_body { $1 }
-  | LPAR PARAM value_type_list RPAR if_block_param_body
+  | LPAR PARAM value_type_vector RPAR if_block_param_body
     { let FuncType (ins, out) = fst $5 in
-      FuncType ($3 @ ins, out), snd $5 }
+      FuncType (Vector.concat $3 ins, out), snd $5 }
 
 if_block_result_body :
-  | if_ { FuncType ([], []), $1 }
-  | LPAR RESULT value_type_list RPAR if_block_result_body
+  | if_ { FuncType (Vector.empty (), Vector.empty ()), $1 }
+  | LPAR RESULT value_type_vector RPAR if_block_result_body
     { let FuncType (ins, out) = fst $5 in
-      FuncType (ins, $3 @ out), snd $5 }
+      FuncType (ins, Vector.concat $3 out), snd $5 }
 
 if_ :
   | expr if_
@@ -802,43 +834,45 @@ func_fields :
 
 func_fields_import :  /* Sugar */
   | func_fields_import_result { $1 }
-  | LPAR PARAM value_type_list RPAR func_fields_import
-    { let FuncType (ins, out) = $5 in FuncType ($3 @ ins, out) }
+  | LPAR PARAM value_type_vector RPAR func_fields_import
+    { let FuncType (ins, out) = $5 in FuncType (Vector.concat $3 ins, out) }
   | LPAR PARAM bind_var value_type RPAR func_fields_import  /* Sugar */
-    { let FuncType (ins, out) = $6 in FuncType ($4 :: ins, out) }
+    { let FuncType (ins, out) = $6 in FuncType (Vector.cons
+ $4 ins, out) }
 
 func_fields_import_result :  /* Sugar */
-  | /* empty */ { FuncType ([], []) }
-  | LPAR RESULT value_type_list RPAR func_fields_import_result
-    { let FuncType (ins, out) = $5 in FuncType (ins, $3 @ out) }
+  | /* empty */ { FuncType (Vector.empty (), Vector.empty ()) }
+  | LPAR RESULT value_type_vector RPAR func_fields_import_result
+    { let FuncType (ins, out) = $5 in FuncType (ins, Vector.concat $3 out) }
 
 func_fields_body :
   | func_result_body { $1 }
-  | LPAR PARAM value_type_list RPAR func_fields_body
+  | LPAR PARAM value_type_vector RPAR func_fields_body
     { let FuncType (ins, out) = fst $5 in
-      FuncType ($3 @ ins, out),
-      fun c -> anon_locals c (lazy $3); snd $5 c }
+      FuncType (Vector.concat $3 ins, out),
+      fun c -> anon_locals c (lazy (vec_to_list $3)); snd $5 c }
   | LPAR PARAM bind_var value_type RPAR func_fields_body  /* Sugar */
     { let FuncType (ins, out) = fst $6 in
-      FuncType ($4 :: ins, out),
+      FuncType (Vector.cons
+ $4 ins, out),
       fun c -> ignore (bind_local c $3); snd $6 c }
 
 func_result_body :
-  | func_body { FuncType ([], []), $1 }
-  | LPAR RESULT value_type_list RPAR func_result_body
+  | func_body { FuncType (Vector.empty (), Vector.empty ()), $1 }
+  | LPAR RESULT value_type_vector RPAR func_result_body
     { let FuncType (ins, out) = fst $5 in
-      FuncType (ins, $3 @ out), snd $5 }
+      FuncType (ins, Vector.concat $3 out), snd $5 }
 
 func_body :
   | instr_list
     { fun c -> let c' = anon_label c in
-      {ftype = -1l @@ at(); locals = Lazy_vector.LwtInt32Vector.create 0l; body = $1 c'} }
+      {ftype = -1l @@ at(); locals = Vector.empty (); body = $1 c'} }
   | LPAR LOCAL value_type_vector RPAR func_body
     { fun c -> anon_locals_vector c (lazy $3); let f = $5 c in
-      {f with locals = Lazy_vector.LwtInt32Vector.concat $3 f.locals} }
+      {f with locals = Vector.concat $3 f.locals} }
   | LPAR LOCAL bind_var value_type RPAR func_body  /* Sugar */
     { fun c -> ignore (bind_local c $3); let f = $6 c in
-      {f with locals = Lazy_vector.LwtInt32Vector.cons $4 f.locals} }
+      {f with locals = Vector.cons $4 f.locals} }
 
 
 /* Tables, Memories & Globals */
@@ -881,29 +915,29 @@ elem :
     { let at = at () in
       fun c -> ignore ($3 c anon_elem bind_elem);
       fun () ->
-      { etype = (fst $4); einit = Lazy_vector.LwtInt32Vector.of_list ((snd $4) c); emode = Passive @@ at } @@ at }
+      { etype = (fst $4); einit = Vector.of_list ((snd $4) c); emode = Passive @@ at } @@ at }
   | LPAR ELEM bind_var_opt table_use offset elem_list RPAR
     { let at = at () in
       fun c -> ignore ($3 c anon_elem bind_elem);
       fun () ->
-      { etype = (fst $6); einit = Lazy_vector.LwtInt32Vector.of_list ((snd $6) c);
+      { etype = (fst $6); einit = Vector.of_list ((snd $6) c);
         emode = Active {index = $4 c table; offset = $5 c} @@ at } @@ at }
   | LPAR ELEM bind_var_opt DECLARE elem_list RPAR
     { let at = at () in
       fun c -> ignore ($3 c anon_elem bind_elem);
       fun () ->
-      { etype = (fst $5); einit = Lazy_vector.LwtInt32Vector.of_list ((snd $5) c); emode = Declarative @@ at } @@ at }
+      { etype = (fst $5); einit = Vector.of_list ((snd $5) c); emode = Declarative @@ at } @@ at }
   | LPAR ELEM bind_var_opt offset elem_list RPAR  /* Sugar */
     { let at = at () in
       fun c -> ignore ($3 c anon_elem bind_elem);
       fun () ->
-      { etype = (fst $5); einit = Lazy_vector.LwtInt32Vector.of_list ((snd $5) c);
+      { etype = (fst $5); einit = Vector.of_list ((snd $5) c);
         emode = Active {index = 0l @@ at; offset = $4 c} @@ at } @@ at }
   | LPAR ELEM bind_var_opt offset elem_var_list RPAR  /* Sugar */
     { let at = at () in
       fun c -> ignore ($3 c anon_elem bind_elem);
       fun () ->
-      { etype = FuncRefType; einit = Lazy_vector.LwtInt32Vector.of_list ($5 c func);
+      { etype = FuncRefType; einit = Vector.of_list ($5 c func);
         emode = Active {index = 0l @@ at; offset = $4 c} @@ at } @@ at }
 
 table :
@@ -926,8 +960,8 @@ table_fields :
   | ref_type LPAR ELEM elem_var_list RPAR  /* Sugar */
     { fun c x at ->
       let offset = [i32_const (0l @@ at) @@ at] @@ at in
-      let einit = Lazy_vector.LwtInt32Vector.of_list ($4 c func) in
-      let size = Lazy_vector.LwtInt32Vector.num_elements einit in
+      let einit = Vector.of_list ($4 c func) in
+      let size = Vector.num_elements einit in
       let emode = Active {index = x; offset} @@ at in
       [{ttype = TableType ({min = size; max = Some size}, $1)} @@ at],
       [{etype = FuncRefType; einit; emode} @@ at],
@@ -935,8 +969,8 @@ table_fields :
   | ref_type LPAR ELEM elem_expr elem_expr_list RPAR  /* Sugar */
     { fun c x at ->
       let offset = [i32_const (0l @@ at) @@ at] @@ at in
-      let einit = Lazy_vector.LwtInt32Vector.of_list ((fun c -> $4 c :: $5 c) c) in
-      let size = Lazy_vector.LwtInt32Vector.num_elements einit in
+      let einit = Vector.of_list ((fun c -> $4 c :: $5 c) c) in
+      let size = Vector.num_elements einit in
       let emode = Active {index = x; offset} @@ at in
       [{ttype = TableType ({min = size; max = Some size}, $1)} @@ at],
       [{etype = FuncRefType; einit; emode} @@ at],

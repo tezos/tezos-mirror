@@ -69,14 +69,12 @@ module Types = struct
        Once the AST is adapted this must not be a list but a lazy structure. *)
     Data_encoding.list value_type_encoding
 
-  let func_type_encoding =
+  let func_type_encoding ~params_encoding ~result_encoding =
     let open Data_encoding in
     conv
       (fun (FuncType (params, result)) -> (params, result))
       (fun (params, result) -> FuncType (params, result))
-      (obj2
-         (req "params" result_type_encoding)
-         (req "result" result_type_encoding))
+      (obj2 (req "params" params_encoding) (req "result" result_encoding))
 
   let mutability_encoding =
     string_enum [("mutable", Mutable); ("immutable", Immutable)]

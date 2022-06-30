@@ -145,9 +145,12 @@ struct
 
   let func_type = function
     | FuncType (ts1, ts2) ->
+        let to_list m =
+          List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings m)
+        in
         vs7 (-0x20) ;
-        vec value_type ts1 ;
-        vec value_type ts2
+        vec value_type (to_list ts1) ;
+        vec value_type (to_list ts2)
 
   let limits vu {min; max} =
     bool (max <> None) ;

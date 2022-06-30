@@ -186,9 +186,12 @@ module Make (T : Tree.S) = struct
           let+ param =
             value
               ["$1"]
-              (Data_encoding.option
-                 Interpreter_encodings.Types.result_type_encoding)
+              Data_encoding.(
+                option (list Interpreter_encodings.Types.value_type_encoding))
           in
+          (* `Select` actually accepts only one value, but is a list for some
+             reason. See [Valid.check_instr] for reference or the reference
+             documentation. *)
           Select param
       | "Block" ->
           let+ type_ =
@@ -405,6 +408,20 @@ module Make (T : Tree.S) = struct
        pointers. *)
     list_decoding (instruction_decoding ())
 
+  let func_type_decoding () =
+    let open Syntax in
+    let* params =
+      lazy_vector_decoding
+        "type_params"
+        (value [] Interpreter_encodings.Types.value_type_encoding)
+    in
+    let+ result =
+      lazy_vector_decoding
+        "type_result"
+        (value [] Interpreter_encodings.Types.value_type_encoding)
+    in
+    Types.FuncType (params, result)
+
   let function_decoding current_module =
     let open Syntax in
     let* is_host_func =
@@ -416,9 +433,7 @@ module Make (T : Tree.S) = struct
       let+ name = value ["name"] Data_encoding.string in
       Host_funcs.lookup name
     else
-      let* type_ =
-        value ["type"] Interpreter_encodings.Types.func_type_encoding
-      in
+      let* type_ = func_type_decoding () in
       let* ftype = value ["ftype"] Interpreter_encodings.Ast.var_encoding in
       let* locals =
         lazy_vector_decoding
@@ -433,9 +448,7 @@ module Make (T : Tree.S) = struct
     lazy_vector_decoding "functions" (function_decoding current_module)
 
   let type_instance_decoding =
-    lazy_vector_decoding
-      "types"
-      (value [] Interpreter_encodings.Types.func_type_encoding)
+    lazy_vector_decoding "types" (func_type_decoding ())
 
   let elem_decoding funcs =
     let open Syntax in

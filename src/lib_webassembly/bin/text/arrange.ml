@@ -82,6 +82,8 @@ let value_type t = string_of_value_type t
 let decls kind ts = tab kind (atom value_type) ts
 
 let func_type (FuncType (ins, out)) =
+  let ins = lazy_vector Fun.id ins in
+  let out = lazy_vector Fun.id out in
   Node ("func", decls "param" ins @ decls "result" out)
 
 let struct_type = func_type

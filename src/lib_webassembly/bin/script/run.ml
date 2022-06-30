@@ -381,16 +381,17 @@ let run_action act : Values.value list Lwt.t =
       match export with
       | Some (Instance.ExternFunc f) ->
           let (Types.FuncType (ins, out)) = Func.type_of f in
-          if List.length vs <> List.length ins then
+          let* ins_l = Lazy_vector.LwtInt32Vector.to_list ins in
+          if List.length vs <> List.length ins_l then
             Script.error act.at "wrong number of arguments" ;
           List.iter2
             (fun v t ->
               if Values.type_of_value v.it <> t then
                 Script.error v.at "wrong type of argument")
             vs
-            ins ;
-          let* _, result = Eval.invoke f (List.map (fun v -> v.it) vs) in
-          Lwt.return result
+            ins_l ;
+          let+ _, result = Eval.invoke f (List.map (fun v -> v.it) vs) in
+          result
       | Some _ -> Assert.error act.at "export is not a function"
       | None -> Assert.error act.at "undefined export")
   | Get (x_opt, name) -> (

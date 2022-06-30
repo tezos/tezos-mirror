@@ -208,16 +208,6 @@ let value_type s =
   | Some n when n >= -0x0f land 0x7f -> VecType (vec_type s)
   | _ -> RefType (ref_type s)
 
-let result_type s = vec value_type s
-
-let func_type s =
-  match vs7 s with
-  | -0x20 ->
-      let ins = result_type s in
-      let out = result_type s in
-      FuncType (ins, out)
-  | _ -> error s (pos s - 1) "malformed function type"
-
 let limits vu s =
   let has_max = bool s in
   let min = vu s in
@@ -1046,7 +1036,33 @@ let section tag f default s = section_with_size tag (fun _ -> f) default s
 
 (* Type section *)
 
-let type_ s = at func_type s
+type func_type_kont =
+  | FKStart
+  | FKIns of value_type lazy_vec_kont
+  | FKOut of value_type Vector.t * value_type lazy_vec_kont
+  | FKStop of func_type
+
+let func_type_step s = function
+  | FKStart ->
+      let tag = vs7 s in
+      let len = len32 s in
+      if tag = -0x20 then FKIns (init_lazy_vec (Int32.of_int len))
+      else error s (pos s - 1) "malformed function type"
+  | FKIns (Lazy_vec {vector = ins; _} as vec) when is_end_of_vec vec ->
+      let len = len32 s in
+      FKOut (ins, init_lazy_vec (Int32.of_int len))
+  | FKIns ins ->
+      let vt = value_type s in
+      FKIns (lazy_vec_step vt ins)
+  | FKOut (ins, (Lazy_vec {vector = out; _} as out_vec))
+    when is_end_of_vec out_vec ->
+      FKStop (FuncType (ins, out))
+  | FKOut (ins, out_vec) ->
+      let vt = value_type s in
+      FKOut (ins, lazy_vec_step vt out_vec)
+  | FKStop _ -> assert false (* cannot reduce *)
+
+(* let _type_ s = at func_type s *)
 
 (* Import section *)
 
@@ -1580,6 +1596,8 @@ type module_kont =
       invariants. *)
   | MKStop of module_'  (** Final step of the parsing, cannot reduce. *)
     (* TODO (https://gitlab.com/tezos/tezos/-/issues/3120): actually, should be module_ *)
+  | MKTypes of func_type_kont * pos * size * type_ lazy_vec_kont
+      (** Function types section parsing. *)
   | MKImport of import_kont * pos * size * import lazy_vec_kont
       (** Import section parsing. *)
   | MKExport of export_kont * pos * size * export lazy_vec_kont
@@ -1804,10 +1822,7 @@ let module_step state =
         (MKSkipCustom None)
   | MKField (ty, size, vec) -> (
       match ty with
-      | TypeField ->
-          let f = type_ s in
-          (* TODO (https://gitlab.com/tezos/tezos/-/issues/3096): check if small enough to fit in a tick *)
-          next @@ MKField (ty, size, lazy_vec_step f vec)
+      | TypeField -> next @@ MKTypes (FKStart, pos s, size, vec)
       | ImportField -> next @@ MKImport (ImpKStart, pos s, size, vec)
       | FuncField ->
           let f = at var s in
@@ -1833,8 +1848,14 @@ let module_step state =
           (* not a vector *)
           assert false
       | CodeField -> next @@ MKCode (CKStart, pos s, size, vec)
-      | DataField -> next @@ MKData (DKStart, pos s, size, vec))
-  (* These sections have a distinct step mechanism. *)
+      | DataField ->
+          next @@ MKData (DKStart, pos s, size, vec)
+          (* These sections have a distinct step mechanism. *))
+  | MKTypes (FKStop func_type, left, size, vec) ->
+      let f = Source.(func_type @@ region s left (pos s)) in
+      next @@ MKField (TypeField, size, lazy_vec_step f vec)
+  | MKTypes (k, pos, size, curr_vec) ->
+      next @@ MKTypes (func_type_step s k, pos, size, curr_vec)
   | MKImport (ImpKStop import, left, size, vec) ->
       let f = Source.(import @@ region s left (pos s)) in
       next @@ MKField (ImportField, size, lazy_vec_step f vec)

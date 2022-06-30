@@ -71,6 +71,13 @@ module type S = sig
       [values] may be provided to supply an initial set of entries. *)
   val create : ?values:'a Map.Map.t -> ?produce_value:'a producer -> key -> 'a t
 
+  (** [empty ()] creates a vector of size zero. This is used in conjunction with
+      {!cons} to model list-like structure. *)
+  val empty : unit -> 'a t
+
+  (** [singleton v] creates a vector of size one containing only [v]. *)
+  val singleton : 'a -> 'a t
+
   (** [of_list values] creates a vector where each association is the index in
       the list to its value. The first item's key is [zero], the second is
       [succ zero] and so on. *)

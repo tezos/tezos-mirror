@@ -133,6 +133,11 @@ let push (ell1, ts1) (ell2, ts2) =
 
 let peek i (ell, ts) = try List.nth (List.rev ts) i with Failure _ -> None
 
+let vec_to_list v =
+  (* The validation is never used in the rollup (in a context were values can be
+     shallow), hence the vectors will be fully loaded. *)
+  Stdlib.List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings v)
+
 (* Type Synthesis *)
 
 let type_num = Values.type_of_num
@@ -261,8 +266,8 @@ let check_memop (c : context) (memop : ('t, 's) memop) ty_size get_sz at =
 let check_block_type (c : context) (bt : block_type) : func_type =
   match bt with
   | VarBlockType x -> type_ c x
-  | ValBlockType None -> FuncType ([], [])
-  | ValBlockType (Some t) -> FuncType ([], [t])
+  | ValBlockType None -> FuncType (Vector.empty (), Vector.empty ())
+  | ValBlockType (Some t) -> FuncType (Vector.empty (), Vector.singleton t)
 
 let rec check_instr (c : context) (e : instr) (s : infer_result_type) : op_type
     =
@@ -286,38 +291,57 @@ let rec check_instr (c : context) (e : instr) (s : infer_result_type) : op_type
       (ts @ ts @ [NumType I32Type]) --> ts
   | Block (bt, es) ->
       let (FuncType (ts1, ts2) as ft) = check_block_type c bt in
+      let ts1_l = vec_to_list ts1 in
+      let ts2_l = vec_to_list ts2 in
       check_block {c with labels = ts2 :: c.labels} es ft e.at ;
-      ts1 --> ts2
+      ts1_l --> ts2_l
   | Loop (bt, es) ->
       let (FuncType (ts1, ts2) as ft) = check_block_type c bt in
+      let ts1_l = vec_to_list ts1 in
+      let ts2_l = vec_to_list ts2 in
       check_block {c with labels = ts1 :: c.labels} es ft e.at ;
-      ts1 --> ts2
+      ts1_l --> ts2_l
   | If (bt, es1, es2) ->
       let (FuncType (ts1, ts2) as ft) = check_block_type c bt in
+      let ts1_l = vec_to_list ts1 in
+      let ts2_l = vec_to_list ts2 in
       check_block {c with labels = ts2 :: c.labels} es1 ft e.at ;
       check_block {c with labels = ts2 :: c.labels} es2 ft e.at ;
-      (ts1 @ [NumType I32Type]) --> ts2
-  | Br x -> label c x -->... []
-  | BrIf x -> (label c x @ [NumType I32Type]) --> label c x
+      (ts1_l @ [NumType I32Type]) --> ts2_l
+  | Br x -> vec_to_list (label c x) -->... []
+  | BrIf x ->
+      let lx = vec_to_list (label c x) in
+      (lx @ [NumType I32Type]) --> lx
   | BrTable (xs, x) ->
-      let n = List.length (label c x) in
+      let lx = label c x in
+      let lx_l = vec_to_list lx in
+      let n = Lazy_vector.LwtInt32Vector.num_elements lx |> Int32.to_int in
       let ts = Lib.List.table n (fun i -> peek (n - i) s) in
-      check_stack ts (known (label c x)) x.at ;
-      List.iter (fun x' -> check_stack ts (known (label c x')) x'.at) xs ;
+      check_stack ts (known lx_l) x.at ;
+      List.iter
+        (fun x' ->
+          let lx' = label c x' in
+          let lx_l' = vec_to_list lx' in
+          check_stack ts (known lx_l') x'.at)
+        xs ;
       (ts @ [Some (NumType I32Type)]) -~>... []
   | Return -> c.results -->... []
   | Call x ->
       let (FuncType (ts1, ts2)) = func c x in
-      ts1 --> ts2
+      let ts1_l = vec_to_list ts1 in
+      let ts2_l = vec_to_list ts2 in
+      ts1_l --> ts2_l
   | CallIndirect (x, y) ->
       let (TableType (lim, t)) = table c x in
       let (FuncType (ts1, ts2)) = type_ c y in
+      let ts1_l = vec_to_list ts1 in
+      let ts2_l = vec_to_list ts2 in
       require
         (t = FuncRefType)
         x.at
         ("type mismatch: instruction requires table of functions"
        ^ " but table has " ^ string_of_ref_type t) ;
-      (ts1 @ [NumType I32Type]) --> ts2
+      (ts1_l @ [NumType I32Type]) --> ts2_l
   | LocalGet x -> [] --> [local c x]
   | LocalSet x -> [local c x] --> []
   | LocalTee x -> [local c x] --> [local c x]
@@ -511,8 +535,10 @@ and check_seq (c : context) (s : infer_result_type) (es : instr list) :
 
 and check_block (c : context) (es : instr list) (ft : func_type) at =
   let (FuncType (ts1, ts2)) = ft in
-  let s = check_seq c (stack ts1) es in
-  let s' = pop (stack ts2) s at in
+  let ts1_l = vec_to_list ts1 in
+  let ts2_l = vec_to_list ts2 in
+  let s = check_seq c (stack ts1_l) es in
+  let s' = pop (stack ts2_l) s at in
   require
     (snd s' = [])
     at
@@ -547,8 +573,10 @@ let check_value_type (t : value_type) at =
 
 let check_func_type (ft : func_type) at =
   let (FuncType (ts1, ts2)) = ft in
-  List.iter (fun t -> check_value_type t at) ts1 ;
-  List.iter (fun t -> check_value_type t at) ts2
+  let ts1_l = vec_to_list ts1 in
+  let ts2_l = vec_to_list ts2 in
+  List.iter (fun t -> check_value_type t at) ts1_l ;
+  List.iter (fun t -> check_value_type t at) ts2_l
 
 let check_table_type (tt : table_type) at =
   let (TableType (lim, t)) = tt in
@@ -581,12 +609,16 @@ let check_type (t : type_) = check_func_type t.it t.at
 
 let check_func (c : context) (f : func) =
   let {ftype; locals; body} = f.it in
-  let locals =
-    List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings locals)
-  in
   let (FuncType (ts1, ts2)) = type_ c ftype in
-  let c' = {c with locals = ts1 @ locals; results = ts2; labels = [ts2]} in
-  check_block c' body (FuncType ([], ts2)) f.at
+  let c' =
+    {
+      c with
+      locals = Lazy_vector.LwtInt32Vector.concat ts1 locals |> vec_to_list;
+      results = vec_to_list ts2;
+      labels = [ts2];
+    }
+  in
+  check_block c' body (FuncType (Vector.empty (), ts2)) f.at
 
 let is_const (c : context) (e : instr) =
   match e.it with
@@ -601,7 +633,11 @@ let check_const (c : context) (const : const) (t : value_type) =
     (List.for_all (is_const c) const.it)
     const.at
     "constant expression required" ;
-  check_block c const.it (FuncType ([], [t])) const.at
+  check_block
+    c
+    const.it
+    (FuncType (Vector.empty (), Vector.singleton t))
+    const.at
 
 (* Tables, Memories, & Globals *)
 
@@ -628,7 +664,7 @@ let check_elem_mode (c : context) (t : ref_type) (mode : segment_mode) =
 
 let check_elem (c : context) (seg : elem_segment) =
   let {etype; einit; emode} = seg.it in
-  let einit = List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings einit) in
+  let einit = vec_to_list einit in
   List.iter (fun const -> check_const c const (RefType etype)) einit ;
   check_elem_mode c etype emode
 
@@ -654,7 +690,7 @@ let check_global (c : context) (glob : global) =
 let check_start (c : context) (start : start) =
   let {sfunc} = start.it in
   require
-    (func c sfunc = FuncType ([], []))
+    (func_type_empty (func c sfunc))
     start.at
     "start function must not have parameters or results"
 
@@ -690,7 +726,6 @@ let check_export (c : context) (set : NameSet.t) (ex : export) : NameSet.t =
 
 let check_module (m : module_) =
   let open Lwt.Syntax in
-  let to_list m = List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings m) in
   let {
     types;
     imports;
@@ -705,15 +740,15 @@ let check_module (m : module_) =
   } =
     m.it
   in
-  let types = to_list types in
-  let imports = to_list imports in
-  let tables = to_list tables in
-  let memories = to_list memories in
-  let globals = to_list globals in
-  let funcs = to_list funcs in
-  let elems = to_list elems in
-  let datas = to_list datas in
-  let exports = to_list exports in
+  let types = vec_to_list types in
+  let imports = vec_to_list imports in
+  let tables = vec_to_list tables in
+  let memories = vec_to_list memories in
+  let globals = vec_to_list globals in
+  let funcs = vec_to_list funcs in
+  let elems = vec_to_list elems in
+  let datas = vec_to_list datas in
+  let exports = vec_to_list exports in
   let+ refs =
     Free.module_
       ({m.it with funcs = Lazy_vector.LwtInt32Vector.create 0l; start = None}

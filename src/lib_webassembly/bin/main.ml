@@ -44,28 +44,33 @@ let argspec =
       ("-v", Arg.Unit banner, " show version");
     ]
 
-let () =
+let run () =
   let open Lwt.Syntax in
-  Printexc.record_backtrace true ;
-  let run () =
-    let* () = configure () in
-    Arg.parse argspec (fun file -> add_arg ("(input " ^ quote file ^ ")")) usage ;
-    Lwt_list.iter_s
-      (fun arg ->
-        let+ res = Run.run_string arg in
-        if not res then exit 1)
-      !args
-  in
-  try
-    Lwt_main.run (run ()) ;
-    if !args = [] then Flags.interactive := true ;
-    if !Flags.interactive then (
-      Flags.print_sig := true ;
-      banner () ;
-      Lwt_main.run (Run.run_stdin ()))
-  with exn ->
-    flush_all () ;
-    prerr_endline
-      (Sys.argv.(0) ^ ": uncaught exception " ^ Printexc.to_string exn) ;
-    Printexc.print_backtrace stderr ;
-    exit 2
+  Lwt.catch
+    (fun () ->
+      let* () = configure () in
+      Arg.parse
+        argspec
+        (fun file -> add_arg ("(input " ^ quote file ^ ")"))
+        usage ;
+      let* () =
+        Lwt_list.iter_s
+          (fun arg ->
+            let+ res = Run.run_string arg in
+            if not res then exit 1)
+          !args
+      in
+      if !args = [] then Flags.interactive := true ;
+      if !Flags.interactive then (
+        Flags.print_sig := true ;
+        banner () ;
+        Run.run_stdin ())
+      else Lwt.return_unit)
+    (fun exn ->
+      flush_all () ;
+      prerr_endline
+        (Sys.argv.(0) ^ ": uncaught exception " ^ Printexc.to_string exn) ;
+      Printexc.print_backtrace stderr ;
+      exit 2)
+
+let _ = Lwt_main.run (run ())

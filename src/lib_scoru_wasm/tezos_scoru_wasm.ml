@@ -135,8 +135,9 @@ let read_input =
         NumType I64Type;
         NumType I64Type;
       ]
+    |> Vector.of_list
   in
-  let output_types = Types.[NumType I32Type] in
+  let output_types = Types.[NumType I32Type] |> Vector.of_list in
   let fun_type = Types.FuncType (input_types, output_types) in
   let f input_buffer module_inst inputs =
     match inputs with

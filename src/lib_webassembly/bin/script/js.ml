@@ -3,6 +3,7 @@ open Ast
 open Script
 open Source
 module TzStdLib = Tezos_lwt_result_stdlib.Lwtreslib.Bare
+module Vector = Lazy_vector.LwtInt32Vector
 
 (* Harness *)
 
@@ -241,6 +242,12 @@ let lookup (mods : modules) x_opt name at =
       (Eval.Crash
          (at, "unknown export \"" ^ string_of_name name ^ "\" within module"))
 
+(* Vectors wrappers *)
+
+let vec_two i j = Vector.(create 2l |> set 0l i |> set 1l j)
+
+let vec_to_list v = Stdlib.List.map snd (Vector.loaded_bindings v)
+
 (* Wrappers *)
 
 let subject_idx = 0l
@@ -300,7 +307,7 @@ let invoke ft vs at =
 
 let get t at = ([], GlobalImport t @@ at, [GlobalGet (subject_idx @@ at) @@ at])
 
-let run ts at = (Lazy_vector.LwtInt32Vector.create 0l, [])
+let run ts at = (Vector.empty (), [])
 
 let assert_return ress ts at =
   let test res =
@@ -419,20 +426,32 @@ let assert_return ress ts at =
           BrIf (0l @@ at) @@ at;
         ]
   in
-  (Lazy_vector.LwtInt32Vector.create 0l, List.flatten (List.rev_map test ress))
+  (Vector.empty (), List.flatten (List.rev_map test ress))
 
 let wrap item_name wrap_action wrap_assertion at =
   let itypes, idesc, action = wrap_action at in
   let locals, assertion = wrap_assertion at in
   let types =
-    (FuncType ([], []) @@ at)
-    :: (FuncType ([NumType I32Type], [RefType ExternRefType]) @@ at)
-    :: (FuncType ([RefType ExternRefType], [NumType I32Type]) @@ at)
-    :: (FuncType ([RefType FuncRefType], [NumType I32Type]) @@ at)
+    (FuncType (Vector.empty (), Vector.empty ()) @@ at)
     :: (FuncType
-          ([RefType ExternRefType; RefType ExternRefType], [NumType I32Type])
+          ( Vector.singleton (NumType I32Type),
+            Vector.singleton (RefType ExternRefType) )
        @@ at)
-    :: (FuncType ([RefType FuncRefType; RefType FuncRefType], [NumType I32Type])
+    :: (FuncType
+          ( Vector.singleton (RefType ExternRefType),
+            Vector.singleton (NumType I32Type) )
+       @@ at)
+    :: (FuncType
+          ( Vector.singleton (RefType FuncRefType),
+            Vector.singleton (NumType I32Type) )
+       @@ at)
+    :: (FuncType
+          ( vec_two (RefType ExternRefType) (RefType ExternRefType),
+            Vector.singleton (NumType I32Type) )
+       @@ at)
+    :: (FuncType
+          ( vec_two (RefType FuncRefType) (RefType FuncRefType),
+            Vector.singleton (NumType I32Type) )
        @@ at)
     :: itypes
     |> Lazy_vector.LwtInt32Vector.of_list
@@ -512,7 +531,10 @@ let is_js_global_type = function
   | GlobalType (t, mut) -> is_js_value_type t && mut = Immutable
 
 let is_js_func_type = function
-  | FuncType (ins, out) -> List.for_all is_js_value_type (ins @ out)
+  | FuncType (ins, out) ->
+      let ins = vec_to_list ins in
+      let out = vec_to_list out in
+      List.for_all is_js_value_type (ins @ out)
 
 (* Script conversion *)
 
@@ -636,7 +658,7 @@ let of_action mods act =
         match lookup mods x_opt name act.at with
         | ExternGlobalType gt when not (is_js_global_type gt) ->
             let (GlobalType (t, _)) = gt in
-            Some (of_wrapper mods x_opt name (get gt), [t])
+            Some (of_wrapper mods x_opt name (get gt), Vector.singleton t)
         | _ -> None ))
 
 let of_assertion' mods act name args wrapper_opt =

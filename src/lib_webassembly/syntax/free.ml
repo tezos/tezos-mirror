@@ -79,7 +79,10 @@ let opt free xo = Lib.Option.get (Lib.Option.map free xo) empty
 let lazy_vector_s free xs =
   let open Lwt.Syntax in
   let open Tezos_lwt_result_stdlib.Lwtreslib.Bare in
-  let* xs = Lazy_vector.LwtInt32Vector.to_list xs in
+  (* [Free] module is used only during the validation of the AST, no mutation
+     can happen at this time, and is only used during tests. It is then safe to
+     simply use the list, it doesn't need to be tickified. *)
+  let* xs = Vector.to_list xs in
   List.fold_left_s
     (fun acc s ->
       let+ f = free s in
