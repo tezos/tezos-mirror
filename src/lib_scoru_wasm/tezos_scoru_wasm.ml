@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Sigs
-
 type input = {
   inbox_level : Tezos_base.Bounded.Int32.NonNegative.t;
   message_counter : Z.t;
@@ -55,7 +53,7 @@ module type S = sig
   val get_info : tree -> info Lwt.t
 end
 
-module Make (T : TreeS) : S with type tree = T.tree = struct
+module Make (T : Tree.S) : S with type tree = T.tree = struct
   type tree = T.tree
 
   module Decodings = Decodings.Make (T)

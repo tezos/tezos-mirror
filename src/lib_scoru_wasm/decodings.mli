@@ -23,12 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Sigs
 open Tezos_webassembly_interpreter.Instance
 
-module Make (T : TreeS) : sig
+module Make (T : Tree.S) : sig
   module Tree : sig
-    include TreeS
+    include Tree.S
 
     module Decoding : Tree_decoding.S with type tree = T.tree
   end

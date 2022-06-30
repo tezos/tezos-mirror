@@ -25,7 +25,7 @@
 
 (** This module exposes a module type {!S} defining a WASM VM API.
     It also exposes a functor {!Make} for constructing a concrete implementation
-    of this module type, given an implementation of a {!Sigs.TreeS} module.
+    of this module type, given an implementation of a {!Tree.S} module.
 
     This library acts as a dependency to the protocol environment. Everything
     WASM VM related that must be exposed to the protocol via the environment
@@ -85,5 +85,5 @@ module type S = sig
   val get_info : tree -> info Lwt.t
 end
 
-(** Builds a WASM VM given a concrete implementation of {!Sigs.TreeS}. *)
-module Make (T : Sigs.TreeS) : S with type tree = T.tree
+(** Builds a WASM VM given a concrete implementation of {!Tree.S}. *)
+module Make (T : Tree.S) : S with type tree = T.tree
