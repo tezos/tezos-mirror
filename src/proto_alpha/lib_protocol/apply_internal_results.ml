@@ -198,7 +198,7 @@ type 'kind iselect =
   packed_internal_operation_result ->
   ('kind internal_operation * 'kind internal_operation_result) option
 
-module Internal_result = struct
+module Internal_operation = struct
   open Data_encoding
 
   type 'kind case =
@@ -490,12 +490,12 @@ let internal_operation_encoding : packed_internal_operation Data_encoding.t =
          Internal_operation {source; operation; nonce})
        (merge_objs
           (obj2 (req "source" Contract.encoding) (req "nonce" uint16))
-          Internal_result.encoding)
+          Internal_operation.encoding)
 
 module Internal_manager_result = struct
   type 'kind case =
     | MCase : {
-        op_case : 'kind Internal_result.case;
+        op_case : 'kind Internal_operation.case;
         encoding : 'a Data_encoding.t;
         kind : 'kind Kind.manager;
         select :
@@ -508,7 +508,7 @@ module Internal_manager_result = struct
         -> 'kind case
 
   let make ~op_case ~encoding ~kind ~select ~proj ~inj =
-    let (Internal_result.MCase {name; _}) = op_case in
+    let (Internal_operation.MCase {name; _}) = op_case in
     let t =
       def (Format.asprintf "operation.alpha.internal_operation_result.%s" name)
       @@ union
@@ -562,8 +562,8 @@ module Internal_manager_result = struct
 
   let[@coq_axiom_with_reason "gadt"] transaction_case =
     make
-      ~op_case:Internal_result.transaction_case
-      ~encoding:Internal_result.transaction_contract_variant_cases
+      ~op_case:Internal_operation.transaction_case
+      ~encoding:Internal_operation.transaction_contract_variant_cases
       ~select:(function
         | Successful_internal_operation_result (ITransaction_result _ as op) ->
             Some op
@@ -574,7 +574,7 @@ module Internal_manager_result = struct
 
   let[@coq_axiom_with_reason "gadt"] origination_case =
     make
-      ~op_case:Internal_result.origination_case
+      ~op_case:Internal_operation.origination_case
       ~encoding:
         (obj6
            (dft "balance_updates" Receipt.balance_updates_encoding [])
@@ -628,7 +628,7 @@ module Internal_manager_result = struct
 
   let delegation_case =
     make
-      ~op_case:Internal_result.delegation_case
+      ~op_case:Internal_operation.delegation_case
       ~encoding:
         Data_encoding.(
           obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
@@ -643,7 +643,7 @@ module Internal_manager_result = struct
 
   let event_case =
     make
-      ~op_case:Internal_result.event_case
+      ~op_case:Internal_operation.event_case
       ~encoding:
         Data_encoding.(
           obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
@@ -662,8 +662,8 @@ let internal_operation_result_encoding :
   let make (type kind)
       (Internal_manager_result.MCase res_case :
         kind Internal_manager_result.case)
-      (Internal_result.MCase ires_case : kind Internal_result.case) =
-    let (Internal_result.MCase op_case) = res_case.op_case in
+      (Internal_operation.MCase ires_case : kind Internal_operation.case) =
+    let (Internal_operation.MCase op_case) = res_case.op_case in
     case
       (Tag op_case.tag)
       ~title:op_case.name
@@ -687,12 +687,12 @@ let internal_operation_result_encoding :
        [
          make
            Internal_manager_result.transaction_case
-           Internal_result.transaction_case;
+           Internal_operation.transaction_case;
          make
            Internal_manager_result.origination_case
-           Internal_result.origination_case;
+           Internal_operation.origination_case;
          make
            Internal_manager_result.delegation_case
-           Internal_result.delegation_case;
-         make Internal_manager_result.event_case Internal_result.event_case;
+           Internal_operation.delegation_case;
+         make Internal_manager_result.event_case Internal_operation.event_case;
        ]
