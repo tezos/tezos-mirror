@@ -131,20 +131,20 @@ type 'kind internal_operation_result =
     'kind successful_internal_operation_result )
   Apply_operation_result.operation_result
 
-type packed_internal_manager_operation_result =
+type packed_internal_operation_result =
   | Internal_operation_result :
       'kind internal_operation * 'kind internal_operation_result
-      -> packed_internal_manager_operation_result
+      -> packed_internal_operation_result
 
 val internal_operation :
   'kind Script_typed_ir.internal_operation -> 'kind internal_operation
 
-val pack_internal_manager_operation_result :
+val pack_internal_operation_result :
   'kind Script_typed_ir.internal_operation ->
   'kind internal_operation_result ->
-  packed_internal_manager_operation_result
+  packed_internal_operation_result
 
 val internal_operation_encoding : packed_internal_operation Data_encoding.t
 
-val internal_manager_operation_result_encoding :
-  packed_internal_manager_operation_result Data_encoding.t
+val internal_operation_result_encoding :
+  packed_internal_operation_result Data_encoding.t

@@ -97,7 +97,7 @@ and 'kind contents_result =
   | Manager_operation_result : {
       balance_updates : Receipt.balance_updates;
       operation_result : 'kind manager_operation_result;
-      internal_operation_results : packed_internal_manager_operation_result list;
+      internal_operation_results : packed_internal_operation_result list;
     }
       -> 'kind Kind.manager contents_result
 

@@ -183,19 +183,19 @@ type 'kind internal_operation_result =
     'kind successful_internal_operation_result )
   operation_result
 
-type packed_internal_manager_operation_result =
+type packed_internal_operation_result =
   | Internal_operation_result :
       'kind internal_operation * 'kind internal_operation_result
-      -> packed_internal_manager_operation_result
+      -> packed_internal_operation_result
 
-let pack_internal_manager_operation_result (type kind)
+let pack_internal_operation_result (type kind)
     (internal_op : kind Script_typed_ir.internal_operation)
     (manager_op : kind internal_operation_result) =
   let internal_op = internal_operation internal_op in
   Internal_operation_result (internal_op, manager_op)
 
 type 'kind iselect =
-  packed_internal_manager_operation_result ->
+  packed_internal_operation_result ->
   ('kind internal_operation * 'kind internal_operation_result) option
 
 module Internal_result = struct
@@ -657,8 +657,8 @@ module Internal_manager_result = struct
       ~inj:(fun consumed_gas -> IEvent_result {consumed_gas})
 end
 
-let internal_manager_operation_result_encoding :
-    packed_internal_manager_operation_result Data_encoding.t =
+let internal_operation_result_encoding :
+    packed_internal_operation_result Data_encoding.t =
   let make (type kind)
       (Internal_manager_result.MCase res_case :
         kind Internal_manager_result.case)

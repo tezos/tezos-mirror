@@ -1925,14 +1925,14 @@ let apply_internal_operations ctxt ~payer ~chain_id ops =
         >>= function
         | Error errors ->
             let result =
-              pack_internal_manager_operation_result
+              pack_internal_operation_result
                 op
                 (Failed (Script_typed_ir.manager_kind op.operation, errors))
             in
             let skipped =
               List.rev_map
                 (fun (Script_typed_ir.Internal_operation op) ->
-                  pack_internal_manager_operation_result
+                  pack_internal_operation_result
                     op
                     (Skipped (Script_typed_ir.manager_kind op.operation)))
                 rest
@@ -1941,8 +1941,7 @@ let apply_internal_operations ctxt ~payer ~chain_id ops =
         | Ok (ctxt, result, emitted) ->
             apply
               ctxt
-              (pack_internal_manager_operation_result op (Applied result)
-              :: applied)
+              (pack_internal_operation_result op (Applied result) :: applied)
               (emitted @ rest))
   in
   apply ctxt [] ops
@@ -2162,7 +2161,7 @@ let apply_manager_contents (type kind) ctxt chain_id
     (op : kind Kind.manager contents) :
     (success_or_failure
     * kind manager_operation_result
-    * packed_internal_manager_operation_result list)
+    * packed_internal_operation_result list)
     Lwt.t =
   let[@coq_match_with_default] (Manager_operation
                                  {

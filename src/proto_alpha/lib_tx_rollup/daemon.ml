@@ -164,7 +164,7 @@ let extract_messages_from_block block_info rollup_id =
       source:public_key_hash ->
       kind manager_operation ->
       kind manager_operation_result ->
-      packed_internal_manager_operation_result list ->
+      packed_internal_operation_result list ->
       Tx_rollup_message.t list * Ticket.t list ->
       Tx_rollup_message.t list * Ticket.t list =
    fun ~source op result internal_operation_results messages_tickets ->
@@ -712,7 +712,7 @@ let handle_l1_operation direction (block : Alpha_block_services.block_info)
       source:public_key_hash ->
       kind manager_operation ->
       kind manager_operation_result ->
-      packed_internal_manager_operation_result list ->
+      packed_internal_operation_result list ->
       'acc ->
       'acc tzresult Lwt.t =
    fun ~source op result _internal_operation_results acc ->
