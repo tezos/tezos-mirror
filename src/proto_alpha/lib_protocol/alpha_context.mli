@@ -4664,6 +4664,7 @@ module Ticket_balance : sig
 end
 
 module First_level_of_protocol : sig
+  (** Get the level of the first block of this protocol. *)
   val get : context -> Raw_level.t tzresult Lwt.t
 end
 
