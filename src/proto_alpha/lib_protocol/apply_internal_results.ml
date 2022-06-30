@@ -492,7 +492,7 @@ let internal_operation_encoding : packed_internal_operation Data_encoding.t =
           (obj2 (req "source" Contract.encoding) (req "nonce" uint16))
           Internal_operation.encoding)
 
-module Internal_manager_result = struct
+module Internal_operation_result = struct
   type 'kind case =
     | MCase : {
         op_case : 'kind Internal_operation.case;
@@ -660,8 +660,8 @@ end
 let internal_operation_result_encoding :
     packed_internal_operation_result Data_encoding.t =
   let make (type kind)
-      (Internal_manager_result.MCase res_case :
-        kind Internal_manager_result.case)
+      (Internal_operation_result.MCase res_case :
+        kind Internal_operation_result.case)
       (Internal_operation.MCase ires_case : kind Internal_operation.case) =
     let (Internal_operation.MCase op_case) = res_case.op_case in
     case
@@ -686,13 +686,13 @@ let internal_operation_result_encoding :
   @@ union
        [
          make
-           Internal_manager_result.transaction_case
+           Internal_operation_result.transaction_case
            Internal_operation.transaction_case;
          make
-           Internal_manager_result.origination_case
+           Internal_operation_result.origination_case
            Internal_operation.origination_case;
          make
-           Internal_manager_result.delegation_case
+           Internal_operation_result.delegation_case
            Internal_operation.delegation_case;
          make Internal_manager_result.event_case Internal_operation.event_case;
        ]
