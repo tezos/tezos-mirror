@@ -132,7 +132,6 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     return genesis_state
 
   let state_of_hash node_ctxt store hash =
-    let open Node_context in
     let open Lwt_result_syntax in
     let*! state = Store.PVMState.find store hash in
     match state with

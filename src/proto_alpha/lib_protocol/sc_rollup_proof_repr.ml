@@ -26,7 +26,7 @@
 
 type t = {
   pvm_step : Sc_rollups.wrapped_proof;
-  inbox : Sc_rollup_inbox_repr.proof option;
+  inbox : Sc_rollup_inbox_repr.serialized_proof option;
 }
 
 let encoding =
@@ -36,7 +36,7 @@ let encoding =
     (fun (pvm_step, inbox) -> {pvm_step; inbox})
     (obj2
        (req "pvm_step" Sc_rollups.wrapped_proof_encoding)
-       (req "inbox" (option Sc_rollup_inbox_repr.proof_encoding)))
+       (req "inbox" (option Sc_rollup_inbox_repr.serialized_proof_encoding)))
 
 let pp ppf _ = Format.fprintf ppf "Refutation game proof"
 
@@ -86,26 +86,31 @@ let valid snapshot commit_level ~pvm_name proof =
   let* () = check (String.equal P.name pvm_name) "Incorrect PVM kind" in
   let input_requested = P.proof_input_requested P.proof in
   let input_given = P.proof_input_given P.proof in
+  let check_inbox_proof serialized_inbox_proof (level, counter) =
+    match Sc_rollup_inbox_repr.of_serialized_proof serialized_inbox_proof with
+    | None -> return None
+    | Some inbox_proof ->
+        Sc_rollup_inbox_repr.verify_proof (level, counter) snapshot inbox_proof
+  in
+  let pp_proof fmt serialized_inbox_proof =
+    match Sc_rollup_inbox_repr.of_serialized_proof serialized_inbox_proof with
+    | None -> Format.pp_print_string fmt "<invalid-proof-serialization>"
+    | Some proof -> Sc_rollup_inbox_repr.pp_proof fmt proof
+  in
   let* input =
     match (input_requested, proof.inbox) with
     | Sc_rollup_PVM_sem.No_input_required, None -> return None
     | Sc_rollup_PVM_sem.Initial, Some inbox_proof ->
-        Sc_rollup_inbox_repr.verify_proof
-          (Raw_level_repr.root, Z.zero)
-          snapshot
-          inbox_proof
+        check_inbox_proof inbox_proof (Raw_level_repr.root, Z.zero)
     | Sc_rollup_PVM_sem.First_after (level, counter), Some inbox_proof ->
-        Sc_rollup_inbox_repr.verify_proof
-          (level, Z.succ counter)
-          snapshot
-          inbox_proof
+        check_inbox_proof inbox_proof (level, Z.succ counter)
     | _ ->
         proof_error
           (Format.asprintf
              "input_requested is %a, inbox proof is %a"
              Sc_rollup_PVM_sem.pp_input_request
              input_requested
-             (Format.pp_print_option Sc_rollup_inbox_repr.pp_proof)
+             (Format.pp_print_option pp_proof)
              proof.inbox)
   in
   let* () =
@@ -124,6 +129,18 @@ module type PVM_with_context_and_state = sig
   val context : context
 
   val state : state
+
+  val proof_encoding : proof Data_encoding.t
+
+  module Inbox_with_history : sig
+    include
+      Sc_rollup_inbox_repr.MerkelizedOperations
+        with type inbox_context = context
+
+    val inbox : Sc_rollup_inbox_repr.history_proof
+
+    val history : history
+  end
 end
 
 let of_lwt_result result =
@@ -131,31 +148,25 @@ let of_lwt_result result =
   let*! r = result in
   match r with Ok x -> return x | Error e -> fail e
 
-let produce pvm_and_state inbox_context inbox_history inbox commit_level =
+let produce pvm_and_state commit_level =
   let open Lwt_tzresult_syntax in
   let (module P : PVM_with_context_and_state) = pvm_and_state in
+  let open P in
   let*! request = P.is_input_state P.state in
   let* inbox, input_given =
     match request with
     | Sc_rollup_PVM_sem.No_input_required -> return (None, None)
     | Sc_rollup_PVM_sem.Initial ->
         let* p, i =
-          Sc_rollup_inbox_repr.produce_proof
-            inbox_context
-            inbox_history
-            inbox
-            (Raw_level_repr.root, Z.zero)
+          Inbox_with_history.(
+            produce_proof context history inbox (Raw_level_repr.root, Z.zero))
         in
-        return (Some p, i)
+        return (Some (Inbox_with_history.to_serialized_proof p), i)
     | Sc_rollup_PVM_sem.First_after (l, n) ->
         let* p, i =
-          Sc_rollup_inbox_repr.produce_proof
-            inbox_context
-            inbox_history
-            inbox
-            (l, Z.succ n)
+          Inbox_with_history.(produce_proof context history inbox (l, Z.succ n))
         in
-        return (Some p, i)
+        return (Some (Inbox_with_history.to_serialized_proof p), i)
   in
   let input_given = Option.bind input_given (cut_at_level commit_level) in
   let* pvm_step_proof =

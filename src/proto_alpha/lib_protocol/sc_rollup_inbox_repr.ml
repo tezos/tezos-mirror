@@ -338,6 +338,10 @@ let key_of_message ix =
 
 let level_key = ["level"]
 
+type serialized_proof = bytes
+
+let serialized_proof_encoding = Data_encoding.bytes
+
 module type MerkelizedOperations = sig
   type inbox_context
 
@@ -402,7 +406,9 @@ module type MerkelizedOperations = sig
 
   val pp_proof : Format.formatter -> proof -> unit
 
-  val proof_encoding : proof Data_encoding.t
+  val to_serialized_proof : proof -> serialized_proof
+
+  val of_serialized_proof : serialized_proof -> proof option
 
   val verify_proof :
     Raw_level_repr.t * Z.t ->
@@ -911,6 +917,10 @@ struct
                 upper_level;
               });
       ]
+
+  let of_serialized_proof = Data_encoding.Binary.of_bytes_opt proof_encoding
+
+  let to_serialized_proof = Data_encoding.Binary.to_bytes_exn proof_encoding
 
   let proof_error reason =
     let open Lwt_tzresult_syntax in
