@@ -76,6 +76,7 @@ Grafazos provides several ready-to-use dashboards for Octez on the `Grafazos pac
 Their sources are also available as `jsonnet <https://jsonnet.org/>`__ files, that can be adjusted to build customized dashboards, if needed:
 
 
-- `octez-basic`: A basic dashboard with all the node metrics
-- `octez-full`: A full dashboard with the logs and hardware data.
+- ``octez-basic``: A basic dashboard with all the node metrics
+- ``octez-full``: A full dashboard with the logs and hardware data.
   This dashboard should be used with `Netdata <https://www.netdata.cloud/>`_  (for supporting hardware data) and `Promtail <https://grafana.com/docs/loki/latest/clients/promtail/>`_ (for exporting the logs).
+- ``octez-compact``: A compact dashboard that gives a brief overwiev of the various node metrics on a single page.
