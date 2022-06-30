@@ -33,8 +33,10 @@ module Make (T : Tree.S) = struct
     module Decoding = Tree_decoding.Make (T)
   end
 
+  open Tree.Decoding
+
   let list_decoding item_enc =
-    let open Tree.Decoding in
+    let open Syntax in
     let* length = value ["length"] Data_encoding.int32 in
     let* head = value ["head"] Data_encoding.int32 in
     let* get_item = lazy_mapping (fun key -> [Int32.to_string key]) item_enc in
@@ -47,7 +49,7 @@ module Make (T : Tree.S) = struct
     of_lwt (Instance.Vector.to_list vector)
 
   let ref_decoding_for ref_type modules =
-    let open Tree.Decoding in
+    let open Syntax in
     match ref_type with
     | FuncRefType ->
         let* modul_id = value ["module"] Data_encoding.int32 in
@@ -62,14 +64,14 @@ module Make (T : Tree.S) = struct
         Script.ExternRef value
 
   let ref_decoding modules =
-    let open Tree.Decoding in
+    let open Syntax in
     let* ref_type =
       value ["type"] Interpreter_encodings.Types.ref_type_encoding
     in
     ref_decoding_for ref_type modules
 
   let value_decoding modules =
-    let open Tree.Decoding in
+    let open Syntax in
     let* value_type =
       value ["type"] Interpreter_encodings.Types.value_type_encoding
     in
@@ -91,16 +93,15 @@ module Make (T : Tree.S) = struct
     | _ -> failwith "Unsupported value_type"
 
   let var_list_decoding =
-    let open Tree.Decoding in
     list_decoding (value [] Interpreter_encodings.Ast.var_encoding)
 
   let memory_chunk_decoding =
-    let open Tree.Decoding in
+    let open Syntax in
     let+ bytes = raw [] in
     Chunked_byte_vector.Chunk.of_bytes bytes
 
   let memory_decoding =
-    let open Tree.Decoding in
+    let open Syntax in
     let+ min_pages = value ["min"] Data_encoding.int32
     and+ max_pages = value ["max"] Data_encoding.int32
     and+ get_chunk =
@@ -115,7 +116,7 @@ module Make (T : Tree.S) = struct
     Memory.of_chunks (MemoryType {min = min_pages; max = Some max_pages}) chunks
 
   let table_decoding modules =
-    let open Tree.Decoding in
+    let open Syntax in
     let+ min = value ["min"] Data_encoding.int32
     and+ max = value ["max"] Data_encoding.int32
     and+ get_ref =
@@ -130,14 +131,14 @@ module Make (T : Tree.S) = struct
     Table.of_lazy_vector table_type table_entries
 
   let global_decoding modules =
-    let open Tree.Decoding in
+    let open Syntax in
     let+ type_ = value ["type"] Interpreter_encodings.Types.mutability_encoding
     and+ value = tree ["value"] (value_decoding modules) in
     let ty = GlobalType (Values.type_of_value value, type_) in
     Global.alloc ty value
 
   let lazy_vector_decoding field_name tree_encoding =
-    let open Tree.Decoding in
+    let open Syntax in
     let+ count = value ["num-" ^ field_name] Data_encoding.int32
     and+ get_instance =
       tree
@@ -155,7 +156,7 @@ module Make (T : Tree.S) = struct
     lazy_vector_decoding "globals" (global_decoding modules)
 
   let data_decoding =
-    let open Tree.Decoding in
+    let open Syntax in
     let+ length = value ["length"] Data_encoding.int64
     and+ get_chunk =
       lazy_mapping (fun index -> [Int64.to_string index]) memory_chunk_decoding
@@ -166,7 +167,7 @@ module Make (T : Tree.S) = struct
 
   let rec instruction_decoding () =
     let open Ast in
-    let open Tree.Decoding in
+    let open Syntax in
     let* tag = value ["tag"] Data_encoding.string in
     let+ instr =
       match tag with
@@ -397,7 +398,7 @@ module Make (T : Tree.S) = struct
     list_decoding (instruction_decoding ())
 
   let function_decoding current_module =
-    let open Tree.Decoding in
+    let open Syntax in
     let* is_host_func =
       value
         ["kind"]
@@ -422,13 +423,12 @@ module Make (T : Tree.S) = struct
     lazy_vector_decoding "functions" (function_decoding current_module)
 
   let type_instance_decoding =
-    let open Tree.Decoding in
     lazy_vector_decoding
       "types"
       (value [] Interpreter_encodings.Types.func_type_encoding)
 
   let elem_decoding funcs =
-    let open Tree.Decoding in
+    let open Syntax in
     let+ length = value ["length"] Data_encoding.int32
     and+ get_ref =
       lazy_mapping
@@ -453,7 +453,7 @@ module Make (T : Tree.S) = struct
     | ExportGlobal of int32
 
   let export_decoding funcs tables memories globals =
-    let open Tree.Decoding in
+    let open Syntax in
     let* export =
       value
         []
@@ -497,7 +497,7 @@ module Make (T : Tree.S) = struct
         Instance.ExternGlobal value
 
   let export_instance_decoding funcs tables memories globals =
-    let open Tree.Decoding in
+    let open Syntax in
     let+ get_export =
       lazy_mapping
         (fun name -> Format.[asprintf "%a" (pp_print_list pp_print_int) name])
@@ -506,7 +506,7 @@ module Make (T : Tree.S) = struct
     Instance.NameMap.create ~produce_value:get_export ()
 
   let module_instance_decoding modules =
-    let open Tree.Decoding in
+    let open Syntax in
     let current_module = ref Instance.empty_module_inst in
     let* memories = memory_instance_decoding in
     let* tables = table_instance_decoding modules in
@@ -523,7 +523,7 @@ module Make (T : Tree.S) = struct
     modul
 
   let module_instances_decoding =
-    let open Tree.Decoding in
+    let open Syntax in
     let self = ref (fun () -> failwith "Uninitialized!") in
     let* count = value ["count"] Data_encoding.int32 in
     let modules =
