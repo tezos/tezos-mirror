@@ -424,6 +424,11 @@ let current_level store =
 
 let hash_of_level = State.hash_of_level
 
+let level_of_hash store hash =
+  let open Lwt_syntax in
+  let* (Block {level; _}) = State.block_of_hash store hash in
+  return level
+
 let predecessor store (Head {hash; _}) =
   let open Lwt_syntax in
   let+ (Block {predecessor; _}) = State.block_of_hash store hash in
