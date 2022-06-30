@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    Testnet dictator key
-   Invocation:   dune exec tezt/tests/main.exe -- --file governance_dictator.ml
+   Invocation:   dune exec tezt/tests/main.exe -- --file testnet_dictator.ml
    Subject:      This tests that, on testnets where a dictator key is setup,
                  the dictator is able to force a protocol migration.
 *)
@@ -102,7 +102,7 @@ let init_with_dictator ~chain_id ~protocol =
         (["blocks_per_cycle"], Some "4");
         (["cycles_per_voting_period"], Some "1");
         (["nonce_revelation_threshold"], Some "3");
-        (["governance_dictator"], Some ("\"" ^ dictator.public_key_hash ^ "\""));
+        (["testnet_dictator"], Some ("\"" ^ dictator.public_key_hash ^ "\""));
       ]
   in
   let* () =
@@ -136,7 +136,7 @@ let register_test chain_id period =
     ~__FILE__
     ~title:
       (sf
-         "governance dictator (%s, %s)"
+         "testnet dictator (%s, %s)"
          (string_of_chain_id chain_id)
          (Voting.period_kind_to_string period))
     ~tags:

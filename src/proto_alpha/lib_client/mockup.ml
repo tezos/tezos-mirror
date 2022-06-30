@@ -100,7 +100,7 @@ module Protocol_constants_overrides = struct
     frozen_deposits_percentage : int option;
     double_baking_punishment : Tez.t option;
     ratio_of_frozen_deposits_slashed_per_double_endorsement : Ratio.t option;
-    governance_dictator : Signature.Public_key_hash.t option option;
+    testnet_dictator : Signature.Public_key_hash.t option option;
     cache_script_size : int option;
     cache_stake_distribution_cycles : int option;
     cache_sampler_state_cycles : int option;
@@ -267,7 +267,7 @@ module Protocol_constants_overrides = struct
                   c.frozen_deposits_percentage,
                   c.double_baking_punishment,
                   c.ratio_of_frozen_deposits_slashed_per_double_endorsement,
-                  c.governance_dictator,
+                  c.testnet_dictator,
                   c.chain_id,
                   c.timestamp,
                   c.initial_seed ),
@@ -309,7 +309,7 @@ module Protocol_constants_overrides = struct
                      frozen_deposits_percentage,
                      double_baking_punishment,
                      ratio_of_frozen_deposits_slashed_per_double_endorsement,
-                     governance_dictator,
+                     testnet_dictator,
                      chain_id,
                      timestamp,
                      initial_seed ),
@@ -352,7 +352,7 @@ module Protocol_constants_overrides = struct
           frozen_deposits_percentage;
           double_baking_punishment;
           ratio_of_frozen_deposits_slashed_per_double_endorsement;
-          governance_dictator;
+          testnet_dictator;
           cache_script_size;
           cache_stake_distribution_cycles;
           cache_sampler_state_cycles;
@@ -408,7 +408,7 @@ module Protocol_constants_overrides = struct
                         "ratio_of_frozen_deposits_slashed_per_double_endorsement"
                         Ratio.encoding)
                      (opt
-                        "governance_dictator"
+                        "testnet_dictator"
                         (option Signature.Public_key_hash.encoding))
                      (opt "chain_id" Chain_id.encoding)
                      (opt "initial_timestamp" Time.Protocol.encoding)
@@ -486,7 +486,7 @@ module Protocol_constants_overrides = struct
         ratio_of_frozen_deposits_slashed_per_double_endorsement =
           Some
             parametric.ratio_of_frozen_deposits_slashed_per_double_endorsement;
-        governance_dictator = Some parametric.governance_dictator;
+        testnet_dictator = Some parametric.testnet_dictator;
         cache_script_size = Some parametric.cache_script_size;
         cache_stake_distribution_cycles =
           Some parametric.cache_stake_distribution_cycles;
@@ -580,7 +580,7 @@ module Protocol_constants_overrides = struct
       frozen_deposits_percentage = None;
       double_baking_punishment = None;
       ratio_of_frozen_deposits_slashed_per_double_endorsement = None;
-      governance_dictator = None;
+      testnet_dictator = None;
       cache_script_size = None;
       cache_stake_distribution_cycles = None;
       cache_sampler_state_cycles = None;
@@ -1037,8 +1037,8 @@ module Protocol_constants_overrides = struct
            Option.value
              ~default:c.ratio_of_frozen_deposits_slashed_per_double_endorsement
              o.ratio_of_frozen_deposits_slashed_per_double_endorsement;
-         governance_dictator =
-           Option.value ~default:c.governance_dictator o.governance_dictator;
+         testnet_dictator =
+           Option.value ~default:c.testnet_dictator o.testnet_dictator;
          (* Notice that the chain_id and the timestamp are not used here
             as they are not protocol constants... *)
          cache_script_size =

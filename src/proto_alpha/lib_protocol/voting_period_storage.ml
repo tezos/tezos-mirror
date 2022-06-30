@@ -193,7 +193,7 @@ let get_rpc_succ_info ctxt =
   in
   Voting_period_repr.{voting_period; position; remaining}
 
-module Governance_dictator = struct
+module Testnet_dictator = struct
   type error += Forbidden_on_mainnet
 
   let overwrite_current_kind ctxt chain_id kind =
