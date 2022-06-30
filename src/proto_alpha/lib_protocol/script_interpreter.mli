@@ -203,4 +203,57 @@ module Internals : sig
 
     val ilog : ('a, 's, 'b, 't, 'r, 'f) ilog
   end
+
+  module Raw : sig
+    open Local_gas_counter
+    open Script_interpreter_defs
+
+    val kmap_exit : ('a, 'b, 'c, 'e, 'f, 'm, 'n, 'o) kmap_exit_type
+
+    val kmap_enter : ('a, 'b, 'c, 'd, 'f, 'i, 'j, 'k) kmap_enter_type
+
+    val klist_exit : ('a, 'b, 'c, 'd, 'e, 'i, 'j) klist_exit_type
+
+    val klist_enter : ('a, 'b, 'c, 'd, 'e, 'f, 'j) klist_enter_type
+
+    val kloop_in_left : ('a, 'b, 'c, 'd, 'e, 'f, 'g) kloop_in_left_type
+
+    val kloop_in : ('a, 'b, 'c, 'r, 'f, 's) kloop_in_type
+
+    val kiter : ('a, 'b, 's, 'r, 'f, 'c) kiter_type
+
+    val next :
+      outdated_context * step_constants ->
+      local_gas_counter ->
+      ('a, 's, 'r, 'f) continuation ->
+      'a ->
+      's ->
+      ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
+
+    val ilist_map : ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) ilist_map_type
+
+    val ilist_iter : ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'cmp) ilist_iter_type
+
+    val iset_iter : ('a, 'b, 'c, 'd, 'e, 'f, 'g) iset_iter_type
+
+    val imap_map : ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) imap_map_type
+
+    val imap_iter : ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'cmp) imap_iter_type
+
+    val imul_teznat : ('a, 'b, 'c, 'd, 'e, 'f) imul_teznat_type
+
+    val imul_nattez : ('a, 'b, 'c, 'd, 'e, 'f) imul_nattez_type
+
+    val ilsl_nat : ('a, 'b, 'c, 'd, 'e, 'f) ilsl_nat_type
+
+    val ilsr_nat : ('a, 'b, 'c, 'd, 'e, 'f) ilsr_nat_type
+
+    val ifailwith : ifailwith_type
+
+    val iexec : ('a, 'b, 'c, 'd, 'e, 'f, 'g) iexec_type
+
+    val iview : ('a, 'b, 'c, 'd, 'e, 'f, 'i, 'o) iview_type
+
+    val step : ('a, 's, 'b, 't, 'r, 'f) step_type
+  end
 end
