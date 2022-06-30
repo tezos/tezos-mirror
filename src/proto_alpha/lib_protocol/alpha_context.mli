@@ -1455,6 +1455,7 @@ module Sapling : sig
     val unparse_to_z : t -> Z.t (* To be used in unparse_data only *)
   end
 
+  (** Create a fresh sapling state in the context. *)
   val fresh : temporary:bool -> context -> (context * Id.t) tzresult Lwt.t
 
   type diff = private {
@@ -1521,6 +1522,7 @@ module Sapling : sig
     string ->
     (context * (Int64.t * state) option) tzresult Lwt.t
 
+  (** See {!Lazy_storage_kind.Sapling_state.alloc}. *)
   type alloc = {memo_size : Memo_size.t}
 
   type updates = diff
