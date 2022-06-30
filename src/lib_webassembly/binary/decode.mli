@@ -4,15 +4,13 @@ exception Code of Source.region * string
 
 (** Instruction parsing continuations. *)
 type instr_block_kont =
-  | IKStop of Ast.instr list  (** Final step of a block parsing. *)
-  | IKRev of Ast.instr list * Ast.instr list
-      (** Reversal of lists of instructions. *)
-  | IKNext of Ast.instr list
+  | IKStop of Ast.block_label  (** Final step of a block parsing. *)
+  | IKNext of Ast.block_label
       (** Tag parsing, containing the accumulation of already parsed values. *)
   | IKBlock of Ast.block_type * int  (** Block parsing step. *)
   | IKLoop of Ast.block_type * int  (** Loop parsing step. *)
   | IKIf1 of Ast.block_type * int  (** If parsing step. *)
-  | IKIf2 of Ast.block_type * int * Ast.instr list
+  | IKIf2 of Ast.block_type * int * Ast.block_label
       (** If .. else parsing step. *)
 
 (** Vector and size continuations *)

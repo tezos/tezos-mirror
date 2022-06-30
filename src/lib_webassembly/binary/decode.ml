@@ -13,10 +13,17 @@ let make_empty_block_state () = {new_blocks = Vector.(singleton (empty ()))}
 
 let make_block_state blocks = {new_blocks = blocks}
 
-let alloc_block s es =
+let alloc_block s =
   let b = Vector.num_elements s.new_blocks in
-  s.new_blocks <- Vector.(grow 1l s.new_blocks |> set b (of_list es)) ;
+  s.new_blocks <- Vector.(grow 1l s.new_blocks |> set b (empty ())) ;
   Ast.Block_label b
+
+let add_to_block s (Ast.Block_label b) instr =
+  let open Lwt.Syntax in
+  let+ block = Vector.get b s.new_blocks in
+  let i = Vector.num_elements block in
+  let block = Vector.(grow 1l block |> set i instr) in
+  s.new_blocks <- Vector.set b block s.new_blocks
 
 let empty_block = Ast.Block_label 0l
 
@@ -83,6 +90,13 @@ let illegal2 s pos b n =
 let at f s =
   let left = pos s in
   let x = f s in
+  let right = pos s in
+  Source.(x @@ region s left right)
+
+let at_s f s =
+  let open Lwt.Syntax in
+  let left = pos s in
+  let+ x = f s in
   let right = pos s in
   Source.(x @@ region s left right)
 
@@ -279,14 +293,13 @@ let block_type s =
 
 (** Instruction parsing continuations. *)
 type instr_block_kont =
-  | IKStop of instr list  (** Final step of a block parsing. *)
-  | IKRev of instr list * instr list  (** Reversal of lists of instructions. *)
-  | IKNext of instr list
+  | IKStop of block_label  (** Final step of a block parsing. *)
+  | IKNext of block_label
       (** Tag parsing, containing the accumulation of already parsed values. *)
   | IKBlock of block_type * int  (** Block parsing step. *)
   | IKLoop of block_type * int  (** Loop parsing step. *)
   | IKIf1 of block_type * int  (** If parsing step. *)
-  | IKIf2 of block_type * int * instr list  (** If .. else parsing step. *)
+  | IKIf2 of block_type * int * block_label  (** If .. else parsing step. *)
 
 let instr s pos tag =
   match tag with
@@ -894,55 +907,57 @@ let instr s pos tag =
   | b -> illegal s pos b
 
 let instr_block_step s bs cont =
+  let open Lwt.Syntax in
   match cont with
-  | [IKStop res] -> invalid_arg "instr_block"
-  | IKStop res :: IKBlock (bt, pos) :: IKNext es :: rest ->
+  | [IKStop lbl] -> invalid_arg "instr_block"
+  | IKStop lbl :: IKBlock (bt, pos) :: IKNext plbl :: rest ->
       end_ s ;
-      let e = Source.(block bt (alloc_block bs res) @@ region s pos pos) in
-      IKNext (e :: es) :: rest
-  | IKStop res :: IKLoop (bt, pos) :: IKNext es :: rest ->
+      let e = Source.(block bt lbl @@ region s pos pos) in
+      let+ () = add_to_block bs plbl e in
+      IKNext plbl :: rest
+  | IKStop lbl :: IKLoop (bt, pos) :: IKNext plbl :: rest ->
       end_ s ;
-      let e = Source.(loop bt (alloc_block bs res) @@ region s pos pos) in
-      IKNext (e :: es) :: rest
-  | IKStop res :: IKIf1 (bt, pos) :: IKNext es :: rest ->
-      if peek s = Some 0x05 then (
-        skip 1 s ;
-        IKNext [] :: IKIf2 (bt, pos, res) :: IKNext es :: rest)
+      let e = Source.(loop bt lbl @@ region s pos pos) in
+      let+ () = add_to_block bs plbl e in
+      IKNext plbl :: rest
+  | IKStop lbl1 :: IKIf1 (bt, pos) :: IKNext plbl :: rest ->
+      if peek s = Some 0x05 then
+        (skip 1 s ;
+         IKNext (alloc_block bs) :: IKIf2 (bt, pos, lbl1) :: IKNext plbl :: rest)
+        |> Lwt.return
       else (
         end_ s ;
-        let e =
-          Source.(if_ bt (alloc_block bs res) empty_block @@ region s pos pos)
-        in
-        IKNext (e :: es) :: rest)
-  | IKStop res2 :: IKIf2 (bt, pos, res1) :: IKNext es :: rest ->
+        let e = Source.(if_ bt lbl1 empty_block @@ region s pos pos) in
+        let+ () = add_to_block bs plbl e in
+        IKNext plbl :: rest)
+  | IKStop lbl2 :: IKIf2 (bt, pos, lbl1) :: IKNext plbl :: rest ->
       end_ s ;
-      let e =
-        Source.(
-          if_ bt (alloc_block bs res1) (alloc_block bs res2) @@ region s pos pos)
-      in
-      IKNext (e :: es) :: rest
-  | IKRev ([], es) :: ks -> IKStop es :: ks
-  | IKRev (e :: rest, es) :: ks -> IKRev (rest, e :: es) :: ks
-  | IKNext es :: ks -> (
+      let e = Source.(if_ bt lbl1 lbl2 @@ region s pos pos) in
+      let+ () = add_to_block bs plbl e in
+      IKNext plbl :: rest
+  | IKNext lbl :: ks -> (
       match peek s with
-      | None | Some (0x05 | 0x0b) -> IKRev (es, []) :: ks
+      | None | Some (0x05 | 0x0b) -> IKStop lbl :: ks |> Lwt.return
       | _ -> (
           let pos = pos s in
           let tag = op s in
           match tag with
           | 0x02 ->
               let bt = block_type s in
-              IKNext [] :: IKBlock (bt, pos) :: IKNext es :: ks
+              IKNext (alloc_block bs) :: IKBlock (bt, pos) :: IKNext lbl :: ks
+              |> Lwt.return
           | 0x03 ->
               let bt = block_type s in
-              IKNext [] :: IKLoop (bt, pos) :: IKNext es :: ks
+              IKNext (alloc_block bs) :: IKLoop (bt, pos) :: IKNext lbl :: ks
+              |> Lwt.return
           | 0x04 ->
               let bt = block_type s in
-              IKNext [] :: IKIf1 (bt, pos) :: IKNext es :: ks
+              IKNext (alloc_block bs) :: IKIf1 (bt, pos) :: IKNext lbl :: ks
+              |> Lwt.return
           | _ ->
-              let e = instr s pos tag in
-              let es = Source.(e @@ region s pos pos) :: es in
-              IKNext es :: ks))
+              let e = Source.(instr s pos tag @@ region s pos pos) in
+              let+ () = add_to_block bs lbl e in
+              IKNext lbl :: ks))
   (* Stop can only be followed a new block, or being the final state. *)
   | IKStop _ :: _ -> invalid_arg "instr_block"
   (* These continuations never reduce directly and are always preceded by an end
@@ -1245,7 +1260,8 @@ let code_step s bs =
   | CKLocalsAccumulate
       {left; size; pos; vec_kont = Lazy_vec {vector = locals; _} as vec_kont; _}
     when is_end_of_vec vec_kont ->
-      CKBody {left; size; locals; const_kont = [IKNext []]} |> Lwt.return
+      CKBody {left; size; locals; const_kont = [IKNext (alloc_block bs)]}
+      |> Lwt.return
   | CKLocalsAccumulate
       {
         left;
@@ -1283,24 +1299,22 @@ let code_step s bs =
       end_ s ;
       check_size size s ;
       let func =
-        at' left s
-        @@ {
-             locals;
-             body = alloc_block bs body;
-             ftype = Source.(-1l @@ Source.no_region);
-           }
+        at' left s @@ {locals; body; ftype = Source.(-1l @@ Source.no_region)}
       in
       CKStop func |> Lwt.return
   | CKBody {left; size; locals; const_kont} ->
-      CKBody {left; size; locals; const_kont = instr_block_step s bs const_kont}
-      |> Lwt.return
+      let+ const_kont = instr_block_step s bs const_kont in
+      CKBody {left; size; locals; const_kont}
   | CKStop _ -> assert false (* final step, cannot reduce *)
 
 (* Element section *)
 
 let elem_index bs s =
+  let open Lwt.Syntax in
   let x = at var s in
-  alloc_block bs [Source.(ref_func x @@ x.at)]
+  let b = alloc_block bs in
+  let+ () = add_to_block bs b Source.(ref_func x @@ x.at) in
+  b
 
 let elem_kind s =
   match u8 s with
@@ -1333,7 +1347,7 @@ type elem_kont =
       (** Element segment initialization code parsing step for constant values. *)
   | EKStop of elem_segment'  (** Final step of a segment parsing. *)
 
-let ek_start s =
+let ek_start s bs =
   let v = vu32 s in
   match v with
   | 0x00l ->
@@ -1346,7 +1360,7 @@ let ek_start s =
           index;
           index_kind = Indexed;
           early_ref_type = Some FuncRefType;
-          offset_kont = (left, [IKNext []]);
+          offset_kont = (left, [IKNext (alloc_block bs)]);
         }
   | 0x01l ->
       (* passive *)
@@ -1366,7 +1380,7 @@ let ek_start s =
           index;
           index_kind = Indexed;
           early_ref_type = None;
-          offset_kont = (left_offset, [IKNext []]);
+          offset_kont = (left_offset, [IKNext (alloc_block bs)]);
         }
   | 0x03l ->
       (* declarative *)
@@ -1379,13 +1393,14 @@ let ek_start s =
       (* active_zero *)
       let index = Source.(0l @@ Source.no_region) in
       let left = pos s in
+      let lbl = alloc_block bs in
       EKMode
         {
           left;
           index;
           index_kind = Const;
           early_ref_type = Some FuncRefType;
-          offset_kont = (left, [IKNext []]);
+          offset_kont = (left, [IKNext lbl]);
         }
   | 0x05l ->
       (* passive *)
@@ -1399,7 +1414,7 @@ let ek_start s =
           mode;
           ref_type;
           einit_vec = init_lazy_vec (Int32.of_int n);
-          einit_kont = (left, [IKNext []]);
+          einit_kont = (left, [IKNext (alloc_block bs)]);
         }
   | 0x06l ->
       (* active *)
@@ -1412,7 +1427,7 @@ let ek_start s =
           index;
           index_kind = Const;
           early_ref_type = None;
-          offset_kont = (left_offset, [IKNext []]);
+          offset_kont = (left_offset, [IKNext (alloc_block bs)]);
         }
   | 0x07l ->
       (* declarative *)
@@ -1426,12 +1441,14 @@ let ek_start s =
           mode;
           ref_type;
           einit_vec = init_lazy_vec (Int32.of_int n);
-          einit_kont = (left, [IKNext []]);
+          einit_kont = (left, [IKNext (alloc_block bs)]);
         }
   | _ -> error s (pos s - 1) "malformed elements segment kind"
 
-let elem_step s bs = function
-  | EKStart -> ek_start s
+let elem_step s bs =
+  let open Lwt.Syntax in
+  function
+  | EKStart -> ek_start s bs |> Lwt.return
   | EKMode
       {
         left;
@@ -1442,9 +1459,7 @@ let elem_step s bs = function
       } ->
       end_ s ;
       let right = pos s in
-      let offset =
-        Source.(alloc_block bs offset @@ region s left_offset right)
-      in
+      let offset = Source.(offset @@ region s left_offset right) in
       let mode = Source.(Active {index; offset} @@ region s left right) in
       let ref_type =
         match early_ref_type with
@@ -1456,6 +1471,7 @@ let elem_step s bs = function
       if index_kind = Indexed then
         EKInitIndexed
           {mode; ref_type; einit_vec = init_lazy_vec (Int32.of_int n)}
+        |> Lwt.return
       else
         let left = pos s in
         EKInitConst
@@ -1463,11 +1479,12 @@ let elem_step s bs = function
             mode;
             ref_type;
             einit_vec = init_lazy_vec (Int32.of_int n);
-            einit_kont = (left, [IKNext []]);
+            einit_kont = (left, [IKNext (alloc_block bs)]);
           }
+        |> Lwt.return
   | EKMode
       {left; index; index_kind; early_ref_type; offset_kont = left_offset, k} ->
-      let k' = instr_block_step s bs k in
+      let+ k' = instr_block_step s bs k in
       EKMode
         {
           left;
@@ -1482,10 +1499,10 @@ let elem_step s bs = function
   | EKInitIndexed
       {mode; ref_type; einit_vec = Lazy_vec {vector = einit; _} as einit_vec}
     when is_end_of_vec einit_vec ->
-      EKStop {etype = ref_type; einit; emode = mode}
+      EKStop {etype = ref_type; einit; emode = mode} |> Lwt.return
   (* Indexed *)
   | EKInitIndexed {mode; ref_type; einit_vec} ->
-      let elem_index = at (elem_index bs) s in
+      let+ elem_index = at_s (elem_index bs) s in
       EKInitIndexed
         {mode; ref_type; einit_vec = lazy_vec_step elem_index einit_vec}
   (* Const *)
@@ -1493,16 +1510,17 @@ let elem_step s bs = function
     ->
       end_ s ;
       let right = pos s in
-      let einit = Source.(alloc_block bs einit @@ region s left right) in
+      let einit = Source.(einit @@ region s left right) in
       EKInitConst
         {
           mode;
           ref_type;
           einit_vec = lazy_vec_step einit einit_vec;
-          einit_kont = (right, [IKNext []]);
+          einit_kont = (right, [IKNext (alloc_block bs)]);
         }
+      |> Lwt.return
   | EKInitConst {mode; ref_type; einit_vec; einit_kont = left, k} ->
-      let k' = instr_block_step s bs k in
+      let+ k' = instr_block_step s bs k in
       EKInitConst {mode; ref_type; einit_vec; einit_kont = (left, k')}
   | EKStop _ -> assert false (* Final step, cannot reduce *)
 
@@ -1518,13 +1536,13 @@ type data_kont =
   | DKInit of {dmode : segment_mode; init_kont : byte_vector_kont}
   | DKStop of data_segment'  (** Final step of a data segment parsing. *)
 
-let data_start s =
+let data_start s bs =
   match vu32 s with
   | 0x00l ->
       (* active_zero *)
       let index = Source.(0l @@ Source.no_region) in
       let left = pos s in
-      DKMode {left; index; offset_kont = (left, [IKNext []])}
+      DKMode {left; index; offset_kont = (left, [IKNext (alloc_block bs)])}
   | 0x01l ->
       (* passive *)
       let mode_pos = pos s in
@@ -1535,24 +1553,23 @@ let data_start s =
       let left = pos s in
       let index = at var s in
       let left_offset = pos s in
-      DKMode {left; index; offset_kont = (left_offset, [IKNext []])}
+      DKMode
+        {left; index; offset_kont = (left_offset, [IKNext (alloc_block bs)])}
   | _ -> error s (pos s - 1) "malformed data segment kind"
 
 let data_step s bs =
   let open Lwt.Syntax in
   function
-  | DKStart -> data_start s |> Lwt.return
+  | DKStart -> data_start s bs |> Lwt.return
   | DKMode {left; index; offset_kont = left_offset, [IKStop offset]} ->
       end_ s ;
       let right = pos s in
-      let offset =
-        Source.(alloc_block bs offset @@ region s left_offset right)
-      in
+      let offset = Source.(offset @@ region s left_offset right) in
       let dmode = Source.(Active {index; offset} @@ region s left right) in
       DKInit {dmode; init_kont = VKStart} |> Lwt.return
   | DKMode {left; index; offset_kont = left_offset, k} ->
-      let k' = instr_block_step s bs k in
-      DKMode {left; index; offset_kont = (left_offset, k')} |> Lwt.return
+      let+ k' = instr_block_step s bs k in
+      DKMode {left; index; offset_kont = (left_offset, k')}
   | DKInit {dmode; init_kont = VKStop dinit} ->
       DKStop {dmode; dinit} |> Lwt.return
   | DKInit {dmode; init_kont} ->
@@ -1874,7 +1891,7 @@ let module_step state =
           next @@ MKField (ty, size, lazy_vec_step f vec)
       | GlobalField ->
           let gtype = global_type s in
-          next @@ MKGlobal (gtype, pos s, [IKNext []], size, vec)
+          next @@ MKGlobal (gtype, pos s, [IKNext (alloc_block bs)], size, vec)
       | ExportField -> next @@ MKExport (ExpKStart, pos s, size, vec)
       | StartField ->
           (* not a vector *)
@@ -1904,16 +1921,18 @@ let module_step state =
       next @@ MKExport (export_step s k, pos, size, curr_vec)
   | MKGlobal (gtype, left, [IKStop res], size, vec) ->
       end_ s ;
-      let ginit = Source.(alloc_block bs res @@ region s left (pos s)) in
+      let ginit = Source.(res @@ region s left (pos s)) in
       let f = Source.({gtype; ginit} @@ region s left (pos s)) in
       next @@ MKField (GlobalField, size, lazy_vec_step f vec)
   | MKGlobal (ty, pos, k, size, curr_vec) ->
-      next @@ MKGlobal (ty, pos, instr_block_step s bs k, size, curr_vec)
+      let* k = instr_block_step s bs k in
+      next @@ MKGlobal (ty, pos, k, size, curr_vec)
   | MKElem (EKStop elem, left, size, vec) ->
       let elem = Source.(elem @@ region s left (pos s)) in
       next @@ MKField (ElemField, size, lazy_vec_step elem vec)
   | MKElem (elem_kont, pos, size, curr_vec) ->
-      next @@ MKElem (elem_step s bs elem_kont, pos, size, curr_vec)
+      let* elem_kont = elem_step s bs elem_kont in
+      next @@ MKElem (elem_kont, pos, size, curr_vec)
   | MKData (DKStop data, left, size, vec) ->
       let data = Source.(data @@ region s left (pos s)) in
       next @@ MKField (DataField, size, lazy_vec_step data vec)
