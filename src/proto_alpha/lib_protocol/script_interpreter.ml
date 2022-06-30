@@ -1603,6 +1603,8 @@ end
 open Raw
 
 module For_logging = struct
+  open Script_interpreter_logging
+
   (*
 
   Zero-cost logging
@@ -1635,19 +1637,9 @@ module For_logging = struct
    fun (logger, event) sty ((ctxt, _) as g) gas k ks accu stack ->
     (match (k, event) with
     | ILog _, LogEntry -> ()
-    | _, LogEntry ->
-        Script_interpreter_logging.log_entry logger ctxt gas k sty accu stack
-    | _, LogExit prev_loc ->
-        Script_interpreter_logging.log_exit
-          logger
-          ctxt
-          gas
-          prev_loc
-          k
-          sty
-          accu
-          stack) ;
-    Script_interpreter_logging.log_next_kinstr logger sty k >>?= fun k ->
+    | _, LogEntry -> log_entry logger ctxt gas k sty accu stack
+    | _, LogExit prev_loc -> log_exit logger ctxt gas prev_loc k sty accu stack) ;
+    log_next_kinstr logger sty k >>?= fun k ->
     (* We need to match on instructions that create continuations so
        that we can instrument those continuations with [KLog] (see
        comment above).  For functions that don't do this, we simply call
@@ -1655,7 +1647,7 @@ module For_logging = struct
     match k with
     | IIf_none {branch_if_none; branch_if_some; k; _} -> (
         let (Item_t (Option_t (ty, _, _), rest)) = sty in
-        Script_interpreter_logging.branched_final_stack_type
+        branched_final_stack_type
           [
             Ex_init_stack_ty (rest, branch_if_none);
             Ex_init_stack_ty (Item_t (ty, rest), branch_if_some);
@@ -1664,9 +1656,7 @@ module For_logging = struct
         let ks' =
           match sty_opt with
           | None -> KCons (k, ks)
-          | Some sty' ->
-              Script_interpreter_logging.instrument_cont logger sty'
-              @@ KCons (k, ks)
+          | Some sty' -> instrument_cont logger sty' @@ KCons (k, ks)
         in
         match accu with
         | None ->
@@ -1680,21 +1670,16 @@ module For_logging = struct
             let (Item_t (Option_t (ty, _, _), rest)) = sty in
             let bsty = Item_t (ty, rest) in
             let kmap_head = KMap_head (Option.some, KCons (k, ks)) in
-            Script_interpreter_logging.kinstr_final_stack_type bsty body
-            >>?= fun sty_opt ->
+            kinstr_final_stack_type bsty body >>?= fun sty_opt ->
             let ks' =
               match sty_opt with
               | None -> kmap_head
-              | Some sty' ->
-                  Script_interpreter_logging.instrument_cont
-                    logger
-                    sty'
-                    kmap_head
+              | Some sty' -> instrument_cont logger sty' kmap_head
             in
             (step [@ocaml.tailcall]) g gas body ks' v stack)
     | IIf_left {branch_if_left; branch_if_right; k; _} -> (
         let (Item_t (Union_t (lty, rty, _, _), rest)) = sty in
-        Script_interpreter_logging.branched_final_stack_type
+        branched_final_stack_type
           [
             Ex_init_stack_ty (Item_t (lty, rest), branch_if_left);
             Ex_init_stack_ty (Item_t (rty, rest), branch_if_right);
@@ -1703,16 +1688,14 @@ module For_logging = struct
         let k' =
           match sty_opt with
           | None -> KCons (k, ks)
-          | Some sty' ->
-              Script_interpreter_logging.instrument_cont logger sty'
-              @@ KCons (k, ks)
+          | Some sty' -> instrument_cont logger sty' @@ KCons (k, ks)
         in
         match accu with
         | L v -> (step [@ocaml.tailcall]) g gas branch_if_left k' v stack
         | R v -> (step [@ocaml.tailcall]) g gas branch_if_right k' v stack)
     | IIf_cons {branch_if_cons; branch_if_nil; k; _} -> (
         let (Item_t ((List_t (elty, _) as lty), rest)) = sty in
-        Script_interpreter_logging.branched_final_stack_type
+        branched_final_stack_type
           [
             Ex_init_stack_ty (rest, branch_if_nil);
             Ex_init_stack_ty (Item_t (elty, Item_t (lty, rest)), branch_if_cons);
@@ -1721,9 +1704,7 @@ module For_logging = struct
         let k' =
           match sty' with
           | None -> KCons (k, ks)
-          | Some sty' ->
-              Script_interpreter_logging.instrument_cont logger sty'
-              @@ KCons (k, ks)
+          | Some sty' -> instrument_cont logger sty' @@ KCons (k, ks)
         in
         match Script_list.uncons accu with
         | None ->
@@ -1733,33 +1714,23 @@ module For_logging = struct
             (step [@ocaml.tailcall]) g gas branch_if_cons k' hd (tl, stack))
     | IList_map (_, body, ty, k) ->
         let (Item_t (_, sty')) = sty in
-        let instrument =
-          Script_interpreter_logging.instrument_cont logger sty'
-        in
+        let instrument = instrument_cont logger sty' in
         (ilist_map [@ocaml.tailcall]) instrument g gas body k ks ty accu stack
     | IList_iter (_, ty, body, k) ->
         let (Item_t (_, sty')) = sty in
-        let instrument =
-          Script_interpreter_logging.instrument_cont logger sty'
-        in
+        let instrument = instrument_cont logger sty' in
         (ilist_iter [@ocaml.tailcall]) instrument g gas body ty k ks accu stack
     | ISet_iter (_, ty, body, k) ->
         let (Item_t (_, rest)) = sty in
-        let instrument =
-          Script_interpreter_logging.instrument_cont logger rest
-        in
+        let instrument = instrument_cont logger rest in
         (iset_iter [@ocaml.tailcall]) instrument g gas body ty k ks accu stack
     | IMap_map (_, ty, body, k) ->
         let (Item_t (_, rest)) = sty in
-        let instrument =
-          Script_interpreter_logging.instrument_cont logger rest
-        in
+        let instrument = instrument_cont logger rest in
         (imap_map [@ocaml.tailcall]) instrument g gas body k ks ty accu stack
     | IMap_iter (_, kvty, body, k) ->
         let (Item_t (_, rest)) = sty in
-        let instrument =
-          Script_interpreter_logging.instrument_cont logger rest
-        in
+        let instrument = instrument_cont logger rest in
         (imap_iter [@ocaml.tailcall]) instrument g gas body kvty k ks accu stack
     | IMul_teznat (loc, k) ->
         (imul_teznat [@ocaml.tailcall]) (Some logger) g gas loc k ks accu stack
@@ -1771,7 +1742,7 @@ module For_logging = struct
         (ilsr_nat [@ocaml.tailcall]) (Some logger) g gas loc k ks accu stack
     | IIf {branch_if_true; branch_if_false; k; _} ->
         let (Item_t (Bool_t, rest)) = sty in
-        Script_interpreter_logging.branched_final_stack_type
+        branched_final_stack_type
           [
             Ex_init_stack_ty (rest, branch_if_true);
             Ex_init_stack_ty (rest, branch_if_false);
@@ -1780,70 +1751,54 @@ module For_logging = struct
         let k' =
           match sty' with
           | None -> KCons (k, ks)
-          | Some sty' ->
-              Script_interpreter_logging.instrument_cont logger sty'
-              @@ KCons (k, ks)
+          | Some sty' -> instrument_cont logger sty' @@ KCons (k, ks)
         in
         let res, stack = stack in
         if accu then (step [@ocaml.tailcall]) g gas branch_if_true k' res stack
         else (step [@ocaml.tailcall]) g gas branch_if_false k' res stack
     | ILoop (_, body, k) ->
-        let ks =
-          Script_interpreter_logging.instrument_cont logger sty
-          @@ KLoop_in (body, KCons (k, ks))
-        in
+        let ks = instrument_cont logger sty @@ KLoop_in (body, KCons (k, ks)) in
         (next [@ocaml.tailcall]) g gas ks accu stack
     | ILoop_left (_, bl, br) ->
         let ks =
-          Script_interpreter_logging.instrument_cont logger sty
-          @@ KLoop_in_left (bl, KCons (br, ks))
+          instrument_cont logger sty @@ KLoop_in_left (bl, KCons (br, ks))
         in
         (next [@ocaml.tailcall]) g gas ks accu stack
     | IDip (_, b, ty, k) ->
         let (Item_t (_, rest)) = sty in
-        Script_interpreter_logging.kinstr_final_stack_type rest b
-        >>?= fun rest' ->
+        kinstr_final_stack_type rest b >>?= fun rest' ->
         let ign = accu in
         let ks =
           match rest' with
           | None -> KUndip (ign, ty, KCons (k, ks))
           | Some rest' ->
-              Script_interpreter_logging.instrument_cont
-                logger
-                rest'
-                (KUndip (ign, ty, KCons (k, ks)))
+              instrument_cont logger rest' (KUndip (ign, ty, KCons (k, ks)))
         in
         let accu, stack = stack in
         (step [@ocaml.tailcall]) g gas b ks accu stack
     | IExec (_, stack_ty, k) ->
         let (Item_t (_, Item_t (Lambda_t (_, ret, _), _))) = sty in
         let sty' = Item_t (ret, Bot_t) in
-        let instrument =
-          Script_interpreter_logging.instrument_cont logger sty'
-        in
+        let instrument = instrument_cont logger sty' in
         iexec instrument (Some logger) g gas stack_ty k ks accu stack
     | IFailwith (kloc, tv) ->
         let {ifailwith} = ifailwith in
         (ifailwith [@ocaml.tailcall]) (Some logger) g gas kloc tv accu
     | IDipn (_, _n, n', b, k) ->
         let accu, stack, restore_prefix = kundip n' accu stack k in
-        let dipped_sty = Script_interpreter_logging.dipn_stack_ty n' sty in
-        Script_interpreter_logging.kinstr_final_stack_type dipped_sty b
-        >>?= fun sty' ->
+        let dipped_sty = dipn_stack_ty n' sty in
+        kinstr_final_stack_type dipped_sty b >>?= fun sty' ->
         let ks =
           match sty' with
           | None -> KCons (restore_prefix, ks)
           | Some sty' ->
-              Script_interpreter_logging.instrument_cont logger sty'
-              @@ KCons (restore_prefix, ks)
+              instrument_cont logger sty' @@ KCons (restore_prefix, ks)
         in
         (step [@ocaml.tailcall]) g gas b ks accu stack
     | IView (_, (View_signature {output_ty; _} as view_signature), stack_ty, k)
       ->
         let sty' = Item_t (output_ty, Bot_t) in
-        let instrument =
-          Script_interpreter_logging.instrument_cont logger sty'
-        in
+        let instrument = instrument_cont logger sty' in
         (iview [@ocaml.tailcall])
           instrument
           g
@@ -1880,11 +1835,8 @@ module For_logging = struct
       | None -> assert false
       | Some ty -> ty
     in
-    (match ks with
-    | KLog _ -> ()
-    | _ -> Script_interpreter_logging.log_control logger ks) ;
-    Script_interpreter_logging.log_next_continuation logger stack_ty ks
-    >>?= function
+    (match ks with KLog _ -> () | _ -> log_control logger ks) ;
+    log_next_continuation logger stack_ty ks >>?= function
     | KCons (ki, k) -> (step [@ocaml.tailcall]) g gas ki k accu stack
     | KLoop_in (ki, k) -> (kloop_in [@ocaml.tailcall]) g gas k0 ki k accu stack
     | KReturn (_, _, _) as k -> (next [@ocaml.tailcall]) g gas k accu stack
@@ -1892,16 +1844,14 @@ module For_logging = struct
         (kloop_in_left [@ocaml.tailcall]) g gas k0 ki k accu stack
     | KUndip (_, _, _) as k -> (next [@ocaml.tailcall]) g gas k accu stack
     | KIter (body, xty, xs, k) ->
-        let instrument =
-          Script_interpreter_logging.instrument_cont logger stack_ty
-        in
+        let instrument = instrument_cont logger stack_ty in
         (kiter [@ocaml.tailcall]) instrument g gas body xty xs k accu stack
     | KList_enter_body (body, xs, ys, ty_opt, len, k) ->
         let instrument =
           let ty = ty_for_logging_unsafe ty_opt in
           let (List_t (vty, _)) = ty in
           let sty = Item_t (vty, stack_ty) in
-          Script_interpreter_logging.instrument_cont logger sty
+          instrument_cont logger sty
         in
         (klist_enter [@ocaml.tailcall])
           instrument
@@ -1917,9 +1867,7 @@ module For_logging = struct
           stack
     | KList_exit_body (body, xs, ys, ty_opt, len, k) ->
         let (Item_t (_, rest)) = stack_ty in
-        let instrument =
-          Script_interpreter_logging.instrument_cont logger rest
-        in
+        let instrument = instrument_cont logger rest in
         (klist_exit [@ocaml.tailcall])
           instrument
           g
@@ -1937,7 +1885,7 @@ module For_logging = struct
           let ty = ty_for_logging_unsafe ty_opt in
           let (Map_t (_, vty, _)) = ty in
           let sty = Item_t (vty, stack_ty) in
-          Script_interpreter_logging.instrument_cont logger sty
+          instrument_cont logger sty
         in
         (kmap_enter [@ocaml.tailcall])
           instrument
@@ -1952,9 +1900,7 @@ module For_logging = struct
           stack
     | KMap_exit_body (body, xs, ys, yk, ty_opt, k) ->
         let (Item_t (_, rest)) = stack_ty in
-        let instrument =
-          Script_interpreter_logging.instrument_cont logger rest
-        in
+        let instrument = instrument_cont logger rest in
         (kmap_exit [@ocaml.tailcall])
           instrument
           g
