@@ -154,6 +154,7 @@ struct
           n ;
         Stdlib.exit 1
 
+  module CamlinternalFormatBasics = CamlinternalFormatBasics
   include Stdlib
   module Pervasives = Stdlib
 

@@ -1,9 +1,11 @@
 (* This file was automatically generated, do not edit.*)
 (* Edit file v0.in.ml instead. *)
 # 1 "v0.in.ml"
-open Tezos_protocol_environment_sigs_internals
-
 module type T = sig
+  module CamlinternalFormatBasics : module type of struct
+    include Tezos_protocol_environment_sigs_internals.CamlinternalFormatBasics
+  end
+
   module Pervasives : sig
 # 1 "v0/pervasives.mli"
 (**************************************************************************)
@@ -479,7 +481,7 @@ val ( ^^ ) :
   ('f, 'b, 'c, 'e, 'g, 'h) format6 ->
   ('a, 'b, 'c, 'd, 'g, 'h) format6
 end
-# 4 "v0.in.ml"
+# 6 "v0.in.ml"
 
 
   open Pervasives
@@ -796,7 +798,7 @@ val sort_uniq : ('a -> 'a -> int) -> 'a list -> 'a list
 *)
 val merge : ('a -> 'a -> int) -> 'a list -> 'a list -> 'a list
 end
-# 8 "v0.in.ml"
+# 10 "v0.in.ml"
 
 
   module String : sig
@@ -1100,7 +1102,7 @@ module LE : sig
   val get_int64 : t -> int -> int64
 end
 end
-# 10 "v0.in.ml"
+# 12 "v0.in.ml"
 
 
   module Int32 : sig
@@ -1291,7 +1293,7 @@ val compare : t -> t -> int
     @since 4.03.0 *)
 val equal : t -> t -> bool
 end
-# 12 "v0.in.ml"
+# 14 "v0.in.ml"
 
 
   module Int64 : sig
@@ -1503,7 +1505,7 @@ val compare : t -> t -> int
     @since 4.03.0 *)
 val equal : t -> t -> bool
 end
-# 14 "v0.in.ml"
+# 16 "v0.in.ml"
 
 
   module Format : sig
@@ -2146,7 +2148,7 @@ val ksprintf : (string -> 'a) -> ('b, unit, string, 'a) format4 -> 'b
 *)
 val kasprintf : (string -> 'a) -> ('b, formatter, unit, 'a) format4 -> 'b
 end
-# 16 "v0.in.ml"
+# 18 "v0.in.ml"
 
 
   module MBytes : sig
@@ -2302,7 +2304,7 @@ val to_hex : t -> [`Hex of string]
 
 val of_hex : [`Hex of string] -> t
 end
-# 18 "v0.in.ml"
+# 20 "v0.in.ml"
 
 
   module Z : sig
@@ -2434,7 +2436,7 @@ val compare : t -> t -> int
     for negative arguments, and that [numbits (-x) = numbits x]. *)
 val numbits : t -> int
 end
-# 20 "v0.in.ml"
+# 22 "v0.in.ml"
 
 
   module Lwt : sig
@@ -2908,7 +2910,7 @@ val ( <&> ) : unit t -> unit t -> unit t
 (* val backtrace_try_bind : (exn -> exn) -> (unit -> 'a t) -> ('a -> 'b t) -> (exn -> 'b t) -> 'b t *)
 (* val backtrace_finalize : (exn -> exn) -> (unit -> 'a t) -> (unit -> unit t) -> 'a t *)
 end
-# 22 "v0.in.ml"
+# 24 "v0.in.ml"
 
 
   module Lwt_list : sig
@@ -2990,7 +2992,7 @@ val partition_s : ('a -> bool Lwt.t) -> 'a list -> ('a list * 'a list) Lwt.t
 
 val partition_p : ('a -> bool Lwt.t) -> 'a list -> ('a list * 'a list) Lwt.t
 end
-# 24 "v0.in.ml"
+# 26 "v0.in.ml"
 
 
   module Raw_hashes : sig
@@ -3026,7 +3028,7 @@ val sha256 : MBytes.t -> MBytes.t
 
 val sha512 : MBytes.t -> MBytes.t
 end
-# 26 "v0.in.ml"
+# 28 "v0.in.ml"
 
 
   module Compare : sig
@@ -3112,7 +3114,7 @@ module List (P : COMPARABLE) : S with type t = P.t list
 
 module Option (P : COMPARABLE) : S with type t = P.t option
 end
-# 28 "v0.in.ml"
+# 30 "v0.in.ml"
 
 
   module Data_encoding : sig
@@ -3541,7 +3543,7 @@ end
     the JSON encoding. *)
 val check_size : int -> 'a encoding -> 'a encoding
 end
-# 30 "v0.in.ml"
+# 32 "v0.in.ml"
 
 
   module Error_monad : sig
@@ -3742,7 +3744,7 @@ type shell_error
 
 type 'a shell_tzresult = ('a, shell_error list) result
 end
-# 32 "v0.in.ml"
+# 34 "v0.in.ml"
 
 
   open Error_monad
@@ -3796,7 +3798,7 @@ val lwt_warn : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 
 val lwt_log_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 end
-# 36 "v0.in.ml"
+# 38 "v0.in.ml"
 
 
   module Time : sig
@@ -3850,7 +3852,7 @@ val rfc_encoding : t Data_encoding.t
 
 val pp_hum : Format.formatter -> t -> unit
 end
-# 38 "v0.in.ml"
+# 40 "v0.in.ml"
 
 
   module Option : sig
@@ -3896,7 +3898,7 @@ val try_with : (unit -> 'a) -> 'a option
 
 val some : 'a -> 'a option
 end
-# 40 "v0.in.ml"
+# 42 "v0.in.ml"
 
 
   module RPC_arg : sig
@@ -3958,7 +3960,7 @@ type ('a, 'b) eq = Eq : ('a, 'a) eq
 
 val eq : 'a arg -> 'b arg -> ('a, 'b) eq option
 end
-# 42 "v0.in.ml"
+# 44 "v0.in.ml"
 
 
   module RPC_path : sig
@@ -4014,7 +4016,7 @@ val add_final_args :
 val ( /:* ) :
   ('prefix, 'params) path -> 'a RPC_arg.t -> ('prefix, 'params * 'a list) path
 end
-# 44 "v0.in.ml"
+# 46 "v0.in.ml"
 
 
   module RPC_query : sig
@@ -4086,7 +4088,7 @@ exception Invalid of string
 
 val parse : 'a query -> untyped -> 'a
 end
-# 46 "v0.in.ml"
+# 48 "v0.in.ml"
 
 
   module RPC_service : sig
@@ -4163,7 +4165,7 @@ val put_service :
   ('prefix, 'params) RPC_path.t ->
   ([`PUT], 'prefix, 'params, 'query, 'input, 'output) service
 end
-# 48 "v0.in.ml"
+# 50 "v0.in.ml"
 
 
   module RPC_answer : sig
@@ -4215,7 +4217,7 @@ val not_found : 'o t Lwt.t
 
 val fail : error list -> 'a t Lwt.t
 end
-# 50 "v0.in.ml"
+# 52 "v0.in.ml"
 
 
   module RPC_directory : sig
@@ -4454,7 +4456,7 @@ val register_dynamic_directory :
   ('a -> 'a directory Lwt.t) ->
   'prefix directory
 end
-# 52 "v0.in.ml"
+# 54 "v0.in.ml"
 
 
   module Base58 : sig
@@ -4504,7 +4506,7 @@ val check_encoded_prefix : 'a encoding -> string -> int -> unit
 
 val decode : string -> data option
 end
-# 54 "v0.in.ml"
+# 56 "v0.in.ml"
 
 
   module S : sig
@@ -4864,7 +4866,7 @@ module type SIGNATURE = sig
   val check : ?watermark:watermark -> Public_key.t -> t -> MBytes.t -> bool
 end
 end
-# 56 "v0.in.ml"
+# 58 "v0.in.ml"
 
 
   module Set : sig
@@ -4934,7 +4936,7 @@ end
     given a totally ordered type. *)
 module Make (Ord : OrderedType) : S.SET with type elt = Ord.t
 end
-# 58 "v0.in.ml"
+# 60 "v0.in.ml"
 
 
   module Map : sig
@@ -5003,7 +5005,7 @@ end
     given a totally ordered type. *)
 module Make (Ord : OrderedType) : S.MAP with type key = Ord.t
 end
-# 60 "v0.in.ml"
+# 62 "v0.in.ml"
 
 
   module Blake2B : sig
@@ -5066,7 +5068,7 @@ module Make (Register : sig
 end)
 (Name : PrefixedName) : S.HASH
 end
-# 62 "v0.in.ml"
+# 64 "v0.in.ml"
 
 
   module Ed25519 : sig
@@ -5100,7 +5102,7 @@ end
 
 include S.SIGNATURE with type watermark := MBytes.t
 end
-# 64 "v0.in.ml"
+# 66 "v0.in.ml"
 
 
   module Secp256k1 : sig
@@ -5134,7 +5136,7 @@ end
 
 include S.SIGNATURE with type watermark := MBytes.t
 end
-# 66 "v0.in.ml"
+# 68 "v0.in.ml"
 
 
   module P256 : sig
@@ -5168,7 +5170,7 @@ end
 
 include S.SIGNATURE with type watermark := MBytes.t
 end
-# 68 "v0.in.ml"
+# 70 "v0.in.ml"
 
 
   module Chain_id : sig
@@ -5200,7 +5202,7 @@ end
 
 include S.HASH
 end
-# 70 "v0.in.ml"
+# 72 "v0.in.ml"
 
 
   module Signature : sig
@@ -5252,7 +5254,7 @@ include
      and type Public_key.t = public_key
      and type watermark := watermark
 end
-# 72 "v0.in.ml"
+# 74 "v0.in.ml"
 
 
   module Block_hash : sig
@@ -5285,7 +5287,7 @@ end
 (** Blocks hashes / IDs. *)
 include S.HASH
 end
-# 74 "v0.in.ml"
+# 76 "v0.in.ml"
 
 
   module Operation_hash : sig
@@ -5318,7 +5320,7 @@ end
 (** Operations hashes / IDs. *)
 include S.HASH
 end
-# 76 "v0.in.ml"
+# 78 "v0.in.ml"
 
 
   module Operation_list_hash : sig
@@ -5351,7 +5353,7 @@ end
 (** Blocks hashes / IDs. *)
 include S.MERKLE_TREE with type elt = Operation_hash.t
 end
-# 78 "v0.in.ml"
+# 80 "v0.in.ml"
 
 
   module Operation_list_list_hash : sig
@@ -5384,7 +5386,7 @@ end
 (** Blocks hashes / IDs. *)
 include S.MERKLE_TREE with type elt = Operation_list_hash.t
 end
-# 80 "v0.in.ml"
+# 82 "v0.in.ml"
 
 
   module Protocol_hash : sig
@@ -5417,7 +5419,7 @@ end
 (** Protocol hashes / IDs. *)
 include S.HASH
 end
-# 82 "v0.in.ml"
+# 84 "v0.in.ml"
 
 
   module Context_hash : sig
@@ -5450,7 +5452,7 @@ end
 (** Committed context hashes / IDs. *)
 include S.HASH
 end
-# 84 "v0.in.ml"
+# 86 "v0.in.ml"
 
 
   module Micheline : sig
@@ -5523,7 +5525,7 @@ val extract_locations :
 val inject_locations :
   (canonical_location -> 'l) -> 'p canonical -> ('l, 'p) node
 end
-# 86 "v0.in.ml"
+# 88 "v0.in.ml"
 
 
   module Block_header : sig
@@ -5574,7 +5576,7 @@ type t = {shell : shell_header; protocol_data : MBytes.t}
 
 include S.HASHABLE with type t := t and type hash := Block_hash.t
 end
-# 88 "v0.in.ml"
+# 90 "v0.in.ml"
 
 
   module Fitness : sig
@@ -5608,7 +5610,7 @@ end
     compared in a lexicographical order (longer list are greater). *)
 include S.T with type t = MBytes.t list
 end
-# 90 "v0.in.ml"
+# 92 "v0.in.ml"
 
 
   module Operation : sig
@@ -5652,7 +5654,7 @@ type t = {shell : shell_header; proto : MBytes.t}
 
 include S.HASHABLE with type t := t and type hash := Operation_hash.t
 end
-# 92 "v0.in.ml"
+# 94 "v0.in.ml"
 
 
   module Context : sig
@@ -5724,7 +5726,7 @@ val register_resolver :
 
 val complete : t -> string -> string list Lwt.t
 end
-# 94 "v0.in.ml"
+# 96 "v0.in.ml"
 
 
   module Updater : sig
@@ -5965,7 +5967,7 @@ val activate : Context.t -> Protocol_hash.t -> Context.t Lwt.t
 val fork_test_chain :
   Context.t -> protocol:Protocol_hash.t -> expiration:Time.t -> Context.t Lwt.t
 end
-# 96 "v0.in.ml"
+# 98 "v0.in.ml"
 
 
   module RPC_context : sig
@@ -6120,6 +6122,6 @@ val make_opt_call3 :
   'i ->
   'o option shell_tzresult Lwt.t
 end
-# 98 "v0.in.ml"
+# 100 "v0.in.ml"
 
 end

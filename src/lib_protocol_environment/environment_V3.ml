@@ -136,6 +136,7 @@ struct
           n ;
         Stdlib.exit 1
 
+  module CamlinternalFormatBasics = CamlinternalFormatBasics
   include Stdlib
 
   (* The modules provided in the [_struct.V3.M] pack are meant specifically to

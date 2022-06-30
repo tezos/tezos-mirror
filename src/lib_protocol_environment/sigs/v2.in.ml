@@ -1,6 +1,8 @@
-open Tezos_protocol_environment_sigs_internals
-
 module type T = sig
+  module CamlinternalFormatBasics : module type of struct
+    include Tezos_protocol_environment_sigs_internals.CamlinternalFormatBasics
+  end
+
   module Pervasives : [%sig "v2/pervasives.mli"]
 
   open Pervasives

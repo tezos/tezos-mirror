@@ -110,6 +110,7 @@ module Make (Param : sig
 end)
 () =
 struct
+  module CamlinternalFormatBasics = CamlinternalFormatBasics
   include Stdlib
 
   (* The modules provided in the [_struct.V1.M] pack are meant specifically to
