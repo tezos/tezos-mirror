@@ -3298,14 +3298,14 @@ end = struct
           ~internal_name:(sf "tezos_protocol_environment_%s" name_underscore)
           ~path:(path // "lib_protocol")
           ~opam:(sf "tezos-protocol-%s" name_dash)
-          ~modules:["Environment"]
+          ~modules:[sf "Tezos_protocol_environment_%s" name_underscore]
           ~linkall:true
           ~deps:[octez_protocol_environment]
           ~dune:
             Dune.
               [
                 targets_rule
-                  ["environment.ml"]
+                  [sf "tezos_protocol_environment_%s.ml" name_underscore]
                   ~action:
                     [
                       S "write-file";
@@ -3337,9 +3337,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
                ())
           ~deps:
             [
-              environment |> open_ ~m:"Environment"
-              |> open_ ~m:"Environment.Pervasives"
-              |> open_ ~m:"Environment.Error_monad";
+              environment |> open_ |> open_ ~m:"Pervasives"
+              |> open_ ~m:"Error_monad";
             ]
       in
       let main =
@@ -3383,7 +3382,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
                         (sf
                            {|
 let hash = Tezos_crypto.Protocol_hash.of_b58check_exn "%s"
-let name = Tezos_protocol_environment_%s.Environment.Name.name
+let name = Tezos_protocol_environment_%s.Name.name
 include Tezos_raw_protocol_%s
 include Tezos_raw_protocol_%s.Main
 |}
@@ -3401,7 +3400,7 @@ include Tezos_raw_protocol_%s.Main
                       S
                         (sf
                            {|
-module Environment = Tezos_protocol_environment_%s.Environment
+module Environment = Tezos_protocol_environment_%s
 module Protocol = Protocol
 |}
                            name_underscore);

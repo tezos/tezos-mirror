@@ -8,10 +8,10 @@
  (libraries
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
- (modules Environment))
+ (modules Tezos_protocol_environment_alpha))
 
 (rule
- (targets environment.ml)
+ (targets tezos_protocol_environment_alpha.ml)
  (action
   (write-file
    %{targets}
@@ -28,9 +28,9 @@
   (:standard)
   -nostdlib
   -nopervasives
-  -open Tezos_protocol_environment_alpha.Environment
-  -open Tezos_protocol_environment_alpha.Environment.Pervasives
-  -open Tezos_protocol_environment_alpha.Environment.Error_monad)
+  -open Tezos_protocol_environment_alpha
+  -open Tezos_protocol_environment_alpha.Pervasives
+  -open Tezos_protocol_environment_alpha.Error_monad)
  (modules
   Misc
   Non_empty_string
@@ -260,14 +260,14 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK\"\nlet name = Tezos_protocol_environment_alpha.Environment.Name.name\ninclude Tezos_raw_protocol_alpha\ninclude Tezos_raw_protocol_alpha.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK\"\nlet name = Tezos_protocol_environment_alpha.Name.name\ninclude Tezos_raw_protocol_alpha\ninclude Tezos_raw_protocol_alpha.Main\n")))
 
 (rule
  (targets tezos_protocol_alpha.ml)
  (action
   (write-file
    %{targets}
-   "\nmodule Environment = Tezos_protocol_environment_alpha.Environment\nmodule Protocol = Protocol\n")))
+   "\nmodule Environment = Tezos_protocol_environment_alpha\nmodule Protocol = Protocol\n")))
 
 (rule
  (alias runtest_compile_protocol)

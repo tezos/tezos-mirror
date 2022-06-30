@@ -8,10 +8,10 @@
  (libraries
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
- (modules Environment))
+ (modules Tezos_protocol_environment_012_Psithaca))
 
 (rule
- (targets environment.ml)
+ (targets tezos_protocol_environment_012_Psithaca.ml)
  (action
   (write-file
    %{targets}
@@ -29,9 +29,9 @@
   -w -51
   -nostdlib
   -nopervasives
-  -open Tezos_protocol_environment_012_Psithaca.Environment
-  -open Tezos_protocol_environment_012_Psithaca.Environment.Pervasives
-  -open Tezos_protocol_environment_012_Psithaca.Environment.Error_monad)
+  -open Tezos_protocol_environment_012_Psithaca
+  -open Tezos_protocol_environment_012_Psithaca.Pervasives
+  -open Tezos_protocol_environment_012_Psithaca.Error_monad)
  (modules
   Misc
   Non_empty_string
@@ -172,14 +172,14 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A\"\nlet name = Tezos_protocol_environment_012_Psithaca.Environment.Name.name\ninclude Tezos_raw_protocol_012_Psithaca\ninclude Tezos_raw_protocol_012_Psithaca.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A\"\nlet name = Tezos_protocol_environment_012_Psithaca.Name.name\ninclude Tezos_raw_protocol_012_Psithaca\ninclude Tezos_raw_protocol_012_Psithaca.Main\n")))
 
 (rule
  (targets tezos_protocol_012_Psithaca.ml)
  (action
   (write-file
    %{targets}
-   "\nmodule Environment = Tezos_protocol_environment_012_Psithaca.Environment\nmodule Protocol = Protocol\n")))
+   "\nmodule Environment = Tezos_protocol_environment_012_Psithaca\nmodule Protocol = Protocol\n")))
 
 (rule
  (alias runtest_compile_protocol)

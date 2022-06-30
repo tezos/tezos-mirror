@@ -8,10 +8,10 @@
  (libraries
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
- (modules Environment))
+ (modules Tezos_protocol_environment_008_PtEdo2Zk))
 
 (rule
- (targets environment.ml)
+ (targets tezos_protocol_environment_008_PtEdo2Zk.ml)
  (action
   (write-file
    %{targets}
@@ -29,9 +29,9 @@
   -w -6-7-9-16-29-32-51-68
   -nostdlib
   -nopervasives
-  -open Tezos_protocol_environment_008_PtEdo2Zk.Environment
-  -open Tezos_protocol_environment_008_PtEdo2Zk.Environment.Pervasives
-  -open Tezos_protocol_environment_008_PtEdo2Zk.Environment.Error_monad)
+  -open Tezos_protocol_environment_008_PtEdo2Zk
+  -open Tezos_protocol_environment_008_PtEdo2Zk.Pervasives
+  -open Tezos_protocol_environment_008_PtEdo2Zk.Error_monad)
  (modules
   Misc
   Storage_description
@@ -134,14 +134,14 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA\"\nlet name = Tezos_protocol_environment_008_PtEdo2Zk.Environment.Name.name\ninclude Tezos_raw_protocol_008_PtEdo2Zk\ninclude Tezos_raw_protocol_008_PtEdo2Zk.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtEdo2ZkT9oKpimTah6x2embF25oss54njMuPzkJTEi5RqfdZFA\"\nlet name = Tezos_protocol_environment_008_PtEdo2Zk.Name.name\ninclude Tezos_raw_protocol_008_PtEdo2Zk\ninclude Tezos_raw_protocol_008_PtEdo2Zk.Main\n")))
 
 (rule
  (targets tezos_protocol_008_PtEdo2Zk.ml)
  (action
   (write-file
    %{targets}
-   "\nmodule Environment = Tezos_protocol_environment_008_PtEdo2Zk.Environment\nmodule Protocol = Protocol\n")))
+   "\nmodule Environment = Tezos_protocol_environment_008_PtEdo2Zk\nmodule Protocol = Protocol\n")))
 
 (rule
  (alias runtest_compile_protocol)

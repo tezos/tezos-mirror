@@ -8,10 +8,10 @@
  (libraries
   tezos-protocol-environment)
  (library_flags (:standard -linkall))
- (modules Environment))
+ (modules Tezos_protocol_environment_genesis))
 
 (rule
- (targets environment.ml)
+ (targets tezos_protocol_environment_genesis.ml)
  (action
   (write-file
    %{targets}
@@ -28,9 +28,9 @@
   (:standard)
   -nostdlib
   -nopervasives
-  -open Tezos_protocol_environment_genesis.Environment
-  -open Tezos_protocol_environment_genesis.Environment.Pervasives
-  -open Tezos_protocol_environment_genesis.Environment.Error_monad)
+  -open Tezos_protocol_environment_genesis
+  -open Tezos_protocol_environment_genesis.Pervasives
+  -open Tezos_protocol_environment_genesis.Error_monad)
  (modules Data Services Main))
 
 (library
@@ -56,14 +56,14 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im\"\nlet name = Tezos_protocol_environment_genesis.Environment.Name.name\ninclude Tezos_raw_protocol_genesis\ninclude Tezos_raw_protocol_genesis.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im\"\nlet name = Tezos_protocol_environment_genesis.Name.name\ninclude Tezos_raw_protocol_genesis\ninclude Tezos_raw_protocol_genesis.Main\n")))
 
 (rule
  (targets tezos_protocol_genesis.ml)
  (action
   (write-file
    %{targets}
-   "\nmodule Environment = Tezos_protocol_environment_genesis.Environment\nmodule Protocol = Protocol\n")))
+   "\nmodule Environment = Tezos_protocol_environment_genesis\nmodule Protocol = Protocol\n")))
 
 (rule
  (alias runtest_compile_protocol)
