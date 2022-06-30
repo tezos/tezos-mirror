@@ -44,12 +44,6 @@ Remove Protocol Tests From Tezt
 The code of Tezt must be updated manually removing the protocol from the type
 `Protocol.t` and adapting the tests accordingly.
 
-Remove Testnets From ``tezos-docker-manager.sh``
-------------------------------------------------
-
-Mentions of the protocol's testnests should be removed from the script
-:src:`scripts/tezos-docker-manager.sh`.
-
 Remove Testnet From ``bin_node``
 --------------------------------
 

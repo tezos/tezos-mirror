@@ -277,12 +277,6 @@ command::
 
     tezos-client activate account alice with "tz1__xxxxxxxxx__.json"
 
-If you run Tezos using Docker images (via the ``tezos-docker-manager.sh`` script, renamed as ``ithacanet.sh``
-to run the Ithacanet test network for instance), you should prefix the file
-with ``container:`` in order to copy it into the Docker image::
-
-    ./ithacanet.sh client activate account alice with "container:tz1__xxxxxxxxx__.json"
-
 Let's check the balance of the new account with::
 
     tezos-client get balance for alice

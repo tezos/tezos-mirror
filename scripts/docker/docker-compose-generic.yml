@@ -14,7 +14,7 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-  ## Duplicate the `baker/endorser/accuser` containers for each PROTOCOL
+  ## Duplicate the `baker/accuser` containers for each PROTOCOL
   ## in file `active_protocol_versions`
   baker-alpha:
     image: tezos/tezos:latest

@@ -9,7 +9,6 @@ scripts/create_docker_image.sh
 scripts/opam-check.sh
 scripts/snapshot_alpha_and_link.sh
 scripts/snapshot_alpha.sh
-scripts/tezos-docker-manager.sh
 scripts/update_hashes.sh
 scripts/update_opam_repo.sh
 scripts/user_activated_upgrade.sh
