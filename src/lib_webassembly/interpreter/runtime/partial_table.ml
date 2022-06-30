@@ -23,9 +23,23 @@ let create size r =
   with
     Out_of_memory | Invalid_argument _ -> raise OutOfMemory
 
+let create_shallow size =
+  try
+    Vector.create size
+  with
+    Out_of_memory | Invalid_argument _ -> raise OutOfMemory
+
 let alloc (TableType (lim, _) as ty) r =
   if not (valid_limits lim) then raise Type;
   {ty; content = create lim.min r}
+
+let of_lazy_vector (TableType (lim, _) as ty) content =
+  if not (valid_limits lim) then raise Type;
+  {ty; content = Vector.of_immutable content}
+
+let alloc_shallow (TableType (lim, _) as ty) =
+  if not (valid_limits lim) then raise Type;
+  {ty; content = create_shallow lim.min}
 
 let size tab =
   Vector.num_elements tab.content

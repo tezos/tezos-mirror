@@ -8,11 +8,9 @@
 
 module Effect : sig
   module type S = sig
-    type 'a t
+    include Lazy_map.Effect.S
 
-    val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
-
-    val return : 'a -> 'a t
+    val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
   end
 
   module Identity : S with type 'a t = 'a
@@ -27,6 +25,8 @@ end
 *)
 module type KeyS = sig
   include Map.OrderedType
+
+  val unsigned_compare : t -> t -> int
 
   val zero : t
 
@@ -100,6 +100,10 @@ module type S = sig
 
   (** [concat lhs rhs] Concatenates two lazy vectors. *)
   val concat : 'a t -> 'a t -> 'a t
+
+  (** [to_list vector] extracts all values of the given [vector] and
+      collects them in a list.  *)
+  val to_list : 'a t -> 'a list effect
 end
 
 module Make (Effect : Effect.S) (Key : KeyS) : S with

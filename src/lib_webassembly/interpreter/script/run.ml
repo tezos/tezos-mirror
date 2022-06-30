@@ -121,6 +121,8 @@ let input_from get_script run =
       | IO (at, msg) -> error at "i/o error" msg
       | Assert (at, msg) -> error at "assertion failure" msg
       | Abort _ -> Lwt.return_false
+      | Lazy_map.UnexpectedAccess ->
+        error no_region "unexpected access" "Unexpected access in lazy map"
       | exn -> raise exn)
 
 let input_script start name lexbuf run =
@@ -329,7 +331,8 @@ let lookup_module = lookup "module" modules
 let lookup_instance = lookup "module" instances
 
 let lookup_registry module_name item_name _t =
-  match Instance.export (Map.find module_name !registry) item_name with
+  let+ value = Instance.export (Map.find module_name !registry) item_name in
+  match value with
   | Some ext -> ext
   | None -> raise Not_found
 
@@ -352,7 +355,8 @@ let run_action act : Values.value list Lwt.t =
   | Invoke (x_opt, name, vs) ->
     trace ("Invoking function \"" ^ Ast.string_of_name name ^ "\"...");
     let inst = lookup_instance x_opt act.at in
-    (match Instance.export inst name with
+    let* export = Instance.export inst name in
+    (match export with
     | Some (Instance.ExternFunc f) ->
       let Types.FuncType (ins, out) = Func.type_of f in
       if List.length vs <> List.length ins then
@@ -369,11 +373,13 @@ let run_action act : Values.value list Lwt.t =
  | Get (x_opt, name) ->
     trace ("Getting global \"" ^ Ast.string_of_name name ^ "\"...");
     let inst = lookup_instance x_opt act.at in
-    (match Instance.export inst name with
-    | Some (Instance.ExternGlobal gl) -> Lwt.return [Global.load gl]
+    let+ export = Instance.export inst name in
+    (match export with
+    | Some (Instance.ExternGlobal gl) -> [Global.load gl]
     | Some _ -> Assert.error act.at "export is not a global"
     | None -> Assert.error act.at "undefined export"
     )
+
 
 let assert_nan_pat n nan =
   let open Values in
@@ -472,7 +478,7 @@ let run_assertion ass : unit Lwt.t =
     if not !Flags.unchecked then Valid.check_module m;
     Lwt.try_bind
       (fun () ->
-        let imports = Import.link m in
+        let* imports = Import.link m in
         Eval.init m imports)
       (fun _ -> Assert.error ass.at "expected linking error")
       (function
@@ -486,7 +492,7 @@ let run_assertion ass : unit Lwt.t =
     if not !Flags.unchecked then Valid.check_module m;
     Lwt.try_bind
       (fun () ->
-        let imports = Import.link m in
+        let* imports = Import.link m in
         Eval.init m imports)
       (fun _ -> Assert.error ass.at "expected instantiation error")
       (function
@@ -537,7 +543,7 @@ let rec run_command cmd : unit Lwt.t =
     bind modules x_opt m;
     if not !Flags.dry then begin
       trace "Initializing...";
-      let imports = Import.link m in
+      let* imports = Import.link m in
       let+ inst = Eval.init m imports in
       bind instances x_opt inst
     end else begin

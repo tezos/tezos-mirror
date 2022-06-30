@@ -1,31 +1,27 @@
 module Effect = struct
   module type S = sig
-    type 'a t
+    include Lazy_map.Effect.S
 
-    val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
-
-    val return : 'a -> 'a t
+    val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
   end
 
   module Identity : S with type 'a t = 'a = struct
-    type 'a t = 'a
+    include Lazy_map.Effect.Identity
 
-    let ( let+ ) x f = f x
-
-    let return = Fun.id
+    let ( let* ) x f = f x
   end
 
   module Lwt : S with type 'a t = 'a Lwt.t = struct
-    type 'a t = 'a Lwt.t
+    include Lazy_map.Effect.Lwt
 
-    let ( let+ ) = Lwt.Syntax.(let+)
-
-    let return = Lwt.return
+    let ( let* ) = Lwt.bind
   end
 end
 
 module type KeyS = sig
   include Map.OrderedType
+
+  val unsigned_compare : t -> t -> int
 
   val zero : t
 
@@ -70,6 +66,8 @@ module type S = sig
   val grow : ?produce_value:'a producer -> key -> 'a t -> 'a t
 
   val concat : 'a t -> 'a t -> 'a t
+
+  val to_list : 'a t -> 'a list effect
 end
 
 module Make (Effect : Effect.S) (Key : KeyS) : S with
@@ -119,8 +117,7 @@ struct
     in
     create ~values num_elements
 
-  let invalid_key key map =
-    Key.compare key map.num_elements >= 0 || Key.compare key Key.zero < 0
+  let invalid_key key map = Key.unsigned_compare key map.num_elements >= 0
 
   let get key map =
     if invalid_key key map then raise Memory_exn.Bounds;
@@ -139,28 +136,29 @@ struct
     { first; values; num_elements }
 
   let grow ?produce_value delta map =
-    (* Make sure we only grow and never shrink. *)
-    if Key.compare delta Key.zero > 0 then
-      let map_produce_value old_produce_value =
-        match produce_value with
-        | Some produce_new_value ->
-          let boundary = Key.add map.num_elements map.first in
-          fun key ->
-            if Key.compare key boundary >= 0 then
-              (* Normalize the key so that it is relative to the boundary.
-                 The first new value will be produced with
-                 [produce_value Key.zero]. *)
-              let key = Key.sub key boundary in
-              produce_new_value key
-            else
-              old_produce_value key
-        | None -> old_produce_value
-      in
-      let values = Map.with_producer map_produce_value map.values in
-      let num_elements = Key.add map.num_elements delta in
-      { map with values; num_elements }
-    else
-      map
+    if
+      Key.unsigned_compare (Key.add delta map.num_elements) map.num_elements < 0
+    then
+      raise Memory_exn.SizeOverflow;
+
+    let map_produce_value old_produce_value =
+      match produce_value with
+      | Some produce_new_value ->
+        let boundary = Key.add map.num_elements map.first in
+        fun key ->
+          if Key.compare key boundary >= 0 then
+            (* Normalize the key so that it is relative to the boundary.
+                The first new value will be produced with
+                [produce_value Key.zero]. *)
+            let key = Key.sub key boundary in
+            produce_new_value key
+          else
+            old_produce_value key
+      | None -> old_produce_value
+    in
+    let values = Map.with_producer map_produce_value map.values in
+    let num_elements = Key.add map.num_elements delta in
+    { map with values; num_elements }
 
   let concat lhs rhs =
     let boundary = Key.add lhs.first lhs.num_elements in
@@ -180,6 +178,25 @@ struct
         lhs.values
     in
     { lhs with num_elements; values }
+
+  let to_list map =
+    let open Effect in
+    let rec unroll acc index =
+      if Key.unsigned_compare index Key.zero > 0 then
+        let* prefix = get index map in
+        (unroll [@ocaml.tailcall]) (prefix :: acc) (Key.pred index)
+      else
+        let* prefix = get Key.zero map in
+        return (prefix :: acc)
+    in
+    (unroll [@ocaml.tailcall]) [] (Key.pred map.num_elements)
+end
+
+module Int = struct
+  include Int
+
+  let unsigned_compare n m = compare (n - min_int) (m - min_int)
+
 end
 
 module IntVector = Make (Effect.Identity) (Int)
