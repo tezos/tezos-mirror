@@ -41,8 +41,15 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
   type endorsing_rights = Plugin.RPC.Endorsing_rights.delegate_rights list
 
   let endorsing_rights cctxt level =
+    let*? level =
+      Environment.wrap_tzresult
+      @@ Protocol.Alpha_context.Raw_level.of_int32 level
+    in
     let* answers =
-      Plugin.RPC.Endorsing_rights.get cctxt (cctxt#chain, `Level level)
+      Plugin.RPC.Endorsing_rights.get
+        cctxt
+        ~levels:[level]
+        (cctxt#chain, `Head 0)
     in
     match answers with
     | answer :: _ -> return answer.Plugin.RPC.Endorsing_rights.delegates_rights
