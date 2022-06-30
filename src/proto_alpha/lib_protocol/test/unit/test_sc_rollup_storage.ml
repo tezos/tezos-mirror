@@ -256,6 +256,21 @@ let test_deposit_to_missing_rollup () =
         rollup
         Sc_rollup_repr.Staker.zero)
 
+let test_last_cemented_commitment_hash_with_level_when_genesis () =
+  let* ctxt = new_context () in
+  let* rollup, genesis_hash, ctxt = lift @@ new_sc_rollup ctxt in
+  let* c1, inbox_level, ctxt =
+    lift
+    @@ Sc_rollup_commitment_storage.last_cemented_commitment_hash_with_level
+         ctxt
+         rollup
+  in
+  let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt genesis_hash c1 in
+  Assert.equal_int32
+    ~loc:__LOC__
+    (Raw_level_repr.to_int32 (Raw_context.current_level ctxt).level)
+    (Raw_level_repr.to_int32 inbox_level)
+
 let test_deposit_by_underfunded_staker () =
   let* ctxt, sc_rollup, _genesis_hash = new_context_with_rollup () in
   let staker =
@@ -3124,6 +3139,10 @@ let tests =
       "Fetching slot subscriptions of missing rollup fails"
       `Quick
       test_subscribed_slots_of_missing_rollup;
+    Tztest.tztest
+      "Originating a rollup creates a genesis commitment"
+      `Quick
+      test_last_cemented_commitment_hash_with_level_when_genesis;
   ]
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2460
