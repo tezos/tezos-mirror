@@ -141,7 +141,7 @@ type t = {
   frozen_deposits_percentage : int;
   double_baking_punishment : Tez_repr.t;
   ratio_of_frozen_deposits_slashed_per_double_endorsement : Ratio_repr.t;
-  governance_dictator : Signature.Public_key_hash.t option;
+  testnet_dictator : Signature.Public_key_hash.t option;
   initial_seed : State_hash.t option;
   (* If a new cache is added, please also modify the
      [cache_layout_size] value. *)
@@ -305,7 +305,7 @@ let encoding =
                 c.frozen_deposits_percentage,
                 c.double_baking_punishment,
                 c.ratio_of_frozen_deposits_slashed_per_double_endorsement,
-                c.governance_dictator,
+                c.testnet_dictator,
                 c.initial_seed ),
               ( ( c.cache_script_size,
                   c.cache_stake_distribution_cycles,
@@ -345,7 +345,7 @@ let encoding =
                    frozen_deposits_percentage,
                    double_baking_punishment,
                    ratio_of_frozen_deposits_slashed_per_double_endorsement,
-                   governance_dictator,
+                   testnet_dictator,
                    initial_seed ),
                  ( ( cache_script_size,
                      cache_stake_distribution_cycles,
@@ -386,7 +386,7 @@ let encoding =
         frozen_deposits_percentage;
         double_baking_punishment;
         ratio_of_frozen_deposits_slashed_per_double_endorsement;
-        governance_dictator;
+        testnet_dictator;
         initial_seed;
         cache_script_size;
         cache_stake_distribution_cycles;
@@ -443,9 +443,7 @@ let encoding =
                    (req
                       "ratio_of_frozen_deposits_slashed_per_double_endorsement"
                       Ratio_repr.encoding)
-                   (opt
-                      "governance_dictator"
-                      Signature.Public_key_hash.encoding)
+                   (opt "testnet_dictator" Signature.Public_key_hash.encoding)
                    (opt "initial_seed" State_hash.encoding))
                 (merge_objs
                    (obj3
