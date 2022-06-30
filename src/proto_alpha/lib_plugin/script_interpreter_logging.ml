@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
+open Environment
+open Error_monad
 open Alpha_context
 open Script_typed_ir
 

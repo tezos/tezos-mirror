@@ -29,3 +29,4 @@ module Mempool = Mempool
 module View_helpers = View_helpers
 module RPC = RPC
 module Metrics = Metrics
+module Script_interpreter_logging = Script_interpreter_logging

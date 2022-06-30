@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
+open Environment
+open Error_monad
 open Script_typed_ir
 
 (** An existential container for an instruction paired with its

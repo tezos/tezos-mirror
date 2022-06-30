@@ -237,7 +237,6 @@
 
         "Script_interpreter_defs",
         "Script_interpreter",
-        "Script_interpreter_logging",
         "Sc_rollup_management_protocol",
         "Sc_rollup_operations",
 
