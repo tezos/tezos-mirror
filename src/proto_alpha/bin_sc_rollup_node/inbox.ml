@@ -160,4 +160,6 @@ let process_head node_ctxt store Layer1.(Head {level; hash = head_hash} as head)
 
 let inbox_of_hash = State.inbox_of_hash
 
+let history_of_hash = State.history_of_hash
+
 let start () = Inbox_event.starting ()
