@@ -1,24 +1,20 @@
 
-v0.2:
+v0.9:
 
-- fork from ocplib-resto: new home, new CI, etc.
+* feature: Added a strategy to pick on the left or on the right on a directory merging collision.
+* feature: Added printers for `Conflict` exception.
 
-v0.3:
+0.8:
 
-* Schemas are now lazy (to speed up initialisation and because schemas are not
-  always used) (by Romain)
-- depend on json-data-encoding (new) fork of ocplib-json-typed (deprecated)
+* Improve ocaml version coverage in CI
+* Added helpers for pretty-printing Paths
+* Added service-lookup feature to resolve parametric URI from concrete URI
 
-v0.4:
+v0.7:
 
-* client does not depend on Unix anymore. Users must pass `gettimeofday`
-  function directly.
-* Added `Gone response code
-
-v0.5:
-
-* Documentation
-* Updated dependencies (notably Lwt)
+* Remove Ezresto (and other Ez libraries)
+* Packaging, build, tests and CI improvements
+* Add the `middleware` feature (contributed by Swann Moreau)
 
 v0.6/v0.6.1:
 
@@ -33,14 +29,24 @@ v0.6/v0.6.1:
 * More tests and better documentation
 * More logging with better level settings
 
-v0.7:
+v0.5:
 
-* Remove Ezresto (and other Ez libraries)
-* Packaging, build, tests and CI improvements
-* Add the `middleware` feature (contributed by Swann Moreau)
+* Documentation
+* Updated dependencies (notably Lwt)
 
-v0.8:
+v0.4:
 
-* Improve ocaml version coverage in CI
-* Add helpers for pretty-printing Paths
-* Add service-lookup feature to resolve parametric URI from concrete URI
+* client does not depend on Unix anymore. Users must pass `gettimeofday`
+  function directly.
+* Added `Gone response code
+
+v0.3:
+
+* Schemas are now lazy (to speed up initialisation and because schemas are not
+  always used) (by Romain)
+- depend on json-data-encoding (new) fork of ocplib-json-typed (deprecated)
+
+v0.2:
+
+- fork from ocplib-resto: new home, new CI, etc.
+
