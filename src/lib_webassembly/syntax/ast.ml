@@ -262,7 +262,7 @@ type name_list = int list
 
 type block_type = VarBlockType of var | ValBlockType of value_type option
 
-type block_label = Block_label of int
+type block_label = Block_label of int32
 
 type nonrec instr' =
   | Unreachable (* trap unconditionally *)
@@ -416,7 +416,7 @@ and module_' = {
   datas : data_segment Vector.t;
   imports : import Vector.t;
   exports : export Vector.t;
-  blocks : instr array array;
+  blocks : instr Vector.t Vector.t;
 }
 
 (* Auxiliary functions *)
@@ -433,7 +433,7 @@ let empty_module =
     datas = Vector.create 0l;
     imports = Vector.create 0l;
     exports = Vector.create 0l;
-    blocks = [||];
+    blocks = Vector.create 0l;
   }
 
 open Source

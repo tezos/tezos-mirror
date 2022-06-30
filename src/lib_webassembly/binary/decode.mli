@@ -216,11 +216,10 @@ type module_kont =
 (** Parsed bytes with the current reading position. *)
 type stream = {name : string; bytes : string; pos : pos ref}
 
-(** Allocation state of basic blocks. *)
-type block_state = {
-  blocks : (int, Ast.instr array) Hashtbl.t;
-  next_block : int ref;
-}
+(** Allocation state of basic blocks. The type relies on the mutable state
+    internaly, but making it private avoids being able to modify it externally.
+*)
+type block_state = private {mutable new_blocks : Ast.instr Vector.t Vector.t}
 
 (** Decoding continuation step. *)
 type decode_kont = {
@@ -234,8 +233,13 @@ type decode_kont = {
 (** [make_stream filename bytes] returns a new stream to decode. *)
 val make_stream : name:string -> bytes:string -> stream
 
-(** [make_block_state ()] returns a new block allocation state. *)
-val make_block_state : unit -> block_state
+(** [make_empty_block_state ()] returns a new block allocation state. *)
+val make_empty_block_state : unit -> block_state
+
+(** [make_block_state blocks] returns a new block allocation state from already
+    existing blocks allocation. This function is used to build block state during
+    tree decoding. *)
+val make_block_state : Ast.instr Vector.t Vector.t -> block_state
 
 (** [module_step kont] takes one step of parsing from a continuation and returns
    a new continuation. Fails when the contination of the module is [MKStop]

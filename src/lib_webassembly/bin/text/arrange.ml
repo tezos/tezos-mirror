@@ -5,6 +5,7 @@ open Values
 open Types
 open Sexpr
 module TzStdLib = Tezos_lwt_result_stdlib.Lwtreslib.Bare
+module Vector = Lazy_vector.Int32Vector
 
 (* Generic formatting *)
 
@@ -43,6 +44,14 @@ let name n =
   string_with List.iter (fun buf (_, uc) -> add_unicode_char buf uc) n
 
 let list_of_opt = function None -> [] | Some x -> [x]
+
+let list_of_block blocks f (Block_label b) =
+  let block = Vector.get b blocks in
+  let rec map acc pos =
+    if pos < 0l then acc
+    else map (f (Vector.get pos block) :: acc) (Int32.pred pos)
+  in
+  map [] (Int32.pred (Vector.num_elements block))
 
 let list f xs = List.map f xs
 
@@ -470,7 +479,7 @@ let block_type = function
   | VarBlockType x -> [Node ("type " ^ var x, [])]
   | ValBlockType ts -> decls "result" (list_of_opt ts)
 
-let rec instr lookup_block e =
+let rec instr blocks e =
   let head, inner =
     match e.it with
     | Unreachable -> ("unreachable", [])
@@ -480,15 +489,15 @@ let rec instr lookup_block e =
     | Select (Some []) -> ("select", [Node ("result", [])])
     | Select (Some ts) -> ("select", decls "result" ts)
     | Block (bt, es) ->
-        ("block", block_type bt @ list (instr lookup_block) (lookup_block es))
+        ("block", block_type bt @ list_of_block blocks (instr blocks) es)
     | Loop (bt, es) ->
-        ("loop", block_type bt @ list (instr lookup_block) (lookup_block es))
+        ("loop", block_type bt @ list_of_block blocks (instr blocks) es)
     | If (bt, es1, es2) ->
         ( "if",
           block_type bt
           @ [
-              Node ("then", list (instr lookup_block) (lookup_block es1));
-              Node ("else", list (instr lookup_block) (lookup_block es2));
+              Node ("then", list_of_block blocks (instr blocks) es1);
+              Node ("else", list_of_block blocks (instr blocks) es2);
             ] )
     | Br x -> ("br " ^ var x, [])
     | BrIf x -> ("br_if " ^ var x, [])
@@ -550,26 +559,27 @@ let rec instr lookup_block e =
   in
   Node (head, inner)
 
-let const lookup_block head c =
-  match lookup_block c.it with
-  | [e] -> instr lookup_block e
-  | es -> Node (head, list (instr lookup_block) es)
+let const blocks head c =
+  let (Block_label b) = c.it in
+  let block = Vector.get b blocks in
+  if Vector.num_elements block = 1l then instr blocks (Vector.get 0l block)
+  else Node (head, list_of_block blocks (instr blocks) (Block_label b))
 
 (* Functions *)
 
-let func_with_name lookup_block name f =
+let func_with_name blocks name f =
   let {ftype; locals; body} = f.it in
   let locals = lazy_vector Fun.id locals in
   Node
     ( "func" ^ name,
       [Node ("type " ^ var ftype, [])]
       @ decls "local" locals
-      @ list (instr lookup_block) (lookup_block body) )
+      @ list_of_block blocks (instr blocks) body )
 
-let func_with_index lookup_block off i f =
-  func_with_name lookup_block (" $" ^ nat (off + i)) f
+let func_with_index blocks off i f =
+  func_with_name blocks (" $" ^ nat (off + i)) f
 
-let func lookup_block f = func_with_name lookup_block "" f
+let func blocks f = func_with_name blocks "" f
 
 (* Tables & memories *)
 
@@ -585,40 +595,46 @@ let is_elem_kind = function FuncRefType -> true | _ -> false
 
 let elem_kind = function FuncRefType -> "func" | _ -> assert false
 
-let is_elem_index lookup_block e =
-  match lookup_block e.it with [{it = RefFunc _; _}] -> true | _ -> false
+let is_elem_index blocks e =
+  let (Block_label b) = e.it in
+  let block = Vector.get b blocks in
+  if Vector.num_elements block = 1l then
+    match Vector.get 0l block with {it = RefFunc _; _} -> true | _ -> false
+  else false
 
-let elem_index lookup_block e =
-  match lookup_block e.it with
-  | [{it = RefFunc x; _}] -> atom var x
-  | _ -> assert false
+let elem_index blocks e =
+  let (Block_label b) = e.it in
+  let block = Vector.get b blocks in
+  if Vector.num_elements block = 1l then
+    match Vector.get 0l block with
+    | {it = RefFunc x; _} -> atom var x
+    | _ -> assert false
+  else assert false
 
-let segment_mode lookup_block category mode =
+let segment_mode blocks category mode =
   match mode.it with
   | Passive -> []
   | Active {index; offset} ->
       (if index.it = 0l then [] else [Node (category, [atom var index])])
-      @ [const lookup_block "offset" offset]
+      @ [const blocks "offset" offset]
   | Declarative -> [Atom "declare"]
 
-let elem lookup_block i seg =
+let elem blocks i seg =
   let {etype; einit; emode} = seg.it in
   let einit = lazy_vector Fun.id einit in
   Node
     ( "elem $" ^ nat i,
-      segment_mode lookup_block "table" emode
+      segment_mode blocks "table" emode
       @
-      if is_elem_kind etype && List.for_all (is_elem_index lookup_block) einit
-      then atom elem_kind etype :: list (elem_index lookup_block) einit
-      else atom ref_type etype :: list (const lookup_block "item") einit )
+      if is_elem_kind etype && List.for_all (is_elem_index blocks) einit then
+        atom elem_kind etype :: list (elem_index blocks) einit
+      else atom ref_type etype :: list (const blocks "item") einit )
 
-let data lookup_block i seg =
+let data blocks i seg =
   let open Lwt.Syntax in
   let {dinit; dmode} = seg.it in
   let+ dinit = Chunked_byte_vector.Lwt.to_string dinit in
-  Node
-    ( "data $" ^ nat i,
-      segment_mode lookup_block "memory" dmode @ break_bytes dinit )
+  Node ("data $" ^ nat i, segment_mode blocks "memory" dmode @ break_bytes dinit)
 
 (* Modules *)
 
@@ -658,11 +674,11 @@ let export ex =
   let {name = n; edesc} = ex.it in
   Node ("export", [atom name n; export_desc edesc])
 
-let global lookup_block off i g =
+let global blocks off i g =
   let {gtype; ginit} = g.it in
   Node
     ( "global $" ^ nat (off + i),
-      global_type gtype :: list (instr lookup_block) (lookup_block ginit.it) )
+      global_type gtype :: list_of_block blocks (instr blocks) ginit.it )
 
 let start s = Node ("start " ^ var s.it.sfunc, [])
 
@@ -677,19 +693,24 @@ let module_with_var_opt x_opt m =
   let mx = ref 0 in
   let gx = ref 0 in
   let imports = lazy_vector (import fx tx mx gx) m.it.imports in
-  let lookup_block (Block_label b) = Array.to_list m.it.blocks.(b) in
-  let+ datas = lazy_vectori_lwt (data lookup_block) m.it.datas in
+  let* blocks =
+    let* bls = Ast.Vector.to_list m.it.blocks in
+    let+ bls_l = TzStdLib.List.map_s Ast.Vector.to_list bls in
+    let bls_v = List.map Vector.of_list bls_l in
+    Vector.of_list bls_v
+  in
+  let+ datas = lazy_vectori_lwt (data blocks) m.it.datas in
   Node
     ( "module" ^ var_opt x_opt,
       lazy_vectori typedef m.it.types
       @ imports
       @ lazy_vectori (table !tx) m.it.tables
       @ lazy_vectori (memory !mx) m.it.memories
-      @ lazy_vectori (global lookup_block !gx) m.it.globals
-      @ lazy_vectori (func_with_index lookup_block !fx) m.it.funcs
+      @ lazy_vectori (global blocks !gx) m.it.globals
+      @ lazy_vectori (func_with_index blocks !fx) m.it.funcs
       @ lazy_vector export m.it.exports
       @ opt start m.it.start
-      @ lazy_vectori (elem lookup_block) m.it.elems
+      @ lazy_vectori (elem blocks) m.it.elems
       @ datas )
 
 let binary_module_with_var_opt x_opt bs =

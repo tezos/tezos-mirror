@@ -1,13 +1,13 @@
 val instr :
   Lwt_io.output_channel ->
-  (Ast.block_label -> Ast.instr list) ->
+  Ast.instr Lazy_vector.Int32Vector.t Lazy_vector.Int32Vector.t ->
   int ->
   Ast.instr ->
   unit Lwt.t
 
 val func :
   Lwt_io.output_channel ->
-  (Ast.block_label -> Ast.instr list) ->
+  Ast.instr Lazy_vector.Int32Vector.t Lazy_vector.Int32Vector.t ->
   int ->
   Ast.func ->
   unit Lwt.t

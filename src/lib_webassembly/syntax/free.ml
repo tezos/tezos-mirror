@@ -40,31 +40,29 @@ let union (s1 : t) (s2 : t) : t =
     labels = Set.union s1.labels s2.labels;
   }
 
-let types s = {empty with types = s}
+let types s = {empty with types = s} |> Lwt.return
 
-let globals s = {empty with globals = s}
+let globals s = {empty with globals = s} |> Lwt.return
 
-let tables s = {empty with tables = s}
+let tables s = {empty with tables = s} |> Lwt.return
 
-let memories s = {empty with memories = s}
+let memories s = {empty with memories = s} |> Lwt.return
 
-let funcs s = {empty with funcs = s}
+let funcs s = {empty with funcs = s} |> Lwt.return
 
-let elems s = {empty with elems = s}
+let elems s = {empty with elems = s} |> Lwt.return
 
-let datas s = {empty with datas = s}
+let datas s = {empty with datas = s} |> Lwt.return
 
-let locals s = {empty with locals = s}
+let locals s = {empty with locals = s} |> Lwt.return
 
-let labels s = {empty with labels = s}
+let labels s = {empty with labels = s} |> Lwt.return
 
 let var x = Set.singleton x.it
 
 let zero = Set.singleton 0l
 
 let shift s = Set.map (Int32.add (-1l)) (Set.remove 0l s)
-
-let ( ++ ) = union
 
 let ( ++* ) x y =
   let open Lwt.Syntax in
@@ -74,18 +72,9 @@ let ( ++* ) x y =
 
 let list free xs = List.fold_left union empty (List.map free xs)
 
-let opt free xo = Lib.Option.get (Lib.Option.map free xo) empty
-
-let lazy_vector_s free xs =
+let list_s free xs =
   let open Lwt.Syntax in
   let open Tezos_lwt_result_stdlib.Lwtreslib.Bare in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3378 &
-     https://gitlab.com/tezos/tezos/-/issues/3387
-
-     [Free] module is used only during the validation of the AST, no mutation
-     can happen at this time, and is only used during tests. It is then safe to
-     simply use the list, it doesn't need to be tickified. *)
-  let* xs = Vector.to_list xs in
   List.fold_left_s
     (fun acc s ->
       let+ f = free s in
@@ -93,32 +82,49 @@ let lazy_vector_s free xs =
     empty
     xs
 
-let lazy_vector free xs = lazy_vector_s (fun x -> Lwt.return (free x)) xs
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3387
+
+   This function is used during parsing (`MKElaborateFunc`), hence it will
+   load entire vectors at once. *)
+let vector_s free v =
+  let open Lwt.Syntax in
+  let rec fold acc n =
+    if n < 0l then Lwt.return acc
+    else
+      let* s = Vector.get n v in
+      let* f = free s in
+      fold (union acc f) (Int32.pred n)
+  in
+  fold empty (Int32.pred (Vector.num_elements v))
+
+let vector free v = vector_s (fun x -> Lwt.return (free x)) v
+
+let opt free xo = match xo with None -> Lwt.return empty | Some v -> free v
 
 let block_type = function
   | VarBlockType x -> types (var x)
-  | ValBlockType _ -> empty
+  | ValBlockType _ -> empty |> Lwt.return
 
-let rec instr lookup_block (e : instr) =
+let rec instr blocks (e : instr) : t Lwt.t =
+  let empty = Lwt.return empty in
   match e.it with
   | Unreachable | Nop | Drop | Select _ -> empty
   | RefNull _ | RefIsNull -> empty
   | RefFunc x -> funcs (var x)
   | Const _ | Test _ | Compare _ | Unary _ | Binary _ | Convert _ -> empty
-  | Block (bt, es) | Loop (bt, es) -> block_type bt ++ block lookup_block es
-  | If (bt, es1, es2) ->
-      block_type bt ++ block lookup_block es1 ++ block lookup_block es2
+  | Block (bt, es) | Loop (bt, es) -> block_type bt ++* block blocks es
+  | If (bt, es1, es2) -> block_type bt ++* block blocks es1 ++* block blocks es2
   | Br x | BrIf x -> labels (var x)
-  | BrTable (xs, x) -> list (fun x -> labels (var x)) (x :: xs)
+  | BrTable (xs, x) -> list_s (fun x -> labels (var x)) (x :: xs)
   | Return -> empty
   | Call x -> funcs (var x)
-  | CallIndirect (x, y) -> tables (var x) ++ types (var y)
+  | CallIndirect (x, y) -> tables (var x) ++* types (var y)
   | LocalGet x | LocalSet x | LocalTee x -> locals (var x)
   | GlobalGet x | GlobalSet x -> globals (var x)
   | TableGet x | TableSet x | TableSize x | TableGrow x | TableFill x ->
       tables (var x)
-  | TableCopy (x, y) -> tables (var x) ++ tables (var y)
-  | TableInit (x, y) -> tables (var x) ++ elems (var y)
+  | TableCopy (x, y) -> tables (var x) ++* tables (var y)
+  | TableInit (x, y) -> tables (var x) ++* elems (var y)
   | ElemDrop x -> elems (var x)
   | Load _ | Store _ | VecLoad _ | VecStore _ | VecLoadLane _ | VecStoreLane _
   | MemorySize | MemoryGrow | MemoryCopy | MemoryFill ->
@@ -128,35 +134,37 @@ let rec instr lookup_block (e : instr) =
   | VecBinaryBits _ | VecTernaryBits _ | VecSplat _ | VecExtract _
   | VecReplace _ ->
       memories zero
-  | MemoryInit x -> memories zero ++ datas (var x)
+  | MemoryInit x -> memories zero ++* datas (var x)
   | DataDrop x -> datas (var x)
 
-and block lookup_block (es : block_label) =
-  let free = list (instr lookup_block) (lookup_block es) in
+and block blocks (Block_label es : block_label) =
+  let open Lwt.Syntax in
+  let* bl = Vector.get es blocks in
+  let+ free = vector_s (instr blocks) bl in
   {free with labels = shift free.labels}
 
-let const lookup_block (c : const) = block lookup_block c.it
+let const blocks (c : const) = block blocks c.it
 
-let global lookup_block (g : global) = const lookup_block g.it.ginit
+let global blocks (g : global) = const blocks g.it.ginit
 
-let func lookup_block (f : func) =
-  {(block lookup_block f.it.body) with locals = Set.empty}
+let func blocks (f : func) =
+  let open Lwt.Syntax in
+  let+ body = block blocks f.it.body in
+  {body with locals = Set.empty}
 
 let table (t : table) = empty
 
 let memory (m : memory) = empty
 
-let segment_mode lookup_block f (m : segment_mode) =
+let segment_mode blocks f (m : segment_mode) =
   match m.it with
-  | Passive | Declarative -> empty
-  | Active {index; offset} -> f (var index) ++ const lookup_block offset
+  | Passive | Declarative -> empty |> Lwt.return
+  | Active {index; offset} -> f (var index) ++* const blocks offset
 
-let elem lookup_block (s : elem_segment) =
-  lazy_vector (const lookup_block) s.it.einit
-  ++* (segment_mode lookup_block tables s.it.emode |> Lwt.return)
+let elem blocks (s : elem_segment) =
+  vector_s (const blocks) s.it.einit ++* segment_mode blocks tables s.it.emode
 
-let data lookup_block (s : data_segment) =
-  segment_mode lookup_block memories s.it.dmode
+let data blocks (s : data_segment) = segment_mode blocks memories s.it.dmode
 
 let type_ (t : type_) = empty
 
@@ -170,9 +178,9 @@ let export_desc (d : export_desc) =
 let import_desc (d : import_desc) =
   match d.it with
   | FuncImport x -> types (var x)
-  | TableImport tt -> empty
-  | MemoryImport mt -> empty
-  | GlobalImport gt -> empty
+  | TableImport tt -> empty |> Lwt.return
+  | MemoryImport mt -> empty |> Lwt.return
+  | GlobalImport gt -> empty |> Lwt.return
 
 let export (e : export) = export_desc e.it.edesc
 
@@ -181,14 +189,13 @@ let import (i : import) = import_desc i.it.idesc
 let start (s : start) = funcs (var s.it.sfunc)
 
 let module_ (m : module_) =
-  let lookup_block (Block_label b) = Array.to_list m.it.blocks.(b) in
-  lazy_vector type_ m.it.types
-  ++* lazy_vector (global lookup_block) m.it.globals
-  ++* lazy_vector table m.it.tables
-  ++* lazy_vector memory m.it.memories
-  ++* lazy_vector (func lookup_block) m.it.funcs
-  ++* Lwt.return (opt start m.it.start)
-  ++* lazy_vector_s (elem lookup_block) m.it.elems
-  ++* lazy_vector (data lookup_block) m.it.datas
-  ++* lazy_vector import m.it.imports
-  ++* lazy_vector export m.it.exports
+  vector type_ m.it.types
+  ++* vector_s (global m.it.blocks) m.it.globals
+  ++* vector table m.it.tables
+  ++* vector memory m.it.memories
+  ++* vector_s (func m.it.blocks) m.it.funcs
+  ++* opt start m.it.start
+  ++* vector_s (elem m.it.blocks) m.it.elems
+  ++* vector_s (data m.it.blocks) m.it.datas
+  ++* vector_s import m.it.imports
+  ++* vector_s export m.it.exports

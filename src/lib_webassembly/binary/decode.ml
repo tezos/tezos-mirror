@@ -7,32 +7,18 @@ type stream = {name : string; bytes : string; pos : int ref}
 
 let make_stream ~name ~bytes = {name; bytes; pos = ref 0}
 
-type block_state = {
-  blocks : (int, Ast.instr array) Hashtbl.t;
-  next_block : int ref;
-}
+type block_state = {mutable new_blocks : Ast.instr Vector.t Vector.t}
 
-let make_block_state () =
-  {
-    blocks =
-      (let init = Hashtbl.create 10 in
-       Hashtbl.add init 0 [||] ;
-       init);
-    next_block = ref 1;
-  }
+let make_empty_block_state () = {new_blocks = Vector.(singleton (empty ()))}
+
+let make_block_state blocks = {new_blocks = blocks}
 
 let alloc_block s es =
-  let es = Array.of_list es in
-  let b = !(s.next_block) in
-  Hashtbl.add s.blocks b es ;
-  incr s.next_block ;
-  assert (!(s.next_block) >= 0) ;
+  let b = Vector.num_elements s.new_blocks in
+  s.new_blocks <- Vector.(grow 1l s.new_blocks |> set b (of_list es)) ;
   Ast.Block_label b
 
-let lookup_block bs (Ast.Block_label b) =
-  Array.to_list (Hashtbl.find bs.blocks b)
-
-let empty_block = Ast.Block_label 0
+let empty_block = Ast.Block_label 0l
 
 let len s = String.length s.bytes
 
@@ -1948,16 +1934,16 @@ let module_step state =
       let* ft = Vector.get offset fts in
       let* fb = Vector.get offset fbs in
       let fb' = Source.({fb.it with ftype = ft} @@ fb.at) in
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3387
+
+         `Free` shouldn't be part of the PVM. *)
+      let* free = Free.func bs.new_blocks fb' in
       next
       @@ MKElaborateFunc
            ( fts,
              fbs,
              lazy_vec_step fb' vec,
-             (* TODO: https://gitlab.com/tezos/tezos/-/issues/3387
-
-                `Free` shouldn't be part of the PVM.*)
-             no_datas_in_func
-             && Free.((func (lookup_block bs) fb').datas = Set.empty) )
+             no_datas_in_func && free.datas = Free.Set.empty )
   | MKBuild (funcs, no_datas_in_func) ->
       let fields = state.building_state in
       let* types = find_vec TypeField fields in
@@ -2009,8 +1995,7 @@ let module_step state =
               elems;
               datas;
               start;
-              blocks =
-                Array.init !(bs.next_block) (fun i -> Hashtbl.find bs.blocks i);
+              blocks = bs.new_blocks;
             };
       }
       |> Lwt.return
@@ -2029,7 +2014,7 @@ let module_ stream =
       building_state = Vector.create 0l;
       module_kont = MKStart;
       stream;
-      block_state = make_block_state ();
+      block_state = make_empty_block_state ();
     }
 
 let decode ~name ~bytes =

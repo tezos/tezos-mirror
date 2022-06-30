@@ -62,7 +62,7 @@ type code = value stack * admin_instr list
 and admin_instr = admin_instr' phrase
 
 and admin_instr' =
-  | From_block of block_label * int
+  | From_block of block_label * int32
   | Plain of instr'
   | Refer of ref_
   | Invoke of func_inst
@@ -192,24 +192,22 @@ let elem_oob frame x i n =
 let rec step (c : config) : config Lwt.t =
   let {frame; code = vs, es; _} = c in
   match es with
-  | {it = From_block (Block_label b, i); at} :: es
-    when i = Array.length frame.inst.Instance.blocks.(b) ->
-      Lwt.return {c with code = (vs, es)}
-  | [] -> Lwt.return c
-  | e :: es ->
-      let e, es =
-        match e with
-        | {it = From_block (Block_label b, i); at} ->
-            let block = frame.inst.Instance.blocks.(b) in
-            let instr = block.(i) in
+  | {it = From_block (Block_label b, i); at} :: es ->
+      let* block = Vector.get b frame.inst.Instance.blocks in
+      let length = Vector.num_elements block in
+      if i = length then Lwt.return {c with code = (vs, es)}
+      else
+        let* e, es =
+          let* instr = Vector.get i block in
+          Lwt.return
             ( Plain instr.it @@ instr.at,
-              {it = From_block (Block_label b, i + 1); at} :: es )
-        | e -> (e, es)
-      in
-      step_resolved c e es
+              {it = From_block (Block_label b, Int32.succ i); at} :: es )
+        in
+        step_resolved c frame vs e es
+  | e :: es -> step_resolved c frame vs e es
+  | [] -> Lwt.return c
 
-and step_resolved (c : config) e es : config Lwt.t =
-  let {frame; code = vs, _; _} = c in
+and step_resolved (c : config) frame vs e es : config Lwt.t =
   let+ vs', es' =
     match (e.it, vs) with
     | From_block _, _ -> assert false (* resolved by [step] *)
@@ -224,14 +222,15 @@ and step_resolved (c : config) e es : config Lwt.t =
             let n2 = Lazy_vector.LwtInt32Vector.num_elements ts2 in
             let args, vs' = (take n1 vs e.at, drop n1 vs e.at) in
             ( vs',
-              [Label (n2, [], (args, [From_block (es', 0) @@ e.at])) @@ e.at] )
+              [Label (n2, [], (args, [From_block (es', 0l) @@ e.at])) @@ e.at]
+            )
         | Loop (bt, es'), vs ->
             let+ (FuncType (ts1, ts2)) = block_type frame.inst bt in
             let n1 = Lazy_vector.LwtInt32Vector.num_elements ts1 in
             let args, vs' = (take n1 vs e.at, drop n1 vs e.at) in
             ( vs',
               [
-                Label (n1, [e' @@ e.at], (args, [From_block (es', 0) @@ e.at]))
+                Label (n1, [e' @@ e.at], (args, [From_block (es', 0l) @@ e.at]))
                 @@ e.at;
               ] )
         | If (bt, es1, es2), Num (I32 i) :: vs' ->
@@ -796,7 +795,8 @@ and step_resolved (c : config) e es : config Lwt.t =
             let frame' = {inst = !inst'; locals = List.map ref locals'} in
             let instr' =
               [
-                Label (n2, [], ([], [From_block (f.it.body, 0) @@ f.at])) @@ f.at;
+                Label (n2, [], ([], [From_block (f.it.body, 0l) @@ f.at]))
+                @@ f.at;
               ]
             in
             (vs', [Frame (n2, frame', ([], instr')) @@ e.at])
@@ -836,7 +836,7 @@ let invoke ?(module_inst = empty_module_inst) ?(input = Input_buffer.alloc ())
   let blocks =
     match func with
     | Func.AstFunc (_, {contents = {blocks; _}}, _) -> blocks
-    | Func.HostFunc _ -> [||]
+    | Func.HostFunc _ -> Instance.Vector.create 0l
   in
   let c =
     config ~input {module_inst with blocks} (List.rev vs) [Invoke func @@ at]
@@ -850,7 +850,7 @@ let invoke ?(module_inst = empty_module_inst) ?(input = Input_buffer.alloc ())
       | exn -> Lwt.fail exn)
 
 let eval_const (inst : module_inst) (const : const) : value Lwt.t =
-  let c = config inst [] [From_block (const.it, 0) @@ const.at] in
+  let c = config inst [] [From_block (const.it, 0l) @@ const.at] in
   let+ vs = eval c in
   match vs with
   | [v] -> v
@@ -948,7 +948,7 @@ let run_elem inst i elem =
   match elem.it.emode.it with
   | Passive -> []
   | Active {index; offset} ->
-      (From_block (offset.it, 0) @@ offset.at)
+      (From_block (offset.it, 0l) @@ offset.at)
       :: List.map
            plain
            [
@@ -969,7 +969,7 @@ let run_data inst i data =
   | Passive -> []
   | Active {index; offset} ->
       assert (index.it = 0l) ;
-      (From_block (offset.it, 0) @@ offset.at)
+      (From_block (offset.it, 0l) @@ offset.at)
       :: List.map
            plain
            [

@@ -107,8 +107,7 @@ type context =
     funcs : space; locals : space; globals : space;
     datas : space; elems : space;
     labels : int32 VarMap.t; deferred_locals : (unit -> unit) list ref;
-    blocks : (int, instr array) Hashtbl.t;
-    next_block : int ref ;
+    new_blocks : instr Vector.t Vector.t ref;
   }
 
 
@@ -118,29 +117,21 @@ let with_blocks f =
     funcs = empty (); locals = empty (); globals = empty ();
     datas = empty (); elems = empty ();
     labels = VarMap.empty; deferred_locals = ref [];
-    blocks =
-      (let init = Hashtbl.create 10 in
-       Hashtbl.add init 0 [||];
-       init) ;
-    next_block = ref 1;
+    new_blocks = ref (Vector.create 0l);
   }
   in
   let res = f c in
-  {res.it with Ast.blocks =
-     Array.init !(c.next_block) (fun i -> Hashtbl.find c.blocks i)}
+  {res.it with Ast.blocks = !(c.new_blocks)}
   @@ res.at
 
 
 let alloc_block c es =
-  let es = Array.of_list es in
-  let b = !(c.next_block) in
-  Hashtbl.add c.blocks b es ;
-  incr c.next_block ;
-  assert (!(c.next_block) >= 0);
+  let b = Vector.num_elements !(c.new_blocks) in
+  c.new_blocks := Vector.grow 1l !(c.new_blocks) |> Vector.set b (Vector.of_list es);
   Block_label b
 
 let empty_block =
-  Block_label 0
+  Block_label 0l
 
 let force_locals (c : context) =
   List.fold_right Stdlib.(@@) !(c.deferred_locals) ();
@@ -308,7 +299,7 @@ let to_module_ pm =
     elems;
     datas;
     start = p_start;
-    blocks = [||];
+    blocks = Vector.create 0l;
   } @@ pm.at
 %}
 

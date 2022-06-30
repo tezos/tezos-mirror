@@ -14,7 +14,7 @@ type t = {
 
 val empty : t
 
-val func : (Ast.block_label -> Ast.instr list) -> Ast.func -> t
+val func : Ast.instr Ast.Vector.t Ast.Vector.t -> Ast.func -> t Lwt.t
 
 val module_ : Ast.module_ -> t Lwt.t
 

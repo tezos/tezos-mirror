@@ -12,6 +12,8 @@ let error = Invalid.error
 
 let require b at s = if not b then error at s
 
+module Vector = Lazy_vector.Int32Vector
+
 (* Context *)
 
 type context = {
@@ -26,7 +28,7 @@ type context = {
   results : value_type list;
   labels : result_type list;
   refs : Free.t;
-  lookup_block : Ast.block_label -> Ast.instr list;
+  blocks : Ast.instr Vector.t Vector.t;
 }
 
 let empty_context =
@@ -42,7 +44,7 @@ let empty_context =
     results = [];
     labels = [];
     refs = Free.empty;
-    lookup_block = (fun _ -> raise Not_found);
+    blocks = Vector.create 0l;
   }
 
 let lookup category list x =
@@ -271,8 +273,9 @@ let check_memop (c : context) (memop : ('t, 's) memop) ty_size get_sz at =
 let check_block_type (c : context) (bt : block_type) : func_type =
   match bt with
   | VarBlockType x -> type_ c x
-  | ValBlockType None -> FuncType (Vector.empty (), Vector.empty ())
-  | ValBlockType (Some t) -> FuncType (Vector.empty (), Vector.singleton t)
+  | ValBlockType None -> FuncType (Ast.Vector.empty (), Ast.Vector.empty ())
+  | ValBlockType (Some t) ->
+      FuncType (Ast.Vector.empty (), Ast.Vector.singleton t)
 
 let rec check_instr (c : context) (e : instr) (s : infer_result_type) : op_type
     =
@@ -528,21 +531,24 @@ let rec check_instr (c : context) (e : instr) (s : infer_result_type) : op_type
         "invalid lane index" ;
       [t; NumType t2] --> [t]
 
-and check_seq (c : context) (s : infer_result_type) (es : instr list) :
-    infer_result_type =
-  match es with
-  | [] -> s
-  | _ ->
-      let es', e = Lib.List.split_last es in
-      let s' = check_seq c s es' in
-      let {ins; outs} = check_instr c e s' in
-      push outs (pop ins s' e.at)
+and check_seq (c : context) (s : infer_result_type) (es : instr Vector.t)
+    (pos : int32) : infer_result_type =
+  if pos < 0l then s
+  else
+    let e = Vector.get pos es in
+    let s' = check_seq c s es (Int32.pred pos) in
+    let {ins; outs} = check_instr c e s' in
+    push outs (pop ins s' e.at)
 
-and check_block (c : context) (es : block_label) (ft : func_type) at =
+and check_block (c : context) (Block_label es : block_label) (ft : func_type) at
+    =
   let (FuncType (ts1, ts2)) = ft in
+  let block = Vector.get es c.blocks in
   let ts1_l = vec_to_list ts1 in
   let ts2_l = vec_to_list ts2 in
-  let s = check_seq c (stack ts1_l) (c.lookup_block es) in
+  let s =
+    check_seq c (stack ts1_l) block (Int32.pred (Vector.num_elements block))
+  in
   let s' = pop (stack ts2_l) s at in
   require
     (snd s' = [])
@@ -623,7 +629,7 @@ let check_func (c : context) (f : func) =
       labels = [ts2];
     }
   in
-  check_block c' body (FuncType (Vector.empty (), ts2)) f.at
+  check_block c' body (FuncType (Ast.Vector.empty (), ts2)) f.at
 
 let is_const (c : context) (e : instr) =
   match e.it with
@@ -633,15 +639,24 @@ let is_const (c : context) (e : instr) =
       mut = Immutable
   | _ -> false
 
+let rec for_all_in_vector f v n =
+  if n < 0l then true
+  else f (Vector.get n v) && for_all_in_vector f v (Int32.pred n)
+
 let check_const (c : context) (const : const) (t : value_type) =
+  let (Block_label b) = const.it in
+  let block = Vector.get b c.blocks in
   require
-    (List.for_all (is_const c) (c.lookup_block const.it))
+    (for_all_in_vector
+       (is_const c)
+       block
+       (Int32.pred (Vector.num_elements block)))
     const.at
     "constant expression required" ;
   check_block
     c
     const.it
-    (FuncType (Vector.empty (), Vector.singleton t))
+    (FuncType (Ast.Vector.empty (), Ast.Vector.singleton t))
     const.at
 
 (* Tables, Memories, & Globals *)
@@ -746,6 +761,13 @@ let check_module (m : module_) =
   } =
     m.it
   in
+  let build_blocks bl =
+    let* bls = Ast.Vector.to_list bl in
+    let+ bls_l = TzStdLib.List.map_s Ast.Vector.to_list bls in
+    let bls_v = List.map Vector.of_list bls_l in
+    Vector.of_list bls_v
+  in
+  let* blocks = build_blocks blocks in
   let types = vec_to_list types in
   let imports = vec_to_list imports in
   let tables = vec_to_list tables in
@@ -760,7 +782,6 @@ let check_module (m : module_) =
       ({m.it with funcs = Lazy_vector.LwtInt32Vector.create 0l; start = None}
       @@ m.at)
   in
-  let lookup_block (Block_label b) = Array.to_list blocks.(b) in
   let c0 =
     List.fold_right
       check_import
@@ -769,7 +790,7 @@ let check_module (m : module_) =
         empty_context with
         refs;
         types = List.map (fun ty -> ty.it) types;
-        lookup_block;
+        blocks;
       }
   in
   let c1 =
