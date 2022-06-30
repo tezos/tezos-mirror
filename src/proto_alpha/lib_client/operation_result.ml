@@ -822,14 +822,14 @@ let pp_manager_operation_contents_result ppf op_result =
 let pp_internal_operation_and_result ppf
     (Internal_manager_operation_result (op, res)) =
   let internal_operation_name (type kind) :
-      kind successful_internal_manager_operation_result -> string = function
+      kind successful_internal_operation_result -> string = function
     | ITransaction_result _ -> "transaction"
     | IOrigination_result _ -> "origination"
     | IDelegation_result _ -> "delegation"
     | IEvent_result _ -> "event"
   in
   let pp_internal_operation_result (type kind) ppf
-      (result : kind successful_internal_manager_operation_result) =
+      (result : kind successful_internal_operation_result) =
     match result with
     | ITransaction_result tx -> pp_transaction_result ppf tx
     | IOrigination_result op_res -> pp_origination_result ppf op_res

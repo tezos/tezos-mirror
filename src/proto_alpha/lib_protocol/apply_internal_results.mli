@@ -109,26 +109,26 @@ type successful_origination_result = {
 }
 
 (** Result of applying a {!Script_typed_ir.internal_operation_contents}. *)
-type _ successful_internal_manager_operation_result =
+type _ successful_internal_operation_result =
   | ITransaction_result :
       successful_transaction_result
-      -> Kind.transaction successful_internal_manager_operation_result
+      -> Kind.transaction successful_internal_operation_result
   | IOrigination_result :
       successful_origination_result
-      -> Kind.origination successful_internal_manager_operation_result
+      -> Kind.origination successful_internal_operation_result
   | IDelegation_result : {
       consumed_gas : Gas.Arith.fp;
     }
-      -> Kind.delegation successful_internal_manager_operation_result
+      -> Kind.delegation successful_internal_operation_result
   | IEvent_result : {
       consumed_gas : Gas.Arith.fp;
     }
-      -> Kind.event successful_internal_manager_operation_result
+      -> Kind.event successful_internal_operation_result
 
 type 'kind internal_manager_operation_result =
   ( 'kind,
     'kind Kind.manager,
-    'kind successful_internal_manager_operation_result )
+    'kind successful_internal_operation_result )
   Apply_operation_result.operation_result
 
 type packed_internal_manager_operation_result =

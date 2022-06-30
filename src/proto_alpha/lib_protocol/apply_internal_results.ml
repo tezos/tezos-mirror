@@ -155,32 +155,32 @@ type successful_origination_result = {
   paid_storage_size_diff : Z.t;
 }
 
-(** Result of applying an internal {!manager_operation}. *)
-type _ successful_internal_manager_operation_result =
+(** Result of applying an internal operation. *)
+type _ successful_internal_operation_result =
   | ITransaction_result :
       successful_transaction_result
-      -> Kind.transaction successful_internal_manager_operation_result
+      -> Kind.transaction successful_internal_operation_result
   | IOrigination_result :
       successful_origination_result
-      -> Kind.origination successful_internal_manager_operation_result
+      -> Kind.origination successful_internal_operation_result
   | IDelegation_result : {
       consumed_gas : Gas.Arith.fp;
     }
-      -> Kind.delegation successful_internal_manager_operation_result
+      -> Kind.delegation successful_internal_operation_result
   | IEvent_result : {
       consumed_gas : Gas.Arith.fp;
     }
-      -> Kind.event successful_internal_manager_operation_result
+      -> Kind.event successful_internal_operation_result
 
 type packed_successful_internal_manager_operation_result =
-  | Successful_internal_manager_result :
-      'kind successful_internal_manager_operation_result
+  | Successful_internal_operation_result :
+      'kind successful_internal_operation_result
       -> packed_successful_internal_manager_operation_result
 
 type 'kind internal_manager_operation_result =
   ( 'kind,
     'kind Kind.manager,
-    'kind successful_internal_manager_operation_result )
+    'kind successful_internal_operation_result )
   operation_result
 
 type packed_internal_manager_operation_result =
@@ -437,7 +437,9 @@ module Internal_result = struct
               (({operation = Event _; _} as op), res) ->
               Some (op, res)
           | _ -> None);
-        select = (function Manager (Event _ as op) -> Some op | _ -> None);
+        select =
+          (function
+          | Internal_operation_contents (Event _ as op) -> Some op | _ -> None);
         proj =
           (function
           | Event {ty; tag; payload} ->
@@ -499,9 +501,9 @@ module Internal_manager_result = struct
         kind : 'kind Kind.manager;
         select :
           packed_successful_internal_manager_operation_result ->
-          'kind successful_internal_manager_operation_result option;
-        proj : 'kind successful_internal_manager_operation_result -> 'a;
-        inj : 'a -> 'kind successful_internal_manager_operation_result;
+          'kind successful_internal_operation_result option;
+        proj : 'kind successful_internal_operation_result -> 'a;
+        inj : 'a -> 'kind successful_internal_operation_result;
         t : 'kind internal_manager_operation_result Data_encoding.t;
       }
         -> 'kind case
@@ -521,7 +523,7 @@ module Internal_manager_result = struct
                  match o with
                  | Skipped _ | Failed _ | Backtracked _ -> None
                  | Applied o -> (
-                     match select (Successful_internal_manager_result o) with
+                     match select (Successful_internal_operation_result o) with
                      | None -> None
                      | Some o -> Some ((), proj o)))
                (fun ((), x) -> Applied (inj x));
@@ -551,7 +553,7 @@ module Internal_manager_result = struct
                  match o with
                  | Skipped _ | Failed _ | Applied _ -> None
                  | Backtracked (o, errs) -> (
-                     match select (Successful_internal_manager_result o) with
+                     match select (Successful_internal_operation_result o) with
                      | None -> None
                      | Some o -> Some (((), errs), proj o)))
                (fun (((), errs), x) -> Backtracked (inj x, errs));
@@ -564,7 +566,7 @@ module Internal_manager_result = struct
       ~op_case:Internal_result.transaction_case
       ~encoding:Internal_result.transaction_contract_variant_cases
       ~select:(function
-        | Successful_internal_manager_result (ITransaction_result _ as op) ->
+        | Successful_internal_operation_result (ITransaction_result _ as op) ->
             Some op
         | _ -> None)
       ~kind:Kind.Transaction_manager_kind
@@ -583,7 +585,7 @@ module Internal_manager_result = struct
            (dft "paid_storage_size_diff" z Z.zero)
            (opt "lazy_storage_diff" Lazy_storage.encoding))
       ~select:(function
-        | Successful_internal_manager_result (IOrigination_result _ as op) ->
+        | Successful_internal_operation_result (IOrigination_result _ as op) ->
             Some op
         | _ -> None)
       ~proj:(function
@@ -632,7 +634,7 @@ module Internal_manager_result = struct
         Data_encoding.(
           obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
-        | Successful_internal_manager_result (IDelegation_result _ as op) ->
+        | Successful_internal_operation_result (IDelegation_result _ as op) ->
             Some op
         | _ -> None)
       ~kind:Kind.Delegation_manager_kind
@@ -647,7 +649,8 @@ module Internal_manager_result = struct
         Data_encoding.(
           obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
-        | Successful_internal_manager_result (IEvent_result _ as op) -> Some op
+        | Successful_internal_operation_result (IEvent_result _ as op) ->
+            Some op
         | _ -> None)
       ~kind:Kind.Event_manager_kind
       ~proj:(function[@coq_match_with_default]

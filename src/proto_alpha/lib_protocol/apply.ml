@@ -1086,7 +1086,7 @@ let apply_internal_operation_contents :
     chain_id:Chain_id.t ->
     kind Script_typed_ir.internal_operation_contents ->
     (context
-    * kind successful_internal_manager_operation_result
+    * kind successful_internal_operation_result
     * Script_typed_ir.packed_internal_operation list)
     tzresult
     Lwt.t =
@@ -1119,8 +1119,7 @@ let apply_internal_operation_contents :
         ~before_operation:ctxt_before_op
       >|=? fun (ctxt, res, ops) ->
       ( ctxt,
-        (ITransaction_result res
-          : kind successful_internal_manager_operation_result),
+        (ITransaction_result res : kind successful_internal_operation_result),
         ops )
   | Transaction_to_smart_contract
       {
@@ -2133,11 +2132,10 @@ let burn_manager_storage_fees :
 let burn_internal_storage_fees :
     type kind.
     context ->
-    kind successful_internal_manager_operation_result ->
+    kind successful_internal_operation_result ->
     storage_limit:Z.t ->
     payer:public_key_hash ->
-    (context * Z.t * kind successful_internal_manager_operation_result) tzresult
-    Lwt.t =
+    (context * Z.t * kind successful_internal_operation_result) tzresult Lwt.t =
  fun ctxt smopr ~storage_limit ~payer ->
   let payer = `Contract (Contract.Implicit payer) in
   match smopr with
