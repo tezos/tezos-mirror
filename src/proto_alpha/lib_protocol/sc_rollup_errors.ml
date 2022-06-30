@@ -56,6 +56,7 @@ type error +=
   | (* `Temporary *) Sc_rollup_invalid_outbox_message_index
   | (* `Temporary *) Sc_rollup_outbox_level_expired
   | (* `Temporary *) Sc_rollup_outbox_message_already_applied
+  | (* `Temporary *) Sc_rollup_state_change_on_zero_tick_commitment
   | (* `Temporary *)
       Sc_rollup_staker_funds_too_low of {
       staker : Signature.public_key_hash;
@@ -73,11 +74,13 @@ type error +=
       (Raw_level_repr.t * Raw_level_repr.t)
 
 let () =
+  let description = "Maximum number of available messages reached" in
   register_error_kind
     `Temporary
     ~id:"Sc_rollup_max_number_of_available_messages_reached"
     ~title:"Maximum number of available messages reached"
-    ~description:"Maximum number of available messages reached"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     Data_encoding.unit
     (function
       | Sc_rollup_max_number_of_available_messages_reached -> Some ()
@@ -144,11 +147,13 @@ let () =
         ])
     (function Sc_rollup_staker_in_game x -> Some x | _ -> None)
     (fun x -> Sc_rollup_staker_in_game x) ;
+  let description = "Attempt to timeout game too early" in
   register_error_kind
     `Temporary
     ~id:"Sc_rollup_timeout_level_not_reached"
     ~title:"Attempt to timeout game too early"
-    ~description:"Attempt to timeout game too early"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     Data_encoding.unit
     (function Sc_rollup_timeout_level_not_reached -> Some () | _ -> None)
     (fun () -> Sc_rollup_timeout_level_not_reached) ;
@@ -174,19 +179,25 @@ let () =
     Data_encoding.unit
     (function Sc_rollup_no_game -> Some () | _ -> None)
     (fun () -> Sc_rollup_no_game) ;
+  let description = "Attempt to play move but not staker's turn" in
   register_error_kind
     `Temporary
     ~id:"Sc_rollup_wrong_turn"
     ~title:"Attempt to play move but not staker's turn"
-    ~description:"Attempt to play move but not staker's turn"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     Data_encoding.unit
     (function Sc_rollup_wrong_turn -> Some () | _ -> None)
     (fun () -> Sc_rollup_wrong_turn) ;
+  let description =
+    "Maximum number of messages reached for commitment period"
+  in
   register_error_kind
     `Temporary
     ~id:"Sc_rollup_max_number_of_messages_reached_for_commitment_period"
     ~title:"Maximum number of messages reached for commitment period"
-    ~description:"Maximum number of messages reached for commitment period"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     Data_encoding.unit
     (function
       | Sc_rollup_max_number_of_messages_reached_for_commitment_period ->
@@ -376,6 +387,17 @@ let () =
     Data_encoding.empty
     (function Sc_rollup_outbox_message_already_applied -> Some () | _ -> None)
     (fun () -> Sc_rollup_outbox_message_already_applied) ;
+  let description = "Attempt to commit zero ticks with state change" in
+  register_error_kind
+    `Temporary
+    ~id:"Sc_rollup_state_change_on_zero_tick_commitment"
+    ~title:description
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    Data_encoding.empty
+    (function
+      | Sc_rollup_state_change_on_zero_tick_commitment -> Some () | _ -> None)
+    (fun () -> Sc_rollup_state_change_on_zero_tick_commitment) ;
   register_error_kind
     `Temporary
     ~id:"Sc_rollup_staker_funds_too_low"

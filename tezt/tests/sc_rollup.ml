@@ -1968,7 +1968,7 @@ let publish_dummy_commitment ~inbox_level ~predecessor ~sc_rollup ~src client =
       inbox_level;
       predecessor;
       number_of_messages = 0;
-      number_of_ticks = 0;
+      number_of_ticks = 1;
     }
   in
 

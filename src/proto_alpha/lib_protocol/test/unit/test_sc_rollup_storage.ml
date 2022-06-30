@@ -2340,6 +2340,53 @@ let test_concurrent_refinement_cement () =
   in
   assert_commitment_hash_equal ~loc:__LOC__ ctxt c1 c2
 
+let test_zero_tick_commitment_cannot_change_state () =
+  let* ctxt, rollup, genesis_hash, staker =
+    originate_rollup_and_deposit_with_one_staker ()
+  in
+  let level = valid_inbox_level ctxt in
+  let commitment =
+    Commitment_repr.
+      {
+        predecessor = genesis_hash;
+        inbox_level = level 1l;
+        number_of_messages = number_of_messages_exn 3l;
+        number_of_ticks = number_of_ticks_exn 1232909l;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* c1, _level, ctxt =
+    lift
+    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+         ctxt
+         rollup
+         staker
+         commitment
+  in
+  let commitment =
+    Commitment_repr.
+      {
+        predecessor = c1;
+        inbox_level = level 2l;
+        number_of_messages = number_of_messages_exn 0l;
+        number_of_ticks = number_of_ticks_exn 0l;
+        compressed_state =
+          Sc_rollup_repr.State_hash.context_hash_to_state_hash
+            (Context_hash.hash_string ["wxyz"]);
+      }
+  in
+  let* () =
+    assert_fails_with
+      ~loc:__LOC__
+      (Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+         ctxt
+         rollup
+         staker
+         commitment)
+      Sc_rollup_errors.Sc_rollup_state_change_on_zero_tick_commitment
+  in
+  assert_true ctxt
+
 let check_gas_consumed ~since ~until =
   let open Raw_context in
   let as_cost = Gas_limit_repr.cost_of_gas @@ gas_consumed ~since ~until in
@@ -3059,6 +3106,10 @@ let tests =
       "Refinement operations are commutative (cement)"
       `Quick
       test_concurrent_refinement_cement;
+    Tztest.tztest
+      "A commitment with zero ticks shouldn't change the state"
+      `Quick
+      test_zero_tick_commitment_cannot_change_state;
     Tztest.tztest
       "Retrieval of in-memory message inbox consumes gas"
       `Quick
