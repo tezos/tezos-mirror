@@ -275,6 +275,133 @@ let test_inconsistent_counters =
         ~expected_proto_error:"inconsistent_counters"
         [transaction_next_counter; transaction2])
 
+(** This test calls the [run_operation] RPC on various faulty
+    revelations.
+
+    This test only supports protocol versions from Kathmandu (014) on,
+    because of changes to the revelation semantic introduced in this
+    protocol. *)
+let test_bad_revelations =
+  Protocol.register_test
+    ~__FILE__
+    ~supports:(Protocol.From_protocol 014)
+    ~title:"Run_operation bad revelations"
+    ~tags:(run_operation_tags @ ["manager"; "reveal"; "bad_revelations"])
+  @@ fun protocol ->
+  Log.info "Initialize a node and a client." ;
+  let* node, client =
+    Client.init_with_protocol
+      ~nodes_args:[Synchronisation_threshold 0]
+      ~protocol
+      `Client
+      ()
+  in
+  Log.info
+    "Create a fresh account: generate a key, inject a transaction that funds \
+     it, and bake a block to apply the transaction." ;
+  let* fresh_account = Client.gen_and_show_keys client in
+  let* _oph =
+    Operation.inject_transfer
+      client
+      ~source:Constant.bootstrap2
+      ~dest:fresh_account
+      ~gas_limit:1500
+      ~amount:10_000_000
+  in
+  let* () = Client.bake_for_and_wait ~node client in
+  let* fresh_account_next_counter =
+    Operation.Manager.get_next_counter ~source:fresh_account client
+  in
+  let incorrect_reveal_position_error = "incorrect_reveal_position" in
+  Log.info
+    "Call [run_operation] on a batch with a reveal in 2nd position, and check \
+     that it returns the [%s] protocol error."
+    incorrect_reveal_position_error ;
+  let* () =
+    let* op =
+      let transaction_payload = Operation.Manager.transfer () in
+      let reveal_payload = Operation.Manager.reveal fresh_account in
+      Operation.Manager.(
+        operation
+          (make_batch
+             ~source:fresh_account
+             ~counter:fresh_account_next_counter
+             [transaction_payload; reveal_payload])
+          client)
+    in
+    let* op_json = Operation.make_run_operation_input op client in
+    let* response =
+      RPC.(
+        call_json node (post_chain_block_helpers_scripts_run_operation op_json))
+    in
+    check_response_contains_proto_error
+      ~expected_proto_error:incorrect_reveal_position_error
+      response ;
+    unit
+  in
+  let inconsistent_hash_error = "inconsistent_hash" in
+  Log.info
+    "Call [run_operation] on a revelation of a public key that is not \
+     consistent with the source's public key hash, and check that it returns \
+     the [%s] protocol error."
+    inconsistent_hash_error ;
+  let* () =
+    let reveal_manager_op =
+      Operation.Manager.(
+        make ~source:fresh_account (reveal Constant.bootstrap1))
+    in
+    let* op = Operation.Manager.operation [reveal_manager_op] client in
+    let* op_json = Operation.make_run_operation_input op client in
+    let* response =
+      RPC.(
+        call_json node (post_chain_block_helpers_scripts_run_operation op_json))
+    in
+    check_response_contains_proto_error
+      ~expected_proto_error:inconsistent_hash_error
+      response ;
+    unit
+  in
+  let previously_revealed_error = "previously_revealed_key" in
+  Log.info
+    "Call [run_operation] on a revelation of an already revealed key. Check \
+     that the call succeeds, but the returned metadata indicate that the \
+     operation's application has failed with the [%s] protocol error."
+    previously_revealed_error ;
+  let* () =
+    let source = Constant.bootstrap1 (* this source is already revealed *) in
+    let manager_op = Operation.Manager.(make ~source (reveal source)) in
+    let* op = Operation.Manager.operation [manager_op] client in
+    let* op_json = Operation.make_run_operation_input op client in
+    let* output =
+      RPC.call node (RPC.post_chain_block_helpers_scripts_run_operation op_json)
+    in
+    let operation_result =
+      JSON.(output |-> "contents" |=> 0 |-> "metadata" |-> "operation_result")
+    in
+    Log.info
+      "Checking metadata.operation_result: %s"
+      (JSON.encode operation_result) ;
+    Check.(
+      (JSON.(operation_result |-> "status" |> as_string) = "failed")
+        string
+        ~error_msg:"Expected operation_result status to be %R, but got %L.") ;
+    let id = JSON.(operation_result |-> "errors" |=> 0 |-> "id" |> as_string) in
+    let proto_error =
+      try List.(hd (rev (String.split_on_char '.' id)))
+      with exn ->
+        Test.fail
+          "Failed to extract proto_error from %s:\n%s"
+          id
+          (Printexc.to_string exn)
+    in
+    Check.(
+      (proto_error = previously_revealed_error)
+        string
+        ~error_msg:"Expected protocol error %R, but got %L.") ;
+    unit
+  in
+  unit
+
 (** This test checks that the [run_operation] RPC succeeds on a
     well-formed batch containing a transaction, a delegation, and a
     second transaction. *)
@@ -414,5 +541,6 @@ let test_misc_manager_ops_from_fresh_account =
 let register ~protocols =
   test_batch_inconsistent_sources protocols ;
   test_inconsistent_counters protocols ;
+  test_bad_revelations protocols ;
   test_correct_batch protocols ;
   test_misc_manager_ops_from_fresh_account protocols
