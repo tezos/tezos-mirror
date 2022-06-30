@@ -78,7 +78,7 @@ let process_applied_manager_operations operations accu f =
   and on_applied_internal_operations accu source internal_operation_results =
     let open Apply_internal_results in
     List.fold_left
-      (fun accu (Internal_manager_operation_result ({operation; _}, result)) ->
+      (fun accu (Internal_operation_result ({operation; _}, result)) ->
         match result with
         | Applied result -> f.apply_internal accu ~source operation result
         | _ -> accu)

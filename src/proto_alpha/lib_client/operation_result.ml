@@ -819,8 +819,7 @@ let pp_manager_operation_contents_result ppf op_result =
     ppf
     op_result
 
-let pp_internal_operation_and_result ppf
-    (Internal_manager_operation_result (op, res)) =
+let pp_internal_operation_and_result ppf (Internal_operation_result (op, res)) =
   let internal_operation_name (type kind) :
       kind successful_internal_operation_result -> string = function
     | ITransaction_result _ -> "transaction"

@@ -124,7 +124,7 @@ let extract_messages_from_block block_info rollup_id =
     (msg :: messages, tickets)
   in
   let get_messages_of_internal_operation ~source messages_tickets
-      (Internal_manager_operation_result
+      (Internal_operation_result
         ( {
             operation;
             source = _use_the_source_of_the_external_operation;

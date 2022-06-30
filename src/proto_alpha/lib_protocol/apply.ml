@@ -2192,7 +2192,7 @@ let apply_manager_contents (type kind) ctxt chain_id
           | Ok (ctxt, storage_limit, operation_results) -> (
               List.fold_left_es
                 (fun (ctxt, storage_limit, res) imopr ->
-                  let (Internal_manager_operation_result (op, mopr)) = imopr in
+                  let (Internal_operation_result (op, mopr)) = imopr in
                   match mopr with
                   | Applied smopr ->
                       burn_internal_storage_fees
@@ -2202,7 +2202,7 @@ let apply_manager_contents (type kind) ctxt chain_id
                         ~payer:source
                       >>=? fun (ctxt, storage_limit, smopr) ->
                       let imopr =
-                        Internal_manager_operation_result (op, Applied smopr)
+                        Internal_operation_result (op, Applied smopr)
                       in
                       return (ctxt, storage_limit, imopr :: res)
                   | _ -> return (ctxt, storage_limit, imopr :: res))
@@ -2371,17 +2371,16 @@ let mark_backtracked results =
       | (Failed _ | Skipped _ | Backtracked _) as result -> result
       | Applied result -> Backtracked (result, None)
     in
-    let mark_internal_manager_operation_result :
+    let mark_internal_operation_result :
         type kind.
-        kind internal_manager_operation_result ->
-        kind internal_manager_operation_result = function
+        kind internal_operation_result -> kind internal_operation_result =
+      function
       | (Failed _ | Skipped _ | Backtracked _) as result -> result
       | Applied result -> Backtracked (result, None)
     in
     let mark_internal_operation_results
-        (Internal_manager_operation_result (kind, result)) =
-      Internal_manager_operation_result
-        (kind, mark_internal_manager_operation_result result)
+        (Internal_operation_result (kind, result)) =
+      Internal_operation_result (kind, mark_internal_operation_result result)
     in
     match results with
     | Manager_operation_result op ->
