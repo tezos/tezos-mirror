@@ -1756,6 +1756,18 @@ module Stack_utils = struct
         ok @@ IFailwith (location, arg_ty)
 end
 
+module type Logger_base = sig
+  val log_interp : ('a, 's, 'b, 'f, 'c, 'u) logging_function
+
+  val log_entry : ('a, 's, 'b, 'f, 'a, 's) logging_function
+
+  val log_control : ('a, 's, 'b, 'f) continuation -> unit
+
+  val log_exit : ('a, 's, 'b, 'f, 'c, 'u) logging_function
+
+  val get_log : unit -> execution_trace option tzresult Lwt.t
+end
+
 module Logger = struct
   open Stack_utils
 
@@ -1781,8 +1793,10 @@ module Logger = struct
     protects us from calling this by mistake.*)
   let log_control logger ks = logger.log_control ks
 
-  (* [log_kinstr logger i] emits an instruction to instrument the
-     execution of [i] with [logger]. *)
+  (** [log_kinstr logger sty instr] returns [instr] prefixed by an
+      [ILog] instruction to log the first instruction in [instr]. Note
+      that [logger] value is only available when logging is enables, so
+      the type system protects us from calling this by mistake. *)
   let log_kinstr logger sty i =
     ILog (kinstr_location i, sty, LogEntry, logger, i)
 
@@ -2220,4 +2234,16 @@ module Logger = struct
    [@@inline]
 end
 
-include Logger
+let make (module Base : Logger_base) =
+  let open Logger in
+  let open Base in
+  {
+    log_interp;
+    log_entry;
+    log_exit;
+    log_control;
+    get_log;
+    log_kinstr;
+    klog;
+    ilog;
+  }

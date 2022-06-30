@@ -144,21 +144,24 @@ let logger () :
     (unit -> trace_element list tzresult Lwt.t) * Script_typed_ir.logger =
   let open Script_typed_ir in
   let log : log_element list ref = ref [] in
-  let log_interp : type a s b f c u. (a, s, b, f, c, u) logging_function =
-   fun instr ctxt loc sty stack ->
-    log := With_stack (ctxt, instr, loc, stack, sty, Interp) :: !log
+  let logger =
+    Script_interpreter_logging.make
+      (module struct
+        let log_interp : type a s b f c u. (a, s, b, f, c, u) logging_function =
+         fun instr ctxt loc sty stack ->
+          log := With_stack (ctxt, instr, loc, stack, sty, Interp) :: !log
+
+        let log_entry instr ctxt loc sty stack =
+          log := With_stack (ctxt, instr, loc, stack, sty, Entry) :: !log
+
+        let log_exit instr ctxt loc sty stack =
+          log := With_stack (ctxt, instr, loc, stack, sty, Exit) :: !log
+
+        let log_control cont = log := Ctrl cont :: !log
+
+        let get_log () = return_none
+      end)
   in
-  let log_entry instr ctxt loc sty stack =
-    log := With_stack (ctxt, instr, loc, stack, sty, Entry) :: !log
-  in
-  let log_exit instr ctxt loc sty stack =
-    log := With_stack (ctxt, instr, loc, stack, sty, Exit) :: !log
-  in
-  let log_control cont = log := Ctrl cont :: !log in
-  let get_log () = return_none in
-  let klog = Script_interpreter_logging.klog in
-  let ilog = Script_interpreter_logging.ilog in
-  let log_kinstr = Script_interpreter_logging.log_kinstr in
   let assemble_log () =
     let open Environment.Error_monad in
     let+ l =
@@ -175,17 +178,7 @@ let logger () :
     in
     List.rev l
   in
-  ( assemble_log,
-    {
-      log_exit;
-      log_entry;
-      log_interp;
-      get_log;
-      log_control;
-      klog;
-      ilog;
-      log_kinstr;
-    } )
+  (assemble_log, logger)
 
 (* [with_logger ~mask f] creates a fresh logger and passes it to [f].
    After [f] finishes, logs are gathered and each occurrence of each

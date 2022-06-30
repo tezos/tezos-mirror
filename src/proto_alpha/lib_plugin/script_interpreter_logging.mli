@@ -24,18 +24,20 @@
 (*****************************************************************************)
 
 open Protocol
+open Environment
+open Error_monad
 open Script_typed_ir
 
-(** [log_kinstr logger sty instr] returns [instr] prefixed by an
-    [ILog] instruction to log the first instruction in [instr]. Note
-    that [logger] value is only available when logging is enables, so
-    the type system protects us from calling this by mistake. *)
-val log_kinstr :
-  logger ->
-  ('a, 'b) stack_ty ->
-  ('a, 'b, 'c, 'd) kinstr ->
-  ('a, 'b, 'c, 'd) kinstr
+module type Logger_base = sig
+  val log_interp : ('a, 's, 'b, 'f, 'c, 'u) logging_function
 
-val klog : ('a, 's, 'r, 'f) klog
+  val log_entry : ('a, 's, 'b, 'f, 'a, 's) logging_function
 
-val ilog : ('a, 's, 'b, 't, 'r, 'f) ilog
+  val log_control : ('a, 's, 'b, 'f) continuation -> unit
+
+  val log_exit : ('a, 's, 'b, 'f, 'c, 'u) logging_function
+
+  val get_log : unit -> execution_trace option tzresult Lwt.t
+end
+
+val make : (module Logger_base) -> logger
