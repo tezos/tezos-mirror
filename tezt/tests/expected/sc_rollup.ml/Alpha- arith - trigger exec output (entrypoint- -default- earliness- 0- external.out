@@ -57,3 +57,44 @@ This sequence of operations was run:
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1000.078
 
+
+./octez-client --wait none execute outbox message of sc rollup '[SC_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]' for commitment hash '[SC_ROLLUP_COMMITMENT_HASH]' and output proof 0x0300009344398412ac09ac71d5fc170c73d11224c00dc0f6ae32ec2d3258226e6ed7699344398412ac09ac71d5fc170c73d11224c00dc0f6ae32ec2d3258226e6ed769900b626f6f745f736563746f72c8baff5f78423676a25d9cd27a412dd932327b9b3e1cc26e754a36410a5efbf7b404636f6465d0d3ba29c544461a2288af2c689a1e460b2194b7ca43d9119fd860a99ef9526c2f0d63757272656e745f6c6576656cc87c712a98763ef0f7dc84b32ccd664529f8870febc2cf5ebd08c9d8c53cd921eb116576616c756174696f6e5f726573756c74c8eda4dcfc891aa48bb021d3ed729b7efc072bfccb367c623f60ed227bc4de490518696e7465726e616c5f6d6573736167655f636f756e746572c863c8a7d7c1e23bed545e7630f6f7e90acb8530d993e5d2c2897fa63ac2f90aee0c6c657865725f627566666572c8ebcbe14f4bd1a623638082a7369fb9c24714c53e015d73a5fdd522ee5693b2a60f6d6573736167655f636f756e746572c8fdba9c9eaf85805b298818a3a591547ee7ab9f0e8cb55dd8b535e20498fe1880086d65746164617461c8281aa0d07cc2e6d0380db2abd7a5d06b9d4a370e633cd45444bbd6a626d6c8c50c6e6578745f6d657373616765c819cbb1ddf1a55131aa082968983a53a26a420156102756154baa4617d937403c066f7574707574810130c8b3be8e119db56ecbdb098e21636b1e0d6f7429a633db34b47445364df8c39c0c0e6f75747075745f636f756e746572c8407f958990678e2e9fb06758bc6520dae46d838d39948a4c51a5b19bd079293d0c7061727365725f7374617465c8407f958990678e2e9fb06758bc6520dae46d838d39948a4c51a5b19bd079293d0e70617273696e675f726573756c74c8eda4dcfc891aa48bb021d3ed729b7efc072bfccb367c623f60ed227bc4de490505737461636bd0ea0b71581cf3b3263274851515fd06b757312f45494fc5ca9900bd8577e20fc306737461747573c8407f958990678e2e9fb06758bc6520dae46d838d39948a4c51a5b19bd079293d047469636bc86f98099c0f0a2145ae4e656e27896027066b88a4e4b9788b98eb4b8a87900f9e9344398412ac09ac71d5fc170c73d11224c00dc0f6ae32ec2d3258226e6ed76900000005000000000023002501c00c5e4e94a48a49e267873112bbe3cf3373be5b000000000764656661756c74 --burn-cap 10
+Node is bootstrapped.
+Estimated gas: 5970.376 units (will add 100 for safety)
+Estimated storage: 5 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.001778
+    Expected counter: 2
+    Gas limit: 6071
+    Storage limit: 25 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001778
+      payload fees(the block proposer) ....... +ꜩ0.001778
+    Smart contract output message execution:
+      Address: [SC_ROLLUP_HASH]
+      Cemented commitment: [SC_ROLLUP_COMMITMENT_HASH]
+      This smart contract output message execution was successfully applied
+      Paid storage size diff: 5 bytes
+      Consumed gas: 4767.272
+      Balance updates:
+        [PUBLIC_KEY_HASH] ... -ꜩ0.00125
+        storage fees ........................... +ꜩ0.00125
+      Internal operations:
+        Internal Transaction:
+          Amount: ꜩ0
+          From: [PUBLIC_KEY_HASH]
+          To: [CONTRACT_HASH]
+          Parameter: 37
+          This transaction was successfully applied
+          Updated storage: 37
+          Storage size: 92 bytes
+          Consumed gas: 1203.104
+

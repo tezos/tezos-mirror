@@ -88,3 +88,7 @@ val cost_hash_bytes : bytes_len:int -> Gas_limit_repr.cost
     [hash_size]. *)
 val cost_check_dissection :
   number_of_states:int -> tick_size:int -> hash_size:int -> Gas_limit_repr.cost
+
+(** [cost_verify_output_proof ~bytes_len] is the cost of verifying an output
+     proof of length [bytes_len]. *)
+val cost_verify_output_proof : bytes_len:int -> Gas_limit_repr.cost

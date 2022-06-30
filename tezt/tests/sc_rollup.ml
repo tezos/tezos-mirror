@@ -3392,6 +3392,7 @@ let test_outbox_message_generic ?regression ?expected_error ~earliness
     | Some {commitment_hash; proof}, None ->
         let*! () =
           Client.Sc_rollup.execute_outbox_message
+            ~hooks
             ~burn_cap:(Tez.of_int 10)
             ~rollup:sc_rollup
             ~src:src2
