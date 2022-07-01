@@ -70,7 +70,11 @@ module Patch_dictator_for_ghostnet = struct
   let patch_constant chain_id ctxt =
     if Chain_id.equal chain_id ghostnet_id then
       Raw_context.patch_constants ctxt (fun c ->
-          {c with testnet_dictator = Some oxhead_testnet_baker})
+          {
+            c with
+            testnet_dictator = Some oxhead_testnet_baker;
+            cycles_per_voting_period = 1l;
+          })
     else Lwt.return ctxt
 end
 

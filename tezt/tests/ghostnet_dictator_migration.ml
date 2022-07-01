@@ -79,7 +79,7 @@ let init chain_id ~from_protocol ~to_protocol =
       ~base:(Right (from_protocol, None))
       [
         (["blocks_per_cycle"], Some "4");
-        (["cycles_per_voting_period"], Some "1");
+        (["cycles_per_voting_period"], Some "2");
       ]
   in
   let* () =
@@ -110,13 +110,26 @@ let register_migration_test chain_id =
       client
       (Protocol.hash from_protocol, Protocol.hash to_protocol)
   in
-  let expected_dictator =
+  let expected_dictator, expected_remaining =
     match chain_id with
     | Chain_id_ghostnet when to_protocol = Alpha ->
-        Some "tz1Xf8zdT3DbAX9cHw3c3CXh79rc4nK4gCe8"
-    | _ -> None
+        (Some "tz1Xf8zdT3DbAX9cHw3c3CXh79rc4nK4gCe8", 1)
+    | _ -> (None, 5)
   in
-  check_dictator client expected_dictator
+
+  let* () = check_dictator client expected_dictator in
+  let* () =
+    Voting.check_current_period
+      client
+      {
+        Voting.index = 0;
+        kind = Proposal;
+        start_position = 0;
+        position = 2;
+        remaining = expected_remaining;
+      }
+  in
+  return ()
 
 let register ~protocols =
   (* Testing migration with the chain_id of Ghostnet.
