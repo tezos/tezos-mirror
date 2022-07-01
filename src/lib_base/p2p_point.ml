@@ -55,7 +55,13 @@ module Id = struct
 
   let pp_addr_port_id fmt {addr; port; peer_id} =
     let open Format in
-    pp_print_string fmt addr ;
+    (* Protects the resulting network resource identifier from
+       conflictual colon (:).
+       See https://en.wikipedia.org/wiki/IPv6_address#Literal_IPv6_addresses_in_network_resource_identifiers *)
+    let unconflictual_addr =
+      if String.contains addr ':' then Format.sprintf "[%s]" addr else addr
+    in
+    pp_print_string fmt unconflictual_addr ;
     Option.iter (fprintf fmt ":%d") port ;
     Option.iter
       (fun peer -> fprintf fmt "#%s" (P2p_peer_id.to_b58check peer))

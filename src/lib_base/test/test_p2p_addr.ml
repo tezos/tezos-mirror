@@ -94,7 +94,7 @@ let addr_port_id_v6 =
   Gen.map
     (fun (ip, port, peer_id) ->
       let peer_id = Option.map (fun gen -> gen.P2p_identity.peer_id) peer_id in
-      P2p_point.Id.{addr = P2p_addr.to_string ip; port; peer_id})
+      P2p_point.Id.{addr = Ipaddr.V6.to_string ip; port; peer_id})
     Generator.ipv6t
 
 let remove_brackets addr =
