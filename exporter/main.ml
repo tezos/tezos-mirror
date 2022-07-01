@@ -23,40 +23,65 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let usage_msg = "teztale-explorer -db <database> -level <level>"
+open Lwt_result_syntax
 
-let db_path = ref ""
+let group = {Clic.name = "teztale-exporter"; Clic.title = "Exporter RPC server"}
 
-let level = ref 0
+let path_parameter =
+  Clic.parameter (fun _ p ->
+      if not (Sys.file_exists p) then failwith "File does not exist: '%s'" p
+      else return p)
 
-let args =
-  [
-    ("-db", Arg.Set_string db_path, "path to the database");
-    ("-level", Arg.Set_int level, "queried level");
-  ]
+let db_path_param =
+  Clic.param
+    ~name:"db_path"
+    ~desc:"path to the Sqlite3 database file where the data is stored"
+    path_parameter
 
-let anon_args _str =
-  Format.eprintf "usage: %s" usage_msg ;
-  exit 1
+let addr_arg =
+  Clic.default_arg
+    ~long:"rpc_addr"
+    ~placeholder:"IP addr|host"
+    ~doc:"the address at which the server listens (default: 127.0.0.1)"
+    ~default:"127.0.0.1"
+    (Client_config.string_parameter ())
 
-let set_pragma_use_wal_mode db =
-  let cmd = "PRAGMA journal_mode = WAL" in
-  match Sqlite3.exec db cmd with
-  | Sqlite3.Rc.OK -> ()
-  | _ -> Format.eprintf "Failed to exec \'%s\': %s@." cmd (Sqlite3.errmsg db)
-
-let main () =
-  let db = Sqlite3.db_open ~mode:`READONLY !db_path in
-  set_pragma_use_wal_mode db ;
-  let () =
-    Exporter.data_at_level db !level
-    |> Data_encoding.Json.construct Data.encoding
-    |> Format.printf "%a@." Data_encoding.Json.pp
-  in
-  let _closed = Sqlite3.db_close db in
-  ()
+type error += Invalid_port of string
 
 let () =
-  Arg.parse args anon_args usage_msg ;
-  if String.equal !db_path "" || !level = 0 then print_endline usage_msg
-  else main ()
+  register_error_kind
+    `Permanent
+    ~id:"exporter.invalidPortArg"
+    ~title:"Bad Port Argument"
+    ~description:"Port argument could not be parsed"
+    ~pp:(fun ppf s -> Format.fprintf ppf "Value %s is not a valid TCP port." s)
+    Data_encoding.(obj1 (req "value" string))
+    (function Invalid_port s -> Some s | _ -> None)
+    (fun s -> Invalid_port s)
+
+let port_arg =
+  Clic.default_arg
+    ~long:"rpc_port"
+    ~placeholder:"number"
+    ~doc:"the port at which the server listens (default: 9799)"
+    ~default:"9799"
+    (Clic.parameter (fun _ x ->
+         match int_of_string_opt x with
+         | Some i -> return i
+         | None -> tzfail (Invalid_port x)))
+
+let run_command =
+  let open Clic in
+  command
+    ~desc:"run the exporter RPC server"
+    (args2 addr_arg port_arg)
+    (prefixes ["run"; "on"] @@ db_path_param @@ stop)
+    (fun addr_port db_path cctxt -> Server.run ~db_path addr_port cctxt)
+
+let commands () = [run_command]
+
+let select_commands _ _ =
+  let open Lwt_result_syntax in
+  return (commands ())
+
+let () = Client_main_run.run (module Client_config) ~select_commands

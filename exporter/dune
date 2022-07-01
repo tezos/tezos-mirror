@@ -3,7 +3,17 @@
  (public_name teztale-exporter)
  (package teztale)
  (promote (until-clean))
- (libraries tezos-client-base-unix sqlite3 teztale_lib)
+ (libraries
+  tezos-client-base-unix
+	sqlite3
+	teztale_lib
+	tezos-rpc-http
+  tezos-rpc-http-server)
  (flags
-  (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix -open
-    Tezos_client_base_unix -open Teztale_lib)))
+  (:standard
+	-open Tezos_base__TzPervasives
+	-open Tezos_stdlib_unix
+	-open Tezos_client_base_unix
+  -open Tezos_rpc_http
+  -open Tezos_rpc_http_server
+	-open Teztale_lib)))
