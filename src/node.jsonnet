@@ -295,7 +295,8 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       linewidth=1,
       format='none',
       legend_alignAsTable=true,
-      legend_total=true,
+      legend_max=true,
+      legend_current=true,
       legend_values=true,
       aliasColors={
         [blocks]: 'light-red',
