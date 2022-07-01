@@ -140,7 +140,7 @@ let deposit_stake_and_check_balances ctxt rollup staker =
     rollup
     staker
     (fun ctxt rollup staker_contract stake ->
-      let* ctxt', _ =
+      let* ctxt', _, _ =
         lift
         @@ Sc_rollup_stake_storage.Internal_for_tests.deposit_stake
              ctxt
@@ -2142,6 +2142,7 @@ let test_refine_stake_of_missing_rollup () =
         ctxt
         rollup
         Sc_rollup_repr.Staker.zero
+        ~staked_on:Sc_rollup_commitment_repr.Hash.zero
         Commitment_repr.
           {
             predecessor = Commitment_repr.Hash.zero;

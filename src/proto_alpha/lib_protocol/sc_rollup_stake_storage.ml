@@ -86,7 +86,7 @@ let deposit_stake ctxt rollup staker =
   in
   let* ctxt, _size = Store.Stakers.init (ctxt, rollup) staker lcc in
   let* ctxt = modify_staker_count ctxt rollup Int32.succ in
-  return (ctxt, balance_updates)
+  return (ctxt, balance_updates, lcc)
 
 let withdraw_stake ctxt rollup staker =
   let open Lwt_tzresult_syntax in
@@ -251,10 +251,9 @@ let increase_commitment_stake_count ctxt rollup node =
    + 0 for Staker_count_update entry *)
 let commitment_storage_size_in_bytes = 85
 
-let refine_stake ctxt rollup staker commitment =
+let refine_stake ctxt rollup staker staked_on commitment =
   let open Lwt_tzresult_syntax in
   let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
-  let* staked_on, ctxt = find_staker_unsafe ctxt rollup staker in
   let* ctxt = assert_refine_conditions_met ctxt rollup lcc commitment in
   let new_hash = Commitment.hash commitment in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2559
@@ -310,12 +309,14 @@ let refine_stake ctxt rollup staker commitment =
 
 let publish_commitment ctxt rollup staker commitment =
   let open Lwt_tzresult_syntax in
-  let* ctxt, res = Store.Stakers.mem (ctxt, rollup) staker in
-  let* ctxt, balance_updates =
-    if res then return (ctxt, []) else deposit_stake ctxt rollup staker
+  let* ctxt, staked_on_opt = Store.Stakers.find (ctxt, rollup) staker in
+  let* ctxt, balance_updates, staked_on =
+    match staked_on_opt with
+    | Some staked_on -> return (ctxt, [], staked_on)
+    | None -> deposit_stake ctxt rollup staker
   in
   let+ commitment_hash, ctxt, level =
-    refine_stake ctxt rollup staker commitment
+    refine_stake ctxt rollup staker staked_on commitment
   in
   (commitment_hash, ctxt, level, balance_updates)
 
@@ -424,5 +425,14 @@ let remove_staker ctxt rollup staker =
 module Internal_for_tests = struct
   let deposit_stake = deposit_stake
 
-  let refine_stake = refine_stake
+  let refine_stake ctxt rollup staker ?staked_on commitment =
+    let open Lwt_tzresult_syntax in
+    match staked_on with
+    | Some staked_on -> refine_stake ctxt rollup staker staked_on commitment
+    | None ->
+        (* This allows to call {!refine_stake} without explicitely passing the
+           staked_on parameter, it's more convenient for tests. However,
+           it still enforce that {!deposit_stake} was called before. *)
+        let* _ctxt, staked_on = Store.Stakers.get (ctxt, rollup) staker in
+        refine_stake ctxt rollup staker staked_on commitment
 end
