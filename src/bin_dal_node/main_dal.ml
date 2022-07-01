@@ -38,11 +38,59 @@ let data_dir_arg =
     ~default
     (Client_config.string_parameter ())
 
+let rpc_addr_arg =
+  let default = Configuration.default_rpc_addr in
+  Clic.default_arg
+    ~long:"rpc-addr"
+    ~placeholder:"rpc-address|ip"
+    ~doc:
+      (Format.sprintf
+         "The address the smart-contract rollup node listens to. Default value \
+          is %s"
+         default)
+    ~default
+    (Client_config.string_parameter ())
+
+let int_parameter =
+  let open Clic in
+  parameter (fun _ p ->
+      try Lwt.return_ok (int_of_string p) with _ -> failwith "Cannot read int")
+
+let rpc_port_arg =
+  let default = Configuration.default_rpc_port |> string_of_int in
+  Clic.default_arg
+    ~long:"rpc-port"
+    ~placeholder:"rpc-port"
+    ~doc:
+      (Format.sprintf
+         "The port the smart-contract rollup node listens to. Default value is \
+          %s"
+         default)
+    ~default
+    int_parameter
+
 let no_trusted_setup_arg =
   Clic.switch
     ~long:"no-trusted-setup"
     ~doc:(Format.sprintf "Allow the DAL Node to run without trusted setup")
     ()
+
+let config_init_command =
+  let open Lwt_result_syntax in
+  let open Clic in
+  command
+    ~group
+    ~desc:"Configure DAL node."
+    (args3 data_dir_arg rpc_addr_arg rpc_port_arg)
+    (prefixes ["init-config"] stop)
+    (fun (data_dir, rpc_addr, rpc_port) cctxt ->
+      let open Configuration in
+      let config = {data_dir; rpc_addr; rpc_port} in
+      let* () = save config in
+      let*! _ =
+        cctxt#message "DAL node configuration written in %s" (filename config)
+      in
+      return ())
 
 let run_command =
   let open Clic in
@@ -54,7 +102,7 @@ let run_command =
     (fun (data_dir, no_trusted_setup) cctxt ->
       Daemon.run ~data_dir ~no_trusted_setup cctxt)
 
-let commands () = [run_command]
+let commands () = [run_command; config_init_command]
 
 let select_commands _ _ =
   let open Lwt_result_syntax in
