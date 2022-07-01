@@ -153,7 +153,7 @@ let produce pvm_and_state inbox_context inbox_history inbox commit_level =
             inbox_context
             inbox_history
             inbox
-            (l, n)
+            (l, Z.succ n)
         in
         return (Some p, i)
   in
