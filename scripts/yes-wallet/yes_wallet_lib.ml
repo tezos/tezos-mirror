@@ -27,13 +27,33 @@
 
 open Tezos_base.TzPervasives
 
-type protocol = Florence | Granada | Hangzhou | Ithaca | Alpha
+type protocol =
+  | Florence
+  | Granada
+  | Hangzhou
+  | Ithaca
+  | Jakarta
+  | Kathmandu
+  | Alpha
+
+let known_protocols =
+  [
+    (Tezos_protocol_009_PsFLoren.Protocol.hash, Florence);
+    (Tezos_protocol_010_PtGRANAD.Protocol.hash, Granada);
+    (Tezos_protocol_011_PtHangz2.Protocol.hash, Hangzhou);
+    (Tezos_protocol_012_Psithaca.Protocol.hash, Ithaca);
+    (Tezos_protocol_013_PtJakart.Protocol.hash, Jakarta);
+    (Tezos_protocol_014_PtKathma.Protocol.hash, Kathmandu);
+    (Tezos_protocol_alpha.Protocol.hash, Alpha);
+  ]
 
 let string_of_protocol = function
   | Florence -> "Florence"
   | Granada -> "Granada"
   | Hangzhou -> "Hangzhou"
   | Ithaca -> "Ithaca"
+  | Jakarta -> "Jakarta"
+  | Kathmandu -> "Kathmandu"
   | Alpha -> "Alpha"
 
 let pp_protocol ppf protocol =
@@ -437,6 +457,120 @@ let get_delegates (proto : protocol) context
       List.sort
         (fun (_, _, x) (_, _, y) -> Alpha_context.Tez.compare y x)
         delegates
+  | Jakarta ->
+      let open Tezos_protocol_013_PtJakart in
+      let open Protocol in
+      let* ctxt, _, _ =
+        let*! r =
+          Alpha_context.prepare context ~level ~predecessor_timestamp ~timestamp
+        in
+        Lwt.return @@ Environment.wrap_tzresult r
+      in
+      (* Loop on delegates to extract keys and compute the total stake. *)
+      let* delegates, total_stake =
+        Alpha_context.Delegate.fold
+          ctxt
+          ~order:`Sorted
+          ~init:(Ok ([], Alpha_context.Tez.zero))
+          ~f:(fun pkh acc ->
+            let* pk =
+              let*! r = Alpha_context.Delegate.pubkey ctxt pkh in
+              Lwt.return @@ Environment.wrap_tzresult r
+            in
+            let*? key_list_acc, staking_balance_acc = acc in
+            let* staking_balance =
+              let*! r = Alpha_context.Delegate.staking_balance ctxt pkh in
+              Lwt.return @@ Environment.wrap_tzresult r
+            in
+            let*? updated_staking_balance_acc =
+              Alpha_context.Tez.(staking_balance_acc +? staking_balance)
+              |> Environment.wrap_tzresult
+            in
+            (* Filter deactivated bakers if required *)
+            if active_bakers_only then
+              let* b =
+                let*! r = Alpha_context.Delegate.deactivated ctxt pkh in
+                Lwt.return @@ Environment.wrap_tzresult r
+              in
+              match b with
+              (* Ignore the baker. *)
+              | true -> return (key_list_acc, staking_balance_acc)
+              (* Consider the baker. *)
+              | false ->
+                  return
+                    ( (pkh, pk, staking_balance) :: key_list_acc,
+                      updated_staking_balance_acc )
+            else
+              return
+                ( (pkh, pk, staking_balance) :: key_list_acc,
+                  updated_staking_balance_acc ))
+      in
+      return
+      @@ filter_up_to_staking_share
+           staking_share_opt
+           total_stake
+           Alpha_context.Tez.to_mutez
+      @@ (* By swapping x and y we do a descending sort *)
+      List.sort
+        (fun (_, _, x) (_, _, y) -> Alpha_context.Tez.compare y x)
+        delegates
+  | Kathmandu ->
+      let open Tezos_protocol_014_PtKathma in
+      let open Protocol in
+      let* ctxt, _, _ =
+        let*! r =
+          Alpha_context.prepare context ~level ~predecessor_timestamp ~timestamp
+        in
+        Lwt.return @@ Environment.wrap_tzresult r
+      in
+      (* Loop on delegates to extract keys and compute the total stake. *)
+      let* delegates, total_stake =
+        Alpha_context.Delegate.fold
+          ctxt
+          ~order:`Sorted
+          ~init:(Ok ([], Alpha_context.Tez.zero))
+          ~f:(fun pkh acc ->
+            let* pk =
+              let*! r = Alpha_context.Delegate.pubkey ctxt pkh in
+              Lwt.return @@ Environment.wrap_tzresult r
+            in
+            let*? key_list_acc, staking_balance_acc = acc in
+            let* staking_balance =
+              let*! r = Alpha_context.Delegate.staking_balance ctxt pkh in
+              Lwt.return @@ Environment.wrap_tzresult r
+            in
+            let*? updated_staking_balance_acc =
+              Alpha_context.Tez.(staking_balance_acc +? staking_balance)
+              |> Environment.wrap_tzresult
+            in
+            (* Filter deactivated bakers if required *)
+            if active_bakers_only then
+              let* b =
+                let*! r = Alpha_context.Delegate.deactivated ctxt pkh in
+                Lwt.return @@ Environment.wrap_tzresult r
+              in
+              match b with
+              (* Ignore the baker. *)
+              | true -> return (key_list_acc, staking_balance_acc)
+              (* Consider the baker. *)
+              | false ->
+                  return
+                    ( (pkh, pk, staking_balance) :: key_list_acc,
+                      updated_staking_balance_acc )
+            else
+              return
+                ( (pkh, pk, staking_balance) :: key_list_acc,
+                  updated_staking_balance_acc ))
+      in
+      return
+      @@ filter_up_to_staking_share
+           staking_share_opt
+           total_stake
+           Alpha_context.Tez.to_mutez
+      @@ (* By swapping x and y we do a descending sort *)
+      List.sort
+        (fun (_, _, x) (_, _, y) -> Alpha_context.Tez.compare y x)
+        delegates
   | Alpha ->
       let open Tezos_protocol_alpha in
       let open Protocol in
@@ -496,20 +630,7 @@ let get_delegates (proto : protocol) context
         delegates
 
 let protocol_of_hash protocol_hash =
-  if Protocol_hash.equal protocol_hash Tezos_protocol_009_PsFLoren.Protocol.hash
-  then Some Florence
-  else if
-    Protocol_hash.equal protocol_hash Tezos_protocol_010_PtGRANAD.Protocol.hash
-  then Some Granada
-  else if
-    Protocol_hash.equal protocol_hash Tezos_protocol_011_PtHangz2.Protocol.hash
-  then Some Hangzhou
-  else if
-    Protocol_hash.equal protocol_hash Tezos_protocol_012_Psithaca.Protocol.hash
-  then Some Ithaca
-  else if Protocol_hash.equal protocol_hash Tezos_protocol_alpha.Protocol.hash
-  then Some Alpha
-  else None
+  List.assoc ~equal:Protocol_hash.equal protocol_hash known_protocols
 
 (** [load_mainnet_bakers_public_keys base_dir active_backers_only] checkouts
     the head context at the given [base_dir] and computes a list of triples
