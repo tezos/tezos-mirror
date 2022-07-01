@@ -58,6 +58,8 @@ module type PROTOCOL = sig
 
     val expr_encoding : expr Data_encoding.t
 
+    val lazy_expr : expr -> lazy_expr
+
     val print_expr : Format.formatter -> expr -> unit
 
     module Hash : sig
@@ -92,7 +94,11 @@ module type PROTOCOL = sig
 
     type ex_ty
 
-    type type_logger
+    type ex_code
+
+    val actual_code_size : ex_code -> int
+
+    val expected_code_size : ex_code -> int
 
     val parse_ty :
       context ->
@@ -108,6 +114,9 @@ module type PROTOCOL = sig
 
     val parse_toplevel :
       context -> legacy:bool -> Script.expr -> toplevel tzresult Lwt.t
+
+    val parse_code :
+      context -> legacy:bool -> Script.lazy_expr -> ex_code tzresult Lwt.t
   end
 
   module Storage : sig

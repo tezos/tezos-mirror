@@ -67,7 +67,14 @@ module Proto = struct
 
     type ex_ty = Script_ir_translator.ex_ty
 
-    type type_logger = Script_ir_translator.type_logger
+    type ex_code = Script_ir_translator.ex_code
+
+    let expected_code_size Script_ir_translator.(Ex_code (Code {code_size; _}))
+        =
+      Obj.magic code_size
+
+    let actual_code_size Script_ir_translator.(Ex_code (Code {code; _})) =
+      8 * Obj.(reachable_words @@ repr code)
 
     let parse_ty (ctxt : Raw_context.t) ~legacy ~allow_lazy_storage
         ~allow_operation ~allow_contract ~allow_ticket script =
@@ -115,6 +122,14 @@ module Proto = struct
         @@ Script_ir_translator.parse_toplevel (Obj.magic ctxt) ~legacy expr
       in
       toplevel
+
+    let parse_code ctxt ~legacy code =
+      let open Lwt_result_syntax in
+      let+ parsed_code, _ =
+        Lwt.map wrap_tzresult
+        @@ Script_ir_translator.parse_code (Obj.magic ctxt) ~legacy ~code
+      in
+      parsed_code
   end
 
   module Storage = struct

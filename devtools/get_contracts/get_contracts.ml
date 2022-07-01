@@ -28,6 +28,8 @@ module Config = struct
 
   let collect_lambdas = true
 
+  let measure_code_size = true
+
   let mainnet_genesis =
     {
       Genesis.time = Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z";
@@ -56,6 +58,12 @@ let mkdir dirname =
 
 module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
   module ExprMap = Map.Make (P.Script.Hash)
+
+  type contract = {
+    script : P.Script.expr;
+    addresses : P.Contract.repr list;
+    storages : P.Script.expr ExprMap.t;
+  }
 
   module File_helpers = struct
     let print_to_file ?err filename fmt =
@@ -306,7 +314,7 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
         in
         match code_opt with
         | None -> Lwt.return (m, i) (* Should not happen *)
-        | Some code ->
+        | Some script ->
             let+ add_storage =
               if Config.(collect_lambdas || collect_storage) then
                 let+ storage_opt =
@@ -324,18 +332,18 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
                     fun storages -> ExprMap.add key storage storages
               else Lwt.return (fun x -> x)
             in
-            let key = hash_expr code in
+            let key = hash_expr script in
             ( ExprMap.update
                 key
                 (fun existing ->
                   let contracts, storages =
                     match existing with
-                    | Some (_code, contracts, storages) -> (contracts, storages)
+                    | Some {addresses; storages; _} -> (addresses, storages)
                     | None -> ([], ExprMap.empty)
                   in
-                  let contracts = contract :: contracts in
+                  let addresses = contract :: contracts in
                   let storages = add_storage storages in
-                  Some (code, contracts, storages))
+                  Some {script; addresses; storages})
                 m,
               i )
   end
@@ -352,6 +360,48 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
     let open Lwt_result_syntax in
     let* _ctxt, values = P.Storage.list_values ctxt_i in
     List.fold_left_es (fun acc v -> f v acc) init values
+
+  let output_contract_results ctxt output_dir hash ctr total_size =
+    let open Lwt_result_syntax in
+    let hash_string = P.Script.Hash.to_b58check hash in
+    File_helpers.print_expr_file
+      ~dirname:output_dir
+      ~ext:".tz"
+      ~hash_string
+      ctr.script ;
+    let filename ~ext =
+      Filename.concat output_dir (Format.sprintf "%s.%s" hash_string ext)
+    in
+    File_helpers.print_to_file
+      (filename ~ext:"address")
+      "%a"
+      (Format.pp_print_list ~pp_sep:Format.pp_print_newline P.Contract.pp)
+      ctr.addresses ;
+    let* contract_size =
+      if Config.measure_code_size then (
+        let* script_code =
+          P.Translator.parse_code ctxt ~legacy:true
+          @@ P.Script.lazy_expr ctr.script
+        in
+        let size =
+          Contract_size.
+            {
+              expected = P.Translator.expected_code_size script_code;
+              actual = P.Translator.actual_code_size script_code;
+            }
+        in
+        File_helpers.print_to_file
+          (filename ~ext:"size")
+          "%a"
+          Contract_size.pp
+          size ;
+        return size)
+      else return Contract_size.zero
+    in
+    (if Config.collect_storage then
+     let dirname = Filename.concat output_dir (hash_string ^ ".storage") in
+     File_helpers.print_expr_dir ~dirname ~ext:".storage" ctr.storages) ;
+    return @@ Contract_size.add contract_size total_size
 
   let main ~output_dir ctxt ~head : unit tzresult Lwt.t =
     let open Lwt_result_syntax in
@@ -388,7 +438,7 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
         print_endline "Getting expressions from contracts..." ;
         let* exprs =
           ExprMap.fold_es
-            (fun hash (script, _contracts, storages) exprs ->
+            (fun hash {script; storages; _} exprs ->
               let exprs =
                 ExprMap.add hash (script, false, ExprMap.empty) exprs
               in
@@ -449,28 +499,18 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
       else return (contract_map, (ExprMap.empty, ExprMap.empty, ExprMap.empty))
     in
     print_endline "Writing contract files..." ;
-    ExprMap.iter
-      (fun hash (script, contracts, storages) ->
-        let hash_string = P.Script.Hash.to_b58check hash in
-        File_helpers.print_expr_file
-          ~dirname:output_dir
-          ~ext:".tz"
-          ~hash_string
-          script ;
-        let filename =
-          Filename.concat output_dir (hash_string ^ ".addresses")
-        in
-        File_helpers.print_to_file
-          filename
-          "%a"
-          (Format.pp_print_list ~pp_sep:Format.pp_print_newline P.Contract.pp)
-          contracts ;
-        if Config.collect_storage then
-          let dirname = Filename.concat output_dir (hash_string ^ ".storage") in
-          File_helpers.print_expr_dir ~dirname ~ext:".storage" storages
-        else ())
-      contract_map ;
+    let* total_ir_size =
+      ExprMap.fold_es
+        (output_contract_results ctxt output_dir)
+        contract_map
+        Contract_size.zero
+    in
     print_endline "Done writing contract files." ;
+    if Config.measure_code_size then
+      Format.printf
+        "@[<v 2>Total IR size:@;%a@]@."
+        Contract_size.pp
+        total_ir_size ;
     let () =
       if not (ExprMap.is_empty lambda_map) then (
         print_endline "Writing lambda files..." ;
