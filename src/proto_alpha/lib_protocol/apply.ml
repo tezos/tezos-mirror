@@ -1455,17 +1455,17 @@ let apply_external_manager_operation_content :
         ctxt
         script.Script.storage
       >>?= fun (_unparsed_storage, ctxt) ->
+      Script.force_decode_in_context
+        ~consume_deserialization_gas
+        ctxt
+        script.Script.code
+      >>?= fun (unparsed_code, ctxt) ->
       Script_ir_translator.parse_script
         ctxt
         ~legacy:false
         ~allow_forged_in_storage:false
         script
       >>=? fun (Ex_script parsed_script, ctxt) ->
-      Script.force_decode_in_context
-        ~consume_deserialization_gas
-        ctxt
-        script.Script.code
-      >>?= fun (unparsed_code, ctxt) ->
       let (Script {storage_type; views; storage; _}) = parsed_script in
       let views_result =
         Script_ir_translator.parse_views ctxt ~legacy:false storage_type views
