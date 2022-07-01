@@ -506,6 +506,12 @@ end)
       let string = Base_samplers.uniform_string ~nbytes:20 rng_state in
       Data_encoding.Binary.of_string_exn Alpha_context.Tx_rollup.encoding string
 
+    let sc_rollup rng_state =
+      let string = Base_samplers.uniform_string ~nbytes:20 rng_state in
+      Data_encoding.Binary.of_string_exn
+        Alpha_context.Sc_rollup.Address.encoding
+        string
+
     let entrypoint rng_state =
       Alpha_context.Entrypoint.of_string_strict_exn
       @@ Base_samplers.string ~size:{min = 1; max = 31} rng_state
@@ -535,6 +541,28 @@ end)
       let address = {destination; entrypoint} in
       return (Typed_contract {arg_ty; address})
 
+    let generate_sc_rollup_contract :
+        type arg argc.
+        (arg, argc) Script_typed_ir.ty ->
+        arg Script_typed_ir.typed_contract sampler =
+     fun arg_ty ->
+      let open M in
+      let* ru = sc_rollup in
+      let* entrypoint = entrypoint in
+      let destination = Alpha_context.Destination.Sc_rollup ru in
+      let address = {destination; entrypoint} in
+      return (Typed_contract {arg_ty; address})
+
+    let generate_any_type_contract :
+        type arg argc.
+        (arg, argc) Script_typed_ir.ty ->
+        arg Script_typed_ir.typed_contract sampler =
+     fun arg_ty ->
+      let open M in
+      let* b = Base_samplers.uniform_bool in
+      if b then generate_originated_contract arg_ty
+      else generate_sc_rollup_contract arg_ty
+
     let generate_contract :
         type arg argc.
         (arg, argc) Script_typed_ir.ty ->
@@ -552,7 +580,7 @@ end)
             let entrypoint = Alpha_context.Entrypoint.default in
             let address = {destination; entrypoint} in
             return (Typed_contract {arg_ty; address})
-          else generate_originated_contract arg_ty
+          else generate_any_type_contract arg_ty
       | Pair_t (Ticket_t _, Tx_rollup_l2_address_t, _, _) ->
           let* b = Base_samplers.uniform_bool in
           if b then
@@ -561,8 +589,8 @@ end)
             let entrypoint = Alpha_context.Tx_rollup.deposit_entrypoint in
             let address = {destination; entrypoint} in
             return (Typed_contract {arg_ty; address})
-          else generate_originated_contract arg_ty
-      | _ -> generate_originated_contract arg_ty
+          else generate_any_type_contract arg_ty
+      | _ -> generate_any_type_contract arg_ty
 
     let tx_rollup_l2_address rng_state =
       let seed =
