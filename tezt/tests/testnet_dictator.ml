@@ -71,18 +71,20 @@ let bake_until_migration_block node client =
     (return ())
     (Base.range 1 p.remaining)
 
-type chain_id = Mainnet | Ghostnet
+type chain_id = Chain_id_mainnet | Chain_id_ghostnet
+
+let all_chain_ids = [Chain_id_mainnet; Chain_id_ghostnet]
 
 let string_of_chain_id = function
-  | Mainnet -> "mainnet"
-  | Ghostnet -> "ghostnet"
+  | Chain_id_mainnet -> "mainnet"
+  | Chain_id_ghostnet -> "ghostnet"
 
 let init_with_dictator ~chain_id ~protocol =
   let patch_config, timestamp =
     match chain_id with
-    | Mainnet -> (None, None)
-    | Ghostnet ->
-        ( Some Node.Config_file.set_ghostnet_sandbox_network,
+    | Chain_id_mainnet -> (None, None)
+    | Chain_id_ghostnet ->
+        ( Some (Node.Config_file.set_ghostnet_sandbox_network ()),
           Some
             (* Ghostnet was started at 2022-01-25 (as Ithacanet) and the
                default timestamp is one year ago. This ad-hoc case could
@@ -160,7 +162,7 @@ let register_test chain_id period =
         dictator.alias ;
       let* () =
         Client.submit_proposals
-          ~expect_failure:(chain_id = Mainnet)
+          ~expect_failure:(chain_id = Chain_id_mainnet)
           ~key:dictator.public_key_hash
           ~proto_hash:Protocol.demo_counter_hash
           ~force:true (* Dictator is not in voting listing. *)
@@ -170,9 +172,9 @@ let register_test chain_id period =
       let* () = bake_until_migration_block node client in
       Log.info
         "Checking that %s migration occurred..."
-        (if chain_id = Mainnet then "no" else "a forced") ;
+        (if chain_id = Chain_id_mainnet then "no" else "a forced") ;
       let expected_protocol =
-        if chain_id = Mainnet then Protocol.hash Alpha
+        if chain_id = Chain_id_mainnet then Protocol.hash Alpha
         else Protocol.demo_counter_hash
       in
       let* () =
@@ -267,5 +269,5 @@ let register ~protocols =
     (fun period ->
       List.iter
         (fun chain_id -> register_test chain_id period protocols)
-        [Ghostnet; Mainnet])
+        all_chain_ids)
     Voting.periods
