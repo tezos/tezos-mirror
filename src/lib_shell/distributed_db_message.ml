@@ -113,11 +113,27 @@ module Bounded_encoding = struct
         5 |}]
   end
 
+  (* FIXME: all constants below are arbitrary high bounds until we
+     have the mechanism to update them properly *)
+
   let block_header_max_size, set_block_header_max_size =
     M.create (8 * 1024 * 1024)
 
-  let block_locator_max_length, set_block_locator_max_length =
-    M.create 1000 (* FIXME: arbitrary *)
+  let block_locator_max_length, set_block_locator_max_length = M.create 1000
+
+  let operation_max_size, set_operation_max_size = M.create (Some (128 * 1024))
+
+  let operation_list_max_size, set_operation_list_max_size =
+    M.create (Some (1024 * 1024))
+
+  let operation_list_max_length, set_operation_list_max_length = M.create None
+
+  let operation_max_pass, set_operation_max_pass = M.create (Some 8)
+
+  let protocol_max_size, set_protocol_max_size =
+    M.create (Some (2 * 1024 * 1024))
+
+  let mempool_max_operations, set_mempool_max_operations = M.create (Some 4000)
 
   let block_header =
     M.map block_header_max_size (fun max_size ->
@@ -131,22 +147,6 @@ module Bounded_encoding = struct
       (fun max_header_size max_length ->
         Block_locator.bounded_encoding ~max_header_size ~max_length ())
     |> M.encoding
-
-  (* FIXME: all constants below are arbitrary high bounds until we
-     have the mechanism to update them properly *)
-
-  let operation_max_size, set_operation_max_size = M.create (Some (128 * 1024))
-  (* FIXME: arbitrary *)
-
-  let operation_list_max_size, set_operation_list_max_size =
-    M.create (Some (1024 * 1024))
-  (* FIXME: arbitrary *)
-
-  let operation_list_max_length, set_operation_list_max_length =
-    M.create None (* FIXME: arbitrary *)
-
-  let operation_max_pass, set_operation_max_pass = M.create (Some 8)
-  (* FIXME: arbitrary *)
 
   let operation =
     M.map operation_max_size (fun max_size ->
@@ -174,17 +174,10 @@ module Bounded_encoding = struct
           ())
     |> M.encoding
 
-  let protocol_max_size, set_protocol_max_size =
-    M.create (Some (2 * 1024 * 1024))
-  (* FIXME: arbitrary *)
-
   let protocol =
     M.map protocol_max_size (fun max_size ->
         Protocol.bounded_encoding ?max_size ())
     |> M.encoding
-
-  (* Twice the current max size of a mempoool *)
-  let mempool_max_operations, set_mempool_max_operations = M.create (Some 4000)
 
   let mempool =
     M.map mempool_max_operations (fun max_operations ->
