@@ -553,7 +553,7 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
   (* The segments are arranged in cosets to evaluate in batch with Kate
      amortized. *)
   let polynomial_to_bytes p =
-    let eval = Evaluations.evaluation_fft2 domain_k p in
+    let eval = Evaluations.(evaluation_fft domain_k p |> to_array) in
     let slot = Bytes.init Params.slot_size (fun _ -> '0') in
     let offset = ref 0 in
     for segment = 0 to nb_segments - 1 do
@@ -561,7 +561,7 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
     done ;
     slot
 
-  let encode = Evaluations.evaluation_fft2 domain_n
+  let encode p = Evaluations.(evaluation_fft domain_n p |> to_array)
 
   (* The shards are arranged in cosets to evaluate in batch with Kate
      amortized. *)
@@ -785,7 +785,11 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
       proof
 
   let prove_single trusted_setup p z =
-    let q = Polynomials.(division_x_z (p - constant (evaluate p z)) z) in
+    let q =
+      fst
+      @@ Polynomials.(
+           division_xn (p - constant (evaluate p z)) 1 (Scalar.negate z))
+    in
     commit' (module Bls12_381.G1) q trusted_setup.srs_g1
 
   let verify_single trusted_setup cm ~point ~evaluation proof =
@@ -823,7 +827,7 @@ module Make (Params : CONFIGURATION) : DAL_cryptobox_sig = struct
       let l = 1 lsl Z.(log2up (of_int segment_len)) in
       let wi = Domains.get domain_k slot_segment_index in
       let domain = Domains.build ~log:Z.(log2up (of_int segment_len)) in
-      let eval_p = Evaluations.evaluation_fft2 domain_k p in
+      let eval_p = Evaluations.(evaluation_fft domain_k p |> to_array) in
       let eval_coset = eval_coset_array eval_p slot_segment_index in
       let remainder =
         Kate_amortized.interpolation_h_poly wi domain eval_coset
