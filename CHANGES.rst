@@ -80,6 +80,11 @@ Node
   compatibility: previous versions of Octez will refuse to run on an
   upgraded data directory.
 
+- **Breaking change**: the built-in network alias for Ithacanet
+  (``--network ithacanet``) has been removed.
+
+- Added the built-in network alias for Ghostnet (``--network ghostnet``).
+
 Client
 ------
 

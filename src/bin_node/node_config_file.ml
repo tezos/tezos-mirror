@@ -162,9 +162,9 @@ let blockchain_network_hangzhounet =
         "hangzhounet.boot.tez.ie";
       ]
 
-let blockchain_network_ithacanet =
+let blockchain_network_ghostnet =
   make_blockchain_network
-    ~alias:"ithacanet"
+    ~alias:"ghostnet"
     {
       time = Time.Protocol.of_notation_exn "2022-01-25T15:00:00Z";
       block =
@@ -188,13 +188,18 @@ let blockchain_network_ithacanet =
     ~chain_name:"TEZOS_ITHACANET_2022-01-25T15:00:00Z"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
     ~user_activated_upgrades:
-      [(8191l, "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A")]
+      [
+        (8191l, "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A");
+        (765952l, "PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY");
+      ]
     ~default_bootstrap_peers:
       [
-        "ithacanet.teztnets.xyz";
-        "ithacanet.smartpy.io";
-        "ithacanet.kaml.fr";
-        "ithacanet.boot.ecadinfra.com";
+        "ghostnet.teztnets.xyz";
+        "ghostnet.smartpy.io";
+        "ghostnet.boot.ecadinfra.com";
+        "ghostnet.kaml.fr";
+        "ghostnet.stakenow.de:9733";
+        "ghostnet.visualtez.com";
       ]
 
 let blockchain_network_jakartanet =
@@ -331,8 +336,8 @@ let builtin_blockchain_networks_with_tags =
     (1, blockchain_network_sandbox);
     (4, blockchain_network_mainnet);
     (16, blockchain_network_hangzhounet);
-    (17, blockchain_network_ithacanet);
     (18, blockchain_network_jakartanet);
+    (19, blockchain_network_ghostnet);
   ]
   |> List.map (fun (tag, network) ->
          match network.alias with
