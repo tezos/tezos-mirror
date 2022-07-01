@@ -920,7 +920,7 @@ let unset_deposits_limit ?hooks ?endpoint ?(wait = "none") ~src client =
   |> Process.check_and_read_stdout
 
 let spawn_originate_contract ?hooks ?log_output ?endpoint ?(wait = "none") ?init
-    ?burn_cap ~alias ~amount ~src ~prg client =
+    ?burn_cap ?gas_limit ?(dry_run = false) ~alias ~amount ~src ~prg client =
   spawn_command
     ?hooks
     ?log_output
@@ -939,7 +939,9 @@ let spawn_originate_contract ?hooks ?log_output ?endpoint ?(wait = "none") ?init
         prg;
       ]
     @ optional_arg "init" Fun.id init
-    @ optional_arg "burn-cap" Tez.to_string burn_cap)
+    @ optional_arg "burn-cap" Tez.to_string burn_cap
+    @ optional_arg "gas-limit" string_of_int gas_limit
+    @ optional_switch "dry-run" dry_run)
 
 let convert_michelson_to_json ~kind ?endpoint ~input client =
   let* client_output =
@@ -957,8 +959,8 @@ let convert_script_to_json ?endpoint ~script client =
 let convert_data_to_json ?endpoint ~data client =
   convert_michelson_to_json ~kind:"data" ?endpoint ~input:data client
 
-let originate_contract ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap ~alias
-    ~amount ~src ~prg client =
+let originate_contract ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
+    ?gas_limit ?dry_run ~alias ~amount ~src ~prg client =
   let* client_output =
     spawn_originate_contract
       ?endpoint
@@ -967,6 +969,8 @@ let originate_contract ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap ~alias
       ?wait
       ?init
       ?burn_cap
+      ?gas_limit
+      ?dry_run
       ~alias
       ~amount
       ~src

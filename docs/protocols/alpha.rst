@@ -35,6 +35,9 @@ Increase_paid_storage
 Bug Fixes
 ---------
 
+- Fix a discrepancy in gas consumption of contract origination between
+  dry run and actual application (MR :gl:`!5659`)
+
 Minor Changes
 -------------
 
