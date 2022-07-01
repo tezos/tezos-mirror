@@ -25,10 +25,9 @@
 
 open Tezos_webassembly_interpreter
 open Types
-open Sigs
 open Data_encoding_utils
 
-module Make (T : TreeS) = struct
+module Make (T : Tree.S) = struct
   module Tree = struct
     include T
     module Decoding = Tree_decoding.Make (T)
