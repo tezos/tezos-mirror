@@ -80,7 +80,7 @@ val create :
   log:(P2p_connection.P2p_event.t -> unit) ->
   ('msg, 'meta, 'meta_conn) t
 
-(** [activate t] starts the worker that will maintain connections *)
+(** [activate t] starts the worker that will maintain connections. *)
 val activate : ('msg, 'meta, 'meta_conn) t -> unit
 
 (** [maintain t] gives a hint to maintenance worker [t] that
@@ -91,3 +91,24 @@ val maintain : ('msg, 'meta, 'meta_conn) t -> unit Lwt.t
 (** [shutdown t] is a thread that returns whenever [t] has
     successfully shut down. *)
 val shutdown : ('msg, 'meta, 'meta_conn) t -> unit Lwt.t
+
+(** enable or disable maintenance triggers. For tests only *)
+module Internal_for_tests : sig
+  type test_config = {
+    trigger_swap : bool;
+    trigger_too_few_connections : bool;
+    trigger_too_many_connections : bool;
+  }
+
+  val create :
+    ?discovery:P2p_discovery.t ->
+    config ->
+    ?debug_config:test_config ->
+    ('msg, 'meta, 'meta_conn) P2p_pool.t ->
+    ('msg, 'meta, 'meta_conn) P2p_connect_handler.t ->
+    P2p_trigger.t ->
+    log:(P2p_connection.P2p_event.t -> unit) ->
+    ('msg, 'meta, 'meta_conn) t
+
+  val activate : ?rng:Random.State.t -> ('msg, 'meta, 'meta_conn) t -> unit
+end
