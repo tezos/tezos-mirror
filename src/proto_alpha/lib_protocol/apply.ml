@@ -831,7 +831,7 @@ let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~parameter
       (ctxt, result, []) )
 
 let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
-    ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal ~parameter =
+    ~entrypoint ~before_operation ~payer ~chain_id ~internal ~parameter =
   let contract = Contract.Originated contract_hash in
   (* Since the contract is originated, nothing will be allocated or this
      transfer of tokens will fail.  [Token.transfer] will succeed even on
@@ -879,7 +879,7 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
       execute
         ctxt
         ~cached_script
-        mode
+        Optimized
         step_constants
         ~script
         ~entrypoint
@@ -1080,7 +1080,6 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
 let apply_internal_manager_operation_content :
     type kind.
     context ->
-    Script_ir_translator.unparsing_mode ->
     payer:public_key_hash ->
     source:Contract.t ->
     chain_id:Chain_id.t ->
@@ -1090,7 +1089,7 @@ let apply_internal_manager_operation_content :
     * Script_typed_ir.packed_internal_operation list)
     tzresult
     Lwt.t =
- fun ctxt_before_op mode ~payer ~source ~chain_id operation ->
+ fun ctxt_before_op ~payer ~source ~chain_id operation ->
   Contract.must_exist ctxt_before_op source >>=? fun () ->
   Gas.consume ctxt_before_op Michelson_v1_gas.Cost_of.manager_operation
   >>?= fun ctxt ->
@@ -1141,7 +1140,6 @@ let apply_internal_manager_operation_content :
         ~before_operation:ctxt_before_op
         ~payer
         ~chain_id
-        ~mode
         ~internal:true
         ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
       >|=? fun (ctxt, res, ops) -> (ctxt, ITransaction_result res, ops)
@@ -1224,7 +1222,6 @@ let apply_internal_manager_operation_content :
 let apply_external_manager_operation_content :
     type kind.
     context ->
-    Script_ir_translator.unparsing_mode ->
     source:public_key_hash ->
     chain_id:Chain_id.t ->
     kind manager_operation ->
@@ -1233,7 +1230,7 @@ let apply_external_manager_operation_content :
     * Script_typed_ir.packed_internal_operation list)
     tzresult
     Lwt.t =
- fun ctxt_before_op mode ~source ~chain_id operation ->
+ fun ctxt_before_op ~source ~chain_id operation ->
   let source_contract = Contract.Implicit source in
   Contract.must_exist ctxt_before_op source_contract >>=? fun () ->
   Gas.consume ctxt_before_op Michelson_v1_gas.Cost_of.manager_operation
@@ -1310,7 +1307,6 @@ let apply_external_manager_operation_content :
         ~before_operation:ctxt_before_op
         ~payer:source
         ~chain_id
-        ~mode
         ~internal:false
         ~parameter:(Untyped_arg parameters)
       >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
@@ -1909,7 +1905,7 @@ let apply_external_manager_operation_content :
 
 type success_or_failure = Success of context | Failure
 
-let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
+let apply_internal_manager_operations ctxt ~payer ~chain_id ops =
   let[@coq_struct "ctxt"] rec apply ctxt applied worklist =
     match worklist with
     | [] -> Lwt.return (Success ctxt, List.rev applied)
@@ -1924,7 +1920,6 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
           let ctxt = record_internal_nonce ctxt nonce in
           apply_internal_manager_operation_content
             ctxt
-            mode
             ~source
             ~payer
             ~chain_id
@@ -2166,7 +2161,7 @@ let burn_internal_storage_fees :
   | IDelegation_result _ -> return (ctxt, storage_limit, smopr)
   | IEvent_result _ -> return (ctxt, storage_limit, smopr)
 
-let apply_manager_contents (type kind) ctxt mode chain_id
+let apply_manager_contents (type kind) ctxt chain_id
     (op : kind Kind.manager contents) :
     (success_or_failure
     * kind manager_operation_result
@@ -2185,12 +2180,11 @@ let apply_manager_contents (type kind) ctxt mode chain_id
   (* We do not expose the internal scaling to the users. Instead, we multiply
        the specified gas limit by the internal scaling. *)
   let ctxt = Gas.set_limit ctxt gas_limit in
-  apply_external_manager_operation_content ctxt mode ~source ~chain_id operation
+  apply_external_manager_operation_content ctxt ~source ~chain_id operation
   >>= function
   | Ok (ctxt, operation_results, internal_operations) -> (
       apply_internal_manager_operations
         ctxt
-        mode
         ~payer:source
         ~chain_id
         internal_operations
@@ -2337,16 +2331,15 @@ let take_fees ctxt (_ : Validate_operation.stamp) contents_list =
 let rec apply_manager_contents_list_rec :
     type kind.
     context ->
-    Script_ir_translator.unparsing_mode ->
     payload_producer:public_key_hash ->
     Chain_id.t ->
     kind Kind.manager fees_updated_contents_list ->
     (success_or_failure * kind Kind.manager contents_result_list) Lwt.t =
- fun ctxt mode ~payload_producer chain_id fees_updated_contents_list ->
+ fun ctxt ~payload_producer chain_id fees_updated_contents_list ->
   let level = Level.current ctxt in
   match[@coq_match_with_default] fees_updated_contents_list with
   | FeesUpdatedSingle {contents = Manager_operation _ as op; balance_updates} ->
-      apply_manager_contents ctxt mode chain_id op
+      apply_manager_contents ctxt chain_id op
       >|= fun (ctxt_result, operation_result, internal_operation_results) ->
       let result =
         Manager_operation_result
@@ -2355,7 +2348,7 @@ let rec apply_manager_contents_list_rec :
       (ctxt_result, Single_result result)
   | FeesUpdatedCons
       ({contents = Manager_operation _ as op; balance_updates}, rest) -> (
-      apply_manager_contents ctxt mode chain_id op >>= function
+      apply_manager_contents ctxt chain_id op >>= function
       | Failure, operation_result, internal_operation_results ->
           let result =
             Manager_operation_result
@@ -2369,12 +2362,7 @@ let rec apply_manager_contents_list_rec :
             Manager_operation_result
               {balance_updates; operation_result; internal_operation_results}
           in
-          apply_manager_contents_list_rec
-            ctxt
-            mode
-            ~payload_producer
-            chain_id
-            rest
+          apply_manager_contents_list_rec ctxt ~payload_producer chain_id rest
           >|= fun (ctxt_result, results) ->
           (ctxt_result, Cons_result (result, results)))
 
@@ -2677,11 +2665,10 @@ let validate_consensus_contents (type kind) ctxt chain_id
       Operation.check_signature delegate_pk chain_id operation >>?= fun () ->
       return (ctxt, delegate_pkh, voting_power)
 
-let apply_manager_contents_list ctxt mode ~payload_producer chain_id
+let apply_manager_contents_list ctxt ~payload_producer chain_id
     fees_updated_contents_list =
   apply_manager_contents_list_rec
     ctxt
-    mode
     ~payload_producer
     chain_id
     fees_updated_contents_list
@@ -2691,7 +2678,7 @@ let apply_manager_contents_list ctxt mode ~payload_producer chain_id
   | Success ctxt ->
       Lazy_storage.cleanup_temporaries ctxt >|= fun ctxt -> (ctxt, results)
 
-let apply_manager_operation ctxt mode ~payload_producer chain_id ~mempool_mode
+let apply_manager_operation ctxt ~payload_producer chain_id ~mempool_mode
     op_validated_stamp contents_list =
   let open Lwt_result_syntax in
   let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
@@ -2701,7 +2688,6 @@ let apply_manager_operation ctxt mode ~payload_producer chain_id ~mempool_mode
   let*! ctxt, contents_result_list =
     apply_manager_contents_list
       ctxt
-      mode
       ~payload_producer
       chain_id
       fees_updated_contents_list
@@ -2881,7 +2867,7 @@ let validate_grand_parent_endorsement ctxt chain_id
                    0 (* dummy endorsement power: this will never be used *);
                }) )
 
-let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
+let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
     ~payload_producer op_validated_stamp (operation : kind operation)
     (contents_list : kind contents_list) :
     (context * kind contents_result_list) tzresult Lwt.t =
@@ -3037,7 +3023,6 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
   | Single (Manager_operation _) ->
       apply_manager_operation
         ctxt
-        mode
         ~payload_producer
         chain_id
         ~mempool_mode
@@ -3046,22 +3031,20 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
   | Cons (Manager_operation _, _) ->
       apply_manager_operation
         ctxt
-        mode
         ~payload_producer
         chain_id
         ~mempool_mode
         op_validated_stamp
         contents_list
 
-let apply_operation ctxt chain_id (apply_mode : apply_mode) mode
-    ~payload_producer op_validated_stamp hash operation =
+let apply_operation ctxt chain_id (apply_mode : apply_mode) ~payload_producer
+    op_validated_stamp hash operation =
   let ctxt = Origination_nonce.init ctxt hash in
   let ctxt = record_operation ctxt hash operation in
   apply_contents_list
     ctxt
     chain_id
     apply_mode
-    mode
     ~payload_producer
     op_validated_stamp
     operation

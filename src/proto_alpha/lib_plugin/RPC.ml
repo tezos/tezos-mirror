@@ -831,7 +831,6 @@ module Scripts = struct
     | Single (Manager_operation _) as op ->
         Apply.apply_manager_operation
           ctxt
-          Optimized
           ~payload_producer
           chain_id
           ~mempool_mode:true
@@ -841,7 +840,6 @@ module Scripts = struct
     | Cons (Manager_operation _, _) as op ->
         Apply.apply_manager_operation
           ctxt
-          Optimized
           ~payload_producer
           chain_id
           ~mempool_mode:true
@@ -866,7 +864,6 @@ module Scripts = struct
                predecessor_round;
                grand_parent_round = Round.zero;
              })
-          Optimized
           ~payload_producer
           op_validated_stamp
           operation

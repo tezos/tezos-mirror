@@ -135,7 +135,6 @@ val apply_operation :
   context ->
   Chain_id.t ->
   apply_mode ->
-  Script_ir_translator.unparsing_mode ->
   payload_producer:public_key_hash ->
   Validate_operation.stamp ->
   Operation_hash.t ->
@@ -168,7 +167,6 @@ val apply_contents_list :
   context ->
   Chain_id.t ->
   apply_mode ->
-  Script_ir_translator.unparsing_mode ->
   payload_producer:public_key_hash ->
   Validate_operation.stamp ->
   'kind operation ->
@@ -207,7 +205,6 @@ val apply_contents_list :
     above during the first phase. *)
 val apply_manager_operation :
   context ->
-  Script_ir_translator.unparsing_mode ->
   payload_producer:public_key_hash ->
   Chain_id.t ->
   mempool_mode:bool ->
