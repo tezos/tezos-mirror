@@ -1219,7 +1219,7 @@ let apply_internal_operation_contents :
       >|=? fun (ctxt, consumed_gas, ops) ->
       (ctxt, IDelegation_result {consumed_gas}, ops)
 
-let apply_external_manager_operation_content :
+let apply_manager_operation :
     type kind.
     context ->
     source:public_key_hash ->
@@ -2176,8 +2176,7 @@ let apply_manager_contents (type kind) ctxt chain_id
   (* We do not expose the internal scaling to the users. Instead, we multiply
        the specified gas limit by the internal scaling. *)
   let ctxt = Gas.set_limit ctxt gas_limit in
-  apply_external_manager_operation_content ctxt ~source ~chain_id operation
-  >>= function
+  apply_manager_operation ctxt ~source ~chain_id operation >>= function
   | Ok (ctxt, operation_results, internal_operations) -> (
       apply_internal_operations ctxt ~payer:source ~chain_id internal_operations
       >>= function
