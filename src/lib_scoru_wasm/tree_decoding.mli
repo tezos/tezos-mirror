@@ -70,19 +70,38 @@ module type S = sig
       function to [Lazy_map.create]. *)
   val lazy_mapping : ('i -> key) -> 'a t -> ('i -> 'a Lwt.t) t
 
-  (* Combinators below *)
-
-  val return : 'a -> 'a t
-
+  (** [of_lwt p] lifts the promise [p] into a decoding value. *)
   val of_lwt : 'a Lwt.t -> 'a t
 
-  val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
+  (** Syntax module for the {!Tree_decoding}. This is intended to be opened
+      locally in functions. Within the scope of this module, the code can
+      include binding operators, leading to a [let]-style syntax. Similar to
+      {!Lwt_result_syntax} and other syntax modules. *)
+  module Syntax : sig
+    (** [return x] returns a value in the decoding monad. *)
+    val return : 'a -> 'a t
 
-  val ( and+ ) : 'a t -> 'b t -> ('a * 'b) t
+    (** [bind m f] monadic composition that decodes using [m] and passes the
+      result to [f]. *)
+    val bind : 'a t -> ('a -> 'b t) -> 'b t
 
-  val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+    (** [both d1 d2] returns a decoder that decodes using [d1] followed by [d2]
+      and combines their results. *)
+    val both : 'a t -> 'b t -> ('a * 'b) t
 
-  val ( and* ) : 'a t -> 'b t -> ('a * 'b) t
+    (** [let*] is a binding operator alias for {!bind}. *)
+    val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+
+    (** [let+] is a binding operator alias for {!map}. *)
+    val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
+
+    (** [and*] is a binding operator alias for {!both}. *)
+    val ( and+ ) : 'a t -> 'b t -> ('a * 'b) t
+
+    (** [and*] is a binding operator alias for {!both}. *)
+    val ( and* ) : 'a t -> 'b t -> ('a * 'b) t
+  end
 end
 
+(** Creates a tree decoder given an a {!Tree.S} module.  *)
 module Make (T : Tree.S) : S with type tree = T.tree

@@ -44,17 +44,23 @@ module type S = sig
 
   val lazy_mapping : ('i -> key) -> 'a t -> ('i -> 'a Lwt.t) t
 
-  val return : 'a -> 'a t
-
   val of_lwt : 'a Lwt.t -> 'a t
 
-  val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
+  module Syntax : sig
+    val return : 'a -> 'a t
 
-  val ( and+ ) : 'a t -> 'b t -> ('a * 'b) t
+    val bind : 'a t -> ('a -> 'b t) -> 'b t
 
-  val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+    val both : 'a t -> 'b t -> ('a * 'b) t
 
-  val ( and* ) : 'a t -> 'b t -> ('a * 'b) t
+    val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+
+    val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
+
+    val ( and+ ) : 'a t -> 'b t -> ('a * 'b) t
+
+    val ( and* ) : 'a t -> 'b t -> ('a * 'b) t
+  end
 end
 
 module Make (T : Tree.S) : S with type tree = T.tree = struct
@@ -76,19 +82,24 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
 
   type 'a t = Tree.tree -> prefix_key -> 'a Lwt.t
 
-  let return value _tree _prefix = Lwt.return value
-
   let of_lwt lwt _tree _prefix = lwt
 
-  let ( let+ ) dec f tree prefix = Lwt.map f (dec tree prefix)
+  module Syntax = struct
+    let return value _tree _prefix = Lwt.return value
 
-  let ( and+ ) lhs rhs tree prefix =
-    Lwt.Syntax.( and+ ) (lhs tree prefix) (rhs tree prefix)
+    let bind dec f tree prefix =
+      Lwt.bind (dec tree prefix) (fun x -> f x tree prefix)
 
-  let ( let* ) dec f tree prefix =
-    Lwt.bind (dec tree prefix) (fun x -> f x tree prefix)
+    let both lhs rhs tree prefix = Lwt.both (lhs tree prefix) (rhs tree prefix)
 
-  let ( and* ) = ( and+ )
+    let ( let+ ) dec f tree prefix = Lwt.map f (dec tree prefix)
+
+    let ( and+ ) = both
+
+    let ( let* ) = bind
+
+    let ( and* ) = ( and+ )
+  end
 
   let run dec tree = dec tree Fun.id
 

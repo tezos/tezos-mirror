@@ -25,18 +25,24 @@
 
 open Tezos_webassembly_interpreter.Instance
 
-module Make (T : Tree.S) : sig
-  module Tree : sig
-    include Tree.S
+(** A module type representing WASM specific decodings. *)
+module type S = sig
+  (** Represents decoders. *)
+  type 'a t
 
-    module Decoding : Tree_decoding.S with type tree = T.tree
-  end
+  (** Represents values encoded as trees. *)
+  type tree
+
+  (** [run decoder tree] runs the tree decoder against the tree. *)
+  val run : 'a t -> tree -> 'a Lwt.t
 
   (** [module_instance_encoding modules] allows you to decode a module instance.
       It requires a vector of previously decoded modules for references. *)
-  val module_instance_decoding :
-    module_inst Vector.t -> module_inst Tree.Decoding.t
+  val module_instance_decoding : module_inst Vector.t -> module_inst t
 
   (** [module_instances_decoding] decodes module instances.  *)
-  val module_instances_decoding : module_inst Vector.t Tree.Decoding.t
+  val module_instances_decoding : module_inst Vector.t t
 end
+
+(** Creates a WASM decoding module given a {!Tree.S} implementation. *)
+module Make (T : Tree.S) : S with type tree = T.tree
