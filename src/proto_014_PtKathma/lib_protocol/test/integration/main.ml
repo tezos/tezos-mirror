@@ -40,6 +40,5 @@ let () =
       ("storage tests", Test_storage_functions.tests);
       ("token movements", Test_token.tests);
       ("frozen bonds", Test_frozen_bonds.tests);
-      ("sc rollup wasm", Test_sc_rollup_wasm.tests);
     ]
   |> Lwt_main.run
