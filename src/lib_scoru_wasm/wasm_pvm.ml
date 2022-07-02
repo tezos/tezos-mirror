@@ -31,31 +31,36 @@
 *)
 
 module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
-  type tree = T.tree
+  include
+    Gather_floppies.Make
+      (T)
+      (struct
+        type tree = T.tree
 
-  module Decodings = Wasm_decodings.Make (T)
+        module Decodings = Wasm_decodings.Make (T)
 
-  let compute_step = Lwt.return
+        let compute_step = Lwt.return
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3092
-     Implement handling of input logic.
-  *)
-  let set_input_step _ _ = Lwt.return
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/3092
+           Implement handling of input logic.
+        *)
+        let set_input_step _ _ = Lwt.return
 
-  let get_output _ _ = Lwt.return ""
+        let get_output _ _ = Lwt.return ""
 
-  let get_info _ =
-    Lwt.return
-      Wasm_pvm_sig.
-        {
-          current_tick = Z.of_int 0;
-          last_input_read = None;
-          input_request = No_input_required;
-        }
+        let get_info _ =
+          Lwt.return
+            Wasm_pvm_sig.
+              {
+                current_tick = Z.of_int 0;
+                last_input_read = None;
+                input_request = No_input_required;
+              }
 
-  let _module_instance_of_tree modules =
-    Decodings.run (Decodings.module_instance_decoding modules)
+        let _module_instance_of_tree modules =
+          Decodings.run (Decodings.module_instance_decoding modules)
 
-  let _module_instances_of_tree =
-    Decodings.run Decodings.module_instances_decoding
+        let _module_instances_of_tree =
+          Decodings.run Decodings.module_instances_decoding
+      end)
 end
