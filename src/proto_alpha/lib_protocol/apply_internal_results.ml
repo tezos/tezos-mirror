@@ -694,5 +694,5 @@ let internal_operation_result_encoding :
          make
            Internal_operation_result.delegation_case
            Internal_operation.delegation_case;
-         make Internal_manager_result.event_case Internal_operation.event_case;
+         make Internal_operation_result.event_case Internal_operation.event_case;
        ]

@@ -829,7 +829,7 @@ module Scripts = struct
     >>=? fun op_validated_stamp ->
     match protocol_data.contents with
     | Single (Manager_operation _) as op ->
-        Apply.apply_manager_operation
+        Apply.apply_manager_operations
           ctxt
           ~payload_producer
           chain_id
@@ -838,7 +838,7 @@ module Scripts = struct
           op
         >|=? fun (_ctxt, result) -> ret result
     | Cons (Manager_operation _, _) as op ->
-        Apply.apply_manager_operation
+        Apply.apply_manager_operations
           ctxt
           ~payload_producer
           chain_id

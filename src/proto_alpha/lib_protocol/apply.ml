@@ -2669,7 +2669,7 @@ let apply_manager_contents_list ctxt ~payload_producer chain_id
   | Success ctxt ->
       Lazy_storage.cleanup_temporaries ctxt >|= fun ctxt -> (ctxt, results)
 
-let apply_manager_operation ctxt ~payload_producer chain_id ~mempool_mode
+let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
     op_validated_stamp contents_list =
   let open Lwt_result_syntax in
   let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
@@ -3012,7 +3012,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
       (* Failing_noop _ always fails *)
       fail Failing_noop_error
   | Single (Manager_operation _) ->
-      apply_manager_operation
+      apply_manager_operations
         ctxt
         ~payload_producer
         chain_id
@@ -3020,7 +3020,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
         op_validated_stamp
         contents_list
   | Cons (Manager_operation _, _) ->
-      apply_manager_operation
+      apply_manager_operations
         ctxt
         ~payload_producer
         chain_id
