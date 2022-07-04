@@ -1331,15 +1331,6 @@ and logger = {
       (** [log_interp] is called at each call of the internal function
           [interp]. [interp] is called when starting the interpretation of
           a script and subsequently at each [Exec] instruction. *)
-  log_entry : 'a 's 'b 'f. ('a, 's, 'b, 'f, 'a, 's) logging_function;
-      (** [log_entry] is called {i before} executing each instruction but
-          {i after} gas for this instruction has been successfully
-          consumed. *)
-  log_control : 'a 's 'b 'f. ('a, 's, 'b, 'f) continuation -> unit;
-      (** [log_control] is called {i before} the interpretation of the
-          current continuation. *)
-  log_exit : 'a 's 'b 'f 'c 'u. ('a, 's, 'b, 'f, 'c, 'u) logging_function;
-      (** [log_exit] is called {i after} executing each instruction. *)
   get_log : unit -> execution_trace option tzresult Lwt.t;
       (** [get_log] allows to obtain an execution trace, if any was
           produced. *)

@@ -1223,9 +1223,6 @@ and execution_trace = (Script.location * Gas.Arith.fp * Script.expr list) list
 
 and logger = {
   log_interp : 'a 's 'b 'f 'c 'u. ('a, 's, 'b, 'f, 'c, 'u) logging_function;
-  log_entry : 'a 's 'b 'f. ('a, 's, 'b, 'f, 'a, 's) logging_function;
-  log_control : 'a 's 'b 'f. ('a, 's, 'b, 'f) continuation -> unit;
-  log_exit : 'a 's 'b 'f 'c 'u. ('a, 's, 'b, 'f, 'c, 'u) logging_function;
   get_log : unit -> execution_trace option tzresult Lwt.t;
   klog : 'a 's 'r 'f. ('a, 's, 'r, 'f) klog;
   ilog : 'a 's 'b 't 'r 'f. ('a, 's, 'b, 't, 'r, 'f) ilog;

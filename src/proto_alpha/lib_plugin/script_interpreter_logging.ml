@@ -2231,13 +2231,4 @@ let make (module Base : Logger_base) =
   let module Logger = Logger (Base) in
   let open Logger in
   let open Base in
-  {
-    log_interp;
-    log_entry;
-    log_exit;
-    log_control;
-    get_log;
-    log_kinstr;
-    klog;
-    ilog;
-  }
+  {log_interp; get_log; log_kinstr; klog; ilog}
