@@ -122,15 +122,12 @@ val game_move :
   Sc_rollup_game_repr.refutation ->
   (Sc_rollup_game_repr.outcome option * Raw_context.t) tzresult Lwt.t
 
-(* TODO: #2902 update reference to timeout period in doc-string *)
-
 (** [timeout ctxt rollup stakers] checks that the timeout has
     elapsed and if this function returns a game outcome that punishes whichever
     of [stakers] is supposed to have played a move.
 
-    The timeout period is currently defined in
-    [timeout_period_in_blocks]. This should become a protocol constant
-    soon.
+    The timeout period is defined a protocol constant, see
+    {!Constants_storage.sc_rollup_timeout_period_in_blocks}.
 
     May fail with:
     {ul

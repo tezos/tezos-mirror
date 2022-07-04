@@ -38,11 +38,11 @@ type point = {
 
 type conflict_point = point * point
 
-(** TODO: #2902 replace with protocol constant and consider good value. *)
-let timeout_period_in_blocks = 500
-
 let timeout_level ctxt =
   let level = Raw_context.current_level ctxt in
+  let timeout_period_in_blocks =
+    Constants_storage.sc_rollup_timeout_period_in_blocks ctxt
+  in
   Raw_level_repr.add level.level timeout_period_in_blocks
 
 let get_ongoing_game ctxt rollup staker1 staker2 =
