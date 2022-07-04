@@ -34,6 +34,7 @@ module Proof = Tezos_context_sigs.Context.Proof_types
 type error +=
   | Cannot_create_file of string
   | Cannot_open_file of string
+  | Cannot_retrieve_commit_info of Context_hash.t
   | Cannot_find_protocol
   | Suspicious_file of int
 
@@ -66,6 +67,20 @@ let () =
     (fun e -> Cannot_open_file e) ;
   register_error_kind
     `Permanent
+    ~id:"cannot_retrieve_commit_info"
+    ~title:"Cannot retrieve commit info"
+    ~description:""
+    ~pp:(fun ppf hash ->
+      Format.fprintf
+        ppf
+        "@[Cannot retrieve commit info associated to context hash %a@]"
+        Context_hash.pp
+        hash)
+    Data_encoding.(obj1 (req "context_hash" Context_hash.encoding))
+    (function Cannot_retrieve_commit_info e -> Some e | _ -> None)
+    (fun e -> Cannot_retrieve_commit_info e) ;
+  register_error_kind
+    `Permanent
     ~id:"context_dump.cannot_find_protocol"
     ~title:"Cannot find protocol"
     ~description:""
@@ -91,6 +106,7 @@ module type TEZOS_CONTEXT_UNIX = sig
   type error +=
     | Cannot_create_file of string
     | Cannot_open_file of string
+    | Cannot_retrieve_commit_info of Context_hash.t
     | Cannot_find_protocol
     | Suspicious_file of int
 
@@ -213,6 +229,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   type error +=
     | Cannot_create_file = Cannot_create_file
     | Cannot_open_file = Cannot_open_file
+    | Cannot_retrieve_commit_info = Cannot_retrieve_commit_info
     | Cannot_find_protocol = Cannot_find_protocol
     | Suspicious_file = Suspicious_file
 
@@ -1070,23 +1087,29 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     Hash.to_context_hash (Store.Tree.hash tree)
 
   let retrieve_commit_info index block_header =
-    let open Lwt_syntax in
-    let* context = checkout_exn index block_header.Block_header.shell.context in
+    let open Lwt_result_syntax in
+    let context_hash = block_header.Block_header.shell.context in
+    let* context =
+      let*! r = checkout index context_hash in
+      match r with
+      | Some c -> return c
+      | None -> tzfail (Cannot_retrieve_commit_info context_hash)
+    in
     let irmin_info = Dumpable_context.context_info context in
     let author = Info.author irmin_info in
     let message = Info.message irmin_info in
     let timestamp = Time.Protocol.of_seconds (Info.date irmin_info) in
-    let* protocol_hash = get_protocol context in
-    let* test_chain_status = get_test_chain context in
-    let* predecessor_block_metadata_hash =
+    let*! protocol_hash = get_protocol context in
+    let*! test_chain_status = get_test_chain context in
+    let*! predecessor_block_metadata_hash =
       find_predecessor_block_metadata_hash context
     in
-    let* predecessor_ops_metadata_hash =
+    let*! predecessor_ops_metadata_hash =
       find_predecessor_ops_metadata_hash context
     in
-    let* data_key = data_node_hash context in
+    let*! data_key = data_node_hash context in
     let parents_contexts = Dumpable_context.context_parents context in
-    return_ok
+    return
       ( protocol_hash,
         author,
         message,
