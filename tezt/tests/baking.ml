@@ -408,7 +408,7 @@ let check_ordering ops =
   let ops' = List.sort compare_info ops in
   assert (ops = ops')
 
-let assert_block_is_well_baked block =
+let assert_block_is_well_baked block mempool_manager_op =
   match JSON.(as_list (block |-> "operations")) with
   | [endorsement_ops; vote_ops; anonymous_ops; manager_ops] ->
       (* There very well might be endorsement operations *)
@@ -418,10 +418,17 @@ let assert_block_is_well_baked block =
       List.iter
         (fun l -> assert (JSON.as_list l = []))
         [vote_ops; anonymous_ops] ;
+      let manager_ops = JSON.as_list manager_ops in
+      let size_manager_ops = List.length manager_ops in
+      let size_mempool_manager_op = List.length mempool_manager_op in
+      if size_manager_ops <> size_mempool_manager_op then
+        Test.fail
+          ~__LOC__
+          "Expected %d operations in the baked block, got %d operations"
+          size_mempool_manager_op
+          size_manager_ops ;
       let fees_managers_and_counters =
-        List.map
-          (fun json -> get_fees_manager_and_counter json)
-          (JSON.as_list manager_ops)
+        List.map (fun json -> get_fees_manager_and_counter json) manager_ops
       in
       check_ordering fees_managers_and_counters
   | _ -> Test.fail "ill-formed operation list list"
@@ -485,7 +492,7 @@ let bake_and_check state ~protocol ~mempool =
   let* block =
     Client.(rpc GET ["chains"; "main"; "blocks"; "head"] state.sandbox_client)
   in
-  assert_block_is_well_baked block ;
+  assert_block_is_well_baked block mempool ;
   return ()
 
 let init ~protocol =
