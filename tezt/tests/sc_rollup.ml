@@ -2133,7 +2133,8 @@ let publish_dummy_commitment ?(number_of_ticks = 1) ~inbox_level ~predecessor
     }
   in
   let*! () = publish_commitment ~src ~commitment client sc_rollup in
-  Client.bake_for_and_wait client
+  let* () = Client.bake_for_and_wait client in
+  get_staked_on_commitment ~sc_rollup ~staker:src client
 
 let test_consecutive_commitments ~kind =
   regression_test
@@ -2157,7 +2158,7 @@ let test_consecutive_commitments ~kind =
       let* predecessor, _ =
         last_cemented_commitment_hash_with_level ~sc_rollup client
       in
-      let* () =
+      let* commit_hash =
         publish_dummy_commitment
           ~inbox_level:(inbox_level + commitment_period_in_blocks + 1)
           ~predecessor
@@ -2165,15 +2166,10 @@ let test_consecutive_commitments ~kind =
           ~src:operator
           client
       in
-      (* We get the predecessor's hash by getting the commitment on which
-         the operator just staked on. *)
-      let* predecessor =
-        get_staked_on_commitment ~sc_rollup ~staker:operator client
-      in
-      let* () =
+      let* _commit_hash =
         publish_dummy_commitment
           ~inbox_level:(inbox_level + (2 * commitment_period_in_blocks) + 1)
-          ~predecessor
+          ~predecessor:commit_hash
           ~sc_rollup
           ~src:operator
           client
