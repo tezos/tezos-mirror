@@ -1010,3 +1010,8 @@ val generate_workspace : Env.t -> Dune.s_expr -> unit
 
     The callback [f] is reponsible for feeding the content of the file by using the formmater. *)
 val write : string -> (Format.formatter -> unit) -> unit
+
+(** [file_content filename] reads the contents of the file identified by [filename].
+    Note that the manifest is assumed to be running in the project root directory,
+    so all paths should be relative to it. *)
+val file_content : string -> string

@@ -25,11 +25,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_base.TzPervasives
-
-let pp_protocol ppf (module P : Sigs.PROTOCOL) =
-  Protocol_hash.pp ppf P.hash
-
 (*
    dune exec devtools/yes_wallet/yes-wallet.exe
 
@@ -38,6 +33,8 @@ let pp_protocol ppf (module P : Sigs.PROTOCOL) =
      with the yes-node.patch
    - creates a 'yes-wallet' directory to be passed to tezos-client -d option
  *)
+
+let pp_protocol ppf (module P : Sigs.PROTOCOL) = Protocol_hash.pp ppf P.hash
 
 let pkh_json (alias, pkh, _pk) =
   Ezjsonm.(dict [("name", string alias); ("value", string pkh)])
@@ -224,7 +221,9 @@ let get_delegates (module P : Sigs.PROTOCOL) context
   List.sort (fun (_, _, x) (_, _, y) -> P.Tez.compare y x) delegates
 
 let protocol_of_hash protocol_hash =
-  List.assoc ~equal:Protocol_hash.equal protocol_hash Known_protocols.all
+  List.find
+    (fun (module P : Sigs.PROTOCOL) -> Protocol_hash.equal P.hash protocol_hash)
+    (Known_protocols.get_all ())
 
 (** [load_mainnet_bakers_public_keys base_dir active_backers_only] checkouts
     the head context at the given [base_dir] and computes a list of triples
@@ -273,7 +272,17 @@ let load_mainnet_bakers_public_keys base_dir active_bakers_only
   let header = header.shell in
   let* delegates =
     match protocol_of_hash protocol_hash with
-    | None -> Error_monad.failwith "unknown protocol hash"
+    | None ->
+        Error_monad.failwith
+          "Unknown protocol hash: %a.@;Known protocols are: %a"
+          Protocol_hash.pp
+          protocol_hash
+          Format.(
+            pp_print_list
+              ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
+              Protocol_hash.pp)
+          (List.map (fun (module P : Sigs.PROTOCOL) -> P.hash)
+          @@ Known_protocols.get_all ())
     | Some protocol ->
         Format.printf
           "@[<h>Detected protocol:@;<10 0>%a@]@."

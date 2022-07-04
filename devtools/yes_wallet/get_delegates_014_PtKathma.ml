@@ -23,49 +23,41 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type PROTOCOL = sig
-  type context
+module Get_delegates = struct
+  open Tezos_protocol_014_PtKathma
+  open Protocol
 
-  module Tez : sig
-    type t
+  type context = Alpha_context.t
 
-    val zero : t
+  let hash = hash
 
-    val compare : t -> t -> int
+  module Tez = struct
+    include Alpha_context.Tez
 
-    val ( +? ) : t -> t -> t tzresult
-
-    val to_mutez : t -> int64
+    let ( +? ) a b = Environment.wrap_tzresult (a +? b)
   end
 
-  module Delegate : sig
-    val fold :
-      context ->
-      order:[`Sorted | `Undefined] ->
-      init:'a ->
-      f:(Signature.public_key_hash -> 'a -> 'a Lwt.t) ->
-      'a Lwt.t
+  module Delegate = struct
+    open Alpha_context.Delegate
 
-    val pubkey :
-      context ->
-      Signature.public_key_hash ->
-      Signature.public_key tzresult Lwt.t
+    let fold ctxt ~order ~init ~f = fold ctxt ~order ~init ~f
 
-    val staking_balance :
-      context -> Signature.public_key_hash -> Tez.t tzresult Lwt.t
+    let pubkey ctxt pkh = pubkey ctxt pkh |> Lwt.map Environment.wrap_tzresult
 
-    val deactivated :
-      context -> Signature.public_key_hash -> bool tzresult Lwt.t
+    let staking_balance ctxt pkh =
+      staking_balance ctxt pkh |> Lwt.map Environment.wrap_tzresult
+
+    let deactivated ctxt pkh =
+      deactivated ctxt pkh |> Lwt.map Environment.wrap_tzresult
   end
 
-  val hash : Protocol_hash.t
-
-  val prepare_context :
-    Tezos_protocol_environment.Context.t ->
-    level:int32 ->
-    predecessor_timestamp:Time.Protocol.t ->
-    timestamp:Time.Protocol.t ->
-    context tzresult Lwt.t
+  let prepare_context ctxt ~level ~predecessor_timestamp ~timestamp =
+    let open Lwt_result_syntax in
+    let+ ctxt, _, _ =
+      Alpha_context.prepare ctxt ~level ~predecessor_timestamp ~timestamp
+      |> Lwt.map Environment.wrap_tzresult
+    in
+    ctxt
 end
 
-type protocol = (module PROTOCOL)
+let () = Known_protocols.register (module Get_delegates)

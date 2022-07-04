@@ -1,9 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_base.TzPervasives
+let all : Sigs.protocol list ref = ref []
 
-let all : (Protocol_hash.t * Sigs.protocol) list =
-  [(Tezos_protocol_alpha.Protocol.hash, (module Get_delegates_alpha))]
+let get_all () = !all
+
+let register proto = all := proto :: !all

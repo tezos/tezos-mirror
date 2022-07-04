@@ -2879,6 +2879,22 @@ let name_for_errors = function
   | None -> "(no target)"
   | Some target -> name_for_errors target
 
+let file_content filename =
+  let ch = open_in filename in
+  let buffer = Buffer.create 512 in
+  Fun.protect
+    ~finally:(fun () -> close_in ch)
+    (fun () ->
+      let bytes = Bytes.create 512 in
+      let rec loop () =
+        let len = input ch bytes 0 512 in
+        if len > 0 then (
+          Buffer.add_subbytes buffer bytes 0 len ;
+          loop ())
+      in
+      loop ()) ;
+  Buffer.contents buffer
+
 let () =
   if
     Sys.file_exists "dune-project"

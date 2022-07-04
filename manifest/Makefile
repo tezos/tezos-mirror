@@ -23,7 +23,7 @@ _build/%: %
 
 manifest: $(foreach file, $(SOURCE), _build/$(file))
 	ocamlc -bin-annot -g -w @1..3@5..28@30..39@43@46..47@49..57@61..62 \
-		-I _build $^ -o manifest
+		-I _build str.cma $^ -o manifest
 
 # Used in the CI.
 .PHONY: check

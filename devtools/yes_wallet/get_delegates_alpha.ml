@@ -23,39 +23,41 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_base.TzPervasives
+module Get_delegates = struct
+  open Tezos_protocol_alpha
+  open Protocol
 
-type context = Alpha_context.t
+  type context = Alpha_context.t
 
-let hash = hash
+  let hash = hash
 
-module Tez = struct
-  include Alpha_context.Tez
+  module Tez = struct
+    include Alpha_context.Tez
 
-  let ( +? ) a b =
-    Environment.wrap_tzresult (a +? b)
+    let ( +? ) a b = Environment.wrap_tzresult (a +? b)
+  end
+
+  module Delegate = struct
+    open Alpha_context.Delegate
+
+    let fold ctxt ~order ~init ~f = fold ctxt ~order ~init ~f
+
+    let pubkey ctxt pkh = pubkey ctxt pkh |> Lwt.map Environment.wrap_tzresult
+
+    let staking_balance ctxt pkh =
+      staking_balance ctxt pkh |> Lwt.map Environment.wrap_tzresult
+
+    let deactivated ctxt pkh =
+      deactivated ctxt pkh |> Lwt.map Environment.wrap_tzresult
+  end
+
+  let prepare_context ctxt ~level ~predecessor_timestamp ~timestamp =
+    let open Lwt_result_syntax in
+    let+ ctxt, _, _ =
+      Alpha_context.prepare ctxt ~level ~predecessor_timestamp ~timestamp
+      |> Lwt.map Environment.wrap_tzresult
+    in
+    ctxt
 end
 
-module Delegate = struct
-  open Alpha_context.Delegate
-
-  let fold ctxt ~order ~init ~f =
-    fold ctxt ~order ~init ~f
-
-  let pubkey ctxt pkh = pubkey ctxt pkh
-    |> Lwt.map Environment.wrap_tzresult
-
-  let staking_balance ctxt pkh = staking_balance ctxt pkh
-    |> Lwt.map Environment.wrap_tzresult
-
-  let deactivated ctxt pkh = deactivated ctxt pkh
-    |> Lwt.map Environment.wrap_tzresult
-end
-  
-let prepare_context ctxt ~level ~predecessor_timestamp ~timestamp =
-  let open Lwt_result_syntax in
-  let+ (ctxt, _, _) =
-    Alpha_context.prepare ctxt ~level ~predecessor_timestamp ~timestamp
-    |> Lwt.map Environment.wrap_tzresult
-  in
-  ctxt
+let () = Known_protocols.register (module Get_delegates)
