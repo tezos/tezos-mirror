@@ -444,6 +444,11 @@ let processed = function
 
 let mark_processed_head store head = State.mark_processed_head store head
 
+let last_processed_head_hash store =
+  let open Lwt_syntax in
+  let* info = State.last_processed_head store in
+  Option.map_s (fun (Head {hash; _}) -> return hash) info
+
 (* We forget about the last seen heads that are not processed so that
    the rollup node can process them when restarted. Notice that this
    does prevent skipping heads when the node is interrupted in a bad

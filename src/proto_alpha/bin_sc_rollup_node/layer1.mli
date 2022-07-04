@@ -110,6 +110,10 @@ val processed : chain_event -> unit Lwt.t
     it. *)
 val mark_processed_head : Store.t -> head -> unit Lwt.t
 
+(** [last_processed_head_hash store] returns the hash of
+    the last processed head. *)
+val last_processed_head_hash : Store.t -> Block_hash.t option Lwt.t
+
 (** [shutdown store] properly shut the layer 1 down. *)
 val shutdown : Store.t -> unit Lwt.t
 
