@@ -69,7 +69,7 @@ module Make (T : Tree.S) = struct
           Instance.FuncRef func)
     | ExternRefType ->
         let+ value = value ["value"] Data_encoding.int32 in
-        Script.ExternRef value
+        Values.ExternRef value
 
   let ref_decoding modules =
     let open Syntax in

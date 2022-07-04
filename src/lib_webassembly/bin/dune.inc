@@ -3,6 +3,8 @@
 
 (include_subdirs unqualified)
 
+(data_only_dirs test)
+
 (subdir
  text
  (rule
@@ -15,17 +17,13 @@
  (ocamlyacc
   (modules parser)))
 
-(env
- (_
-  (flags
-   (-w +a-4-27-42-44-45-69-70 -warn-error +a-3))))
-
 (rule
  ; Run the WebAssembly core tests.
- ; See src/lib_webassembly/test/core/README.md for details.
+ ; See src/bin_webassembly/test/core/README.md for details.
  (alias runtest-python)
  (deps
   ./main.exe
-  (source_tree ../test))
+  (source_tree .)
+  (source_tree ..))
  (action
-  (run poetry run ../test/core/run.py --wasm ./main.exe)))
+  (run poetry run ./test/core/run.py --wasm ./main.exe)))

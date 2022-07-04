@@ -13,7 +13,9 @@ type num = (I32.t, I64.t, F32.t, F64.t) op
 type vec = (V128.t) vecop
 
 type ref_ = ..
-type ref_ += NullRef of ref_type
+type ref_ +=
+    NullRef of ref_type
+  | ExternRef of int32
 
 type value = Num of num | Vec of vec | Ref of ref_
 

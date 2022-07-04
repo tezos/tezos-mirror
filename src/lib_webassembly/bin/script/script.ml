@@ -1,6 +1,6 @@
 type var = string Source.phrase
 
-type Values.ref_ += ExternRef of int32
+type Values.ref_ += ExternRef = Values.ExternRef
 type num = Values.num Source.phrase
 type ref_ = Values.ref_ Source.phrase
 type literal = Values.value Source.phrase
