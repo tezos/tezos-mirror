@@ -4640,12 +4640,28 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Item_t (Chest_key_t, Item_t (Chest_t, Item_t (Nat_t, rest))) ) ->
       let instr = {apply = (fun k -> IOpen_chest (loc, k))} in
       typed ctxt loc instr (Item_t (union_bytes_bool_t, rest))
+  (* Events *)
+  | Prim (loc, I_EMIT, [], annot), Item_t (data, rest) ->
+      check_packable ~legacy loc data >>?= fun () ->
+      parse_entrypoint_annot_strict loc annot >>?= fun tag ->
+      unparse_ty ~loc:() ctxt data >>?= fun (unparsed_ty, ctxt) ->
+      Gas.consume ctxt (Script.strip_locations_cost unparsed_ty)
+      >>?= fun ctxt ->
+      let unparsed_ty = Micheline.strip_locations unparsed_ty in
+      let instr =
+        {apply = (fun k -> IEmit {loc; tag; ty = data; unparsed_ty; k})}
+      in
+      typed ctxt loc instr (Item_t (Operation_t, rest))
   | Prim (loc, I_EMIT, [ty_node], annot), Item_t (data, rest) ->
       parse_packable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ty_node
       >>?= fun (Ex_ty ty, ctxt) ->
       check_item_ty ctxt ty data loc I_EMIT 1 2 >>?= fun (Eq, ctxt) ->
       parse_entrypoint_annot_strict loc annot >>?= fun tag ->
-      let instr = {apply = (fun k -> IEmit {loc; tag; ty = data; k})} in
+      Gas.consume ctxt (Script.strip_locations_cost ty_node) >>?= fun ctxt ->
+      let unparsed_ty = Micheline.strip_locations ty_node in
+      let instr =
+        {apply = (fun k -> IEmit {loc; tag; ty = data; unparsed_ty; k})}
+      in
       typed ctxt loc instr (Item_t (Operation_t, rest))
   (* Primitive parsing errors *)
   | ( Prim

@@ -72,21 +72,31 @@ let test_emit_event protocol =
     |-> "internal_operation_results"
   in
   let event = events |=> 0 in
-  let assert_type event =
-    let ty = event |-> "type" in
-    assert (ty |-> "prim" |> as_string = "or") ;
-    let args = ty |-> "args" in
-    assert (args |=> 0 |-> "prim" |> as_string = "nat") ;
-    assert (args |=> 1 |-> "prim" |> as_string = "string")
+  let assert_prim ~prim ~annots json =
+    assert (json |-> "prim" |> as_string = prim) ;
+    assert (json |-> "annots" |> as_list |> List.map as_string = annots)
   in
-  assert_type event ;
+  let assert_type ~annots event =
+    let ty = event |-> "type" in
+    assert_prim ty ~prim:"or" ~annots:[] ;
+    let args = ty |-> "args" in
+    assert_prim
+      (args |=> 0)
+      ~prim:"nat"
+      ~annots:(if annots then ["%int"] else []) ;
+    assert_prim
+      (args |=> 1)
+      ~prim:"string"
+      ~annots:(if annots then ["%str"] else [])
+  in
+  assert_type ~annots:false event ;
   let data = event |-> "payload" in
   assert (data |-> "prim" |> as_string = "Right") ;
   assert (data |-> "args" |=> 0 |-> "string" |> as_string = "right") ;
   let tag = event |-> "tag" |> as_string in
   assert (tag = "tag1") ;
   let event = events |=> 1 in
-  assert_type event ;
+  assert_type ~annots:true event ;
   let data = event |-> "payload" in
   assert (data |-> "prim" |> as_string = "Left") ;
   assert (data |-> "args" |=> 0 |-> "int" |> as_string = "2") ;

@@ -967,7 +967,14 @@ let check_kinstr_size () =
       Kinstr ("IOpen_chest", IOpen_chest (loc, halt ()));
       Kinstr
         ( "IEmit",
-          IEmit {loc; tag = entrypoint "entry"; ty = Unit_t; k = halt ()} );
+          IEmit
+            {
+              loc;
+              tag = entrypoint "entry";
+              ty = Unit_t;
+              unparsed_ty = Micheline.(strip_locations @@ Seq (loc, []));
+              k = halt ();
+            } );
       Kinstr ("IHalt ()", halt ());
     ]
 
