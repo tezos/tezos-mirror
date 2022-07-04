@@ -21,7 +21,6 @@ module Effect : sig
 
   module Identity : S with type 'a t = 'a
 
-
   module Lwt : S with type 'a t = 'a Lwt.t
 end
 

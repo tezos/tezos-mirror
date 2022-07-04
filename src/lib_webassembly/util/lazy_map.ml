@@ -18,7 +18,7 @@ module Effect = struct
   module Lwt : S with type 'a t = 'a Lwt.t = struct
     type 'a t = 'a Lwt.t
 
-    let ( let+ ) = Lwt.Syntax.(let+)
+    let ( let+ ) = Lwt.Syntax.( let+ )
 
     let return = Lwt.return
   end
@@ -63,10 +63,8 @@ end
 
 exception UnexpectedAccess
 
-module Make (Effect : Effect.S) (Key : KeyS) : S with
-  type key = Key.t and
-  type 'a effect = 'a Effect.t =
-struct
+module Make (Effect : Effect.S) (Key : KeyS) :
+  S with type key = Key.t and type 'a effect = 'a Effect.t = struct
   module Map = Map.Make (Key)
 
   type key = Key.t
@@ -75,19 +73,18 @@ struct
 
   type 'a producer = key -> 'a effect
 
-  type 'a t = {
-    produce_value : 'a producer;
-    mutable values : 'a Map.t
-  }
+  type 'a t = {produce_value : 'a producer; mutable values : 'a Map.t}
 
   let pp pp_value =
     let pp_values fmt values =
       Map.bindings values
-      |> Format.fprintf fmt "@[<hv>%a@]"
+      |> Format.fprintf
+           fmt
+           "@[<hv>%a@]"
            (Format.pp_print_list
               ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
               (fun ppf (k, v) ->
-                 Format.fprintf ppf "%s => %a" (Key.to_string k) pp_value v))
+                Format.fprintf ppf "%s => %a" (Key.to_string k) pp_value v))
     in
     fun fmt map ->
       Format.fprintf
@@ -103,23 +100,22 @@ struct
   let def_produce_value _ = raise UnexpectedAccess
 
   let create ?(values = Map.empty) ?(produce_value = def_produce_value) () =
-    { produce_value; values }
+    {produce_value; values}
 
   let get key map =
     let open Effect in
     match Map.find_opt key map.values with
     | None ->
-      (* Need to create the missing key-value association. *)
-      let+ value = map.produce_value key in
-      map.values <- Map.add key value map.values;
-      value
-    | Some value ->
-      return value
+        (* Need to create the missing key-value association. *)
+        let+ value = map.produce_value key in
+        map.values <- Map.add key value map.values ;
+        value
+    | Some value -> return value
 
-  let set key value map =
-    { map with values = Map.add key value map.values }
+  let set key value map = {map with values = Map.add key value map.values}
 
-  let merge_into ?(map_key = Fun.id) ?(choose_producer = fun _ dest -> dest) src dest =
+  let merge_into ?(map_key = Fun.id) ?(choose_producer = fun _ dest -> dest) src
+      dest =
     let produce_value = choose_producer src.produce_value dest.produce_value in
     let values =
       Map.fold
@@ -127,22 +123,17 @@ struct
         src.values (* fold subject *)
         dest.values (* accumulator *)
     in
-    { produce_value; values }
+    {produce_value; values}
 
   let with_producer morph map =
-    { map with produce_value = morph map.produce_value }
+    {map with produce_value = morph map.produce_value}
 end
 
 module IntMap = Make (Effect.Identity) (Int)
-
 module Int32Map = Make (Effect.Identity) (Int32)
-
 module Int64Map = Make (Effect.Identity) (Int64)
-
 module LwtIntMap = Make (Effect.Lwt) (Int)
-
 module LwtInt32Map = Make (Effect.Lwt) (Int32)
-
 module LwtInt64Map = Make (Effect.Lwt) (Int64)
 
 module Mutable = struct
@@ -157,7 +148,8 @@ module Mutable = struct
 
     val of_immutable : 'a Map.t -> 'a t
 
-    val create : ?values:'a Map.Map.t -> ?produce_value:'a Map.producer -> unit -> 'a t
+    val create :
+      ?values:'a Map.Map.t -> ?produce_value:'a Map.producer -> unit -> 'a t
 
     val get : key -> 'a t -> 'a Map.effect
 
@@ -166,10 +158,8 @@ module Mutable = struct
     val snapshot : 'a t -> 'a Map.t
   end
 
-  module Make (Effect : Effect.S) (Key : KeyS) : S with
-    type key = Key.t and
-    type 'a effect = 'a Effect.t =
-  struct
+  module Make (Effect : Effect.S) (Key : KeyS) :
+    S with type key = Key.t and type 'a effect = 'a Effect.t = struct
     module Map = Make (Effect) (Key)
 
     type key = Map.key
@@ -191,14 +181,9 @@ module Mutable = struct
   end
 
   module IntMap = Make (Effect.Identity) (Int)
-
   module Int32Map = Make (Effect.Identity) (Int32)
-
   module Int64Map = Make (Effect.Identity) (Int64)
-
   module LwtIntMap = Make (Effect.Lwt) (Int)
-
   module LwtInt32Map = Make (Effect.Lwt) (Int32)
-
   module LwtInt64Map = Make (Effect.Lwt) (Int64)
 end

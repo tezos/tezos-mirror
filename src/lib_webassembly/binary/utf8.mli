@@ -1,4 +1,5 @@
 val decode : string -> int list (* raises Utf8 *)
+
 val encode : int list -> string (* raises Utf8 *)
 
 (** [decode_step get stream] reads a character (or more) from a stream [stream]

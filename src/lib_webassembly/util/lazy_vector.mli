@@ -106,9 +106,8 @@ module type S = sig
   val to_list : 'a t -> 'a list effect
 end
 
-module Make (Effect : Effect.S) (Key : KeyS) : S with
-  type key = Key.t and
-  type 'a effect = 'a Effect.t
+module Make (Effect : Effect.S) (Key : KeyS) :
+  S with type key = Key.t and type 'a effect = 'a Effect.t
 
 module IntVector : S with type key = int and type 'a effect = 'a
 
@@ -153,9 +152,8 @@ module Mutable : sig
     val snapshot : 'a t -> 'a Vector.t
   end
 
-  module Make (Effect : Effect.S) (Key : KeyS) : S with
-    type key = Key.t and
-    type 'a effect = 'a Effect.t
+  module Make (Effect : Effect.S) (Key : KeyS) :
+    S with type key = Key.t and type 'a effect = 'a Effect.t
 
   module IntVector : S with type key = int and type 'a effect = 'a
 

@@ -18,14 +18,14 @@ module Chunk = struct
 
   let alloc () =
     let chunk = Array1_64.create Int8_unsigned C_layout size in
-    Array1.fill chunk 0;
+    Array1.fill chunk 0 ;
     chunk
 
   let of_bytes bytes =
     let chunk = alloc () in
     for i = 0 to Int.max (Int64.to_int size) (Bytes.length bytes) - 1 do
       Array1.set chunk i (Char.code (Bytes.get bytes i))
-    done;
+    done ;
     chunk
 
   let num_needed length =
@@ -35,8 +35,7 @@ module Chunk = struct
           but would allocate 2 chunks without a [pred] applied to the first
           argument. *)
       Int64.(div (pred length) size |> succ)
-    else
-      0L
+    else 0L
 end
 
 module Effect = struct
@@ -104,46 +103,44 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
 
   type 'a effect = 'a Effect.t
 
-  type t = { mutable length : int64; chunks : Chunk.t Vector.t }
+  type t = {mutable length : int64; chunks : Chunk.t Vector.t}
 
   let def_get_chunk _ = Effect.return (Chunk.alloc ())
 
   let create ?(get_chunk = def_get_chunk) length =
     let chunks =
-      Vector.create
-        ~produce_value:get_chunk
-        (Chunk.num_needed length)
+      Vector.create ~produce_value:get_chunk (Chunk.num_needed length)
     in
-    { length; chunks }
+    {length; chunks}
 
   let grow vector size_delta =
-    if Int64.compare size_delta 0L > 0 then
+    if Int64.compare size_delta 0L > 0 then (
       let new_size = Int64.add vector.length size_delta in
       let new_chunks = Chunk.num_needed new_size in
       let current_chunks = Vector.num_elements vector.chunks in
       let chunk_count_delta = Int64.sub new_chunks current_chunks in
       if Int64.compare chunk_count_delta 0L > 0 then
-        Vector.grow chunk_count_delta vector.chunks;
-      vector.length <- new_size
+        Vector.grow chunk_count_delta vector.chunks ;
+      vector.length <- new_size)
 
   let length vector = vector.length
 
   let load_byte vector address =
     let open Effect in
-    if Int64.compare address vector.length >= 0 then raise Memory_exn.Bounds;
+    if Int64.compare address vector.length >= 0 then raise Memory_exn.Bounds ;
     let+ chunk = Vector.get (Chunk.index address) vector.chunks in
     Array1_64.get chunk (Chunk.offset address)
 
   let store_byte vector address byte =
     let open Effect in
-    if Int64.compare address vector.length >= 0 then raise Memory_exn.Bounds;
+    if Int64.compare address vector.length >= 0 then raise Memory_exn.Bounds ;
     let+ chunk = Vector.get (Chunk.index address) vector.chunks in
     Array1_64.set chunk (Chunk.offset address) byte
 
   let store_bytes vector address bytes =
     List.init (Bytes.length bytes) (fun i ->
-      let c = Bytes.get bytes i in
-      store_byte vector Int64.(of_int i |> add address) (Char.code c))
+        let c = Bytes.get bytes i in
+        store_byte vector Int64.(of_int i |> add address) (Char.code c))
     |> Effect.join
 
   let of_string str =
@@ -151,8 +148,8 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
     let vector = String.length str |> Int64.of_int |> create in
     let+ () =
       List.init (String.length str) (fun i ->
-        let c = String.get str i in
-        store_byte vector (Int64.of_int i) (Char.code c))
+          let c = String.get str i in
+          store_byte vector (Int64.of_int i) (Char.code c))
       |> join
     in
     vector
@@ -164,23 +161,22 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
     vector
 
   module Buffer = struct
+    type nonrec t = {vector : t; offset : int64}
 
-    type nonrec t = { vector: t; offset: int64 }
+    let length {vector; _} = length vector
 
-    let length { vector; _ } = length vector
-
-    let add_byte { vector; offset } b =
+    let add_byte {vector; offset} b =
       let open Effect in
       let+ () = store_byte vector offset b in
-      { vector ; offset = Int64.succ offset }
+      {vector; offset = Int64.succ offset}
 
     let of_string str =
       let open Effect in
       let offset = String.length str |> Int64.of_int in
       let+ vector = of_string str in
-      { vector; offset }
+      {vector; offset}
 
-    let create length = { vector = create length; offset = 0L }
+    let create length = {vector = create length; offset = 0L}
 
     (* This function makes a lot of conversion from Int64 to native int but it
        should be called only when converting a parsed data segment into a string
@@ -188,9 +184,9 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
 
        @raise Invalid_argument "Chunked_byte.vector.to_string" if the size of the
        vector is greater than [Sys.max_string_length]. *)
-    let to_string_unstable { vector; offset } =
+    let to_string_unstable {vector; offset} =
       let open Effect in
-      if offset > Int64.of_int (Sys.max_string_length) then
+      if offset > Int64.of_int Sys.max_string_length then
         invalid_arg "Chunked_byte_vector.to_string"
       else
         let buff = Bytes.create (Int64.to_int offset) in
@@ -202,10 +198,9 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
         in
         Bytes.to_string buff
 
-    let to_byte_vector { vector; _ } = vector
+    let to_byte_vector {vector; _} = vector
   end
 end
 
 include Make (Effect.Identity)
-
 module Lwt = Make (Effect.Lwt)
