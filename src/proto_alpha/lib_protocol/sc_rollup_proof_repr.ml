@@ -80,30 +80,30 @@ let check p reason =
   let open Lwt_tzresult_syntax in
   if p then return () else proof_error reason
 
+let check_inbox_proof snapshot serialized_inbox_proof (level, counter) =
+  match Sc_rollup_inbox_repr.of_serialized_proof serialized_inbox_proof with
+  | None -> return None
+  | Some inbox_proof ->
+      Sc_rollup_inbox_repr.verify_proof (level, counter) snapshot inbox_proof
+
+let pp_proof fmt serialized_inbox_proof =
+  match Sc_rollup_inbox_repr.of_serialized_proof serialized_inbox_proof with
+  | None -> Format.pp_print_string fmt "<invalid-proof-serialization>"
+  | Some proof -> Sc_rollup_inbox_repr.pp_proof fmt proof
+
 let valid snapshot commit_level ~pvm_name proof =
-  let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
   let open Lwt_tzresult_syntax in
+  let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
   let* () = check (String.equal P.name pvm_name) "Incorrect PVM kind" in
   let input_requested = P.proof_input_requested P.proof in
   let input_given = P.proof_input_given P.proof in
-  let check_inbox_proof serialized_inbox_proof (level, counter) =
-    match Sc_rollup_inbox_repr.of_serialized_proof serialized_inbox_proof with
-    | None -> return None
-    | Some inbox_proof ->
-        Sc_rollup_inbox_repr.verify_proof (level, counter) snapshot inbox_proof
-  in
-  let pp_proof fmt serialized_inbox_proof =
-    match Sc_rollup_inbox_repr.of_serialized_proof serialized_inbox_proof with
-    | None -> Format.pp_print_string fmt "<invalid-proof-serialization>"
-    | Some proof -> Sc_rollup_inbox_repr.pp_proof fmt proof
-  in
   let* input =
     match (input_requested, proof.inbox) with
     | Sc_rollup_PVM_sem.No_input_required, None -> return None
     | Sc_rollup_PVM_sem.Initial, Some inbox_proof ->
-        check_inbox_proof inbox_proof (Raw_level_repr.root, Z.zero)
+        check_inbox_proof snapshot inbox_proof (Raw_level_repr.root, Z.zero)
     | Sc_rollup_PVM_sem.First_after (level, counter), Some inbox_proof ->
-        check_inbox_proof inbox_proof (level, Z.succ counter)
+        check_inbox_proof snapshot inbox_proof (level, Z.succ counter)
     | _ ->
         proof_error
           (Format.asprintf
