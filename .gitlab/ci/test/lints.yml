@@ -22,7 +22,7 @@ misc_checks:
     # check that the hack-module patch applies cleanly
     - git apply devtools/protocol-print/add-hack-module.patch
     # check that yes-wallet builds correctly
-    - dune build scripts/yes-wallet/yes_wallet.exe
+    - dune build devtools/yes_wallet/yes_wallet.exe
 
 misc_opam_checks:
   extends: .test_template

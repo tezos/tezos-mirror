@@ -31,7 +31,7 @@ let pp_protocol ppf (module P : Sigs.PROTOCOL) =
   Protocol_hash.pp ppf P.hash
 
 (*
-   dune exec scripts/yes-wallet/yes-wallet.exe
+   dune exec devtools/yes_wallet/yes-wallet.exe
 
    Given a list of aliases and public key hashes:
    - encodes each public key as a fake secret key that can be used
