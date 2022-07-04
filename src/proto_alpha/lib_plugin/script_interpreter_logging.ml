@@ -1936,9 +1936,9 @@ module Logger (Base : Logger_base) = struct
   *)
   let ilog :
       type a s b t r f.
-      logger * logging_event -> (a, s) stack_ty -> (a, s, b, t, r, f) step_type
+      logger -> logging_event -> (a, s) stack_ty -> (a, s, b, t, r, f) step_type
       =
-   fun (logger, event) sty ((ctxt, _) as g) gas k ks accu stack ->
+   fun logger event sty ((ctxt, _) as g) gas k ks accu stack ->
     (match (k, event) with
     | ILog _, LogEntry -> ()
     | _, LogEntry -> log_entry ctxt gas k sty accu stack

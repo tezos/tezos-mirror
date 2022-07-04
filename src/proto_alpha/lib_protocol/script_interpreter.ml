@@ -627,7 +627,8 @@ module Raw = struct
         match i with
         | ILog (_, sty, event, logger, k) ->
             (logger.ilog [@ocaml.tailcall])
-              (logger, event)
+              logger
+              event
               sty
               g
               gas
