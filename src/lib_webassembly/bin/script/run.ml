@@ -17,6 +17,7 @@ exception Assert = Assert.Error
 exception IO = IO.Error
 
 let trace name = if !Flags.trace then print_endline ("-- " ^ name)
+let trace_lwt name = if !Flags.trace then Lwt_io.printf "-- %s\n"  name else Lwt.return_unit
 
 
 (* File types *)
@@ -45,40 +46,28 @@ let dispatch_file_ext on_binary on_sexpr on_script_binary on_script on_js file =
 (* Output *)
 
 let create_binary_file file _ get_module =
-  trace ("Encoding (" ^ file ^ ")...");
+  let* () = trace_lwt ("Encoding (" ^ file ^ ")...") in
   let s = Encode.encode (get_module ()) in
-  let oc = open_out_bin file in
-  try
-    trace "Writing...";
-    output_string oc s;
-    close_out oc
-  with exn -> close_out oc; raise exn
+  Lwt_io.(with_file ~mode:Output file (fun oc ->
+    let* () = trace_lwt "Writing..." in
+    write oc s))
 
 let create_sexpr_file file _ get_module =
-  trace ("Writing (" ^ file ^ ")...");
-  let oc = open_out file in
-  try
-    Print.module_ oc !Flags.width (get_module ());
-    close_out oc
-  with exn -> close_out oc; raise exn
+  let* () = trace_lwt ("Writing (" ^ file ^ ")...") in
+  Lwt_io.(with_file ~mode:Output file (fun oc ->
+    Print.module_ oc !Flags.width (get_module ())))
 
 let create_script_file mode file get_script _ =
-  trace ("Writing (" ^ file ^ ")...");
-  let oc = open_out file in
-  try
-    Print.script oc !Flags.width mode (get_script ());
-    close_out oc
-  with exn -> close_out oc; raise exn
+  let* () = trace_lwt ("Writing (" ^ file ^ ")...") in
+  Lwt_io.with_file ~mode:Lwt_io.Output file (fun oc ->
+      Print.script oc !Flags.width mode (get_script ()))
 
 let create_js_file file get_script _ =
-  trace ("Converting (" ^ file ^ ")...");
+  let* () = trace_lwt ("Converting (" ^ file ^ ")...") in
   let js = Js.of_script (get_script ()) in
-  let oc = open_out file in
-  try
-    trace "Writing...";
-    output_string oc js;
-    close_out oc
-  with exn -> close_out oc; raise exn
+  Lwt_io.(with_file ~mode:Output file (fun oc ->
+    let* () = trace_lwt "Writing..." in
+    write oc js))
 
 let output_file =
   dispatch_file_ext
@@ -89,24 +78,26 @@ let output_file =
     create_js_file
 
 let output_stdout get_module =
-  trace "Printing...";
-  Print.module_ stdout !Flags.width (get_module ())
+  let* () = trace_lwt "Printing..." in
+  Print.module_ Lwt_io.stdout !Flags.width (get_module ())
 
 
 (* Input *)
 
 let error at category msg =
-  trace ("Error: ");
-  prerr_endline (Source.string_of_region at ^ ": " ^ category ^ ": " ^ msg);
-  Lwt.return_false
+  let* () = trace_lwt ("Error: ") in
+  let+ () =
+    Lwt_io.eprintf "%s: %s: %s\n%!"(Source.string_of_region at) category msg in
+  false
 
 let input_from get_script run =
   Lwt.catch
     (fun () ->
        let script = get_script () in
-       trace "Running...";
+       let* () = trace_lwt "Running..." in
        let+ () = run script in
-       true)
+       true
+    )
     (function
       | Decode.Code (at, msg) -> error at "decoding error" msg
       | Parse.Syntax (at, msg) -> error at "syntax error" msg
@@ -139,26 +130,23 @@ let input_binary name buf run =
     [Module (None, Encoded (name, buf) @@ no_region) @@ no_region]) run
 
 let input_sexpr_file input file run =
-  trace ("Loading (" ^ file ^ ")...");
-  let ic = open_in file in
-  Lwt.finalize
-    (fun () ->
-       let lexbuf = Lexing.from_channel ic in
-       trace "Parsing...";
-       input file lexbuf run)
-    (fun () -> close_in ic; Lwt.return_unit)
+  let* () = trace_lwt ("Loading (" ^ file ^ ")...") in
+  Lwt_io.with_file ~mode:Lwt_io.Input file (fun ic ->
+      let* s = Lwt_io.read ic in
+      let lexbuf = Lexing.from_string s in
+      let* () = trace_lwt "Parsing..." in
+      let success = input file lexbuf run in
+      success)
 
 let input_binary_file file run =
-  trace ("Loading (" ^ file ^ ")...");
-  let ic = open_in_bin file in
-  Lwt.finalize
-    (fun () ->
-       let len = in_channel_length ic in
-       let buf = Bytes.make len '\x00' in
-       really_input ic buf 0 len;
-       trace "Decoding...";
-       input_binary file (Bytes.to_string buf) run)
-    (fun () -> close_in ic; Lwt.return_unit)
+  let* () = trace_lwt ("Loading (" ^ file ^ ")...") in
+  Lwt_io.(with_file ~mode:Input file (fun ic ->
+      let* len = length ic in
+      let len = Int64.to_int len in
+      let buf = Bytes.make len '\x00' in
+      let* () = read_into_exactly ic buf 0 len in
+      let* () = trace_lwt "Decoding..." in
+      input_binary file (Bytes.to_string buf) run))
 
 let input_js_file file run =
   raise (Sys_error (file ^ ": unrecognized input file type"))
@@ -173,9 +161,9 @@ let input_file file run =
     file run
 
 let input_string string run =
-  trace ("Running (\"" ^ String.escaped string ^ "\")...");
+  let* () = trace_lwt ("Running (\"" ^ String.escaped string ^ "\")...") in
   let lexbuf = Lexing.from_string string in
-  trace "Parsing...";
+  let* () = trace_lwt "Parsing..." in
   input_script Parse.Script "string" lexbuf run
 
 
@@ -198,6 +186,7 @@ let lexbuf_stdin buf len =
   n
 
 let input_stdin run =
+  (* TODO (#3334): Remove the unused REPL. *)
   let lexbuf = Lexing.from_function lexbuf_stdin in
   let rec loop () =
     let* success = input_script Parse.Script1 "stdin" lexbuf run in
@@ -208,10 +197,9 @@ let input_stdin run =
   in
   Lwt.catch loop
     (function
-      | End_of_file ->
-        print_endline "";
-        trace "Bye." ;
-        Lwt.return_unit
+        End_of_file ->
+        let* () = Lwt_io.printf "\n%!" in
+        trace_lwt "Bye."
       | exn -> raise exn)
 
 
@@ -339,21 +327,21 @@ let lookup_registry module_name item_name _t =
 
 (* Running *)
 
-let rec run_definition def : Ast.module_ =
+let rec run_definition def : Ast.module_ Lwt.t =
   match def.it with
-  | Textual m -> m
+  | Textual m -> Lwt.return m
   | Encoded (name, bs) ->
-    trace "Decoding...";
+    let+ () = trace_lwt "Decoding..." in
     Decode.decode name bs
   | Quoted (_, s) ->
-    trace "Parsing quote...";
+    let* () = trace_lwt "Parsing quote..." in
     let def' = Parse.string_to_module s in
     run_definition def'
 
 let run_action act : Values.value list Lwt.t =
   match act.it with
   | Invoke (x_opt, name, vs) ->
-    trace ("Invoking function \"" ^ Ast.string_of_name name ^ "\"...");
+    let* () = trace_lwt ("Invoking function \"" ^ Ast.string_of_name name ^ "\"...") in
     let inst = lookup_instance x_opt act.at in
     let* export = Instance.export inst name in
     (match export with
@@ -371,7 +359,7 @@ let run_action act : Values.value list Lwt.t =
     )
 
  | Get (x_opt, name) ->
-    trace ("Getting global \"" ^ Ast.string_of_name name ^ "\"...");
+    let* () = trace_lwt ("Getting global \"" ^ Ast.string_of_name name ^ "\"...") in
     let inst = lookup_instance x_opt act.at in
     let+ export = Instance.export inst name in
     (match export with
@@ -453,28 +441,31 @@ let assert_message at name msg re =
 let run_assertion ass : unit Lwt.t =
   match ass.it with
   | AssertMalformed (def, re) ->
-    trace "Asserting malformed...";
-    (match ignore (run_definition def : Ast.module_) with
-    | exception Decode.Code (_, msg) -> assert_message ass.at "decoding" msg re
-    | exception Parse.Syntax (_, msg) -> assert_message ass.at "parsing" msg re
-    | _ -> Assert.error ass.at "expected decoding/parsing error"
-    )
+    let* () = trace_lwt "Asserting malformed..." in
+    Lwt.try_bind
+      (fun () -> run_definition def)
+      (fun _ -> Assert.error ass.at "expected decoding/parsing error")
+      (function
+        | Decode.Code (_, msg) -> assert_message ass.at "decoding" msg re
+        | Parse.Syntax (_, msg) -> assert_message ass.at "parsing" msg re
+        | exn -> raise exn
+      )
 
   | AssertInvalid (def, re) ->
-    trace "Asserting invalid...";
-    (match
-      let m = run_definition def in
-      Valid.check_module m ;
-      Lwt.return_unit
-    with
-    | exception Valid.Invalid (_, msg) ->
-      assert_message ass.at "validation" msg re
-    | _ -> Assert.error ass.at "expected validation error"
-    )
+    let* () = trace_lwt "Asserting invalid..." in
+    Lwt.try_bind
+      (fun () ->
+         let+ m = run_definition def in
+         Valid.check_module m)
+      (fun _ -> Assert.error ass.at "expected validation error")
+    (function
+      | Valid.Invalid (_, msg) ->
+        assert_message ass.at "validation" msg re
+      | exn -> raise exn)
 
   | AssertUnlinkable (def, re) ->
-    trace "Asserting unlinkable...";
-    let m = run_definition def in
+    let* () = trace_lwt "Asserting unlinkable..." in
+    let* m = run_definition def in
     if not !Flags.unchecked then Valid.check_module m;
     Lwt.try_bind
       (fun () ->
@@ -487,8 +478,8 @@ let run_assertion ass : unit Lwt.t =
       | exn -> raise exn)
 
   | AssertUninstantiable (def, re) ->
-    trace "Asserting trap...";
-    let m = run_definition def in
+    let* () = trace_lwt "Asserting trap..." in
+    let* m = run_definition def in
     if not !Flags.unchecked then Valid.check_module m;
     Lwt.try_bind
       (fun () ->
@@ -501,13 +492,13 @@ let run_assertion ass : unit Lwt.t =
       | exn -> raise exn)
 
   | AssertReturn (act, rs) ->
-    trace ("Asserting return...");
+    let* () = trace_lwt ("Asserting return...") in
     let+ got_vs = run_action act in
     let expect_rs = List.map (fun r -> r.it) rs in
     assert_result ass.at got_vs expect_rs
 
   | AssertTrap (act, re) ->
-    trace ("Asserting trap...");
+    let* () = trace_lwt ("Asserting trap...") in
     Lwt.try_bind
       (fun () -> run_action act)
       (fun _ -> Assert.error ass.at "expected runtime error")
@@ -517,7 +508,7 @@ let run_assertion ass : unit Lwt.t =
       | exn -> raise exn)
 
   | AssertExhaustion (act, re) ->
-    trace ("Asserting exhaustion...");
+    let* () = trace_lwt ("Asserting exhaustion...") in
     Lwt.try_bind
       (fun () -> run_action act)
       (fun _ -> Assert.error ass.at "expected exhaustion error")
@@ -530,19 +521,23 @@ let rec run_command cmd : unit Lwt.t =
   match cmd.it with
   | Module (x_opt, def) ->
     quote := cmd :: !quote;
-    let m = run_definition def in
-    if not !Flags.unchecked then begin
-      trace "Checking...";
-      Valid.check_module m;
-      if !Flags.print_sig then begin
-        trace "Signature:";
-        print_module x_opt m
+    let* m = run_definition def in
+    let* () =
+      if not !Flags.unchecked then begin
+        let* () = trace_lwt "Checking..." in
+        Valid.check_module m;
+        if !Flags.print_sig then begin
+          let+ () = trace_lwt "Signature:" in
+          print_module x_opt m
+        end
+        else Lwt.return_unit
       end
-    end;
+      else Lwt.return_unit
+    in
     bind scripts x_opt [cmd];
     bind modules x_opt m;
     if not !Flags.dry then begin
-      trace "Initializing...";
+      let* () = trace_lwt "Initializing..." in
       let* imports = Import.link m in
       let+ inst = Eval.init m imports in
       bind instances x_opt inst
@@ -595,7 +590,7 @@ and run_meta cmd =
             Abort.error cmd.at "aborting")
         (function
            | Sys_error msg -> IO.error cmd.at msg
-           | exn -> Lwt.fail exn) in
+           | exn -> raise exn) in
     bind scripts x_opt (lookup_script None cmd.at);
     if x_opt <> None then begin
       bind modules x_opt (lookup_module None cmd.at);
@@ -605,17 +600,22 @@ and run_meta cmd =
     end
 
   | Output (x_opt, Some file) ->
-    (try
-      output_file file
-        (fun () -> lookup_script x_opt cmd.at)
-        (fun () -> lookup_module x_opt cmd.at)
-    with Sys_error msg -> IO.error cmd.at msg);
-    Lwt.return_unit
+    Lwt.catch
+      (fun () ->
+         output_file file
+           (fun () -> lookup_script x_opt cmd.at)
+           (fun () -> lookup_module x_opt cmd.at))
+      (function
+          Sys_error msg -> IO.error cmd.at msg
+        | exn -> raise exn)
 
   | Output (x_opt, None) ->
-    (try output_stdout (fun () -> lookup_module x_opt cmd.at)
-    with Sys_error msg -> IO.error cmd.at msg);
-    Lwt.return_unit
+    Lwt.catch
+      (fun () ->
+         output_stdout (fun () -> lookup_module x_opt cmd.at))
+      (function
+          Sys_error msg -> IO.error cmd.at msg
+        | exn -> raise exn)
 
 and run_script script =
   TzStdLib.List.iter_s run_command script
