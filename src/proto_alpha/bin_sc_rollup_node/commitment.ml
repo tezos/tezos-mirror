@@ -323,20 +323,16 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       | None ->
           (* Configured to not publish commitments *)
           return_unit
-      | Some (source, src_pk, src_sk) ->
-          let* _oph, _op, _results =
-            Client_proto_context.sc_rollup_publish
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ~commitment
-              ~source
-              ~rollup:rollup_address
-              ~src_pk
-              ~src_sk
-              ~fee_parameter:Configuration.default_fee_parameter
-              ()
+      | Some (source, _src_pk, _src_sk) ->
+          let publish_operation =
+            Sc_rollup_publish {rollup = node_ctxt.rollup_address; commitment}
           in
+          let* () = Injector.add_pending_operation ~source publish_operation in
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/3462
+             Decouple commitments from head processing
+
+             Move the following, in a part where we know the operation is
+             included. *)
           let*! () =
             Store.Last_published_commitment_level.set
               store
@@ -350,8 +346,6 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
           return_unit
     else return_unit
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2869
-     use the Injector to publish commitments. *)
   let publish_commitment node_ctxt store =
     let open Lwt_result_syntax in
     (* Check level of next publishable commitment and avoid publishing if it is
