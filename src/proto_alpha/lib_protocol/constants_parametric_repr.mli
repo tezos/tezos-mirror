@@ -102,6 +102,8 @@ type sc_rollup = {
   max_outbox_messages_per_level : int;
   (* The default number of required sections in a dissection *)
   number_of_sections_in_dissection : int;
+  (* The timeout period for a player in a refutation game. *)
+  timeout_period_in_blocks : int;
 }
 
 type t = {

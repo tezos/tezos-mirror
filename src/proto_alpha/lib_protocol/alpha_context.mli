@@ -808,6 +808,7 @@ module Constants : sig
       max_active_outbox_levels : int32;
       max_outbox_messages_per_level : int;
       number_of_sections_in_dissection : int;
+      timeout_period_in_blocks : int;
     }
 
     type t = {
