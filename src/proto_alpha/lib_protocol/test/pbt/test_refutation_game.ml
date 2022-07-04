@@ -235,6 +235,8 @@ end) : TestPVM with type state = int = struct
 
   type state = int
 
+  let pp x = Lwt.return @@ fun fmt _ -> Format.pp_print_int fmt x
+
   type hash = State_hash.t
 
   type context = unit
@@ -304,6 +306,10 @@ end) : TestPVM with type state = int = struct
 
   let produce_output_proof _ _ _ =
     Stdlib.failwith "Dummy PVM can't handle output proof"
+
+  module Internal_for_tests = struct
+    let insert_failure _ = Stdlib.failwith "Dummy PVM does not insert failures"
+  end
 end
 
 (** This is a random PVM. Its state is a pair of a string and a
@@ -319,6 +325,14 @@ end) : TestPVM with type state = string * int list = struct
   let pp_boot_sector fmt x = Format.fprintf fmt "%s" x
 
   type state = string * int list
+
+  let pp (s, xs) =
+    Lwt.return @@ fun fmt _ ->
+    Format.fprintf
+      fmt
+      "%s / %s"
+      s
+      (String.concat ":" @@ List.map string_of_int xs)
 
   type context = unit
 
@@ -399,6 +413,10 @@ end) : TestPVM with type state = string * int list = struct
 
   let produce_output_proof _ _ _ =
     Stdlib.failwith "Dummy PVM can't handle output proof"
+
+  module Internal_for_tests = struct
+    let insert_failure _ = Stdlib.failwith "Dummy PVM does not insert failures"
+  end
 end
 
 module ContextPVM = ArithPVM.Make (struct

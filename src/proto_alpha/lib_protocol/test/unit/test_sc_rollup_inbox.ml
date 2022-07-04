@@ -252,8 +252,12 @@ module Node = MakeHashingScheme (Tree)
     instances having the same encoding, and use this function to
     convert. *)
 let node_proof_to_protocol_proof p =
-  Data_encoding.Binary.(
-    to_bytes_exn Node.proof_encoding p |> of_bytes_exn proof_encoding)
+  let open Data_encoding.Binary in
+  let enc = serialized_proof_encoding in
+  let bytes = Node.to_serialized_proof p |> to_bytes_exn enc in
+  of_bytes_exn enc bytes |> of_serialized_proof |> function
+  | None -> assert false
+  | Some r -> r
 
 (** This is basically identical to {!setup_inbox_with_messages}, except
     that it uses the {!Node} instance instead of the protocol instance. *)
