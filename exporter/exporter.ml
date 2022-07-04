@@ -99,7 +99,7 @@ end
 
 module Pkh_ops = Map.Make (Op_key)
 
-type received = {reception_time : Time.System.t; errors : string}
+type received = {reception_time : Time.System.t; errors : error list option}
 
 type op_info = {included : Block_hash.t list; received : received list}
 
@@ -142,16 +142,23 @@ let select_ops db level =
   in
   let q_received =
     Format.asprintf
-      "SELECT hex(d.address), d.alias, r.timestamp, r.errors, o.endorsement, \
-       o.round FROM operations o, operations_reception r, delegates d ON \
-       r.operation = o.id AND o.endorser = d.id WHERE o.level = %d"
+      "SELECT hex(d.address), d.alias, r.timestamp, iif(r.errors IS NULL, \
+       NULL, hex(r.errors)), o.endorsement, o.round FROM operations o, \
+       operations_reception r, delegates d ON r.operation = o.id AND \
+       o.endorser = d.id WHERE o.level = %d"
       level
   in
   let parse_received_row row =
     ( `Hex (Stdlib.Option.get row.(0)) |> Signature.Public_key_hash.of_hex_exn,
       row.(1),
       Time.System.of_notation_exn (Stdlib.Option.get row.(2)),
-      Option.value ~default:"" row.(3),
+      row.(3)
+      |> Option.map (fun x -> `Hex x)
+      |> Option.map Hex.to_bytes |> Option.join
+      |> Option.map (fun bytes ->
+             Data_encoding.Binary.of_bytes_exn
+               (Data_encoding.list Error_monad.error_encoding)
+               bytes),
       (match row.(4) with
       | Some "0" -> Consensus_ops.Preendorsement
       | Some "1" -> Consensus_ops.Endorsement
@@ -211,8 +218,8 @@ let select_ops db level =
   let translate_ops pkh_ops =
     List.map
       (fun (Op_key.{kind; round}, op_info) ->
-        let reception_time =
-          if op_info.received = [] then None
+        let (reception_time, errors) =
+          if op_info.received = [] then (None, None)
           else
             let ordered =
               List.sort
@@ -221,14 +228,14 @@ let select_ops db level =
                 op_info.received
             in
             let r = Stdlib.List.hd ordered in
-            Some r.reception_time
+            (Some r.reception_time, r.errors)
         in
         Data.Delegate_operations.
           {
             kind;
             round = Some (Int32.of_int round);
             reception_time;
-            errors = None (* TODO *);
+            errors;
             block_inclusion = op_info.included;
           })
       (Pkh_ops.bindings pkh_ops)
