@@ -1,7 +1,9 @@
 (library
  (name yes_wallet_lib)
  (flags
-  (:standard -open Tezos_stdlib -open Data_encoding))
+  (:standard -open Tezos_stdlib -open Data_encoding
+             -open Tezos_protocol_alpha
+             -open Tezos_protocol_alpha.Protocol))
  (libraries
   tezos-base
   tezos-base.unix
@@ -17,7 +19,7 @@
   tezos-protocol-013-PtJakart
   tezos-protocol-014-PtKathma
   tezos-protocol-alpha)
- (modules yes_wallet_lib))
+ (modules sigs known_protocols yes_wallet_lib get_delegates_alpha))
 
 (executable
  (name yes_wallet)
