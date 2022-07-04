@@ -237,7 +237,15 @@ let gen_ctxt_req : ctxt_cstrs -> ctxt_req QCheck2.Gen.t =
   let* fund_del = gen_tez del_cstrs in
   let* fund_tx = gen_tez tx_cstrs in
   let+ fund_sc = gen_tez sc_cstrs in
-  {hard_gas_limit_per_block; fund_src; fund_dest; fund_del; fund_tx; fund_sc}
+  {
+    hard_gas_limit_per_block;
+    fund_src;
+    fund_dest;
+    fund_del;
+    fund_tx;
+    fund_sc;
+    flags = all_enabled;
+  }
 
 (** {2 Wrappers} *)
 

@@ -109,6 +109,9 @@ type operation_req = {
   amount : Tez.t option;
 }
 
+(** Feature flags requirements for a context setting for a test. *)
+type feature_flags = {dal : bool; scoru : bool; toru : bool}
+
 (** The requirements for a context setting for a test. *)
 type ctxt_req = {
   hard_gas_limit_per_block : Gas.Arith.integral option;
@@ -117,6 +120,7 @@ type ctxt_req = {
   fund_del : Tez.t option;
   fund_tx : Tez.t option;
   fund_sc : Tez.t option;
+  flags : feature_flags;
 }
 
 (** Validation mode.
@@ -128,7 +132,15 @@ type ctxt_req = {
 type mode = Construction | Mempool | Application
 
 (** {2 Default values} *)
-let ctxt_req_default =
+let all_enabled = {dal = true; scoru = true; toru = true}
+
+let disabled_dal = {all_enabled with dal = false}
+
+let disabled_scoru = {all_enabled with scoru = false}
+
+let disabled_toru = {all_enabled with toru = false}
+
+let ctxt_req_default_to_flag flags =
   {
     hard_gas_limit_per_block = None;
     fund_src = Some Tez.one;
@@ -136,7 +148,10 @@ let ctxt_req_default =
     fund_del = Some Tez.one;
     fund_tx = Some Tez.one;
     fund_sc = Some Tez.one;
+    flags;
   }
+
+let ctxt_req_default = ctxt_req_default_to_flag all_enabled
 
 let operation_req_default kind =
   {
@@ -222,8 +237,15 @@ let pp_2_operation_req pp (op_req1, op_req2) =
     op_req2
 
 let pp_ctxt_req pp
-    {hard_gas_limit_per_block; fund_src; fund_dest; fund_del; fund_tx; fund_sc}
-    =
+    {
+      hard_gas_limit_per_block;
+      fund_src;
+      fund_dest;
+      fund_del;
+      fund_tx;
+      fund_sc;
+      flags;
+    } =
   Format.fprintf
     pp
     "@[<v 4>Ctxt_req:@,\
@@ -233,6 +255,9 @@ let pp_ctxt_req pp
      fund_del: %a tz@,\
      fund_tx: %a tz@,\
      fund_sc: %a tz@,\
+     dal_flag: %a@,\
+     scoru_flag: %a@,\
+     toru_flag: %a@,\
      @]"
     (pp_opt Gas.Arith.pp_integral)
     hard_gas_limit_per_block
@@ -246,6 +271,12 @@ let pp_ctxt_req pp
     fund_tx
     (pp_opt Tez.pp)
     fund_sc
+    Format.pp_print_bool
+    flags.dal
+    Format.pp_print_bool
+    flags.scoru
+    Format.pp_print_bool
+    flags.toru
 
 let pp_mode pp = function
   | Construction -> Format.fprintf pp "Construction"
@@ -360,7 +391,15 @@ let fund_account block bootstrap account fund =
    have been created and funded according to the context
    requirements.*)
 let init_ctxt : ctxt_req -> infos tzresult Lwt.t =
- fun {hard_gas_limit_per_block; fund_src; fund_dest; fund_del; fund_tx; fund_sc} ->
+ fun {
+       hard_gas_limit_per_block;
+       fund_src;
+       fund_dest;
+       fund_del;
+       fund_tx;
+       fund_sc;
+       flags;
+     } ->
   let open Lwt_result_syntax in
   let create_and_fund ?originate_rollup block bootstrap fund =
     match fund with
@@ -382,10 +421,10 @@ let init_ctxt : ctxt_req -> infos tzresult Lwt.t =
       6
       ~consensus_threshold:0
       ?hard_gas_limit_per_block
-      ~tx_rollup_enable:true
+      ~tx_rollup_enable:flags.toru
       ~tx_rollup_sunset_level:Int32.max_int
-      ~sc_rollup_enable:true
-      ~dal_enable:true
+      ~sc_rollup_enable:flags.scoru
+      ~dal_enable:flags.dal
       ()
   in
   let get_bootstrap bootstraps n = Stdlib.List.nth bootstraps n in
@@ -400,18 +439,24 @@ let init_ctxt : ctxt_req -> infos tzresult Lwt.t =
     create_and_fund block (get_bootstrap bootstraps 2) fund_del
   in
   let* block, tx, tx_rollup =
-    create_and_fund
-      ~originate_rollup:(fun infos account -> originate_tx_rollup infos account)
-      block
-      (get_bootstrap bootstraps 3)
-      fund_tx
+    if flags.toru then
+      create_and_fund
+        ~originate_rollup:(fun infos account ->
+          originate_tx_rollup infos account)
+        block
+        (get_bootstrap bootstraps 3)
+        fund_tx
+    else return (block, None, None)
   in
   let* block, sc, sc_rollup =
-    create_and_fund
-      ~originate_rollup:(fun infos account -> originate_sc_rollup infos account)
-      block
-      (get_bootstrap bootstraps 4)
-      fund_sc
+    if flags.scoru then
+      create_and_fund
+        ~originate_rollup:(fun infos account ->
+          originate_sc_rollup infos account)
+        block
+        (get_bootstrap bootstraps 4)
+        fund_sc
+    else return (block, None, None)
   in
   let* create_contract_hash, originated_contract =
     Op.contract_origination_hash
@@ -454,6 +499,8 @@ let ctxt_with_delegation : ctxt_req -> infos tzresult Lwt.t =
   {infos with ctxt}
 
 let default_init_ctxt () = init_ctxt ctxt_req_default
+
+let default_init_with_flags flags = init_ctxt (ctxt_req_default_to_flag flags)
 
 let default_ctxt_with_self_delegation () =
   ctxt_with_self_delegation ctxt_req_default
@@ -1340,3 +1387,19 @@ let gas_consumer_in_validate_subjects, not_gas_consumer_in_validate_subjects =
 
 let revealed_subjects =
   List.filter (function K_Reveal -> false | _ -> true) subjects
+
+let is_disabled flags = function
+  | K_Transaction | K_Origination | K_Register_global_constant | K_Delegation
+  | K_Undelegation | K_Self_delegation | K_Set_deposits_limit | K_Reveal
+  | K_Increase_paid_storage ->
+      false
+  | K_Tx_rollup_origination | K_Tx_rollup_submit_batch | K_Tx_rollup_commit
+  | K_Tx_rollup_return_bond | K_Tx_rollup_finalize
+  | K_Tx_rollup_remove_commitment | K_Tx_rollup_dispatch_tickets
+  | K_Transfer_ticket | K_Tx_rollup_reject ->
+      flags.toru = false
+  | K_Sc_rollup_origination | K_Sc_rollup_publish | K_Sc_rollup_cement
+  | K_Sc_rollup_add_messages | K_Sc_rollup_refute | K_Sc_rollup_timeout
+  | K_Sc_rollup_execute_outbox_message | K_Sc_rollup_recover_bond ->
+      flags.scoru = false
+  | K_Dal_publish_slot_header -> flags.dal = false

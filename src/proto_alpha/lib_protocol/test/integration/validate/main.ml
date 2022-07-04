@@ -46,5 +46,7 @@ let () =
         Test_batched_manager_operation_validation.gas_tests );
       ( "Batched: fees checks",
         Test_batched_manager_operation_validation.fee_tests );
+      ( "Flags: feature flag checks",
+        Test_manager_operation_validation.flags_tests );
     ]
   |> Lwt_main.run

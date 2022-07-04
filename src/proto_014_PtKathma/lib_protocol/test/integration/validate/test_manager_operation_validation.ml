@@ -664,6 +664,97 @@ let test_validate kind () =
 let generate_tests_validate () =
   create_Tztest test_validate "Validate." subjects
 
+(* Feature flags.*)
+
+(* Select the error according to the positionned flag.
+   We assume that only one feature is disabled. *)
+let flag_expect_failure flags errs =
+  match errs with
+  | [
+   Environment.Ecoproto_error
+     Validate_operation.Manager.Sc_rollup_feature_disabled;
+  ]
+    when flags.scoru = false ->
+      return_unit
+  | [
+   Environment.Ecoproto_error
+     Validate_operation.Manager.Tx_rollup_feature_disabled;
+  ]
+    when flags.toru = false ->
+      return_unit
+  | [Environment.Ecoproto_error Dal_errors.Dal_feature_disabled]
+    when flags.dal = false ->
+      return_unit
+  | err ->
+      failwith
+        "Error trace:@, %a does not match the expected one"
+        Error_monad.pp_print_trace
+        err
+
+(* Tests that operations depending on feature flags are not valid
+   when the flag is set as disable.
+
+   See [is_disabled] and the [flags] in `manager_operation_helpers`.
+   We assume that only one flag is set at false in flag.
+
+   In order to forge Toru, Scoru or Dal operation when the correspondong
+   feature is disable, we use a [infos_op] with default requirements,
+   so that we have a Tx_rollup.t and a Sc_rollup.t. *)
+let test_feature_flags flags kind () =
+  let open Lwt_result_syntax in
+  let* infos_op = default_init_ctxt () in
+  let* infos = default_init_with_flags flags in
+  let infos =
+    {
+      infos with
+      ctxt =
+        {
+          infos.ctxt with
+          tx_rollup = infos_op.ctxt.tx_rollup;
+          sc_rollup = infos_op.ctxt.sc_rollup;
+        };
+    }
+  in
+  let* counter =
+    Context.Contract.counter
+      (B infos.ctxt.block)
+      (contract_of infos.accounts.source)
+  in
+  let* op =
+    select_op
+      {
+        {(operation_req_default kind) with force_reveal = Some true} with
+        counter = Some counter;
+      }
+      infos
+  in
+  let* _ =
+    if is_disabled flags kind then
+      validate_ko_diagnostic infos [op] (flag_expect_failure flags)
+    else
+      let* _ = validate_diagnostic infos [op] in
+      return_unit
+  in
+  return_unit
+
+let generate_dal_flag () =
+  create_Tztest
+    (test_feature_flags disabled_dal)
+    "Validate with dal disabled."
+    subjects
+
+let generate_scoru_flag () =
+  create_Tztest
+    (test_feature_flags disabled_scoru)
+    "Validate with scoru disabled."
+    subjects
+
+let generate_toru_flag () =
+  create_Tztest
+    (test_feature_flags disabled_toru)
+    "Validate with toru disabled."
+    subjects
+
 let sanity_tests =
   test_ensure_manager_operation_coverage () :: generate_tests_validate ()
 
@@ -684,3 +775,6 @@ let fee_tests =
 let contract_tests =
   generate_high_counter () @ generate_low_counter () @ generate_not_allocated ()
   @ generate_unrevealed_key ()
+
+let flags_tests =
+  generate_dal_flag () @ generate_toru_flag () @ generate_scoru_flag ()
