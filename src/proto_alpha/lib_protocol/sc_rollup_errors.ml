@@ -256,11 +256,11 @@ let () =
     Data_encoding.empty
     (function Sc_rollup_not_staked_on_lcc -> Some () | _ -> None)
     (fun () -> Sc_rollup_not_staked_on_lcc) ;
-  let description = "Parent is not cemented." in
+  let description = "Parent is not the last cemented commitment." in
   register_error_kind
     `Temporary
     ~id:"Sc_rollup_parent_not_lcc"
-    ~title:"Parent not cemented"
+    ~title:"Parent is not the last cemented commitment"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     Data_encoding.empty
