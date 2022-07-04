@@ -48,12 +48,15 @@ let sc_rollup_max_active_outbox_levels =
     pay for at origination time. *)
 let sc_rollup_max_outbox_messages_per_level = 100
 
-(** The timeout period in blocks is about 4h with 30s block-time (15000s / 30s).
+(** The timeout period is about a week with 30s block-time (604800s / 30s).
+
+    It suffers from the same risk of censorship as
+    {!sc_rollup_challenge_windows_in_blocks} so we use the same value.
 
     TODO: https://gitlab.com/tezos/tezos/-/issues/2902
     This constant needs to be refined.
 *)
-let sc_rollup_timeout_period_in_blocks = 500
+let sc_rollup_timeout_period_in_blocks = 20_160
 
 (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3177
 

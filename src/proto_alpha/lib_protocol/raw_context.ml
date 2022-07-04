@@ -1003,7 +1003,7 @@ let prepare_first_block ~level ~timestamp ctxt =
                 number_of_sections_in_dissection = 32;
                 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2902
                    This constant needs to be refined. *)
-                timeout_period_in_blocks = 500;
+                timeout_period_in_blocks = 20_160;
               };
           }
       in

@@ -690,7 +690,7 @@ def _test_create_mockup_init_show_roundtrip(
                 "sc_rollup_max_active_outbox_levels": 20_160,
                 "sc_rollup_max_outbox_messages_per_level": 100,
                 "sc_rollup_number_of_sections_in_dissection": 32,
-                "sc_rollup_timeout_period_in_blocks": 500,
+                "sc_rollup_timeout_period_in_blocks": 20_160,
             }
         ),
     ],

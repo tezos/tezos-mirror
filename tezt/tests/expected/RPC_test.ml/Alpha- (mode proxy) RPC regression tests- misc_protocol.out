@@ -57,7 +57,7 @@
   "sc_rollup_max_active_outbox_levels": 20160,
   "sc_rollup_max_outbox_messages_per_level": 100,
   "sc_rollup_number_of_sections_in_dissection": 32,
-  "sc_rollup_timeout_period_in_blocks": 500 }
+  "sc_rollup_timeout_period_in_blocks": 20160 }
 protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/helpers/baking_rights
