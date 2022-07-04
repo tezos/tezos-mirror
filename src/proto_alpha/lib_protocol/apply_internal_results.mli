@@ -30,45 +30,50 @@
 
 open Alpha_context
 
-type 'kind internal_manager_operation =
+(** [internal_operation_contents] are the internal operations as output in
+    receipts.
+    The type simply weakens {!Script_typed_ir.internal_operation_contents} so
+    that it is easier to define an encoding for it (i.e. we remove the typed
+    parameter). *)
+type 'kind internal_operation_contents =
   | Transaction : {
       amount : Tez.tez;
       parameters : Script.lazy_expr;
       entrypoint : Entrypoint.t;
       destination : Destination.t;
     }
-      -> Kind.transaction internal_manager_operation
+      -> Kind.transaction internal_operation_contents
   | Origination : {
       delegate : Signature.Public_key_hash.t option;
       script : Script.t;
       credit : Tez.tez;
     }
-      -> Kind.origination internal_manager_operation
+      -> Kind.origination internal_operation_contents
   | Delegation :
       Signature.Public_key_hash.t option
-      -> Kind.delegation internal_manager_operation
+      -> Kind.delegation internal_operation_contents
   | Event : {
       ty : Script.expr;
       tag : Entrypoint.t;
       payload : Script.expr;
     }
-      -> Kind.event internal_manager_operation
+      -> Kind.event internal_operation_contents
 
-type 'kind internal_contents = {
+type 'kind internal_operation = {
   source : Contract.t;
-  operation : 'kind internal_manager_operation;
+  operation : 'kind internal_operation_contents;
   nonce : int;
 }
 
-type packed_internal_contents =
-  | Internal_contents : 'kind internal_contents -> packed_internal_contents
+type packed_internal_operation =
+  | Internal_operation : 'kind internal_operation -> packed_internal_operation
 
-val contents_of_packed_internal_operation :
-  Script_typed_ir.packed_internal_operation -> packed_internal_contents
+val packed_internal_operation :
+  Script_typed_ir.packed_internal_operation -> packed_internal_operation
 
-val contents_of_packed_internal_operations :
+val packed_internal_operations :
   Script_typed_ir.packed_internal_operation list ->
-  packed_internal_contents list
+  packed_internal_operation list
 
 (** Result of applying an internal transaction. *)
 type successful_transaction_result =
@@ -103,43 +108,43 @@ type successful_origination_result = {
   paid_storage_size_diff : Z.t;
 }
 
-(** Result of applying a {!Script_typed_ir.internal_operation}. *)
-type _ successful_internal_manager_operation_result =
+(** Result of applying a {!Script_typed_ir.internal_operation_contents}. *)
+type _ successful_internal_operation_result =
   | ITransaction_result :
       successful_transaction_result
-      -> Kind.transaction successful_internal_manager_operation_result
+      -> Kind.transaction successful_internal_operation_result
   | IOrigination_result :
       successful_origination_result
-      -> Kind.origination successful_internal_manager_operation_result
+      -> Kind.origination successful_internal_operation_result
   | IDelegation_result : {
       consumed_gas : Gas.Arith.fp;
     }
-      -> Kind.delegation successful_internal_manager_operation_result
+      -> Kind.delegation successful_internal_operation_result
   | IEvent_result : {
       consumed_gas : Gas.Arith.fp;
     }
-      -> Kind.event successful_internal_manager_operation_result
+      -> Kind.event successful_internal_operation_result
 
-type 'kind internal_manager_operation_result =
+type 'kind internal_operation_result =
   ( 'kind,
     'kind Kind.manager,
-    'kind successful_internal_manager_operation_result )
+    'kind successful_internal_operation_result )
   Apply_operation_result.operation_result
 
-type packed_internal_manager_operation_result =
-  | Internal_manager_operation_result :
-      'kind internal_contents * 'kind internal_manager_operation_result
-      -> packed_internal_manager_operation_result
+type packed_internal_operation_result =
+  | Internal_operation_result :
+      'kind internal_operation * 'kind internal_operation_result
+      -> packed_internal_operation_result
 
-val contents_of_internal_operation :
-  'kind Script_typed_ir.internal_operation -> 'kind internal_contents
+val internal_operation :
+  'kind Script_typed_ir.internal_operation -> 'kind internal_operation
 
-val pack_internal_manager_operation_result :
+val pack_internal_operation_result :
   'kind Script_typed_ir.internal_operation ->
-  'kind internal_manager_operation_result ->
-  packed_internal_manager_operation_result
+  'kind internal_operation_result ->
+  packed_internal_operation_result
 
-val internal_contents_encoding : packed_internal_contents Data_encoding.t
+val internal_operation_encoding : packed_internal_operation Data_encoding.t
 
-val internal_manager_operation_result_encoding :
-  packed_internal_manager_operation_result Data_encoding.t
+val internal_operation_result_encoding :
+  packed_internal_operation_result Data_encoding.t

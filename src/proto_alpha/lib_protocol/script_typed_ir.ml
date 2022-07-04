@@ -1338,7 +1338,7 @@ and ('input, 'output) view_signature =
     }
       -> ('input, 'output) view_signature
 
-and 'kind manager_operation =
+and 'kind internal_operation_contents =
   | Transaction_to_implicit : {
       destination : Signature.Public_key_hash.t;
       amount : Tez.tez;
@@ -1348,7 +1348,7 @@ and 'kind manager_operation =
       parameters : 'a;
       unparsed_parameters : Script.expr;
     }
-      -> Kind.transaction manager_operation
+      -> Kind.transaction internal_operation_contents
   | Transaction_to_smart_contract : {
       destination : Contract_hash.t;
       amount : Tez.tez;
@@ -1358,14 +1358,14 @@ and 'kind manager_operation =
       parameters : 'a;
       unparsed_parameters : Script.expr;
     }
-      -> Kind.transaction manager_operation
+      -> Kind.transaction internal_operation_contents
   | Transaction_to_tx_rollup : {
       destination : Tx_rollup.t;
       parameters_ty : ('a, _) ty;
       parameters : 'a;
       unparsed_parameters : Script.expr;
     }
-      -> Kind.transaction manager_operation
+      -> Kind.transaction internal_operation_contents
   | Transaction_to_sc_rollup : {
       destination : Sc_rollup.t;
       entrypoint : Entrypoint.t;
@@ -1373,13 +1373,13 @@ and 'kind manager_operation =
       parameters : 'a;
       unparsed_parameters : Script.expr;
     }
-      -> Kind.transaction manager_operation
+      -> Kind.transaction internal_operation_contents
   | Event : {
       ty : Script.expr;
       tag : Entrypoint.t;
       unparsed_data : Script.expr;
     }
-      -> Kind.event manager_operation
+      -> Kind.event internal_operation_contents
   | Origination : {
       delegate : Signature.Public_key_hash.t option;
       code : Script.expr;
@@ -1389,14 +1389,14 @@ and 'kind manager_operation =
       storage_type : ('storage, _) ty;
       storage : 'storage;
     }
-      -> Kind.origination manager_operation
+      -> Kind.origination internal_operation_contents
   | Delegation :
       Signature.Public_key_hash.t option
-      -> Kind.delegation manager_operation
+      -> Kind.delegation internal_operation_contents
 
 and 'kind internal_operation = {
   source : Contract.t;
-  operation : 'kind manager_operation;
+  operation : 'kind internal_operation_contents;
   nonce : int;
 }
 
@@ -1427,12 +1427,8 @@ type ('arg, 'storage) script =
     }
       -> ('arg, 'storage) script
 
-type packed_manager_operation =
-  | Manager : 'kind manager_operation -> packed_manager_operation
-[@@ocaml.unboxed]
-
-let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
-  function
+let manager_kind :
+    type kind. kind internal_operation_contents -> kind Kind.manager = function
   | Transaction_to_implicit _ -> Kind.Transaction_manager_kind
   | Transaction_to_smart_contract _ -> Kind.Transaction_manager_kind
   | Transaction_to_tx_rollup _ -> Kind.Transaction_manager_kind

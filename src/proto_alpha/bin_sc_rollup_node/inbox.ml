@@ -85,10 +85,9 @@ let get_messages l1_ctxt head rollup =
     | _ -> accu
   in
   let apply_internal (type kind) accu ~source:_
-      (_operation : kind Apply_internal_results.internal_manager_operation)
+      (_operation : kind Apply_internal_results.internal_operation_contents)
       (_result :
-        kind Apply_internal_results.successful_internal_manager_operation_result)
-      =
+        kind Apply_internal_results.successful_internal_operation_result) =
     accu
   in
   let messages =

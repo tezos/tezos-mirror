@@ -76,7 +76,7 @@ let parse_tx_rollup_deposit_parameters :
   let open Protocol in
   (* /!\ This pattern matching needs to remain in sync with the deposit
      parameters. See the transaction to Tx_rollup case in
-     Protocol.Apply.Apply.apply_internal_manager_operations *)
+     Protocol.Apply.Apply.apply_internal_operation_contents *)
   match root parameters with
   | Seq
       ( _,
@@ -124,7 +124,7 @@ let extract_messages_from_block block_info rollup_id =
     (msg :: messages, tickets)
   in
   let get_messages_of_internal_operation ~source messages_tickets
-      (Internal_manager_operation_result
+      (Internal_operation_result
         ( {
             operation;
             source = _use_the_source_of_the_external_operation;
@@ -164,7 +164,7 @@ let extract_messages_from_block block_info rollup_id =
       source:public_key_hash ->
       kind manager_operation ->
       kind manager_operation_result ->
-      packed_internal_manager_operation_result list ->
+      packed_internal_operation_result list ->
       Tx_rollup_message.t list * Ticket.t list ->
       Tx_rollup_message.t list * Ticket.t list =
    fun ~source op result internal_operation_results messages_tickets ->
@@ -712,7 +712,7 @@ let handle_l1_operation direction (block : Alpha_block_services.block_info)
       source:public_key_hash ->
       kind manager_operation ->
       kind manager_operation_result ->
-      packed_internal_manager_operation_result list ->
+      packed_internal_operation_result list ->
       'acc ->
       'acc tzresult Lwt.t =
    fun ~source op result _internal_operation_results acc ->

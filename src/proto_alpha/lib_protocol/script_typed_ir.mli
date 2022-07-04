@@ -1469,13 +1469,13 @@ and ('input, 'output) view_signature =
     }
       -> ('input, 'output) view_signature
 
-and 'kind manager_operation =
+and 'kind internal_operation_contents =
   | Transaction_to_implicit : {
       (* The [unparsed_parameters] field may seem useless since we have
          access to a typed version of the field (with [parameters_ty] and
          [parameters]), but we keep it so that we do not have to unparse the
          typed version in order to produce the receipt
-         ([Apply_results.internal_manager_operation]). *)
+         ([Apply_internal_results.internal_operation_contents]). *)
       destination : Signature.Public_key_hash.t;
       amount : Tez.tez;
       entrypoint : Entrypoint.t;
@@ -1484,13 +1484,13 @@ and 'kind manager_operation =
       parameters : 'a;
       unparsed_parameters : Script.expr;
     }
-      -> Kind.transaction manager_operation
+      -> Kind.transaction internal_operation_contents
   | Transaction_to_smart_contract : {
       (* The [unparsed_parameters] field may seem useless since we have
          access to a typed version of the field (with [parameters_ty] and
          [parameters]), but we keep it so that we do not have to unparse the
          typed version in order to produce the receipt
-         ([Apply_results.internal_manager_operation]). *)
+         ([Apply_internal_results.internal_operation_contents]). *)
       destination : Contract_hash.t;
       amount : Tez.tez;
       entrypoint : Entrypoint.t;
@@ -1499,14 +1499,14 @@ and 'kind manager_operation =
       parameters : 'a;
       unparsed_parameters : Script.expr;
     }
-      -> Kind.transaction manager_operation
+      -> Kind.transaction internal_operation_contents
   | Transaction_to_tx_rollup : {
       destination : Tx_rollup.t;
       parameters_ty : ('a, _) ty;
       parameters : 'a;
       unparsed_parameters : Script.expr;
     }
-      -> Kind.transaction manager_operation
+      -> Kind.transaction internal_operation_contents
   | Transaction_to_sc_rollup : {
       destination : Sc_rollup.t;
       entrypoint : Entrypoint.t;
@@ -1514,13 +1514,13 @@ and 'kind manager_operation =
       parameters : 'a;
       unparsed_parameters : Script.expr;
     }
-      -> Kind.transaction manager_operation
+      -> Kind.transaction internal_operation_contents
   | Event : {
       ty : Script.expr;
       tag : Entrypoint.t;
       unparsed_data : Script.expr;
     }
-      -> Kind.event manager_operation
+      -> Kind.event internal_operation_contents
   | Origination : {
       delegate : Signature.Public_key_hash.t option;
       code : Script.expr;
@@ -1530,14 +1530,14 @@ and 'kind manager_operation =
       storage_type : ('storage, _) ty;
       storage : 'storage;
     }
-      -> Kind.origination manager_operation
+      -> Kind.origination internal_operation_contents
   | Delegation :
       Signature.Public_key_hash.t option
-      -> Kind.delegation manager_operation
+      -> Kind.delegation internal_operation_contents
 
 and 'kind internal_operation = {
   source : Contract.t;
-  operation : 'kind manager_operation;
+  operation : 'kind internal_operation_contents;
   nonce : int;
 }
 
@@ -1563,11 +1563,7 @@ type ('arg, 'storage) script =
     }
       -> ('arg, 'storage) script
 
-type packed_manager_operation =
-  | Manager : 'kind manager_operation -> packed_manager_operation
-[@@ocaml.unboxed]
-
-val manager_kind : 'kind manager_operation -> 'kind Kind.manager
+val manager_kind : 'kind internal_operation_contents -> 'kind Kind.manager
 
 val kinstr_location : (_, _, _, _) kinstr -> Script.location
 

@@ -101,7 +101,8 @@ type error +=
   | Cannot_transfer_ticket_to_implicit
   | Sc_rollup_feature_disabled
   | Wrong_voting_period of {expected : int32; provided : int32}
-  | Internal_operation_replay of Apply_internal_results.packed_internal_contents
+  | Internal_operation_replay of
+      Apply_internal_results.packed_internal_operation
   | Invalid_denunciation of denunciation_kind
   | Inconsistent_denunciation of {
       kind : denunciation_kind;
@@ -568,12 +569,12 @@ let () =
     ~id:"internal_operation_replay"
     ~title:"Internal operation replay"
     ~description:"An internal operation was emitted twice by a script"
-    ~pp:(fun ppf (Apply_internal_results.Internal_contents {nonce; _}) ->
+    ~pp:(fun ppf (Apply_internal_results.Internal_operation {nonce; _}) ->
       Format.fprintf
         ppf
         "Internal operation %d was emitted twice by a script"
         nonce)
-    Apply_internal_results.internal_contents_encoding
+    Apply_internal_results.internal_operation_encoding
     (function Internal_operation_replay op -> Some op | _ -> None)
     (fun op -> Internal_operation_replay op) ;
   register_error_kind
@@ -1077,15 +1078,15 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
 
 *)
 
-let apply_internal_manager_operation_content :
+let apply_internal_operation_contents :
     type kind.
     context ->
     payer:public_key_hash ->
     source:Contract.t ->
     chain_id:Chain_id.t ->
-    kind Script_typed_ir.manager_operation ->
+    kind Script_typed_ir.internal_operation_contents ->
     (context
-    * kind successful_internal_manager_operation_result
+    * kind successful_internal_operation_result
     * Script_typed_ir.packed_internal_operation list)
     tzresult
     Lwt.t =
@@ -1118,8 +1119,7 @@ let apply_internal_manager_operation_content :
         ~before_operation:ctxt_before_op
       >|=? fun (ctxt, res, ops) ->
       ( ctxt,
-        (ITransaction_result res
-          : kind successful_internal_manager_operation_result),
+        (ITransaction_result res : kind successful_internal_operation_result),
         ops )
   | Transaction_to_smart_contract
       {
@@ -1219,7 +1219,7 @@ let apply_internal_manager_operation_content :
       >|=? fun (ctxt, consumed_gas, ops) ->
       (ctxt, IDelegation_result {consumed_gas}, ops)
 
-let apply_external_manager_operation_content :
+let apply_manager_operation :
     type kind.
     context ->
     source:public_key_hash ->
@@ -1905,20 +1905,18 @@ let apply_external_manager_operation_content :
 
 type success_or_failure = Success of context | Failure
 
-let apply_internal_manager_operations ctxt ~payer ~chain_id ops =
+let apply_internal_operations ctxt ~payer ~chain_id ops =
   let[@coq_struct "ctxt"] rec apply ctxt applied worklist =
     match worklist with
     | [] -> Lwt.return (Success ctxt, List.rev applied)
     | Script_typed_ir.Internal_operation ({source; operation; nonce} as op)
       :: rest -> (
         (if internal_nonce_already_recorded ctxt nonce then
-         let op_res =
-           Apply_internal_results.contents_of_internal_operation op
-         in
-         fail (Internal_operation_replay (Internal_contents op_res))
+         let op_res = Apply_internal_results.internal_operation op in
+         fail (Internal_operation_replay (Internal_operation op_res))
         else
           let ctxt = record_internal_nonce ctxt nonce in
-          apply_internal_manager_operation_content
+          apply_internal_operation_contents
             ctxt
             ~source
             ~payer
@@ -1927,14 +1925,14 @@ let apply_internal_manager_operations ctxt ~payer ~chain_id ops =
         >>= function
         | Error errors ->
             let result =
-              pack_internal_manager_operation_result
+              pack_internal_operation_result
                 op
                 (Failed (Script_typed_ir.manager_kind op.operation, errors))
             in
             let skipped =
               List.rev_map
                 (fun (Script_typed_ir.Internal_operation op) ->
-                  pack_internal_manager_operation_result
+                  pack_internal_operation_result
                     op
                     (Skipped (Script_typed_ir.manager_kind op.operation)))
                 rest
@@ -1943,8 +1941,7 @@ let apply_internal_manager_operations ctxt ~payer ~chain_id ops =
         | Ok (ctxt, result, emitted) ->
             apply
               ctxt
-              (pack_internal_manager_operation_result op (Applied result)
-              :: applied)
+              (pack_internal_operation_result op (Applied result) :: applied)
               (emitted @ rest))
   in
   apply ctxt [] ops
@@ -2134,11 +2131,10 @@ let burn_manager_storage_fees :
 let burn_internal_storage_fees :
     type kind.
     context ->
-    kind successful_internal_manager_operation_result ->
+    kind successful_internal_operation_result ->
     storage_limit:Z.t ->
     payer:public_key_hash ->
-    (context * Z.t * kind successful_internal_manager_operation_result) tzresult
-    Lwt.t =
+    (context * Z.t * kind successful_internal_operation_result) tzresult Lwt.t =
  fun ctxt smopr ~storage_limit ~payer ->
   let payer = `Contract (Contract.Implicit payer) in
   match smopr with
@@ -2165,7 +2161,7 @@ let apply_manager_contents (type kind) ctxt chain_id
     (op : kind Kind.manager contents) :
     (success_or_failure
     * kind manager_operation_result
-    * packed_internal_manager_operation_result list)
+    * packed_internal_operation_result list)
     Lwt.t =
   let[@coq_match_with_default] (Manager_operation
                                  {
@@ -2180,14 +2176,9 @@ let apply_manager_contents (type kind) ctxt chain_id
   (* We do not expose the internal scaling to the users. Instead, we multiply
        the specified gas limit by the internal scaling. *)
   let ctxt = Gas.set_limit ctxt gas_limit in
-  apply_external_manager_operation_content ctxt ~source ~chain_id operation
-  >>= function
+  apply_manager_operation ctxt ~source ~chain_id operation >>= function
   | Ok (ctxt, operation_results, internal_operations) -> (
-      apply_internal_manager_operations
-        ctxt
-        ~payer:source
-        ~chain_id
-        internal_operations
+      apply_internal_operations ctxt ~payer:source ~chain_id internal_operations
       >>= function
       | Success ctxt, internal_operations_results -> (
           burn_manager_storage_fees
@@ -2199,7 +2190,7 @@ let apply_manager_contents (type kind) ctxt chain_id
           | Ok (ctxt, storage_limit, operation_results) -> (
               List.fold_left_es
                 (fun (ctxt, storage_limit, res) imopr ->
-                  let (Internal_manager_operation_result (op, mopr)) = imopr in
+                  let (Internal_operation_result (op, mopr)) = imopr in
                   match mopr with
                   | Applied smopr ->
                       burn_internal_storage_fees
@@ -2209,7 +2200,7 @@ let apply_manager_contents (type kind) ctxt chain_id
                         ~payer:source
                       >>=? fun (ctxt, storage_limit, smopr) ->
                       let imopr =
-                        Internal_manager_operation_result (op, Applied smopr)
+                        Internal_operation_result (op, Applied smopr)
                       in
                       return (ctxt, storage_limit, imopr :: res)
                   | _ -> return (ctxt, storage_limit, imopr :: res))
@@ -2378,17 +2369,16 @@ let mark_backtracked results =
       | (Failed _ | Skipped _ | Backtracked _) as result -> result
       | Applied result -> Backtracked (result, None)
     in
-    let mark_internal_manager_operation_result :
+    let mark_internal_operation_result :
         type kind.
-        kind internal_manager_operation_result ->
-        kind internal_manager_operation_result = function
+        kind internal_operation_result -> kind internal_operation_result =
+      function
       | (Failed _ | Skipped _ | Backtracked _) as result -> result
       | Applied result -> Backtracked (result, None)
     in
     let mark_internal_operation_results
-        (Internal_manager_operation_result (kind, result)) =
-      Internal_manager_operation_result
-        (kind, mark_internal_manager_operation_result result)
+        (Internal_operation_result (kind, result)) =
+      Internal_operation_result (kind, mark_internal_operation_result result)
     in
     match results with
     | Manager_operation_result op ->
@@ -2678,7 +2668,7 @@ let apply_manager_contents_list ctxt ~payload_producer chain_id
   | Success ctxt ->
       Lazy_storage.cleanup_temporaries ctxt >|= fun ctxt -> (ctxt, results)
 
-let apply_manager_operation ctxt ~payload_producer chain_id ~mempool_mode
+let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
     op_validated_stamp contents_list =
   let open Lwt_result_syntax in
   let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
@@ -3021,7 +3011,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
       (* Failing_noop _ always fails *)
       fail Failing_noop_error
   | Single (Manager_operation _) ->
-      apply_manager_operation
+      apply_manager_operations
         ctxt
         ~payload_producer
         chain_id
@@ -3029,7 +3019,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
         op_validated_stamp
         contents_list
   | Cons (Manager_operation _, _) ->
-      apply_manager_operation
+      apply_manager_operations
         ctxt
         ~payload_producer
         chain_id

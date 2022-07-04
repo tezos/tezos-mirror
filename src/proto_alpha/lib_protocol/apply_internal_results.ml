@@ -27,48 +27,48 @@ open Alpha_context
 open Data_encoding
 open Apply_operation_result
 
-type 'kind internal_manager_operation =
+type 'kind internal_operation_contents =
   | Transaction : {
       amount : Tez.tez;
       parameters : Script.lazy_expr;
       entrypoint : Entrypoint.t;
       destination : Destination.t;
     }
-      -> Kind.transaction internal_manager_operation
+      -> Kind.transaction internal_operation_contents
   | Origination : {
       delegate : Signature.Public_key_hash.t option;
       script : Script.t;
       credit : Tez.tez;
     }
-      -> Kind.origination internal_manager_operation
+      -> Kind.origination internal_operation_contents
   | Delegation :
       Signature.Public_key_hash.t option
-      -> Kind.delegation internal_manager_operation
+      -> Kind.delegation internal_operation_contents
   | Event : {
       ty : Script.expr;
       tag : Entrypoint.t;
       payload : Script.expr;
     }
-      -> Kind.event internal_manager_operation
+      -> Kind.event internal_operation_contents
 
-type packed_internal_manager_operation =
-  | Manager :
-      'kind internal_manager_operation
-      -> packed_internal_manager_operation
+type packed_internal_operation_contents =
+  | Internal_operation_contents :
+      'kind internal_operation_contents
+      -> packed_internal_operation_contents
 
-type 'kind internal_contents = {
+type 'kind internal_operation = {
   source : Contract.t;
-  operation : 'kind internal_manager_operation;
+  operation : 'kind internal_operation_contents;
   nonce : int;
 }
 
-type packed_internal_contents =
-  | Internal_contents : 'kind internal_contents -> packed_internal_contents
+type packed_internal_operation =
+  | Internal_operation : 'kind internal_operation -> packed_internal_operation
 
-let contents_of_internal_operation (type kind)
+let internal_operation (type kind)
     ({source; operation; nonce} : kind Script_typed_ir.internal_operation) :
-    kind internal_contents =
-  let operation : kind internal_manager_operation =
+    kind internal_operation =
+  let operation : kind internal_operation_contents =
     match operation with
     | Transaction_to_implicit
         {destination; amount; entrypoint; unparsed_parameters; _} ->
@@ -119,12 +119,10 @@ let contents_of_internal_operation (type kind)
   in
   {source; operation; nonce}
 
-let contents_of_packed_internal_operation
-    (Script_typed_ir.Internal_operation op) =
-  Internal_contents (contents_of_internal_operation op)
+let packed_internal_operation (Script_typed_ir.Internal_operation op) =
+  Internal_operation (internal_operation op)
 
-let contents_of_packed_internal_operations =
-  List.map contents_of_packed_internal_operation
+let packed_internal_operations = List.map packed_internal_operation
 
 type successful_transaction_result =
   | Transaction_to_contract_result of {
@@ -157,50 +155,50 @@ type successful_origination_result = {
   paid_storage_size_diff : Z.t;
 }
 
-(** Result of applying an internal {!manager_operation}. *)
-type _ successful_internal_manager_operation_result =
+(** Result of applying an internal operation. *)
+type _ successful_internal_operation_result =
   | ITransaction_result :
       successful_transaction_result
-      -> Kind.transaction successful_internal_manager_operation_result
+      -> Kind.transaction successful_internal_operation_result
   | IOrigination_result :
       successful_origination_result
-      -> Kind.origination successful_internal_manager_operation_result
+      -> Kind.origination successful_internal_operation_result
   | IDelegation_result : {
       consumed_gas : Gas.Arith.fp;
     }
-      -> Kind.delegation successful_internal_manager_operation_result
+      -> Kind.delegation successful_internal_operation_result
   | IEvent_result : {
       consumed_gas : Gas.Arith.fp;
     }
-      -> Kind.event successful_internal_manager_operation_result
+      -> Kind.event successful_internal_operation_result
 
-type packed_successful_internal_manager_operation_result =
-  | Successful_internal_manager_result :
-      'kind successful_internal_manager_operation_result
-      -> packed_successful_internal_manager_operation_result
+type packed_successful_internal_operation_result =
+  | Successful_internal_operation_result :
+      'kind successful_internal_operation_result
+      -> packed_successful_internal_operation_result
 
-type 'kind internal_manager_operation_result =
+type 'kind internal_operation_result =
   ( 'kind,
     'kind Kind.manager,
-    'kind successful_internal_manager_operation_result )
+    'kind successful_internal_operation_result )
   operation_result
 
-type packed_internal_manager_operation_result =
-  | Internal_manager_operation_result :
-      'kind internal_contents * 'kind internal_manager_operation_result
-      -> packed_internal_manager_operation_result
+type packed_internal_operation_result =
+  | Internal_operation_result :
+      'kind internal_operation * 'kind internal_operation_result
+      -> packed_internal_operation_result
 
-let pack_internal_manager_operation_result (type kind)
+let pack_internal_operation_result (type kind)
     (internal_op : kind Script_typed_ir.internal_operation)
-    (manager_op : kind internal_manager_operation_result) =
-  let internal_op = contents_of_internal_operation internal_op in
-  Internal_manager_operation_result (internal_op, manager_op)
+    (manager_op : kind internal_operation_result) =
+  let internal_op = internal_operation internal_op in
+  Internal_operation_result (internal_op, manager_op)
 
 type 'kind iselect =
-  packed_internal_manager_operation_result ->
-  ('kind internal_contents * 'kind internal_manager_operation_result) option
+  packed_internal_operation_result ->
+  ('kind internal_operation * 'kind internal_operation_result) option
 
-module Internal_result = struct
+module Internal_operation = struct
   open Data_encoding
 
   type 'kind case =
@@ -210,10 +208,10 @@ module Internal_result = struct
         encoding : 'a Data_encoding.t;
         iselect : 'kind iselect;
         select :
-          packed_internal_manager_operation ->
-          'kind internal_manager_operation option;
-        proj : 'kind internal_manager_operation -> 'a;
-        inj : 'a -> 'kind internal_manager_operation;
+          packed_internal_operation_contents ->
+          'kind internal_operation_contents option;
+        proj : 'kind internal_operation_contents -> 'a;
+        inj : 'a -> 'kind internal_operation_contents;
       }
         -> 'kind case
   [@@coq_force_gadt]
@@ -340,12 +338,14 @@ module Internal_result = struct
                   (req "value" Script.lazy_expr_encoding)));
         iselect : Kind.transaction iselect =
           (function
-          | Internal_manager_operation_result
+          | Internal_operation_result
               (({operation = Transaction _; _} as op), res) ->
               Some (op, res)
           | _ -> None);
         select =
-          (function Manager (Transaction _ as op) -> Some op | _ -> None);
+          (function
+          | Internal_operation_contents (Transaction _ as op) -> Some op
+          | _ -> None);
         proj =
           (function
           | Transaction {amount; destination; parameters; entrypoint} ->
@@ -381,12 +381,14 @@ module Internal_result = struct
             (req "script" Script.encoding);
         iselect : Kind.origination iselect =
           (function
-          | Internal_manager_operation_result
+          | Internal_operation_result
               (({operation = Origination _; _} as op), res) ->
               Some (op, res)
           | _ -> None);
         select =
-          (function Manager (Origination _ as op) -> Some op | _ -> None);
+          (function
+          | Internal_operation_contents (Origination _ as op) -> Some op
+          | _ -> None);
         proj =
           (function
           | Origination {credit; delegate; script} -> (credit, delegate, script));
@@ -405,12 +407,14 @@ module Internal_result = struct
         encoding = obj1 (opt "delegate" Signature.Public_key_hash.encoding);
         iselect : Kind.delegation iselect =
           (function
-          | Internal_manager_operation_result
+          | Internal_operation_result
               (({operation = Delegation _; _} as op), res) ->
               Some (op, res)
           | _ -> None);
         select =
-          (function Manager (Delegation _ as op) -> Some op | _ -> None);
+          (function
+          | Internal_operation_contents (Delegation _ as op) -> Some op
+          | _ -> None);
         proj = (function Delegation key -> key);
         inj = (fun key -> Delegation key);
       }
@@ -429,11 +433,12 @@ module Internal_result = struct
             (opt "payload" Script.expr_encoding);
         iselect : Kind.event iselect =
           (function
-          | Internal_manager_operation_result
-              (({operation = Event _; _} as op), res) ->
+          | Internal_operation_result (({operation = Event _; _} as op), res) ->
               Some (op, res)
           | _ -> None);
-        select = (function Manager (Event _ as op) -> Some op | _ -> None);
+        select =
+          (function
+          | Internal_operation_contents (Event _ as op) -> Some op | _ -> None);
         proj =
           (function
           | Event {ty; tag; payload} ->
@@ -464,7 +469,7 @@ module Internal_result = struct
         name
         encoding
         (fun o -> match select o with None -> None | Some o -> Some (proj o))
-        (fun x -> Manager (inj x))
+        (fun x -> Internal_operation_contents (inj x))
     in
     union
       ~tag_size:`Uint8
@@ -476,34 +481,34 @@ module Internal_result = struct
       ]
 end
 
-let internal_contents_encoding : packed_internal_contents Data_encoding.t =
+let internal_operation_encoding : packed_internal_operation Data_encoding.t =
   def "apply_internal_results.alpha.operation_result"
   @@ conv
-       (fun (Internal_contents {source; operation; nonce}) ->
-         ((source, nonce), Manager operation))
-       (fun ((source, nonce), Manager operation) ->
-         Internal_contents {source; operation; nonce})
+       (fun (Internal_operation {source; operation; nonce}) ->
+         ((source, nonce), Internal_operation_contents operation))
+       (fun ((source, nonce), Internal_operation_contents operation) ->
+         Internal_operation {source; operation; nonce})
        (merge_objs
           (obj2 (req "source" Contract.encoding) (req "nonce" uint16))
-          Internal_result.encoding)
+          Internal_operation.encoding)
 
-module Internal_manager_result = struct
+module Internal_operation_result = struct
   type 'kind case =
     | MCase : {
-        op_case : 'kind Internal_result.case;
+        op_case : 'kind Internal_operation.case;
         encoding : 'a Data_encoding.t;
         kind : 'kind Kind.manager;
         select :
-          packed_successful_internal_manager_operation_result ->
-          'kind successful_internal_manager_operation_result option;
-        proj : 'kind successful_internal_manager_operation_result -> 'a;
-        inj : 'a -> 'kind successful_internal_manager_operation_result;
-        t : 'kind internal_manager_operation_result Data_encoding.t;
+          packed_successful_internal_operation_result ->
+          'kind successful_internal_operation_result option;
+        proj : 'kind successful_internal_operation_result -> 'a;
+        inj : 'a -> 'kind successful_internal_operation_result;
+        t : 'kind internal_operation_result Data_encoding.t;
       }
         -> 'kind case
 
   let make ~op_case ~encoding ~kind ~select ~proj ~inj =
-    let (Internal_result.MCase {name; _}) = op_case in
+    let (Internal_operation.MCase {name; _}) = op_case in
     let t =
       def (Format.asprintf "operation.alpha.internal_operation_result.%s" name)
       @@ union
@@ -517,7 +522,7 @@ module Internal_manager_result = struct
                  match o with
                  | Skipped _ | Failed _ | Backtracked _ -> None
                  | Applied o -> (
-                     match select (Successful_internal_manager_result o) with
+                     match select (Successful_internal_operation_result o) with
                      | None -> None
                      | Some o -> Some ((), proj o)))
                (fun ((), x) -> Applied (inj x));
@@ -547,7 +552,7 @@ module Internal_manager_result = struct
                  match o with
                  | Skipped _ | Failed _ | Applied _ -> None
                  | Backtracked (o, errs) -> (
-                     match select (Successful_internal_manager_result o) with
+                     match select (Successful_internal_operation_result o) with
                      | None -> None
                      | Some o -> Some (((), errs), proj o)))
                (fun (((), errs), x) -> Backtracked (inj x, errs));
@@ -557,10 +562,10 @@ module Internal_manager_result = struct
 
   let[@coq_axiom_with_reason "gadt"] transaction_case =
     make
-      ~op_case:Internal_result.transaction_case
-      ~encoding:Internal_result.transaction_contract_variant_cases
+      ~op_case:Internal_operation.transaction_case
+      ~encoding:Internal_operation.transaction_contract_variant_cases
       ~select:(function
-        | Successful_internal_manager_result (ITransaction_result _ as op) ->
+        | Successful_internal_operation_result (ITransaction_result _ as op) ->
             Some op
         | _ -> None)
       ~kind:Kind.Transaction_manager_kind
@@ -569,7 +574,7 @@ module Internal_manager_result = struct
 
   let[@coq_axiom_with_reason "gadt"] origination_case =
     make
-      ~op_case:Internal_result.origination_case
+      ~op_case:Internal_operation.origination_case
       ~encoding:
         (obj6
            (dft "balance_updates" Receipt.balance_updates_encoding [])
@@ -579,7 +584,7 @@ module Internal_manager_result = struct
            (dft "paid_storage_size_diff" z Z.zero)
            (opt "lazy_storage_diff" Lazy_storage.encoding))
       ~select:(function
-        | Successful_internal_manager_result (IOrigination_result _ as op) ->
+        | Successful_internal_operation_result (IOrigination_result _ as op) ->
             Some op
         | _ -> None)
       ~proj:(function
@@ -623,12 +628,12 @@ module Internal_manager_result = struct
 
   let delegation_case =
     make
-      ~op_case:Internal_result.delegation_case
+      ~op_case:Internal_operation.delegation_case
       ~encoding:
         Data_encoding.(
           obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
-        | Successful_internal_manager_result (IDelegation_result _ as op) ->
+        | Successful_internal_operation_result (IDelegation_result _ as op) ->
             Some op
         | _ -> None)
       ~kind:Kind.Delegation_manager_kind
@@ -638,12 +643,13 @@ module Internal_manager_result = struct
 
   let event_case =
     make
-      ~op_case:Internal_result.event_case
+      ~op_case:Internal_operation.event_case
       ~encoding:
         Data_encoding.(
           obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
-        | Successful_internal_manager_result (IEvent_result _ as op) -> Some op
+        | Successful_internal_operation_result (IEvent_result _ as op) ->
+            Some op
         | _ -> None)
       ~kind:Kind.Event_manager_kind
       ~proj:(function[@coq_match_with_default]
@@ -651,13 +657,13 @@ module Internal_manager_result = struct
       ~inj:(fun consumed_gas -> IEvent_result {consumed_gas})
 end
 
-let internal_manager_operation_result_encoding :
-    packed_internal_manager_operation_result Data_encoding.t =
+let internal_operation_result_encoding :
+    packed_internal_operation_result Data_encoding.t =
   let make (type kind)
-      (Internal_manager_result.MCase res_case :
-        kind Internal_manager_result.case)
-      (Internal_result.MCase ires_case : kind Internal_result.case) =
-    let (Internal_result.MCase op_case) = res_case.op_case in
+      (Internal_operation_result.MCase res_case :
+        kind Internal_operation_result.case)
+      (Internal_operation.MCase ires_case : kind Internal_operation.case) =
+    let (Internal_operation.MCase op_case) = res_case.op_case in
     case
       (Tag op_case.tag)
       ~title:op_case.name
@@ -674,19 +680,19 @@ let internal_manager_operation_result_encoding :
         | None -> None)
       (fun (((), source, nonce), (op, res)) ->
         let op = {source; operation = ires_case.inj op; nonce} in
-        Internal_manager_operation_result (op, res))
+        Internal_operation_result (op, res))
   in
   def "apply_internal_results.alpha.operation_result"
   @@ union
        [
          make
-           Internal_manager_result.transaction_case
-           Internal_result.transaction_case;
+           Internal_operation_result.transaction_case
+           Internal_operation.transaction_case;
          make
-           Internal_manager_result.origination_case
-           Internal_result.origination_case;
+           Internal_operation_result.origination_case
+           Internal_operation.origination_case;
          make
-           Internal_manager_result.delegation_case
-           Internal_result.delegation_case;
-         make Internal_manager_result.event_case Internal_result.event_case;
+           Internal_operation_result.delegation_case
+           Internal_operation.delegation_case;
+         make Internal_operation_result.event_case Internal_operation.event_case;
        ]

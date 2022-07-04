@@ -144,8 +144,7 @@ let detect_script_failure :
       in
       detect_script_failure operation_result >>? fun () ->
       List.iter_e
-        (fun (Internal_manager_operation_result (_, r)) ->
-          detect_script_failure r)
+        (fun (Internal_operation_result (_, r)) -> detect_script_failure r)
         internal_operation_results
     in
     function

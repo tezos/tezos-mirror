@@ -43,7 +43,7 @@ let pp_micheline_from_lazy_expr ppf expr =
   in
   pp_micheline_expr ppf expr
 
-let pp_internal_operation ppf (Internal_contents {operation; source; _}) =
+let pp_internal_operation ppf (Internal_operation {operation; source; _}) =
   (* For now, try to use the same format as in [pp_manager_operation_content]. *)
   Format.fprintf ppf "@[<v 2>Internal " ;
   (match operation with
@@ -819,17 +819,16 @@ let pp_manager_operation_contents_result ppf op_result =
     ppf
     op_result
 
-let pp_internal_operation_and_result ppf
-    (Internal_manager_operation_result (op, res)) =
+let pp_internal_operation_and_result ppf (Internal_operation_result (op, res)) =
   let internal_operation_name (type kind) :
-      kind successful_internal_manager_operation_result -> string = function
+      kind successful_internal_operation_result -> string = function
     | ITransaction_result _ -> "transaction"
     | IOrigination_result _ -> "origination"
     | IDelegation_result _ -> "delegation"
     | IEvent_result _ -> "event"
   in
   let pp_internal_operation_result (type kind) ppf
-      (result : kind successful_internal_manager_operation_result) =
+      (result : kind successful_internal_operation_result) =
     match result with
     | ITransaction_result tx -> pp_transaction_result ppf tx
     | IOrigination_result op_res -> pp_origination_result ppf op_res
@@ -840,7 +839,7 @@ let pp_internal_operation_and_result ppf
     ppf
     "@[<v 2>%a@,%a@]"
     pp_internal_operation
-    (Internal_contents op)
+    (Internal_operation op)
     (pp_operation_result
        ~operation_name:internal_operation_name
        pp_internal_operation_result)

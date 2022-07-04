@@ -82,14 +82,14 @@ let contract_test () =
              {
                internal_operation_results =
                  [
-                   Internal_manager_operation_result
+                   Internal_operation_result
                      ( {
                          operation =
                            Event {tag = tag1; payload = data1; ty = ty1};
                          _;
                        },
                        Applied (IEvent_result _) );
-                   Internal_manager_operation_result
+                   Internal_operation_result
                      ( {
                          operation =
                            Event {tag = tag2; payload = data2; ty = ty2};

@@ -1012,7 +1012,7 @@ type 'kind contents_result =
   | Manager_operation_result : {
       balance_updates : Receipt.balance_updates;
       operation_result : 'kind manager_operation_result;
-      internal_operation_results : packed_internal_manager_operation_result list;
+      internal_operation_results : packed_internal_operation_result list;
     }
       -> 'kind Kind.manager contents_result
 
@@ -1378,7 +1378,7 @@ module Encoding = struct
             (req "operation_result" res_case.t)
             (dft
                "internal_operation_results"
-               (list internal_manager_operation_result_encoding)
+               (list internal_operation_result_encoding)
                []);
         select =
           (function

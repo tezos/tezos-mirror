@@ -416,10 +416,10 @@ let unparse_key_hash ~loc ctxt mode k =
 (* Operations are only unparsed during the production of execution traces of
    the interpreter. *)
 let unparse_operation ~loc ctxt {piop; lazy_storage_diff = _} =
-  let iop = Apply_internal_results.contents_of_packed_internal_operation piop in
+  let iop = Apply_internal_results.packed_internal_operation piop in
   let bytes =
     Data_encoding.Binary.to_bytes_exn
-      Apply_internal_results.internal_contents_encoding
+      Apply_internal_results.internal_operation_encoding
       iop
   in
   Gas.consume ctxt (Unparse_costs.operation bytes) >|? fun ctxt ->

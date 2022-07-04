@@ -183,7 +183,7 @@ module Scripts = struct
            (req "storage" Script.expr_encoding)
            (req
               "operations"
-              (list Apply_internal_results.internal_contents_encoding))
+              (list Apply_internal_results.internal_operation_encoding))
            (opt "lazy_storage_diff" Lazy_storage.encoding))
 
     let trace_code_input_encoding = run_code_input_encoding
@@ -205,7 +205,7 @@ module Scripts = struct
            (req "storage" Script.expr_encoding)
            (req
               "operations"
-              (list Apply_internal_results.internal_contents_encoding))
+              (list Apply_internal_results.internal_operation_encoding))
            (req "trace" trace_encoding)
            (opt "lazy_storage_diff" Lazy_storage.encoding))
 
@@ -829,7 +829,7 @@ module Scripts = struct
     >>=? fun op_validated_stamp ->
     match protocol_data.contents with
     | Single (Manager_operation _) as op ->
-        Apply.apply_manager_operation
+        Apply.apply_manager_operations
           ctxt
           ~payload_producer
           chain_id
@@ -838,7 +838,7 @@ module Scripts = struct
           op
         >|=? fun (_ctxt, result) -> ret result
     | Cons (Manager_operation _, _) as op ->
-        Apply.apply_manager_operation
+        Apply.apply_manager_operations
           ctxt
           ~payload_producer
           chain_id
@@ -1050,8 +1050,7 @@ module Scripts = struct
                    },
                    _ ) ->
         ( storage,
-          Apply_internal_results.contents_of_packed_internal_operations
-            operations,
+          Apply_internal_results.packed_internal_operations operations,
           lazy_storage_diff )) ;
     Registration.register0
       ~chunked:true
@@ -1123,8 +1122,7 @@ module Scripts = struct
                      _ctxt ),
                    trace ) ->
         ( storage,
-          Apply_internal_results.contents_of_packed_internal_operations
-            operations,
+          Apply_internal_results.packed_internal_operations operations,
           trace,
           lazy_storage_diff )) ;
     Registration.register0

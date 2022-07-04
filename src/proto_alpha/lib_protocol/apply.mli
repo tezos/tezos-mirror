@@ -38,7 +38,7 @@ open Apply_results
 open Apply_internal_results
 
 type error +=
-  | Internal_operation_replay of packed_internal_contents
+  | Internal_operation_replay of packed_internal_operation
   | Tx_rollup_feature_disabled
   | Tx_rollup_invalid_transaction_ticket_amount
   | Sc_rollup_feature_disabled
@@ -129,7 +129,7 @@ type apply_mode =
     been extended to every kind of operation, [apply_operation] should
     never return an error.
 
-    See {!apply_manager_operation} for additional information on the
+    See {!apply_manager_operations} for additional information on the
     application of manager operations. *)
 val apply_operation :
   context ->
@@ -185,12 +185,12 @@ val apply_contents_list :
     - decrease of the available block gas by operation's [gas_limit].
 
     These updates are mandatory. In particular, taking the fees is
-    critically important. That's why [apply_manager_operation] takes a
+    critically important. That's why [apply_manager_operations] takes a
     [Validate_operation.stamp] argument, so that it may only be called
     after having validated the operation by calling
     {!Validate_operation}. Indeed, this module is responsible for
     ensuring that the operation is solvable, i.e. that fees can be
-    taken, i.e. that the first stage of [apply_manager_operation]
+    taken, i.e. that the first stage of [apply_manager_operations]
     cannot fail. If this stage fails nevertheless, the function returns
     an error.
 
@@ -203,7 +203,7 @@ val apply_contents_list :
     stage, and a [contents_result_list] that contains the error. This
     means that the operation has no other effects than those described
     above during the first phase. *)
-val apply_manager_operation :
+val apply_manager_operations :
   context ->
   payload_producer:public_key_hash ->
   Chain_id.t ->
