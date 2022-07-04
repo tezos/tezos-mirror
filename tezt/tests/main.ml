@@ -133,6 +133,7 @@ let () =
   Testnet_dictator.register ~protocols:[Alpha] ;
   Ghostnet_dictator_migration.register ~protocols:[Alpha] ;
   Test_contract_bls12_381.register ~protocols:[Alpha] ;
+  Increase_paid_storage.register ~protocols:[Alpha] ;
   Config.register () ;
   Events.register ~protocols:[Alpha] ;
   (* Relies on a feature only available since K. *)
