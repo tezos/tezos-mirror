@@ -46,11 +46,17 @@ val inbox_of_hash :
   Node_context.t ->
   Store.t ->
   Block_hash.t ->
-  Alpha_context.Sc_rollup.Inbox.t Lwt.t
+  Alpha_context.Sc_rollup.Inbox.t tzresult Lwt.t
 
 (** [history_of_hash node_ctxt store block_hash] returns the rollup
     inbox history at the end of the given validation of [block_hash]. *)
-val history_of_hash : Store.t -> Block_hash.t -> Store.Inbox.history Lwt.t
+val history_of_hash :
+  Node_context.t ->
+  Store.t ->
+  Block_hash.t ->
+  Store.Inbox.history tzresult Lwt.t
+
+val find_message_tree : Store.t -> Block_hash.t -> Store.tree option Lwt.t
 
 (** [start ()] initializes the inbox to track the messages being published. *)
 val start : unit -> unit Lwt.t
