@@ -57,7 +57,7 @@ module Arith_proof_format = struct
 
   let produce_proof context tree step =
     let open Lwt_syntax in
-    let* res = IStore.set_tree ~info:commit_info context [] tree in
+    let* res = IStore.set_tree ~info:commit_info context ["pvm_state"] tree in
     match res with
     | Error _ -> return None
     | Ok () -> (
