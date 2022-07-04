@@ -27,10 +27,11 @@
 (** The rollup node stores and publishes commitments for the PVM every
     [Constants.sc_rollup_commitment_period_in_blocks] levels.
 
-    Every time a finalized block is processed  by the rollup node,
-    the latter determines whether the last commitment that the node
-    has produced referred to 20 blocks earlier. In this case, it
-    computes and stores a new commitment in a level-indexed map.
+    Every time a finalized block is processed by the rollup node, the latter
+    determines whether the last commitment that the node has produced referred
+    to [sc_rollup.commitment_period_in_blocks] blocks earlier. For mainnet,
+    [sc_rollup.commitment_period_in_blocks = 30]. In this case, it computes and
+    stores a new commitment in a level-indexed map.
 
     Stored commitments are signed by the rollup node operator
     and published on the layer1 chain. To ensure that commitments
