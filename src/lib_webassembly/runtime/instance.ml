@@ -1,17 +1,18 @@
 open Types
-
 module Vector = Lazy_vector.LwtInt32Vector
 
-module NameMap = Lazy_map.Make (Lazy_map.Effect.Lwt) (struct
-  type t = Ast.name
+module NameMap =
+  Lazy_map.Make
+    (Lazy_map.Effect.Lwt)
+    (struct
+      type t = Ast.name
 
-  let compare = List.compare Int.compare
+      let compare = List.compare Int.compare
 
-  let to_string = Utf8.encode
-end)
+      let to_string = Utf8.encode
+    end)
 
-type module_inst =
-{
+type module_inst = {
   types : func_type Vector.t;
   funcs : func_inst Vector.t;
   tables : table_inst Vector.t;
@@ -23,11 +24,17 @@ type module_inst =
 }
 
 and func_inst = module_inst ref Func.t
+
 and table_inst = Table.t
+
 and memory_inst = Memory.t
+
 and global_inst = Global.t
+
 and export_inst = Ast.name * extern
+
 and elem_inst = Values.ref_ Vector.t ref
+
 and data_inst = Chunked_byte_vector.Lwt.t ref
 
 and extern =
@@ -36,30 +43,27 @@ and extern =
   | ExternMemory of memory_inst
   | ExternGlobal of global_inst
 
-
 (* Reference types *)
 
 type Values.ref_ += FuncRef of func_inst
 
 let () =
   let type_of_ref' = !Values.type_of_ref' in
-  Values.type_of_ref' := function
-    | FuncRef _ -> FuncRefType
-    | r -> type_of_ref' r
+  Values.type_of_ref' :=
+    function FuncRef _ -> FuncRefType | r -> type_of_ref' r
 
 let () =
   let string_of_ref' = !Values.string_of_ref' in
-  Values.string_of_ref' := function
-    | FuncRef _ -> "func"
-    | r -> string_of_ref' r
+  Values.string_of_ref' :=
+    function FuncRef _ -> "func" | r -> string_of_ref' r
 
 let () =
   let eq_ref' = !Values.eq_ref' in
-  Values.eq_ref' := fun r1 r2 ->
-    match r1, r2 with
-    | FuncRef f1, FuncRef f2 -> f1 == f2
-    | _, _ -> eq_ref' r1 r2
-
+  Values.eq_ref' :=
+    fun r1 r2 ->
+      match (r1, r2) with
+      | FuncRef f1, FuncRef f2 -> f1 == f2
+      | _, _ -> eq_ref' r1 r2
 
 (* Auxiliary functions *)
 
@@ -88,5 +92,5 @@ let export inst name =
       let+ export = NameMap.get name inst.exports in
       Some export)
     (function
-    | Not_found | Lazy_map.UnexpectedAccess -> Lwt.return_none
-    | exn -> Lwt.fail exn)
+      | Not_found | Lazy_map.UnexpectedAccess -> Lwt.return_none
+      | exn -> Lwt.fail exn)

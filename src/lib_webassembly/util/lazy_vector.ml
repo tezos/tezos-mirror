@@ -70,10 +70,8 @@ module type S = sig
   val to_list : 'a t -> 'a list effect
 end
 
-module Make (Effect : Effect.S) (Key : KeyS) : S with
-  type key = Key.t and
-  type 'a effect = 'a Effect.t =
-struct
+module Make (Effect : Effect.S) (Key : KeyS) :
+  S with type key = Key.t and type 'a effect = 'a Effect.t = struct
   module Map = Lazy_map.Make (Effect) (Key)
 
   type key = Key.t
@@ -82,21 +80,16 @@ struct
 
   type 'a producer = key -> 'a effect
 
-  type 'a t = {
-    first : key;
-    num_elements : key;
-    values : 'a Map.t
-  }
+  type 'a t = {first : key; num_elements : key; values : 'a Map.t}
 
-  let pp pp_value =
-    fun fmt map ->
-      Format.fprintf
-        fmt
-        "@[<hv 2>{ first = %s;@ num_elements = %s;@ values = %a }@]"
-        (Key.to_string map.first)
-        (Key.to_string map.num_elements)
-        (Map.pp pp_value)
-        map.values
+  let pp pp_value fmt map =
+    Format.fprintf
+      fmt
+      "@[<hv 2>{ first = %s;@ num_elements = %s;@ values = %a }@]"
+      (Key.to_string map.first)
+      (Key.to_string map.num_elements)
+      (Map.pp pp_value)
+      map.values
 
   let to_string show_value map =
     let pp_value fmt value = Format.pp_print_string fmt (show_value value) in
@@ -106,12 +99,10 @@ struct
 
   let create ?values ?produce_value num_elements =
     let values = Map.create ?values ?produce_value () in
-    { first = Key.zero; num_elements; values }
+    {first = Key.zero; num_elements; values}
 
   let of_list values =
-    let fold (map, len) value =
-      Map.Map.add len value map, Key.succ len
-    in
+    let fold (map, len) value = (Map.Map.add len value map, Key.succ len) in
     let values, num_elements =
       List.fold_left fold (Map.Map.empty, Key.zero) values
     in
@@ -120,53 +111,50 @@ struct
   let invalid_key key map = Key.unsigned_compare key map.num_elements >= 0
 
   let get key map =
-    if invalid_key key map then raise Memory_exn.Bounds;
+    if invalid_key key map then raise Memory_exn.Bounds ;
     let key = Key.add map.first key in
     Map.get key map.values
 
   let set key value map =
-    if invalid_key key map then raise Memory_exn.Bounds;
+    if invalid_key key map then raise Memory_exn.Bounds ;
     let key = Key.add map.first key in
-    { map with values = Map.set key value map.values }
+    {map with values = Map.set key value map.values}
 
   let cons value map =
     let first = Key.pred map.first in
     let values = Map.set first value map.values in
     let num_elements = Key.succ map.num_elements in
-    { first; values; num_elements }
+    {first; values; num_elements}
 
   let grow ?produce_value delta map =
     if
       Key.unsigned_compare (Key.add delta map.num_elements) map.num_elements < 0
-    then
-      raise Memory_exn.SizeOverflow;
+    then raise Memory_exn.SizeOverflow ;
 
     let map_produce_value old_produce_value =
       match produce_value with
       | Some produce_new_value ->
-        let boundary = Key.add map.num_elements map.first in
-        fun key ->
-          if Key.compare key boundary >= 0 then
-            (* Normalize the key so that it is relative to the boundary.
-                The first new value will be produced with
-                [produce_value Key.zero]. *)
-            let key = Key.sub key boundary in
-            produce_new_value key
-          else
-            old_produce_value key
+          let boundary = Key.add map.num_elements map.first in
+          fun key ->
+            if Key.compare key boundary >= 0 then
+              (* Normalize the key so that it is relative to the boundary.
+                  The first new value will be produced with
+                  [produce_value Key.zero]. *)
+              let key = Key.sub key boundary in
+              produce_new_value key
+            else old_produce_value key
       | None -> old_produce_value
     in
     let values = Map.with_producer map_produce_value map.values in
     let num_elements = Key.add map.num_elements delta in
-    { map with values; num_elements }
+    {map with values; num_elements}
 
   let concat lhs rhs =
     let boundary = Key.add lhs.first lhs.num_elements in
     let choose_producer rhs_produce_value lhs_produce_value key =
       if Key.compare key boundary >= 0 then
         rhs_produce_value (Key.sub key boundary |> Key.add rhs.first)
-      else
-        lhs_produce_value key
+      else lhs_produce_value key
     in
     let num_elements = Key.add lhs.num_elements rhs.num_elements in
     let rhs_offset = Key.sub boundary rhs.first in
@@ -177,7 +165,7 @@ struct
         rhs.values
         lhs.values
     in
-    { lhs with num_elements; values }
+    {lhs with num_elements; values}
 
   let to_list map =
     let open Effect in
@@ -196,19 +184,13 @@ module Int = struct
   include Int
 
   let unsigned_compare n m = compare (n - min_int) (m - min_int)
-
 end
 
 module IntVector = Make (Effect.Identity) (Int)
-
 module Int32Vector = Make (Effect.Identity) (Int32)
-
 module Int64Vector = Make (Effect.Identity) (Int64)
-
 module LwtIntVector = Make (Effect.Lwt) (Int)
-
 module LwtInt32Vector = Make (Effect.Lwt) (Int32)
-
 module LwtInt64Vector = Make (Effect.Lwt) (Int64)
 
 module Mutable = struct
@@ -240,10 +222,8 @@ module Mutable = struct
     val snapshot : 'a t -> 'a Vector.t
   end
 
-  module Make (Effect : Effect.S) (Key : KeyS) : S with
-    type key = Key.t and
-    type 'a effect = 'a Effect.t =
-  struct
+  module Make (Effect : Effect.S) (Key : KeyS) :
+    S with type key = Key.t and type 'a effect = 'a Effect.t = struct
     module Vector = Make (Effect) (Key)
 
     type key = Vector.key
@@ -261,8 +241,7 @@ module Mutable = struct
 
     let get key map_ref = Vector.get key !map_ref
 
-    let set key value map_ref =
-      map_ref := Vector.set key value !map_ref
+    let set key value map_ref = map_ref := Vector.set key value !map_ref
 
     let grow ?produce_value delta map_ref =
       map_ref := Vector.grow ?produce_value delta !map_ref
@@ -271,14 +250,9 @@ module Mutable = struct
   end
 
   module IntVector = Make (Effect.Identity) (Int)
-
   module Int32Vector = Make (Effect.Identity) (Int32)
-
   module Int64Vector = Make (Effect.Identity) (Int64)
-
   module LwtIntVector = Make (Effect.Lwt) (Int)
-
   module LwtInt32Vector = Make (Effect.Lwt) (Int32)
-
   module LwtInt64Vector = Make (Effect.Lwt) (Int64)
 end

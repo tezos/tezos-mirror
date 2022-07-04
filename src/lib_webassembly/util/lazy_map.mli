@@ -90,9 +90,8 @@ end
     to [S.create]. *)
 exception UnexpectedAccess
 
-module Make (Effect : Effect.S) (Key : KeyS) : S with
-  type key = Key.t and
-  type 'a effect = 'a Effect.t
+module Make (Effect : Effect.S) (Key : KeyS) :
+  S with type key = Key.t and type 'a effect = 'a Effect.t
 
 module IntMap : S with type key = int and type 'a effect = 'a
 
@@ -120,7 +119,8 @@ module Mutable : sig
 
     val of_immutable : 'a Map.t -> 'a t
 
-    val create : ?values:'a Map.Map.t -> ?produce_value:'a Map.producer -> unit -> 'a t
+    val create :
+      ?values:'a Map.Map.t -> ?produce_value:'a Map.producer -> unit -> 'a t
 
     val get : key -> 'a t -> 'a Map.effect
 
@@ -129,9 +129,8 @@ module Mutable : sig
     val snapshot : 'a t -> 'a Map.t
   end
 
-  module Make (Effect : Effect.S) (Key : KeyS) : S with
-    type key = Key.t and
-    type 'a effect = 'a Effect.t
+  module Make (Effect : Effect.S) (Key : KeyS) :
+    S with type key = Key.t and type 'a effect = 'a Effect.t
 
   module IntMap : S with type key = int and type 'a effect = 'a
 

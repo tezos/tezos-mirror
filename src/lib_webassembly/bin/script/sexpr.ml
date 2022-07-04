@@ -3,8 +3,10 @@ module TzStdLib = Tezos_lwt_result_stdlib.Lwtreslib.Bare
 type sexpr = Atom of string | Node of string * sexpr list
 
 type rope = Leaf of string | Concat of rope list
-let (^+) s r = Concat [Leaf s; r]
-let (+^) r s = Concat [r; Leaf s]
+
+let ( ^+ ) s r = Concat [Leaf s; r]
+
+let ( +^ ) r s = Concat [r; Leaf s]
 
 let rec iter f = function
   | Leaf s -> f s
@@ -15,14 +17,19 @@ let rec concat = function
   | Concat rs -> String.concat "" (List.map concat rs)
 
 let rec pp off width = function
-  | Atom s -> String.length s, Leaf s
+  | Atom s -> (String.length s, Leaf s)
   | Node (s, xs) ->
-    let lens, rs = List.split (List.map (pp (off + 2) width) xs) in
-    let len = String.length s + List.length rs + List.fold_left (+) 2 lens in
-    let sep, fin =
-      if off + len <= width then " ", ""
-      else let indent = String.make off ' ' in "\n  " ^ indent, "\n" ^ indent
-    in len, "(" ^+ s ^+ Concat (List.map (fun r -> sep ^+ r) rs) +^ fin +^ ")"
+      let lens, rs = List.split (List.map (pp (off + 2) width) xs) in
+      let len =
+        String.length s + List.length rs + List.fold_left ( + ) 2 lens
+      in
+      let sep, fin =
+        if off + len <= width then (" ", "")
+        else
+          let indent = String.make off ' ' in
+          ("\n  " ^ indent, "\n" ^ indent)
+      in
+      (len, "(" ^+ s ^+ (Concat (List.map (fun r -> sep ^+ r) rs) +^ fin +^ ")"))
 
 let output oc width x =
   let open Lwt.Syntax in
