@@ -36,27 +36,30 @@ It ignores lines that do not start with '+' or '-', and the ones that start with
 "+++" and "---".
 
 Other lines (the ones that start with '+' or '-', but not "+++" nor "---") are
-parsed by recognizing sub-strings (function [Stats.categorize]).
+parsed by recognizing sub-strings (function [Stats.categorize]), but this relies
+on a high-level description of the categories (in [Category.all]).
 For instance, a line that contains "Estimated gas: " followed by a decimal
-number [n] will be parsed into [Stat.Estimated n]. Whether the line is deleted
-or added in the diff is also recognized.
+number will be recognized. Whether the line is deleted or added in the diff is
+also recorded.
 
 The deleted lines are added in a queue. When an added line is found, it is
 compared with the oldest line in the queue. If they match (meaning that they
 concern the same kind of gas change; both lines contain "Estimated gas: " for
-example), then the synthesis ([Synth.synth]) for this kind is updated
+example), then the synthesis ([Synth.t]) for this kind is updated
 ([Synths.update]).
 
 The reason for a queue of deleted lines instead of just a single deleted line
-is that [git diff] does not always produce a sequence of a deletion followed by
-an addition. Indeed, we can also find several lines being deleted and then,
-after this batch, the corresponding added lines.
+is that [git diff] by default does not always produce a sequence of a deletion
+followed by an addition. Indeed, we can also find several lines being deleted
+and then, after this batch, the corresponding added lines.
 *)
 
 let ( let* ) = Option.bind
 
 let ( let+ ) f opt = Option.map opt f
 
+(* [either l a] returns the first function [f] in [l] such that [f a <> None].
+*)
 let either l a = List.find_map (fun f -> f a) l
 
 module Option = struct
@@ -154,33 +157,75 @@ module Decimal = struct
     with Division_by_zero -> None
 end
 
-module Synth = struct
+(* Each declared category in [Category.all] will have a dedicated section in the
+   output. *)
+module Category = struct
+  (* Let's simply use the string to match as the representant of a category. *)
+  type t = string
+
+  let compare = String.compare
+
+  (* Associated to a category with an amount, a [dir] states whether it's better
+     that the amount increases or decreases.
+     For example, we'd like the estimated gas to decrease, while we want the gas
+     remaining to increase. *)
+  type dir = Inc | Dec
+
+  (* Categories have different payloads: a decimal for estimated gas, gas
+     remaining, etc., and nothing for the public key hash for instance.
+     Even if a category does not have a payload, we still recognize it as such.
+  *)
+  type case = Decimal_payload_case of dir | No_payload_case
+
+  let increasing_payload = Decimal_payload_case Inc
+
+  let decreasing_payload = Decimal_payload_case Dec
+
+  let no_payload = No_payload_case
+
   (* All the kinds of lines that are recognized:
-     - [Estimated] is for a line with "Estimated gas: " and has the amount for
-       parameter;
-     - [Consumed] is for a line with "Consumed gas: " and has the amount for
-       parameter;
+     - "Estimated gas: " with an amount (a decimal) that we'd like to decrease;
+     - "Gas remaining: " with an amount (a decimal) that we'd like to increase;
+     - "PUBLIC_KEY_HASH" with nothing else interesting to record;
      - etc.
-     (The recognized strings are defined further below.) *)
-  type kind =
-    | Estimated of Decimal.t
-    | Estimated_storage of Decimal.t
-    | Consumed of Decimal.t
-    | Gas_remaining of Decimal.t
-    | Storage_size of Decimal.t
-    | Gas_limit of Decimal.t
-    | Storage_limit of Decimal.t
-    | Remaining_gas of Decimal.t
-    | Baker_fee of Decimal.t
-    | Payload_fee of Decimal.t
-    | Storage_fee of Decimal.t
-    | Fee of Decimal.t
-    | Hash
-    | Tezos_client
-    | Operation_hash
-    | New_contract
-    | To
-    | Parameter
+     These declarations will be iterated on when initializing syntheses and
+     categorizing a line. *)
+  let all : (t * case) list =
+    [
+      ("Estimated gas: ", decreasing_payload);
+      ("Estimated storage: ", decreasing_payload);
+      ("Consumed gas: ", decreasing_payload);
+      ("Gas remaining: ", increasing_payload);
+      ("Storage size: ", decreasing_payload);
+      ("Gas limit: ", decreasing_payload);
+      ("Storage limit: ", decreasing_payload);
+      ("remaining gas: ", increasing_payload);
+      ("Fee to the baker: ꜩ", decreasing_payload);
+      ("payload fees(the block proposer) ....... +ꜩ", decreasing_payload);
+      ("storage fees ........................... +ꜩ", decreasing_payload);
+      ("fee = ", decreasing_payload);
+      ("PUBLIC_KEY_HASH", no_payload);
+      ("CONTRACT_HASH", no_payload);
+      ("Operation hash", no_payload);
+      ("tezos-client", no_payload);
+      ("New contract", no_payload);
+      ("To: ", no_payload);
+      ("Parameter: ", no_payload);
+    ]
+end
+
+module Synth = struct
+  (* The synthesis associated to a recognized category. What the synthesis
+     contains depends on the type of payload. *)
+  open Category
+
+  type dir = Category.dir = Inc | Dec
+
+  type payload = Decimal_payload of Decimal.t | No_payload
+
+  (* When a line is recognized in a git diff, this means that a category was
+     found with an expected payload. *)
+  type kind = Category.t * payload
 
   (* Whether a line is removed or added in the git diff. *)
   type diff = Removed | Added
@@ -189,14 +234,8 @@ module Synth = struct
      and whether it's deleted or added. *)
   type diff_kind = diff * kind
 
-  (* Associated to a kind with an amount, a [dir] states whether it's better
-     that the amount increases or decreases.
-     For example, we'd like the estimated gas to decrease, while we want the gas
-     remaining to increase. *)
-  type dir = Inc | Dec
-
   (* The synthesis associated to a kind that has an amount for parameter. *)
-  type synth = {
+  type decimal_synth = {
     (* The accumulated amount from deleted lines. *)
     old : Decimal.t;
     (* The accumulated amount from added lines. *)
@@ -211,56 +250,16 @@ module Synth = struct
     (* The maximum amount saved in percentage on a line (with regards to [dir]
        below), with the line number. *)
     max_gain_pct : (Decimal.t * int) option;
-    (* The number of lines with a degradation (with regards to [dir] below).
-      *)
+    (* The number of lines with a degradation (with regards to [dir] below). *)
     degradations : int;
     (* Total number of lines changed. *)
     total : int;
     (* Whether an amelioration is seen when the amount increases or decreases.
-     *)
+    *)
     win : dir;
-    (* The sub-string to be matched by lines that will be included in this
-       synthesis. *)
-    str : string;
   }
 
-  let estimated_str = "Estimated gas: "
-
-  let estimated_storage_str = "Estimated storage: "
-
-  let consumed_str = "Consumed gas: "
-
-  let gas_remaining_str = "Gas remaining: "
-
-  let storage_size_str = "Storage size: "
-
-  let gas_limit_str = "Gas limit: "
-
-  let storage_limit_str = "Storage limit: "
-
-  let remaining_gas_str = "remaining gas: "
-
-  let baker_fee_str = "Fee to the baker: ꜩ"
-
-  let payload_fee_str = "payload fees(the block proposer) ....... +ꜩ"
-
-  let storage_fee_str = "storage fees ........................... +ꜩ"
-
-  let fee_str = "fee = "
-
-  let hash_strs = ["PUBLIC_KEY_HASH"; "CONTRACT_HASH"]
-
-  let operation_hash_strs = ["Operation hash"]
-
-  let tezos_client_strs = ["tezos-client"]
-
-  let new_contract_strs = ["New contract"]
-
-  let to_strs = ["To: "]
-
-  let parameter_strs = ["Parameter: "]
-
-  let empty_synth str win =
+  let empty_decimal_synth win =
     {
       old = Decimal.zero;
       new_ = Decimal.zero;
@@ -271,10 +270,24 @@ module Synth = struct
       degradations = 0;
       total = 0;
       win;
-      str;
     }
 
-  let show_it
+  type no_payload_synth = int (* total number of lines changed *)
+
+  type t =
+    | Decimal_synth of decimal_synth
+    | No_payload_synth of no_payload_synth
+
+  (* Initializing a synth from a category case. *)
+  let make_synth = function
+    | Decimal_payload_case dir -> Decimal_synth (empty_decimal_synth dir)
+    | No_payload_case -> No_payload_synth 0
+
+  (* Initializing all categories. *)
+  let categories =
+    List.map (fun (category, case) -> (category, make_synth case)) Category.all
+
+  let show_it str
       {
         old;
         new_;
@@ -285,7 +298,6 @@ module Synth = struct
         degradations;
         total;
         win;
-        str;
       } =
     let open Decimal in
     let total_win = match win with Dec -> old - new_ | Inc -> new_ - old in
@@ -323,143 +335,81 @@ module Synth = struct
       total
       degradations
 
-  let show synth = if synth.total <> 0 then show_it synth
+  let show str = function
+    | Decimal_synth synth -> if synth.total <> 0 then show_it str synth
+    | No_payload_synth _ -> ()
+
+  let show_unchanged str = function
+    | Decimal_synth synth ->
+        if synth.total = 0 then Printf.printf "  `%s`\n%!" str
+    | No_payload_synth _ -> ()
+
+  let show_ignored str = function
+    | Decimal_synth _ -> ()
+    | No_payload_synth _ -> Printf.printf "  `%s`\n%!" str
 
   let get_diff = function '-' -> Some Removed | '+' -> Some Added | _ -> None
 
   (* [get_dec str cstr line] looks for [str] in [line] and then parses a decimal
-     number at the index following the occurrence of [str]. Finally, it applies
-     [cstr] to the obtained decimal.
+     number at the index following the occurrence of [str].
      The function is used to return the amount found on a line of a git diff for
      the various supported categories. *)
-  let get_dec sub cstr =
+  let get_dec sub =
     (* Lets's leave this line below out of the function so that the expression
-       is compiled only once for each [get_*], and not every time we call
+       is compiled only once for each category, and not every time we call
        [get_dec]. *)
     let re = Re.(compile (seq [str sub; group Decimal.re])) in
     fun line ->
       let* re = Re.exec_opt re line in
       let* dec_str = Re.Group.get_opt re 1 in
       let+ dec = Decimal.of_string dec_str in
-      cstr dec
+      (sub, Decimal_payload dec)
 
-  let get_estimated = get_dec estimated_str (fun v -> Estimated v)
-
-  let get_estimated_storage =
-    get_dec estimated_storage_str (fun v -> Estimated_storage v)
-
-  let get_consumed = get_dec consumed_str (fun v -> Consumed v)
-
-  let get_gas_remaining = get_dec gas_remaining_str (fun v -> Gas_remaining v)
-
-  let get_storage_size = get_dec storage_size_str (fun v -> Storage_size v)
-
-  let get_gas_limit = get_dec gas_limit_str (fun v -> Gas_limit v)
-
-  let get_storage_limit = get_dec storage_limit_str (fun v -> Storage_limit v)
-
-  let get_remaining_gas = get_dec remaining_gas_str (fun v -> Remaining_gas v)
-
-  let get_baker_fee = get_dec baker_fee_str (fun v -> Baker_fee v)
-
-  let get_payload_fee = get_dec payload_fee_str (fun v -> Payload_fee v)
-
-  let get_storage_fee = get_dec storage_fee_str (fun v -> Storage_fee v)
-
-  let get_fee = get_dec fee_str (fun v -> Fee v)
-
-  let get_discarded strs res =
+  let get_discarded sub =
     (* Lets's leave this line below out of the function so that the expression
-       is compiled only once for each [get_*], and not every time we call
+       is compiled only once for each category, and not every time we call
        [get_discarded]. *)
-    let re_ts = List.map (fun sub -> Re.(compile (str sub))) strs in
-    let contains line re_t = Re.execp re_t line in
-    fun line -> if List.exists (contains line) re_ts then Some res else None
+    let re = Re.(compile (str sub)) in
+    let contains line re = Re.execp re line in
+    fun line -> if contains line re then Some (sub, No_payload) else None
 
-  let get_hash = get_discarded hash_strs Hash
+  (* Recognition of a line from a category case. *)
+  let make_get_kind = function
+    | Decimal_payload_case _dir -> get_dec
+    | No_payload_case -> get_discarded
 
-  let get_tezos_client = get_discarded tezos_client_strs Tezos_client
+  (* The list of all ways to recognize a line. *)
+  let get_kinds =
+    List.map (fun (category, case) -> make_get_kind case category) Category.all
 
-  let get_operation_hash = get_discarded operation_hash_strs Operation_hash
-
-  let get_new_contract = get_discarded new_contract_strs New_contract
-
-  let get_to = get_discarded to_strs To
-
-  let get_parameter = get_discarded parameter_strs Parameter
-
-  let get_kind line =
-    either
-      [
-        get_estimated;
-        get_estimated_storage;
-        get_consumed;
-        get_gas_remaining;
-        get_storage_size;
-        get_gas_limit;
-        get_storage_limit;
-        get_remaining_gas;
-        get_baker_fee;
-        get_hash;
-        get_payload_fee;
-        get_storage_fee;
-        get_fee;
-        get_tezos_client;
-        get_operation_hash;
-        get_new_contract;
-        get_to;
-        get_parameter;
-      ]
-      line
+  (* [get_kind line] recognizes a line by the first kind-getter that matches it.
+     Returns None otherwise. *)
+  let get_kind = either get_kinds
 end
 
 module Synths = struct
   open Synth
+  module CMap = Map.Make (Category)
 
-  (* All the kinds of changes in a git diff for which we build statistics.
+  (* All the kinds of changes in a git diff for which we build syntheses.
 
      [previous_kinds] is a queue of deleted parsed lines (with the unparsed line
      kept for error management). An element in this list will be consumed when a
-     corresponding added line is found; the statistics are then updated
+     corresponding added line is found; the syntheses are then updated
      accordingly. *)
   type t = {
     previous_kinds : (string * kind * int (* line number *)) list;
-    estimated : synth;
-    estimated_storage : synth;
-    consumed : synth;
-    gas_remaining : synth;
-    storage_size : synth;
-    gas_limit : synth;
-    storage_limit : synth;
-    remaining_gas : synth;
-    baker_fee : synth;
-    payload_fee : synth;
-    storage_fee : synth;
-    fee : synth;
+    categories : Synth.t CMap.t;
     total_lines : int;
     total_degradations : int;
   }
 
   let empty =
-    {
-      previous_kinds = [];
-      estimated = empty_synth estimated_str Dec;
-      estimated_storage = empty_synth estimated_storage_str Dec;
-      consumed = empty_synth consumed_str Dec;
-      gas_remaining = empty_synth gas_remaining_str Inc;
-      storage_size = empty_synth storage_size_str Dec;
-      gas_limit = empty_synth gas_limit_str Dec;
-      storage_limit = empty_synth storage_limit_str Dec;
-      remaining_gas = empty_synth remaining_gas_str Inc;
-      baker_fee = empty_synth baker_fee_str Dec;
-      payload_fee = empty_synth payload_fee_str Dec;
-      storage_fee = empty_synth storage_fee_str Dec;
-      fee = empty_synth fee_str Dec;
-      total_lines = 0;
-      total_degradations = 0;
-    }
+    let add_category map (category, synth) = CMap.add category synth map in
+    let categories = List.fold_left add_category CMap.empty Synth.categories in
+    {previous_kinds = []; categories; total_lines = 0; total_degradations = 0}
 
-  type category =
+  type git_line =
     (* Lines that don't start with a '+' or a '-', or that start with "+++" or
        "---". We are not interested in those. *)
     | Garbage
@@ -486,98 +436,25 @@ module Synths = struct
         | Some _, None -> Unsupported
         | Some diff, Some kind -> Diff (diff, kind)
 
-  let same_kind kind1 kind2 =
-    match (kind1, kind2) with
-    | Estimated _, Estimated _
-    | Estimated_storage _, Estimated_storage _
-    | Consumed _, Consumed _
-    | Gas_remaining _, Gas_remaining _
-    | Storage_size _, Storage_size _
-    | Gas_limit _, Gas_limit _
-    | Storage_limit _, Storage_limit _
-    | Remaining_gas _, Remaining_gas _
-    | Baker_fee _, Baker_fee _
-    | Payload_fee _, Payload_fee _
-    | Storage_fee _, Storage_fee _
-    | Fee _, Fee _
-    | Hash, Hash
-    | Tezos_client, Tezos_client
-    | Operation_hash, Operation_hash
-    | New_contract, New_contract
-    | To, To
-    | Parameter, Parameter ->
-        true
-    | _ (* we shouldn't be using a joker here... *) -> false
+  (* The old and new value of a payload when a deleted and an added line match.
+  *)
+  type payload_diff =
+    | Decimal_payload_diff of Decimal.t * Decimal.t
+    | No_payload_diff
 
-  let builder = function
-    | Estimated v ->
-        Some
-          ( v,
-            (fun synth -> synth.estimated),
-            fun estimated synths -> {synths with estimated} )
-    | Estimated_storage v ->
-        Some
-          ( v,
-            (fun synth -> synth.estimated_storage),
-            fun estimated_storage synths -> {synths with estimated_storage} )
-    | Consumed v ->
-        Some
-          ( v,
-            (fun synth -> synth.consumed),
-            fun consumed synths -> {synths with consumed} )
-    | Gas_remaining v ->
-        Some
-          ( v,
-            (fun synth -> synth.gas_remaining),
-            fun gas_remaining synths -> {synths with gas_remaining} )
-    | Storage_size v ->
-        Some
-          ( v,
-            (fun synth -> synth.storage_size),
-            fun storage_size synths -> {synths with storage_size} )
-    | Gas_limit v ->
-        Some
-          ( v,
-            (fun synth -> synth.gas_limit),
-            fun gas_limit synths -> {synths with gas_limit} )
-    | Storage_limit v ->
-        Some
-          ( v,
-            (fun synth -> synth.storage_limit),
-            fun storage_limit synths -> {synths with storage_limit} )
-    | Remaining_gas v ->
-        Some
-          ( v,
-            (fun synth -> synth.remaining_gas),
-            fun remaining_gas synths -> {synths with remaining_gas} )
-    | Baker_fee v ->
-        Some
-          ( v,
-            (fun synth -> synth.baker_fee),
-            fun baker_fee synths -> {synths with baker_fee} )
-    | Payload_fee v ->
-        Some
-          ( v,
-            (fun synth -> synth.payload_fee),
-            fun payload_fee synths -> {synths with payload_fee} )
-    | Storage_fee v ->
-        Some
-          ( v,
-            (fun synth -> synth.storage_fee),
-            fun storage_fee synths -> {synths with storage_fee} )
-    | Fee v ->
-        Some (v, (fun synth -> synth.fee), fun fee synths -> {synths with fee})
-    | Hash | Tezos_client | Operation_hash | New_contract | To | Parameter ->
-        None
-
-  let extract_value kind =
-    let+ v, _, _ = builder kind in
-    v
-
-  let builders old_kind new_kind =
-    let* old_v, getter, setter = builder old_kind in
-    let+ new_v = extract_value new_kind in
-    (old_v, new_v, getter, setter)
+  (* [same_kind] returns the category and payload diff between two [diff_kind]s
+     if their category is the same and the kind match, and [None] otherwise. *)
+  let same_kind (category1, payload1) (category2, payload2) =
+    if category1 <> category2 then None
+    else
+      let+ payload_diff =
+        match (payload1, payload2) with
+        | Decimal_payload v1, Decimal_payload v2 ->
+            Some (Decimal_payload_diff (v1, v2))
+        | No_payload, No_payload -> Some No_payload_diff
+        | Decimal_payload _, No_payload | No_payload, Decimal_payload _ -> None
+      in
+      (category1, payload_diff)
 
   let update_max line_nb old_value old_max_diff old_max_diff_pct diff =
     let open Decimal in
@@ -587,70 +464,77 @@ module Synths = struct
       (diff, max_diff_pct)
     else (old_max_diff, old_max_diff_pct)
 
-  let update line_nb synth old_v new_v =
-    let open Decimal in
-    let win = synth.win in
-    let old = synth.old + old_v in
-    let new_ = synth.new_ + new_v in
-    let loss = match win with Dec -> new_v - old_v | Inc -> old_v - new_v in
-    let max_loss, max_loss_pct =
-      update_max line_nb old_v synth.max_loss synth.max_loss_pct loss
-    in
-    let max_gain, max_gain_pct =
-      update_max line_nb old_v synth.max_gain synth.max_gain_pct (opp loss)
-    in
-    let open Stdlib in
-    let is_degraded = Decimal.gt loss zero in
-    let degradations = synth.degradations + if is_degraded then 1 else 0 in
-    let total = synth.total + 1 in
-    ( {
-        old;
-        new_;
-        max_loss;
-        max_loss_pct;
-        max_gain;
-        max_gain_pct;
-        degradations;
-        total;
-        win;
-        str = synth.str;
-      },
-      is_degraded )
+  let update line_nb synth kind_diff =
+    match (synth, kind_diff) with
+    | Decimal_synth synth, Decimal_payload_diff (old_v, new_v) ->
+        let open Decimal in
+        let win = synth.win in
+        let old = synth.old + old_v in
+        let new_ = synth.new_ + new_v in
+        let loss =
+          match win with Dec -> new_v - old_v | Inc -> old_v - new_v
+        in
+        let max_loss, max_loss_pct =
+          update_max line_nb old_v synth.max_loss synth.max_loss_pct loss
+        in
+        let max_gain, max_gain_pct =
+          update_max line_nb old_v synth.max_gain synth.max_gain_pct (opp loss)
+        in
+        let open Stdlib in
+        let is_degraded = Decimal.gt loss zero in
+        let degradations = synth.degradations + if is_degraded then 1 else 0 in
+        let total = synth.total + 1 in
+        let new_synth =
+          Decimal_synth
+            {
+              old;
+              new_;
+              max_loss;
+              max_loss_pct;
+              max_gain;
+              max_gain_pct;
+              degradations;
+              total;
+              win;
+            }
+        in
+        (new_synth, is_degraded)
+    | No_payload_synth total, No_payload_diff ->
+        (No_payload_synth (total + 1), false)
+    | Decimal_synth _, No_payload_diff
+    | No_payload_synth _, Decimal_payload_diff _ ->
+        (* Yes, we could avoid this with typing and GADTs for example, but hey,
+           that's just a script, let's keep it simple. We're not even explaining
+           how the invariant is maintained... *)
+        assert false
 
-  (* [consume_kind line line_nb synths kind] tries to match the added line
-     [line] at line number [line_nb], that was successfully parsed as [kind],
-     with the first element of the queue of deleted lines
-     [synths.previous_kinds]. If they indeed match, that synthesis in [synths]
-     is updated accordingly. *)
+  (* [consume_kind line line_number synths kind] tries to match the added [line]
+     at [line_number], whose [kind] was successfully parsed, with the first
+     element of the queue of deleted lines [synths.previous_kinds]. If they
+     indeed match, that synthesis in [synths] is updated accordingly. *)
   let consume_kind line line_nb synths kind =
     match synths.previous_kinds with
     | [] ->
         Printf.printf "* No line to consume for line %d `%s`.\n%!" line_nb line ;
         synths
-    | (_, previous_kind, _) :: previous_kinds when same_kind previous_kind kind
-      ->
-        let synths =
-          match builders previous_kind kind with
-          | None -> synths
-          | Some (old_v, new_v, getter, setter) ->
-              let new_synth, is_degraded =
-                update line_nb (getter synths) old_v new_v
-              in
-              let total_lines = synths.total_lines + 1 in
-              let total_degradations =
-                synths.total_degradations + if is_degraded then 1 else 0
-              in
-              let synths = setter new_synth synths in
-              {synths with total_lines; total_degradations}
-        in
-        {synths with previous_kinds}
-    | (line', _, line_nb) :: _ ->
-        Printf.printf
-          "* At line %d, unmatched lines `%s` and `%s`.\n%!"
-          line_nb
-          line
-          line' ;
-        synths
+    | (line', previous_kind, line_nb) :: previous_kinds -> (
+        match same_kind previous_kind kind with
+        | Some (category, kind_diff) ->
+            let old_synth = CMap.find category synths.categories in
+            let new_synth, is_degraded = update line_nb old_synth kind_diff in
+            let categories = CMap.add category new_synth synths.categories in
+            let total_lines = synths.total_lines + 1 in
+            let total_degradations =
+              synths.total_degradations + if is_degraded then 1 else 0
+            in
+            {previous_kinds; categories; total_lines; total_degradations}
+        | None ->
+            Printf.printf
+              "* At line %d, unmatched lines `%s` and `%s`.\n%!"
+              line_nb
+              line
+              line' ;
+            synths)
 
   let add_line synths line line_nb =
     match categorize line with
@@ -665,68 +549,29 @@ module Synths = struct
         }
     | Diff (Added, k) -> consume_kind line line_nb synths k
 
-  let show
-      {
-        previous_kinds;
-        estimated;
-        estimated_storage;
-        consumed;
-        gas_remaining;
-        storage_size;
-        gas_limit;
-        storage_limit;
-        remaining_gas;
-        baker_fee;
-        payload_fee;
-        storage_fee;
-        fee;
-        total_lines;
-        total_degradations;
-      } =
+  let show {previous_kinds; categories; total_lines; total_degradations} =
+    let count_ignored _ synth total =
+      match synth with
+      | Decimal_synth _ -> total
+      | No_payload_synth total' -> total + total'
+    in
+    let nb_ignored = CMap.fold count_ignored categories 0 in
     List.iter
       (fun (line, _, line_nb) ->
         Printf.printf "* Leftover at line %d: `%s`.\n%!" line_nb line)
       previous_kinds ;
     Printf.printf "\n%!" ;
-    Synth.show estimated ;
-    Synth.show estimated_storage ;
-    Synth.show consumed ;
-    Synth.show gas_remaining ;
-    Synth.show storage_size ;
-    Synth.show gas_limit ;
-    Synth.show storage_limit ;
-    Synth.show remaining_gas ;
-    Synth.show baker_fee ;
-    Synth.show payload_fee ;
-    Synth.show storage_fee ;
-    Synth.show fee ;
+    CMap.iter Synth.show categories ;
     Printf.printf "Total number of lines with a change: %d.\n" total_lines ;
     Printf.printf
-      "Total number of lines with a degradation: %d.\n\n"
+      "Total number of lines with a degradation: %d.\n"
       total_degradations ;
-    Printf.printf "Lines with the following strings have not changed:\n%!" ;
-    List.iter
-      (fun synth ->
-        if synth.Synth.total = 0 then Printf.printf "  `%s`\n%!" synth.Synth.str)
-      [
-        estimated;
-        estimated_storage;
-        consumed;
-        gas_remaining;
-        storage_size;
-        gas_limit;
-        storage_limit;
-        remaining_gas;
-        baker_fee;
-        payload_fee;
-        storage_fee;
-        fee;
-      ] ;
-    Printf.printf "\nLines with the following strings were ignored:\n%!" ;
-    List.iter
-      (Printf.printf "  `%s`\n%!")
-      (hash_strs @ tezos_client_strs @ operation_hash_strs @ new_contract_strs
-     @ to_strs @ parameter_strs)
+    Printf.printf "\nLines with the following strings were not changed:\n%!" ;
+    CMap.iter Synth.show_unchanged categories ;
+    Printf.printf
+      "\n%d line(s) with the following strings have changed:\n%!"
+      nb_ignored ;
+    CMap.iter Synth.show_ignored categories
 end
 
 let run file_opt =
