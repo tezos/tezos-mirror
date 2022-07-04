@@ -262,6 +262,10 @@ let sc_rollup_max_outbox_messages_per_level c =
   let sc_rollup = Raw_context.sc_rollup c in
   sc_rollup.max_outbox_messages_per_level
 
+let sc_rollup_number_of_sections_in_dissection c =
+  let sc_rollup = Raw_context.sc_rollup c in
+  sc_rollup.number_of_sections_in_dissection
+
 let dal_number_of_slots c =
   let constants = Raw_context.constants c in
   constants.dal.number_of_slots

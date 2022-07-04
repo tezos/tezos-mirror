@@ -69,7 +69,7 @@ let hash_int n = hash_string (Format.sprintf "%d" n)
 
 let mk_dissection_chunk (state_hash, tick) = G.{state_hash; tick}
 
-let init_dissection ?(size = 32) ?init_tick start_hash =
+let init_dissection ~size ?init_tick start_hash =
   let default_init_tick i =
     let hash =
       if i = size - 1 then None
@@ -85,11 +85,11 @@ let init_dissection ?(size = 32) ?init_tick start_hash =
   in
   Stdlib.List.init size init_tick
 
-let init_refutation ?size ?init_tick start_hash =
+let init_refutation ~size ?init_tick start_hash =
   G.
     {
       choice = Sc_rollup_tick_repr.initial;
-      step = Dissection (init_dissection ?size ?init_tick start_hash);
+      step = Dissection (init_dissection ~size ?init_tick start_hash);
     }
 
 let two_stakers_in_conflict () =
@@ -163,7 +163,10 @@ let test_poorly_distributed_dissection () =
   let* ctxt =
     T.lift @@ R.start_game ctxt rollup ~player:refuter ~opponent:defender
   in
-  let move = init_refutation ~init_tick start_hash in
+  let size =
+    Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt
+  in
+  let move = init_refutation ~size ~init_tick start_hash in
   let* outcome, _ctxt =
     T.lift @@ R.game_move ctxt rollup ~player:refuter ~opponent:defender move
   in
@@ -176,13 +179,17 @@ let test_poorly_distributed_dissection () =
 let test_single_valid_game_move () =
   let* ctxt, rollup, refuter, defender = two_stakers_in_conflict () in
   let start_hash = hash_string "foo" in
+  let size =
+    Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt
+  in
+  let tick_per_state = 10_000 / size in
   let dissection =
-    Stdlib.List.init 32 (fun i ->
+    Stdlib.List.init size (fun i ->
         mk_dissection_chunk
         @@
         if i = 0 then (Some start_hash, tick_of_int_exn 0)
-        else if i = 31 then (None, tick_of_int_exn 10000)
-        else (Some (hash_int i), tick_of_int_exn (i * 200)))
+        else if i = size - 1 then (None, tick_of_int_exn 10000)
+        else (Some (hash_int i), tick_of_int_exn (i * tick_per_state)))
   in
   let* ctxt =
     T.lift @@ R.start_game ctxt rollup ~player:refuter ~opponent:defender
@@ -230,7 +237,10 @@ let staker_injectivity_gen ~refuter2_plays =
     let hash2 = hash_string "bar" in
     let hash3 = hash_string "xyz" in
     let hash4 = hash_string "abc" in
-    let refutation = init_refutation hash1 in
+    let size =
+      Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt
+    in
+    let refutation = init_refutation ~size hash1 in
     let commit1 =
       Commitment_repr.
         {

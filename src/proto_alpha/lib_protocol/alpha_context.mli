@@ -808,6 +808,7 @@ module Constants : sig
       max_lookahead_in_blocks : int32;
       max_active_outbox_levels : int32;
       max_outbox_messages_per_level : int;
+      number_of_sections_in_dissection : int;
     }
 
     type t = {
@@ -991,6 +992,8 @@ module Constants : sig
   val sc_rollup_max_active_outbox_levels : context -> int32
 
   val sc_rollup_max_outbox_messages_per_level : context -> int
+
+  val sc_rollup_number_of_sections_in_dissection : context -> int
 
   (** All constants: fixed and parametric *)
   type t = private {fixed : fixed; parametric : Parametric.t}
@@ -3309,6 +3312,7 @@ module Sc_rollup : sig
       level : Raw_level.t;
       pvm_name : string;
       dissection : dissection_chunk list;
+      default_number_of_sections : int;
     }
 
     val pp : Format.formatter -> t -> unit
@@ -3354,17 +3358,21 @@ module Sc_rollup : sig
       child:Commitment.t ->
       refuter:Staker.t ->
       defender:Staker.t ->
+      default_number_of_sections:int ->
       t
 
-    val check_dissection :
-      State_hash.t option ->
-      Tick.t ->
-      State_hash.t option ->
-      Tick.t ->
-      dissection_chunk list ->
-      (unit, reason) result Lwt.t
-
     val play : t -> refutation -> (outcome, t) Either.t Lwt.t
+
+    module Internal_for_tests : sig
+      val check_dissection :
+        default_number_of_sections:int ->
+        State_hash.t option ->
+        Tick.t ->
+        State_hash.t option ->
+        Tick.t ->
+        dissection_chunk list ->
+        (unit, reason) result Lwt.t
+    end
   end
 
   module Stake_storage : sig

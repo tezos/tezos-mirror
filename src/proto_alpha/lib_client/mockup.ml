@@ -63,6 +63,7 @@ module Protocol_constants_overrides = struct
     max_lookahead_in_blocks : int32 option;
     max_active_outbox_levels : int32 option;
     max_outbox_messages_per_level : int option;
+    number_of_sections_in_dissection : int option;
   }
 
   type t = {
@@ -196,7 +197,8 @@ module Protocol_constants_overrides = struct
           c.commitment_period_in_blocks,
           c.max_lookahead_in_blocks,
           c.max_active_outbox_levels,
-          c.max_outbox_messages_per_level ))
+          c.max_outbox_messages_per_level,
+          c.number_of_sections_in_dissection ))
       (fun ( sc_rollup_enable,
              sc_rollup_origination_size,
              sc_rollup_challenge_window_in_blocks,
@@ -205,7 +207,8 @@ module Protocol_constants_overrides = struct
              sc_rollup_commitment_period_in_blocks,
              sc_rollup_max_lookahead_in_blocks,
              sc_rollup_max_active_outbox_levels,
-             sc_rollup_max_outbox_messages_per_level ) ->
+             sc_rollup_max_outbox_messages_per_level,
+             sc_rollup_number_of_sections_in_dissection ) ->
         {
           enable = sc_rollup_enable;
           origination_size = sc_rollup_origination_size;
@@ -217,8 +220,10 @@ module Protocol_constants_overrides = struct
           max_active_outbox_levels = sc_rollup_max_active_outbox_levels;
           max_outbox_messages_per_level =
             sc_rollup_max_outbox_messages_per_level;
+          number_of_sections_in_dissection =
+            sc_rollup_number_of_sections_in_dissection;
         })
-      (obj9
+      (obj10
          (opt "sc_rollup_enable" bool)
          (opt "sc_rollup_origination_size" int31)
          (opt "sc_rollup_challenge_window_in_blocks" int31)
@@ -227,7 +232,8 @@ module Protocol_constants_overrides = struct
          (opt "sc_rollup_commitment_period_in_blocks" int31)
          (opt "sc_rollup_max_lookahead_in_blocks" int32)
          (opt "sc_rollup_max_active_outbox_levels" int32)
-         (opt "sc_rollup_max_outbox_messages_per_level" int31))
+         (opt "sc_rollup_max_outbox_messages_per_level" int31)
+         (opt "sc_rollup_number_of_sections_in_dissection" uint8))
 
   let encoding =
     let open Data_encoding in
@@ -508,6 +514,8 @@ module Protocol_constants_overrides = struct
               Some parametric.sc_rollup.max_active_outbox_levels;
             max_outbox_messages_per_level =
               Some parametric.sc_rollup.max_outbox_messages_per_level;
+            number_of_sections_in_dissection =
+              Some parametric.sc_rollup.number_of_sections_in_dissection;
           };
         dal = Some parametric.dal;
         tx_rollup =
@@ -595,6 +603,7 @@ module Protocol_constants_overrides = struct
           max_lookahead_in_blocks = None;
           max_active_outbox_levels = None;
           max_outbox_messages_per_level = None;
+          number_of_sections_in_dissection = None;
         };
       dal = None;
       tx_rollup =
@@ -1086,6 +1095,10 @@ module Protocol_constants_overrides = struct
                Option.value
                  ~default:c.sc_rollup.max_outbox_messages_per_level
                  o.sc_rollup.max_outbox_messages_per_level;
+             number_of_sections_in_dissection =
+               Option.value
+                 ~default:c.sc_rollup.number_of_sections_in_dissection
+                 o.sc_rollup.number_of_sections_in_dissection;
            };
          dal = Option.value ~default:c.dal o.dal;
          tx_rollup =

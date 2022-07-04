@@ -153,6 +153,8 @@ val sc_rollup_max_active_outbox_levels : Raw_context.t -> int32
 
 val sc_rollup_max_outbox_messages_per_level : Raw_context.t -> int
 
+val sc_rollup_number_of_sections_in_dissection : Raw_context.t -> int
+
 val dal_number_of_slots : Raw_context.t -> int
 
 val dal_enable : Raw_context.t -> bool
