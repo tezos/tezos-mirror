@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,14 +23,41 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  Alcotest_lwt.run
-    "tezos-benchmark"
-    [
-      ("sparse_vec", Test_sparse_vec.tests);
-      ("costlang", Test_costlang.tests);
-      ("probing", Test_probe.tests);
-      ("measure", Test_measure.tests);
-      ("benchmark_helpers", Test_benchmark_helpers.tests);
-    ]
-  |> Lwt_main.run
+open Tezos_benchmark
+
+(** Helper for Ezjsonm.t alcotest print and equality test *)
+let ezjson_t : Ezjsonm.t Alcotest.testable =
+  (module struct
+    type t = Ezjsonm.t
+
+    let equal = ( = )
+
+    let pp ppf x = Format.pp_print_string ppf (Ezjsonm.to_string x)
+  end)
+
+let exn_t : exn Alcotest.testable =
+  (module struct
+    type t = exn
+
+    let equal = ( = )
+
+    let pp ppf x = Format.pp_print_string ppf (Printexc.to_string x)
+  end)
+
+let load_missing_json_err () =
+  let file = "./__doesnotexist" in
+  let expected =
+    Result.error
+    @@ Sys_error (Printf.sprintf "%s: No such file or directory" file)
+  in
+  let actual () = Benchmark_helpers.load_json file in
+  let result_t = Alcotest.result ezjson_t exn_t in
+  Alcotest.(check result_t) "missing file returns Error " (actual ()) expected
+
+let tests =
+  [
+    Alcotest_lwt.test_case_sync
+      "raise exception when file is missing"
+      `Quick
+      load_missing_json_err;
+  ]

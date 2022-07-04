@@ -23,14 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  Alcotest_lwt.run
-    "tezos-benchmark"
-    [
-      ("sparse_vec", Test_sparse_vec.tests);
-      ("costlang", Test_costlang.tests);
-      ("probing", Test_probe.tests);
-      ("measure", Test_measure.tests);
-      ("benchmark_helpers", Test_benchmark_helpers.tests);
-    ]
-  |> Lwt_main.run
+open Tezos_benchmark
+open Tezos_benchmark_examples
+
+let bench_opts =
+  let open Measure in
+  {
+    seed = Some 1337;
+    nsamples = 3000;
+    (* Percentile 50 = Median *)
+    determinizer = Percentile 50;
+    bench_number = 100;
+    minor_heap_size = `words (256 * 1024);
+    config_dir = None;
+  }
+
+let test_parse_config () =
+  let opts = bench_opts in
+  match Benchmark.ex_unpack (module Blake2b.Blake2b_bench : Benchmark.S) with
+  | Ex bench ->
+      let _bench = Measure.parse_config bench opts in
+      ()
+
+let tests =
+  [
+    Alcotest_lwt.test_case_sync
+      "parse_config does not fail"
+      `Quick
+      test_parse_config;
+  ]

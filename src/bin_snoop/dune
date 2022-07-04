@@ -1,6 +1,9 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
+(cram
+ (deps ./main_snoop.exe))
+
 (executable
  (name main_snoop)
  (public_name tezos-snoop)

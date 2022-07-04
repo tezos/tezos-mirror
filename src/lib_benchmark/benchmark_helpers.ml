@@ -24,21 +24,9 @@
 (*****************************************************************************)
 
 let load_json file =
-  let ic =
-    try open_in file
-    with Sys_error _ ->
-      Format.eprintf "load_json: file %s not found, exiting" file ;
-      exit 1
-  in
-  let json =
-    try Ezjsonm.from_channel ic
-    with Ezjsonm.Parse_error _ ->
-      close_in ic ;
-      Format.eprintf "load_json: file %s could not be parsed, exiting" file ;
-      exit 1
-  in
-  close_in ic ;
-  json
+  Result.catch
+    (fun () -> In_channel.with_open_text file Ezjsonm.from_channel)
+    ~catch_only:(function Sys_error _ -> true | _ -> false)
 
 let make_progress_printer fmtr total message =
   let counter = ref 1 in
