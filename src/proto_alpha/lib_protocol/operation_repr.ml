@@ -1112,9 +1112,7 @@ module Encoding = struct
             obj3
               (req "rollup" Sc_rollup_repr.encoding)
               (req "opponent" Sc_rollup_repr.Staker.encoding)
-              (req
-                 "refutation"
-                 (option Sc_rollup_game_repr.refutation_encoding));
+              (opt "refutation" Sc_rollup_game_repr.refutation_encoding);
           select =
             (function
             | Manager (Sc_rollup_refute _ as op) -> Some op | _ -> None);
