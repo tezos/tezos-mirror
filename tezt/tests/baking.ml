@@ -144,28 +144,6 @@ let mempool_operation_encoding : mempool_operation Data_encoding.t =
   let open Data_encoding in
   conv
     (function
-      | Mempool_operation {protocol; shell_header; protocol_data} ->
-          ( protocol,
-            shell_header.branch,
-            protocol_data.contents,
-            protocol_data.signature ))
-    (fun (protocol, branch, contents, signature) ->
-      Mempool_operation
-        {
-          protocol;
-          shell_header = {branch};
-          protocol_data = {contents; signature};
-        })
-    (obj4
-       (req "protocol" Tezos_crypto.Protocol_hash.encoding)
-       (req "branch" Block_hash.encoding)
-       (req "contents" (list operation_content_encoding))
-       (opt "signature" signature_encoding))
-
-let ithaca_mempool_operation_encoding : mempool_operation Data_encoding.t =
-  let open Data_encoding in
-  conv
-    (function
       | Mempool_operation {protocol = _; shell_header; protocol_data} ->
           (shell_header.branch, protocol_data.contents, protocol_data.signature))
     (fun _ -> assert false)
@@ -173,44 +151,6 @@ let ithaca_mempool_operation_encoding : mempool_operation Data_encoding.t =
        (req "branch" Block_hash.encoding)
        (req "contents" (list operation_content_encoding))
        (opt "signature" signature_encoding))
-
-let mempool_encoding : mempool Data_encoding.t =
-  let open Data_encoding in
-  let is_empty = function [] -> true | _ -> false in
-  conv
-    (fun operations ->
-      let applied = [] in
-      let refused = [] in
-      let outdated = [] in
-      let branch_refused = [] in
-      let branch_delayed = [] in
-      let unprocessed = operations in
-      (applied, refused, outdated, branch_refused, branch_delayed, unprocessed))
-    (fun ( applied,
-           refused,
-           outdated,
-           branch_refused,
-           branch_delayed,
-           unprocessed ) ->
-      assert (is_empty applied) ;
-      assert (is_empty refused) ;
-      assert (is_empty outdated) ;
-      assert (is_empty branch_refused) ;
-      assert (is_empty branch_delayed) ;
-      unprocessed)
-    (obj6
-       (* We put [unit] as a stub *)
-       (req "applied" (list (dynamic_size unit)))
-       (req "refused" (list (dynamic_size unit)))
-       (req "outdated" (list (dynamic_size unit)))
-       (req "branch_refused" (list (dynamic_size unit)))
-       (req "branch_delayed" (list (dynamic_size unit)))
-       (req
-          "unprocessed"
-          (list
-             (tup2
-                Tezos_crypto.Operation_hash.encoding
-                mempool_operation_encoding))))
 
 (* ------------------------------------------------------------------------- *)
 (* Operation-related helpers *)
@@ -345,13 +285,8 @@ let sample_next_transfer_for state ~fee ~branch ~account =
 
 let bake_with_mempool ?protocol node client mempool =
   let mempool_json =
-    match protocol with
-    | Some Protocol.Ithaca ->
-        let open Data_encoding in
-        Json.construct
-          (list ithaca_mempool_operation_encoding)
-          (List.map snd mempool)
-    | _ -> Data_encoding.Json.construct mempool_encoding mempool
+    let open Data_encoding in
+    Json.construct (list mempool_operation_encoding) (List.map snd mempool)
   in
   let mempool_str = Ezjsonm.value_to_string mempool_json in
   let mempool = Temp.file "mempool.json" in
