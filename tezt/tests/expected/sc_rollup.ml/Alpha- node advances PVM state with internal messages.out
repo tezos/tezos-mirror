@@ -44,142 +44,142 @@ This sequence of operations was run:
 "\000\000\000\007"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs139EB5Ny4fma7o6nS9mGauvHFbwpfvsJijBU4tNjEr9QZ8ZJWQd"
+"scs12qBnDaws8qffw6QDktoXqyVnQqsB7ZYta9AeumRrJu46uEXa8s"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"19"
+"18"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs139EB5Ny4fma7o6nS9mGauvHFbwpfvsJijBU4tNjEr9QZ8ZJWQd"
+"scs12qBnDaws8qffw6QDktoXqyVnQqsB7ZYta9AeumRrJu46uEXa8s"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"19"
+"18"
 
 ./tezos-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\n"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12UMx1ykNkh7mGwph7oc47aPAYSZfSdx6E6gqHdNuD3fWoY5z7V"
+"scs132JyuMz3CnpXF3jbe2nJdJ4CbLnwGfUdpwRf9H14oKbLGf6gXY"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"37"
+"35"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12UMx1ykNkh7mGwph7oc47aPAYSZfSdx6E6gqHdNuD3fWoY5z7V"
+"scs132JyuMz3CnpXF3jbe2nJdJ4CbLnwGfUdpwRf9H14oKbLGf6gXY"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"37"
+"35"
 
 ./tezos-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\r"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12ssnuPLi7HmVNDsZmAn38HQHQ3Yy7M8iqxALseKWEZjhetGdQj"
+"scs13LToVZYSTBF7YCWecXYN2PnbPa1YykGn9k4R5His735aYYqFZ9"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"56"
+"53"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12ssnuPLi7HmVNDsZmAn38HQHQ3Yy7M8iqxALseKWEZjhetGdQj"
+"scs13LToVZYSTBF7YCWecXYN2PnbPa1YykGn9k4R5His735aYYqFZ9"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"56"
+"53"
 
 ./tezos-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\016"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs11bU88Xg7RJhWwcd6xjATkP9KxurEXizBzGm99Y7f1AuwHSwMFr"
+"scs13GPvXsed8QkXQ6BdyqaED7ySSNJyAN8J8c318DpKCUwngmemeX"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"75"
+"71"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs11bU88Xg7RJhWwcd6xjATkP9KxurEXizBzGm99Y7f1AuwHSwMFr"
+"scs13GPvXsed8QkXQ6BdyqaED7ySSNJyAN8J8c318DpKCUwngmemeX"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"75"
+"71"
 
 ./tezos-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\019"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs11deEDoFvXGQjSLah1h2N13p1PJTVQNqm1qxaSHUhX9HnZGK3wZ"
+"scs11fsCtryeBMasKPzudhJLnMPMHC1amn2HR88wCvnLcmrUxBcJg2"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"94"
+"89"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs11deEDoFvXGQjSLah1h2N13p1PJTVQNqm1qxaSHUhX9HnZGK3wZ"
+"scs11fsCtryeBMasKPzudhJLnMPMHC1amn2HR88wCvnLcmrUxBcJg2"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"94"
+"89"
 
 ./tezos-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\022"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs13DumkywYF7EtycrHEqToSzBFnYBvJeTA2XUZySvttgXzWWP14d"
+"scs13PsZc2DSGRhRrdZKHT9wpeLhLrYN5dkD9XZDPu3mYzPd3N8Piu"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"113"
+"107"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs13DumkywYF7EtycrHEqToSzBFnYBvJeTA2XUZySvttgXzWWP14d"
+"scs13PsZc2DSGRhRrdZKHT9wpeLhLrYN5dkD9XZDPu3mYzPd3N8Piu"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"113"
+"107"
 
 ./tezos-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\025"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs13RfGYbA1saxvGJMLCySU3tja9MNaqG4CRiWofbCuFiwNofAFCt"
+"scs12CNZfYDyBvihucTXbD3TLou8WQn55Zk1DrRnLPLHw51Umiku8J"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"132"
+"125"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs13RfGYbA1saxvGJMLCySU3tja9MNaqG4CRiWofbCuFiwNofAFCt"
+"scs12CNZfYDyBvihucTXbD3TLou8WQn55Zk1DrRnLPLHw51Umiku8J"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"132"
+"125"
 
 ./tezos-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\028"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs11vJrzpmNeM3aydKLFC8LN2qzEiLPDW1hYUAWb9aFXKyveoZHGM"
+"scs137sVeLTakoSaACKmjZ77uisWL7LBFQmG57mDLfwZUp6ZqMtYgS"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"151"
+"143"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs11vJrzpmNeM3aydKLFC8LN2qzEiLPDW1hYUAWb9aFXKyveoZHGM"
+"scs137sVeLTakoSaACKmjZ77uisWL7LBFQmG57mDLfwZUp6ZqMtYgS"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"151"
+"143"
 
 ./tezos-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\031"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs11daEh8MqwPhDawd8n5frMeRhoASh46rnJYNvFz2eSWiVeUfYwS"
+"scs11d3KpHobBBVEH5j4xgC3myHPf8sffSvUZWLHVZH7ZcoqGh41A8"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"170"
+"161"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs11daEh8MqwPhDawd8n5frMeRhoASh46rnJYNvFz2eSWiVeUfYwS"
+"scs11d3KpHobBBVEH5j4xgC3myHPf8sffSvUZWLHVZH7ZcoqGh41A8"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"170"
+"161"
 
 ./tezos-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\""
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12P2MF8NUnH7BrSuRCuSjpBcYpL3ZGJwwm6N3WYkBxvbbwGhdtz"
+"scs11ZmqpAH3wWYnySzqDFUPU8KL1nNSb8gBx4sBwkU9f11FWtAK22"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"190"
+"180"

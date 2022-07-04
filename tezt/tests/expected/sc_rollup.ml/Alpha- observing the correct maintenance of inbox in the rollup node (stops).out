@@ -53,19 +53,19 @@ This sequence of operations was run:
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1651.778
-      Resulting inbox state: 
-         rollup = [SC_ROLLUP_HASH]
-         level = 3
-         current messages hash  = [SC_ROLLUP_INBOX_HASH]
-         nb_messages_in_commitment_period = 1
-         starting_level_of_current_commitment_period = 2
-         message_counter = 1
-         old_levels_messages = 
+      Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
+                               level = 3
+                               current messages hash  = [SC_ROLLUP_INBOX_HASH]
+                               nb_messages_in_commitment_period = 1
+                               starting_level_of_current_commitment_period = 2
+                               message_counter = 1
+                               old_levels_messages = hash : [SC_ROLLUP_INBOX_HASH]
+                                                     
        content = [SC_ROLLUP_INBOX_HASH]
        index = 1
        back_pointers = [SC_ROLLUP_INBOX_HASH]
     
-    
+                               }
 
 
 ./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
@@ -91,20 +91,20 @@ This sequence of operations was run:
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1652.596
-      Resulting inbox state: 
-         rollup = [SC_ROLLUP_HASH]
-         level = 4
-         current messages hash  = [SC_ROLLUP_INBOX_HASH]
-         nb_messages_in_commitment_period = 3
-         starting_level_of_current_commitment_period = 2
-         message_counter = 2
-         old_levels_messages = 
+      Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
+                               level = 4
+                               current messages hash  = [SC_ROLLUP_INBOX_HASH]
+                               nb_messages_in_commitment_period = 3
+                               starting_level_of_current_commitment_period = 2
+                               message_counter = 2
+                               old_levels_messages = hash : [SC_ROLLUP_INBOX_HASH]
+                                                     
        content = [SC_ROLLUP_INBOX_HASH]
        index = 2
        back_pointers = [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
     
-    
+                               }
 
 
 ./tezos-client --wait none send sc rollup message 'text:["CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
@@ -130,20 +130,20 @@ This sequence of operations was run:
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1652.079
-      Resulting inbox state: 
-         rollup = [SC_ROLLUP_HASH]
-         level = 5
-         current messages hash  = [SC_ROLLUP_INBOX_HASH]
-         nb_messages_in_commitment_period = 4
-         starting_level_of_current_commitment_period = 2
-         message_counter = 1
-         old_levels_messages = 
+      Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
+                               level = 5
+                               current messages hash  = [SC_ROLLUP_INBOX_HASH]
+                               nb_messages_in_commitment_period = 4
+                               starting_level_of_current_commitment_period = 2
+                               message_counter = 1
+                               old_levels_messages = hash : [SC_ROLLUP_INBOX_HASH]
+                                                     
        content = [SC_ROLLUP_INBOX_HASH]
        index = 3
        back_pointers = [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
     
-    
+                               }
 
 
 ./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
@@ -169,19 +169,19 @@ This sequence of operations was run:
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1652.803
-      Resulting inbox state: 
-         rollup = [SC_ROLLUP_HASH]
-         level = 6
-         current messages hash  = [SC_ROLLUP_INBOX_HASH]
-         nb_messages_in_commitment_period = 6
-         starting_level_of_current_commitment_period = 2
-         message_counter = 2
-         old_levels_messages = 
+      Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
+                               level = 6
+                               current messages hash  = [SC_ROLLUP_INBOX_HASH]
+                               nb_messages_in_commitment_period = 6
+                               starting_level_of_current_commitment_period = 2
+                               message_counter = 2
+                               old_levels_messages = hash : [SC_ROLLUP_INBOX_HASH]
+                                                     
        content = [SC_ROLLUP_INBOX_HASH]
        index = 4
        back_pointers = [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
     
-    
+                               }
 

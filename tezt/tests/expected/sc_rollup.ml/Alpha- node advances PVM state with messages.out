@@ -63,35 +63,35 @@ This sequence of operations was run:
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1651.829
-      Resulting inbox state: 
-         rollup = [SC_ROLLUP_HASH]
-         level = 3
-         current messages hash  = [SC_ROLLUP_INBOX_HASH]
-         nb_messages_in_commitment_period = 1
-         starting_level_of_current_commitment_period = 2
-         message_counter = 1
-         old_levels_messages = 
+      Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
+                               level = 3
+                               current messages hash  = [SC_ROLLUP_INBOX_HASH]
+                               nb_messages_in_commitment_period = 1
+                               starting_level_of_current_commitment_period = 2
+                               message_counter = 1
+                               old_levels_messages = hash : [SC_ROLLUP_INBOX_HASH]
+                                                     
        content = [SC_ROLLUP_INBOX_HASH]
        index = 1
        back_pointers = [SC_ROLLUP_INBOX_HASH]
     
-    
+                               }
 
 
 ./tezos-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\007"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs11brdXnUqwwkqChBy8JsHPVzsS3b6YU9i1PpLczV3tCSnjkTYd1"
+"scs13CGfXJuhF7NnAKY7v3TBokPphzCEYPE5n14UHDnpTAMTAC7GzC"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"19"
+"18"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs11brdXnUqwwkqChBy8JsHPVzsS3b6YU9i1PpLczV3tCSnjkTYd1"
+"scs13CGfXJuhF7NnAKY7v3TBokPphzCEYPE5n14UHDnpTAMTAC7GzC"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"19"
+"18"
 
 ./tezos-client --wait none send sc rollup message '["2 8 + value"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -116,36 +116,36 @@ This sequence of operations was run:
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1652.051
-      Resulting inbox state: 
-         rollup = [SC_ROLLUP_HASH]
-         level = 4
-         current messages hash  = [SC_ROLLUP_INBOX_HASH]
-         nb_messages_in_commitment_period = 2
-         starting_level_of_current_commitment_period = 2
-         message_counter = 1
-         old_levels_messages = 
+      Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
+                               level = 4
+                               current messages hash  = [SC_ROLLUP_INBOX_HASH]
+                               nb_messages_in_commitment_period = 2
+                               starting_level_of_current_commitment_period = 2
+                               message_counter = 1
+                               old_levels_messages = hash : [SC_ROLLUP_INBOX_HASH]
+                                                     
        content = [SC_ROLLUP_INBOX_HASH]
        index = 2
        back_pointers = [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
     
-    
+                               }
 
 
 ./tezos-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\n"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12Tgfr71PpKXJqDp8yXnohfSYoTT57KeRMEi1YacXtRyyvMxjZ4"
+"scs12BVD7ers632i9FZGzaeT4Zt9jQi13guYDh7yb5HFipfVc13wku"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"37"
+"35"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12Tgfr71PpKXJqDp8yXnohfSYoTT57KeRMEi1YacXtRyyvMxjZ4"
+"scs12BVD7ers632i9FZGzaeT4Zt9jQi13guYDh7yb5HFipfVc13wku"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"37"
+"35"
 
 ./tezos-client --wait none send sc rollup message '["3 10 + value"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -170,36 +170,36 @@ This sequence of operations was run:
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1652.147
-      Resulting inbox state: 
-         rollup = [SC_ROLLUP_HASH]
-         level = 5
-         current messages hash  = [SC_ROLLUP_INBOX_HASH]
-         nb_messages_in_commitment_period = 3
-         starting_level_of_current_commitment_period = 2
-         message_counter = 1
-         old_levels_messages = 
+      Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
+                               level = 5
+                               current messages hash  = [SC_ROLLUP_INBOX_HASH]
+                               nb_messages_in_commitment_period = 3
+                               starting_level_of_current_commitment_period = 2
+                               message_counter = 1
+                               old_levels_messages = hash : [SC_ROLLUP_INBOX_HASH]
+                                                     
        content = [SC_ROLLUP_INBOX_HASH]
        index = 3
        back_pointers = [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
     
-    
+                               }
 
 
 ./tezos-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\r"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs13M1yuX6NMTpdqWgYMx1uAtaLpiCgQAgXK2n93iua2LjfGajSiT"
+"scs12nXMLncCoT9SGzJX8CwUEG4D1myYhKGYBY6eGvtPrjwqooCovf"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"56"
+"53"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs13M1yuX6NMTpdqWgYMx1uAtaLpiCgQAgXK2n93iua2LjfGajSiT"
+"scs12nXMLncCoT9SGzJX8CwUEG4D1myYhKGYBY6eGvtPrjwqooCovf"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"56"
+"53"
 
 ./tezos-client --wait none send sc rollup message '["4 12 + value"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -224,37 +224,37 @@ This sequence of operations was run:
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1652.275
-      Resulting inbox state: 
-         rollup = [SC_ROLLUP_HASH]
-         level = 6
-         current messages hash  = [SC_ROLLUP_INBOX_HASH]
-         nb_messages_in_commitment_period = 4
-         starting_level_of_current_commitment_period = 2
-         message_counter = 1
-         old_levels_messages = 
+      Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
+                               level = 6
+                               current messages hash  = [SC_ROLLUP_INBOX_HASH]
+                               nb_messages_in_commitment_period = 4
+                               starting_level_of_current_commitment_period = 2
+                               message_counter = 1
+                               old_levels_messages = hash : [SC_ROLLUP_INBOX_HASH]
+                                                     
        content = [SC_ROLLUP_INBOX_HASH]
        index = 4
        back_pointers = [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
     
-    
+                               }
 
 
 ./tezos-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\016"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12iwXS6KpaLNTTaBqxFvkyvZpHLq8H5xp35upZ4Tz7Wqtnv68dd"
+"scs11tcLMA9CwjW3K3VuAFp4RiJRujh9msGbyMSHyediDMTfchY2JY"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"75"
+"71"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12iwXS6KpaLNTTaBqxFvkyvZpHLq8H5xp35upZ4Tz7Wqtnv68dd"
+"scs11tcLMA9CwjW3K3VuAFp4RiJRujh9msGbyMSHyediDMTfchY2JY"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"75"
+"71"
 
 ./tezos-client --wait none send sc rollup message '["5 14 + value"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -279,37 +279,37 @@ This sequence of operations was run:
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1652.354
-      Resulting inbox state: 
-         rollup = [SC_ROLLUP_HASH]
-         level = 7
-         current messages hash  = [SC_ROLLUP_INBOX_HASH]
-         nb_messages_in_commitment_period = 5
-         starting_level_of_current_commitment_period = 2
-         message_counter = 1
-         old_levels_messages = 
+      Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
+                               level = 7
+                               current messages hash  = [SC_ROLLUP_INBOX_HASH]
+                               nb_messages_in_commitment_period = 5
+                               starting_level_of_current_commitment_period = 2
+                               message_counter = 1
+                               old_levels_messages = hash : [SC_ROLLUP_INBOX_HASH]
+                                                     
        content = [SC_ROLLUP_INBOX_HASH]
        index = 5
        back_pointers = [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
     
-    
+                               }
 
 
 ./tezos-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\019"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12GyR6dnoCQ3T6NCHe7wCEwzs1FSFdMmKPk8hzvPLMWA9po1vHp"
+"scs11eYQany2zXFhZ6q62wfrHQA1CYzskBu8k5pnnWnBaAQ3ZEWBK6"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"94"
+"89"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12GyR6dnoCQ3T6NCHe7wCEwzs1FSFdMmKPk8hzvPLMWA9po1vHp"
+"scs11eYQany2zXFhZ6q62wfrHQA1CYzskBu8k5pnnWnBaAQ3ZEWBK6"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"94"
+"89"
 
 ./tezos-client --wait none send sc rollup message '["6 16 + value"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -334,37 +334,37 @@ This sequence of operations was run:
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1652.354
-      Resulting inbox state: 
-         rollup = [SC_ROLLUP_HASH]
-         level = 8
-         current messages hash  = [SC_ROLLUP_INBOX_HASH]
-         nb_messages_in_commitment_period = 6
-         starting_level_of_current_commitment_period = 2
-         message_counter = 1
-         old_levels_messages = 
+      Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
+                               level = 8
+                               current messages hash  = [SC_ROLLUP_INBOX_HASH]
+                               nb_messages_in_commitment_period = 6
+                               starting_level_of_current_commitment_period = 2
+                               message_counter = 1
+                               old_levels_messages = hash : [SC_ROLLUP_INBOX_HASH]
+                                                     
        content = [SC_ROLLUP_INBOX_HASH]
        index = 6
        back_pointers = [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
     
-    
+                               }
 
 
 ./tezos-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\022"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs13QvpMutd3qKfBeqBUbk719sF8sG2S3PCwbm3nuVr9kib5KA9Vz"
+"scs11ibk6bxp8XcMmHchNkLxniEMGeuu67FYqjeFgsFaK2nSbaj6v6"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"113"
+"107"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs13QvpMutd3qKfBeqBUbk719sF8sG2S3PCwbm3nuVr9kib5KA9Vz"
+"scs11ibk6bxp8XcMmHchNkLxniEMGeuu67FYqjeFgsFaK2nSbaj6v6"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"113"
+"107"
 
 ./tezos-client --wait none send sc rollup message '["7 18 + value"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -389,37 +389,37 @@ This sequence of operations was run:
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1652.354
-      Resulting inbox state: 
-         rollup = [SC_ROLLUP_HASH]
-         level = 9
-         current messages hash  = [SC_ROLLUP_INBOX_HASH]
-         nb_messages_in_commitment_period = 7
-         starting_level_of_current_commitment_period = 2
-         message_counter = 1
-         old_levels_messages = 
+      Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
+                               level = 9
+                               current messages hash  = [SC_ROLLUP_INBOX_HASH]
+                               nb_messages_in_commitment_period = 7
+                               starting_level_of_current_commitment_period = 2
+                               message_counter = 1
+                               old_levels_messages = hash : [SC_ROLLUP_INBOX_HASH]
+                                                     
        content = [SC_ROLLUP_INBOX_HASH]
        index = 7
        back_pointers = [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
     
-    
+                               }
 
 
 ./tezos-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\025"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12d3sxy4uVnARXJi4KWs3cz5DrmR73Y9ZVk2DkLRXNio9i9yyX4"
+"scs1271ctQaBTEibVsSeGQDQwFHaHUhd8EZ1V35wT87wwNkZRKuod2"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"132"
+"125"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12d3sxy4uVnARXJi4KWs3cz5DrmR73Y9ZVk2DkLRXNio9i9yyX4"
+"scs1271ctQaBTEibVsSeGQDQwFHaHUhd8EZ1V35wT87wwNkZRKuod2"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"132"
+"125"
 
 ./tezos-client --wait none send sc rollup message '["8 20 + value"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -444,38 +444,38 @@ This sequence of operations was run:
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1652.482
-      Resulting inbox state: 
-         rollup = [SC_ROLLUP_HASH]
-         level = 10
-         current messages hash  = [SC_ROLLUP_INBOX_HASH]
-         nb_messages_in_commitment_period = 8
-         starting_level_of_current_commitment_period = 2
-         message_counter = 1
-         old_levels_messages = 
+      Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
+                               level = 10
+                               current messages hash  = [SC_ROLLUP_INBOX_HASH]
+                               nb_messages_in_commitment_period = 8
+                               starting_level_of_current_commitment_period = 2
+                               message_counter = 1
+                               old_levels_messages = hash : [SC_ROLLUP_INBOX_HASH]
+                                                     
        content = [SC_ROLLUP_INBOX_HASH]
        index = 8
        back_pointers = [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
     
-    
+                               }
 
 
 ./tezos-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\028"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs13CsbaoCfv3vCgBWtL78hQ3sPaH7iVhmCWqBd5hvCqfQWhxje7D"
+"scs12hefiWoaPQGYvPcuUYHhiU5FAAfpBtHcztGqTj6LqB3PxDQiyG"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"151"
+"143"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs13CsbaoCfv3vCgBWtL78hQ3sPaH7iVhmCWqBd5hvCqfQWhxje7D"
+"scs12hefiWoaPQGYvPcuUYHhiU5FAAfpBtHcztGqTj6LqB3PxDQiyG"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"151"
+"143"
 
 ./tezos-client --wait none send sc rollup message '["9 22 + value"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -500,38 +500,38 @@ This sequence of operations was run:
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1652.561
-      Resulting inbox state: 
-         rollup = [SC_ROLLUP_HASH]
-         level = 11
-         current messages hash  = [SC_ROLLUP_INBOX_HASH]
-         nb_messages_in_commitment_period = 9
-         starting_level_of_current_commitment_period = 2
-         message_counter = 1
-         old_levels_messages = 
+      Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
+                               level = 11
+                               current messages hash  = [SC_ROLLUP_INBOX_HASH]
+                               nb_messages_in_commitment_period = 9
+                               starting_level_of_current_commitment_period = 2
+                               message_counter = 1
+                               old_levels_messages = hash : [SC_ROLLUP_INBOX_HASH]
+                                                     
        content = [SC_ROLLUP_INBOX_HASH]
        index = 9
        back_pointers = [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
     
-    
+                               }
 
 
 ./tezos-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\031"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12TkBvyg8cSuoNGfrzwM516T9isZwxAphpo7AnxJYVyPGWDwybq"
+"scs11oq2aLp31bKWq7Tp3GccxvZHpaE41PzH7FUQNNKWpYSvUn7Fex"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"170"
+"161"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12TkBvyg8cSuoNGfrzwM516T9isZwxAphpo7AnxJYVyPGWDwybq"
+"scs11oq2aLp31bKWq7Tp3GccxvZHpaE41PzH7FUQNNKWpYSvUn7Fex"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"170"
+"161"
 
 ./tezos-client --wait none send sc rollup message '["10 24 + value"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -556,29 +556,29 @@ This sequence of operations was run:
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1652.578
-      Resulting inbox state: 
-         rollup = [SC_ROLLUP_HASH]
-         level = 12
-         current messages hash  = [SC_ROLLUP_INBOX_HASH]
-         nb_messages_in_commitment_period = 10
-         starting_level_of_current_commitment_period = 2
-         message_counter = 1
-         old_levels_messages = 
+      Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
+                               level = 12
+                               current messages hash  = [SC_ROLLUP_INBOX_HASH]
+                               nb_messages_in_commitment_period = 10
+                               starting_level_of_current_commitment_period = 2
+                               message_counter = 1
+                               old_levels_messages = hash : [SC_ROLLUP_INBOX_HASH]
+                                                     
        content = [SC_ROLLUP_INBOX_HASH]
        index = 10
        back_pointers = [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
-      [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
+                                                     [SC_ROLLUP_INBOX_HASH]
     
-    
+                               }
 
 
 ./tezos-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\""
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs13GcPbRV1mSUravbXkE3LFT2SgEGu2muVHjNzKumLC91MikErA8"
+"scs12z8UFkMz6jxQo5hDNhBz96Pjq31V8fSBz3kH3DPgVhpfQFe6Fk"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"190"
+"180"
