@@ -72,7 +72,7 @@ let () =
     ~pp:(fun ppf highwatermark ->
       Format.fprintf
         ppf
-        "A preendorsements with a higher watermark than the current one (%a) \
+        "A preendorsement with a higher watermark than the current one (%a) \
          was already produced."
         pp_highwatermark
         highwatermark)
@@ -89,7 +89,7 @@ let () =
     ~pp:(fun ppf highwatermark ->
       Format.fprintf
         ppf
-        "An endorsements with a higher watermark than the current one (%a) was \
+        "An endorsement with a higher watermark than the current one (%a) was \
          already produced."
         pp_highwatermark
         highwatermark)

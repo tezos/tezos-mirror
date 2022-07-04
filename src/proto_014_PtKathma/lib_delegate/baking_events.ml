@@ -802,8 +802,7 @@ module Nonces = struct
       ~section
       ~name:"cant_retrieve_block_header_for_nonce"
       ~level:Warning
-      ~msg:
-        "cannot retrieved block header {header} associated with nonce {trace}"
+      ~msg:"cannot retrieve block header {header} associated with nonce {trace}"
       ("header", Data_encoding.string)
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
