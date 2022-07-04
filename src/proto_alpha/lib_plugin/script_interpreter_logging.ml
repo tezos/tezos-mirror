@@ -1754,6 +1754,30 @@ module Stack_utils = struct
     | Ex_split_halt loc -> ok @@ IHalt loc
     | Ex_split_failwith {location; arg_ty; _} ->
         ok @@ IFailwith (location, arg_ty)
+
+  (** [dipn_stack_ty witness stack_ty] returns the type of the stack
+    on which instructions inside dipped block will be operating. *)
+  let rec dipn_stack_ty :
+      type a s e z c u d w.
+      (a, s, e, z, c, u, d, w) stack_prefix_preservation_witness ->
+      (c, u) stack_ty ->
+      (a, s) stack_ty =
+   fun witness stack ->
+    match (witness, stack) with
+    | KPrefix (_, _, witness'), Item_t (_, sty) -> dipn_stack_ty witness' sty
+    | KRest, sty -> sty
+
+  (** [instrument_cont logger sty] creates a function instrumenting
+    continuations starting from the stack type described by [sty].
+    Instrumentation consists in wrapping inner continuations in
+    [KLog] continuation so that logging continues. *)
+  let instrument_cont :
+      type a b c d.
+      logger ->
+      (a, b) stack_ty ->
+      (a, b, c, d) continuation ->
+      (a, b, c, d) continuation =
+   fun logger sty -> function KLog _ as k -> k | k -> KLog (k, sty, logger)
 end
 
 module type Logger_base = sig
@@ -1770,6 +1794,9 @@ end
 
 module Logger = struct
   open Stack_utils
+  open Local_gas_counter
+  open Script_interpreter_defs
+  open Script_interpreter.Internals.Raw
 
   (** [log_entry logger ctxt gas instr sty accu stack] simply calls
     [logger.log_entry] function with the appropriate arguments. Note
@@ -1827,18 +1854,6 @@ module Logger = struct
           log_kinstr logger sty k )
     in
     kinstr_rewritek sty i {apply}
-
-  (** [instrument_cont logger sty] creates a function instrumenting
-    continuations starting from the stack type described by [sty].
-    Instrumentation consists in wrapping inner continuations in
-    [KLog] continuation so that logging continues. *)
-  let instrument_cont :
-      type a b c d.
-      logger ->
-      (a, b) stack_ty ->
-      (a, b, c, d) continuation ->
-      (a, b, c, d) continuation =
-   fun logger sty -> function KLog _ as k -> k | k -> KLog (k, sty, logger)
 
   (** [log_next_continuation logger sty cont] instruments the next
     continuation in [cont] with [KLog] continuations to ensure
@@ -1899,22 +1914,6 @@ module Logger = struct
     | KView_exit (_, _)
     | KLog _ (* This case should never happen. *) | KNil ->
         ok cont
-
-  (** [dipn_stack_ty witness stack_ty] returns the type of the stack
-    on which instructions inside dipped block will be operating. *)
-  let rec dipn_stack_ty :
-      type a s e z c u d w.
-      (a, s, e, z, c, u, d, w) stack_prefix_preservation_witness ->
-      (c, u) stack_ty ->
-      (a, s) stack_ty =
-   fun witness stack ->
-    match (witness, stack) with
-    | KPrefix (_, _, witness'), Item_t (_, sty) -> dipn_stack_ty witness' sty
-    | KRest, sty -> sty
-
-  open Local_gas_counter
-  open Script_interpreter_defs
-  open Script_interpreter.Internals.Raw
 
   (*
   
