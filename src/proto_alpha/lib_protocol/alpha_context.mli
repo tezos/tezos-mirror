@@ -3286,6 +3286,13 @@ module Sc_rollup : sig
 
     type error += Sc_rollup_proof_check of string
 
+    val valid :
+      Inbox.history_proof ->
+      Raw_level.t ->
+      pvm_name:string ->
+      t ->
+      bool tzresult Lwt.t
+
     val produce :
       (module PVM_with_context_and_state) ->
       Inbox.inbox_context ->
