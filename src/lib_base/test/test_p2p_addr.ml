@@ -54,9 +54,20 @@ module Generator = struct
 
   let ipv6 = Gen.(map Ipaddr.V6.of_int64 (pair int64 int64))
 
-  let ipv4t = Gen.triple ipv4 port_opt peer_id
+  let ipstring =
+    let open Gen in
+    oneof [map Ipaddr.V4.to_string ipv4; map Ipaddr.V6.to_string ipv6]
 
-  let ipv6t = Gen.triple ipv6 port_opt peer_id
+  let ipt = Gen.triple ipstring port_opt peer_id
+
+  let addr_port_id =
+    Gen.map
+      (fun (ip, port, peer_id) ->
+        let peer_id =
+          Option.map (fun gen -> gen.P2p_identity.peer_id) peer_id
+        in
+        P2p_point.Id.{addr = ip; port; peer_id})
+      ipt
 
   let ipv4_as_v6 = Gen.map Ipaddr.v6_of_v4 ipv4
 
@@ -82,20 +93,6 @@ let pp_addr_port_id fmt {P2p_point.Id.addr; port; peer_id} =
   Option.iter (fprintf fmt "#%a" P2p_peer_id.pp) peer_id
 
 let print_addr_port_id = Format.asprintf "%a" pp_addr_port_id
-
-let addr_port_id_v4 =
-  Gen.map
-    (fun (ip, port, peer_id) ->
-      let peer_id = Option.map (fun gen -> gen.P2p_identity.peer_id) peer_id in
-      P2p_point.Id.{addr = Ipaddr.V4.to_string ip; port; peer_id})
-    Generator.ipv4t
-
-let addr_port_id_v6 =
-  Gen.map
-    (fun (ip, port, peer_id) ->
-      let peer_id = Option.map (fun gen -> gen.P2p_identity.peer_id) peer_id in
-      P2p_point.Id.{addr = Ipaddr.V6.to_string ip; port; peer_id})
-    Generator.ipv6t
 
 let remove_brackets addr =
   let len = String.length addr in
@@ -143,28 +140,11 @@ let ip_to_string_from_string =
       | None -> Test.fail_report "cannot parse printed address"
       | Some t' -> qcheck_eq' ~pp ~expected:t ~actual:t' ())
 
-let ipv6_to_string_from_string =
+let point_to_string_from_string =
   Test.make
-    ~name:"Base.P2p_point.addr_port_id.ipv6.to-string-from-string-ok"
+    ~name:"Base.P2p_point.addr_port_id.to-string-from-string"
     ~print:print_addr_port_id
-    addr_port_id_v6
-    (fun t ->
-      let open P2p_point.Id in
-      let s = addr_port_id_to_string t in
-      match parse_addr_port_id s with
-      | Error err ->
-          Test.fail_report
-            (Format.asprintf
-               "cannot parse address '%s': %s"
-               s
-               (P2p_point.Id.string_of_parsing_error err))
-      | Ok res -> qcheck_eq' ~pp:pp_addr_port_id ~eq ~expected:t ~actual:res ())
-
-let ipv4_to_string_from_string =
-  Test.make
-    ~name:"Base.P2p_point.addr_port_id.ipv4.to-string-from-string"
-    ~print:print_addr_port_id
-    addr_port_id_v4
+    Generator.addr_port_id
     (fun t ->
       let open P2p_point.Id in
       let s = addr_port_id_to_string t in
@@ -256,12 +236,7 @@ let p2p_point_encoding_eager_fail =
 let p2p_addr = [ip_to_string_from_string]
 
 let p2p_point =
-  [
-    ipv6_to_string_from_string;
-    ipv4_to_string_from_string;
-    encode_decode;
-    p2p_point_encoding_eager_fail;
-  ]
+  [point_to_string_from_string; encode_decode; p2p_point_encoding_eager_fail]
 
 let tests =
   [
