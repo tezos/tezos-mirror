@@ -219,8 +219,20 @@ end
 
 let group = {Clic.name = "teztale"; Clic.title = "A delegate operation monitor"}
 
+let await_protocol_activation cctxt protocol_hash =
+  let* (_block_stream, stop) =
+    Shell_services.Monitor.heads
+      cctxt
+      ~next_protocols:[protocol_hash]
+      cctxt#chain
+  in
+  stop () ;
+  return_unit
+
 module Make_json_commands (Loops : MAIN_LOOPS) : JSON_COMMANDS = struct
   let main cctxt prefix =
+    let* () = Client_confirmations.wait_for_bootstrapped cctxt in
+    let* () = await_protocol_activation cctxt Loops.protocol_hash in
     let dumper = Json_archiver.launch cctxt prefix in
     let main =
       let*! () =
@@ -257,6 +269,8 @@ end
 
 module Make_db_commands (Loops : MAIN_LOOPS) : DB_COMMANDS = struct
   let main cctxt db_path source =
+    let* () = Client_confirmations.wait_for_bootstrapped cctxt in
+    let* () = await_protocol_activation cctxt Loops.protocol_hash in
     let db = Sqlite3.db_open db_path in
     let () = Db.set_pragma_use_foreign_keys db in
     let dumper = Db_archiver.launch db source in

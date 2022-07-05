@@ -4,6 +4,7 @@
  (libraries
   sqlite3
   tezos-client-base-unix
+  tezos-client-base
   teztale.lib
   (select
    PtGRANAD_machine.ml
@@ -23,6 +24,12 @@
    (tezos-client-013-PtJakart -> PtJakart_machine.real.ml)))
  (modules_without_implementation archiver)
  (flags
-  (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix -open
-    Tezos_shell_services -open Tezos_client_base_unix -open
-    Tezos_rpc_http_client_unix -open Tezos_rpc_http -open Teztale_lib)))
+  (:standard
+	 -open Tezos_base__TzPervasives
+	 -open Tezos_stdlib_unix
+	 -open Tezos_shell_services
+	 -open Tezos_client_base
+	 -open Tezos_client_base_unix
+	 -open Tezos_rpc_http_client_unix
+	 -open Tezos_rpc_http
+	 -open Teztale_lib)))
