@@ -265,7 +265,7 @@ let perform_carbonated_map_benchmarks snoop proto =
   in
   perform_benchmarks [] snoop benches
 
-let perform_tx_rollup_benchmark snoop proto =
+let perform_tx_rollup_benchmarks snoop proto =
   let* benches =
     Snoop.(list_benchmarks ~mode:All ~tags:[Tx_rollup; Proto proto] snoop)
   in
@@ -281,4 +281,5 @@ let main protocol =
   let* () = perform_global_constants_benchmarks snoop in
   let* () = perform_cache_benchmarks snoop in
   let* () = perform_encoding_benchmarks snoop protocol in
+  let* () = perform_tx_rollup_benchmarks snoop protocol in
   perform_carbonated_map_benchmarks snoop protocol

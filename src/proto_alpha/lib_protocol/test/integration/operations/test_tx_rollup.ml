@@ -3596,6 +3596,7 @@ module Rejection = struct
       {proof with state = (fun () -> truncated_node)}
     in
     Op.tx_rollup_reject
+      ~gas_limit:(Custom_gas (Gas.Arith.integral_of_int_exn 100_000))
       (B b)
       account
       tx_rollup
