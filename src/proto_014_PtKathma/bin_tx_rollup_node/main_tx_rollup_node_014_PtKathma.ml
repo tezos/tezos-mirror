@@ -454,4 +454,4 @@ let tx_rollup_commands () =
 
 let select_commands _ _ = return (tx_rollup_commands ())
 
-let () = Client_main_run.run (module Client_config) ~select_commands
+let () = Client_main_run.run (module Daemon_config) ~select_commands
