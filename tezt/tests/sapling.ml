@@ -171,6 +171,7 @@ module Helpers = struct
       return @@ Re.balance_diff ~dst:contract client_output
 
   let transfer ?(expect_failure = false) (client, contract) src dst amount_tez =
+    let temp_sapling_transaction_file = Temp.file "sapling_transaction" in
     let* () =
       Client.spawn_command
         client
@@ -185,6 +186,8 @@ module Helpers = struct
           dst;
           "using";
           contract;
+          "--file";
+          temp_sapling_transaction_file;
         ]
       |> Process.check ~expect_failure
     in
@@ -197,7 +200,7 @@ module Helpers = struct
           @ [
               "sapling";
               "submit";
-              "sapling_transaction";
+              temp_sapling_transaction_file;
               "from";
               Constant.bootstrap1.alias;
               "using";
