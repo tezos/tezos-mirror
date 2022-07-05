@@ -4399,6 +4399,40 @@ module Protocol = Protocol
             tx_rollup |> if_some |> open_;
           ]
     in
+    let dal =
+      only_if (active && N.(number >= 015)) @@ fun () ->
+      public_lib
+        (sf "tezos-dal-%s" name_dash)
+        ~path:(path // "lib_dal")
+        ~synopsis:
+          "Tezos/Protocol: protocol specific library for the Data availability \
+           Layer"
+        ~deps:
+          [
+            octez_base |> open_ ~m:"TzPervasives"
+            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            main |> open_;
+          ]
+        ~inline_tests:ppx_expect
+        ~linkall:true
+    in
+    let _dal_tests =
+      only_if (active && N.(number >= 015)) @@ fun () ->
+      test
+        "main"
+        ~path:(path // "lib_dal/test")
+        ~opam:(sf "tezos-dal-%s" name_dash)
+        ~deps:
+          [
+            octez_base |> open_ ~m:"TzPervasives"
+            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            dal |> if_some |> open_;
+            main |> open_;
+            octez_base_test_helpers |> open_;
+            test_helpers |> if_some |> open_;
+            alcotest_lwt;
+          ]
+    in
     let benchmark_type_inference =
       only_if active @@ fun () ->
       public_lib

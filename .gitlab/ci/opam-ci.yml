@@ -693,6 +693,13 @@ opam:tezos-crypto:
   variables:
     package: tezos-crypto
 
+opam:tezos-dal-alpha:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_2
+  variables:
+    package: tezos-dal-alpha
+
 opam:tezos-embedded-protocol-000-Ps9mPmXa:
   extends:
     - .opam_template
@@ -773,7 +780,7 @@ opam:tezos-embedded-protocol-008-PtEdoTez:
 opam:tezos-embedded-protocol-009-PsFLoren:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-embedded-protocol-009-PsFLoren
 
@@ -857,7 +864,7 @@ opam:tezos-event-logging:
 opam:tezos-event-logging-test-helpers:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-event-logging-test-helpers
 
@@ -1130,7 +1137,7 @@ opam:tezos-protocol-environment:
 opam:tezos-protocol-genesis:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-protocol-genesis
 
@@ -1207,7 +1214,7 @@ opam:tezos-protocol-plugin-011-PtHangz2-registerer:
 opam:tezos-protocol-plugin-012-Psithaca:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-protocol-plugin-012-Psithaca
 
@@ -1256,7 +1263,7 @@ opam:tezos-protocol-plugin-alpha:
 opam:tezos-protocol-plugin-alpha-registerer:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-protocol-plugin-alpha-registerer
 
