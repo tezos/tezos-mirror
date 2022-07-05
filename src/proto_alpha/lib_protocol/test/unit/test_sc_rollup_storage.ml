@@ -2679,7 +2679,7 @@ let test_subscribe_slot_twice_at_same_level () =
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index)
-    (Sc_rollup_errors.Sc_rollup_dal_slot_already_registered (rollup, slot_index))
+    (Dal_errors_repr.Dal_rollup_already_registered_to_slot (rollup, slot_index))
 
 let test_subscribe_slot_twice_at_different_levels () =
   let* ctxt = new_context () in
@@ -2692,7 +2692,7 @@ let test_subscribe_slot_twice_at_different_levels () =
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index)
-    (Sc_rollup_errors.Sc_rollup_dal_slot_already_registered (rollup, slot_index))
+    (Dal_errors_repr.Dal_rollup_already_registered_to_slot (rollup, slot_index))
 
 let test_subscribe_different_slots_at_same_level () =
   let* ctxt = new_context () in
@@ -2853,7 +2853,7 @@ let test_subscribed_slots_at_level_past_context_level () =
        ctxt
        rollup
        future_level)
-    (Sc_rollup_errors.Sc_rollup_requested_dal_slot_subscriptions_of_future_level
+    (Dal_errors_repr.Dal_requested_subscriptions_at_future_level
        (current_level, future_level))
 
 let test_subscribed_slots_entries_at_future_level () =
