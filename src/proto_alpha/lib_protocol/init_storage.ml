@@ -74,6 +74,50 @@ module Patch_dictator_for_ghostnet = struct
     else Lwt.return ctxt
 end
 
+let patch_script (address, hash, patched_code) ctxt =
+  Contract_repr.of_b58check address >>?= fun contract ->
+  Storage.Contract.Code.find ctxt contract >>=? fun (ctxt, code_opt) ->
+  Logging.log Notice "Patching %s... " address ;
+  match code_opt with
+  | Some old_code ->
+      let old_bin = Data_encoding.force_bytes old_code in
+      let old_hash = Script_expr_hash.hash_bytes [old_bin] in
+      if Script_expr_hash.equal old_hash hash then (
+        let new_code = Script_repr.lazy_expr patched_code in
+        Storage.Contract.Code.update ctxt contract new_code
+        >>=? fun (ctxt, size_diff) ->
+        Logging.log Notice "Contract %s successfully patched" address ;
+        let size_diff = Z.of_int size_diff in
+        Storage.Contract.Used_storage_space.get ctxt contract
+        >>=? fun prev_size ->
+        let new_size = Z.add prev_size size_diff in
+        Storage.Contract.Used_storage_space.update ctxt contract new_size
+        >>=? fun ctxt ->
+        if Z.(gt size_diff zero) then
+          Storage.Contract.Paid_storage_space.get ctxt contract
+          >>=? fun prev_paid_size ->
+          let paid_size = Z.add prev_paid_size size_diff in
+          Storage.Contract.Paid_storage_space.update ctxt contract paid_size
+        else return ctxt)
+      else (
+        Logging.log
+          Error
+          "Patching %s was skipped because its script does not have the \
+           expected hash (expected: %a, found: %a)"
+          address
+          Script_expr_hash.pp
+          hash
+          Script_expr_hash.pp
+          old_hash ;
+        return ctxt)
+  | None ->
+      Logging.log
+        Error
+        "Patching %s was skipped because no script was found for it in the \
+         context."
+        address ;
+      return ctxt
+
 let prepare_first_block chain_id ctxt ~typecheck ~level ~timestamp =
   Raw_context.prepare_first_block ~level ~timestamp ctxt
   >>=? fun (previous_protocol, ctxt) ->
@@ -149,6 +193,8 @@ let prepare_first_block chain_id ctxt ~typecheck ~level ~timestamp =
         ~amount_mutez:3_000_000_000L
       >>= fun (ctxt, balance_updates) -> return (ctxt, balance_updates))
   >>=? fun (ctxt, balance_updates) ->
+  List.fold_right_es patch_script Legacy_script_patches.addresses_to_patch ctxt
+  >>=? fun ctxt ->
   Receipt_repr.group_balance_updates balance_updates >>?= fun balance_updates ->
   Storage.Pending_migration.Balance_updates.add ctxt balance_updates
   >>= fun ctxt -> return ctxt
