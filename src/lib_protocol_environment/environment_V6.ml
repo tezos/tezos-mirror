@@ -1142,7 +1142,7 @@ struct
       let get_output {outbox_level; message_index} (tree : Tree.tree) =
         Wasm.get_output {outbox_level; message_index} tree
 
-      let convert_input : Tezos_scoru_wasm.input -> input = function
+      let convert_input : Tezos_scoru_wasm.input_info -> input = function
         | {inbox_level; message_counter} -> {inbox_level; message_counter}
 
       let get_info (tree : Tree.tree) =

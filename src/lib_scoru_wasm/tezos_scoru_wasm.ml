@@ -23,44 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_webassembly_interpreter
+open Instance
+
 (*
 
   This library acts as a dependency to the protocol environment. Everything that
   must be exposed to the protocol via the environment shall be added here.
 
 *)
-open Tezos_webassembly_interpreter
-open Instance
 
-type input = {
-  inbox_level : Tezos_base.Bounded.Int32.NonNegative.t;
-  message_counter : Z.t;
-}
-
-type output = {
-  outbox_level : Tezos_base.Bounded.Int32.NonNegative.t;
-  message_index : Z.t;
-}
-
-type input_request = No_input_required | Input_required
-
-type info = {
-  current_tick : Z.t;
-  last_input_read : input option;
-  input_request : input_request;
-}
-
-module type S = sig
-  type tree
-
-  val compute_step : tree -> tree Lwt.t
-
-  val set_input_step : input -> string -> tree -> tree Lwt.t
-
-  val get_output : output -> tree -> string Lwt.t
-
-  val get_info : tree -> info Lwt.t
-end
+include Wasm_pvm
 
 module Make (T : Tree.S) : S with type tree = T.tree = struct
   type tree = T.tree

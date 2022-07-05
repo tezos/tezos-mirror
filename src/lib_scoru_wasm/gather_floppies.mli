@@ -23,43 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module exposes a module type {!S} defining a WASM VM API.
-    It also exposes a functor {!Make} for constructing a concrete implementation
-    of this module type, given an implementation of a {!Tree.S} module.
+(** Raised when the origination message contains neither a complete nor an
+    incomplete kernel message. *)
+exception Malformed_origination_message of Data_encoding.Binary.read_error
 
-    This library acts as a dependency to the protocol environment. Everything
-    WASM VM related that must be exposed to the protocol via the environment
-    shall be added here. *)
+(** Raised when a message containing a kernel image chunk was expected, but 
+    the message in the inbox contained something else. *)
+exception Malformed_inbox_message of Data_encoding.Binary.read_error
 
-include module type of Wasm_pvm
+(** Raised when [compute_step] was called when the floppy gathering module 
+    expected input. *)
+exception Compute_step_expected_input
 
-(** Builds a WASM VM given a concrete implementation of {!Tree.S}. *)
-module Make (T : Tree.S) : Wasm_pvm.S with type tree = T.tree
+(** Raised when the floppy gathering module wasn't expecting input, but input
+    was given using [set_input_step]. A [compute_step] is needed right after
+    origination. *)
+exception Set_input_step_expected_compute_step
 
-exception Bad_input
+(** Generic internal error. Some data in storage had errornous encoding. *)
+exception Encoding_error of Data_encoding.Binary.write_error
 
-(** [aux_write_memory ~input_buffer ~module_inst ~rtype_offset ~level_offset
-     ~id_offset ~dst ~max_bytes]
-     reads `input_buffer` and writes its components to the  memory of
-    `module_inst` based on the memory addreses offsets described. It also
-    checks that the input payload is no larger than `max_input` and crashes
-    with `input too large` otherwise. It returns the size of the payload.*)
-val aux_write_input_in_memory :
-  input_buffer:Tezos_webassembly_interpreter.Input_buffer.t ->
-  module_inst:Tezos_webassembly_interpreter.Instance.module_inst ref ->
-  rtype_offset:int64 ->
-  level_offset:int64 ->
-  id_offset:int64 ->
-  dst:int64 ->
-  max_bytes:int64 ->
-  int Lwt.t
+(** Internal error. Raised if the [input_info] record that is stored somehow
+    gets overwritten with something malformed. *)
+exception Malformed_input_info_record
 
-(** read_input is a HostFunction. It has to be invoked with a list of 5 values
-  representing rtype_offset, level_offset, id_offset, dst and max_bytes. When
-  invoked, it applies `aux_write_input_in_memory` with the corresponding
-  parameters and returns a singleton value list containing the size of the
-  input_buffer payload.   *)
-val read_input :
-  ( Tezos_webassembly_interpreter.Input_buffer.t,
-    Tezos_webassembly_interpreter.Instance.module_inst ref )
-  Tezos_webassembly_interpreter.Func.func
+(** [Make] encapsulates a WASM PVM to give it the ability to load a kernel
+    image as either a complete kernel in the origination message or a kernel
+    image divided into chunks and provided via both origination- and inbox-
+    messages. *)
+module Make (T : Tree.S) (Wasm : Wasm_pvm.S with type tree = T.tree) :
+  Wasm_pvm.S with type tree = T.tree

@@ -23,43 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module exposes a module type {!S} defining a WASM VM API.
-    It also exposes a functor {!Make} for constructing a concrete implementation
-    of this module type, given an implementation of a {!Tree.S} module.
+type input_info = {
+  inbox_level : Tezos_base.Bounded.Int32.NonNegative.t;
+  message_counter : Z.t;
+}
 
-    This library acts as a dependency to the protocol environment. Everything
-    WASM VM related that must be exposed to the protocol via the environment
-    shall be added here. *)
+type output_info = {
+  outbox_level : Tezos_base.Bounded.Int32.NonNegative.t;
+  message_index : Z.t;
+}
 
-include module type of Wasm_pvm
+type input_request = No_input_required | Input_required
 
-(** Builds a WASM VM given a concrete implementation of {!Tree.S}. *)
-module Make (T : Tree.S) : Wasm_pvm.S with type tree = T.tree
+type info = {
+  current_tick : Z.t;
+  last_input_read : input_info option;
+  input_request : input_request;  (** The current VM input request. *)
+}
 
-exception Bad_input
+module type S = sig
+  type tree
 
-(** [aux_write_memory ~input_buffer ~module_inst ~rtype_offset ~level_offset
-     ~id_offset ~dst ~max_bytes]
-     reads `input_buffer` and writes its components to the  memory of
-    `module_inst` based on the memory addreses offsets described. It also
-    checks that the input payload is no larger than `max_input` and crashes
-    with `input too large` otherwise. It returns the size of the payload.*)
-val aux_write_input_in_memory :
-  input_buffer:Tezos_webassembly_interpreter.Input_buffer.t ->
-  module_inst:Tezos_webassembly_interpreter.Instance.module_inst ref ->
-  rtype_offset:int64 ->
-  level_offset:int64 ->
-  id_offset:int64 ->
-  dst:int64 ->
-  max_bytes:int64 ->
-  int Lwt.t
+  val compute_step : tree -> tree Lwt.t
 
-(** read_input is a HostFunction. It has to be invoked with a list of 5 values
-  representing rtype_offset, level_offset, id_offset, dst and max_bytes. When
-  invoked, it applies `aux_write_input_in_memory` with the corresponding
-  parameters and returns a singleton value list containing the size of the
-  input_buffer payload.   *)
-val read_input :
-  ( Tezos_webassembly_interpreter.Input_buffer.t,
-    Tezos_webassembly_interpreter.Instance.module_inst ref )
-  Tezos_webassembly_interpreter.Func.func
+  val set_input_step : input_info -> string -> tree -> tree Lwt.t
+
+  val get_output : output_info -> tree -> string Lwt.t
+
+  val get_info : tree -> info Lwt.t
+end
