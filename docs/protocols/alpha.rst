@@ -38,6 +38,8 @@ Bug Fixes
 - Fix a discrepancy in gas consumption of contract origination between
   dry run and actual application (MR :gl:`!5659`)
 
+- Fixes the ``delegated_balance`` rpc, which reported an incorrect value for delegates that have frozen bonds (MR :gl:`!5765`)
+
 Minor Changes
 -------------
 

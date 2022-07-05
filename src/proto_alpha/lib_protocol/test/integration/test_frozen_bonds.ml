@@ -145,7 +145,7 @@ let test_delegate_then_freeze_deposit () =
   >>=? fun () ->
   (* Fetch user's balance again. *)
   Token.balance ctxt user_account >>>=? fun (_, user_balance') ->
-  (* Ensure user's balance decreased. *)
+  (* Ensure user's balance is unchanged. *)
   Assert.equal_tez ~loc:__LOC__ user_balance' user_balance
 
 (** Tested scenario:
@@ -202,7 +202,7 @@ let test_freeze_deposit_then_delegate () =
   >>=? fun () ->
   (* Fetch user's balance. *)
   Token.balance ctxt user_account >>>=? fun (_, user_balance') ->
-  (* Ensure user's balance decreased. *)
+  (* Ensure user's balance is unchanged. *)
   Assert.equal_tez ~loc:__LOC__ user_balance' user_balance
 
 (** Tested scenario:
@@ -302,6 +302,84 @@ let test_total_stake ~user_is_delegate () =
   (* Check that stake of contract is equal to balance. *)
   Contract.get_balance_and_frozen_bonds ctxt user_contract >>>=? fun stake ->
   Assert.equal_tez ~loc:__LOC__ stake balance
+
+let check_delegated_balance_is ctxt ~loc delegate expected_balance =
+  (* Fetch the delegated balance of d. *)
+  Delegate.delegated_balance ctxt delegate >>>=? fun delegated_balance ->
+  (* Check that the delegated balance of [delegate] is as explected. *)
+  Assert.equal_tez ~loc delegated_balance expected_balance
+
+(** Tested scenario:
+     1. freeze some bonds for the delegate,
+     2. check that the delegated balance is null,
+     3. let user contract delegate to 'delegate',
+     4. check that the staking balance of 'delegate' has increased as expected,
+     5. check that the delegated balance of 'delegate' is equal to the balance of the delegator,
+     6. unfreeze the bonds,
+     7. check that the staking balance has not changed,
+     8. check that the delegated balance of 'delegate' is equal to the balance of the delegator,
+     9. remove the delegation,
+    10. check that staking balance has decreased as expected,
+    11. check that the delegated balance is null,
+    12. check that the user's balance is unchanged. *)
+let test_delegated_balance () =
+  init_test ~user_is_delegate:false
+  >>=? fun (ctxt, user_contract, user_account, delegate) ->
+  let delegate_contract = Contract.Implicit delegate in
+  let delegate_account = `Contract delegate_contract in
+  (* Fetch user's initial balance before freeze. *)
+  Token.balance ctxt user_account >>>=? fun (ctxt, user_balance) ->
+  (* Fetch staking balance before freeze. *)
+  Delegate.staking_balance ctxt delegate >>>=? fun staking_balance ->
+  (* Freeze a tx-rollup deposit for the delegate. *)
+  let tx_rollup, _ = mk_tx_rollup () in
+  let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
+  let deposit_amount = small_random_amount () in
+  let deposit_account = `Frozen_bonds (delegate_contract, bond_id) in
+  Token.transfer ctxt delegate_account deposit_account deposit_amount
+  >>>=? fun (ctxt, _) ->
+  (* Check that the delegated balance of [delegate] is null. *)
+  check_delegated_balance_is ctxt ~loc:__LOC__ delegate Tez.zero >>=? fun () ->
+  (* Let user delegate to "delegate". *)
+  Delegate.set ctxt user_contract (Some delegate) >>>=? fun ctxt ->
+  (* Fetch staking balance after delegation. *)
+  Delegate.staking_balance ctxt delegate >>>=? fun staking_balance' ->
+  (* ensure staking balance increased by the user's balance. *)
+  Assert.equal_tez
+    ~loc:__LOC__
+    staking_balance'
+    (user_balance +! staking_balance)
+  >>=? fun () ->
+  (* Check that the delegated balance of [delegate] is equal to [user_balance]. *)
+  check_delegated_balance_is ctxt ~loc:__LOC__ delegate user_balance
+  >>=? fun () ->
+  (* Unfreeze the deposit. *)
+  Token.transfer ctxt deposit_account delegate_account deposit_amount
+  >>>=? fun (ctxt, _) ->
+  (* Fetch staking balance after unfreeze. *)
+  Delegate.staking_balance ctxt delegate >>>=? fun staking_balance'' ->
+  (* Ensure that staking balance is unchanged. *)
+  Assert.equal_tez ~loc:__LOC__ staking_balance'' staking_balance'
+  >>=? fun () ->
+  (* Check that the delegated balance of [delegate] is equal to [user_balance]. *)
+  check_delegated_balance_is ctxt ~loc:__LOC__ delegate user_balance
+  >>=? fun () ->
+  (* Remove delegation. *)
+  Delegate.set ctxt user_contract None >>>=? fun ctxt ->
+  (* Fetch staking balance. *)
+  Delegate.staking_balance ctxt delegate >>>=? fun staking_balance''' ->
+  (* Check that staking balance has decreased by the user's initial balance. *)
+  Assert.equal_tez
+    ~loc:__LOC__
+    staking_balance'''
+    (staking_balance'' -! user_balance)
+  >>=? fun () ->
+  (* Check that the delegated balance of [delegate] is null. *)
+  check_delegated_balance_is ctxt ~loc:__LOC__ delegate Tez.zero >>=? fun () ->
+  (* Fetch user's balance. *)
+  Token.balance ctxt user_account >>>=? fun (_, user_balance') ->
+  (* Ensure user's balance is unchanged. *)
+  Assert.equal_tez ~loc:__LOC__ user_balance' user_balance
 
 (** Tests that the rpcs [contract/pkh/frozen_bonds] and
     [contract/pkh/balance_and_frozen_bonds] can be called successfully.
@@ -589,6 +667,7 @@ let tests =
         "frozen bonds - total stake, user is a delegate"
         `Quick
         (test_total_stake ~user_is_delegate:true);
+      tztest "frozen bonds - delegated balance" `Quick test_delegated_balance;
       tztest "frozen bonds - test rpcs" `Quick test_rpcs;
       tztest
         "test: delegate, freeze, unfreeze, undelegate"
