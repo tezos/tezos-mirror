@@ -37,7 +37,9 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty ~genesis_commitment =
   let*? ctxt, nonce = Raw_context.increment_origination_nonce ctxt in
   let level = Raw_context.current_level ctxt in
   let*? address = Sc_rollup_repr.Address.from_nonce nonce in
-  let*! ctxt = Store.PVM_kind.add ctxt address kind in
+  let* ctxt, pvm_kind_size, _kind_existed =
+    Store.PVM_kind.add ctxt address kind
+  in
   let*! ctxt =
     Store.Genesis_info.add
       ctxt
@@ -94,20 +96,20 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty ~genesis_commitment =
       (origination_size + stored_kind_size + boot_sector_size + addresses_size
      + inbox_size_diff + lcc_size_diff + commitment_size_diff
      + commitment_added_size_diff + commitment_staker_count_size_diff
-     + stakers_size_diff + param_ty_size_diff)
+     + stakers_size_diff + param_ty_size_diff + pvm_kind_size)
   in
   return (address, size, genesis_commitment_hash, ctxt)
 
 let kind ctxt address =
   let open Lwt_tzresult_syntax in
-  let* kind_opt = Store.PVM_kind.find ctxt address in
+  let* ctxt, kind_opt = Store.PVM_kind.find ctxt address in
   match kind_opt with
-  | Some k -> return k
+  | Some k -> return (ctxt, k)
   | None -> fail (Sc_rollup_errors.Sc_rollup_does_not_exist address)
 
 let list_unaccounted ctxt =
   let open Lwt_syntax in
-  let+ res = Store.PVM_kind.keys ctxt in
+  let+ res = Store.PVM_kind.keys_unaccounted ctxt in
   Result.return res
 
 let genesis_info ctxt rollup =

@@ -303,9 +303,9 @@ let validate_and_decode_output_proof ctxt ~cemented_commitment rollup
     ~output_proof =
   let open Lwt_tzresult_syntax in
   (* Lookup the PVM of the rollup. *)
-  let* (module PVM : Sc_rollup.PVM.S) =
-    let+ kind = Sc_rollup.kind ctxt rollup in
-    Sc_rollup.Kind.pvm_of kind
+  let* ctxt, (module PVM : Sc_rollup.PVM.S) =
+    let+ ctxt, kind = Sc_rollup.kind ctxt rollup in
+    (ctxt, Sc_rollup.Kind.pvm_of kind)
   in
   let*? ctxt =
     Gas.consume
