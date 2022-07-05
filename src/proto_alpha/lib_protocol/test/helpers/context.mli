@@ -279,6 +279,12 @@ type 'accounts init :=
   unit ->
   (Block.t * 'accounts) tzresult Lwt.t
 
+(** Returns an initial block and the implicit contracts corresponding
+    to its bootstrap accounts. The number of bootstrap accounts, and
+    the structure of the returned contracts, are specified by the [tup]
+    argument. *)
+val init_gen : (Alpha_context.Contract.t, 'accounts) tup -> 'accounts init
+
 (** [init_n n] : returns an initial block with [n] initialized accounts
     and the associated implicit contracts *)
 val init_n : int -> Alpha_context.Contract.t list init

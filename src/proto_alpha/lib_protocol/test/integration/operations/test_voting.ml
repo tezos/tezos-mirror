@@ -104,16 +104,24 @@ let protos =
 
 (** {2 Helper functions} *)
 
-let assert_period_kind expected_kind kind loc =
-  if Stdlib.(expected_kind = kind) then return_unit
+let assert_period_kinds expected_kinds kind loc =
+  if
+    List.exists
+      (fun expected_kind -> Stdlib.(expected_kind = kind))
+      expected_kinds
+  then return_unit
   else
     Alcotest.failf
       "%s - Unexpected voting period kind - expected %a, got %a"
       loc
-      Voting_period.pp_kind
-      expected_kind
+      (Format.pp_print_list
+         ~pp_sep:(fun fmt () -> Format.fprintf fmt " or ")
+         Voting_period.pp_kind)
+      expected_kinds
       Voting_period.pp_kind
       kind
+
+let assert_period_kind expected_kind = assert_period_kinds [expected_kind]
 
 let assert_period_index expected_index index loc =
   if expected_index = index then return_unit
@@ -142,17 +150,23 @@ let assert_period_remaining expected_remaining remaining loc =
       expected_remaining
       remaining
 
-let assert_period ?expected_kind ?expected_index ?expected_position
-    ?expected_remaining b loc =
+let assert_period ?expected_kind ?expected_kinds ?expected_index
+    ?expected_position ?expected_remaining b loc =
   let open Lwt_result_syntax in
   let* {voting_period; position; remaining} =
     Context.Vote.get_current_period (B b)
   in
   let* () =
-    match expected_kind with
-    | Some expected_kind ->
+    match (expected_kind, expected_kinds) with
+    | None, None -> return_unit
+    | Some expected_kind, None ->
         assert_period_kind expected_kind voting_period.kind loc
-    | None -> return_unit
+    | None, Some expected_kinds ->
+        assert_period_kinds expected_kinds voting_period.kind loc
+    | Some _, Some _ ->
+        invalid_arg
+          "assert_period: arguments expected_kind and expected_kinds should \
+           not both be provided."
   in
   let* () =
     match expected_index with
@@ -234,21 +248,56 @@ let bake_until_first_block_of_next_period ?policy b =
   Context.Vote.get_current_period (B b) >>=? fun {remaining; _} ->
   Block.bake_n ?policy Int32.(add remaining one |> to_int) b
 
-let context_init =
+let context_init_tup tup ?(blocks_per_cycle = 4l) =
   (* Note that some of these tests assume (more or less) that the
      accounts remain active during a voting period, which roughly
      translates to the following condition being assumed to hold:
      `blocks_per_voting_period <= preserved_cycles * blocks_per_cycle.`
      We also set baking and endorsing rewards to zero in order to
      ease accounting of exact baker stake. *)
-  Context.init_n
-    ~blocks_per_cycle:4l
+  Context.init_gen
+    tup
+    ~blocks_per_cycle
     ~cycles_per_voting_period:1l
     ~consensus_threshold:0
     ~endorsing_reward_per_slot:Tez.zero
     ~baking_reward_bonus_per_slot:Tez.zero
     ~baking_reward_fixed_portion:Tez.zero
     ~nonce_revelation_threshold:2l
+
+(** [context_init n ()] returns [(block, contracts)] where [block] is
+    an initial block with [n] bootstrap accounts, and [contracts] is
+    the list of associated implicit contracts.
+
+    See {!context_init_tup} and {!Context.init_gen} for optional
+    arguments. *)
+let context_init n = context_init_tup (Context.TList n)
+
+(** [context_init1 ()] returns [(block, contract)] where [block] is an
+    initial block with one bootstrap account, and [contract] is the
+    associated implicit contract. *)
+let context_init1 = context_init_tup Context.T1
+
+(** [context_init2 ()] returns [(block, contracts)] where [block] is
+    an initial block with two bootstrap accounts, and [contracts] is
+    the pair of associated implicit contracts. *)
+let context_init2 = context_init_tup Context.T2
+
+(** Call {!context_init2}, then inject a Proposals operation and bake
+    blocks in order to move on to an Exploration period. Return a
+    block, a delegate (distinct from the one who submitted the
+    Proposals), and the current proposal. *)
+let context_init_exploration ?(proposal = protos.(0)) () =
+  let open Lwt_result_syntax in
+  let* block, (proposer, other_delegate) = context_init2 () in
+  let* operation = Op.proposals (B block) proposer [proposal] in
+  let* block = Block.bake block ~operation in
+  let* block = bake_until_first_block_of_next_period block in
+  let* () = assert_period ~expected_kind:Exploration block __LOC__ in
+  return (block, other_delegate, proposal)
+
+let append_loc ~caller_loc loc =
+  Format.sprintf "%s@.Called from %s" loc caller_loc
 
 (** {3 Expected protocol errors} *)
 
@@ -260,7 +309,40 @@ let wrong_error expected_error_name actual_error_trace loc =
     Error_monad.pp_print_trace
     actual_error_trace
 
-let empty_proposals loc = function
+let unregistered_delegate delegate loc = function
+  | [Environment.Ecoproto_error (Delegate_storage.Unregistered_delegate pkh)] ->
+      Assert.equal_pkh ~loc:(append_loc ~caller_loc:loc __LOC__) pkh delegate
+  | err -> wrong_error "Unregistered_delegate" err loc
+
+let missing_signature loc = function
+  | [Environment.Ecoproto_error Operation.Missing_signature] -> return_unit
+  | err -> wrong_error "Missing_signature" err loc
+
+let invalid_signature loc = function
+  | [Environment.Ecoproto_error Operation.Invalid_signature] -> return_unit
+  | err -> wrong_error "Invalid_signature" err loc
+
+let wrong_voting_period ~current_index ~op_index loc = function
+  | [
+      Environment.Ecoproto_error (Apply.Wrong_voting_period {expected; provided});
+    ] ->
+      let open Lwt_result_syntax in
+      let make_loc = append_loc ~caller_loc:loc in
+      let* () =
+        Assert.equal_int32 ~loc:(make_loc __LOC__) expected current_index
+      in
+      Assert.equal_int32 ~loc:(make_loc __LOC__) provided op_index
+  | err -> wrong_error "Wrong_voting_period" err loc
+
+let unexpected_proposal loc = function
+  | [Environment.Ecoproto_error Amendment.Unexpected_proposal] -> return_unit
+  | err -> wrong_error "Unexpected_proposal" err loc
+
+let unauthorized_proposal loc = function
+  | [Environment.Ecoproto_error Amendment.Unauthorized_proposal] -> return_unit
+  | err -> wrong_error "Unauthorized_proposal" err loc
+
+let empty_proposal loc = function
   | [Environment.Ecoproto_error Amendment.Empty_proposal] -> return_unit
   | err -> wrong_error "Empty_proposal" err loc
 
@@ -268,29 +350,41 @@ let too_many_proposals loc = function
   | [Environment.Ecoproto_error Amendment.Too_many_proposals] -> return_unit
   | err -> wrong_error "Too_many_proposals" err loc
 
+let unexpected_ballot loc = function
+  | [Environment.Ecoproto_error Amendment.Unexpected_ballot] -> return_unit
+  | err -> wrong_error "Unexpected_ballot" err loc
+
+let invalid_proposal loc = function
+  | [Environment.Ecoproto_error Amendment.Invalid_proposal] -> return_unit
+  | err -> wrong_error "Invalid_proposal" err loc
+
 let duplicate_ballot loc = function
   | [Environment.Ecoproto_error Amendment.Duplicate_ballot] -> return_unit
   | err -> wrong_error "Duplicate_ballot" err loc
 
-let assert_validate_proposals_fails ~expected_error ~proposer ~proposals block
-    loc =
+let unauthorized_ballot loc = function
+  | [Environment.Ecoproto_error Amendment.Unauthorized_ballot] -> return_unit
+  | err -> wrong_error "Unauthorized_ballot" err loc
+
+let assert_validate_proposals_fails ~expected_error ~proposer ~proposals ?period
+    block loc =
   let open Lwt_result_syntax in
-  let* operation = Op.proposals (B block) proposer proposals in
+  let* operation = Op.proposals (B block) proposer ?period proposals in
   Incremental.assert_validate_operation_fails
     (expected_error loc)
     operation
     block
 
-let assert_validate_ballot_fails ~expected_error ~voter ~proposal ~ballot block
-    loc =
+let assert_validate_ballot_fails ~expected_error ~voter ~proposal ~ballot
+    ?period block loc =
   let open Lwt_result_syntax in
-  let* operation = Op.ballot (B block) voter proposal ballot in
+  let* operation = Op.ballot (B block) voter ?period proposal ballot in
   Incremental.assert_validate_operation_fails
     (expected_error loc)
     operation
     block
 
-(** {2 Tests} *)
+(** {2 Scenarized tests} *)
 
 (** A normal and successful vote sequence. *)
 let test_successful_vote num_delegates () =
@@ -389,7 +483,7 @@ let test_successful_vote num_delegates () =
   >>=? fun () ->
   (* proposing less than one proposal fails *)
   assert_validate_proposals_fails
-    ~expected_error:empty_proposals
+    ~expected_error:empty_proposal
     ~proposer:del1
     ~proposals:[]
     b
@@ -1129,8 +1223,614 @@ let test_voting_period_pp () =
     (Format.asprintf "%a" Voting_period_repr.pp vp)
     "index: 123, kind:proposal, start_position: 321"
 
+(** {2 Validity tests}
+
+    For each vote operation (Proposals and Ballot), we define a serie
+    of negative tests and a positive test.
+
+    Negative tests target errors that can occur during
+    application. They check that the appropriate error is triggered.
+
+    If the operation is valid, then its application must succeed when
+    it is baked into a block. Positive tests observe the effects of the
+    operation application by comparing the states before and after the
+    block. *)
+
+(** {3 Proposal -- Negative tests} *)
+
+(** Test that a Proposals operation fails when its source is not a
+    registered delegate. *)
+let test_proposals_unregistered_delegate () =
+  let open Lwt_result_syntax in
+  let* block, _delegate = context_init1 () in
+  let fresh_account = Account.new_account () in
+  assert_validate_proposals_fails
+    ~expected_error:(unregistered_delegate fresh_account.pkh)
+    ~proposer:(Contract.Implicit fresh_account.pkh)
+    ~proposals:[Protocol_hash.zero]
+    block
+    __LOC__
+
+(** Test that a Proposals operation fails when it is unsigned. *)
+let test_proposals_missing_signature () =
+  let open Lwt_result_syntax in
+  let* block, proposer = context_init1 () in
+  let* contents = Op.proposals_contents (B block) proposer [protos.(0)] in
+  let op = Op.pack_operation (B block) None contents in
+  Incremental.assert_validate_operation_fails
+    (missing_signature __LOC__)
+    op
+    block
+
+(** Test that a Proposals operation fails when its signature is invalid. *)
+let test_proposals_invalid_signature () =
+  let open Lwt_result_syntax in
+  let* block, proposer = context_init1 () in
+  let* contents = Op.proposals_contents (B block) proposer [protos.(0)] in
+  let op = Op.pack_operation (B block) (Some Signature.zero) contents in
+  Incremental.assert_validate_operation_fails
+    (invalid_signature __LOC__)
+    op
+    block
+
+(** Test that a Proposals operation fails when the period index
+    provided in the operation is not the current voting period index. *)
+let test_proposals_wrong_voting_period () =
+  let open Lwt_result_syntax in
+  let* block, proposer = context_init1 () in
+  let* current_period = Context.Vote.get_current_period (B block) in
+  let current_index = current_period.voting_period.index in
+  let op_index = Int32.succ current_index in
+  assert_validate_proposals_fails
+    ~expected_error:(wrong_voting_period ~current_index ~op_index)
+    ~proposer
+    ~proposals:[Protocol_hash.zero]
+    ~period:op_index
+    block
+    __LOC__
+
+(** Test that a Proposals operation fails when it occurs in a
+    non-Proposal voting period. *)
+let test_unexpected_proposal () =
+  let open Lwt_result_syntax in
+  let* block, proposer = context_init1 () in
+  let proposal = protos.(0) in
+  let assert_proposals_fails_with_unexpected_proposal =
+    assert_validate_proposals_fails
+      ~expected_error:unexpected_proposal
+      ~proposer
+      ~proposals:[proposal]
+  in
+  (* End the initial Proposals period with a submitted
+     proposal, to move on to an Exploration period. *)
+  let* operation = Op.proposals (B block) proposer [proposal] in
+  let* block = Block.bake block ~operation in
+  let* block = bake_until_first_block_of_next_period block in
+  (* Proposals during Exploration. *)
+  let* () = assert_period ~expected_kind:Exploration block __LOC__ in
+  let* () = assert_proposals_fails_with_unexpected_proposal block __LOC__ in
+  (* End the Exploration period with enough votes to move on to a
+     Cooldown period. *)
+  let* operation = Op.ballot (B block) proposer proposal Vote.Yay in
+  let* block = Block.bake ~operation block in
+  let* block = bake_until_first_block_of_next_period block in
+  (* Proposals during Cooldown. *)
+  let* () = assert_period ~expected_kind:Cooldown block __LOC__ in
+  let* () = assert_proposals_fails_with_unexpected_proposal block __LOC__ in
+  (* Proposals during Promotion. *)
+  let* block = bake_until_first_block_of_next_period block in
+  let* () = assert_period ~expected_kind:Promotion block __LOC__ in
+  let* () = assert_proposals_fails_with_unexpected_proposal block __LOC__ in
+  (* End the Promotion period with enough votes to move on to an
+     Adoption period. *)
+  let* operation = Op.ballot (B block) proposer proposal Vote.Yay in
+  let* block = Block.bake ~operation block in
+  let* block = bake_until_first_block_of_next_period block in
+  (* Proposals during Adoption. *)
+  let* () = assert_period ~expected_kind:Adoption block __LOC__ in
+  assert_proposals_fails_with_unexpected_proposal block __LOC__
+
+(** Test that a Proposals operation fails when the proposer is not in
+    the vote listings. *)
+let test_unauthorized_proposal () =
+  let open Lwt_result_syntax in
+  let* block, funder = context_init1 () in
+  let account = Account.new_account () in
+  let proposer = Contract.Implicit account.pkh in
+  let* operation = Op.transaction (B block) funder proposer Tez.one in
+  let* block = Block.bake block ~operation in
+  let* operation =
+    Op.delegation ~force_reveal:true (B block) proposer (Some account.pkh)
+  in
+  let* block = Block.bake block ~operation in
+  assert_validate_proposals_fails
+    ~expected_error:unauthorized_proposal
+    ~proposer
+    ~proposals:[Protocol_hash.zero]
+    block
+    __LOC__
+
+(** Test that a Proposals operation fails when its proposal list is
+    empty. *)
+let test_empty_proposal () =
+  let open Lwt_result_syntax in
+  let* block, proposer = context_init1 () in
+  assert_validate_proposals_fails
+    ~expected_error:empty_proposal
+    ~proposer
+    ~proposals:[]
+    block
+    __LOC__
+
+(** Test that a Proposals operation fails when its proposal list is
+    longer than the [max_proposals_per_delegate] protocol constant. *)
+let test_operation_has_too_many_proposals () =
+  let open Lwt_result_syntax in
+  let* block, proposer = context_init1 () in
+  assert (Array.length protos >= Constants.max_proposals_per_delegate + 1) ;
+  let proposals =
+    List.map (Array.get protos) (0 -- Constants.max_proposals_per_delegate)
+  in
+  assert_validate_proposals_fails
+    ~expected_error:too_many_proposals
+    ~proposer
+    ~proposals
+    block
+    __LOC__
+
+(** Test that a Proposals operation fails when it would make the total
+    count of proposals submitted by the proposer exceed the
+    [max_proposals_per_delegate] protocol constant. *)
+let test_too_many_proposals () =
+  let open Lwt_result_syntax in
+  let* block, proposer = context_init1 () in
+  assert (Array.length protos >= Constants.max_proposals_per_delegate + 1) ;
+  let proposals =
+    List.map (Array.get protos) (1 -- Constants.max_proposals_per_delegate)
+  in
+  let* operation = Op.proposals (B block) proposer proposals in
+  let* block = Block.bake block ~operation in
+  assert_validate_proposals_fails
+    ~expected_error:too_many_proposals
+    ~proposer
+    ~proposals:[protos.(0)]
+    block
+    __LOC__
+
+(** {3 Proposals -- Positive test}
+
+    A Proposals operation is valid when:
+
+    - its source is a registered delegate and belongs to the voting
+      listings,
+
+    - the current voting period is a Proposal period and has the same
+      index as the period provided in the operation,
+
+    - its list of proposals is not empty,
+
+    - it won't make the total proposal count of the proposer exceed
+      the [max_proposals_per_delegate] protocol constant, and
+
+    - its signature is valid.
+
+    We can observe the successful application of the Proposals
+    operation from a pre-state to a post-state as follows:
+
+    - the proposal count of the proposer has been incremented by the
+      number of proposals in the operation,
+
+    - the operation proposals have been added to the recorded
+      proposals of the proposer, and
+
+    - the total weight supporting each of the proposals has been
+      incremented by the voting power of the proposer. *)
+
+let observe_proposals pre_state post_state op caller_loc =
+  let open Lwt_result_syntax in
+  let make_loc = append_loc ~caller_loc in
+  let* (Proposals {source; period; proposals}) =
+    let (Operation_data {contents; _}) = op.protocol_data in
+    match contents with
+    | Single (Proposals _ as contents) -> return contents
+    | _ -> failwith "%s - Expected a Proposals operation" (make_loc __LOC__)
+  in
+
+  (* Validity conditions *)
+  let proposals_num = List.length proposals in
+  let* () = Assert.not_equal_int ~loc:(make_loc __LOC__) 0 proposals_num in
+  let* () =
+    assert_period ~expected_kind:Proposal pre_state (make_loc __LOC__)
+  in
+  let* pre_period = Context.Vote.get_current_period (B pre_state) in
+  let* () =
+    Assert.equal_int32
+      ~loc:(make_loc __LOC__)
+      period
+      pre_period.voting_period.index
+  in
+  let* del =
+    Context.Contract.delegate (B pre_state) (Contract.Implicit source)
+  in
+  let* () = Assert.equal_pkh ~loc:(make_loc __LOC__) source del in
+  let* dels, _powers = get_delegates_and_power_from_listings pre_state in
+  assert (List.mem ~equal:Contract.equal (Contract.Implicit source) dels) ;
+  let* pre_voting_infos = Context.Delegate.voting_info (B pre_state) source in
+  let* () =
+    Assert.not_equal_int
+      ~loc:(make_loc __LOC__)
+      0
+      pre_voting_infos.remaining_proposals
+  in
+  let* () =
+    Assert.leq_int
+      ~loc:(make_loc __LOC__)
+      proposals_num
+      pre_voting_infos.remaining_proposals
+  in
+
+  (* Observations *)
+  (* Check [voting_info] update. *)
+  let* post_voting_infos = Context.Delegate.voting_info (B post_state) source in
+  let* () =
+    Assert.equal_int
+      ~loc:(make_loc __LOC__)
+      post_voting_infos.remaining_proposals
+      (pre_voting_infos.remaining_proposals - proposals_num)
+  in
+  assert (
+    List.for_all
+      (fun a -> Stdlib.List.mem a post_voting_infos.current_proposals)
+      proposals) ;
+  (* Check [Storage.Vote.Proposals_count] update. *)
+  let* proposal_count_pre =
+    Context.Vote.recorded_proposal_count_for_delegate (B pre_state) source
+  in
+  let* proposal_count_post =
+    Context.Vote.recorded_proposal_count_for_delegate (B post_state) source
+  in
+  let* () =
+    Assert.equal_int
+      ~loc:(make_loc __LOC__)
+      (proposal_count_pre + proposals_num)
+      proposal_count_post
+  in
+  (* Check the update of the total weight of supporters for each proposal. *)
+  let* proposal_weights_pre = Context.Vote.get_proposals (B pre_state) in
+  let* proposal_weights_post = Context.Vote.get_proposals (B post_state) in
+  let* source_power =
+    Assert.get_some ~loc:(make_loc __LOC__) pre_voting_infos.voting_power
+  in
+  List.iter_es
+    (fun proposal ->
+      let weight_pre =
+        Environment.Protocol_hash.Map.find proposal proposal_weights_pre
+        |> Option.value ~default:Int64.zero
+      in
+      let* weight_post =
+        Assert.get_some
+          ~loc:(make_loc __LOC__)
+          (Environment.Protocol_hash.Map.find proposal proposal_weights_post)
+      in
+      Assert.equal_int64
+        ~loc:(make_loc __LOC__)
+        weight_post
+        (Int64.add weight_pre source_power))
+    proposals
+
+(* Bake blocks with various valid Proposals operations, and observe
+   that their effects are correctly applied. *)
+let test_valid_proposals () =
+  let open Lwt_result_syntax in
+  (* We use a higher [blocks_per_cycle] than the
+     {!default_blocks_per_cycle} (which is [4l]), so that we can bake
+     each operation in a separate block without reaching the end of
+     the voting cycle. *)
+  let* b0, (proposer0, proposer1) = context_init2 ~blocks_per_cycle:10l () in
+  let* op0 = Op.proposals (B b0) proposer0 [protos.(0)] in
+  let* b1 = Block.bake b0 ~operation:op0 in
+  let* () = observe_proposals b0 b1 op0 __LOC__ in
+  let* op1 =
+    Op.proposals (B b1) proposer0 [protos.(1); protos.(2); protos.(3)]
+  in
+  let* b2 = Block.bake b1 ~operation:op1 in
+  let* () = observe_proposals b1 b2 op1 __LOC__ in
+  let* op2 =
+    Op.proposals
+      (B b2)
+      proposer1
+      [protos.(0); protos.(2); protos.(4); protos.(5)]
+  in
+  let* b3 = Block.bake b2 ~operation:op2 in
+  let* () = observe_proposals b2 b3 op2 __LOC__ in
+  let* op3 = Op.proposals (B b3) proposer0 [protos.(5); protos.(6)] in
+  let* b4 = Block.bake b3 ~operation:op3 in
+  observe_proposals b3 b4 op3 __LOC__
+
+(** {3 Proposals -- Incoming semantic change} *)
+
+(** Test that a Proposals operation can be replayed
+    (this will no longer be true in an upcoming commit). *)
+let test_replay_proposals () =
+  let open Lwt_result_syntax in
+  let* bpre, proposer = context_init1 ~blocks_per_cycle:10l () in
+  let* operation = Op.proposals (B bpre) proposer [protos.(0)] in
+  let* bpost = Block.bake bpre ~operation in
+  let* () = observe_proposals bpre bpost operation __LOC__ in
+  (* We do not observe the effects of replayed operations because they
+     are different from fresh operations: since the proposals were
+     already recorded for the proposer,
+     [voting_infos.remaining_proposals] does not decrease, nor does
+     the total supporting weight increase.
+
+     We simply check that [Block.bake] does not fail. *)
+  let* bpost = Block.bake bpost ~operation in
+  let* _bpost = Block.bake bpost ~operations:[operation; operation] in
+  return_unit
+
+(** {3 Ballot -- Negative tests} *)
+
+(** Test that a Ballot operation fails when its source is not a
+    registered delegate. *)
+let test_ballot_unregistered_delegate () =
+  let open Lwt_result_syntax in
+  let* block, _delegate, proposal = context_init_exploration () in
+  let fresh_account = Account.new_account () in
+  assert_validate_ballot_fails
+    ~expected_error:(unregistered_delegate fresh_account.pkh)
+    ~voter:(Contract.Implicit fresh_account.pkh)
+    ~proposal
+    ~ballot:Vote.Yay
+    block
+    __LOC__
+
+(** Test that a Ballot operation fails when it is unsigned. *)
+let test_ballot_missing_signature () =
+  let open Lwt_result_syntax in
+  let* block, voter, proposal = context_init_exploration () in
+  let* contents = Op.ballot_contents (B block) voter proposal Vote.Yay in
+  let op = Op.pack_operation (B block) None contents in
+  Incremental.assert_validate_operation_fails
+    (missing_signature __LOC__)
+    op
+    block
+
+(** Test that a Ballot operation fails when its signature is invalid. *)
+let test_ballot_invalid_signature () =
+  let open Lwt_result_syntax in
+  let* block, voter, proposal = context_init_exploration () in
+  let* contents = Op.ballot_contents (B block) voter proposal Vote.Yay in
+  let op = Op.pack_operation (B block) (Some Signature.zero) contents in
+  Incremental.assert_validate_operation_fails
+    (invalid_signature __LOC__)
+    op
+    block
+
+(** Test that a Ballot operation fails when the period index provided
+    in the operation is not the current voting period index. *)
+let test_ballot_wrong_voting_period () =
+  let open Lwt_result_syntax in
+  let* block, voter = context_init1 () in
+  let* current_period = Context.Vote.get_current_period (B block) in
+  let current_index = current_period.voting_period.index in
+  let op_index = Int32.succ current_index in
+  assert_validate_ballot_fails
+    ~expected_error:(wrong_voting_period ~current_index ~op_index)
+    ~voter
+    ~proposal:protos.(0)
+    ~ballot:Vote.Yay
+    ~period:op_index
+    block
+    __LOC__
+
+(** Test that a Ballot operation fails when it occurs outside of an
+    Exploration or Promotion voting period. *)
+let test_unexpected_ballot () =
+  let open Lwt_result_syntax in
+  let* block, voter = context_init1 () in
+  let proposal = protos.(0) in
+  let assert_ballot_fails_with_unexpected_ballot =
+    assert_validate_ballot_fails
+      ~expected_error:unexpected_ballot
+      ~voter
+      ~proposal
+      ~ballot:Vote.Nay
+  in
+  (* Ballot during Proposals. *)
+  let* () = assert_period ~expected_kind:Proposal block __LOC__ in
+  let* () = assert_ballot_fails_with_unexpected_ballot block __LOC__ in
+  (* End the Proposals period with a submitted proposal, to move on to
+     an Exploration period. *)
+  let* operation = Op.proposals (B block) voter [proposal] in
+  let* block = Block.bake block ~operation in
+  let* block = bake_until_first_block_of_next_period block in
+  (* End the Exploration period with enough votes to move on to a
+     Cooldown period. *)
+  let* operation = Op.ballot (B block) voter proposal Vote.Yay in
+  let* block = Block.bake block ~operation in
+  let* block = bake_until_first_block_of_next_period block in
+  (* Ballot during Cooldown. *)
+  let* () = assert_period ~expected_kind:Cooldown block __LOC__ in
+  let* () = assert_ballot_fails_with_unexpected_ballot block __LOC__ in
+  (* End the Cooldown period, then end the Promotion period with
+     enough votes to move on to an Adoption period. *)
+  let* block = bake_until_first_block_of_next_period block in
+  let* operation = Op.ballot (B block) voter proposal Vote.Yay in
+  let* block = Block.bake ~operation block in
+  let* block = bake_until_first_block_of_next_period block in
+  (* Ballot during Adoption. *)
+  let* () = assert_period ~expected_kind:Adoption block __LOC__ in
+  assert_ballot_fails_with_unexpected_ballot block __LOC__
+
+(** Test that a Ballot operation fails when its proposal is not the
+    current proposal. *)
+let test_ballot_on_invalid_proposal () =
+  let open Lwt_result_syntax in
+  let* block, voter, _proposal =
+    context_init_exploration ~proposal:protos.(0) ()
+  in
+  assert_validate_ballot_fails
+    ~expected_error:invalid_proposal
+    ~voter
+    ~proposal:protos.(1)
+    ~ballot:Vote.Yay
+    block
+    __LOC__
+
+(** Test that a Ballot operation fails when its source has already
+    submitted a Ballot. *)
+let test_duplicate_ballot () =
+  let open Lwt_result_syntax in
+  let* block, voter, proposal = context_init_exploration () in
+  let* operation = Op.ballot (B block) voter proposal Vote.Yay in
+  let* block = Block.bake ~operation block in
+  assert_validate_ballot_fails
+    ~expected_error:duplicate_ballot
+    ~voter
+    ~proposal
+    ~ballot:Vote.Nay
+    block
+    __LOC__
+
+(** Test that a Ballot operation fails when its source is not in the
+    vote listings. *)
+let test_unauthorized_ballot () =
+  let open Lwt_result_syntax in
+  let* block, funder, proposal = context_init_exploration () in
+  let account = Account.new_account () in
+  let voter = Contract.Implicit account.pkh in
+  let* operation = Op.transaction (B block) funder voter Tez.one in
+  let* block = Block.bake block ~operation in
+  let* operation =
+    Op.delegation ~force_reveal:true (B block) voter (Some account.pkh)
+  in
+  let* block = Block.bake block ~operation in
+  assert_validate_ballot_fails
+    ~expected_error:unauthorized_ballot
+    ~voter
+    ~proposal
+    ~ballot:Vote.Yay
+    block
+    __LOC__
+
+(** {3 Ballot -- Positive test}
+
+    A Ballot operation is valid when:
+
+    - its source is a registered delegate and belongs to the voting
+      listings,
+
+    - the current voting period is an Exploration or Promotion period,
+      and has the same index as the period provided in the operation,
+
+    - its proposal is the current proposal in the context,
+
+    - the voter had submitted no ballot in the current voting period
+      yet, and
+
+    - its signature is valid.
+
+    We can observe the successful application of a Ballot operation by
+    checking that:
+
+    - the ballot has been recorded for the voter in the post-state,
+      and
+
+    - the score of the ballot's vote (yay/nay/pass) has been
+      incremented by the voting power of the source. *)
+
+let observe_ballot pre_state post_state op caller_loc =
+  let open Lwt_result_syntax in
+  let make_loc = append_loc ~caller_loc in
+  let* (Ballot {source; period; proposal; ballot}) =
+    let (Operation_data {contents; _}) = op.protocol_data in
+    match contents with
+    | Single (Ballot _ as contents) -> return contents
+    | _ -> failwith "%s - Expected a Ballot operation" (make_loc __LOC__)
+  in
+  (* Validity conditions *)
+  let* () =
+    assert_period
+      ~expected_kinds:[Exploration; Promotion]
+      pre_state
+      (make_loc __LOC__)
+  in
+  let* pre_period = Context.Vote.get_current_period (B pre_state) in
+  let* () =
+    Assert.equal_int32
+      ~loc:(make_loc __LOC__)
+      period
+      pre_period.voting_period.index
+  in
+  let* del =
+    Context.Contract.delegate (B pre_state) (Contract.Implicit source)
+  in
+  let* () = Assert.equal_pkh ~loc:(make_loc __LOC__) source del in
+  let* dels, _powers = get_delegates_and_power_from_listings pre_state in
+  assert (List.mem ~equal:Contract.equal (Contract.Implicit source) dels) ;
+  let* pre_voting_infos = Context.Delegate.voting_info (B pre_state) source in
+  let* () =
+    Assert.is_none
+      ~loc:(make_loc __LOC__)
+      ~pp:(fun fmt _ -> Format.fprintf fmt "Voter already has a ballot.@.")
+      pre_voting_infos.current_ballot
+  in
+  let* current_proposal = Context.Vote.get_current_proposal (B pre_state) in
+  let* current_proposal =
+    Assert.get_some ~loc:(make_loc __LOC__) current_proposal
+  in
+  assert (Protocol_hash.equal proposal current_proposal) ;
+  (* Observations *)
+  let* post_voting_infos = Context.Delegate.voting_info (B post_state) source in
+  let* recorded_ballot =
+    Assert.get_some ~loc:(make_loc __LOC__) post_voting_infos.current_ballot
+  in
+  let* () =
+    Assert.equal
+      ~loc:(make_loc __LOC__)
+      Vote.equal_ballot
+      "Wrong ballot recorded"
+      Vote.pp_ballot
+      ballot
+      recorded_ballot
+  in
+  let* ballots_pre = Context.Vote.get_ballots (B pre_state) in
+  let* source_power =
+    Assert.get_some ~loc:(make_loc __LOC__) pre_voting_infos.voting_power
+  in
+  let expected_ballots_post =
+    match ballot with
+    | Yay -> {ballots_pre with yay = Int64.add ballots_pre.yay source_power}
+    | Nay -> {ballots_pre with nay = Int64.add ballots_pre.nay source_power}
+    | Pass -> {ballots_pre with pass = Int64.add ballots_pre.pass source_power}
+  in
+  assert_ballots expected_ballots_post post_state (make_loc __LOC__)
+
+let test_valid_ballot () =
+  let open Lwt_result_syntax in
+  let* block, delegates = context_init ~blocks_per_cycle:10l 4 () in
+  let* proposer, voter1, voter2, voter3 =
+    match delegates with
+    | [a; b; c; d] -> return (a, b, c, d)
+    | _ -> failwith "%s@,[context_init n] should return [n] delegates" __LOC__
+  in
+  let proposal = protos.(0) in
+  let* operation = Op.proposals (B block) proposer [proposal] in
+  let* block = Block.bake block ~operation in
+  let* b0 = bake_until_first_block_of_next_period block in
+  let* operation = Op.ballot (B b0) voter1 proposal Vote.Yay in
+  let* b1 = Block.bake b0 ~operation in
+  let* () = observe_ballot b0 b1 operation __LOC__ in
+  let* operation = Op.ballot (B b1) voter2 proposal Vote.Nay in
+  let* b2 = Block.bake b1 ~operation in
+  let* () = observe_ballot b1 b2 operation __LOC__ in
+  let* operation = Op.ballot (B b2) voter3 proposal Vote.Pass in
+  let* b3 = Block.bake b2 ~operation in
+  observe_ballot b2 b3 operation __LOC__
+
 let tests =
   [
+    (* Scenarized tests *)
     Tztest.tztest "voting successful_vote" `Quick (test_successful_vote 137);
     Tztest.tztest
       "voting cooldown, not enough quorum"
@@ -1185,4 +1885,59 @@ let tests =
       `Quick
       test_voting_power_updated_each_voting_period;
     Tztest.tztest "voting period pretty print" `Quick test_voting_period_pp;
+    (* Validity tests on Proposals *)
+    Tztest.tztest
+      "Proposals from unregistered delegate"
+      `Quick
+      test_proposals_unregistered_delegate;
+    Tztest.tztest
+      "Proposals missing signature"
+      `Quick
+      test_proposals_missing_signature;
+    Tztest.tztest
+      "Proposals invalid signature"
+      `Quick
+      test_proposals_invalid_signature;
+    Tztest.tztest
+      "Proposals wrong voting period"
+      `Quick
+      test_proposals_wrong_voting_period;
+    Tztest.tztest "Unexpected proposals" `Quick test_unexpected_proposal;
+    Tztest.tztest "Unauthorized proposal" `Quick test_unauthorized_proposal;
+    Tztest.tztest "Empty proposal" `Quick test_empty_proposal;
+    Tztest.tztest
+      "Operation has too many proposals"
+      `Quick
+      test_operation_has_too_many_proposals;
+    Tztest.tztest
+      "Too many proposals (over two operations)"
+      `Quick
+      test_too_many_proposals;
+    Tztest.tztest "Valid Proposals operations" `Quick test_valid_proposals;
+    Tztest.tztest "Replay proposals" `Quick test_replay_proposals;
+    (* Validity tests on Ballot *)
+    Tztest.tztest
+      "Ballot from unregistered delegate"
+      `Quick
+      test_ballot_unregistered_delegate;
+    Tztest.tztest
+      "Ballot missing signature"
+      `Quick
+      test_ballot_missing_signature;
+    Tztest.tztest
+      "Ballot invalid signature"
+      `Quick
+      test_ballot_invalid_signature;
+    Tztest.tztest
+      "Ballot wrong voting period"
+      `Quick
+      test_ballot_wrong_voting_period;
+    Tztest.tztest "Unexpected ballot" `Quick test_unexpected_ballot;
+    Tztest.tztest
+      "Ballot on invalid proposal"
+      `Quick
+      test_ballot_on_invalid_proposal;
+    Tztest.tztest "Duplicate ballot" `Quick test_duplicate_ballot;
+    Tztest.tztest "Unauthorized ballot" `Quick test_unauthorized_ballot;
+    Tztest.tztest "Valid Ballot operations" `Quick test_valid_ballot;
   ]

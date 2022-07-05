@@ -2605,6 +2605,8 @@ module Vote : sig
 
   val equal_ballot : ballot -> ballot -> bool
 
+  val pp_ballot : Format.formatter -> ballot -> unit
+
   type delegate_info = {
     voting_power : Int64.t option;
     current_ballot : ballot option;
