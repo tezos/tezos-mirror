@@ -1,9 +1,6 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(cram
- (deps ./main_snoop.exe))
-
 (executable
  (name main_snoop)
  (public_name tezos-snoop)
@@ -30,3 +27,5 @@
   -open Tezos_base.TzPervasives
   -open Tezos_stdlib_unix
   -open Tezos_benchmark))
+
+(cram (deps main_snoop.exe) (package tezos-snoop))
