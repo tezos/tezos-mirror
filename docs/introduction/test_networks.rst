@@ -16,7 +16,7 @@ former is obviously important as users need to test their development
 with the current protocol. The latter is also needed to test the proposed
 protocol and its new features, both to decide whether to vote yes and
 to prepare for its activation. After the intended protocol of a test
-network is activated (such as Ithaca for ithacanet), the protocol
+network is activated (such as Jakarta for jakartanet), the protocol
 no longer changes because this could break the workflow of some users
 while they are testing their development, as they may not be ready for
 the new protocol. So every time a new protocol is proposed on Mainnet,
@@ -51,23 +51,6 @@ On Jakartanet, some constants differ from Mainnet.
 This results in a faster chain than Mainnet.
 See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
 
-Ithacanet
-=========
-
-- Built-in network alias: ``ithacanet`` (see :ref:`builtin_networks`)
-
-  * Available from version 12.0~rc1 but 12.0~rc2 updated it to refer
-    to the second version of Ithacanet which runs ``Psithaca2`` instead
-    of ``PsiThaCa``.
-
-Ithacanet is a test network which ran the Ithaca protocol and which was reset
-to run on the Ithaca2 protocol.
-Ithacanet will run until Ithaca2 is replaced by another protocol on Mainnet.
-
-On Ithacanet, some constants differ from Mainnet.
-This results in a faster chain than Mainnet.
-See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
-
 Future Networks
 ===============
 
@@ -78,9 +61,32 @@ test network until either P is rejected or activated. If P is rejected, P-net wi
 end, unless P is immediately re-submitted for injection. If, however,
 P is activated, the previous test network will end and P-net will continue on its own.
 
+.. _ghostnet:
+
+Ghostnet
+========
+
+Ghostnet is a long running, centrally managed test network designed to follow (in fact, anticipate!) Tezos Mainnet protocol upgrades.
+Indeed, Ghostnet generally updates to the same protocol as Mainnet a few hours or days before the Mainnet itself.
+
+Ghostnet was previously known as :ref:`ithacanet`, the testchain for the Ithaca protocol.
+
+See also
+========
+
+An external description of the various test networks available can be found on https://teztnets.xyz/.
+
 Old Networks
 ============
 
+.. _ithacanet:
+
+Ithacanet
+---------
+
+Ithacanet was a test network running the Ithaca protocol.
+Following the activation of the Jakarta protocol replacing Ithaca on Mainnet,
+Ithacanet was converted to :ref:`ghostnet` on June 28, 2022.
 
 Hangzhounet
 -----------

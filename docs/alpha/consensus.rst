@@ -138,6 +138,8 @@ should be taken at round 0, meaning that the time between blocks would be
 :math:`round\_duration(0)` seconds i.e., parameter ``MINIMAL_BLOCK_DELAY``.
 
 
+.. _active_stake_alpha:
+
 Validator selection: staking balance, active stake, and frozen deposits
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

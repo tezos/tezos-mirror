@@ -31,10 +31,10 @@ dnf install -y dnf-plugins-core
 dnf copr enable -y $REPO && dnf update -y
 dnf install -y tezos-client
 dnf install -y tezos-node
-dnf install -y tezos-baker-012-Psithaca
-dnf install -y tezos-accuser-012-Psithaca
+dnf install -y tezos-baker-013-PtJakart
+dnf install -y tezos-accuser-013-PtJakart
 # [test executables]
 tezos-client --version
 tezos-node --version
-tezos-baker-012-Psithaca --version
-tezos-accuser-012-Psithaca --version
+tezos-baker-013-PtJakart --version
+tezos-accuser-013-PtJakart --version

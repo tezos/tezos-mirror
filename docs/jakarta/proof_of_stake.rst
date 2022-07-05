@@ -53,6 +53,7 @@ from the delegates' own balance.
 Active and passive delegates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. _active_delegate:
 .. _active_delegate_jakarta:
 
 A delegate can be marked as either active or passive. A passive
@@ -71,6 +72,7 @@ Delegates' rights selection
 Tezos being proof-of-stake, the delegates' rights are selected at random based on their
 stake. In what follows we detail the selection mechanism used in Tezos.
 
+.. _random_seed:
 .. _random_seed_jakarta:
 
 Random seed
@@ -126,6 +128,7 @@ is the seed of cycle ``n-1``; at each iteration, the new bitstring is
 the hash of the concatenation of the previous bitstring with the iterated
 revealed nonce.
 
+.. _snapshots:
 .. _snapshots_jakarta:
 
 Stake snapshots
@@ -148,6 +151,7 @@ cycle ``n``.
 
 Only the stake of active delegates with the minimal stake of ``TOKENS_PER_ROLL`` is snapshot.
 
+.. _rights:
 .. _rights_jakarta:
 
 Slot selection
@@ -180,6 +184,7 @@ simple procedure which has as its initial state: the level, the
 level belongs, and the slot.
 
 
+.. _protocol_constants:
 .. _protocol_constants_jakarta:
 
 Protocol constants
@@ -193,6 +198,7 @@ The values of protocol constants can be found using a :ref:`specific RPC call <G
 
 In particular, the protocol constants related to the proof-of-stake mechanism are detailed below.
 
+.. _ps_constants:
 .. _ps_constants_jakarta:
 
 Proof-of-stake parameters
