@@ -256,8 +256,8 @@ module Make_json_commands (Loops : MAIN_LOOPS) : JSON_COMMANDS = struct
 end
 
 module Make_db_commands (Loops : MAIN_LOOPS) : DB_COMMANDS = struct
-  let main cctxt prefix source =
-    let db = Sqlite3.db_open prefix in
+  let main cctxt db_path source =
+    let db = Sqlite3.db_open db_path in
     let () = Db.set_pragma_use_foreign_keys db in
     let dumper = Db_archiver.launch db source in
     let main =
@@ -293,8 +293,8 @@ module Make_db_commands (Loops : MAIN_LOOPS) : DB_COMMANDS = struct
                  ~desc:"path to file in which to store the Sqlite3 database"
                  new_file_parameter
             @@ Clic.stop)
-            (fun () path _cctxt ->
-              Db.create_db path ;
+            (fun () db_path _cctxt ->
+              Db.create_db db_path ;
               return_unit);
           Clic.command
             ~group
@@ -311,6 +311,6 @@ module Make_db_commands (Loops : MAIN_LOOPS) : DB_COMMANDS = struct
                  ~desc:"name of the data source (i.e. of the node)"
                  (Clic.parameter (fun _ p -> return p))
             @@ Clic.stop)
-            (fun () prefix source cctxt -> main cctxt prefix source);
+            (fun () db_path source cctxt -> main cctxt db_path source);
         ])
 end
