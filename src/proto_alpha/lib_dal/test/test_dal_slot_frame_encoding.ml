@@ -31,11 +31,17 @@
     Subject:    Tests for the SCORU storage module
 *)
 
+(* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3421
+   Property based tests to check basic invariants of slot-frame encoding V0. *)
+
 open Protocol
 open Alpha_context
-module Rollup_messages_map = Dal_slot_frame_encoding.V0.Rollup_map
+module Rollup_messages_map = Dal_slot_frame_encoding.Rollups_map
+module V0 = Dal_slot_frame_encoding.V0
 
-let max_size = 1_024_576
+(* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3339
+   Fetch this value from protocol default constants *)
+let max_size = 1_048_576
 
 let assert_fails_with ~loc k expected_err =
   let open Lwt_result_syntax in
@@ -78,19 +84,16 @@ let sc_rollup_2 =
 
 let slot_frame_encoding_size_correct_single_v0 () =
   let open Lwt_result_syntax in
-  let module Rollup_messages_map = Dal_slot_frame_encoding.V0.Rollup_map in
   let messages_rollup_1 =
     ["hello"; "is"; "it"; "me"; "you"; "are"; "looking"; "for"]
   in
   (* One rollup with offset should take 24 bytes *)
-  let entry_size = Dal_slot_frame_encoding.V0.rollup_entry_size in
+  let entry_size = V0.Internal.rollup_entry_size in
   let* () = Assert.equal_int ~loc:__LOC__ entry_size 24 in
   (* 1 byte for version *)
   let expected_version_size = 1 in
   (* 20 bytes for one rollup address + 4 bytes of offset + 4 bytes for frame length = 28 bytes *)
-  let computed_rollups_frame_size =
-    Dal_slot_frame_encoding.V0.rollups_frame_size 1
-  in
+  let computed_rollups_frame_size = V0.Internal.rollups_frame_size 1 in
   let expected_rollups_frame_size = 28 in
   let* () =
     Assert.equal_int
@@ -103,7 +106,7 @@ let slot_frame_encoding_size_correct_single_v0 () =
     4 bytes list length prefix +
     63 bytes for messages frame *)
   let computed_messages_frame_size =
-    Dal_slot_frame_encoding.V0.messages_frame_size messages_rollup_1
+    V0.Internal.messages_frame_size messages_rollup_1
   in
   let expected_messages_frame_size = 63 in
   let* () =
@@ -115,7 +118,7 @@ let slot_frame_encoding_size_correct_single_v0 () =
   (* 4 bytes of list length prefix +
      63 bytes of messages_frame_size = 67 bytes for all messages frames *)
   let computed_all_messages_frames_size =
-    Dal_slot_frame_encoding.V0.all_messages_frames_size [messages_rollup_1]
+    V0.Internal.all_messages_frames_size [messages_rollup_1]
   in
   let expected_all_messages_frames_size = 4 + expected_messages_frame_size in
   let* () =
@@ -132,12 +135,11 @@ let slot_frame_encoding_size_correct_single_v0 () =
     Rollup_messages_map.empty
     |> Rollup_messages_map.add sc_rollup_1 messages_rollup_1
   in
-  let computed_size = Dal_slot_frame_encoding.V0.expected_slot_size map in
+  let computed_size = V0.expected_slot_size map in
   Assert.equal_int ~loc:__LOC__ expected_size computed_size
 
 let slot_frame_encoding_size_correct_multiple_v0 () =
   let open Lwt_result_syntax in
-  let module Rollup_messages_map = Dal_slot_frame_encoding.V0.Rollup_map in
   let messages_rollup_1 = ["Summer"; "loving"; "had"; "me"; "a"; "blast"] in
   let messages_rollup_2 = ["Summer"; "loving"; "happened"; "so"; "fast"] in
   (* 1 byte for version *)
@@ -145,9 +147,7 @@ let slot_frame_encoding_size_correct_multiple_v0 () =
   (* 24 * 2 = 48 bytes for two rollup entries +
      4 bytes for frame length prefix = 52 bytes
   *)
-  let computed_rollups_frame_size =
-    Dal_slot_frame_encoding.V0.rollups_frame_size 2
-  in
+  let computed_rollups_frame_size = V0.Internal.rollups_frame_size 2 in
   let expected_rollups_frame_size = 52 in
   let* () =
     Assert.equal_int
@@ -172,8 +172,7 @@ let slot_frame_encoding_size_correct_multiple_v0 () =
      105 bytes
   *)
   let computed_all_messages_frames_size =
-    Dal_slot_frame_encoding.V0.all_messages_frames_size
-      [messages_rollup_1; messages_rollup_2]
+    V0.Internal.all_messages_frames_size [messages_rollup_1; messages_rollup_2]
   in
   let expected_all_messages_frames_size = 105 in
   let* () =
@@ -191,7 +190,7 @@ let slot_frame_encoding_size_correct_multiple_v0 () =
     |> Rollup_messages_map.add sc_rollup_1 messages_rollup_1
     |> Rollup_messages_map.add sc_rollup_2 messages_rollup_2
   in
-  let computed_size = Dal_slot_frame_encoding.V0.expected_slot_size map in
+  let computed_size = V0.expected_slot_size map in
   Assert.equal_int ~loc:__LOC__ expected_size computed_size
 
 let slot_frame_encoding_decoding_correct_single_v0 () =
@@ -203,18 +202,14 @@ let slot_frame_encoding_decoding_correct_single_v0 () =
     Rollup_messages_map.empty
     |> Rollup_messages_map.add sc_rollup_1 messages_rollup_1
   in
-  let* serialized =
-    Dal_slot_frame_encoding.V0.serialize ~max_size messages_map
-  in
+  let* serialized = V0.serialize ~max_size messages_map in
   let* () =
     Assert.equal_int
       ~loc:__LOC__
       (String.length serialized)
-      (Dal_slot_frame_encoding.V0.expected_slot_size messages_map)
+      (V0.expected_slot_size messages_map)
   in
-  let* deserialized =
-    Dal_slot_frame_encoding.V0.deserialize ~max_size serialized
-  in
+  let* deserialized = V0.deserialize ~max_size serialized in
   let rollups_with_messages = Rollup_messages_map.bindings deserialized in
   let* () =
     assert_equal_list_rollups
@@ -238,18 +233,14 @@ let slot_frame_encoding_decoding_correct_multiple_v0 () =
     |> Rollup_messages_map.add sc_rollup_1 messages_rollup_1
     |> Rollup_messages_map.add sc_rollup_2 messages_rollup_2
   in
-  let* serialized =
-    Dal_slot_frame_encoding.V0.serialize ~max_size messages_map
-  in
+  let* serialized = V0.serialize ~max_size messages_map in
   let* () =
     Assert.equal_int
       ~loc:__LOC__
       (String.length serialized)
-      (Dal_slot_frame_encoding.V0.expected_slot_size messages_map)
+      (V0.expected_slot_size messages_map)
   in
-  let* deserialized =
-    Dal_slot_frame_encoding.V0.deserialize ~max_size serialized
-  in
+  let* deserialized = V0.deserialize ~max_size serialized in
   let rollups_with_messages = Rollup_messages_map.bindings deserialized in
   let* () =
     assert_equal_list_rollups
@@ -265,7 +256,6 @@ let slot_frame_encoding_decoding_correct_multiple_v0 () =
     (List.map snd rollups_with_messages)
 
 let slot_frame_encoding_fails_if_too_big () =
-  let module Rollup_messages_map = Dal_slot_frame_encoding.V0.Rollup_map in
   let messages_rollup_1 = ["Summer"; "loving"; "had"; "me"; "a"; "blast"] in
   let messages_rollup_2 = ["Summer"; "loving"; "happened"; "so"; "fast"] in
   let messages_map =
@@ -273,20 +263,34 @@ let slot_frame_encoding_fails_if_too_big () =
     |> Rollup_messages_map.add sc_rollup_1 messages_rollup_1
     |> Rollup_messages_map.add sc_rollup_2 messages_rollup_2
   in
-  let actual_size =
-    Dal_slot_frame_encoding.V0.expected_slot_size messages_map
-  in
+  let actual_size = V0.expected_slot_size messages_map in
   let max_size = actual_size - 1 in
   assert_fails_with
     ~loc:__LOC__
-    (Dal_slot_frame_encoding.V0.serialize ~max_size messages_map)
+    (V0.serialize ~max_size messages_map)
     (Dal_slot_frame_encoding.Slot_size_is_too_big {actual_size; max_size})
 
-let slot_frame_encoding_correct_offsets () =
+let slot_frame_decoding_fails_if_too_big () =
   let open Lwt_result_syntax in
-  let module Rollup_messages_map = Dal_slot_frame_encoding.V0.Rollup_map in
-  let messages_rollup_1 = ["hello"; "world"] in
-  let messages_rollup_2 = ["CAFEBABE"; "CAFEDEAD"] in
+  let messages_rollup_1 = ["Summer"; "loving"; "had"; "me"; "a"; "blast"] in
+  let messages_rollup_2 = ["Summer"; "loving"; "happened"; "so"; "fast"] in
+  let messages_map =
+    Rollup_messages_map.empty
+    |> Rollup_messages_map.add sc_rollup_1 messages_rollup_1
+    |> Rollup_messages_map.add sc_rollup_2 messages_rollup_2
+  in
+  let actual_size = V0.expected_slot_size messages_map in
+  let* serialized = V0.serialize ~max_size:actual_size messages_map in
+  let max_size = actual_size - 1 in
+  assert_fails_with
+    ~loc:__LOC__
+    (V0.deserialize ~max_size serialized)
+    (Dal_slot_frame_encoding.Slot_size_is_too_big {actual_size; max_size})
+
+let slot_frame_decoding_fails_if_wrong_version () =
+  let open Lwt_result_syntax in
+  let messages_rollup_1 = ["Summer"; "loving"; "had"; "me"; "a"; "blast"] in
+  let messages_rollup_2 = ["Summer"; "loving"; "happened"; "so"; "fast"] in
   let messages_map =
     Rollup_messages_map.empty
     |> Rollup_messages_map.add sc_rollup_1 messages_rollup_1
@@ -295,6 +299,25 @@ let slot_frame_encoding_correct_offsets () =
   let* serialized =
     Dal_slot_frame_encoding.V0.serialize ~max_size messages_map
   in
+  let serialized_wrong_version =
+    "\001" ^ String.sub serialized 1 (String.length serialized - 1)
+  in
+  assert_fails_with
+    ~loc:__LOC__
+    (V0.deserialize ~max_size serialized_wrong_version)
+    (Dal_slot_frame_encoding.Wrong_slot_frame_version
+       {expected = 0; provided = 1})
+
+let slot_frame_encoding_correct_offsets () =
+  let open Lwt_result_syntax in
+  let messages_rollup_1 = ["hello"; "world"] in
+  let messages_rollup_2 = ["CAFEBABE"; "CAFEDEAD"] in
+  let messages_map =
+    Rollup_messages_map.empty
+    |> Rollup_messages_map.add sc_rollup_1 messages_rollup_1
+    |> Rollup_messages_map.add sc_rollup_2 messages_rollup_2
+  in
+  let* serialized = V0.serialize ~max_size messages_map in
   (* the value of the offset that denotes where the messages frame for
      sc_rollup_1 starts can be found at offset 25 until 29 (excluded):
      1 byte for version +
@@ -372,11 +395,19 @@ let tests =
       `Quick
       slot_frame_encoding_decoding_correct_multiple_v0;
     Tztest.tztest
-      "Encoding of a slot over maximum size fails"
+      "Encoding of a slot over maximum size fails (V0)"
       `Quick
       slot_frame_encoding_fails_if_too_big;
     Tztest.tztest
-      "Offsets of messages frames are correct"
+      "Offsets of messages frames are correct (V0)"
       `Quick
       slot_frame_encoding_correct_offsets;
+    Tztest.tztest
+      "Slot decoding fails when slot size is too big (V0)"
+      `Quick
+      slot_frame_decoding_fails_if_too_big;
+    Tztest.tztest
+      "Slot decoding fails when first byte has wrong version (V0)"
+      `Quick
+      slot_frame_decoding_fails_if_wrong_version;
   ]
