@@ -364,9 +364,5 @@ module Sc_rollup : sig
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/sc_rollup/[rollup_hash]/staker/[staker]/staked_on_commitment *)
   val get_staked_on_commitment :
-    ?chain:string ->
-    ?block:string ->
-    sc_rollup_address:string ->
-    string ->
-    JSON.t t
+    ?chain:string -> ?block:string -> sc_rollup:string -> string -> JSON.t t
 end
