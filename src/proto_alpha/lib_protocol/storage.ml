@@ -1606,7 +1606,7 @@ module Sc_rollup = struct
       end)
 
   module Boot_sector =
-    Indexed_context.Make_map
+    Indexed_context.Make_carbonated_map
       (struct
         let name = ["boot_sector"]
       end)
