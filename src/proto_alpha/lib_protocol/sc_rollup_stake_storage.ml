@@ -246,10 +246,10 @@ let increase_commitment_stake_count ctxt rollup node =
   in
   return (size_diff, ctxt)
 
-(* 77 for Commitments entry + 4 for Commitment_stake_count entry
+(* 73 for Commitments entry + 4 for Commitment_stake_count entry
    + 4 for Commitment_added entry
    + 0 for Staker_count_update entry *)
-let commitment_storage_size_in_bytes = 85
+let commitment_storage_size_in_bytes = 81
 
 let refine_stake ctxt rollup staker staked_on commitment =
   let open Lwt_tzresult_syntax in
@@ -320,17 +320,6 @@ let publish_commitment ctxt rollup staker commitment =
   in
   (commitment_hash, ctxt, level, balance_updates)
 
-(** Try to consume n messages. *)
-let consume_n_messages ctxt rollup n =
-  let open Lwt_tzresult_syntax in
-  let* ctxt, inbox = Store.Inbox.get ctxt rollup in
-  Sc_rollup_inbox_repr.consume_n_messages n inbox >>?= function
-  | None -> return ctxt
-  | Some inbox ->
-      let* ctxt, size = Store.Inbox.update ctxt rollup inbox in
-      assert (Compare.Int.(size <= 0)) ;
-      return ctxt
-
 let cement_commitment ctxt rollup new_lcc =
   let open Lwt_tzresult_syntax in
   let refutation_deadline_blocks =
@@ -380,12 +369,7 @@ let cement_commitment ctxt rollup new_lcc =
      on the new LCC, and no one is directly staked on the old LCC. We
      can safely deallocate the old LCC.
   *)
-  let* ctxt = deallocate ctxt rollup old_lcc in
-  consume_n_messages
-    ctxt
-    rollup
-    (Sc_rollup_repr.Number_of_messages.to_int32
-       new_lcc_commitment.number_of_messages)
+  deallocate ctxt rollup old_lcc
 
 let remove_staker ctxt rollup staker =
   let open Lwt_tzresult_syntax in

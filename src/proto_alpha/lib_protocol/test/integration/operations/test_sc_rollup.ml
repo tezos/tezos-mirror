@@ -160,11 +160,6 @@ let init_and_originate ?boot_sector ?origination_proof
   in
   return (block, contracts, rollup)
 
-let number_of_messages_exn n =
-  match Sc_rollup.Number_of_messages.of_int32 n with
-  | Some x -> x
-  | None -> Stdlib.failwith "Bad Number_of_messages"
-
 let number_of_ticks_exn n =
   match Sc_rollup.Number_of_ticks.of_int32 n with
   | Some x -> x
@@ -194,7 +189,6 @@ let dummy_commitment ctxt rollup =
       {
         predecessor;
         inbox_level;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 3000l;
         compressed_state;
       }
@@ -1383,6 +1377,37 @@ let test_insufficient_ticket_balances () =
        ~source
        output)
 
+let test_inbox_max_number_of_messages_per_commitment_period () =
+  let* block, (account1, account2) = context_init Context.T2 in
+  let* block, rollup = sc_originate block account1 "unit" in
+  let* constants = Context.get_constants (B block) in
+  let Constants.Parametric.{max_number_of_messages_per_commitment_period; _} =
+    constants.parametric.sc_rollup
+  in
+  let* incr = Incremental.begin_construction block in
+  (* This just one message below the limit *)
+  let messages =
+    List.repeat max_number_of_messages_per_commitment_period "foo"
+  in
+  let* op = Op.sc_rollup_add_messages (I incr) account1 rollup messages in
+  let* incr = Incremental.add_operation ~check_size:false incr op in
+  (* This break the limit *)
+  let* op = Op.sc_rollup_add_messages (I incr) account2 rollup ["foo"] in
+  let expect_apply_failure = function
+    | Environment.Ecoproto_error
+        (Sc_rollup_errors
+         .Sc_rollup_max_number_of_messages_reached_for_commitment_period as e)
+      :: _ ->
+        Assert.test_error_encodings e ;
+        return_unit
+    | _ ->
+        failwith
+          "It should have failed with \
+           [Sc_rollup_max_number_of_messages_reached_for_commitment_period"
+  in
+  let* _incr = Incremental.add_operation ~expect_apply_failure incr op in
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -1459,4 +1484,8 @@ let tests =
       "insufficient ticket balances"
       `Quick
       test_insufficient_ticket_balances;
+    Tztest.tztest
+      "inbox max number of messages during commitment period"
+      `Quick
+      test_inbox_max_number_of_messages_per_commitment_period;
   ]

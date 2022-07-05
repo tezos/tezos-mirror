@@ -54,12 +54,6 @@ let gen_commitment_hash =
   let* bytes = bytes_fixed_gen Sc_rollup_commitment_repr.Hash.size in
   return (Sc_rollup_commitment_repr.Hash.of_bytes_exn bytes)
 
-let gen_number_of_messages =
-  let open Gen in
-  let open Sc_rollup_repr.Number_of_messages in
-  let* v = int32_range_gen min_int max_int in
-  return (WithExceptions.Option.get ~loc:__LOC__ (of_int32 v))
-
 let gen_number_of_ticks =
   let open Gen in
   let open Sc_rollup_repr.Number_of_ticks in
@@ -71,17 +65,10 @@ let gen_commitment =
   let* compressed_state = gen_state_hash
   and* inbox_level = gen_raw_level
   and* predecessor = gen_commitment_hash
-  and* number_of_messages = gen_number_of_messages
   and* number_of_ticks = gen_number_of_ticks in
   return
     Sc_rollup_commitment_repr.
-      {
-        compressed_state;
-        inbox_level;
-        predecessor;
-        number_of_messages;
-        number_of_ticks;
-      }
+      {compressed_state; inbox_level; predecessor; number_of_ticks}
 
 let gen_versioned_commitment =
   let open Gen in

@@ -118,8 +118,6 @@ let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
 *)
 let test_sc_rollup_commitment_storage_size () =
   let open Protocol in
-  Assert.get_some ~loc:__LOC__ (Sc_rollup_repr.Number_of_messages.of_int32 3l)
-  >>=? fun number_of_messages ->
   Assert.get_some
     ~loc:__LOC__
     (Sc_rollup_repr.Number_of_ticks.of_int32 1232909l)
@@ -129,7 +127,6 @@ let test_sc_rollup_commitment_storage_size () =
       {
         predecessor = Sc_rollup_commitment_repr.Hash.zero;
         inbox_level = Raw_level_repr.of_int32_exn 21l;
-        number_of_messages;
         number_of_ticks;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }

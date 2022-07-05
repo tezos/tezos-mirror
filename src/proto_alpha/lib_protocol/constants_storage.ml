@@ -238,9 +238,9 @@ let sc_rollup_challenge_window_in_blocks c =
   let sc_rollup = Raw_context.sc_rollup c in
   sc_rollup.challenge_window_in_blocks
 
-let sc_rollup_max_available_messages c =
+let sc_rollup_max_number_of_messages_per_commitment_period c =
   let sc_rollup = Raw_context.sc_rollup c in
-  sc_rollup.max_available_messages
+  sc_rollup.max_number_of_messages_per_commitment_period
 
 let sc_rollup_stake_amount c =
   let sc_rollup = Raw_context.sc_rollup c in

@@ -57,7 +57,7 @@ module Protocol_constants_overrides = struct
     enable : bool option;
     origination_size : int option;
     challenge_window_in_blocks : int option;
-    max_available_messages : int option;
+    max_number_of_messages_per_commitment_period : int option;
     stake_amount : Tez.t option;
     commitment_period_in_blocks : int option;
     max_lookahead_in_blocks : int32 option;
@@ -192,7 +192,7 @@ module Protocol_constants_overrides = struct
         ( c.enable,
           c.origination_size,
           c.challenge_window_in_blocks,
-          c.max_available_messages,
+          c.max_number_of_messages_per_commitment_period,
           c.stake_amount,
           c.commitment_period_in_blocks,
           c.max_lookahead_in_blocks,
@@ -202,7 +202,7 @@ module Protocol_constants_overrides = struct
       (fun ( sc_rollup_enable,
              sc_rollup_origination_size,
              sc_rollup_challenge_window_in_blocks,
-             sc_rollup_max_available_messages,
+             sc_rollup_max_number_of_messages_per_commitment_period,
              sc_rollup_stake_amount,
              sc_rollup_commitment_period_in_blocks,
              sc_rollup_max_lookahead_in_blocks,
@@ -213,7 +213,8 @@ module Protocol_constants_overrides = struct
           enable = sc_rollup_enable;
           origination_size = sc_rollup_origination_size;
           challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
-          max_available_messages = sc_rollup_max_available_messages;
+          max_number_of_messages_per_commitment_period =
+            sc_rollup_max_number_of_messages_per_commitment_period;
           stake_amount = sc_rollup_stake_amount;
           commitment_period_in_blocks = sc_rollup_commitment_period_in_blocks;
           max_lookahead_in_blocks = sc_rollup_max_lookahead_in_blocks;
@@ -227,7 +228,7 @@ module Protocol_constants_overrides = struct
          (opt "sc_rollup_enable" bool)
          (opt "sc_rollup_origination_size" int31)
          (opt "sc_rollup_challenge_window_in_blocks" int31)
-         (opt "sc_rollup_max_available_messages" int31)
+         (opt "sc_rollup_max_number_of_messages_per_commitment_period" int31)
          (opt "sc_rollup_stake_amount" Tez.encoding)
          (opt "sc_rollup_commitment_period_in_blocks" int31)
          (opt "sc_rollup_max_lookahead_in_blocks" int32)
@@ -503,8 +504,10 @@ module Protocol_constants_overrides = struct
             origination_size = Some parametric.sc_rollup.origination_size;
             challenge_window_in_blocks =
               Some parametric.sc_rollup.challenge_window_in_blocks;
-            max_available_messages =
-              Some parametric.sc_rollup.max_available_messages;
+            max_number_of_messages_per_commitment_period =
+              Some
+                parametric.sc_rollup
+                  .max_number_of_messages_per_commitment_period;
             stake_amount = Some parametric.sc_rollup.stake_amount;
             commitment_period_in_blocks =
               Some parametric.sc_rollup.commitment_period_in_blocks;
@@ -597,7 +600,7 @@ module Protocol_constants_overrides = struct
           enable = None;
           origination_size = None;
           challenge_window_in_blocks = None;
-          max_available_messages = None;
+          max_number_of_messages_per_commitment_period = None;
           stake_amount = None;
           commitment_period_in_blocks = None;
           max_lookahead_in_blocks = None;
@@ -1071,10 +1074,11 @@ module Protocol_constants_overrides = struct
                Option.value
                  ~default:c.sc_rollup.challenge_window_in_blocks
                  o.sc_rollup.challenge_window_in_blocks;
-             max_available_messages =
+             max_number_of_messages_per_commitment_period =
                Option.value
-                 ~default:c.sc_rollup.max_available_messages
-                 o.sc_rollup.max_available_messages;
+                 ~default:
+                   c.sc_rollup.max_number_of_messages_per_commitment_period
+                 o.sc_rollup.max_number_of_messages_per_commitment_period;
              stake_amount =
                Option.value
                  ~default:c.sc_rollup.stake_amount

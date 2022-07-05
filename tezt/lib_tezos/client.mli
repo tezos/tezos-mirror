@@ -1257,8 +1257,7 @@ module Sc_rollup : sig
 
   (** Run [tezos-client publish commitment from <src> for sc rollup <sc_rollup>
       with compressed state <compressed_state> at inbox level <inbox_level>
-      and predecessor <predecessor> and number of messages <number_of_messages>
-      and number of ticks <number_of_ticks>. *)
+      and predecessor <predecessor> and number of ticks <number_of_ticks>. *)
   val publish_commitment :
     ?hooks:Process.hooks ->
     ?wait:string ->
@@ -1268,7 +1267,6 @@ module Sc_rollup : sig
     compressed_state:string ->
     inbox_level:int ->
     predecessor:string ->
-    number_of_messages:int ->
     number_of_ticks:int ->
     t ->
     unit Runnable.process

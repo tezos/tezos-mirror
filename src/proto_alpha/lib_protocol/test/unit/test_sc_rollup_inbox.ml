@@ -51,7 +51,7 @@ let test_empty () =
   create_context () >>=? fun ctxt ->
   empty ctxt rollup level >>= fun inbox ->
   fail_unless
-    Z.(equal (number_of_available_messages inbox) zero)
+    Compare.Int64.(equal (number_of_messages_during_commitment_period inbox) 0L)
     (err "An empty inbox should have no available message.")
 
 let setup_inbox_with_messages list_of_payloads f =
@@ -89,29 +89,11 @@ let test_add_messages payloads =
   setup_inbox_with_messages [payloads]
   @@ fun _ctxt _messages _history inbox _inboxes ->
   fail_unless
-    Z.(equal (number_of_available_messages inbox) (of_int nb_payloads))
-    (err "Invalid number of available messages.")
-
-let test_consume_messages (payloads, nb_consumed_messages) =
-  let nb_payloads = List.length payloads |> Int32.of_int in
-  setup_inbox_with_messages [payloads]
-  @@ fun _ctxt _messages _history inbox _inboxes ->
-  consume_n_messages nb_consumed_messages inbox |> Environment.wrap_tzresult
-  >>?= function
-  | Some inbox ->
-      let available_messages = Int32.sub nb_payloads nb_consumed_messages in
-      fail_unless
-        Z.(
-          equal
-            (number_of_available_messages inbox)
-            (of_int32 available_messages))
-        (err "Invalid number of available messages.")
-  | None ->
-      fail_unless
-        (nb_consumed_messages > nb_payloads)
-        (err
-           "Message consumption fails only when trying to consume more than \
-            the number of available messages.")
+    Compare.Int64.(
+      equal
+        (number_of_messages_during_commitment_period inbox)
+        (Int64.of_int nb_payloads))
+    (err "Invalid number of messages during commitment period.")
 
 (* An external message is prefixed with a tag whose length is one byte, and
    whose value is 1. *)
@@ -448,13 +430,6 @@ let tests =
       ~name:"Get message payload."
       QCheck2.Gen.(list_size (1 -- 50) bounded_string)
       test_get_message_payload;
-    Tztest.tztest_qcheck2
-      ~name:"Consume only available messages."
-      QCheck2.Gen.(
-        let* l = list_size (1 -- 50) bounded_string in
-        let* n = 0 -- ((List.length l * 2) + 1) in
-        return (l, Int32.of_int n))
-      test_consume_messages;
   ]
   @
   let gen_inclusion_proof_inputs =

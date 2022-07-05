@@ -60,63 +60,33 @@ module V1 = struct
     compressed_state : State_hash.t;
     inbox_level : Raw_level_repr.t;
     predecessor : Hash.t;
-    number_of_messages : Number_of_messages.t;
     number_of_ticks : Number_of_ticks.t;
   }
 
-  let pp fmt
-      {
-        compressed_state;
-        inbox_level;
-        predecessor;
-        number_of_messages;
-        number_of_ticks;
-      } =
+  let pp fmt {compressed_state; inbox_level; predecessor; number_of_ticks} =
     Format.fprintf
       fmt
       "@[<v 2>SCORU Commitment:@ compressed_state: %a@ inbox_level: %a@ \
-       predecessor: %a@ number_of_messages: %ld@ number_of_ticks: %ld@]"
+       predecessor: %a@ number_of_ticks: %ld@]"
       State_hash.pp
       compressed_state
       Raw_level_repr.pp
       inbox_level
       Hash.pp
       predecessor
-      (Number_of_messages.to_int32 number_of_messages)
       (Number_of_ticks.to_int32 number_of_ticks)
 
   let encoding =
     let open Data_encoding in
     conv
-      (fun {
-             compressed_state;
-             inbox_level;
-             predecessor;
-             number_of_messages;
-             number_of_ticks;
-           } ->
-        ( compressed_state,
-          inbox_level,
-          predecessor,
-          number_of_messages,
-          number_of_ticks ))
-      (fun ( compressed_state,
-             inbox_level,
-             predecessor,
-             number_of_messages,
-             number_of_ticks ) ->
-        {
-          compressed_state;
-          inbox_level;
-          predecessor;
-          number_of_messages;
-          number_of_ticks;
-        })
-      (obj5
+      (fun {compressed_state; inbox_level; predecessor; number_of_ticks} ->
+        (compressed_state, inbox_level, predecessor, number_of_ticks))
+      (fun (compressed_state, inbox_level, predecessor, number_of_ticks) ->
+        {compressed_state; inbox_level; predecessor; number_of_ticks})
+      (obj4
          (req "compressed_state" State_hash.encoding)
          (req "inbox_level" Raw_level_repr.encoding)
          (req "predecessor" Hash.encoding)
-         (req "number_of_messages" Number_of_messages.encoding)
          (req "number_of_ticks" Number_of_ticks.encoding))
 
   let hash commitment =
@@ -128,13 +98,11 @@ module V1 = struct
   (* For [number_of_messages] and [number_of_ticks] min_value is equal to zero. *)
   let genesis_commitment ~origination_level ~genesis_state_hash =
     let open Sc_rollup_repr in
-    let number_of_messages = Number_of_messages.zero in
     let number_of_ticks = Number_of_ticks.zero in
     {
       compressed_state = genesis_state_hash;
       inbox_level = origination_level;
       predecessor = Hash.zero;
-      number_of_messages;
       number_of_ticks;
     }
 

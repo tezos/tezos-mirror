@@ -98,7 +98,7 @@ type sc_rollup = {
   enable : bool;
   origination_size : int;
   challenge_window_in_blocks : int;
-  max_available_messages : int;
+  max_number_of_messages_per_commitment_period : int;
   stake_amount : Tez_repr.t;
   commitment_period_in_blocks : int;
   max_lookahead_in_blocks : int32;
@@ -231,7 +231,7 @@ let sc_rollup_encoding =
       ( c.enable,
         c.origination_size,
         c.challenge_window_in_blocks,
-        c.max_available_messages,
+        c.max_number_of_messages_per_commitment_period,
         c.stake_amount,
         c.commitment_period_in_blocks,
         c.max_lookahead_in_blocks,
@@ -241,7 +241,7 @@ let sc_rollup_encoding =
     (fun ( sc_rollup_enable,
            sc_rollup_origination_size,
            sc_rollup_challenge_window_in_blocks,
-           sc_rollup_max_available_messages,
+           sc_rollup_max_number_of_messages_per_commitment_period,
            sc_rollup_stake_amount,
            sc_rollup_commitment_period_in_blocks,
            sc_rollup_max_lookahead_in_blocks,
@@ -252,7 +252,8 @@ let sc_rollup_encoding =
         enable = sc_rollup_enable;
         origination_size = sc_rollup_origination_size;
         challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
-        max_available_messages = sc_rollup_max_available_messages;
+        max_number_of_messages_per_commitment_period =
+          sc_rollup_max_number_of_messages_per_commitment_period;
         stake_amount = sc_rollup_stake_amount;
         commitment_period_in_blocks = sc_rollup_commitment_period_in_blocks;
         max_lookahead_in_blocks = sc_rollup_max_lookahead_in_blocks;
@@ -265,7 +266,7 @@ let sc_rollup_encoding =
        (req "sc_rollup_enable" bool)
        (req "sc_rollup_origination_size" int31)
        (req "sc_rollup_challenge_window_in_blocks" int31)
-       (req "sc_rollup_max_available_messages" int31)
+       (req "sc_rollup_max_number_of_messages_per_commitment_period" int31)
        (req "sc_rollup_stake_amount" Tez_repr.encoding)
        (req "sc_rollup_commitment_period_in_blocks" int31)
        (req "sc_rollup_max_lookahead_in_blocks" int32)

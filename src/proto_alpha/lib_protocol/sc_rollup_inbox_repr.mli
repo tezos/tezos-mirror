@@ -53,12 +53,12 @@
    A message processed by the rollup can be consumed or available. A
    message unprocessed by the rollup is always available.
 
-   The number of available messages is bounded by
-   {!Constants_storage.sc_rollup_max_available_messages}. When an inbox
-   reaches the maximum number of available messages, the inbox is said
-   to be full and cannot accept more messages. This limitation is
-   meant to ensure that Merkle proofs about the inbox contents have a
-   bounded size. (See next section.)
+   The number of messages in a commitment period is bounded by
+   {!Constants_storage.sc_rollup_max_number_of_messages_per_commitment_period}.
+   When an inbox reaches the maximum number of messages in the commitment
+   period, the inbox is said to be full and cannot accept more messages.
+   This limitation is meant to ensure that Merkle proofs about the inbox
+   contents have a bounded size. (See next section.)
 
    {1 Merkelization of the inbox}
 
@@ -174,10 +174,6 @@ module V1 : sig
     skip list is kept. *)
   val old_levels_messages : t -> history_proof
 
-  (** [number_of_available_messages inbox] returns the number of
-    messages that can be consumed in [inbox]. *)
-  val number_of_available_messages : t -> Z.t
-
   (** [number_of_messages_during_commitment_period inbox] returns the
     number of messages added in the inbox since the beginning of
     the current commitment period. *)
@@ -190,11 +186,6 @@ module V1 : sig
   (** [starting_level_of_current_commitment_period inbox] returns the
     level at the beginning of a current commitment period. *)
   val starting_level_of_current_commitment_period : t -> Raw_level_repr.t
-
-  (** [consume_n_messages n inbox] returns an inbox where [n] messages have
-      been consumed, or [None] if there are strictly less than [n] messages
-      available in [inbox]. *)
-  val consume_n_messages : int32 -> t -> t option tzresult
 end
 
 (** Versioning, see {!Sc_rollup_data_version_sig.S} for more information. *)

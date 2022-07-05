@@ -532,11 +532,6 @@ let mk_sc_rollup_origination ?counter ?fee ?gas_limit ?storage_limit
   op
 
 let sc_dummy_commitment =
-  let number_of_messages =
-    match Sc_rollup.Number_of_messages.of_int32 3l with
-    | None -> assert false
-    | Some x -> x
-  in
   let number_of_ticks =
     match Sc_rollup.Number_of_ticks.of_int32 3000l with
     | None -> assert false
@@ -546,7 +541,6 @@ let sc_dummy_commitment =
     {
       predecessor = Sc_rollup.Commitment.Hash.zero;
       inbox_level = Raw_level.of_int32_exn Int32.zero;
-      number_of_messages;
       number_of_ticks;
       compressed_state = Sc_rollup.State_hash.zero;
     }

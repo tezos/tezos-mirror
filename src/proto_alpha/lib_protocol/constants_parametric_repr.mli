@@ -88,7 +88,7 @@ type sc_rollup = {
   enable : bool;
   origination_size : int;
   challenge_window_in_blocks : int;
-  max_available_messages : int;
+  max_number_of_messages_per_commitment_period : int;
   stake_amount : Tez_repr.t;
   (* The period with which commitments are made. *)
   commitment_period_in_blocks : int;

@@ -412,11 +412,6 @@ let test_withdrawing_twice () =
     (Sc_rollup_stake_storage.withdraw_stake ctxt rollup staker)
     Sc_rollup_errors.Sc_rollup_not_staked
 
-let number_of_messages_exn n =
-  match Sc_rollup_repr.Number_of_messages.of_int32 n with
-  | Some x -> x
-  | None -> Stdlib.failwith "Bad Number_of_messages"
-
 let number_of_ticks_exn n =
   match Sc_rollup_repr.Number_of_ticks.of_int32 n with
   | Some x -> x
@@ -448,7 +443,6 @@ let test_deposit_then_refine () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state =
           Sc_rollup_repr.State_hash.zero (* genesis.compressed_state; *);
@@ -476,7 +470,6 @@ let test_deposit_then_refine_bad_inbox () =
       {
         predecessor = genesis_hash;
         inbox_level = Raw_level_repr.of_int32_exn 22l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -503,7 +496,6 @@ let test_publish () =
          {
            predecessor = genesis_hash;
            inbox_level = valid_inbox_level ctxt 1l;
-           number_of_messages = number_of_messages_exn 5l;
            number_of_ticks = number_of_ticks_exn 152231l;
            compressed_state = Sc_rollup_repr.State_hash.zero;
          }
@@ -522,7 +514,6 @@ let test_publish_returns_oldest_publish_level () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_messages = number_of_messages_exn 5l;
         number_of_ticks = number_of_ticks_exn 152231l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -562,7 +553,6 @@ let test_withdraw_and_cement () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -592,7 +582,6 @@ let test_refine_commitment_different_stakers () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -610,7 +599,6 @@ let test_refine_commitment_different_stakers () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -635,7 +623,6 @@ let test_refine_stake_twice_different_stakers () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -667,7 +654,6 @@ let test_refine_stake_twice_same_staker () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -701,7 +687,6 @@ let test_deposit_then_publish () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_messages = number_of_messages_exn 5l;
         number_of_ticks = number_of_ticks_exn 152231l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -721,7 +706,6 @@ let test_publish_missing_rollup () =
       {
         predecessor = Commitment_repr.Hash.zero;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -748,7 +732,6 @@ let test_cement () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -789,7 +772,6 @@ let test_cement_three_commitments () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -806,7 +788,6 @@ let test_cement_three_commitments () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -823,7 +804,6 @@ let test_cement_three_commitments () =
       {
         predecessor = c2;
         inbox_level = level 3l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -856,7 +836,6 @@ let test_cement_then_remove () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -877,64 +856,6 @@ let test_cement_then_remove () =
     ~loc:__LOC__
     (Sc_rollup_stake_storage.remove_staker ctxt rollup staker)
     Sc_rollup_errors.Sc_rollup_remove_lcc
-
-let test_cement_consumes_available_messages () =
-  let* ctxt = new_context () in
-  let challenge_window =
-    Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
-  in
-  let* rollup, genesis_hash, ctxt = lift @@ new_sc_rollup ctxt in
-  let staker =
-    Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
-  in
-  let* ctxt = deposit_stake_and_check_balances ctxt rollup staker in
-  let* inbox, _n, ctxt =
-    lift
-    @@ Sc_rollup_inbox_storage.add_external_messages
-         ctxt
-         rollup
-         ["one"; "two"; "three"]
-  in
-  let available_messages =
-    Sc_rollup_inbox_repr.number_of_available_messages inbox
-  in
-  let commitment =
-    Commitment_repr.
-      {
-        predecessor = genesis_hash;
-        inbox_level = valid_inbox_level ctxt 1l;
-        number_of_messages = number_of_messages_exn 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
-        compressed_state = Sc_rollup_repr.State_hash.zero;
-      }
-  in
-  let* c1, _level, ctxt =
-    lift
-    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
-         ctxt
-         rollup
-         staker
-         commitment
-  in
-  let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
-  let* ctxt =
-    lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
-  in
-  let* new_inbox, _ctxt = lift @@ Sc_rollup_inbox_storage.inbox ctxt rollup in
-  let new_available_messages =
-    Sc_rollup_inbox_repr.number_of_available_messages new_inbox
-  in
-  let consumed_messages =
-    Z.of_int32
-    @@ Sc_rollup_repr.Number_of_messages.to_int32 commitment.number_of_messages
-  in
-  Assert.equal
-    ~loc:__LOC__
-    Z.equal
-    "Compare consumed messages"
-    Z.pp_print
-    Z.(available_messages - new_available_messages)
-    consumed_messages
 
 let test_cement_unknown_commitment_fails () =
   let* ctxt = new_context () in
@@ -970,7 +891,6 @@ let test_cement_with_zero_stakers_fails () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1006,7 +926,6 @@ let test_cement_fail_too_recent () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1045,7 +964,6 @@ let test_cement_deadline_uses_oldest_add_time () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1092,7 +1010,6 @@ let test_last_cemented_commitment_hash_with_level () =
       {
         predecessor = genesis_hash;
         inbox_level;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1133,7 +1050,6 @@ let test_withdrawal_fails_when_not_staked_on_lcc () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1172,7 +1088,6 @@ let test_stake_on_existing_node () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1204,7 +1119,6 @@ let test_cement_with_two_stakers () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1222,7 +1136,6 @@ let test_cement_with_two_stakers () =
          {
            predecessor = c1;
            inbox_level = level 2l;
-           number_of_messages = number_of_messages_exn 3l;
            number_of_ticks = number_of_ticks_exn 1232909l;
            compressed_state = Sc_rollup_repr.State_hash.zero;
          }
@@ -1254,7 +1167,6 @@ let test_can_remove_staker () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1272,7 +1184,6 @@ let test_can_remove_staker () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1305,7 +1216,6 @@ let test_can_remove_staker2 () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1323,7 +1233,6 @@ let test_can_remove_staker2 () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1356,7 +1265,6 @@ let test_removed_staker_can_not_withdraw () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1374,7 +1282,6 @@ let test_removed_staker_can_not_withdraw () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1405,7 +1312,6 @@ let test_no_cement_on_conflict () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1423,7 +1329,6 @@ let test_no_cement_on_conflict () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 44l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1457,7 +1362,6 @@ let test_no_cement_with_one_staker_at_zero_commitment () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1489,7 +1393,6 @@ let test_non_cemented_parent () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1507,7 +1410,6 @@ let test_non_cemented_parent () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1539,7 +1441,6 @@ let test_finds_conflict_point_at_lcc () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1557,7 +1458,6 @@ let test_finds_conflict_point_at_lcc () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 55l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1590,7 +1490,6 @@ let test_finds_conflict_point_beneath_lcc () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1608,7 +1507,6 @@ let test_finds_conflict_point_beneath_lcc () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1626,8 +1524,7 @@ let test_finds_conflict_point_beneath_lcc () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_messages = number_of_messages_exn 4l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 7373l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1660,7 +1557,6 @@ let test_conflict_point_is_first_point_of_disagreement () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1678,7 +1574,6 @@ let test_conflict_point_is_first_point_of_disagreement () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1696,8 +1591,7 @@ let test_conflict_point_is_first_point_of_disagreement () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_messages = number_of_messages_exn 4l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 7373l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1714,7 +1608,6 @@ let test_conflict_point_is_first_point_of_disagreement () =
       {
         predecessor = c2;
         inbox_level = level 3l;
-        number_of_messages = number_of_messages_exn 4l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1758,7 +1651,6 @@ let test_conflict_point_computation_fits_in_gas_limit () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 1l;
         number_of_ticks = number_of_ticks_exn 1l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1785,8 +1677,7 @@ let test_conflict_point_computation_fits_in_gas_limit () =
         {
           predecessor;
           inbox_level = level i;
-          number_of_messages = number_of_messages_exn staker_id;
-          number_of_ticks = number_of_ticks_exn 1l;
+          number_of_ticks = number_of_ticks_exn staker_id;
           compressed_state = Sc_rollup_repr.State_hash.zero;
         }
     in
@@ -1843,7 +1734,6 @@ let test_no_conflict_point_one_staker_at_lcc_preboot () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1888,7 +1778,6 @@ let test_no_conflict_point_one_staker_at_lcc () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1906,7 +1795,6 @@ let test_no_conflict_point_one_staker_at_lcc () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1944,7 +1832,6 @@ let test_no_conflict_point_both_stakers_at_lcc () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -1994,7 +1881,6 @@ let test_staker_cannot_backtrack () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -2012,7 +1898,6 @@ let test_staker_cannot_backtrack () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -2044,7 +1929,6 @@ let test_staker_cannot_change_branch () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -2062,7 +1946,6 @@ let test_staker_cannot_change_branch () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -2080,8 +1963,7 @@ let test_staker_cannot_change_branch () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_messages = number_of_messages_exn 4l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 7373l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -2099,7 +1981,6 @@ let test_staker_cannot_change_branch () =
       {
         predecessor = c2;
         inbox_level = level 3l;
-        number_of_messages = number_of_messages_exn 4l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -2147,7 +2028,6 @@ let test_refine_stake_of_missing_rollup () =
           {
             predecessor = Commitment_repr.Hash.zero;
             inbox_level = valid_inbox_level ctxt 1l;
-            number_of_messages = number_of_messages_exn 3l;
             number_of_ticks = number_of_ticks_exn 1232909l;
             compressed_state = Sc_rollup_repr.State_hash.zero;
           })
@@ -2213,7 +2093,6 @@ let test_concurrent_refinement_point_of_conflict () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -2223,8 +2102,7 @@ let test_concurrent_refinement_point_of_conflict () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 10l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 7373l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -2284,7 +2162,6 @@ let test_concurrent_refinement_cement () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level before_ctxt 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -2351,7 +2228,6 @@ let test_zero_tick_commitment_cannot_change_state () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_messages = number_of_messages_exn 3l;
         number_of_ticks = number_of_ticks_exn 1232909l;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
@@ -2369,7 +2245,6 @@ let test_zero_tick_commitment_cannot_change_state () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_messages = number_of_messages_exn 0l;
         number_of_ticks = number_of_ticks_exn 0l;
         compressed_state =
           Sc_rollup_repr.State_hash.context_hash_to_state_hash
@@ -2466,7 +2341,10 @@ let test_limit_on_number_of_messages_during_commitment_period with_gap () =
   let commitment_period =
     Constants_storage.sc_rollup_commitment_period_in_blocks ctxt
   in
-  let max_number = Int32.to_int Sc_rollup_repr.Number_of_messages.max_int in
+  let max_number =
+    Constants_storage.sc_rollup_max_number_of_messages_per_commitment_period
+      ctxt
+  in
   let*? payload =
     List.init
       ~when_negative_length:[]
@@ -2973,10 +2851,6 @@ let tests =
       `Quick
       test_cement_three_commitments;
     Tztest.tztest "cannot unstake staker at LCC" `Quick test_cement_then_remove;
-    Tztest.tztest
-      "cement consumes available messages"
-      `Quick
-      test_cement_consumes_available_messages;
     Tztest.tztest
       "cement unknown commitment fails"
       `Quick

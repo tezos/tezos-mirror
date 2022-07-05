@@ -30,7 +30,6 @@ type commitment = {
   compressed_state : string;
   inbox_level : int;
   predecessor : string;
-  number_of_messages : int;
   number_of_ticks : int;
 }
 

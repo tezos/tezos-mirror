@@ -801,7 +801,7 @@ module Constants : sig
       enable : bool;
       origination_size : int;
       challenge_window_in_blocks : int;
-      max_available_messages : int;
+      max_number_of_messages_per_commitment_period : int;
       stake_amount : Tez.t;
       commitment_period_in_blocks : int;
       max_lookahead_in_blocks : int32;
@@ -980,7 +980,7 @@ module Constants : sig
 
   val sc_rollup_origination_size : context -> int
 
-  val sc_rollup_max_available_messages : context -> int
+  val sc_rollup_max_number_of_messages_per_commitment_period : context -> int
 
   val sc_rollup_stake_amount : t -> Tez.t
 
@@ -2799,10 +2799,6 @@ module Sc_rollup : sig
 
     val inbox_level : t -> Raw_level.t
 
-    val number_of_available_messages : t -> Z.t
-
-    val consume_n_messages : int32 -> t -> t option tzresult
-
     type history_proof
 
     module Hash : sig
@@ -3200,12 +3196,6 @@ module Sc_rollup : sig
     val reference_initial_state_hash : State_hash.t
   end
 
-  module Number_of_messages : sig
-    include Bounded.Int32.S
-
-    val zero : t
-  end
-
   module Number_of_ticks : sig
     include Bounded.Int32.S
 
@@ -3219,7 +3209,6 @@ module Sc_rollup : sig
       compressed_state : State_hash.t;
       inbox_level : Raw_level.t;
       predecessor : Hash.t;
-      number_of_messages : Number_of_messages.t;
       number_of_ticks : Number_of_ticks.t;
     }
 

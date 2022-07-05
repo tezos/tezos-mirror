@@ -104,7 +104,6 @@ let two_stakers_in_conflict () =
       {
         predecessor = genesis_hash;
         inbox_level = T.valid_inbox_level ctxt 1l;
-        number_of_messages = T.number_of_messages_exn 5l;
         number_of_ticks = T.number_of_ticks_exn 152231l;
         compressed_state = hash1;
       }
@@ -122,7 +121,6 @@ let two_stakers_in_conflict () =
       {
         predecessor = parent;
         inbox_level = T.valid_inbox_level ctxt 2l;
-        number_of_messages = T.number_of_messages_exn 2l;
         number_of_ticks = T.number_of_ticks_exn 10000l;
         compressed_state = hash2;
       }
@@ -132,7 +130,6 @@ let two_stakers_in_conflict () =
       {
         predecessor = parent;
         inbox_level = T.valid_inbox_level ctxt 2l;
-        number_of_messages = T.number_of_messages_exn 2l;
         number_of_ticks = T.number_of_ticks_exn 10000l;
         compressed_state = hash3;
       }
@@ -246,12 +243,11 @@ let staker_injectivity_gen ~refuter2_plays =
         {
           predecessor = genesis_hash;
           inbox_level = T.valid_inbox_level ctxt 1l;
-          number_of_messages = T.number_of_messages_exn 5l;
           number_of_ticks = T.number_of_ticks_exn 152231l;
           compressed_state = hash1;
         }
     in
-    let* c1hash, _, ctxt =
+    let* c1_hash, _, ctxt =
       T.lift
       @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
            ctxt
@@ -262,9 +258,8 @@ let staker_injectivity_gen ~refuter2_plays =
     let challenging_commit compressed_state =
       Commitment_repr.
         {
-          predecessor = c1hash;
+          predecessor = c1_hash;
           inbox_level = T.valid_inbox_level ctxt 2l;
-          number_of_messages = T.number_of_messages_exn 4l;
           number_of_ticks = T.number_of_ticks_exn 10000l;
           compressed_state;
         }
