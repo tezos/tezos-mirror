@@ -1,13 +1,15 @@
-Project's Title: **Observer**
-Project Description: 
-    Observer is a suite of scripts for viewing information about the Tezos consensus algorithm
-Table of Contents:
+Project's Title: 
+     **Observer** 
 
-How to Install and Run the Project:
-    Prérequisite:
-        - Chrome OS
-        
-    - Install the CORS Changer Chrome Plugin, to avoid CORS Policy issues.
+Project Description: \
+    - Observer is a suite of scripts for viewing information about the Tezos consensus algorithm  
 
-How to Use the Project:
+Table of Contents: 
+
+How to Install and Run the Project: \
+    - Prerequisite: Chrome OS \
+    - Install the CORS Changer Chrome Plugin, to avoid CORS Policy issues. 
+    
+
+How to Use the Project: \
     - Open the script in Chrome Browser 
