@@ -1595,7 +1595,7 @@ module Sc_rollup = struct
   end
 
   module PVM_kind =
-    Indexed_context.Make_map
+    Indexed_context.Make_carbonated_map
       (struct
         let name = ["kind"]
       end)
