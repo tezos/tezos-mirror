@@ -38,6 +38,12 @@ Breaking Changes
 RPC Changes
 -----------
 
+- The ``run_operation`` RPC description has been updated to indicate
+  that the RPC does not support consensus operations. It could already
+  give inconsistent results on such operations, which was not
+  documented. It now returns on error when called on a consensus
+  operation. (MR :gl:`!5707`)
+
 Operation receipts
 ------------------
 
