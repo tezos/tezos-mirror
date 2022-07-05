@@ -134,14 +134,6 @@ module Events = struct
       ~msg:"end of stream"
       ()
 
-  let received_new_operations =
-    declare_0
-      ~section
-      ~name:"received_new_operations"
-      ~level:Debug
-      ~msg:"received new operations"
-      ()
-
   (* info messages *)
   let shutting_down =
     declare_0
@@ -510,7 +502,6 @@ let create ?(monitor_node_operations = true)
               cancel_monitoring state ;
               worker_loop ()
           | Some ops ->
-              Events.(emit received_new_operations ()) >>= fun () ->
               state.operation_pool <-
                 Operation_pool.add_operations state.operation_pool ops ;
               update_monitoring state ops >>= fun () -> loop ()
