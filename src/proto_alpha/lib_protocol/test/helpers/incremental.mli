@@ -116,6 +116,15 @@ val add_operation :
 *)
 val finalize_block : incremental -> Block.t tzresult Lwt.t
 
+(** [assert_validate_operation_fails expect_failure operation block]
+    calls {!begin_construction} on top of [block], then
+    {!validate_operation} with [~expect_failure]. *)
+val assert_validate_operation_fails :
+  (tztrace -> unit tzresult Lwt.t) ->
+  Operation.packed ->
+  Block.t ->
+  unit tzresult Lwt.t
+
 val rpc_ctxt : incremental Environment.RPC_context.simple
 
 val alpha_ctxt : incremental -> Alpha_context.context

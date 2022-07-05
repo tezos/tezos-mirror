@@ -26,6 +26,11 @@
 open Protocol
 open Alpha_context
 
+let pack_operation ctxt signature contents =
+  let branch = Context.branch ctxt in
+  Operation.pack
+    ({shell = {branch}; protocol_data = {contents; signature}} : _ Operation.t)
+
 let sign ?(watermark = Signature.Generic_operation) sk ctxt contents =
   let branch = Context.branch ctxt in
   let unsigned =
@@ -560,21 +565,37 @@ let vdf_revelation ctxt solution =
         {contents = Single (Vdf_revelation {solution}); signature = None};
   }
 
-let proposals ctxt (pkh : Contract.t) proposals =
-  let source = Context.Contract.pkh pkh in
-  Context.Vote.get_current_period ctxt
-  >>=? fun {voting_period = {index; _}; _} ->
-  let op = Proposals {source; period = index; proposals} in
-  Account.find source >|=? fun account ->
-  sign account.sk ctxt (Contents_list (Single op))
+let get_period ?period ctxt =
+  let open Lwt_result_syntax in
+  match period with
+  | Some period -> return period
+  | None ->
+      let* current_period = Context.Vote.get_current_period ctxt in
+      return current_period.voting_period.index
 
-let ballot ctxt (pkh : Contract.t) proposal ballot =
-  let source = Context.Contract.pkh pkh in
-  Context.Vote.get_current_period ctxt
-  >>=? fun {voting_period = {index; _}; _} ->
-  let op = Ballot {source; period = index; proposal; ballot} in
-  Account.find source >|=? fun account ->
-  sign account.sk ctxt (Contents_list (Single op))
+let proposals_contents ctxt proposer ?period proposals =
+  let open Lwt_result_syntax in
+  let source = Context.Contract.pkh proposer in
+  let* period = get_period ?period ctxt in
+  return (Single (Proposals {source; period; proposals}))
+
+let proposals ctxt proposer ?period proposals =
+  let open Lwt_result_syntax in
+  let* contents = proposals_contents ctxt proposer ?period proposals in
+  let* account = Account.find (Context.Contract.pkh proposer) in
+  return (sign account.sk ctxt (Contents_list contents))
+
+let ballot_contents ctxt voter ?period proposal ballot =
+  let open Lwt_result_syntax in
+  let source = Context.Contract.pkh voter in
+  let* period = get_period ?period ctxt in
+  return (Single (Ballot {source; period; proposal; ballot}))
+
+let ballot ctxt voter ?period proposal ballot =
+  let open Lwt_result_syntax in
+  let* contents = ballot_contents ctxt voter ?period proposal ballot in
+  let* account = Account.find (Context.Contract.pkh voter) in
+  return (sign account.sk ctxt (Contents_list contents))
 
 let dummy_script =
   let open Micheline in
