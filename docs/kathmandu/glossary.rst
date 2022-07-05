@@ -147,6 +147,8 @@ _`Round`
     the round's corresponding time span. Baking_ outside of one's designated
     round results in an invalid block_.
 
+.. _glossary_roll_kathmandu:
+
 _`Roll`
     An amount of tez (e.g., 6000ꜩ) serving as a minimal amount for a
     delegate to have baking_ and voting rights in a cycle_. However,

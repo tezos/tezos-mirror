@@ -13,17 +13,15 @@ P2PDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/p2p_doc.exe
 RPCDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCERRORDIR)/error_doc.exe
 
-NAMED_PROTOS  = ithaca jakarta kathmandu
+NAMED_PROTOS  = jakarta kathmandu
 PROTOCOLS     = $(NAMED_PROTOS) alpha
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
-ithaca_long   = Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
 jakarta_long  = PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
 kathmandu_long = PtKathmaHPSjL3WDmUCJP7iHBsUix65HdAgSeVacukogRK6hum6
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
-ithaca_short  = 012-Psithaca
 jakarta_short = 013-PtJakart
 kathmandu_short = 014-PtKathma
 alpha_short   = alpha
@@ -99,8 +97,7 @@ redirectcheck: html
 # - on the active protocol using its numeric name (not the "active" symlink)
 # - on each other protocol including alpha, also checking label defs (option -l)
 xrefscheck:
-	$(CHECKXREFS) ithaca
-	$(CHECKXREFS) -l jakarta
+	$(CHECKXREFS) jakarta
 	$(CHECKXREFS) -l kathmandu
 	$(CHECKXREFS) -l alpha
 
@@ -114,7 +111,8 @@ scriptsindoccheck:
 	scripts/test_doc_scripts.sh install-opam-scratch
 	scripts/test_doc_scripts.sh install-opam-bionic
 	scripts/test_doc_scripts.sh install-opam-focal
-	scripts/test_doc_scripts.sh compile-sources-buster
+	scripts/test_doc_scripts.sh compile-release-sources-buster
+	scripts/test_doc_scripts.sh compile-master-sources-buster
 
 # build dune targets together to avoid concurrent dunes
 docexes: main
@@ -155,7 +153,7 @@ html: api/errors.rst developer/metrics.csv user/node-config.json \
 		rpc p2p manuals install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
-	@ln -s active "$(BUILDDIR)/ithaca" || true
+	@ln -s active "$(BUILDDIR)/jakarta" || true
 
 # pylint does not support pyproject.toml configuration for now
 # It is configured by ./.pylint.rc
@@ -198,5 +196,5 @@ lint: pylint pycodestyle lint_black
 
 clean:
 	@-rm -Rf "$(BUILDDIR)" linkcheck
-	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json active/rpc.rst ithaca/rpc.rst jakarta/rpc.rst kathmandu/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
-	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html ithaca/tezos-*.html jakarta/tezos-*.html kathmandu/tezos-*.html alpha/tezos-*.html
+	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json active/rpc.rst jakarta/rpc.rst kathmandu/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
+	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html jakarta/tezos-*.html kathmandu/tezos-*.html alpha/tezos-*.html

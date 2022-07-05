@@ -154,7 +154,7 @@ An example Docker Compose script is provided in
 :src:`scripts/docker/docker-compose-generic.yml`.
 It launches a node, a baker, and an accuser for protocol Alpha.
 You can adapt it to run the baker and accuser for other protocols
-by replacing all instances of ``alpha`` to e.g. ``012-Psithaca`` for Ithaca.
+by replacing all instances of ``alpha`` to e.g. ``013-PtJakart`` for Jakarta.
 Replacing the value of the ``PROTOCOL`` environment variable is enough
 but you may want to update the ``hostname`` and the container name too.
 

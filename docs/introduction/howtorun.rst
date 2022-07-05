@@ -96,7 +96,7 @@ consensus are not roll-based, they are based on the actual, non-approximated sta
 Delegates are required to freeze around 10% of their active stake into
 a security deposit (more precisely, it's 10% of the maximum active
 stake during the last 7 cycles). A delegate is
-:ref:`slashed<slashing_ithaca>`, that is, it looses funds from its
+:ref:`slashed<slashing>`, that is, it looses funds from its
 security deposits when it misbehaves by double-signing. The funds in
 the security deposit come from the delegate's account. In case a
 delegate is over-delegated (that is, its own balance does not cover
@@ -222,14 +222,14 @@ If you are running the baker Docker image, you can watch the baker logs with
     docker ps
 
 If your container is running, its name will appear in the last column.
-For instance, if the name is ``mainnet_baker-012-Psithaca_1``, you can
+For instance, if the name is ``mainnet_baker-013-PtJakart_1``, you can
 view recent logs with::
 
-    docker logs mainnet_baker-012-Psithaca_1
+    docker logs mainnet_baker-013-PtJakart_1
 
 If you want to keep watching logs, use ``-f``::
 
-    docker logs mainnet_baker-012-Psithaca_1 -f
+    docker logs mainnet_baker-013-PtJakart_1 -f
 
 This allows you to know if you baked.
 You should see lines such as::

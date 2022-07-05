@@ -123,6 +123,7 @@ _`Implicit account`
     letters `tz` followed by `1`, `2` or `3` (depending on the
     signature scheme) and finally the hash of the public key.
 
+.. _glossary_michelson:
 .. _glossary_michelson_jakarta:
 
 Michelson
@@ -146,6 +147,9 @@ _`Round`
     A baker_ with baking_ rights at a given round is only allowed to bake during
     the round's corresponding time span. Baking_ outside of one's designated
     round results in an invalid block_.
+
+.. _glossary_roll:
+.. _glossary_roll_jakarta:
 
 _`Roll`
     An amount of tez (e.g., 6000ꜩ) serving as a minimal amount for a

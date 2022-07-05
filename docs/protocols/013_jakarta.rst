@@ -201,7 +201,7 @@ Breaking Changes
   Bonds are like deposits.
   However, they can be associated to implicit or originated accounts,
   unlike deposits that only apply to implicit accounts that are also
-  delegates (see :doc:`../jakarta/token_management`).
+  delegates (see :doc:`../active/token_management`).
   (MR :gl:`!4437`)
 
 Bug Fixes

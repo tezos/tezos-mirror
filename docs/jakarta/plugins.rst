@@ -35,6 +35,7 @@ In turn protocol plugins may, for example:
 - implement some common operations that are customized for each
   protocol (e.g., :ref:`prevalidator_filters_jakarta`).
 
+.. _prevalidator_filters:
 .. _prevalidator_filters_jakarta:
 
 Prevalidator filters
@@ -54,6 +55,7 @@ The interface of the prevalidator plugin is described at the `mempool plugin API
 
 The different kinds of prevalidator filters are described below.
 
+.. _fees_filter:
 .. _fees_filter_jakarta:
 
 Fees filter
@@ -71,6 +73,7 @@ configuration of your node.
 This filtering strategy is implemented in the ``prefilter`` (see
 :doc:`../shell/prevalidation`).
 
+.. _consensus_filter:
 .. _consensus_filter_jakarta:
 
 Consensus filter
@@ -196,6 +199,7 @@ to be the smallest manager operation, with 126 Bytes, so there are at most
 512 * 1024 / 126 = 4161 manager operations per block.
 
 
+.. _active_filter_rpc:
 .. _active_filter_rpc_jakarta:
 
 Filters RPCs
