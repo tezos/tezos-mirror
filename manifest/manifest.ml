@@ -2464,7 +2464,9 @@ let check_for_non_generated_files ~remove_extra_files
   then
     error
       "Please modify manifest/main.ml to either generate the above file(s)\n\
-       or declare them in the 'exclude' function (but not both)."
+       or declare them in the 'exclude' function (but not both).\n\
+       If this file is a leftover from some previous work on the build\n\
+       system then simply remove it."
 
 let check_js_of_ocaml () =
   let internal_name ({kind; path; _} : Target.internal) =
