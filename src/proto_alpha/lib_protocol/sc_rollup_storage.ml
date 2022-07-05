@@ -44,7 +44,9 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty ~genesis_commitment =
       address
       {commitment_hash = genesis_commitment_hash; level = level.level}
   in
-  let*! ctxt = Store.Boot_sector.add ctxt address boot_sector in
+  let* ctxt, boot_sector_size, _sector_existed =
+    Store.Boot_sector.add ctxt address boot_sector
+  in
   let* ctxt, param_ty_size_diff, _added =
     Store.Parameters_type.add ctxt address parameters_ty
   in
@@ -86,9 +88,6 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty ~genesis_commitment =
   let* ctxt, stakers_size_diff = Store.Staker_count.init ctxt address 0l in
   let addresses_size = 2 * Sc_rollup_repr.Address.size in
   let stored_kind_size = 2 (* because tag_size of kind encoding is 16bits. *) in
-  let boot_sector_size =
-    Data_encoding.Binary.length Data_encoding.string boot_sector
-  in
   let origination_size = Constants_storage.sc_rollup_origination_size ctxt in
   let size =
     Z.of_int
@@ -120,10 +119,10 @@ let genesis_info ctxt rollup =
 
 let get_boot_sector ctxt rollup =
   let open Lwt_tzresult_syntax in
-  let* boot_sector = Storage.Sc_rollup.Boot_sector.find ctxt rollup in
+  let* ctxt, boot_sector = Storage.Sc_rollup.Boot_sector.find ctxt rollup in
   match boot_sector with
   | None -> fail (Sc_rollup_does_not_exist rollup)
-  | Some boot_sector -> return boot_sector
+  | Some boot_sector -> return (ctxt, boot_sector)
 
 let parameters_type ctxt rollup =
   let open Lwt_result_syntax in
