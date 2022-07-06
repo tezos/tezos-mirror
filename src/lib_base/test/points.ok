@@ -12,3 +12,10 @@ _:8444
 :8444
 _#idqSpQPFDBN4yMhLEzwtqGgxRLNrj4
 #idqSpQPFDBN4yMhLEzwtqGgxRLNrj4
+127.0.0.1:8444#idqSpQPFDBN4yMhLEzwtqGgxRLNrj4
+[::]
+[::]:8444
+[0::0:0]
+[0::0:0]:8444#idqSpQPFDBN4yMhLEzwtqGgxRLNrj4
+[ff:ff:ff::ff:00:ff]
+[ff:ff:ff::ff:00:ff]:8444
