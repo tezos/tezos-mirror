@@ -25,7 +25,7 @@
 
 (** This module exposes a type {!t} that represents inbox messages. Inbox
     messages are produced by the Layer 1 protocol and are encoded using the
-    {!to_bytes} function, before being added to a smart-contract rollup's inbox.
+    {!serialize} function, before being added to a smart-contract rollup's inbox.
 
     They are part of the [Rollup Management Protocol] that defines the
     communication protocol for exchanging messages between Layer 1 and Layer 2
