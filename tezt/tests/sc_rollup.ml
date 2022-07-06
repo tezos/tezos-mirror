@@ -126,8 +126,8 @@ let setup ?commitment_period ?challenge_window ?timeout f ~protocol =
   let* node, client =
     Client.init_with_protocol ~parameter_file `Client ~protocol ~nodes_args ()
   in
-  let bootstrap1_key = Constant.bootstrap1.public_key_hash in
-  f node client bootstrap1_key
+  let operator = Constant.bootstrap1.alias in
+  f node client operator
 
 let get_sc_rollup_commitment_period_in_blocks client =
   let* constants = get_sc_rollup_constants client in
@@ -159,18 +159,34 @@ let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))
   let* () = Client.bake_for_and_wait client in
   return sc_rollup
 
-let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
-  let* sc_rollup = originate_sc_rollup ~src:bootstrap1_key tezos_client in
+(* Configuration of a rollup node
+   ------------------------------
+
+   A rollup node has a configuration file that must be initialized.
+*)
+let with_fresh_rollup ?boot_sector f tezos_node tezos_client operator =
+  let* sc_rollup =
+    originate_sc_rollup ?boot_sector ~src:operator tezos_client
+  in
   let sc_rollup_node =
-    Sc_rollup_node.create
-      tezos_node
-      tezos_client
-      ~default_operator:bootstrap1_key
+    Sc_rollup_node.create tezos_node tezos_client ~default_operator:operator
   in
   let* configuration_filename =
     Sc_rollup_node.config_init sc_rollup_node sc_rollup
   in
   f sc_rollup sc_rollup_node configuration_filename
+
+let with_fresh_rollups n f node client operator =
+  let rec go n addrs k =
+    if n < 1 then k addrs
+    else
+      with_fresh_rollup
+        (fun addr _ _ -> go (n - 1) (String_set.add addr addrs) k)
+        node
+        client
+        operator
+  in
+  go n String_set.empty f
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2933
    Many tests can be refactored using test_scenario. *)
@@ -272,38 +288,6 @@ let test_origination =
       setup ~protocol @@ fun _node client bootstrap1_key ->
       let* _sc_rollup = originate_sc_rollup ~src:bootstrap1_key client in
       unit)
-
-(* Configuration of a rollup node
-   ------------------------------
-
-   A rollup node has a configuration file that must be initialized.
-*)
-let with_fresh_rollup ?boot_sector f tezos_node tezos_client bootstrap1_key =
-  let* sc_rollup =
-    originate_sc_rollup ~src:bootstrap1_key ?boot_sector tezos_client
-  in
-  let sc_rollup_node =
-    Sc_rollup_node.create
-      tezos_node
-      tezos_client
-      ~default_operator:bootstrap1_key
-  in
-  let* configuration_filename =
-    Sc_rollup_node.config_init sc_rollup_node sc_rollup
-  in
-  f sc_rollup sc_rollup_node configuration_filename
-
-let with_fresh_rollups n f node client bootstrap1 =
-  let rec go n addrs k =
-    if n < 1 then k addrs
-    else
-      with_fresh_rollup
-        (fun addr _ _ -> go (n - 1) (String_set.add addr addrs) k)
-        node
-        client
-        bootstrap1
-  in
-  go n String_set.empty f
 
 let test_rollup_node_configuration =
   regression_test
@@ -1337,7 +1321,7 @@ let commitment_stored_robust_to_failures _protocol sc_rollup_node sc_rollup node
   let bootstrap2_key = Constant.bootstrap2.public_key_hash in
   let* client' = Client.init ?endpoint:(Some (Node node)) () in
   let sc_rollup_node' =
-    Sc_rollup_node.create node client' ~operator_pkh:bootstrap2_key
+    Sc_rollup_node.create Operator node client' ~default_operator:bootstrap2_key
   in
   let* _configuration_filename =
     Sc_rollup_node.config_init sc_rollup_node' sc_rollup
@@ -2092,7 +2076,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window variant
   let bootstrap2_key = Constant.bootstrap2.public_key_hash in
 
   let sc_rollup_node2 =
-    Sc_rollup_node.create node client ~operator_pkh:bootstrap2_key
+    Sc_rollup_node.create Operator node client ~default_operator:bootstrap2_key
   in
   let* _configuration_filename =
     Sc_rollup_node.config_init ~loser_mode sc_rollup_node2 sc_rollup_address
