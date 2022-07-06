@@ -128,6 +128,10 @@ let bytes_size b = string_size_gen (Bytes.length b)
 
 let string_size s = string_size_gen (String.length s)
 
+let blake2b_hash_size = h1w +! string_size_gen 20
+
+let public_key_hash_in_memory_size = h1w +! blake2b_hash_size
+
 let ret_adding (nodes, size) added = (nodes, size +! added)
 
 let ret_succ_adding (nodes, size) added = (Nodes.succ nodes, size +! added)

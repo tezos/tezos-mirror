@@ -464,42 +464,9 @@ let apply ctxt gas capture_ty capture lam =
       let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
       return (lam', ctxt, gas)
 
-let make_transaction_to_contract ctxt ~(destination : Contract.t) ~amount
-    ~entrypoint ~location ~parameters_ty ~parameters =
-  unparse_data ctxt Optimized parameters_ty parameters
-  >>=? fun (unparsed_parameters, ctxt) ->
-  Lwt.return
-    ( Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
-    >|? fun ctxt ->
-      let unparsed_parameters = Micheline.strip_locations unparsed_parameters in
-      match destination with
-      | Implicit destination ->
-          ( Transaction_to_implicit
-              {
-                destination;
-                amount;
-                entrypoint;
-                location;
-                parameters_ty;
-                parameters;
-                unparsed_parameters;
-              },
-            ctxt )
-      | Originated destination ->
-          ( Transaction_to_smart_contract
-              {
-                destination;
-                amount;
-                entrypoint;
-                location;
-                parameters_ty;
-                parameters;
-                unparsed_parameters;
-              },
-            ctxt ) )
-
-let make_transaction_to_tx_rollup (type t tc) ctxt ~destination ~amount
-    ~entrypoint ~(parameters_ty : (t, tc) ty) ~parameters =
+let make_transaction_to_tx_rollup (type t) ctxt ~destination ~amount ~entrypoint
+    ~(parameters_ty : ((t ticket, tx_rollup_l2_address) pair, _) ty) ~parameters
+    =
   (* The entrypoints of a transaction rollup are polymorphic wrt. the
      tickets it can process. However, two Michelson values can have
      the same Micheline representation, but different types. What
@@ -517,32 +484,21 @@ let make_transaction_to_tx_rollup (type t tc) ctxt ~destination ~amount
     Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint)
     (Script_tc_errors.No_such_entrypoint entrypoint)
   >>?= fun () ->
-  match parameters_ty with
-  | Pair_t (Ticket_t (tp, _), _, _, _) ->
-      unparse_data ctxt Optimized parameters_ty parameters
-      >>=? fun (unparsed_parameters, ctxt) ->
-      Lwt.return
-        ( Script_ir_translator.unparse_ty ~loc:Micheline.dummy_location ctxt tp
-        >>? fun (ty, ctxt) ->
-          let unparsed_parameters =
-            Micheline.Seq (Micheline.dummy_location, [unparsed_parameters; ty])
-          in
-          Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
-          >|? fun ctxt ->
-          let unparsed_parameters =
-            Micheline.strip_locations unparsed_parameters
-          in
-          ( Transaction_to_tx_rollup
-              {destination; parameters_ty; parameters; unparsed_parameters},
-            ctxt ) )
-  | _ ->
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/2455
-         Refute this branch thanks to the type system.
-         Thanks to the implementation of the [CONTRACT]
-         instruction, this branch is unreachable. But this is
-         not enforced by the type system, which means we are one
-         refactoring away to reach it. *)
-      assert false
+  let (Pair_t (Ticket_t (tp, _), _, _, _)) = parameters_ty in
+  unparse_data ctxt Optimized parameters_ty parameters
+  >>=? fun (unparsed_parameters, ctxt) ->
+  Lwt.return
+    ( Script_ir_translator.unparse_ty ~loc:Micheline.dummy_location ctxt tp
+    >>? fun (ty, ctxt) ->
+      let unparsed_parameters =
+        Micheline.Seq (Micheline.dummy_location, [unparsed_parameters; ty])
+      in
+      Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
+      >|? fun ctxt ->
+      let unparsed_parameters = Micheline.strip_locations unparsed_parameters in
+      ( Transaction_to_tx_rollup
+          {destination; parameters_ty; parameters; unparsed_parameters},
+        ctxt ) )
 
 let make_transaction_to_sc_rollup ctxt ~destination ~amount ~entrypoint
     ~parameters_ty ~parameters =
@@ -586,8 +542,9 @@ let emit_event (type t tc) (ctxt, sc) gas ~(event_type : (t, tc) ty)
    creates an operation that transfers an amount of [tez] to a destination and
    an entrypoint instantiated with argument [parameters] of type
    [parameters_ty]. *)
-let transfer (ctxt, sc) gas amount location parameters_ty parameters
-    (destination : Destination.t) entrypoint =
+let transfer (type t tc) (ctxt, sc) gas amount location
+    (parameters_ty : (t, tc) ty) (parameters : t)
+    (destination : t typed_destination) entrypoint =
   let ctxt = update_context gas ctxt in
   collect_lazy_storage ctxt parameters_ty parameters
   >>?= fun (to_duplicate, ctxt) ->
@@ -602,16 +559,47 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters
     ~temporary:true
   >>=? fun (parameters, lazy_storage_diff, ctxt) ->
   (match destination with
-  | Contract destination ->
-      make_transaction_to_contract
-        ctxt
-        ~destination
-        ~amount
-        ~entrypoint
-        ~location
-        ~parameters_ty
-        ~parameters
-  | Tx_rollup destination ->
+  | Typed_implicit destination ->
+      unparse_data ctxt Optimized parameters_ty parameters
+      >>=? fun (unparsed_parameters, ctxt) ->
+      Lwt.return
+        ( Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
+        >|? fun ctxt ->
+          let unparsed_parameters =
+            Micheline.strip_locations unparsed_parameters
+          in
+          ( Transaction_to_implicit
+              {
+                destination;
+                amount;
+                entrypoint;
+                location;
+                parameters_ty;
+                parameters;
+                unparsed_parameters;
+              },
+            ctxt ) )
+  | Typed_originated destination ->
+      unparse_data ctxt Optimized parameters_ty parameters
+      >>=? fun (unparsed_parameters, ctxt) ->
+      Lwt.return
+        ( Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
+        >|? fun ctxt ->
+          let unparsed_parameters =
+            Micheline.strip_locations unparsed_parameters
+          in
+          ( Transaction_to_smart_contract
+              {
+                destination;
+                amount;
+                entrypoint;
+                location;
+                parameters_ty;
+                parameters;
+                unparsed_parameters;
+              },
+            ctxt ) )
+  | Typed_tx_rollup destination ->
       make_transaction_to_tx_rollup
         ctxt
         ~destination
@@ -619,7 +607,7 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters
         ~entrypoint
         ~parameters_ty
         ~parameters
-  | Sc_rollup destination ->
+  | Typed_sc_rollup destination ->
       make_transaction_to_sc_rollup
         ctxt
         ~destination

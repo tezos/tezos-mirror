@@ -373,7 +373,10 @@ let unparse_tx_rollup_l2_address ~loc ctxt mode
       let b58check = Tx_rollup_l2_address.to_b58check tx_address in
       (String (loc, b58check), ctxt)
 
-let unparse_contract ~loc ctxt mode (Typed_contract {arg_ty = _; address}) =
+let unparse_contract ~loc ctxt mode
+    (Typed_contract {arg_ty = _; destination; entrypoint}) =
+  let destination = Typed_destination.untyped destination in
+  let address = {destination; entrypoint} in
   unparse_address ~loc ctxt mode address
 
 let unparse_signature ~loc ctxt mode s =
@@ -2480,7 +2483,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
             arg_ty
             address.destination
             ~entrypoint:address.entrypoint
-          >|=? fun (ctxt, _) -> (Typed_contract {arg_ty; address}, ctxt) )
+          >|=? fun (ctxt, typed_contract) -> (typed_contract, ctxt) )
   (* Pairs *)
   | Pair_t (tl, tr, _, _), expr ->
       let r_witness = comb_witness1 tr in
@@ -4918,7 +4921,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
   match destination with
   | Contract contract -> (
       match contract with
-      | Implicit _ ->
+      | Implicit pkh ->
           Lwt.return
             (if Entrypoint.is_default entrypoint then
              (* An implicit account on the "default" entrypoint always exists and has type unit. *)
@@ -4926,12 +4929,13 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
              >|? fun (eq, ctxt) ->
              ( ctxt,
                eq >|? fun Eq ->
-               let address = {destination; entrypoint} in
-               Typed_contract {arg_ty = arg; address} )
+               let destination = Typed_implicit pkh in
+               (Typed_contract {arg_ty = arg; destination; entrypoint}
+                 : arg typed_contract) )
             else
               (* An implicit account on any other entrypoint is not a valid contract. *)
               ok (error ctxt (fun _loc -> No_such_entrypoint entrypoint)))
-      | Originated _ ->
+      | Originated contract_hash ->
           trace
             (Invalid_contract (loc, contract))
             ( Contract.get_script_code ctxt contract >>=? fun (ctxt, code) ->
@@ -4967,8 +4971,8 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
                     >|? fun (entrypoint_arg, ctxt) ->
                     ( ctxt,
                       entrypoint_arg >|? fun (entrypoint, arg_ty) ->
-                      let address = {destination; entrypoint} in
-                      Typed_contract {arg_ty; address} )) ))
+                      let destination = Typed_originated contract_hash in
+                      Typed_contract {arg_ty; destination; entrypoint} )) ))
   | Tx_rollup tx_rollup ->
       Tx_rollup_state.assert_exist ctxt tx_rollup >|=? fun ctxt ->
       if Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) then
@@ -4976,8 +4980,11 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
            [parse_tx_rollup_deposit_parameters]. *)
         match arg with
         | Pair_t (Ticket_t (_, _), Tx_rollup_l2_address_t, _, _) ->
-            let address = {destination; entrypoint} in
-            (ctxt, ok @@ Typed_contract {arg_ty = arg; address})
+            let destination = Typed_tx_rollup tx_rollup in
+            ( ctxt,
+              ok
+              @@ (Typed_contract {arg_ty = arg; destination; entrypoint}
+                   : arg typed_contract) )
         | _ ->
             error ctxt (fun loc ->
                 Tx_rollup_bad_deposit_parameter (loc, serialize_ty_for_error arg))
@@ -5015,8 +5022,8 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
             >|? fun (entrypoint_arg, ctxt) ->
             ( ctxt,
               entrypoint_arg >|? fun (entrypoint, arg_ty) ->
-              let address = {destination; entrypoint} in
-              Typed_contract {arg_ty; address} ))
+              let destination = Typed_sc_rollup sc_rollup in
+              Typed_contract {arg_ty; destination; entrypoint} ))
 
 (* Same as [parse_contract], but does not fail when the contact is missing or
    if the expected type doesn't match the actual one. In that case None is

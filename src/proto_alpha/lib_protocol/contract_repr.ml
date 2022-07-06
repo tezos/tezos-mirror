@@ -39,14 +39,6 @@ include Compare.Make (struct
     | Originated _, Implicit _ -> 1
 end)
 
-let blake2b_hash_size =
-  let open Cache_memory_helpers in
-  h1w +! string_size_gen 20
-
-let public_key_hash_in_memory_size =
-  let open Cache_memory_helpers in
-  header_size +! word_size +! blake2b_hash_size
-
 let in_memory_size =
   let open Cache_memory_helpers in
   function
