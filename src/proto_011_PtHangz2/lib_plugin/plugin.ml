@@ -1645,9 +1645,8 @@ module RPC = struct
                }))
 
     module Manager = struct
-      let[@coq_axiom_with_reason "cast on e"] operations ctxt block ~branch
-          ~source ?sourcePubKey ~counter ~fee ~gas_limit ~storage_limit
-          operations =
+      let operations ctxt block ~branch ~source ?sourcePubKey ~counter ~fee
+          ~gas_limit ~storage_limit operations =
         Contract_services.manager_key ctxt block source >>= function
         | Error _ as e -> Lwt.return e
         | Ok revealed ->
