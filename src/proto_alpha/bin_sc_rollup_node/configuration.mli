@@ -24,6 +24,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Mode for the rollup node *)
+type mode =
+  | Observer  (** Only follows the chain and reconstructs inboxes *)
+  | Batcher  (** Accept transactions in its queue and batches them on the L1 *)
+  | Maintenance  (** Follows the chain and publishes commitments *)
+  | Operator  (** Equivalent to maintenance + batcher  *)
+  | Custom
+      (** This mode allows to tweak which operations are injected by selecting
+          the signers *)
+
 (** Purposes for operators, indicating the kind of operations that they sign. *)
 type purpose = Publish | Add_messages | Cement | Refute
 
@@ -38,6 +48,7 @@ type t = {
   rpc_addr : string;
   rpc_port : int;
   fee_parameter : Injection.fee_parameter;
+  mode : mode;
   loser_mode : Loser_mode.t;
 }
 
@@ -71,8 +82,21 @@ val default_rpc_port : int
 (** [default_fee_parameter] is the default value for [fee_parameter] *)
 val default_fee_parameter : Injection.fee_parameter
 
+(** This is the list of available modes. *)
+val modes : mode list
+
+(** [string_of_mode mode] returns a string representation of the mode [mode]. *)
+val string_of_mode : mode -> string
+
+(** [mode_of_string s] returns the mode represented by string [s] if it exists. *)
+val mode_of_string : string -> mode tzresult
+
 (** [filename configuration] returns the [configuration] filename. *)
 val filename : t -> string
+
+(** [check_mode config] ensures the operators correspond to the chosen mode and
+    removes the extra ones. *)
+val check_mode : t -> t tzresult
 
 (** [save configuration] overwrites [configuration] file. *)
 val save : t -> unit tzresult Lwt.t

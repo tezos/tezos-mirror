@@ -35,6 +35,9 @@ type error +=
   | Cannot_produce_proof of
       Sc_rollup.Inbox.t * Sc_rollup.Inbox.history * Raw_level.t
 
+type error +=
+  | Missing_mode_operators of {mode : string; missing_operators : string list}
+
 let () =
   register_error_kind
     `Permanent
@@ -108,4 +111,27 @@ let () =
           Some (inbox, history, level)
       | _ -> None)
     (fun (inbox, history, level) ->
-      Cannot_produce_proof (inbox, history, level))
+      Cannot_produce_proof (inbox, history, level)) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.missing_mode_operators"
+    ~title:"Missing operators for the chosen mode"
+    ~description:"Missing operators for the chosen mode."
+    ~pp:(fun ppf (mode, missing_operators) ->
+      Format.fprintf
+        ppf
+        "@[<hov>Missing operators %a for mode %s.@]"
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+           Format.pp_print_string)
+        missing_operators
+        mode)
+    `Permanent
+    Data_encoding.(
+      obj2 (req "mode" string) (req "missing_operators" (list string)))
+    (function
+      | Missing_mode_operators {mode; missing_operators} ->
+          Some (mode, missing_operators)
+      | _ -> None)
+    (fun (mode, missing_operators) ->
+      Missing_mode_operators {mode; missing_operators})

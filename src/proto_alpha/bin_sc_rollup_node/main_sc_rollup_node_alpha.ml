@@ -75,6 +75,22 @@ let sc_rollup_node_operator_param =
       (* cannot happen due to String.split's implementation. *)
       assert false
 
+let possible_modes = List.map Configuration.string_of_mode Configuration.modes
+
+let mode_parameter =
+  Clic.parameter
+    ~autocomplete:(fun _ -> return possible_modes)
+    (fun _ m -> Lwt.return (Configuration.mode_of_string m))
+
+let mode_param =
+  Clic.param
+    ~name:"mode"
+    ~desc:
+      (Printf.sprintf
+         "The mode for the rollup node (%s)"
+         (String.concat ", " possible_modes))
+    mode_parameter
+
 let rpc_addr_arg =
   let default = Configuration.default_rpc_addr in
   Clic.default_arg
@@ -214,6 +230,7 @@ let group =
   }
 
 let config_init_command =
+  let open Lwt_result_syntax in
   let open Clic in
   command
     ~group
@@ -229,7 +246,8 @@ let config_init_command =
        fee_cap_arg
        burn_cap_arg
        loser_mode)
-    (prefixes ["config"; "init"; "on"]
+    (prefix "init" @@ mode_param
+    @@ prefixes ["config"; "for"]
     @@ sc_rollup_address_param
     @@ prefixes ["with"; "operators"]
     @@ seq_of_param @@ sc_rollup_node_operator_param)
@@ -243,6 +261,7 @@ let config_init_command =
            fee_cap,
            burn_cap,
            loser_mode )
+         mode
          sc_rollup_address
          sc_rollup_node_operators
          cctxt ->
@@ -281,9 +300,11 @@ let config_init_command =
               fee_cap;
               burn_cap;
             };
+          mode;
           loser_mode;
         }
       in
+      let*? config = check_mode config in
       save config >>=? fun () ->
       cctxt#message
         "Smart-contract rollup node configuration written in %s"

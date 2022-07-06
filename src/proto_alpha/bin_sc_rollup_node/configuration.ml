@@ -26,6 +26,8 @@
 
 open Protocol.Alpha_context
 
+type mode = Observer | Batcher | Maintenance | Operator | Custom
+
 type purpose = Publish | Add_messages | Cement | Refute
 
 let purposes = [Publish; Add_messages; Cement; Refute]
@@ -45,6 +47,7 @@ type t = {
   rpc_addr : string;
   rpc_port : int;
   fee_parameter : Injection.fee_parameter;
+  mode : mode;
   loser_mode : Loser_mode.t;
 }
 
@@ -230,6 +233,33 @@ let fee_parameter_encoding =
           Tez.encoding
           default_burn_cap))
 
+let modes = [Observer; Batcher; Maintenance; Operator; Custom]
+
+let string_of_mode = function
+  | Observer -> "observer"
+  | Batcher -> "batcher"
+  | Maintenance -> "maintenance"
+  | Operator -> "operator"
+  | Custom -> "custom"
+
+let mode_of_string = function
+  | "observer" -> Ok Observer
+  | "batcher" -> Ok Batcher
+  | "maintenance" -> Ok Maintenance
+  | "operator" -> Ok Operator
+  | "custom" -> Ok Custom
+  | _ -> Error [Exn (Failure "Invalid mode")]
+
+let mode_encoding =
+  Data_encoding.string_enum
+    [
+      ("observer", Observer);
+      ("batcher", Batcher);
+      ("maintenance", Maintenance);
+      ("operator", Operator);
+      ("custom", Custom);
+    ]
+
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
@@ -240,6 +270,7 @@ let encoding : t Data_encoding.t =
            rpc_addr;
            rpc_port;
            fee_parameter;
+           mode;
            loser_mode;
          } ->
       ( data_dir,
@@ -248,6 +279,7 @@ let encoding : t Data_encoding.t =
         rpc_addr,
         rpc_port,
         fee_parameter,
+        mode,
         loser_mode ))
     (fun ( data_dir,
            sc_rollup_address,
@@ -255,6 +287,7 @@ let encoding : t Data_encoding.t =
            rpc_addr,
            rpc_port,
            fee_parameter,
+           mode,
            loser_mode ) ->
       {
         data_dir;
@@ -263,9 +296,10 @@ let encoding : t Data_encoding.t =
         rpc_addr;
         rpc_port;
         fee_parameter;
+        mode;
         loser_mode;
       })
-    (obj7
+    (obj8
        (dft
           "data-dir"
           ~description:"Location of the data dir"
@@ -288,6 +322,7 @@ let encoding : t Data_encoding.t =
           ~description:"The fee parameter used when injecting operations in L1"
           fee_parameter_encoding
           default_fee_parameter)
+       (req ~description:"The mode for this rollup node" "mode" mode_encoding)
        (dft
           "loser-mode"
           ~description:
@@ -295,6 +330,38 @@ let encoding : t Data_encoding.t =
              test only!)"
           Loser_mode.encoding
           Loser_mode.no_failures))
+
+let check_mode config =
+  let open Result_syntax in
+  let check_purposes purposes =
+    let missing_operators =
+      List.filter
+        (fun p ->
+          not (Operator_purpose_map.mem p config.sc_rollup_node_operators))
+        purposes
+    in
+    if missing_operators <> [] then
+      let mode = string_of_mode config.mode in
+      let missing_operators = List.map string_of_purpose missing_operators in
+      tzfail
+        (Sc_rollup_node_errors.Missing_mode_operators {mode; missing_operators})
+    else return_unit
+  in
+  let narrow_purposes purposes =
+    let+ () = check_purposes purposes in
+    let sc_rollup_node_operators =
+      Operator_purpose_map.filter
+        (fun op_purpose _ -> List.mem ~equal:Stdlib.( = ) op_purpose purposes)
+        config.sc_rollup_node_operators
+    in
+    {config with sc_rollup_node_operators}
+  in
+  match config.mode with
+  | Observer -> narrow_purposes []
+  | Batcher -> narrow_purposes [Add_messages]
+  | Maintenance -> narrow_purposes [Publish; Cement; Refute]
+  | Operator -> narrow_purposes [Publish; Cement; Add_messages; Refute]
+  | Custom -> return config
 
 let loser_warning_message config =
   if config.loser_mode <> Loser_mode.no_failures then
