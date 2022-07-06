@@ -51,8 +51,6 @@ constants_storage.ml
 constants_storage.mli
 contract_delegate_storage.ml
 contract_delegate_storage.mli
-contract_event_repr.ml
-contract_event_repr.mli
 contract_hash.ml
 contract_hash.mli
 contract_manager_storage.ml
