@@ -490,31 +490,107 @@ end)
 
     val stack : ('a, 'b) Script_typed_ir.stack_ty -> ('a * 'b) sampler
   end = struct
+    let implicit = Crypto_samplers.pkh
+
+    let originated rng_state =
+      (* For a description of the format, see
+         tezos-codec describe alpha.contract binary encoding *)
+      let string =
+        "\001" ^ Base_samplers.uniform_string ~nbytes:20 rng_state ^ "\000"
+      in
+      Data_encoding.Binary.of_string_exn
+        Alpha_context.Contract.originated_encoding
+        string
+
+    let tx_rollup rng_state =
+      let string = Base_samplers.uniform_string ~nbytes:20 rng_state in
+      Data_encoding.Binary.of_string_exn Alpha_context.Tx_rollup.encoding string
+
+    let sc_rollup rng_state =
+      let string = Base_samplers.uniform_string ~nbytes:20 rng_state in
+      Data_encoding.Binary.of_string_exn
+        Alpha_context.Sc_rollup.Address.encoding
+        string
+
+    let entrypoint rng_state =
+      Alpha_context.Entrypoint.of_string_strict_exn
+      @@ Base_samplers.string ~size:{min = 1; max = 31} rng_state
+
     let address rng_state =
       if Base_samplers.uniform_bool rng_state then
-        let contract =
-          Alpha_context.Contract.Implicit (Crypto_samplers.pkh rng_state)
+        let destination =
+          Alpha_context.Destination.Contract (Implicit (implicit rng_state))
         in
-        {
-          destination = Contract contract;
-          entrypoint = Alpha_context.Entrypoint.default;
-        }
+        {destination; entrypoint = Alpha_context.Entrypoint.default}
       else
-        (* For a description of the format, see
-           tezos-codec describe alpha.contract binary encoding *)
-        let string =
-          "\001" ^ Base_samplers.uniform_string ~nbytes:20 rng_state ^ "\000"
+        let destination =
+          Alpha_context.Destination.Contract (Originated (originated rng_state))
         in
-        let contract =
-          Data_encoding.Binary.of_string_exn
-            Alpha_context.Contract.encoding
-            string
-        in
-        let ep =
-          Alpha_context.Entrypoint.of_string_strict_exn
-          @@ Base_samplers.string ~size:{min = 1; max = 31} rng_state
-        in
-        {destination = Contract contract; entrypoint = ep}
+        let entrypoint = entrypoint rng_state in
+        {destination; entrypoint}
+
+    let generate_originated_contract :
+        type arg argc.
+        (arg, argc) Script_typed_ir.ty ->
+        arg Script_typed_ir.typed_contract sampler =
+     fun arg_ty ->
+      let open M in
+      let* c = originated in
+      let* entrypoint = entrypoint in
+      let destination = Alpha_context.Destination.Contract (Originated c) in
+      let address = {destination; entrypoint} in
+      return (Typed_contract {arg_ty; address})
+
+    let generate_sc_rollup_contract :
+        type arg argc.
+        (arg, argc) Script_typed_ir.ty ->
+        arg Script_typed_ir.typed_contract sampler =
+     fun arg_ty ->
+      let open M in
+      let* ru = sc_rollup in
+      let* entrypoint = entrypoint in
+      let destination = Alpha_context.Destination.Sc_rollup ru in
+      let address = {destination; entrypoint} in
+      return (Typed_contract {arg_ty; address})
+
+    let generate_any_type_contract :
+        type arg argc.
+        (arg, argc) Script_typed_ir.ty ->
+        arg Script_typed_ir.typed_contract sampler =
+     fun arg_ty ->
+      let open M in
+      let* b = Base_samplers.uniform_bool in
+      if b then generate_originated_contract arg_ty
+      else generate_sc_rollup_contract arg_ty
+
+    let generate_contract :
+        type arg argc.
+        (arg, argc) Script_typed_ir.ty ->
+        arg Script_typed_ir.typed_contract sampler =
+     fun arg_ty ->
+      let open M in
+      match arg_ty with
+      | Unit_t ->
+          let* b = Base_samplers.uniform_bool in
+          if b then
+            let* pkh = implicit in
+            let destination =
+              Alpha_context.Destination.Contract (Implicit pkh)
+            in
+            let entrypoint = Alpha_context.Entrypoint.default in
+            let address = {destination; entrypoint} in
+            return (Typed_contract {arg_ty; address})
+          else generate_any_type_contract arg_ty
+      | Pair_t (Ticket_t _, Tx_rollup_l2_address_t, _, _) ->
+          let* b = Base_samplers.uniform_bool in
+          if b then
+            let* tx_rollup = tx_rollup in
+            let destination = Alpha_context.Destination.Tx_rollup tx_rollup in
+            let entrypoint = Alpha_context.Tx_rollup.deposit_entrypoint in
+            let address = {destination; entrypoint} in
+            return (Typed_contract {arg_ty; address})
+          else generate_any_type_contract arg_ty
+      | _ -> generate_any_type_contract arg_ty
 
     let tx_rollup_l2_address rng_state =
       let seed =
@@ -676,15 +752,6 @@ end)
               (Error_monad.TzTrace.pp_print Error_monad.pp)
               e ;
             fail_sampling "raise_if_error"
-
-    and generate_contract :
-        type arg argc.
-        (arg, argc) Script_typed_ir.ty ->
-        arg Script_typed_ir.typed_contract sampler =
-     fun arg_ty ->
-      let open M in
-      let* address = value address_t in
-      return (Typed_contract {arg_ty; address})
 
     and generate_operation : Script_typed_ir.operation sampler =
      fun rng_state ->
