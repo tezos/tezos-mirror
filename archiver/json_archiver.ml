@@ -129,6 +129,7 @@ let extract_anomalies path level infos =
                     {
                       level;
                       round;
+                      kind;
                       delegate;
                       delegate_alias;
                       problem = Data.Anomaly.Incorrect;
@@ -140,6 +141,7 @@ let extract_anomalies path level infos =
                       {
                         level;
                         round;
+                        kind;
                         delegate;
                         delegate_alias;
                         problem = Data.Anomaly.Missed;
@@ -149,6 +151,7 @@ let extract_anomalies path level infos =
                       {
                         level;
                         round;
+                        kind;
                         delegate;
                         delegate_alias;
                         problem = Data.Anomaly.Forgotten;
@@ -158,6 +161,7 @@ let extract_anomalies path level infos =
                       {
                         level;
                         round;
+                        kind;
                         delegate;
                         delegate_alias;
                         problem = Data.Anomaly.Sequestered;

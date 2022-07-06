@@ -194,6 +194,7 @@ module Anomaly = struct
   type t = {
     level : Int32.t;
     round : Int32.t option;
+    kind : Consensus_ops.operation_kind;
     delegate : Signature.Public_key_hash.t;
     delegate_alias : string option;
     problem : problem;
@@ -211,13 +212,17 @@ module Anomaly = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {level; round; delegate; delegate_alias; problem} ->
-        (level, round, delegate, delegate_alias, problem))
-      (fun (level, round, delegate, delegate_alias, problem) ->
-        {level; round; delegate; delegate_alias; problem})
-      (obj5
+      (fun {level; round; kind; delegate; delegate_alias; problem} ->
+        (level, round, kind, delegate, delegate_alias, problem))
+      (fun (level, round, kind, delegate, delegate_alias, problem) ->
+        {level; round; kind; delegate; delegate_alias; problem})
+      (obj6
          (req "level" int32)
          (opt "round" int32)
+         (dft
+            "kind"
+            Consensus_ops.operation_kind_encoding
+            Consensus_ops.Endorsement)
          (req "delegate" Signature.Public_key_hash.encoding)
          (opt "delegate_alias" string)
          (req "problem" problem_encoding))
