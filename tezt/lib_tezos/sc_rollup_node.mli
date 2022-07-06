@@ -62,7 +62,8 @@ val create :
   ?event_pipe:string ->
   ?rpc_host:string ->
   ?rpc_port:int ->
-  operator_pkh:string ->
+  ?operators:(string * string) list ->
+  ?default_operator:string ->
   Node.t ->
   Client.t ->
   t
@@ -84,9 +85,6 @@ val data_dir : t -> string
 
 (** Get the base-dir of an sc node *)
 val base_dir : t -> string
-
-(** Get the public key hash of the sc node oeprator *)
-val operator_pkh : t -> string
 
 (** Wait until an sc node terminates and check its status.
 

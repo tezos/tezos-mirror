@@ -28,7 +28,8 @@ type 'a known = Unknown | Known of 'a
 module Parameters = struct
   type persistent_state = {
     data_dir : string;
-    operator_pkh : string;
+    operators : (string * string) list;
+    default_operator : string option;
     rpc_host : string;
     rpc_port : int;
     client : Client.t;
@@ -77,7 +78,17 @@ let data_dir sc_node = sc_node.persistent_state.data_dir
 
 let base_dir sc_node = Client.base_dir sc_node.persistent_state.client
 
-let operator_pkh sc_node = sc_node.persistent_state.operator_pkh
+let operators_params sc_node =
+  let acc =
+    match sc_node.persistent_state.default_operator with
+    | None -> []
+    | Some operator -> [operator]
+  in
+  List.fold_left
+    (fun acc (purpose, operator) ->
+      String.concat ":" [purpose; operator] :: acc)
+    acc
+    sc_node.persistent_state.operators
 
 let layer1_addr sc_node = Node.rpc_host sc_node.persistent_state.node
 
@@ -87,24 +98,18 @@ let spawn_command sc_node =
   Process.spawn ~name:sc_node.name ~color:sc_node.color sc_node.path
 
 let spawn_config_init sc_node ?loser_mode rollup_address =
-  spawn_command
-    sc_node
-    ([
-       "config";
-       "init";
-       "on";
-       rollup_address;
-       "with";
-       "operator";
-       operator_pkh sc_node;
-       "--data-dir";
-       data_dir sc_node;
-       "--rpc-addr";
-       rpc_host sc_node;
-       "--rpc-port";
-       string_of_int @@ rpc_port sc_node;
-     ]
-    @ match loser_mode with None -> [] | Some mode -> ["--loser-mode"; mode])
+  spawn_command sc_node
+  @@ ["config"; "init"; "on"; rollup_address; "with"; "operators"]
+  @ operators_params sc_node
+  @ [
+      "--data-dir";
+      data_dir sc_node;
+      "--rpc-addr";
+      rpc_host sc_node;
+      "--rpc-port";
+      string_of_int @@ rpc_port sc_node;
+    ]
+  @ match loser_mode with None -> [] | Some mode -> ["--loser-mode"; mode]
 
 let config_init sc_node ?loser_mode rollup_address =
   let process = spawn_config_init sc_node ?loser_mode rollup_address in
@@ -209,8 +214,8 @@ let handle_event sc_node {name; value} =
   | _ -> ()
 
 let create ?(path = Constant.sc_rollup_node) ?name ?color ?data_dir ?event_pipe
-    ?(rpc_host = "127.0.0.1") ?rpc_port ~operator_pkh (node : Node.t)
-    (client : Client.t) =
+    ?(rpc_host = "127.0.0.1") ?rpc_port ?(operators = []) ?default_operator
+    (node : Node.t) (client : Client.t) =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -228,7 +233,8 @@ let create ?(path = Constant.sc_rollup_node) ?name ?color ?data_dir ?event_pipe
         data_dir;
         rpc_host;
         rpc_port;
-        operator_pkh;
+        operators;
+        default_operator;
         node;
         client;
         pending_ready = [];
