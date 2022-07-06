@@ -23,4 +23,5 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let lookup name = failwith (Printf.sprintf "Unknown host function %s" name)
+let lookup name =
+  Stdlib.failwith (Printf.sprintf "Unknown host function %s" name)

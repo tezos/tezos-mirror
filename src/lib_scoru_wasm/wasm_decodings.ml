@@ -98,7 +98,7 @@ module Make (T : Tree.S) = struct
     | RefType ref_type ->
         let+ ref_value = ref_decoding_for ref_type modules in
         Values.Ref ref_value
-    | _ -> failwith "Unsupported value_type"
+    | _ -> Stdlib.failwith "Unsupported value_type"
 
   let var_list_decoding =
     list_decoding (value [] Interpreter_encodings.Ast.var_encoding)
@@ -395,7 +395,7 @@ module Make (T : Tree.S) = struct
             value ["$1"] Interpreter_encodings.Ast.vec_replaceop_encoding
           in
           VecReplace op
-      | _ -> failwith (Printf.sprintf "Unknown instruction tag %s" tag)
+      | _ -> Stdlib.failwith (Printf.sprintf "Unknown instruction tag %s" tag)
     in
     Source.(instr @@ no_region)
 
@@ -532,7 +532,7 @@ module Make (T : Tree.S) = struct
 
   let module_instances_decoding =
     let open Syntax in
-    let self = ref (fun () -> failwith "Uninitialized!") in
+    let self = ref (fun () -> Stdlib.failwith "Uninitialized!") in
     let* count = value ["count"] Data_encoding.int32 in
     let modules =
       (* This is a proxy for the mapping returned by the function contained in
