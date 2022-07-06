@@ -186,3 +186,39 @@ let encoding =
        (dft "unaccurate" bool false))
 
 let empty = {blocks = []; delegate_operations = []; unaccurate = true}
+
+module Anomaly = struct
+  (* only anomalies related to endorsements are considered for now *)
+  type problem = Missed | Forgotten | Sequestered | Incorrect
+
+  type t = {
+    level : Int32.t;
+    round : Int32.t option;
+    delegate : Signature.Public_key_hash.t;
+    delegate_alias : string option;
+    problem : problem;
+  }
+
+  let problem_encoding =
+    Data_encoding.string_enum
+      [
+        ("missed", Missed);
+        ("forgotten", Forgotten);
+        ("sequestered", Sequestered);
+        ("incorrect", Incorrect);
+      ]
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {level; round; delegate; delegate_alias; problem} ->
+        (level, round, delegate, delegate_alias, problem))
+      (fun (level, round, delegate, delegate_alias, problem) ->
+        {level; round; delegate; delegate_alias; problem})
+      (obj5
+         (req "level" int32)
+         (opt "round" int32)
+         (req "delegate" Signature.Public_key_hash.encoding)
+         (opt "delegate_alias" string)
+         (req "problem" problem_encoding))
+end

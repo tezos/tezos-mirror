@@ -30,44 +30,11 @@ class type t = Tezos_client_base.Client_context.full
 let levels_per_folder = 4096l
 
 module Anomaly = struct
-  (* only anomalies related to endorsements are considered for now *)
-  type problem = Missed | Forgotten | Sequestered | Incorrect
-
-  type t = {
-    level : Int32.t;
-    round : Int32.t option;
-    delegate : Signature.Public_key_hash.t;
-    delegate_alias : string option;
-    problem : problem;
-  }
-
-  let problem_encoding =
-    Data_encoding.string_enum
-      [
-        ("missed", Missed);
-        ("forgotten", Forgotten);
-        ("sequestered", Sequestered);
-        ("incorrect", Incorrect);
-      ]
-
-  let encoding =
-    let open Data_encoding in
-    conv
-      (fun {level; round; delegate; delegate_alias; problem} ->
-        (level, round, delegate, delegate_alias, problem))
-      (fun (level, round, delegate, delegate_alias, problem) ->
-        {level; round; delegate; delegate_alias; problem})
-      (obj5
-         (req "level" int32)
-         (opt "round" int32)
-         (req "delegate" Signature.Public_key_hash.encoding)
-         (opt "delegate_alias" string)
-         (req "problem" problem_encoding))
-
-  let rec insert_in_ordered_list ({level; delegate; _} as anomaly) = function
+  let rec insert_in_ordered_list (Data.Anomaly.{level; delegate; _} as anomaly)
+      = function
     | [] -> [anomaly]
     | head :: tail as l ->
-        if Compare.Int32.(head.level < level) then anomaly :: l
+        if Compare.Int32.(head.Data.Anomaly.level < level) then anomaly :: l
         else if
           Int32.equal head.level level
           && Signature.Public_key_hash.equal head.delegate delegate
@@ -132,10 +99,12 @@ let dump_anomalies path level anomalies =
   let mutex = get_file_mutex filename in
   let*! out =
     Lwt_mutex.with_lock mutex (fun () ->
-        let* known = load filename (Data_encoding.list Anomaly.encoding) [] in
+        let* known =
+          load filename (Data_encoding.list Data.Anomaly.encoding) []
+        in
         write
           filename
-          (Data_encoding.list Anomaly.encoding)
+          (Data_encoding.list Data.Anomaly.encoding)
           (List.fold_left
              (fun x y -> Anomaly.insert_in_ordered_list y x)
              known
@@ -156,46 +125,43 @@ let extract_anomalies path level infos =
                    {kind; round; reception_time; errors; block_inclusion} ->
               match errors with
               | Some (_ :: _) ->
-                  Anomaly.
+                  Data.Anomaly.
                     {
                       level;
                       round;
                       delegate;
                       delegate_alias;
-                      problem = Anomaly.Incorrect;
+                      problem = Data.Anomaly.Incorrect;
                     }
                   :: acc
               | None | Some [] -> (
                   match (kind, reception_time, block_inclusion) with
                   | (Endorsement, None, []) ->
-                      Anomaly.
-                        {
-                          level;
-                          round;
-                          delegate;
-                          delegate_alias;
-                          problem = Anomaly.Missed;
-                        }
+                      {
+                        level;
+                        round;
+                        delegate;
+                        delegate_alias;
+                        problem = Data.Anomaly.Missed;
+                      }
                       :: acc
                   | (Endorsement, Some _, []) ->
-                      Anomaly.
-                        {
-                          level;
-                          round;
-                          delegate;
-                          delegate_alias;
-                          problem = Anomaly.Forgotten;
-                        }
+                      {
+                        level;
+                        round;
+                        delegate;
+                        delegate_alias;
+                        problem = Data.Anomaly.Forgotten;
+                      }
                       :: acc
                   | (Endorsement, None, _ :: _) ->
-                      Anomaly.
-                        {
-                          level;
-                          round;
-                          delegate;
-                          delegate_alias;
-                          problem = Anomaly.Sequestered;
-                        }
+                      {
+                        level;
+                        round;
+                        delegate;
+                        delegate_alias;
+                        problem = Data.Anomaly.Sequestered;
+                      }
                       :: acc
                   | (Endorsement, Some _, _ :: _) -> acc
                   | (Preendorsement, _, _) -> acc))
