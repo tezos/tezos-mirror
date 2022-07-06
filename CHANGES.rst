@@ -122,5 +122,17 @@ Docker Images
   since version 13.0. It is recommended to write your own docker-compose file instead.
   ``scripts/docker/docker-compose-generic.yml`` is an example of such file.
 
+Rollup Binaries
+---------------
+
+- Included the Transaction Rollups (TORU) and Smart-contract Rollups
+  (SCORU) binaries in the Docker images of Octez.  These binaries are
+  **experimental**.  They are provided solely for testing-purposes,
+  and should not be used in production.  Besides, they should not be
+  considered as being part of Octez, and as a consequence will not be
+  provided with the same degree of maintenance.  However, developers
+  interested in implementing their own rollup nodes and clients are
+  more than welcome to leverage them.
+
 Miscellaneous
 -------------
