@@ -153,7 +153,7 @@ let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
       ~src:bootstrap1_key
       ~kind:"arith"
       ~boot_sector:""
-      ~parameters_ty:"unit"
+      ~parameters_ty:"string"
       tezos_client
   in
   let sc_rollup_node =
@@ -263,7 +263,7 @@ let test_origination =
           ~burn_cap:Tez.(of_int 9999999)
           ~src:bootstrap1_key
           ~kind:"arith"
-          ~parameters_ty:"unit"
+          ~parameters_ty:"string"
           ~boot_sector:""
           client
       in
@@ -282,7 +282,7 @@ let with_fresh_rollup ?(boot_sector = "") f tezos_node tezos_client
       ~burn_cap:Tez.(of_int 9999999)
       ~src:bootstrap1_key
       ~kind:"arith"
-      ~parameters_ty:"unit"
+      ~parameters_ty:"string"
       ~boot_sector
       tezos_client
   in
@@ -923,8 +923,8 @@ let test_rollup_node_boots_into_initial_state =
    When the rollup node receives messages, we like to see evidence that the PVM
    has advanced.
 *)
-let test_rollup_node_advances_pvm_state =
-  let go client sc_rollup sc_rollup_node =
+let test_rollup_node_advances_pvm_state protocols =
+  let go ~internal client sc_rollup sc_rollup_node =
     let* genesis_info =
       RPC.Client.call ~hooks client @@ RPC.Sc_rollup.get_genesis_info sc_rollup
     in
@@ -937,17 +937,48 @@ let test_rollup_node_advances_pvm_state =
     Check.(level = init_level)
       Check.int
       ~error_msg:"Current level has moved past origination level (%L = %R)" ;
-
+    let* level, forwarder =
+      if not internal then return (level, None)
+      else
+        (* Originate forwarder contract to send internal messages to rollup *)
+        let* contract_id =
+          Client.originate_contract
+            ~alias:"rollup_deposit"
+            ~amount:Tez.zero
+            ~src:Constant.bootstrap1.alias
+            ~prg:"file:./tezt/tests/contracts/proto_alpha/sc_rollup_forward.tz"
+            ~init:"Unit"
+            ~burn_cap:Tez.(of_int 1)
+            client
+        in
+        let* () = Client.bake_for_and_wait client in
+        Log.info
+          "The forwarder %s contract was successfully originated"
+          contract_id ;
+        return (level + 1, Some contract_id)
+    in
     let test_message i =
       let* prev_state_hash =
         Sc_rollup_client.state_hash ~hooks sc_rollup_client
       in
       let* prev_ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
+      let message = sf "%d %d + value" i ((i + 2) * 2) in
       let* () =
-        send_message
-          client
-          sc_rollup
-          (Printf.sprintf "[\"%d %d + value\"]" i ((i + 2) * 2))
+        match forwarder with
+        | None ->
+            (* External message *)
+            send_message client sc_rollup (sf "[%S]" message)
+        | Some forwarder ->
+            (* Internal message through forwarder *)
+            let* () =
+              Client.transfer
+                client
+                ~amount:Tez.zero
+                ~giver:Constant.bootstrap1.alias
+                ~receiver:forwarder
+                ~arg:(sf "Pair %S %S" sc_rollup message)
+            in
+            Client.bake_for_and_wait client
       in
       let* _ = Sc_rollup_node.wait_for_level sc_rollup_node (level + i) in
       let* encoded_value =
@@ -990,10 +1021,24 @@ let test_rollup_node_advances_pvm_state =
     (fun protocol ->
       setup ~protocol @@ fun node client ->
       with_fresh_rollup
-        (fun sc_rollup sc_rollup_node _filename ->
-          go client sc_rollup sc_rollup_node)
+        (fun sc_rollup_address sc_rollup_node _filename ->
+          go ~internal:false client sc_rollup_address sc_rollup_node)
         node
         client)
+    protocols ;
+
+  regression_test
+    ~__FILE__
+    ~tags:["run"; "node"; "internal"]
+    "node advances PVM state with internal messages"
+    (fun protocol ->
+      setup ~protocol @@ fun node client ->
+      with_fresh_rollup
+        (fun sc_rollup_address sc_rollup_node _filename ->
+          go ~internal:true client sc_rollup_address sc_rollup_node)
+        node
+        client)
+    protocols
 
 (* Ensure that commitments are stored and published properly.
    ----------------------------------------------------------
@@ -1887,7 +1932,7 @@ let test_consecutive_commitments =
           ~burn_cap:Tez.(of_int 9999999)
           ~src:bootstrap1_key
           ~kind:"arith"
-          ~parameters_ty:"unit"
+          ~parameters_ty:"string"
           ~boot_sector:""
           client
       in
