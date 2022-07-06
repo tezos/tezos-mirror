@@ -267,7 +267,7 @@ module S = struct
       ~description:
         "Returns the sum (in mutez) of all balances of all the contracts that \
          delegate to a given delegate. This excludes the delegate's own \
-         balance and its frozen deposits."
+         balance, its frozen deposits and its frozen bonds."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "delegated_balance")

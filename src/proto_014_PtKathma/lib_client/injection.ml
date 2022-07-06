@@ -310,14 +310,14 @@ let estimated_gas_single (type kind)
         | Transaction_result
             ( Transaction_to_contract_result {consumed_gas; _}
             | Transaction_to_tx_rollup_result {consumed_gas; _}
-            | Transaction_to_sc_rollup_result {consumed_gas; _}
-            | Transaction_to_event_result {consumed_gas; _} ) ->
+            | Transaction_to_sc_rollup_result {consumed_gas; _} ) ->
             Ok consumed_gas
         | Origination_result {consumed_gas; _} -> Ok consumed_gas
         | Reveal_result {consumed_gas} -> Ok consumed_gas
         | Delegation_result {consumed_gas} -> Ok consumed_gas
         | Register_global_constant_result {consumed_gas; _} -> Ok consumed_gas
         | Set_deposits_limit_result {consumed_gas} -> Ok consumed_gas
+        | Increase_paid_storage_result {consumed_gas; _} -> Ok consumed_gas
         | Tx_rollup_origination_result {consumed_gas; _} -> Ok consumed_gas
         | Tx_rollup_submit_batch_result {consumed_gas; _} -> Ok consumed_gas
         | Tx_rollup_commit_result {consumed_gas; _} -> Ok consumed_gas
@@ -353,11 +353,11 @@ let estimated_gas_single (type kind)
         | ITransaction_result
             ( Transaction_to_contract_result {consumed_gas; _}
             | Transaction_to_tx_rollup_result {consumed_gas; _}
-            | Transaction_to_sc_rollup_result {consumed_gas; _}
-            | Transaction_to_event_result {consumed_gas; _} ) ->
-            Ok consumed_gas
-        | IOrigination_result {consumed_gas; _} -> Ok consumed_gas
-        | IDelegation_result {consumed_gas} -> Ok consumed_gas)
+            | Transaction_to_sc_rollup_result {consumed_gas; _} )
+        | IOrigination_result {consumed_gas; _}
+        | IDelegation_result {consumed_gas}
+        | IEvent_result {consumed_gas} ->
+            Ok consumed_gas)
     | Skipped _ ->
         Ok Gas.Arith.zero (* there must be another error for this to happen *)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
@@ -389,10 +389,7 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
                We need to charge for newly allocated storage (as we do for
                Michelson’s big map). *)
             Ok Z.zero
-        | Transaction_result
-            (Transaction_to_sc_rollup_result _ | Transaction_to_event_result _)
-          ->
-            Ok Z.zero
+        | Transaction_result (Transaction_to_sc_rollup_result _) -> Ok Z.zero
         | Origination_result {paid_storage_size_diff; _} ->
             Ok (Z.add paid_storage_size_diff origination_size)
         | Reveal_result _ -> Ok Z.zero
@@ -400,6 +397,7 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
         | Register_global_constant_result {size_of_constant; _} ->
             Ok size_of_constant
         | Set_deposits_limit_result _ -> Ok Z.zero
+        | Increase_paid_storage_result _ -> Ok Z.zero
         | Tx_rollup_origination_result _ -> Ok tx_rollup_origination_size
         | Tx_rollup_submit_batch_result {paid_storage_size_diff; _}
         | Sc_rollup_execute_outbox_message_result {paid_storage_size_diff; _} ->
@@ -449,13 +447,10 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
                We need to charge for newly allocated storage (as we do for
                Michelson’s big map). *)
             Ok Z.zero
-        | ITransaction_result
-            (Transaction_to_sc_rollup_result _ | Transaction_to_event_result _)
-          ->
-            Ok Z.zero
+        | ITransaction_result (Transaction_to_sc_rollup_result _) -> Ok Z.zero
         | IOrigination_result {paid_storage_size_diff; _} ->
             Ok (Z.add paid_storage_size_diff origination_size)
-        | IDelegation_result _ -> Ok Z.zero)
+        | IDelegation_result _ | IEvent_result _ -> Ok Z.zero)
     | Skipped _ ->
         Ok Z.zero (* there must be another error for this to happen *)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
@@ -499,8 +494,7 @@ let originated_contracts_single (type kind)
             Ok originated_contracts
         | Transaction_result
             ( Transaction_to_tx_rollup_result _
-            | Transaction_to_sc_rollup_result _ | Transaction_to_event_result _
-              ) ->
+            | Transaction_to_sc_rollup_result _ ) ->
             Ok []
         | Origination_result {originated_contracts; _} ->
             Ok originated_contracts
@@ -508,6 +502,7 @@ let originated_contracts_single (type kind)
         | Reveal_result _ -> Ok []
         | Delegation_result _ -> Ok []
         | Set_deposits_limit_result _ -> Ok []
+        | Increase_paid_storage_result _ -> Ok []
         | Tx_rollup_origination_result _ -> Ok []
         | Tx_rollup_submit_batch_result _ -> Ok []
         | Tx_rollup_commit_result _ -> Ok []
@@ -540,12 +535,11 @@ let originated_contracts_single (type kind)
             Ok originated_contracts
         | ITransaction_result
             ( Transaction_to_tx_rollup_result _
-            | Transaction_to_sc_rollup_result _ | Transaction_to_event_result _
-              ) ->
+            | Transaction_to_sc_rollup_result _ ) ->
             Ok []
         | IOrigination_result {originated_contracts; _} ->
             Ok originated_contracts
-        | IDelegation_result _ -> Ok [])
+        | IDelegation_result _ | IEvent_result _ -> Ok [])
     | Skipped _ -> Ok [] (* there must be another error for this to happen *)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
   in
@@ -858,7 +852,8 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
                let safety_guard =
                  match c.operation with
                  | Transaction {destination = Implicit _; _}
-                 | Reveal _ | Delegation _ | Set_deposits_limit _ ->
+                 | Reveal _ | Delegation _ | Set_deposits_limit _
+                 | Increase_paid_storage _ ->
                      Gas.Arith.zero
                  | _ -> safety_guard
                in

@@ -1187,12 +1187,11 @@ let apply_internal_manager_operation_content :
         Transaction_to_sc_rollup_result {consumed_gas; inbox_after}
       in
       (ctxt, ITransaction_result result, [])
-  | Transaction_to_event {addr = _; unparsed_data = _; tag = _} ->
+  | Event {ty = _; unparsed_data = _; tag = _} ->
       return
         ( ctxt,
-          ITransaction_result
-            (Transaction_to_event_result
-               {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt}),
+          IEvent_result
+            {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt},
           [] )
   | Origination
       {
@@ -1455,17 +1454,17 @@ let apply_external_manager_operation_content :
         ctxt
         script.Script.storage
       >>?= fun (_unparsed_storage, ctxt) ->
+      Script.force_decode_in_context
+        ~consume_deserialization_gas
+        ctxt
+        script.Script.code
+      >>?= fun (unparsed_code, ctxt) ->
       Script_ir_translator.parse_script
         ctxt
         ~legacy:false
         ~allow_forged_in_storage:false
         script
       >>=? fun (Ex_script parsed_script, ctxt) ->
-      Script.force_decode_in_context
-        ~consume_deserialization_gas
-        ctxt
-        script.Script.code
-      >>?= fun (unparsed_code, ctxt) ->
       let (Script {storage_type; views; storage; _}) = parsed_script in
       let views_result =
         Script_ir_translator.parse_views ctxt ~legacy:false storage_type views
@@ -1553,6 +1552,21 @@ let apply_external_manager_operation_content :
           Set_deposits_limit_result
             {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt},
           [] )
+  | Increase_paid_storage {amount_in_bytes; destination} ->
+      let contract = Contract.Originated destination in
+      Contract.increase_paid_storage ctxt contract ~amount_in_bytes
+      >>=? fun ctxt ->
+      let payer = `Contract (Contract.Implicit source) in
+      Fees.burn_storage_increase_fees ctxt ~payer amount_in_bytes
+      >|=? fun (ctxt, storage_bus) ->
+      let result =
+        Increase_paid_storage_result
+          {
+            balance_updates = storage_bus;
+            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
+          }
+      in
+      (ctxt, result, [])
   | Tx_rollup_origination ->
       Tx_rollup.originate ctxt >>=? fun (ctxt, originated_tx_rollup) ->
       let result =
@@ -1970,8 +1984,6 @@ let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
           storage_limit,
           Transaction_to_tx_rollup_result {payload with balance_updates} )
   | Transaction_to_sc_rollup_result _ -> return (ctxt, storage_limit, trr)
-  | Transaction_to_event_result {consumed_gas} ->
-      return (ctxt, storage_limit, Transaction_to_event_result {consumed_gas})
 
 let burn_origination_storage_fees ctxt
     {
@@ -2047,6 +2059,7 @@ let burn_manager_storage_fees :
             global_address = payload.global_address;
           } )
   | Set_deposits_limit_result _ -> return (ctxt, storage_limit, smopr)
+  | Increase_paid_storage_result _ -> return (ctxt, storage_limit, smopr)
   | Tx_rollup_origination_result payload ->
       Fees.burn_tx_rollup_origination_fees ctxt ~storage_limit ~payer
       >|=? fun (ctxt, storage_limit, origination_bus) ->
@@ -2143,6 +2156,7 @@ let burn_internal_storage_fees :
       >|=? fun (ctxt, storage_limit, origination_result) ->
       (ctxt, storage_limit, IOrigination_result origination_result)
   | IDelegation_result _ -> return (ctxt, storage_limit, smopr)
+  | IEvent_result _ -> return (ctxt, storage_limit, smopr)
 
 let apply_manager_contents (type kind) ctxt mode chain_id
     (op : kind Kind.manager contents) :

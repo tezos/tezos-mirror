@@ -87,7 +87,6 @@
   Sc_rollup_commitment_repr
   Sc_rollup_proof_repr
   Sc_rollup_game_repr
-  Contract_event_repr
   Tx_rollup_level_repr
   Tx_rollup_l2_proof
   Tx_rollup_l2_address
@@ -328,7 +327,6 @@
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
   sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
-  contract_event_repr.ml contract_event_repr.mli
   tx_rollup_level_repr.ml tx_rollup_level_repr.mli
   tx_rollup_l2_proof.ml tx_rollup_l2_proof.mli
   tx_rollup_l2_address.ml tx_rollup_l2_address.mli
@@ -550,7 +548,6 @@
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
   sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
-  contract_event_repr.ml contract_event_repr.mli
   tx_rollup_level_repr.ml tx_rollup_level_repr.mli
   tx_rollup_l2_proof.ml tx_rollup_l2_proof.mli
   tx_rollup_l2_address.ml tx_rollup_l2_address.mli
@@ -777,7 +774,6 @@
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
   sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
-  contract_event_repr.ml contract_event_repr.mli
   tx_rollup_level_repr.ml tx_rollup_level_repr.mli
   tx_rollup_l2_proof.ml tx_rollup_l2_proof.mli
   tx_rollup_l2_address.ml tx_rollup_l2_address.mli

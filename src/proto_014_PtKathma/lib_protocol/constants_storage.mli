@@ -129,7 +129,7 @@ val tx_rollup_sunset_level : Raw_context.t -> int32
 val ratio_of_frozen_deposits_slashed_per_double_endorsement :
   Raw_context.t -> Ratio_repr.t
 
-val governance_dictator : Raw_context.t -> Signature.Public_key_hash.t option
+val testnet_dictator : Raw_context.t -> Signature.Public_key_hash.t option
 
 val minimal_block_delay : Raw_context.t -> Period_repr.t
 

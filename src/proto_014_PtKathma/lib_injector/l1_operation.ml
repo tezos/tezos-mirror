@@ -49,6 +49,7 @@ module Manager_operation = struct
            make origination_case;
            make delegation_case;
            make set_deposits_limit_case;
+           make increase_paid_storage_case;
            make register_global_constant_case;
            make tx_rollup_origination_case;
            make tx_rollup_submit_batch_case;
@@ -81,6 +82,7 @@ module Manager_operation = struct
     | Delegation _ -> delegation_case
     | Register_global_constant _ -> register_global_constant_case
     | Set_deposits_limit _ -> set_deposits_limit_case
+    | Increase_paid_storage _ -> increase_paid_storage_case
     | Tx_rollup_origination -> tx_rollup_origination_case
     | Tx_rollup_submit_batch _ -> tx_rollup_submit_batch_case
     | Tx_rollup_commit _ -> tx_rollup_commit_case

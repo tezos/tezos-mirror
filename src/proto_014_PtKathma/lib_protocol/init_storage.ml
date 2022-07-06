@@ -58,7 +58,27 @@
   See !3730 for an example.
 *)
 
-let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp =
+module Patch_dictator_for_ghostnet = struct
+  let ghostnet_id =
+    let id = Chain_id.of_b58check_exn "NetXnHfVqm9iesp" in
+    if Chain_id.equal id Constants_repr.mainnet_id then assert false else id
+
+  let oxhead_testnet_baker =
+    Signature.Public_key_hash.of_b58check_exn
+      "tz1Xf8zdT3DbAX9cHw3c3CXh79rc4nK4gCe8"
+
+  let patch_constant chain_id ctxt =
+    if Chain_id.equal chain_id ghostnet_id then
+      Raw_context.patch_constants ctxt (fun c ->
+          {
+            c with
+            testnet_dictator = Some oxhead_testnet_baker;
+            cycles_per_voting_period = 1l;
+          })
+    else Lwt.return ctxt
+end
+
+let prepare_first_block chain_id ctxt ~typecheck ~level ~timestamp =
   Raw_context.prepare_first_block ~level ~timestamp ctxt
   >>=? fun (previous_protocol, ctxt) ->
   let parametric = Raw_context.constants ctxt in
@@ -123,7 +143,9 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp =
          if that is done, do not set Storage.Tenderbake.First_level_of_protocol. *)
       Raw_level_repr.of_int32 level >>?= fun level ->
       Storage.Tenderbake.First_level_of_protocol.update ctxt level
-      >>=? fun ctxt -> return (ctxt, []))
+      >>=? fun ctxt ->
+      Patch_dictator_for_ghostnet.patch_constant chain_id ctxt >>= fun ctxt ->
+      return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
   Receipt_repr.group_balance_updates balance_updates >>?= fun balance_updates ->
   Storage.Pending_migration.Balance_updates.add ctxt balance_updates

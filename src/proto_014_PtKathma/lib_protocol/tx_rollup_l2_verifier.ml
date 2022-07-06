@@ -38,8 +38,8 @@ let verify_proof_model message_size proof_size =
      of the message (that is expected to capture the algoritmic
      complexity of computation to make) and the size of the proof
      (that is expected to capture the overhead of the storage). *)
-  let proof_size_coeff = safe_int 152 in
-  let message_size_coeff = safe_int 5_488 in
+  let proof_size_coeff = safe_int 124 in
+  let message_size_coeff = safe_int 8_416 in
 
   let ( * ) = mul in
   let ( + ) = add in

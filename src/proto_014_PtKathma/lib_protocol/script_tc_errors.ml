@@ -80,9 +80,6 @@ type error += Tx_rollup_addresses_disabled of Script.location
 
 type error += Sc_rollup_disabled of Script.location
 
-(* Event errors *)
-type error += Event_invalid_destination of Script.location
-
 (* Instruction typing errors *)
 type error += Fail_not_in_tail_position of Script.location
 

@@ -99,7 +99,11 @@ module Kind : sig
 
   type delegation = Delegation_kind
 
+  type event = Event_kind
+
   type set_deposits_limit = Set_deposits_limit_kind
+
+  type increase_paid_storage = Increase_paid_storage_kind
 
   type failing_noop = Failing_noop_kind
 
@@ -149,8 +153,10 @@ module Kind : sig
     | Transaction_manager_kind : transaction manager
     | Origination_manager_kind : origination manager
     | Delegation_manager_kind : delegation manager
+    | Event_manager_kind : event manager
     | Register_global_constant_manager_kind : register_global_constant manager
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
+    | Increase_paid_storage_manager_kind : increase_paid_storage manager
     | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
     | Tx_rollup_submit_batch_manager_kind : tx_rollup_submit_batch manager
     | Tx_rollup_commit_manager_kind : tx_rollup_commit manager
@@ -376,6 +382,13 @@ and _ manager_operation =
   | Set_deposits_limit :
       Tez_repr.t option
       -> Kind.set_deposits_limit manager_operation
+  (* [Increase_paid_storage] allows a sender to pay to increase the paid storage of
+     some contract by some amount. *)
+  | Increase_paid_storage : {
+      amount_in_bytes : Z.t;
+      destination : Contract_hash.t;
+    }
+      -> Kind.increase_paid_storage manager_operation
   (* [Tx_rollup_origination] allows an implicit contract to originate
      a new transactional rollup. *)
   | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
@@ -636,6 +649,8 @@ module Encoding : sig
 
   val set_deposits_limit_case : Kind.set_deposits_limit Kind.manager case
 
+  val increase_paid_storage_case : Kind.increase_paid_storage Kind.manager case
+
   val tx_rollup_origination_case : Kind.tx_rollup_origination Kind.manager case
 
   val tx_rollup_submit_batch_case :
@@ -706,6 +721,8 @@ module Encoding : sig
     val register_global_constant_case : Kind.register_global_constant case
 
     val set_deposits_limit_case : Kind.set_deposits_limit case
+
+    val increase_paid_storage_case : Kind.increase_paid_storage case
 
     val tx_rollup_origination_case : Kind.tx_rollup_origination case
 

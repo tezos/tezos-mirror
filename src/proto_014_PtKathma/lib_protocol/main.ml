@@ -849,4 +849,4 @@ let precheck_manager {validate_operation_info; validate_operation_state; _}
     contents_list
     should_check_signature
 
-(* Vanity nonce: 7274408335653994 *)
+(* Vanity nonce: 5924335419340975 *)

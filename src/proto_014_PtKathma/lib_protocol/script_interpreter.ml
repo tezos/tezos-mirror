@@ -514,7 +514,7 @@ and iview : type a b c d e f i o. (a, b, c, d, e, f, i, o) iview_type =
     (step [@ocaml.tailcall]) (ctxt, sc) gas k ks None stack
   in
   match addr.destination with
-  | Contract (Implicit _) | Tx_rollup _ | Sc_rollup _ | Event _ ->
+  | Contract (Implicit _) | Tx_rollup _ | Sc_rollup _ ->
       (return_none [@ocaml.tailcall]) ctxt
   | Contract (Originated contract_hash as c) -> (
       Contract.get_script ctxt contract_hash >>=? fun (ctxt, script_opt) ->
@@ -1532,9 +1532,9 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                 | Bogus_opening -> R true)
           in
           (step [@ocaml.tailcall]) g gas k ks accu stack
-      | IEmit {tag; ty = event_type; k; addr = event_address; loc = _} ->
+      | IEmit {tag; ty = event_type; unparsed_ty; k; loc = _} ->
           let event_data = accu in
-          emit_event (ctxt, sc) gas ~event_address ~event_type ~tag ~event_data
+          emit_event (ctxt, sc) gas ~event_type ~unparsed_ty ~tag ~event_data
           >>=? fun (accu, ctxt, gas) ->
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks accu stack)
 

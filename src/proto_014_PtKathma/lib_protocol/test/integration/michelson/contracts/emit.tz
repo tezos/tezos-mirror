@@ -4,7 +4,7 @@ code { DROP ;
        UNIT ;
        PUSH string "right" ;
        RIGHT nat ;
-       EMIT %tag1 (or (nat %int) (string %str)) ;
+       EMIT %tag1 ;
        PUSH nat 2 ;
        LEFT string ;
        EMIT %tag2 (or (nat %int) (string %str)) ;
