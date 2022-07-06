@@ -63,7 +63,7 @@ module Make (T : Tree.S) = struct
         let* modul_id = value ["module"] Data_encoding.int32 in
         let* func_id = value ["function"] Data_encoding.int32 in
         of_lwt
-          (let open Lwt.Syntax in
+          (let open Lwt_syntax in
           let* modul = Instance.Vector.get modul_id modules in
           let+ func = Instance.Vector.get func_id modul.Instance.funcs in
           Instance.FuncRef func)
@@ -444,7 +444,7 @@ module Make (T : Tree.S) = struct
         (value [] Data_encoding.int32)
     in
     let produce_value index =
-      let open Lwt.Syntax in
+      let open Lwt_syntax in
       let* func_id = get_ref index in
       let+ func = Instance.Vector.get func_id funcs in
       Instance.FuncRef func
