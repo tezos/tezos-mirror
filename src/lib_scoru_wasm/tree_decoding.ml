@@ -104,19 +104,19 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
   let run dec tree = dec tree Fun.id
 
   let raw key tree prefix =
-    let open Lwt.Syntax in
+    let open Lwt_syntax in
     let key = prefix key in
     let+ value = Tree.find tree key in
     match value with Some value -> value | None -> raise (Key_not_found key)
 
   let value key decoder tree prefix =
-    let open Lwt.Syntax in
+    let open Lwt_syntax in
     let key = prefix key in
     let* value = Tree.find tree key in
     match value with
     | Some value -> (
         match Data_encoding.Binary.of_bytes decoder value with
-        | Ok value -> Lwt.return value
+        | Ok value -> return value
         | Error error -> raise (Decode_error {key; error}))
     | None -> raise (Key_not_found key)
 

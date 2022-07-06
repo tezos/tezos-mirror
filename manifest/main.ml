@@ -1462,6 +1462,7 @@ let octez_scoru_wasm =
       "Protocol environment dependency providing WASM functionality for SCORU"
     ~deps:
       [
+        octez_base |> open_ ~m:"TzPervasives";
         octez_webassembly_interpreter;
         octez_context_sigs;
         octez_lwt_result_stdlib;

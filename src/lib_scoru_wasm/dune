@@ -6,7 +6,11 @@
  (public_name tezos-scoru-wasm)
  (instrumentation (backend bisect_ppx))
  (libraries
+  tezos-base
   tezos-webassembly-interpreter
   tezos-context.sigs
   tezos-lwt-result-stdlib
-  data-encoding))
+  data-encoding)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives))
