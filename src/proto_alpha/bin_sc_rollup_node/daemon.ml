@@ -236,6 +236,14 @@ let run ~data_dir (cctxt : Protocol_client_context.full) =
   let*! () = Event.starting_node () in
   let* configuration = Configuration.load ~data_dir in
   let open Configuration in
+  let* () =
+    (* Check that the operators are valid keys. *)
+    Operator_purpose_map.iter_es
+      (fun _purpose operator ->
+        let+ _pkh, _pk, _skh = Client_keys.get_key cctxt operator in
+        ())
+      configuration.sc_rollup_node_operators
+  in
   let*! store = Store.load configuration in
   let* l1_ctxt, genesis_info, kind = Layer1.start configuration cctxt store in
   let* node_ctxt =
@@ -245,11 +253,9 @@ let run ~data_dir (cctxt : Protocol_client_context.full) =
       configuration.sc_rollup_address
       genesis_info
       kind
-      configuration.sc_rollup_node_operator
+      configuration.sc_rollup_node_operators
       configuration.fee_parameter
       ~loser_mode:configuration.loser_mode
   in
-  let* _pkh, _pk, _skh = Node_context.get_operator_keys node_ctxt in
-  (* Check that the public key hash is valid. *)
   let module Daemon = Make ((val Components.pvm_of_kind node_ctxt.kind)) in
   Daemon.run node_ctxt configuration store

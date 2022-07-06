@@ -26,10 +26,22 @@
 
 open Protocol.Alpha_context
 
+type purpose = Publish | Add_messages | Cement | Refute
+
+let purposes = [Publish; Add_messages; Cement; Refute]
+
+module Operator_purpose_map = Map.Make (struct
+  type t = purpose
+
+  let compare = Stdlib.compare
+end)
+
+type operators = Signature.Public_key_hash.t Operator_purpose_map.t
+
 type t = {
   data_dir : string;
   sc_rollup_address : Sc_rollup.t;
-  sc_rollup_node_operator : Signature.Public_key_hash.t;
+  sc_rollup_node_operators : operators;
   rpc_addr : string;
   rpc_port : int;
   fee_parameter : Injection.fee_parameter;
@@ -81,6 +93,77 @@ let default_fee_parameter =
     fee_cap = default_fee_cap;
     burn_cap = default_burn_cap;
   }
+
+let string_of_purpose = function
+  | Publish -> "publish"
+  | Add_messages -> "add_messages"
+  | Cement -> "cement"
+  | Refute -> "refute"
+
+let purpose_of_string = function
+  | "publish" -> Publish
+  | "add_messages" -> Add_messages
+  | "cement" -> Cement
+  | "refute" -> Refute
+  | s -> invalid_arg ("purpose_of_string " ^ s)
+
+let make_purpose_map ~default bindings =
+  let map = Operator_purpose_map.of_seq @@ List.to_seq bindings in
+  match default with
+  | None -> map
+  | Some default ->
+      List.fold_left
+        (fun map purpose ->
+          if Operator_purpose_map.mem purpose map then map
+          else Operator_purpose_map.add purpose default map)
+        map
+        purposes
+
+let operator_purpose_map_encoding encoding =
+  let open Data_encoding in
+  let schema =
+    let open Json_schema in
+    let v_schema = Data_encoding.Json.schema encoding in
+    let v_schema_r = root v_schema in
+    let kind =
+      Object
+        {
+          properties =
+            List.map
+              (fun purpose ->
+                (string_of_purpose purpose, v_schema_r, false, None))
+              purposes;
+          pattern_properties = [];
+          additional_properties = None;
+          min_properties = 0;
+          max_properties = None;
+          schema_dependencies = [];
+          property_dependencies = [];
+        }
+    in
+    update (element kind) v_schema
+  in
+  conv
+    ~schema
+    (fun map ->
+      let fields =
+        Operator_purpose_map.bindings map
+        |> List.map (fun (p, v) ->
+               (string_of_purpose p, Data_encoding.Json.construct encoding v))
+      in
+      `O fields)
+    (function
+      | `O fields ->
+          List.map
+            (fun (p, v) ->
+              (purpose_of_string p, Data_encoding.Json.destruct encoding v))
+            fields
+          |> List.to_seq |> Operator_purpose_map.of_seq
+      | _ -> assert false)
+    Data_encoding.Json.encoding
+
+let operators_encoding =
+  operator_purpose_map_encoding Signature.Public_key_hash.encoding
 
 let fee_parameter_encoding =
   let open Data_encoding in
@@ -148,7 +231,7 @@ let encoding : t Data_encoding.t =
     (fun {
            data_dir;
            sc_rollup_address;
-           sc_rollup_node_operator;
+           sc_rollup_node_operators;
            rpc_addr;
            rpc_port;
            fee_parameter;
@@ -156,14 +239,14 @@ let encoding : t Data_encoding.t =
          } ->
       ( data_dir,
         sc_rollup_address,
-        sc_rollup_node_operator,
+        sc_rollup_node_operators,
         rpc_addr,
         rpc_port,
         fee_parameter,
         loser_mode ))
     (fun ( data_dir,
            sc_rollup_address,
-           sc_rollup_node_operator,
+           sc_rollup_node_operators,
            rpc_addr,
            rpc_port,
            fee_parameter,
@@ -171,7 +254,7 @@ let encoding : t Data_encoding.t =
       {
         data_dir;
         sc_rollup_address;
-        sc_rollup_node_operator;
+        sc_rollup_node_operators;
         rpc_addr;
         rpc_port;
         fee_parameter;
@@ -190,8 +273,9 @@ let encoding : t Data_encoding.t =
        (req
           "sc-rollup-node-operator"
           ~description:
-            "Public key hash of the Smart contract rollup node operator"
-          Signature.Public_key_hash.encoding)
+            "Operators that sign operations of the smart contract rollup, by \
+             purpose"
+          operators_encoding)
        (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
        (dft "rpc-port" ~description:"RPC port" int16 default_rpc_port)
        (dft

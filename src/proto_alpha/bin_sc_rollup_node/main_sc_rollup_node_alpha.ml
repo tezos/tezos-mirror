@@ -38,11 +38,24 @@ let sc_rollup_node_operator_param =
   Clic.param
     ~name:"node-operator"
     ~desc:"Public key hash of the the smart-contract rollup node operator"
-    (Clic.parameter (fun _ s ->
-         match Signature.Public_key_hash.of_b58check_opt s with
-         | None ->
-             failwith "Could not read public key hash for rollup node operator"
-         | Some pkh -> return pkh))
+  @@ Clic.parameter
+  @@ fun _ s ->
+  let pkh_of_string s =
+    match Signature.Public_key_hash.of_b58check_opt s with
+    | None -> failwith "Could not read public key hash for rollup node operator"
+    | Some pkh -> return pkh
+  in
+  match String.split ~limit:1 ':' s with
+  | [_] ->
+      let+ pkh = pkh_of_string s in
+      `Default pkh
+  | [purpose; s] ->
+      let purpose = Configuration.purpose_of_string purpose in
+      let+ pkh = pkh_of_string s in
+      `Purpose (purpose, pkh)
+  | _ ->
+      (* cannot happen due to String.split's implementation. *)
+      assert false
 
 let rpc_addr_arg =
   let default = Configuration.default_rpc_addr in
@@ -200,8 +213,8 @@ let config_init_command =
        loser_mode)
     (prefixes ["config"; "init"; "on"]
     @@ sc_rollup_address_param
-    @@ prefixes ["with"; "operator"]
-    @@ sc_rollup_node_operator_param stop)
+    @@ prefixes ["with"; "operators"]
+    @@ seq_of_param @@ sc_rollup_node_operator_param)
     (fun ( data_dir,
            rpc_addr,
            rpc_port,
@@ -213,14 +226,32 @@ let config_init_command =
            burn_cap,
            loser_mode )
          sc_rollup_address
-         sc_rollup_node_operator
+         sc_rollup_node_operators
          cctxt ->
       let open Configuration in
+      let purposed_operators, default_operators =
+        List.partition_map
+          (function
+            | `Purpose p_operator -> Left p_operator
+            | `Default operator -> Right operator)
+          sc_rollup_node_operators
+      in
+      let default_operator =
+        match default_operators with
+        | [] -> None
+        | [default_operator] -> Some default_operator
+        | _ -> Stdlib.failwith "Multiple default operators"
+      in
+      let sc_rollup_node_operators =
+        Configuration.make_purpose_map
+          purposed_operators
+          ~default:default_operator
+      in
       let config =
         {
           data_dir;
           sc_rollup_address;
-          sc_rollup_node_operator;
+          sc_rollup_node_operators;
           rpc_addr;
           rpc_port;
           fee_parameter =

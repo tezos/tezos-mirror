@@ -58,8 +58,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   module Interpreter = Interpreter.Make (PVM)
   open Sc_rollup.Game
 
-  let node_role node_ctxt Sc_rollup.Game.Index.{alice; bob} =
-    let self = node_ctxt.Node_context.operator in
+  let node_role ~self Sc_rollup.Game.Index.{alice; bob} =
     if Sc_rollup.Staker.equal alice self then Alice
     else if Sc_rollup.Staker.equal bob self then Bob
     else (* By validity of [ongoing_game] RPC. *)
@@ -67,21 +66,21 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
 
   type role = Our_turn of {opponent : public_key_hash} | Their_turn
 
-  let turn node_ctxt game players =
+  let turn ~self game players =
     let Sc_rollup.Game.Index.{alice; bob} = players in
-    match (node_role node_ctxt players, game.turn) with
+    match (node_role ~self players, game.turn) with
     | Alice, Alice -> Our_turn {opponent = bob}
     | Bob, Bob -> Our_turn {opponent = alice}
     | Alice, Bob -> Their_turn
     | Bob, Alice -> Their_turn
 
-  (** [inject_next_move node_ctxt move] submits an L1 operation to
-      issue the next move in the refutation game. [node_ctxt] provides
-      the connection to the Tezos node. *)
-  let inject_next_move node_ctxt ~refutation ~opponent =
+  (** [inject_next_move node_ctxt signer ~refuation ~opponent] submits an L1
+      operation (signed by [signer]) to issue the next move in the refutation
+      game. [node_ctxt] provides the connection to the Tezos node. *)
+  let inject_next_move node_ctxt (source, src_pk, src_sk) ~refutation ~opponent
+      =
     let open Node_context in
     let open Lwt_result_syntax in
-    let* source, src_pk, src_sk = Node_context.get_operator_keys node_ctxt in
     let {rollup_address; cctxt; _} = node_ctxt in
     let* _, _, Manager_operation_result {operation_result; _} =
       Client_proto_context.sc_rollup_refute
@@ -268,7 +267,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     let*! _res = f () in
     return_unit
 
-  let play_next_move node_ctxt store game opponent =
+  let play_next_move node_ctxt store game signer opponent =
     let open Lwt_result_syntax in
     let* refutation = next_move node_ctxt store game in
     (* FIXME: #3008
@@ -279,13 +278,12 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
        the injector to enter the scene.
     *)
     try_ @@ fun () ->
-    inject_next_move node_ctxt ~refutation:(Some refutation) ~opponent
+    inject_next_move node_ctxt signer ~refutation:(Some refutation) ~opponent
 
-  let play_timeout node_ctxt players =
+  let play_timeout node_ctxt (source, src_pk, src_sk) players =
     let Sc_rollup.Game.Index.{alice; bob} = players in
     let open Node_context in
     let open Lwt_result_syntax in
-    let* source, src_pk, src_sk = Node_context.get_operator_keys node_ctxt in
     let {rollup_address; cctxt; _} = node_ctxt in
     let* _, _, Manager_operation_result {operation_result; _} =
       Client_proto_context.sc_rollup_timeout
@@ -315,7 +313,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     in
     return_unit
 
-  let timeout_reached head_block node_ctxt players =
+  let timeout_reached ~self head_block node_ctxt players =
     let open Lwt_result_syntax in
     let Node_context.{rollup_address; cctxt; _} = node_ctxt in
     let* res =
@@ -328,51 +326,54 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     in
     let open Sc_rollup.Game in
     let index = Index.make (fst players) (snd players) in
-    let node_player = node_role node_ctxt index in
+    let node_player = node_role ~self index in
     match res with
     | Some player when not (player_equal node_player player) -> return_true
     | None -> return_false
     | Some _myself -> return_false
 
-  let play head_block node_ctxt store game staker1 staker2 =
+  let play head_block node_ctxt store ((self, _, _) as signer) game staker1
+      staker2 =
     let open Lwt_result_syntax in
     let players = (staker1, staker2) in
     let index = Sc_rollup.Game.Index.make staker1 staker2 in
-    match turn node_ctxt game index with
-    | Our_turn {opponent} -> play_next_move node_ctxt store game opponent
+    match turn ~self game index with
+    | Our_turn {opponent} -> play_next_move node_ctxt store game signer opponent
     | Their_turn ->
-        let* timeout_reached = timeout_reached head_block node_ctxt players in
+        let* timeout_reached =
+          timeout_reached ~self head_block node_ctxt players
+        in
         unless timeout_reached @@ fun () ->
-        try_ @@ fun () -> play_timeout node_ctxt index
+        try_ @@ fun () -> play_timeout node_ctxt signer index
 
-  let ongoing_game head_block node_ctxt =
-    let Node_context.{rollup_address; cctxt; operator; _} = node_ctxt in
+  let ongoing_game head_block node_ctxt self =
+    let Node_context.{rollup_address; cctxt; _} = node_ctxt in
     Plugin.RPC.Sc_rollup.ongoing_refutation_game
       cctxt
       (cctxt#chain, head_block)
       rollup_address
-      operator
+      self
       ()
 
-  let play_opening_move node_ctxt conflict =
+  let play_opening_move node_ctxt signer conflict =
     let open Lwt_syntax in
     let open Sc_rollup.Refutation_storage in
     let* () = Refutation_game_event.conflict_detected conflict in
-    inject_next_move node_ctxt ~refutation:None ~opponent:conflict.other
+    inject_next_move node_ctxt signer ~refutation:None ~opponent:conflict.other
 
-  let start_game_if_conflict head_block node_ctxt =
+  let start_game_if_conflict head_block node_ctxt ((self, _, _) as signer) =
     let open Lwt_result_syntax in
-    let Node_context.{rollup_address; cctxt; operator; _} = node_ctxt in
+    let Node_context.{rollup_address; cctxt; _} = node_ctxt in
     let* conflicts =
       Plugin.RPC.Sc_rollup.conflicts
         cctxt
         (cctxt#chain, head_block)
         rollup_address
-        operator
+        self
         ()
     in
     let*! res =
-      Option.iter_es (play_opening_move node_ctxt) (List.hd conflicts)
+      Option.iter_es (play_opening_move node_ctxt signer) (List.hd conflicts)
     in
     match res with
     | Ok r -> return r
@@ -389,9 +390,15 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   let process (Layer1.Head {hash; _}) node_ctxt store =
     let head_block = `Hash (hash, 0) in
     let open Lwt_result_syntax in
-    let* res = ongoing_game head_block node_ctxt in
-    match res with
-    | Some (game, staker1, staker2) ->
-        play head_block node_ctxt store game staker1 staker2
-    | None -> start_game_if_conflict head_block node_ctxt
+    let* signer = Node_context.get_operator_keys node_ctxt Refute in
+    match signer with
+    | None ->
+        (* Not injecting refutations, don't play refutation games *)
+        return_unit
+    | Some ((self, _, _) as signer) -> (
+        let* res = ongoing_game head_block node_ctxt self in
+        match res with
+        | Some (game, staker1, staker2) ->
+            play head_block node_ctxt store signer game staker1 staker2
+        | None -> start_game_if_conflict head_block node_ctxt signer)
 end

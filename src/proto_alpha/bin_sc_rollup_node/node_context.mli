@@ -35,8 +35,8 @@ type t = {
       (** Layer 1 context to fetch blocks and monitor heads, etc.*)
   rollup_address : Sc_rollup.t;
       (** Smart contract rollup tracked by the rollup node. *)
-  operator : Signature.Public_key_hash.t;
-      (** Address of the rollup node operator. *)
+  operators : Configuration.operators;
+      (** Addresses of the rollup node operators by purposes. *)
   genesis_info : Sc_rollup.Commitment.genesis_info;
       (** Origination information of the smart contract rollup. *)
   block_finality_time : int;
@@ -56,11 +56,13 @@ type t = {
 *)
 val get_operator_keys :
   t ->
+  Configuration.purpose ->
   (Signature.Public_key_hash.t * Signature.Public_key.t * Client_keys.sk_uri)
+  option
   tzresult
   Lwt.t
 
-(** [init cctxt l1_ctxt sc_rollup operator_pkh] initialises the rollup
+(** [init cctxt l1_ctxt sc_rollup operators_pkh] initialises the rollup
     representation.  The rollup origination level and kind are fetched via an
     RPC call to the layer1 node that [cctxt] uses for RPC requests.
 *)
@@ -70,7 +72,7 @@ val init :
   Sc_rollup.t ->
   Protocol.Alpha_context.Sc_rollup.Commitment.genesis_info ->
   Protocol.Alpha_context.Sc_rollup.Kind.t ->
-  Signature.Public_key_hash.t ->
+  Configuration.operators ->
   Injection.fee_parameter ->
   loser_mode:Loser_mode.t ->
   t tzresult Lwt.t

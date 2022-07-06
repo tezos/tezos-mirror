@@ -24,15 +24,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Purposes for operators, indicating the kind of operations that they sign. *)
+type purpose = Publish | Add_messages | Cement | Refute
+
+module Operator_purpose_map : Map.S with type key = purpose
+
+type operators = Signature.Public_key_hash.t Operator_purpose_map.t
+
 type t = {
   data_dir : string;
   sc_rollup_address : Protocol.Alpha_context.Sc_rollup.t;
-  sc_rollup_node_operator : Signature.Public_key_hash.t;
+  sc_rollup_node_operators : operators;
   rpc_addr : string;
   rpc_port : int;
   fee_parameter : Injection.fee_parameter;
   loser_mode : Loser_mode.t;
 }
+
+(** [make_purpose_map ~default purposes] constructs a purpose map from a list of
+    bindings [purposes], with a potential [default] value. *)
+val make_purpose_map :
+  default:'a option -> (purpose * 'a) trace -> 'a Operator_purpose_map.t
+
+(** Parses a purpose.
+    @raise Invalid_argument if not a valid purpose *)
+val purpose_of_string : string -> purpose
 
 (** [default_data_dir] is the default value for [data_dir]. *)
 val default_data_dir : string
