@@ -238,12 +238,14 @@ let run ~data_dir (cctxt : Protocol_client_context.full) =
     configuration
   in
   let*! store = Store.load configuration in
-  let* l1_ctxt = Layer1.start configuration cctxt store in
+  let* l1_ctxt, genesis_info, kind = Layer1.start configuration cctxt store in
   let* node_ctxt =
     Node_context.init
       cctxt
       l1_ctxt
       sc_rollup_address
+      genesis_info
+      kind
       sc_rollup_node_operator
       fee_parameter
   in

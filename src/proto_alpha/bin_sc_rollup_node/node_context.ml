@@ -52,19 +52,10 @@ let get_operator_keys node_ctxt =
 let retrieve_constants cctxt =
   Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
 
-let init (cctxt : Protocol_client_context.full) l1_ctxt rollup_address operator
-    fee_parameter =
+let init (cctxt : Protocol_client_context.full) l1_ctxt rollup_address
+    genesis_info kind operator fee_parameter =
   let open Lwt_result_syntax in
-  let* genesis_info =
-    Plugin.RPC.Sc_rollup.genesis_info
-      cctxt
-      (cctxt#chain, cctxt#block)
-      rollup_address
-  in
-  let* protocol_constants = retrieve_constants cctxt in
-  let+ kind =
-    Plugin.RPC.Sc_rollup.kind cctxt (cctxt#chain, cctxt#block) rollup_address ()
-  in
+  let+ protocol_constants = retrieve_constants cctxt in
   {
     cctxt;
     l1_ctxt;

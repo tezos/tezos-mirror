@@ -368,42 +368,22 @@ let chain_events cctxt store chain =
   in
   (Lwt_stream.map_list_s on_head heads, stopper)
 
-let check_sc_rollup_address_exists sc_rollup_address
-    (cctxt : Protocol_client_context.full) =
-  let open Lwt_result_syntax in
-  let* kind =
-    RPC.Sc_rollup.kind cctxt (cctxt#chain, cctxt#block) sc_rollup_address ()
-  in
-  let*! () = Event.rollup_exists ~addr:sc_rollup_address ~kind in
-  return_unit
-
-type info = {origination_level : int32}
-
-let gather_info (cctxt : Protocol_client_context.full) sc_rollup_address =
-  let open Lwt_result_syntax in
-  let* genesis_info =
-    RPC.Sc_rollup.genesis_info
-      cctxt
-      (cctxt#chain, cctxt#block)
-      sc_rollup_address
-  in
-  return {origination_level = Raw_level.to_int32 genesis_info.level}
-
 (** [discard_pre_origination_blocks info chain_events] filters [chain_events] in order to
     discard all heads that occur before the SC rollup origination. *)
-let discard_pre_origination_blocks info chain_events =
+let discard_pre_origination_blocks
+    (genesis_info : Sc_rollup.Commitment.genesis_info) chain_events =
+  let origination_level = Raw_level.to_int32 genesis_info.level in
   let at_or_after_origination event =
     match event with
     | SameBranch {new_head = Head {level; _} as new_head; intermediate_heads}
-      when level >= info.origination_level ->
+      when level >= origination_level ->
         let intermediate_heads =
           List.filter
-            (fun (Head {level; _}) -> level >= info.origination_level)
+            (fun (Head {level; _}) -> level >= origination_level)
             intermediate_heads
         in
         Some (SameBranch {new_head; intermediate_heads})
-    | Rollback {new_head = Head {level; _}} when level >= info.origination_level
-      ->
+    | Rollback {new_head = Head {level; _}} when level >= origination_level ->
         Some event
     | _ -> None
   in
@@ -412,13 +392,25 @@ let discard_pre_origination_blocks info chain_events =
 let start configuration (cctxt : Protocol_client_context.full) store =
   let open Lwt_result_syntax in
   let*! () = Layer1_event.starting () in
-  let* () =
-    check_sc_rollup_address_exists configuration.sc_rollup_address cctxt
+  let* kind =
+    RPC.Sc_rollup.kind
+      cctxt
+      (cctxt#chain, cctxt#block)
+      configuration.sc_rollup_address
+      ()
   in
-  let* event_stream, stopper = chain_events cctxt store `Main in
-  let+ info = gather_info cctxt configuration.sc_rollup_address in
-  let events = discard_pre_origination_blocks info event_stream in
-  {cctxt; events; blocks_cache = State.Blocks_cache.create 32; stopper}
+  let*! () = Event.rollup_exists ~addr:configuration.sc_rollup_address ~kind in
+  let* genesis_info =
+    RPC.Sc_rollup.genesis_info
+      cctxt
+      (cctxt#chain, cctxt#block)
+      configuration.sc_rollup_address
+  in
+  let+ event_stream, stopper = chain_events cctxt store `Main in
+  let events = discard_pre_origination_blocks genesis_info event_stream in
+  ( {cctxt; events; blocks_cache = State.Blocks_cache.create 32; stopper},
+    genesis_info,
+    kind )
 
 let current_head_hash store =
   let open Lwt_syntax in
