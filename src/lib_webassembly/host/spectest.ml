@@ -34,10 +34,10 @@ let print_value v =
     (Values.string_of_value v)
     (Types.string_of_value_type (Values.type_of_value v))
 
-let print (FuncType (_, out)) vs =
+let print (FuncType (_, out)) _m _v vs =
   List.iter print_value vs ;
   flush_all () ;
-  List.map default_value out
+  Lwt.return @@ List.map default_value out
 
 let lookup name t =
   match (Utf8.encode name, t) with

@@ -25,4 +25,4 @@
 
 (** [lookup name] retrieves or instantiates a host function by the given
     [name]. *)
-val lookup : string -> 'inst Tezos_webassembly_interpreter.Func.t
+val lookup : string -> ('input, 'inst) Tezos_webassembly_interpreter.Func.t

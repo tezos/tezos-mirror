@@ -87,3 +87,31 @@ end
 
 (** Builds a WASM VM given a concrete implementation of {!Tree.S}. *)
 module Make (T : Tree.S) : S with type tree = T.tree
+
+exception Bad_input
+
+(** [aux_write_memory ~input_buffer ~module_inst ~rtype_offset ~level_offset 
+     ~id_offset ~dst ~max_bytes]
+     reads `input_buffer` and writes its components to the  memory of 
+    `module_inst` based on the memory addreses offsets described. It also 
+    checks that the input payload is no larger than `max_input` and crashes 
+    with `input too large` otherwise. It returns the size of the payload.*)
+val aux_write_input_in_memory :
+  input_buffer:Tezos_webassembly_interpreter.Input_buffer.t ->
+  module_inst:Tezos_webassembly_interpreter.Instance.module_inst ref ->
+  rtype_offset:int64 ->
+  level_offset:int64 ->
+  id_offset:int64 ->
+  dst:int64 ->
+  max_bytes:int64 ->
+  int Lwt.t
+
+(** read_input is a HostFunction. It has to be invoked with a list of 5 values
+  representing rtype_offset, level_offset, id_offset, dst and max_bytes. When 
+  invoked, it applies `aux_write_input_in_memory` with the corresponding 
+  parameters and returns a singleton value list containing the size of the 
+  input_buffer payload.   *)
+val read_input :
+  ( Tezos_webassembly_interpreter.Input_buffer.t,
+    Tezos_webassembly_interpreter.Instance.module_inst ref )
+  Tezos_webassembly_interpreter.Func.func

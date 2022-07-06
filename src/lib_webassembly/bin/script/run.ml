@@ -377,7 +377,8 @@ let run_action act : Values.value list Lwt.t =
                 Script.error v.at "wrong type of argument")
             vs
             ins ;
-          Eval.invoke f (List.map (fun v -> v.it) vs)
+          let* _, result = Eval.invoke f (List.map (fun v -> v.it) vs) in
+          Lwt.return result
       | Some _ -> Assert.error act.at "export is not a function"
       | None -> Assert.error act.at "undefined export")
   | Get (x_opt, name) -> (

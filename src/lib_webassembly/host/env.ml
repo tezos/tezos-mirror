@@ -26,12 +26,12 @@ let int = function
   | Num (I32 i) -> Int32.to_int i
   | v -> type_error v (NumType I32Type)
 
-let abort vs =
+let abort _input _mod_inst vs =
   empty vs ;
   print_endline "Abort!" ;
   exit (-1)
 
-let exit vs = exit (int (single vs))
+let exit _input (_mod_inst : module_inst ref) vs = exit (int (single vs))
 
 let lookup name t =
   match (Utf8.encode name, t) with

@@ -1,11 +1,11 @@
 open Types
 open Values
 
-type 'inst t = 'inst func
+type ('input, 'inst) t = ('input, 'inst) func
 
-and 'inst func =
+and ('input, 'inst) func =
   | AstFunc of func_type * 'inst * Ast.func
-  | HostFunc of func_type * (value list -> value list)
+  | HostFunc of func_type * ('input -> 'inst -> value list -> value list Lwt.t)
 
 let alloc ft inst f = AstFunc (ft, inst, f)
 
