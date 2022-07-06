@@ -85,6 +85,8 @@ Node
 
 - Added the built-in network alias for Ghostnet (``--network ghostnet``).
 
+- Updated the encoding of worker events json messages.
+
 Client
 ------
 
