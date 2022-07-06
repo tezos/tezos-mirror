@@ -132,3 +132,5 @@ type error += Tx_rollup_deposit_not_allowed
 
 (** Error (fatal) when we are slashed *)
 type error += Tx_rollup_deposit_slashed of Operation_hash.t
+
+type error += Wrong_deposit_parameters

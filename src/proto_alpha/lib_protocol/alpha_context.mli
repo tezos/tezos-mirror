@@ -2304,7 +2304,6 @@ module Tx_rollup_errors : sig
           [ `Valid_path of Tx_rollup_commitment.Merkle.h * int
           | `Hash of Tx_rollup_message_result_hash.t ];
       }
-    | Wrong_deposit_parameters
     | Proof_failed_to_reject
     | Proof_produced_rejected_state
     | Proof_invalid_before of {
