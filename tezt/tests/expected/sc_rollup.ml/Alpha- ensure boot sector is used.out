@@ -1,5 +1,5 @@
 
-./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string booting with '10 10 10 + +' --burn-cap 9999999
+./tezos-client --wait none originate sc rollup from bootstrap1 of kind arith of type string booting with '10 10 10 + +' --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 3110.481 units (will add 100 for safety)
 Estimated storage: 6664 bytes added (will add 20 for safety)
@@ -79,7 +79,7 @@ This sequence of operations was run:
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
 "scs1371W53YVrt8USjs6PafacnNV6ZoFr4VjvyKP9UYszqdg5v4ZC7"
 
-./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string booting with 31 --burn-cap 9999999
+./tezos-client --wait none originate sc rollup from bootstrap1 of kind arith of type string booting with 31 --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 3110.441 units (will add 100 for safety)
 Estimated storage: 6654 bytes added (will add 20 for safety)
