@@ -31,6 +31,8 @@
 (** Smart contract rollup node states. *)
 type t
 
+type mode = Batcher | Custom | Maintenance | Observer | Operator
+
 (** Create a smart contract rollup node.
 
     A smart contract rollup node is associated to a tezos node
@@ -64,6 +66,7 @@ val create :
   ?rpc_port:int ->
   ?operators:(string * string) list ->
   ?default_operator:string ->
+  mode ->
   Node.t ->
   Client.t ->
   t

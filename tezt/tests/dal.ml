@@ -93,6 +93,7 @@ let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
   in
   let sc_rollup_node =
     Sc_rollup_node.create
+      Operator
       tezos_node
       tezos_client
       ~default_operator:bootstrap1_key

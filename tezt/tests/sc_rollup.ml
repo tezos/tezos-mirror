@@ -169,7 +169,11 @@ let with_fresh_rollup ?boot_sector f tezos_node tezos_client operator =
     originate_sc_rollup ?boot_sector ~src:operator tezos_client
   in
   let sc_rollup_node =
-    Sc_rollup_node.create tezos_node tezos_client ~default_operator:operator
+    Sc_rollup_node.create
+      Operator
+      tezos_node
+      tezos_client
+      ~default_operator:operator
   in
   let* configuration_filename =
     Sc_rollup_node.config_init sc_rollup_node sc_rollup
@@ -1638,7 +1642,7 @@ let commitment_before_lcc_not_published _protocol sc_rollup_node sc_rollup node
   let bootstrap2_key = Constant.bootstrap2.public_key_hash in
   let* client' = Client.init ?endpoint:(Some (Node node)) () in
   let sc_rollup_node' =
-    Sc_rollup_node.create node client' ~default_operator:bootstrap2_key
+    Sc_rollup_node.create Operator node client' ~default_operator:bootstrap2_key
   in
   let sc_rollup_client' = Sc_rollup_client.create sc_rollup_node' in
   let* _configuration_filename =
@@ -1768,7 +1772,7 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup node
   let bootstrap2_key = Constant.bootstrap2.public_key_hash in
   let* client' = Client.init ?endpoint:(Some (Node node)) () in
   let sc_rollup_node' =
-    Sc_rollup_node.create node client' ~default_operator:bootstrap2_key
+    Sc_rollup_node.create Operator node client' ~default_operator:bootstrap2_key
   in
   let sc_rollup_client' = Sc_rollup_client.create sc_rollup_node' in
   let* _configuration_filename =

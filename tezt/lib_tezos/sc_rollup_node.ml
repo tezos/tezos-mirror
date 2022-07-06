@@ -25,6 +25,8 @@
 
 type 'a known = Unknown | Known of 'a
 
+type mode = Batcher | Custom | Maintenance | Observer | Operator
+
 module Parameters = struct
   type persistent_state = {
     data_dir : string;
@@ -32,6 +34,7 @@ module Parameters = struct
     default_operator : string option;
     rpc_host : string;
     rpc_port : int;
+    mode : mode;
     client : Client.t;
     node : Node.t;
     mutable pending_ready : unit option Lwt.u list;
@@ -47,6 +50,13 @@ end
 
 open Parameters
 include Daemon.Make (Parameters)
+
+let string_of_mode = function
+  | Observer -> "observer"
+  | Batcher -> "batcher"
+  | Maintenance -> "maintenance"
+  | Operator -> "operator"
+  | Custom -> "custom"
 
 let check_error ?exit_code ?msg sc_node =
   match sc_node.status with
@@ -101,7 +111,15 @@ let spawn_command sc_node args =
 
 let spawn_config_init sc_node ?loser_mode rollup_address =
   spawn_command sc_node
-  @@ ["config"; "init"; "on"; rollup_address; "with"; "operators"]
+  @@ [
+       "init";
+       string_of_mode sc_node.persistent_state.mode;
+       "config";
+       "for";
+       rollup_address;
+       "with";
+       "operators";
+     ]
   @ operators_params sc_node
   @ [
       "--data-dir";
@@ -216,7 +234,7 @@ let handle_event sc_node {name; value} =
   | _ -> ()
 
 let create ?(path = Constant.sc_rollup_node) ?name ?color ?data_dir ?event_pipe
-    ?(rpc_host = "127.0.0.1") ?rpc_port ?(operators = []) ?default_operator
+    ?(rpc_host = "127.0.0.1") ?rpc_port ?(operators = []) ?default_operator mode
     (node : Node.t) (client : Client.t) =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
@@ -237,6 +255,7 @@ let create ?(path = Constant.sc_rollup_node) ?name ?color ?data_dir ?event_pipe
         rpc_port;
         operators;
         default_operator;
+        mode;
         node;
         client;
         pending_ready = [];
