@@ -490,7 +490,7 @@ val ( ^^ ) :
 *)
 end
 # 4 "v5.in.ml"
- [@@coq_plain_module]
+
 
   open Pervasives
 
@@ -572,7 +572,7 @@ val compare :
     [Left _] values are smaller than [Right _] values. *)
 end
 # 8 "v5.in.ml"
- [@@coq_plain_module]
+
 
   module String : sig
 # 1 "v5/string.mli"
@@ -820,7 +820,7 @@ val split_on_char: char -> string -> string list
 *)
 end
 # 10 "v5.in.ml"
- [@@coq_plain_module]
+
 
   module Char : sig
 # 1 "v5/char.mli"
@@ -880,7 +880,7 @@ val equal: t -> t -> bool
     @since 4.03.0 *)
 end
 # 12 "v5.in.ml"
- [@@coq_plain_module]
+
 
   module Bytes : sig
 # 1 "v5/bytes.mli"
@@ -1144,7 +1144,7 @@ val equal: t -> t -> bool
     @since 4.03.0 (4.05.0 in BytesLabels) *)
 end
 # 14 "v5.in.ml"
- [@@coq_plain_module]
+
 
   module Int32 : sig
 # 1 "v5/int32.mli"
@@ -1295,7 +1295,7 @@ val equal: t -> t -> bool
     @since 4.03.0 *)
 end
 # 16 "v5.in.ml"
- [@@coq_plain_module]
+
 
   module Int64 : sig
 # 1 "v5/int64.mli"
@@ -1454,7 +1454,7 @@ val equal: t -> t -> bool
     @since 4.03.0 *)
 end
 # 18 "v5.in.ml"
- [@@coq_plain_module]
+
 
   module Format : sig
 # 1 "v5/format.mli"
@@ -2218,7 +2218,7 @@ val kasprintf : (string -> 'a) -> ('b, formatter, unit, 'a) format4 -> 'b
 *)
 end
 # 20 "v5.in.ml"
- [@@coq_plain_module]
+
 
   module Logging : sig
 # 1 "v5/logging.mli"
@@ -2268,7 +2268,7 @@ val log : level -> ('a, Format.formatter, unit, unit) format4 -> 'a
 val log_string : level -> string -> unit
 end
 # 22 "v5.in.ml"
- [@@coq_plain_module]
+
 
   module Hex : sig
 # 1 "v5/hex.mli"
@@ -2356,7 +2356,7 @@ val show : t -> string
     a string. *)
 end
 # 24 "v5.in.ml"
- [@@coq_plain_module]
+
 
   module Z : sig
 # 1 "v5/z.mli"
@@ -2830,7 +2830,7 @@ external of_bits: string -> t = "ml_z_of_bits"
  *)
 end
 # 26 "v5.in.ml"
- [@@coq_plain_module]
+
 
   module Lwt : sig
 # 1 "v5/lwt.mli"
@@ -3101,7 +3101,7 @@ val return_false : bool t
     {!Lwt.return}[ false]. *)
 end
 # 28 "v5.in.ml"
- [@@coq_plain_module]
+
 
   module Data_encoding : sig
 # 1 "v5/data_encoding.mli"
@@ -4590,7 +4590,7 @@ module Binary : sig
 end
 end
 # 30 "v5.in.ml"
- [@@coq_plain_module]
+
 
   module Raw_hashes : sig
 # 1 "v5/raw_hashes.mli"
@@ -4632,7 +4632,7 @@ val sha3_256 : bytes -> bytes
 val sha3_512 : bytes -> bytes
 end
 # 32 "v5.in.ml"
- [@@coq_plain_module]
+
 
   module Compare : sig
 # 1 "v5/compare.mli"
@@ -4910,7 +4910,7 @@ let compare (foo_a, bar_a) (foo_b, bar_b) =
 val or_else : int -> (unit -> int) -> int
 end
 # 34 "v5.in.ml"
- [@@coq_plain_module]
+
 
   module Time : sig
 # 1 "v5/time.mli"
@@ -4964,7 +4964,7 @@ val rfc_encoding : t Data_encoding.t
 val pp_hum : Format.formatter -> t -> unit
 end
 # 36 "v5.in.ml"
- [@@coq_plain_module]
+
 
   module TzEndian : sig
 # 1 "v5/tzEndian.mli"
@@ -5030,7 +5030,7 @@ val get_uint16_string : string -> int -> int
 val set_uint16 : bytes -> int -> int -> unit
 end
 # 38 "v5.in.ml"
- [@@coq_plain_module]
+
 
   module Bits : sig
 # 1 "v5/bits.mli"
@@ -5067,7 +5067,7 @@ end
 val numbits : int -> int
 end
 # 40 "v5.in.ml"
- [@@coq_plain_module]
+
 
   module Equality_witness : sig
 # 1 "v5/equality_witness.mli"
@@ -5136,7 +5136,6 @@ val hash : 'a t -> int
 end
 # 42 "v5.in.ml"
 
-  [@@coq_plain_module]
 
   module FallbackArray : sig
 # 1 "v5/fallbackArray.mli"
@@ -5225,8 +5224,8 @@ val fold : ('b -> 'a -> 'b) -> 'a t -> 'b -> 'b
    filled. *)
 val fold_map : ('b -> 'a -> 'b * 'c) -> 'a t -> 'b -> 'c -> 'b * 'c t
 end
-# 45 "v5.in.ml"
- [@@coq_plain_module]
+# 44 "v5.in.ml"
+
 
   module Error_monad : sig
 # 1 "v5/error_monad.mli"
@@ -5655,8 +5654,8 @@ module Lwt_tzresult_syntax : sig
     ('a * 'b, 'error trace) result Lwt.t
 end
 end
-# 47 "v5.in.ml"
- [@@coq_plain_module]
+# 46 "v5.in.ml"
+
 
   open Error_monad
 
@@ -5782,8 +5781,8 @@ val iter_ep :
     them is. *)
 val iter_p : ('a -> unit Lwt.t) -> 'a t -> unit Lwt.t
 end
-# 51 "v5.in.ml"
- [@@coq_plain_module]
+# 50 "v5.in.ml"
+
 
   module List : sig
 # 1 "v5/list.mli"
@@ -7114,8 +7113,8 @@ val exists_ep :
   'a list ->
   (bool, 'error Error_monad.trace) result Lwt.t
 end
-# 53 "v5.in.ml"
- [@@coq_plain_module]
+# 52 "v5.in.ml"
+
 
   module Set : sig
 # 1 "v5/set.mli"
@@ -7263,8 +7262,8 @@ end
 
 module Make (Ord : Compare.COMPARABLE) : S with type elt = Ord.t
 end
-# 55 "v5.in.ml"
- [@@coq_plain_module]
+# 54 "v5.in.ml"
+
 
   module Map : sig
 # 1 "v5/map.mli"
@@ -7432,8 +7431,8 @@ end
 
 module Make (Ord : Compare.COMPARABLE) : S with type key = Ord.t
 end
-# 57 "v5.in.ml"
- [@@coq_plain_module]
+# 56 "v5.in.ml"
+
 
   module Option : sig
 # 1 "v5/option.mli"
@@ -7580,8 +7579,8 @@ val catch : ?catch_only:(exn -> bool) -> (unit -> 'a) -> 'a option
 val catch_s :
   ?catch_only:(exn -> bool) -> (unit -> 'a Lwt.t) -> 'a option Lwt.t
 end
-# 59 "v5.in.ml"
- [@@coq_plain_module]
+# 58 "v5.in.ml"
+
 
   module Result : sig
 # 1 "v5/result.mli"
@@ -7746,8 +7745,8 @@ val catch_f :
 val catch_s :
   ?catch_only:(exn -> bool) -> (unit -> 'a Lwt.t) -> ('a, exn) result Lwt.t
 end
-# 61 "v5.in.ml"
- [@@coq_plain_module]
+# 60 "v5.in.ml"
+
 
   module RPC_arg : sig
 # 1 "v5/RPC_arg.mli"
@@ -7816,8 +7815,8 @@ type ('a, 'b) eq = Eq : ('a, 'a) eq
 
 val eq : 'a arg -> 'b arg -> ('a, 'b) eq option
 end
-# 63 "v5.in.ml"
- [@@coq_plain_module]
+# 62 "v5.in.ml"
+
 
   module RPC_path : sig
 # 1 "v5/RPC_path.mli"
@@ -7872,8 +7871,8 @@ val add_final_args :
 val ( /:* ) :
   ('prefix, 'params) path -> 'a RPC_arg.t -> ('prefix, 'params * 'a list) path
 end
-# 65 "v5.in.ml"
- [@@coq_plain_module]
+# 64 "v5.in.ml"
+
 
   module RPC_query : sig
 # 1 "v5/RPC_query.mli"
@@ -7944,8 +7943,8 @@ exception Invalid of string
 
 val parse : 'a query -> untyped -> 'a
 end
-# 67 "v5.in.ml"
- [@@coq_plain_module]
+# 66 "v5.in.ml"
+
 
   module RPC_service : sig
 # 1 "v5/RPC_service.mli"
@@ -8021,8 +8020,8 @@ val put_service :
   ('prefix, 'params) RPC_path.t ->
   ([`PUT], 'prefix, 'params, 'query, 'input, 'output) service
 end
-# 69 "v5.in.ml"
- [@@coq_plain_module]
+# 68 "v5.in.ml"
+
 
   module RPC_answer : sig
 # 1 "v5/RPC_answer.mli"
@@ -8082,8 +8081,8 @@ val not_found : 'o t Lwt.t
 
 val fail : error list -> 'a t Lwt.t
 end
-# 71 "v5.in.ml"
- [@@coq_plain_module]
+# 70 "v5.in.ml"
+
 
   module RPC_directory : sig
 # 1 "v5/RPC_directory.mli"
@@ -8347,8 +8346,8 @@ val register_dynamic_directory :
   ('a -> 'a directory Lwt.t) ->
   'prefix directory
 end
-# 73 "v5.in.ml"
- [@@coq_plain_module]
+# 72 "v5.in.ml"
+
 
   module Base58 : sig
 # 1 "v5/base58.mli"
@@ -8412,8 +8411,8 @@ val check_encoded_prefix : 'a encoding -> string -> int -> unit
     not start with a registered prefix. *)
 val decode : string -> data option
 end
-# 75 "v5.in.ml"
- [@@coq_plain_module]
+# 74 "v5.in.ml"
+
 
   module S : sig
 # 1 "v5/s.mli"
@@ -8830,8 +8829,8 @@ module type PVSS = sig
   val reconstruct : Clear_share.t list -> int list -> Public_key.t
 end
 end
-# 77 "v5.in.ml"
- [@@coq_plain_module]
+# 76 "v5.in.ml"
+
 
   module Blake2B : sig
 # 1 "v5/blake2B.mli"
@@ -8895,8 +8894,8 @@ end
 
 module Make (Register : Register) (Name : PrefixedName) : S.HASH
 end
-# 79 "v5.in.ml"
- [@@coq_plain_module]
+# 78 "v5.in.ml"
+
 
   module Bls12_381 : sig
 # 1 "v5/bls12_381.mli"
@@ -8933,8 +8932,8 @@ module G2 : S.CURVE with type Scalar.t = Fr.t
 
 val pairing_check : (G1.t * G2.t) list -> bool
 end
-# 81 "v5.in.ml"
- [@@coq_plain_module]
+# 80 "v5.in.ml"
+
 
   module Bls_signature : sig
 # 1 "v5/bls_signature.mli"
@@ -9029,8 +9028,8 @@ val verify : pk -> Bytes.t -> signature -> bool
 
 val aggregate_verify : (pk * Bytes.t) list -> signature -> bool
 end
-# 83 "v5.in.ml"
- [@@coq_plain_module]
+# 82 "v5.in.ml"
+
 
   module Ed25519 : sig
 # 1 "v5/ed25519.mli"
@@ -9063,8 +9062,8 @@ end
 
 include S.SIGNATURE with type watermark := bytes
 end
-# 85 "v5.in.ml"
- [@@coq_plain_module]
+# 84 "v5.in.ml"
+
 
   module Secp256k1 : sig
 # 1 "v5/secp256k1.mli"
@@ -9097,8 +9096,8 @@ end
 
 include S.SIGNATURE with type watermark := bytes
 end
-# 87 "v5.in.ml"
- [@@coq_plain_module]
+# 86 "v5.in.ml"
+
 
   module P256 : sig
 # 1 "v5/p256.mli"
@@ -9131,8 +9130,8 @@ end
 
 include S.SIGNATURE with type watermark := bytes
 end
-# 89 "v5.in.ml"
- [@@coq_plain_module]
+# 88 "v5.in.ml"
+
 
   module Chain_id : sig
 # 1 "v5/chain_id.mli"
@@ -9163,8 +9162,8 @@ end
 
 include S.HASH
 end
-# 91 "v5.in.ml"
- [@@coq_plain_module]
+# 90 "v5.in.ml"
+
 
   module Signature : sig
 # 1 "v5/signature.mli"
@@ -9215,8 +9214,8 @@ include
      and type Public_key.t = public_key
      and type watermark := watermark
 end
-# 93 "v5.in.ml"
- [@@coq_plain_module]
+# 92 "v5.in.ml"
+
 
   module Block_hash : sig
 # 1 "v5/block_hash.mli"
@@ -9248,8 +9247,8 @@ end
 (** Blocks hashes / IDs. *)
 include S.HASH
 end
-# 95 "v5.in.ml"
- [@@coq_plain_module]
+# 94 "v5.in.ml"
+
 
   module Operation_hash : sig
 # 1 "v5/operation_hash.mli"
@@ -9281,8 +9280,8 @@ end
 (** Operations hashes / IDs. *)
 include S.HASH
 end
-# 97 "v5.in.ml"
- [@@coq_plain_module]
+# 96 "v5.in.ml"
+
 
   module Operation_list_hash : sig
 # 1 "v5/operation_list_hash.mli"
@@ -9314,9 +9313,8 @@ end
 (** Blocks hashes / IDs. *)
 include S.MERKLE_TREE with type elt = Operation_hash.t
 end
-# 99 "v5.in.ml"
+# 98 "v5.in.ml"
 
-  [@@coq_plain_module]
 
   module Operation_list_list_hash : sig
 # 1 "v5/operation_list_list_hash.mli"
@@ -9348,9 +9346,8 @@ end
 (** Blocks hashes / IDs. *)
 include S.MERKLE_TREE with type elt = Operation_list_hash.t
 end
-# 102 "v5.in.ml"
+# 100 "v5.in.ml"
 
-  [@@coq_plain_module]
 
   module Protocol_hash : sig
 # 1 "v5/protocol_hash.mli"
@@ -9382,8 +9379,8 @@ end
 (** Protocol hashes / IDs. *)
 include S.HASH
 end
-# 105 "v5.in.ml"
- [@@coq_plain_module]
+# 102 "v5.in.ml"
+
 
   module Context_hash : sig
 # 1 "v5/context_hash.mli"
@@ -9435,8 +9432,8 @@ end
 
 type version = Version.t
 end
-# 107 "v5.in.ml"
- [@@coq_plain_module]
+# 104 "v5.in.ml"
+
 
   module Pvss_secp256k1 : sig
 # 1 "v5/pvss_secp256k1.mli"
@@ -9469,8 +9466,8 @@ end
 
 include S.PVSS
 end
-# 109 "v5.in.ml"
- [@@coq_plain_module]
+# 106 "v5.in.ml"
+
 
   module Sapling : sig
 # 1 "v5/sapling.mli"
@@ -9617,8 +9614,8 @@ module Verification : sig
   val final_check : t -> UTXO.transaction -> string -> bool
 end
 end
-# 111 "v5.in.ml"
- [@@coq_plain_module]
+# 108 "v5.in.ml"
+
 
   module Timelock : sig
 # 1 "v5/timelock.mli"
@@ -9676,8 +9673,8 @@ val open_chest : chest -> chest_key -> time:int -> opening_result
     Used for gas accounting*)
 val get_plaintext_size : chest -> int
 end
-# 113 "v5.in.ml"
- [@@coq_plain_module]
+# 110 "v5.in.ml"
+
 
   module Micheline : sig
 # 1 "v5/micheline.mli"
@@ -9736,8 +9733,8 @@ val annotations : ('l, 'p) node -> string list
 
 val strip_locations : (_, 'p) node -> 'p canonical
 end
-# 115 "v5.in.ml"
- [@@coq_plain_module]
+# 112 "v5.in.ml"
+
 
   module Block_header : sig
 # 1 "v5/block_header.mli"
@@ -9793,8 +9790,8 @@ type t = {shell : shell_header; protocol_data : bytes}
 
 include S.HASHABLE with type t := t and type hash := Block_hash.t
 end
-# 117 "v5.in.ml"
- [@@coq_plain_module]
+# 114 "v5.in.ml"
+
 
   module Bounded : sig
 # 1 "v5/bounded.mli"
@@ -9869,8 +9866,8 @@ module Int32 : sig
   module Make (_ : BOUNDS) : S
 end
 end
-# 119 "v5.in.ml"
- [@@coq_plain_module]
+# 116 "v5.in.ml"
+
 
   module Fitness : sig
 # 1 "v5/fitness.mli"
@@ -9903,8 +9900,8 @@ end
     compared in a lexicographical order (longer list are greater). *)
 include S.T with type t = bytes list
 end
-# 121 "v5.in.ml"
- [@@coq_plain_module]
+# 118 "v5.in.ml"
+
 
   module Operation : sig
 # 1 "v5/operation.mli"
@@ -9947,8 +9944,8 @@ type t = {shell : shell_header; proto : bytes}
 
 include S.HASHABLE with type t := t and type hash := Operation_hash.t
 end
-# 123 "v5.in.ml"
- [@@coq_plain_module]
+# 120 "v5.in.ml"
+
 
   module Context : sig
 # 1 "v5/context.mli"
@@ -10584,8 +10581,8 @@ module Cache :
      and type key = cache_key
      and type value = cache_value
 end
-# 125 "v5.in.ml"
- [@@coq_plain_module]
+# 122 "v5.in.ml"
+
 
   module Updater : sig
 # 1 "v5/updater.mli"
@@ -10885,8 +10882,8 @@ end
    not complete until [init] in invoked. *)
 val activate : Context.t -> Protocol_hash.t -> Context.t Lwt.t
 end
-# 127 "v5.in.ml"
- [@@coq_plain_module]
+# 124 "v5.in.ml"
+
 
   module RPC_context : sig
 # 1 "v5/RPC_context.mli"
@@ -11040,6 +11037,6 @@ val make_opt_call3 :
   'i ->
   'o option shell_tzresult Lwt.t
 end
-# 129 "v5.in.ml"
- [@@coq_plain_module]
+# 126 "v5.in.ml"
+
 end
