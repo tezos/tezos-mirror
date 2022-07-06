@@ -34,6 +34,7 @@ __pycache__
 /tezos-tps-evaluation-*
 /tezos-sc-rollup-node-*
 /tezos-sc-rollup-client-*
+/tezos-dal-node
 /tezos-binaries
 
 /src/proto_*/parameters/*-parameters.json

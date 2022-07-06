@@ -8,6 +8,7 @@ tezos-baker-014-PtKathma
 tezos-baker-alpha
 tezos-client
 tezos-codec
+tezos-dal-node
 tezos-node
 tezos-protocol-compiler
 tezos-proxy-server
