@@ -232,8 +232,7 @@ module Inbox = struct
       | Error _ -> assert false
 
     let to_inbox_hash kinded_hash =
-      match kinded_hash with
-      | `Value h | `Node h -> Hash.of_bytes_exn (Context_hash.to_bytes h)
+      match kinded_hash with `Value h | `Node h -> Hash.of_context_hash h
 
     let from_inbox_hash inbox_hash =
       let ctxt_hash = Hash.to_context_hash inbox_hash in
