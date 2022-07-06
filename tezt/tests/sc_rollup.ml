@@ -1049,7 +1049,10 @@ let test_rollup_node_advances_pvm_state protocols =
    trying to publish a commitment.
 *)
 
-let bake_levels n client = repeat n @@ fun () -> Client.bake_for_and_wait client
+let bake_levels ?hook n client =
+  fold n () @@ fun i () ->
+  let* () = match hook with None -> return () | Some hook -> hook i in
+  Client.bake_for_and_wait client
 
 let check_eq_commitment (c1 : Sc_rollup_client.commitment)
     (c2 : Sc_rollup_client.commitment) =
@@ -1987,7 +1990,7 @@ let test_consecutive_commitments =
 
 *)
 let test_refutation_scenario ?commitment_period ?challenge_window variant
-    (loser_mode, inputs, final_level, empty_levels) =
+    (loser_mode, inputs, final_level, empty_levels, stop_loser_at) =
   test_scenario
     ?commitment_period
     ?challenge_window
@@ -2011,10 +2014,17 @@ let test_refutation_scenario ?commitment_period ?challenge_window variant
 
   let* start_level = Client.level client in
 
+  let stop_loser level =
+    if List.mem level stop_loser_at then
+      Sc_rollup_node.terminate sc_rollup_node2
+    else return ()
+  in
+
   let rec consume_inputs i = function
     | [] -> return ()
     | inputs :: next_batches as all ->
         let level = start_level + i in
+        let* () = stop_loser level in
         if List.mem level empty_levels then
           let* () = Client.bake_for_and_wait client in
           consume_inputs (i + 1) all
@@ -2026,7 +2036,13 @@ let test_refutation_scenario ?commitment_period ?challenge_window variant
           consume_inputs (i + 1) next_batches
   in
   let* () = consume_inputs 0 inputs in
-  let* () = bake_levels (final_level - List.length inputs) client in
+  let* after_inputs_level = Client.level client in
+
+  let hook i =
+    let level = after_inputs_level + i in
+    stop_loser level
+  in
+  let* () = bake_levels ~hook (final_level - List.length inputs) client in
 
   let*! honest_deposit =
     RPC.Contracts.get_frozen_bonds ~contract_id:bootstrap1_key client
@@ -2055,15 +2071,19 @@ let inputs_for n =
   [swap i ["3 3 +"; "1"; "1 1 x"; "3 7 8 + * y"; "2 2 out"]]
 
 let test_refutation protocols =
-  let challenge_window = 100 in
+  let challenge_window = 10 in
   [
-    ("inbox_proof", ("5 0 0", inputs_for 10, 30, []));
-    ("inbox_proof_one_empty_level", ("6 0 0", inputs_for 10, 40, [2]));
-    ("inbox_proof_many_empty_levels", ("9 0 0", inputs_for 10, 40, [2; 3; 4]));
-    ("pvm_proof_0", ("5 0 1", inputs_for 10, 30, []));
-    ("pvm_proof_1", ("7 1 2", inputs_for 10, 30, []));
-    ("pvm_proof_2", ("7 2 5", inputs_for 7, 30, []));
-    ("pvm_proof_3", ("9 2 5", inputs_for 7, 30, [4; 5]));
+    ("inbox_proof_at_genesis", ("3 0 0", inputs_for 10, 30, [], []));
+    ("pvm_proof_at_genesis", ("3 0 1", inputs_for 10, 30, [], []));
+    ("inbox_proof", ("5 0 0", inputs_for 10, 30, [], []));
+    ("inbox_proof_one_empty_level", ("6 0 0", inputs_for 10, 40, [2], []));
+    ( "inbox_proof_many_empty_levels",
+      ("9 0 0", inputs_for 10, 40, [2; 3; 4], []) );
+    ("pvm_proof_0", ("5 0 1", inputs_for 10, 30, [], []));
+    ("pvm_proof_1", ("7 1 2", inputs_for 10, 30, [], []));
+    ("pvm_proof_2", ("7 2 5", inputs_for 7, 30, [], []));
+    ("pvm_proof_3", ("9 2 5", inputs_for 7, 30, [4; 5], []));
+    ("timeout", ("5 0 1", inputs_for 10, 40, [], [35]));
   ]
   |> List.iter (fun (variant, inputs) ->
          test_refutation_scenario ~challenge_window variant inputs protocols)
