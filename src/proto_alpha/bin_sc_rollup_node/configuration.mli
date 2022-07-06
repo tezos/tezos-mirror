@@ -46,9 +46,14 @@ type t = {
 val make_purpose_map :
   default:'a option -> (purpose * 'a) trace -> 'a Operator_purpose_map.t
 
-(** Parses a purpose.
-    @raise Invalid_argument if not a valid purpose *)
-val purpose_of_string : string -> purpose
+(** [purpose_of_string s] parses a purpose from the given string [s]. *)
+val purpose_of_string : string -> purpose option
+
+(** [string_of_purpose p] returns a string representation of purpose [p]. *)
+val string_of_purpose : purpose -> string
+
+(** List of possible purposes for operator specialization. *)
+val purposes : purpose list
 
 (** [default_data_dir] is the default value for [data_dir]. *)
 val default_data_dir : string

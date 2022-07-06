@@ -36,23 +36,41 @@ let sc_rollup_address_param =
 let sc_rollup_node_operator_param =
   let open Lwt_result_syntax in
   Clic.param
-    ~name:"node-operator"
-    ~desc:"Public key hash of the the smart-contract rollup node operator"
+    ~name:"operator"
+    ~desc:
+      (Printf.sprintf
+         "Public key hash, or alias, of a smart-contract rollup node operator. \
+          An operator can be specialized to a particular purpose by prefixing \
+          its key or alias by said purpose, e.g. publish:alias_of_my_operator. \
+          The possible purposes are: %s."
+         (String.concat ", "
+         @@ Configuration.(List.map string_of_purpose purposes)))
   @@ Clic.parameter
-  @@ fun _ s ->
-  let pkh_of_string s =
-    match Signature.Public_key_hash.of_b58check_opt s with
-    | None -> failwith "Could not read public key hash for rollup node operator"
-    | Some pkh -> return pkh
+  @@ fun cctxt s ->
+  let parse_pkh s =
+    let from_alias s = Client_keys.Public_key_hash.find cctxt s in
+    let from_key s =
+      match Signature.Public_key_hash.of_b58check_opt s with
+      | None ->
+          failwith "Could not read public key hash for rollup node operator"
+      | Some pkh -> return pkh
+    in
+    Client_aliases.parse_alternatives
+      [("alias", from_alias); ("key", from_key)]
+      s
   in
   match String.split ~limit:1 ':' s with
   | [_] ->
-      let+ pkh = pkh_of_string s in
+      let+ pkh = parse_pkh s in
       `Default pkh
-  | [purpose; s] ->
-      let purpose = Configuration.purpose_of_string purpose in
-      let+ pkh = pkh_of_string s in
-      `Purpose (purpose, pkh)
+  | [purpose; operator_s] -> (
+      match Configuration.purpose_of_string purpose with
+      | Some purpose ->
+          let+ pkh = parse_pkh operator_s in
+          `Purpose (purpose, pkh)
+      | None ->
+          let+ pkh = parse_pkh s in
+          `Default pkh)
   | _ ->
       (* cannot happen due to String.split's implementation. *)
       assert false

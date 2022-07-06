@@ -101,11 +101,16 @@ let string_of_purpose = function
   | Refute -> "refute"
 
 let purpose_of_string = function
-  | "publish" -> Publish
-  | "add_messages" -> Add_messages
-  | "cement" -> Cement
-  | "refute" -> Refute
-  | s -> invalid_arg ("purpose_of_string " ^ s)
+  | "publish" -> Some Publish
+  | "add_messages" -> Some Add_messages
+  | "cement" -> Some Cement
+  | "refute" -> Some Refute
+  | _ -> None
+
+let purpose_of_string_exn s =
+  match purpose_of_string s with
+  | Some p -> p
+  | None -> invalid_arg ("purpose_of_string " ^ s)
 
 let make_purpose_map ~default bindings =
   let map = Operator_purpose_map.of_seq @@ List.to_seq bindings in
@@ -156,7 +161,7 @@ let operator_purpose_map_encoding encoding =
       | `O fields ->
           List.map
             (fun (p, v) ->
-              (purpose_of_string p, Data_encoding.Json.destruct encoding v))
+              (purpose_of_string_exn p, Data_encoding.Json.destruct encoding v))
             fields
           |> List.to_seq |> Operator_purpose_map.of_seq
       | _ -> assert false)
