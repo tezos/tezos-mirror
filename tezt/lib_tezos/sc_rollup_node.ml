@@ -94,8 +94,10 @@ let layer1_addr sc_node = Node.rpc_host sc_node.persistent_state.node
 
 let layer1_port sc_node = Node.rpc_port sc_node.persistent_state.node
 
-let spawn_command sc_node =
+let spawn_command sc_node args =
   Process.spawn ~name:sc_node.name ~color:sc_node.color sc_node.path
+  @@ ["--base-dir"; base_dir sc_node]
+  @ args
 
 let spawn_config_init sc_node ?loser_mode rollup_address =
   spawn_command sc_node
