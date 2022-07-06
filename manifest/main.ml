@@ -587,7 +587,7 @@ let octez_webassembly_interpreter =
     ~synopsis:"WebAssembly reference interpreter with tweaks for Tezos"
     ~flags:(Flags.standard ~disable_warnings:[27] ())
     ~dune:Dune.[[S "include_subdirs"; S "unqualified"]]
-    ~deps:[octez_lwt_result_stdlib]
+    ~deps:[octez_lwt_result_stdlib; zarith]
 
 let _octez_webassembly_repl =
   private_exe
@@ -1467,6 +1467,23 @@ let octez_scoru_wasm =
         octez_context_sigs;
         octez_lwt_result_stdlib;
         data_encoding;
+      ]
+
+let _octez_scoru_wasm_tests =
+  test
+    "test_scoru_wasm"
+    ~path:"src/lib_scoru_wasm/test"
+    ~opam:"tezos-scoru-wasm-test"
+    ~synopsis:"Tests for the scoru-wasm functionality"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_base_test_helpers |> open_;
+        octez_test_helpers;
+        octez_scoru_wasm;
+        qcheck_alcotest;
+        alcotest_lwt;
       ]
 
 let octez_context_encoding =

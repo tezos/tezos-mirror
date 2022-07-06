@@ -176,6 +176,7 @@
 (package (name tezos-sc-rollup-node-014-PtKathma))
 (package (name tezos-sc-rollup-node-alpha))
 (package (name tezos-scoru-wasm))
+(package (name tezos-scoru-wasm-test)(allow_empty))
 (package (name tezos-shell))
 (package (name tezos-shell-benchmarks))
 (package (name tezos-shell-context))

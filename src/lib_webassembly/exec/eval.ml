@@ -74,13 +74,15 @@ and admin_instr' =
 
 type config = {
   frame : frame;
+  input : input_inst;
   code : code;
   budget : int; (* to model stack overflow *)
 }
 
 let frame inst locals = {inst; locals}
 
-let config inst vs es = {frame = frame inst []; code = (vs, es); budget = 300}
+let config ?(input = Input_buffer.alloc ()) inst vs es =
+  {frame = frame inst []; input; code = (vs, es); budget = 300}
 
 let plain e = Plain e.it @@ e.at
 
@@ -186,7 +188,7 @@ let elem_oob frame x i n =
     (Int64.of_int32 (Instance.Vector.num_elements !elem))
 
 let rec step (c : config) : config Lwt.t =
-  let {frame; code = vs, es; _} = c in
+  let {frame; code = vs, es; input; _} = c in
   let e = List.hd es in
   let+ vs', es' =
     match (e.it, vs) with
@@ -743,28 +745,38 @@ let rec step (c : config) : config Lwt.t =
     | Frame (n, frame', (vs', {it = Returning vs0; at} :: es')), vs ->
         Lwt.return (take n vs0 e.at @ vs, [])
     | Frame (n, frame', code'), vs ->
-        let+ c' = step {frame = frame'; code = code'; budget = c.budget - 1} in
+        let+ c' =
+          step
+            {
+              frame = frame';
+              code = code';
+              budget = c.budget - 1;
+              input = c.input;
+            }
+        in
         (vs, [Frame (n, c'.frame, c'.code) @@ e.at])
     | Invoke func, vs when c.budget = 0 ->
         Exhaustion.error e.at "call stack exhausted"
-    | Invoke func, vs ->
-        Lwt.return
-          (let (FuncType (ins, out)) = func_type_of func in
-           let n1, n2 = (Lib.List32.length ins, Lib.List32.length out) in
-           let args, vs' = (take n1 vs e.at, drop n1 vs e.at) in
-           match func with
-           | Func.AstFunc (t, inst', f) ->
-               let locals' =
-                 List.rev args @ List.map default_value f.it.locals
-               in
-               let frame' = {inst = !inst'; locals = List.map ref locals'} in
-               let instr' =
-                 [Label (n2, [], ([], List.map plain f.it.body)) @@ f.at]
-               in
-               (vs', [Frame (n2, frame', ([], instr')) @@ e.at])
-           | Func.HostFunc (t, f) -> (
-               try (List.rev (f (List.rev args)) @ vs', [])
-               with Crash (_, msg) -> Crash.error e.at msg))
+    | Invoke func, vs -> (
+        let (FuncType (ins, out)) = func_type_of func in
+        let n1, n2 = (Lib.List32.length ins, Lib.List32.length out) in
+        let args, vs' = (take n1 vs e.at, drop n1 vs e.at) in
+        match func with
+        | Func.AstFunc (t, inst', f) ->
+            let locals' = List.rev args @ List.map default_value f.it.locals in
+            let frame' = {inst = !inst'; locals = List.map ref locals'} in
+            let instr' =
+              [Label (n2, [], ([], List.map plain f.it.body)) @@ f.at]
+            in
+            Lwt.return (vs', [Frame (n2, frame', ([], instr')) @@ e.at])
+        | Func.HostFunc (t, f) ->
+            let inst = ref frame.inst in
+            Lwt.catch
+              (fun () ->
+                let+ res = f input inst (List.rev args) in
+                (List.rev res @ vs', []))
+              (function
+                | Crash (_, msg) -> Crash.error e.at msg | exn -> raise exn))
   in
   {c with code = (vs', es' @ List.tl es)}
 
@@ -778,18 +790,20 @@ let rec eval (c : config) : value stack Lwt.t =
 
 (* Functions & Constants *)
 
-let invoke (func : func_inst) (vs : value list) : value list Lwt.t =
+let invoke ?(module_inst = empty_module_inst) ?(input = Input_buffer.alloc ())
+    (func : func_inst) (vs : value list) : (module_inst * value list) Lwt.t =
   let at = match func with Func.AstFunc (_, _, f) -> f.at | _ -> no_region in
   let (FuncType (ins, out)) = Func.type_of func in
   if List.length vs <> List.length ins then
     Crash.error at "wrong number of arguments" ;
   if not (List.for_all2 (fun v -> ( = ) (type_of_value v)) vs ins) then
     Crash.error at "wrong types of arguments" ;
-  let c = config empty_module_inst (List.rev vs) [Invoke func @@ at] in
+
+  let c = config ~input module_inst (List.rev vs) [Invoke func @@ at] in
   Lwt.catch
     (fun () ->
       let+ values = eval c in
-      List.rev values)
+      (c.frame.inst, List.rev values))
     (function
       | Stack_overflow -> Exhaustion.error at "call stack exhausted"
       | exn -> Lwt.fail exn)

@@ -121,6 +121,8 @@ module LwtInt32Vector : S with type key = int32 and type 'a effect = 'a Lwt.t
 
 module LwtInt64Vector : S with type key = int64 and type 'a effect = 'a Lwt.t
 
+module LwtZVector : S with type key = Z.t and type 'a effect = 'a Lwt.t
+
 (** [Make] generates a lazy vector module using a given [Key] module. *)
 module Mutable : sig
   (** [S] is the signature of a mutable lazy vector module. *)
@@ -149,6 +151,8 @@ module Mutable : sig
 
     val grow : ?produce_value:'a Vector.producer -> key -> 'a t -> unit
 
+    val cons : 'a -> 'a t -> unit
+
     val snapshot : 'a t -> 'a Vector.t
   end
 
@@ -166,4 +170,6 @@ module Mutable : sig
   module LwtInt32Vector : S with type key = int32 and type 'a effect = 'a Lwt.t
 
   module LwtInt64Vector : S with type key = int64 and type 'a effect = 'a Lwt.t
+
+  module LwtZVector : S with type key = Z.t and type 'a effect = 'a Lwt.t
 end

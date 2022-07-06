@@ -23,13 +23,15 @@ type module_inst = {
   datas : data_inst Vector.t;
 }
 
-and func_inst = module_inst ref Func.t
+and func_inst = (input_inst, module_inst ref) Func.t
 
 and table_inst = Table.t
 
 and memory_inst = Memory.t
 
 and global_inst = Global.t
+
+and input_inst = Input_buffer.t
 
 and export_inst = Ast.name * extern
 

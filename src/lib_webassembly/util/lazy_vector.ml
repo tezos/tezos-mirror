@@ -70,6 +70,19 @@ module type S = sig
   val to_list : 'a t -> 'a list effect
 end
 
+module ZZ : KeyS with type t = Z.t = struct
+  include Z
+
+  (** Note that, in fixed sized integers we need to use a specialized `unsigned`
+       version of compare. This is because, internally, some keys can be 
+       represented by negative integers (using wraparound). For example after a 
+       while the value of num_elements will surpass max_int and so it will 
+       become negative Nevertheless we still want this to represent large 
+       unsigned integers (up until 2*max_int). In the case of Z this is not an 
+       issue as there is no wraparound.*)
+  let unsigned_compare = Z.compare
+end
+
 module Make (Effect : Effect.S) (Key : KeyS) :
   S with type key = Key.t and type 'a effect = 'a Effect.t = struct
   module Map = Lazy_map.Make (Effect) (Key)
@@ -192,6 +205,7 @@ module Int64Vector = Make (Effect.Identity) (Int64)
 module LwtIntVector = Make (Effect.Lwt) (Int)
 module LwtInt32Vector = Make (Effect.Lwt) (Int32)
 module LwtInt64Vector = Make (Effect.Lwt) (Int64)
+module LwtZVector = Make (Effect.Lwt) (ZZ)
 
 module Mutable = struct
   module type S = sig
@@ -218,6 +232,8 @@ module Mutable = struct
     val set : key -> 'a -> 'a t -> unit
 
     val grow : ?produce_value:'a Vector.producer -> key -> 'a t -> unit
+
+    val cons : 'a -> 'a t -> unit
 
     val snapshot : 'a t -> 'a Vector.t
   end
@@ -246,6 +262,8 @@ module Mutable = struct
     let grow ?produce_value delta map_ref =
       map_ref := Vector.grow ?produce_value delta !map_ref
 
+    let cons a map_ref = map_ref := Vector.cons a !map_ref
+
     let snapshot map_ref = !map_ref
   end
 
@@ -255,4 +273,5 @@ module Mutable = struct
   module LwtIntVector = Make (Effect.Lwt) (Int)
   module LwtInt32Vector = Make (Effect.Lwt) (Int32)
   module LwtInt64Vector = Make (Effect.Lwt) (Int64)
+  module LwtZVector = Make (Effect.Lwt) (ZZ)
 end

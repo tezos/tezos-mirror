@@ -12,4 +12,9 @@ exception Exhaustion of Source.region * string
 val init :
   Ast.module_ -> extern list -> module_inst Lwt.t (* raises Link, Trap *)
 
-val invoke : func_inst -> value list -> value list Lwt.t (* raises Trap *)
+val invoke :
+  ?module_inst:module_inst ->
+  ?input:Input_buffer.t ->
+  func_inst ->
+  value list ->
+  (module_inst * value list) Lwt.t (* raises Trap *)
