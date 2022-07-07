@@ -298,7 +298,6 @@ let rec value_size :
     | Chest_t -> ret_succ_adding accu (chest_size x)
   in
   value_traverse ty x accu {apply}
- [@@coq_axiom_with_reason "unreachable expressions '.' not handled for now"]
 
 and big_map_size :
     type a b bc.

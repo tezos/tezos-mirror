@@ -39,6 +39,5 @@ type ('kind, 'manager, 'successful) operation_result =
       'manager * error trace
       -> ('kind, 'manager, 'successful) operation_result
   | Skipped : 'manager -> ('kind, 'manager, 'successful) operation_result
-[@@coq_force_gadt]
 
 val trace_encoding : error trace Data_encoding.t

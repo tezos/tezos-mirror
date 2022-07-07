@@ -42,7 +42,6 @@
 module Arith :
   Fixed_point_repr.Full
     with type 'a t = private Saturation_repr.may_saturate Saturation_repr.t
-[@@coq_plain_module]
 
 type t = Unaccounted | Limited of {remaining : Arith.fp}
 

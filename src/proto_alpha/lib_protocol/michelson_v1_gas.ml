@@ -1441,7 +1441,6 @@ module Cost_of = struct
         | Return -> cost
       in
       compare ty x y Gas.free Return
-     [@@coq_axiom_with_reason "non top-level mutually recursive function"]
 
     let set_mem (type a) (elt : a) (set : a Script_typed_ir.set) =
       let open S_syntax in

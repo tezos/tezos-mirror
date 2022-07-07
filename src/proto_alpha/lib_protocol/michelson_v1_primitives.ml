@@ -232,9 +232,7 @@ let namespace = function
 let valid_case name =
   let is_lower = function '_' | 'a' .. 'z' -> true | _ -> false in
   let is_upper = function '_' | 'A' .. 'Z' -> true | _ -> false in
-  let[@coq_struct "a_value"] rec for_all a b f =
-    Compare.Int.(a > b) || (f a && for_all (a + 1) b f)
-  in
+  let rec for_all a b f = Compare.Int.(a > b) || (f a && for_all (a + 1) b f) in
   let len = String.length name in
   Compare.Int.(len <> 0)
   && Compare.Char.(name.[0] <> '_')
@@ -566,8 +564,6 @@ let prims_of_strings expr =
     | Seq (loc, args) -> List.map_e convert args >|? fun args -> Seq (loc, args)
   in
   convert (root expr) >|? fun expr -> strip_locations expr
-  [@@coq_axiom_with_reason
-    "implicit type conversion for expr in the constant cases"]
 
 let strings_of_prims expr =
   let rec convert = function
@@ -581,8 +577,6 @@ let strings_of_prims expr =
         Seq (loc, args)
   in
   strip_locations (convert (root expr))
-  [@@coq_axiom_with_reason
-    "implicit type conversion for expr in the constant cases"]
 
 let prim_encoding =
   let open Data_encoding in

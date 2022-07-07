@@ -1108,7 +1108,6 @@ and ('arg, 'ret) lambda =
   | Lam :
       ('arg, end_of_stack, 'ret, end_of_stack) kdescr * Script.node
       -> ('arg, 'ret) lambda
-[@@coq_force_gadt]
 
 and 'arg typed_destination =
   | Typed_implicit : public_key_hash -> unit typed_destination
@@ -1332,7 +1331,6 @@ and ('value, 'before, 'after) comb_set_gadt_witness =
   | Comb_set_plus_two :
       ('value, 'before, 'after) comb_set_gadt_witness
       -> ('value, 'a * 'before, 'a * 'after) comb_set_gadt_witness
-[@@coq_force_gadt]
 
 and (_, _, _, _) dup_n_gadt_witness =
   | Dup_n_zero : ('a, _, _, 'a) dup_n_gadt_witness
@@ -2151,7 +2149,6 @@ let value_traverse (type t tc) (ty : (t, tc) ty) (x : t) init f =
                 (on_bindings [@ocaml.tailcall]) accu kty ty' continue xs))
   in
   aux init ty x (fun accu -> accu)
-  [@@coq_axiom_with_reason "local mutually recursive definition not handled"]
 
 let stack_top_ty : type a b s. (a, b * s) stack_ty -> a ty_ex_c = function
   | Item_t (ty, _) -> Ty_ex_c ty
