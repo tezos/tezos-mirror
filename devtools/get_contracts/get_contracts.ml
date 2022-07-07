@@ -636,8 +636,12 @@ let run (module Main : Sigs.MAIN) =
   let chain_id = Tezos_store.Store.Chain.chain_id chain_store in
   Format.printf "Chain id: %a\n%!" Chain_id.pp chain_id ;
   let*! head = Tezos_store.Store.Chain.current_head chain_store in
+  Format.printf
+    "Head block: %a\n%!"
+    Block_hash.pp
+    (Tezos_store.Store.Block.hash head) ;
   let* proto_hash = Tezos_store.Store.Block.protocol_hash chain_store head in
-  Format.printf "Protocol is %a\n%!" Protocol_hash.pp proto_hash ;
+  Format.printf "Protocol hash: %a\n%!" Protocol_hash.pp proto_hash ;
   let*! ctxt = Tezos_store.Store.Block.context_exn chain_store head in
   print_endline "Pre-preparing raw context..." ;
   Main.main ~output_dir ctxt ~head
