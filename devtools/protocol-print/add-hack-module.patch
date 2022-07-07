@@ -20,11 +20,11 @@ index 9122fe44aa..b38ae9c127 100644
 +++ b/src/lib_protocol_environment/sigs/v3.in.ml
 @@ -42,6 +42,8 @@ module type T = sig
  
-   module FallbackArray : [%sig "v3/fallbackArray.mli"] [@@coq_plain_module]
+   module FallbackArray : [%sig "v3/fallbackArray.mli"]
  
-+  module Hack : [%sig "v3/hack.mli"] [@@coq_plain_module]
++  module Hack : [%sig "v3/hack.mli"]
 +
-   module Error_monad : [%sig "v3/error_monad.mli"] [@@coq_plain_module]
+   module Error_monad : [%sig "v3/error_monad.mli"]
  
    open Error_monad
 diff --git a/src/lib_protocol_environment/sigs/v3/hack.mli b/src/lib_protocol_environment/sigs/v3/hack.mli
