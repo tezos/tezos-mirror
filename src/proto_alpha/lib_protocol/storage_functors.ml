@@ -1081,7 +1081,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
           | false -> Lwt.return acc
           | true -> f i acc)
 
-    let _keys_unaccounted s =
+    let keys_unaccounted s =
       fold_keys_unaccounted s ~order:`Sorted ~init:[] ~f:(fun p acc ->
           Lwt.return (p :: acc))
 

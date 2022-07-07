@@ -209,6 +209,10 @@ module type Non_iterable_indexed_carbonated_data_storage = sig
       Returns the freed size, and a boolean
       indicating if a value was already associated to this key. *)
   val remove : context -> key -> (Raw_context.t * int * bool) tzresult Lwt.t
+
+  (** Returns the list of all storage bucket keys.
+      Not carbonated (i.e. gas is not consumed); use with care. *)
+  val keys_unaccounted : context -> key list Lwt.t
 end
 
 module type Non_iterable_indexed_carbonated_data_storage_with_values = sig
