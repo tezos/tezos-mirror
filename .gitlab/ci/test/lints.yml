@@ -1,9 +1,8 @@
 misc_checks:
-  extends: 
-    - .test_template
-    - .needs_template__wait_for_trigger_job
+  extends: .test_template
   # These tests are not flaky at all so we overwrite the retry value
   retry: 1
+  needs: []
   script:
     # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
     - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
@@ -26,9 +25,8 @@ misc_checks:
     - dune build scripts/yes-wallet/yes_wallet.exe
 
 misc_opam_checks:
-  extends: 
-    - .test_template
-    - .needs_template__wait_for_trigger_job
+  extends: .test_template
+  needs: []
   script:
     # checks that all deps of opam packages are already installed
     - ./scripts/opam-check.sh
@@ -42,7 +40,6 @@ semgrep:
   extends:
     - .default_settings_template
     - .rules_template__development
-    - .needs_template__wait_for_trigger_job
   # We specify the image by hash to avoid flakiness. Indeed, if we took the
   # latest release, then an update in the parser or analyser could result in new
   # errors being found even if the code doesn't change. This would place the
@@ -53,14 +50,14 @@ semgrep:
   # Last update: 20212-01-03
   image: returntocorp/semgrep-agent:sha-c6cd7cf
   stage: test
+  needs: []
   script:
     - echo "OCaml code linting. For information on how to reproduce locally, check out scripts/semgrep/README.md"
     - sh ./scripts/semgrep/lint-all-ocaml-sources.sh
 
 check_precommit_hook:
-  extends: 
-    - .test_template
-    - .needs_template__wait_for_trigger_job
+  extends: .test_template
+  needs: []
   script:
     - ./scripts/pre_commit/pre_commit.py --test-itself
     - poetry run pylint scripts/pre_commit/pre_commit.py
@@ -70,9 +67,8 @@ check_precommit_hook:
 check_scripts_b58_prefix:
   # Can be changed to a python image, but using the build docker image to keep
   # in sync with the python version used for the tests
-  extends:
-    - .test_template
-    - .needs_template__wait_for_trigger_job
+  extends: .test_template
+  needs: []
   script:
     - poetry run pylint scripts/b58_prefix/b58_prefix.py --disable=missing-docstring --disable=invalid-name
     - poetry run pytest scripts/b58_prefix/test_b58_prefix.py -v
@@ -88,7 +84,7 @@ ometrics-code-quality-default:
     # empty report on the default branch which is supposed to be the target branch
     # in most cases.
     - .rules_template__tezos_default_branch_only
-    - .needs_template__wait_for_trigger_job
+  needs: []
   interruptible: true
   script:
     - mkdir -p _reports/
@@ -99,12 +95,12 @@ ometrics-code-quality-default:
 
 ometrics-code-quality:
   stage: test
+  needs: []
   extends:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
     - .template__code_quality
     - .rules_template__merge_request_only
-    - .needs_template__wait_for_trigger_job
   allow_failure: true
   interruptible: true
   script:
