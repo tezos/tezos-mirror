@@ -695,23 +695,23 @@ let pp_manager_operation_contents_result ppf op_result =
     pp_balance_updates ppf balance_updates
   in
   let pp_sc_rollup_refute_result
-      (Sc_rollup_refute_result {consumed_gas; status; balance_updates}) =
+      (Sc_rollup_refute_result {consumed_gas; game_status; balance_updates}) =
     pp_consumed_gas ppf consumed_gas ;
     Format.fprintf
       ppf
       "@,Refutation game status: %a"
       Sc_rollup.Game.pp_status
-      status ;
+      game_status ;
     pp_balance_updates ppf balance_updates
   in
   let pp_sc_rollup_timeout_result
-      (Sc_rollup_timeout_result {consumed_gas; status; balance_updates}) =
+      (Sc_rollup_timeout_result {consumed_gas; game_status; balance_updates}) =
     pp_consumed_gas ppf consumed_gas ;
     Format.fprintf
       ppf
       "@,Refutation game status: %a"
       Sc_rollup.Game.pp_status
-      status ;
+      game_status ;
     pp_balance_updates ppf balance_updates
   in
   let pp_sc_rollup_execute_outbox_message_result

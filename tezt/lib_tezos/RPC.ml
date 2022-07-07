@@ -336,11 +336,10 @@ module Sc_rollup = struct
       @ ["last_cemented_commitment_hash_with_level"])
       Fun.id
 
-  let get_staked_on_commitment ?(chain = "main") ?(block = "head")
-      ~sc_rollup_address staker =
+  let get_staked_on_commitment ?(chain = "main") ?(block = "head") ~sc_rollup
+      staker =
     make
       GET
-      (path ~chain ~block sc_rollup_address
-      @ ["staker"; staker; "staked_on_commitment"])
+      (path ~chain ~block sc_rollup @ ["staker"; staker; "staked_on_commitment"])
       Fun.id
 end

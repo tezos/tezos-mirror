@@ -147,13 +147,13 @@ type _ successful_manager_operation_result =
       -> Kind.sc_rollup_publish successful_manager_operation_result
   | Sc_rollup_refute_result : {
       consumed_gas : Gas.Arith.fp;
-      status : Sc_rollup.Game.status;
+      game_status : Sc_rollup.Game.status;
       balance_updates : Receipt.balance_updates;
     }
       -> Kind.sc_rollup_refute successful_manager_operation_result
   | Sc_rollup_timeout_result : {
       consumed_gas : Gas.Arith.fp;
-      status : Sc_rollup.Game.status;
+      game_status : Sc_rollup.Game.status;
       balance_updates : Receipt.balance_updates;
     }
       -> Kind.sc_rollup_timeout successful_manager_operation_result
@@ -844,17 +844,18 @@ module Manager_result = struct
         Data_encoding.(
           obj3
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-            (req "status" Sc_rollup.Game.status_encoding)
+            (req "game_status" Sc_rollup.Game.status_encoding)
             (req "balance_updates" Receipt.balance_updates_encoding))
       ~select:(function
         | Successful_manager_result (Sc_rollup_refute_result _ as op) -> Some op
         | _ -> None)
       ~proj:(function
-        | Sc_rollup_refute_result {consumed_gas; status; balance_updates} ->
-            (consumed_gas, status, balance_updates))
+        | Sc_rollup_refute_result {consumed_gas; game_status; balance_updates}
+          ->
+            (consumed_gas, game_status, balance_updates))
       ~kind:Kind.Sc_rollup_refute_manager_kind
-      ~inj:(fun (consumed_gas, status, balance_updates) ->
-        Sc_rollup_refute_result {consumed_gas; status; balance_updates})
+      ~inj:(fun (consumed_gas, game_status, balance_updates) ->
+        Sc_rollup_refute_result {consumed_gas; game_status; balance_updates})
 
   let sc_rollup_timeout_case =
     make
@@ -862,18 +863,19 @@ module Manager_result = struct
       ~encoding:
         (obj3
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-           (req "status" Sc_rollup.Game.status_encoding)
+           (req "game_status" Sc_rollup.Game.status_encoding)
            (req "balance_updates" Receipt.balance_updates_encoding))
       ~select:(function
         | Successful_manager_result (Sc_rollup_timeout_result _ as op) ->
             Some op
         | _ -> None)
       ~proj:(function
-        | Sc_rollup_timeout_result {consumed_gas; status; balance_updates} ->
-            (consumed_gas, status, balance_updates))
+        | Sc_rollup_timeout_result {consumed_gas; game_status; balance_updates}
+          ->
+            (consumed_gas, game_status, balance_updates))
       ~kind:Kind.Sc_rollup_timeout_manager_kind
-      ~inj:(fun (consumed_gas, status, balance_updates) ->
-        Sc_rollup_timeout_result {consumed_gas; status; balance_updates})
+      ~inj:(fun (consumed_gas, game_status, balance_updates) ->
+        Sc_rollup_timeout_result {consumed_gas; game_status; balance_updates})
 
   let sc_rollup_execute_outbox_message_case =
     make

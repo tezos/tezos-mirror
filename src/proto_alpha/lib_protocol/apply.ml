@@ -1850,20 +1850,20 @@ let apply_manager_operation :
       | Some o ->
           let stakers = Sc_rollup.Game.Index.make source opponent in
           Sc_rollup.Refutation_storage.apply_outcome ctxt rollup stakers o)
-      >>=? fun (status, ctxt, balance_updates) ->
+      >>=? fun (game_status, ctxt, balance_updates) ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result =
-        Sc_rollup_refute_result {status; consumed_gas; balance_updates}
+        Sc_rollup_refute_result {game_status; consumed_gas; balance_updates}
       in
       return (ctxt, result, [])
   | Sc_rollup_timeout {rollup; stakers} ->
       Sc_rollup.Refutation_storage.timeout ctxt rollup stakers
       >>=? fun (outcome, ctxt) ->
       Sc_rollup.Refutation_storage.apply_outcome ctxt rollup stakers outcome
-      >>=? fun (status, ctxt, balance_updates) ->
+      >>=? fun (game_status, ctxt, balance_updates) ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result =
-        Sc_rollup_timeout_result {status; consumed_gas; balance_updates}
+        Sc_rollup_timeout_result {game_status; consumed_gas; balance_updates}
       in
       return (ctxt, result, [])
   | Sc_rollup_execute_outbox_message {rollup; cemented_commitment; output_proof}
