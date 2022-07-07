@@ -120,7 +120,7 @@ doc_index="docs/index.rst"
     grep -A9999 -F "$alpha_line" "$doc_index" \
       | grep -B9999 -F 'toctree' -m1 \
       | head -n-1 \
-      | sed -e "s/Alpha Development/${label} ${capitalized_label}/g" \
+      | sed -e "s/Alpha Development/${capitalized_label}/g" \
             -e "s,alpha/,${label}/,g"
     grep -B9999 -F "$alpha_line" "$doc_index" \
       | tac \

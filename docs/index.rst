@@ -158,7 +158,7 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
-   :caption: kathmandu Kathmandu Protocol doc:
+   :caption: Kathmandu Protocol doc:
 
    kathmandu/protocol
    kathmandu/glossary
