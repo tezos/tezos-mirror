@@ -845,7 +845,7 @@ module Constants : sig
       frozen_deposits_percentage : int;
       double_baking_punishment : Tez.t;
       ratio_of_frozen_deposits_slashed_per_double_endorsement : Ratio.t;
-      governance_dictator : public_key_hash option;
+      testnet_dictator : public_key_hash option;
       initial_seed : State_hash.t option;
       cache_script_size : int;
       cache_stake_distribution_cycles : int;
@@ -946,7 +946,7 @@ module Constants : sig
   val ratio_of_frozen_deposits_slashed_per_double_endorsement :
     context -> Ratio.t
 
-  val governance_dictator : context -> public_key_hash option
+  val testnet_dictator : context -> public_key_hash option
 
   val tx_rollup_enable : context -> bool
 
@@ -1685,6 +1685,9 @@ module Contract : sig
   val check_allocated_and_get_balance :
     context -> public_key_hash -> Tez.t tzresult Lwt.t
 
+  val increase_paid_storage :
+    context -> t -> amount_in_bytes:Z.t -> context tzresult Lwt.t
+
   val fresh_contract_from_current_nonce :
     context -> (context * Contract_hash.t) tzresult
 
@@ -2338,19 +2341,6 @@ module Bond_id : sig
   end
 end
 
-(** Contract_event exposes fields for event data access. See [Contract_event_repr]. *)
-module Contract_event : sig
-  module Hash : module type of Contract_event_repr.Hash
-
-  type t = Hash.t
-
-  val in_memory_size : t -> Cache_memory_helpers.sint
-
-  val to_b58check : t -> string
-
-  val pp : Format.formatter -> t -> unit
-end
-
 (** This module re-exports definitions from {!Receipt_repr}. *)
 module Receipt : sig
   type balance =
@@ -2558,7 +2548,7 @@ module Voting_period : sig
 
   val get_rpc_succ_info : context -> info tzresult Lwt.t
 
-  module Governance_dictator : sig
+  module Testnet_dictator : sig
     val overwrite_current_kind :
       context -> Chain_id.t -> Voting_period_repr.kind -> context tzresult Lwt.t
   end
@@ -3331,7 +3321,6 @@ module Destination : sig
     | Contract of Contract.t
     | Tx_rollup of Tx_rollup.t
     | Sc_rollup of Sc_rollup.t
-    | Event of Contract_event.t
 
   val encoding : t Data_encoding.t
 
@@ -3506,7 +3495,11 @@ module Kind : sig
 
   type delegation = Delegation_kind
 
+  type event = Event_kind
+
   type set_deposits_limit = Set_deposits_limit_kind
+
+  type increase_paid_storage = Increase_paid_storage_kind
 
   type failing_noop = Failing_noop_kind
 
@@ -3556,8 +3549,10 @@ module Kind : sig
     | Transaction_manager_kind : transaction manager
     | Origination_manager_kind : origination manager
     | Delegation_manager_kind : delegation manager
+    | Event_manager_kind : event manager
     | Register_global_constant_manager_kind : register_global_constant manager
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
+    | Increase_paid_storage_manager_kind : increase_paid_storage manager
     | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
     | Tx_rollup_submit_batch_manager_kind : tx_rollup_submit_batch manager
     | Tx_rollup_commit_manager_kind : tx_rollup_commit manager
@@ -3707,6 +3702,11 @@ and _ manager_operation =
   | Set_deposits_limit :
       Tez.t option
       -> Kind.set_deposits_limit manager_operation
+  | Increase_paid_storage : {
+      amount_in_bytes : Z.t;
+      destination : Contract_hash.t;
+    }
+      -> Kind.increase_paid_storage manager_operation
   | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
   | Tx_rollup_submit_batch : {
       tx_rollup : Tx_rollup.t;
@@ -3978,6 +3978,9 @@ module Operation : sig
 
     val set_deposits_limit_case : Kind.set_deposits_limit Kind.manager case
 
+    val increase_paid_storage_case :
+      Kind.increase_paid_storage Kind.manager case
+
     val sc_rollup_originate_case : Kind.sc_rollup_originate Kind.manager case
 
     val sc_rollup_add_messages_case :
@@ -4023,6 +4026,8 @@ module Operation : sig
       val register_global_constant_case : Kind.register_global_constant case
 
       val set_deposits_limit_case : Kind.set_deposits_limit case
+
+      val increase_paid_storage_case : Kind.increase_paid_storage case
 
       val tx_rollup_origination_case : Kind.tx_rollup_origination case
 
@@ -4345,6 +4350,13 @@ module Fees : sig
     payer:Token.source ->
     Z.t ->
     (context * Z.t * Receipt.balance_updates) tzresult Lwt.t
+
+  val burn_storage_increase_fees :
+    ?origin:Receipt_repr.update_origin ->
+    context ->
+    payer:Token.source ->
+    Z.t ->
+    (context * Receipt.balance_updates) tzresult Lwt.t
 
   val burn_origination_fees :
     ?origin:Receipt.update_origin ->

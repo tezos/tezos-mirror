@@ -593,11 +593,6 @@ let hash_comparable_data ctxt ty data =
   pack_comparable_data ctxt ty data >>=? fun (bytes, ctxt) ->
   Lwt.return @@ hash_bytes ctxt bytes
 
-let hash_event_ty ctxt unparsed =
-  pack_node unparsed ctxt >>? fun (bytes, ctxt) ->
-  Gas.consume ctxt (Michelson_v1_gas.Cost_of.Interpreter.blake2b bytes)
-  >|? fun ctxt -> (Contract_event.Hash.hash_bytes [bytes], ctxt)
-
 (* ---- Tickets ------------------------------------------------------------ *)
 
 (*
@@ -2544,7 +2539,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
         >>=? fun (({destination; entrypoint = _}, (contents, amount)), ctxt) ->
         match destination with
         | Contract ticketer -> return ({ticketer; contents; amount}, ctxt)
-        | Tx_rollup _ | Sc_rollup _ | Event _ ->
+        | Tx_rollup _ | Sc_rollup _ ->
             fail (Unexpected_ticket_owner destination)
       else traced_fail (Unexpected_forged_value (location expr))
   (* Sets *)
@@ -4645,13 +4640,28 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Item_t (Chest_key_t, Item_t (Chest_t, Item_t (Nat_t, rest))) ) ->
       let instr = {apply = (fun k -> IOpen_chest (loc, k))} in
       typed ctxt loc instr (Item_t (union_bytes_bool_t, rest))
+  (* Events *)
+  | Prim (loc, I_EMIT, [], annot), Item_t (data, rest) ->
+      check_packable ~legacy loc data >>?= fun () ->
+      parse_entrypoint_annot_strict loc annot >>?= fun tag ->
+      unparse_ty ~loc:() ctxt data >>?= fun (unparsed_ty, ctxt) ->
+      Gas.consume ctxt (Script.strip_locations_cost unparsed_ty)
+      >>?= fun ctxt ->
+      let unparsed_ty = Micheline.strip_locations unparsed_ty in
+      let instr =
+        {apply = (fun k -> IEmit {loc; tag; ty = data; unparsed_ty; k})}
+      in
+      typed ctxt loc instr (Item_t (Operation_t, rest))
   | Prim (loc, I_EMIT, [ty_node], annot), Item_t (data, rest) ->
       parse_packable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ty_node
       >>?= fun (Ex_ty ty, ctxt) ->
       check_item_ty ctxt ty data loc I_EMIT 1 2 >>?= fun (Eq, ctxt) ->
       parse_entrypoint_annot_strict loc annot >>?= fun tag ->
-      hash_event_ty ctxt ty_node >>?= fun (addr, ctxt) ->
-      let instr = {apply = (fun k -> IEmit {loc; tag; ty = data; addr; k})} in
+      Gas.consume ctxt (Script.strip_locations_cost ty_node) >>?= fun ctxt ->
+      let unparsed_ty = Micheline.strip_locations ty_node in
+      let instr =
+        {apply = (fun k -> IEmit {loc; tag; ty = data; unparsed_ty; k})}
+      in
       typed ctxt loc instr (Item_t (Operation_t, rest))
   (* Primitive parsing errors *)
   | ( Prim
@@ -5007,7 +5017,6 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
               entrypoint_arg >|? fun (entrypoint, arg_ty) ->
               let address = {destination; entrypoint} in
               Typed_contract {arg_ty; address} ))
-  | Event _ -> return (error ctxt (fun _ -> No_such_entrypoint entrypoint))
 
 (* Same as [parse_contract], but does not fail when the contact is missing or
    if the expected type doesn't match the actual one. In that case None is

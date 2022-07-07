@@ -115,7 +115,7 @@ let get_approval_and_update_participation_ema ctxt =
    for the next block. *)
 let start_new_voting_period ctxt =
   (* any change related to the storage in this function must probably
-     be replicated in `record_governance_dictator_proposals` *)
+     be replicated in `record_testnet_dictator_proposals` *)
   Voting_period.get_current_kind ctxt >>=? fun kind ->
   (match kind with
   | Proposal -> (
@@ -246,12 +246,11 @@ let () =
     `Permanent
     ~id:"invalid_dictator_proposal"
     ~title:"Invalid dictator proposal"
-    ~description:"A governance dictator can only submit one proposal at a time."
+    ~description:"A testnet dictator can only submit one proposal at a time."
     ~pp:(fun ppf () ->
       Format.fprintf
         ppf
-        "A governance dictator can only submit one proposal at a time. There \
-         is no governance dictator on mainnet.")
+        "A testnet dictator can only submit one proposal at a time.")
     empty
     (function Invalid_dictator_proposal -> Some () | _ -> None)
     (fun () -> Invalid_dictator_proposal)
@@ -283,34 +282,34 @@ let record_delegate_proposals ctxt delegate proposals =
       else fail Unauthorized_proposal
   | Exploration | Cooldown | Promotion | Adoption -> fail Unexpected_proposal
 
-let record_governance_dictator_proposals ctxt chain_id proposals =
+let record_testnet_dictator_proposals ctxt chain_id proposals =
   Vote.clear_ballots ctxt >>= fun ctxt ->
   Vote.clear_proposals ctxt >>= fun ctxt ->
   Vote.clear_current_proposal ctxt >>=? fun ctxt ->
   match proposals with
   | [] ->
-      Voting_period.Governance_dictator.overwrite_current_kind
+      Voting_period.Testnet_dictator.overwrite_current_kind
         ctxt
         chain_id
         Proposal
   | [proposal] ->
       Vote.init_current_proposal ctxt proposal >>=? fun ctxt ->
-      Voting_period.Governance_dictator.overwrite_current_kind
+      Voting_period.Testnet_dictator.overwrite_current_kind
         ctxt
         chain_id
         Adoption
   | _ :: _ :: _ -> fail Invalid_dictator_proposal
 
-let is_governance_dictator ctxt chain_id delegate =
+let is_testnet_dictator ctxt chain_id delegate =
   (* This function should always, ALWAYS, return false on mainnet!!!! *)
-  match Constants.governance_dictator ctxt with
+  match Constants.testnet_dictator ctxt with
   | Some pkh when Chain_id.(chain_id <> Constants_repr.mainnet_id) ->
       Signature.Public_key_hash.equal pkh delegate
   | _ -> false
 
 let record_proposals ctxt chain_id delegate proposals =
-  if is_governance_dictator ctxt chain_id delegate then
-    record_governance_dictator_proposals ctxt chain_id proposals
+  if is_testnet_dictator ctxt chain_id delegate then
+    record_testnet_dictator_proposals ctxt chain_id proposals
   else record_delegate_proposals ctxt delegate proposals
 
 let record_ballot ctxt delegate proposal ballot =

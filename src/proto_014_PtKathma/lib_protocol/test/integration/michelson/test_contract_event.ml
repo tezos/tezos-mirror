@@ -30,9 +30,8 @@ open Lwt_result_syntax
 (** Testing
     -------
     Component:  Protocol (event logging)
-    Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
-                -- test '^event logging$'
+    Invocation: cd src/proto_alpha/lib_protocol/test/integration/michelson && \
+                dune exec ./main.exe -- test '^event logging$'
     Subject:  This module tests that the event logs can be written to the receipt
               in correct order and expected format.
 *)
@@ -85,53 +84,22 @@ let contract_test () =
                    Internal_manager_operation_result
                      ( {
                          operation =
-                           Transaction
-                             {
-                               entrypoint = tag1;
-                               parameters = data1;
-                               amount = amount1;
-                               destination = Destination.Event addr1;
-                             };
+                           Event {tag = tag1; payload = data1; ty = ty1};
                          _;
                        },
-                       Applied
-                         (ITransaction_result (Transaction_to_event_result _))
-                     );
+                       Applied (IEvent_result _) );
                    Internal_manager_operation_result
                      ( {
                          operation =
-                           Transaction
-                             {
-                               entrypoint = tag2;
-                               parameters = data2;
-                               amount = amount2;
-                               destination = Destination.Event addr2;
-                             };
+                           Event {tag = tag2; payload = data2; ty = ty2};
                          _;
                        },
-                       Applied
-                         (ITransaction_result (Transaction_to_event_result _))
-                     );
+                       Applied (IEvent_result _) );
                  ];
                _;
              });
      };
   ] ->
-      let ctxt = Gas.set_unlimited (Incremental.alpha_ctxt incr) in
-      let* data1, ctxt =
-        Lwt.return @@ Environment.wrap_tzresult
-        @@ Script.force_decode_in_context
-             ~consume_deserialization_gas:When_needed
-             ctxt
-             data1
-      in
-      let* data2, _ =
-        Lwt.return @@ Environment.wrap_tzresult
-        @@ Script.force_decode_in_context
-             ~consume_deserialization_gas:When_needed
-             ctxt
-             data2
-      in
       let open Micheline in
       ((match root data1 with
        | Prim (_, D_Right, [String (_, "right")], _) -> ()
@@ -140,14 +108,21 @@ let contract_test () =
        match root data2 with
        | Prim (_, D_Left, [Int (_, n)], _) -> assert (Z.to_int n = 2)
        | _ -> assert false) ;
-      let addr1 = Contract_event.to_b58check addr1 in
-      let addr2 = Contract_event.to_b58check addr2 in
       assert (Entrypoint.to_string tag1 = "tag1") ;
       assert (Entrypoint.to_string tag2 = "tag2") ;
-      assert (addr1 = "ev12m5E1yW14mc9rsrcdGAWVfDSdmRGuctykrVU55bHZBGv9kmdhW") ;
-      assert (addr2 = "ev12m5E1yW14mc9rsrcdGAWVfDSdmRGuctykrVU55bHZBGv9kmdhW") ;
-      assert (Tez.(amount1 = zero)) ;
-      assert (Tez.(amount2 = zero)) ;
+      (match root ty1 with
+      | Prim (_, T_or, [Prim (_, T_nat, [], []); Prim (_, T_string, [], [])], [])
+        ->
+          ()
+      | _ -> assert false) ;
+      (match root ty2 with
+      | Prim
+          ( _,
+            T_or,
+            [Prim (_, T_nat, [], ["%int"]); Prim (_, T_string, [], ["%str"])],
+            [] ) ->
+          ()
+      | _ -> assert false) ;
       return_unit
   | _ -> assert false
 

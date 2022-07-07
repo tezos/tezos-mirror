@@ -40,7 +40,7 @@ module Cache_costs = struct
 
   let cache_update_constant = S.safe_int 600
 
-  let cache_update_coeff = S.safe_int 57
+  let cache_update_coeff = S.safe_int 43
 
   (* Cost of calling [Environment_cache.update]. *)
   let cache_update ~cache_size_in_bytes =

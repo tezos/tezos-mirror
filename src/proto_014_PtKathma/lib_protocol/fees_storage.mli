@@ -25,6 +25,8 @@
 
 type error += Cannot_pay_storage_fee (* `Temporary *)
 
+type error += Negative_storage_input (* `Temporary *)
+
 type error += Operation_quota_exceeded (* `Temporary *)
 
 type error += Storage_limit_too_high (* `Permanent *)
@@ -68,6 +70,21 @@ val burn_storage_fees :
   payer:Token.source ->
   Z.t ->
   (Raw_context.t * Z.t * Receipt_repr.balance_updates) tzresult Lwt.t
+
+(** [burn_storage_increase_fees ctxt ~payer amount_in_bytes] takes funds from the
+    [payer] to pay the cost of the [amount_in_bytes] storage. This function has an
+    optional parameter [~origin] that allows to set the origin of returned
+    balance updates (by default the parameter is set to [Block_application]).
+    Returns an updated context and the relevant balance updates.
+    Raises the [Negative_storage_input] error if the amount_in_bytes is null or negative.
+    Raises the [Cannot_pay_storage_fee] error if the funds from the [payer] are
+    not sufficient to pay the storage fees. *)
+val burn_storage_increase_fees :
+  ?origin:Receipt_repr.update_origin ->
+  Raw_context.t ->
+  payer:Token.source ->
+  Z.t ->
+  (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
 (** Calls [burn_storage_fees] with the parameter [consumed] mapped to the
     constant [origination_size]. *)

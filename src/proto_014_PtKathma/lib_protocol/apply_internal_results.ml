@@ -44,6 +44,12 @@ type 'kind internal_manager_operation =
   | Delegation :
       Signature.Public_key_hash.t option
       -> Kind.delegation internal_manager_operation
+  | Event : {
+      ty : Script.expr;
+      tag : Entrypoint.t;
+      payload : Script.expr;
+    }
+      -> Kind.event internal_manager_operation
 
 type packed_internal_manager_operation =
   | Manager :
@@ -91,14 +97,7 @@ let contents_of_internal_operation (type kind)
             entrypoint;
             parameters = Script.lazy_expr unparsed_parameters;
           }
-    | Transaction_to_event {addr; tag; unparsed_data} ->
-        Transaction
-          {
-            destination = Event addr;
-            amount = Tez.zero;
-            entrypoint = tag;
-            parameters = Script.lazy_expr unparsed_data;
-          }
+    | Event {ty; tag; unparsed_data} -> Event {ty; tag; payload = unparsed_data}
     | Origination {delegate; code; unparsed_storage; credit; _} ->
         let script =
           {
@@ -139,7 +138,6 @@ type successful_transaction_result =
       consumed_gas : Gas.Arith.fp;
       inbox_after : Sc_rollup.Inbox.t;
     }
-  | Transaction_to_event_result of {consumed_gas : Gas.Arith.fp}
 
 type successful_origination_result = {
   lazy_storage_diff : Lazy_storage.diffs option;
@@ -162,6 +160,10 @@ type _ successful_internal_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.delegation successful_internal_manager_operation_result
+  | IEvent_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.event successful_internal_manager_operation_result
 
 type packed_successful_internal_manager_operation_result =
   | Successful_internal_manager_result :
@@ -309,15 +311,6 @@ module Internal_result = struct
           (function
             | consumed_gas, inbox_after ->
                 Transaction_to_sc_rollup_result {consumed_gas; inbox_after});
-        case
-          ~title:"To_event"
-          (Tag 3)
-          (obj1
-             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
-          (function
-            | Transaction_to_event_result {consumed_gas} -> Some consumed_gas
-            | _ -> None)
-          (fun consumed_gas -> Transaction_to_event_result {consumed_gas});
       ]
 
   let[@coq_axiom_with_reason "gadt"] transaction_case =
@@ -413,6 +406,40 @@ module Internal_result = struct
         inj = (fun key -> Delegation key);
       }
 
+  let[@coq_axiom_with_reason "gadt"] event_case =
+    MCase
+      {
+        (* This value should be changed with care: maybe receipts are read by
+           external tools such as indexers. *)
+        tag = 4;
+        name = "event";
+        encoding =
+          obj3
+            (req "type" Script.expr_encoding)
+            (opt "tag" Entrypoint.smart_encoding)
+            (opt "payload" Script.expr_encoding);
+        iselect : Kind.event iselect =
+          (function
+          | Internal_manager_operation_result
+              (({operation = Event _; _} as op), res) ->
+              Some (op, res)
+          | _ -> None);
+        select = (function Manager (Event _ as op) -> Some op | _ -> None);
+        proj =
+          (function
+          | Event {ty; tag; payload} ->
+              let tag = if Entrypoint.is_default tag then None else Some tag in
+              let payload =
+                if Script_repr.is_unit payload then None else Some payload
+              in
+              (ty, tag, payload));
+        inj =
+          (fun (ty, tag, payload) ->
+            let tag = Option.value ~default:Entrypoint.default tag in
+            let payload = Option.value ~default:Script_repr.unit payload in
+            Event {ty; tag; payload});
+      }
+
   let case tag name args proj inj =
     case
       tag
@@ -432,7 +459,12 @@ module Internal_result = struct
     in
     union
       ~tag_size:`Uint8
-      [make transaction_case; make origination_case; make delegation_case]
+      [
+        make transaction_case;
+        make origination_case;
+        make delegation_case;
+        make event_case;
+      ]
 end
 
 let internal_contents_encoding : packed_internal_contents Data_encoding.t =
@@ -594,6 +626,20 @@ module Internal_manager_result = struct
       ~proj:(function[@coq_match_with_default]
         | IDelegation_result {consumed_gas} -> consumed_gas)
       ~inj:(fun consumed_gas -> IDelegation_result {consumed_gas})
+
+  let event_case =
+    make
+      ~op_case:Internal_result.event_case
+      ~encoding:
+        Data_encoding.(
+          obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+      ~select:(function
+        | Successful_internal_manager_result (IEvent_result _ as op) -> Some op
+        | _ -> None)
+      ~kind:Kind.Event_manager_kind
+      ~proj:(function[@coq_match_with_default]
+        | IEvent_result {consumed_gas} -> consumed_gas)
+      ~inj:(fun consumed_gas -> IEvent_result {consumed_gas})
 end
 
 let internal_manager_operation_result_encoding :
@@ -633,4 +679,5 @@ let internal_manager_operation_result_encoding :
          make
            Internal_manager_result.delegation_case
            Internal_result.delegation_case;
+         make Internal_manager_result.event_case Internal_result.event_case;
        ]

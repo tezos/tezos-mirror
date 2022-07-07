@@ -234,7 +234,7 @@ let tickets_of_operation ctxt ~allow_zero_amount_tickets
         ~preorigination
         ~storage_type
         ~storage
-  | Delegation _ | Transaction_to_event _ -> return (None, ctxt)
+  | Delegation _ | Event _ -> return (None, ctxt)
 
 let add_transfer_to_token_map ctxt token_map {destination; tickets} =
   List.fold_left_es

@@ -32,13 +32,16 @@ open Apply_internal_results
 
 let tez_sym = "\xEA\x9C\xA9"
 
+let pp_micheline_expr ppf expr =
+  Format.fprintf ppf "@[<v 0>%a@]" Michelson_v1_printer.print_expr expr
+
 let pp_micheline_from_lazy_expr ppf expr =
   let expr =
     WithExceptions.Option.to_exn
       ~none:(Failure "ill-serialized micheline expression")
       (Data_encoding.force_decode expr)
   in
-  Format.fprintf ppf "@[<v 0>%a@]" Michelson_v1_printer.print_expr expr
+  pp_micheline_expr ppf expr
 
 let pp_internal_operation ppf (Internal_contents {operation; source; _}) =
   (* For now, try to use the same format as in [pp_manager_operation_content]. *)
@@ -99,7 +102,18 @@ let pp_internal_operation ppf (Internal_contents {operation; source; _}) =
       Format.fprintf ppf "Delegation:@,Contract: %a@,To: " Contract.pp source ;
       match delegate_opt with
       | None -> Format.pp_print_string ppf "nobody"
-      | Some delegate -> Signature.Public_key_hash.pp ppf delegate)) ;
+      | Some delegate -> Signature.Public_key_hash.pp ppf delegate)
+  | Event {ty; tag; payload} ->
+      Format.fprintf
+        ppf
+        "Event:@,From: %a@,Type: %a"
+        Contract.pp
+        source
+        pp_micheline_expr
+        ty ;
+      if not (Entrypoint.is_default tag) then
+        Format.fprintf ppf "@,Tag: %a" Entrypoint.pp tag ;
+      Format.fprintf ppf "@,Payload: %a" pp_micheline_expr payload) ;
   Format.fprintf ppf "@]"
 
 let pp_manager_operation_content (type kind) source ppf
@@ -185,6 +199,16 @@ let pp_manager_operation_content (type kind) source ppf
       match limit_opt with
       | None -> Format.pp_print_string ppf "Unlimited deposits"
       | Some limit -> Format.fprintf ppf "Limit: %a" Tez.pp limit)
+  | Increase_paid_storage {amount_in_bytes; destination} ->
+      Format.fprintf
+        ppf
+        "Increase paid storage:@,Bytes: : %a@,From: %a@,To: %a"
+        Z.pp_print
+        amount_in_bytes
+        Contract.pp
+        source
+        Contract_hash.pp
+        destination
   | Tx_rollup_origination ->
       Format.fprintf ppf "Tx rollup origination:@,From: %a" Contract.pp source
   | Tx_rollup_submit_batch {tx_rollup; content; burn_limit = _} ->
@@ -542,9 +566,6 @@ let pp_transaction_result ppf = function
   | Transaction_to_sc_rollup_result {consumed_gas; inbox_after} ->
       pp_consumed_gas ppf consumed_gas ;
       pp_inbox_after ppf inbox_after
-  | Transaction_to_event_result {consumed_gas} ->
-      pp_consumed_gas ppf consumed_gas ;
-      Format.fprintf ppf "@,@[<v 2>Event Applied]"
 
 let pp_operation_result ~operation_name pp_operation_result ppf = function
   | Skipped _ -> Format.fprintf ppf "This operation was skipped."
@@ -575,6 +596,11 @@ let pp_manager_operation_contents_result ppf op_result =
     pp_consumed_gas ppf consumed_gas ;
     pp_storage_size ppf size_of_constant ;
     Format.fprintf ppf "@,Global address: %a" Script_expr_hash.pp global_address
+  in
+  let pp_increase_paid_storage_result
+      (Increase_paid_storage_result {consumed_gas; balance_updates}) =
+    pp_balance_updates ppf balance_updates ;
+    pp_consumed_gas ppf consumed_gas
   in
   let pp_tx_rollup_origination_result
       (Tx_rollup_origination_result
@@ -724,6 +750,7 @@ let pp_manager_operation_contents_result ppf op_result =
     | Delegation_result _ -> "delegation"
     | Register_global_constant_result _ -> "global constant registration"
     | Set_deposits_limit_result _ -> "deposits limit modification"
+    | Increase_paid_storage_result _ -> "paid storage increase"
     | Tx_rollup_origination_result _ -> "transaction rollup origination"
     | Tx_rollup_submit_batch_result _ -> "transaction rollup batch submission"
     | Tx_rollup_commit_result _ -> "transaction rollup commitment"
@@ -761,6 +788,7 @@ let pp_manager_operation_contents_result ppf op_result =
     | Origination_result op_res -> pp_origination_result ppf op_res
     | Register_global_constant_result _ as op ->
         pp_register_global_constant_result op
+    | Increase_paid_storage_result _ as op -> pp_increase_paid_storage_result op
     | Tx_rollup_origination_result _ as op -> pp_tx_rollup_origination_result op
     | Tx_rollup_submit_batch_result _ as op ->
         pp_tx_rollup_submit_batch_result op
@@ -803,13 +831,15 @@ let pp_internal_operation_and_result ppf
     | ITransaction_result _ -> "transaction"
     | IOrigination_result _ -> "origination"
     | IDelegation_result _ -> "delegation"
+    | IEvent_result _ -> "event"
   in
   let pp_internal_operation_result (type kind) ppf
       (result : kind successful_internal_manager_operation_result) =
     match result with
     | ITransaction_result tx -> pp_transaction_result ppf tx
     | IOrigination_result op_res -> pp_origination_result ppf op_res
-    | IDelegation_result {consumed_gas} -> pp_consumed_gas ppf consumed_gas
+    | IDelegation_result {consumed_gas} | IEvent_result {consumed_gas} ->
+        pp_consumed_gas ppf consumed_gas
   in
   Format.fprintf
     ppf

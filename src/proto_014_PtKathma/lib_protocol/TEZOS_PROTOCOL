@@ -1,6 +1,6 @@
 {
     "expected_env_version": 6,
-    "hash": "PtKathmaHPSjL3WDmUCJP7iHBsUix65HdAgSeVacukogRK6hum6",
+    "hash": "PtKathmaXYPEsBau83zRwXK19HAQRzZSj6pCXnvtyLZFjRxdQxt",
     "modules": [
         "Misc",
         "Non_empty_string",
@@ -58,7 +58,6 @@
         "Sc_rollup_commitment_repr",
         "Sc_rollup_proof_repr",
         "Sc_rollup_game_repr",
-        "Contract_event_repr",
         "Tx_rollup_level_repr",
         "Tx_rollup_l2_proof",
         "Tx_rollup_l2_address",

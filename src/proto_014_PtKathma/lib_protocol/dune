@@ -87,7 +87,6 @@
   Sc_rollup_commitment_repr
   Sc_rollup_proof_repr
   Sc_rollup_game_repr
-  Contract_event_repr
   Tx_rollup_level_repr
   Tx_rollup_l2_proof
   Tx_rollup_l2_address
@@ -260,7 +259,7 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtKathmaHPSjL3WDmUCJP7iHBsUix65HdAgSeVacukogRK6hum6\"\nlet name = Tezos_protocol_environment_014_PtKathma.Name.name\ninclude Tezos_raw_protocol_014_PtKathma\ninclude Tezos_raw_protocol_014_PtKathma.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtKathmaXYPEsBau83zRwXK19HAQRzZSj6pCXnvtyLZFjRxdQxt\"\nlet name = Tezos_protocol_environment_014_PtKathma.Name.name\ninclude Tezos_raw_protocol_014_PtKathma\ninclude Tezos_raw_protocol_014_PtKathma.Main\n")))
 
 (rule
  (targets tezos_protocol_014_PtKathma.ml)
@@ -328,7 +327,6 @@
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
   sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
-  contract_event_repr.ml contract_event_repr.mli
   tx_rollup_level_repr.ml tx_rollup_level_repr.mli
   tx_rollup_l2_proof.ml tx_rollup_l2_proof.mli
   tx_rollup_l2_address.ml tx_rollup_l2_address.mli
@@ -550,7 +548,6 @@
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
   sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
-  contract_event_repr.ml contract_event_repr.mli
   tx_rollup_level_repr.ml tx_rollup_level_repr.mli
   tx_rollup_l2_proof.ml tx_rollup_l2_proof.mli
   tx_rollup_l2_address.ml tx_rollup_l2_address.mli
@@ -777,7 +774,6 @@
   sc_rollup_commitment_repr.ml sc_rollup_commitment_repr.mli
   sc_rollup_proof_repr.ml sc_rollup_proof_repr.mli
   sc_rollup_game_repr.ml sc_rollup_game_repr.mli
-  contract_event_repr.ml contract_event_repr.mli
   tx_rollup_level_repr.ml tx_rollup_level_repr.mli
   tx_rollup_l2_proof.ml tx_rollup_l2_proof.mli
   tx_rollup_l2_address.ml tx_rollup_l2_address.mli

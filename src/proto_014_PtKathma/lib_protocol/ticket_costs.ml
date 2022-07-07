@@ -27,7 +27,7 @@ open Alpha_context
 module S = Saturation_repr
 
 module Constants = struct
-  let cost_collect_tickets_step = S.safe_int 60
+  let cost_collect_tickets_step = S.safe_int 80
 
   let cost_has_tickets_of_ty type_size =
     S.add (S.safe_int 10) (S.mul (S.safe_int 6) type_size)

@@ -1085,9 +1085,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
          kinstr
   | IEmit : {
       loc : Script.location;
-      addr : Contract_event.t;
       tag : Entrypoint.t;
       ty : ('a, _) ty;
+      unparsed_ty : Script.expr;
       k : (operation, 's, 'r, 'f) kinstr;
     }
       -> ('a, 's, 'r, 'f) kinstr
@@ -1365,12 +1365,12 @@ and 'kind manager_operation =
       unparsed_parameters : Script.expr;
     }
       -> Kind.transaction manager_operation
-  | Transaction_to_event : {
-      addr : Contract_event.t;
+  | Event : {
+      ty : Script.expr;
       tag : Entrypoint.t;
       unparsed_data : Script.expr;
     }
-      -> Kind.transaction manager_operation
+      -> Kind.event manager_operation
   | Origination : {
       delegate : Signature.Public_key_hash.t option;
       code : Script.expr;
@@ -1427,7 +1427,7 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Transaction_to_contract _ -> Kind.Transaction_manager_kind
   | Transaction_to_tx_rollup _ -> Kind.Transaction_manager_kind
   | Transaction_to_sc_rollup _ -> Kind.Transaction_manager_kind
-  | Transaction_to_event _ -> Kind.Transaction_manager_kind
+  | Event _ -> Kind.Event_manager_kind
   | Origination _ -> Kind.Origination_manager_kind
   | Delegation _ -> Kind.Delegation_manager_kind
 

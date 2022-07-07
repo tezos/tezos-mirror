@@ -1586,14 +1586,14 @@ let kinstr_split :
              continuation = k;
              reconstruct = (fun k -> IMin_block_time (loc, k));
            }
-  | IEmit {loc; ty; addr; tag; k}, Item_t (_, s) ->
+  | IEmit {loc; ty; unparsed_ty; tag; k}, Item_t (_, s) ->
       let s = Item_t (operation_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IEmit {loc; ty; addr; tag; k});
+             reconstruct = (fun k -> IEmit {loc; ty; unparsed_ty; tag; k});
            }
   | IEmit _, Bot_t -> .
   | IHalt loc, _s -> ok @@ Ex_split_halt loc

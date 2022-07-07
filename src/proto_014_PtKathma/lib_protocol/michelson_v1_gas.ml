@@ -272,11 +272,11 @@ module Cost_of = struct
     let cost_N_IDup = S.safe_int 10
 
     (* model N_IDupN *)
-    (* Approximating 1.129785 x term *)
+    (* Approximating 1.222263 x term *)
     let cost_N_IDupN size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 20 + v0 + (v0 lsr 3)
+      S.safe_int 20 + v0 + (v0 lsr 2)
 
     let cost_div_int size1 size2 =
       let q = size1 - size2 in
@@ -888,25 +888,25 @@ module Cost_of = struct
     let cost_ENCODING_SIGNATURE_secp256k1 = S.safe_int 45
 
     (* model ENCODING_Chest_key *)
-    let cost_ENCODING_Chest_key = S.safe_int 13500
+    let cost_ENCODING_Chest_key = S.safe_int 10_000
 
     (* model ENCODING_Chest *)
     (* Approximating 0.120086 x term *)
     let cost_ENCODING_Chest ~plaintext_size =
       let open S_syntax in
       let v0 = S.safe_int plaintext_size in
-      S.safe_int 16630 + (v0 lsr 3)
+      S.safe_int 12_200 + (v0 lsr 3)
 
     (* model TIMESTAMP_READABLE_DECODING *)
-    (* Approximating 0.354278 x term *)
+    (* Approximating 0.045400 x term *)
     let cost_TIMESTAMP_READABLE_DECODING ~bytes =
       let open S_syntax in
       let b = S.safe_int bytes in
       let v0 = S.mul (S.sqrt b) b in
-      S.safe_int 800 + ((v0 lsr 2) + (v0 lsr 3))
+      S.safe_int 105 + ((v0 lsr 5) + (v0 lsr 6))
 
     (* model TIMESTAMP_READABLE_ENCODING *)
-    let cost_TIMESTAMP_READABLE_ENCODING = S.safe_int 100
+    let cost_TIMESTAMP_READABLE_ENCODING = S.safe_int 820
 
     (* model CHECK_PRINTABLE *)
     let cost_CHECK_PRINTABLE size =

@@ -38,7 +38,7 @@ open Script_typed_ir
 open Script_ir_translator
 open Local_gas_counter
 
-type error += Rollup_invalid_transaction_amount | Event_invalid_destination
+type error += Rollup_invalid_transaction_amount
 
 let () =
   register_error_kind
@@ -53,22 +53,7 @@ let () =
       Format.pp_print_string ppf "Transaction amount to a rollup must be zero.")
     Data_encoding.unit
     (function Rollup_invalid_transaction_amount -> Some () | _ -> None)
-    (fun () -> Rollup_invalid_transaction_amount) ;
-  register_error_kind
-    `Permanent
-    ~id:"operation.event_invalid_destination"
-    ~title:"Event sinks are invalid transaction destinations"
-    ~description:
-      "Event sinks are not real transaction destinations, and therefore \
-       operations targeting an event sink are invalid. To emit events, use \
-       EMIT instead."
-    ~pp:(fun ppf () ->
-      Format.pp_print_string
-        ppf
-        "Event sinks are invalid transaction destinations.")
-    Data_encoding.unit
-    (function Event_invalid_destination -> Some () | _ -> None)
-    (fun () -> Event_invalid_destination)
+    (fun () -> Rollup_invalid_transaction_amount)
 
 (*
 
@@ -567,8 +552,8 @@ let make_transaction_to_sc_rollup ctxt ~destination ~amount ~entrypoint
 
 (** [emit_event] generates an internal operation that will effect an event emission
     if the contract code returns this successfully. *)
-let emit_event (type t tc) (ctxt, sc) gas ~event_address
-    ~(event_type : (t, tc) ty) ~tag ~(event_data : t) =
+let emit_event (type t tc) (ctxt, sc) gas ~(event_type : (t, tc) ty)
+    ~unparsed_ty ~tag ~(event_data : t) =
   let ctxt = update_context gas ctxt in
   (* No need to take care of lazy storage as only packable types are allowed *)
   let lazy_storage_diff = None in
@@ -577,9 +562,7 @@ let emit_event (type t tc) (ctxt, sc) gas ~event_address
   Gas.consume ctxt (Script.strip_locations_cost unparsed_data) >>?= fun ctxt ->
   let unparsed_data = Micheline.strip_locations unparsed_data in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
-  let operation =
-    Transaction_to_event {addr = event_address; tag; unparsed_data}
-  in
+  let operation = Event {ty = unparsed_ty; tag; unparsed_data} in
   let iop = {source = Contract.Originated sc.self; operation; nonce} in
   let res = {piop = Internal_operation iop; lazy_storage_diff} in
   let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
@@ -629,8 +612,7 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters
         ~amount
         ~entrypoint
         ~parameters_ty
-        ~parameters
-  | Event _ -> fail Event_invalid_destination)
+        ~parameters)
   >>=? fun (operation, ctxt) ->
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let iop = {source = Contract.Originated sc.self; operation; nonce} in

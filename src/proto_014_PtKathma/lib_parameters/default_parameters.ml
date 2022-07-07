@@ -132,8 +132,8 @@ let constants_mainnet =
     double_baking_punishment = Tez.(mul_exn one 640);
     ratio_of_frozen_deposits_slashed_per_double_endorsement =
       {numerator = 1; denominator = 2};
-    (* The `governance_dictator` should absolutely be None on mainnet *)
-    governance_dictator = None;
+    (* The `testnet_dictator` should absolutely be None on mainnet *)
+    testnet_dictator = None;
     initial_seed = None;
     (* A cache for contract source code and storage. Its size has been
        chosen not too exceed 100 000 000 bytes. *)

@@ -970,9 +970,9 @@ let check_kinstr_size () =
           IEmit
             {
               loc;
-              addr = Contract_event_repr.Hash.zero;
               tag = entrypoint "entry";
               ty = Unit_t;
+              unparsed_ty = Micheline.(strip_locations @@ Seq (loc, []));
               k = halt ();
             } );
       Kinstr ("IHalt ()", halt ());
