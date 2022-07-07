@@ -81,6 +81,8 @@ Minor Changes
 -------------
 
 - Split internal transactions. (MR :gl:`!5585`)
+- Add a new LAMBDA_REC instruction to create recursive lambda functions. (MR
+  :gl:`!5194`)
 
 - Rename error ``Previously_revealed_nonce`` in
   ``Already_revealed_nonce`` (MR :gl:`!5849`)
