@@ -27,9 +27,8 @@
     -------
     Component:    Protocol (interpretation)
     Dependencies: src/proto_alpha/lib_protocol/script_interpreter.ml
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
-                  -- test "^interpretation$"
+    Invocation:   cd src/proto_alpha/lib_protocol/test/integration/michelson && \
+                  dune exec ./main.exe -- test "^interpretation$"
     Subject:      Interpretation of Michelson scripts
 *)
 
@@ -288,6 +287,44 @@ module Test_map_instr_on_options = struct
     assertions storage_before new_storage input
 end
 
+let test_contract path storage param ~ok ~ko =
+  test_context () >>=? fun ctx ->
+  let read_file filename =
+    let ch = open_in filename in
+    let s = really_input_string ch (in_channel_length ch) in
+    close_in ch ;
+    s
+  in
+  let contract = path in
+  let script = read_file contract in
+  Contract_helpers.run_script ctx script ~storage ~parameter:param ()
+  >>= function
+  | Ok (res, _) -> ok res
+  | Error t -> ko t
+
+let test_contract_success path storage param expected_storage () =
+  let real_storage = Expr.from_string expected_storage in
+  test_contract
+    path
+    storage
+    param
+    ~ok:(fun res ->
+      if res.storage = real_storage then return_unit
+      else Alcotest.fail "Unexpected result")
+    ~ko:(fun trace ->
+      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace trace)
+
+let test_contract_fail path storage param () =
+  test_contract
+    path
+    storage
+    param
+    ~ok:(fun _ ->
+      Alcotest.failf
+        "Unexpected success: interpreting %s should have failed"
+        path)
+    ~ko:(fun _ -> return_unit)
+
 let tests =
   [
     Tztest.tztest "test bad contract error" `Quick test_bad_contract_parameter;
@@ -306,5 +343,17 @@ let tests =
       QCheck2.Gen.(
         triple (opt small_signed_int) (opt small_signed_int) small_signed_int)
       Test_map_instr_on_options.test_mapping;
+    Tztest.tztest
+      "test lambda_rec instruction"
+      `Quick
+      (test_contract_success "./contracts/rec_fact.tz" "0" "5" "120");
+    Tztest.tztest
+      "test lambda_rec instruction with apply"
+      `Quick
+      (test_contract_success "./contracts/rec_fact_apply.tz" "0" "5" "120");
+    Tztest.tztest
+      "test lambda_rec instruction with an infinite recursion"
+      `Quick
+      (test_contract_fail "./contracts/omega.tz" "Unit" "Unit");
   ]
   @ error_encoding_tests

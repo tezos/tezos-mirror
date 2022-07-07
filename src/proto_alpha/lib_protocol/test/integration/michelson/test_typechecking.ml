@@ -898,6 +898,33 @@ let test_parse_contract_data_for_rollup_with_invalid_type () =
     res
     (( = ) (Script_tc_errors.No_such_entrypoint entrypoint))
 
+let test_contract path ~ok ~ko () =
+  let contract = path in
+  let script = read_file contract in
+  let contract_expr = Expr.from_string script in
+  test_context () >>=? fun ctxt ->
+  Script_ir_translator.typecheck_code
+    ~legacy:false
+    ~show_types:false
+    ctxt
+    contract_expr
+  >>= function
+  | Ok _ -> ok ()
+  | Error t -> ko t
+
+let test_contract_success path =
+  test_contract path ~ok:return ~ko:(fun t ->
+      Alcotest.failf "Unexpected error: %a" Environment.Error_monad.pp_trace t)
+
+let test_contract_failure path =
+  test_contract
+    path
+    ~ok:(fun () ->
+      Alcotest.failf
+        "Unexpected success: typechecking %s should have failed"
+        path)
+    ~ko:(fun _ -> return_unit)
+
 let tests =
   [
     Tztest.tztest "test unparse view" `Quick test_unparse_view;
@@ -947,4 +974,16 @@ let tests =
       "test parse contract data for rollup with entrypoint"
       `Quick
       test_parse_contract_data_for_rollup_with_invalid_type;
+    Tztest.tztest
+      "test lambda_rec instruction"
+      `Quick
+      (test_contract_success "./contracts/rec_fact.tz");
+    Tztest.tztest
+      "test lambda_rec instruction with apply"
+      `Quick
+      (test_contract_success "./contracts/rec_fact_apply.tz");
+    Tztest.tztest
+      "test lambda_rec with type error"
+      `Quick
+      (test_contract_failure "./contracts/fail_rec.tz");
   ]
