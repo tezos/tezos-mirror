@@ -215,7 +215,7 @@ let initial_nonce_hash_0 = hash initial_nonce_0
 let deterministic_seed seed = update_seed seed zero_bytes
 
 let initial_seeds ?initial_seed n =
-  let[@coq_struct "i"] rec loop acc elt i =
+  let rec loop acc elt i =
     if Compare.Int.(i = 1) then List.rev (elt :: acc)
     else loop (elt :: acc) (deterministic_seed elt) (i - 1)
   in

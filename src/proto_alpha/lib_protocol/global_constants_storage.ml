@@ -56,7 +56,6 @@ let bottom_up_fold_cps initial_accumulator node initial_k f =
                 k accu (node :: nodes)))
   in
   traverse_node initial_accumulator node initial_k
-  [@@coq_axiom_with_reason "local mutually recursive definition not handled"]
 
 module Gas_costs = Global_constants_costs
 module Expr_hash_map = Map.Make (Script_expr_hash)

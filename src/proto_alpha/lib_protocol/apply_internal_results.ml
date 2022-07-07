@@ -214,9 +214,8 @@ module Internal_operation = struct
         inj : 'a -> 'kind internal_operation_contents;
       }
         -> 'kind case
-  [@@coq_force_gadt]
 
-  let[@coq_axiom_with_reason "gadt"] transaction_contract_variant_cases =
+  let transaction_contract_variant_cases =
     union
       [
         case
@@ -320,7 +319,7 @@ module Internal_operation = struct
                 Transaction_to_sc_rollup_result {consumed_gas; inbox_after});
       ]
 
-  let[@coq_axiom_with_reason "gadt"] transaction_case =
+  let transaction_case =
     MCase
       {
         (* This value should be changed with care: maybe receipts are read by
@@ -367,7 +366,7 @@ module Internal_operation = struct
             Transaction {amount; destination; parameters; entrypoint});
       }
 
-  let[@coq_axiom_with_reason "gadt"] origination_case =
+  let origination_case =
     MCase
       {
         (* This value should be changed with care: maybe receipts are read by
@@ -397,7 +396,7 @@ module Internal_operation = struct
             Origination {credit; delegate; script});
       }
 
-  let[@coq_axiom_with_reason "gadt"] delegation_case =
+  let delegation_case =
     MCase
       {
         (* This value should be changed with care: maybe receipts are read by
@@ -419,7 +418,7 @@ module Internal_operation = struct
         inj = (fun key -> Delegation key);
       }
 
-  let[@coq_axiom_with_reason "gadt"] event_case =
+  let event_case =
     MCase
       {
         (* This value should be changed with care: maybe receipts are read by
@@ -560,7 +559,7 @@ module Internal_operation_result = struct
     in
     MCase {op_case; encoding; kind; select; proj; inj; t}
 
-  let[@coq_axiom_with_reason "gadt"] transaction_case =
+  let transaction_case =
     make
       ~op_case:Internal_operation.transaction_case
       ~encoding:Internal_operation.transaction_contract_variant_cases
@@ -572,7 +571,7 @@ module Internal_operation_result = struct
       ~proj:(function ITransaction_result x -> x)
       ~inj:(fun x -> ITransaction_result x)
 
-  let[@coq_axiom_with_reason "gadt"] origination_case =
+  let origination_case =
     make
       ~op_case:Internal_operation.origination_case
       ~encoding:
@@ -637,8 +636,7 @@ module Internal_operation_result = struct
             Some op
         | _ -> None)
       ~kind:Kind.Delegation_manager_kind
-      ~proj:(function[@coq_match_with_default]
-        | IDelegation_result {consumed_gas} -> consumed_gas)
+      ~proj:(function IDelegation_result {consumed_gas} -> consumed_gas)
       ~inj:(fun consumed_gas -> IDelegation_result {consumed_gas})
 
   let event_case =
@@ -652,8 +650,7 @@ module Internal_operation_result = struct
             Some op
         | _ -> None)
       ~kind:Kind.Event_manager_kind
-      ~proj:(function[@coq_match_with_default]
-        | IEvent_result {consumed_gas} -> consumed_gas)
+      ~proj:(function IEvent_result {consumed_gas} -> consumed_gas)
       ~inj:(fun consumed_gas -> IEvent_result {consumed_gas})
 end
 

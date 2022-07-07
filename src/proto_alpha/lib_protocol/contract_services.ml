@@ -290,7 +290,7 @@ module S = struct
   end
 end
 
-let[@coq_axiom_with_reason "gadt"] register () =
+let register () =
   let open Services_registration in
   register0 ~chunked:true S.list (fun ctxt () () -> Contract.list ctxt >|= ok) ;
   let register_field_gen ~filter_contract ~wrap_result ~chunked s f =

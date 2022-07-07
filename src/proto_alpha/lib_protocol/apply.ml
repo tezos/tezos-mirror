@@ -1907,7 +1907,7 @@ let apply_manager_operation :
 type success_or_failure = Success of context | Failure
 
 let apply_internal_operations ctxt ~payer ~chain_id ops =
-  let[@coq_struct "ctxt"] rec apply ctxt applied worklist =
+  let rec apply ctxt applied worklist =
     match worklist with
     | [] -> Lwt.return (Success ctxt, List.rev applied)
     | Script_typed_ir.Internal_operation ({source; operation; nonce} as op)
@@ -2164,14 +2164,7 @@ let apply_manager_contents (type kind) ctxt chain_id
     * kind manager_operation_result
     * packed_internal_operation_result list)
     Lwt.t =
-  let[@coq_match_with_default] (Manager_operation
-                                 {
-                                   source;
-                                   operation;
-                                   gas_limit;
-                                   storage_limit;
-                                   _;
-                                 }) =
+  let (Manager_operation {source; operation; gas_limit; storage_limit; _}) =
     op
   in
   (* We do not expose the internal scaling to the users. Instead, we multiply
@@ -2251,7 +2244,7 @@ let rec mark_skipped :
     kind Kind.manager fees_updated_contents_list ->
     kind Kind.manager contents_result_list =
  fun ~payload_producer level fees_updated_contents_list ->
-  match[@coq_match_with_default] fees_updated_contents_list with
+  match fees_updated_contents_list with
   | FeesUpdatedSingle
       {contents = Manager_operation {operation; _}; balance_updates} ->
       Single_result
@@ -2329,7 +2322,7 @@ let rec apply_manager_contents_list_rec :
     (success_or_failure * kind Kind.manager contents_result_list) Lwt.t =
  fun ctxt ~payload_producer chain_id fees_updated_contents_list ->
   let level = Level.current ctxt in
-  match[@coq_match_with_default] fees_updated_contents_list with
+  match fees_updated_contents_list with
   | FeesUpdatedSingle {contents = Manager_operation _ as op; balance_updates} ->
       apply_manager_contents ctxt chain_id op
       >|= fun (ctxt_result, operation_result, internal_operation_results) ->
@@ -2867,7 +2860,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
     | Partial_construction _ -> true
     | Full_construction _ | Application _ -> false
   in
-  match[@coq_match_with_default] contents_list with
+  match contents_list with
   | Single (Preendorsement consensus_content) ->
       validate_consensus_contents
         ctxt

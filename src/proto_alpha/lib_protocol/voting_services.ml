@@ -121,9 +121,6 @@ let register () =
       Vote.find_current_proposal ctxt) ;
   register0 ~chunked:false S.total_voting_power (fun ctxt () () ->
       Vote.get_total_voting_power_free ctxt)
-  [@@coq_axiom_with_reason
-    "disabled because we would need to re-create the error e in order to have \
-     different polymorphic variables"]
 
 let ballots ctxt block = RPC_context.make_call0 S.ballots ctxt block () ()
 

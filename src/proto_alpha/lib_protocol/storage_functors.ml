@@ -194,7 +194,6 @@ struct
       ~get:find
       (register_named_subcontext description N.name)
       V.encoding
-    [@@coq_axiom_with_reason "stack overflow in Coq"]
 end
 
 module type INDEX = sig
@@ -267,7 +266,6 @@ module Make_data_set_storage (C : Raw_context.T) (I : INDEX) :
          C.description
          I.args)
       Data_encoding.bool
-    [@@coq_axiom_with_reason "stack overflow in Coq"]
 end
 
 module Make_indexed_data_storage (C : Raw_context.T) (I : INDEX) (V : VALUE) :
@@ -351,7 +349,6 @@ struct
          C.description
          I.args)
       V.encoding
-    [@@coq_axiom_with_reason "stack overflow in Coq"]
 end
 
 (* Internal-use-only version of {!Make_indexed_carbonated_data_storage} to
@@ -541,7 +538,6 @@ module Make_indexed_carbonated_data_storage_INTERNAL
          C.description
          I.args)
       V.encoding
-    [@@coq_axiom_with_reason "stack overflow in Coq"]
 end
 
 module Make_indexed_carbonated_data_storage : functor
@@ -879,7 +875,6 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
           mem c k >>= function true -> return_some true | false -> return_none)
         (register_named_subcontext description N.name)
         Data_encoding.bool
-      [@@coq_axiom_with_reason "stack overflow in Coq"]
   end
 
   module Make_map (N : NAME) (V : VALUE) :
@@ -972,7 +967,6 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
           find c k)
         (register_named_subcontext Raw_context.description N.name)
         V.encoding
-      [@@coq_axiom_with_reason "stack overflow in Coq"]
   end
 
   module Make_carbonated_map (N : NAME) (V : VALUE) :
@@ -1088,7 +1082,6 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
           find c k >|=? fun (_, v) -> v)
         (register_named_subcontext Raw_context.description N.name)
         V.encoding
-      [@@coq_axiom_with_reason "stack overflow in Coq"]
   end
 end
 
