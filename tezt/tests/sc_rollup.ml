@@ -2062,6 +2062,12 @@ let register ~protocols =
   test_rollup_node_advances_pvm_state protocols ;
   test_commitment_scenario "commitment_is_stored" commitment_stored protocols ;
   test_commitment_scenario
+    ~commitment_period:15
+    ~challenge_window:10080
+    "node_use_proto_param"
+    commitment_stored
+    protocols ;
+  test_commitment_scenario
     "non_final_level"
     commitment_not_stored_if_non_final
     protocols ;

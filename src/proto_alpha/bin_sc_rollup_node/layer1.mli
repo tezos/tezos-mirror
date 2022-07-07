@@ -66,7 +66,14 @@ val chain_event_head_hash : chain_event -> Block_hash.t
     layer 1 state is stored in the data directory declared in
     [configuration]. *)
 val start :
-  Configuration.t -> Protocol_client_context.full -> Store.t -> t tzresult Lwt.t
+  Configuration.t ->
+  Protocol_client_context.full ->
+  Store.t ->
+  (t
+  * Protocol.Alpha_context.Sc_rollup.Commitment.genesis_info
+  * Protocol.Alpha_context.Sc_rollup.Kind.t)
+  tzresult
+  Lwt.t
 
 (** [current_head_hash store] is the current hash of the head of the
    Tezos chain as far as the smart-contract rollup node knows from the
