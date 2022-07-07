@@ -1,0 +1,16 @@
+---
+# Note: The purpose of this job is to launch the CI manually in certain cases 
+# (the rules are defined in the rules_template__trigger fragment of the 
+# template.yml file). The objective is not to run computing when it is not
+# necessary and the decision to do so belongs to the developer
+
+trigger:
+  extends:
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__trigger
+  stage: trigger
+  # This job is simple and fast
+  allow_failure: false
+  timeout: "10m"
+  script:
+    - echo 'Trigger pipeline 🤠'
