@@ -105,7 +105,7 @@ let kind ctxt address =
   | Some k -> return k
   | None -> fail (Sc_rollup_errors.Sc_rollup_does_not_exist address)
 
-let list ctxt =
+let list_unaccounted ctxt =
   let open Lwt_syntax in
   let+ res = Store.PVM_kind.keys ctxt in
   Result.return res

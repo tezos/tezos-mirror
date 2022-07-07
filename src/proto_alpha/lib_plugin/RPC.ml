@@ -1989,7 +1989,7 @@ module Sc_rollup = struct
 
   let register_root () =
     Registration.register0 ~chunked:true S.root (fun context () () ->
-        Sc_rollup.list context)
+        Sc_rollup.list_unaccounted context)
 
   let register_ongoing_refutation_game () =
     Registration.register1
