@@ -2072,6 +2072,19 @@ let rec parse_data :
            ta
            tr
            script_instr
+  | ( Lambda_t (ta, tr, _ty_name),
+      Prim (loc, I_LAMBDA_REC, [_; _; (Seq (_loc, _) as script_instr)], []) ) ->
+      traced
+      @@ ( lambda_t loc ta tr >>?= fun lambda_rec_ty ->
+           parse_returning_rec
+             Tc_context.(add_lambda data)
+             ~elab_conf
+             ~stack_depth:(stack_depth + 1)
+             ctxt
+             ta
+             tr
+             lambda_rec_ty
+             script_instr )
   | Lambda_t _, expr ->
       traced_fail (Invalid_kind (location expr, [Seq_kind], kind expr))
   (* Options *)
@@ -2417,6 +2430,48 @@ and parse_returning :
   | Failed {descr}, ctxt ->
       return
         ( (Lam (close_descr (descr (Item_t (ret, Bot_t))), script_instr)
+            : (arg, ret) lambda),
+          ctxt )
+
+and parse_returning_rec :
+    type arg argc ret retc.
+    elab_conf:elab_conf ->
+    stack_depth:int ->
+    tc_context ->
+    context ->
+    (arg, argc) ty ->
+    (ret, retc) ty ->
+    ((arg, ret) lambda, _) ty ->
+    Script.node ->
+    ((arg, ret) lambda * context) tzresult Lwt.t =
+ fun ~elab_conf ~stack_depth tc_context ctxt arg ret lambda_rec_ty script_instr ->
+  parse_instr
+    ~elab_conf
+    tc_context
+    ctxt
+    ~stack_depth:(stack_depth + 1)
+    script_instr
+    (Item_t (arg, Item_t (lambda_rec_ty, Bot_t)))
+  >>=? function
+  | Typed ({loc; aft = Item_t (ty, Bot_t) as stack_ty; _} as descr), ctxt ->
+      Lwt.return
+        (let error_details = Informative loc in
+         Gas_monad.run ctxt
+         @@ Gas_monad.record_trace_eval ~error_details (fun loc ->
+                let ret = serialize_ty_for_error ret in
+                let stack_ty = serialize_stack_for_error ctxt stack_ty in
+                Bad_return (loc, stack_ty, ret))
+         @@ ty_eq ~error_details ty ret
+         >>? fun (eq, ctxt) ->
+         eq >|? fun Eq ->
+         ((LamRec (close_descr descr, script_instr) : (arg, ret) lambda), ctxt))
+  | Typed {loc; aft = stack_ty; _}, ctxt ->
+      let ret = serialize_ty_for_error ret in
+      let stack_ty = serialize_stack_for_error ctxt stack_ty in
+      fail @@ Bad_return (loc, stack_ty, ret)
+  | Failed {descr}, ctxt ->
+      return
+        ( (LamRec (close_descr (descr (Item_t (ret, Bot_t))), script_instr)
             : (arg, ret) lambda),
           ctxt )
 
@@ -3311,6 +3366,29 @@ and parse_instr :
       lambda_t loc arg ret >>?= fun ty ->
       let stack = Item_t (ty, stack) in
       typed ctxt loc instr stack
+  | ( Prim (loc, I_LAMBDA_REC, [arg_ty_expr; ret_ty_expr; lambda_expr], annot),
+      stack ) ->
+      parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy arg_ty_expr
+      >>?= fun (Ex_ty arg, ctxt) ->
+      parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ret_ty_expr
+      >>?= fun (Ex_ty ret, ctxt) ->
+      check_kind [Seq_kind] lambda_expr >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
+      lambda_t loc arg ret >>?= fun lambda_rec_ty ->
+      parse_returning_rec
+        Tc_context.(add_lambda tc_context)
+        ~elab_conf
+        ~stack_depth:(stack_depth + 1)
+        ctxt
+        arg
+        ret
+        lambda_rec_ty
+        lambda_expr
+      >>=? fun (code, ctxt) ->
+      let instr = {apply = (fun k -> ILambda (loc, code, k))} in
+      lambda_t loc arg ret >>?= fun lambda_ty ->
+      let stack = Item_t (lambda_ty, stack) in
+      typed ctxt loc instr stack
   | ( Prim (loc, I_EXEC, [], annot),
       Item_t (arg, Item_t (Lambda_t (param, ret, _), rest)) ) ->
       check_item_ty ctxt arg param loc I_EXEC 1 2 >>?= fun (Eq, ctxt) ->
@@ -3813,7 +3891,7 @@ and parse_instr :
   | ( Prim (loc, (I_CREATE_CONTRACT as prim), [(Seq _ as code)], annot),
       Item_t
         (Option_t (Key_hash_t, _, _), Item_t (Mutez_t, Item_t (ginit, rest))) )
-    ->
+    -> (
       Tc_context.check_not_in_view ~legacy loc tc_context prim >>?= fun () ->
       check_two_var_annot loc annot >>?= fun () ->
       (* We typecheck the script to make sure we will originate only well-typed
@@ -3852,31 +3930,59 @@ and parse_instr :
            arg_type_full
            ret_type_full
            code_field)
-      >>=? fun ( Lam
-                   ( {kbef = Item_t (arg, Bot_t); kaft = Item_t (ret, Bot_t); _},
-                     _ ),
-                 ctxt ) ->
-      let views_result = parse_views ctxt ~elab_conf storage_type views in
-      trace (Ill_typed_contract (canonical_code, [])) views_result
-      >>=? fun (_typed_views, ctxt) ->
-      (let error_details = Informative loc in
-       Gas_monad.run ctxt
-       @@
-       let open Gas_monad.Syntax in
-       let* Eq = ty_eq ~error_details arg arg_type_full in
-       let* Eq = ty_eq ~error_details ret ret_type_full in
-       ty_eq ~error_details storage_type ginit)
-      >>?= fun (storage_eq, ctxt) ->
-      storage_eq >>?= fun Eq ->
-      let instr =
-        {
-          apply =
-            (fun k ->
-              ICreate_contract {loc; storage_type; code = canonical_code; k});
-        }
-      in
-      let stack = Item_t (operation_t, Item_t (address_t, rest)) in
-      typed ctxt loc instr stack
+      >>=? function
+      | ( Lam ({kbef = Item_t (arg, Bot_t); kaft = Item_t (ret, Bot_t); _}, _),
+          ctxt ) ->
+          let views_result = parse_views ctxt ~elab_conf storage_type views in
+          trace (Ill_typed_contract (canonical_code, [])) views_result
+          >>=? fun (_typed_views, ctxt) ->
+          (let error_details = Informative loc in
+           Gas_monad.run ctxt
+           @@
+           let open Gas_monad.Syntax in
+           let* Eq = ty_eq ~error_details arg arg_type_full in
+           let* Eq = ty_eq ~error_details ret ret_type_full in
+           ty_eq ~error_details storage_type ginit)
+          >>?= fun (storage_eq, ctxt) ->
+          storage_eq >>?= fun Eq ->
+          let instr =
+            {
+              apply =
+                (fun k ->
+                  ICreate_contract {loc; storage_type; code = canonical_code; k});
+            }
+          in
+          let stack = Item_t (operation_t, Item_t (address_t, rest)) in
+          typed ctxt loc instr stack
+      | ( LamRec
+            ( {
+                kbef = Item_t (arg, Item_t (Lambda_t (_, _, _), Bot_t));
+                kaft = Item_t (ret, Bot_t);
+                _;
+              },
+              _ ),
+          ctxt ) ->
+          let views_result = parse_views ctxt ~elab_conf storage_type views in
+          trace (Ill_typed_contract (canonical_code, [])) views_result
+          >>=? fun (_typed_views, ctxt) ->
+          (let error_details = Informative loc in
+           Gas_monad.run ctxt
+           @@
+           let open Gas_monad.Syntax in
+           let* Eq = ty_eq ~error_details arg arg_type_full in
+           let* Eq = ty_eq ~error_details ret ret_type_full in
+           ty_eq ~error_details storage_type ginit)
+          >>?= fun (storage_eq, ctxt) ->
+          storage_eq >>?= fun Eq ->
+          let instr =
+            {
+              apply =
+                (fun k ->
+                  ICreate_contract {loc; storage_type; code = canonical_code; k});
+            }
+          in
+          let stack = Item_t (operation_t, Item_t (address_t, rest)) in
+          typed ctxt loc instr stack)
   | Prim (loc, I_NOW, [], annot), stack ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun k -> INow (loc, k))} in
@@ -4694,20 +4800,21 @@ let typecheck_code :
       ret_type_full
       code_field
   in
-  trace (Ill_typed_contract (code, !type_map)) result >>=? fun (Lam _, ctxt) ->
-  let views_result = parse_views ctxt ~elab_conf storage_type views in
-  trace (Ill_typed_contract (code, !type_map)) views_result
-  >|=? fun (typed_views, ctxt) ->
-  ( Typechecked_code_internal
-      {
-        toplevel;
-        arg_type;
-        storage_type;
-        entrypoints;
-        typed_views;
-        type_map = !type_map;
-      },
-    ctxt )
+  trace (Ill_typed_contract (code, !type_map)) result >>=? function
+  | Lam _, ctxt | LamRec _, ctxt ->
+      let views_result = parse_views ctxt ~elab_conf storage_type views in
+      trace (Ill_typed_contract (code, !type_map)) views_result
+      >|=? fun (typed_views, ctxt) ->
+      ( Typechecked_code_internal
+          {
+            toplevel;
+            arg_type;
+            storage_type;
+            entrypoints;
+            typed_views;
+            type_map = !type_map;
+          },
+        ctxt )
 
 (* Uncarbonated because used only in RPCs *)
 let list_entrypoints_uncarbonated (type full fullc) (full : (full, fullc) ty)

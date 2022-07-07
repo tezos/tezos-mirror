@@ -104,6 +104,7 @@ type prim =
   | I_IF_NONE
   | I_INT
   | I_LAMBDA
+  | I_LAMBDA_REC
   | I_LE
   | I_LEFT
   | I_LEVEL

@@ -169,7 +169,9 @@ module Proto = struct
           ('a, _) Script_typed_ir.ty * ('a -> ex_lambda list) list
           -> ex_ty_lambdas
 
-    let lam_node (Ex_lambda (_, Lam (_, node))) = node
+    let lam_node node =
+      match node with
+      | Ex_lambda (_, Lam (_, node)) | Ex_lambda (_, LamRec (_, node)) -> node
 
     let rec find_lambda_tys :
         type a c. (a, c) Script_typed_ir.ty -> (a -> ex_lambda list) list =

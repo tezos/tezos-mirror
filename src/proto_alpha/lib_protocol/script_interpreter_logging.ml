@@ -927,9 +927,19 @@ let kinstr_split :
           continuation = k;
           reconstruct = (fun k -> IApply (loc, ty, k));
         }
-  | ILambda (loc, l, k), s ->
-      let (Lam (desc, _)) = l in
+  | ILambda (loc, (Lam (desc, _) as l), k), s ->
       let (Item_t (a, Bot_t)) = desc.kbef in
+      let (Item_t (b, Bot_t)) = desc.kaft in
+      lambda_t dummy a b >|? fun lam ->
+      let s = Item_t (lam, s) in
+      Ex_split_kinstr
+        {
+          cont_init_stack = s;
+          continuation = k;
+          reconstruct = (fun k -> ILambda (loc, l, k));
+        }
+  | ILambda (loc, (LamRec (desc, _) as l), k), s ->
+      let (Item_t (a, Item_t (Lambda_t _, Bot_t))) = desc.kbef in
       let (Item_t (b, Bot_t)) = desc.kaft in
       lambda_t dummy a b >|? fun lam ->
       let s = Item_t (lam, s) in

@@ -91,6 +91,7 @@ type prim =
   | I_IF_NONE
   | I_INT
   | I_LAMBDA
+  | I_LAMBDA_REC
   | I_LE
   | I_LEFT
   | I_LEVEL
@@ -209,16 +210,16 @@ let namespace = function
   | I_EMPTY_BIG_MAP | I_EMPTY_MAP | I_EMPTY_SET | I_EQ | I_EXEC | I_FAILWITH
   | I_GE | I_GET | I_GET_AND_UPDATE | I_GT | I_HASH_KEY | I_IF | I_IF_CONS
   | I_IF_LEFT | I_IF_NONE | I_IMPLICIT_ACCOUNT | I_INT | I_ISNAT | I_ITER
-  | I_JOIN_TICKETS | I_KECCAK | I_LAMBDA | I_LE | I_LEFT | I_LEVEL | I_LOOP
-  | I_LOOP_LEFT | I_LSL | I_LSR | I_LT | I_MAP | I_MEM | I_MUL | I_NEG | I_NEQ
-  | I_NEVER | I_NIL | I_NONE | I_NOT | I_NOW | I_MIN_BLOCK_TIME | I_OR | I_PACK
-  | I_PAIR | I_PAIRING_CHECK | I_PUSH | I_READ_TICKET | I_RENAME | I_RIGHT
-  | I_SAPLING_EMPTY_STATE | I_SAPLING_VERIFY_UPDATE | I_SELF | I_SELF_ADDRESS
-  | I_SENDER | I_SET_DELEGATE | I_SHA256 | I_SHA512 | I_SHA3 | I_SIZE | I_SLICE
-  | I_SOME | I_SOURCE | I_SPLIT_TICKET | I_STEPS_TO_QUOTA | I_SUB | I_SUB_MUTEZ
-  | I_SWAP | I_TICKET | I_TOTAL_VOTING_POWER | I_TRANSFER_TOKENS | I_UNIT
-  | I_UNPACK | I_UNPAIR | I_UPDATE | I_VOTING_POWER | I_XOR | I_OPEN_CHEST
-  | I_EMIT ->
+  | I_JOIN_TICKETS | I_KECCAK | I_LAMBDA | I_LAMBDA_REC | I_LE | I_LEFT
+  | I_LEVEL | I_LOOP | I_LOOP_LEFT | I_LSL | I_LSR | I_LT | I_MAP | I_MEM
+  | I_MUL | I_NEG | I_NEQ | I_NEVER | I_NIL | I_NONE | I_NOT | I_NOW
+  | I_MIN_BLOCK_TIME | I_OR | I_PACK | I_PAIR | I_PAIRING_CHECK | I_PUSH
+  | I_READ_TICKET | I_RENAME | I_RIGHT | I_SAPLING_EMPTY_STATE
+  | I_SAPLING_VERIFY_UPDATE | I_SELF | I_SELF_ADDRESS | I_SENDER
+  | I_SET_DELEGATE | I_SHA256 | I_SHA512 | I_SHA3 | I_SIZE | I_SLICE | I_SOME
+  | I_SOURCE | I_SPLIT_TICKET | I_STEPS_TO_QUOTA | I_SUB | I_SUB_MUTEZ | I_SWAP
+  | I_TICKET | I_TOTAL_VOTING_POWER | I_TRANSFER_TOKENS | I_UNIT | I_UNPACK
+  | I_UNPAIR | I_UPDATE | I_VOTING_POWER | I_XOR | I_OPEN_CHEST | I_EMIT ->
       Instr_namespace
   | T_address | T_tx_rollup_l2_address | T_big_map | T_bool | T_bytes
   | T_chain_id | T_contract | T_int | T_key | T_key_hash | T_lambda | T_list
@@ -297,6 +298,7 @@ let string_of_prim = function
   | I_IF_NONE -> "IF_NONE"
   | I_INT -> "INT"
   | I_LAMBDA -> "LAMBDA"
+  | I_LAMBDA_REC -> "LAMBDA_REC"
   | I_LE -> "LE"
   | I_LEFT -> "LEFT"
   | I_LEVEL -> "LEVEL"
@@ -453,6 +455,7 @@ let prim_of_string = function
   | "INT" -> ok I_INT
   | "KECCAK" -> ok I_KECCAK
   | "LAMBDA" -> ok I_LAMBDA
+  | "LAMBDA_REC" -> ok I_LAMBDA_REC
   | "LE" -> ok I_LE
   | "LEFT" -> ok I_LEFT
   | "LEVEL" -> ok I_LEVEL
@@ -761,7 +764,9 @@ let prim_encoding =
          ("sapling_transaction", T_sapling_transaction);
          (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
          (* Alpha_014 addition *)
-         ("EMIT", I_EMIT)
+         ("EMIT", I_EMIT);
+         (* Alpha_015 addition *)
+         ("LAMBDA_REC", I_LAMBDA_REC)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *);
        ]

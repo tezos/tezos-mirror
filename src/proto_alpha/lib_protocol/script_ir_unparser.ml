@@ -603,6 +603,14 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
         >|=? fun (items, ctxt) -> (Micheline.Seq (loc, items), ctxt)
     | Lambda_t _, Lam (_, original_code) ->
         unparse_code ctxt ~stack_depth:(stack_depth + 1) mode original_code
+    | Lambda_t (arg, ret, _), LamRec (_, original_code) ->
+        unparse_ty ~loc ctxt arg >>?= fun (arg_ty_expr, ctxt) ->
+        unparse_ty ~loc ctxt ret >>?= fun (ret_ty_expr, ctxt) ->
+        unparse_code ctxt ~stack_depth:(stack_depth + 1) mode original_code
+        >|=? fun (body, ctxt) ->
+        ( Micheline.Prim
+            (loc, I_LAMBDA_REC, [arg_ty_expr; ret_ty_expr; body], []),
+          ctxt )
     | Never_t, _ -> .
     | Sapling_transaction_t _, s ->
         Lwt.return

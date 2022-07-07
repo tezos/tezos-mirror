@@ -428,40 +428,95 @@ let rec kundip :
 (* [apply ctxt gas ty v lam] specializes [lam] by fixing its first
    formal argument to [v]. The type of [v] is represented by [ty]. *)
 let apply ctxt gas capture_ty capture lam =
-  let (Lam (descr, expr)) = lam in
-  let (Item_t (full_arg_ty, _)) = descr.kbef in
-  let ctxt = update_context gas ctxt in
-  unparse_data ctxt Optimized capture_ty capture >>=? fun (const_expr, ctxt) ->
-  let loc = Micheline.dummy_location in
-  Script_ir_unparser.unparse_ty ~loc ctxt capture_ty >>?= fun (ty_expr, ctxt) ->
-  match full_arg_ty with
-  | Pair_t (capture_ty, arg_ty, _, _) ->
-      let arg_stack_ty = Item_t (arg_ty, Bot_t) in
-      let full_descr =
-        {
-          kloc = descr.kloc;
-          kbef = arg_stack_ty;
-          kaft = descr.kaft;
-          kinstr =
-            IConst
-              ( descr.kloc,
-                capture_ty,
-                capture,
-                ICons_pair (descr.kloc, descr.kinstr) );
-        }
-      in
-      let full_expr =
-        Micheline.Seq
-          ( loc,
-            [
-              Prim (loc, I_PUSH, [ty_expr; const_expr], []);
-              Prim (loc, I_PAIR, [], []);
-              expr;
-            ] )
-      in
-      let lam' = Lam (full_descr, full_expr) in
-      let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
-      return (lam', ctxt, gas)
+  match lam with
+  | LamRec (descr, expr) -> (
+      let (Item_t (full_arg_ty, _)) = descr.kbef in
+      let (Item_t (ret_ty, _)) = descr.kaft in
+      let ctxt = update_context gas ctxt in
+      unparse_data ctxt Optimized capture_ty capture
+      >>=? fun (const_expr, ctxt) ->
+      let loc = Micheline.dummy_location in
+      Script_ir_unparser.unparse_ty ~loc ctxt capture_ty
+      >>?= fun (ty_expr, ctxt) ->
+      Script_ir_unparser.unparse_ty ~loc ctxt full_arg_ty
+      >>?= fun (arg_ty_expr, ctxt) ->
+      Script_ir_unparser.unparse_ty ~loc ctxt ret_ty
+      >>?= fun (ret_ty_expr, ctxt) ->
+      match full_arg_ty with
+      | Pair_t (capture_ty, arg_ty, _, _) ->
+          let arg_stack_ty = Item_t (arg_ty, Bot_t) in
+          let full_descr =
+            {
+              kloc = descr.kloc;
+              kbef = arg_stack_ty;
+              kaft = descr.kaft;
+              kinstr =
+                IConst
+                  ( descr.kloc,
+                    capture_ty,
+                    capture,
+                    ICons_pair
+                      ( descr.kloc,
+                        ILambda
+                          ( descr.kloc,
+                            lam,
+                            ISwap
+                              ( descr.kloc,
+                                IExec
+                                  (descr.kloc, Some descr.kaft, IHalt descr.kloc)
+                              ) ) ) );
+            }
+          in
+          let full_expr =
+            Micheline.Seq
+              ( loc,
+                [
+                  Prim (loc, I_PUSH, [ty_expr; const_expr], []);
+                  Prim (loc, I_PAIR, [], []);
+                  Prim (loc, I_LAMBDA_REC, [arg_ty_expr; ret_ty_expr; expr], []);
+                  Prim (loc, I_SWAP, [], []);
+                  Prim (loc, I_EXEC, [], []);
+                ] )
+          in
+          let lam' = Lam (full_descr, full_expr) in
+          let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
+          return (lam', ctxt, gas))
+  | Lam (descr, expr) -> (
+      let (Item_t (full_arg_ty, _)) = descr.kbef in
+      let ctxt = update_context gas ctxt in
+      unparse_data ctxt Optimized capture_ty capture
+      >>=? fun (const_expr, ctxt) ->
+      let loc = Micheline.dummy_location in
+      Script_ir_unparser.unparse_ty ~loc ctxt capture_ty
+      >>?= fun (ty_expr, ctxt) ->
+      match full_arg_ty with
+      | Pair_t (capture_ty, arg_ty, _, _) ->
+          let arg_stack_ty = Item_t (arg_ty, Bot_t) in
+          let full_descr =
+            {
+              kloc = descr.kloc;
+              kbef = arg_stack_ty;
+              kaft = descr.kaft;
+              kinstr =
+                IConst
+                  ( descr.kloc,
+                    capture_ty,
+                    capture,
+                    ICons_pair (descr.kloc, descr.kinstr) );
+            }
+          in
+          let full_expr =
+            Micheline.Seq
+              ( loc,
+                [
+                  Prim (loc, I_PUSH, [ty_expr; const_expr], []);
+                  Prim (loc, I_PAIR, [], []);
+                  expr;
+                ] )
+          in
+          let lam' = Lam (full_descr, full_expr) in
+          let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
+          return (lam', ctxt, gas))
 
 let make_transaction_to_tx_rollup (type t) ctxt ~destination ~amount
     ~(parameters_ty : ((t ticket, tx_rollup_l2_address) pair, _) ty) ~parameters
