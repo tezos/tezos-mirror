@@ -25,18 +25,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Script_typed_ir
+
 type deposit_parameters = {
   ex_ticket : Ticket_scanner.ex_ticket;
-  l2_destination : Script_typed_ir.tx_rollup_l2_address;
+  l2_destination : tx_rollup_l2_address;
 }
 
 let get_deposit_parameters :
     type a comparable.
-    (a, comparable) Script_typed_ir.ty -> a -> deposit_parameters tzresult =
- fun ty contents ->
-  let open Script_typed_ir in
-  match (ty, contents) with
-  | ( Pair_t (Ticket_t (ty, _), Tx_rollup_l2_address_t, _, _),
-      (ticket, l2_destination) ) ->
-      ok {ex_ticket = Ticket_scanner.Ex_ticket (ty, ticket); l2_destination}
-  | _ -> error Alpha_context.Tx_rollup_errors.Wrong_deposit_parameters
+    ((a ticket, tx_rollup_l2_address) pair, comparable) ty ->
+    (a ticket, tx_rollup_l2_address) pair ->
+    deposit_parameters =
+ fun (Pair_t (Ticket_t (ty, _), Tx_rollup_l2_address_t, _, _))
+     (ticket, l2_destination) ->
+  {ex_ticket = Ticket_scanner.Ex_ticket (ty, ticket); l2_destination}

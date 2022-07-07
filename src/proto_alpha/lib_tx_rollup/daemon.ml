@@ -53,14 +53,11 @@ let parse_ticketer : Script.node -> Contract.t tzresult =
   let open Micheline in
   function
   | Bytes (_loc, bytes) (* As unparsed with [Optimized]. *) ->
-      Result.of_option
-        ~error:
-          [Environment.wrap_tzerror Tx_rollup_errors.Wrong_deposit_parameters]
+      Result.of_option ~error:[Wrong_deposit_parameters]
       @@ Data_encoding.Binary.of_bytes_opt Contract.encoding bytes
   | String (_loc, str) (* As unparsed with [Readable]. *) ->
       Environment.wrap_tzresult @@ Contract.of_b58check str
-  | Int _ | Prim _ | Seq _ ->
-      error (Environment.wrap_tzerror Tx_rollup_errors.Wrong_deposit_parameters)
+  | Int _ | Prim _ | Seq _ -> error Wrong_deposit_parameters
 
 let parse_tx_rollup_deposit_parameters :
     Script.expr ->

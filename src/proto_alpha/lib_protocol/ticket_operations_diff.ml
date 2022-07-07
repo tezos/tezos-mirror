@@ -193,8 +193,9 @@ let tickets_of_operation ctxt ~allow_zero_amount_tickets
         ~parameters
   | Transaction_to_tx_rollup
       {destination; unparsed_parameters = _; parameters_ty; parameters} ->
-      Tx_rollup_parameters.get_deposit_parameters parameters_ty parameters
-      >>?= fun {ex_ticket; l2_destination = _} ->
+      let Tx_rollup_parameters.{ex_ticket; l2_destination = _} =
+        Tx_rollup_parameters.get_deposit_parameters parameters_ty parameters
+      in
       return
         ( Some
             {

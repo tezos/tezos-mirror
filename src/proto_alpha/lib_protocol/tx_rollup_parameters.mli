@@ -28,22 +28,24 @@
 (** A module for representing and extracting typed transactional rollup
     parameters. *)
 
+open Script_typed_ir
+
 (** A type representing deposit parameters for transactional rollups. Deposit
     parameters consist of a ticket of arbitrary content along with a
     layer-2 destination address. *)
 type deposit_parameters = {
   ex_ticket : Ticket_scanner.ex_ticket;
-  l2_destination : Script_typed_ir.tx_rollup_l2_address;
+  l2_destination : tx_rollup_l2_address;
 }
 
 (** [get_deposit_parameters ty value] returns [ex_ticket] and a
-    [tx_rollup_l2_address] from a michelson typed value. if [ty] is not of a
-    pair of ticket and [tx_rollup_l2_address] then it fails with
-    [Tx_rollup_errors.Wrong_deposit_parameters].
+    [tx_rollup_l2_address] from a michelson typed value.
 
     This function is intended to be used to enforce the type of the transaction
     to a [tx_rollup%deposit]. It must be used both in [ticket_diffs_of_operations]
     to account for the ticket deposited and in [apply] to retrieve the ticket
     when applying the transaction to a tx_rollup. *)
 val get_deposit_parameters :
-  ('a, 'comparable) Script_typed_ir.ty -> 'a -> deposit_parameters tzresult
+  (('a ticket, tx_rollup_l2_address) pair, 'comparable) ty ->
+  ('a ticket, tx_rollup_l2_address) pair ->
+  deposit_parameters

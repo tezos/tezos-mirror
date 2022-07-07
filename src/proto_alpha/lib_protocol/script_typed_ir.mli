@@ -1512,8 +1512,8 @@ and 'kind internal_operation_contents =
       -> Kind.transaction internal_operation_contents
   | Transaction_to_tx_rollup : {
       destination : Tx_rollup.t;
-      parameters_ty : ('a, _) ty;
-      parameters : 'a;
+      parameters_ty : (('a ticket, tx_rollup_l2_address) pair, _) ty;
+      parameters : ('a ticket, tx_rollup_l2_address) pair;
       unparsed_parameters : Script.expr;
     }
       -> Kind.transaction internal_operation_contents

@@ -561,3 +561,5 @@ let () =
     Data_encoding.(obj1 (req "operation" Operation_hash.encoding))
     (function Tx_rollup_deposit_slashed o -> Some o | _ -> None)
     (fun o -> Tx_rollup_deposit_slashed o)
+
+type error += Wrong_deposit_parameters
