@@ -130,18 +130,18 @@ let start_new_voting_period ctxt =
       >>=? fun (ctxt, approved) ->
       if approved then Voting_period.succ ctxt
       else
-        Vote.clear_current_proposal ctxt >>=? fun ctxt ->
+        Vote.clear_current_proposal ctxt >>= fun ctxt ->
         Voting_period.reset ctxt
   | Cooldown -> Voting_period.succ ctxt
   | Promotion ->
       get_approval_and_update_participation_ema ctxt
       >>=? fun (ctxt, approved) ->
       if approved then Voting_period.succ ctxt
-      else Vote.clear_current_proposal ctxt >>=? Voting_period.reset
+      else Vote.clear_current_proposal ctxt >>= Voting_period.reset
   | Adoption ->
       Vote.get_current_proposal ctxt >>=? fun proposal ->
       activate ctxt proposal >>= fun ctxt ->
-      Vote.clear_current_proposal ctxt >>=? Voting_period.reset)
+      Vote.clear_current_proposal ctxt >>= Voting_period.reset)
   >>=? fun ctxt -> Vote.update_listings ctxt
 
 let may_start_new_voting_period ctxt =
@@ -152,107 +152,191 @@ let may_start_new_voting_period ctxt =
 
 open Validate_errors.Voting
 
-let check_no_duplicates proposals =
+(** Helpers to validate and apply Proposals operations from a
+    registered dictator of a test chain. These operations let the
+    dictator immediately change the current voting period's kind, and
+    the current proposal if applicable. Of course, there must never be
+    such a dictator on mainnet. *)
+module Testnet_dictator = struct
+  let is_testnet_dictator ctxt chain_id delegate =
+    (* This function should always, ALWAYS, return false on mainnet!!!! *)
+    match Constants.testnet_dictator ctxt with
+    | Some pkh when Chain_id.(chain_id <> Constants.mainnet_id) ->
+        Signature.Public_key_hash.equal pkh delegate
+    | _ -> false
+
+  (** Check that [record_proposals] below will not fail.
+
+      This function is designed to be exclusively called by
+      [validate_proposals] further down this file.
+
+      @return [Error Multiple_proposals] if [proposals] has more than
+      one element. *)
+  let check_proposals chain_id proposals =
+    (* This assertion should be ensured by the fact that
+       {!is_testnet_dictator} cannot be [true] on mainnet, but we
+       double check it because it is critical. *)
+    assert (Chain_id.(chain_id <> Constants.mainnet_id)) ;
+    match proposals with
+    | [] | [_] ->
+        (* In [record_proposals] below, the call to
+           {!Vote.init_current_proposal} (in the singleton list case)
+           cannot fail because {!Vote.clear_current_proposal} is called
+           right before.
+
+           The calls to
+           {!Voting_period.Testnet_dictator.overwrite_current_kind} may
+           usually fail when the voting period is not
+           initialized. However, this cannot happen because the current
+           function is only called in [validate_proposals] after a
+           successful call to {!Voting_period.get_current}. *)
+        ok ()
+    | _ :: _ :: _ -> error Testnet_dictator_multiple_proposals
+
+  (** Forcibly update the voting period according to a voting
+      dictator's Proposals operation.
+
+      {!check_proposals} should guarantee that this function cannot
+      return an error. *)
+  let record_proposals ctxt chain_id proposals =
+    let open Lwt_tzresult_syntax in
+    let*! ctxt = Vote.clear_ballots ctxt in
+    let*! ctxt = Vote.clear_proposals ctxt in
+    let*! ctxt = Vote.clear_current_proposal ctxt in
+    match proposals with
+    | [] ->
+        Voting_period.Testnet_dictator.overwrite_current_kind
+          ctxt
+          chain_id
+          Proposal
+    | [proposal] ->
+        let* ctxt = Vote.init_current_proposal ctxt proposal in
+        Voting_period.Testnet_dictator.overwrite_current_kind
+          ctxt
+          chain_id
+          Adoption
+    | _ :: _ :: _ -> fail Testnet_dictator_multiple_proposals
+end
+
+let check_period_index ~expected period_index =
+  error_unless
+    Compare.Int32.(expected = period_index)
+    (Wrong_voting_period_index {expected; provided = period_index})
+
+(** Check that the list of proposals is not empty and does not contain
+    duplicates. *)
+let check_proposal_list_sanity proposals =
   let open Tzresult_syntax in
+  let* () =
+    match proposals with [] -> error Empty_proposals | _ :: _ -> ok ()
+  in
   let* (_ : Protocol_hash.Set.t) =
     List.fold_left_e
-      (fun previous_proposals proposal ->
+      (fun previous_elements proposal ->
         let* () =
           error_when
-            (Protocol_hash.Set.mem proposal previous_proposals)
+            (Protocol_hash.Set.mem proposal previous_elements)
             (Proposals_contain_duplicate {proposal})
         in
-        return (Protocol_hash.Set.add proposal previous_proposals))
+        return (Protocol_hash.Set.add proposal previous_elements))
       Protocol_hash.Set.empty
       proposals
   in
   return_unit
 
-let record_delegate_proposals ctxt delegate proposals =
-  (match proposals with
-  | [] -> error Empty_proposals
-  | _ :: _ -> Result.return_unit)
-  >>?= fun () ->
-  check_no_duplicates proposals >>?= fun () ->
-  Voting_period.get_current_kind ctxt >>=? function
-  | Proposal ->
-      Vote.in_listings ctxt delegate >>= fun in_listings ->
-      if in_listings then (
-        Vote.get_delegate_proposal_count ctxt delegate >>=? fun count ->
-        assert (Compare.Int.(Constants.max_proposals_per_delegate >= count)) ;
-        error_when
-          Compare.Int.(
-            List.compare_length_with
-              proposals
-              (Constants.max_proposals_per_delegate - count)
-            > 0)
-          Too_many_proposals
-        >>?= fun () ->
-        (* The mix of syntactic styles will go away in the next commit *)
-        let open Lwt_tzresult_syntax in
-        let* ctxt, count =
-          List.fold_left_es
-            (fun (ctxt, count) proposal ->
-              let* () =
-                let*! already_proposed =
-                  Vote.has_proposed ctxt delegate proposal
-                in
-                fail_when already_proposed (Already_proposed {proposal})
-              in
-              let*! ctxt = Vote.add_proposal ctxt delegate proposal in
-              return (ctxt, count + 1))
-            (ctxt, count)
-            proposals
-        in
-        let*! ctxt = Vote.set_delegate_proposal_count ctxt delegate count in
-        return ctxt)
-      else fail Source_not_in_vote_listings
+let check_period_kind_for_proposals current_period =
+  match current_period.Voting_period.kind with
+  | Proposal -> ok ()
   | (Exploration | Cooldown | Promotion | Adoption) as current ->
-      fail (Wrong_voting_period_kind {current; expected = [Proposal]})
+      error (Wrong_voting_period_kind {current; expected = [Proposal]})
 
-let record_testnet_dictator_proposals ctxt chain_id proposals =
-  Vote.clear_ballots ctxt >>= fun ctxt ->
-  Vote.clear_proposals ctxt >>= fun ctxt ->
-  Vote.clear_current_proposal ctxt >>=? fun ctxt ->
-  match proposals with
-  | [] ->
-      Voting_period.Testnet_dictator.overwrite_current_kind
-        ctxt
-        chain_id
-        Proposal
-  | [proposal] ->
-      Vote.init_current_proposal ctxt proposal >>=? fun ctxt ->
-      Voting_period.Testnet_dictator.overwrite_current_kind
-        ctxt
-        chain_id
-        Adoption
-  | _ :: _ :: _ -> fail Testnet_dictator_multiple_proposals
+let check_in_listings ctxt source =
+  let open Lwt_tzresult_syntax in
+  let*! in_listings = Vote.in_listings ctxt source in
+  fail_unless in_listings Source_not_in_vote_listings
 
-let is_testnet_dictator ctxt chain_id delegate =
-  (* This function should always, ALWAYS, return false on mainnet!!!! *)
-  match Constants.testnet_dictator ctxt with
-  | Some pkh when Chain_id.(chain_id <> Constants_repr.mainnet_id) ->
-      Signature.Public_key_hash.equal pkh delegate
-  | _ -> false
+let check_count ctxt proposer proposals =
+  let open Lwt_tzresult_syntax in
+  let* count = Vote.get_delegate_proposal_count ctxt proposer in
+  (* [count] should never have been increased above
+     [max_proposals_per_delegate]. *)
+  assert (Compare.Int.(count <= Constants.max_proposals_per_delegate)) ;
+  fail_unless
+    Compare.List_length_with.(
+      proposals <= Constants.max_proposals_per_delegate - count)
+    Too_many_proposals
 
-let record_proposals ctxt chain_id delegate proposals =
-  if is_testnet_dictator ctxt chain_id delegate then
-    record_testnet_dictator_proposals ctxt chain_id proposals
-  else record_delegate_proposals ctxt delegate proposals
+let check_already_proposed ctxt proposer proposals =
+  let open Lwt_tzresult_syntax in
+  List.iter_es
+    (fun proposal ->
+      let*! already_proposed = Vote.has_proposed ctxt proposer proposal in
+      fail_when already_proposed (Already_proposed {proposal}))
+    proposals
 
-let apply_proposals ctxt chain_id (operation : Kind.proposals operation) =
+(* For now, this function is still called directly by
+   [apply_proposals], and so [ctxt] is still the context at
+   application time (where previous operations from the current block
+   have been applied).
+
+   In the next commit, this function will be called by
+   [Validate_operation.validate_operation] instead (and will need to
+   be updated because [ctxt] will not be the same). *)
+let validate_proposals ctxt chain_id ~should_check_signature
+    (operation : Kind.proposals operation) =
+  let open Lwt_tzresult_syntax in
   let (Single (Proposals {source; period; proposals})) =
     operation.protocol_data.contents
   in
-  Delegate.pubkey ctxt source >>=? fun delegate ->
-  Operation.check_signature delegate chain_id operation >>?= fun () ->
-  Voting_period.get_current ctxt >>=? fun {index = current_period; _} ->
-  error_unless
-    Compare.Int32.(current_period = period)
-    (Wrong_voting_period_index {expected = current_period; provided = period})
-  >>?= fun () ->
-  record_proposals ctxt chain_id source proposals >|=? fun ctxt ->
-  (ctxt, Apply_results.Single_result Proposals_result)
+  let* current_period = Voting_period.get_current ctxt in
+  let*? () = check_period_index ~expected:current_period.index period in
+  let* () =
+    if Testnet_dictator.is_testnet_dictator ctxt chain_id source then
+      Lwt.return (Testnet_dictator.check_proposals chain_id proposals)
+    else
+      let*? () = check_proposal_list_sanity proposals in
+      let*? () = check_period_kind_for_proposals current_period in
+      let* () = check_in_listings ctxt source in
+      let* () = check_count ctxt source proposals in
+      check_already_proposed ctxt source proposals
+  in
+  (* The signature check is done last because it is more costly than
+     most checks. *)
+  when_ should_check_signature (fun () ->
+      (* Retrieving the public key cannot fail. Indeed, we have
+         already checked that the delegate is in the vote listings
+         (or is a testnet dictator), which implies that it is a
+         manager with a revealed key. *)
+      let* public_key = Delegate.pubkey ctxt source in
+      Lwt.return (Operation.check_signature public_key chain_id operation))
+
+let record_proposals ctxt proposer proposals =
+  let open Lwt_tzresult_syntax in
+  let* count = Vote.get_delegate_proposal_count ctxt proposer in
+  let new_count = count + List.length proposals in
+  let*! ctxt = Vote.set_delegate_proposal_count ctxt proposer new_count in
+  let*! ctxt =
+    List.fold_left_s
+      (fun ctxt proposal -> Vote.add_proposal ctxt proposer proposal)
+      ctxt
+      proposals
+  in
+  return ctxt
+
+let apply_proposals ctxt chain_id (operation : Kind.proposals operation) =
+  let open Lwt_tzresult_syntax in
+  let* () =
+    validate_proposals ctxt chain_id ~should_check_signature:true operation
+  in
+  let (Single (Proposals {source; period = _; proposals})) =
+    operation.protocol_data.contents
+  in
+  let* ctxt =
+    if Testnet_dictator.is_testnet_dictator ctxt chain_id source then
+      Testnet_dictator.record_proposals ctxt chain_id proposals
+    else record_proposals ctxt source proposals
+  in
+  return (ctxt, Apply_results.Single_result Proposals_result)
 
 let record_ballot ctxt delegate proposal ballot =
   Voting_period.get_current_kind ctxt >>=? function

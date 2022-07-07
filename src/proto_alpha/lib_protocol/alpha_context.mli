@@ -2573,6 +2573,7 @@ module Voting_period : sig
   val get_rpc_succ_info : context -> info tzresult Lwt.t
 
   module Testnet_dictator : sig
+    (** See {!Voting_period_storage.Testnet_dictator.overwrite_current_kind}. *)
     val overwrite_current_kind :
       context -> Chain_id.t -> Voting_period_repr.kind -> context tzresult Lwt.t
   end
@@ -2672,13 +2673,20 @@ module Vote : sig
 
   val set_participation_ema : context -> int32 -> context tzresult Lwt.t
 
+  (** See {!Vote_storage.current_proposal_exists}. *)
+  val current_proposal_exists : context -> bool Lwt.t
+
+  (** See {!Vote_storage.get_current_proposal}. *)
   val get_current_proposal : context -> proposal tzresult Lwt.t
 
+  (** See {!Vote_storage.find_current_proposal}. *)
   val find_current_proposal : context -> proposal option tzresult Lwt.t
 
+  (** See {!Vote_storage.init_current_proposal}. *)
   val init_current_proposal : context -> proposal -> context tzresult Lwt.t
 
-  val clear_current_proposal : context -> context tzresult Lwt.t
+  (** See {!Vote_storage.clear_current_proposal}. *)
+  val clear_current_proposal : context -> context Lwt.t
 end
 
 module Dal : sig

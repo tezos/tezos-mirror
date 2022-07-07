@@ -88,13 +88,6 @@ val may_start_new_voting_period : context -> context tzresult Lwt.t
 
 (** Update the [context] with the effects of a Proposals operation.
 
-    @return [Error Delegate_storage.Unregistered_delegate] if the
-    source's contract does not exist or its public key is unreavealed.
-
-    @return [Error Operation.Missing_signature] or [Error
-    Operation.Invalid_signature] if the operation is unsigned or
-    incorrectly signed.
-
     @return [Error Wrong_voting_period_index] if the operation's
     period and the [context]'s current period do not have the same
     index.
@@ -119,7 +112,11 @@ val may_start_new_voting_period : context -> context tzresult Lwt.t
 
     @return [Error Testnet_dictator_multiple_proposals] if the source
     is a testnet dictator and the operation contains more than one
-    proposal. *)
+    proposal.
+
+    @return [Error Operation.Missing_signature] or [Error
+    Operation.Invalid_signature] if the operation is unsigned or
+    incorrectly signed. *)
 val apply_proposals :
   context ->
   Chain_id.t ->

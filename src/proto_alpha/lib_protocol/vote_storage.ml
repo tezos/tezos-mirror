@@ -252,14 +252,15 @@ let get_participation_ema = Storage.Vote.Participation_ema.get
 
 let set_participation_ema = Storage.Vote.Participation_ema.update
 
+let current_proposal_exists = Storage.Vote.Current_proposal.mem
+
 let get_current_proposal = Storage.Vote.Current_proposal.get
 
 let find_current_proposal = Storage.Vote.Current_proposal.find
 
 let init_current_proposal = Storage.Vote.Current_proposal.init
 
-let clear_current_proposal ctxt =
-  Storage.Vote.Current_proposal.remove ctxt >|= ok
+let clear_current_proposal = Storage.Vote.Current_proposal.remove
 
 let init ctxt ~start_position =
   (* participation EMA is in centile of a percentage *)

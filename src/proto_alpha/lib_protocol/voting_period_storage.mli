@@ -61,8 +61,13 @@ val get_rpc_current_info :
 val get_rpc_succ_info : Raw_context.t -> Voting_period_repr.info tzresult Lwt.t
 
 module Testnet_dictator : sig
-  (** Overwrites the kind of the current voting period WITHOUT incrementing the index.
-      Must ONLY be called by the testnet dictator on a testnet. *)
+  (** Overwrites the kind of the current voting period WITHOUT
+      incrementing the index.
+
+      Must ONLY be called by the testnet dictator on a testnet.
+
+      @return [Error Storage_error] if the current voting period is
+      not set or its deserialization fails. *)
   val overwrite_current_kind :
     Raw_context.t ->
     Chain_id.t ->

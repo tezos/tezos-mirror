@@ -1230,19 +1230,6 @@ let test_voting_period_pp () =
 
 (** {3 Proposal -- Negative tests} *)
 
-(** Test that a Proposals operation fails when its source is not a
-    registered delegate. *)
-let test_proposals_unregistered_delegate () =
-  let open Lwt_result_syntax in
-  let* block, _delegate = context_init1 () in
-  let fresh_account = Account.new_account () in
-  assert_validate_proposals_fails
-    ~expected_error:(unregistered_delegate fresh_account.pkh)
-    ~proposer:(Contract.Implicit fresh_account.pkh)
-    ~proposals:[Protocol_hash.zero]
-    block
-    __LOC__
-
 (** Test that a Proposals operation fails when it is unsigned. *)
 let test_proposals_missing_signature () =
   let open Lwt_result_syntax in
@@ -1323,24 +1310,34 @@ let test_proposals_wrong_voting_period_kind () =
   assert_proposals_fails_with_unexpected_proposal block __LOC__
 
 (** Test that a Proposals operation fails when the proposer is not in
-    the vote listings. *)
+    the vote listings (with the same error, no matter how far the
+    source is from being a delegate with voting rights). *)
 let test_proposals_source_not_in_vote_listings () =
   let open Lwt_result_syntax in
-  let* block, funder = context_init1 () in
-  let account = Account.new_account () in
-  let proposer = Contract.Implicit account.pkh in
+  let* block, funder = context_init1 ~blocks_per_cycle:10l () in
+  let fresh_account = Account.new_account () in
+  let proposer = Contract.Implicit fresh_account.pkh in
+  let assert_fails_with_source_not_in_vote_listings block =
+    assert_validate_proposals_fails
+      ~expected_error:source_not_in_vote_listings
+      ~proposer
+      ~proposals:[Protocol_hash.zero]
+      block
+  in
+  (* Fail when the source has no contract in the storage. *)
+  let* () = assert_fails_with_source_not_in_vote_listings block __LOC__ in
   let* operation = Op.transaction (B block) funder proposer Tez.one in
   let* block = Block.bake block ~operation in
-  let* operation =
-    Op.delegation ~force_reveal:true (B block) proposer (Some account.pkh)
-  in
+  (* Fail when the contract's public key is unreavealed. *)
+  let* () = assert_fails_with_source_not_in_vote_listings block __LOC__ in
+  let* operation = Op.revelation (B block) fresh_account.pk in
   let* block = Block.bake block ~operation in
-  assert_validate_proposals_fails
-    ~expected_error:source_not_in_vote_listings
-    ~proposer
-    ~proposals:[Protocol_hash.zero]
-    block
-    __LOC__
+  (* Fail when the source is not a delegate. *)
+  let* () = assert_fails_with_source_not_in_vote_listings block __LOC__ in
+  let* operation = Op.delegation (B block) proposer (Some fresh_account.pkh) in
+  let* block = Block.bake block ~operation in
+  (* Fail when the source is a delegate, but not yet in the vote listings. *)
+  assert_fails_with_source_not_in_vote_listings block __LOC__
 
 (** Test that a Proposals operation fails when its proposal list is
     empty. *)
@@ -1905,10 +1902,6 @@ let tests =
       test_voting_power_updated_each_voting_period;
     Tztest.tztest "voting period pretty print" `Quick test_voting_period_pp;
     (* Validity tests on Proposals *)
-    Tztest.tztest
-      "Proposals from unregistered delegate"
-      `Quick
-      test_proposals_unregistered_delegate;
     Tztest.tztest
       "Proposals missing signature"
       `Quick
