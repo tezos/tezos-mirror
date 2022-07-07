@@ -187,5 +187,9 @@ module VDF = struct
         ~retry:(retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
         cctxt
     in
+    let*! () =
+      cctxt#message "Waiting for protocol %s to start..." Protocol.name
+    in
+    let* () = Node_rpc.await_protocol_activation cctxt ~chain () in
     if keep_alive then retry_on_disconnection cctxt process else process ()
 end

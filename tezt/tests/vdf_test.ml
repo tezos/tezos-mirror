@@ -155,8 +155,8 @@ let test_vdf : Protocol.t list -> unit =
   @@ fun protocol ->
   let* node = Node.init [Synchronisation_threshold 0; Private_mode] in
   let* client = Client.init ~endpoint:(Node node) () in
-  let* () = Client.activate_protocol ~protocol client in
-  let* vdf_baker = Vdf.init ~protocol node in
+  let* () = Client.activate_protocol ~protocol client
+  and* vdf_baker = Vdf.init ~protocol node in
 
   let* constants = RPC.get_constants client in
   let* blocks_per_cycle =
