@@ -283,7 +283,6 @@ let convert_service expected_path expected_method
       "expected method %s but found %s"
       (Method.to_http_string expected_method)
       (Method.to_http_string meth) ;
-  (* TODO: in practice [expected_path <> path]. Investigate why. *)
   if expected_path <> path then
     warn
       "expected path %s but found %s"
