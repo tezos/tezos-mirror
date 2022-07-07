@@ -213,7 +213,7 @@ let first_published_at_level (_hash, (_ : Sc_rollup_client.commitment), level) =
 let predecessor (_hash, {Sc_rollup_client.predecessor; _}, _level) = predecessor
 
 let cement_commitment client ~sc_rollup ~hash =
-  let* () =
+  let*! () =
     Client.Sc_rollup.cement_commitment
       ~hooks
       ~src:"bootstrap1"
