@@ -349,13 +349,36 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
     let open Lwt_syntax in
     let* res = get_env_rpc_context chain block in
     match res with
-    | Error trace ->
-        (* proto_directory expects a unit Directory.t Lwt.t,
-           we can't give it a unit tzresult Directory.t Lwt.t, hence
-           throwing an exception. It's handled in
-           [Tezos_mockup_proxy.RPC_client]. This is not ideal, but
-           it's better than asserting false. *)
-        raise (Rpc_dir_creation_failure trace)
+    | Error trace -> (
+        (* proto_directory expects a unit Directory.t Lwt.t, and we
+           can't give it a unit tzresult Directory.t Lwt.t, hence
+           we throw an exception instead if we can't make the
+           directory.
+
+           This happens notably in the proxy server case when a
+           request is made for a block baked on a protocol differing
+           from the protocol the proxy server is currently running on.
+
+           In the proxy server case, we'd prefer to return a 404
+           instead of a 500. Luckily, Resto handles the [Not_found]
+           exception specially and returns a 404, which our
+           query-forwarding middleware (see
+           Tezos_rpc_http.RPC_middleware) can then turn into a redirect
+           to the node.
+
+           In the client cases, we throw an exception (which Resto
+           turns into a 500) and print the trace. *)
+        match mode with
+        | Proxy_server _ -> raise Not_found
+        | Light_client _ | Proxy_client ->
+            let* () =
+              printer#warning
+                "Error while building RPC directory (perhaps a protocol \
+                 version mismatch between block and client?): %a"
+                Error_monad.pp_print_trace
+                trace
+            in
+            raise (Rpc_dir_creation_failure trace))
     | Ok res -> Lwt.return res
   in
   let proto_directory =
