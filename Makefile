@@ -278,6 +278,7 @@ test: test-code
 check-linting:
 	@scripts/lint.sh --check-scripts
 	@scripts/lint.sh --check-ocamlformat
+	@scripts/lint.sh --check-coq-attributes
 	@dune build --profile=$(PROFILE) @fmt
 
 check-python-linting:
