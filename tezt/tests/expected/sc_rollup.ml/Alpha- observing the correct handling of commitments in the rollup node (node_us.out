@@ -19,7 +19,10 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000654
       payload fees(the block proposer) ....... +ꜩ0.000654
-    Originate smart contract rollup of kind arith and type string with boot sector ''
+    Smart contract rollup origination:
+      Kind: arith
+      Parameter type: string
+      Boot sector: ''
       This smart contract rollup origination was successfully applied
       Consumed gas: 2909.116
       Storage size: 6616 bytes
@@ -54,7 +57,8 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000457
       payload fees(the block proposer) ....... +ꜩ0.000457
-    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+    Smart contract rollup messages submission:
+      Address: [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1651.778
       Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
@@ -92,7 +96,8 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000469
       payload fees(the block proposer) ....... +ꜩ0.000469
-    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+    Smart contract rollup messages submission:
+      Address: [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1652.596
       Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
@@ -131,7 +136,8 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000481
       payload fees(the block proposer) ....... +ꜩ0.000481
-    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+    Smart contract rollup messages submission:
+      Address: [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1653.271
       Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
@@ -170,7 +176,8 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000493
       payload fees(the block proposer) ....... +ꜩ0.000493
-    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+    Smart contract rollup messages submission:
+      Address: [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1653.995
       Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
@@ -210,7 +217,8 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000505
       payload fees(the block proposer) ....... +ꜩ0.000505
-    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+    Smart contract rollup messages submission:
+      Address: [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1654.670
       Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
@@ -250,7 +258,8 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000517
       payload fees(the block proposer) ....... +ꜩ0.000517
-    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+    Smart contract rollup messages submission:
+      Address: [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1655.266
       Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
@@ -290,7 +299,8 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000529
       payload fees(the block proposer) ....... +ꜩ0.000529
-    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+    Smart contract rollup messages submission:
+      Address: [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1655.862
       Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
@@ -330,7 +340,8 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000541
       payload fees(the block proposer) ....... +ꜩ0.000541
-    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+    Smart contract rollup messages submission:
+      Address: [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1656.586
       Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
@@ -371,7 +382,8 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000553
       payload fees(the block proposer) ....... +ꜩ0.000553
-    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+    Smart contract rollup messages submission:
+      Address: [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1657.261
       Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
@@ -412,7 +424,8 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000565
       payload fees(the block proposer) ....... +ꜩ0.000565
-    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+    Smart contract rollup messages submission:
+      Address: [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1657.857
       Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
@@ -453,7 +466,8 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000577
       payload fees(the block proposer) ....... +ꜩ0.000577
-    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+    Smart contract rollup messages submission:
+      Address: [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1658.453
       Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
@@ -494,7 +508,8 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000589
       payload fees(the block proposer) ....... +ꜩ0.000589
-    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+    Smart contract rollup messages submission:
+      Address: [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1659.049
       Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
@@ -535,7 +550,8 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000601
       payload fees(the block proposer) ....... +ꜩ0.000601
-    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+    Smart contract rollup messages submission:
+      Address: [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1659.645
       Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
@@ -576,7 +592,8 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000614
       payload fees(the block proposer) ....... +ꜩ0.000614
-    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+    Smart contract rollup messages submission:
+      Address: [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1660.241
       Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
@@ -617,7 +634,8 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000626
       payload fees(the block proposer) ....... +ꜩ0.000626
-    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+    Smart contract rollup messages submission:
+      Address: [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1660.837
       Resulting inbox state: { rollup = [SC_ROLLUP_HASH]

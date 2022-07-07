@@ -102,12 +102,14 @@ let pp_template :
  fun pp_messages fmt t ->
   Format.fprintf
     fmt
-    "commitment %a : messages = %a predecessor %a for inbox with merkle root %a"
+    "Level: %a@,Messages: %a@,Predecessor: %a@,Inbox merkle root: %a"
     Tx_rollup_level_repr.pp
     t.level
     pp_messages
     t.messages
-    (Format.pp_print_option Hash.pp)
+    (Format.pp_print_option
+       ~none:(fun fmt () -> Format.pp_print_string fmt "None")
+       Hash.pp)
     t.predecessor
     Tx_rollup_inbox_repr.Merkle.pp_root
     t.inbox_merkle_root
@@ -138,7 +140,7 @@ module Compact = struct
     pp_template (fun fmt {count; root; last_result_message_hash} ->
         Format.fprintf
           fmt
-          "count: %d, root: %a, last_result_message_hash: %a"
+          "Count: %d@, Merkle root hash: %a@,Last result message hash: %a"
           count
           Merkle_hash.pp
           root

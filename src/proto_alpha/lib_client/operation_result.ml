@@ -202,7 +202,7 @@ let pp_manager_operation_content (type kind) source ppf
   | Increase_paid_storage {amount_in_bytes; destination} ->
       Format.fprintf
         ppf
-        "Increase paid storage:@,Bytes: : %a@,From: %a@,To: %a"
+        "Increase paid storage:@,Increased size: %a bytes@,From: %a@,To: %a"
         Z.pp_print
         amount_in_bytes
         Contract.pp
@@ -210,11 +210,18 @@ let pp_manager_operation_content (type kind) source ppf
         Contract_hash.pp
         destination
   | Tx_rollup_origination ->
-      Format.fprintf ppf "Tx rollup origination:@,From: %a" Contract.pp source
+      Format.fprintf
+        ppf
+        "Transaction rollup origination:@,From: %a"
+        Contract.pp
+        source
   | Tx_rollup_submit_batch {tx_rollup; content; burn_limit = _} ->
       Format.fprintf
         ppf
-        "Tx rollup transaction:%a, %d bytes, From: %a"
+        "Transaction rollup transaction:@,\
+         Address:%a@,\
+         Message length: %d bytes@,\
+         From: %a"
         Tx_rollup.pp
         tx_rollup
         (String.length content)
@@ -223,7 +230,11 @@ let pp_manager_operation_content (type kind) source ppf
   | Tx_rollup_commit {tx_rollup; commitment} ->
       Format.fprintf
         ppf
-        "Tx rollup commitment:%a, %a@,From: %a"
+        "Transaction rollup commitment:@,\
+         Address: %a@,\
+         @[<v 2>Commitment:@,\
+         %a@]@,\
+         From: %a"
         Tx_rollup.pp
         tx_rollup
         Tx_rollup_commitment.Full.pp
@@ -233,7 +244,7 @@ let pp_manager_operation_content (type kind) source ppf
   | Tx_rollup_return_bond {tx_rollup} ->
       Format.fprintf
         ppf
-        "Tx rollup return commitment bond:%a @,From: %a"
+        "Transaction rollup recover commitment bond:@,Address: %a@,From: %a"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
@@ -241,7 +252,7 @@ let pp_manager_operation_content (type kind) source ppf
   | Tx_rollup_finalize_commitment {tx_rollup} ->
       Format.fprintf
         ppf
-        "Tx rollup finalize commitment:%a @,From: %a"
+        "Transaction rollup finalize commitment:@,Address: %a@,From: %a"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
@@ -249,7 +260,7 @@ let pp_manager_operation_content (type kind) source ppf
   | Tx_rollup_remove_commitment {tx_rollup; _} ->
       Format.fprintf
         ppf
-        "Tx rollup remove commitment:%a @,From: %a"
+        "Transaction rollup remove commitment:@,Address: %a@,From: %a"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
@@ -258,7 +269,7 @@ let pp_manager_operation_content (type kind) source ppf
       (* FIXME/TORU *)
       Format.fprintf
         ppf
-        "Tx rollup rejection:%a @,From: %a"
+        "Transaction rollup rejection:@,Address: %a@,From: %a"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
@@ -266,22 +277,46 @@ let pp_manager_operation_content (type kind) source ppf
   | Tx_rollup_dispatch_tickets {tx_rollup; _} ->
       Format.fprintf
         ppf
-        "Tx rollup dispatch tickets:%a@,From: %a"
+        "Transaction rollup dispatch tickets:@,Address: %a@,From: %a"
         Tx_rollup.pp
         tx_rollup
         Contract.pp
         source
-  | Transfer_ticket _ ->
-      Format.fprintf ppf "Transfer tickets:@,From: %a" Contract.pp source
-  | Dal_publish_slot_header {slot} ->
-      Format.fprintf ppf "@[<v 2>Publish slot %a@]" Dal.Slot.pp slot
+  | Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint} ->
+      Format.fprintf
+        ppf
+        "Transfer tickets:@,\
+         Ticket content: %a@,\
+         Ticket content type: %a@,\
+         Ticket ticketer: %a@,\
+         Ticket amount: %a@,\
+         Destination: %a%a@,\
+         From: %a"
+        pp_micheline_from_lazy_expr
+        contents
+        pp_micheline_from_lazy_expr
+        ty
+        Contract.pp
+        ticketer
+        Z.pp_print
+        amount
+        Contract.pp
+        destination
+        (fun ppf entrypoint ->
+          if not (Entrypoint.is_default entrypoint) then
+            Format.fprintf ppf "@,Entrypoint: %a" Entrypoint.pp entrypoint)
+        entrypoint
+        Contract.pp
+        source
   | Sc_rollup_originate
       {kind; boot_sector; origination_proof = _; parameters_ty} ->
       let (module R : Sc_rollup.PVM.S) = Sc_rollup.Kind.pvm_of kind in
       Format.fprintf
         ppf
-        "Originate smart contract rollup of kind %s and type %a with boot \
-         sector '%a'"
+        "Smart contract rollup origination:@,\
+         Kind: %s@,\
+         Parameter type: %a@,\
+         Boot sector: '%a'"
         R.name
         pp_micheline_from_lazy_expr
         parameters_ty
@@ -290,67 +325,73 @@ let pp_manager_operation_content (type kind) source ppf
   | Sc_rollup_add_messages {rollup; messages = _} ->
       Format.fprintf
         ppf
-        "Add a message to the inbox of the smart contract rollup at address %a"
+        "Smart contract rollup messages submission:@,Address: %a"
         Sc_rollup.Address.pp
         rollup
   | Sc_rollup_cement {rollup; commitment} ->
       Format.fprintf
         ppf
-        "Cement the commitment %a in the smart contract rollup at address %a"
-        Sc_rollup.Commitment.Hash.pp
-        commitment
+        "Smart contract rollup commitment cementing:@,\
+         Address: %a@,\
+         Commitment: %a"
         Sc_rollup.Address.pp
         rollup
+        Sc_rollup.Commitment.Hash.pp
+        commitment
   | Sc_rollup_publish {rollup; commitment} ->
       Format.fprintf
         ppf
-        "Publish commitment %a in the smart contract rollup at address %a"
-        Sc_rollup.Commitment.pp
-        commitment
+        "Smart contract rollup commitment publishing:@,\
+         Address: %a@,\
+         @[<v 2>Commitment:@,\
+         %a@]"
         Sc_rollup.Address.pp
         rollup
+        Sc_rollup.Commitment.pp
+        commitment
   | Sc_rollup_refute {rollup; opponent; refutation} ->
       Format.fprintf
         ppf
-        "Refute staker %a in the smart contract rollup at address %a using %a"
-        Sc_rollup.Staker.pp
-        opponent
+        "Smart contract rollup refutation move:@,\
+         Address: %a@,\
+         Staker: %a@,\
+         Move: %a"
         Sc_rollup.Address.pp
         rollup
+        Sc_rollup.Staker.pp
+        opponent
         (fun fmt -> function
-          | None -> Format.pp_print_string fmt "opening move of the game"
+          | None -> Format.pp_print_string fmt "opening of the game"
           | Some refutation -> Sc_rollup.Game.pp_refutation fmt refutation)
         refutation
   | Sc_rollup_timeout {rollup; stakers = {alice; bob}} ->
       Format.fprintf
         ppf
-        "Punish one of the two stakers %a and %a by timeout in the smart \
-         contract rollup at address %a"
+        "Smart contract rollup refutation timeout:@,\
+         Address: %a@,\
+         First staker (Alice): %a@,\
+         Second staker (Bob): %a"
+        Sc_rollup.Address.pp
+        rollup
         Sc_rollup.Staker.pp
         alice
         Sc_rollup.Staker.pp
         bob
-        Sc_rollup.Address.pp
-        rollup
-  | Sc_rollup_execute_outbox_message {rollup; cemented_commitment; output_proof}
-    ->
-      (* TODO #3125
-         Improve pretty-printing of this content and sc operations above.
-         Should avoid printing on a single line and use indentation.
-      *)
+  | Sc_rollup_execute_outbox_message
+      {rollup; cemented_commitment; output_proof = _} ->
       Format.fprintf
         ppf
-        "Execute the outbox message of the smart contract rollup at address \
-         %a, with cemented commit %a and output proof %s"
+        "Smart contract output message execution:@,\
+         Address: %a@,\
+         Cemented commitment: %a"
         Sc_rollup.Address.pp
         rollup
         Sc_rollup.Commitment.Hash.pp
         cemented_commitment
-        output_proof
   | Sc_rollup_recover_bond {sc_rollup} ->
       Format.fprintf
         ppf
-        "Sc rollup recover commitment bond:%a @,From: %a"
+        "Smart contract bond retrieval:@,Address: %a@,From: %a"
         Sc_rollup.Address.pp
         sc_rollup
         Contract.pp
@@ -358,12 +399,19 @@ let pp_manager_operation_content (type kind) source ppf
   | Sc_rollup_dal_slot_subscribe {rollup; slot_index} ->
       Format.fprintf
         ppf
-        "Register data availability slot number %a for smart contract rollup \
-         address %a"
+        "Data availability slot subscription:@,\
+         Slot number: %a@,\
+         Smart contract rollup address: %a"
         Dal.Slot_index.pp
         slot_index
         Sc_rollup.Address.pp
         rollup
+  | Dal_publish_slot_header {slot} ->
+      Format.fprintf
+        ppf
+        "Data availability slot header publishing:@,Slot: %a"
+        Dal.Slot.pp
+        slot
 
 let pp_balance_updates ppf balance_updates =
   let open Receipt in
@@ -769,8 +817,10 @@ let pp_manager_operation_contents_result ppf op_result =
     | Sc_rollup_execute_outbox_message_result _ ->
         "smart contract output message execution"
     | Sc_rollup_recover_bond_result _ -> "smart contract bond retrieval"
-    | Sc_rollup_dal_slot_subscribe_result _ -> "subscription to dal slot"
-    | Dal_publish_slot_header_result _ -> "slot header publishing"
+    | Sc_rollup_dal_slot_subscribe_result _ ->
+        "data availability slot subscription"
+    | Dal_publish_slot_header_result _ ->
+        "data availability slot header publishing"
   in
   let pp_manager_operation_contents_result (type kind) ppf
       (result : kind successful_manager_operation_result) =

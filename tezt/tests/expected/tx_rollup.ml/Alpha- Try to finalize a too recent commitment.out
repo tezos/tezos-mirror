@@ -18,7 +18,7 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000379
       payload fees(the block proposer) ....... +ꜩ0.000379
-    Tx rollup origination:
+    Transaction rollup origination:
       From: [PUBLIC_KEY_HASH]
       This transaction rollup origination was successfully applied
       Balance updates:
@@ -49,7 +49,10 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000474
       payload fees(the block proposer) ....... +ꜩ0.000474
-    Tx rollup transaction:[TX_ROLLUP_HASH], 4 bytes, From: [PUBLIC_KEY_HASH]
+    Transaction rollup transaction:
+      Address:[TX_ROLLUP_HASH]
+      Message length: 4 bytes
+      From: [PUBLIC_KEY_HASH]
       This transaction rollup batch submission was successfully applied
       Consumed gas: 2108.283
 
@@ -74,7 +77,13 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000697
       payload fees(the block proposer) ....... +ꜩ0.000697
-    Tx rollup commitment:[TX_ROLLUP_HASH], commitment 0 : messages = [TX_ROLLUP_MESSAGE_RESULT_HASH] predecessor  for inbox with merkle root [TX_ROLLUP_INBOX_HASH]
+    Transaction rollup commitment:
+      Address: [TX_ROLLUP_HASH]
+      Commitment:
+        Level: 0
+        Messages: [TX_ROLLUP_MESSAGE_RESULT_HASH]
+        Predecessor: None
+        Inbox merkle root: [TX_ROLLUP_INBOX_HASH]
       From: [PUBLIC_KEY_HASH]
       This transaction rollup commitment was successfully applied
       Balance updates:
@@ -92,7 +101,8 @@ This simulation failed:
     Expected counter: 4
     Gas limit: 1040000
     Storage limit: 60000 bytes
-    Tx rollup finalize commitment:[TX_ROLLUP_HASH] 
+    Transaction rollup finalize commitment:
+      Address: [TX_ROLLUP_HASH]
       From: [PUBLIC_KEY_HASH]
       This operation FAILED.
 

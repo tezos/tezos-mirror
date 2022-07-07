@@ -18,7 +18,7 @@ This sequence of operations was run:
       tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.000348
       payload fees(the block proposer) ....... +ꜩ0.000348
     Increase paid storage:
-      Bytes: : 1000
+      Increased size: 1000 bytes
       From: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
       To: KT1NveRFUkyV37m2kiKFFn2zsqm1wFmkp4Lk
       This paid storage increase was successfully applied
