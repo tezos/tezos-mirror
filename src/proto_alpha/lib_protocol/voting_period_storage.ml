@@ -194,6 +194,9 @@ let get_rpc_succ_info ctxt =
   Voting_period_repr.{voting_period; position; remaining}
 
 module Testnet_dictator = struct
+  (* This error must never happen. It is deliberately unregistered so
+     that the execution fails loudly if [overwrite_current_kind] is
+     ever called on mainnet. *)
   type error += Forbidden_on_mainnet
 
   let overwrite_current_kind ctxt chain_id kind =

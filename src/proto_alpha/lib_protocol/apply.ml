@@ -2127,28 +2127,8 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
       Token.transfer ctxt src (`Contract contract) amount
       >>=? fun (ctxt, bupds) ->
       return (ctxt, Single_result (Activate_account_result bupds))
-  | Single (Proposals {source; period; proposals}) ->
-      Delegate.pubkey ctxt source >>=? fun delegate ->
-      Operation.check_signature delegate chain_id operation >>?= fun () ->
-      Voting_period.get_current ctxt >>=? fun {index = current_period; _} ->
-      error_unless
-        Compare.Int32.(current_period = period)
-        (Validate_errors.Voting.Wrong_voting_period_index
-           {expected = current_period; provided = period})
-      >>?= fun () ->
-      Amendment.record_proposals ctxt chain_id source proposals >|=? fun ctxt ->
-      (ctxt, Single_result Proposals_result)
-  | Single (Ballot {source; period; proposal; ballot}) ->
-      Delegate.pubkey ctxt source >>=? fun delegate ->
-      Operation.check_signature delegate chain_id operation >>?= fun () ->
-      Voting_period.get_current ctxt >>=? fun {index = current_period; _} ->
-      error_unless
-        Compare.Int32.(current_period = period)
-        (Validate_errors.Voting.Wrong_voting_period_index
-           {expected = current_period; provided = period})
-      >>?= fun () ->
-      Amendment.record_ballot ctxt source proposal ballot >|=? fun ctxt ->
-      (ctxt, Single_result Ballot_result)
+  | Single (Proposals _) -> Amendment.apply_proposals ctxt chain_id operation
+  | Single (Ballot _) -> Amendment.apply_ballot ctxt chain_id operation
   | Single (Failing_noop _) ->
       (* Failing_noop _ always fails *)
       fail Failing_noop_error

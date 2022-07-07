@@ -144,6 +144,12 @@ let start_new_voting_period ctxt =
       Vote.clear_current_proposal ctxt >>=? Voting_period.reset)
   >>=? fun ctxt -> Vote.update_listings ctxt
 
+let may_start_new_voting_period ctxt =
+  Voting_period.is_last_block ctxt >>=? fun is_last ->
+  if is_last then start_new_voting_period ctxt else return ctxt
+
+(** {2 Validation and application of voting operations} *)
+
 open Validate_errors.Voting
 
 let record_delegate_proposals ctxt delegate proposals =
@@ -204,6 +210,20 @@ let record_proposals ctxt chain_id delegate proposals =
     record_testnet_dictator_proposals ctxt chain_id proposals
   else record_delegate_proposals ctxt delegate proposals
 
+let apply_proposals ctxt chain_id (operation : Kind.proposals operation) =
+  let (Single (Proposals {source; period; proposals})) =
+    operation.protocol_data.contents
+  in
+  Delegate.pubkey ctxt source >>=? fun delegate ->
+  Operation.check_signature delegate chain_id operation >>?= fun () ->
+  Voting_period.get_current ctxt >>=? fun {index = current_period; _} ->
+  error_unless
+    Compare.Int32.(current_period = period)
+    (Wrong_voting_period_index {expected = current_period; provided = period})
+  >>?= fun () ->
+  record_proposals ctxt chain_id source proposals >|=? fun ctxt ->
+  (ctxt, Apply_results.Single_result Proposals_result)
+
 let record_ballot ctxt delegate proposal ballot =
   Voting_period.get_current_kind ctxt >>=? function
   | Exploration | Promotion ->
@@ -222,6 +242,16 @@ let record_ballot ctxt delegate proposal ballot =
       fail
         (Wrong_voting_period_kind {current; expected = [Exploration; Promotion]})
 
-let may_start_new_voting_period ctxt =
-  Voting_period.is_last_block ctxt >>=? fun is_last ->
-  if is_last then start_new_voting_period ctxt else return ctxt
+let apply_ballot ctxt chain_id (operation : Kind.ballot operation) =
+  let (Single (Ballot {source; period; proposal; ballot})) =
+    operation.protocol_data.contents
+  in
+  Delegate.pubkey ctxt source >>=? fun delegate ->
+  Operation.check_signature delegate chain_id operation >>?= fun () ->
+  Voting_period.get_current ctxt >>=? fun {index = current_period; _} ->
+  error_unless
+    Compare.Int32.(current_period = period)
+    (Wrong_voting_period_index {expected = current_period; provided = period})
+  >>?= fun () ->
+  record_ballot ctxt source proposal ballot >|=? fun ctxt ->
+  (ctxt, Apply_results.Single_result Ballot_result)

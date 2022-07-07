@@ -74,27 +74,78 @@ open Alpha_context
     the state machine of the amendment procedure. *)
 val may_start_new_voting_period : context -> context tzresult Lwt.t
 
-(** Records a list of proposals for a delegate.
-    @raise Wrong_voting_period_kind if [ctxt] is not in a proposal period.
-    @raise Source_not_in_vote_listings if [delegate] is not in the listing. *)
-val record_proposals :
+(** {2 Validation and application of voting operations}
+
+    There are two kinds of voting operations:
+
+    - Proposals: A delegate submits a list of protocol amendment
+      proposals. This operation is only accepted during a Proposal period
+      (see above).
+
+    - Ballot: A delegate casts a vote for/against the current proposal
+      (or pass). This operation is only accepted during an Exploration
+      or Promotion period (see above). *)
+
+(** Update the [context] with the effects of a Proposals operation.
+
+    @return [Error Delegate_storage.Unregistered_delegate] if the
+    source's contract does not exist or its public key is unreavealed.
+
+    @return [Error Operation.Missing_signature] or [Error
+    Operation.Invalid_signature] if the operation is unsigned or
+    incorrectly signed.
+
+    @return [Error Wrong_voting_period_index] if the operation's
+    period and the [context]'s current period do not have the same
+    index.
+
+    @return [Error Empty_proposals] if the list of proposals is empty.
+
+    @return [Error Wrong_voting_period_kind] if the voting period is
+    not of the Proposal kind.
+
+    @return [Error Source_not_in_vote_listings] if the source is not
+    in the vote listings.
+
+    @return [Error Too_many_proposals] if the operation would make the
+    source's total number of proposals exceed
+    {!Constants.recorded_proposal_count_for_delegate}.
+
+    @return [Error Testnet_dictator_multiple_proposals] if the source
+    is a testnet dictator and the operation contains more than one
+    proposal. *)
+val apply_proposals :
   context ->
   Chain_id.t ->
-  public_key_hash ->
-  Protocol_hash.t list ->
-  context tzresult Lwt.t
+  Kind.proposals operation ->
+  (context * Kind.proposals Apply_results.contents_result_list) tzresult Lwt.t
 
-(** Records a vote for a delegate if the current voting period is
-    Exploration or Promotion.
-    @raise Ballot_for_wrong_proposal if [proposal] ≠ [current_proposal].
-    @raise Already_submitted_a_ballot if delegate already voted.
-    @raise Source_not_in_vote_listings if delegate is not listed to vote.
-    @raise Wrong_voting_period_kind if current period is not Exploration
-    or Promotion.
-*)
-val record_ballot :
+(** Update the [context] with the effects of a Ballot operation.
+
+    @return [Error Delegate_storage.Unregistered_delegate] if the
+    source's contract does not exist or its public key is unreavealed.
+
+    @return [Error Operation.Missing_signature] or [Error
+    Operation.Invalid_signature] if the operation is unsigned or
+    incorrectly signed.
+
+    @return [Error Wrong_voting_period_index] if the operation's
+    period and the [context]'s current period do not have the same
+    index.
+
+    @return [Error Wrong_voting_period_kind] if the voting period is
+    not of the Exploration or Promotion kind.
+
+    @return [Error Ballot_for_wrong_proposal] if the operation's
+    proposal is different from the [context]'s current proposal.
+
+    @return [Error Already_submitted_a_ballot] if the source has
+    already voted.
+
+    @return [Error Source_not_in_vote_listings] if the source is not
+    in the vote listings. *)
+val apply_ballot :
   context ->
-  public_key_hash ->
-  Protocol_hash.t ->
-  Vote.ballot ->
-  context tzresult Lwt.t
+  Chain_id.t ->
+  Kind.ballot operation ->
+  (context * Kind.ballot Apply_results.contents_result_list) tzresult Lwt.t
