@@ -212,16 +212,17 @@ let first_published_at_level (_hash, (_ : Sc_rollup_client.commitment), level) =
 
 let predecessor (_hash, {Sc_rollup_client.predecessor; _}, _level) = predecessor
 
-let cement_commitment client ~sc_rollup ~hash =
-  let*! () =
-    Client.Sc_rollup.cement_commitment
-      ~hooks
-      ~src:"bootstrap1"
-      ~dst:sc_rollup
-      ~hash
-      client
+let cement_commitment ?(src = "bootstrap1") ?fail ~sc_rollup ~hash client =
+  let p =
+    Client.Sc_rollup.cement_commitment ~hooks ~dst:sc_rollup ~src ~hash client
   in
-  Client.bake_for_and_wait client
+  match fail with
+  | None ->
+      let*! () = p in
+      Client.bake_for_and_wait client
+  | Some failure ->
+      let*? process = p in
+      Process.check_error ~msg:(rex failure) process
 
 let publish_commitment ?(src = Constant.bootstrap1.public_key_hash) ~commitment
     client sc_rollup =
