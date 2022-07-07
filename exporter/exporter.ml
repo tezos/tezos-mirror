@@ -103,6 +103,29 @@ type received = {reception_time : Time.System.t; errors : error list option}
 
 type op_info = {included : Block_hash.t list; received : received list}
 
+let round_of_opt_field field = field |> Stdlib.Option.get |> int_of_string
+
+(* NB: It can happen that there is an EQC at round r, but a block at
+   round r+1 is still proposed. In this case, the anomaly is rather
+   that the block is proposed (either the proposer has not seen an EQC
+   in time, or it is malicious), than that there are missing consensus
+   ops at round r+1. In other words, the "max round" should be r, not
+   r+1. *)
+let _max_round db level =
+  let q_blocks =
+    Format.asprintf "SELECT max(round) FROM blocks WHERE level = %d" level
+  in
+  let m1 = ref 0 in
+  let cb_blocks r _headers = m1 := round_of_opt_field r.(0) in
+  exec db ~cb:cb_blocks q_blocks ;
+  let q_ops =
+    Format.asprintf "SELECT max(round) FROM operations WHERE level = %d" level
+  in
+  let m2 = ref 0 in
+  let cb_ops r _headers = m2 := round_of_opt_field r.(0) in
+  exec db ~cb:cb_ops q_ops ;
+  max !m1 !m2
+
 let select_ops db level =
   (* We make 3 queries:
      - one to detect "missing" ops (not included, not received)
@@ -215,7 +238,10 @@ let select_ops db level =
   exec db ~cb:cb_missing q_missing ;
   exec db ~cb:cb_included q_included ;
   exec db ~cb:cb_received q_received ;
-  let translate_ops pkh_ops =
+  !info
+
+let translate_ops info =
+  let translate pkh_ops =
     List.map
       (fun (Op_key.{kind; round}, op_info) ->
         let (reception_time, errors) =
@@ -240,20 +266,55 @@ let select_ops db level =
           })
       (Pkh_ops.bindings pkh_ops)
   in
-  Ops.fold
+  Signature.Public_key_hash.Map.fold
     (fun pkh (alias, pkh_ops) acc ->
       Data.Delegate_operations.
-        {
-          delegate = pkh;
-          delegate_alias = alias;
-          operations = translate_ops pkh_ops;
-        }
+        {delegate = pkh; delegate_alias = alias; operations = translate pkh_ops}
       :: acc)
-    !info
+    info
+    []
+
+(* NB: We're not yet extracting [Incorrect] operations. we easily
+   could, they are quite noisy. At least in some cases, the "consensus
+   operations for old/future round/level" errors should be seen as a
+   "per block anomaly" rather than a "per delegate anomaly". *)
+let anomalies level ops =
+  let level = Int32.of_int level in
+  let extract_anomalies delegate delegate_alias pkh_ops =
+    Pkh_ops.fold
+      (fun Op_key.{kind; round} {received; included} acc ->
+        let problem =
+          match (received, included) with
+          | ([], []) -> Some Data.Anomaly.Missed
+          | ([], _) -> Some Data.Anomaly.Forgotten
+          | (_, []) -> Some Data.Anomaly.Sequestered
+          | _ -> None
+        in
+        match problem with
+        | None -> acc
+        | Some problem ->
+            Data.Anomaly.
+              {
+                level;
+                kind;
+                round = Some (Int32.of_int round);
+                delegate;
+                delegate_alias;
+                problem;
+              }
+            :: acc)
+      pkh_ops
+      []
+  in
+  Signature.Public_key_hash.Map.fold
+    (fun pkh (alias, pkh_ops) acc -> extract_anomalies pkh alias pkh_ops @ acc)
+    ops
     []
 
 let data_at_level db level =
   let blocks = select_blocks db level in
-  let delegate_operations = select_ops db level in
+  let delegate_operations = select_ops db level |> translate_ops in
   let unaccurate = (* FIXME: we should check the node's head *) false in
   Data.{blocks; delegate_operations; unaccurate}
+
+let anomalies_at_level db level = select_ops db level |> anomalies level

@@ -26,23 +26,69 @@
 module Services = struct
   let level_arg = RPC_arg.int
 
-  let data_at_level_service () =
+  let level_range_arg =
+    let max_range = 4096 in
+    RPC_arg.make
+      ~descr:
+        (Format.asprintf
+           "a level range in the format '<min_level>-<max_level>'; the maximum \
+            range is set at %d levels"
+           max_range)
+      ~name:"level range"
+      ~destruct:(fun str ->
+        Format.printf "parsing '%s'@." str ;
+        match String.split_on_char '-' str with
+        | [str1; str2] -> (
+            match (int_of_string_opt str1, int_of_string_opt str2) with
+            | (Some l1, Some l2) ->
+                if l1 > l2 || l1 < 0 then Error "not a valid range"
+                else if l2 - l1 > max_range then
+                  Error (Format.asprintf "range exceeds %d levels" max_range)
+                else Ok (l1, l2)
+            | _ -> Error "int_of_string failure")
+        | _ -> Error "expecting a range")
+      ~construct:(fun (l1, l2) -> Format.asprintf "%d-%d" l1 l2)
+      ()
+
+  let data_at_level () =
     RPC_service.get_service
       ~description:"export data at level"
       ~query:RPC_query.empty
       ~output:Data.encoding
-      RPC_path.(open_root /: level_arg)
+      RPC_path.(open_root / "level" /: level_arg)
+
+  let anomalies_at_levels () =
+    RPC_service.get_service
+      ~description:"export anomalies at levels"
+      ~query:RPC_query.empty
+      ~output:(Data_encoding.list Data.Anomaly.encoding)
+      RPC_path.(open_root / "anomalies" /: level_range_arg)
 end
 
 module RPC_server = struct
   let register_data_at_level db dir =
     RPC_directory.register
       dir
-      (Services.data_at_level_service ())
+      (Services.data_at_level ())
       (fun (_, level) () () ->
         Exporter.data_at_level db level |> Lwt_result_syntax.return)
 
-  let register_rpcs db _ctxt = RPC_directory.empty |> register_data_at_level db
+  let register_anomalies_at_levels db dir =
+    RPC_directory.register
+      dir
+      (Services.anomalies_at_levels ())
+      (fun (_, (first_level, last_level)) () () ->
+        let levels =
+          Stdlib.List.init
+            (last_level - first_level + 1)
+            (fun i -> first_level + i)
+        in
+        Lwt_result_syntax.return @@ List.concat
+        @@ List.map (Exporter.anomalies_at_level db) levels)
+
+  let register_rpcs db _ctxt =
+    RPC_directory.empty |> register_data_at_level db
+    |> register_anomalies_at_levels db
 
   let start (addr, port) dir =
     let open Lwt_syntax in
