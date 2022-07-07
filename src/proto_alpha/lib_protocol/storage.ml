@@ -312,6 +312,8 @@ module Contract = struct
     let add ctxt contract value =
       consume_serialize_gas ctxt value >>?= fun ctxt ->
       I.add ctxt contract value
+
+    let _keys_unaccounted _ctxt = assert false
   end
 
   module Code = Make_carbonated_map_expr (struct
@@ -535,6 +537,8 @@ module Big_map = struct
       | None -> ok (ctxt, None)
       | Some value ->
           consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value_opt)
+
+    let _keys_unaccounted _ctxt = assert false
   end
 end
 
