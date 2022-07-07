@@ -144,28 +144,6 @@ let mempool_operation_encoding : mempool_operation Data_encoding.t =
   let open Data_encoding in
   conv
     (function
-      | Mempool_operation {protocol; shell_header; protocol_data} ->
-          ( protocol,
-            shell_header.branch,
-            protocol_data.contents,
-            protocol_data.signature ))
-    (fun (protocol, branch, contents, signature) ->
-      Mempool_operation
-        {
-          protocol;
-          shell_header = {branch};
-          protocol_data = {contents; signature};
-        })
-    (obj4
-       (req "protocol" Tezos_crypto.Protocol_hash.encoding)
-       (req "branch" Block_hash.encoding)
-       (req "contents" (list operation_content_encoding))
-       (opt "signature" signature_encoding))
-
-let ithaca_mempool_operation_encoding : mempool_operation Data_encoding.t =
-  let open Data_encoding in
-  conv
-    (function
       | Mempool_operation {protocol = _; shell_header; protocol_data} ->
           (shell_header.branch, protocol_data.contents, protocol_data.signature))
     (fun _ -> assert false)
@@ -173,44 +151,6 @@ let ithaca_mempool_operation_encoding : mempool_operation Data_encoding.t =
        (req "branch" Block_hash.encoding)
        (req "contents" (list operation_content_encoding))
        (opt "signature" signature_encoding))
-
-let mempool_encoding : mempool Data_encoding.t =
-  let open Data_encoding in
-  let is_empty = function [] -> true | _ -> false in
-  conv
-    (fun operations ->
-      let applied = [] in
-      let refused = [] in
-      let outdated = [] in
-      let branch_refused = [] in
-      let branch_delayed = [] in
-      let unprocessed = operations in
-      (applied, refused, outdated, branch_refused, branch_delayed, unprocessed))
-    (fun ( applied,
-           refused,
-           outdated,
-           branch_refused,
-           branch_delayed,
-           unprocessed ) ->
-      assert (is_empty applied) ;
-      assert (is_empty refused) ;
-      assert (is_empty outdated) ;
-      assert (is_empty branch_refused) ;
-      assert (is_empty branch_delayed) ;
-      unprocessed)
-    (obj6
-       (* We put [unit] as a stub *)
-       (req "applied" (list (dynamic_size unit)))
-       (req "refused" (list (dynamic_size unit)))
-       (req "outdated" (list (dynamic_size unit)))
-       (req "branch_refused" (list (dynamic_size unit)))
-       (req "branch_delayed" (list (dynamic_size unit)))
-       (req
-          "unprocessed"
-          (list
-             (tup2
-                Tezos_crypto.Operation_hash.encoding
-                mempool_operation_encoding))))
 
 (* ------------------------------------------------------------------------- *)
 (* Operation-related helpers *)
@@ -345,13 +285,8 @@ let sample_next_transfer_for state ~fee ~branch ~account =
 
 let bake_with_mempool ?protocol node client mempool =
   let mempool_json =
-    match protocol with
-    | Some Protocol.Ithaca ->
-        let open Data_encoding in
-        Json.construct
-          (list ithaca_mempool_operation_encoding)
-          (List.map snd mempool)
-    | _ -> Data_encoding.Json.construct mempool_encoding mempool
+    let open Data_encoding in
+    Json.construct (list mempool_operation_encoding) (List.map snd mempool)
   in
   let mempool_str = Ezjsonm.value_to_string mempool_json in
   let mempool = Temp.file "mempool.json" in
@@ -408,7 +343,7 @@ let check_ordering ops =
   let ops' = List.sort compare_info ops in
   assert (ops = ops')
 
-let assert_block_is_well_baked block =
+let assert_block_is_well_baked block expected_number_manager_op =
   match JSON.(as_list (block |-> "operations")) with
   | [endorsement_ops; vote_ops; anonymous_ops; manager_ops] ->
       (* There very well might be endorsement operations *)
@@ -418,10 +353,15 @@ let assert_block_is_well_baked block =
       List.iter
         (fun l -> assert (JSON.as_list l = []))
         [vote_ops; anonymous_ops] ;
+      let manager_ops = JSON.as_list manager_ops in
+      let number_manager_ops = List.length manager_ops in
+      Check.(
+        (number_manager_ops = expected_number_manager_op)
+          int
+          ~error_msg:
+            "Expected %R operations in the baked block, got %L operations.") ;
       let fees_managers_and_counters =
-        List.map
-          (fun json -> get_fees_manager_and_counter json)
-          (JSON.as_list manager_ops)
+        List.map (fun json -> get_fees_manager_and_counter json) manager_ops
       in
       check_ordering fees_managers_and_counters
   | _ -> Test.fail "ill-formed operation list list"
@@ -451,19 +391,10 @@ let single_baker_increasing_fees state ~account : mempool Lwt.t =
   in
   mempool_from_list_of_ops state.sandbox_client state.protocol ops
 
-let distinct_bakers_increasing_fees state : mempool Lwt.t =
+let distinct_bakers_increasing_fees state sources : mempool Lwt.t =
   let* branch = get_current_head_hash state in
   let fees = random_permutation [1_000; 2_000; 3_000; 4_000; 5_000] in
-  let accounts =
-    random_permutation
-      [
-        Constant.bootstrap1;
-        Constant.bootstrap2;
-        Constant.bootstrap3;
-        Constant.bootstrap4;
-        Constant.bootstrap5;
-      ]
-  in
+  let accounts = random_permutation sources in
   let* ops =
     Lwt_list.map_s
       (fun (account, fee) ->
@@ -478,14 +409,24 @@ let distinct_bakers_increasing_fees state : mempool Lwt.t =
 (* ------------------------------------------------------------------------- *)
 (* Test entrypoints *)
 
-let bake_and_check state ~protocol ~mempool =
+let has_1m_restriction_in_blocks protocol =
+  Protocol.(number protocol >= number Kathmandu)
+
+let bake_and_check state ~protocol ~mempool ~sources =
   let* () =
     bake_with_mempool ~protocol state.sandbox_node state.sandbox_client mempool
   in
-  let* block =
-    Client.(rpc GET ["chains"; "main"; "blocks"; "head"] state.sandbox_client)
+  let* block = RPC.(Client.call state.sandbox_client (get_chain_block ())) in
+  let expected_number_manager_op =
+    if has_1m_restriction_in_blocks protocol then
+      List.length
+        (List.sort_uniq
+           (fun src1 src2 ->
+             String.compare src1.Account.public_key_hash src2.public_key_hash)
+           sources)
+    else List.length mempool
   in
-  assert_block_is_well_baked block ;
+  assert_block_is_well_baked block expected_number_manager_op ;
   return ()
 
 let init ~protocol =
@@ -509,13 +450,18 @@ let test_ordering =
   @@ fun protocol ->
   let* state = init ~protocol in
   Log.info "Testing ordering by counter" ;
-  let* mempool =
-    single_baker_increasing_fees state ~account:Constant.bootstrap1
-  in
-  let* () = bake_and_check state ~protocol ~mempool in
+  let account = Constant.bootstrap1 in
+  let* mempool = single_baker_increasing_fees state ~account in
+  let* () = bake_and_check state ~protocol ~mempool ~sources:[account] in
+  (* If 1m restriction is enabled on the protocol side, only one
+     operation has been added to the previous block, hence the next
+     counter for bootstrap1 is the successor of one. *)
+  if has_1m_restriction_in_blocks protocol then
+    Hashtbl.add state.counters account 2 ;
   Log.info "Testing ordering by fees" ;
-  let* mempool = distinct_bakers_increasing_fees state in
-  bake_and_check state ~protocol ~mempool
+  let sources = Array.to_list bootstraps in
+  let* mempool = distinct_bakers_increasing_fees state sources in
+  bake_and_check state ~protocol ~mempool ~sources
 
 let check_op_not_in_baked_block client op =
   let* ops = RPC.get_operations client in
@@ -650,7 +596,7 @@ let baking_operation_exception =
     ~__FILE__
     ~title:"ensure we can still bake with a faulty operation"
     ~tags:["baking"; "exception"]
-    ~supports:Protocol.(From_protocol (number Alpha))
+    ~supports:Protocol.(From_protocol (number Jakarta))
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol `Client ~protocol () in
   let data_dir = Node.data_dir node in
