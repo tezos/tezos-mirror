@@ -3,6 +3,8 @@
    This module should never be part of the PVM since it assumes lazy vectors are
    fully loaded. *)
 
+module TzStdLib = Tezos_lwt_result_stdlib.Lwtreslib.Bare
+
 (* Version *)
 
 let version = 1l
@@ -105,11 +107,17 @@ struct
 
   let list f xs = List.iter f xs
 
+  let list_lwt f xs = TzStdLib.List.iter_s f xs
+
   let opt f xo = Lib.Option.app f xo
 
   let vec f xs =
     len (List.length xs) ;
     list f xs
+
+  let vec_lwt f xs =
+    len (List.length xs) ;
+    list_lwt f xs
 
   let gap32 () =
     let p = pos s in
@@ -935,6 +943,16 @@ struct
       f x ;
       patch_gap32 g (pos s - p))
 
+  let section_lwt id f x needed =
+    let open Lwt.Syntax in
+    if needed then (
+      u8 id ;
+      let g = gap32 () in
+      let p = pos s in
+      let+ () = f x in
+      patch_gap32 g (pos s - p))
+    else Lwt.return_unit
+
   (* Type section *)
   let type_ t = func_type t.it
 
@@ -1108,8 +1126,9 @@ struct
 
   (* Data section *)
   let data seg =
+    let open Lwt.Syntax in
     let {dinit; dmode} = seg.it in
-    let dinit = Chunked_byte_vector.Buffer.to_string_unstable dinit in
+    let+ dinit = Chunked_byte_vector.Lwt.Buffer.to_string_unstable dinit in
     match dmode.it with
     | Passive ->
         vu32 0x01l ;
@@ -1125,7 +1144,7 @@ struct
         string dinit
     | Declarative -> assert false
 
-  let data_section datas = section 11 (vec data) datas (datas <> [])
+  let data_section datas = section_lwt 11 (vec_lwt data) datas (datas <> [])
 
   (* Data count section *)
   let data_count_section datas m =
@@ -1157,7 +1176,7 @@ struct
     export_section (to_list m.it.exports) ;
     start_section m.it.start ;
     elem_section (to_list m.it.elems) ;
-    let+ () = data_count_section (to_list m.it.datas) m in
+    let* () = data_count_section (to_list m.it.datas) m in
     code_section (to_list m.it.funcs) ;
     data_section (to_list m.it.datas)
 end

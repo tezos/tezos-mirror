@@ -4,6 +4,7 @@ open Script
 open Values
 open Types
 open Sexpr
+module TzStdLib = Tezos_lwt_result_stdlib.Lwtreslib.Bare
 
 (* Generic formatting *)
 
@@ -52,6 +53,11 @@ let lazy_vector f map =
 
 let lazy_vectori f map =
   List.map
+    (fun (i32, v) -> f (Int32.to_int i32) v)
+    (Lazy_vector.LwtInt32Vector.loaded_bindings map)
+
+let lazy_vectori_lwt f map =
+  TzStdLib.List.map_s
     (fun (i32, v) -> f (Int32.to_int i32) v)
     (Lazy_vector.LwtInt32Vector.loaded_bindings map)
 
@@ -596,11 +602,10 @@ let elem i seg =
       else atom ref_type etype :: list (const "item") einit )
 
 let data i seg =
+  let open Lwt.Syntax in
   let {dinit; dmode} = seg.it in
-  Node
-    ( "data $" ^ nat i,
-      segment_mode "memory" dmode
-      @ break_bytes (Chunked_byte_vector.Buffer.to_string_unstable dinit) )
+  let+ dinit = Chunked_byte_vector.Lwt.Buffer.to_string_unstable dinit in
+  Node ("data $" ^ nat i, segment_mode "memory" dmode @ break_bytes dinit)
 
 (* Modules *)
 
@@ -651,11 +656,13 @@ let start s = Node ("start " ^ var s.it.sfunc, [])
 let var_opt = function None -> "" | Some x -> " " ^ x.it
 
 let module_with_var_opt x_opt m =
+  let open Lwt.Syntax in
   let fx = ref 0 in
   let tx = ref 0 in
   let mx = ref 0 in
   let gx = ref 0 in
   let imports = lazy_vector (import fx tx mx gx) m.it.imports in
+  let+ datas = lazy_vectori_lwt data m.it.datas in
   Node
     ( "module" ^ var_opt x_opt,
       lazy_vectori typedef m.it.types
@@ -667,7 +674,7 @@ let module_with_var_opt x_opt m =
       @ lazy_vector export m.it.exports
       @ opt start m.it.start
       @ lazy_vectori elem m.it.elems
-      @ lazy_vectori data m.it.datas )
+      @ datas )
 
 let binary_module_with_var_opt x_opt bs =
   Node ("module" ^ var_opt x_opt ^ " binary", break_bytes bs)
@@ -706,7 +713,7 @@ let definition mode x_opt def =
             | Encoded (_, bytes) -> Decode.decode ~name:"" ~bytes
             | Quoted (_, s) -> unquote (Parse.string_to_module s)
           in
-          let+ unquoted = unquote def in
+          let* unquoted = unquote def in
           module_with_var_opt x_opt unquoted
       | `Binary ->
           let rec unquote def =
@@ -721,7 +728,7 @@ let definition mode x_opt def =
           binary_module_with_var_opt x_opt unquoted
       | `Original -> (
           match def.it with
-          | Textual m -> module_with_var_opt x_opt m |> Lwt.return
+          | Textual m -> module_with_var_opt x_opt m
           | Encoded (_, bs) -> binary_module_with_var_opt x_opt bs |> Lwt.return
           | Quoted (_, s) -> quoted_module_with_var_opt x_opt s |> Lwt.return))
     (function
