@@ -16,6 +16,9 @@ module Chunk = struct
   (** Get the offset within its chunk for a given address. *)
   let offset address = Int64.(logand address (sub size 1L))
 
+  (** Get the address from a page index and an offset. *)
+  let address ~index ~offset = Int64.(add (shift_left index offset_bits) offset)
+
   let alloc () =
     let chunk = Array1_64.create Int8_unsigned C_layout size in
     Array1.fill chunk 0 ;
@@ -65,7 +68,7 @@ module type S = sig
 
   val create : ?get_chunk:(int64 -> Chunk.t effect) -> int64 -> t
 
-  val of_string : string -> t effect
+  val of_string : string -> t
 
   val of_bytes : bytes -> t effect
 
@@ -90,7 +93,7 @@ module type S = sig
 
     val add_byte : t -> int -> t effect
 
-    val of_string : string -> t effect
+    val of_string : string -> t
 
     val to_string_unstable : t -> string effect
 
@@ -144,13 +147,33 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
     |> Effect.join
 
   let of_string str =
-    let open Effect in
-    let vector = String.length str |> Int64.of_int |> create in
-    let+ () =
-      List.init (String.length str) (fun i ->
-          let c = String.get str i in
-          store_byte vector (Int64.of_int i) (Char.code c))
-      |> join
+    (* Strings are limited in size and contained in `nativeint` (either int31 or
+       int63 depending of the architecture). The maximum size of strings in
+       OCaml is limited by {!Sys.max_string_length} which is lesser than
+       `Int64.max_int` (and even Int.max_int). As such conversions from / to
+       Int64 to manipulate the vector is safe since the size of the
+       Chunked_byte_vector from a string can be contained in an `int`.
+
+       Moreover, WASM strings are limited to max_uint32 in size for data
+       segments, which is the primary usage of this function in the text
+       parser. *)
+    let len = String.length str in
+    let vector = create (Int64.of_int len) in
+    let _ =
+      List.init
+        (Vector.num_elements vector.chunks |> Int64.to_int)
+        (fun index ->
+          let index = Int64.of_int index in
+          let chunk = Chunk.alloc () in
+          let _ =
+            List.init (Chunk.size |> Int64.to_int) (fun offset ->
+                let offset = Int64.of_int offset in
+                let address = Chunk.address ~index ~offset |> Int64.to_int in
+                if address < len then
+                  let c = String.get str address in
+                  Array1_64.set chunk offset (Char.code c))
+          in
+          Vector.set index chunk vector.chunks)
     in
     vector
 
@@ -171,9 +194,8 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
       {vector; offset = Int64.succ offset}
 
     let of_string str =
-      let open Effect in
       let offset = String.length str |> Int64.of_int in
-      let+ vector = of_string str in
+      let vector = of_string str in
       {vector; offset}
 
     let create length = {vector = create length; offset = 0L}
