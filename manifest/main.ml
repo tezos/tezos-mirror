@@ -4078,6 +4078,7 @@ module Protocol = Protocol
         ~internal_name:(sf "main_%s_%s" daemon name_underscore)
         ~path:(path // sf "bin_%s" daemon)
         ~synopsis:(sf "Tezos/Protocol: %s binary" daemon)
+        ~release:true
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
@@ -4142,6 +4143,7 @@ module Protocol = Protocol
         ~internal_name:(sf "main_sc_rollup_client_%s" name_underscore)
         ~path:(path // "bin_sc_rollup_client")
         ~synopsis:"Tezos/Protocol: `tezos-sc-rollup-client-alpha` client binary"
+        ~release:true
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
@@ -4165,6 +4167,7 @@ module Protocol = Protocol
         ~internal_name:(sf "main_sc_rollup_node_%s" name_underscore)
         ~path:(path // "bin_sc_rollup_node")
         ~synopsis:"Tezos/Protocol: Smart Contract Rollup node binary"
+        ~release:true
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
@@ -4236,6 +4239,7 @@ module Protocol = Protocol
         ~internal_name:(sf "main_tx_rollup_client_%s" name_underscore)
         ~path:(path // "bin_tx_rollup_client")
         ~synopsis:"Tezos/Protocol: `tezos-tx-rollup-client-alpha` client binary"
+        ~release:true
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
@@ -4256,6 +4260,7 @@ module Protocol = Protocol
         ~internal_name:(sf "main_tx_rollup_node_%s" name_underscore)
         ~path:(path // "bin_tx_rollup_node")
         ~synopsis:"Tezos/Protocol: Transaction Rollup node binary"
+        ~release:true
         ~deps:
           [
             octez_base |> open_ ~m:"TzPervasives"
@@ -4617,7 +4622,6 @@ let _git_gas_diff =
     ~opam:"internal-devtools"
     ~deps:[external_lib "num" V.True; re]
     ~static:false
-    ~release:false
     ~bisect_ppx:false
 
 let get_contracts_lib =
@@ -4636,7 +4640,6 @@ let get_contracts_lib =
       ]
     ~modules:["get_contracts"; "sigs"; "storage_helpers"; "contract_size"]
     ~static:false
-    ~release:false
     ~bisect_ppx:false
 
 let _get_contracts =
@@ -4675,7 +4678,6 @@ let _get_contracts =
                    ]
                  ~modules:[name]
                  ~static:false
-                 ~release:false
                  ~bisect_ppx:false)
         | _ ->
             if Sys.file_exists main_module then
@@ -4741,6 +4743,7 @@ let _octez_node =
     ~path:"src/bin_node"
     ~internal_name:"main"
     ~synopsis:"Tezos: `tezos-node` binary"
+    ~release:true
     ~deps:
       ([
          octez_base |> open_ ~m:"TzPervasives" |> open_;
@@ -4808,6 +4811,7 @@ let _octez_client =
     ~internal_names:["main_client"; "main_admin"]
     ~opam:"tezos-client"
     ~synopsis:"Tezos: `tezos-client` binary"
+    ~release:true
     ~deps:
       ([
          octez_base |> open_ ~m:"TzPervasives";
@@ -4844,6 +4848,7 @@ let _octez_codec =
     ~path:"src/bin_codec"
     ~internal_name:"codec"
     ~synopsis:"Tezos: `tezos-codec` binary to encode and decode values"
+    ~release:true
     ~deps:
       ([
          data_encoding |> open_;
@@ -4962,7 +4967,6 @@ let _tztop =
     ~opam:"internal-devtools"
     ~modes:[Byte]
     ~bisect_ppx:false
-    ~release:false
     ~static:false
     ~deps:
       [
@@ -4983,6 +4987,7 @@ let _octez_signer =
     ~path:"src/bin_signer"
     ~internal_name:"main_signer"
     ~synopsis:"Tezos: `tezos-signer` binary"
+    ~release:true
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -5030,7 +5035,6 @@ let _octez_tps_evaluation =
         uri;
       ]
     ~static:false
-    ~release:false
     ~dune:
       Dune.
         [

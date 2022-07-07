@@ -5,27 +5,10 @@
 # shellcheck disable=SC2034
 architectures='x86_64 arm64'
 
-binaries='tezos-admin-client tezos-client tezos-node tezos-signer tezos-codec'
+current_dir=$(cd "$(dirname "${0}")" && pwd)
 
-while read -r  proto
-do
-  if [ "${proto}" = '011-PtHangz2' ]
-  then
-    binaries="${binaries} tezos-accuser-${proto} tezos-baker-${proto} tezos-endorser-${proto}"
-  else
-    binaries="${binaries} tezos-accuser-${proto} tezos-baker-${proto}"
-  fi
-done < active_protocol_versions
-
-while read -r  proto
-do
-  binaries="${binaries} tezos-tx-rollup-client-${proto} tezos-tx-rollup-node-${proto}"
-done < tx_rollup_protocol_versions
-
-while read -r  proto
-do
-  binaries="${binaries} tezos-sc-rollup-client-${proto} tezos-sc-rollup-node-${proto}"
-done < sc_rollup_protocol_versions
+# shellcheck source=./binaries-for-release
+binaries="$(cat "${current_dir}/../../binaries-for-release")"
 
 ### Compute GitLab release names
 

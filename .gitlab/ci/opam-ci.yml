@@ -5,6 +5,8 @@
 
 # Ignoring package tezos-benchmark-tests, it only contains tests or private targets
 
+# Ignoring package tezos-dal-node, it only contains tests or private targets
+
 # Ignoring package tezos-protocol-012-Psithaca-tests, it only contains tests or private targets
 
 # Ignoring package tezos-protocol-013-PtJakart-tests, it only contains tests or private targets
@@ -21,11 +23,17 @@
 
 # Ignoring package tezos-protocol-plugin-alpha-tests, it only contains tests or private targets
 
+# Ignoring package tezos-proxy-server, it only contains tests or private targets
+
 # Ignoring package tezos-scoru-wasm-test, it only contains tests or private targets
 
 # Ignoring package tezos-shell-context-test, it only contains tests or private targets
 
+# Ignoring package tezos-snoop, it only contains tests or private targets
+
 # Ignoring package tezos-tps-evaluation, it only contains tests or private targets
+
+# Ignoring package tezt-self-tests, it only contains tests or private targets
 
 .rules_template__trigger_opam_batch_1:
   rules:
@@ -380,14 +388,14 @@ opam:tezos-baking-alpha:
 opam:tezos-baking-alpha-commands:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_1
   variables:
     package: tezos-baking-alpha-commands
 
 opam:tezos-base:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_7
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-base
 
@@ -499,7 +507,7 @@ opam:tezos-benchmarks-proto-alpha:
 opam:tezos-clic:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_7
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-clic
 
@@ -681,16 +689,9 @@ opam:tezos-context-ops:
 opam:tezos-crypto:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_7
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-crypto
-
-opam:tezos-dal-node:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_3
-  variables:
-    package: tezos-dal-node
 
 opam:tezos-embedded-protocol-000-Ps9mPmXa:
   extends:
@@ -758,21 +759,21 @@ opam:tezos-embedded-protocol-007-PsDELPH1:
 opam:tezos-embedded-protocol-008-PtEdo2Zk:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-embedded-protocol-008-PtEdo2Zk
 
 opam:tezos-embedded-protocol-008-PtEdoTez:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-embedded-protocol-008-PtEdoTez
 
 opam:tezos-embedded-protocol-009-PsFLoren:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-embedded-protocol-009-PsFLoren
 
@@ -856,7 +857,7 @@ opam:tezos-event-logging:
 opam:tezos-event-logging-test-helpers:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_7
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-event-logging-test-helpers
 
@@ -1108,14 +1109,14 @@ opam:tezos-protocol-compiler:
 opam:tezos-protocol-demo-counter:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-protocol-demo-counter
 
 opam:tezos-protocol-demo-noops:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-protocol-demo-noops
 
@@ -1129,7 +1130,7 @@ opam:tezos-protocol-environment:
 opam:tezos-protocol-genesis:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-protocol-genesis
 
@@ -1178,7 +1179,7 @@ opam:tezos-protocol-plugin-009-PsFLoren-registerer:
 opam:tezos-protocol-plugin-010-PtGRANAD:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-protocol-plugin-010-PtGRANAD
 
@@ -1192,7 +1193,7 @@ opam:tezos-protocol-plugin-010-PtGRANAD-registerer:
 opam:tezos-protocol-plugin-011-PtHangz2:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-protocol-plugin-011-PtHangz2
 
@@ -1206,7 +1207,7 @@ opam:tezos-protocol-plugin-011-PtHangz2-registerer:
 opam:tezos-protocol-plugin-012-Psithaca:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_5
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-protocol-plugin-012-Psithaca
 
@@ -1255,7 +1256,7 @@ opam:tezos-protocol-plugin-alpha:
 opam:tezos-protocol-plugin-alpha-registerer:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_2
   variables:
     package: tezos-protocol-plugin-alpha-registerer
 
@@ -1272,13 +1273,6 @@ opam:tezos-proxy:
     - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-proxy
-
-opam:tezos-proxy-server:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_3
-  variables:
-    package: tezos-proxy-server
 
 opam:tezos-proxy-server-config:
   extends:
@@ -1462,13 +1456,6 @@ opam:tezos-signer-services:
   variables:
     package: tezos-signer-services
 
-opam:tezos-snoop:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-snoop
-
 opam:tezos-stdlib:
   extends:
     - .opam_template
@@ -1622,13 +1609,6 @@ opam:tezt-performance-regression:
     - .rules_template__trigger_opam_batch_7
   variables:
     package: tezt-performance-regression
-
-opam:tezt-self-tests:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_6
-  variables:
-    package: tezt-self-tests
 
 opam:tezt-tezos:
   extends:

@@ -609,8 +609,10 @@ type with_test = Always | Never | Only_on_64_arch
       Typical use cases are runtime dependencies and build dependencies for users
       of the target (but not the target itself).
 
-    - [release]: unused for now. The intent is to define whether this should be released.
-      Default is [true] for public executables and [false] for other targets.
+    - [release]: defines whether this should be released. Note: it is not always the case that
+      public_exes should be released. They are often public because they are needed by other
+      opam packages, such as in tests. Releasable [public_exe] values should be marked explicitly.
+      Default is [false].
 
     - [static]: whether to incluce [ %{workspace_root}/static-link-flags.sexp ] to the link
       flags to provide a static compilation profile.
