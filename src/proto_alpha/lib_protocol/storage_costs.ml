@@ -46,9 +46,9 @@ let write_access ~written_bytes =
    Fill in real benchmarked values.
    Benchmark defined in [Storage_benchmarks].
 *)
-let list_key_values_step_cost = Saturation_repr.safe_int 2
+let list_key_values_step_cost = Saturation_repr.safe_int 117
 
-let list_key_values_intercept = Saturation_repr.safe_int 20
+let list_key_values_intercept = Saturation_repr.safe_int 470
 
 let list_key_values_traverse ~size =
   Saturation_repr.(
