@@ -786,7 +786,7 @@ type 'loc execution_arg =
   | Typed_arg : 'loc * ('a, _) Script_typed_ir.ty * 'a -> 'loc execution_arg
   | Untyped_arg : Script.expr -> _ execution_arg
 
-let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~untyped_parameter
+let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh
     ~external_entrypoint ~before_operation =
   let contract = Contract.Implicit pkh in
   (* Transfers of zero to implicit accounts are forbidden. *)
@@ -796,14 +796,6 @@ let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~untyped_parameter
   Contract.allocated ctxt contract >>= fun already_allocated ->
   Token.transfer ctxt (`Contract source) (`Contract contract) amount
   >>=? fun (ctxt, balance_updates) ->
-  (* Only allow [Unit] parameter to implicit accounts. *)
-  (match untyped_parameter with
-  | None -> Result.return_unit
-  | Some parameter -> (
-      match Micheline.root parameter with
-      | Prim (_, Michelson_v1_primitives.D_Unit, [], _) -> Result.return_unit
-      | _ -> error (Script_interpreter.Bad_contract_parameter contract)))
-  >>?= fun () ->
   (match external_entrypoint with
   | None -> Result.return_unit
   | Some entrypoint ->
@@ -1100,7 +1092,6 @@ let apply_internal_operation_contents :
         ~source
         ~amount
         ~pkh
-        ~untyped_parameter:None
         ~external_entrypoint:None
         ~before_operation:ctxt_before_op
       >|=? fun (ctxt, res, ops) ->
@@ -1267,12 +1258,16 @@ let apply_manager_operation :
         ctxt
         parameters
       >>?= fun (parameters, ctxt) ->
+      (* Only allow [Unit] parameter to implicit accounts. *)
+      (match Micheline.root parameters with
+      | Prim (_, Michelson_v1_primitives.D_Unit, [], _) -> Result.return_unit
+      | _ -> error (Script_interpreter.Bad_contract_parameter source_contract))
+      >>?= fun () ->
       apply_transaction_to_implicit
         ~ctxt
         ~source:source_contract
         ~amount
         ~pkh
-        ~untyped_parameter:(Some parameters)
         ~external_entrypoint:(Some entrypoint)
         ~before_operation:ctxt_before_op
       >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
