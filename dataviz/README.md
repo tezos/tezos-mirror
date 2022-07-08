@@ -16,8 +16,10 @@ Table of Contents:
 
     - Soon: Endorsement reception delays for a delegate 
 
-How to Install and Run the Project: \
-    - Prerequisite: Chrome OS \
+How to Install and Run the Project: 
+
+    - Prerequisite: Chrome OS 
+    
     - Install the CORS Changer Chrome Plugin, to avoid CORS Policy issues. 
     
 
