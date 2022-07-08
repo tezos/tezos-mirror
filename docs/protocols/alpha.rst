@@ -18,6 +18,20 @@ New Environment Version (V7)
 This protocol requires a different protocol environment than Kathmandu.
 It requires protocol environment V7, compared to V6 for Kathmandu.
 
+Smart Contract Optimistic Rollups (ongoing)
+-------------------------------------------
+
+Rollups supporting execution of smart contracts. (MRs :gl:`!5603`, :gl:`!5606`,
+:gl:`!5447`, :gl:`!5655`, :gl:`!5660`, :gl:`!5680`, :gl:`!5598`, :gl:`!5677`,
+:gl:`!5646`, :gl:`!5686`, :gl:`!5693`, :gl:`!5623`, :gl:`!5687`, :gl:`!5714`,
+:gl:`!5689`, :gl:`!5708`, :gl:`!5565`, :gl:`!5561`, :gl:`!5567`, :gl:`!5332`,
+:gl:`!5628`, :gl:`!5754`, :gl:`!5736`, :gl:`!5784`)
+
+Data Availability Layer (ongoing)
+---------------------------------
+
+Distribution of rollup operations data off-chain. (MRs :gl:`!5711`)
+
 Breaking Changes
 ----------------
 
@@ -27,21 +41,22 @@ RPC Changes
 Operation receipts
 ------------------
 
-Increase_paid_storage
----------------------
-
-- Increase_paid_storage is a new operation that enable a payer to increase the paid storage of a smart contract by some bytes amount. (MR :gl:`!5605`)
-
 Bug Fixes
 ---------
-
-- Fix a discrepancy in gas consumption of contract origination between
-  dry run and actual application (MR :gl:`!5659`)
-
-- Fixes the ``delegated_balance`` rpc, which reported an incorrect value for delegates that have frozen bonds (MR :gl:`!5765`)
 
 Minor Changes
 -------------
 
+- Split internal transactions. (MR :gl:`!5585`)
+
 Internal
 --------
+
+- Get rid of unparsing_mode. (MR :gl:`!5738`)
+
+- Rename internal operation definitions. (MR :gl:`!5737`)
+
+- Remove Coq attributes. (MR :gl:`!5735`)
+
+- Internal refactorings in Michelson typechecker and interpreter. (MRs
+  :gl:`!5586`, :gl:`!5587`)

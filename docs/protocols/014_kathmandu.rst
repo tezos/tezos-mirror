@@ -1,5 +1,5 @@
-Protocol Alpha
-==============
+Protocol Kathmandu
+==================
 
 This page contains all the relevant information for protocol Kathmandu
 (see :ref:`naming_convention`).
@@ -58,12 +58,14 @@ Contract Event Logging
 
 Contracts may now emit events thanks to a new ``EMIT`` instruction.
 
-Event emissions are denoted by internal operations that perform a contract call to a specific class of addresses starting with `ev1`. 
-
-This new class of addresses can be computed with a newly introduced RPC at ``helpers/scripts/event_address``.
-
 See :doc:`Event <../alpha/event>` for more information.
-(MR :gl:`!4656`)
+(MRs :gl:`!4656`, :gl:`!5715`, :gl:`!5724`, :gl:`!5731`)
+
+Increase_paid_storage
+---------------------
+
+- Increase_paid_storage is a new operation that enable a payer to increase the
+  paid storage of a smart contract by some bytes amount. (MR :gl:`!5605`)
 
 Breaking Changes
 ----------------
@@ -103,7 +105,8 @@ RPC Changes
 
   ``/chains/<chain_id>/blocks/<block>/helpers/scripts/run_script_view``
 
-- Deprecate the ``endorsing_rights`` RPC for whole cycles, by deprecating the ``cycle`` parameter. (:gl:`!5082`)
+- Deprecate the ``endorsing_rights`` RPC for whole cycles, by deprecating the
+  ``cycle`` parameter. (MR :gl:`!5082`)
 
 - Some contract RPCs working on originated contracts only may return a different
   error than before on implicit accounts. (MR :gl:`!5373`)
@@ -111,9 +114,13 @@ RPC Changes
 Operation receipts
 ------------------
 
-- Remove field ``consumed_gas``, deprecated in Jakarta. Use field ``consumed_milligas`` instead. (:gl:`!5536`)
+- Remove field ``consumed_gas``, deprecated in Jakarta. Use field
+  ``consumed_milligas`` instead. (MRs :gl:`!5536`, :gl:`!5703`)
 
-- Operations that are both manager operations and internal operations returned by Michelson scripts now have different names for receipt encodings. This concerns transations, originations and delegations, where the word "internal" explicitly appears in the case of internal operation receipts. (:gl:`!5149`)
+- Operations that are both manager operations and internal operations returned
+  by Michelson scripts now have different names for receipt encodings. This
+  concerns transations, originations and delegations, where the word "internal"
+  explicitly appears in the case of internal operation receipts. (:gl:`!5149`)
 
 Bug Fixes
 ---------
@@ -128,6 +135,12 @@ Bug Fixes
 
 - The ``helpers/scripts/run_operation`` RPC now checks whether all
   operations in a batch have the same source. (MR :gl:`!5557`)
+
+- Fix a discrepancy in gas consumption of contract origination between
+  dry run and actual application (MR :gl:`!5659`)
+
+- Fix the ``delegated_balance`` rpc, which reported an incorrect value for
+  delegates that have frozen bonds (MR :gl:`!5765`)
 
 Minor Changes
 -------------
@@ -145,8 +158,10 @@ Minor Changes
 - Fail when attempting to delegate from unrevealed key at bootstrap.
   (MR :gl:`!5645`)
 
-- Allow to register a governance dictator for testnets and private chain.
-  (MR :gl:`!4547`)
+- Allow to register a governance dictator for testnets and private chains.
+  (MRs :gl:`!4547`, :gl:`!5662`, :gl:`!5612`, :gl:`!5751`)
+
+- Update gas for K. (MR :gl:`!5702`)
 
 Internal
 --------
@@ -218,7 +233,9 @@ Internal
 
 - Restrict external transfers to non-tx-rollups. (MR :gl:`!5326`)
 
-- Remove stack types from kinfo. (MR :gl:`!4731`)
+- Remove stack types from kinfo. (MRs :gl:`!4731`, :gl:`!5664`, :gl:`!5676`)
+
+- Fix the size of Micheline code predicted by the size model. (MR :gl:`!5709`)
 
 - Internal refactorings in Michelson typechecker and interpreter. (MRs
   :gl:`!4722`, :gl:`!4723`, :gl:`!5077`, :gl:`!5104`, :gl:`!5474`)

@@ -25,6 +25,10 @@ be documented here either.
 Node
 ----
 
+- Added Kathmandu, a protocol proposal for Mainnet featuring, among others,
+  pipelining of manager operations, improved randomness generation, event
+  logging and support for permanent testnets.
+
 - Fix a bug that leads to forgetting the trusted status of peers when connection
   is lost
 
