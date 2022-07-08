@@ -96,14 +96,8 @@ let dispatch_withdrawals_signer_arg =
 let rollup_id_param =
   let open Client_proto_rollups in
   Clic.parameter ~autocomplete:TxRollupAlias.autocomplete (fun cctxt s ->
-      let open Lwt_result_syntax in
       let from_alias s = TxRollupAlias.find cctxt s in
-      let from_key s =
-        match Protocol.Alpha_context.Tx_rollup.of_b58check s with
-        | Ok x -> return x
-        | Error _ ->
-            failwith "Cannot parse %s as a transaction rollup address" s
-      in
+      let from_key s = TxRollupAlias.of_source s in
       Client_aliases.parse_alternatives
         [("alias", from_alias); ("key", from_key)]
         s)
@@ -200,11 +194,16 @@ let group =
       title = "Commands related to the transaction rollup node";
     }
 
-let config_from_args data_dir rollup_id mode operator batch_signer
-    finalize_commitment_signer remove_commitment_signer rejection_signer
-    dispatch_withdrawals_signer origination_level rpc_addr cors_origins
-    cors_headers allow_deposit reconnection_delay =
+let config_from_args data_dir (rollup_id : Client_proto_rollups.TxRollupAlias.t)
+    mode operator batch_signer finalize_commitment_signer
+    remove_commitment_signer rejection_signer dispatch_withdrawals_signer
+    origination_level rpc_addr cors_origins cors_headers allow_deposit
+    reconnection_delay =
   let open Lwt_syntax in
+  let origination_level =
+    Option.either rollup_id.origination_level origination_level
+  in
+  let rollup_id = rollup_id.rollup in
   let+ data_dir =
     match data_dir with
     | Some d -> return d
@@ -241,10 +240,15 @@ let config_from_args data_dir rollup_id mode operator batch_signer
       batch_burn_limit = None;
     }
 
-let patch_config_from_args config rollup_id mode operator batch_signer
-    finalize_commitment_signer remove_commitment_signer rejection_signer
-    dispatch_withdrawals_signer origination_level rpc_addr cors_origins
-    cors_headers allow_deposit reconnection_delay =
+let patch_config_from_args config
+    (rollup_id : Client_proto_rollups.TxRollupAlias.t) mode operator
+    batch_signer finalize_commitment_signer remove_commitment_signer
+    rejection_signer dispatch_withdrawals_signer origination_level rpc_addr
+    cors_origins cors_headers allow_deposit reconnection_delay =
+  let origination_level =
+    Option.either rollup_id.origination_level origination_level
+  in
+  let rollup_id = rollup_id.rollup in
   if
     Protocol.Alpha_context.Tx_rollup.(rollup_id <> config.Node_config.rollup_id)
   then
