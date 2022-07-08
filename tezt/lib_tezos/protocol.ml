@@ -137,7 +137,7 @@ let write_parameter_file :
 
 let next_protocol = function
   | Ithaca -> Some Jakarta
-  | Jakarta -> None
+  | Jakarta -> Some Kathmandu
   | Kathmandu -> None
   | Alpha -> None
 
