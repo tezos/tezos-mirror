@@ -36,7 +36,7 @@ val slot_header_of_hex : string -> Dal_types.slot_header tzresult
 (** [split_and_store ts store slot] splits [slot] in shards, stores it onto the
     disk and returns the corresponding [slot_header], using trusted setup [ts] *)
 val split_and_store :
-  Cryptobox.trusted_setup ->
+  Cryptobox.srs ->
   Store.t ->
   Dal_types.slot ->
   Dal_types.slot_header tzresult Lwt.t

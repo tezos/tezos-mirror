@@ -45,7 +45,11 @@ module Test = struct
           let shards_amount = shards_amount
         end) in
         let trusted_setup =
-          DAL_crypto.build_trusted_setup_instance `Unsafe_for_test_only
+          DAL_crypto.srs
+            ~redundancy_factor
+            ~slot_size
+            ~slot_segment_size
+            ~shards_amount
           (*(`Files {srs_g1_file; srs_g2_file; logarithm_size = 21})*)
         in
 

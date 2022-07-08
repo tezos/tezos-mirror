@@ -42,6 +42,49 @@ end
 
 module type S = Dal_cryptobox_sigs.S
 
+type srs = {
+  srs_g1 : Bls12_381.G1.t array;
+  srs_g2 : Bls12_381.G2.t array;
+  kate_amortized_srs_g2_shards : Bls12_381.G2.t;
+  kate_amortized_srs_g2_segments : Bls12_381.G2.t;
+}
+
+let srs ~redundancy_factor ~slot_segment_size ~shards_amount ~slot_size : srs =
+  let module Scalar = Bls12_381.Fr in
+  let scalar_bytes_amount = Scalar.size_in_bytes - 1 in
+  let k = 1 lsl Z.(log2up (of_int slot_size / of_int scalar_bytes_amount)) in
+  let n = redundancy_factor * k in
+  let shard_size = n / shards_amount in
+  let evaluations_per_proof_log = Z.(log2 (of_int shard_size)) in
+  let scalar_bytes_amount = Scalar.size_in_bytes - 1 in
+  let segment_len = Int.div slot_segment_size scalar_bytes_amount + 1 in
+  let build_array init next len =
+    let xi = ref init in
+    Array.init len (fun _ ->
+        let i = !xi in
+        xi := next !xi ;
+        i)
+  in
+  let create_srs :
+      type t.
+      (module Bls12_381.CURVE with type t = t) -> int -> Scalar.t -> t array =
+   fun (module G) d x -> build_array G.(copy one) (fun g -> G.(mul g x)) d
+  in
+  let secret =
+    Scalar.of_string
+      "20812168509434597367146703229805575690060615791308155437936410982393987532344"
+  in
+  let srs_g1 = create_srs (module Bls12_381.G1) slot_size secret in
+  let srs_g2 = create_srs (module Bls12_381.G2) slot_size secret in
+  {
+    srs_g1;
+    srs_g2;
+    kate_amortized_srs_g2_shards =
+      Array.get srs_g2 (1 lsl evaluations_per_proof_log);
+    kate_amortized_srs_g2_segments =
+      Array.get srs_g2 (1 lsl Z.(log2up (of_int segment_len)));
+  }
+
 module Make (C : CONSTANTS) : S = struct
   open Kate_amortized
 
@@ -56,6 +99,8 @@ module Make (C : CONSTANTS) : S = struct
   module Domains = Polynomial.Domain
   module Polynomials = Polynomial.Polynomial
   module IntMap = Tezos_error_monad.TzLwtreslib.Map.Make (Int)
+
+  type nonrec srs = srs
 
   type polynomial = Polynomials.t
 
@@ -79,13 +124,6 @@ module Make (C : CONSTANTS) : S = struct
 
   type shards_proofs_precomputation =
     Scalar.t array * proof_slot_segment array array
-
-  type trusted_setup = {
-    srs_g1 : Bls12_381.G1.t array;
-    srs_g2 : Bls12_381.G2.t array;
-    kate_amortized_srs_g2_shards : Bls12_381.G2.t;
-    kate_amortized_srs_g2_segments : Bls12_381.G2.t;
-  }
 
   type trusted_setup_files = {
     srs_g1_file : string;
@@ -196,7 +234,7 @@ module Make (C : CONSTANTS) : S = struct
     (* Shards must contain at least two elements. *)
     assert (n > C.shards_amount)
 
-  let build_trusted_setup_instance = function
+  let _build_trusted_setup_instance = function
     | `Unsafe_for_test_only ->
         let module Scalar = Bls12_381.Fr in
         let build_array init next len =
@@ -262,6 +300,8 @@ module Make (C : CONSTANTS) : S = struct
           kate_amortized_srs_g2_segments =
             Array.get srs_g2 (1 lsl Z.(log2up (of_int segment_len)));
         }
+
+  let srs = srs
 
   let polynomial_degree = Polynomials.degree
 

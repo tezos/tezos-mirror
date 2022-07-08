@@ -229,14 +229,15 @@ module type S = sig
       parameters. *)
   type shards_proofs_precomputation
 
-  type trusted_setup
+  type srs
 
   (** The path to the files of the SRS on G1 and G2 and the log of their size. *)
-  type trusted_setup_files = {
-    srs_g1_file : string;
-    srs_g2_file : string;
-    logarithm_size : int;
-  }
+  val srs :
+    redundancy_factor:int ->
+    slot_segment_size:int ->
+    shards_amount:int ->
+    slot_size:int ->
+    srs
 
   module Encoding : sig
     val commitment_encoding : commitment Data_encoding.t
@@ -256,12 +257,6 @@ module type S = sig
     val shards_proofs_precomputation_encoding :
       shards_proofs_precomputation Data_encoding.t
   end
-
-  (** [build_trusted_setup_instance files] builds a trusted setup from [files]
-      on disk. Warning: if [files] is [`Unsafe_for_test_only] it triggers a
-      computation of an unsafe trusted setup! *)
-  val build_trusted_setup_instance :
-    [`Unsafe_for_test_only | `Files of trusted_setup_files] -> trusted_setup
 
   (** Length of the erasure-encoded slot in terms of scalar elements. *)
   val erasure_encoding_length : int
@@ -293,7 +288,7 @@ module type S = sig
   (** [commit p] returns the commitment to [p]. Errors with
       [`Degree_exceeds_srs_length] if the degree of [p] exceeds the SRS size. *)
   val commit :
-    trusted_setup ->
+    srs ->
     polynomial ->
     (commitment, [> `Degree_exceeds_srs_length of string]) Result.t
 
@@ -301,7 +296,7 @@ module type S = sig
       than [n]. The function fails with [`Degree_exceeds_srs_length] if that is
         not the case. *)
   val prove_degree :
-    trusted_setup ->
+    srs ->
     polynomial ->
     int ->
     (proof_degree, [> `Degree_exceeds_srs_length of string]) Result.t
@@ -310,7 +305,7 @@ module type S = sig
       committed polynomial has degree less than [n], using trusted setup
       [ts]. *)
   val verify_degree :
-    trusted_setup ->
+    srs ->
     commitment ->
     proof_degree ->
     int ->
@@ -318,7 +313,7 @@ module type S = sig
 
   (** [precompute_shards_proofs ts] returns the precomputation used to prove
       shards, using trusted setup [ts]. *)
-  val precompute_shards_proofs : trusted_setup -> shards_proofs_precomputation
+  val precompute_shards_proofs : srs -> shards_proofs_precomputation
 
   (** [save_precompute_shards_proofs precomputation filename ()] saves to file
       [filename] the given [precomputation]. *)
@@ -337,12 +332,12 @@ module type S = sig
   (** [verify_shard ts cm shard proof] returns true if and only if the
       [proof] certifies that the [shard] is comming from the erasure encoding
       of the committed polynomial whose commitment is [cm]. *)
-  val verify_shard : trusted_setup -> commitment -> shard -> proof_shard -> bool
+  val verify_shard : srs -> commitment -> shard -> proof_shard -> bool
 
   (** [prove_single ts p z] returns a proof of evaluation of [p] at [z], using
       trusted setup [ts]. *)
   val prove_single :
-    trusted_setup ->
+    srs ->
     polynomial ->
     Scalar.t ->
     (proof_single, [> `Degree_exceeds_srs_length of string]) Result.t
@@ -351,7 +346,7 @@ module type S = sig
     is correct with regard to the opening ([cm], [point], [evaluation]), using
     the trusted setup [ts]. *)
   val verify_single :
-    trusted_setup ->
+    srs ->
     commitment ->
     point:Scalar.t ->
     evaluation:Scalar.t ->
@@ -362,7 +357,7 @@ module type S = sig
       [polynomial_from_bytes slot], returns proofs for the slot segment] whose
       index is [slot_segment_index], using the trusted setup [ts]. *)
   val prove_slot_segment :
-    trusted_setup ->
+    srs ->
     polynomial ->
     int ->
     ( proof_slot_segment,
@@ -374,7 +369,7 @@ module type S = sig
       certifies that the [slot_segment] is indeed included in the slot committed
       with commitment [cm],  using the trusted setup [ts]. *)
   val verify_slot_segment :
-    trusted_setup ->
+    srs ->
     commitment ->
     slot_segment ->
     proof_slot_segment ->
