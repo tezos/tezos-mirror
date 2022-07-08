@@ -88,6 +88,7 @@ let () =
   Monitor_operations.register ~protocols:[Alpha] ;
   Stresstest_command.register ~protocols:[Alpha] ;
   Big_map_all.register ~protocols:[Alpha] ;
+  Op_validation.register ~protocols ;
   (* Adding a new protocol would require adding samples at ./tezt/tests/encoding_samples directory*)
   Encoding.register ~protocols ;
   Precheck.register ~protocols ;
@@ -135,7 +136,5 @@ let () =
   Test_contract_bls12_381.register ~protocols:[Alpha] ;
   Increase_paid_storage.register ~protocols:[Alpha] ;
   Events.register ~protocols:[Alpha] ;
-  (* Relies on a feature only available since K. *)
-  Op_validation.register ~protocols ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()
