@@ -115,15 +115,15 @@ let () =
     ~to_protocol:Demo
     ~loser_protocols:[Jakarta] ;
   Reject_malformed_micheline.register ~protocols:[Alpha] ;
-  Tx_rollup.register ~protocols:[Jakarta; Kathmandu; Alpha] ;
-  Tx_rollup_node.register ~protocols:[Jakarta; Kathmandu; Alpha] ;
   Manager_operations.register ~protocols ;
   Replace_by_fees.register ~protocols ;
-  Views.register [Alpha] ;
   Runtime_script_failure.register ~protocols ;
   Deposits_limit.register ~protocols ;
-  Large_metadata.register ~protocols:[Alpha] ;
   (* Relies on a feature only available since J. *)
+  Views.register [Alpha] ;
+  Large_metadata.register ~protocols:[Alpha] ;
+  Tx_rollup.register ~protocols:[Jakarta; Kathmandu; Alpha] ;
+  Tx_rollup_node.register ~protocols:[Jakarta; Kathmandu; Alpha] ;
   Run_script.register ~protocols:[Alpha] ;
   Sapling.register ~protocols:[Alpha] ;
   Client_run_view.register ~protocols:[Jakarta; Kathmandu; Alpha] ;
