@@ -60,16 +60,17 @@ let register_protocol_migration_tests () =
   Protocol_migration.register ~migrate_from ~migrate_to ;
   Protocol_table_update.register ~migrate_from ~migrate_to ;
   User_activated_upgrade.register ~migrate_from ~migrate_to ;
-  (* Alpha cannot stitch from Jakarta yet, but when it can, we can
+  (* TODO #3380
+     Alpha cannot stitch from Jakarta yet, but when it can, we can
      add a voting test from Jakarta to Alpha. *)
-  Voting.register
-    ~from_protocol:Ithaca
-    ~to_protocol:(Known Jakarta)
-    ~loser_protocols:[migrate_to] ;
-  Voting.register
-    ~from_protocol:Ithaca
-    ~to_protocol:Injected_test
-    ~loser_protocols:[migrate_to; Ithaca] ;
+  (* Voting.register
+       ~from_protocol:migrate_from
+       ~to_protocol:(Known migrate_to)
+       ~loser_protocols:[migrate_to] ;
+     Voting.register
+       ~from_protocol:migrate_from
+       ~to_protocol:Injected_test
+       ~loser_protocols:[migrate_to; migrate_from] ; *)
   Voting.register
     ~from_protocol:migrate_to
     ~to_protocol:Injected_test
