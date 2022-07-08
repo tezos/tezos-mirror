@@ -35,15 +35,15 @@ exception Encoding_error of Data_encoding.Binary.write_error
 
 exception Malformed_input_info_record
 
-module Make (T : Tree.S) (Wasm : Wasm_pvm.S with type tree = T.tree) :
-  Wasm_pvm.S with type tree = T.tree = struct
+module Make (T : Tree.S) (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
+  Wasm_pvm_sig.S with type tree = T.tree = struct
   type tree = Wasm.tree
 
   type 'a value = 'a Thunk.value
 
   module Thunk = Thunk.Make (T)
   module Decoding = Tree_decoding.Make (T)
-  include Wasm_pvm
+  open Wasm_pvm_sig
 
   (* TYPES *)
 

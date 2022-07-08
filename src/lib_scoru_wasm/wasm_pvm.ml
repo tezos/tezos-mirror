@@ -23,32 +23,39 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type input_info = {
-  inbox_level : Tezos_base.Bounded.Int32.NonNegative.t;
-  message_counter : Z.t;
-}
+(*
 
-type output_info = {
-  outbox_level : Tezos_base.Bounded.Int32.NonNegative.t;
-  message_index : Z.t;
-}
+  This library acts as a dependency to the protocol environment. Everything that
+  must be exposed to the protocol via the environment shall be added here.
 
-type input_request = No_input_required | Input_required
+*)
 
-type info = {
-  current_tick : Z.t;
-  last_input_read : input_info option;
-  input_request : input_request;  (** The current VM input request. *)
-}
+module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
+  type tree = T.tree
 
-module type S = sig
-  type tree
+  module Decodings = Wasm_decodings.Make (T)
 
-  val compute_step : tree -> tree Lwt.t
+  let compute_step = Lwt.return
 
-  val set_input_step : input_info -> string -> tree -> tree Lwt.t
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3092
+     Implement handling of input logic.
+  *)
+  let set_input_step _ _ = Lwt.return
 
-  val get_output : output_info -> tree -> string Lwt.t
+  let get_output _ _ = Lwt.return ""
 
-  val get_info : tree -> info Lwt.t
+  let get_info _ =
+    Lwt.return
+      Wasm_pvm_sig.
+        {
+          current_tick = Z.of_int 0;
+          last_input_read = None;
+          input_request = No_input_required;
+        }
+
+  let _module_instance_of_tree modules =
+    Decodings.run (Decodings.module_instance_decoding modules)
+
+  let _module_instances_of_tree =
+    Decodings.run Decodings.module_instances_decoding
 end

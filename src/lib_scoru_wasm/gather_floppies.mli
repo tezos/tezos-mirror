@@ -27,11 +27,11 @@
     incomplete kernel message. *)
 exception Malformed_origination_message of Data_encoding.Binary.read_error
 
-(** Raised when a message containing a kernel image chunk was expected, but 
+(** Raised when a message containing a kernel image chunk was expected, but
     the message in the inbox contained something else. *)
 exception Malformed_inbox_message of Data_encoding.Binary.read_error
 
-(** Raised when [compute_step] was called when the floppy gathering module 
+(** Raised when [compute_step] was called when the floppy gathering module
     expected input. *)
 exception Compute_step_expected_input
 
@@ -51,5 +51,5 @@ exception Malformed_input_info_record
     image as either a complete kernel in the origination message or a kernel
     image divided into chunks and provided via both origination- and inbox-
     messages. *)
-module Make (T : Tree.S) (Wasm : Wasm_pvm.S with type tree = T.tree) :
-  Wasm_pvm.S with type tree = T.tree
+module Make (T : Tree.S) (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
+  Wasm_pvm_sig.S with type tree = T.tree

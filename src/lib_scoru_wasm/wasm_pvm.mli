@@ -23,56 +23,5 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Represents the location of an input message. *)
-type input_info = {
-  inbox_level : Tezos_base.Bounded.Int32.NonNegative.t;
-      (** The inbox level at which the message exists.*)
-  message_counter : Z.t;  (** The index of the message in the inbox. *)
-}
-
-(** Represents the location of an output message. *)
-type output_info = {
-  outbox_level : Tezos_base.Bounded.Int32.NonNegative.t;
-      (** The outbox level at which the message exists.*)
-  message_index : Z.t;  (** The index of the message in the outbox. *)
-}
-
-(** Represents the state of input requests. *)
-type input_request =
-  | No_input_required  (** The VM does not expect any input. *)
-  | Input_required  (** The VM needs input in order to progress. *)
-
-(** Represents the state of the VM. *)
-type info = {
-  current_tick : Z.t;
-      (** The number of ticks processed by the VM, zero for the initial state.
-          [current_tick] must be incremented for each call to [step] *)
-  last_input_read : input_info option;
-      (** The last message to be read by the VM, if any. *)
-  input_request : input_request;  (** The current VM input request. *)
-}
-
-(** This module type defines a WASM VM API used for smart-contract rollups. *)
-module type S = sig
-  type tree
-
-  (** [compute_step] forwards the VM by one compute tick. If the VM is expecting
-      input, it gets stuck. If the VM is already stuck, this function may
-      raise an exception. *)
-  val compute_step : tree -> tree Lwt.t
-
-  (** [set_input_step] forwards the VM by one input tick. If the VM is not
-      expecting input, it gets stuck. If the VM is already stuck, this function
-      may raise an exception. *)
-  val set_input_step : input_info -> string -> tree -> tree Lwt.t
-
-  (** [get_output output state] returns the payload associated with the given
-      output. The result is meant to be deserialized using
-      [Sc_rollup_PVM_sem.output_encoding]. If the output is missing, this
-      function may raise an exception. *)
-  val get_output : output_info -> tree -> string Lwt.t
-
-  (** [get_info] provides a typed view of the current machine state. Should not
-      raise. *)
-  val get_info : tree -> info Lwt.t
-end
+(** Builds a WASM VM given a concrete implementation of {!Tree.S}. *)
+module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree
