@@ -776,21 +776,48 @@ let notify_synchronized state =
   if old_value = false then
     Lwt_condition.broadcast state.State.sync.on_synchronized ()
 
-let process_head state
-    (current_hash, (current_header : Tezos_base.Block_header.t)) =
+let process_head ?(notify_sync = true) state
+    (current_hash, (current_header : Tezos_base.Block_header.t option)) =
   let open Lwt_result_syntax in
-  State.set_known_tezos_level state current_header.shell.level ;
+  (if notify_sync then
+   match current_header with
+   | None -> ()
+   | Some current_header ->
+       State.set_known_tezos_level state current_header.shell.level) ;
   let*! () = Event.(emit new_block) current_hash in
   let* _, _, blocks_to_commit = process_block state current_hash in
   let* l1_reorg = State.set_tezos_head state current_hash in
-  notify_synchronized state ;
+  if notify_sync then notify_synchronized state ;
   let* () = handle_l1_reorg state () l1_reorg in
   let* () = List.iter_es (commit_block_on_l1 state) blocks_to_commit in
   let* () = batch () in
   let* () = queue_gc_operations state in
   let* () = notify_head state current_hash l1_reorg in
-  let*! () = trigger_injection state current_header in
+  let*! () =
+    match current_header with
+    | None -> Lwt.return_unit
+    | Some current_header -> trigger_injection state current_header
+  in
   return_unit
+
+let look_for_origination_block state block_list =
+  let open Lwt_result_syntax in
+  let rollup_id = state.State.rollup_info.rollup_id in
+  state.State.sync.synchronized <- false ;
+  let rec loop = function
+    | [] -> return_none
+    | block_hash :: rest as block_list ->
+        let* block = State.fetch_tezos_block state block_hash in
+        let*! () =
+          Event.(emit look_for_origination)
+            (block.hash, block.header.shell.level)
+        in
+        if originated_in_block rollup_id block then return_some block_list
+        else (
+          State.notify_processed_tezos_level state block.header.shell.level ;
+          loop rest)
+  in
+  loop block_list
 
 let catch_up_on_commitments state =
   let open Lwt_result_syntax in
@@ -854,7 +881,60 @@ let catch_up_on_commitments state =
       let*! to_commit = missing_commitments [] head in
       List.iter_es (commit_block_on_l1 state) to_commit
 
-let catch_up state = catch_up_on_commitments state
+let catch_up_on_blocks (state : State.t) origination_level =
+  let open Lwt_result_syntax in
+  let* head = Alpha_block_services.Header.shell_header state.cctxt () in
+  let* last_tezos_block = State.get_tezos_head state in
+  let first_handle_level =
+    match last_tezos_block with
+    | Some b -> Some (Int32.succ b.header.shell.level)
+    | None -> origination_level
+  in
+  match first_handle_level with
+  | None -> return_unit
+  | Some first_handle_level ->
+      let missing_levels =
+        Int32.to_int head.level - Int32.to_int first_handle_level + 1
+      in
+      let*! () = Event.(emit missing_blocks) missing_levels in
+      if missing_levels <= 0 then return_unit
+      else
+        let* missing_blocks =
+          Chain_services.Blocks.list state.cctxt ~length:missing_levels ()
+        in
+        let missing_blocks =
+          match missing_blocks with
+          | missing_blocks :: _ -> List.rev missing_blocks
+          | [] -> []
+        in
+        State.set_known_tezos_level state head.level ;
+        let* missing_blocks =
+          match State.get_head state with
+          | Some _ -> return missing_blocks
+          | None -> (
+              (* No L2 blocks processed yet, look for origination first *)
+              let* missing_blocks =
+                look_for_origination_block state missing_blocks
+              in
+              match missing_blocks with
+              | None -> tzfail Tx_rollup_originated_in_fork
+              | Some missing_blocks -> return missing_blocks)
+        in
+        let+ () =
+          List.iter_es
+            (fun block ->
+              let*! res = process_head ~notify_sync:false state (block, None) in
+              match res with
+              | Error (Tx_rollup_originated_in_fork :: _) -> return_unit
+              | _ -> Lwt.return res)
+            missing_blocks
+        in
+        notify_synchronized state
+
+let catch_up state =
+  let open Lwt_result_syntax in
+  let* () = catch_up_on_commitments state in
+  catch_up_on_blocks state state.State.rollup_info.origination_level
 (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2958
    We may also need to catch up on finalization/removal of commitments here. *)
 
@@ -978,8 +1058,8 @@ let run configuration cctxt =
           in
           let*! () =
             Lwt_stream.iter_s
-              (fun head ->
-                let*! r = process_head state head in
+              (fun (head, header) ->
+                let*! r = process_head state (head, Some header) in
                 match r with
                 | Ok _ -> Lwt.return ()
                 | Error trace when is_connection_error trace ->

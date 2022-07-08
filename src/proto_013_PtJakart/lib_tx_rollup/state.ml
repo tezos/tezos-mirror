@@ -107,6 +107,15 @@ let set_tezos_head state new_head_hash =
   in
   return reorg
 
+let get_tezos_head state =
+  let open Lwt_result_syntax in
+  let*! block = Stores.Tezos_head_store.read state.stores.tezos_head in
+  match block with
+  | None -> return None
+  | Some block ->
+      let+ block = fetch_tezos_block state block in
+      Some block
+
 let save_tezos_block_info state block l2_block ~level ~predecessor =
   Stores.Tezos_block_store.add
     state.stores.tezos_blocks

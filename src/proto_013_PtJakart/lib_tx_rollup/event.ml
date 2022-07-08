@@ -112,12 +112,29 @@ let processing_block =
     ("block_hash", Block_hash.encoding)
     ("predecessor_hash", Block_hash.encoding)
 
+let missing_blocks =
+  declare_1
+    ~section
+    ~name:"tx_rollup_node_missing_blocks"
+    ~msg:"Rollup node needs to process {nb} missing Tezos blocks"
+    ~level:Notice
+    ("nb", Data_encoding.int31)
+
+let look_for_origination =
+  declare_2
+    ~section
+    ~name:"tx_rollup_node_look_for_origination"
+    ~msg:"Looking for rollup origination in block {block} level {level}"
+    ~level:Notice
+    ("block", Block_hash.encoding)
+    ("level", Data_encoding.int32)
+
 let detected_origination =
   declare_2
     ~section
     ~name:"tx_rollup_node_detected_origination"
     ~msg:"Detected rollup {rollup} origination in {block}"
-    ~level:Debug
+    ~level:Notice
     ("rollup", Protocol.Alpha_context.Tx_rollup.encoding)
     ("block", Block_hash.encoding)
 
