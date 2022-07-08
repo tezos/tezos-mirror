@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,51 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Protocol store *)
+
+(** The type for the protocol store. *)
 type t
 
-type config = {
-  genesis : Genesis.t;
-  chain_name : Distributed_db_version.Name.t;
-  sandboxed_chain_name : Distributed_db_version.Name.t;
-  user_activated_upgrades : User_activated.upgrades;
-  user_activated_protocol_overrides : User_activated.protocol_overrides;
-  operation_metadata_size_limit : int option;
-  data_dir : string;
-  store_root : string;
-  context_root : string;
-  protocol_root : string;
-  patch_context :
-    (Tezos_protocol_environment.Context.t ->
-    Tezos_protocol_environment.Context.t tzresult Lwt.t)
-    option;
-  p2p : (P2p.config * P2p.limits) option;
-  target : (Block_hash.t * int32) option;
-  disable_mempool : bool;
-      (** If [true], all non-empty mempools will be ignored. *)
-  enable_testchain : bool;
-      (** If [false], testchain related messages will be ignored. *)
-}
+(** [mem pstore proto_hash] tests the existence of the protocol
+    indexed by [proto_hash] in the store. *)
+val mem : t -> Protocol_hash.t -> bool
 
-val default_peer_validator_limits : Peer_validator.limits
+(** [all pstore] returns the set of all stored protocols in [pstore]. *)
+val all : t -> Protocol_hash.Set.t
 
-val default_prevalidator_limits : Prevalidator.limits
+(** [raw_store pstore proto_hash proto_bytes] stores on disk the
+    protocol [proto_bytes] (encoded bytes) indexed as
+    [proto_hash]. Returns [None] if the protocol already exists. *)
+val raw_store : t -> Protocol_hash.t -> bytes -> Protocol_hash.t option Lwt.t
 
-val default_block_validator_limits : Block_validator.limits
+(** [store pstore proto_hash protocol] stores on disk the protocol
+    [protocol] indexed as [proto_hash]. Returns [None] if the protocol
+    already exists. *)
+val store : t -> Protocol_hash.t -> Protocol.t -> Protocol_hash.t option Lwt.t
 
-val default_chain_validator_limits : Chain_validator.limits
+(** [read pstore proto_hash] reads from [pstore] and returns the
+   protocol indexed by [proto_hash]. Returns [None] if the protocol
+   cannot be read. *)
+val read : t -> Protocol_hash.t -> Protocol.t option Lwt.t
 
-val create :
-  ?sandboxed:bool ->
-  ?sandbox_parameters:Data_encoding.json ->
-  singleprocess:bool ->
-  config ->
-  Peer_validator.limits ->
-  Block_validator.limits ->
-  Prevalidator.limits ->
-  Chain_validator.limits ->
-  History_mode.t option ->
-  t tzresult Lwt.t
-
-val shutdown : t -> unit Lwt.t
-
-val build_rpc_directory : t -> unit RPC_directory.t
+(** [init store_dir] creates a store relatively to [store_dir] path
+    or loads it if it already exists. *)
+val init : [`Store_dir] Naming.directory -> t Lwt.t

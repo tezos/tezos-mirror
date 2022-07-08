@@ -69,7 +69,7 @@ let chain_id = Chain_id.of_block_hash genesis_block_hash
 
 let patch_context ctxt =
   let open Lwt_syntax in
-  let* v = Context.add ctxt ["version"] (Bytes.of_string "demo_noops") in
+  let* v = Context_ops.add ctxt ["version"] (Bytes.of_string "demo_noops") in
   return_ok v
 
 (** [init_chain base_dir] with working directory [base_dir] returns a new state

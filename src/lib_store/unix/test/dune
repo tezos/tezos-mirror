@@ -1,11 +1,15 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name test)
+(executables
+ (names test test_locator)
  (libraries
   tezos-base
-  tezos-store
+  tezos-context-ops
+  tezos-store.shared
+  tezos-store.unix
+  tezos-store.unix-reconstruction
+  tezos-store.unix-snapshots
   tezos-shell-services
   tezos-stdlib-unix
   tezos-validation
@@ -20,7 +24,11 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_store
+  -open Tezos_context_ops
+  -open Tezos_store_shared
+  -open Tezos_store_unix
+  -open Tezos_store_unix_reconstruction
+  -open Tezos_store_unix_snapshots
   -open Tezos_shell_services
   -open Tezos_stdlib_unix
   -open Tezos_validation
@@ -35,3 +43,8 @@
 (rule
  (alias test_slow_manual)
  (action (setenv SLOW_TEST true (run %{exe:test.exe}))))
+
+(rule
+ (alias runtest_locator_bench)
+ (package tezos-store)
+ (action (run %{exe:test_locator.exe} --bench)))

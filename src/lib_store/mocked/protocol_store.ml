@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,51 +23,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t
+module Protocol_table = Protocol_hash.Table
 
-type config = {
-  genesis : Genesis.t;
-  chain_name : Distributed_db_version.Name.t;
-  sandboxed_chain_name : Distributed_db_version.Name.t;
-  user_activated_upgrades : User_activated.upgrades;
-  user_activated_protocol_overrides : User_activated.protocol_overrides;
-  operation_metadata_size_limit : int option;
-  data_dir : string;
-  store_root : string;
-  context_root : string;
-  protocol_root : string;
-  patch_context :
-    (Tezos_protocol_environment.Context.t ->
-    Tezos_protocol_environment.Context.t tzresult Lwt.t)
-    option;
-  p2p : (P2p.config * P2p.limits) option;
-  target : (Block_hash.t * int32) option;
-  disable_mempool : bool;
-      (** If [true], all non-empty mempools will be ignored. *)
-  enable_testchain : bool;
-      (** If [false], testchain related messages will be ignored. *)
-}
+type t = Protocol.t Protocol_table.t
 
-val default_peer_validator_limits : Peer_validator.limits
+let mem table protocol_hash = Protocol_hash.Table.mem table protocol_hash
 
-val default_prevalidator_limits : Prevalidator.limits
+let all table = Protocol_table.to_seq_keys table |> Protocol_hash.Set.of_seq
 
-val default_block_validator_limits : Block_validator.limits
+let raw_store store protocol_hash bytes =
+  if mem store protocol_hash then Lwt.return_none
+  else
+    let protocol_opt = Protocol.of_bytes bytes in
+    match protocol_opt with
+    | None -> Lwt.return_none
+    | Some proto ->
+        Protocol_table.add store protocol_hash proto ;
+        Lwt.return_some protocol_hash
 
-val default_chain_validator_limits : Chain_validator.limits
+let store store protocol_hash protocol =
+  if mem store protocol_hash then Lwt.return_none
+  else (
+    Protocol_table.add store protocol_hash protocol ;
+    Lwt.return_some protocol_hash)
 
-val create :
-  ?sandboxed:bool ->
-  ?sandbox_parameters:Data_encoding.json ->
-  singleprocess:bool ->
-  config ->
-  Peer_validator.limits ->
-  Block_validator.limits ->
-  Prevalidator.limits ->
-  Chain_validator.limits ->
-  History_mode.t option ->
-  t tzresult Lwt.t
+let read store protocol_hash =
+  Lwt.return @@ Protocol_table.find_opt store protocol_hash
 
-val shutdown : t -> unit Lwt.t
-
-val build_rpc_directory : t -> unit RPC_directory.t
+let init _store_dir = Lwt.return @@ Protocol_table.create 11

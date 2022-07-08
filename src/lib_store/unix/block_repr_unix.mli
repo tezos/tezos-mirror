@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,51 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t
+open Block_repr
 
-type config = {
-  genesis : Genesis.t;
-  chain_name : Distributed_db_version.Name.t;
-  sandboxed_chain_name : Distributed_db_version.Name.t;
-  user_activated_upgrades : User_activated.upgrades;
-  user_activated_protocol_overrides : User_activated.protocol_overrides;
-  operation_metadata_size_limit : int option;
-  data_dir : string;
-  store_root : string;
-  context_root : string;
-  protocol_root : string;
-  patch_context :
-    (Tezos_protocol_environment.Context.t ->
-    Tezos_protocol_environment.Context.t tzresult Lwt.t)
-    option;
-  p2p : (P2p.config * P2p.limits) option;
-  target : (Block_hash.t * int32) option;
-  disable_mempool : bool;
-      (** If [true], all non-empty mempools will be ignored. *)
-  enable_testchain : bool;
-      (** If [false], testchain related messages will be ignored. *)
-}
+(** Unix-dependent accessors for {!Block_repr}. *)
 
-val default_peer_validator_limits : Peer_validator.limits
+(** [read_next_block_exn fd] reads from [fd] and decode the next block
+   found in the descriptor. The [fd]'s offset is moved as a side
+   effect. This returns the decoded block along with the block length
+   (number of bytes) of the encoded block. This function updates the
+   given [fd] state and may raise Unix.error errors, see Unix.read. *)
+val read_next_block_exn : Lwt_unix.file_descr -> (t * int) Lwt.t
 
-val default_prevalidator_limits : Prevalidator.limits
+(** Same as [read_next_block fd] but returns [None] if there was an
+    error. *)
+val read_next_block : Lwt_unix.file_descr -> (t * int) option Lwt.t
 
-val default_block_validator_limits : Block_validator.limits
+(** [pread_block_exn fd ~file_offset] reads from [fd] and decode the
+   block at offset [file_offset] in the descriptor. This returns the
+   decoded block along with the block length (number of bytes) of the
+   encoded block. This function may raise Unix.error errors, see
+   Unix.read. *)
+val pread_block_exn : Lwt_unix.file_descr -> file_offset:int -> (t * int) Lwt.t
 
-val default_chain_validator_limits : Chain_validator.limits
-
-val create :
-  ?sandboxed:bool ->
-  ?sandbox_parameters:Data_encoding.json ->
-  singleprocess:bool ->
-  config ->
-  Peer_validator.limits ->
-  Block_validator.limits ->
-  Prevalidator.limits ->
-  Chain_validator.limits ->
-  History_mode.t option ->
-  t tzresult Lwt.t
-
-val shutdown : t -> unit Lwt.t
-
-val build_rpc_directory : t -> unit RPC_directory.t
+(** Same as [pread_block fd ~file_offset] but returns [None] if there
+    was an error. *)
+val pread_block :
+  Lwt_unix.file_descr -> file_offset:int -> (t * int) option Lwt.t

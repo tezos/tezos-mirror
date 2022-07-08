@@ -4,7 +4,6 @@
 (executables
  (names
   test_shell
-  test_locator
   test_synchronisation_heuristic_fuzzy
   test_prevalidation
   test_prevalidation_t
@@ -16,7 +15,9 @@
   tezos-base
   tezos-base-test-helpers
   tezos-store
+  tezos-store.shared
   tezos-context
+  tezos-context-ops
   tezos-shell-context
   tezos-protocol-updater
   tezos-p2p
@@ -35,7 +36,9 @@
   -open Tezos_base.TzPervasives
   -open Tezos_base_test_helpers
   -open Tezos_store
+  -open Tezos_store_shared
   -open Tezos_context
+  -open Tezos_context_ops
   -open Tezos_shell_context
   -open Tezos_protocol_updater
   -open Tezos_p2p
@@ -50,11 +53,6 @@
  (alias runtest)
  (package tezos-shell)
  (action (run %{dep:./test_shell.exe})))
-
-(rule
- (alias runtest)
- (package tezos-shell)
- (action (run %{dep:./test_locator.exe})))
 
 (rule
  (alias runtest)
@@ -90,8 +88,3 @@
  (alias runtest)
  (package tezos-shell)
  (action (run %{dep:./test_peer_validator.exe})))
-
-(rule
- (alias runtest_locator_bench)
- (package tezos-shell)
- (action (run %{exe:test_locator.exe} --bench)))

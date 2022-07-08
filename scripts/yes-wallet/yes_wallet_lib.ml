@@ -673,7 +673,7 @@ let load_mainnet_bakers_public_keys base_dir active_bakers_only
   let header = Store.Block.header block in
   let*! context =
     let*! r = Store.Block.context_exn main_chain_store block in
-    Lwt.return @@ Tezos_shell_context.Shell_context.wrap_disk_context r
+    Lwt.return r
   in
   let*! protocol_hash = Store.Block.protocol_hash_exn main_chain_store block in
   let header = header.shell in

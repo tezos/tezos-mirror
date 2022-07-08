@@ -27,5 +27,5 @@
 val patch_context :
   Genesis.t ->
   (string * Data_encoding.json) option ->
-  Context.t ->
-  Context.t tzresult Lwt.t
+  Tezos_protocol_environment.Context.t ->
+  Tezos_protocol_environment.Context.t tzresult Lwt.t

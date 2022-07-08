@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2020-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,51 +23,42 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t
+(** Persistent data manager.
 
-type config = {
-  genesis : Genesis.t;
-  chain_name : Distributed_db_version.Name.t;
-  sandboxed_chain_name : Distributed_db_version.Name.t;
-  user_activated_upgrades : User_activated.upgrades;
-  user_activated_protocol_overrides : User_activated.protocol_overrides;
-  operation_metadata_size_limit : int option;
-  data_dir : string;
-  store_root : string;
-  context_root : string;
-  protocol_root : string;
-  patch_context :
-    (Tezos_protocol_environment.Context.t ->
-    Tezos_protocol_environment.Context.t tzresult Lwt.t)
-    option;
-  p2p : (P2p.config * P2p.limits) option;
-  target : (Block_hash.t * int32) option;
-  disable_mempool : bool;
-      (** If [true], all non-empty mempools will be ignored. *)
-  enable_testchain : bool;
-      (** If [false], testchain related messages will be ignored. *)
-}
+    Every data read/write operation is protected by a mutex preventing
+    concurrent data-races. *)
 
-val default_peer_validator_limits : Peer_validator.limits
+(** The type for the persistent data. *)
+type 'a t
 
-val default_prevalidator_limits : Prevalidator.limits
+(** [get data] accesses the data (cached). *)
+val get : 'a t -> 'a Lwt.t
 
-val default_block_validator_limits : Block_validator.limits
+(** [write data value] overwrites the previous [data] with the new
+    [value]. *)
+val write : 'a t -> 'a -> unit tzresult Lwt.t
 
-val default_chain_validator_limits : Chain_validator.limits
+(** [write_file encoded_file value] raw writes the [encoded_file] with
+   the [value].
 
-val create :
-  ?sandboxed:bool ->
-  ?sandbox_parameters:Data_encoding.json ->
-  singleprocess:bool ->
-  config ->
-  Peer_validator.limits ->
-  Block_validator.limits ->
-  Prevalidator.limits ->
-  Chain_validator.limits ->
-  History_mode.t option ->
-  t tzresult Lwt.t
+    {b Warning} this function should not be used in a normal context
+   as it aims to overwrite the target without preserving data
+   races. Favour the usage of [write]. *)
+val write_file : ('kind, 'a) Naming.encoded_file -> 'a -> unit tzresult Lwt.t
 
-val shutdown : t -> unit Lwt.t
+(** [update_with data f] {b atomically} updates [data] with the result
+    of the application of [f]. Concurrent accesses to the data will
+    block until the value is updated.
 
-val build_rpc_directory : t -> unit RPC_directory.t
+    {b Warning} Calling read/write in [f] will result in a deadlock. *)
+val update_with : 'a t -> ('a -> 'a Lwt.t) -> unit tzresult Lwt.t
+
+(** [load encoded_file] loads and decode a data from an
+    [encoded_file]. *)
+val load : ('kind, 'a) Naming.encoded_file -> 'a t tzresult Lwt.t
+
+(** [init encoded_file ~initial_data] creates or load an on-disk
+    data. If the file already exists, then the data is read from the
+    file. Otherwise, [initial_data] is used. *)
+val init :
+  ('kind, 'a) Naming.encoded_file -> initial_data:'a -> 'a t tzresult Lwt.t

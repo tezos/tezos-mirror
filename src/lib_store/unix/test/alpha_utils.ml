@@ -151,7 +151,6 @@ let make_rpc_context ~chain_id ctxt block =
     Tezos_base.Block_header.hash
       {shell = header; protocol_data = Store.Block.protocol_data block}
   in
-  let ctxt = Shell_context.wrap_disk_context ctxt in
   let*! value_of_key =
     Main.value_of_key
       ~chain_id
@@ -438,13 +437,12 @@ let patch_context ctxt ~json =
   let proto_params =
     Data_encoding.Binary.to_bytes_exn Data_encoding.json json
   in
-  let* ctxt = Context.add ctxt ["version"] (Bytes.of_string "genesis") in
-  let* ctxt = Context.add ctxt protocol_param_key proto_params in
-  let ctxt = Shell_context.wrap_disk_context ctxt in
+  let* ctxt = Context_ops.add ctxt ["version"] (Bytes.of_string "genesis") in
+  let* ctxt = Context_ops.add ctxt protocol_param_key proto_params in
   let* r = Main.init Chain_id.zero ctxt shell in
   match r with
   | Error e -> failwith "%a" Environment.Error_monad.pp_trace e
-  | Ok {context; _} -> return_ok (Shell_context.unwrap_disk_context context)
+  | Ok {context; _} -> return_ok context
 
 let default_patch_context ctxt =
   patch_context
@@ -486,14 +484,14 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
   let*! context =
     match Store.Block.block_metadata_hash pred with
     | None -> Lwt.return ctxt
-    | Some hash -> Context.add_predecessor_block_metadata_hash ctxt hash
+    | Some hash -> Context_ops.add_predecessor_block_metadata_hash ctxt hash
   in
   let*! ctxt =
     match Store.Block.all_operations_metadata_hash pred with
     | None -> Lwt.return context
-    | Some hash -> Context.add_predecessor_ops_metadata_hash context hash
+    | Some hash -> Context_ops.add_predecessor_ops_metadata_hash context hash
   in
-  let predecessor_context = Shell_context.wrap_disk_context ctxt in
+  let predecessor_context = ctxt in
   let* element_of_key =
     element_of_key
       ~chain_id

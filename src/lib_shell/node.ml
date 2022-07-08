@@ -127,7 +127,10 @@ type config = {
   store_root : string;
   context_root : string;
   protocol_root : string;
-  patch_context : (Context.t -> Context.t tzresult Lwt.t) option;
+  patch_context :
+    (Tezos_protocol_environment.Context.t ->
+    Tezos_protocol_environment.Context.t tzresult Lwt.t)
+    option;
   p2p : (P2p.config * P2p.limits) option;
   target : (Block_hash.t * int32) option;
   disable_mempool : bool;

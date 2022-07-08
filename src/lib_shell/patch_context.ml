@@ -30,14 +30,13 @@ let patch_context (genesis : Genesis.t) key_json ctxt =
     match key_json with
     | None -> Lwt.return ctxt
     | Some (key, json) ->
-        Tezos_context.Context.add
+        Context_ops.add
           ctxt
           [key]
           (Data_encoding.Binary.to_bytes_exn Data_encoding.json json)
   in
   let* proto = Registered_protocol.get_result genesis.protocol in
   let module Proto = (val proto) in
-  let ctxt = Shell_context.wrap_disk_context ctxt in
   let* {context; _} =
     Proto.init
       (Chain_id.of_block_hash genesis.block)
@@ -53,4 +52,4 @@ let patch_context (genesis : Genesis.t) key_json ctxt =
         context = Context_hash.zero;
       }
   in
-  return (Shell_context.unwrap_disk_context context)
+  return context

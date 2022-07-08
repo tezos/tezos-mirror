@@ -51,7 +51,10 @@ let () =
 module type CHAIN_STORE = sig
   type chain_store
 
-  val context : chain_store -> Store.Block.t -> Context.t tzresult Lwt.t
+  val context :
+    chain_store ->
+    Store.Block.t ->
+    Tezos_protocol_environment.Context.t tzresult Lwt.t
 
   val chain_id : chain_store -> Chain_id.t
 end
@@ -185,9 +188,6 @@ module MakeAbstract
       Store.Block.header predecessor
     in
     let* predecessor_context = Chain_store.context chain_store predecessor in
-    let predecessor_context =
-      Shell_context.wrap_disk_context predecessor_context
-    in
     let predecessor_hash = Store.Block.hash predecessor in
     let*! predecessor_context =
       Block_validation.update_testchain_status

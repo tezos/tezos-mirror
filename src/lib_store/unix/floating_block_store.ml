@@ -73,7 +73,7 @@ let read_block_and_predecessors floating_store hash =
             Floating_block_index.find floating_store.floating_block_index hash
           in
           let* o =
-            Block_repr.pread_block floating_store.fd ~file_offset:offset
+            Block_repr_unix.pread_block floating_store.fd ~file_offset:offset
           in
           match o with
           | Some (block, _) -> Lwt.return_some (block, predecessors)
@@ -150,7 +150,7 @@ let iter_s_raw_fd f fd =
   let rec loop nb_bytes_left =
     if nb_bytes_left = 0 then return_unit
     else
-      let*! o = Block_repr.read_next_block fd in
+      let*! o = Block_repr_unix.read_next_block fd in
       match o with
       | None -> return_unit
       | Some (block, length) ->
@@ -310,7 +310,7 @@ let full_integrity_check chain_dir kind =
           let rec loop index fd nb_bytes_left count =
             if nb_bytes_left = 0 then Lwt.return_false
             else
-              let* o = Block_repr.read_next_block fd in
+              let* o = Block_repr_unix.read_next_block fd in
               match o with
               | None ->
                   (* Returns None if the next block could not be

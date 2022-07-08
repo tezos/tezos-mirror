@@ -1925,11 +1925,11 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     let stream, bpush = Lwt_stream.create_bounded 1000 in
     (* Retrieve first floating block *)
     let* first_block =
-      let*! o = Block_repr.read_next_block floating_ro_fd in
+      let*! o = Block_repr_unix.read_next_block floating_ro_fd in
       match o with
       | Some (block, _length) -> return block
       | None -> (
-          let*! o = Block_repr.read_next_block floating_rw_fd in
+          let*! o = Block_repr_unix.read_next_block floating_rw_fd in
           match o with
           | Some (block, _length) -> return block
           | None ->
@@ -2999,7 +2999,7 @@ module Raw_importer : IMPORTER = struct
         if nb_bytes_left < 0 then tzfail Corrupted_floating_store
         else if nb_bytes_left = 0 then return_unit
         else
-          let*! block, len_read = Block_repr.read_next_block_exn fd in
+          let*! block, len_read = Block_repr_unix.read_next_block_exn fd in
           let* () =
             Block_repr.check_block_consistency ~genesis_hash ?pred_block block
           in
@@ -3285,7 +3285,7 @@ module Tar_importer : IMPORTER = struct
           else if nb_bytes_left = 0L then return_unit
           else
             let*! block, len_read =
-              Block_repr.read_next_block_exn floating_blocks_file_fd
+              Block_repr_unix.read_next_block_exn floating_blocks_file_fd
             in
             let* () =
               Block_repr.check_block_consistency ~genesis_hash ?pred_block block
@@ -3323,7 +3323,9 @@ module type Snapshot_importer = sig
 
   val import :
     snapshot_path:string ->
-    ?patch_context:(Context.t -> Context.t tzresult Lwt.t) ->
+    ?patch_context:
+      (Tezos_protocol_environment.Context.t ->
+      Tezos_protocol_environment.Context.t tzresult Lwt.t) ->
     ?block:Block_hash.t ->
     ?check_consistency:bool ->
     dst_store_dir:[`Store_dir] Naming.directory ->
@@ -3661,6 +3663,15 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     in
     let* legacy = Version.is_legacy snapshot_version in
     let indexing_strategy = if legacy then `Always else `Minimal in
+    let patch_context =
+      Option.map
+        (fun f ctxt ->
+          let open Tezos_shell_context in
+          let ctxt = Shell_context.wrap_disk_context ctxt in
+          let+ ctxt = f ctxt in
+          Shell_context.unwrap_disk_context ctxt)
+        patch_context
+    in
     let*! context_index =
       Context.init
         ~readonly:false

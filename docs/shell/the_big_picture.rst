@@ -294,7 +294,7 @@ run them.
    (in directory :src:`src/lib_context/test/`):
    tests for the versioned key-value context.
  - :package-name:`tezos-store`
-   (in directory :src:`src/lib_store/test/`):
+   (in directory :src:`src/lib_store/unix/test/`):
    tests for the on-disk store.
  - :package-name:`tezos-protocol-alpha`
    (in directory :src:`src/proto_alpha/lib_protocol/test/`):

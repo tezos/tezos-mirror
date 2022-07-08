@@ -486,7 +486,7 @@ let read_block fd block_number =
   in
   let* _ofs = Lwt_unix.lseek fd offset Unix.SEEK_SET in
   (* We move the cursor to the element's position *)
-  let* block, _len = Block_repr.read_next_block_exn fd in
+  let* block, _len = Block_repr_unix.read_next_block_exn fd in
   Lwt.return block
 
 let get_lowest_cemented_level cemented_store =
@@ -854,7 +854,7 @@ let check_indexes_consistency ?(post_step = fun () -> Lwt.return_unit)
                            (Bad_offset
                               {level = n; cycle = Naming.file_path file}))
                     in
-                    let*! block, _ = Block_repr.read_next_block_exn fd in
+                    let*! block, _ = Block_repr_unix.read_next_block_exn fd in
                     let* () =
                       fail_unless
                         Compare.Int32.(

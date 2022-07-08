@@ -195,12 +195,12 @@ module Internal_validator_process = struct
     let context_hash = predecessor_block_header.shell.context in
     let context_index = get_context_index chain_store in
     let* predecessor_context =
-      let*! o = Context.checkout context_index context_hash in
+      let*! o = Context_ops.checkout context_index context_hash in
       match o with
       | None ->
           tzfail
             (Block_validator_errors.Failed_to_checkout_context context_hash)
-      | Some ctx -> return (Shell_context.wrap_disk_context ctx)
+      | Some ctx -> return ctx
     in
     let predecessor_block_metadata_hash =
       Store.Block.block_metadata_hash predecessor
@@ -267,12 +267,12 @@ module Internal_validator_process = struct
     in
     let context_hash = predecessor_shell_header.Block_header.context in
     let* predecessor_context =
-      let*! o = Context.checkout context_index context_hash in
+      let*! o = Context_ops.checkout context_index context_hash in
       match o with
       | None ->
           tzfail
             (Block_validator_errors.Failed_to_checkout_context context_hash)
-      | Some ctx -> return (Shell_context.wrap_disk_context ctx)
+      | Some ctx -> return ctx
     in
     let user_activated_upgrades = validator.user_activated_upgrades in
     let user_activated_protocol_overrides =
@@ -312,12 +312,12 @@ module Internal_validator_process = struct
     let predecessor_block_header = Store.Block.header predecessor in
     let context_hash = predecessor_block_header.Block_header.shell.context in
     let* predecessor_context =
-      let*! o = Context.checkout context_index context_hash in
+      let*! o = Context_ops.checkout context_index context_hash in
       match o with
       | None ->
           tzfail
             (Block_validator_errors.Failed_to_checkout_context context_hash)
-      | Some ctx -> return (Shell_context.wrap_disk_context ctx)
+      | Some ctx -> return ctx
     in
     let cache =
       match validator.cache with
@@ -338,7 +338,7 @@ module Internal_validator_process = struct
   let commit_genesis validator ~chain_id =
     let context_index = get_context_index validator.chain_store in
     let genesis = Store.Chain.genesis validator.chain_store in
-    Context.commit_genesis
+    Context_ops.commit_genesis
       context_index
       ~chain_id
       ~time:genesis.time
@@ -348,7 +348,6 @@ module Internal_validator_process = struct
     let open Lwt_result_syntax in
     let forked_header = Store.Block.header forking_block in
     let* context = Store.Block.context validator.chain_store forking_block in
-    let context = Shell_context.wrap_disk_context context in
     Block_validation.init_test_chain chain_id context forked_header
 
   let reconfigure_event_logging _ _ = Lwt_result_syntax.return_unit

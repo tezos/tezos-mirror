@@ -210,7 +210,7 @@ let may_update_protocol_level chain_store ~block =
   let new_proto_level = Store.Block.proto_level block in
   if Compare.Int.(prev_proto_level < new_proto_level) then
     let* context = Store.Block.context chain_store block in
-    let*! new_protocol = Context.get_protocol context in
+    let*! new_protocol = Context_ops.get_protocol context in
     Store.Chain.may_update_protocol_level
       chain_store
       ~pred
@@ -223,8 +223,12 @@ let may_switch_test_chain w active_chains spawn_child block =
   let nv = Worker.state w in
   let may_create_child block test_protocol expiration forking_block_hash =
     let block_header = Store.Block.header block in
-    let genesis_hash = Context.compute_testchain_genesis forking_block_hash in
-    let testchain_id = Context.compute_testchain_chain_id genesis_hash in
+    let genesis_hash =
+      Tezos_context_disk.Context.compute_testchain_genesis forking_block_hash
+    in
+    let testchain_id =
+      Tezos_context_disk.Context.compute_testchain_chain_id genesis_hash
+    in
     let*! activated =
       match nv.child with
       | None -> Lwt.return_false

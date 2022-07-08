@@ -1,0 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_store_real)
+ (public_name tezos-store.real)
+ (implements tezos-store)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-store.unix)
+ (flags
+  (:standard)
+  -open Tezos_store_unix))
