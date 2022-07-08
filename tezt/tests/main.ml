@@ -63,7 +63,6 @@ let () =
   Baker_test.register ~protocols:[Alpha] ;
   Signer_test.register ~protocols:[Alpha] ;
   Basic.register ~protocols:[Alpha] ;
-  Vdf_test.register ~protocols:[Kathmandu; Alpha] ;
   Client_config.register ~protocols:[Alpha] ;
   Client_commands.register ~protocols ;
   Global_constants.register ~protocols:[Alpha] ;
@@ -120,7 +119,6 @@ let () =
   Tx_rollup_node.register ~protocols:[Jakarta; Kathmandu; Alpha] ;
   Manager_operations.register ~protocols ;
   Replace_by_fees.register ~protocols ;
-  Sc_rollup.register ~protocols:[Alpha] ;
   Views.register [Alpha] ;
   Runtime_script_failure.register ~protocols ;
   Deposits_limit.register ~protocols ;
@@ -136,5 +134,7 @@ let () =
   Test_contract_bls12_381.register ~protocols:[Alpha] ;
   Increase_paid_storage.register ~protocols:[Alpha] ;
   Events.register ~protocols:[Alpha] ;
+  Sc_rollup.register ~protocols:[Alpha] ;
+  Vdf_test.register ~protocols:[Kathmandu; Alpha] ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()
