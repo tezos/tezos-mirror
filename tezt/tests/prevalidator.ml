@@ -2230,7 +2230,7 @@ let check_if_op_is_in_mempool client ~classification oph =
       in
       if res then Test.fail "%s found in mempool" oph else unit
 
-let get_endorsement_as_bytes ~protocol client =
+let get_endorsement_as_bytes client =
   let* mempool = RPC.get_mempool_pending_operations client in
   let open JSON in
   let ops_list = as_list (mempool |-> "applied") in
@@ -2275,53 +2275,48 @@ let get_endorsement_as_bytes ~protocol client =
           e
   in
   let wrapped_bytes =
-    match protocol with
-    | Protocol.Ithaca | Protocol.Jakarta | Protocol.Kathmandu | Protocol.Alpha
-      ->
-        let signature = get_signature op in
-        let kind = JSON.get "kind" contents |> JSON.as_string in
-        if not (kind = "endorsement") then
-          Test.fail "Operation kind should be endorsement, got %s" kind ;
-        let level =
-          Tezos_protocol_alpha.Protocol.Raw_level_repr.of_int32_exn
-            (Int32.of_int (JSON.get "level" contents |> JSON.as_int))
-        in
-        let round =
-          let round = JSON.get "round" contents |> JSON.as_int in
-          match
-            Tezos_protocol_alpha.Protocol.Round_repr.of_int32
-              (Int32.of_int round)
-          with
-          | Ok round -> round
-          | Error _ ->
-              Test.fail
-                "Could not create a round with %d (from the mempool result) "
-                round
-        in
-        let block_payload_hash =
-          let block_payload_hash =
-            JSON.get "block_payload_hash" contents |> JSON.as_string
-          in
-          Tezos_protocol_alpha.Protocol.Block_payload_hash.of_b58check_exn
-            block_payload_hash
-        in
-        let wrapped =
-          Tezos_protocol_alpha.Protocol.Operation_repr.
-            {
-              shell;
-              protocol_data =
-                Operation_data
-                  {
-                    contents =
-                      Single
-                        (Endorsement {slot; round; level; block_payload_hash});
-                    signature = Some signature;
-                  };
-            }
-        in
-        Data_encoding.Binary.to_bytes_exn
-          Tezos_protocol_alpha.Protocol.Operation_repr.encoding
-          wrapped
+    let signature = get_signature op in
+    let kind = JSON.get "kind" contents |> JSON.as_string in
+    if not (kind = "endorsement") then
+      Test.fail "Operation kind should be endorsement, got %s" kind ;
+    let level =
+      Tezos_protocol_alpha.Protocol.Raw_level_repr.of_int32_exn
+        (Int32.of_int (JSON.get "level" contents |> JSON.as_int))
+    in
+    let round =
+      let round = JSON.get "round" contents |> JSON.as_int in
+      match
+        Tezos_protocol_alpha.Protocol.Round_repr.of_int32 (Int32.of_int round)
+      with
+      | Ok round -> round
+      | Error _ ->
+          Test.fail
+            "Could not create a round with %d (from the mempool result) "
+            round
+    in
+    let block_payload_hash =
+      let block_payload_hash =
+        JSON.get "block_payload_hash" contents |> JSON.as_string
+      in
+      Tezos_protocol_alpha.Protocol.Block_payload_hash.of_b58check_exn
+        block_payload_hash
+    in
+    let wrapped =
+      Tezos_protocol_alpha.Protocol.Operation_repr.
+        {
+          shell;
+          protocol_data =
+            Operation_data
+              {
+                contents =
+                  Single (Endorsement {slot; round; level; block_payload_hash});
+                signature = Some signature;
+              };
+        }
+    in
+    Data_encoding.Binary.to_bytes_exn
+      Tezos_protocol_alpha.Protocol.Operation_repr.encoding
+      wrapped
   in
   Lwt.return (wrapped_bytes, hash)
 
@@ -2419,7 +2414,7 @@ let propagation_future_endorsement =
   let* () = Client.endorse_for client_1 ~force:true ~protocol in
   let* () = endorser_waiter in
   Log.info "%s" step4_msg ;
-  let* bytes, hash = get_endorsement_as_bytes ~protocol client_1 in
+  let* bytes, hash = get_endorsement_as_bytes client_1 in
   Log.info "%s" step5_msg ;
   let* _ = RPC.mempool_ban_operation ~data:(`String hash) client_1 in
   Log.info "%s" step6_msg ;
