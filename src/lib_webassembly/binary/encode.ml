@@ -1115,7 +1115,9 @@ struct
 
   (* Data count section *)
   let data_count_section datas m =
-    section 12 len (List.length datas) Free.((module_ m).datas <> Set.empty)
+    let open Lwt.Syntax in
+    let+ modl = Free.module_ m in
+    section 12 len (List.length datas) Free.(modl.datas <> Set.empty)
 
   (* Custom section *)
   let custom (n, bs) =
@@ -1126,27 +1128,32 @@ struct
 
   (* Module *)
   let module_ m =
+    let open Lwt.Syntax in
+    let to_list m =
+      List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings m)
+    in
     u32 0x6d736100l ;
     u32 version ;
-    type_section m.it.types ;
-    import_section m.it.imports ;
-    func_section m.it.funcs ;
-    table_section m.it.tables ;
-    memory_section m.it.memories ;
-    global_section m.it.globals ;
-    export_section m.it.exports ;
+    type_section (to_list m.it.types) ;
+    import_section (to_list m.it.imports) ;
+    func_section (to_list m.it.funcs) ;
+    table_section (to_list m.it.tables) ;
+    memory_section (to_list m.it.memories) ;
+    global_section (to_list m.it.globals) ;
+    export_section (to_list m.it.exports) ;
     start_section m.it.start ;
-    elem_section m.it.elems ;
-    data_count_section m.it.datas m ;
-    code_section m.it.funcs ;
-    data_section m.it.datas
+    elem_section (to_list m.it.elems) ;
+    let+ () = data_count_section (to_list m.it.datas) m in
+    code_section (to_list m.it.funcs) ;
+    data_section (to_list m.it.datas)
 end
 
 let encode m =
+  let open Lwt.Syntax in
   let module E = E (struct
     let stream = stream ()
   end) in
-  E.module_ m ;
+  let+ () = E.module_ m in
   to_string E.s
 
 let encode_custom name content =

@@ -1,5 +1,4 @@
 open Lwt.Syntax
-module TzStdLib = Tezos_lwt_result_stdlib.Lwtreslib.Bare
 open Values
 open Types
 open Instance
@@ -878,8 +877,9 @@ let create_data (inst : module_inst) (seg : data_segment) : data_inst Lwt.t =
   ref data
 
 let add_import (m : module_) (ext : extern) (im : import) (inst : module_inst) :
-    module_inst =
-  if not (match_extern_type (extern_type_of ext) (import_type m im)) then
+    module_inst Lwt.t =
+  let+ t = import_type m im in
+  if not (match_extern_type (extern_type_of ext) t) then
     Link.error
       im.at
       ("incompatible import type for " ^ "\""
@@ -887,7 +887,7 @@ let add_import (m : module_) (ext : extern) (im : import) (inst : module_inst) :
       ^ "\" " ^ "\""
       ^ Utf8.encode im.it.item_name
       ^ "\": " ^ "expected "
-      ^ Types.string_of_extern_type (import_type m im)
+      ^ Types.string_of_extern_type t
       ^ ", got "
       ^ Types.string_of_extern_type (extern_type_of ext)) ;
   match ext with
@@ -941,6 +941,7 @@ let run_data i data =
 let run_start start = [Call start.it.sfunc @@ start.at]
 
 let init (m : module_) (exts : extern list) : module_inst Lwt.t =
+  let open Lwt.Syntax in
   let {
     imports;
     tables;
@@ -955,11 +956,40 @@ let init (m : module_) (exts : extern list) : module_inst Lwt.t =
   } =
     m.it
   in
-  if List.length exts <> List.length imports then
-    Link.error m.at "wrong number of imports provided for initialisation" ;
+
+  (* TODO: #3076
+
+     These transformations should be refactored and abadoned during the
+     tickification, to avoid the roundtrip vector -> list -> vector. *)
+  let* types = Vector.to_list types in
+  let* imports = Vector.to_list imports in
+  let* tables = Vector.to_list tables in
+  let* memories = Vector.to_list memories in
+  let* globals = Vector.to_list globals in
+  let* funcs = Vector.to_list funcs in
+  let* elems = Vector.to_list elems in
+  let* datas = Vector.to_list datas in
+  let* exports = Vector.to_list exports in
+
+  (* TODO: #3076
+     To refactor during the tickification. *)
+  let* init_inst0 =
+    TzStdLib.List.fold_right2_s
+      ~when_different_lengths:()
+      (add_import m)
+      exts
+      imports
+      empty_module_inst
+  in
+  let init_inst0 =
+    match init_inst0 with
+    | Ok i -> i
+    | Error () ->
+        Link.error m.at "wrong number of imports provided for initialisation"
+  in
   let inst0 =
     {
-      (List.fold_right2 (add_import m) exts imports empty_module_inst) with
+      init_inst0 with
       types =
         (* TODO: #3076
            [types] should be a lazy structure so we can avoid traversing it

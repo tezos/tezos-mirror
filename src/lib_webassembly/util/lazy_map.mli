@@ -84,6 +84,11 @@ module type S = sig
 
   (** [with_producer morph] lifts a morphism for a [producer] to one on [t]. *)
   val with_producer : ('a producer -> 'a producer) -> 'a t -> 'a t
+
+  (** [loaded_bindings map] returns the [(key * 'a) list] representation of the
+      map [map] containing only the loaded values, in order of increasing keys.
+      This function is a witness of internal mutations. *)
+  val loaded_bindings : 'a t -> (key * 'a) list
 end
 
 (** [UnexpectedAccess] is raised in the default of the [produce_value] argument

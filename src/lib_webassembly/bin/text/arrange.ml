@@ -43,9 +43,15 @@ let list_of_opt = function None -> [] | Some x -> [x]
 
 let list f xs = List.map f xs
 
-let listi f xs = List.mapi f xs
-
 let opt f xo = list f (list_of_opt xo)
+
+let lazy_vector f map =
+  List.map (fun (_, v) -> f v) (Lazy_vector.LwtInt32Vector.loaded_bindings map)
+
+let lazy_vectori f map =
+  List.map
+    (fun (i32, v) -> f (Int32.to_int i32) v)
+    (Lazy_vector.LwtInt32Vector.loaded_bindings map)
 
 let tab head f xs = if xs = [] then [] else [Node (head, list f xs)]
 
@@ -643,16 +649,19 @@ let module_with_var_opt x_opt m =
   let tx = ref 0 in
   let mx = ref 0 in
   let gx = ref 0 in
-  let imports = list (import fx tx mx gx) m.it.imports in
+  let imports = lazy_vector (import fx tx mx gx) m.it.imports in
   Node
     ( "module" ^ var_opt x_opt,
-      listi typedef m.it.types @ imports
-      @ listi (table !tx) m.it.tables
-      @ listi (memory !mx) m.it.memories
-      @ listi (global !gx) m.it.globals
-      @ listi (func_with_index !fx) m.it.funcs
-      @ list export m.it.exports @ opt start m.it.start @ listi elem m.it.elems
-      @ listi data m.it.datas )
+      lazy_vectori typedef m.it.types
+      @ imports
+      @ lazy_vectori (table !tx) m.it.tables
+      @ lazy_vectori (memory !mx) m.it.memories
+      @ lazy_vectori (global !gx) m.it.globals
+      @ lazy_vectori (func_with_index !fx) m.it.funcs
+      @ lazy_vector export m.it.exports
+      @ opt start m.it.start
+      @ lazy_vectori elem m.it.elems
+      @ lazy_vectori data m.it.datas )
 
 let binary_module_with_var_opt x_opt bs =
   Node ("module" ^ var_opt x_opt ^ " binary", break_bytes bs)
@@ -680,30 +689,39 @@ let literal mode lit =
   | Ref r -> ref_ r
 
 let definition mode x_opt def =
-  try
-    match mode with
-    | `Textual ->
-        let rec unquote def =
+  let open Lwt.Syntax in
+  Lwt.catch
+    (fun () ->
+      match mode with
+      | `Textual ->
+          let rec unquote def =
+            match def.it with
+            | Textual m -> Lwt.return m
+            | Encoded (_, bytes) -> Decode.decode ~name:"" ~bytes
+            | Quoted (_, s) -> unquote (Parse.string_to_module s)
+          in
+          let+ unquoted = unquote def in
+          module_with_var_opt x_opt unquoted
+      | `Binary ->
+          let rec unquote def =
+            match def.it with
+            | Textual m -> Encode.encode m
+            | Encoded (_, bytes) ->
+                let* m = Decode.decode ~name:"" ~bytes in
+                Encode.encode m
+            | Quoted (_, s) -> unquote (Parse.string_to_module s)
+          in
+          let+ unquoted = unquote def in
+          binary_module_with_var_opt x_opt unquoted
+      | `Original -> (
           match def.it with
-          | Textual m -> m
-          | Encoded (_, bs) -> Decode.decode "" bs
-          | Quoted (_, s) -> unquote (Parse.string_to_module s)
-        in
-        module_with_var_opt x_opt (unquote def)
-    | `Binary ->
-        let rec unquote def =
-          match def.it with
-          | Textual m -> Encode.encode m
-          | Encoded (_, bs) -> Encode.encode (Decode.decode "" bs)
-          | Quoted (_, s) -> unquote (Parse.string_to_module s)
-        in
-        binary_module_with_var_opt x_opt (unquote def)
-    | `Original -> (
-        match def.it with
-        | Textual m -> module_with_var_opt x_opt m
-        | Encoded (_, bs) -> binary_module_with_var_opt x_opt bs
-        | Quoted (_, s) -> quoted_module_with_var_opt x_opt s)
-  with Parse.Syntax _ -> quoted_module_with_var_opt x_opt "<invalid module>"
+          | Textual m -> module_with_var_opt x_opt m |> Lwt.return
+          | Encoded (_, bs) -> binary_module_with_var_opt x_opt bs |> Lwt.return
+          | Quoted (_, s) -> quoted_module_with_var_opt x_opt s |> Lwt.return))
+    (function
+      | Parse.Syntax _ ->
+          quoted_module_with_var_opt x_opt "<invalid module>" |> Lwt.return
+      | e -> Lwt.fail e)
 
 let access x_opt n = String.concat " " [var_opt x_opt; name n]
 
@@ -749,37 +767,45 @@ let result mode res =
   | RefResult rp -> ref_pat rp
 
 let assertion mode ass =
+  let open Lwt.Syntax in
   match ass.it with
   | AssertMalformed (def, re) -> (
       match (mode, def.it) with
-      | `Binary, Quoted _ -> []
+      | `Binary, Quoted _ -> Lwt.return []
       | _ ->
-          [
-            Node
-              ( "assert_malformed",
-                [definition `Original None def; Atom (string re)] );
-          ])
+          let+ def = definition `Original None def in
+          [Node ("assert_malformed", [def; Atom (string re)])])
   | AssertInvalid (def, re) ->
-      [Node ("assert_invalid", [definition mode None def; Atom (string re)])]
+      let+ def = definition mode None def in
+      [Node ("assert_invalid", [def; Atom (string re)])]
   | AssertUnlinkable (def, re) ->
-      [Node ("assert_unlinkable", [definition mode None def; Atom (string re)])]
+      let+ def = definition mode None def in
+      [Node ("assert_unlinkable", [def; Atom (string re)])]
   | AssertUninstantiable (def, re) ->
-      [Node ("assert_trap", [definition mode None def; Atom (string re)])]
+      let+ def = definition mode None def in
+      [Node ("assert_trap", [def; Atom (string re)])]
   | AssertReturn (act, results) ->
-      [
-        Node ("assert_return", action mode act :: List.map (result mode) results);
-      ]
+      Lwt.return
+        [
+          Node
+            ("assert_return", action mode act :: List.map (result mode) results);
+        ]
   | AssertTrap (act, re) ->
-      [Node ("assert_trap", [action mode act; Atom (string re)])]
+      Lwt.return [Node ("assert_trap", [action mode act; Atom (string re)])]
   | AssertExhaustion (act, re) ->
-      [Node ("assert_exhaustion", [action mode act; Atom (string re)])]
+      Lwt.return
+        [Node ("assert_exhaustion", [action mode act; Atom (string re)])]
 
 let command mode cmd =
+  let open Lwt.Syntax in
   match cmd.it with
-  | Module (x_opt, def) -> [definition mode x_opt def]
-  | Register (n, x_opt) -> [Node ("register " ^ name n ^ var_opt x_opt, [])]
-  | Action act -> [action mode act]
+  | Module (x_opt, def) ->
+      let+ def = definition mode x_opt def in
+      [def]
+  | Register (n, x_opt) ->
+      Lwt.return [Node ("register " ^ name n ^ var_opt x_opt, [])]
+  | Action act -> Lwt.return [action mode act]
   | Assertion ass -> assertion mode ass
   | Meta _ -> assert false
 
-let script mode scr = Lib.List.concat_map (command mode) scr
+let script mode scr = Lib.List.concat_map_s (command mode) scr

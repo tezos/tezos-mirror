@@ -17,6 +17,8 @@
  *)
 
 open Types
+module TzStdLib = Tezos_lwt_result_stdlib.Lwtreslib.Bare
+module Vector = Lazy_vector.LwtInt32Vector
 
 type void = Lib.void
 
@@ -396,65 +398,95 @@ and start' = {sfunc : var}
 type module_ = module_' Source.phrase
 
 and module_' = {
-  types : type_ list;
-  globals : global list;
-  tables : table list;
-  memories : memory list;
-  funcs : func list;
+  types : type_ Vector.t;
+  globals : global Vector.t;
+  tables : table Vector.t;
+  memories : memory Vector.t;
+  funcs : func Vector.t;
   start : start option;
-  elems : elem_segment list;
-  datas : data_segment list;
-  imports : import list;
-  exports : export list;
+  elems : elem_segment Vector.t;
+  datas : data_segment Vector.t;
+  imports : import Vector.t;
+  exports : export Vector.t;
 }
 
 (* Auxiliary functions *)
 
 let empty_module =
   {
-    types = [];
-    globals = [];
-    tables = [];
-    memories = [];
-    funcs = [];
+    types = Vector.create 0l;
+    globals = Vector.create 0l;
+    tables = Vector.create 0l;
+    memories = Vector.create 0l;
+    funcs = Vector.create 0l;
     start = None;
-    elems = [];
-    datas = [];
-    imports = [];
-    exports = [];
+    elems = Vector.create 0l;
+    datas = Vector.create 0l;
+    imports = Vector.create 0l;
+    exports = Vector.create 0l;
   }
 
 open Source
 
-let func_type_for (m : module_) (x : var) : func_type =
-  (Lib.List32.nth m.it.types x.it).it
+let func_type_for (m : module_) (x : var) : func_type Lwt.t =
+  let open Lwt.Syntax in
+  let+ ty = Vector.get x.it m.it.types in
+  ty.it
 
-let import_type (m : module_) (im : import) : extern_type =
+let import_type (m : module_) (im : import) : extern_type Lwt.t =
+  let open Lwt.Syntax in
   let {idesc; _} = im.it in
   match idesc.it with
-  | FuncImport x -> ExternFuncType (func_type_for m x)
-  | TableImport t -> ExternTableType t
-  | MemoryImport t -> ExternMemoryType t
-  | GlobalImport t -> ExternGlobalType t
+  | FuncImport x ->
+      let+ ty = func_type_for m x in
+      ExternFuncType ty
+  | TableImport t -> Lwt.return (ExternTableType t)
+  | MemoryImport t -> Lwt.return (ExternMemoryType t)
+  | GlobalImport t -> Lwt.return (ExternGlobalType t)
 
-let export_type (m : module_) (ex : export) : extern_type =
+(* This function is only used to printing types for debugging purpose, as such
+   it is safe to use conversions to lists. *)
+let export_type (m : module_) (ex : export) : extern_type Lwt.t =
+  let open Lwt.Syntax in
   let {edesc; _} = ex.it in
-  let its = List.map (import_type m) m.it.imports in
+  let* its =
+    TzStdLib.List.map_s
+      (fun (_, i) -> import_type m i)
+      (Vector.loaded_bindings m.it.imports)
+  in
   let open Lib.List32 in
   match edesc.it with
   | FuncExport x ->
-      let fts =
-        funcs its @ List.map (fun f -> func_type_for m f.it.ftype) m.it.funcs
+      let+ fts' =
+        TzStdLib.List.map_s
+          (fun (_, f) -> func_type_for m f.it.ftype)
+          (Vector.loaded_bindings m.it.funcs)
       in
+      let fts = funcs its @ fts' in
       ExternFuncType (nth fts x.it)
   | TableExport x ->
-      let tts = tables its @ List.map (fun t -> t.it.ttype) m.it.tables in
+      let+ tts' =
+        TzStdLib.List.map_s
+          (fun (_, t) -> Lwt.return t.it.ttype)
+          (Vector.loaded_bindings m.it.tables)
+      in
+      let tts = tables its @ tts' in
       ExternTableType (nth tts x.it)
   | MemoryExport x ->
-      let mts = memories its @ List.map (fun m -> m.it.mtype) m.it.memories in
+      let+ mts' =
+        TzStdLib.List.map_s
+          (fun (_, m) -> Lwt.return m.it.mtype)
+          (Vector.loaded_bindings m.it.memories)
+      in
+      let mts = memories its @ mts' in
       ExternMemoryType (nth mts x.it)
   | GlobalExport x ->
-      let gts = globals its @ List.map (fun g -> g.it.gtype) m.it.globals in
+      let+ gts' =
+        TzStdLib.List.map_s
+          (fun (_, g) -> Lwt.return g.it.gtype)
+          (Vector.loaded_bindings m.it.globals)
+      in
+      let gts = globals its @ gts' in
       ExternGlobalType (nth gts x.it)
 
 let string_of_name n =

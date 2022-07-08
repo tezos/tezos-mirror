@@ -68,6 +68,8 @@ module type S = sig
   val concat : 'a t -> 'a t -> 'a t
 
   val to_list : 'a t -> 'a list effect
+
+  val loaded_bindings : 'a t -> (key * 'a) list
 end
 
 module ZZ : KeyS with type t = Z.t = struct
@@ -183,6 +185,7 @@ module Make (Effect : Effect.S) (Key : KeyS) :
   let to_list map =
     let open Effect in
     let rec unroll acc index =
+      Format.printf "index: %s\n%!" (Key.to_string index) ;
       if Key.unsigned_compare index Key.zero > 0 then
         let* prefix = get index map in
         (unroll [@ocaml.tailcall]) (prefix :: acc) (Key.pred index)
@@ -190,7 +193,13 @@ module Make (Effect : Effect.S) (Key : KeyS) :
         let* prefix = get Key.zero map in
         return (prefix :: acc)
     in
-    (unroll [@ocaml.tailcall]) [] (Key.pred map.num_elements)
+    (* The empty vector is not correctly taken into account otherwise, since
+       `pred zero` = `-1`, which is an invalid key according to
+       {!invalid_key}. *)
+    if map.num_elements = Key.zero then return []
+    else (unroll [@ocaml.tailcall]) [] (Key.pred map.num_elements)
+
+  let loaded_bindings m = Map.loaded_bindings m.values
 end
 
 module Int = struct

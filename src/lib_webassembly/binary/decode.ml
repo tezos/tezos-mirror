@@ -1,10 +1,11 @@
 (* Decoding stream *)
 
 open Binary_exn
+module Vector = Lazy_vector.LwtInt32Vector
 
 type stream = {name : string; bytes : string; pos : int ref}
 
-let stream name bs = {name; bytes = bs; pos = ref 0}
+let make_stream ~name ~bytes = {name; bytes; pos = ref 0}
 
 let len s = String.length s.bytes
 
@@ -951,6 +952,16 @@ type ('a, 'b) vec_map_kont =
 
 type 'a vec_kont = ('a, 'a) vec_map_kont
 
+type 'a lazy_vec_kont = Lazy_vec of {offset : int32; vector : 'a Vector.t}
+
+let is_end_of_vec (Lazy_vec {offset; vector}) =
+  Vector.num_elements vector <= offset
+
+let init_lazy_vec n = Lazy_vec {offset = 0l; vector = Vector.create n}
+
+let lazy_vec_step v (Lazy_vec {offset; vector}) =
+  Lazy_vec {offset = Int32.add offset 1l; vector = Vector.set offset v vector}
+
 type pos = int
 
 (** Size checking version of {!sized} for CPS-style parsing. *)
@@ -1508,108 +1519,138 @@ type _ field_type =
 
 (** Result of a section parsing, being either a single value or a vector. *)
 type field =
-  | VecField : 'a field_type * 'a list * int -> field
+  | VecField : 'a field_type * 'a Vector.t -> field
   | SingleField : 'a field_type * 'a option -> field
 
 (** Module parsing steps *)
-type module_kont' =
+type module_kont =
   | MKStart  (** Initial state of a module parsing *)
-  | MKSkipCustom : ('a field_type * section_tag) option -> module_kont'
+  | MKSkipCustom : ('a field_type * section_tag) option -> module_kont
       (** Custom section which are skipped, with the next section to parse. *)
-  | MKFieldStart : 'a field_type * section_tag -> module_kont'
+  | MKFieldStart : 'a field_type * section_tag -> module_kont
       (** Starting point of a section, handles parsing generic section header. *)
-  | MKField : 'a field_type * size * 'a vec_kont -> module_kont'
+  | MKField : 'a field_type * size * 'a lazy_vec_kont -> module_kont
       (** Section currently parsed, accumulating each element from the underlying vector. *)
   | MKElaborateFunc :
-      var list * func list * func vec_kont * bool
-      -> module_kont'
+      var Vector.t * func Vector.t * func lazy_vec_kont * bool
+      -> module_kont
       (** Elaboration of functions from the code section with their declared type in
       the func section, and accumulating invariants conditions associated to
       functions. *)
-  | MKBuild of func list option * bool
+  | MKBuild of func Vector.t option * bool
       (** Accumulating the parsed sections vectors into a module and checking
       invariants. *)
-  | MKStop of module_' (* TODO (#3120): actually, should be module_ *)
-      (** Final step of the parsing, cannot reduce. *)
-  (* For the next continuations, the vectors are only used for accumulation, and
-     reduce to `MK_Field(.., Rev ..)`. *)
-  | MKImport of import_kont * pos * size * import vec_kont
+  | MKStop of module_'  (** Final step of the parsing, cannot reduce. *)
+    (* TODO (https://gitlab.com/tezos/tezos/-/issues/3120): actually, should be module_ *)
+  | MKImport of import_kont * pos * size * import lazy_vec_kont
       (** Import section parsing. *)
-  | MKExport of export_kont * pos * size * export vec_kont
+  | MKExport of export_kont * pos * size * export lazy_vec_kont
       (** Export section parsing. *)
   | MKGlobal of
-      global_type * int * instr_block_kont list * size * global vec_kont
+      global_type * int * instr_block_kont list * size * global lazy_vec_kont
       (** Globals section parsing, containing the starting position, the
       continuation of the current global block instruction, and the size of the
       section. *)
-  | MKElem of elem_kont * int * size * elem_segment vec_kont
+  | MKElem of elem_kont * int * size * elem_segment lazy_vec_kont
       (** Element segments section parsing, containing the current element parsing
       continuation, the starting position of the current element, the size of
       the section. *)
-  | MKData of data_kont * int * size * data_segment vec_kont
+  | MKData of data_kont * int * size * data_segment lazy_vec_kont
       (** Data segments section parsing, containing the current data parsing
       continuation, the starting position of the current data, the size of the
       section. *)
-  | MKCode of code_kont * int * size * func vec_kont
+  | MKCode of code_kont * int * size * func lazy_vec_kont
       (** Code section parsing, containing the current function parsing
       continuation, the starting position of the current function, the size of
       the section. *)
 
-type module_kont = {
-  building_state : field list;  (** Accumulated parsed sections. *)
-  kont : module_kont';
+type decode_kont = {
+  building_state : field Vector.t;  (** Accumulated parsed sections. *)
+  module_kont : module_kont;
+  stream : stream;
 }
 
-let rec find_vec : type t. t field_type -> _ -> t list * int =
- fun ty fields ->
-  match fields with
-  | [] -> assert false
-  | SingleField _ :: rest -> find_vec ty rest
-  | VecField (ty', v, len) :: rest -> (
-      let v = (v, len) in
-      match (ty, ty') with
-      (* TODO (#3120): factor this out with a Leibnitz equality witness *)
-      | TypeField, TypeField -> v
-      | ImportField, ImportField -> v
-      | FuncField, FuncField -> v
-      | TableField, TableField -> v
-      | MemoryField, MemoryField -> v
-      | GlobalField, GlobalField -> v
-      | ExportField, ExportField -> v
-      | StartField, StartField -> v
-      | ElemField, ElemField -> v
-      | DataCountField, DataCountField -> v
-      | CodeField, CodeField -> v
-      | DataField, DataField -> v
-      | _ -> find_vec ty rest)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3366
+   Check the size of the proof generated after calling `find_vec'`. *)
+let rec find_vec' :
+    type t. t field_type -> int32 -> _ Vector.t -> t Vector.t Lwt.t =
+ fun ty index fields ->
+  (* This function is called once the whole module has been parsed. As such
+     each module section is available and it cannot fail. *)
+  let open Lwt.Syntax in
+  if Vector.num_elements fields <= index then invalid_arg "find_vec"
+  else
+    let* field = Vector.get index fields in
+    match field with
+    | SingleField _ -> find_vec' ty (Int32.add index 1l) fields
+    | VecField (ty', v) -> (
+        let v = Lwt.return v in
+        match (ty, ty') with
+        (* TODO (https://gitlab.com/tezos/tezos/-/issues/3120):
+           factor this out with a Leibnitz equality witness *)
+        | TypeField, TypeField -> v
+        | ImportField, ImportField -> v
+        | FuncField, FuncField -> v
+        | TableField, TableField -> v
+        | MemoryField, MemoryField -> v
+        | GlobalField, GlobalField -> v
+        | ExportField, ExportField -> v
+        | StartField, StartField -> v
+        | ElemField, ElemField -> v
+        | DataCountField, DataCountField -> v
+        | CodeField, CodeField -> v
+        | DataField, DataField -> v
+        | _ -> find_vec' ty (Int32.succ index) fields)
 
-let rec find_single : type t. t field_type -> _ -> t option =
- fun ty fields ->
-  match fields with
-  | [] -> assert false
-  | VecField _ :: rest -> find_single ty rest
-  | SingleField (ty', v) :: rest -> (
-      match (ty, ty') with
-      | TypeField, TypeField -> v
-      | ImportField, ImportField -> v
-      | FuncField, FuncField -> v
-      | TableField, TableField -> v
-      | MemoryField, MemoryField -> v
-      | GlobalField, GlobalField -> v
-      | ExportField, ExportField -> v
-      | StartField, StartField -> v
-      | ElemField, ElemField -> v
-      | DataCountField, DataCountField -> v
-      | CodeField, CodeField -> v
-      | DataField, DataField -> v
-      | _ -> find_single ty rest)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3366
+   Check the size of the proof generated after calling `find_single'`. *)
+let rec find_single' :
+    type t. t field_type -> int32 -> _ Vector.t -> t option Lwt.t =
+ fun ty index fields ->
+  (* This function is called once the whole module has been parsed. As such
+     each module section is available and it cannot fail. *)
+  let open Lwt.Syntax in
+  if Vector.num_elements fields <= index then invalid_arg "find_single"
+  else
+    let* field = Vector.get index fields in
+    match field with
+    | VecField _ -> find_single' ty (Int32.add index 1l) fields
+    | SingleField (ty', v) -> (
+        let v = Lwt.return v in
+        match (ty, ty') with
+        | TypeField, TypeField -> v
+        | ImportField, ImportField -> v
+        | FuncField, FuncField -> v
+        | TableField, TableField -> v
+        | MemoryField, MemoryField -> v
+        | GlobalField, GlobalField -> v
+        | ExportField, ExportField -> v
+        | StartField, StartField -> v
+        | ElemField, ElemField -> v
+        | DataCountField, DataCountField -> v
+        | CodeField, CodeField -> v
+        | DataField, DataField -> v
+        | _ -> find_single' ty (Int32.succ index) fields)
 
-let module_step s state =
-  let next kont = {state with kont} in
-  let next_with_field field kont =
-    {building_state = field :: state.building_state; kont}
+let find_vec ty fields = find_vec' ty 0l fields
+
+let find_single ty fields = find_single' ty 0l fields
+
+let vec_field ty (Lazy_vec {vector; _}) = VecField (ty, vector)
+
+let module_step state =
+  let open Lwt.Syntax in
+  let next module_kont = Lwt.return {state with module_kont} in
+  let next_with_field field module_kont =
+    Lwt.return
+      {
+        state with
+        building_state = Vector.cons field state.building_state;
+        module_kont;
+      }
   in
-  match state.kont with
+  let s = state.stream in
+  match state.module_kont with
   | MKStart ->
       (* Module header *)
       let header = u32 s in
@@ -1633,16 +1674,17 @@ let module_step s state =
       | _ -> (
           match k with
           | None ->
-              let func_types, func_types_len =
-                find_vec FuncField state.building_state
-              in
-              let func_bodies, func_bodies_len =
-                find_vec CodeField state.building_state
-              in
-
-              next
-              @@ MKElaborateFunc
-                   (func_types, func_bodies, Collect (func_types_len, []), true)
+              let* func_types = find_vec FuncField state.building_state in
+              let* func_bodies = find_vec CodeField state.building_state in
+              if Vector.(num_elements func_types <> num_elements func_bodies)
+              then next @@ MKBuild (None, true)
+              else
+                next
+                @@ MKElaborateFunc
+                     ( func_types,
+                       func_bodies,
+                       init_lazy_vec (Vector.num_elements func_types),
+                       true )
           | Some (ty, tag) -> next @@ MKFieldStart (ty, tag)))
   | MKFieldStart (DataCountField, `DataCountSection) ->
       let v = data_count_section s in
@@ -1654,10 +1696,7 @@ let module_step s state =
       next_with_field
         (SingleField (StartField, v))
         (MKSkipCustom (Some (ElemField, `ElemSection)))
-  (* Parsing of vectors. Fields reduce into two mutual steps:
-     - First collecting the elements from the vector into a list
-     - Then once everything as been parsed, reverse the list
-  *)
+  (* Parsing of fields vector. *)
   | MKFieldStart (ty, tag) -> (
       match id s with
       | Some t when t = tag ->
@@ -1665,192 +1704,161 @@ let module_step s state =
           let size = size s in
           (* length of `vec` *)
           let l = len32 s in
-          next @@ MKField (ty, size, Collect (l, []))
+          next @@ MKField (ty, size, init_lazy_vec (Int32.of_int l))
       | _ ->
           let size = {size = 0; start = pos s} in
-          next @@ MKField (ty, size, Rev ([], [], 0)))
-  | MKField (ty, size, Collect (0, l)) ->
-      next @@ MKField (ty, size, Rev (l, [], 0))
-  | MKField (ty, size, Collect (n, l)) -> (
+          next @@ MKField (ty, size, init_lazy_vec 0l)
+          (* Transitions steps from the end of a section to the next one.
+
+             The values accumulated from the section are accumulated into the building
+             state..*))
+  (* TODO (https://gitlab.com/tezos/tezos/-/issues/3120): maybe we can factor-out these similarly shaped module section transitions *)
+  | MKField (TypeField, size, vec) when is_end_of_vec vec ->
+      check_size size s ;
+      next_with_field
+        (vec_field TypeField vec)
+        (MKSkipCustom (Some (ImportField, `ImportSection)))
+  | MKField (ImportField, size, vec) when is_end_of_vec vec ->
+      check_size size s ;
+      next_with_field
+        (vec_field ImportField vec)
+        (MKSkipCustom (Some (FuncField, `FuncSection)))
+  | MKField (FuncField, size, vec) when is_end_of_vec vec ->
+      check_size size s ;
+      next_with_field
+        (vec_field FuncField vec)
+        (MKSkipCustom (Some (TableField, `TableSection)))
+  | MKField (TableField, size, vec) when is_end_of_vec vec ->
+      check_size size s ;
+      next_with_field
+        (vec_field TableField vec)
+        (MKSkipCustom (Some (MemoryField, `MemorySection)))
+  | MKField (MemoryField, size, vec) when is_end_of_vec vec ->
+      check_size size s ;
+      next_with_field
+        (vec_field MemoryField vec)
+        (MKSkipCustom (Some (GlobalField, `GlobalSection)))
+  | MKField (GlobalField, size, vec) when is_end_of_vec vec ->
+      check_size size s ;
+      next_with_field
+        (vec_field GlobalField vec)
+        (MKSkipCustom (Some (ExportField, `ExportSection)))
+  | MKField (ExportField, size, vec) when is_end_of_vec vec ->
+      check_size size s ;
+      next_with_field
+        (vec_field ExportField vec)
+        (MKSkipCustom (Some (StartField, `StartSection)))
+  | MKField (ElemField, size, vec) when is_end_of_vec vec ->
+      check_size size s ;
+      next_with_field
+        (vec_field ElemField vec)
+        (MKSkipCustom (Some (DataCountField, `DataCountSection)))
+  | MKField (CodeField, size, vec) when is_end_of_vec vec ->
+      check_size size s ;
+      next_with_field
+        (vec_field CodeField vec)
+        (MKSkipCustom (Some (DataField, `DataSection)))
+  | MKField (DataField, size, vec) when is_end_of_vec vec ->
+      check_size size s ;
+      next_with_field
+        (vec_field DataField vec)
+        (* All sections are parsed, time to build the module *)
+        (MKSkipCustom None)
+  | MKField (ty, size, vec) -> (
       match ty with
       | TypeField ->
           let f = type_ s in
-          (* TODO (#3096): check if small enough to fit in a tick *)
-          next @@ MKField (ty, size, Collect (n - 1, f :: l))
-      | ImportField -> next @@ MKImport (ImpKStart, pos s, size, Collect (n, l))
+          (* TODO (https://gitlab.com/tezos/tezos/-/issues/3096): check if small enough to fit in a tick *)
+          next @@ MKField (ty, size, lazy_vec_step f vec)
+      | ImportField -> next @@ MKImport (ImpKStart, pos s, size, vec)
       | FuncField ->
           let f = at var s in
           (* small enough to fit in a tick *)
-          next @@ MKField (ty, size, Collect (n - 1, f :: l))
+          next @@ MKField (ty, size, lazy_vec_step f vec)
       | TableField ->
           let f = at table s in
           (* small enough to fit in a tick *)
-          next @@ MKField (ty, size, Collect (n - 1, f :: l))
+          next @@ MKField (ty, size, lazy_vec_step f vec)
       | MemoryField ->
           let f = at memory s in
           (* small enough to fit in a tick *)
-          next @@ MKField (ty, size, Collect (n - 1, f :: l))
+          next @@ MKField (ty, size, lazy_vec_step f vec)
       | GlobalField ->
           let gtype = global_type s in
-          next @@ MKGlobal (gtype, pos s, [IKNext []], size, Collect (n, l))
-      | ExportField -> next @@ MKExport (ExpKStart, pos s, size, Collect (n, l))
+          next @@ MKGlobal (gtype, pos s, [IKNext []], size, vec)
+      | ExportField -> next @@ MKExport (ExpKStart, pos s, size, vec)
       | StartField ->
           (* not a vector *)
           assert false
-      | ElemField -> next @@ MKElem (EKStart, pos s, size, Collect (n, l))
+      | ElemField -> next @@ MKElem (EKStart, pos s, size, vec)
       | DataCountField ->
           (* not a vector *)
           assert false
-      | CodeField -> next @@ MKCode (CKStart, pos s, size, Collect (n, l))
-      | DataField -> next @@ MKData (DKStart, pos s, size, Collect (n, l)))
+      | CodeField -> next @@ MKCode (CKStart, pos s, size, vec)
+      | DataField -> next @@ MKData (DKStart, pos s, size, vec))
   (* These sections have a distinct step mechanism. *)
-  | MKImport (ImpKStop import, left, size, Collect (n, l)) ->
+  | MKImport (ImpKStop import, left, size, vec) ->
       let f = Source.(import @@ region s left (pos s)) in
-      next @@ MKField (ImportField, size, Collect (n - 1, f :: l))
-  | MKImport (_, _, _, Rev (_, _, _)) ->
-      (* Impossible case, there's no need for reversal. *)
-      assert false
+      next @@ MKField (ImportField, size, lazy_vec_step f vec)
   | MKImport (k, pos, size, curr_vec) ->
       next @@ MKImport (import_step s k, pos, size, curr_vec)
-  | MKExport (ExpKStop import, left, size, Collect (n, l)) ->
+  | MKExport (ExpKStop import, left, size, vec) ->
       let f = Source.(import @@ region s left (pos s)) in
-      next @@ MKField (ExportField, size, Collect (n - 1, f :: l))
-  | MKExport (_, _, _, Rev (_, _, _)) ->
-      (* Impossible case, there's no need for reversal. *)
-      assert false
+      next @@ MKField (ExportField, size, lazy_vec_step f vec)
   | MKExport (k, pos, size, curr_vec) ->
       next @@ MKExport (export_step s k, pos, size, curr_vec)
-  | MKGlobal (gtype, left, [IKStop res], size, Collect (n, l)) ->
+  | MKGlobal (gtype, left, [IKStop res], size, vec) ->
       end_ s ;
       let ginit = Source.(res @@ region s left (pos s)) in
       let f = Source.({gtype; ginit} @@ region s left (pos s)) in
-      next @@ MKField (GlobalField, size, Collect (n - 1, f :: l))
-  | MKGlobal (ty, pos, [IKStop res], _, Rev (_, _, _)) ->
-      (* Impossible case, there's no need for reversal. *)
-      assert false
+      next @@ MKField (GlobalField, size, lazy_vec_step f vec)
   | MKGlobal (ty, pos, k, size, curr_vec) ->
       next @@ MKGlobal (ty, pos, instr_block_step s k, size, curr_vec)
-  | MKElem (EKStop elem, left, size, Collect (n, l)) ->
+  | MKElem (EKStop elem, left, size, vec) ->
       let elem = Source.(elem @@ region s left (pos s)) in
-      next @@ MKField (ElemField, size, Collect (n - 1, elem :: l))
-  | MKElem (EKStop _, _, _, Rev _) ->
-      (* Impossible case, there's no need for reversal. *)
-      assert false
+      next @@ MKField (ElemField, size, lazy_vec_step elem vec)
   | MKElem (elem_kont, pos, size, curr_vec) ->
       next @@ MKElem (elem_step s elem_kont, pos, size, curr_vec)
-  | MKData (DKStop data, left, size, Collect (n, l)) ->
+  | MKData (DKStop data, left, size, vec) ->
       let data = Source.(data @@ region s left (pos s)) in
-      next @@ MKField (DataField, size, Collect (n - 1, data :: l))
-  | MKData (DKStop _, _, _, Rev _) ->
-      (* Impossible case, there's no need for reversal. *)
-      assert false
+      next @@ MKField (DataField, size, lazy_vec_step data vec)
   | MKData (data_kont, pos, size, curr_vec) ->
       next @@ MKData (data_step s data_kont, pos, size, curr_vec)
-  | MKCode (CKStop func, left, size, Collect (n, l)) ->
-      next @@ MKField (CodeField, size, Collect (n - 1, func :: l))
-  | MKCode (CKStop _, _, _, Rev _) ->
-      (* Impossible case, there's no need for reversal. *)
-      assert false
+  | MKCode (CKStop func, left, size, vec) ->
+      next @@ MKField (CodeField, size, lazy_vec_step func vec)
   | MKCode (code_kont, pos, size, curr_vec) ->
       next @@ MKCode (code_step s code_kont, pos, size, curr_vec)
-  (* Transitions steps from the end of a section to the next one.
-
-     The values accumulated from the section are accumulated into the `Next`
-     continuation that will be used to build the module.*)
-  | MKField (ty, size, Rev (f :: l, fs, len)) ->
-      next @@ MKField (ty, size, Rev (l, f :: fs, len + 1))
-  (* TODO: maybe we can factor-out these similarly shaped module section transitions *)
-  | MKField (TypeField, size, Rev ([], l, len)) ->
-      check_size size s ;
-      next_with_field
-        (VecField (TypeField, l, len))
-        (MKSkipCustom (Some (ImportField, `ImportSection)))
-  | MKField (ImportField, size, Rev ([], l, len)) ->
-      check_size size s ;
-      next_with_field
-        (VecField (ImportField, l, len))
-        (MKSkipCustom (Some (FuncField, `FuncSection)))
-  | MKField (FuncField, size, Rev ([], l, len)) ->
-      check_size size s ;
-      next_with_field
-        (VecField (FuncField, l, len))
-        (MKSkipCustom (Some (TableField, `TableSection)))
-  | MKField (TableField, size, Rev ([], l, len)) ->
-      check_size size s ;
-      next_with_field
-        (VecField (TableField, l, len))
-        (MKSkipCustom (Some (MemoryField, `MemorySection)))
-  | MKField (MemoryField, size, Rev ([], l, len)) ->
-      check_size size s ;
-      next_with_field
-        (VecField (MemoryField, l, len))
-        (MKSkipCustom (Some (GlobalField, `GlobalSection)))
-  | MKField (GlobalField, size, Rev ([], l, len)) ->
-      check_size size s ;
-      next_with_field
-        (VecField (GlobalField, l, len))
-        (MKSkipCustom (Some (ExportField, `ExportSection)))
-  | MKField (ExportField, size, Rev ([], l, len)) ->
-      check_size size s ;
-      next_with_field
-        (VecField (ExportField, l, len))
-        (MKSkipCustom (Some (StartField, `StartSection)))
-  | MKField (ElemField, size, Rev ([], l, len)) ->
-      check_size size s ;
-      next_with_field
-        (VecField (ElemField, l, len))
-        (MKSkipCustom (Some (DataCountField, `DataCountSection)))
-  | MKField (CodeField, size, Rev ([], l, len)) ->
-      check_size size s ;
-      next_with_field
-        (VecField (CodeField, l, len))
-        (MKSkipCustom (Some (DataField, `DataSection)))
-  | MKField (DataField, size, Rev ([], l, len)) ->
-      check_size size s ;
-      next_with_field
-        (VecField (DataField, l, len))
-        (* All sections are parsed, time to build the module *)
-        (MKSkipCustom None)
-  | MKElaborateFunc ([], _ :: _, _, no_datas_in_func)
-  | MKElaborateFunc (_ :: _, [], _, no_datas_in_func) ->
-      (* Impossible cases where the two does not have the same legnth, which is
-         checked earlier. *)
-      next @@ MKBuild (None, no_datas_in_func)
-  | MKElaborateFunc ([], [], Collect (_, func_types), no_datas_in_func) ->
-      next @@ MKElaborateFunc ([], [], Rev (func_types, [], 0), no_datas_in_func)
-  | MKElaborateFunc (ft :: fts, fb :: fbs, Collect (n, fbs'), no_datas_in_func)
+  | MKElaborateFunc
+      (ft, fb, (Lazy_vec {vector = func_types; _} as vec), no_datas_in_func)
+    when is_end_of_vec vec ->
+      next @@ MKBuild (Some func_types, no_datas_in_func)
+  | MKElaborateFunc (fts, fbs, (Lazy_vec {offset; _} as vec), no_datas_in_func)
     ->
+      let* ft = Vector.get offset fts in
+      let* fb = Vector.get offset fbs in
+      let fb' = Source.({fb.it with ftype = ft} @@ fb.at) in
       next
       @@ MKElaborateFunc
            ( fts,
              fbs,
-             Collect (n - 1, Source.({fb.it with ftype = ft} @@ fb.at) :: fbs'),
-             no_datas_in_func )
-  | MKElaborateFunc (_, _, Rev ([], funcs, _), no_datas_in_func) ->
-      next @@ MKBuild (Some funcs, no_datas_in_func)
-  | MKElaborateFunc (fts, fbs, Rev (f :: l, l', len), no_datas_in_func) ->
-      next
-      @@ MKElaborateFunc
-           ( fts,
-             fbs,
-             Rev (l, f :: l', len + 1),
-             no_datas_in_func && Free.((func f).datas = Set.empty) )
+             lazy_vec_step fb' vec,
+             no_datas_in_func && Free.((func fb').datas = Set.empty) )
   | MKBuild (funcs, no_datas_in_func) ->
       let fields = state.building_state in
-      let types, _ = find_vec TypeField fields in
-      let data_count = find_single DataCountField fields in
-      let datas, datas_len = find_vec DataField fields in
-      let elems, _ = find_vec ElemField fields in
-      let start = find_single StartField fields in
-      let tables, _ = find_vec TableField fields in
-      let memories, _ = find_vec MemoryField fields in
-      let globals, _ = find_vec GlobalField fields in
-      let imports, _ = find_vec ImportField fields in
-      let exports, _ = find_vec ExportField fields in
+      let* types = find_vec TypeField fields in
+      let* data_count = find_single DataCountField fields in
+      let* datas = find_vec DataField fields in
+      let* elems = find_vec ElemField fields in
+      let* start = find_single StartField fields in
+      let* tables = find_vec TableField fields in
+      let* memories = find_vec MemoryField fields in
+      let* globals = find_vec GlobalField fields in
+      let* imports = find_vec ImportField fields in
+      let* exports = find_vec ExportField fields in
       ignore types ;
       require (pos s = len s) s (len s) "unexpected content after last section" ;
       require
-        (data_count = None || data_count = Some (I32.of_int_s datas_len))
+        (data_count = None || data_count = Some (Vector.num_elements datas))
         s
         (len s)
         "data count and data section have inconsistent lengths" ;
@@ -1869,8 +1877,11 @@ let module_step s state =
         (len s)
         "data count section required" ;
       {
-        building_state = [];
-        kont =
+        state with
+        building_state = Vector.create 0l;
+        (* At this point, there shouldn't be any new fields added, we can safely
+           reset the building state. *)
+        module_kont =
           MKStop
             {
               types;
@@ -1885,22 +1896,26 @@ let module_step s state =
               start;
             };
       }
-  | MKField (StartField, _, _) ->
-      (* StarField is not a vector. *)
-      assert false
-  | MKField (DataCountField, _, _) ->
-      (* DataCountField is not a vector. *)
-      assert false
+      |> Lwt.return
   | MKStop _ (* Stop cannot reduce. *) -> assert false
 
-let module_ s =
+let module_ stream =
+  let open Lwt.Syntax in
   let rec loop = function
-    | {kont = MKStop m; _} -> m
-    | k -> loop (module_step s k)
+    | {module_kont = MKStop m; _} -> Lwt.return m
+    | k ->
+        let* next_state = module_step k in
+        loop next_state
   in
-  loop {building_state = []; kont = MKStart}
+  loop {building_state = Vector.create 0l; module_kont = MKStart; stream}
 
-let decode name bs = at module_ (stream name bs)
+let decode ~name ~bytes =
+  let open Lwt.Syntax in
+  let s = make_stream ~name ~bytes in
+  let left = pos s in
+  let+ m = module_ s in
+  let right = pos s in
+  Source.(m @@ region s left right)
 
 let all_custom tag s =
   let header = u32 s in
@@ -1916,4 +1931,4 @@ let all_custom tag s =
   in
   collect ()
 
-let decode_custom tag name bs = all_custom tag (stream name bs)
+let decode_custom tag ~name ~bytes = all_custom tag (make_stream ~name ~bytes)

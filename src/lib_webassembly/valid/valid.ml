@@ -685,6 +685,8 @@ let check_export (c : context) (set : NameSet.t) (ex : export) : NameSet.t =
   NameSet.add name set
 
 let check_module (m : module_) =
+  let open Lwt.Syntax in
+  let to_list m = List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings m) in
   let {
     types;
     imports;
@@ -699,15 +701,25 @@ let check_module (m : module_) =
   } =
     m.it
   in
+  let types = to_list types in
+  let imports = to_list imports in
+  let tables = to_list tables in
+  let memories = to_list memories in
+  let globals = to_list globals in
+  let funcs = to_list funcs in
+  let elems = to_list elems in
+  let datas = to_list datas in
+  let exports = to_list exports in
+  let+ refs =
+    Free.module_
+      ({m.it with funcs = Lazy_vector.LwtInt32Vector.create 0l; start = None}
+      @@ m.at)
+  in
   let c0 =
     List.fold_right
       check_import
       imports
-      {
-        empty_context with
-        refs = Free.module_ ({m.it with funcs = []; start = None} @@ m.at);
-        types = List.map (fun ty -> ty.it) types;
-      }
+      {empty_context with refs; types = List.map (fun ty -> ty.it) types}
   in
   let c1 =
     {
