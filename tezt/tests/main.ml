@@ -125,24 +125,26 @@ let register_J_plus_tests () =
   (* Relies on a feature only available since J.
      Move these to [register_protocol_agnostic_tests] once J is the smallest
      protocol. *)
-  Client_run_view.register ~protocols:[Jakarta; Kathmandu; Alpha] ;
+  let protocols = Protocol.[Jakarta; Kathmandu; Alpha] in
+  Client_run_view.register ~protocols ;
   Large_metadata.register ~protocols:[Alpha] ;
   Multinode_snapshot.register ~protocols:[Alpha] ;
   Run_script.register ~protocols:[Alpha] ;
   Sapling.register ~protocols:[Alpha] ;
-  Tx_rollup.register ~protocols:[Jakarta; Kathmandu; Alpha] ;
-  Tx_rollup_node.register ~protocols:[Jakarta; Kathmandu; Alpha] ;
+  Tx_rollup.register ~protocols ;
+  Tx_rollup_node.register ~protocols ;
   Views.register [Alpha]
 
 let register_K_plus_tests () =
   (* Relies on a feature only available since K. *)
+  let protocols = Protocol.[Kathmandu; Alpha] in
   Events.register ~protocols:[Alpha] ;
   Ghostnet_dictator_migration.register ~protocols:[Alpha] ;
   Increase_paid_storage.register ~protocols:[Alpha] ;
   Sc_rollup.register ~protocols:[Alpha] ;
   Test_contract_bls12_381.register ~protocols:[Alpha] ;
   Testnet_dictator.register ~protocols:[Alpha] ;
-  Vdf_test.register ~protocols:[Kathmandu; Alpha]
+  Vdf_test.register ~protocols
 
 let () =
   register_protocol_independent_tests () ;
