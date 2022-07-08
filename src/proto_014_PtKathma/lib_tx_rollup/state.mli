@@ -82,6 +82,8 @@ val init :
     in the past or change in case of reorganisations at the L1 layer.  *)
 val get_head : t -> L2block.t option
 
+val get_tezos_head : t -> Alpha_block_services.block_info option tzresult Lwt.t
+
 (** Retrieve an L2 block by its hash *)
 val get_block : t -> L2block.hash -> L2block.t option Lwt.t
 
