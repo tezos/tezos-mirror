@@ -93,9 +93,9 @@ let run (baker : t) =
       "local";
       "node";
       Node.data_dir node;
+      "--liquidity-baking-toggle-vote";
+      "pass";
     ]
-    @ (if Protocol.number baker.persistent_state.protocol < 013 then []
-      else ["--liquidity-baking-toggle-vote"; "pass"])
     @ delegates
   in
   let on_terminate _ =

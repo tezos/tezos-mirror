@@ -763,16 +763,7 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
     ~executors
   @@ fun () ->
   let parameters =
-    if Protocol.number migrate_from >= 013 then
-      [
-        (["blocks_per_cycle"], Some "8");
-        (["cycles_per_voting_period"], Some "1");
-      ]
-    else
-      [
-        (["blocks_per_cycle"], Some "8");
-        (["blocks_per_voting_period"], Some "8");
-      ]
+    [(["blocks_per_cycle"], Some "8"); (["cycles_per_voting_period"], Some "1")]
   in
   let* parameter_file =
     Protocol.write_parameter_file ~base:(Right (migrate_from, None)) parameters

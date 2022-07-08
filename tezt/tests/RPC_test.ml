@@ -969,7 +969,7 @@ let test_misc_shell _test_mode_tag protocol ?endpoint client =
   let* _ = RPC.Client.call ?endpoint client @@ RPC.get_config in
   unit
 
-let test_chain _test_mode_tag protocol ?endpoint client =
+let test_chain _test_mode_tag _protocol ?endpoint client =
   let block_level = 3 in
   let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_blocks () in
   let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_chain_id () in
@@ -982,15 +982,9 @@ let test_chain _test_mode_tag protocol ?endpoint client =
     RPC.Client.call ?endpoint client
     @@ RPC.get_chain_block_context_nonce block_level
   in
-  let* () =
-    if Protocol.number protocol >= 013 then
-      let* _ =
-        (* Calls [/chains/main/blocks/head/context/sc_rollup] *)
-        RPC.Client.call ?endpoint client
-        @@ RPC.get_chain_block_context_sc_rollup ()
-      in
-      unit
-    else unit
+  let* _ =
+    (* Calls [/chains/main/blocks/head/context/sc_rollup] *)
+    RPC.Client.call ?endpoint client @@ RPC.get_chain_block_context_sc_rollup ()
   in
   let* _ =
     (* Calls [/chains/main/blocks/head/context/raw/bytes] *)
@@ -1219,11 +1213,7 @@ let register protocols =
         sub_group
         protocols
     in
-    let consensus_threshold protocol =
-      if Protocol.number protocol >= 012 then
-        [(["consensus_threshold"], Some "0")]
-      else []
-    in
+    let consensus_threshold _protocol = [(["consensus_threshold"], Some "0")] in
     check_rpc_regression
       "contracts"
       ~test_function:test_contracts
