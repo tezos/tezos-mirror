@@ -1,22 +1,30 @@
-# The Tezos blockchain
+# Test suite for the Tezos blockchain using the Tezt framework
 
-This directory contains the sources of the Tezt framework. Tezt is a
-generic test framework that is used for writing tests in OCaml for
-Tezos.
+This directory contains a test suite for Octez (an implementation of the Tezos blockchain) based on Tezt. Tezt is a
+generic test framework that is used for writing tests in OCaml.
+
+The directory includes the sources of the Tezt framework, its extension with specific support for Tezos, and a whole test suite.
 
 ## Overview
 
-Information about Tezt and its documentation can be found online at
-https://tezos.gitlab.io/developer/tezt.html
+User documentation for this testsuite can be found online at
+<https://tezos.gitlab.io/developer/tezt.html>.
 
-The Tezt directory contains several directories:
+This directory contains the following subdirectories:
 
 - `lib` defines an OCaml library named `tezt` which contains the test
-  framework. It is independent from Tezos.
+  framework. It is independent from Octez and from the Tezos protocols.
 
 - `lib_tezos` defines another OCaml library named `tezt-tezos` which
-  is specific to Tezos, complementing the above with Tezos-specific
+  is specific to Octez, complementing the above with Octez-specific
   features.
+
+- `lib_performance_regression` defines another OCaml library named
+  `tezt-performance-regression` which implements the so-called
+  Long Test Framework (LTF). It provides ways to register tests that are
+  to be run on dedicated "executors" with stable performances.
+  It features InfluxDB and Grafana integration for measures,
+  and Slack integration for alerts.
 
 - `tests` defines an OCaml executable which gathers automatic tests
   written for Tezos.
@@ -24,6 +32,22 @@ The Tezt directory contains several directories:
 - `manual_tests` defines an OCaml executable which gathers manual
   tests written for Tezos. A manual test is a test which requires
   extra configuration and cannot be set up easily in the CI.
+
+- `long_tests` defines an OCaml executable which gathers tests that
+  are run on the LTF (see `lib_performance_regression` above).
+
+- `remote_tests` defines an OCaml executable with some Octez tests that serve
+  as examples for the ability of Tezt to run external executables through SSH.
+
+- `vesting_contract_test` defines an OCaml executable which gathers
+  tests for the vesting contract. Those tests are too long to run
+  in the CI, the goal is to run them manually. (They could be moved to
+  `manual_tests`.)
+
+- `self_tests` defines an OCaml executable with some tests that test
+  other libraries in this directory (in particular `tezt` itself).
+
+- `snoop` defines an OCaml executable that performs benchmarks for gas.
 
 - `_regressions` defines a set of output expected from a call to an
   RPC or from some OCaml value serialized to JSON. If a file
@@ -42,25 +66,22 @@ The Tezt directory contains several directories:
 ## Implementation Details
 
 Tezt is implemented in the [OCaml
-language](https://ocaml.org). Currently, the project ensures that both
+language](https://ocaml.org). Currently, the project ensures that
 libraries `tezt` and `tezt-tezos` do not depend on any library of
 `Tezos`. The motto of the library is to provide an **extensive** but
 **simple** test framework for Tezos.
 
-An important feature of `tezt` is the possibility to catch `events`
+An important feature of `tezt-tezos` is the possibility to catch `events`
 emitted by the node. This allows fine-grained tests. In particular, as
-much as possible, a test in `tezt` should avoid the use of `timeouts`
+much as possible, a test in this testsuite should avoid the use of timeouts
 and instead, should rely on `events` if possible.
 
-Tezt provides an experimental module to deploy tests on remote machines.
-It is important to note that it relies on the existence of an `openssh`
-configuration on the different machines.
+The implementation of the `tezt` library is detailed in its own documentation in the `lib/README.md` file.
 
 ## API Documentation
 
-The `tezt` and `tezt-tezos` APIs are documented in the
-interface files (end by `mli`). Both APIs are available online:
-https://tezos.gitlab.io/api/api-inline.html
+The APIs of the `tezt` and `tezt-tezos` libraries are documented in the
+interface files (suffix `mli`). Both APIs are available online at
+<https://tezos.gitlab.io/api/api-inline.html>.
 
-The user manual of `tezt` is also available online on the [tezt
-page](https://tezos.gitlab.io/developer/tezt.html).
+The user manual of this testsuite is also available online at <https://tezos.gitlab.io/developer/tezt.html>.

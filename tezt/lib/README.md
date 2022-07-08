@@ -1,4 +1,4 @@
-# Component Name
+# Tezt
 <!-- Summary line: One sentence about this component. -->
 Tezt is a test framework for OCaml covering unit/integration/regression tests.
 
