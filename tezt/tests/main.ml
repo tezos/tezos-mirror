@@ -58,6 +58,24 @@ let () =
   Protocol_migration.register ~migrate_from ~migrate_to ;
   User_activated_upgrade.register ~migrate_from ~migrate_to ;
   Protocol_table_update.register ~migrate_from ~migrate_to ;
+  (* Alpha cannot stitch from Jakarta yet, but when it can, we can
+     add a voting test from Jakarta to Alpha. *)
+  Voting.register
+    ~from_protocol:Ithaca
+    ~to_protocol:(Known Jakarta)
+    ~loser_protocols:[Alpha] ;
+  Voting.register
+    ~from_protocol:Ithaca
+    ~to_protocol:Injected_test
+    ~loser_protocols:[Alpha; Ithaca] ;
+  Voting.register
+    ~from_protocol:Alpha
+    ~to_protocol:Injected_test
+    ~loser_protocols:[Jakarta] ;
+  Voting.register
+    ~from_protocol:Alpha
+    ~to_protocol:Demo
+    ~loser_protocols:[Jakarta] ;
   (* Tests that are relatively protocol-agnostic.
      We can run them on all protocols, or only one if the CI would be too slow. *)
   Baker_test.register ~protocols:[Alpha] ;
@@ -93,24 +111,6 @@ let () =
   Tenderbake.register ~protocols:[Alpha] ;
   Forge.register ~protocols:[Alpha] ;
   RPC_test.register protocols ;
-  (* Alpha cannot stitch from Jakarta yet, but when it can, we can
-     add a voting test from Jakarta to Alpha. *)
-  Voting.register
-    ~from_protocol:Ithaca
-    ~to_protocol:(Known Jakarta)
-    ~loser_protocols:[Alpha] ;
-  Voting.register
-    ~from_protocol:Ithaca
-    ~to_protocol:Injected_test
-    ~loser_protocols:[Alpha; Ithaca] ;
-  Voting.register
-    ~from_protocol:Alpha
-    ~to_protocol:Injected_test
-    ~loser_protocols:[Jakarta] ;
-  Voting.register
-    ~from_protocol:Alpha
-    ~to_protocol:Demo
-    ~loser_protocols:[Jakarta] ;
   Reject_malformed_micheline.register ~protocols:[Alpha] ;
   Manager_operations.register ~protocols ;
   Replace_by_fees.register ~protocols ;
