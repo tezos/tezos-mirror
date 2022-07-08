@@ -33,8 +33,10 @@ open Client_proto_rollups
 open Client_keys
 open Client_proto_args
 
-let save_tx_rollup ~force (cctxt : #Client_context.full) alias_name tx_rollup =
-  TxRollupAlias.add ~force cctxt alias_name tx_rollup >>=? fun () ->
+let save_tx_rollup ~force (cctxt : #Client_context.full) alias_name rollup
+    ~origination_level =
+  TxRollupAlias.add ~force cctxt alias_name {rollup; origination_level}
+  >>=? fun () ->
   cctxt#message "Transaction rollup memorized as %s" alias_name >>= fun () ->
   return_unit
 
@@ -1932,6 +1934,10 @@ let commands_rw () =
             failwith "Only implicit accounts can originate transaction rollups"
         | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Protocol_client_context.Alpha_block_services.Header.shell_header
+              cctxt
+              ()
+            >>=? fun {level = head_level; _} ->
             originate_tx_rollup
               cctxt
               ~chain:cctxt#chain
@@ -1963,7 +1969,11 @@ let commands_rw () =
                   } ) ->
                 ok originated_tx_rollup
             | _ -> error_with "transaction rollup was not correctly originated")
-            >>?= fun res -> save_tx_rollup ~force cctxt alias_name res);
+            >>?= fun res ->
+            (* Approximate origination level, needs to be <= actual origination
+               level *)
+            let origination_level = Some head_level in
+            save_tx_rollup ~force cctxt alias_name res ~origination_level);
     command
       ~group
       ~desc:"Submit a batch of transaction rollup operations."
