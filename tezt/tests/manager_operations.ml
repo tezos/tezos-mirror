@@ -1800,8 +1800,8 @@ module Simple_transfers = struct
     test_simple_transfer_of_the_whole_balance protocols ;
     test_simple_transfers_successive_wrong_counters protocols ;
     test_simple_transfers_successive_wrong_counters_no_op_pre protocols ;
-    test_batch_simple_transfers_wrong_counters [Alpha] ;
-    test_batch_simple_transfers_wrong_counters_2 [Alpha]
+    test_batch_simple_transfers_wrong_counters protocols ;
+    test_batch_simple_transfers_wrong_counters_2 protocols
 end
 
 module Simple_contract_calls = struct
