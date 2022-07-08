@@ -88,13 +88,10 @@ let () =
   Stresstest_command.register ~protocols:[Alpha] ;
   Big_map_all.register ~protocols:[Alpha] ;
   Op_validation.register ~protocols ;
-  (* Adding a new protocol would require adding samples at ./tezt/tests/encoding_samples directory*)
   Encoding.register ~protocols ;
   Precheck.register ~protocols ;
   Tenderbake.register ~protocols:[Alpha] ;
   Forge.register ~protocols:[Alpha] ;
-  (* Tests that are heavily protocol-dependent.
-     Those modules define different tests for different protocols in their [register]. *)
   RPC_test.register protocols ;
   (* Alpha cannot stitch from Jakarta yet, but when it can, we can
      add a voting test from Jakarta to Alpha. *)
