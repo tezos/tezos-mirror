@@ -2,6 +2,7 @@
 
 .build:
   extends: .build_template
+  needs: []
   variables:
     ARCH: ""
     # We fix the value of GIT_{SHORTREF,DATETIME,VERSION} (these are
@@ -76,6 +77,7 @@ build_get_contracts:
     - .default_settings_template
     - .image_template__runtime_build_dependencies_template
   stage: build
+  needs: []
   variables:
     ARCH: ""
   script:

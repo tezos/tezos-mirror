@@ -9,8 +9,8 @@ documentation:build_all:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
     - .rules_template__development
-    - .needs_template__wait_for_trigger_job
   stage: build
+  needs: []
   before_script:
     - . $HOME/.venv/bin/activate
   script:
