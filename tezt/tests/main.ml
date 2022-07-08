@@ -42,6 +42,15 @@ let migrate_to = Protocol.Alpha
    Each module defines tests which are thematically related,
    as functions to be called here. *)
 let () =
+  (* Tests that are protocol-independent.
+     They do not take a protocol as a parameter and thus need to be registered only once. *)
+  Light.register_protocol_independent () ;
+  P2p.register_protocol_independent () ;
+  Proxy.register_protocol_independent () ;
+  Mockup.register_protocol_independent () ;
+  Bootstrap.register_protocol_independent () ;
+  Cli_tezos.register_protocol_independent () ;
+  Client_keys.register_protocol_independent () ;
   (* Tests that are relatively protocol-agnostic.
      We can run them on all protocols, or only one if the CI would be too slow. *)
   Baker_test.register ~protocols:[Alpha] ;
@@ -81,15 +90,6 @@ let () =
   Precheck.register ~protocols ;
   Tenderbake.register ~protocols:[Alpha] ;
   Forge.register ~protocols:[Alpha] ;
-  (* Tests that are protocol-independent.
-     They do not take a protocol as a parameter and thus need to be registered only once. *)
-  Light.register_protocol_independent () ;
-  P2p.register_protocol_independent () ;
-  Proxy.register_protocol_independent () ;
-  Mockup.register_protocol_independent () ;
-  Bootstrap.register_protocol_independent () ;
-  Cli_tezos.register_protocol_independent () ;
-  Client_keys.register_protocol_independent () ;
   (* Tests that are heavily protocol-dependent.
      Those modules define different tests for different protocols in their [register]. *)
   RPC_test.register protocols ;
