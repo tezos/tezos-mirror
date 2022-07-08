@@ -28,7 +28,7 @@
    Component: big_maps RPC
    Invocation: dune exec tezt/tests/main.exe -- big_map_all
    Subject: Check that RPC [/chain/<chain_id>/blocks/<block_id>/context/big_maps]
-            behaves correctly with and without pagination
+            added in protocol G behaves correctly with and without pagination.
 *)
 
 let init ~protocol =
@@ -174,16 +174,14 @@ let test_invalid_input_fail client =
   let* _ = must_fail ~offset:(-1) ~length:(-1) () in
   Lwt.return_unit
 
-let test_wrapper ~protocol =
-  Test.register
+let test_wrapper =
+  Protocol.register_test
     ~__FILE__
     ~title:
-      (sf
-         "(%s) RPC \
-          /chain/<chain_id>/blocks/<block_id>/context/big_maps/<big_map_id>?offset=[int]&length=[int]"
-         (Protocol.name protocol))
+      "RPC \
+       /chain/<chain_id>/blocks/<block_id>/context/big_maps/<big_map_id>?offset=[int]&length=[int]"
     ~tags:["big_map_all"; "rpc"]
-  @@ fun () ->
+  @@ fun protocol ->
   let* _, client = init ~protocol in
   let entries : (string * int) list =
     List.map (fun i -> (Format.sprintf "\"%04i\"" i, i)) all_values
@@ -216,4 +214,4 @@ let test_wrapper ~protocol =
   let* () = test_invalid_input_fail client in
   Lwt.return_unit
 
-let register () = test_wrapper ~protocol:Protocol.Alpha
+let register ~protocols = test_wrapper protocols

@@ -75,6 +75,7 @@ let () =
   Dal.register ~protocols:[Alpha] ;
   Monitor_operations.register ~protocols:[Alpha] ;
   Stresstest_command.register ~protocols:[Alpha] ;
+  Big_map_all.register ~protocols:[Alpha] ;
   (* Adding a new protocol would require adding samples at ./tezt/tests/encoding_samples directory*)
   Encoding.register ~protocols ;
   Precheck.register ~protocols ;
@@ -111,8 +112,6 @@ let () =
     ~from_protocol:Alpha
     ~to_protocol:Demo
     ~loser_protocols:[Jakarta] ;
-  (* This file tests an RPC added in protocol G *)
-  Big_map_all.register () ;
   Reject_malformed_micheline.register ~protocols:[Alpha] ;
   Tx_rollup.register ~protocols:[Jakarta; Kathmandu; Alpha] ;
   Tx_rollup_node.register ~protocols:[Jakarta; Kathmandu; Alpha] ;
