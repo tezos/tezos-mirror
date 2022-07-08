@@ -26,8 +26,9 @@
 open Protocol
 open Alpha_context
 
-module TxRollupAlias :
-  Client_aliases.Alias with type t = Alpha_context.Tx_rollup.t
+type rollup_entity = {rollup : Tx_rollup.t; origination_level : int32 option}
+
+module TxRollupAlias : Client_aliases.Alias with type t = rollup_entity
 
 module ScRollup : sig
   val origination_proof_exn :

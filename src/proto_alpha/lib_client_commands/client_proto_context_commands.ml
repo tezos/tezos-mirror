@@ -33,9 +33,12 @@ open Client_proto_rollups
 open Client_keys
 open Client_proto_args
 
-let save_tx_rollup ~force (cctxt : #Client_context.full) alias_name tx_rollup =
+let save_tx_rollup ~force (cctxt : #Client_context.full) alias_name rollup
+    ~origination_level =
   let open Lwt_result_syntax in
-  let* () = TxRollupAlias.add ~force cctxt alias_name tx_rollup in
+  let* () =
+    TxRollupAlias.add ~force cctxt alias_name {rollup; origination_level}
+  in
   let*! () = cctxt#message "Transaction rollup memorized as %s" alias_name in
   return_unit
 
@@ -2133,6 +2136,11 @@ let commands_rw () =
            cctxt ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* {level = head_level; _} =
+          Protocol_client_context.Alpha_block_services.Header.shell_header
+            cctxt
+            ()
+        in
         let* _, _, res =
           originate_tx_rollup
             cctxt
@@ -2165,7 +2173,10 @@ let commands_rw () =
           | _ -> error_with "transaction rollup was not correctly originated"
         in
         let* alias_name = TxRollupAlias.of_fresh cctxt force alias in
-        save_tx_rollup ~force cctxt alias_name res);
+        (* Approximate origination level, needs to be <= actual origination
+           level *)
+        let origination_level = Some head_level in
+        save_tx_rollup ~force cctxt alias_name res ~origination_level);
     command
       ~group
       ~desc:"Submit a batch of transaction rollup operations."
