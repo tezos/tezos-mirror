@@ -837,15 +837,24 @@ module Make (Context : P) :
 
   let set_input_monadic {PS.inbox_level; message_counter; payload} =
     let open Monad.Syntax in
-    match Sc_rollup_inbox_message_repr.deserialize payload with
-    | Ok (External payload) ->
+    let payload =
+      match Sc_rollup_inbox_message_repr.deserialize payload with
+      | Error _ -> None
+      | Ok (External payload) -> Some payload
+      | Ok (Internal {payload; _}) -> (
+          match Micheline.root payload with
+          | String (_, payload) -> Some payload
+          | _ -> None)
+    in
+    match payload with
+    | Some payload ->
         let* boot_sector = Boot_sector.get in
         let msg = boot_sector ^ payload in
         let* () = CurrentLevel.set inbox_level in
         let* () = MessageCounter.set (Some message_counter) in
         let* () = NextMessage.set (Some msg) in
         return ()
-    | Error _ | Ok (Internal _) ->
+    | None ->
         let* () = CurrentLevel.set inbox_level in
         let* () = MessageCounter.set (Some message_counter) in
         let* () = Status.set WaitingForInputMessage in

@@ -63,6 +63,9 @@ type t = Internal of internal_inbox_message | External of string
 
 type serialized = private string
 
+(** Encoding for messages from Layer 1 to Layer 2 *)
+val encoding : t Data_encoding.t
+
 (** [serialize msg] encodes the inbox message [msg] in binary format. *)
 val serialize : t -> serialized tzresult
 

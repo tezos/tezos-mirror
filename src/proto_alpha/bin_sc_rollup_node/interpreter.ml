@@ -98,10 +98,7 @@ module Make (PVM : Pvm.S) : S = struct
           let*! messages = Store.Messages.get store hash in
           let* state =
             List.fold_left_i_es
-              (fun message_counter state external_message ->
-                let message =
-                  Sc_rollup.Inbox.Message.External external_message
-                in
+              (fun message_counter state message ->
                 let*? payload =
                   Environment.wrap_tzresult
                     (Sc_rollup.Inbox.Message.serialize message)

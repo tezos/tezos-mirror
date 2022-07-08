@@ -39,7 +39,7 @@ type 'accu operation_processor = {
     'kind.
     'accu ->
     source:public_key_hash ->
-    'kind Apply_internal_results.internal_operation_contents ->
+    'kind Apply_internal_results.internal_operation ->
     'kind Apply_internal_results.successful_internal_operation_result ->
     'accu;
 }
@@ -48,4 +48,4 @@ type 'accu operation_processor = {
     folds over the list of [operations] applying [operator] to
     transform [accu] along the way. *)
 val process_applied_manager_operations :
-  'a -> operation trace trace -> 'a operation_processor -> 'a
+  'a -> operation list list -> 'a operation_processor -> 'a

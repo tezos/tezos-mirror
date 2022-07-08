@@ -70,39 +70,58 @@ module State = struct
   let set_message_tree = Store.MessageTrees.set
 end
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3199
-   For the moment, the rollup node ignores L1 to L2 messages.
-*)
-let get_messages l1_ctxt head rollup =
+let get_messages Node_context.{l1_ctxt; rollup_address; _} head =
   let open Lwt_result_syntax in
   let* block = Layer1.fetch_tezos_block l1_ctxt head in
   let apply (type kind) accu ~source:_ (operation : kind manager_operation)
       _result =
+    let open Result_syntax in
+    let+ accu = accu in
     match operation with
-    | Sc_rollup_add_messages {rollup = rollup'; messages}
-      when Sc_rollup.Address.(rollup' = rollup) ->
+    | Sc_rollup_add_messages {rollup; messages}
+      when Sc_rollup.Address.(rollup = rollup_address) ->
+        let messages =
+          List.map
+            (fun message -> Store.Inbox.Message.External message)
+            messages
+        in
         List.rev_append messages accu
     | _ -> accu
   in
-  let apply_internal (type kind) accu ~source:_
-      (_operation : kind Apply_internal_results.internal_operation_contents)
-      (_result :
+  let apply_internal (type kind) accu ~source
+      (operation : kind Apply_internal_results.internal_operation)
+      (result :
         kind Apply_internal_results.successful_internal_operation_result) =
-    accu
+    let open Result_syntax in
+    let* accu = accu in
+    match (operation, result) with
+    | ( {
+          operation = Transaction {destination = Sc_rollup rollup; parameters; _};
+          source = Originated sender;
+          _;
+        },
+        ITransaction_result (Transaction_to_sc_rollup_result _) )
+      when Sc_rollup.Address.(rollup = rollup_address) ->
+        let+ payload =
+          Environment.wrap_tzresult @@ Script_repr.force_decode parameters
+        in
+        let message = Store.Inbox.Message.{payload; sender; source} in
+        Store.Inbox.Message.Internal message :: accu
+    | _ -> return accu
   in
-  let messages =
+  let*? messages =
     Layer1_services.(
       process_applied_manager_operations
-        []
+        (Ok [])
         block.operations
         {apply; apply_internal})
   in
   return (List.rev messages)
 
-let process_head Node_context.({l1_ctxt; rollup_address; _} as node_ctxt) store
-    Layer1.(Head {level; hash = head_hash} as head) =
+let process_head node_ctxt store Layer1.(Head {level; hash = head_hash} as head)
+    =
   let open Lwt_result_syntax in
-  let*! res = get_messages l1_ctxt head_hash rollup_address in
+  let*! res = get_messages node_ctxt head_hash in
   match res with
   | Error e -> head_processing_failure e
   | Ok [] -> return_unit
@@ -124,12 +143,7 @@ let process_head Node_context.({l1_ctxt; rollup_address; _} as node_ctxt) store
       @@ let*! history = State.history_of_hash store predecessor in
          let*! messages_tree = State.find_message_tree store predecessor in
          let*? level = Raw_level.of_int32 level in
-         let*? messages =
-           List.map_e
-             (fun message ->
-               Sc_rollup.Inbox.Message.(serialize @@ External message))
-             messages
-         in
+         let*? messages = List.map_e Store.Inbox.Message.serialize messages in
          let* messages_tree, history, inbox =
            Store.Inbox.add_messages
              store

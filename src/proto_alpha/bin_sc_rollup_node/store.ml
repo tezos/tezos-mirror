@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
+open Protocol
+open Alpha_context
 module Maker = Irmin_pack_unix.Maker (Tezos_context_encoding.Context.Conf)
 
 module IStore = struct
@@ -410,14 +411,10 @@ module Messages = Make_append_only_map (struct
 
   let string_of_key = Block_hash.to_b58check
 
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3199
-     For the moment, the rollup node ignores L1 to L2 messages.
-     When internal messages will also be considered, the following
-     should probably be changed into [Sc_rollup.Inbox.message list].
-  *)
-  type value = string list
+  type value = Inbox.Message.t list
 
-  let value_encoding = Data_encoding.(list string)
+  let value_encoding =
+    Data_encoding.(list @@ dynamic_size Inbox.Message.encoding)
 end)
 
 (** Inbox state for each block *)
