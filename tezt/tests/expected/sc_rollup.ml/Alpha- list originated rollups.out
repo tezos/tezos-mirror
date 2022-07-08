@@ -1,5 +1,5 @@
 
-./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type unit booting with  --burn-cap 9999999
+./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string booting with  --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 2509.092 units (will add 100 for safety)
 Estimated storage: 6614 bytes added (will add 20 for safety)
@@ -19,7 +19,7 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000614
       payload fees(the block proposer) ....... +ꜩ0.000614
-    Originate smart contract rollup of kind arith and type unit with boot sector ''
+    Originate smart contract rollup of kind arith and type string with boot sector ''
       This smart contract rollup origination was successfully applied
       Consumed gas: 2509.092
       Storage size: 6614 bytes
@@ -30,7 +30,7 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.6535
 
 
-./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type unit booting with  --burn-cap 9999999
+./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string booting with  --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 2509.092 units (will add 100 for safety)
 Estimated storage: 6614 bytes added (will add 20 for safety)
@@ -50,7 +50,7 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000614
       payload fees(the block proposer) ....... +ꜩ0.000614
-    Originate smart contract rollup of kind arith and type unit with boot sector ''
+    Originate smart contract rollup of kind arith and type string with boot sector ''
       This smart contract rollup origination was successfully applied
       Consumed gas: 2509.092
       Storage size: 6614 bytes
@@ -61,7 +61,7 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.6535
 
 
-./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type unit booting with  --burn-cap 9999999
+./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string booting with  --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 2509.092 units (will add 100 for safety)
 Estimated storage: 6614 bytes added (will add 20 for safety)
@@ -81,7 +81,7 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000614
       payload fees(the block proposer) ....... +ꜩ0.000614
-    Originate smart contract rollup of kind arith and type unit with boot sector ''
+    Originate smart contract rollup of kind arith and type string with boot sector ''
       This smart contract rollup origination was successfully applied
       Consumed gas: 2509.092
       Storage size: 6614 bytes
@@ -92,7 +92,7 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.6535
 
 
-./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type unit booting with  --burn-cap 9999999
+./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string booting with  --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 2509.092 units (will add 100 for safety)
 Estimated storage: 6614 bytes added (will add 20 for safety)
@@ -112,7 +112,7 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000614
       payload fees(the block proposer) ....... +ꜩ0.000614
-    Originate smart contract rollup of kind arith and type unit with boot sector ''
+    Originate smart contract rollup of kind arith and type string with boot sector ''
       This smart contract rollup origination was successfully applied
       Consumed gas: 2509.092
       Storage size: 6614 bytes
@@ -123,7 +123,7 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.6535
 
 
-./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type unit booting with  --burn-cap 9999999
+./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string booting with  --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 2509.092 units (will add 100 for safety)
 Estimated storage: 6614 bytes added (will add 20 for safety)
@@ -143,7 +143,7 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000614
       payload fees(the block proposer) ....... +ꜩ0.000614
-    Originate smart contract rollup of kind arith and type unit with boot sector ''
+    Originate smart contract rollup of kind arith and type string with boot sector ''
       This smart contract rollup origination was successfully applied
       Consumed gas: 2509.092
       Storage size: 6614 bytes
@@ -154,7 +154,7 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.6535
 
 
-./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type unit booting with  --burn-cap 9999999
+./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string booting with  --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 2509.092 units (will add 100 for safety)
 Estimated storage: 6614 bytes added (will add 20 for safety)
@@ -174,7 +174,7 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000614
       payload fees(the block proposer) ....... +ꜩ0.000614
-    Originate smart contract rollup of kind arith and type unit with boot sector ''
+    Originate smart contract rollup of kind arith and type string with boot sector ''
       This smart contract rollup origination was successfully applied
       Consumed gas: 2509.092
       Storage size: 6614 bytes
@@ -185,7 +185,7 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.6535
 
 
-./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type unit booting with  --burn-cap 9999999
+./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string booting with  --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 2509.092 units (will add 100 for safety)
 Estimated storage: 6614 bytes added (will add 20 for safety)
@@ -205,7 +205,7 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000614
       payload fees(the block proposer) ....... +ꜩ0.000614
-    Originate smart contract rollup of kind arith and type unit with boot sector ''
+    Originate smart contract rollup of kind arith and type string with boot sector ''
       This smart contract rollup origination was successfully applied
       Consumed gas: 2509.092
       Storage size: 6614 bytes
@@ -216,7 +216,7 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.6535
 
 
-./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type unit booting with  --burn-cap 9999999
+./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string booting with  --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 2509.092 units (will add 100 for safety)
 Estimated storage: 6614 bytes added (will add 20 for safety)
@@ -236,7 +236,7 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000614
       payload fees(the block proposer) ....... +ꜩ0.000614
-    Originate smart contract rollup of kind arith and type unit with boot sector ''
+    Originate smart contract rollup of kind arith and type string with boot sector ''
       This smart contract rollup origination was successfully applied
       Consumed gas: 2509.092
       Storage size: 6614 bytes
@@ -247,7 +247,7 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.6535
 
 
-./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type unit booting with  --burn-cap 9999999
+./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string booting with  --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 2509.092 units (will add 100 for safety)
 Estimated storage: 6614 bytes added (will add 20 for safety)
@@ -267,7 +267,7 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000614
       payload fees(the block proposer) ....... +ꜩ0.000614
-    Originate smart contract rollup of kind arith and type unit with boot sector ''
+    Originate smart contract rollup of kind arith and type string with boot sector ''
       This smart contract rollup origination was successfully applied
       Consumed gas: 2509.092
       Storage size: 6614 bytes
@@ -278,7 +278,7 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.6535
 
 
-./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type unit booting with  --burn-cap 9999999
+./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string booting with  --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 2509.092 units (will add 100 for safety)
 Estimated storage: 6614 bytes added (will add 20 for safety)
@@ -298,7 +298,7 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000614
       payload fees(the block proposer) ....... +ꜩ0.000614
-    Originate smart contract rollup of kind arith and type unit with boot sector ''
+    Originate smart contract rollup of kind arith and type string with boot sector ''
       This smart contract rollup origination was successfully applied
       Consumed gas: 2509.092
       Storage size: 6614 bytes
