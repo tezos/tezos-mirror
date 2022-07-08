@@ -266,6 +266,10 @@ let sc_rollup_number_of_sections_in_dissection c =
   let sc_rollup = Raw_context.sc_rollup c in
   sc_rollup.number_of_sections_in_dissection
 
+let sc_rollup_timeout_period_in_blocks c =
+  let sc_rollup = Raw_context.sc_rollup c in
+  sc_rollup.timeout_period_in_blocks
+
 let dal_number_of_slots c =
   let constants = Raw_context.constants c in
   constants.dal.number_of_slots

@@ -1001,6 +1001,9 @@ let prepare_first_block ~level ~timestamp ctxt =
                 max_outbox_messages_per_level = 100;
                 (* The default number of required sections in a dissection *)
                 number_of_sections_in_dissection = 32;
+                (* TODO: https://gitlab.com/tezos/tezos/-/issues/2902
+                   This constant needs to be refined. *)
+                timeout_period_in_blocks = 20_160;
               };
           }
       in

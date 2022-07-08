@@ -105,6 +105,7 @@ type sc_rollup = {
   max_active_outbox_levels : int32;
   max_outbox_messages_per_level : int;
   number_of_sections_in_dissection : int;
+  timeout_period_in_blocks : int;
 }
 
 type t = {
@@ -228,26 +229,28 @@ let sc_rollup_encoding =
   let open Data_encoding in
   conv
     (fun (c : sc_rollup) ->
-      ( c.enable,
-        c.origination_size,
-        c.challenge_window_in_blocks,
-        c.max_number_of_messages_per_commitment_period,
-        c.stake_amount,
-        c.commitment_period_in_blocks,
-        c.max_lookahead_in_blocks,
-        c.max_active_outbox_levels,
-        c.max_outbox_messages_per_level,
-        c.number_of_sections_in_dissection ))
-    (fun ( sc_rollup_enable,
-           sc_rollup_origination_size,
-           sc_rollup_challenge_window_in_blocks,
-           sc_rollup_max_number_of_messages_per_commitment_period,
-           sc_rollup_stake_amount,
-           sc_rollup_commitment_period_in_blocks,
-           sc_rollup_max_lookahead_in_blocks,
-           sc_rollup_max_active_outbox_levels,
-           sc_rollup_max_outbox_messages_per_level,
-           sc_rollup_number_of_sections_in_dissection ) ->
+      ( ( c.enable,
+          c.origination_size,
+          c.challenge_window_in_blocks,
+          c.max_number_of_messages_per_commitment_period,
+          c.stake_amount,
+          c.commitment_period_in_blocks,
+          c.max_lookahead_in_blocks,
+          c.max_active_outbox_levels,
+          c.max_outbox_messages_per_level,
+          c.number_of_sections_in_dissection ),
+        c.timeout_period_in_blocks ))
+    (fun ( ( sc_rollup_enable,
+             sc_rollup_origination_size,
+             sc_rollup_challenge_window_in_blocks,
+             sc_rollup_max_number_of_messages_per_commitment_period,
+             sc_rollup_stake_amount,
+             sc_rollup_commitment_period_in_blocks,
+             sc_rollup_max_lookahead_in_blocks,
+             sc_rollup_max_active_outbox_levels,
+             sc_rollup_max_outbox_messages_per_level,
+             sc_rollup_number_of_sections_in_dissection ),
+           sc_rollup_timeout_period_in_blocks ) ->
       {
         enable = sc_rollup_enable;
         origination_size = sc_rollup_origination_size;
@@ -261,18 +264,21 @@ let sc_rollup_encoding =
         max_outbox_messages_per_level = sc_rollup_max_outbox_messages_per_level;
         number_of_sections_in_dissection =
           sc_rollup_number_of_sections_in_dissection;
+        timeout_period_in_blocks = sc_rollup_timeout_period_in_blocks;
       })
-    (obj10
-       (req "sc_rollup_enable" bool)
-       (req "sc_rollup_origination_size" int31)
-       (req "sc_rollup_challenge_window_in_blocks" int31)
-       (req "sc_rollup_max_number_of_messages_per_commitment_period" int31)
-       (req "sc_rollup_stake_amount" Tez_repr.encoding)
-       (req "sc_rollup_commitment_period_in_blocks" int31)
-       (req "sc_rollup_max_lookahead_in_blocks" int32)
-       (req "sc_rollup_max_active_outbox_levels" int32)
-       (req "sc_rollup_max_outbox_messages_per_level" int31)
-       (req "sc_rollup_number_of_sections_in_dissection" uint8))
+    (merge_objs
+       (obj10
+          (req "sc_rollup_enable" bool)
+          (req "sc_rollup_origination_size" int31)
+          (req "sc_rollup_challenge_window_in_blocks" int31)
+          (req "sc_rollup_max_number_of_messages_per_commitment_period" int31)
+          (req "sc_rollup_stake_amount" Tez_repr.encoding)
+          (req "sc_rollup_commitment_period_in_blocks" int31)
+          (req "sc_rollup_max_lookahead_in_blocks" int32)
+          (req "sc_rollup_max_active_outbox_levels" int32)
+          (req "sc_rollup_max_outbox_messages_per_level" int31)
+          (req "sc_rollup_number_of_sections_in_dissection" uint8))
+       (obj1 (req "sc_rollup_timeout_period_in_blocks" int31)))
 
 let encoding =
   let open Data_encoding in

@@ -64,6 +64,7 @@ module Protocol_constants_overrides = struct
     max_active_outbox_levels : int32 option;
     max_outbox_messages_per_level : int option;
     number_of_sections_in_dissection : int option;
+    timeout_period_in_blocks : int option;
   }
 
   type t = {
@@ -189,26 +190,28 @@ module Protocol_constants_overrides = struct
     let open Data_encoding in
     conv
       (fun (c : sc_rollup) ->
-        ( c.enable,
-          c.origination_size,
-          c.challenge_window_in_blocks,
-          c.max_number_of_messages_per_commitment_period,
-          c.stake_amount,
-          c.commitment_period_in_blocks,
-          c.max_lookahead_in_blocks,
-          c.max_active_outbox_levels,
-          c.max_outbox_messages_per_level,
-          c.number_of_sections_in_dissection ))
-      (fun ( sc_rollup_enable,
-             sc_rollup_origination_size,
-             sc_rollup_challenge_window_in_blocks,
-             sc_rollup_max_number_of_messages_per_commitment_period,
-             sc_rollup_stake_amount,
-             sc_rollup_commitment_period_in_blocks,
-             sc_rollup_max_lookahead_in_blocks,
-             sc_rollup_max_active_outbox_levels,
-             sc_rollup_max_outbox_messages_per_level,
-             sc_rollup_number_of_sections_in_dissection ) ->
+        ( ( c.enable,
+            c.origination_size,
+            c.challenge_window_in_blocks,
+            c.max_number_of_messages_per_commitment_period,
+            c.stake_amount,
+            c.commitment_period_in_blocks,
+            c.max_lookahead_in_blocks,
+            c.max_active_outbox_levels,
+            c.max_outbox_messages_per_level,
+            c.number_of_sections_in_dissection ),
+          c.timeout_period_in_blocks ))
+      (fun ( ( sc_rollup_enable,
+               sc_rollup_origination_size,
+               sc_rollup_challenge_window_in_blocks,
+               sc_rollup_max_number_of_messages_per_commitment_period,
+               sc_rollup_stake_amount,
+               sc_rollup_commitment_period_in_blocks,
+               sc_rollup_max_lookahead_in_blocks,
+               sc_rollup_max_active_outbox_levels,
+               sc_rollup_max_outbox_messages_per_level,
+               sc_rollup_number_of_sections_in_dissection ),
+             sc_rollup_timeout_period_in_blocks ) ->
         {
           enable = sc_rollup_enable;
           origination_size = sc_rollup_origination_size;
@@ -223,18 +226,21 @@ module Protocol_constants_overrides = struct
             sc_rollup_max_outbox_messages_per_level;
           number_of_sections_in_dissection =
             sc_rollup_number_of_sections_in_dissection;
+          timeout_period_in_blocks = sc_rollup_timeout_period_in_blocks;
         })
-      (obj10
-         (opt "sc_rollup_enable" bool)
-         (opt "sc_rollup_origination_size" int31)
-         (opt "sc_rollup_challenge_window_in_blocks" int31)
-         (opt "sc_rollup_max_number_of_messages_per_commitment_period" int31)
-         (opt "sc_rollup_stake_amount" Tez.encoding)
-         (opt "sc_rollup_commitment_period_in_blocks" int31)
-         (opt "sc_rollup_max_lookahead_in_blocks" int32)
-         (opt "sc_rollup_max_active_outbox_levels" int32)
-         (opt "sc_rollup_max_outbox_messages_per_level" int31)
-         (opt "sc_rollup_number_of_sections_in_dissection" uint8))
+      (merge_objs
+         (obj10
+            (opt "sc_rollup_enable" bool)
+            (opt "sc_rollup_origination_size" int31)
+            (opt "sc_rollup_challenge_window_in_blocks" int31)
+            (opt "sc_rollup_max_number_of_messages_per_commitment_period" int31)
+            (opt "sc_rollup_stake_amount" Tez.encoding)
+            (opt "sc_rollup_commitment_period_in_blocks" int31)
+            (opt "sc_rollup_max_lookahead_in_blocks" int32)
+            (opt "sc_rollup_max_active_outbox_levels" int32)
+            (opt "sc_rollup_max_outbox_messages_per_level" int31)
+            (opt "sc_rollup_number_of_sections_in_dissection" uint8))
+         (obj1 (opt "sc_rollup_timeout_period_in_blocks" int31)))
 
   let encoding =
     let open Data_encoding in
@@ -519,6 +525,8 @@ module Protocol_constants_overrides = struct
               Some parametric.sc_rollup.max_outbox_messages_per_level;
             number_of_sections_in_dissection =
               Some parametric.sc_rollup.number_of_sections_in_dissection;
+            timeout_period_in_blocks =
+              Some parametric.sc_rollup.timeout_period_in_blocks;
           };
         dal = Some parametric.dal;
         tx_rollup =
@@ -607,6 +615,7 @@ module Protocol_constants_overrides = struct
           max_active_outbox_levels = None;
           max_outbox_messages_per_level = None;
           number_of_sections_in_dissection = None;
+          timeout_period_in_blocks = None;
         };
       dal = None;
       tx_rollup =
@@ -1103,6 +1112,10 @@ module Protocol_constants_overrides = struct
                Option.value
                  ~default:c.sc_rollup.number_of_sections_in_dissection
                  o.sc_rollup.number_of_sections_in_dissection;
+             timeout_period_in_blocks =
+               Option.value
+                 ~default:c.sc_rollup.timeout_period_in_blocks
+                 o.sc_rollup.timeout_period_in_blocks;
            };
          dal = Option.value ~default:c.dal o.dal;
          tx_rollup =
