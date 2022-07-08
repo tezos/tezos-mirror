@@ -1062,7 +1062,7 @@ module Gas_limits = struct
   let register ~protocols =
     block_below_ops_below protocols ;
     block_below_ops_over protocols ;
-    block_over_ops_below [Ithaca; Alpha]
+    block_over_ops_below protocols
 end
 
 module Reveal = struct
