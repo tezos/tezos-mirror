@@ -782,14 +782,12 @@ let apply_delegation ~ctxt ~source ~delegate ~before_operation =
   Delegate.set ctxt source delegate >|=? fun ctxt ->
   (ctxt, Gas.consumed ~since:before_operation ~until:ctxt, [])
 
-type execution_arg =
-  | Typed_arg :
-      Script.location * ('a, _) Script_typed_ir.ty * 'a
-      -> execution_arg
-  | Untyped_arg : Script.expr -> execution_arg
+type 'loc execution_arg =
+  | Typed_arg : 'loc * ('a, _) Script_typed_ir.ty * 'a -> 'loc execution_arg
+  | Untyped_arg : Script.expr -> _ execution_arg
 
-let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~parameter
-    ~entrypoint ~before_operation =
+let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~untyped_parameter
+    ~external_entrypoint ~before_operation =
   let contract = Contract.Implicit pkh in
   (* Transfers of zero to implicit accounts are forbidden. *)
   error_when Tez.(amount = zero) (Empty_transaction contract) >>?= fun () ->
@@ -798,38 +796,34 @@ let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~parameter
   Contract.allocated ctxt contract >>= fun already_allocated ->
   Token.transfer ctxt (`Contract source) (`Contract contract) amount
   >>=? fun (ctxt, balance_updates) ->
-  let is_unit =
-    match parameter with
-    | Typed_arg (_, Unit_t, ()) -> true
-    | Typed_arg _ -> false
-    | Untyped_arg parameter -> (
-        match Micheline.root parameter with
-        | Prim (_, Michelson_v1_primitives.D_Unit, [], _) -> true
-        | _ -> false)
+  (* Only allow [Unit] parameter to implicit accounts. *)
+  (match untyped_parameter with
+  | None -> Result.return_unit
+  | Some parameter -> (
+      match Micheline.root parameter with
+      | Prim (_, Michelson_v1_primitives.D_Unit, [], _) -> Result.return_unit
+      | _ -> error (Script_interpreter.Bad_contract_parameter contract)))
+  >>?= fun () ->
+  (match external_entrypoint with
+  | None -> Result.return_unit
+  | Some entrypoint ->
+      if Entrypoint.is_default entrypoint then Result.return_unit
+      else error (Script_tc_errors.No_such_entrypoint entrypoint))
+  >>?= fun () ->
+  let result =
+    Transaction_to_contract_result
+      {
+        storage = None;
+        lazy_storage_diff = None;
+        balance_updates;
+        originated_contracts = [];
+        consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+        storage_size = Z.zero;
+        paid_storage_size_diff = Z.zero;
+        allocated_destination_contract = not already_allocated;
+      }
   in
-  Lwt.return
-    ( ( (if Entrypoint.is_default entrypoint then Result.return_unit
-        else error (Script_tc_errors.No_such_entrypoint entrypoint))
-      >>? fun () ->
-        if is_unit then
-          (* Only allow [Unit] parameter to implicit accounts. *)
-          ok ctxt
-        else error (Script_interpreter.Bad_contract_parameter contract) )
-    >|? fun ctxt ->
-      let result =
-        Transaction_to_contract_result
-          {
-            storage = None;
-            lazy_storage_diff = None;
-            balance_updates;
-            originated_contracts = [];
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-            storage_size = Z.zero;
-            paid_storage_size_diff = Z.zero;
-            allocated_destination_contract = not already_allocated;
-          }
-      in
-      (ctxt, result, []) )
+  return (ctxt, result, [])
 
 let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
     ~entrypoint ~before_operation ~payer ~chain_id ~internal ~parameter =
@@ -1100,23 +1094,14 @@ let apply_internal_operation_contents :
      comparing it with the [ctxt] we will have at the end of the
      application). *)
   match operation with
-  | Transaction_to_implicit
-      {
-        destination = pkh;
-        amount;
-        unparsed_parameters = _;
-        entrypoint;
-        location;
-        parameters_ty;
-        parameters = typed_parameters;
-      } ->
+  | Transaction_to_implicit {destination = pkh; amount} ->
       apply_transaction_to_implicit
         ~ctxt
         ~source
         ~amount
         ~pkh
-        ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
-        ~entrypoint
+        ~untyped_parameter:None
+        ~external_entrypoint:None
         ~before_operation:ctxt_before_op
       >|=? fun (ctxt, res, ops) ->
       ( ctxt,
@@ -1287,8 +1272,8 @@ let apply_manager_operation :
         ~source:source_contract
         ~amount
         ~pkh
-        ~parameter:(Untyped_arg parameters)
-        ~entrypoint
+        ~untyped_parameter:(Some parameters)
+        ~external_entrypoint:(Some entrypoint)
         ~before_operation:ctxt_before_op
       >|=? fun (ctxt, res, ops) -> (ctxt, Transaction_result res, ops)
   | Transaction

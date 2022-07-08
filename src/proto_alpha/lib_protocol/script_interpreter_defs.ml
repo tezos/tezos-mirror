@@ -559,25 +559,11 @@ let transfer (type t tc) (ctxt, sc) gas amount location
   >>=? fun (parameters, lazy_storage_diff, ctxt) ->
   (match destination with
   | Typed_implicit destination ->
-      unparse_data ctxt Optimized parameters_ty parameters
-      >>=? fun (unparsed_parameters, ctxt) ->
-      Lwt.return
-        ( Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
-        >|? fun ctxt ->
-          let unparsed_parameters =
-            Micheline.strip_locations unparsed_parameters
-          in
-          ( Transaction_to_implicit
-              {
-                destination;
-                amount;
-                entrypoint;
-                location;
-                parameters_ty;
-                parameters;
-                unparsed_parameters;
-              },
-            ctxt ) )
+      let Unit_t = parameters_ty in
+      let () = parameters in
+      (if Entrypoint.is_default entrypoint then Result.return_unit
+      else error (Script_tc_errors.No_such_entrypoint entrypoint))
+      >>?= fun () -> return (Transaction_to_implicit {destination; amount}, ctxt)
   | Typed_originated destination ->
       unparse_data ctxt Optimized parameters_ty parameters
       >>=? fun (unparsed_parameters, ctxt) ->
