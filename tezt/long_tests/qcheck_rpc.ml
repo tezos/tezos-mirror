@@ -537,4 +537,4 @@ let property_test_rpc_server ~executors =
     ~timeout:(Hours 1)
     Test.test_rpc_server
 
-let register () = property_test_rpc_server
+let register_for_alpha () = property_test_rpc_server
