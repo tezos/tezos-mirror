@@ -75,7 +75,7 @@ black:
 
 lint_black:
 	@echo "Running black formatter as style checker"
-	$(BLACK) --check $(SRCS)
+	$(BLACK) --diff --check $(SRCS)
 
 pylint:
 	@echo "Linting with pylint, version:"
