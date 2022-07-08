@@ -65,19 +65,19 @@ let register_protocol_migration_tests () =
   Voting.register
     ~from_protocol:Ithaca
     ~to_protocol:(Known Jakarta)
-    ~loser_protocols:[Alpha] ;
+    ~loser_protocols:[migrate_to] ;
   Voting.register
     ~from_protocol:Ithaca
     ~to_protocol:Injected_test
-    ~loser_protocols:[Alpha; Ithaca] ;
+    ~loser_protocols:[migrate_to; Ithaca] ;
   Voting.register
-    ~from_protocol:Alpha
+    ~from_protocol:migrate_to
     ~to_protocol:Injected_test
-    ~loser_protocols:[Jakarta] ;
+    ~loser_protocols:[migrate_from] ;
   Voting.register
-    ~from_protocol:Alpha
+    ~from_protocol:migrate_to
     ~to_protocol:Demo
-    ~loser_protocols:[Jakarta]
+    ~loser_protocols:[migrate_from]
 
 let register_protocol_agnostic_tests () =
   (* Tests that are relatively protocol-agnostic.
