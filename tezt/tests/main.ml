@@ -32,7 +32,7 @@
             other files.
 *)
 
-let protocols = Protocol.[Ithaca; Jakarta; Kathmandu; Alpha]
+let protocols = Protocol.[Jakarta; Kathmandu; Alpha]
 
 let migrate_to = Protocol.Alpha
 

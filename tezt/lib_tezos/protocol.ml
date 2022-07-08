@@ -25,25 +25,19 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Ithaca | Jakarta | Kathmandu | Alpha
+type t = Jakarta | Kathmandu | Alpha
 
 type constants = Constants_sandbox | Constants_mainnet | Constants_test
 
 let name = function
   | Alpha -> "Alpha"
-  | Ithaca -> "Ithaca"
   | Jakarta -> "Jakarta"
   | Kathmandu -> "Kathmandu"
 
-let number = function
-  | Ithaca -> 012
-  | Jakarta -> 013
-  | Kathmandu -> 014
-  | Alpha -> 015
+let number = function Jakarta -> 013 | Kathmandu -> 014 | Alpha -> 015
 
 let directory = function
   | Alpha -> "proto_alpha"
-  | Ithaca -> "proto_012_Psithaca"
   | Jakarta -> "proto_013_PtJakart"
   | Kathmandu -> "proto_014_PtKathma"
 
@@ -52,7 +46,6 @@ let tag protocol = String.lowercase_ascii (name protocol)
 
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
-  | Ithaca -> "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
   | Jakarta -> "PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY"
   | Kathmandu -> "PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg"
 
@@ -73,7 +66,6 @@ let parameter_file ?(constants = default_constants) protocol =
 
 let daemon_name = function
   | Alpha -> "alpha"
-  | Ithaca -> "012-Psithaca"
   | Jakarta -> "013-PtJakart"
   | Kathmandu -> "014-PtKathma"
 
@@ -136,18 +128,16 @@ let write_parameter_file :
   Lwt.return overriden_parameters
 
 let next_protocol = function
-  | Ithaca -> Some Jakarta
   | Jakarta -> Some Kathmandu
   | Kathmandu -> None (* To update once the migration starts from Kathmandu. *)
   | Alpha -> None
 
 let previous_protocol = function
   | Alpha -> Some Jakarta (* To update once the migration starts from K. *)
-  | Jakarta -> Some Ithaca
   | Kathmandu -> Some Jakarta
-  | Ithaca -> None
+  | Jakarta -> None
 
-let all = [Alpha; Ithaca; Jakarta; Kathmandu]
+let all = [Alpha; Jakarta; Kathmandu]
 
 type supported_protocols =
   | Any_protocol

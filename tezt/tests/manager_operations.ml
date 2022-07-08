@@ -858,8 +858,7 @@ module Deserialisation = struct
 
   (* Gas to execute call to noop contract without deserialization *)
   let gas_to_execute_rest_noop = function
-    | Protocol.Ithaca -> 2049
-    | Jakarta | Kathmandu | Alpha -> 2109
+    | Protocol.Jakarta | Kathmandu | Alpha -> 2109
 
   let inject_call_with_bytes ?(source = Constant.bootstrap5) ?protocol ~contract
       ~size_kB ~gas_limit client =
@@ -1148,7 +1147,7 @@ module Reveal = struct
   (* After the work in !5182, which enforces that reveal operations
       can only be placed at the head of the batch, this test should
       fail with a permanent, Apply.Incorrect_reveal_position error (see
-      #2774). For Ithaca and Jakarta, we leave the original behaviour
+      #2774). For Jakarta, we leave the original behaviour
       which resulted in an Branch Refused error. *)
   let revealed_twice_in_batch protocols =
     revealed_twice_in_batch
@@ -1208,7 +1207,7 @@ module Reveal = struct
   (* After the work in !5182, which enforces that reveal operations
      can only be placed at the head of the batch, this test should
      fail with a permanent, Apply.Incorrect_reveal_position error (see
-     #2774). For Ithaca and Jakarta, we leave the original behaviour
+     #2774). For Jakarta, we leave the original behaviour
      which resulted in an Branch Refused error. *)
   let revealed_twice_in_batch_bad_second_key protocols =
     revealed_twice_in_batch_bad_second_key
