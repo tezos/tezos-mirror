@@ -442,7 +442,9 @@ let find_choice game tick =
       :: ({state_hash = next_state; tick = next_tick} as next)
       :: others ->
         if Sc_rollup_tick_repr.(tick = state_tick) then
-          return (state, tick, next_state, next_tick)
+          return
+            ( {state_hash = state; tick},
+              {state_hash = next_state; tick = next_tick} )
         else traverse (next :: others)
     | _ -> invalid_move "This choice was not proposed"
   in
@@ -452,11 +454,11 @@ let check pred reason =
   let open Lwt_result_syntax in
   if pred then return () else invalid_move reason
 
-let check_dissection ~default_number_of_sections start start_tick stop stop_tick
+let check_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
     dissection =
   let open Lwt_result_syntax in
   let len = Z.of_int @@ List.length dissection in
-  let dist = Sc_rollup_tick_repr.distance start_tick stop_tick in
+  let dist = Sc_rollup_tick_repr.distance start_chunk.tick stop_chunk.tick in
   let should_be_equal_to what =
     Format.asprintf "The number of sections must be equal to %a" Z.pp_print what
   in
@@ -476,8 +478,9 @@ let check_dissection ~default_number_of_sections start start_tick stop stop_tick
       ->
         let* () =
           check
-            (Option.equal State_hash.equal a start && not (Option.is_none a))
-            (match start with
+            (Option.equal State_hash.equal a start_chunk.state_hash
+            && not (Option.is_none a))
+            (match start_chunk.state_hash with
             | None -> "The start hash must not be None"
             | Some start ->
                 Format.asprintf
@@ -487,8 +490,8 @@ let check_dissection ~default_number_of_sections start start_tick stop stop_tick
         in
         let* () =
           check
-            (not (Option.equal State_hash.equal b stop))
-            (match stop with
+            (not (Option.equal State_hash.equal b stop_chunk.state_hash))
+            (match stop_chunk.state_hash with
             | None -> "The stop hash should be None."
             | Some stop ->
                 Format.asprintf
@@ -498,18 +501,18 @@ let check_dissection ~default_number_of_sections start start_tick stop stop_tick
         in
         Sc_rollup_tick_repr.(
           check
-            (a_tick = start_tick && b_tick = stop_tick)
+            (a_tick = start_chunk.tick && b_tick = stop_chunk.tick)
             (Format.asprintf
                "We should have section_start_tick(%a) = %a and \
                 section_stop_tick(%a) = %a"
                pp
                a_tick
                pp
-               start_tick
+               start_chunk.tick
                pp
                b_tick
                pp
-               stop_tick))
+               stop_chunk.tick))
     | _ -> invalid_move "Dissection should contain at least 2 elements"
   in
   let rec traverse states =
@@ -536,18 +539,18 @@ let check_dissection ~default_number_of_sections start start_tick stop stop_tick
 
     Note: this does not check the proof itself is valid, just that it
     makes the expected claims about start and stop states. The function
-    [play] below has to call [Sc_rollup_proof_repr.valid] separately
+    {!play} below has to call {!Sc_rollup_proof_repr.valid} separately
     to ensure the proof is actually valid. *)
-let check_proof_start_stop start start_tick stop stop_tick proof =
+let check_proof_start_stop ~start_chunk ~stop_chunk proof =
   let open Lwt_result_syntax in
-  let dist = Sc_rollup_tick_repr.distance start_tick stop_tick in
+  let dist = Sc_rollup_tick_repr.distance start_chunk.tick stop_chunk.tick in
   let* () = check Z.(equal dist one) "dist should be equal to 1" in
   let start_proof = Sc_rollup_proof_repr.start proof in
   let stop_proof = Sc_rollup_proof_repr.stop proof in
   let* () =
     check
-      (Option.equal State_hash.equal start (Some start_proof))
-      (match start with
+      (Option.equal State_hash.equal start_chunk.state_hash (Some start_proof))
+      (match start_chunk.state_hash with
       | None -> "Start is absent and should not."
       | Some start ->
           Format.asprintf
@@ -562,29 +565,25 @@ let check_proof_start_stop start start_tick stop stop_tick proof =
     | Some x -> pp fmt x
   in
   check
-    (not (Option.equal State_hash.equal stop stop_proof))
+    (not (Option.equal State_hash.equal stop_chunk.state_hash stop_proof))
     (Format.asprintf
        "stop(%a) should not be equal to stop_proof(%a)"
        (option_pp State_hash.pp)
-       stop
+       stop_chunk.state_hash
        (option_pp State_hash.pp)
        stop_proof)
 
 let play game refutation =
   let open Lwt_result_syntax in
   let*! result =
-    let* start, start_tick, stop, stop_tick =
-      find_choice game refutation.choice
-    in
+    let* start_chunk, stop_chunk = find_choice game refutation.choice in
     match refutation.step with
     | Dissection states ->
         let* () =
           check_dissection
             ~default_number_of_sections:game.default_number_of_sections
-            start
-            start_tick
-            stop
-            stop_tick
+            ~start_chunk
+            ~stop_chunk
             states
         in
         return
@@ -598,9 +597,7 @@ let play game refutation =
                default_number_of_sections = game.default_number_of_sections;
              })
     | Proof proof ->
-        let* () =
-          check_proof_start_stop start start_tick stop stop_tick proof
-        in
+        let* () = check_proof_start_stop ~start_chunk ~stop_chunk proof in
         let {inbox_snapshot; level; pvm_name; _} = game in
         let*! (proof_valid_tzresult : bool tzresult) =
           Sc_rollup_proof_repr.valid inbox_snapshot level ~pvm_name proof

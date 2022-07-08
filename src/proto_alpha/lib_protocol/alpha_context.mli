@@ -3360,10 +3360,8 @@ module Sc_rollup : sig
     module Internal_for_tests : sig
       val check_dissection :
         default_number_of_sections:int ->
-        State_hash.t option ->
-        Tick.t ->
-        State_hash.t option ->
-        Tick.t ->
+        start_chunk:dissection_chunk ->
+        stop_chunk:dissection_chunk ->
         dissection_chunk list ->
         (unit, reason) result Lwt.t
     end

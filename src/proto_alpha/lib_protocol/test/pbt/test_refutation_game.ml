@@ -1023,10 +1023,8 @@ let test_random_dissection (module P : TestPVM) start_at length
   let* check =
     Game.Internal_for_tests.check_dissection
       ~default_number_of_sections
-      (Some start)
-      section_start_at
-      stop_hash
-      section_stop_at
+      ~start_chunk:{state_hash = Some start; tick = section_start_at}
+      ~stop_chunk:{state_hash = stop_hash; tick = section_stop_at}
       dissection
   in
   return (Result.to_option check = Some ())
@@ -1104,10 +1102,8 @@ let testRandomDissection =
           let* check =
             Game.Internal_for_tests.check_dissection
               ~default_number_of_sections
-              (Some start_hash)
-              start_at
-              new_hash
-              stop_at
+              ~start_chunk:{state_hash = Some start_hash; tick = start_at}
+              ~stop_chunk:{state_hash = new_hash; tick = stop_at}
               dissection
           in
           return (Result.to_option check = Some ())
