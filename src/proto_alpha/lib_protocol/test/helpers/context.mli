@@ -124,12 +124,11 @@ module Vote : sig
     remaining_proposals : int;
   }
 
-  (** See {!Vote_storage.recorded_proposal_count_for_delegate}.
+  (** See {!Vote_storage.get_delegate_proposal_count}.
 
       Note that unlike most functions in the current module, this one
       does not call an RPC. *)
-  val recorded_proposal_count_for_delegate :
-    t -> public_key_hash -> int tzresult Lwt.t
+  val get_delegate_proposal_count : t -> public_key_hash -> int tzresult Lwt.t
 end
 
 module Contract : sig

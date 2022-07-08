@@ -2582,15 +2582,23 @@ end
 module Vote : sig
   type proposal = Protocol_hash.t
 
-  val record_proposal :
-    context -> Protocol_hash.t -> public_key_hash -> context tzresult Lwt.t
+  (** See {!Vote_storage.get_delegate_proposal_count}. *)
+  val get_delegate_proposal_count :
+    context -> public_key_hash -> int tzresult Lwt.t
+
+  (** See {!Vote_storage.set_delegate_proposal_count}. *)
+  val set_delegate_proposal_count :
+    context -> public_key_hash -> int -> context Lwt.t
+
+  (** See {!Vote_storage.has_proposed}. *)
+  val has_proposed : context -> public_key_hash -> proposal -> bool Lwt.t
+
+  (** See {!Vote_storage.add_proposal}. *)
+  val add_proposal : context -> public_key_hash -> proposal -> context Lwt.t
 
   val get_proposals : context -> int64 Protocol_hash.Map.t tzresult Lwt.t
 
   val clear_proposals : context -> context Lwt.t
-
-  val recorded_proposal_count_for_delegate :
-    context -> public_key_hash -> int tzresult Lwt.t
 
   val listings_encoding :
     (Signature.Public_key_hash.t * int64) list Data_encoding.t

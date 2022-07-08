@@ -152,17 +152,33 @@ let may_start_new_voting_period ctxt =
 
 open Validate_errors.Voting
 
+let check_no_duplicates proposals =
+  let open Tzresult_syntax in
+  let* (_ : Protocol_hash.Set.t) =
+    List.fold_left_e
+      (fun previous_proposals proposal ->
+        let* () =
+          error_when
+            (Protocol_hash.Set.mem proposal previous_proposals)
+            (Proposals_contain_duplicate {proposal})
+        in
+        return (Protocol_hash.Set.add proposal previous_proposals))
+      Protocol_hash.Set.empty
+      proposals
+  in
+  return_unit
+
 let record_delegate_proposals ctxt delegate proposals =
   (match proposals with
   | [] -> error Empty_proposals
   | _ :: _ -> Result.return_unit)
   >>?= fun () ->
+  check_no_duplicates proposals >>?= fun () ->
   Voting_period.get_current_kind ctxt >>=? function
   | Proposal ->
       Vote.in_listings ctxt delegate >>= fun in_listings ->
       if in_listings then (
-        Vote.recorded_proposal_count_for_delegate ctxt delegate
-        >>=? fun count ->
+        Vote.get_delegate_proposal_count ctxt delegate >>=? fun count ->
         assert (Compare.Int.(Constants.max_proposals_per_delegate >= count)) ;
         error_when
           Compare.Int.(
@@ -172,10 +188,24 @@ let record_delegate_proposals ctxt delegate proposals =
             > 0)
           Too_many_proposals
         >>?= fun () ->
-        List.fold_left_es
-          (fun ctxt proposal -> Vote.record_proposal ctxt proposal delegate)
-          ctxt
-          proposals)
+        (* The mix of syntactic styles will go away in the next commit *)
+        let open Lwt_tzresult_syntax in
+        let* ctxt, count =
+          List.fold_left_es
+            (fun (ctxt, count) proposal ->
+              let* () =
+                let*! already_proposed =
+                  Vote.has_proposed ctxt delegate proposal
+                in
+                fail_when already_proposed (Already_proposed {proposal})
+              in
+              let*! ctxt = Vote.add_proposal ctxt delegate proposal in
+              return (ctxt, count + 1))
+            (ctxt, count)
+            proposals
+        in
+        let*! ctxt = Vote.set_delegate_proposal_count ctxt delegate count in
+        return ctxt)
       else fail Source_not_in_vote_listings
   | (Exploration | Cooldown | Promotion | Adoption) as current ->
       fail (Wrong_voting_period_kind {current; expected = [Proposal]})

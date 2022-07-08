@@ -26,15 +26,39 @@
 
 (** Manages all the voting related storage in Storage.Vote.  *)
 
-(** Records a protocol proposal with the delegate that proposed it. *)
-val record_proposal :
-  Raw_context.t ->
-  Protocol_hash.t ->
-  Signature.Public_key_hash.t ->
-  Raw_context.t tzresult Lwt.t
+(** [get_delegate_proposal_count ctxt proposer] returns the number of
+    proposals already made by [proposer] in the current voting cycle.
 
-val recorded_proposal_count_for_delegate :
-  Raw_context.t -> Signature.Public_key_hash.t -> int tzresult Lwt.t
+    This number of proposals, aka [count], has its own storage bucket.
+
+    @return [0] if the [count] of the proposer was not initialized.
+
+    @return [Error Storage_error] if the deserialization of [count]
+    fails. *)
+val get_delegate_proposal_count :
+  Raw_context.t -> Signature.public_key_hash -> int tzresult Lwt.t
+
+(** [set_delegate_proposal_count ctxt proposer count] sets
+    [proposer]'s number of submitted proposals to [count].
+
+    More precisely, the relevant storage bucket is allocated and
+    initialized to [count] if it didn't exist; otherwise it is simply
+    updated. *)
+val set_delegate_proposal_count :
+  Raw_context.t -> Signature.public_key_hash -> int -> Raw_context.t Lwt.t
+
+(** [has_proposed ctxt proposer proposal] indicates whether the
+    [proposer] has already proposed the [proposal]. *)
+val has_proposed :
+  Raw_context.t -> Signature.public_key_hash -> Protocol_hash.t -> bool Lwt.t
+
+(** [add_proposal ctxt proposer proposal] records the submission of
+    [proposal] by [proposer]. *)
+val add_proposal :
+  Raw_context.t ->
+  Signature.public_key_hash ->
+  Protocol_hash.t ->
+  Raw_context.t Lwt.t
 
 (** Computes for each proposal how many delegates proposed it. *)
 val get_proposals : Raw_context.t -> int64 Protocol_hash.Map.t tzresult Lwt.t

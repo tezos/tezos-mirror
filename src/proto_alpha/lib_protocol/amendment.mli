@@ -101,6 +101,9 @@ val may_start_new_voting_period : context -> context tzresult Lwt.t
 
     @return [Error Empty_proposals] if the list of proposals is empty.
 
+    @return [Error Proposals_contain_duplicate] if the list of
+    proposals contains a duplicate element.
+
     @return [Error Wrong_voting_period_kind] if the voting period is
     not of the Proposal kind.
 
@@ -110,6 +113,9 @@ val may_start_new_voting_period : context -> context tzresult Lwt.t
     @return [Error Too_many_proposals] if the operation would make the
     source's total number of proposals exceed
     {!Constants.recorded_proposal_count_for_delegate}.
+
+    @return [Error Already_proposed] if one of the proposals has
+    already been proposed by the source.
 
     @return [Error Testnet_dictator_multiple_proposals] if the source
     is a testnet dictator and the operation contains more than one

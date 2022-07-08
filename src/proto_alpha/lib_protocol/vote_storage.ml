@@ -23,13 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let recorded_proposal_count_for_delegate ctxt proposer =
+let get_delegate_proposal_count ctxt proposer =
   Storage.Vote.Proposals_count.find ctxt proposer >|=? Option.value ~default:0
 
-let record_proposal ctxt proposal proposer =
-  recorded_proposal_count_for_delegate ctxt proposer >>=? fun count ->
-  Storage.Vote.Proposals_count.add ctxt proposer (count + 1) >>= fun ctxt ->
-  Storage.Vote.Proposals.add ctxt (proposal, proposer) >|= ok
+let set_delegate_proposal_count ctxt proposer count =
+  Storage.Vote.Proposals_count.add ctxt proposer count
+
+let has_proposed ctxt proposer proposal =
+  Storage.Vote.Proposals.mem ctxt (proposal, proposer)
+
+let add_proposal ctxt proposer proposal =
+  Storage.Vote.Proposals.add ctxt (proposal, proposer)
 
 let get_proposals ctxt =
   Storage.Vote.Proposals.fold

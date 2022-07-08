@@ -348,9 +348,25 @@ let empty_proposals loc = function
   | [Environment.Ecoproto_error Empty_proposals] -> return_unit
   | err -> wrong_error "Empty_proposals" err loc
 
+let proposals_contain_duplicate duplicate_proposal loc = function
+  | [Environment.Ecoproto_error (Proposals_contain_duplicate {proposal})] ->
+      Assert.equal_protocol_hash
+        ~loc:(append_loc ~caller_loc:loc __LOC__)
+        proposal
+        duplicate_proposal
+  | err -> wrong_error "Proposals_contain_duplicate" err loc
+
 let too_many_proposals loc = function
   | [Environment.Ecoproto_error Too_many_proposals] -> return_unit
   | err -> wrong_error "Too_many_proposals" err loc
+
+let already_proposed already_proposed_proposal loc = function
+  | [Environment.Ecoproto_error (Already_proposed {proposal})] ->
+      Assert.equal_protocol_hash
+        ~loc:(append_loc ~caller_loc:loc __LOC__)
+        proposal
+        already_proposed_proposal
+  | err -> wrong_error "Already_proposed" err loc
 
 let ballot_for_wrong_proposal ~current_proposal ~op_proposal loc = function
   | [
@@ -809,37 +825,6 @@ let test_not_enough_quorum_in_promotion num_delegates () =
   (* we move back to the proposal period because not enough quorum *)
   assert_period ~expected_kind:Proposal b __LOC__ >>=? fun () ->
   assert_listings_not_empty b ~loc:__LOC__ >>=? fun () -> return_unit
-
-(** Identical proposals (identified by their hash) must be counted as
-    one. *)
-let test_multiple_identical_proposals_count_as_one () =
-  context_init 1 () >>=? fun (b, delegates) ->
-  assert_period ~expected_kind:Proposal b __LOC__ >>=? fun () ->
-  let proposer = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd delegates in
-  Op.proposals (B b) proposer [Protocol_hash.zero; Protocol_hash.zero]
-  >>=? fun operation ->
-  Block.bake ~operation b >>=? fun b ->
-  (* compute the weight of proposals *)
-  Context.Vote.get_proposals (B b) >>=? fun ps ->
-  (* compute the voting power of proposer *)
-  let pkh = Context.Contract.pkh proposer in
-  Context.Vote.get_listings (B b) >>=? fun l ->
-  (match List.find_opt (fun (del, _) -> del = pkh) l with
-  | None -> failwith "%s - Missing delegate" __LOC__
-  | Some (_, proposer_power) -> return proposer_power)
-  >>=? fun proposer_power ->
-  (* correctly count the double proposal for zero as one proposal *)
-  let expected_weight_proposer = proposer_power in
-  match Environment.Protocol_hash.(Map.find zero ps) with
-  | Some v ->
-      if v = expected_weight_proposer then return_unit
-      else
-        failwith
-          "%s - Wrong count %Ld is not %Ld; identical proposals count as one"
-          __LOC__
-          v
-          expected_weight_proposer
-  | None -> failwith "%s - Missing proposal" __LOC__
 
 (** Assume the initial balance of accounts allocated by Context.init_n is at
     least 4 times the value of the minimal_stake constant. *)
@@ -1369,6 +1354,18 @@ let test_empty_proposals () =
     block
     __LOC__
 
+(** Test that a Proposals operation fails when its proposal list
+    contains multiple occurrences of the same proposal. *)
+let test_proposals_contain_duplicate () =
+  let open Lwt_result_syntax in
+  let* block, proposer = context_init1 () in
+  assert_validate_proposals_fails
+    ~expected_error:(proposals_contain_duplicate protos.(1))
+    ~proposer
+    ~proposals:[protos.(0); protos.(1); protos.(2); protos.(1); protos.(3)]
+    block
+    __LOC__
+
 (** Test that a Proposals operation fails when its proposal list is
     longer than the [max_proposals_per_delegate] protocol constant. *)
 let test_operation_has_too_many_proposals () =
@@ -1403,6 +1400,45 @@ let test_too_many_proposals () =
     ~proposals:[protos.(0)]
     block
     __LOC__
+
+(** Test that a Proposals operation fails when one of its proposals has
+    already been submitted by the same proposer in an earlier block. *)
+let test_already_proposed () =
+  let open Lwt_result_syntax in
+  let* block, proposer = context_init1 () in
+  let* operation = Op.proposals (B block) proposer [protos.(0); protos.(1)] in
+  let* block = Block.bake block ~operation in
+  (* The [proposer] cannot submit protocol [0] again. *)
+  let* () =
+    assert_validate_proposals_fails
+      ~expected_error:(already_proposed protos.(0))
+      ~proposer
+      ~proposals:[protos.(0)]
+      block
+      __LOC__
+  in
+  (* The [proposer] cannot submit protocol [1] again, even among other
+     new proposals. *)
+  let* () =
+    assert_validate_proposals_fails
+      ~expected_error:(already_proposed protos.(1))
+      ~proposer
+      ~proposals:[protos.(2); protos.(1); protos.(3)]
+      block
+      __LOC__
+  in
+  (* The initial [operation] cannot be replayed. *)
+  let* () =
+    Incremental.assert_validate_operation_fails
+      (already_proposed protos.(0) __LOC__)
+      operation
+      block
+  in
+  let* block = bake_until_first_block_of_next_period block in
+  Incremental.assert_validate_operation_fails
+    (wrong_voting_period_index ~current_index:1l ~op_index:0l __LOC__)
+    operation
+    block
 
 (** {3 Proposals -- Positive test}
 
@@ -1491,10 +1527,10 @@ let observe_proposals pre_state post_state op caller_loc =
       proposals) ;
   (* Check [Storage.Vote.Proposals_count] update. *)
   let* proposal_count_pre =
-    Context.Vote.recorded_proposal_count_for_delegate (B pre_state) source
+    Context.Vote.get_delegate_proposal_count (B pre_state) source
   in
   let* proposal_count_post =
-    Context.Vote.recorded_proposal_count_for_delegate (B post_state) source
+    Context.Vote.get_delegate_proposal_count (B post_state) source
   in
   let* () =
     Assert.equal_int
@@ -1553,27 +1589,6 @@ let test_valid_proposals () =
   let* op3 = Op.proposals (B b3) proposer0 [protos.(5); protos.(6)] in
   let* b4 = Block.bake b3 ~operation:op3 in
   observe_proposals b3 b4 op3 __LOC__
-
-(** {3 Proposals -- Incoming semantic change} *)
-
-(** Test that a Proposals operation can be replayed
-    (this will no longer be true in an upcoming commit). *)
-let test_replay_proposals () =
-  let open Lwt_result_syntax in
-  let* bpre, proposer = context_init1 ~blocks_per_cycle:10l () in
-  let* operation = Op.proposals (B bpre) proposer [protos.(0)] in
-  let* bpost = Block.bake bpre ~operation in
-  let* () = observe_proposals bpre bpost operation __LOC__ in
-  (* We do not observe the effects of replayed operations because they
-     are different from fresh operations: since the proposals were
-     already recorded for the proposer,
-     [voting_infos.remaining_proposals] does not decrease, nor does
-     the total supporting weight increase.
-
-     We simply check that [Block.bake] does not fail. *)
-  let* bpost = Block.bake bpost ~operation in
-  let* _bpost = Block.bake bpost ~operations:[operation; operation] in
-  return_unit
 
 (** {3 Ballot -- Negative tests} *)
 
@@ -1849,10 +1864,6 @@ let tests =
       `Quick
       (test_not_enough_quorum_in_promotion 432);
     Tztest.tztest
-      "voting counting double proposal"
-      `Quick
-      test_multiple_identical_proposals_count_as_one;
-    Tztest.tztest
       "voting proposal, with supermajority"
       `Quick
       (test_supermajority_in_proposal true);
@@ -1920,6 +1931,10 @@ let tests =
       test_proposals_source_not_in_vote_listings;
     Tztest.tztest "Empty proposals" `Quick test_empty_proposals;
     Tztest.tztest
+      "Proposals contain a duplicate proposal"
+      `Quick
+      test_proposals_contain_duplicate;
+    Tztest.tztest
       "Operation has too many proposals"
       `Quick
       test_operation_has_too_many_proposals;
@@ -1927,8 +1942,11 @@ let tests =
       "Too many proposals (over two operations)"
       `Quick
       test_too_many_proposals;
+    Tztest.tztest
+      "A proposal had already been proposed"
+      `Quick
+      test_already_proposed;
     Tztest.tztest "Valid Proposals operations" `Quick test_valid_proposals;
-    Tztest.tztest "Replay proposals" `Quick test_replay_proposals;
     (* Validity tests on Ballot *)
     Tztest.tztest
       "Ballot from unregistered delegate"

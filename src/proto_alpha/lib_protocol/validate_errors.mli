@@ -96,7 +96,9 @@ module Voting : sig
     | Source_not_in_vote_listings
     | (* Proposals errors *)
         Empty_proposals
+    | Proposals_contain_duplicate of {proposal : Protocol_hash.t}
     | Too_many_proposals
+    | Already_proposed of {proposal : Protocol_hash.t}
     | Testnet_dictator_multiple_proposals
     | (* Ballot errors *)
         Ballot_for_wrong_proposal of {

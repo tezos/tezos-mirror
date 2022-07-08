@@ -394,7 +394,9 @@ module Voting = struct
     | Source_not_in_vote_listings
     | (* Proposals errors *)
         Empty_proposals
+    | Proposals_contain_duplicate of {proposal : Protocol_hash.t}
     | Too_many_proposals
+    | Already_proposed of {proposal : Protocol_hash.t}
     | Testnet_dictator_multiple_proposals
     | (* Ballot errors *)
         Ballot_for_wrong_proposal of {
@@ -475,6 +477,22 @@ module Voting = struct
       Data_encoding.empty
       (function Empty_proposals -> Some () | _ -> None)
       (fun () -> Empty_proposals) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate_operation.proposals_contain_duplicate"
+      ~title:"Proposals contain duplicate"
+      ~description:"The list of proposals contains a duplicate element."
+      ~pp:(fun ppf proposal ->
+        Format.fprintf
+          ppf
+          "The list of proposals contains multiple occurrences of the proposal \
+           %a."
+          Protocol_hash.pp
+          proposal)
+      Data_encoding.(obj1 (req "proposal" Protocol_hash.encoding))
+      (function
+        | Proposals_contain_duplicate {proposal} -> Some proposal | _ -> None)
+      (fun proposal -> Proposals_contain_duplicate {proposal}) ;
     let description =
       "The proposer exceeded the maximum number of allowed proposals."
     in
@@ -487,6 +505,21 @@ module Voting = struct
       Data_encoding.empty
       (function Too_many_proposals -> Some () | _ -> None)
       (fun () -> Too_many_proposals) ;
+    register_error_kind
+      `Branch
+      ~id:"validate_operation.already_proposed"
+      ~title:"Already proposed"
+      ~description:
+        "The delegate has already submitted one of the operation's proposals."
+      ~pp:(fun ppf proposal ->
+        Format.fprintf
+          ppf
+          "The delegate has already submitted the proposal %a."
+          Protocol_hash.pp
+          proposal)
+      Data_encoding.(obj1 (req "proposal" Protocol_hash.encoding))
+      (function Already_proposed {proposal} -> Some proposal | _ -> None)
+      (fun proposal -> Already_proposed {proposal}) ;
     let description =
       "A testnet dictator cannot submit more than one proposal at a time."
     in
