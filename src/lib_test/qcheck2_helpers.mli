@@ -31,6 +31,21 @@ val qcheck_wrap :
   QCheck2.Test.t list ->
   unit Alcotest.test_case list
 
+(** [qcheck_make_result ?print ?pp_error ?count ?check ~name ~gen f]
+    is a wrapper around {!QCheck2.Test.make} where [f] returns a
+    result type. If [check] is not provided and if the result of [f] is
+    an error, {!Qcheck2.Test.fail_reportf} is called and the error is
+    shown if [pp_error] is provided. *)
+val qcheck_make_result :
+  ?count:int ->
+  ?print:'a QCheck2.Print.t ->
+  ?pp_error:(Format.formatter -> 'b -> unit) ->
+  ?check:((bool, 'b) result -> bool) ->
+  name:string ->
+  gen:'a QCheck2.Gen.t ->
+  ('a -> (bool, 'b) result) ->
+  QCheck2.Test.t
+
 (** [qcheck_eq_tests ~eq ~gen ~eq_name] returns
     three tests of [eq]: reflexivity, symmetry, and transitivity.
 
