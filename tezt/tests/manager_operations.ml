@@ -975,7 +975,7 @@ module Deserialisation = struct
   let register ~protocols =
     test_deserialization_gas_canary protocols ;
     test_not_enough_gas_deserialization protocols ;
-    test_deserialization_gas_accounting [Ithaca; Alpha]
+    test_deserialization_gas_accounting protocols
 end
 
 module Gas_limits = struct
