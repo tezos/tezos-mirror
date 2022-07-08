@@ -59,7 +59,7 @@ let () =
   (* This test depends on [Tezos_protocol_alpha.*] Tezos libraries *)
   Qcheck_rpc.register_for_alpha ~executors:default_executors () ;
   Prt_client.register ~executors:default_executors ~protocols:[Alpha] ;
-  Script_cache.register ~executors:default_executors ~protocols:[Ithaca; Alpha] ;
+  Script_cache.register ~executors:default_executors ~protocols:[Jakarta; Alpha] ;
   Block_validation.register ~executors:default_executors () ;
   (* [Test.run] must be the last function to be called. *)
   Test.run ()
