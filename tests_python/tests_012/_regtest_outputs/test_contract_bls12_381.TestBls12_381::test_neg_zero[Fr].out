@@ -1,9 +1,0 @@
-tests_012/test_contract_bls12_381.py::TestBls12_381::test_neg_zero[Fr]
-
-storage
-  (Some 0x0000000000000000000000000000000000000000000000000000000000000000)
-emitted operations
-  
-big_map diff
-  
-
