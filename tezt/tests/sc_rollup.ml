@@ -1906,16 +1906,16 @@ let test_rollup_client_list_keys =
           pp
           maybe_keys)
 
-let publish_dummy_commitment ~inbox_level ~predecessor ~sc_rollup ~src client =
+let publish_dummy_commitment ?(number_of_ticks = 1) ~inbox_level ~predecessor
+    ~sc_rollup ~src client =
   let commitment : Sc_rollup_client.commitment =
     {
       compressed_state = Constant.sc_rollup_compressed_state;
       inbox_level;
       predecessor;
-      number_of_ticks = 1;
+      number_of_ticks;
     }
   in
-
   let*! () = publish_commitment ~src ~commitment client sc_rollup in
   Client.bake_for_and_wait client
 
