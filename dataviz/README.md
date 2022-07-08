@@ -13,7 +13,7 @@ Table of Contents:
 
     - Proportion of preendorsement received before threshold time 
 
-    - Temps minimum pour recevoir la quantité de preendorsement, correspondant à un pourcentage (défini par l'utilisateur) de l'endorsing power 
+    - Minimum time to receive the amount of preendorsement, corresponding to a percentage (user defined) of the endorsing power 
 
     - Soon: Endorsement reception delays for a delegate 
 
