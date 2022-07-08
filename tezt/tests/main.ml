@@ -32,8 +32,7 @@
             other files.
 *)
 
-let protocols =
-  [Protocol.Alpha; Protocol.Kathmandu; Protocol.Jakarta; Protocol.Ithaca]
+let protocols = Protocol.[Ithaca; Jakarta; Kathmandu; Alpha]
 
 let migrate_from = Protocol.Jakarta
 
@@ -115,8 +114,8 @@ let () =
   (* This file tests an RPC added in protocol G *)
   Big_map_all.register () ;
   Reject_malformed_micheline.register ~protocols:[Alpha] ;
-  Tx_rollup.register ~protocols:[Alpha; Jakarta; Kathmandu] ;
-  Tx_rollup_node.register ~protocols:[Alpha; Jakarta; Kathmandu] ;
+  Tx_rollup.register ~protocols:[Jakarta; Kathmandu; Alpha] ;
+  Tx_rollup_node.register ~protocols:[Jakarta; Kathmandu; Alpha] ;
   Manager_operations.register ~protocols ;
   Replace_by_fees.register ~protocols:[Ithaca; Jakarta; Kathmandu; Alpha] ;
   Sc_rollup.register ~protocols:[Alpha] ;
@@ -127,7 +126,7 @@ let () =
   (* Relies on a feature only available since J. *)
   Run_script.register ~protocols:[Alpha] ;
   Sapling.register ~protocols:[Alpha] ;
-  Client_run_view.register ~protocols:[Alpha; Jakarta; Kathmandu] ;
+  Client_run_view.register ~protocols:[Jakarta; Kathmandu; Alpha] ;
   Multinode_snapshot.register ~protocols:[Alpha] ;
   (* Relies on a feature only available since K. *)
   Testnet_dictator.register ~protocols:[Alpha] ;
