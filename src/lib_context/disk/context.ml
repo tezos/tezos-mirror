@@ -165,6 +165,50 @@ let () =
       Logs.set_reporter (reporter ())
   | `Default -> ()
 
+module Events = struct
+  include Internal_event.Simple
+
+  let section = ["node"; "context"; "disk"]
+
+  let starting_gc =
+    declare_1
+      ~section
+      ~level:Info
+      ~name:"starting_gc"
+      ~msg:"starting context garbage collection for commit {context_hash}"
+      ~pp1:Context_hash.pp
+      ("context_hash", Context_hash.encoding)
+
+  let ending_gc =
+    declare_2
+      ~section
+      ~level:Info
+      ~name:"ending_gc"
+      ~msg:
+        "context garbage collection finished in {duration} (finalised in \
+         {finalisation})"
+      ~pp1:Time.System.Span.pp_hum
+      ("duration", Time.System.Span.encoding)
+      ~pp2:Time.System.Span.pp_hum
+      ("finalisation", Time.System.Span.encoding)
+
+  let gc_failure =
+    declare_1
+      ~section
+      ~level:Warning
+      ~name:"gc_failure"
+      ~msg:"context garbage collection failed: {error}"
+      ("error", Data_encoding.string)
+
+  let gc_launch_failure =
+    declare_1
+      ~section
+      ~level:Warning
+      ~name:"gc_launch_failure"
+      ~msg:"context garbage collection launch failed: {error}"
+      ("error", Data_encoding.string)
+end
+
 module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   type error +=
     | Cannot_create_file = Cannot_create_file
@@ -310,6 +354,36 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     let open Lwt_syntax in
     let+ commit = raw_commit ~time ?message context in
     Hash.to_context_hash (Store.Commit.hash commit)
+
+  let gc index context_hash =
+    let open Lwt_syntax in
+    let repo = index.repo in
+    let* commit_opt =
+      Store.Commit.of_hash index.repo (Hash.of_context_hash context_hash)
+    in
+    match commit_opt with
+    | None ->
+        Fmt.failwith "%a: unknown context hash" Context_hash.pp context_hash
+    | Some commit -> (
+        let* () = Events.(emit starting_gc) context_hash in
+        Logs.info (fun m ->
+            m "Launch GC for commit %a@." Context_hash.pp context_hash) ;
+        let finished = function
+          | Ok (stats : Store.Gc.stats) ->
+              Events.(emit ending_gc)
+                ( Time.System.Span.of_seconds_exn stats.duration,
+                  Time.System.Span.of_seconds_exn stats.finalisation_duration )
+          | Error (`Msg err) -> Events.(emit gc_failure) err
+        in
+        let commit_key = Store.Commit.key commit in
+        let* launch_result = Store.Gc.run ~finished repo commit_key in
+        match launch_result with
+        | Ok _ -> return_unit
+        | Error (`Msg err) ->
+            let* () = Events.(emit gc_launch_failure) err in
+            return_unit)
+
+  let is_gc_allowed index = Store.Gc.is_allowed index.repo
 
   (*-- Generic Store Primitives ------------------------------------------------*)
 

@@ -716,6 +716,18 @@ module type TEZOS_CONTEXT = sig
   val commit :
     time:Time.Protocol.t -> ?message:string -> context -> Context_hash.t Lwt.t
 
+  (** [gc t h] removes from disk all the data older than the commit
+    [hash]. Every operations working on checkouts greater or equal to
+    [h] will continue to work. Calling [checkout h'] on GC-ed commits
+    will return [None]. *)
+  val gc : index -> Context_hash.t -> unit Lwt.t
+
+  (** [is_gc_allowed index] returns whether or not it is possible to
+     run a GC on the given context tree. If false is returned, it
+     means that the context was run, at least once, with the indexing
+     strategy mode "always", which is not suitable for GC.*)
+  val is_gc_allowed : index -> bool
+
   val set_head : index -> Chain_id.t -> Context_hash.t -> unit Lwt.t
 
   val set_master : index -> Context_hash.t -> unit Lwt.t
