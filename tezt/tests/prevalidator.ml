@@ -1902,10 +1902,8 @@ module Revamped = struct
         client
     in
     let balance = JSON.as_string json_balance |> int_of_string in
-    let error = rex "proto.012-Psithaca.balance_is_empty" in
     let* _op =
-      Operation.Manager.(
-        inject ~error [make ~fee:balance @@ transfer ()] client)
+      Operation.Manager.(inject [make ~fee:balance @@ transfer ()] client)
     in
     unit
 
@@ -4027,8 +4025,7 @@ let register ~protocols =
   Revamped.test_prefiltered_limit protocols ;
   Revamped.test_prefiltered_limit_remove protocols ;
   Revamped.wrong_signed_branch_delayed_becomes_refused protocols ;
-  Revamped.precheck_with_empty_balance [Protocol.Ithaca]
-  (* FIXME: handle the case for Alpha. *) ;
+  Revamped.precheck_with_empty_balance Protocol.[Jakarta; Kathmandu; Alpha] ;
   Revamped.inject_operations protocols ;
   Revamped.test_inject_manager_batch protocols ;
   propagation_future_endorsement protocols ;
