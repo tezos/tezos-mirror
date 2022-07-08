@@ -51,6 +51,8 @@ let () =
   Bootstrap.register_protocol_independent () ;
   Cli_tezos.register_protocol_independent () ;
   Client_keys.register_protocol_independent () ;
+  Config.register () ;
+  Demo_counter.register () ;
   (* Tests that are relatively protocol-agnostic.
      We can run them on all protocols, or only one if the CI would be too slow. *)
   Baker_test.register ~protocols:[Alpha] ;
@@ -93,7 +95,6 @@ let () =
   (* Tests that are heavily protocol-dependent.
      Those modules define different tests for different protocols in their [register]. *)
   RPC_test.register protocols ;
-  Demo_counter.register () ;
   (* Alpha cannot stitch from Jakarta yet, but when it can, we can
      add a voting test from Jakarta to Alpha. *)
   Voting.register
@@ -132,7 +133,6 @@ let () =
   Ghostnet_dictator_migration.register ~protocols:[Alpha] ;
   Test_contract_bls12_381.register ~protocols:[Alpha] ;
   Increase_paid_storage.register ~protocols:[Alpha] ;
-  Config.register () ;
   Events.register ~protocols:[Alpha] ;
   (* Relies on a feature only available since K. *)
   Op_validation.register ~protocols ;
