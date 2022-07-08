@@ -48,7 +48,7 @@ let () =
   Baker_test.register ~protocols:[Alpha] ;
   Signer_test.register ~protocols:[Alpha] ;
   Basic.register ~protocols:[Alpha] ;
-  Vdf_test.register ~protocols:[Alpha] ;
+  Vdf_test.register ~protocols:[Kathmandu; Alpha] ;
   Client_config.register ~protocols:[Alpha] ;
   Client_commands.register ~protocols ;
   Global_constants.register ~protocols:[Alpha] ;
