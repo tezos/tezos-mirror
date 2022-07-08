@@ -41,7 +41,8 @@ let migrate_to = Protocol.Alpha
 (* This module runs the tests implemented in all other modules of this directory.
    Each module defines tests which are thematically related,
    as functions to be called here. *)
-let () =
+
+let register_protocol_independent_tests () =
   (* Tests that are protocol-independent.
      They do not take a protocol as a parameter and thus need to be registered only once. *)
   Light.register_protocol_independent () ;
@@ -52,7 +53,9 @@ let () =
   Cli_tezos.register_protocol_independent () ;
   Client_keys.register_protocol_independent () ;
   Config.register () ;
-  Demo_counter.register () ;
+  Demo_counter.register ()
+
+let register_protocol_migration_tests () =
   (* Tests related to protocol migration. *)
   Mockup.register_constant_migration ~migrate_from ~migrate_to ;
   Protocol_migration.register ~migrate_from ~migrate_to ;
@@ -75,7 +78,9 @@ let () =
   Voting.register
     ~from_protocol:Alpha
     ~to_protocol:Demo
-    ~loser_protocols:[Jakarta] ;
+    ~loser_protocols:[Jakarta]
+
+let register_protocol_agnostic_tests () =
   (* Tests that are relatively protocol-agnostic.
      We can run them on all protocols, or only one if the CI would be too slow. *)
   Baker_test.register ~protocols:[Alpha] ;
@@ -115,8 +120,12 @@ let () =
   Manager_operations.register ~protocols ;
   Replace_by_fees.register ~protocols ;
   Runtime_script_failure.register ~protocols ;
-  Deposits_limit.register ~protocols ;
-  (* Relies on a feature only available since J. *)
+  Deposits_limit.register ~protocols
+
+let register_J_plus_tests () =
+  (* Relies on a feature only available since J.
+     Move these to [register_protocol_agnostic_tests] once J is the smallest
+     protocol. *)
   Views.register [Alpha] ;
   Large_metadata.register ~protocols:[Alpha] ;
   Tx_rollup.register ~protocols:[Jakarta; Kathmandu; Alpha] ;
@@ -124,7 +133,9 @@ let () =
   Run_script.register ~protocols:[Alpha] ;
   Sapling.register ~protocols:[Alpha] ;
   Client_run_view.register ~protocols:[Jakarta; Kathmandu; Alpha] ;
-  Multinode_snapshot.register ~protocols:[Alpha] ;
+  Multinode_snapshot.register ~protocols:[Alpha]
+
+let register_K_plus_tests () =
   (* Relies on a feature only available since K. *)
   Testnet_dictator.register ~protocols:[Alpha] ;
   Ghostnet_dictator_migration.register ~protocols:[Alpha] ;
@@ -132,6 +143,13 @@ let () =
   Increase_paid_storage.register ~protocols:[Alpha] ;
   Events.register ~protocols:[Alpha] ;
   Sc_rollup.register ~protocols:[Alpha] ;
-  Vdf_test.register ~protocols:[Kathmandu; Alpha] ;
+  Vdf_test.register ~protocols:[Kathmandu; Alpha]
+
+let () =
+  register_protocol_independent_tests () ;
+  register_protocol_migration_tests () ;
+  register_protocol_agnostic_tests () ;
+  register_J_plus_tests () ;
+  register_K_plus_tests () ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()
