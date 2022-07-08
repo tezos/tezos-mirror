@@ -257,7 +257,6 @@ let register ~protocols =
       Protocol.register_test
         ~__FILE__
         ~title
-        ~supports:Protocol.(From_protocol (number Jakarta))
         ~tags:["client"; "michelson"; "view"]
         (fun protocol -> test_function ~protocol ())
         protocols)

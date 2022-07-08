@@ -526,7 +526,6 @@ let baking_operation_exception =
     ~__FILE__
     ~title:"ensure we can still bake with a faulty operation"
     ~tags:["baking"; "exception"]
-    ~supports:Protocol.(From_protocol (number Jakarta))
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol `Client ~protocol () in
   let data_dir = Node.data_dir node in
