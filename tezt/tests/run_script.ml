@@ -70,7 +70,12 @@ let check_sender = prg "address" "SENDER"
 
 let check_source = prg "address" "SOURCE"
 
-let test_balance_and_self_address ~protocol () =
+let test_balance_and_self_address =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Run script with balance and self address"
+    ~tags:["client"; "michelson"]
+  @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   (* With no parameters, the default BALANCE is 4 000 000 ꜩ. *)
   let* _storage =
@@ -143,7 +148,12 @@ let test_balance_and_self_address ~protocol () =
   in
   unit
 
-let test_source_and_sender ~protocol () =
+let test_source_and_sender =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Run script with source and sender"
+    ~tags:["client"; "michelson"]
+  @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* bootstrap1 = Client.show_address ~alias:"bootstrap1" client in
   let* bootstrap2 = Client.show_address ~alias:"bootstrap2" client in
@@ -212,15 +222,6 @@ let test_source_and_sender ~protocol () =
   in
   unit
 
-let make_for ~protocol () =
-  List.iter
-    (fun (title, f) ->
-      Test.register ~__FILE__ ~title ~tags:["client"; "michelson"] f)
-    [
-      ( "Run script with balance and self address",
-        test_balance_and_self_address ~protocol );
-      ("Run script with source and sender", test_source_and_sender ~protocol);
-    ]
-
 let register ~protocols =
-  List.iter (fun protocol -> make_for ~protocol ()) protocols
+  test_balance_and_self_address protocols ;
+  test_source_and_sender protocols
