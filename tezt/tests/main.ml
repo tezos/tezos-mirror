@@ -34,8 +34,6 @@
 
 let protocols = Protocol.[Ithaca; Jakarta; Kathmandu; Alpha]
 
-let migrate_from = Protocol.Jakarta
-
 let migrate_to = Protocol.Alpha
 
 (* This module runs the tests implemented in all other modules of this directory.
@@ -57,6 +55,7 @@ let register_protocol_independent_tests () =
 
 let register_protocol_migration_tests () =
   (* Tests related to protocol migration. *)
+  let migrate_from = Option.get @@ Protocol.previous_protocol migrate_to in
   Mockup.register_constant_migration ~migrate_from ~migrate_to ;
   Protocol_migration.register ~migrate_from ~migrate_to ;
   User_activated_upgrade.register ~migrate_from ~migrate_to ;
