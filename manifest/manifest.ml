@@ -2370,7 +2370,7 @@ let generate_package_json_file () =
     (List.sort compare !l)
 
 let generate_binaries_for_release () =
-  write "binaries-for-release" @@ fun fmt ->
+  write "script-inputs/binaries-for-release" @@ fun fmt ->
   !Target.registered
   |> List.iter (fun (internal : Target.internal) ->
          if internal.release then
@@ -2387,7 +2387,7 @@ let generate_binaries_for_release () =
                       Format.fprintf fmt "%s@." full_name.public_name))
 
 let generate_static_packages () =
-  write "static-packages" @@ fun fmt ->
+  write "script-inputs/static-packages" @@ fun fmt ->
   Target.iter_internal_by_opam (fun package internals ->
       if
         List.exists

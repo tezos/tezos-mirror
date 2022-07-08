@@ -19,7 +19,7 @@ Remove Accuser, Baker
 
 These daemons are no longer needed. Thus, the code in
 `bin_{accuser,baker}/` can be safely removed and the files
-`active_protocol_versions` and `active_testing_protocol_versions` should be
+`script-inputs/active_protocol_versions` and `script-inputs/active_testing_protocol_versions` should be
 modified accordingly.
 
 Remove Protocol Tests

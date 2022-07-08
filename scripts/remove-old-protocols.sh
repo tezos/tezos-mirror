@@ -13,8 +13,8 @@ all_protocols=$(find src -maxdepth 1 -type d -regex 'src/proto.*' | \
                 sed -r 's/_/-/g')
 
 to_be_removed=$(echo "$all_protocols" | \
-                grep -wvFf ./active_protocol_versions | \
-                grep -wvFf ./active_testing_protocol_versions | \
+                grep -wvFf script-inputs/active_protocol_versions | \
+                grep -wvFf script-inputs/active_testing_protocol_versions | \
                 sed -r 's/-/_/g')
 
 for proto in $to_be_removed; do

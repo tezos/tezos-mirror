@@ -1,9 +1,9 @@
 PACKAGES_SUBPROJECT:=$(patsubst %.opam,%,$(notdir $(shell find src vendors -name \*.opam -print)))
 PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find opam -name \*.opam -print)))
 
-active_protocol_versions := $(shell cat active_protocol_versions)
-tx_rollup_protocol_versions := $(shell cat tx_rollup_protocol_versions)
-sc_rollup_protocol_versions := $(shell cat sc_rollup_protocol_versions)
+active_protocol_versions := $(shell cat script-inputs/active_protocol_versions)
+tx_rollup_protocol_versions := $(shell cat script-inputs/tx_rollup_protocol_versions)
+sc_rollup_protocol_versions := $(shell cat script-inputs/sc_rollup_protocol_versions)
 
 define directory_of_version
 src/proto_$(shell echo $1 | tr -- - _)
