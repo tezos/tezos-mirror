@@ -40,7 +40,6 @@ type error +=
       Sc_rollup_unknown_commitment of
       Sc_rollup_commitment_repr.Hash.t
   | (* `Temporary *) Sc_rollup_bad_inbox_level
-  | (* `Temporary *) Sc_rollup_max_number_of_available_messages_reached
   | (* `Temporary *) Sc_rollup_game_already_started
   | (* `Temporary *) Sc_rollup_wrong_turn
   | (* `Temporary *) Sc_rollup_no_game
@@ -66,18 +65,6 @@ type error +=
     }
 
 let () =
-  let description = "Maximum number of available messages reached" in
-  register_error_kind
-    `Temporary
-    ~id:"Sc_rollup_max_number_of_available_messages_reached"
-    ~title:"Maximum number of available messages reached"
-    ~description
-    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
-    Data_encoding.unit
-    (function
-      | Sc_rollup_max_number_of_available_messages_reached -> Some ()
-      | _ -> None)
-    (fun () -> Sc_rollup_max_number_of_available_messages_reached) ;
   register_error_kind
     `Temporary
     ~id:"Sc_rollup_staker_in_game"

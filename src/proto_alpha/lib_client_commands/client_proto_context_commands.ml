@@ -2722,11 +2722,6 @@ let commands_rw () =
            ~name:"predecessor"
            ~desc:"The hash of the commitment's predecessor"
            Sc_rollup_params.commitment_hash_parameter
-      @@ prefixes ["and"; "number"; "of"; "messages"]
-      @@ param
-           ~name:"number_of_messages"
-           ~desc:"The number of messages for the commitment."
-           Sc_rollup_params.number_of_messages_parameter
       @@ prefixes ["and"; "number"; "of"; "ticks"]
       @@ param
            ~name:"number_of_ticks"
@@ -2745,7 +2740,6 @@ let commands_rw () =
            compressed_state
            inbox_level
            predecessor
-           number_of_messages
            number_of_ticks
            cctxt ->
         (match source with
@@ -2755,13 +2749,7 @@ let commands_rw () =
         >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         let commitment : Alpha_context.Sc_rollup.Commitment.t =
-          {
-            compressed_state;
-            inbox_level;
-            predecessor;
-            number_of_messages;
-            number_of_ticks;
-          }
+          {compressed_state; inbox_level; predecessor; number_of_ticks}
         in
         sc_rollup_publish
           cctxt

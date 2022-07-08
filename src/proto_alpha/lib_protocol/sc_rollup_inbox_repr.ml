@@ -25,41 +25,33 @@
 
 (**
 
-   A Merkelized inbox represents a list of available messages. This list
+   A Merkelized inbox represents a list of messages. This list
    is decomposed into sublists of messages, one for each non-empty Tezos
    level greater than the level of the Last Cemented Commitment (LCC).
 
    This module is designed to:
 
-   1. give a constant-time access to the number of available messages ;
-
-   2. provide a space-efficient representation for proofs of inbox
+   1. provide a space-efficient representation for proofs of inbox
    inclusions (only for inboxes obtained at the end of block
    validation) ;
 
-   3. offer an efficient function to add a new batch of messages in the
+   2. offer an efficient function to add a new batch of messages in the
    inbox at the current level.
 
-   To solve (1), we simply maintain the number of available messages in
-   a field.
-
-   To solve (2), we use a proof tree H which is implemented by a sparse
+   To solve (1), we use a proof tree H which is implemented by a sparse
    merkelized skip list allowing for compact inclusion proofs (See
    {!skip_list_repr.ml}).
 
-   To solve (3), we maintain a separate proof tree C witnessing the
+   To solve (2), we maintain a separate proof tree C witnessing the
    contents of messages of the current level.
 
-   The protocol maintains the number of available messages, the
-   hashes of the head of H, and the root hash of C.
+   The protocol maintains the hashes of the head of H, and the root hash of C.
 
    The rollup node needs to maintain a full representation for C and a
    partial representation for H back to the level of the LCC.
 
 *)
 type error += Invalid_level_add_messages of Raw_level_repr.t
-
-type error += Invalid_number_of_messages_to_consume of int64
 
 type error += Inbox_proof_error of string
 
@@ -77,17 +69,6 @@ let () =
     (obj1 (req "level" Raw_level_repr.encoding))
     (function Invalid_level_add_messages level -> Some level | _ -> None)
     (fun level -> Invalid_level_add_messages level) ;
-
-  register_error_kind
-    `Permanent
-    ~id:"sc_rollup_inbox.consume_n_messages"
-    ~title:"Internal error: Trying to consume a negative number of messages"
-    ~description:
-      "Sc_rollup_inbox.consume_n_messages must be called with a non negative \
-       integer."
-    (obj1 (req "consume_n_messages" int64))
-    (function Invalid_number_of_messages_to_consume n -> Some n | _ -> None)
-    (fun n -> Invalid_number_of_messages_to_consume n) ;
 
   register_error_kind
     `Permanent
@@ -172,7 +153,6 @@ module V1 = struct
    - [rollup] : the address of the rollup ;
    - [level] : the inbox level ;
    - [message_counter] : the number of messages in the [level]'s inbox ;
-   - [nb_available_messages] :
      the number of messages that have not been consumed by a commitment cementing ;
    - [nb_messages_in_commitment_period] :
      the number of messages during the commitment period ;
@@ -194,7 +174,6 @@ module V1 = struct
   type t = {
     rollup : Sc_rollup_repr.t;
     level : Raw_level_repr.t;
-    nb_available_messages : int64;
     nb_messages_in_commitment_period : int64;
     starting_level_of_current_commitment_period : Raw_level_repr.t;
     message_counter : Z.t;
@@ -208,7 +187,6 @@ module V1 = struct
     let {
       rollup;
       level;
-      nb_available_messages;
       nb_messages_in_commitment_period;
       starting_level_of_current_commitment_period;
       message_counter;
@@ -219,7 +197,6 @@ module V1 = struct
     in
     Sc_rollup_repr.Address.equal rollup inbox2.rollup
     && Raw_level_repr.equal level inbox2.level
-    && Compare.Int64.(equal nb_available_messages inbox2.nb_available_messages)
     && Compare.Int64.(
          equal
            nb_messages_in_commitment_period
@@ -236,7 +213,6 @@ module V1 = struct
       {
         rollup;
         level;
-        nb_available_messages;
         nb_messages_in_commitment_period;
         starting_level_of_current_commitment_period;
         message_counter;
@@ -249,7 +225,6 @@ module V1 = struct
          rollup = %a
          level = %a
          current messages hash  = %a
-         nb_available_messages = %Ld
          nb_messages_in_commitment_period = %s
          starting_level_of_current_commitment_period = %a
          message_counter = %a
@@ -261,7 +236,6 @@ module V1 = struct
       level
       Hash.pp
       (current_level_hash ())
-      nb_available_messages
       (Int64.to_string nb_messages_in_commitment_period)
       Raw_level_repr.pp
       starting_level_of_current_commitment_period
@@ -285,7 +259,6 @@ module V1 = struct
         (fun {
                rollup;
                message_counter;
-               nb_available_messages;
                nb_messages_in_commitment_period;
                starting_level_of_current_commitment_period;
                level;
@@ -294,7 +267,6 @@ module V1 = struct
              } ->
           ( rollup,
             message_counter,
-            nb_available_messages,
             nb_messages_in_commitment_period,
             starting_level_of_current_commitment_period,
             level,
@@ -302,7 +274,6 @@ module V1 = struct
             old_levels_messages ))
         (fun ( rollup,
                message_counter,
-               nb_available_messages,
                nb_messages_in_commitment_period,
                starting_level_of_current_commitment_period,
                level,
@@ -311,17 +282,15 @@ module V1 = struct
           {
             rollup;
             message_counter;
-            nb_available_messages;
             nb_messages_in_commitment_period;
             starting_level_of_current_commitment_period;
             level;
             current_level_hash = (fun () -> current_level_hash);
             old_levels_messages;
           })
-        (obj8
+        (obj7
            (req "rollup" Sc_rollup_repr.encoding)
            (req "message_counter" n)
-           (req "nb_available_messages" int64)
            (req "nb_messages_in_commitment_period" int64)
            (req
               "starting_level_of_current_commitment_period"
@@ -329,9 +298,6 @@ module V1 = struct
            (req "level" Raw_level_repr.encoding)
            (req "current_level_hash" Hash.encoding)
            (req "old_levels_messages" old_levels_messages_encoding)))
-
-  let number_of_available_messages inbox =
-    Z.of_int64 inbox.nb_available_messages
 
   let number_of_messages_during_commitment_period inbox =
     inbox.nb_messages_in_commitment_period
@@ -345,16 +311,6 @@ module V1 = struct
 
   let starting_level_of_current_commitment_period inbox =
     inbox.starting_level_of_current_commitment_period
-
-  let consume_n_messages n ({nb_available_messages; _} as inbox) :
-      t option tzresult =
-    let n = Int64.of_int32 n in
-    if Compare.Int64.(n < 0L) then
-      error (Invalid_number_of_messages_to_consume n)
-    else if Compare.Int64.(n > nb_available_messages) then ok None
-    else
-      let nb_available_messages = Int64.(sub nb_available_messages n) in
-      ok (Some {inbox with nb_available_messages})
 end
 
 type versioned = V1 of V1.t
@@ -523,7 +479,6 @@ struct
     let open Lwt_tzresult_syntax in
     let message_index = inbox.message_counter in
     let message_counter = Z.succ message_index in
-    let nb_available_messages = Int64.succ inbox.nb_available_messages in
     let*! level_tree =
       Tree.add
         level_tree
@@ -543,7 +498,6 @@ struct
         level = inbox.level;
         old_levels_messages = inbox.old_levels_messages;
         message_counter;
-        nb_available_messages;
         nb_messages_in_commitment_period;
       }
     in
@@ -712,7 +666,6 @@ struct
             inbox.starting_level_of_current_commitment_period;
           current_level_hash = inbox.current_level_hash;
           rollup = inbox.rollup;
-          nb_available_messages = inbox.nb_available_messages;
           nb_messages_in_commitment_period =
             inbox.nb_messages_in_commitment_period;
           old_levels_messages;
@@ -1218,7 +1171,6 @@ struct
         rollup;
         level;
         message_counter = Z.zero;
-        nb_available_messages = 0L;
         nb_messages_in_commitment_period = 0L;
         starting_level_of_current_commitment_period = level;
         current_level_hash = (fun () -> initial_hash);

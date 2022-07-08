@@ -39,17 +39,14 @@ end
 
     {ul
       {li assuming the PVM and Inbox are in a state implied by [predecessor]}
-      {li the PVM consumes [number_of_messages] messages tagged with
-      [inbox_level] from the Inbox}
+      {li the PVM consumes all the messages until [inbox_level] (not included)
+          from the inbox ; }
       {li the PVM advances to the state [compressed_state] over
-      [number_of_ticks] ticks }
+          [number_of_ticks] ticks. }
     }
 
     Commitments are disjoint. The next correct commitment is a function of the
     previous machine state and Inbox.
-
-    [number_of_messages] and [inbox_level] can be proven/disproven by Merkle
-    proofs on the Inbox state.
 
     [compressed_state] and [number_of_ticks] can be proven/disproven by PVM
     execution, or equivalently, by an interactive proof game between
@@ -60,7 +57,6 @@ module V1 : sig
     compressed_state : State_hash.t;
     inbox_level : Raw_level_repr.t;
     predecessor : Hash.t;
-    number_of_messages : Number_of_messages.t;
     number_of_ticks : Number_of_ticks.t;
   }
 

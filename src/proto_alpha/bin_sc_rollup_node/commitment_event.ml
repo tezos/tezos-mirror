@@ -76,10 +76,10 @@ module Simple = struct
     let msg =
       event_msg_prefix ?op_result op_type
       ^ " - predecessor: {predecessor}, inbox_level: {inbox_level}, \
-         compressed_state: {compressed_state}, number_of_messages: \
-         {number_of_messages}, number_of_ticks: {number_of_ticks}"
+         compressed_state: {compressed_state}, number_of_ticks: \
+         {number_of_ticks}"
     in
-    declare_5
+    declare_4
       ~section
       ~name
       ~msg
@@ -87,7 +87,6 @@ module Simple = struct
       ("predecessor", Sc_rollup.Commitment.Hash.encoding)
       ("inbox_level", Raw_level.encoding)
       ("compressed_state", Sc_rollup.State_hash.encoding)
-      ("number_of_messages", Sc_rollup.Number_of_messages.encoding)
       ("number_of_ticks", Sc_rollup.Number_of_ticks.encoding)
 
   let starting =
@@ -107,21 +106,19 @@ module Simple = struct
       ()
 
   let commitment_will_not_be_published =
-    declare_6
+    declare_5
       ~section
       ~name:"sc_rollup_node_commitment_will_not_be_published"
       ~msg:
         "Commitment will not be published: its inbox level is less or equal \
          than the last cemented commitment level {lcc_level} - predecessor: \
          {predecessor}, inbox_level: {inbox_level}, compressed_state: \
-         {compressed_state}, number_of_messages: {number_of_messages}, \
-         number_of_ticks: {number_of_ticks}"
+         {compressed_state}, number_of_ticks: {number_of_ticks}"
       ~level:Notice
       ("lcc_level", Raw_level.encoding)
       ("predecessor", Sc_rollup.Commitment.Hash.encoding)
       ("inbox_level", Raw_level.encoding)
       ("compressed_state", Sc_rollup.State_hash.encoding)
-      ("number_of_messages", Sc_rollup.Number_of_messages.encoding)
       ("number_of_ticks", Sc_rollup.Number_of_ticks.encoding)
 
   let last_cemented_commitment_updated =
@@ -189,39 +186,15 @@ let stopping = Simple.(emit stopping)
 open Sc_rollup.Commitment
 
 let emit_commitment_event f
-    {
-      predecessor;
-      inbox_level;
-      compressed_state;
-      number_of_messages;
-      number_of_ticks;
-    } =
-  Simple.(
-    emit
-      f
-      ( predecessor,
-        inbox_level,
-        compressed_state,
-        number_of_messages,
-        number_of_ticks ))
+    {predecessor; inbox_level; compressed_state; number_of_ticks} =
+  Simple.(emit f (predecessor, inbox_level, compressed_state, number_of_ticks))
 
 let commitment_will_not_be_published lcc_level
-    {
-      predecessor;
-      inbox_level;
-      compressed_state;
-      number_of_messages;
-      number_of_ticks;
-    } =
+    {predecessor; inbox_level; compressed_state; number_of_ticks} =
   Simple.(
     emit
       commitment_will_not_be_published
-      ( lcc_level,
-        predecessor,
-        inbox_level,
-        compressed_state,
-        number_of_messages,
-        number_of_ticks ))
+      (lcc_level, predecessor, inbox_level, compressed_state, number_of_ticks))
 
 let commitment_stored = emit_commitment_event Simple.commitment_stored
 

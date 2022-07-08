@@ -50,7 +50,7 @@ let block_finality_time = 2
 type sc_rollup_constants = {
   origination_size : int;
   challenge_window_in_blocks : int;
-  max_available_messages : int;
+  max_number_of_messages_per_commitment_period : int;
   stake_amount : Tez.t;
   commitment_period_in_blocks : int;
   max_lookahead_in_blocks : int32;
@@ -65,8 +65,8 @@ let get_sc_rollup_constants client =
   let challenge_window_in_blocks =
     json |-> "sc_rollup_challenge_window_in_blocks" |> as_int
   in
-  let max_available_messages =
-    json |-> "sc_rollup_max_available_messages" |> as_int
+  let max_number_of_messages_per_commitment_period =
+    json |-> "sc_rollup_max_number_of_messages_per_commitment_period" |> as_int
   in
   let stake_amount =
     json |-> "sc_rollup_stake_amount" |> as_string |> Int64.of_string
@@ -88,7 +88,7 @@ let get_sc_rollup_constants client =
     {
       origination_size;
       challenge_window_in_blocks;
-      max_available_messages;
+      max_number_of_messages_per_commitment_period;
       stake_amount;
       commitment_period_in_blocks;
       max_lookahead_in_blocks;
@@ -184,10 +184,6 @@ let test_scenario ?commitment_period ?challenge_window
 let inbox_level (_hash, (commitment : Sc_rollup_client.commitment), _level) =
   commitment.inbox_level
 
-let number_of_messages
-    (_hash, (commitment : Sc_rollup_client.commitment), _level) =
-  commitment.number_of_messages
-
 let number_of_ticks (_hash, (commitment : Sc_rollup_client.commitment), _level)
     =
   commitment.number_of_ticks
@@ -229,13 +225,7 @@ let cement_commitment client ~sc_rollup ~hash =
 
 let publish_commitment ?(src = Constant.bootstrap1.public_key_hash) ~commitment
     client sc_rollup =
-  let ({
-         compressed_state;
-         inbox_level;
-         predecessor;
-         number_of_messages;
-         number_of_ticks;
-       }
+  let ({compressed_state; inbox_level; predecessor; number_of_ticks}
         : Sc_rollup_client.commitment) =
     commitment
   in
@@ -246,7 +236,6 @@ let publish_commitment ?(src = Constant.bootstrap1.public_key_hash) ~commitment
     ~compressed_state
     ~inbox_level
     ~predecessor
-    ~number_of_messages
     ~number_of_ticks
     client
 
@@ -526,7 +515,7 @@ let parse_inbox json =
     let inbox = JSON.as_object json in
     return
       ( List.assoc "current_level_hash" inbox |> JSON.as_string,
-        List.assoc "nb_available_messages" inbox |> JSON.as_int )
+        List.assoc "nb_messages_in_commitment_period" inbox |> JSON.as_int )
   in
   Lwt.catch go @@ fun exn ->
   failwith
@@ -555,10 +544,12 @@ let test_rollup_inbox_size =
       ( with_fresh_rollup @@ fun sc_rollup _sc_rollup_node _filename ->
         let n = 10 in
         let* () = send_messages n sc_rollup client in
-        let* _, inbox_size = get_inbox_from_tezos_node sc_rollup client in
+        let* _, inbox_msg_during_commitment_period =
+          get_inbox_from_tezos_node sc_rollup client
+        in
         return
         @@ Check.(
-             (inbox_size = n * (n + 1) / 2)
+             (inbox_msg_during_commitment_period = n * (n + 1) / 2)
                int
                ~error_msg:"expected value %R, got %L") )
         node
@@ -778,32 +769,6 @@ let basic_scenario _protocol sc_rollup_node sc_rollup _node client =
   Log.info "level: %d\n" level ;
   let* _ = Sc_rollup_node.wait_for_level sc_rollup_node expected_level in
   return ()
-
-let too_many_messages _protocol sc_rollup_node sc_rollup _node client =
-  (* The following should be equal to `Sc_rollup_repr.Number_of_messages.max_int`. *)
-  let num_messages = 4_096 in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2932
-     The following should be equal to the period of commitment publications. *)
-  let num_levels = 20 in
-  let batch_size = (num_messages / num_levels) + 1 in
-  let* current_level = RPC.get_current_level client in
-  let expected_level = JSON.(as_int (current_level |-> "level")) + num_levels in
-  let* () = Sc_rollup_node.run sc_rollup_node in
-  let* success =
-    Lwt.catch
-      (fun () ->
-        let* () = send_messages ~batch_size num_levels sc_rollup client in
-        let* _ =
-          Sc_rollup_node.wait_for_level
-            ~timeout:3.
-            sc_rollup_node
-            expected_level
-        in
-        return false)
-      (fun _exn -> return true)
-  in
-  if success then return ()
-  else failwith "Adding too many messages in the inbox should fail."
 
 let sc_rollup_node_stops_scenario _protocol sc_rollup_node sc_rollup _node
     client =
@@ -1054,9 +1019,6 @@ let check_eq_commitment (c1 : Sc_rollup_client.commitment)
   Check.(c1.inbox_level = c2.inbox_level)
     Check.int
     ~error_msg:"Commitments differ in inbox_level (%L = %R)" ;
-  Check.(c1.number_of_messages = c2.number_of_messages)
-    Check.int
-    ~error_msg:"Commitments differ in inbox_level (%L = %R)" ;
   Check.(c1.number_of_ticks = c2.number_of_ticks)
     Check.int
     ~error_msg:"Commitments differ in inbox_level (%L = %R)"
@@ -1164,17 +1126,6 @@ let commitment_stored _protocol sc_rollup_node sc_rollup _node client =
     (Check.option Check.int)
     ~error_msg:
       "Commitment has been stored at a level different than expected (%L = %R)" ;
-  let expected_number_of_messages =
-    Some (levels_to_commitment * (levels_to_commitment + 1) / 2)
-  in
-  (let stored_number_of_messages =
-     Option.map number_of_messages stored_commitment
-   in
-   Check.(expected_number_of_messages = stored_number_of_messages)
-     (Check.option Check.int)
-     ~error_msg:
-       "Number of messages processed by commitment is different from the \
-        number of messages expected (%L expected <> %R processed)") ;
   let* published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
@@ -1294,14 +1245,6 @@ let commitments_messages_reset _protocol sc_rollup_node sc_rollup _node client =
     (Check.option Check.int)
     ~error_msg:
       "Commitment has been stored at a level different than expected (%L = %R)" ;
-  (let stored_number_of_messages =
-     Option.map number_of_messages stored_commitment
-   in
-   Check.(stored_number_of_messages = Some 0)
-     (Check.option Check.int)
-     ~error_msg:
-       "Number of messages processed by commitment is different from the \
-        number of messages expected (%L = %R)") ;
   (let stored_number_of_ticks = Option.map number_of_ticks stored_commitment in
    Check.(stored_number_of_ticks = Some 0)
      (Check.option Check.int)
@@ -1417,14 +1360,6 @@ let commitments_reorgs protocol sc_rollup_node sc_rollup node client =
     (Check.option Check.int)
     ~error_msg:
       "Commitment has been stored at a level different than expected (%L = %R)" ;
-  (let stored_number_of_messages =
-     Option.map number_of_messages stored_commitment
-   in
-   Check.(stored_number_of_messages = Some 0)
-     (Check.option Check.int)
-     ~error_msg:
-       "Number of messages processed by commitment is different from the \
-        number of messages expected (%L = %R)") ;
   (let stored_number_of_ticks = Option.map number_of_ticks stored_commitment in
    Check.(stored_number_of_ticks = Some 0)
      (Check.option Check.int)
@@ -1932,7 +1867,6 @@ let publish_dummy_commitment ~inbox_level ~predecessor ~sc_rollup ~src client =
       compressed_state = Constant.sc_rollup_compressed_state;
       inbox_level;
       predecessor;
-      number_of_messages = 0;
       number_of_ticks = 1;
     }
   in
@@ -2004,10 +1938,6 @@ let register ~protocols =
   test_rollup_inbox_size protocols ;
   test_rollup_inbox_current_messages_hash protocols ;
   test_rollup_inbox_of_rollup_node "basic" basic_scenario protocols ;
-  test_rollup_inbox_of_rollup_node
-    "too_many_messages"
-    too_many_messages
-    protocols ;
   test_rollup_inbox_of_rollup_node
     "stops"
     sc_rollup_node_stops_scenario

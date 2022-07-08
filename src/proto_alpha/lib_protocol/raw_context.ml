@@ -982,9 +982,9 @@ let prepare_first_block ~level ~timestamp ctxt =
                 challenge_window_in_blocks = 20_160;
                 (* The following value is chosen to limit the maximal
                    length of an inbox refutation proof. *)
-                (* TODO: https://gitlab.com/tezos/tezos/-/issues/2556
-                   The follow constants need to be refined. *)
-                max_available_messages = 1_000_000;
+                (* TODO: https://gitlab.com/tezos/tezos/-/issues/2373
+                   check this is reasonable. *)
+                max_number_of_messages_per_commitment_period = 32_765;
                 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
                    The following constants need to be refined. *)
                 stake_amount = Tez_repr.of_mutez_exn 10_000_000_000L;

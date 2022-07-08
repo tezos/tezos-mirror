@@ -1668,8 +1668,7 @@ module Sc_rollup = struct
     Process.check process
 
   let publish_commitment ?hooks ?(wait = "none") ?burn_cap ~src ~sc_rollup
-      ~compressed_state ~inbox_level ~predecessor ~number_of_messages
-      ~number_of_ticks client =
+      ~compressed_state ~inbox_level ~predecessor ~number_of_ticks client =
     let process =
       spawn_command
         ?hooks
@@ -1695,11 +1694,6 @@ module Sc_rollup = struct
             "and";
             "predecessor";
             predecessor;
-            "and";
-            "number";
-            "of";
-            "messages";
-            string_of_int number_of_messages;
             "and";
             "number";
             "of";

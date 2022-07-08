@@ -69,22 +69,16 @@ let proof_start_state proof = proof.start
 
 let proof_stop_state proof = proof.stop
 
-let number_of_messages_exn n =
-  match Number_of_messages.of_int32 n with
-  | Some x -> x
-  | None -> Stdlib.failwith "Bad Number_of_messages"
-
 let number_of_ticks_exn n =
   match Number_of_ticks.of_int32 n with
   | Some x -> x
   | None -> Stdlib.failwith "Bad Number_of_ticks"
 
-let get_comm pred inbox_level messages ticks state =
+let get_comm pred inbox_level ticks state =
   Commitment.
     {
       predecessor = pred;
       inbox_level = Raw_level.of_int32_exn inbox_level;
-      number_of_messages = number_of_messages_exn messages;
       number_of_ticks = number_of_ticks_exn ticks;
       compressed_state = state;
     }
@@ -621,10 +615,8 @@ module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
     in
     let int_tick = tick_to_int_exn tick in
     let number_of_ticks = Int32.of_int int_tick in
-    let parent = get_comm Commitment.Hash.zero 0l 3l 1l start_hash in
-    let child =
-      get_comm Commitment.Hash.zero 0l 3l number_of_ticks initial_hash
-    in
+    let parent = get_comm Commitment.Hash.zero 0l 1l start_hash in
+    let child = get_comm Commitment.Hash.zero 0l number_of_ticks initial_hash in
     let initial_game =
       Game.initial
         inbox

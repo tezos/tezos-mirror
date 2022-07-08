@@ -281,10 +281,11 @@ let check_constants constants =
         non-negative.")
   >>? fun () ->
   error_unless
-    Compare.Int.(constants.sc_rollup.max_available_messages > 0)
+    Compare.Int.(
+      constants.sc_rollup.max_number_of_messages_per_commitment_period > 0)
     (Invalid_protocol_constants
-       "The smart contract rollup max available messages must be strictly \
-        greater than 0.")
+       "The smart contract rollup max number of messages per commitment \
+        period  must be strictly greater than 0.")
   >>? fun () ->
   error_unless
     Tez_repr.(constants.sc_rollup.stake_amount >= zero)

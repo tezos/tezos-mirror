@@ -77,17 +77,6 @@ module State_hash : sig
   val hash_string : unreachable -> t
 end
 
-(** Number of messages consumed by a single commitment. This represents a claim
-    about the shape of the Inbox, which can be disputed as part of a commitment
-    dispute.
-
-    See also {!Commitment_repr.}. *)
-module Number_of_messages : sig
-  include Bounded.Int32.S
-
-  val zero : t
-end
-
 (** Number of ticks computed by a single commitment. This represents a claim
     about the state of the PVM, which can be disputed as part of a commitment
     dispute.

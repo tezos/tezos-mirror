@@ -141,7 +141,8 @@ val sc_rollup_origination_size : Raw_context.t -> int
 
 val sc_rollup_challenge_window_in_blocks : Raw_context.t -> int
 
-val sc_rollup_max_available_messages : Raw_context.t -> int
+val sc_rollup_max_number_of_messages_per_commitment_period :
+  Raw_context.t -> int
 
 val sc_rollup_stake_amount : Raw_context.t -> Tez_repr.t
 

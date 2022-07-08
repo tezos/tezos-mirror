@@ -40,24 +40,17 @@ let inbox ctxt rollup =
   | None -> fail (Sc_rollup_does_not_exist rollup)
   | Some inbox -> return (inbox, ctxt)
 
-let assert_inbox_size_ok ctxt inbox extra_num_messages =
-  let next_size =
-    Z.add
-      (Sc_rollup_inbox_repr.number_of_available_messages inbox)
-      (Z.of_int extra_num_messages)
-  in
-  let max_size = Constants_storage.sc_rollup_max_available_messages ctxt in
-  fail_unless
-    Compare.Z.(next_size <= Z.of_int max_size)
-    Sc_rollup_max_number_of_available_messages_reached
-
-let assert_inbox_nb_messages_in_commitment_period inbox extra_messages =
+let assert_inbox_nb_messages_in_commitment_period ctxt inbox extra_messages =
   let nb_messages_in_commitment_period =
     Int64.add
       (Sc_rollup_inbox_repr.number_of_messages_during_commitment_period inbox)
       (Int64.of_int extra_messages)
   in
-  let limit = Int64.of_int32 Sc_rollup_repr.Number_of_messages.max_int in
+  let limit =
+    Constants_storage.sc_rollup_max_number_of_messages_per_commitment_period
+      ctxt
+    |> Int64.of_int
+  in
   fail_when
     Compare.Int64.(nb_messages_in_commitment_period > limit)
     Sc_rollup_max_number_of_messages_reached_for_commitment_period
@@ -88,7 +81,6 @@ let add_messages ctxt rollup messages =
       (0, 0, ctxt)
       messages
   in
-  let* () = assert_inbox_size_ok ctxt inbox num_messages in
   let start =
     Sc_rollup_inbox_repr.starting_level_of_current_commitment_period inbox
   in
@@ -108,7 +100,9 @@ let add_messages ctxt rollup messages =
       Sc_rollup_inbox_repr.start_new_commitment_period inbox new_starting_level)
     else inbox
   in
-  let* () = assert_inbox_nb_messages_in_commitment_period inbox num_messages in
+  let* () =
+    assert_inbox_nb_messages_in_commitment_period ctxt inbox num_messages
+  in
   let inbox_level = Sc_rollup_inbox_repr.inbox_level inbox in
   let* genesis_info = Storage.Sc_rollup.Genesis_info.get ctxt rollup in
   let origination_level = genesis_info.level in

@@ -182,17 +182,6 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
             "PVM state for block hash not available %s"
             (Block_hash.to_string block_hash)
     in
-    let number_of_messages = Number_of_messages.get () in
-    let* number_of_messages =
-      match
-        Sc_rollup.Number_of_messages.of_int32 @@ Z.to_int32 number_of_messages
-      with
-      | Some number_of_messages -> return number_of_messages
-      | None ->
-          failwith
-            "Invalid number of messages %s"
-            (Z.to_string number_of_messages)
-    in
     let number_of_ticks = Number_of_ticks.get () in
     let+ number_of_ticks =
       match
@@ -208,13 +197,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     let () = Number_of_messages.reset () in
     let () = Number_of_ticks.reset () in
     Sc_rollup.Commitment.
-      {
-        predecessor;
-        inbox_level;
-        number_of_messages;
-        number_of_ticks;
-        compressed_state;
-      }
+      {predecessor; inbox_level; number_of_ticks; compressed_state}
 
   let store_commitment_if_necessary node_ctxt store current_level block_hash =
     let open Lwt_result_syntax in

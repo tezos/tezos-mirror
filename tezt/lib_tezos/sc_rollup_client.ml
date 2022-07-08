@@ -35,7 +35,6 @@ type commitment = {
   compressed_state : string;
   inbox_level : int;
   predecessor : string;
-  number_of_messages : int;
   number_of_ticks : int;
 }
 
@@ -45,18 +44,8 @@ let commitment_from_json json =
     let compressed_state = JSON.as_string @@ JSON.get "compressed_state" json in
     let inbox_level = JSON.as_int @@ JSON.get "inbox_level" json in
     let predecessor = JSON.as_string @@ JSON.get "predecessor" json in
-    let number_of_messages =
-      JSON.as_int @@ JSON.get "number_of_messages" json
-    in
     let number_of_ticks = JSON.as_int @@ JSON.get "number_of_ticks" json in
-    Some
-      {
-        compressed_state;
-        inbox_level;
-        predecessor;
-        number_of_messages;
-        number_of_ticks;
-      }
+    Some {compressed_state; inbox_level; predecessor; number_of_ticks}
 
 let commitment_with_hash_and_level_from_json json =
   let hash, commitment_json, published_at_level =
