@@ -2230,7 +2230,7 @@ let check_if_op_is_in_mempool client ~classification oph =
       in
       if res then Test.fail "%s found in mempool" oph else unit
 
-let get_endorsement_has_bytes ~protocol client =
+let get_endorsement_as_bytes ~protocol client =
   let* mempool = RPC.get_mempool_pending_operations client in
   let open JSON in
   let ops_list = as_list (mempool |-> "applied") in
@@ -2419,7 +2419,7 @@ let propagation_future_endorsement =
   let* () = Client.endorse_for client_1 ~force:true ~protocol in
   let* () = endorser_waiter in
   Log.info "%s" step4_msg ;
-  let* bytes, hash = get_endorsement_has_bytes ~protocol client_1 in
+  let* bytes, hash = get_endorsement_as_bytes ~protocol client_1 in
   Log.info "%s" step5_msg ;
   let* _ = RPC.mempool_ban_operation ~data:(`String hash) client_1 in
   Log.info "%s" step6_msg ;
