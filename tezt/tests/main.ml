@@ -53,6 +53,11 @@ let () =
   Client_keys.register_protocol_independent () ;
   Config.register () ;
   Demo_counter.register () ;
+  (* Tests related to protocol migration. *)
+  Mockup.register_constant_migration ~migrate_from ~migrate_to ;
+  Protocol_migration.register ~migrate_from ~migrate_to ;
+  User_activated_upgrade.register ~migrate_from ~migrate_to ;
+  Protocol_table_update.register ~migrate_from ~migrate_to ;
   (* Tests that are relatively protocol-agnostic.
      We can run them on all protocols, or only one if the CI would be too slow. *)
   Baker_test.register ~protocols:[Alpha] ;
@@ -69,17 +74,13 @@ let () =
   Double_bake.register ~protocols:[Alpha] ;
   Light.register ~protocols:[Alpha] ;
   Mockup.register ~protocols ;
-  Mockup.register_constant_migration ~migrate_from ~migrate_to ;
   Mockup.register_global_constants ~protocols:[Alpha] ;
   Node_event_level.register ~protocols:[Alpha] ;
   Proxy.register ~protocols ;
   Proxy_server_test.register ~protocols:[Alpha] ;
   P2p.register ~protocols:[Alpha] ;
   Protocol_limits.register ~protocols:[Alpha] ;
-  Protocol_migration.register ~migrate_from ~migrate_to ;
-  User_activated_upgrade.register ~migrate_from ~migrate_to ;
   Rpc_config_logging.register ~protocols:[Alpha] ;
-  Protocol_table_update.register ~migrate_from ~migrate_to ;
   Cache_cache.register protocols ;
   Baking.register ~protocols ;
   Prevalidator.register ~protocols ;
