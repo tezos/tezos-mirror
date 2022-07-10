@@ -84,7 +84,7 @@ val default_state_recorder_config : state_recorder_config
 
 val default_extra_operations : Operations_source.t option
 
-val default_per_block_vote_file : string option
+val default_per_block_vote_file : string
 
 val default_config : t
 
