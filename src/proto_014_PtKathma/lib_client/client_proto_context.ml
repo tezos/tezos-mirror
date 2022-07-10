@@ -348,6 +348,40 @@ let set_deposits_limit cctxt ~chain ~block ?confirmations ?dry_run
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
 
+let increase_paid_storage cctxt ~chain ~block ?force ?dry_run ?verbose_signing
+    ?fee ?confirmations ?simulation ~source ~destination ~src_pk ~manager_sk
+    ~fee_parameter ~amount_in_bytes () =
+  let operation = Increase_paid_storage {amount_in_bytes; destination} in
+  let operation =
+    Injection.prepare_manager_operation
+      ~fee:(Limit.of_option fee)
+      ~gas_limit:Limit.unknown
+      ~storage_limit:Limit.unknown
+      operation
+  in
+  let operation = Annotated_manager_operation.Single_manager operation in
+  Injection.inject_manager_operation
+    cctxt
+    ~chain
+    ~block
+    ?confirmations
+    ?force
+    ?dry_run
+    ?verbose_signing
+    ?simulation
+    ~source
+    ~fee:(Limit.of_option fee)
+    ~gas_limit:Limit.unknown
+    ~storage_limit:Limit.unknown
+    ~src_pk
+    ~src_sk:manager_sk
+    ~fee_parameter
+    operation
+  >>=? fun (oph, _, op, result) ->
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+      return (oph, op, result)
+
 let save_contract ~force cctxt alias_name contract =
   RawContractAlias.add ~force cctxt alias_name contract >>=? fun () ->
   message_added_contract cctxt alias_name >>= fun () -> return_unit
