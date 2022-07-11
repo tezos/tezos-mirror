@@ -25,6 +25,8 @@
 
 open Wasm_pvm_sig
 
+(** FIXME: https://gitlab.com/tezos/tezos/-/issues/3361
+    Increase the SCORU message size limit, and bump value to be 4,096. *)
 let chunk_size = 4_000
 
 exception Malformed_origination_message of Data_encoding.Binary.read_error
@@ -48,7 +50,6 @@ let internal_status_encoding =
       ("NotGatheringFloppies", Not_gathering_floppies);
     ]
 
-(* An at most 4,096-byte fragment of a kernel. *)
 type chunk = bytes
 
 let chunk_encoding = Data_encoding.Bounded.bytes chunk_size
@@ -100,8 +101,10 @@ module Make (T : Tree.S) (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
   module Thunk = Thunk.Make (T)
   module Decoding = Tree_decoding.Make (T)
 
-  (* TYPES *)
-
+  (** The [state] type is a phantom type that is used to describe the
+      data model of our PVM instrumentation. That is, values of type
+      [state] are never constructed. On the contrary, we manipulate
+      values of type [state Thunk.t]. *)
   type state =
     (internal_status value * Tezos_crypto.Signature.Public_key.t value)
     * string value
@@ -112,6 +115,7 @@ module Make (T : Tree.S) (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
        better with the [lib_webassembly]. *)
     * bytes value Thunk.Lazy_list.t
 
+  (** This [schema] decides how our data-model are encoded in a tree. *)
   let state_schema : state Thunk.schema =
     let open Thunk.Schema in
     obj5
@@ -128,30 +132,57 @@ module Make (T : Tree.S) (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
       @@ folders ["kernel"; "boot.wasm"]
       @@ Thunk.Lazy_list.schema (encoding chunk_encoding))
 
+  (** [status_l] is a lens to access the current [internal_status] of
+      the instrumented PVM. The instrumented PVM is either in the
+      process of gathering floppies, or is done with this pre-boot
+      step. *)
   let status_l : (state, internal_status value) Thunk.lens =
     Thunk.(tup5_0 ^. tup2_0)
 
+  (** [public_key_l] is a lens to access the public key incoming
+      chunks of kernel are expected to be signed with. The public key
+      is submitted in the [origination_message], and used as long as
+      the instrumented PVM is in the [Gather_floppies] state. *)
   let public_key_l :
       (state, Tezos_crypto.Signature.Public_key.t value) Thunk.lens =
     Thunk.(tup5_0 ^. tup2_1)
 
+  (** [boot_sector_l] is a lens to access the [origination_message]
+      provided at the origination of the rollup. This message is
+      either a complete kernel, or a chunk of a kernel with a public
+      key. *)
   let boot_sector_l : (state, string value) Thunk.lens = Thunk.tup5_1
 
+  (** [last_input_info_l] is a lens to access the input that was last
+      provided to the PVM, along with some metadata. It is updated
+      after each chunk of kernel is received. *)
   let last_input_info_l : (state, input_info value) Thunk.lens = Thunk.tup5_2
 
+  (** [interal_tick_l] is a lens to access the number of ticks
+      performed by the “gather floppies” instrumentation, before the
+      PVM starts its real execution. *)
   let internal_tick_l : (state, Z.t value) Thunk.lens = Thunk.tup5_3
 
+  (** [chunks_l] is a lens to access the collection of chunks (saved
+      as a so-called [Thunk.Lazy_map.t]) already received by the
+      instrumented PVM. *)
   let chunks_l : (state, bytes value Thunk.Lazy_list.t) Thunk.lens =
     Thunk.tup5_4
 
-  (* STORAGE/TREE INTERACTION *)
-
+  (** [check_signature payload signature state] returns [true] iff
+      [signature] is a correct signature for [payload], that is, it
+      has been computed with the companion secret key of the public
+      key submitted in the [origination_message], and stored in
+      [state] (see {!public_key_l}). *)
   let check_signature payload signature state =
     let open Lwt_syntax in
     let open Thunk.Syntax in
     let*^ pk = state ^-> public_key_l in
     return @@ Tezos_crypto.Signature.check pk signature payload
 
+  (** [store_chunk state chunk] adds [chunk] in the collection of
+      chunks already collected by the instrumented PVM and stored in
+      [state] (see {!chunks_l}). *)
   let store_chunk state chunk =
     let open Lwt_syntax in
     let open Thunk.Syntax in
@@ -159,6 +190,9 @@ module Make (T : Tree.S) (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
     let* _ = Thunk.Lazy_list.cons chunks chunk in
     return ()
 
+  (** [store_bytes state bytes] slices [bytes] into individual chunks,
+      and adds them in the collection of chunks stored in [state] (see
+      {!store_chunk}). *)
   let store_bytes state : bytes -> unit Lwt.t =
     let rec aux bytes =
       let open Lwt_syntax in
@@ -177,12 +211,18 @@ module Make (T : Tree.S) (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
     in
     aux
 
+  (** [get_internal_ticks state] returns the number of ticks as stored
+      in [state], or [0] if the values has not been initialized
+      yet. *)
   let get_internal_ticks state =
     let open Lwt_syntax in
     let open Thunk.Syntax in
     let*^? tick = state ^-> internal_tick_l in
     return @@ Option.value ~default:Z.zero tick
 
+  (** [increment_ticks state] increments the number of ticks as stored
+      in [state], or set it to [1] in case it has not been initialized
+      yet. *)
   let increment_ticks state =
     let open Lwt_syntax in
     let open Thunk.Syntax in
@@ -191,9 +231,12 @@ module Make (T : Tree.S) (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
 
   (* PROCESS MESSAGES *)
 
-  (* Process and store the kernel image in the origination message
-     This message contains either the entire (small) kernel image or
-     the first chunk of it. *)
+  (** [origination_kernel_loading_step state] processes and stores the
+      (potentially incomplete) kernel image contained in the
+      origination message.
+
+      This message contains either the entire (small) kernel image or
+      the first chunk of it (see {!origination_message}). *)
   let origination_kernel_loading_step state =
     let open Lwt_syntax in
     let open Thunk.Syntax in
@@ -222,37 +265,65 @@ module Make (T : Tree.S) (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
         (* TODO: Add a proper [status] constructor *)
         return ()
 
-  (* Process one sub-sequent kernel image chunks. If the chunk has
-     zero length it * means we're done and we have the entire kernel
-     image. *)
+  (** [kernel_loading_step input_info message state] processes the
+      sub-sequent kernel image chunk encoded in [message], as part of
+      an input tick described by [input_info].
+
+      If the chunk is not strictly equal to [chunk_size], then it is
+      considered as the very last chunk of the kernel, meaning the
+      instrumented PVM will update its status to start the regular
+      execution of the PVM. An empty chunk is also allowed. *)
   let kernel_loading_step input message state =
     let open Lwt_syntax in
     let open Thunk.Syntax in
     let* () = (state ^-> last_input_info_l) ^:= input in
     let* () = increment_ticks state in
-    (* TODO: check that the first byte of [message] is 0x01 (External). *)
-    match
-      Data_encoding.Binary.read
-        floppy_encoding
-        message
-        1
-        (String.length message - 1)
-    with
-    | Error error -> raise (Malformed_inbox_message error)
-    | Ok (_, {chunk; signature}) ->
-        let* check = check_signature chunk signature state in
-        if check then
-          let* () =
-            if 0 < Bytes.length chunk then store_chunk state chunk
+    if 0 < String.length message then
+      (* It is safe to read the very first character stored in
+         [message], that is [String.get] will not raise an exception. *)
+      match
+        ( String.get message 0,
+          Data_encoding.Binary.read
+            floppy_encoding
+            message
+            1
+            (String.length message - 1) )
+      with
+      | '\001', Ok (_, {chunk; signature}) ->
+          let* check = check_signature chunk signature state in
+          if check then
+            let* () =
+              if 0 < Bytes.length chunk then store_chunk state chunk
+              else return ()
+            in
+            if Bytes.length chunk < chunk_size then
+              (state ^-> status_l) ^:= Not_gathering_floppies
             else return ()
-          in
-          if Bytes.length chunk < chunk_size then
-            (state ^-> status_l) ^:= Not_gathering_floppies
           else return ()
-        else return ()
+      | '\001', Error error -> raise (Malformed_inbox_message error)
+      | _, _ ->
+          (* [message] is not an external message (its tag is not
+             [0x01]), that is it is not a valid input. *)
+          return ()
+    else (* [message] is empty, that is it is not a valid input. *)
+      return ()
 
   (* Encapsulated WASM *)
 
+  (** [compute_step tree] instruments [Wasm.compute_step] to check the
+      current status of the PVM.
+
+      {ul
+        {li If the status has not yet been initialized, it means it is
+            the very first step of the rollup, and we interpret the
+            [origination_message] that was provided at origination
+            time.}
+        {li If the status is [Gathering_floppies], then the PVM is
+            expected to receive the next kernel chunk, and
+            [compute_step] raises an exception.}
+        {li If the status is [Not_gathering_floppies], then the PVM
+            pre-boot has ended, the kernel has been provided, and
+            [Wasm.compute_step] is called.}} *)
   let compute_step tree =
     let open Lwt_syntax in
     let open Thunk.Syntax in
@@ -265,6 +336,15 @@ module Make (T : Tree.S) (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
         let* () = origination_kernel_loading_step state in
         Thunk.encode tree state
 
+  (** [set_input_step input message tree] instruments
+      [Wasm.set_input_step] to interpret incoming input messages as
+      floppies (that is, a kernel chunk and a signature) when the PVM
+      status is [Gathering_floppies].
+
+      When the status is [Not_gathering_floppies] the pre-boot phase
+      has ended and [Wasm.set_input_step] is called. If the status has
+      not yet been initialized, this function raises an exception, as
+      the origination message has yet to be interpreted. *)
   let set_input_step input message tree =
     let open Lwt_syntax in
     let open Thunk.Syntax in
@@ -299,7 +379,14 @@ module Make (T : Tree.S) (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
         return
           {
             inner_info with
-            current_tick = Z.(add inner_info.current_tick ticks);
+            current_tick =
+              (* We consider [Wasm] as a black box. In particular, we
+                 don’t know where [Wasm] is storing the number of
+                 internal ticks it has interpreted, hence the need to
+                 add both tick counters (the one introduced by our
+                 instrumentation, and the one maintained by
+                 [Wasm]). *)
+              Z.(add inner_info.current_tick ticks);
             last_input_read =
               Option.fold
                 ~none:last_boot_read
