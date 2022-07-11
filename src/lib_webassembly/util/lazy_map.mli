@@ -39,6 +39,9 @@ module type S = sig
 
   type 'a t
 
+  (** [string_of_key key] turns the given [key] into a string. *)
+  val string_of_key : key -> string
+
   (** [pp pp_value] gives you a pretty-printer. This function is a witness of
       internal mutation. *)
   val pp : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit

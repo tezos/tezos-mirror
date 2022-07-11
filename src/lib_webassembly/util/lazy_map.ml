@@ -41,6 +41,8 @@ module type S = sig
 
   type 'a t
 
+  val string_of_key : key -> string
+
   val pp : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
 
   val to_string : ('a -> string) -> 'a t -> string
@@ -76,6 +78,8 @@ module Make (Effect : Effect.S) (Key : KeyS) :
   type 'a producer = key -> 'a effect
 
   type 'a t = {produce_value : 'a producer; mutable values : 'a Map.t}
+
+  let string_of_key = Key.to_string
 
   let pp pp_value =
     let pp_values fmt values =
