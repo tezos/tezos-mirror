@@ -4025,7 +4025,7 @@ let register ~protocols =
   Revamped.test_prefiltered_limit protocols ;
   Revamped.test_prefiltered_limit_remove protocols ;
   Revamped.wrong_signed_branch_delayed_becomes_refused protocols ;
-  Revamped.precheck_with_empty_balance Protocol.[Jakarta; Kathmandu; Alpha] ;
+  Revamped.precheck_with_empty_balance protocols ;
   Revamped.inject_operations protocols ;
   Revamped.test_inject_manager_batch protocols ;
   propagation_future_endorsement protocols ;

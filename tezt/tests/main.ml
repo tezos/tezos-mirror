@@ -91,6 +91,7 @@ let register_protocol_agnostic_tests () =
   Cache_cache.register protocols ;
   Client_config.register ~protocols:[Alpha] ;
   Client_commands.register ~protocols ;
+  Client_run_view.register ~protocols ;
   Dal.register ~protocols:[Alpha] ;
   Deposits_limit.register ~protocols ;
   Double_bake.register ~protocols:[Alpha] ;
@@ -98,11 +99,13 @@ let register_protocol_agnostic_tests () =
   Forge.register ~protocols:[Alpha] ;
   Global_constants.register ~protocols:[Alpha] ;
   Hash_data.register ~protocols:[Alpha] ;
+  Large_metadata.register ~protocols:[Alpha] ;
   Light.register ~protocols:[Alpha] ;
   Manager_operations.register ~protocols ;
   Mockup.register ~protocols ;
   Mockup.register_global_constants ~protocols:[Alpha] ;
   Monitor_operations.register ~protocols:[Alpha] ;
+  Multinode_snapshot.register ~protocols:[Alpha] ;
   Node_event_level.register ~protocols:[Alpha] ;
   Normalize.register ~protocols:[Alpha] ;
   Precheck.register ~protocols ;
@@ -116,28 +119,21 @@ let register_protocol_agnostic_tests () =
   Rpc_config_logging.register ~protocols:[Alpha] ;
   RPC_test.register protocols ;
   Run_operation_RPC.register ~protocols ;
+  Run_script.register ~protocols:[Alpha] ;
   Runtime_script_failure.register ~protocols ;
+  Sapling.register ~protocols:[Alpha] ;
   Signer_test.register ~protocols:[Alpha] ;
   Stresstest_command.register ~protocols:[Alpha] ;
   Synchronisation_heuristic.register ~protocols:[Alpha] ;
-  Tenderbake.register ~protocols:[Alpha]
-
-let register_J_plus_tests () =
-  (* Relies on a feature only available since J.
-     Move these to [register_protocol_agnostic_tests] once J is the smallest
-     protocol. *)
-  let protocols = Protocol.[Jakarta; Kathmandu; Alpha] in
-  Client_run_view.register ~protocols ;
-  Large_metadata.register ~protocols:[Alpha] ;
-  Multinode_snapshot.register ~protocols:[Alpha] ;
-  Run_script.register ~protocols:[Alpha] ;
-  Sapling.register ~protocols:[Alpha] ;
+  Tenderbake.register ~protocols:[Alpha] ;
   Tx_rollup.register ~protocols ;
   Tx_rollup_node.register ~protocols ;
   Views.register [Alpha]
 
 let register_K_plus_tests () =
-  (* Relies on a feature only available since K. *)
+  (* Relies on a feature only available since K.
+     Move these to [register_protocol_agnostic_tests] once K is the smallest
+     protocol. *)
   let protocols = Protocol.[Kathmandu; Alpha] in
   Events.register ~protocols:[Alpha] ;
   Ghostnet_dictator_migration.register ~protocols:[Alpha] ;
@@ -152,7 +148,6 @@ let () =
   register_protocol_independent_tests () ;
   register_protocol_migration_tests () ;
   register_protocol_agnostic_tests () ;
-  register_J_plus_tests () ;
   register_K_plus_tests () ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()
