@@ -1073,6 +1073,18 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
     let add_or_remove s i v =
       match v with None -> remove s i | Some v -> add s i v
 
+    let mem_unaccounted s i = Raw_context.mem (pack s i) data_name
+
+    let fold_keys_unaccounted s ~order ~init ~f =
+      fold_keys s ~order ~init ~f:(fun i acc ->
+          mem_unaccounted s i >>= function
+          | false -> Lwt.return acc
+          | true -> f i acc)
+
+    let keys_unaccounted s =
+      fold_keys_unaccounted s ~order:`Sorted ~init:[] ~f:(fun p acc ->
+          Lwt.return (p :: acc))
+
     let () =
       let open Storage_description in
       let unpack = unpack I.args in
