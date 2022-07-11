@@ -113,8 +113,9 @@ module Bounded_encoding = struct
         5 |}]
   end
 
-  (* FIXME: all constants below are arbitrary high bounds until we
-     have the mechanism to update them properly *)
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3370
+     all constants below are arbitrary high bounds until we have the
+     mechanism to update them properly. *)
 
   let block_header_max_size, set_block_header_max_size =
     M.create (8 * 1024 * 1024)
