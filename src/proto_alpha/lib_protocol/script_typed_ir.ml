@@ -1109,18 +1109,22 @@ and ('arg, 'ret) lambda =
       ('arg, end_of_stack, 'ret, end_of_stack) kdescr * Script.node
       -> ('arg, 'ret) lambda
 
-and 'arg typed_destination =
-  | Typed_implicit : public_key_hash -> unit typed_destination
-  | Typed_originated of Contract_hash.t
-  | Typed_tx_rollup :
-      Tx_rollup.t
-      -> (_ ticket, tx_rollup_l2_address) pair typed_destination
-  | Typed_sc_rollup of Sc_rollup.t
-
 and 'arg typed_contract =
-  | Typed_contract : {
+  | Typed_implicit : public_key_hash -> unit typed_contract
+  | Typed_originated : {
       arg_ty : ('arg, _) ty;
-      destination : 'arg typed_destination;
+      contract_hash : Contract_hash.t;
+      entrypoint : Entrypoint.t;
+    }
+      -> 'arg typed_contract
+  | Typed_tx_rollup : {
+      arg_ty : (('a ticket, tx_rollup_l2_address) pair, _) ty;
+      tx_rollup : Tx_rollup.t;
+    }
+      -> ('a ticket, tx_rollup_l2_address) pair typed_contract
+  | Typed_sc_rollup : {
+      arg_ty : ('arg, _) ty;
+      sc_rollup : Sc_rollup.t;
       entrypoint : Entrypoint.t;
     }
       -> 'arg typed_contract
@@ -2148,30 +2152,45 @@ let value_traverse (type t tc) (ty : (t, tc) ty) (x : t) init f =
 let stack_top_ty : type a b s. (a, b * s) stack_ty -> a ty_ex_c = function
   | Item_t (ty, _) -> Ty_ex_c ty
 
-module Typed_destination = struct
-  let untyped : type a. a typed_destination -> Destination.t = function
+module Typed_contract = struct
+  let destination : type a. a typed_contract -> Destination.t = function
     | Typed_implicit pkh -> Destination.Contract (Implicit pkh)
-    | Typed_originated contract_hash ->
+    | Typed_originated {contract_hash; _} ->
         Destination.Contract (Originated contract_hash)
-    | Typed_tx_rollup tx_rollup -> Destination.Tx_rollup tx_rollup
-    | Typed_sc_rollup sc_rollup -> Destination.Sc_rollup sc_rollup
+    | Typed_tx_rollup {tx_rollup; _} -> Destination.Tx_rollup tx_rollup
+    | Typed_sc_rollup {sc_rollup; _} -> Destination.Sc_rollup sc_rollup
+
+  let arg_ty : type a. a typed_contract -> a ty_ex_c = function
+    | Typed_implicit _ -> (Ty_ex_c Unit_t : a ty_ex_c)
+    | Typed_originated {arg_ty; _} -> Ty_ex_c arg_ty
+    | Typed_tx_rollup {arg_ty; _} -> Ty_ex_c arg_ty
+    | Typed_sc_rollup {arg_ty; _} -> Ty_ex_c arg_ty
+
+  let entrypoint : type a. a typed_contract -> Entrypoint.t = function
+    | Typed_implicit _ -> Entrypoint.default
+    | Typed_tx_rollup _ -> Tx_rollup.deposit_entrypoint
+    | Typed_originated {entrypoint; _} | Typed_sc_rollup {entrypoint; _} ->
+        entrypoint
 
   module Internal_for_tests = struct
     let typed_exn :
-        type a ac. (a, ac) ty -> Destination.t -> a typed_destination =
-     fun ty destination ->
-      match (destination, ty) with
+        type a ac.
+        (a, ac) ty -> Destination.t -> Entrypoint.t -> a typed_contract =
+     fun arg_ty destination entrypoint ->
+      match (destination, arg_ty) with
       | Contract (Implicit pkh), Unit_t -> Typed_implicit pkh
       | Contract (Implicit _), _ ->
           invalid_arg "Implicit contracts expect type unit"
-      | Contract (Originated contract_hash), _ -> Typed_originated contract_hash
+      | Contract (Originated contract_hash), _ ->
+          Typed_originated {arg_ty; contract_hash; entrypoint}
       | Tx_rollup tx_rollup, Pair_t (Ticket_t _, Tx_rollup_l2_address_t, _, _)
         ->
-          Typed_tx_rollup tx_rollup
+          (Typed_tx_rollup {arg_ty; tx_rollup} : a typed_contract)
       | Tx_rollup _, _ ->
           invalid_arg
             "Transaction rollups expect type (pair (ticket _) \
              tx_rollup_l2_address)"
-      | Sc_rollup sc_rollup, _ -> Typed_sc_rollup sc_rollup
+      | Sc_rollup sc_rollup, _ ->
+          Typed_sc_rollup {arg_ty; sc_rollup; entrypoint}
   end
 end

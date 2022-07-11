@@ -793,9 +793,7 @@ let test_parse_contract_data_for_unit_rollup () =
   let* block, rollup = sc_originate block contract "unit" in
   let* incr = Incremental.begin_construction block in
   let ctxt = Incremental.alpha_ctxt incr in
-  let* ( _ctxt,
-         Typed_contract
-           {arg_ty = Script_typed_ir.Unit_t; destination; entrypoint} ) =
+  let* _ctxt, typed_contract =
     wrap_error_lwt
     @@ Script_ir_translator.parse_contract_data
          ctxt
@@ -804,7 +802,11 @@ let test_parse_contract_data_for_unit_rollup () =
          (Destination.Sc_rollup rollup)
          ~entrypoint:Entrypoint.default
   in
-  let destination = Script_typed_ir.Typed_destination.untyped destination in
+  let (Ty_ex_c Script_typed_ir.Unit_t) =
+    Script_typed_ir.Typed_contract.arg_ty typed_contract
+  in
+  let destination = Script_typed_ir.Typed_contract.destination typed_contract in
+  let entrypoint = Script_typed_ir.Typed_contract.entrypoint typed_contract in
   (* Check that the destinations match. *)
   let* () =
     Assert.equal_string
@@ -828,7 +830,7 @@ let test_parse_contract_data_for_rollup_with_entrypoints () =
   let rollup_destination = Sc_rollup.Address.to_b58check rollup in
   let* incr = Incremental.begin_construction block in
   let ctxt = Incremental.alpha_ctxt incr in
-  let* ctxt, Typed_contract {arg_ty = _; destination; entrypoint} =
+  let* ctxt, typed_contract =
     let*? (Script_typed_ir.Ty_ex_c nat_pair) =
       Environment.wrap_tzresult Script_typed_ir.(pair_t (-1) nat_t nat_t)
     in
@@ -840,7 +842,8 @@ let test_parse_contract_data_for_rollup_with_entrypoints () =
          (Destination.Sc_rollup rollup)
          ~entrypoint:(Entrypoint.of_string_strict_exn "add")
   in
-  let destination = Script_typed_ir.Typed_destination.untyped destination in
+  let destination = Script_typed_ir.Typed_contract.destination typed_contract in
+  let entrypoint = Script_typed_ir.Typed_contract.entrypoint typed_contract in
   (* Check that the destinations match. *)
   let* () =
     Assert.equal_string
@@ -852,7 +855,7 @@ let test_parse_contract_data_for_rollup_with_entrypoints () =
   let* () =
     Assert.equal_string ~loc:__LOC__ (Entrypoint.to_string entrypoint) "add"
   in
-  let* _ctxt, Typed_contract {arg_ty = _; destination; entrypoint} =
+  let* _ctxt, typed_contract =
     wrap_error_lwt
     @@ Script_ir_translator.parse_contract_data
          ctxt
@@ -861,7 +864,8 @@ let test_parse_contract_data_for_rollup_with_entrypoints () =
          (Destination.Sc_rollup rollup)
          ~entrypoint:(Entrypoint.of_string_strict_exn "reset")
   in
-  let destination = Script_typed_ir.Typed_destination.untyped destination in
+  let destination = Script_typed_ir.Typed_contract.destination typed_contract in
+  let entrypoint = Script_typed_ir.Typed_contract.entrypoint typed_contract in
   (* Check that the destinations match. *)
   let* () =
     Assert.equal_string

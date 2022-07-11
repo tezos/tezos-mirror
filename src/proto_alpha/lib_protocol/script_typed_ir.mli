@@ -1110,18 +1110,22 @@ and ('arg, 'ret) lambda =
       ('arg, end_of_stack, 'ret, end_of_stack) kdescr * Script.node
       -> ('arg, 'ret) lambda
 
-and 'arg typed_destination =
-  | Typed_implicit : public_key_hash -> unit typed_destination
-  | Typed_originated of Contract_hash.t
-  | Typed_tx_rollup :
-      Tx_rollup.t
-      -> (_ ticket, tx_rollup_l2_address) pair typed_destination
-  | Typed_sc_rollup of Sc_rollup.t
-
 and 'arg typed_contract =
-  | Typed_contract : {
+  | Typed_implicit : public_key_hash -> unit typed_contract
+  | Typed_originated : {
       arg_ty : ('arg, _) ty;
-      destination : 'arg typed_destination;
+      contract_hash : Contract_hash.t;
+      entrypoint : Entrypoint.t;
+    }
+      -> 'arg typed_contract
+  | Typed_tx_rollup : {
+      arg_ty : (('a ticket, tx_rollup_l2_address) pair, _) ty;
+      tx_rollup : Tx_rollup.t;
+    }
+      -> ('a ticket, tx_rollup_l2_address) pair typed_contract
+  | Typed_sc_rollup : {
+      arg_ty : ('arg, _) ty;
+      sc_rollup : Sc_rollup.t;
       entrypoint : Entrypoint.t;
     }
       -> 'arg typed_contract
@@ -1750,13 +1754,18 @@ val value_traverse : ('t, _) ty -> 't -> 'r -> 'r value_traverse -> 'r
 
 val stack_top_ty : ('a, 'b * 's) stack_ty -> 'a ty_ex_c
 
-module Typed_destination : sig
-  val untyped : _ typed_destination -> Destination.t
+module Typed_contract : sig
+  val destination : _ typed_contract -> Destination.t
+
+  val arg_ty : 'a typed_contract -> 'a ty_ex_c
+
+  val entrypoint : _ typed_contract -> Entrypoint.t
 
   module Internal_for_tests : sig
     (* This function doesn't guarantee that the contract is well-typed wrt its
        registered type at origination, it only guarantees that the type is
        plausible wrt to the destination kind. *)
-    val typed_exn : ('a, _) ty -> Destination.t -> 'a typed_destination
+    val typed_exn :
+      ('a, _) ty -> Destination.t -> Entrypoint.t -> 'a typed_contract
   end
 end

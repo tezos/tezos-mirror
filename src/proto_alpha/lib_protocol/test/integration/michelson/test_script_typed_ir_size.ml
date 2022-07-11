@@ -589,8 +589,9 @@ let check_value_size () =
        Contract_t
        =========
     *)
-    @ (let show fmt (Typed_contract {arg_ty = _; destination; entrypoint}) =
-         let destination = Typed_destination.untyped destination in
+    @ (let show fmt typed_contract =
+         let destination = Typed_contract.destination typed_contract in
+         let entrypoint = Typed_contract.entrypoint typed_contract in
          show_address fmt {destination; entrypoint}
        in
        exs

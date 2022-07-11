@@ -373,9 +373,9 @@ let unparse_tx_rollup_l2_address ~loc ctxt mode
       let b58check = Tx_rollup_l2_address.to_b58check tx_address in
       (String (loc, b58check), ctxt)
 
-let unparse_contract ~loc ctxt mode
-    (Typed_contract {arg_ty = _; destination; entrypoint}) =
-  let destination = Typed_destination.untyped destination in
+let unparse_contract ~loc ctxt mode typed_contract =
+  let destination = Typed_contract.destination typed_contract in
+  let entrypoint = Typed_contract.entrypoint typed_contract in
   let address = {destination; entrypoint} in
   unparse_address ~loc ctxt mode address
 
@@ -4922,11 +4922,7 @@ and parse_contract :
              (* An implicit account on the "default" entrypoint always exists and has type unit. *)
              Gas_monad.run ctxt @@ ty_eq ~error_details arg unit_t
              >|? fun (eq, ctxt) ->
-             ( ctxt,
-               eq >|? fun Eq ->
-               let destination = Typed_implicit pkh in
-               (Typed_contract {arg_ty = arg; destination; entrypoint}
-                 : arg typed_contract) )
+             (ctxt, eq >|? fun Eq : arg typed_contract -> Typed_implicit pkh)
             else
               (* An implicit account on any other entrypoint is not a valid contract. *)
               ok (error ctxt (fun _loc -> No_such_entrypoint entrypoint)))
@@ -4966,8 +4962,7 @@ and parse_contract :
                     >|? fun (entrypoint_arg, ctxt) ->
                     ( ctxt,
                       entrypoint_arg >|? fun (entrypoint, arg_ty) ->
-                      let destination = Typed_originated contract_hash in
-                      Typed_contract {arg_ty; destination; entrypoint} )) ))
+                      Typed_originated {arg_ty; contract_hash; entrypoint} )) ))
   | Tx_rollup tx_rollup ->
       Tx_rollup_state.assert_exist ctxt tx_rollup >|=? fun ctxt ->
       if Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) then
@@ -4975,10 +4970,9 @@ and parse_contract :
            [parse_tx_rollup_deposit_parameters]. *)
         match arg with
         | Pair_t (Ticket_t (_, _), Tx_rollup_l2_address_t, _, _) ->
-            let destination = Typed_tx_rollup tx_rollup in
             ( ctxt,
               ok
-              @@ (Typed_contract {arg_ty = arg; destination; entrypoint}
+              @@ (Typed_tx_rollup {arg_ty = arg; tx_rollup}
                    : arg typed_contract) )
         | _ ->
             error ctxt (fun loc ->
@@ -5017,8 +5011,7 @@ and parse_contract :
             >|? fun (entrypoint_arg, ctxt) ->
             ( ctxt,
               entrypoint_arg >|? fun (entrypoint, arg_ty) ->
-              let destination = Typed_sc_rollup sc_rollup in
-              Typed_contract {arg_ty; destination; entrypoint} ))
+              Typed_sc_rollup {arg_ty; sc_rollup; entrypoint} ))
 
 (* Same as [parse_contract], but does not fail when the contact is missing or
    if the expected type doesn't match the actual one. In that case None is

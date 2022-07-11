@@ -3118,10 +3118,6 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                level;
              }
            in
-           let parameter =
-             Micheline.strip_locations
-               Michelson_v1_primitives.(Prim (0, D_Unit, [], []))
-           in
            (*
                  Call CPPM default entrypoint with parameter Unit.
                  This is necessary for the CPMM's xtz_pool in storage to
@@ -3133,13 +3129,15 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                  - storage burn (extra storage is free)
                  - fees (the operation is mandatory)
           *)
-           Script_interpreter.execute
+           Script_interpreter.execute_with_typed_parameter
              ctxt
              Optimized
              step_constants
              ~script
-             ~parameter
+             ~parameter:()
+             ~parameter_ty:Unit_t
              ~cached_script:(Some script_ir)
+             ~location:Micheline.dummy_location
              ~entrypoint:Entrypoint.default
              ~internal:false
            >>=? fun ( {

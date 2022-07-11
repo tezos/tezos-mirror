@@ -518,9 +518,8 @@ module Scripts = struct
       {log_exit; log_entry; log_interp; get_log; log_control}
 
     let execute ctxt step_constants ~script ~entrypoint ~parameter =
-      let open Script_interpreter in
       let logger = trace_logger () in
-      execute
+      Script_interpreter.execute
         ~logger
         ~cached_script:None
         ctxt
