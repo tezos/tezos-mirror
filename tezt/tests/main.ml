@@ -32,111 +32,125 @@
             other files.
 *)
 
-let protocols =
-  [Protocol.Alpha; Protocol.Kathmandu; Protocol.Jakarta; Protocol.Ithaca]
-
-let migrate_from = Protocol.Jakarta
+let protocols = Protocol.[Ithaca; Jakarta; Kathmandu; Alpha]
 
 let migrate_to = Protocol.Alpha
 
 (* This module runs the tests implemented in all other modules of this directory.
    Each module defines tests which are thematically related,
    as functions to be called here. *)
-let () =
-  (* Tests that are relatively protocol-agnostic.
-     We can run them on all protocols, or only one if the CI would be too slow. *)
-  Baker_test.register ~protocols:[Alpha] ;
-  Signer_test.register ~protocols:[Alpha] ;
-  Basic.register ~protocols:[Alpha] ;
-  Vdf_test.register ~protocols:[Kathmandu; Alpha] ;
-  Client_config.register ~protocols:[Alpha] ;
-  Client_commands.register ~protocols ;
-  Global_constants.register ~protocols:[Alpha] ;
-  Bootstrap.register ~protocols:[Alpha] ;
-  Hash_data.register ~protocols:[Alpha] ;
-  Synchronisation_heuristic.register ~protocols:[Alpha] ;
-  Normalize.register ~protocols:[Alpha] ;
-  Double_bake.register ~protocols:[Alpha] ;
-  Light.register ~protocols:[Alpha] ;
-  Mockup.register ~protocols:[Ithaca; Jakarta; Kathmandu; Alpha] ;
-  Mockup.register_constant_migration ~migrate_from ~migrate_to ;
-  Mockup.register_global_constants ~protocols:[Alpha] ;
-  Node_event_level.register ~protocols:[Alpha] ;
-  Proxy.register ~protocols ;
-  Proxy_server_test.register ~protocols:[Alpha] ;
-  P2p.register ~protocols:[Alpha] ;
-  Protocol_limits.register ~protocols:[Alpha] ;
-  Protocol_migration.register ~migrate_from ~migrate_to ;
-  User_activated_upgrade.register ~migrate_from ~migrate_to ;
-  Rpc_config_logging.register ~protocols:[Alpha] ;
-  Protocol_table_update.register ~migrate_from ~migrate_to ;
-  Cache_cache.register [Ithaca; Jakarta; Kathmandu; Alpha] ;
-  Baking.register ~protocols:[Ithaca; Jakarta; Kathmandu; Alpha] ;
-  Prevalidator.register ~protocols:[Ithaca; Jakarta; Kathmandu; Alpha] ;
-  Dal.register ~protocols:[Alpha] ;
-  Monitor_operations.register ~protocols:[Alpha] ;
-  Stresstest_command.register ~protocols:[Alpha] ;
-  (* Adding a new protocol would require adding samples at ./tezt/tests/encoding_samples directory*)
-  Encoding.register ~protocols ;
-  Precheck.register ~protocols:[Ithaca; Jakarta; Kathmandu; Alpha] ;
-  Tenderbake.register ~protocols:[Alpha] ;
-  Forge.register ~protocols:[Alpha] ;
+
+let register_protocol_independent_tests () =
   (* Tests that are protocol-independent.
      They do not take a protocol as a parameter and thus need to be registered only once. *)
-  Light.register_protocol_independent () ;
-  P2p.register_protocol_independent () ;
-  Proxy.register_protocol_independent () ;
-  Mockup.register_protocol_independent () ;
   Bootstrap.register_protocol_independent () ;
   Cli_tezos.register_protocol_independent () ;
   Client_keys.register_protocol_independent () ;
-  (* Tests that are heavily protocol-dependent.
-     Those modules define different tests for different protocols in their [register]. *)
-  RPC_test.register [Ithaca; Jakarta; Kathmandu; Alpha] ;
-  Demo_counter.register () ;
+  Light.register_protocol_independent () ;
+  Mockup.register_protocol_independent () ;
+  P2p.register_protocol_independent () ;
+  Proxy.register_protocol_independent () ;
+  Config.register () ;
+  Demo_counter.register ()
+
+let register_protocol_migration_tests () =
+  (* Tests related to protocol migration. *)
+  let migrate_from = Option.get @@ Protocol.previous_protocol migrate_to in
+  Mockup.register_constant_migration ~migrate_from ~migrate_to ;
+  Protocol_migration.register ~migrate_from ~migrate_to ;
+  Protocol_table_update.register ~migrate_from ~migrate_to ;
+  User_activated_upgrade.register ~migrate_from ~migrate_to ;
   (* Alpha cannot stitch from Jakarta yet, but when it can, we can
      add a voting test from Jakarta to Alpha. *)
   Voting.register
     ~from_protocol:Ithaca
     ~to_protocol:(Known Jakarta)
-    ~loser_protocols:[Alpha] ;
+    ~loser_protocols:[migrate_to] ;
   Voting.register
     ~from_protocol:Ithaca
     ~to_protocol:Injected_test
-    ~loser_protocols:[Alpha; Ithaca] ;
+    ~loser_protocols:[migrate_to; Ithaca] ;
   Voting.register
-    ~from_protocol:Alpha
+    ~from_protocol:migrate_to
     ~to_protocol:Injected_test
-    ~loser_protocols:[Jakarta] ;
+    ~loser_protocols:[migrate_from] ;
   Voting.register
-    ~from_protocol:Alpha
+    ~from_protocol:migrate_to
     ~to_protocol:Demo
-    ~loser_protocols:[Jakarta] ;
-  (* This file tests an RPC added in protocol G *)
-  Big_map_all.register () ;
-  Reject_malformed_micheline.register ~protocols:[Alpha] ;
-  Tx_rollup.register ~protocols:[Alpha; Jakarta; Kathmandu] ;
-  Tx_rollup_node.register ~protocols:[Alpha; Jakarta; Kathmandu] ;
+    ~loser_protocols:[migrate_from]
+
+let register_protocol_agnostic_tests () =
+  (* Tests that are relatively protocol-agnostic.
+     We can run them on all protocols, or only one if the CI would be too slow. *)
+  Baker_test.register ~protocols:[Alpha] ;
+  Baking.register ~protocols ;
+  Basic.register ~protocols:[Alpha] ;
+  Big_map_all.register ~protocols:[Alpha] ;
+  Bootstrap.register ~protocols:[Alpha] ;
+  Cache_cache.register protocols ;
+  Client_config.register ~protocols:[Alpha] ;
+  Client_commands.register ~protocols ;
+  Dal.register ~protocols:[Alpha] ;
+  Deposits_limit.register ~protocols ;
+  Double_bake.register ~protocols:[Alpha] ;
+  Encoding.register ~protocols ;
+  Forge.register ~protocols:[Alpha] ;
+  Global_constants.register ~protocols:[Alpha] ;
+  Hash_data.register ~protocols:[Alpha] ;
+  Light.register ~protocols:[Alpha] ;
   Manager_operations.register ~protocols ;
-  Replace_by_fees.register ~protocols:[Ithaca; Jakarta; Kathmandu; Alpha] ;
-  Sc_rollup.register ~protocols:[Alpha] ;
-  Views.register [Alpha] ;
+  Mockup.register ~protocols ;
+  Mockup.register_global_constants ~protocols:[Alpha] ;
+  Monitor_operations.register ~protocols:[Alpha] ;
+  Node_event_level.register ~protocols:[Alpha] ;
+  Normalize.register ~protocols:[Alpha] ;
+  Op_validation.register ~protocols ;
+  Precheck.register ~protocols ;
+  Prevalidator.register ~protocols ;
+  Protocol_limits.register ~protocols:[Alpha] ;
+  Proxy.register ~protocols ;
+  Proxy_server_test.register ~protocols:[Alpha] ;
+  P2p.register ~protocols:[Alpha] ;
+  Reject_malformed_micheline.register ~protocols:[Alpha] ;
+  Replace_by_fees.register ~protocols ;
+  Rpc_config_logging.register ~protocols:[Alpha] ;
+  RPC_test.register protocols ;
   Runtime_script_failure.register ~protocols ;
-  Deposits_limit.register ~protocols:[Ithaca; Jakarta; Kathmandu; Alpha] ;
+  Signer_test.register ~protocols:[Alpha] ;
+  Stresstest_command.register ~protocols:[Alpha] ;
+  Synchronisation_heuristic.register ~protocols:[Alpha] ;
+  Tenderbake.register ~protocols:[Alpha]
+
+let register_J_plus_tests () =
+  (* Relies on a feature only available since J.
+     Move these to [register_protocol_agnostic_tests] once J is the smallest
+     protocol. *)
+  let protocols = Protocol.[Jakarta; Kathmandu; Alpha] in
+  Client_run_view.register ~protocols ;
   Large_metadata.register ~protocols:[Alpha] ;
-  (* Relies on a feature only available since J. *)
+  Multinode_snapshot.register ~protocols:[Alpha] ;
   Run_script.register ~protocols:[Alpha] ;
   Sapling.register ~protocols:[Alpha] ;
-  Client_run_view.register ~protocols:[Alpha; Jakarta; Kathmandu] ;
-  Multinode_snapshot.register ~protocols:[Alpha] ;
+  Tx_rollup.register ~protocols ;
+  Tx_rollup_node.register ~protocols ;
+  Views.register [Alpha]
+
+let register_K_plus_tests () =
   (* Relies on a feature only available since K. *)
-  Testnet_dictator.register ~protocols:[Alpha] ;
-  Ghostnet_dictator_migration.register ~protocols:[Alpha] ;
-  Test_contract_bls12_381.register ~protocols:[Alpha] ;
-  Increase_paid_storage.register ~protocols:[Alpha] ;
-  Config.register () ;
+  let protocols = Protocol.[Kathmandu; Alpha] in
   Events.register ~protocols:[Alpha] ;
-  (* Relies on a feature only available since K. *)
-  Op_validation.register ~protocols ;
+  Ghostnet_dictator_migration.register ~protocols:[Alpha] ;
+  Increase_paid_storage.register ~protocols:[Alpha] ;
+  Sc_rollup.register ~protocols:[Alpha] ;
+  Test_contract_bls12_381.register ~protocols:[Alpha] ;
+  Testnet_dictator.register ~protocols:[Alpha] ;
+  Vdf_test.register ~protocols
+
+let () =
+  register_protocol_independent_tests () ;
+  register_protocol_migration_tests () ;
+  register_protocol_agnostic_tests () ;
+  register_J_plus_tests () ;
+  register_K_plus_tests () ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()
