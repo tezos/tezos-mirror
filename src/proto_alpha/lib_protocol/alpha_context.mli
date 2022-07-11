@@ -1327,8 +1327,11 @@ module Seed : sig
   val generate_vdf_setup :
     seed_discriminant:seed -> seed_challenge:seed -> vdf_setup
 
-  val check_vdf_and_update_seed :
-    context -> vdf_solution -> context tzresult Lwt.t
+  (** See {!Seed_storage.check_vdf}. *)
+  val check_vdf : context -> vdf_solution -> unit tzresult Lwt.t
+
+  (** See {!Seed_storage.update_seed}. *)
+  val update_seed : context -> vdf_solution -> context tzresult Lwt.t
 
   val compute_randao : context -> context tzresult Lwt.t
 

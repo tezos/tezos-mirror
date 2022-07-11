@@ -57,6 +57,7 @@ type anonymous_state = {
   double_baking_evidences_seen : Operation_hash.t Double_evidence.t;
   double_consensus_evidences_seen : Operation_hash.t Double_evidence.t;
   seed_nonce_levels_seen : Raw_level.Set.t;
+  vdf_solution_seen : bool;
 }
 
 let empty_anonymous_state =
@@ -65,6 +66,7 @@ let empty_anonymous_state =
     double_baking_evidences_seen = Double_evidence.empty;
     double_consensus_evidences_seen = Double_evidence.empty;
     seed_nonce_levels_seen = Raw_level.Set.empty;
+    vdf_solution_seen = false;
   }
 
 (** Static information used to validate manager operations. *)
@@ -378,7 +380,19 @@ module Anonymous = struct
     in
     return new_vs
 
-  let validate_vdf_revelation _vi vs (Vdf_revelation {solution = _}) = return vs
+  let validate_vdf_revelation vi vs (Vdf_revelation {solution}) =
+    let open Lwt_result_syntax in
+    let*? () =
+      error_unless
+        (not vs.anonymous_state.vdf_solution_seen)
+        Seed_storage.Already_accepted
+    in
+    let* () = Seed.check_vdf vi.ctxt solution in
+    return
+      {
+        vs with
+        anonymous_state = {vs.anonymous_state with vdf_solution_seen = true};
+      }
 end
 
 module Manager = struct

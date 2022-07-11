@@ -433,14 +433,20 @@ let test_early_incorrect_unverified_correct_already_vdf () =
   let operation = Op.vdf_revelation (B b) dummy_solution in
   let*! e = Block.bake ~operation b in
   let* () =
-    Assert.proto_error_with_info ~loc:__LOC__ e "Too early VDF revelation"
+    Assert.proto_error ~loc:__LOC__ e (function
+        | Seed_storage.Too_early_revelation -> true
+        | _ -> false)
   in
   (* bake until nonce reveal period finishes *)
   let* b = Block.bake_n ~policy nonce_revelation_threshold b in
   (* test that revealing non group elements produces an error *)
   let operation = Op.vdf_revelation (B b) dummy_solution in
   let*! e = Block.bake ~operation b in
-  let* () = Assert.proto_error_with_info ~loc:__LOC__ e "Unverified VDF" in
+  let* () =
+    Assert.proto_error ~loc:__LOC__ e (function
+        | Seed_storage.Unverified_vdf -> true
+        | _ -> false)
+  in
   let* seed_status = Context.get_seed_computation (B b) in
   match seed_status with
   | Nonce_revelation_stage -> assert false
@@ -462,7 +468,11 @@ let test_early_incorrect_unverified_correct_already_vdf () =
       in
       let operation = Op.vdf_revelation (B b) wrong_solution in
       let*! e = Block.bake ~operation b in
-      let* () = Assert.proto_error_with_info ~loc:__LOC__ e "Unverified VDF" in
+      let* () =
+        Assert.proto_error ~loc:__LOC__ e (function
+            | Seed_storage.Unverified_vdf -> true
+            | _ -> false)
+      in
       (* test with correct input *)
       (* compute the VDF solution (the result and the proof ) *)
       let solution =
@@ -474,6 +484,17 @@ let test_early_incorrect_unverified_correct_already_vdf () =
       in
       let* baker_bal = Context.Contract.balance (B b) baker in
       let operation = Op.vdf_revelation (B b) solution in
+      let*! e =
+        Block.bake
+          ~policy:(Block.By_account baker_pkh)
+          ~operations:[operation; operation]
+          b
+      in
+      let* () =
+        Assert.proto_error ~loc:__LOC__ e (function
+            | Seed_storage.Already_accepted -> true
+            | _ -> false)
+      in
       (* verify the balance was credited following operation inclusion *)
       let* b = Block.bake ~policy:(Block.By_account baker_pkh) ~operation b in
       let* () =
@@ -494,10 +515,9 @@ let test_early_incorrect_unverified_correct_already_vdf () =
           let operation = Op.vdf_revelation (B b) solution in
           let*! e = Block.bake ~operation b in
           let* () =
-            Assert.proto_error_with_info
-              ~loc:__LOC__
-              e
-              "Previously revealed VDF"
+            Assert.proto_error ~loc:__LOC__ e (function
+                | Seed_storage.Already_accepted -> true
+                | _ -> false)
           in
           (* verify the stored seed has the expected value *)
           let open Data_encoding.Binary in

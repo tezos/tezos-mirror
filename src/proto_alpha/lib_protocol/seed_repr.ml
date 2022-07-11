@@ -243,9 +243,10 @@ let generate_vdf_setup ~seed_discriminant ~seed_challenge =
 let verify (discriminant, challenge) vdf_difficulty solution =
   (* We return false when getting non group elements as input *)
   let result, proof = solution in
-  Option.catch
-    ~catch_only:(function Invalid_argument _ -> true | _ -> false)
-    (fun () -> Vdf.verify discriminant challenge vdf_difficulty result proof)
+  (* Note: external library call must be wrapped to ensure that
+     exceptions are caught. *)
+  Option.catch (fun () ->
+      Vdf.verify discriminant challenge vdf_difficulty result proof)
 
 let vdf_to_seed seed_challenge solution =
   let result, _ = solution in
