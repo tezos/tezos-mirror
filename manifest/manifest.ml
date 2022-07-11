@@ -2266,17 +2266,6 @@ let generate_opam_files_for_release packages_dir release =
 let dune_lang_version = "3.0"
 
 let generate_dune_project_files () =
-  let t = Hashtbl.create 17 in
-  (* Add a dune project at the root *)
-  Hashtbl.replace t "" false ;
-  (* And one next to every opam files.
-     Dune only understand dune files at the root of a dune project. *)
-  Target.iter_internal_by_opam (fun package _internals ->
-      let cram_enabled =
-        Option.value ~default:false (Hashtbl.find_opt t package)
-        || List.exists (fun Target.{cram; _} -> cram) _internals
-      in
-      Hashtbl.replace t (Filename.dirname package) cram_enabled) ;
   write "dune-project" @@ fun fmt ->
   Format.fprintf fmt "(lang dune %s)@." dune_lang_version ;
   Format.fprintf fmt "(formatting (enabled_for ocaml))@." ;
