@@ -37,12 +37,12 @@ let failure_encoding =
        (req "message_index" int31)
        (req "message_tick" int31))
 
-let compare_failure f1 f2 =
+let compare_failure {level; message_index; message_tick} f2 =
   let open Compare.Int in
-  match compare f1.level f2.level with
+  match compare level f2.level with
   | 0 -> (
-      match compare f1.message_index f2.message_index with
-      | 0 -> compare f1.message_tick f2.message_tick
+      match compare message_index f2.message_index with
+      | 0 -> compare message_tick f2.message_tick
       | n -> n)
   | n -> n
 
