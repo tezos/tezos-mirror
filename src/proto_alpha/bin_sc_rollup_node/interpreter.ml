@@ -275,7 +275,9 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     let*! predecessor_hash = Layer1.predecessor store head in
     transition_pvm node_ctxt store predecessor_hash hash
 
-  (** [run_until_tick tick] *)
+  (** [run_until_tick node_ctxt store predecessor_hash hash
+      tick_distance] starts the evaluation of the inbox at block [hash]
+      for at most [tick_distance]. *)
   let run_until_tick node_ctxt store predecessor_hash hash tick_distance =
     let open Lwt_result_syntax in
     let* state = state_of_hash node_ctxt store predecessor_hash in
@@ -285,8 +287,8 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     return state
 
   (** [state_of_tick node_ctxt store tick level] returns [Some (state, hash)]
-     for a given [tick] if this [tick] happened before
-     [level]. Otherwise, returns [None].*)
+      for a given [tick] if this [tick] happened before [level].
+      Otherwise, returns [None].*)
   let state_of_tick node_ctxt store tick level =
     let open Lwt_result_syntax in
     let* closest_event =
@@ -300,6 +302,13 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
           let tick_distance =
             Sc_rollup.Tick.distance tick event.tick |> Z.to_int
           in
+          (* TODO: #3384
+             We assume that [StateHistory] correctly stores enough
+             events to compute the state of any tick using
+             [run_until_tick]. In particular, this assumes that
+             [event.block_hash] is the block where the tick
+             happened. We should test that this is always true because
+             [state_of_tick] is a critical function. *)
           let* state =
             run_until_tick
               node_ctxt
