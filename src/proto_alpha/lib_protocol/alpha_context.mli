@@ -3445,7 +3445,7 @@ module Sc_rollup : sig
 
   val genesis_info : context -> rollup -> Commitment.genesis_info tzresult Lwt.t
 
-  val get_boot_sector : context -> t -> string tzresult Lwt.t
+  val get_boot_sector : context -> t -> (context * string) tzresult Lwt.t
 
   module Dal_slot : sig
     val subscribe :

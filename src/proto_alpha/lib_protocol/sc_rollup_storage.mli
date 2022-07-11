@@ -59,7 +59,8 @@ val genesis_info :
   Sc_rollup_commitment_repr.genesis_info tzresult Lwt.t
 
 (** [get_boot_sector ctxt sc_rollup] retrieves the boot sector for [sc_rollup]. *)
-val get_boot_sector : Raw_context.t -> Sc_rollup_repr.t -> string tzresult Lwt.t
+val get_boot_sector :
+  Raw_context.t -> Sc_rollup_repr.t -> (Raw_context.t * string) tzresult Lwt.t
 
 (** [parameters_type ctxt rollup] returns the registered type of a rollup.
     Returns [None] in case there is no registered type for the rollup. *)

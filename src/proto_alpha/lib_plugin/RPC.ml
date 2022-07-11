@@ -1942,7 +1942,11 @@ module Sc_rollup = struct
   let register_boot_sector () =
     Registration.register1 ~chunked:true S.boot_sector
     @@ fun ctxt address () () ->
-    Alpha_context.Sc_rollup.get_boot_sector ctxt address
+    let open Lwt_tzresult_syntax in
+    let+ _ctxt, boot_sector =
+      Alpha_context.Sc_rollup.get_boot_sector ctxt address
+    in
+    boot_sector
 
   let register_last_cemented_commitment_hash_with_level () =
     Registration.register1
