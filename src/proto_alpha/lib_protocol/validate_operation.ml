@@ -32,6 +32,39 @@ open Alpha_context
     change of head block in mempool mode; they are never put in the
     storage. *)
 
+module Double_evidence = Map.Make (struct
+  type t = Signature.Public_key_hash.t * Level.t
+
+  let compare (d1, l1) (d2, l2) =
+    let res = Signature.Public_key_hash.compare d1 d2 in
+    if Compare.Int.equal res 0 then Level.compare l1 l2 else res
+end)
+
+(** State used and modified when validating anonymous operations.
+    These fields are used to enforce that we do not validate the same
+    operation multiple times.
+
+    Note that as part of {!validate_operation_state}, these maps live
+    in memory. They are not explicitly bounded here, however:
+
+    - In block validation mode, they are bounded by the number of
+    anonymous operations allowed in the block.
+
+    - In mempool mode, bounding the number of operations in this map
+    is the responsability of the prevalidator on the shell side. *)
+type anonymous_state = {
+  blinded_pkhs_seen : Operation_hash.t Blinded_public_key_hash.Map.t;
+  double_baking_evidences_seen : Operation_hash.t Double_evidence.t;
+  double_consensus_evidences_seen : Operation_hash.t Double_evidence.t;
+}
+
+let empty_anonymous_state =
+  {
+    blinded_pkhs_seen = Blinded_public_key_hash.Map.empty;
+    double_baking_evidences_seen = Double_evidence.empty;
+    double_consensus_evidences_seen = Double_evidence.empty;
+  }
+
 (** Static information used to validate manager operations. *)
 type manager_info = {
   hard_storage_limit_per_operation : Z.t;
@@ -83,7 +116,10 @@ type validate_operation_info = {
   manager_info : manager_info;
 }
 
-type validate_operation_state = {manager_state : manager_state}
+type validate_operation_state = {
+  anonymous_state : anonymous_state;
+  manager_state : manager_state;
+}
 
 let init_validate_operation_info ctxt mode chain_id =
   {
@@ -95,7 +131,10 @@ let init_validate_operation_info ctxt mode chain_id =
   }
 
 let init_validate_operation_state ctxt =
-  {manager_state = init_manager_state ctxt}
+  {
+    anonymous_state = empty_anonymous_state;
+    manager_state = init_manager_state ctxt;
+  }
 
 let init_info_and_state ctxt mode chain_id =
   let vi = init_validate_operation_info ctxt mode chain_id in
@@ -555,7 +594,7 @@ module Manager = struct
     let remaining_block_gas =
       maybe_update_remaining_block_gas vi vs batch_state
     in
-    return {manager_state = {managers_seen; remaining_block_gas}}
+    return {vs with manager_state = {managers_seen; remaining_block_gas}}
 end
 
 let validate_operation (vi : validate_operation_info)
