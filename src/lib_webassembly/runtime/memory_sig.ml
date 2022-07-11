@@ -8,7 +8,7 @@ module type S = sig
 
   type size = int32 (* number of pages *)
 
-  type address = int64
+  type address = int32
 
   type offset = int32
 

@@ -166,9 +166,7 @@ let drop n (vs : 'a stack) at =
 
 let mem_oob frame x i n =
   let+ mem = memory frame.inst x in
-  I64.gt_u
-    (I64.add (I64_convert.extend_i32_u i) (I64_convert.extend_i32_u n))
-    (Memory.bound mem)
+  I32.gt_u (I32.add i n) (Memory.bound mem)
 
 let data_oob frame x i n =
   let+ data = data frame.inst x in
@@ -376,77 +374,72 @@ let rec step (c : config) : config Lwt.t =
             (vs, [])
         | Load {offset; ty; pack; _}, Num (I32 i) :: vs' ->
             let* mem = memory frame.inst (0l @@ e.at) in
-            let a = I64_convert.extend_i32_u i in
             Lwt.catch
               (fun () ->
                 let+ n =
                   match pack with
-                  | None -> Memory.load_num mem a offset ty
+                  | None -> Memory.load_num mem i offset ty
                   | Some (sz, ext) ->
-                      Memory.load_num_packed sz ext mem a offset ty
+                      Memory.load_num_packed sz ext mem i offset ty
                 in
                 (Num n :: vs', []))
               (fun exn ->
                 Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
         | Store {offset; pack; _}, Num n :: Num (I32 i) :: vs' ->
             let* mem = memory frame.inst (0l @@ e.at) in
-            let a = I64_convert.extend_i32_u i in
             Lwt.catch
               (fun () ->
                 let+ () =
                   match pack with
-                  | None -> Memory.store_num mem a offset n
-                  | Some sz -> Memory.store_num_packed sz mem a offset n
+                  | None -> Memory.store_num mem i offset n
+                  | Some sz -> Memory.store_num_packed sz mem i offset n
                 in
                 (vs', []))
               (fun exn ->
                 Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
         | VecLoad {offset; ty; pack; _}, Num (I32 i) :: vs' ->
             let* mem = memory frame.inst (0l @@ e.at) in
-            let addr = I64_convert.extend_i32_u i in
             Lwt.catch
               (fun () ->
                 let+ v =
                   match pack with
-                  | None -> Memory.load_vec mem addr offset ty
+                  | None -> Memory.load_vec mem i offset ty
                   | Some (sz, ext) ->
-                      Memory.load_vec_packed sz ext mem addr offset ty
+                      Memory.load_vec_packed sz ext mem i offset ty
                 in
                 (Vec v :: vs', []))
               (fun exn ->
                 Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
         | VecStore {offset; _}, Vec v :: Num (I32 i) :: vs' ->
             let* mem = memory frame.inst (0l @@ e.at) in
-            let addr = I64_convert.extend_i32_u i in
             Lwt.catch
               (fun () ->
-                let+ () = Memory.store_vec mem addr offset v in
+                let+ () = Memory.store_vec mem i offset v in
                 (vs', []))
               (fun exn ->
                 Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
         | ( VecLoadLane ({offset; ty; pack; _}, j),
             Vec (V128 v) :: Num (I32 i) :: vs' ) ->
             let* mem = memory frame.inst (0l @@ e.at) in
-            let addr = I64_convert.extend_i32_u i in
             Lwt.catch
               (fun () ->
                 let+ v =
                   match pack with
                   | Pack8 ->
                       let+ mem =
-                        Memory.load_num_packed Pack8 SX mem addr offset I32Type
+                        Memory.load_num_packed Pack8 SX mem i offset I32Type
                       in
                       V128.I8x16.replace_lane j v (I32Num.of_num 0 mem)
                   | Pack16 ->
                       let+ mem =
-                        Memory.load_num_packed Pack16 SX mem addr offset I32Type
+                        Memory.load_num_packed Pack16 SX mem i offset I32Type
                       in
                       V128.I16x8.replace_lane j v (I32Num.of_num 0 mem)
                   | Pack32 ->
-                      let+ mem = Memory.load_num mem addr offset I32Type in
+                      let+ mem = Memory.load_num mem i offset I32Type in
                       V128.I32x4.replace_lane j v (I32Num.of_num 0 mem)
                   | Pack64 ->
-                      let+ mem = Memory.load_num mem addr offset I64Type in
+                      let+ mem = Memory.load_num mem i offset I64Type in
                       V128.I64x2.replace_lane j v (I64Num.of_num 0 mem)
                 in
                 (Vec (V128 v) :: vs', []))
@@ -455,7 +448,6 @@ let rec step (c : config) : config Lwt.t =
         | ( VecStoreLane ({offset; ty; pack; _}, j),
             Vec (V128 v) :: Num (I32 i) :: vs' ) ->
             let* mem = memory frame.inst (0l @@ e.at) in
-            let addr = I64_convert.extend_i32_u i in
             Lwt.catch
               (fun () ->
                 let+ () =
@@ -464,26 +456,26 @@ let rec step (c : config) : config Lwt.t =
                       Memory.store_num_packed
                         Pack8
                         mem
-                        addr
+                        i
                         offset
                         (I32 (V128.I8x16.extract_lane_s j v))
                   | Pack16 ->
                       Memory.store_num_packed
                         Pack16
                         mem
-                        addr
+                        i
                         offset
                         (I32 (V128.I16x8.extract_lane_s j v))
                   | Pack32 ->
                       Memory.store_num
                         mem
-                        addr
+                        i
                         offset
                         (I32 (V128.I32x4.extract_lane_s j v))
                   | Pack64 ->
                       Memory.store_num
                         mem
-                        addr
+                        i
                         offset
                         (I64 (V128.I64x2.extract_lane_s j v))
                 in

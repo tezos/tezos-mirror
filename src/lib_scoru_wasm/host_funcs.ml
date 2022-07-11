@@ -43,7 +43,7 @@ let aux_write_input_in_memory ~input_buffer ~module_inst ~rtype_offset
     raise (Eval.Crash (Source.no_region, "input too large"))
   else
     let payload =
-      Bytes.sub payload 0 @@ min input_size (Int64.to_int max_bytes)
+      Bytes.sub payload 0 @@ min input_size (Int32.to_int max_bytes)
     in
     let* memory =
       match Vector.num_elements memories with
@@ -67,11 +67,11 @@ let read_input =
   let input_types =
     Types.
       [
-        NumType I64Type;
-        NumType I64Type;
-        NumType I64Type;
-        NumType I64Type;
-        NumType I64Type;
+        NumType I32Type;
+        NumType I32Type;
+        NumType I32Type;
+        NumType I32Type;
+        NumType I32Type;
       ]
     |> Vector.of_list
   in
@@ -80,11 +80,11 @@ let read_input =
   let f input_buffer module_inst inputs =
     match inputs with
     | [
-     Values.(Num (I64 rtype_offset));
-     Values.(Num (I64 level_offset));
-     Values.(Num (I64 id_offset));
-     Values.(Num (I64 dst));
-     Values.(Num (I64 max_bytes));
+     Values.(Num (I32 rtype_offset));
+     Values.(Num (I32 level_offset));
+     Values.(Num (I32 id_offset));
+     Values.(Num (I32 dst));
+     Values.(Num (I32 max_bytes));
     ] ->
         let* x =
           aux_write_input_in_memory

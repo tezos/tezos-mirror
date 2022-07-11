@@ -54,10 +54,10 @@ module Internal_for_tests : sig
   val aux_write_input_in_memory :
     input_buffer:Tezos_webassembly_interpreter.Input_buffer.t ->
     module_inst:Tezos_webassembly_interpreter.Instance.module_inst ref ->
-    rtype_offset:int64 ->
-    level_offset:int64 ->
-    id_offset:int64 ->
-    dst:int64 ->
-    max_bytes:int64 ->
+    rtype_offset:int32 ->
+    level_offset:int32 ->
+    id_offset:int32 ->
+    dst:int32 ->
+    max_bytes:int32 ->
     int Lwt.t
 end
