@@ -342,14 +342,27 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         operator
         ()
     in
-    Option.iter_es (play_opening_move node_ctxt) (List.hd conflicts)
+    let*! res =
+      Option.iter_es (play_opening_move node_ctxt) (List.hd conflicts)
+    in
+    match res with
+    | Ok r -> return r
+    | Error
+        [
+          Environment.Ecoproto_error
+            Sc_rollup_errors.Sc_rollup_game_already_started;
+        ] ->
+        (* The game may already be starting in the meantime. So we
+           ignore this error. *)
+        return_unit
+    | Error errs -> Lwt.return (Error errs)
 
-  let process (Layer1.Head {hash; level}) node_ctxt store =
-    let head_block = `Hash (hash, Int32.to_int level) in
+  let process (Layer1.Head {hash; _}) node_ctxt store =
+    let head_block = `Hash (hash, 0) in
     let open Lwt_result_syntax in
     let* res = ongoing_game head_block node_ctxt in
     match res with
-    | Some (game, alice, bob) ->
-        play node_ctxt store (game, Sc_rollup.Game.Index.make alice bob)
+    | Some (game, staker1, staker2) ->
+        play head_block node_ctxt store game staker1 staker2
     | None -> start_game_if_conflict head_block node_ctxt
 end
