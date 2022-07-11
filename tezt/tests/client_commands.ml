@@ -305,10 +305,4 @@ end
 let register ~protocols =
   Simulation.register [Jakarta; Alpha] ;
   Transfer.register protocols ;
-  Dry_run.register
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3336
-
-       use `protocols` when the fixes added in
-       https://gitlab.com/tezos/tezos/-/merge_requests/5659 will be
-       backported to `K` *)
-    [Alpha; Jakarta; Ithaca]
+  Dry_run.register protocols
