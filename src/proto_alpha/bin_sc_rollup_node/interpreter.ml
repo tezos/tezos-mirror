@@ -143,7 +143,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     in
     return (state, fuel)
 
-  let eval_level ?fuel failures store hash state =
+  let eval_block_inbox ?fuel failures store hash state =
     let open Lwt_result_syntax in
     (* Obtain inbox and its messages for this block. *)
     let*! inbox = Store.Inboxes.find store hash in
@@ -230,7 +230,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     in
 
     let* state, num_messages, inbox_level, _fuel =
-      eval_level node_ctxt.loser_mode store hash predecessor_state
+      eval_block_inbox node_ctxt.loser_mode store hash predecessor_state
     in
 
     (* Write final state to store. *)
@@ -280,7 +280,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     let open Lwt_result_syntax in
     let* state = state_of_hash node_ctxt store predecessor_hash in
     let* state, _counter, _level, _fuel =
-      eval_level node_ctxt.loser_mode ~fuel:tick_distance store hash state
+      eval_block_inbox node_ctxt.loser_mode ~fuel:tick_distance store hash state
     in
     return state
 
