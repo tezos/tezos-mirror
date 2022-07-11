@@ -21,7 +21,9 @@ How to Install and Run the Project:
 
     - Prerequisite: Chrome OS 
     
-    - Install the CORS Changer Chrome Plugin, to avoid CORS Policy issues. 
+    - Install the CORS Changer Chrome Plugin, to avoid CORS Policy issues ( https://chrome.google.com/webstore/detail/moesif-origin-cors-change/digfbfaphojjndkpccljibejjbppifbc ) and activate the extension.
+
+    - restart the browser
     
 
 How to Use the Project: 
