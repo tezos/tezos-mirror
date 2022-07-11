@@ -226,7 +226,7 @@ let init_game ctxt rollup ~refuter ~defender =
           child_info.predecessor
       in
       let* ctxt, inbox = Store.Inbox.get ctxt rollup in
-      let* kind = Store.PVM_kind.get ctxt rollup in
+      let* ctxt, kind = Store.PVM_kind.get ctxt rollup in
       let default_number_of_sections =
         Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt
       in

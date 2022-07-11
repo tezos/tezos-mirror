@@ -47,9 +47,12 @@ val originate :
 (** [kind context address] returns the kind of the given rollup [address] iff
     [address] is an existing rollup. Fails with an [Sc_rollup_does_not_exist]
     error in case the rollup does not exist. *)
-val kind : Raw_context.t -> Sc_rollup_repr.t -> Sc_rollups.Kind.t tzresult Lwt.t
+val kind :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  (Raw_context.t * Sc_rollups.Kind.t) tzresult Lwt.t
 
-val list : Raw_context.t -> Sc_rollup_repr.t list tzresult Lwt.t
+val list_unaccounted : Raw_context.t -> Sc_rollup_repr.t list tzresult Lwt.t
 
 (** [genesis_info ctxt sc_rollup] returns the level at which a [sc_rollup] was
    originated, and its genesis commitment hash. *)

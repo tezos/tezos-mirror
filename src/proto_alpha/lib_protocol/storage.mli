@@ -698,7 +698,7 @@ module Sc_rollup : sig
       See module {!Sc_rollup_repr.Commitment} for details.
   *)
   module PVM_kind :
-    Indexed_data_storage
+    Non_iterable_indexed_carbonated_data_storage
       with type key = Sc_rollup_repr.t
        and type value = Sc_rollups.Kind.t
        and type t := Raw_context.t

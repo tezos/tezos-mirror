@@ -3246,7 +3246,7 @@ module Sc_rollup : sig
   val parameters_type :
     context -> t -> (Script.lazy_expr option * context) tzresult Lwt.t
 
-  val kind : context -> t -> Kind.t tzresult Lwt.t
+  val kind : context -> t -> (context * Kind.t) tzresult Lwt.t
 
   module Errors : sig
     type error += Sc_rollup_does_not_exist of t
@@ -3441,7 +3441,7 @@ module Sc_rollup : sig
 
   val rpc_arg : t RPC_arg.t
 
-  val list : context -> t list tzresult Lwt.t
+  val list_unaccounted : context -> t list tzresult Lwt.t
 
   val genesis_info : context -> rollup -> Commitment.genesis_info tzresult Lwt.t
 
