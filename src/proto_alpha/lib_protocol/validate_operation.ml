@@ -144,6 +144,41 @@ let init_info_and_state ctxt mode chain_id =
 (* See mli file. *)
 type stamp = Operation_validated_stamp
 
+module Anonymous = struct
+  type denunciation_kind = Preendorsement | Endorsement
+
+  let validate_activate_account _vi vs _oph
+      (Activate_account {id = _; activation_code = _}) =
+    return vs
+
+  let validate_double_consensus ~consensus_operation:_ _vi vs _oph _op1 _op2 =
+    return vs
+
+  let validate_double_preendorsement_evidence vi vs oph
+      (Double_preendorsement_evidence {op1; op2}) =
+    validate_double_consensus
+      ~consensus_operation:Preendorsement
+      vi
+      vs
+      oph
+      op1
+      op2
+
+  let validate_double_endorsement_evidence vi vs oph
+      (Double_endorsement_evidence {op1; op2}) =
+    validate_double_consensus ~consensus_operation:Endorsement vi vs oph op1 op2
+
+  let validate_double_baking_evidence _vi vs _oph
+      (Double_baking_evidence {bh1 = _; bh2 = _}) =
+    return vs
+
+  let validate_seed_nonce_revelation _vi vs
+      (Seed_nonce_revelation {level = _; nonce = _}) =
+    return vs
+
+  let validate_vdf_revelation _vi vs (Vdf_revelation {solution = _}) = return vs
+end
+
 module Manager = struct
   open Validate_errors.Manager
 
@@ -603,6 +638,18 @@ let validate_operation (vi : validate_operation_info)
   let open Lwt_result_syntax in
   let* vs =
     match operation.protocol_data.contents with
+    | Single (Activate_account _ as contents) ->
+        Anonymous.validate_activate_account vi vs oph contents
+    | Single (Double_preendorsement_evidence _ as contents) ->
+        Anonymous.validate_double_preendorsement_evidence vi vs oph contents
+    | Single (Double_endorsement_evidence _ as contents) ->
+        Anonymous.validate_double_endorsement_evidence vi vs oph contents
+    | Single (Double_baking_evidence _ as contents) ->
+        Anonymous.validate_double_baking_evidence vi vs oph contents
+    | Single (Seed_nonce_revelation _ as contents) ->
+        Anonymous.validate_seed_nonce_revelation vi vs contents
+    | Single (Vdf_revelation _ as contents) ->
+        Anonymous.validate_vdf_revelation vi vs contents
     | Single (Manager_operation {source; _}) ->
         Manager.validate_manager_operation
           vi
@@ -622,14 +669,8 @@ let validate_operation (vi : validate_operation_info)
     | Single (Preendorsement _)
     | Single (Endorsement _)
     | Single (Dal_slot_availability _)
-    | Single (Seed_nonce_revelation _)
-    | Single (Vdf_revelation _)
     | Single (Proposals _)
     | Single (Ballot _)
-    | Single (Activate_account _)
-    | Single (Double_preendorsement_evidence _)
-    | Single (Double_endorsement_evidence _)
-    | Single (Double_baking_evidence _)
     | Single (Failing_noop _) ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/2603
 
