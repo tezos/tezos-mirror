@@ -62,14 +62,24 @@ module type S = sig
       internal mutation. *)
   val to_string : ('a -> string) -> 'a t -> string
 
+  (** [string_of_key key] turns the given [key] into a string. *)
+  val string_of_key : key -> string
+
   (** [num_elements vector] returns the maximum number of elements in the lazy
       vector. *)
   val num_elements : 'a t -> key
 
-  (** [create ?values ?produce_value num_elements] produces a lazy vector with
-      [num_elements] entries where each is created using [produce_value].
-      [values] may be provided to supply an initial set of entries. *)
-  val create : ?values:'a Map.Map.t -> ?produce_value:'a producer -> key -> 'a t
+  (** [create ?first_key ?values ?produce_value num_elements] produces a lazy
+      vector with [num_elements] entries where each is created using
+      [produce_value]. [values] may be provided to supply an initial set of
+      entries. [first_key] specifies the first index of the vector if given and
+      defaults to zero. *)
+  val create :
+    ?first_key:key ->
+    ?values:'a Map.Map.t ->
+    ?produce_value:'a producer ->
+    key ->
+    'a t
 
   (** [empty ()] creates a vector of size zero. This is used in conjunction with
       {!cons} to model list-like structure. *)
@@ -116,6 +126,9 @@ module type S = sig
       the vector [vector] containing only the loaded values, in order of
       increasing keys. This function is a witness of internal mutations. *)
   val loaded_bindings : 'a t -> (key * 'a) list
+
+  (** [first_key v] returns the first key of the given vector [v]. *)
+  val first_key : 'a t -> key
 end
 
 module Make (Effect : Effect.S) (Key : KeyS) :
