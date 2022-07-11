@@ -63,3 +63,6 @@ val batch : unit -> unit tzresult Lwt.t
 
 (** Notifies a new L2 head to the batcher worker. *)
 val new_head : L2block.t -> unit tzresult Lwt.t
+
+(** Shutdown the batcher, waiting for the ongoing request to be processed. *)
+val shutdown : unit -> unit Lwt.t
