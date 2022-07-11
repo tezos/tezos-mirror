@@ -1280,18 +1280,7 @@ module Sc_rollup : sig
     src:string ->
     dst:string ->
     t ->
-    unit Lwt.t
-
-  (** Same as [cement_commitment], but do not wait for the process to exit. *)
-  val spawn_cement_commitment :
-    ?hooks:Process.hooks ->
-    ?wait:string ->
-    ?burn_cap:Tez.t ->
-    hash:string ->
-    src:string ->
-    dst:string ->
-    t ->
-    Process.t
+    unit Runnable.process
 
   (** Run [tezos-client submit sc rollup recover bond to <sc_rollup> from <src>]. *)
   val submit_recover_bond :

@@ -1705,20 +1705,20 @@ module Sc_rollup = struct
     let parse process = Process.check process in
     {value = process; run = parse}
 
-  let spawn_cement_commitment ?hooks ?(wait = "none") ?burn_cap ~hash ~src ~dst
-      client =
-    spawn_command
-      ?hooks
-      client
-      (["--wait"; wait]
-      @ ["cement"; "commitment"; hash; "from"; src; "for"; "sc"; "rollup"; dst]
-      @ optional_arg "burn-cap" Tez.to_string burn_cap)
-
-  let cement_commitment ?hooks ?wait ?burn_cap ~hash ~src ~dst client =
+  let cement_commitment ?hooks ?(wait = "none") ?burn_cap ~hash ~src ~dst client
+      =
     let process =
-      spawn_cement_commitment ?hooks ?wait ?burn_cap ~hash ~src ~dst client
+      spawn_command
+        ?hooks
+        client
+        (["--wait"; wait]
+        @ [
+            "cement"; "commitment"; hash; "from"; src; "for"; "sc"; "rollup"; dst;
+          ]
+        @ optional_arg "burn-cap" Tez.to_string burn_cap)
     in
-    Process.check process
+    let parse process = Process.check process in
+    {value = process; run = parse}
 
   let submit_recover_bond ?(wait = "none") ?burn_cap ?storage_limit ?fee ?hooks
       ~rollup ~src client =

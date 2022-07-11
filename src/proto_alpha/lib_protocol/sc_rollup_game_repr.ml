@@ -109,7 +109,7 @@ module V1 = struct
          (fun {state_hash; tick} -> (state_hash, tick))
          (fun (state_hash, tick) -> {state_hash; tick})
          (obj2
-            (req "state" (option State_hash.encoding))
+            (opt "state" State_hash.encoding)
             (req "tick" Sc_rollup_tick_repr.encoding)))
 
   let encoding =
