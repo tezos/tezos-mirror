@@ -27,12 +27,16 @@ type key = string list
 
 exception Key_not_found of key
 
+exception No_tag_matched_on_decoding
+
 exception Decode_error of {key : key; error : Data_encoding.Binary.read_error}
 
 module type S = sig
   type tree
 
   type 'a t
+
+  type ('tag, 'a) case
 
   val run : 'a t -> tree -> 'a Lwt.t
 
@@ -45,6 +49,14 @@ module type S = sig
   val lazy_mapping : ('i -> key) -> 'a t -> ('i -> 'a Lwt.t) t
 
   val of_lwt : 'a Lwt.t -> 'a t
+
+  val map : ('a -> 'b) -> 'a t -> 'b t
+
+  val map_lwt : ('a -> 'b Lwt.t) -> 'a t -> 'b t
+
+  val case : 'tag -> 'b t -> ('b -> 'a) -> ('tag, 'a) case
+
+  val tagged_union : 'tag t -> ('tag, 'a) case list -> 'a t
 
   module Syntax : sig
     val return : 'a -> 'a t
@@ -82,7 +94,14 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
 
   type 'a t = Tree.tree -> prefix_key -> 'a Lwt.t
 
+  type ('tag, 'a) case =
+    | Case : {tag : 'tag; extract : 'b -> 'a; decode : 'b t} -> ('tag, 'a) case
+
   let of_lwt lwt _tree _prefix = lwt
+
+  let map f dec tree prefix = Lwt.map f (dec tree prefix)
+
+  let map_lwt f dec tree prefix = Lwt.bind (dec tree prefix) f
 
   module Syntax = struct
     let return value _tree _prefix = Lwt.return value
@@ -92,7 +111,7 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
 
     let both lhs rhs tree prefix = Lwt.both (lhs tree prefix) (rhs tree prefix)
 
-    let ( let+ ) dec f tree prefix = Lwt.map f (dec tree prefix)
+    let ( let+ ) m f = map f m
 
     let ( and+ ) = both
 
@@ -127,4 +146,17 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
       tree (to_key index) field_enc input_tree input_prefix
     in
     Lwt.return produce_value
+
+  let case tag decode extract = Case {tag; decode; extract}
+
+  let tagged_union decode_tag cases input_tree prefix =
+    let open Lwt_syntax in
+    let* target_tag = tree ["tag"] decode_tag input_tree prefix in
+    (* Search through the cases to find a matching branch. *)
+    cases
+    |> List.find_map (fun (Case {tag; decode; extract}) ->
+           if tag = target_tag then
+             Some (map extract (tree ["value"] decode) input_tree prefix)
+           else None)
+    |> Option.value_f ~default:(fun _ -> raise No_tag_matched_on_decoding)
 end
