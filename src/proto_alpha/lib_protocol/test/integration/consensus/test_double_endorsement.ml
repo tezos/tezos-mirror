@@ -173,7 +173,11 @@ let test_invalid_double_endorsement () =
   Block.bake ~operation:(Operation.pack endorsement) b >>=? fun b ->
   Op.double_endorsement (B b) endorsement endorsement |> fun operation ->
   Block.bake ~operation b >>= fun res ->
-  Assert.proto_error_with_info ~loc:__LOC__ res "Invalid denunciation"
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Validate_errors.Anonymous.Invalid_denunciation kind
+        when kind = Validate_errors.Anonymous.Endorsement ->
+          true
+      | _ -> false)
 
 (** Check that an double endorsement operation that is invalid due to
    incorrect ordering of the endorsements fails. *)
@@ -192,7 +196,11 @@ let test_invalid_double_endorsement_variant () =
     endorsement_b
   |> fun operation ->
   Block.bake ~operation genesis >>= fun res ->
-  Assert.proto_error_with_info ~loc:__LOC__ res "Invalid denunciation"
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Validate_errors.Anonymous.Invalid_denunciation kind
+        when kind = Validate_errors.Anonymous.Endorsement ->
+          true
+      | _ -> false)
 
 (** Check that a future-cycle double endorsement fails. *)
 let test_too_early_double_endorsement_evidence () =
@@ -205,7 +213,11 @@ let test_too_early_double_endorsement_evidence () =
   Op.endorsement ~endorsed_block:blk_b (B blk_2) () >>=? fun endorsement_b ->
   double_endorsement (B genesis) endorsement_a endorsement_b |> fun operation ->
   Block.bake ~operation genesis >>= fun res ->
-  Assert.proto_error_with_info ~loc:__LOC__ res "Too early denunciation"
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Validate_errors.Anonymous.Too_early_denunciation {kind; _}
+        when kind = Validate_errors.Anonymous.Endorsement ->
+          true
+      | _ -> false)
 
 (** Check that after [max_slashing_period * blocks_per_cycle + 1], it is not possible
     to create a double_endorsement anymore. *)
@@ -223,7 +235,11 @@ let test_too_late_double_endorsement_evidence () =
   >>=? fun blk ->
   double_endorsement (B blk) endorsement_a endorsement_b |> fun operation ->
   Block.bake ~operation blk >>= fun res ->
-  Assert.proto_error_with_info ~loc:__LOC__ res "Outdated denunciation"
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Validate_errors.Anonymous.Outdated_denunciation {kind; _}
+        when kind = Validate_errors.Anonymous.Endorsement ->
+          true
+      | _ -> false)
 
 (** Check that an invalid double endorsement evidence that exposes two
     endorsements made by two different endorsers fails. *)
@@ -256,7 +272,11 @@ let test_different_delegates () =
   Block.bake ~operation:(Operation.pack e_b) blk_b >>=? fun _ ->
   double_endorsement (B blk_b) e_a e_b |> fun operation ->
   Block.bake ~operation blk_b >>= fun res ->
-  Assert.proto_error_with_info ~loc:__LOC__ res "Inconsistent denunciation"
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Validate_errors.Anonymous.Inconsistent_denunciation {kind; _}
+        when kind = Validate_errors.Anonymous.Endorsement ->
+          true
+      | _ -> false)
 
 (** Check that a double endorsement evidence that exposes a ill-formed
     endorsement fails. *)
@@ -287,7 +307,11 @@ let test_wrong_delegate () =
   >>=? fun endorsement_b ->
   double_endorsement (B blk_b) endorsement_a endorsement_b |> fun operation ->
   Block.bake ~operation blk_b >>= fun res ->
-  Assert.proto_error_with_info ~loc:__LOC__ res "Inconsistent denunciation"
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Validate_errors.Anonymous.Inconsistent_denunciation {kind; _}
+        when kind = Validate_errors.Anonymous.Endorsement ->
+          true
+      | _ -> false)
 
 let test_freeze_more_with_low_balance =
   let get_endorsing_slots_for_account ctxt account =
@@ -431,7 +455,7 @@ let test_freeze_more_with_low_balance =
     Assert.equal_bool ~loc:__LOC__ info6.deactivated true
 
 (** Injecting a valid double endorsement multiple times raises an error. *)
-let test_two_double_endorsement_evidences_leads_to_unreqired_denunciation () =
+let test_two_double_endorsement_evidences_leads_to_duplicate_denunciation () =
   Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, _contracts) ->
   block_fork genesis >>=? fun (blk_1, blk_2) ->
   Block.bake blk_1 >>=? fun blk_a ->
@@ -450,7 +474,9 @@ let test_two_double_endorsement_evidences_leads_to_unreqired_denunciation () =
     blk_a
   >>= fun e ->
   Assert.proto_error ~loc:__LOC__ e (function
-      | Apply.Unrequired_denunciation -> true
+      | Validate_errors.Anonymous.Conflicting_denunciation {kind; _}
+        when kind = Validate_errors.Anonymous.Endorsement ->
+          true
       | _ -> false)
   >>=? fun () ->
   Block.bake ~policy:(By_account baker) ~operation blk_a
@@ -458,7 +484,9 @@ let test_two_double_endorsement_evidences_leads_to_unreqired_denunciation () =
   Block.bake ~policy:(By_account baker) ~operation blk_with_evidence1
   >>= fun e ->
   Assert.proto_error ~loc:__LOC__ e (function
-      | Apply.Unrequired_denunciation -> true
+      | Validate_errors.Anonymous.Already_denounced {kind; _}
+        when kind = Validate_errors.Anonymous.Endorsement ->
+          true
       | _ -> false)
 
 let tests =
@@ -474,7 +502,7 @@ let tests =
     Tztest.tztest
       "valid double endorsement injected multiple time"
       `Quick
-      test_two_double_endorsement_evidences_leads_to_unreqired_denunciation;
+      test_two_double_endorsement_evidences_leads_to_duplicate_denunciation;
     Tztest.tztest
       "invalid double endorsement evidence"
       `Quick

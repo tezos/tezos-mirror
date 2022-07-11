@@ -2698,9 +2698,8 @@ let punish_delegate ctxt delegate level mistake mk_result ~payload_producer =
   let balance_updates = reward_balance_updates @ punish_balance_updates in
   (ctxt, Single_result (mk_result balance_updates))
 
-let punish_double_endorsement_or_preendorsement (type kind) ctxt ~chain_id
-    ~preendorsement ~(op1 : kind Kind.consensus Operation.t)
-    ~(op2 : kind Kind.consensus Operation.t) ~payload_producer :
+let punish_double_endorsement_or_preendorsement (type kind) ctxt
+    ~(op1 : kind Kind.consensus Operation.t) ~payload_producer :
     (context
     * kind Kind.double_consensus_operation_evidence contents_result_list)
     tzresult
@@ -2713,38 +2712,11 @@ let punish_double_endorsement_or_preendorsement (type kind) ctxt ~chain_id
     | Single (Endorsement _) ->
         Double_endorsement_evidence_result balance_updates
   in
-  match (op1.protocol_data.contents, op2.protocol_data.contents) with
-  | Single (Preendorsement e1), Single (Preendorsement e2)
-  | Single (Endorsement e1), Single (Endorsement e2) ->
-      let kind = if preendorsement then Preendorsement else Endorsement in
-      let op1_hash = Operation.hash op1 in
-      let op2_hash = Operation.hash op2 in
-      fail_unless
-        (Raw_level.(e1.level = e2.level)
-        && Round.(e1.round = e2.round)
-        && (not
-              (Block_payload_hash.equal
-                 e1.block_payload_hash
-                 e2.block_payload_hash))
-        && (* we require an order on hashes to avoid the existence of
-              equivalent evidences *)
-        Operation_hash.(op1_hash < op2_hash))
-        (Invalid_denunciation kind)
-      >>=? fun () ->
-      (* Disambiguate: levels are equal *)
+  match op1.protocol_data.contents with
+  | Single (Preendorsement e1) | Single (Endorsement e1) ->
       let level = Level.from_raw ctxt e1.level in
-      check_denunciation_age ctxt kind level.level >>=? fun () ->
       Stake_distribution.slot_owner ctxt level e1.slot
-      >>=? fun (ctxt, (delegate1_pk, delegate1)) ->
-      Stake_distribution.slot_owner ctxt level e2.slot
-      >>=? fun (ctxt, (_delegate2_pk, delegate2)) ->
-      fail_unless
-        (Signature.Public_key_hash.equal delegate1 delegate2)
-        (Inconsistent_denunciation {kind; delegate1; delegate2})
-      >>=? fun () ->
-      let delegate_pk, delegate = (delegate1_pk, delegate1) in
-      Operation.check_signature delegate_pk chain_id op1 >>?= fun () ->
-      Operation.check_signature delegate_pk chain_id op2 >>?= fun () ->
+      >>=? fun (ctxt, (_delegate_pk, delegate)) ->
       punish_delegate
         ctxt
         delegate
@@ -2931,22 +2903,10 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
       Token.transfer ctxt `Revelation_rewards (`Contract contract) tip
       >|=? fun (ctxt, balance_updates) ->
       (ctxt, Single_result (Vdf_revelation_result balance_updates))
-  | Single (Double_preendorsement_evidence {op1; op2}) ->
-      punish_double_endorsement_or_preendorsement
-        ctxt
-        ~preendorsement:true
-        ~chain_id
-        ~op1
-        ~op2
-        ~payload_producer
-  | Single (Double_endorsement_evidence {op1; op2}) ->
-      punish_double_endorsement_or_preendorsement
-        ctxt
-        ~preendorsement:false
-        ~chain_id
-        ~op1
-        ~op2
-        ~payload_producer
+  | Single (Double_preendorsement_evidence {op1; op2 = _}) ->
+      punish_double_endorsement_or_preendorsement ctxt ~op1 ~payload_producer
+  | Single (Double_endorsement_evidence {op1; op2 = _}) ->
+      punish_double_endorsement_or_preendorsement ctxt ~op1 ~payload_producer
   | Single (Double_baking_evidence {bh1; bh2}) ->
       punish_double_baking ctxt chain_id bh1 bh2 ~payload_producer
   | Single (Activate_account {id = pkh; activation_code}) ->

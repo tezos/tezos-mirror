@@ -147,8 +147,6 @@ type stamp = Operation_validated_stamp
 module Anonymous = struct
   open Validate_errors.Anonymous
 
-  type denunciation_kind = Preendorsement | Endorsement
-
   let validate_activate_account vi vs oph
       (Activate_account {id = edpkh; activation_code}) =
     let open Lwt_result_syntax in
@@ -175,8 +173,96 @@ module Anonymous = struct
     return
       {vs with anonymous_state = {vs.anonymous_state with blinded_pkhs_seen}}
 
-  let validate_double_consensus ~consensus_operation:_ _vi vs _oph _op1 _op2 =
-    return vs
+  let check_denunciation_age vi kind given_level =
+    let open Result_syntax in
+    let current_cycle = vi.current_level.cycle in
+    let given_cycle = (Level.from_raw vi.ctxt given_level).cycle in
+    let max_slashing_period = Constants.max_slashing_period vi.ctxt in
+    let last_slashable_cycle = Cycle.add given_cycle max_slashing_period in
+    let* () =
+      error_unless
+        Cycle.(given_cycle <= current_cycle)
+        (Too_early_denunciation
+           {kind; level = given_level; current = vi.current_level.level})
+    in
+    error_unless
+      Cycle.(last_slashable_cycle > current_cycle)
+      (Outdated_denunciation
+         {kind; level = given_level; last_cycle = last_slashable_cycle})
+
+  let validate_double_consensus (type kind)
+      ~consensus_operation:denunciation_kind vi vs oph
+      (op1 : kind Kind.consensus Operation.t)
+      (op2 : kind Kind.consensus Operation.t) =
+    let open Lwt_result_syntax in
+    match (op1.protocol_data.contents, op2.protocol_data.contents) with
+    | Single (Preendorsement e1), Single (Preendorsement e2)
+    | Single (Endorsement e1), Single (Endorsement e2) ->
+        let op1_hash = Operation.hash op1 in
+        let op2_hash = Operation.hash op2 in
+        let*? () =
+          error_unless
+            (Raw_level.(e1.level = e2.level)
+            && Round.(e1.round = e2.round)
+            && (not
+                  (Block_payload_hash.equal
+                     e1.block_payload_hash
+                     e2.block_payload_hash))
+            && (* we require an order on hashes to avoid the existence of
+                  equivalent evidences *)
+            Operation_hash.(op1_hash < op2_hash))
+            (Invalid_denunciation denunciation_kind)
+        in
+        (* Disambiguate: levels are equal *)
+        let level = Level.from_raw vi.ctxt e1.level in
+        let*? () = check_denunciation_age vi denunciation_kind level.level in
+        let* ctxt, (delegate1_pk, delegate1) =
+          Stake_distribution.slot_owner vi.ctxt level e1.slot
+        in
+        let* ctxt, (_delegate2_pk, delegate2) =
+          Stake_distribution.slot_owner ctxt level e2.slot
+        in
+        let*? () =
+          error_unless
+            (Signature.Public_key_hash.equal delegate1 delegate2)
+            (Inconsistent_denunciation
+               {kind = denunciation_kind; delegate1; delegate2})
+        in
+        let delegate_pk, delegate = (delegate1_pk, delegate1) in
+        let*? () =
+          match
+            Double_evidence.find
+              (delegate, level)
+              vs.anonymous_state.double_consensus_evidences_seen
+          with
+          | None -> ok ()
+          | Some oph' ->
+              error
+                (Conflicting_denunciation
+                   {kind = denunciation_kind; delegate; level; hash = oph'})
+        in
+        let* already_slashed =
+          Delegate.already_slashed_for_double_endorsing ctxt delegate level
+        in
+        let*? () =
+          error_unless
+            (not already_slashed)
+            (Already_denounced {kind = denunciation_kind; delegate; level})
+        in
+        let*? () = Operation.check_signature delegate_pk vi.chain_id op1 in
+        let*? () = Operation.check_signature delegate_pk vi.chain_id op2 in
+        let double_consensus_evidences_seen =
+          Double_evidence.add
+            (delegate, level)
+            oph
+            vs.anonymous_state.double_consensus_evidences_seen
+        in
+        return
+          {
+            vs with
+            anonymous_state =
+              {vs.anonymous_state with double_consensus_evidences_seen};
+          }
 
   let validate_double_preendorsement_evidence vi vs oph
       (Double_preendorsement_evidence {op1; op2}) =

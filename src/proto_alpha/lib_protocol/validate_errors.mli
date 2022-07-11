@@ -25,9 +25,38 @@
 
 (** Errors that may arise while validating an anonymous operation. *)
 module Anonymous : sig
+  type denunciation_kind = Preendorsement | Endorsement
+
   type error +=
     | Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
     | Conflicting_activation of Ed25519.Public_key_hash.t * Operation_hash.t
+    | Invalid_denunciation of denunciation_kind
+    | Inconsistent_denunciation of {
+        kind : denunciation_kind;
+        delegate1 : Signature.Public_key_hash.t;
+        delegate2 : Signature.Public_key_hash.t;
+      }
+    | Already_denounced of {
+        kind : denunciation_kind;
+        delegate : Signature.Public_key_hash.t;
+        level : Alpha_context.Level.t;
+      }
+    | Conflicting_denunciation of {
+        kind : denunciation_kind;
+        delegate : Signature.Public_key_hash.t;
+        level : Alpha_context.Level.t;
+        hash : Operation_hash.t;
+      }
+    | Too_early_denunciation of {
+        kind : denunciation_kind;
+        level : Alpha_context.Raw_level.t;
+        current : Alpha_context.Raw_level.t;
+      }
+    | Outdated_denunciation of {
+        kind : denunciation_kind;
+        level : Alpha_context.Raw_level.t;
+        last_cycle : Alpha_context.Cycle.t;
+      }
 end
 
 (** Errors that may arise while validating a manager operation. *)

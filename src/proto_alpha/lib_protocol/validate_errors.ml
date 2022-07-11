@@ -71,6 +71,200 @@ module Anonymous = struct
       (function
         | Conflicting_activation (edpkh, oph) -> Some (edpkh, oph) | _ -> None)
       (fun (edpkh, oph) -> Conflicting_activation (edpkh, oph))
+
+  type denunciation_kind = Preendorsement | Endorsement
+
+  let denunciation_kind_encoding =
+    let open Data_encoding in
+    string_enum
+      [("preendorsement", Preendorsement); ("endorsement", Endorsement)]
+
+  let pp_denunciation_kind fmt : denunciation_kind -> unit = function
+    | Preendorsement -> Format.fprintf fmt "preendorsement"
+    | Endorsement -> Format.fprintf fmt "endorsement"
+
+  type error +=
+    | Invalid_denunciation of denunciation_kind
+    | Inconsistent_denunciation of {
+        kind : denunciation_kind;
+        delegate1 : Signature.Public_key_hash.t;
+        delegate2 : Signature.Public_key_hash.t;
+      }
+    | Already_denounced of {
+        kind : denunciation_kind;
+        delegate : Signature.Public_key_hash.t;
+        level : Level.t;
+      }
+    | Conflicting_denunciation of {
+        kind : denunciation_kind;
+        delegate : Signature.Public_key_hash.t;
+        level : Level.t;
+        hash : Operation_hash.t;
+      }
+    | Too_early_denunciation of {
+        kind : denunciation_kind;
+        level : Raw_level.t;
+        current : Raw_level.t;
+      }
+    | Outdated_denunciation of {
+        kind : denunciation_kind;
+        level : Raw_level.t;
+        last_cycle : Cycle.t;
+      }
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"validate_operation.block.invalid_denunciation"
+      ~title:"Invalid denunciation"
+      ~description:"A denunciation is malformed"
+      ~pp:(fun ppf kind ->
+        Format.fprintf
+          ppf
+          "Malformed double-%a evidence"
+          pp_denunciation_kind
+          kind)
+      Data_encoding.(obj1 (req "kind" denunciation_kind_encoding))
+      (function Invalid_denunciation kind -> Some kind | _ -> None)
+      (fun kind -> Invalid_denunciation kind) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate_operation.block.inconsistent_denunciation"
+      ~title:"Inconsistent denunciation"
+      ~description:
+        "A denunciation operation is inconsistent (two distinct delegates)"
+      ~pp:(fun ppf (kind, delegate1, delegate2) ->
+        Format.fprintf
+          ppf
+          "Inconsistent double-%a evidence (distinct delegate: %a and %a)"
+          pp_denunciation_kind
+          kind
+          Signature.Public_key_hash.pp_short
+          delegate1
+          Signature.Public_key_hash.pp_short
+          delegate2)
+      Data_encoding.(
+        obj3
+          (req "kind" denunciation_kind_encoding)
+          (req "delegate1" Signature.Public_key_hash.encoding)
+          (req "delegate2" Signature.Public_key_hash.encoding))
+      (function
+        | Inconsistent_denunciation {kind; delegate1; delegate2} ->
+            Some (kind, delegate1, delegate2)
+        | _ -> None)
+      (fun (kind, delegate1, delegate2) ->
+        Inconsistent_denunciation {kind; delegate1; delegate2}) ;
+    register_error_kind
+      `Branch
+      ~id:"validate_operation.already_denounced"
+      ~title:"Already denounced"
+      ~description:"The same denunciation has already been validated."
+      ~pp:(fun ppf (kind, delegate, level) ->
+        Format.fprintf
+          ppf
+          "Delegate %a at level %a has already been denounced for a double %a."
+          pp_denunciation_kind
+          kind
+          Signature.Public_key_hash.pp
+          delegate
+          Level.pp
+          level)
+      Data_encoding.(
+        obj3
+          (req "denunciation_kind" denunciation_kind_encoding)
+          (req "delegate" Signature.Public_key_hash.encoding)
+          (req "level" Level.encoding))
+      (function
+        | Already_denounced {kind; delegate; level} ->
+            Some (kind, delegate, level)
+        | _ -> None)
+      (fun (kind, delegate, level) -> Already_denounced {kind; delegate; level}) ;
+    register_error_kind
+      `Branch
+      ~id:"validate_operation.conflicting_denunciation"
+      ~title:"Conflicting denunciation in current validation state"
+      ~description:
+        "The same denunciation has already been validated in the current \
+         validation state."
+      ~pp:(fun ppf (kind, delegate, level, oph) ->
+        Format.fprintf
+          ppf
+          "Double %a evidence for the delegate %a at level %a already exists \
+           in the current validation state as operation %a."
+          pp_denunciation_kind
+          kind
+          Signature.Public_key_hash.pp
+          delegate
+          Level.pp
+          level
+          Operation_hash.pp
+          oph)
+      Data_encoding.(
+        obj4
+          (req "denunciation_kind" denunciation_kind_encoding)
+          (req "delegate" Signature.Public_key_hash.encoding)
+          (req "level" Level.encoding)
+          (req "hash" Operation_hash.encoding))
+      (function
+        | Conflicting_denunciation {kind; delegate; level; hash} ->
+            Some (kind, delegate, level, hash)
+        | _ -> None)
+      (fun (kind, delegate, level, hash) ->
+        Conflicting_denunciation {kind; delegate; level; hash}) ;
+    register_error_kind
+      `Temporary
+      ~id:"validate_operation.block.too_early_denunciation"
+      ~title:"Too early denunciation"
+      ~description:"A denunciation is too far in the future"
+      ~pp:(fun ppf (kind, level, current) ->
+        Format.fprintf
+          ppf
+          "A double-%a denunciation is too far in the future (current level: \
+           %a, given level: %a)"
+          pp_denunciation_kind
+          kind
+          Raw_level.pp
+          current
+          Raw_level.pp
+          level)
+      Data_encoding.(
+        obj3
+          (req "kind" denunciation_kind_encoding)
+          (req "level" Raw_level.encoding)
+          (req "current" Raw_level.encoding))
+      (function
+        | Too_early_denunciation {kind; level; current} ->
+            Some (kind, level, current)
+        | _ -> None)
+      (fun (kind, level, current) ->
+        Too_early_denunciation {kind; level; current}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate_operation.block.outdated_denunciation"
+      ~title:"Outdated denunciation"
+      ~description:"A denunciation is outdated."
+      ~pp:(fun ppf (kind, level, last_cycle) ->
+        Format.fprintf
+          ppf
+          "A double-%a denunciation is outdated (last acceptable cycle: %a, \
+           given level: %a)."
+          pp_denunciation_kind
+          kind
+          Cycle.pp
+          last_cycle
+          Raw_level.pp
+          level)
+      Data_encoding.(
+        obj3
+          (req "kind" denunciation_kind_encoding)
+          (req "level" Raw_level.encoding)
+          (req "last" Cycle.encoding))
+      (function
+        | Outdated_denunciation {kind; level; last_cycle} ->
+            Some (kind, level, last_cycle)
+        | _ -> None)
+      (fun (kind, level, last_cycle) ->
+        Outdated_denunciation {kind; level; last_cycle})
 end
 
 module Manager = struct
