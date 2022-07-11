@@ -35,6 +35,7 @@ type validator_kind =
   | Internal : Store.Chain.chain_store -> validator_kind
   | External : {
       genesis : Genesis.t;
+      readonly : bool;
       data_dir : string;
       context_root : string;
       protocol_root : string;
@@ -50,6 +51,7 @@ module type S = sig
   val close : t -> unit Lwt.t
 
   val apply_block :
+    simulate:bool ->
     t ->
     Store.chain_store ->
     predecessor:Store.Block.t ->
@@ -221,8 +223,8 @@ module Internal_validator_process = struct
         operation_metadata_size_limit;
       }
 
-  let apply_block validator chain_store ~predecessor ~max_operations_ttl
-      block_header operations =
+  let apply_block ~simulate validator chain_store ~predecessor
+      ~max_operations_ttl block_header operations =
     let open Lwt_result_syntax in
     let* env =
       make_apply_environment
@@ -242,6 +244,7 @@ module Internal_validator_process = struct
     in
     let* {result; cache} =
       Block_validation.apply
+        ~simulate
         ?cached_result:validator.preapply_result
         env
         block_header
@@ -503,8 +506,9 @@ module External_validator_process = struct
   type process_status = Uninitialized | Running of validator_process | Exiting
 
   type t = {
-    data_dir : string;
     genesis : Genesis.t;
+    readonly : bool;
+    data_dir : string;
     context_root : string;
     protocol_root : string;
     user_activated_upgrades : User_activated.upgrades;
@@ -536,9 +540,12 @@ module External_validator_process = struct
     let canceler = Lwt_canceler.create () in
     (* We assume that there is only one validation process per socket *)
     let socket_dir = get_temporary_socket_dir () in
+    let args =
+      ["tezos-validator"; "--socket-dir"; socket_dir]
+      @ match vp.readonly with true -> ["--readonly"] | false -> []
+    in
     let process =
-      Lwt_process.open_process_none
-        (vp.process_path, [|"tezos-validator"; "--socket-dir"; socket_dir|])
+      Lwt_process.open_process_none (vp.process_path, Array.of_list args)
     in
     let socket_path =
       External_validation.socket_path ~socket_dir ~pid:process#pid
@@ -713,13 +720,14 @@ module External_validator_process = struct
          operation_metadata_size_limit;
          _;
        } :
-        validator_environment) ~genesis ~data_dir ~context_root ~protocol_root
-      ~process_path ~sandbox_parameters =
+        validator_environment) ~genesis ~data_dir ~readonly ~context_root
+      ~protocol_root ~process_path ~sandbox_parameters =
     let open Lwt_result_syntax in
     let*! () = Events.(emit init ()) in
     let validator =
       {
         data_dir;
+        readonly;
         genesis;
         context_root;
         protocol_root;
@@ -737,8 +745,8 @@ module External_validator_process = struct
     in
     return validator
 
-  let apply_block validator chain_store ~predecessor ~max_operations_ttl
-      block_header operations =
+  let apply_block ~simulate validator chain_store ~predecessor
+      ~max_operations_ttl block_header operations =
     let chain_id = Store.Chain.chain_id chain_store in
     let predecessor_block_header = Store.Block.header predecessor in
     let predecessor_block_metadata_hash =
@@ -757,6 +765,7 @@ module External_validator_process = struct
           predecessor_ops_metadata_hash;
           operations;
           max_operations_ttl;
+          simulate;
         }
     in
     send_request validator request Block_validation.result_encoding
@@ -883,6 +892,7 @@ let init validator_environment validator_kind =
   | External
       {
         genesis;
+        readonly;
         data_dir;
         context_root;
         protocol_root;
@@ -894,6 +904,7 @@ let init validator_environment validator_kind =
           validator_environment
           ~genesis
           ~data_dir
+          ~readonly
           ~context_root
           ~protocol_root
           ~process_path
@@ -910,8 +921,9 @@ let reconfigure_event_logging (E {validator_process = (module VP); validator})
     config =
   VP.reconfigure_event_logging validator config
 
-let apply_block (E {validator_process = (module VP); validator}) chain_store
-    ~predecessor header operations =
+let apply_block ?(simulate = false)
+    (E {validator_process = (module VP); validator}) chain_store ~predecessor
+    header operations =
   let open Lwt_result_syntax in
   let* metadata = Store.Block.get_block_metadata chain_store predecessor in
   let max_operations_ttl = Store.Block.max_operations_ttl metadata in
@@ -927,6 +939,7 @@ let apply_block (E {validator_process = (module VP); validator}) chain_store
       operations
   in
   VP.apply_block
+    ~simulate
     validator
     chain_store
     ~predecessor

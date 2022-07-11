@@ -91,6 +91,10 @@ Node
 
 - Updated the encoding of worker events json messages.
 
+- Fix a bug preventing the ``replay`` command to run in readonly
+  mode. As a side effect, the ``replay`` command was actually writing
+  data to the context store.
+
 Client
 ------
 

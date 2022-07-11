@@ -166,6 +166,7 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
         config.shell.block_validator_limits.operation_metadata_size_limit;
     }
   in
+  let readonly = true in
   let* validator_process, store =
     if singleprocess then
       let* store =
@@ -173,6 +174,7 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
           ~store_dir:store_root
           ~context_dir:context_root
           ~allow_testchains:false
+          ~readonly
           genesis
       in
       let main_chain_store = Store.main_chain_store store in
@@ -187,6 +189,7 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
           (External
              {
                data_dir = config.data_dir;
+               readonly;
                genesis;
                context_root;
                protocol_root;
@@ -202,6 +205,7 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
           ~store_dir:store_root
           ~context_dir:context_root
           ~allow_testchains:false
+          ~readonly
           ~commit_genesis
           genesis
       in
@@ -212,11 +216,11 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
     (fun () ->
       List.iter_es
         (fun block ->
-          let block_alias =
+          let* block_alias =
             match block with
-            | `Head _ | `Genesis | `Alias _ ->
-                Some (Block_services.to_string block)
-            | _ -> None
+            | `Head _ | `Alias _ -> return_some (Block_services.to_string block)
+            | `Genesis -> tzfail Cannot_replay_orphan
+            | _ -> return_none
           in
           let* block =
             protect
@@ -263,6 +267,7 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                 in
                 let* result =
                   Block_validator_process.apply_block
+                    ~simulate:true
                     validator_process
                     main_chain_store
                     ~predecessor

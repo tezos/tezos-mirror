@@ -161,7 +161,7 @@ let handshake input output =
     (not (Bytes.equal magic External_validation.magic))
     (inconsistent_handshake "bad magic")
 
-let init input =
+let init ~readonly input =
   let open Lwt_syntax in
   let* () = Events.(emit initialization_request ()) in
   let* {
@@ -187,6 +187,7 @@ let init input =
           Patch_context.patch_context genesis sandbox_parameters ctxt
         in
         Shell_context.unwrap_disk_context ctxt)
+      ~readonly
       context_root
   in
   Lwt.return
@@ -197,7 +198,7 @@ let init input =
       user_activated_protocol_overrides,
       operation_metadata_size_limit )
 
-let run input output =
+let run ~readonly input output =
   let open Lwt_result_syntax in
   let* () = handshake input output in
   let*! ( context_index,
@@ -206,7 +207,7 @@ let run input output =
           user_activated_upgrades,
           user_activated_protocol_overrides,
           operation_metadata_size_limit ) =
-    init input
+    init ~readonly input
   in
   let rec loop (cache : Tezos_protocol_environment.Context.block_cache option)
       cached_result =
@@ -249,6 +250,7 @@ let run input output =
           predecessor_ops_metadata_hash;
           operations;
           max_operations_ttl;
+          simulate;
         } ->
         let*! () = Events.(emit validation_request block_header) in
         let*! block_application_result =
@@ -288,6 +290,7 @@ let run input output =
           in
           with_retry_to_load_protocol protocol_root (fun () ->
               Block_validation.apply
+                ~simulate
                 ?cached_result
                 env
                 block_header
@@ -477,7 +480,7 @@ let run input output =
   let*! () = loop None None in
   return_unit
 
-let main ?socket_dir () =
+let main ?socket_dir ~readonly () =
   let open Lwt_result_syntax in
   let canceler = Lwt_canceler.create () in
   let*! in_channel, out_channel =
@@ -497,7 +500,7 @@ let main ?socket_dir () =
   let*! () = Events.(emit initialized ()) in
   let*! r =
     Error_monad.catch_es (fun () ->
-        let* () = run in_channel out_channel in
+        let* () = run ~readonly in_channel out_channel in
         let*! r = Lwt_canceler.cancel canceler in
         match r with
         | Ok () | Error [] -> return_unit

@@ -582,9 +582,10 @@ module Make (Proto : Registered_protocol.T) = struct
           in
           return (validation_result, NewProto.environment_version)
 
-  let apply ?cached_result chain_id ~cache ~user_activated_upgrades
-      ~user_activated_protocol_overrides ~operation_metadata_size_limit
-      ~max_operations_ttl ~(predecessor_block_header : Block_header.t)
+  let apply ?(simulate = false) ?cached_result chain_id ~cache
+      ~user_activated_upgrades ~user_activated_protocol_overrides
+      ~operation_metadata_size_limit ~max_operations_ttl
+      ~(predecessor_block_header : Block_header.t)
       ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash
       ~predecessor_context ~(block_header : Block_header.t) operations =
     let open Lwt_result_syntax in
@@ -599,10 +600,17 @@ module Make (Proto : Registered_protocol.T) = struct
                 block_header.shell.timestamp ->
         let*! () = Validation_events.(emit using_preapply_result block_hash) in
         let*! context_hash =
-          Context_ops.commit
-            ~time:block_header.shell.timestamp
-            ?message:result.validation_store.message
-            context
+          if simulate then
+            Lwt.return
+            @@ Context_ops.hash
+                 ~time:block_header.shell.timestamp
+                 ?message:result.validation_store.message
+                 context
+          else
+            Context_ops.commit
+              ~time:block_header.shell.timestamp
+              ?message:result.validation_store.message
+              context
         in
         assert (
           Context_hash.equal context_hash result.validation_store.context_hash) ;
@@ -697,10 +705,17 @@ module Make (Proto : Registered_protocol.T) = struct
         let (Context {cache; _}) = validation_result.context in
         let context = validation_result.context in
         let*! context_hash =
-          (Context_ops.commit
-             ~time:block_header.shell.timestamp
-             ?message:validation_result.message
-             context [@time.duration_lwt context_commitment] [@time.flush])
+          if simulate then
+            Lwt.return
+            @@ Context_ops.hash
+                 ~time:block_header.shell.timestamp
+                 ?message:validation_result.message
+                 context
+          else
+            Context_ops.commit
+              ~time:block_header.shell.timestamp
+              ?message:validation_result.message
+              context [@time.duration_lwt context_commitment] [@time.flush]
         in
         let* () =
           fail_unless
@@ -1228,7 +1243,7 @@ let recompute_metadata ~chain_id ~predecessor_block_header ~predecessor_context
       tzfail (System_error {errno = Unix.error_message errno; fn; msg})
   | (Ok _ | Error _) as res -> Lwt.return res
 
-let apply ?cached_result
+let apply ?simulate ?cached_result
     {
       chain_id;
       user_activated_upgrades;
@@ -1252,6 +1267,7 @@ let apply ?cached_result
   in
   let module Block_validation = Make (Proto) in
   Block_validation.apply
+    ?simulate
     ?cached_result
     chain_id
     ~user_activated_upgrades
@@ -1266,14 +1282,14 @@ let apply ?cached_result
     ~block_header
     operations
 
-let apply ?cached_result c ~cache block_header operations =
+let apply ?simulate ?cached_result c ~cache block_header operations =
   let open Lwt_result_syntax in
   let block_hash = Block_header.hash block_header in
   let*! r =
     (* The cache might be inconsistent with the context. By forcing
        the reloading of the cache, we restore the consistency. *)
     let*! r =
-      apply ?cached_result c ~cache block_hash block_header operations
+      apply ?simulate ?cached_result c ~cache block_hash block_header operations
     in
     match r with
     | Error (Validation_errors.Inconsistent_hash _ :: _) ->
