@@ -26,4 +26,13 @@
 val data_at_level :
   Sqlite3.db -> #RPC_context.simple -> int -> Data.t tzresult Lwt.t
 
+(* get the data at [diff] levels in the past relative to the node's
+   head; by default [diff = 0] *)
+val data_at_latest_level :
+  Sqlite3.db ->
+  #RPC_context.simple ->
+  ?diff:int ->
+  unit ->
+  Data.t tzresult Lwt.t
+
 val anomalies_at_level : Sqlite3.db -> int -> Data.Anomaly.t list

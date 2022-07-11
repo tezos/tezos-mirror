@@ -57,6 +57,24 @@ module Services = struct
       ~output:Data.encoding
       RPC_path.(open_root / "level" /: level_arg)
 
+  type latest_level_query = {diff : int option}
+
+  let latest_level_query =
+    let open RPC_query in
+    query (fun diff -> {diff})
+    |+ opt_field "diff" RPC_arg.int (fun t -> t.diff)
+    |> seal
+
+  let data_at_latest_level () =
+    RPC_service.get_service
+      ~description:
+        "export data at latest level; the optional argument 'diff' allows to \
+         refer to older levels relative to the node's head (for instance, to \
+         obtain the data for the latest final level, use `diff = 2`)"
+      ~query:latest_level_query
+      ~output:Data.encoding
+      RPC_path.(open_root / "lastest_level")
+
   let anomalies_at_levels () =
     RPC_service.get_service
       ~description:"export anomalies at levels"
@@ -71,6 +89,12 @@ module RPC_server = struct
       dir
       (Services.data_at_level ())
       (fun (_, level) () () -> Exporter.data_at_level db ctxt level)
+
+  let register_data_at_latest_level db ctxt dir =
+    RPC_directory.register
+      dir
+      (Services.data_at_latest_level ())
+      (fun _ {diff} () -> Exporter.data_at_latest_level db ctxt ?diff ())
 
   let register_anomalies_at_levels db dir =
     RPC_directory.register
@@ -88,6 +112,7 @@ module RPC_server = struct
   let register_rpcs db ctxt =
     RPC_directory.empty
     |> register_data_at_level db ctxt
+    |> register_data_at_latest_level db ctxt
     |> register_anomalies_at_levels db
 
   let start (addr, port) dir =

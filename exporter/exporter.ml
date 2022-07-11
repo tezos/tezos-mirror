@@ -319,4 +319,14 @@ let data_at_level db ctxt level =
   let unaccurate = level >= Int32.to_int header.level in
   return Data.{blocks; delegate_operations; unaccurate}
 
+let data_at_latest_level db ctxt ?diff () =
+  let diff = Option.value ~default:0 diff in
+  let open Lwt_result_syntax in
+  let* header = Shell_services.Blocks.Header.shell_header ctxt () in
+  let level = Int32.to_int header.level - diff in
+  let blocks = select_blocks db level in
+  let delegate_operations = select_ops db level |> translate_ops in
+  let unaccurate = level >= Int32.to_int header.level in
+  return Data.{blocks; delegate_operations; unaccurate}
+
 let anomalies_at_level db level = select_ops db level |> anomalies level
