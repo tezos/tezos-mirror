@@ -236,6 +236,8 @@ module Raw_level : sig
   val of_int32 : int32 -> raw_level tzresult
 
   val of_int32_exn : int32 -> raw_level
+
+  module Set : Set.S with type elt = raw_level
 end
 
 (** This module re-exports definitions from {!Cycle_repr}. *)
@@ -1285,6 +1287,9 @@ module Nonce : sig
   type unrevealed = {nonce_hash : Nonce_hash.t; delegate : public_key_hash}
 
   val record_hash : context -> unrevealed -> context tzresult Lwt.t
+
+  (** See {!Nonce_storage.check_unrevealed}. *)
+  val check_unrevealed : context -> Level.t -> nonce -> unit tzresult Lwt.t
 
   val reveal : context -> Level.t -> nonce -> context tzresult Lwt.t
 

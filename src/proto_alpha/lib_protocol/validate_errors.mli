@@ -65,6 +65,7 @@ module Anonymous : sig
         level : Alpha_context.Raw_level.t;
         last_cycle : Alpha_context.Cycle.t;
       }
+    | Conflicting_nonce_revelation
 end
 
 (** Errors that may arise while validating a manager operation. *)

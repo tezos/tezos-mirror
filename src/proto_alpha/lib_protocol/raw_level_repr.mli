@@ -30,6 +30,8 @@ type t
 
 type raw_level = t
 
+module Set : Set.S with type elt = t
+
 (** @raise Invalid_argument when the level to encode is not positive *)
 val encoding : raw_level Data_encoding.t
 

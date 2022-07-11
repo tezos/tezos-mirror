@@ -162,7 +162,9 @@ let test_revelation_early_wrong_right_twice () =
   in
   let*! e = Block.bake ~policy ~operation b in
   let* () =
-    Assert.proto_error_with_info ~loc:__LOC__ e "Too early nonce revelation"
+    Assert.proto_error ~loc:__LOC__ e (function
+        | Nonce_storage.Too_early_revelation -> true
+        | _ -> false)
   in
   (* finish the cycle excluding the committing baker, id *)
   let* b = Block.bake_until_cycle_end ~policy b in
@@ -176,7 +178,11 @@ let test_revelation_early_wrong_right_twice () =
       (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get wrong_hash)
   in
   let*! e = Block.bake ~operation b in
-  let* () = Assert.proto_error_with_info ~loc:__LOC__ e "Inconsistent nonce" in
+  let* () =
+    Assert.proto_error ~loc:__LOC__ e (function
+        | Nonce_storage.Inconsistent_nonce -> true
+        | _ -> false)
+  in
   (* reveals correctly *)
   let operation =
     Op.seed_nonce_revelation
@@ -187,6 +193,18 @@ let test_revelation_early_wrong_right_twice () =
   let* baker_pkh, _, _ = Block.get_next_baker ~policy b in
   let baker = Alpha_context.Contract.Implicit baker_pkh in
   let* baker_bal = Context.Contract.balance (B b) baker in
+  (* test that revealing twice in a block produces an error *)
+  let*! e =
+    Block.bake
+      ~policy:(Block.By_account baker_pkh)
+      ~operations:[operation; operation]
+      b
+  in
+  let* () =
+    Assert.proto_error ~loc:__LOC__ e (function
+        | Validate_errors.Anonymous.Conflicting_nonce_revelation -> true
+        | _ -> false)
+  in
   let* b = Block.bake ~policy:(Block.By_account baker_pkh) ~operation b in
   (* test that the baker gets the tip reward plus the baking reward*)
   let* () =
@@ -205,7 +223,9 @@ let test_revelation_early_wrong_right_twice () =
       (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get wrong_hash)
   in
   let*! e = Block.bake ~operation ~policy b in
-  Assert.proto_error_with_info ~loc:__LOC__ e "Previously revealed nonce"
+  Assert.proto_error ~loc:__LOC__ e (function
+      | Nonce_storage.Already_revealed_nonce -> true
+      | _ -> false)
 
 (** Test that revealing too late produces an error. Note that a
     committer who doesn't reveal at cycle 1 is not punished.*)
@@ -240,7 +260,9 @@ let test_revelation_missing_and_late () =
   in
   let*! e = Block.bake ~operation ~policy b in
   let* () =
-    Assert.proto_error_with_info ~loc:__LOC__ e "Too late nonce revelation"
+    Assert.proto_error ~loc:__LOC__ e (function
+        | Nonce_storage.Too_late_revelation -> true
+        | _ -> false)
   in
   (* finish cycle 1 excluding the committing baker [id] *)
   let* b = Block.bake_until_cycle_end ~policy b in
@@ -252,7 +274,9 @@ let test_revelation_missing_and_late () =
       (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get committed_hash)
   in
   let*! e = Block.bake ~operation b in
-  Assert.proto_error_with_info ~loc:__LOC__ e "Too late nonce revelation"
+  Assert.proto_error ~loc:__LOC__ e (function
+      | Nonce_storage.Too_late_revelation -> true
+      | _ -> false)
 
 let wrap e = e >|= Environment.wrap_tzresult
 

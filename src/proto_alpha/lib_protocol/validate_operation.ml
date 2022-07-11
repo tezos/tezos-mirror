@@ -56,6 +56,7 @@ type anonymous_state = {
   blinded_pkhs_seen : Operation_hash.t Blinded_public_key_hash.Map.t;
   double_baking_evidences_seen : Operation_hash.t Double_evidence.t;
   double_consensus_evidences_seen : Operation_hash.t Double_evidence.t;
+  seed_nonce_levels_seen : Raw_level.Set.t;
 }
 
 let empty_anonymous_state =
@@ -63,6 +64,7 @@ let empty_anonymous_state =
     blinded_pkhs_seen = Blinded_public_key_hash.Map.empty;
     double_baking_evidences_seen = Double_evidence.empty;
     double_consensus_evidences_seen = Double_evidence.empty;
+    seed_nonce_levels_seen = Raw_level.Set.empty;
   }
 
 (** Static information used to validate manager operations. *)
@@ -350,9 +352,31 @@ module Anonymous = struct
         anonymous_state = {vs.anonymous_state with double_baking_evidences_seen};
       }
 
-  let validate_seed_nonce_revelation _vi vs
-      (Seed_nonce_revelation {level = _; nonce = _}) =
-    return vs
+  let validate_seed_nonce_revelation vi vs
+      (Seed_nonce_revelation {level = commitment_raw_level; nonce}) =
+    let open Lwt_result_syntax in
+    let commitment_level = Level.from_raw vi.ctxt commitment_raw_level in
+    let*? () =
+      error_unless
+        (not
+           (Raw_level.Set.mem
+              commitment_raw_level
+              vs.anonymous_state.seed_nonce_levels_seen))
+        Conflicting_nonce_revelation
+    in
+    let* () = Nonce.check_unrevealed vi.ctxt commitment_level nonce in
+    let seed_nonce_levels_seen =
+      Raw_level.Set.add
+        commitment_raw_level
+        vs.anonymous_state.seed_nonce_levels_seen
+    in
+    let new_vs =
+      {
+        vs with
+        anonymous_state = {vs.anonymous_state with seed_nonce_levels_seen};
+      }
+    in
+    return new_vs
 
   let validate_vdf_revelation _vi vs (Vdf_revelation {solution = _}) = return vs
 end

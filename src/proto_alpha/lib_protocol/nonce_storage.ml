@@ -32,7 +32,7 @@ let encoding = Seed_repr.nonce_encoding
 type error +=
   | Too_late_revelation
   | Too_early_revelation
-  | Previously_revealed_nonce
+  | Already_revealed_nonce
   | Inconsistent_nonce
 
 let () =
@@ -58,13 +58,13 @@ let () =
     (fun () -> Too_early_revelation) ;
   register_error_kind
     `Branch
-    ~id:"nonce.previously_revealed"
-    ~title:"Previously revealed nonce"
+    ~id:"nonce.already_revealed"
+    ~title:"Already revealed nonce"
     ~description:"Duplicated revelation for a nonce."
-    ~pp:(fun ppf () -> Format.fprintf ppf "This nonce was previously revealed")
+    ~pp:(fun ppf () -> Format.fprintf ppf "This nonce was already revealed")
     Data_encoding.unit
-    (function Previously_revealed_nonce -> Some () | _ -> None)
-    (fun () -> Previously_revealed_nonce) ;
+    (function Already_revealed_nonce -> Some () | _ -> None)
+    (fun () -> Already_revealed_nonce) ;
   register_error_kind
     `Branch
     ~id:"nonce.inconsistent"
@@ -98,19 +98,21 @@ let get_unrevealed ctxt (level : Level_repr.t) =
       then fail Too_late_revelation
       else
         Storage.Seed.Nonce.get ctxt level >>=? function
-        | Revealed _ -> fail Previously_revealed_nonce
+        | Revealed _ -> fail Already_revealed_nonce
         | Unrevealed status -> return status)
 
 let record_hash ctxt unrevealed =
   let level = Level_storage.current ctxt in
   Storage.Seed.Nonce.init ctxt level (Unrevealed unrevealed)
 
-let reveal ctxt level nonce =
+let check_unrevealed ctxt (level : Level_repr.t) nonce =
   get_unrevealed ctxt level >>=? fun unrevealed ->
-  error_unless
+  fail_unless
     (Seed_repr.check_hash nonce unrevealed.nonce_hash)
     Inconsistent_nonce
-  >>?= fun () -> Storage.Seed.Nonce.update ctxt level (Revealed nonce)
+
+let reveal ctxt level nonce =
+  Storage.Seed.Nonce.update ctxt level (Revealed nonce)
 
 type unrevealed = Storage.Seed.unrevealed_nonce = {
   nonce_hash : Nonce_hash.t;

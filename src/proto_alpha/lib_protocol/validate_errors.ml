@@ -313,6 +313,24 @@ module Anonymous = struct
         | _ -> None)
       (fun (kind, level, last_cycle) ->
         Outdated_denunciation {kind; level; last_cycle})
+
+  type error += Conflicting_nonce_revelation
+
+  let () =
+    register_error_kind
+      `Branch
+      ~id:"validate_operation.conflicting_nonce_revelation"
+      ~title:"Conflicting nonce revelation in the current validation state)."
+      ~description:
+        "A revelation for the same nonce has already been validated for the \
+         current validation state."
+      ~pp:(fun ppf () ->
+        Format.fprintf
+          ppf
+          "This nonce was previously revealed in the current block")
+      Data_encoding.unit
+      (function Conflicting_nonce_revelation -> Some () | _ -> None)
+      (fun () -> Conflicting_nonce_revelation)
 end
 
 module Manager = struct
