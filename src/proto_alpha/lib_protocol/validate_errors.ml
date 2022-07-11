@@ -72,18 +72,31 @@ module Anonymous = struct
         | Conflicting_activation (edpkh, oph) -> Some (edpkh, oph) | _ -> None)
       (fun (edpkh, oph) -> Conflicting_activation (edpkh, oph))
 
-  type denunciation_kind = Preendorsement | Endorsement
+  type denunciation_kind = Preendorsement | Endorsement | Block
 
   let denunciation_kind_encoding =
     let open Data_encoding in
     string_enum
-      [("preendorsement", Preendorsement); ("endorsement", Endorsement)]
+      [
+        ("preendorsement", Preendorsement);
+        ("endorsement", Endorsement);
+        ("block", Block);
+      ]
 
   let pp_denunciation_kind fmt : denunciation_kind -> unit = function
     | Preendorsement -> Format.fprintf fmt "preendorsement"
     | Endorsement -> Format.fprintf fmt "endorsement"
+    | Block -> Format.fprintf fmt "block"
 
   type error +=
+    | Invalid_double_baking_evidence of {
+        hash1 : Block_hash.t;
+        level1 : Raw_level.t;
+        round1 : Round.t;
+        hash2 : Block_hash.t;
+        level2 : Raw_level.t;
+        round2 : Round.t;
+      }
     | Invalid_denunciation of denunciation_kind
     | Inconsistent_denunciation of {
         kind : denunciation_kind;
@@ -113,6 +126,41 @@ module Anonymous = struct
       }
 
   let () =
+    register_error_kind
+      `Permanent
+      ~id:"validate.block.invalid_double_baking_evidence"
+      ~title:"Invalid double baking evidence"
+      ~description:
+        "A double-baking evidence is inconsistent (two distinct levels)"
+      ~pp:(fun ppf (hash1, level1, round1, hash2, level2, round2) ->
+        Format.fprintf
+          ppf
+          "Invalid double-baking evidence (hash: %a and %a, levels/rounds: \
+           (%ld,%ld) and (%ld,%ld))"
+          Block_hash.pp
+          hash1
+          Block_hash.pp
+          hash2
+          (Raw_level.to_int32 level1)
+          (Round.to_int32 round1)
+          (Raw_level.to_int32 level2)
+          (Round.to_int32 round2))
+      Data_encoding.(
+        obj6
+          (req "hash1" Block_hash.encoding)
+          (req "level1" Raw_level.encoding)
+          (req "round1" Round.encoding)
+          (req "hash2" Block_hash.encoding)
+          (req "level2" Raw_level.encoding)
+          (req "round2" Round.encoding))
+      (function
+        | Invalid_double_baking_evidence
+            {hash1; level1; round1; hash2; level2; round2} ->
+            Some (hash1, level1, round1, hash2, level2, round2)
+        | _ -> None)
+      (fun (hash1, level1, round1, hash2, level2, round2) ->
+        Invalid_double_baking_evidence
+          {hash1; level1; round1; hash2; level2; round2}) ;
     register_error_kind
       `Permanent
       ~id:"validate_operation.block.invalid_denunciation"
@@ -186,7 +234,7 @@ module Anonymous = struct
       ~description:
         "The same denunciation has already been validated in the current \
          validation state."
-      ~pp:(fun ppf (kind, delegate, level, oph) ->
+      ~pp:(fun ppf (kind, delegate, level, hash) ->
         Format.fprintf
           ppf
           "Double %a evidence for the delegate %a at level %a already exists \
@@ -198,7 +246,7 @@ module Anonymous = struct
           Level.pp
           level
           Operation_hash.pp
-          oph)
+          hash)
       Data_encoding.(
         obj4
           (req "denunciation_kind" denunciation_kind_encoding)

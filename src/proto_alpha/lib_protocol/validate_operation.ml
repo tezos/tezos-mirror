@@ -278,9 +278,77 @@ module Anonymous = struct
       (Double_endorsement_evidence {op1; op2}) =
     validate_double_consensus ~consensus_operation:Endorsement vi vs oph op1 op2
 
-  let validate_double_baking_evidence _vi vs _oph
-      (Double_baking_evidence {bh1 = _; bh2 = _}) =
-    return vs
+  let validate_double_baking_evidence vi vs oph
+      (Double_baking_evidence {bh1; bh2}) =
+    let open Lwt_result_syntax in
+    let hash1 = Block_header.hash bh1 in
+    let hash2 = Block_header.hash bh2 in
+    let*? bh1_fitness = Fitness.from_raw bh1.shell.fitness in
+    let round1 = Fitness.round bh1_fitness in
+    let*? bh2_fitness = Fitness.from_raw bh2.shell.fitness in
+    let round2 = Fitness.round bh2_fitness in
+    let*? level1 = Raw_level.of_int32 bh1.shell.level in
+    let*? level2 = Raw_level.of_int32 bh2.shell.level in
+    let*? () =
+      error_unless
+        (Raw_level.(level1 = level2)
+        && Round.(round1 = round2)
+        && (* we require an order on hashes to avoid the existence of
+              equivalent evidences *)
+        Block_hash.(hash1 < hash2))
+        (Invalid_double_baking_evidence
+           {hash1; level1; round1; hash2; level2; round2})
+    in
+    let*? () = check_denunciation_age vi Block level1 in
+    let level = Level.from_raw vi.ctxt level1 in
+    let committee_size = Constants.consensus_committee_size vi.ctxt in
+    let*? slot1 = Round.to_slot round1 ~committee_size in
+    let* ctxt, (delegate1_pk, delegate1) =
+      Stake_distribution.slot_owner vi.ctxt level slot1
+    in
+    let*? slot2 = Round.to_slot round2 ~committee_size in
+    let* ctxt, (_delegate2_pk, delegate2) =
+      Stake_distribution.slot_owner ctxt level slot2
+    in
+    let*? () =
+      error_unless
+        Signature.Public_key_hash.(delegate1 = delegate2)
+        (Inconsistent_denunciation {kind = Block; delegate1; delegate2})
+    in
+    let delegate_pk, delegate = (delegate1_pk, delegate1) in
+    let*? () =
+      match
+        Double_evidence.find
+          (delegate, level)
+          vs.anonymous_state.double_baking_evidences_seen
+      with
+      | None -> ok ()
+      | Some oph' ->
+          error
+            (Conflicting_denunciation
+               {kind = Block; delegate; level; hash = oph'})
+    in
+    let* already_slashed =
+      Delegate.already_slashed_for_double_baking ctxt delegate level
+    in
+    let*? () =
+      error_unless
+        (not already_slashed)
+        (Already_denounced {kind = Block; delegate; level})
+    in
+    let*? () = Block_header.check_signature bh1 vi.chain_id delegate_pk in
+    let*? () = Block_header.check_signature bh2 vi.chain_id delegate_pk in
+    let double_baking_evidences_seen =
+      Double_evidence.add
+        (delegate, level)
+        oph
+        vs.anonymous_state.double_baking_evidences_seen
+    in
+    return
+      {
+        vs with
+        anonymous_state = {vs.anonymous_state with double_baking_evidences_seen};
+      }
 
   let validate_seed_nonce_revelation _vi vs
       (Seed_nonce_revelation {level = _; nonce = _}) =

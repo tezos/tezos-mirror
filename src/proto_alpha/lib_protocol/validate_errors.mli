@@ -25,12 +25,20 @@
 
 (** Errors that may arise while validating an anonymous operation. *)
 module Anonymous : sig
-  type denunciation_kind = Preendorsement | Endorsement
+  type denunciation_kind = Preendorsement | Endorsement | Block
 
   type error +=
     | Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
     | Conflicting_activation of Ed25519.Public_key_hash.t * Operation_hash.t
     | Invalid_denunciation of denunciation_kind
+    | Invalid_double_baking_evidence of {
+        hash1 : Block_hash.t;
+        level1 : Alpha_context.Raw_level.t;
+        round1 : Alpha_context.Round.t;
+        hash2 : Block_hash.t;
+        level2 : Alpha_context.Raw_level.t;
+        round2 : Alpha_context.Round.t;
+      }
     | Inconsistent_denunciation of {
         kind : denunciation_kind;
         delegate1 : Signature.Public_key_hash.t;
