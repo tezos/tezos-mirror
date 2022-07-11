@@ -663,18 +663,22 @@ For instance,
 
     tezos-tx-rollup-node-013-PtJakart init batcher config for ${rollup}  \
           --data-dir /tmp/tx-node \
+          --rpc-addr ${rollup_node_rpc_server_address} \
           --batch-signer ${batcher}
 
 will create a configuration file in ``/tmp/tx-node``, for the
 transaction rollup identified by the variable ``${rollup}``.
 
+The rollup node will expose a RPC server at the address
+provided with the ``rpc-addr`` argument. If omitted, the default value
+used by the rollup node is ``localhost:9999``.
+
 Once the configuration is ready, starting the rollup node is as simple as
 
 .. code:: sh
 
-    tezos-tx-rollup-node-013-PtJakart run ${mode} for ${rollup_address_or_name} \
-          --endpoint ${tezos_node_address} \
-          --rpc-addr ${rollup_node_rpc_server_address} \
+    tezos-tx-rollup-node-013-PtJakart --endpoint ${tezos_node_address} \
+          run ${mode} for ${rollup_address_or_name} \
           --data-dir ${data_dir} \
           [--allow-deposit]
 
@@ -696,10 +700,6 @@ available.
    executed on the same machine as the Tezos node it tracks. It may
    not work properly in another set-up (*e.g.*, when ``--endpoint`` is
    the address of a remote, public Tezos node).
-
-Finally, the rollup node will expose a RPC server at the address
-provided with the ``rpc-addr`` argument. If omitted, the default value
-used by the rollup node is ``localhost:9999``.
 
 Depositing Assets on a Rollup
 *****************************
