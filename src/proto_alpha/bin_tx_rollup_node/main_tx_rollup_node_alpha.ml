@@ -121,11 +121,10 @@ let origination_level_arg =
 let rpc_addr_arg =
   let default = P2p_point.Id.to_string Node_config.default_rpc_addr in
   let doc = rpc_addr_doc default in
-  Clic.default_arg
+  Clic.arg
     ~long:"rpc-addr"
     ~placeholder:"address:port"
     ~doc
-    ~default
     (Clic.parameter (fun _ s ->
          P2p_point.Id.of_string s
          |> Result.map_error (fun e -> [Exn (Failure e)])
@@ -163,17 +162,6 @@ let cors_headers_arg =
          String.split_no_empty ',' s |> List.map String.trim |> return)
 
 let reconnection_delay_arg =
-  let default = Node_config.default_reconnection_delay in
-  let doc = reconnection_delay_doc default in
-  Clic.default_arg
-    ~long:"reconnection-delay"
-    ~placeholder:"delay"
-    ~doc
-    ~default:(string_of_float default)
-    (Clic.parameter (fun _ p ->
-         try return (float_of_string p) with _ -> failwith "Cannot read float"))
-
-let reconnection_delay_opt_arg =
   let default = Node_config.default_reconnection_delay in
   let doc = reconnection_delay_doc default in
   Clic.arg
@@ -220,6 +208,12 @@ let config_from_args data_dir rollup_id mode operator batch_signer
     match data_dir with
     | Some d -> d
     | None -> Node_config.default_data_dir rollup_id
+  in
+  let rpc_addr = Option.value rpc_addr ~default:Node_config.default_rpc_addr in
+  let reconnection_delay =
+    Option.value
+      reconnection_delay
+      ~default:Node_config.default_reconnection_delay
   in
   Node_config.
     {
@@ -402,7 +396,7 @@ let run_command =
        cors_origins_arg
        cors_headers_arg
        allow_deposit_arg
-       reconnection_delay_opt_arg)
+       reconnection_delay_arg)
     (prefix "run" @@ mode_param @@ prefix "for"
     @@ Clic.param
          ~name:"rollup-id"
@@ -427,14 +421,6 @@ let run_command =
          cctxt ->
       let*! () = Event.(emit preamble_warning) () in
       let config_from_args =
-        let rpc_addr =
-          Option.value rpc_addr ~default:Node_config.default_rpc_addr
-        in
-        let reconnection_delay =
-          Option.value
-            reconnection_delay
-            ~default:Node_config.default_reconnection_delay
-        in
         config_from_args
           data_dir
           rollup_id
