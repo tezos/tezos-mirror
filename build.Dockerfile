@@ -8,9 +8,9 @@ ARG GIT_VERSION
 WORKDIR /home/tezos
 RUN mkdir -p /home/tezos/tezos/scripts
 COPY --chown=tezos:nogroup Makefile tezos
-COPY --chown=tezos:nogroup active_protocol_versions tezos
-COPY --chown=tezos:nogroup tx_rollup_protocol_versions tezos
-COPY --chown=tezos:nogroup sc_rollup_protocol_versions tezos
+COPY --chown=tezos:nogroup script-inputs/active_protocol_versions tezos
+COPY --chown=tezos:nogroup script-inputs/tx_rollup_protocol_versions tezos
+COPY --chown=tezos:nogroup script-inputs/sc_rollup_protocol_versions tezos
 COPY --chown=tezos:nogroup dune tezos
 COPY --chown=tezos:nogroup scripts/version.sh tezos/scripts/
 COPY --chown=tezos:nogroup src tezos/src

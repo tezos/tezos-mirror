@@ -158,7 +158,7 @@ main () {
     echo "exec $admin_client \"\$@\""  >> $client_dir/bin/tezos-admin-client
     chmod +x $client_dir/bin/tezos-admin-client
 
-    for protocol in $(cat $bin_dir/../../active_protocol_versions); do
+    for protocol in $(cat $bin_dir/../../script-inputs/active_protocol_versions); do
         protocol_underscore=$(echo $protocol | tr -- - _)
         local_baker="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_baker/main_baker_$protocol_underscore.exe"
         local_endorser="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_endorser/main_endorser_$protocol_underscore.exe"

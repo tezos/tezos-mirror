@@ -5318,7 +5318,7 @@ let () =
     | Alpha | V _ -> Format.fprintf fmt "%s\n" (Protocol.name_dash protocol)
     | Other -> ()
   in
-  write "active_protocol_versions" @@ fun fmt ->
+  write "script-inputs/active_protocol_versions" @@ fun fmt ->
   List.iter (write_protocol fmt) Protocol.active
 
 let () = check ~exclude ()
