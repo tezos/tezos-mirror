@@ -322,13 +322,7 @@ module Internal_for_tests : sig
   val find_choice :
     t ->
     Sc_rollup_tick_repr.t ->
-    ( Sc_rollup_repr.State_hash.t option
-      * Sc_rollup_tick_repr.t
-      * Sc_rollup_repr.State_hash.t option
-      * Sc_rollup_tick_repr.t,
-      reason )
-    result
-    Lwt.t
+    (dissection_chunk * dissection_chunk, reason) result Lwt.t
 
   (** We check firstly that [dissection] is the correct length. It must be
     [default_number_of_sections] values long, unless the distance between
@@ -349,10 +343,8 @@ module Internal_for_tests : sig
     [None] states. *)
   val check_dissection :
     default_number_of_sections:int ->
-    Sc_rollup_repr.State_hash.t option ->
-    Sc_rollup_tick_repr.t ->
-    Sc_rollup_repr.State_hash.t option ->
-    Sc_rollup_tick_repr.t ->
+    start_chunk:dissection_chunk ->
+    stop_chunk:dissection_chunk ->
     dissection_chunk list ->
     (unit, reason) result Lwt.t
 end
