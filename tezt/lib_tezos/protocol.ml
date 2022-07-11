@@ -129,11 +129,11 @@ let write_parameter_file :
 
 let next_protocol = function
   | Jakarta -> Some Kathmandu
-  | Kathmandu -> None (* To update once the migration starts from Kathmandu. *)
+  | Kathmandu -> Some Alpha
   | Alpha -> None
 
 let previous_protocol = function
-  | Alpha -> Some Jakarta (* To update once the migration starts from K. *)
+  | Alpha -> Some Kathmandu
   | Kathmandu -> Some Jakarta
   | Jakarta -> None
 
