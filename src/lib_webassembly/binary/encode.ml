@@ -1,3 +1,8 @@
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3378
+
+   This module should never be part of the PVM since it assumes lazy vectors are
+   fully loaded. *)
+
 (* Version *)
 
 let version = 1l

@@ -1902,6 +1902,9 @@ let module_step state =
            ( fts,
              fbs,
              lazy_vec_step fb' vec,
+             (* TODO: https://gitlab.com/tezos/tezos/-/issues/3387
+
+                `Free` shouldn't be part of the PVM.*)
              no_datas_in_func && Free.((func fb').datas = Set.empty) )
   | MKBuild (funcs, no_datas_in_func) ->
       let fields = state.building_state in

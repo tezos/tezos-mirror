@@ -134,7 +134,10 @@ let push (ell1, ts1) (ell2, ts2) =
 let peek i (ell, ts) = try List.nth (List.rev ts) i with Failure _ -> None
 
 let vec_to_list v =
-  (* The validation is never used in the rollup (in a context were values can be
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3378 Ensure `Valid` is never
+     used in the PVM.
+
+     The validation is never used in the rollup (in a context were values can be
      shallow), hence the vectors will be fully loaded. *)
   Stdlib.List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings v)
 

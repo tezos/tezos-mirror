@@ -88,7 +88,10 @@ let func_type_empty (FuncType (ins, out)) =
   Lazy_vector.LwtInt32Vector.num_elements ins = 0l
   && Lazy_vector.LwtInt32Vector.num_elements out = 0l
 
-(* This function should probably be tickified *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3387
+
+   This function should probably be tickified, or the check removed from the
+   evaluation. *)
 let func_types_equal (FuncType (ins, out)) (FuncType (ins', out')) =
   let open Lwt.Syntax in
   let ins_len = Lazy_vector.LwtInt32Vector.num_elements ins in
@@ -171,6 +174,11 @@ let string_of_global_type = function
   | GlobalType (t, Mutable) -> "(mut " ^ string_of_value_type t ^ ")"
 
 let string_of_result_type ts =
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3378
+
+     Ensure `string_of_*` functions are never used in the PVM, since it will be
+     wrong on partial values. It can only be used during the execution of the
+     testsuite. *)
   let ts = List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings ts) in
   "[" ^ String.concat " " (List.map string_of_value_type ts) ^ "]"
 
