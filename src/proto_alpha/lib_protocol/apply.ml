@@ -120,7 +120,6 @@ type error +=
       level : Raw_level.t;
       last_cycle : Cycle.t;
     }
-  | Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
   | Multiple_revelation
   | Failing_noop_error
   | Zero_frozen_deposits of Signature.Public_key_hash.t
@@ -685,22 +684,6 @@ let () =
       | _ -> None)
     (fun (kind, level, last_cycle) ->
       Outdated_denunciation {kind; level; last_cycle}) ;
-  register_error_kind
-    `Permanent
-    ~id:"operation.invalid_activation"
-    ~title:"Invalid activation"
-    ~description:
-      "The given key and secret do not correspond to any existing preallocated \
-       contract"
-    ~pp:(fun ppf pkh ->
-      Format.fprintf
-        ppf
-        "Invalid activation. The public key %a does not match any commitment."
-        Ed25519.Public_key_hash.pp
-        pkh)
-    Data_encoding.(obj1 (req "pkh" Ed25519.Public_key_hash.encoding))
-    (function Invalid_activation {pkh} -> Some pkh | _ -> None)
-    (fun pkh -> Invalid_activation {pkh}) ;
   register_error_kind
     `Permanent
     ~id:"block.multiple_revelation"
@@ -2971,8 +2954,6 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
         Blinded_public_key_hash.of_ed25519_pkh activation_code pkh
       in
       let src = `Collected_commitments blinded_pkh in
-      Token.allocated ctxt src >>=? fun (ctxt, src_exists) ->
-      fail_unless src_exists (Invalid_activation {pkh}) >>=? fun () ->
       let contract = Contract.Implicit (Signature.Ed25519 pkh) in
       Token.balance ctxt src >>=? fun (ctxt, amount) ->
       Token.transfer ctxt src (`Contract contract) amount

@@ -4336,6 +4336,9 @@ module Commitment : sig
     amount : Tez.tez;
   }
 
+  (** See {!Commitment_storage.exists}. *)
+  val exists : context -> Blinded_public_key_hash.t -> bool Lwt.t
+
   val encoding : t Data_encoding.t
 end
 

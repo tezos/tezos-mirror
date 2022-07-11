@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Errors that may arise while validating an anonymous operation. *)
+module Anonymous : sig
+  type error +=
+    | Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
+    | Conflicting_activation of Ed25519.Public_key_hash.t * Operation_hash.t
+end
+
 (** Errors that may arise while validating a manager operation. *)
 module Manager : sig
   type error +=

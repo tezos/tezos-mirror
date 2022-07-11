@@ -145,11 +145,35 @@ let init_info_and_state ctxt mode chain_id =
 type stamp = Operation_validated_stamp
 
 module Anonymous = struct
+  open Validate_errors.Anonymous
+
   type denunciation_kind = Preendorsement | Endorsement
 
-  let validate_activate_account _vi vs _oph
-      (Activate_account {id = _; activation_code = _}) =
-    return vs
+  let validate_activate_account vi vs oph
+      (Activate_account {id = edpkh; activation_code}) =
+    let open Lwt_result_syntax in
+    let blinded_pkh =
+      Blinded_public_key_hash.of_ed25519_pkh activation_code edpkh
+    in
+    let*? () =
+      match
+        Blinded_public_key_hash.Map.find
+          blinded_pkh
+          vs.anonymous_state.blinded_pkhs_seen
+      with
+      | None -> ok ()
+      | Some oph' -> error (Conflicting_activation (edpkh, oph'))
+    in
+    let*! exists = Commitment.exists vi.ctxt blinded_pkh in
+    let*? () = error_unless exists (Invalid_activation {pkh = edpkh}) in
+    let blinded_pkhs_seen =
+      Blinded_public_key_hash.Map.add
+        blinded_pkh
+        oph
+        vs.anonymous_state.blinded_pkhs_seen
+    in
+    return
+      {vs with anonymous_state = {vs.anonymous_state with blinded_pkhs_seen}}
 
   let validate_double_consensus ~consensus_operation:_ _vi vs _oph _op1 _op2 =
     return vs

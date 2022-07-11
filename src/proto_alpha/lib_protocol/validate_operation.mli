@@ -133,11 +133,12 @@ type stamp
 
     TODO: https://gitlab.com/tezos/tezos/-/issues/2603
 
-    This function currently does nothing for non-manager operations
-    (instead, the validity of a non-manager operation is decided by
-    calling {!Apply.apply_operation} to check whether it returns an
-    error). We should specify and implement the validation of every
-    kind of operation. *)
+    This function currently does nothing for operations other than
+    anonymous or manager operation. (instead, the validity of a
+    consensus or voting operation is decided by calling
+    {!Apply.apply_operation} to check whether it returns an error).
+    We should specify and implement the validation of every kind of
+    operation. *)
 val validate_operation :
   validate_operation_info ->
   validate_operation_state ->

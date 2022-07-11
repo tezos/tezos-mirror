@@ -25,6 +25,54 @@
 
 open Alpha_context
 
+module Anonymous = struct
+  type error +=
+    | Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
+    | Conflicting_activation of Ed25519.Public_key_hash.t * Operation_hash.t
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"validate_operation.invalid_activation"
+      ~title:"Invalid activation"
+      ~description:
+        "The given key and secret do not correspond to any existing \
+         preallocated contract."
+      ~pp:(fun ppf pkh ->
+        Format.fprintf
+          ppf
+          "Invalid activation. The public key %a and accompanying secret do \
+           not match any commitment."
+          Ed25519.Public_key_hash.pp
+          pkh)
+      Data_encoding.(obj1 (req "pkh" Ed25519.Public_key_hash.encoding))
+      (function Invalid_activation {pkh} -> Some pkh | _ -> None)
+      (fun pkh -> Invalid_activation {pkh}) ;
+    register_error_kind
+      `Branch
+      ~id:"validate_operation.conflicting_activation"
+      ~title:"Account already activated in current validation_state"
+      ~description:
+        "The account has already been activated by a previous operation in the \
+         current validation state."
+      ~pp:(fun ppf (edpkh, oph) ->
+        Format.fprintf
+          ppf
+          "Invalid activation: the account %a has already been activated in \
+           the current validation state by operation %a."
+          Ed25519.Public_key_hash.pp
+          edpkh
+          Operation_hash.pp
+          oph)
+      Data_encoding.(
+        obj2
+          (req "account_edpkh" Ed25519.Public_key_hash.encoding)
+          (req "conflicting_op_hash" Operation_hash.encoding))
+      (function
+        | Conflicting_activation (edpkh, oph) -> Some (edpkh, oph) | _ -> None)
+      (fun (edpkh, oph) -> Conflicting_activation (edpkh, oph))
+end
+
 module Manager = struct
   type error +=
     | Manager_restriction of Signature.Public_key_hash.t * Operation_hash.t
