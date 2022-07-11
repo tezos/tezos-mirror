@@ -5079,6 +5079,13 @@ let _octez_snoop =
         prbnmcn_stats;
       ]
     ~linkall:true
+    ~dune:
+      Dune.
+        [
+          S "cram"
+          :: G [S "deps" :: [S "main_snoop.exe"]]
+          :: [S "package" :: [S "tezos-snoop"]];
+        ]
 
 (* We use Dune's select statement and keep uTop optional *)
 (* Keeping uTop optional lets `make build` succeed, *)
