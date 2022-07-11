@@ -33,4 +33,4 @@ type slot = bytes
 
 type slot_header = Cryptobox.commitment
 
-let slot_header_encoding = Cryptobox.Encoding.commitment_encoding
+let slot_header_encoding = Cryptobox.commitment_encoding

@@ -30,9 +30,6 @@
    - reading a slot means rebuild it from the shards
    *)
 
-(** [slot_header_of_hex s] decodes the slot_header from an hexadecimal string *)
-val slot_header_of_hex : string -> Dal_types.slot_header tzresult
-
 (** [split_and_store ts store slot] splits [slot] in shards, stores it onto the
     disk and returns the corresponding [slot_header], using trusted setup [ts] *)
 val split_and_store :
@@ -49,6 +46,16 @@ val get_shard :
 (** [get_slot store slot_header] fetches from disk the shards associated to
     [slot_header], gathers them, rebuilds and returns the [slot]. *)
 val get_slot : Store.t -> Dal_types.slot_header -> Dal_types.slot tzresult Lwt.t
+
+module Slot_header : sig
+  type t = Cryptobox.commitment
+
+  val to_b58check : t -> string
+
+  val of_b58check_opt : string -> t option
+
+  val rpc_arg : t RPC_arg.t
+end
 
 module Utils : sig
   (** [trim_x00 b] removes trailing '\000' at the end of a [b] and returns a new

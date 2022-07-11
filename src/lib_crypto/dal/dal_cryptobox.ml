@@ -24,23 +24,7 @@
 (*****************************************************************************)
 
 open Error_monad
-
-(** Parameters of the DAL relevant to the cryptographic primitives. *)
-module type CONSTANTS = sig
-  (** Redundancy factor of the erasure code. *)
-  val redundancy_factor : int
-
-  (** Size in bytes of a slot, must be a power of two. *)
-  val slot_size : int
-
-  (** Size in bytes of a slot segment, must be a power of two. *)
-  val slot_segment_size : int
-
-  (** Each erasure-encoded slot splits evenly into the given amount of shards. *)
-  val shards_amount : int
-end
-
-module type S = Dal_cryptobox_sigs.S
+include Dal_cryptobox_sigs
 
 type srs = {
   srs_g1 : Bls12_381.G1.t array;
@@ -49,7 +33,7 @@ type srs = {
   kate_amortized_srs_g2_segments : Bls12_381.G2.t;
 }
 
-let srs ~redundancy_factor ~slot_segment_size ~shards_amount ~slot_size : srs =
+let srs ~redundancy_factor ~segment_size ~slot_size ~shards_amount : srs =
   let module Scalar = Bls12_381.Fr in
   let scalar_bytes_amount = Scalar.size_in_bytes - 1 in
   let k = 1 lsl Z.(log2up (of_int slot_size / of_int scalar_bytes_amount)) in
@@ -57,7 +41,7 @@ let srs ~redundancy_factor ~slot_segment_size ~shards_amount ~slot_size : srs =
   let shard_size = n / shards_amount in
   let evaluations_per_proof_log = Z.(log2 (of_int shard_size)) in
   let scalar_bytes_amount = Scalar.size_in_bytes - 1 in
-  let segment_len = Int.div slot_segment_size scalar_bytes_amount + 1 in
+  let segment_len = Int.div segment_size scalar_bytes_amount + 1 in
   let build_array init next len =
     let xi = ref init in
     Array.init len (fun _ ->
@@ -85,7 +69,7 @@ let srs ~redundancy_factor ~slot_segment_size ~shards_amount ~slot_size : srs =
       Array.get srs_g2 (1 lsl Z.(log2up (of_int segment_len)));
   }
 
-module Make (C : CONSTANTS) : S = struct
+module Make (C : CONSTANTS) = struct
   open Kate_amortized
 
   (* Scalars are elements of the prime field Fr from BLS. *)
@@ -102,28 +86,31 @@ module Make (C : CONSTANTS) : S = struct
 
   type nonrec srs = srs
 
+  type slot = bytes
+
+  type scalar = Scalar.t
+
   type polynomial = Polynomials.t
 
   type commitment = Kate_amortized.commitment
 
-  type proof_shard = Kate_amortized.proof
+  type shard_proof = Kate_amortized.proof
 
-  type proof_degree = Bls12_381.G1.t
+  type commitment_proof = Bls12_381.G1.t
 
-  type proof_single = Bls12_381.G1.t
+  type _proof_single = Bls12_381.G1.t
 
-  type proof_slot_segment = Bls12_381.G1.t
+  type segment_proof = Bls12_381.G1.t
 
-  type slot_segment = int * bytes
+  type segment = {index : int; content : bytes}
 
   type share = Scalar.t array
 
-  type shards_map = share IntMap.t
+  type _shards_map = share IntMap.t
 
-  type shard = int * share
+  type shard = {index : int; share : share}
 
-  type shards_proofs_precomputation =
-    Scalar.t array * proof_slot_segment array array
+  type shards_proofs_precomputation = Scalar.t array * segment_proof array array
 
   type trusted_setup_files = {
     srs_g1_file : string;
@@ -136,23 +123,36 @@ module Make (C : CONSTANTS) : S = struct
 
     let fr_encoding = conv Bls12_381.Fr.to_bytes Bls12_381.Fr.of_bytes_exn bytes
 
+    (* FIXME https://gitlab.com/tezos/tezos/-/issues/3391
+
+       The commitment is not bounded. *)
     let g1_encoding =
       conv
         Bls12_381.G1.to_compressed_bytes
         Bls12_381.G1.of_compressed_bytes_exn
         bytes
 
+    let commitment_to_bytes = Bls12_381.G1.to_bytes
+
+    let commitment_of_bytes_opt = Bls12_381.G1.of_bytes_opt
+
     let commitment_encoding = g1_encoding
 
-    let proof_shards_encoding = g1_encoding
+    let _proof_shards_encoding = g1_encoding
 
-    let proof_degree_encoding = g1_encoding
+    let commitment_proof_encoding = g1_encoding
 
-    let proof_single_encoding = g1_encoding
+    let _proof_single_encoding = g1_encoding
+
+    let segment_proof_encoding = g1_encoding
 
     let share_encoding = array fr_encoding
 
-    let shard_encoding = tup2 int31 share_encoding
+    let shard_encoding =
+      conv
+        (fun {index; share} -> (index, share))
+        (fun (index, share) -> {index; share})
+        (tup2 int31 share_encoding)
 
     let shards_encoding =
       conv
@@ -164,6 +164,8 @@ module Make (C : CONSTANTS) : S = struct
       tup2 (array fr_encoding) (array (array g1_encoding))
   end
 
+  include Encoding
+
   (* Number of bytes fitting in a Scalar.t. Since scalars are integer modulo
      r~2^255, we restrict ourselves to 248-bit integers (31 bytes). *)
   let scalar_bytes_amount = Scalar.size_in_bytes - 1
@@ -173,7 +175,7 @@ module Make (C : CONSTANTS) : S = struct
 
   let n = C.redundancy_factor * k
 
-  let erasure_encoding_length = n
+  let _erasure_encoding_length = n
 
   (* Memoize intermediate domains for the FFTs. *)
   let intermediate_domains : Evaluations.domain IntMap.t ref = ref IntMap.empty
@@ -193,11 +195,11 @@ module Make (C : CONSTANTS) : S = struct
   let shard_size = C.(n / shards_amount)
 
   (* Number of slot segments. *)
-  let nb_segments = C.(slot_size / slot_segment_size)
+  let nb_segments = C.(slot_size / segment_size)
 
-  let segment_len = Int.div C.slot_segment_size scalar_bytes_amount + 1
+  let segment_len = Int.div C.segment_size scalar_bytes_amount + 1
 
-  let remaining_bytes = C.slot_segment_size mod scalar_bytes_amount
+  let remaining_bytes = C.segment_size mod scalar_bytes_amount
 
   (* Log of the number of evaluations that constitute an erasure encoded
      polynomial. *)
@@ -219,7 +221,7 @@ module Make (C : CONSTANTS) : S = struct
     (* According to the specification the lengths of a slot a slot segment are
        in MiB *)
     assert (is_pow_of_two C.slot_size) ;
-    assert (is_pow_of_two C.slot_segment_size) ;
+    assert (is_pow_of_two C.segment_size) ;
 
     assert (is_pow_of_two n) ;
 
@@ -340,9 +342,9 @@ module Make (C : CONSTANTS) : S = struct
     in
     poly_mul_aux ps
 
-  (* We encode by segments of [slot_segment_size] bytes each.
-     The segments are arranged in cosets to evaluate in batch with Kate
-       amortized. *)
+  (* We encode by segments of [segment_size] bytes each.  The segments
+     are arranged in cosets to evaluate in batch with Kate
+     amortized. *)
   let polynomial_from_bytes' slot =
     if Bytes.length slot <> C.slot_size then
       Error
@@ -368,7 +370,7 @@ module Make (C : CONSTANTS) : S = struct
       done ;
       Ok res
 
-  let polynomial_from_bytes slot =
+  let polynomial_from_slot slot =
     let open Result_syntax in
     let* data = polynomial_from_bytes' slot in
     Ok (Evaluations.interpolation_fft2 domain_k data)
@@ -412,7 +414,7 @@ module Make (C : CONSTANTS) : S = struct
 
   (* The shards are arranged in cosets to evaluate in batch with Kate
      amortized. *)
-  let to_shards p =
+  let shards_from_polynomial p =
     let codeword = encode p in
     let len_shard = n / C.shards_amount in
     let rec loop i map =
@@ -460,7 +462,7 @@ module Make (C : CONSTANTS) : S = struct
     in
     Ok n_poly
 
-  let from_shards shards =
+  let polynomial_from_shards shards =
     if k > IntMap.cardinal shards * shard_size then
       Error
         (`Not_enough_shards
@@ -557,23 +559,22 @@ module Make (C : CONSTANTS) : S = struct
      using the commitments for p and p X^{d-n}, and computing the commitment for
      X^{d-n} on G_2.*)
 
-  let prove_degree trusted_setup p n =
-    let d = k - 1 in
+  let prove_commitment trusted_setup p =
     commit'
       (module Bls12_381.G1)
-      (Polynomials.mul
-         (Polynomials.of_coefficients [(Scalar.(copy one), d - n)])
-         p)
+      (Polynomials.mul (Polynomials.of_coefficients [(Scalar.(copy one), 0)]) p)
       trusted_setup.srs_g1
 
-  let verify_degree trusted_setup cm proof n =
+  (* FIXME https://gitlab.com/tezos/tezos/-/issues/3389
+
+     Generalize this function to pass the degree in parameter. *)
+  let verify_commitment trusted_setup cm proof =
     let open Result_syntax in
     let open Bls12_381 in
-    let d = k - 1 in
     let* commit_xk =
       commit'
         (module G2)
-        (Polynomials.of_coefficients [(Scalar.(copy one), d - n)])
+        (Polynomials.of_coefficients [(Scalar.(copy one), 0)])
         trusted_setup.srs_g2
     in
     Ok
@@ -590,7 +591,7 @@ module Make (C : CONSTANTS) : S = struct
     in
     (eval_to_array eval, m)
 
-  let save_precompute_shards_proofs (preprocess : shards_proofs_precomputation)
+  let _save_precompute_shards_proofs (preprocess : shards_proofs_precomputation)
       filename =
     let chan = Out_channel.open_bin filename in
     Out_channel.output_bytes
@@ -600,7 +601,7 @@ module Make (C : CONSTANTS) : S = struct
          preprocess) ;
     Out_channel.close_noerr chan
 
-  let load_precompute_shards_proofs filename =
+  let _load_precompute_shards_proofs filename =
     let chan = In_channel.open_bin filename in
     let len = Int64.to_int (In_channel.length chan) in
     let data = Bytes.create len in
@@ -613,7 +614,8 @@ module Make (C : CONSTANTS) : S = struct
     In_channel.close_noerr chan ;
     precomp
 
-  let prove_shards p ~preprocess =
+  let prove_shards srs p =
+    let preprocess = precompute_shards_proofs srs in
     Kate_amortized.multiple_multi_reveals
       ~chunk_len:evaluations_per_proof_log
       ~chunk_count:proofs_log
@@ -621,7 +623,8 @@ module Make (C : CONSTANTS) : S = struct
       ~preprocess
       (Polynomials.to_dense_coefficients p |> Array.to_list)
 
-  let verify_shard trusted_setup cm (shard_index, shard_evaluations) proof =
+  let verify_shard trusted_setup cm
+      {index = shard_index; share = shard_evaluations} proof =
     let d_n = Kate_amortized.Domain.build ~log:evaluations_log in
     let domain = Kate_amortized.Domain.build ~log:evaluations_per_proof_log in
     Kate_amortized.verify
@@ -631,7 +634,7 @@ module Make (C : CONSTANTS) : S = struct
       (Kate_amortized.Domain.get d_n shard_index, shard_evaluations)
       proof
 
-  let prove_single trusted_setup p z =
+  let _prove_single trusted_setup p z =
     let q =
       fst
       @@ Polynomials.(
@@ -639,7 +642,7 @@ module Make (C : CONSTANTS) : S = struct
     in
     commit' (module Bls12_381.G1) q trusted_setup.srs_g1
 
-  let verify_single trusted_setup cm ~point ~evaluation proof =
+  let _verify_single trusted_setup cm ~point ~evaluation proof =
     let h_secret = Array.get trusted_setup.srs_g2 1 in
     Bls12_381.(
       Pairing.pairing_check
@@ -667,15 +670,15 @@ module Make (C : CONSTANTS) : S = struct
     (* p(x) * 1/(x^l - z) mod x^{k - l + 1} = q(x) since deg q <= k - l. *)
     fft_mul domain_2k [p; div] |> Polynomials.copy ~len:(k - l + 1)
 
-  let prove_slot_segment trusted_setup p slot_segment_index =
-    if slot_segment_index < 0 || slot_segment_index >= nb_segments then
-      Error `Slot_segment_index_out_of_range
+  let prove_segment trusted_setup p segment_index =
+    if segment_index < 0 || segment_index >= nb_segments then
+      Error `Segment_index_out_of_range
     else
       let l = 1 lsl Z.(log2up (of_int segment_len)) in
-      let wi = Domains.get domain_k slot_segment_index in
+      let wi = Domains.get domain_k segment_index in
       let domain = Domains.build ~log:Z.(log2up (of_int segment_len)) in
       let eval_p = Evaluations.(evaluation_fft domain_k p |> to_array) in
-      let eval_coset = eval_coset_array eval_p slot_segment_index in
+      let eval_coset = eval_coset_array eval_p segment_index in
       let remainder =
         Kate_amortized.interpolation_h_poly wi domain eval_coset
         |> Array.of_list |> Polynomials.of_dense
@@ -690,8 +693,8 @@ module Make (C : CONSTANTS) : S = struct
 
   (* Parses the [slot_segment] to get the evaluations that it contains. The
      evaluation points are given by the [slot_segment_index]. *)
-  let verify_slot_segment trusted_setup cm (slot_segment_index, slot_segment)
-      proof =
+  let verify_segment trusted_setup cm
+      {index = slot_segment_index; content = slot_segment} proof =
     if slot_segment_index < 0 || slot_segment_index >= nb_segments then
       Error `Slot_segment_index_out_of_range
     else
@@ -730,3 +733,6 @@ module Make (C : CONSTANTS) : S = struct
            (Domains.get domain_k slot_segment_index, slot_segment_evaluations)
            proof)
 end
+
+module Verifier (C : CONSTANTS) = Make (C)
+module Builder (C : CONSTANTS) = Make (C)

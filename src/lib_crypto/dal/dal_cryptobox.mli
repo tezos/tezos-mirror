@@ -23,21 +23,54 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Parameters of the DAL relevant to the cryptographic primitives. *)
-module type CONSTANTS = sig
-  (** Redundancy factor of the erasure code. *)
-  val redundancy_factor : int
+open Dal_cryptobox_sigs
 
-  (** Size in bytes of a slot, must be a power of two. *)
-  val slot_size : int
+(** Because of the shell/protocol separation, cryptographic primitives
+   need to be splitted. An interface, called the {!module:Verifier}
+   aims to be provided for the economic protocol. The other interface,
+   called the {!module:Builder} is for the shell.
 
-  (** Size in bytes of a slot segment, must be a power of two. *)
-  val slot_segment_size : int
+    A [Verifier], has hinted by the name, mainly needs to check
+   proofs:
 
-  (** Each erasure-encoded slot splits evenly into the given amount of shards. *)
-  val shards_amount : int
+    1. A proof that a commitment is valid
+
+    2. A proof that a segment is valid
+
+   A technicality is that the economic protocol is able to configure
+   those cryptographic primitives via several constants.  Also, an SRS
+   (aka trusted setup) is required.
+
+   It is the responsibility of the shell and the protocol to ensure
+   that both the [Verifier] and the [Builder] as instantiated with the
+   same parameters and use the same trusted setup. *)
+
+module Verifier : functor (C : CONSTANTS) -> sig
+  include SRS
+
+  include COMMITMENT with type srs := srs
+
+  include SEGMENT with type commitment := commitment and type srs := srs
 end
 
-module type S = Dal_cryptobox_sigs.S
+module Builder (C : CONSTANTS) : sig
+  include module type of Verifier (C)
 
-module Make (C : CONSTANTS) : S
+  include POLYNOMIAL with type srs := srs and type commitment := commitment
+
+  include
+    SHARD
+      with type srs := srs
+       and type polynomial := polynomial
+       and type commitment := commitment
+       and module IntMap := IntMap
+
+  include
+    PROOF
+      with type srs := srs
+       and type commitment := commitment
+       and type polynomial := polynomial
+       and type commitment_proof := commitment_proof
+       and type segment_proof := segment_proof
+       and type shard_proof := shard_proof
+end

@@ -27,7 +27,7 @@ open Tezos_crypto_dal
 module Constants = struct
   let redundancy_factor = 2
 
-  let slot_segment_size = 4096
+  let segment_size = 4096
 
   let slot_size = 1048576 (* 1Mb *)
 
@@ -36,7 +36,7 @@ module Constants = struct
   let trusted_setup_logarithm_size = 21
 end
 
-include Dal_cryptobox.Make (Constants)
+include Dal_cryptobox.Builder (Constants)
 
 exception Trusted_setup_not_found of string list
 
@@ -73,4 +73,4 @@ let () =
 
 let srs =
   let open Constants in
-  srs ~redundancy_factor ~slot_segment_size ~shards_amount ~slot_size
+  srs ~redundancy_factor ~segment_size ~shards_amount ~slot_size
