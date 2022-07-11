@@ -1311,6 +1311,84 @@ let commitments_messages_reset _protocol sc_rollup_node sc_rollup _node client =
          Option.map (fun (_hash, c2, _level) -> (c1, c2)) stored_commitment) ;
   check_published_commitment_in_l1 sc_rollup client published_commitment
 
+let commitment_stored_robust_to_failures _protocol sc_rollup_node sc_rollup node
+    client =
+  (* This test uses two rollup nodes for the same rollup, tracking the same L1 node.
+     Both nodes process heads from the L1. However, the second node is stopped
+     one level before publishing a commitment, and then is restarted.
+     We should not observe any difference in the commitments stored by the
+     two rollup nodes.
+  *)
+  let* genesis_info =
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
+  in
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
+
+  let* levels_to_commitment =
+    get_sc_rollup_commitment_period_in_blocks client
+  in
+  let bootstrap2_key = Constant.bootstrap2.public_key_hash in
+  let* client' = Client.init ?endpoint:(Some (Node node)) () in
+  let sc_rollup_node' =
+    Sc_rollup_node.create node client' ~operator_pkh:bootstrap2_key
+  in
+  let* _configuration_filename =
+    Sc_rollup_node.config_init sc_rollup_node' sc_rollup
+  in
+  let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
+  let sc_rollup_client' = Sc_rollup_client.create sc_rollup_node' in
+  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = Sc_rollup_node.run sc_rollup_node' in
+  let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
+  Check.(level = init_level)
+    Check.int
+    ~error_msg:"Current level has moved past origination level (%L = %R)" ;
+  let* () =
+    (* at init_level + i we publish i messages, therefore at level
+       init_level + i a total of 1+..+i = (i*(i+1))/2 messages will have been
+       sent.
+    *)
+    send_messages levels_to_commitment sc_rollup client
+  in
+  (* The line below works as long as we have a block finality time which is strictly positive,
+     which is a safe assumption. *)
+  let* () = bake_levels (block_finality_time - 1) client in
+  let* level_before_storing_commitment =
+    Sc_rollup_node.wait_for_level
+      sc_rollup_node
+      (init_level + levels_to_commitment + block_finality_time - 1)
+  in
+  let* _ =
+    Sc_rollup_node.wait_for_level
+      sc_rollup_node'
+      level_before_storing_commitment
+  in
+  let* () = Sc_rollup_node.terminate sc_rollup_node' in
+  let* () = Sc_rollup_node.run sc_rollup_node' in
+  let* () = Client.bake_for_and_wait client in
+  let* () = Sc_rollup_node.terminate sc_rollup_node' in
+  let* () = Client.bake_for_and_wait client in
+  let* () = Sc_rollup_node.run sc_rollup_node' in
+  let* level_commitment_is_stored =
+    Sc_rollup_node.wait_for_level
+      sc_rollup_node
+      (level_before_storing_commitment + 1)
+  in
+  let* _ =
+    Sc_rollup_node.wait_for_level sc_rollup_node' level_commitment_is_stored
+  in
+  let* stored_commitment =
+    Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client
+  in
+  let* stored_commitment' =
+    Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client'
+  in
+  Option.iter (fun (c1, c2) -> check_eq_commitment c1 c2)
+  @@ Option.bind stored_commitment' (fun (_hash, c1, _level) ->
+         Option.map (fun (_, c2, _level) -> (c1, c2)) stored_commitment) ;
+  return ()
+
 let commitments_reorgs protocol sc_rollup_node sc_rollup node client =
   (* No messages are published after origination, for
      `sc_rollup_commitment_period_in_blocks - 1` levels. Then a divergence
@@ -2115,6 +2193,10 @@ let register ~protocols =
   test_rollup_node_boots_into_initial_state protocols ;
   test_rollup_node_advances_pvm_state protocols ;
   test_commitment_scenario "commitment_is_stored" commitment_stored protocols ;
+  test_commitment_scenario
+    "robust_to_failures"
+    commitment_stored_robust_to_failures
+    protocols ;
   test_commitment_scenario
     ~commitment_period:15
     ~challenge_window:10080
