@@ -61,9 +61,8 @@ let dir =
 
 let dir =
   register_dynamic_directory1 dir prefix_dir1 (fun _ ->
-      let prefixed_dir = empty in
       let prefixed_dir =
-        register2 prefixed_dir minus_service (fun i j () () ->
+        register2 empty minus_service (fun i j () () ->
             Lwt.return (`Ok (i -. float_of_int j)))
       in
       Lwt.return prefixed_dir)

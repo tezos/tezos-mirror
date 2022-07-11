@@ -95,6 +95,7 @@ module Make (Encoding : ENCODING) = struct
     | CService of meth
     | CDir
     | CBuilder
+    | CDynDescr of string * string
     | CTail
     | CTypes of Arg.descr * Arg.descr
     | CType of Arg.descr * string list
@@ -229,8 +230,41 @@ module Make (Encoding : ENCODING) = struct
     | Empty, t -> t
     | t, Empty -> t
     | Static l, Static r -> Static (merge_static_directory strategy path l r)
+    | Dynamic (l_desc, l_builder), Dynamic (r_desc, r_builder) ->
+        let sub_desc, sub_dir =
+          merge_dynamic_directories
+            strategy
+            path
+            l_desc
+            l_builder
+            r_desc
+            r_builder
+        in
+        Dynamic (sub_desc, sub_dir)
+    | DynamicTail (argl, subtl), DynamicTail (argr, subtr) -> (
+        try
+          let Eq = Ty.eq argl.id argr.id in
+          let subt =
+            merge_loop strategy (DynamicTail argl.descr :: path) subtl subtr
+          in
+          DynamicTail (argl, subt)
+        with Ty.Not_equal -> conflict path (CTypes (argl.descr, argr.descr)))
     | Dynamic _, _ | _, Dynamic _ -> conflict path CBuilder
     | DynamicTail _, _ | _, DynamicTail _ -> conflict path CTail
+
+  and select_using_strategy :
+      type p.
+      [`Raise | `Pick_left | `Pick_right] ->
+      step list ->
+      conflict ->
+      p ->
+      p ->
+      p option =
+   fun strategy path cfct left right ->
+    match strategy with
+    | `Raise -> conflict path cfct
+    | `Pick_right -> Some right
+    | `Pick_left -> Some left
 
   and merge_static_directory :
       type p.
@@ -277,15 +311,36 @@ module Make (Encoding : ENCODING) = struct
     in
     let services =
       MethMap.union
-        (fun meth left right ->
-          match strategy with
-          | `Raise -> conflict path (CService meth)
-          | `Pick_right -> Some right
-          | `Pick_left -> Some left)
+        (fun meth -> select_using_strategy strategy path @@ CService meth)
         left.services
         right.services
     in
     {subdirs; services}
+
+  and merge_dynamic_directories :
+      type p.
+      [`Raise | `Pick_left | `Pick_right] ->
+      step list ->
+      string option ->
+      (p -> p directory Lwt.t) ->
+      string option ->
+      (p -> p directory Lwt.t) ->
+      string option * (p -> p directory Lwt.t) =
+   fun strategy path left_desc left_builder right_desc right_builder ->
+    let merged_description =
+      match (left_desc, right_desc) with
+      | Some l, Some r ->
+          select_using_strategy strategy path (CDynDescr (l, r)) l r
+      | Some l, None -> Some l
+      | None, Some r -> Some r
+      | None, None -> None
+    in
+    let merged_subdirs key =
+      left_builder key >>= fun left_subdir ->
+      right_builder key >>= fun right_subdir ->
+      Lwt.return @@ merge_loop strategy path left_subdir right_subdir
+    in
+    (merged_description, merged_subdirs)
 
   let merge ?(strategy = `Raise) left right = merge_loop strategy [] left right
 
@@ -822,31 +877,36 @@ module Make (Encoding : ENCODING) = struct
 
   let string_of_step : step -> string = function
     | Static s -> s
-    | Dynamic arg -> Format.sprintf "<%s>" arg.name
-    | DynamicTail arg -> Format.sprintf "<%s...>" arg.name
+    | Dynamic arg -> Printf.sprintf "<%s>" arg.name
+    | DynamicTail arg -> Printf.sprintf "<%s...>" arg.name
 
   let string_of_conflict_kind = function
     | CDir -> "Directory conflict"
     | CBuilder -> "Builder conflict"
+    | CDynDescr (l, r) ->
+        Printf.sprintf
+          "Conflict between dynamic directories description %s and %s"
+          l
+          r
     | CTail -> "Tail conflict"
     | CService meth ->
-        Format.sprintf
+        Printf.sprintf
           "Service conflict for method %s"
           (Resto.string_of_meth meth)
     | CTypes (arg1, arg2) ->
-        Format.sprintf
+        Printf.sprintf
           "Type conflict between arguments: found type %s but type %s was \
            expected"
           arg2.name
           arg1.name
     | CType (arg, names) ->
-        Format.sprintf
+        Printf.sprintf
           "Type conflict for %s with argument %s"
           (String.concat ", " names)
           arg.name
 
   let string_of_conflict (steps, kind) =
-    Format.sprintf
+    Printf.sprintf
       "%s in /%s"
       (string_of_conflict_kind kind)
       (String.concat "/" @@ List.map string_of_step steps)

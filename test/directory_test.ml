@@ -36,6 +36,8 @@ let traverse = function
       Lwt.return @@ Ok r
   | Error _ as err -> Lwt.return err
 
+let get_or_else f = function Ok i -> i | Error err -> f err
+
 module Resolve_uri_desc = struct
   let uri_desc_res_testable =
     let meth_pp fmt m = Fmt.pf fmt "%s" @@ Resto.string_of_meth m in
@@ -157,72 +159,140 @@ module Merge = struct
 
   let dir5 = Resto.Path.(dir3 / "dir5")
 
-  let s1 =
+  let dir6 = Resto.Path.(open_root / "dir6" /:* Resto.Arg.int)
+
+  let dyn1 = Resto.Path.(root / "dyn1" /: Resto.Arg.int)
+
+  let get_service =
     Service.get_service
       ~query:Resto.Query.empty
       ~output:Json_encoding.int
       ~error:Json_encoding.empty
-      dir2
 
-  let s2 =
-    Service.get_service
-      ~query:Resto.Query.empty
-      ~output:Json_encoding.int
-      ~error:Json_encoding.empty
-      dir1
+  let open_root_service = get_service Resto.Path.open_root
 
-  let s3 =
-    Service.get_service
-      ~query:Resto.Query.empty
-      ~output:Json_encoding.int
-      ~error:Json_encoding.empty
-      dir5
+  let s1 = get_service dir2
 
-  let s4 =
-    Service.get_service
-      ~query:Resto.Query.empty
-      ~output:Json_encoding.int
-      ~error:Json_encoding.empty
-      dir4
+  let s2 = get_service dir1
 
-  let register v services =
-    let do_register directory service =
-      Directory.register0 directory service (fun () () -> Lwt.return @@ `Ok v)
-    in
-    List.fold_left do_register Directory.empty services
+  let s3 = get_service dir5
+
+  let s4 = get_service dir4
+
+  let s5 = open_root_service
+
+  let s6 = open_root_service
+
+  let s7 = open_root_service
+
+  let s8 = get_service dir6
+
+  let int_handler v () () = Lwt.return @@ `Ok v
+
+  let register_list registration = List.fold_left registration Directory.empty
+
+  let register0 v service directory =
+    Directory.register0 directory service @@ int_handler v
+
+  let register1 v service directory =
+    Directory.register1 directory service @@ fun _ -> int_handler v
+
+  let register2 v service directory =
+    Directory.register2 directory service @@ fun _ _ -> int_handler v
+
+  let register0_list v = register_list (fun d s -> register0 v s d)
+
+  (* root
+      ├── dir1
+      │   ├── dir3
+      │   │   └── dir5
+      │   │       └── s3 ----> 0
+      │   └── s2 ------------> 0
+      ├── dir2
+      │   └── s1 ------------> 0
+      └── dyn1
+          ├── <0>
+          │    └── s5 -------> 0
+          └── <2>
+               └── s7 -------> 0 *)
+  let left_dir =
+    let v = 0 in
+    let d = register0_list v [s1; s2; s3] in
+    Directory.register_dynamic_directory1 d dyn1 (function
+        | 0 -> Lwt.return @@ register1 v s5 Directory.empty
+        | 2 -> Lwt.return @@ register1 v s7 Directory.empty
+        | _ -> Lwt.return @@ Directory.empty)
 
   (* root
      ├── dir1
      │   ├── dir3
      │   │   └── dir5
-     │   │       └── s3 ----> 0
-     │   └── s2 ------------> 0
-     └── dir2
-         └── s1 ------------> 0 *)
-  let left_dir = register 0 [s1; s2; s3]
+     │   │       └── s3 ----> 1
+     │   ├── dir4
+     │   │   └── s4 --------> 1
+     │   └── s2 ------------> 1
+     └── dyn1
+         ├── <1>
+         │    └── s6 -------> 1
+         └── <2>
+              ├── dir6
+              │   └── <_>*
+              │        └── s8 ---> 1
+              └── s7 -------> 1 *)
+  let right_dir =
+    let v = 1 in
+    let d = register0_list v [s2; s3; s4] in
+    Directory.register_dynamic_directory1 d dyn1 (function
+        | 1 -> Lwt.return @@ register1 v s6 Directory.empty
+        | 2 -> register1 v s7 Directory.empty |> register2 v s8 |> Lwt.return
+        | _ -> Lwt.return @@ Directory.empty)
 
-  (* root
-     └── dir1
-         ├── dir3
-         │   └── dir5
-         │       └── s3 ----> 1
-         ├── dir4
-         │   └── s4 --------> 1
-         └── s2 ------------> 1 *)
-  let right_dir = register 1 [s2; s3; s4]
+  let path_of_service s =
+    let {Service.uri; _} = Service.forge_request s () () in
+    uri
 
-  let check_call_result dir service expd msg =
-    let* answer = Directory.transparent_lookup dir service () () () in
-    let res =
-      match answer with
-      | `Ok i -> i
-      | _ ->
+  let request dir uri =
+    let string_uri = Uri.to_string uri in
+    let path = Resto.Utils.decode_split_path @@ Uri.path uri in
+    let* service = Directory.lookup dir () `GET path in
+    let (Directory.Service s) =
+      get_or_else
+        (fun _ ->
           Alcotest.fail
-            (Format.sprintf
-               "The query for service %s must be successful by precondition."
-               msg)
+            (Printf.sprintf "Could not locate the service %s" string_uri))
+        service
     in
-    Lwt.return @@ Alcotest.(check int) msg expd res
+    let query = Resto.Query.parse s.types.query [] in
+    let* answer =
+      match s.types.input with
+      | Service.No_input -> s.handler query ()
+      | Service.Input input ->
+          s.handler query (Json_encoding.destruct input (`O []))
+    in
+    match answer with
+    | `Ok a ->
+        let encoded_output = Json_encoding.construct s.types.output a in
+        let decoded_output =
+          try Json_encoding.(destruct int encoded_output)
+          with _ ->
+            Alcotest.fail
+              (Printf.sprintf
+                 "The output for sercive %s could not be deserialized as an int"
+                 string_uri)
+        in
+        Lwt.return decoded_output
+    | _ ->
+        Alcotest.fail
+          (Printf.sprintf
+             "The query for service %s must be successful by precondition."
+             string_uri)
+
+  let check_call_results dir =
+    let do_check (path, msg, expd) =
+      let* answer = request dir path in
+      Lwt.return @@ Alcotest.(check int) msg expd answer
+    in
+    Lwt_list.iter_s do_check
 
   let check_raises f =
     match f () with
@@ -237,38 +307,78 @@ module Merge = struct
              ├── dir1
              │   ├── dir3
              │   │   └── dir5
-             │   │       └── s3 ----> 0 (Already existing in left)
+             │   │       └── s3 --------> 0 (Already existing in left)
              │   ├── dir4
-             │   │   └── s4 --------> 1 (Added from right)
-             │   └── s2 ------------> 0 (Already existing in left)
-             └── dir2
-                 └── s1 ------------> 0 (Already existing in left) *)
+             │   │   └── s4 ------------> 1 (Added from right)
+             │   └── s2 ----------------> 0 (Already existing in left)
+             ├── dir2
+             │   └── s1 ----------------> 0 (Already existing in left)
+             └── dyn1
+                 ├── <0>
+                 │    └── s5 ------------> 0 (Already existing in left)
+                 ├── <1>
+                 │    └── s6 ------------> 1 (Added from right)
+                 └── <2>
+                      ├── dir6
+                      │   └── <_>*
+                      │        └── s8 ---> 1 (Added from right)
+                      └── s7 ------------> 0 (Already existing in left) *)
           let merged =
             Directory.merge ~strategy:`Pick_left left_dir right_dir
           in
-          let* () = check_call_result merged s1 0 "s1" in
-          let* () = check_call_result merged s2 0 "s2" in
-          let* () = check_call_result merged s3 0 "s3" in
-          check_call_result merged s4 1 "s4" );
+          let grid =
+            [
+              (path_of_service s1, "s1", 0);
+              (path_of_service s2, "s2", 0);
+              (path_of_service s3, "s3", 0);
+              (path_of_service s4, "s4", 1);
+              (Uri.of_string "/dyn1/0", "s5", 0);
+              (Uri.of_string "/dyn1/1", "s6", 1);
+              (Uri.of_string "/dyn1/2", "s7", 0);
+              (Uri.of_string "/dyn1/2/dir6", "s8", 1);
+              (Uri.of_string "/dyn1/2/dir6/1/2/3/4", "s8*", 1);
+            ]
+          in
+          check_call_results merged grid );
       ( "succeed to pick right",
         fun () ->
           (* root
              ├── dir1
              │   ├── dir3
              │   │   └── dir5
-             │   │       └── s3 ----> 1 (Already existing in right)
+             │   │       └── s3 ---------> 1 (Already existing in right)
              │   ├── dir4
-             │   │   └── s4 --------> 1 (Already existing in right)
-             │   └── s2 ------------> 1 (Already existing in right)
-             └── dir2
-                 └── s1 ------------> 0 (Added from left) *)
+             │   │   └── s4 -------------> 1 (Already existing in right)
+             │   └── s2 -----------------> 1 (Already existing in right)
+             ├── dir2
+             │   └── s1 -----------------> 0 (Added from left)
+             └── dyn1
+                 ├── <0>
+                 │    └── s5 ------------> 0 (Added from left)
+                 ├── <1>
+                 │    └── s6 ------------> 1 (Already existing in right)
+                 └── <2>
+                      ├── dir6
+                      │   └── <_>*
+                      │        └── s8 ---> 1 (Added from right)
+                      └── s7 ------------> 1 (Already existing in right) *)
           let merged =
             Directory.merge ~strategy:`Pick_right left_dir right_dir
           in
-          let* () = check_call_result merged s1 0 "s1" in
-          let* () = check_call_result merged s2 1 "s2" in
-          let* () = check_call_result merged s3 1 "s3" in
-          check_call_result merged s4 1 "s4" );
+          let grid =
+            [
+              (path_of_service s1, "s1", 0);
+              (path_of_service s2, "s2", 1);
+              (path_of_service s3, "s3", 1);
+              (path_of_service s4, "s4", 1);
+              (Uri.of_string "/dyn1/0", "s5", 0);
+              (Uri.of_string "/dyn1/1", "s6", 1);
+              (Uri.of_string "/dyn1/2", "s7", 1);
+              (Uri.of_string "/dyn1/2/dir6", "s8", 1);
+              (Uri.of_string "/dyn1/2/dir6/1/2/3/4", "s8*", 1);
+            ]
+          in
+          check_call_results merged grid );
       ( "fail with Conflict exception when requiring `Raise",
         fun () ->
           check_raises @@ fun () ->

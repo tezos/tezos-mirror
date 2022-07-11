@@ -81,14 +81,32 @@ module Make (Encoding : ENCODING) : sig
         (** The remainder of the chunks are to be interpreted
             as a list of arguments *)
 
-  (** Possible error while registring services. *)
+  (** Possible kind of conflictual error that can occur while
+      registering services into a directory or while merging
+      directories. *)
   type conflict =
     | CService of meth
+        (** A collision with a service that has been already
+            defined for the given method at the certain path. *)
     | CDir
+        (** An incompatibility with the directory at a
+            certain path. *)
     | CBuilder
+        (** A collision with the builder part of another
+            dynamic directory of a certain path. *)
+    | CDynDescr of string * string
+        (** A collision between the descriptions of two given
+            dynamic directories. *)
     | CTail
+        (** A collision with another dynamic tail directory
+            of a certain path. *)
     | CTypes of Arg.descr * Arg.descr
+        (** A typing incompatibility with an URI parameter
+            of a certain type when another parameter type
+            was expected. *)
     | CType of Arg.descr * string list
+        (** A typing impompatibility with an URI parameter
+            with the given subdirectories. *)
 
   exception Conflict of step list * conflict
 
@@ -185,26 +203,44 @@ module Make (Encoding : ENCODING) : sig
   (** [merge ~strategy d1 d2] is a directory which includes all the
       services of [d1] and [d2].
 
-      If one or more service from [d1] collides with one or more service from [d2],
-      the function will make a choice depending on the given merging [strategy]:
-      - [`Raise] will raise a [Conflict] exception. {b This is the default choice.}
-      - [`Pick_left] will pick the service from [d1] to be part of the resulting
-        directory.
-      - [`Pick_right] will pick the service from [d2] to be part of the resulting
-        directory.
+      It is possible to merge both static and dynamic trees.
+      - In case of static trees, the resulting merge will occur in a eager way
+        at function call.
+      - In case of dynamic trees and because of their nature, the resulting merging
+        directory can't however be computed directly: We don't know the subtree of
+        such a tree before resolving it whith a proper argument [key] and thus don't
+        have a way to merge it directly at function call.
+        In such a case, the merging computation will be delayed at resolving time.
+        This may not be a problem in most cases. But {b merging directories containing
+        a lot of nested dynamic directories should still be avoided} as it may impact
+        queries performances.
 
-      Be careful, this function is only capable to merge static directory trees.
-      If a subtree of one of the given directory is dynamic, the function will
-      raise a [Conflict] exception.
+      As a few elements that constitutes a directory tree are not mergeable,
+      it may be possible to come upon a collision case during a merge. Unmergeable
+      elements are:
+      - Services
+      - Dynamic directories description.
+
+      If one or more of these elements from [d1] collides with one or more element
+      from [d2], the function will make a choice depending on the given merging
+      [strategy]:
+      - [`Raise] will raise a [Conflict] exception. {b This is the default choice.}
+      - [`Pick_left] will pick the element from [d1] to be part of the resulting
+        directory.
+      - [`Pick_right] will pick the element from [d2] to be part of the resulting
+        directory.
 
       @raise [Conflict] if:
-      - One or more service from [d1] collides with one or more service from [d2]
-        and the merging [strategy] is [`Raise] or unspecified.
-      - A [Dynamic] or [DynamicTail] directory can be found in [d1] or [d2] directories.
+      - One or more unmergeable element from [d1] collides with one or more unmergeable
+        element from [d2] and the merging [strategy] is [`Raise] or unspecified.
       - Sub-directories can't be merged because of a structural conflict. For instance,
         if a [path] leads from [d1] to a sub-directory [d1'] that is an URI parameter, but
         [path] also leads from [d2] to a sub-directory [d2'] that is only a static segment
-        of the URI. *)
+        of the URI.
+      - Sub-directories can't be merged because of a typing conflict. For instance, if a
+        [path] leads from [d1] to a sub-directory [d1'] that is an URI parameter of type
+        [int], but [path], also leads from [d2] to a sub-directory [d2'] that is an URI
+        parameter of type [float].  *)
   val merge :
     ?strategy:[`Raise | `Pick_left | `Pick_right] ->
     'a directory ->
