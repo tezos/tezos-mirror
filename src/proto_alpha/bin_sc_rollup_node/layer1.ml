@@ -89,6 +89,10 @@ let head_encoding =
       (obj2 (req "hash" Block_hash.encoding) (req "level" Data_encoding.int32)))
 
 module State = struct
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3433
+     Check what the actual value of `reorganization_window_length`
+     should be, and if we want to make it configurable.
+  *)
   let reorganization_window_length = 10
 
   module Store = struct
@@ -149,6 +153,14 @@ module State = struct
 
       let value_encoding = head_encoding
     end)
+
+    module Heads_seen_but_not_finalized = Store.Make_mutable_value (struct
+      let path = ["heads"; "not_finalized"]
+
+      type value = head list
+
+      let value_encoding = Data_encoding.list head_encoding
+    end)
   end
 
   let last_seen_head = Store.Head.find
@@ -177,6 +189,14 @@ module State = struct
   let hash_of_level = Store.Levels.get
 
   let set_hash_of_level = Store.Levels.add
+
+  let set_heads_not_finalized store heads =
+    Store.Heads_seen_but_not_finalized.set store heads
+
+  let get_heads_not_finalized store =
+    let open Lwt_syntax in
+    let+ heads_opt = Store.Heads_seen_but_not_finalized.find store in
+    Option.value ~default:[] heads_opt
 end
 
 type blocks_cache =
@@ -448,6 +468,10 @@ let last_processed_head_hash store =
   let open Lwt_syntax in
   let+ info = State.last_processed_head store in
   Option.map (fun (Head {hash; _}) -> hash) info
+
+let set_heads_not_finalized = State.set_heads_not_finalized
+
+let get_heads_not_finalized = State.get_heads_not_finalized
 
 (* We forget about the last seen heads that are not processed so that
    the rollup node can process them when restarted. Notice that this
