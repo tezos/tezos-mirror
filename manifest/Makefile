@@ -5,11 +5,11 @@ SOURCE=JSON_AST.ml JSON_parser.mli JSON_parser.ml JSON_lexer.ml tezos_protocol.m
 
 .PHONY: all
 all: manifest
-	./manifest
+	(cd .. && manifest/manifest)
 
 _build/JSON_parser.ml _build/JSON_parser.mli: _build/JSON_parser.mly
 	ocamlyacc $^
-	
+
 _build/JSON_lexer.ml: _build/JSON_lexer.mll
 	ocamllex $^
 
