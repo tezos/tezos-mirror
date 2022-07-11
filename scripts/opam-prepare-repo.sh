@@ -72,9 +72,9 @@ else
 fi
 
 log "Generating opam files for $version..."
-cd "$script_dir"/../manifest
-make manifest
-./manifest \
+cd "$script_dir"/..
+make -C manifest manifest
+./manifest/manifest \
     --packages-dir "$opam_dir/packages" \
     --url "$tarball" \
     --sha256 "$sha256" \

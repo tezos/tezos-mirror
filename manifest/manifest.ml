@@ -1705,12 +1705,8 @@ let rec create_parent path =
     if not (Sys.file_exists parent) then Sys.mkdir parent 0o755)
 
 let write_raw filename f =
-  let real_filename =
-    if Filename.is_relative filename then Filename.parent_dir_name // filename
-    else filename
-  in
-  create_parent real_filename ;
-  let outch = open_out real_filename in
+  create_parent filename ;
+  let outch = open_out filename in
   let fmt = Format.formatter_of_out_channel outch in
   match f fmt with
   | exception exn ->
@@ -2425,9 +2421,10 @@ let generate_workspace env dune =
   Format.fprintf fmt "; This file was automatically generated, do not edit.@." ;
   Format.fprintf fmt "; Edit file manifest/manifest.ml instead.@."
 
-let find_opam_and_dune_files dir =
-  let rec loop prefix acc dir =
-    let dir_contents = Sys.readdir (prefix // dir) in
+let find_opam_and_dune_files =
+  let root = "." in
+  let rec loop acc dir =
+    let dir_contents = Sys.readdir (root // dir) in
     let add_item acc filename =
       let full_filename = dir // filename in
       if
@@ -2438,14 +2435,14 @@ let find_opam_and_dune_files dir =
       then String_set.add full_filename acc
       else if filename.[0] = '.' || filename.[0] = '_' then acc
       else if
-        try Sys.is_directory (prefix // dir // filename)
+        try Sys.is_directory (root // dir // filename)
         with Sys_error _ -> false
-      then loop prefix acc full_filename
+      then loop acc full_filename
       else acc
     in
     Array.fold_left add_item acc dir_contents
   in
-  loop ".." String_set.empty dir
+  loop String_set.empty
 
 let check_for_non_generated_files ~remove_extra_files
     ?(exclude = fun _ -> false) () =
@@ -2467,7 +2464,7 @@ let check_for_non_generated_files ~remove_extra_files
     (fun file ->
       if remove_extra_files then (
         info "%s: exists but was not generated, removing it.\n%!" file ;
-        Sys.remove (Filename.concat ".." file))
+        Sys.remove file)
       else error "%s: exists but was not generated\n%!" file)
     error_not_generated ;
   if
@@ -2892,3 +2889,12 @@ include Target
 let name_for_errors = function
   | None -> "(no target)"
   | Some target -> name_for_errors target
+
+let () =
+  if
+    Sys.file_exists "dune-project"
+    && Sys.file_exists ".git" && Sys.is_directory ".git"
+  then ()
+  else (
+    Printf.eprintf "The manifest should be run from the root of the repo\n" ;
+    exit 1)

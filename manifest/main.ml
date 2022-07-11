@@ -52,7 +52,7 @@ let sf = Printf.sprintf
 module String_set = Set.Make (String)
 
 let final_protocol_versions =
-  let path = "../src/lib_protocol_compiler/final_protocol_versions" in
+  let path = "src/lib_protocol_compiler/final_protocol_versions" in
   let ic = open_in path in
   let rec loop acc =
     try
@@ -3395,7 +3395,7 @@ end = struct
       let name_dash = Name.name_dash name in
       let number = Name.number name in
       let path = Name.base_path name in
-      let dirname = ".." // path // "lib_protocol" in
+      let dirname = path // "lib_protocol" in
       let tezos_protocol_filename = dirname // "TEZOS_PROTOCOL" in
       let tezos_protocol = Tezos_protocol.of_file_exn tezos_protocol_filename in
       let modules_as_deps =
@@ -4778,7 +4778,7 @@ let _get_contracts =
       (fun proto ->
         let proto_version = Protocol.name_underscore proto in
         let name = "get_contracts_" ^ proto_version in
-        let main_module = mk_path [".."; path; name ^ ".ml"] in
+        let main_module = mk_path [path; name ^ ".ml"] in
         match (Protocol.status proto, Protocol.client proto) with
         | Active, Some client ->
             let main = Protocol.main proto in
@@ -4786,7 +4786,7 @@ let _get_contracts =
               ignore @@ Sys.command
               @@ Format.sprintf
                    "cp %s %s"
-                   (mk_path [".."; path; "get_contracts_alpha.ml"])
+                   (mk_path [path; "get_contracts_alpha.ml"])
                    main_module ;
             Some
               (private_exe
