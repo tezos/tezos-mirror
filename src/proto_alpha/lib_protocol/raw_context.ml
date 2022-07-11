@@ -827,7 +827,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
       };
   }
 
-type previous_protocol = Genesis of Parameters_repr.t | Jakarta_013
+type previous_protocol = Genesis of Parameters_repr.t | Kathmandu_014
 
 let check_and_update_protocol_version ctxt =
   (Context.find ctxt version_key >>= function
@@ -839,7 +839,8 @@ let check_and_update_protocol_version ctxt =
          failwith "Internal error: previously initialized context."
        else if Compare.String.(s = "genesis") then
          get_proto_param ctxt >|=? fun (param, ctxt) -> (Genesis param, ctxt)
-       else if Compare.String.(s = "jakarta_013") then return (Jakarta_013, ctxt)
+       else if Compare.String.(s = "kathmandu_014") then
+         return (Kathmandu_014, ctxt)
        else Lwt.return @@ storage_error (Incompatible_protocol_version s))
   >>=? fun (previous_proto, ctxt) ->
   Context.add ctxt version_key (Bytes.of_string version_value) >|= fun ctxt ->
@@ -890,8 +891,29 @@ let prepare_first_block ~level ~timestamp ctxt =
       Level_repr.create_cycle_eras [cycle_era] >>?= fun cycle_eras ->
       set_cycle_eras ctxt cycle_eras >>=? fun ctxt ->
       add_constants ctxt param.constants >|= ok
-  | Jakarta_013 ->
+  | Kathmandu_014 ->
       get_previous_protocol_constants ctxt >>= fun c ->
+      let tx_rollup =
+        Constants_parametric_repr.
+          {
+            enable = c.tx_rollup.enable;
+            origination_size = c.tx_rollup.origination_size;
+            hard_size_limit_per_inbox = c.tx_rollup.hard_size_limit_per_inbox;
+            hard_size_limit_per_message =
+              c.tx_rollup.hard_size_limit_per_message;
+            max_withdrawals_per_batch = c.tx_rollup.max_withdrawals_per_batch;
+            max_ticket_payload_size = c.tx_rollup.max_ticket_payload_size;
+            commitment_bond = c.tx_rollup.commitment_bond;
+            finality_period = c.tx_rollup.finality_period;
+            withdraw_period = c.tx_rollup.withdraw_period;
+            max_inboxes_count = c.tx_rollup.max_inboxes_count;
+            max_messages_per_inbox = c.tx_rollup.max_messages_per_inbox;
+            max_commitments_count = c.tx_rollup.max_commitments_count;
+            cost_per_byte_ema_factor = c.tx_rollup.cost_per_byte_ema_factor;
+            rejection_max_proof_size = c.tx_rollup.rejection_max_proof_size;
+            sunset_level = c.tx_rollup.sunset_level;
+          }
+      in
       let dal =
         Constants_parametric_repr.
           {
@@ -902,24 +924,52 @@ let prepare_first_block ~level ~timestamp ctxt =
             availability_threshold = 50;
           }
       in
+      let sc_rollup =
+        Constants_parametric_repr.
+          {
+            enable = false;
+            origination_size = c.sc_rollup.origination_size;
+            challenge_window_in_blocks = 20_160;
+            (* The following value is chosen to limit the maximal
+               length of an inbox refutation proof. *)
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2373
+               check this is reasonable. *)
+            max_number_of_messages_per_commitment_period = 32_765;
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
+               The following constants need to be refined. *)
+            stake_amount = Tez_repr.of_mutez_exn 10_000_000_000L;
+            commitment_period_in_blocks = 30;
+            max_lookahead_in_blocks = 30_000l;
+            (* Number of active levels kept for executing outbox messages.
+               WARNING: Changing this value impacts the storage charge for
+               applying messages from the outbox. It also requires migration for
+               remapping existing active outbox levels to new indices. *)
+            max_active_outbox_levels = 20_160l;
+            (* Maximum number of outbox messages per level.
+               WARNING: changing this value impacts the storage cost charged
+               for applying messages from the outbox. *)
+            max_outbox_messages_per_level = 100;
+            (* The default number of required sections in a dissection *)
+            number_of_sections_in_dissection = 32;
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2902
+               This constant needs to be refined. *)
+            timeout_period_in_blocks = 20_160;
+          }
+      in
       let constants =
         Constants_parametric_repr.
           {
             preserved_cycles = c.preserved_cycles;
             blocks_per_cycle = c.blocks_per_cycle;
             blocks_per_commitment = c.blocks_per_commitment;
-            nonce_revelation_threshold =
-              (if Compare.Int32.(256l < c.blocks_per_cycle) then 256l
-              else (* not on mainnet *) Int32.div c.blocks_per_cycle 2l);
+            nonce_revelation_threshold = c.nonce_revelation_threshold;
             blocks_per_stake_snapshot = c.blocks_per_stake_snapshot;
             cycles_per_voting_period = c.cycles_per_voting_period;
             hard_gas_limit_per_operation = c.hard_gas_limit_per_operation;
             hard_gas_limit_per_block = c.hard_gas_limit_per_block;
             proof_of_work_threshold = c.proof_of_work_threshold;
             tokens_per_roll = c.tokens_per_roll;
-            vdf_difficulty =
-              (if Compare.Int32.(256l < c.blocks_per_cycle) then 8_000_000_000L
-              else (* not on mainnet *) 50_000L);
+            vdf_difficulty = c.vdf_difficulty;
             seed_nonce_revelation_tip = c.seed_nonce_revelation_tip;
             origination_size = c.origination_size;
             max_operations_time_to_live = c.max_operations_time_to_live;
@@ -947,63 +997,14 @@ let prepare_first_block ~level ~timestamp ctxt =
             ratio_of_frozen_deposits_slashed_per_double_endorsement =
               c.ratio_of_frozen_deposits_slashed_per_double_endorsement;
             (* The `testnet_dictator` should absolutely be None on mainnet *)
-            testnet_dictator = None;
+            testnet_dictator = c.testnet_dictator;
             initial_seed = c.initial_seed;
             cache_script_size = c.cache_script_size;
             cache_stake_distribution_cycles = c.cache_stake_distribution_cycles;
             cache_sampler_state_cycles = c.cache_sampler_state_cycles;
-            tx_rollup =
-              {
-                enable = c.tx_rollup_enable;
-                origination_size = c.tx_rollup_origination_size;
-                hard_size_limit_per_inbox =
-                  c.tx_rollup_hard_size_limit_per_inbox;
-                hard_size_limit_per_message =
-                  c.tx_rollup_hard_size_limit_per_message;
-                max_withdrawals_per_batch =
-                  c.tx_rollup_max_withdrawals_per_batch;
-                max_ticket_payload_size = c.tx_rollup_max_ticket_payload_size;
-                commitment_bond = c.tx_rollup_commitment_bond;
-                finality_period = c.tx_rollup_finality_period;
-                withdraw_period = c.tx_rollup_withdraw_period;
-                max_inboxes_count = c.tx_rollup_max_inboxes_count;
-                max_messages_per_inbox = c.tx_rollup_max_messages_per_inbox;
-                max_commitments_count = c.tx_rollup_max_commitments_count;
-                cost_per_byte_ema_factor = c.tx_rollup_cost_per_byte_ema_factor;
-                rejection_max_proof_size = c.tx_rollup_rejection_max_proof_size;
-                sunset_level = c.tx_rollup_sunset_level;
-              };
+            tx_rollup;
             dal;
-            sc_rollup =
-              {
-                enable = false;
-                origination_size = c.sc_rollup_origination_size;
-                challenge_window_in_blocks = 20_160;
-                (* The following value is chosen to limit the maximal
-                   length of an inbox refutation proof. *)
-                (* TODO: https://gitlab.com/tezos/tezos/-/issues/2373
-                   check this is reasonable. *)
-                max_number_of_messages_per_commitment_period = 32_765;
-                (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
-                   The following constants need to be refined. *)
-                stake_amount = Tez_repr.of_mutez_exn 10_000_000_000L;
-                commitment_period_in_blocks = 30;
-                max_lookahead_in_blocks = 30_000l;
-                (* Number of active levels kept for executing outbox messages.
-                   WARNING: Changing this value impacts the storage charge for
-                   applying messages from the outbox. It also requires migration for
-                   remapping existing active outbox levels to new indices. *)
-                max_active_outbox_levels = 20_160l;
-                (* Maximum number of outbox messages per level.
-                   WARNING: changing this value impacts the storage cost charged
-                   for applying messages from the outbox. *)
-                max_outbox_messages_per_level = 100;
-                (* The default number of required sections in a dissection *)
-                number_of_sections_in_dissection = 32;
-                (* TODO: https://gitlab.com/tezos/tezos/-/issues/2902
-                   This constant needs to be refined. *)
-                timeout_period_in_blocks = 20_160;
-              };
+            sc_rollup;
           }
       in
       add_constants ctxt constants >>= fun ctxt -> return ctxt)
