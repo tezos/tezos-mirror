@@ -40,13 +40,12 @@ let preamble_warning =
     ()
 
 let configuration_was_written =
-  declare_2
+  declare_1
     ~section
     ~name:"tx_rollup_node_configuration_written"
     ~msg:"configuration written in {file}"
     ~level:Notice
     ("file", Data_encoding.string)
-    ("config", Node_config.encoding)
 
 let starting_node =
   declare_0

@@ -204,9 +204,10 @@ let config_from_args data_dir rollup_id mode operator batch_signer
     finalize_commitment_signer remove_commitment_signer rejection_signer
     dispatch_withdrawals_signer origination_level rpc_addr cors_origins
     cors_headers allow_deposit reconnection_delay =
-  let data_dir =
+  let open Lwt_syntax in
+  let+ data_dir =
     match data_dir with
-    | Some d -> d
+    | Some d -> return d
     | None -> Node_config.default_data_dir rollup_id
   in
   let rpc_addr = Option.value rpc_addr ~default:Node_config.default_rpc_addr in
@@ -351,7 +352,7 @@ let configuration_init_command =
          cctxt ->
       let open Lwt_result_syntax in
       let*! () = Event.(emit preamble_warning) () in
-      let config =
+      let*! config =
         config_from_args
           data_dir
           rollup_id
@@ -374,7 +375,7 @@ let configuration_init_command =
       (* This is necessary because the node has not yet been launched, so event
          listening can't be used. *)
       let*! () = cctxt#message "Configuration written in %s" file in
-      let*! () = Event.(emit configuration_was_written) (file, config) in
+      let*! () = Event.(emit configuration_was_written) file in
       return_unit)
 
 let run_command =
@@ -420,7 +421,7 @@ let run_command =
          rollup_id
          cctxt ->
       let*! () = Event.(emit preamble_warning) () in
-      let config_from_args =
+      let*! config_from_args =
         config_from_args
           data_dir
           rollup_id
