@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Wasm_pvm_sig
+
+let chunk_size = 4_000
+
 exception Malformed_origination_message of Data_encoding.Binary.read_error
 
 exception Malformed_inbox_message of Data_encoding.Binary.read_error
@@ -35,6 +39,58 @@ exception Encoding_error of Data_encoding.Binary.write_error
 
 exception Malformed_input_info_record
 
+type internal_status = Gathering_floppies | Not_gathering_floppies
+
+let internal_status_encoding =
+  Data_encoding.string_enum
+    [
+      ("GatheringFloppies", Gathering_floppies);
+      ("NotGatheringFloppies", Not_gathering_floppies);
+    ]
+
+(* An at most 4,096-byte fragment of a kernel. *)
+type chunk = bytes
+
+let chunk_encoding = Data_encoding.Bounded.bytes chunk_size
+
+type floppy = {chunk : chunk; signature : Tezos_crypto.Signature.t}
+
+let floppy_encoding =
+  Data_encoding.(
+    conv
+      (fun {chunk; signature} -> (chunk, signature))
+      (fun (chunk, signature) -> {chunk; signature})
+      (obj2
+         (req "chunk" chunk_encoding)
+         (req "signature" Tezos_crypto.Signature.encoding)))
+
+(* Encoding for message in "boot sector" *)
+type origination_message =
+  | Complete_kernel of bytes
+  | Incomplete_kernel of chunk * Tezos_crypto.Signature.Public_key.t
+
+let origination_message_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"complete"
+        (Tag 0)
+        (obj1 @@ req "complete_kernel" bytes)
+        (function Complete_kernel s -> Some s | _ -> None)
+        (fun s -> Complete_kernel s);
+      case
+        ~title:"incomplete"
+        (Tag 1)
+        (obj2
+           (req "first_chunk" chunk_encoding)
+           (req "public_key" Tezos_crypto.Signature.Public_key.encoding))
+        (function Incomplete_kernel (s, pk) -> Some (s, pk) | _ -> None)
+        (fun (s, pk) -> Incomplete_kernel (s, pk));
+    ]
+
+(* STORAGE KEYS *)
+
 module Make (T : Tree.S) (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
   Wasm_pvm_sig.S with type tree = T.tree = struct
   type tree = Wasm.tree
@@ -43,73 +99,8 @@ module Make (T : Tree.S) (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
 
   module Thunk = Thunk.Make (T)
   module Decoding = Tree_decoding.Make (T)
-  open Wasm_pvm_sig
 
   (* TYPES *)
-
-  type internal_status = Gathering_floppies | Not_gathering_floppies
-
-  let internal_status_encoding =
-    Data_encoding.string_enum
-      [
-        ("GatheringFloppies", Gathering_floppies);
-        ("NotGatheringFloppies", Not_gathering_floppies);
-      ]
-
-  (* An at most 4,096-byte fragment of a kernel. *)
-  type chunk = bytes
-
-  let chunk_encoding = Data_encoding.Bounded.bytes 4_096
-
-  type floppy = {chunk : chunk; signature : Tezos_crypto.Signature.t}
-
-  let floppy_encoding =
-    Data_encoding.(
-      conv
-        (fun {chunk; signature} -> (chunk, signature))
-        (fun (chunk, signature) -> {chunk; signature})
-        (obj2
-           (req "chunk" chunk_encoding)
-           (req "signature" Tezos_crypto.Signature.encoding)))
-
-  (* Encoding for message in "boot sector" *)
-  type origination_message =
-    | Complete_kernel of bytes
-    | Incomplete_kernel of chunk * Tezos_crypto.Signature.Public_key.t
-
-  let boot_sector_encoding =
-    let open Data_encoding in
-    union
-      [
-        case
-          ~title:"complete"
-          (Tag 0)
-          (obj1 @@ req "complete_kernel" chunk_encoding)
-          (function Complete_kernel s -> Some s | _ -> None)
-          (fun s -> Complete_kernel s);
-        case
-          ~title:"incomplete"
-          (Tag 1)
-          (obj2
-             (req "first_chunk" chunk_encoding)
-             (req "public_key" Tezos_crypto.Signature.Public_key.encoding))
-          (function Incomplete_kernel (s, pk) -> Some (s, pk) | _ -> None)
-          (fun (s, pk) -> Incomplete_kernel (s, pk));
-      ]
-
-  let input_encoding =
-    let open Data_encoding in
-    conv
-      (fun {inbox_level; message_counter} ->
-        ( Tezos_base.Bounded.Int32.NonNegative.to_int32 inbox_level,
-          message_counter ))
-      (fun (inbox_level, message_counter) ->
-        match Tezos_base.Bounded.Int32.NonNegative.of_int32 inbox_level with
-        | Some v -> {inbox_level = v; message_counter}
-        | None -> raise Malformed_input_info_record)
-      (tup2 int32 z)
-
-  (* STORAGE KEYS *)
 
   type state =
     (internal_status value * Tezos_crypto.Signature.Public_key.t value)
@@ -131,7 +122,7 @@ module Make (T : Tree.S) (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
             (req "public-key"
             @@ encoding Tezos_crypto.Signature.Public_key.encoding)))
       (req "boot-sector" @@ encoding Data_encoding.string)
-      (req "last-input-info" @@ encoding input_encoding)
+      (req "last-input-info" @@ encoding input_info_encoding)
       (req "internal-loading-kernel-tick" @@ encoding Data_encoding.n)
       (req "durable"
       @@ folders ["kernel"; "boot.wasm"]
@@ -175,12 +166,12 @@ module Make (T : Tree.S) (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
       let len = Bytes.length bytes in
       let* chunks = state ^-> chunks_l in
       if len = 0 then return ()
-      else if len < 4_096 then
+      else if len < chunk_size then
         let* _ = Thunk.Lazy_list.cons chunks bytes in
         return ()
       else
-        let chunk = Bytes.sub bytes 0 4_096 in
-        let rst = Bytes.sub bytes 4_096 (len - 4_096) in
+        let chunk = Bytes.sub bytes 0 chunk_size in
+        let rst = Bytes.sub bytes chunk_size (len - chunk_size) in
         let* _ = Thunk.Lazy_list.cons chunks chunk in
         aux rst
     in
@@ -209,14 +200,16 @@ module Make (T : Tree.S) (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
     let* () = increment_ticks state in
     let*^ boot_sector = state ^-> boot_sector_l in
     let boot_sector =
-      Data_encoding.Binary.of_string_opt boot_sector_encoding boot_sector
+      Data_encoding.Binary.of_string_opt
+        origination_message_encoding
+        boot_sector
     in
     match boot_sector with
     | Some (Complete_kernel kernel) ->
         let* () = store_bytes state kernel in
         (state ^-> status_l) ^:= Not_gathering_floppies
-    | Some (Incomplete_kernel (chunk, _boot_pk)) when Bytes.length chunk = 4_096
-      ->
+    | Some (Incomplete_kernel (chunk, _boot_pk))
+      when Bytes.length chunk < chunk_size ->
         (* Despite claiming the boot sector is not a complete kernel,
            it is not large enough to fill a chunk. *)
         let* () = store_chunk state chunk in
@@ -237,16 +230,23 @@ module Make (T : Tree.S) (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
     let open Thunk.Syntax in
     let* () = (state ^-> last_input_info_l) ^:= input in
     let* () = increment_ticks state in
-    match Data_encoding.Binary.of_string floppy_encoding message with
+    (* TODO: check that the first byte of [message] is 0x01 (External). *)
+    match
+      Data_encoding.Binary.read
+        floppy_encoding
+        message
+        1
+        (String.length message - 1)
+    with
     | Error error -> raise (Malformed_inbox_message error)
-    | Ok {chunk; signature} ->
+    | Ok (_, {chunk; signature}) ->
         let* check = check_signature chunk signature state in
         if check then
           let* () =
             if 0 < Bytes.length chunk then store_chunk state chunk
             else return ()
           in
-          if Bytes.length chunk < 4_096 then
+          if Bytes.length chunk < chunk_size then
             (state ^-> status_l) ^:= Not_gathering_floppies
           else return ()
         else return ()

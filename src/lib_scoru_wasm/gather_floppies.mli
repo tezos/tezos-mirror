@@ -47,6 +47,29 @@ exception Encoding_error of Data_encoding.Binary.write_error
     gets overwritten with something malformed. *)
 exception Malformed_input_info_record
 
+(** The instrumented PVM is either in a pre-boot state
+    ([Gathering_floppies]), or in its regular functioning state
+    ([Not_gathering_floppies]). *)
+type internal_status = Gathering_floppies | Not_gathering_floppies
+
+val internal_status_encoding : internal_status Data_encoding.t
+
+type chunk = bytes
+
+val chunk_size : int
+
+val chunk_encoding : chunk Data_encoding.t
+
+type floppy = {chunk : chunk; signature : Tezos_crypto.Signature.t}
+
+val floppy_encoding : floppy Data_encoding.t
+
+type origination_message =
+  | Complete_kernel of chunk
+  | Incomplete_kernel of chunk * Tezos_crypto.Signature.Public_key.t
+
+val origination_message_encoding : origination_message Data_encoding.t
+
 (** [Make] encapsulates a WASM PVM to give it the ability to load a kernel
     image as either a complete kernel in the origination message or a kernel
     image divided into chunks and provided via both origination- and inbox-

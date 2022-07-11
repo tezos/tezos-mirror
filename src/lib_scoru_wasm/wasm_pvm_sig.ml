@@ -76,3 +76,14 @@ module type S = sig
       raise. *)
   val get_info : tree -> info Lwt.t
 end
+
+(* Encodings *)
+
+let input_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun {inbox_level; message_counter} -> (inbox_level, message_counter))
+    (fun (inbox_level, message_counter) -> {inbox_level; message_counter})
+    (obj2
+       (req "inbox_level" Tezos_base.Bounded.Int32.NonNegative.encoding)
+       (req "message_counter" n))
