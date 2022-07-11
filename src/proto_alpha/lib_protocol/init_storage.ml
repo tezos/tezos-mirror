@@ -25,31 +25,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(*
-  To add invoices, you can use a helper function like this one:
+(** Invoice a contract at a given address with a given amount. Returns the
+    updated context and a  balance update receipt (singleton list). The address
+    must be a valid base58 hash, otherwise this is no-op and returns an empty
+    receipts list.
 
-  (** Invoice a contract at a given address with a given amount. Returns the
-      updated context and a  balance update receipt (singleton list). The address
-      must be a valid base58 hash, otherwise this is no-op and returns an empty
-      receipts list.
-
-      Do not fail if something goes wrong.
-  *)
-  let invoice_contract ctxt ~address ~amount_mutez =
-    match Tez_repr.of_mutez amount_mutez with
-    | None -> Lwt.return (ctxt, [])
-    | Some amount -> (
-        ( Contract_repr.of_b58check address >>?= fun recipient ->
-          Token.transfer
-            ~origin:Protocol_migration
-            ctxt
-            `Invoice
-            (`Contract recipient)
-            amount )
-        >|= function
-        | Ok res -> res
-        | Error _ -> (ctxt, []))
+    Do not fail if something goes wrong.
 *)
+let invoice_contract ctxt ~address ~amount_mutez =
+  match Tez_repr.of_mutez amount_mutez with
+  | None -> Lwt.return (ctxt, [])
+  | Some amount -> (
+      ( Contract_repr.of_b58check address >>?= fun recipient ->
+        Token.transfer
+          ~origin:Protocol_migration
+          ctxt
+          `Invoice
+          (`Contract recipient)
+          amount )
+      >|= function
+      | Ok res -> res
+      | Error _ -> (ctxt, []))
 
 (*
   To patch code of legacy contracts you can add a helper function here and call
@@ -147,7 +143,11 @@ let prepare_first_block chain_id ctxt ~typecheck ~level ~timestamp =
       Storage.Tenderbake.First_level_of_protocol.update ctxt level
       >>=? fun ctxt ->
       Patch_dictator_for_ghostnet.patch_constant chain_id ctxt >>= fun ctxt ->
-      return (ctxt, []))
+      invoice_contract
+        ctxt
+        ~address:"tz1X81bCXPtMiHu1d4UZF4GPhMPkvkp56ssb"
+        ~amount_mutez:3_000_000_000L
+      >>= fun (ctxt, balance_updates) -> return (ctxt, balance_updates))
   >>=? fun (ctxt, balance_updates) ->
   Receipt_repr.group_balance_updates balance_updates >>?= fun balance_updates ->
   Storage.Pending_migration.Balance_updates.add ctxt balance_updates
