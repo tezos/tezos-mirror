@@ -194,6 +194,8 @@ module V1 : sig
 
   val player_equal : player -> player -> bool
 
+  val player_encoding : player Data_encoding.t
+
   val pp : Format.formatter -> t -> unit
 end
 

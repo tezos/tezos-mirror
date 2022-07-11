@@ -1909,6 +1909,25 @@ module Sc_rollup = struct
         ~query
         ~output
         RPC_path.(path /: Sc_rollup.Address.rpc_arg / "conflicts")
+
+    let timeout_reached =
+      let query =
+        let open RPC_query in
+        query (fun x y ->
+            Sc_rollup.Staker.(of_b58check_exn x, of_b58check_exn y))
+        |+ field "staker1" RPC_arg.string "" (fun (x, _) ->
+               Format.asprintf "%a" Sc_rollup.Staker.pp x)
+        |+ field "staker2" RPC_arg.string "" (fun (_, x) ->
+               Format.asprintf "%a" Sc_rollup.Staker.pp x)
+        |> seal
+      in
+      let output = Data_encoding.option Sc_rollup.Game.player_encoding in
+      RPC_service.get_service
+        ~description:
+          "Returns whether the timeout is reached for the current player."
+        ~query
+        ~output
+        RPC_path.(path /: Sc_rollup.Address.rpc_arg / "timeout_reached")
   end
 
   let kind ctxt block sc_rollup_address =
@@ -2011,6 +2030,18 @@ module Sc_rollup = struct
           rollup
           staker)
 
+  let register_timeout_reached () =
+    Registration.register1
+      ~chunked:false
+      S.timeout_reached
+      (fun context rollup (staker1, staker2) () ->
+        let open Lwt_tzresult_syntax in
+        let index = Sc_rollup.Game.Index.make staker1 staker2 in
+        let*! res = Sc_rollup.Refutation_storage.timeout context rollup index in
+        match res with
+        | Ok (outcome, _context) -> return_some outcome.loser
+        | Error _ -> return_none)
+
   let register () =
     register_kind () ;
     register_inbox () ;
@@ -2022,7 +2053,8 @@ module Sc_rollup = struct
     register_dal_slot_subscriptions () ;
     register_root () ;
     register_ongoing_refutation_game () ;
-    register_conflicts ()
+    register_conflicts () ;
+    register_timeout_reached ()
 
   let list ctxt block = RPC_context.make_call0 S.root ctxt block () ()
 
@@ -2061,6 +2093,15 @@ module Sc_rollup = struct
 
   let conflicts ctxt block sc_rollup_address staker =
     RPC_context.make_call1 S.conflicts ctxt block sc_rollup_address staker
+
+  let timeout_reached ctxt block sc_rollup_address staker1 staker2 =
+    RPC_context.make_call1
+      S.timeout_reached
+      ctxt
+      block
+      sc_rollup_address
+      staker1
+      staker2
 end
 
 module Tx_rollup = struct

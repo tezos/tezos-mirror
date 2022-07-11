@@ -3324,6 +3324,8 @@ module Sc_rollup : sig
 
     val player_equal : player -> player -> bool
 
+    val player_encoding : player Data_encoding.t
+
     type dissection_chunk = {state_hash : State_hash.t option; tick : Tick.t}
 
     type t = {

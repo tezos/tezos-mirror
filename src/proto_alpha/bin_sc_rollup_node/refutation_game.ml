@@ -287,13 +287,34 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     in
     return_unit
 
-  let play node_ctxt store (game, players) =
+  let timeout_reached head_block node_ctxt players =
     let open Lwt_result_syntax in
-    match turn node_ctxt game players with
+    let Node_context.{rollup_address; cctxt; _} = node_ctxt in
+    let* res =
+      Plugin.RPC.Sc_rollup.timeout_reached
+        cctxt
+        (cctxt#chain, head_block)
+        rollup_address
+        players
+        ()
+    in
+    let open Sc_rollup.Game in
+    let index = Index.make (fst players) (snd players) in
+    let node_player = node_role node_ctxt index in
+    match res with
+    | Some player when not (player_equal node_player player) -> return_true
+    | None -> return_false
+    | Some _myself -> return_false
+
+  let play head_block node_ctxt store game staker1 staker2 =
+    let open Lwt_result_syntax in
+    let players = (staker1, staker2) in
+    let index = Sc_rollup.Game.Index.make staker1 staker2 in
+    match turn node_ctxt game index with
     | Our_turn {opponent} -> play_next_move node_ctxt store game opponent
-    | Their_turn -> (
-        let*! res = try_timeout node_ctxt players in
-        match res with Ok _ -> return_unit | Error _ -> return_unit)
+    | Their_turn ->
+        let* timeout_reached = timeout_reached head_block node_ctxt players in
+        unless timeout_reached @@ fun () -> try_timeout node_ctxt index
 
   let ongoing_game head_block node_ctxt =
     let Node_context.{rollup_address; cctxt; operator; _} = node_ctxt in
