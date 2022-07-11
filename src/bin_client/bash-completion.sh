@@ -50,3 +50,4 @@ complete -F _tezos-client_complete tezos-client
 complete -F _tezos-client_complete tezos-admin-client
 complete -F _tezos-client_complete tezos-baker-alpha
 complete -F _tezos-client_complete tezos-accuser-alpha
+complete -F _tezos-client_complete tezos-snoop
