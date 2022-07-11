@@ -14,6 +14,7 @@
 	-open Tezos_base__TzPervasives
 	-open Tezos_stdlib_unix
 	-open Tezos_client_base_unix
+	-open Tezos_shell_services
   -open Tezos_rpc_http
   -open Tezos_rpc_http_server
 	-open Teztale_lib)))

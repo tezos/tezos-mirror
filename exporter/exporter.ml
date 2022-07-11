@@ -311,10 +311,12 @@ let anomalies level ops =
     ops
     []
 
-let data_at_level db level =
+let data_at_level db ctxt level =
   let blocks = select_blocks db level in
   let delegate_operations = select_ops db level |> translate_ops in
-  let unaccurate = (* FIXME: we should check the node's head *) false in
-  Data.{blocks; delegate_operations; unaccurate}
+  let open Lwt_result_syntax in
+  let* header = Shell_services.Blocks.Header.shell_header ctxt () in
+  let unaccurate = level >= Int32.to_int header.level in
+  return Data.{blocks; delegate_operations; unaccurate}
 
 let anomalies_at_level db level = select_ops db level |> anomalies level

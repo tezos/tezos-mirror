@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val data_at_level : Sqlite3.db -> int -> Data.t
+val data_at_level :
+  Sqlite3.db -> #RPC_context.simple -> int -> Data.t tzresult Lwt.t
 
 val anomalies_at_level : Sqlite3.db -> int -> Data.Anomaly.t list

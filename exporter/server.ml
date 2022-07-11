@@ -66,12 +66,11 @@ module Services = struct
 end
 
 module RPC_server = struct
-  let register_data_at_level db dir =
+  let register_data_at_level db ctxt dir =
     RPC_directory.register
       dir
       (Services.data_at_level ())
-      (fun (_, level) () () ->
-        Exporter.data_at_level db level |> Lwt_result_syntax.return)
+      (fun (_, level) () () -> Exporter.data_at_level db ctxt level)
 
   let register_anomalies_at_levels db dir =
     RPC_directory.register
@@ -86,8 +85,9 @@ module RPC_server = struct
         Lwt_result_syntax.return @@ List.concat
         @@ List.map (Exporter.anomalies_at_level db) levels)
 
-  let register_rpcs db _ctxt =
-    RPC_directory.empty |> register_data_at_level db
+  let register_rpcs db ctxt =
+    RPC_directory.empty
+    |> register_data_at_level db ctxt
     |> register_anomalies_at_levels db
 
   let start (addr, port) dir =
