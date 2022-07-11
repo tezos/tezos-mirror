@@ -60,6 +60,17 @@ Client
 - Simulation returns correct errors on batches of operations where some are
   backtracked, failed and/or skipped.
 
+- External operations pool specified by the ``--operations-pool`` option are
+  guaranteed to be included in the order they are received from the operations
+  source.
+
+Baker
+-----
+
+- External operations pool specified by the ``--operations-pool`` option are
+  guaranteed to be included in the order they are received from the operations
+  source.
+
 Accuser
 -------
 
