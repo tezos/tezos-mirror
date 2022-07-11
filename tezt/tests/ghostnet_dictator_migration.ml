@@ -74,13 +74,16 @@ let init chain_id ~from_protocol ~to_protocol =
   in
   let* node = Node.init ?patch_config [Synchronisation_threshold 0] in
   let* client = Client.init ~endpoint:(Node node) () in
+  let parameters =
+    [(["blocks_per_cycle"], Some "4"); (["cycles_per_voting_period"], Some "2")]
+  in
+  let parameters =
+    if Protocol.number from_protocol >= 014 then
+      parameters @ [(["nonce_revelation_threshold"], Some "2")]
+    else parameters
+  in
   let* parameter_file =
-    Protocol.write_parameter_file
-      ~base:(Right (from_protocol, None))
-      [
-        (["blocks_per_cycle"], Some "4");
-        (["cycles_per_voting_period"], Some "2");
-      ]
+    Protocol.write_parameter_file ~base:(Right (from_protocol, None)) parameters
   in
   let* () =
     Client.activate_protocol
@@ -112,7 +115,7 @@ let register_migration_test chain_id =
   in
   let expected_dictator, expected_remaining =
     match chain_id with
-    | Chain_id_ghostnet when to_protocol = Alpha ->
+    | Chain_id_ghostnet when to_protocol = Kathmandu ->
         (Some "tz1Xf8zdT3DbAX9cHw3c3CXh79rc4nK4gCe8", 1)
     | _ -> (None, 5)
   in
