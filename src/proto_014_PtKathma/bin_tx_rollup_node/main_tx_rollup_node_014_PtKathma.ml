@@ -143,6 +143,25 @@ let rpc_addr_opt_arg =
          |> Result.map_error (fun e -> [Exn (Failure e)])
          |> Lwt.return))
 
+let cors_origins_arg =
+  Clic.arg
+    ~doc:
+      "CORS origins allowed by the RPC server via Access-Control-Allow-Origin"
+    ~placeholder:"c1, c2, ..."
+    ~long:"cors-origins"
+  @@ Clic.parameter (fun _ctxt s ->
+         String.split_no_empty ',' s |> List.map String.trim |> return)
+
+let cors_headers_arg =
+  Clic.arg
+    ~doc:
+      "Header reported by Access-Control-Allow-Headers reported during CORS \
+       preflighting"
+    ~placeholder:"h1, h2, ..."
+    ~long:"cors-headers"
+  @@ Clic.parameter (fun _ctxt s ->
+         String.split_no_empty ',' s |> List.map String.trim |> return)
+
 let reconnection_delay_arg =
   let default = Node_config.default_reconnection_delay in
   let doc = reconnection_delay_doc default in
@@ -195,8 +214,8 @@ let group =
 
 let config_from_args data_dir rollup_id mode operator batch_signer
     finalize_commitment_signer remove_commitment_signer rejection_signer
-    dispatch_withdrawals_signer origination_level rpc_addr allow_deposit
-    reconnection_delay =
+    dispatch_withdrawals_signer origination_level rpc_addr cors_origins
+    cors_headers allow_deposit reconnection_delay =
   let data_dir =
     match data_dir with
     | Some d -> d
@@ -218,6 +237,8 @@ let config_from_args data_dir rollup_id mode operator batch_signer
       rollup_id;
       origination_level;
       rpc_addr;
+      cors_origins = Option.value cors_origins ~default:[];
+      cors_headers = Option.value cors_headers ~default:[];
       reconnection_delay;
       allow_deposit;
       l2_blocks_cache_size = default_l2_blocks_cache_size;
@@ -227,8 +248,8 @@ let config_from_args data_dir rollup_id mode operator batch_signer
 
 let patch_config_from_args config rollup_id mode operator batch_signer
     finalize_commitment_signer remove_commitment_signer rejection_signer
-    dispatch_withdrawals_signer origination_level rpc_addr allow_deposit
-    reconnection_delay =
+    dispatch_withdrawals_signer origination_level rpc_addr cors_origins
+    cors_headers allow_deposit reconnection_delay =
   if
     Protocol.Alpha_context.Tx_rollup.(rollup_id <> config.Node_config.rollup_id)
   then
@@ -269,6 +290,8 @@ let patch_config_from_args config rollup_id mode operator batch_signer
       Option.either origination_level config.origination_level
     in
     let rpc_addr = Option.value rpc_addr ~default:config.rpc_addr in
+    let cors_origins = Option.value cors_origins ~default:config.cors_origins in
+    let cors_headers = Option.value cors_headers ~default:config.cors_headers in
     let reconnection_delay =
       Option.value reconnection_delay ~default:config.reconnection_delay
     in
@@ -280,6 +303,8 @@ let patch_config_from_args config rollup_id mode operator batch_signer
         signers;
         origination_level;
         rpc_addr;
+        cors_origins;
+        cors_headers;
         reconnection_delay;
         allow_deposit;
       }
@@ -291,7 +316,7 @@ let configuration_init_command =
   command
     ~group
     ~desc:"Configure the transaction rollup daemon."
-    (args12
+    (args14
        force_switch
        data_dir_arg
        operator_arg
@@ -302,6 +327,8 @@ let configuration_init_command =
        dispatch_withdrawals_signer_arg
        origination_level_arg
        rpc_addr_arg
+       cors_origins_arg
+       cors_headers_arg
        allow_deposit_arg
        reconnection_delay_arg)
     (prefix "init" @@ mode_param
@@ -321,6 +348,8 @@ let configuration_init_command =
            dispatch_withdrawals_signer,
            origination_level,
            rpc_addr,
+           cors_origins,
+           cors_headers,
            allow_deposit,
            reconnection_delay )
          mode
@@ -341,6 +370,8 @@ let configuration_init_command =
           dispatch_withdrawals_signer
           origination_level
           rpc_addr
+          cors_origins
+          cors_headers
           allow_deposit
           reconnection_delay
       in
@@ -358,7 +389,7 @@ let run_command =
   command
     ~group
     ~desc:"Run the transaction rollup daemon."
-    (args11
+    (args13
        data_dir_arg
        operator_arg
        batch_signer_arg
@@ -368,6 +399,8 @@ let run_command =
        dispatch_withdrawals_signer_arg
        origination_level_arg
        rpc_addr_opt_arg
+       cors_origins_arg
+       cors_headers_arg
        allow_deposit_arg
        reconnection_delay_opt_arg)
     (prefix "run" @@ mode_param @@ prefix "for"
@@ -385,6 +418,8 @@ let run_command =
            dispatch_withdrawals_signer,
            origination_level,
            rpc_addr,
+           cors_origins,
+           cors_headers,
            allow_deposit,
            reconnection_delay )
          mode
@@ -412,6 +447,8 @@ let run_command =
           dispatch_withdrawals_signer
           origination_level
           rpc_addr
+          cors_origins
+          cors_headers
           allow_deposit
           reconnection_delay
       in
@@ -439,6 +476,8 @@ let run_command =
                     dispatch_withdrawals_signer
                     origination_level
                     rpc_addr
+                    cors_origins
+                    cors_headers
                     allow_deposit
                     reconnection_delay
                 in

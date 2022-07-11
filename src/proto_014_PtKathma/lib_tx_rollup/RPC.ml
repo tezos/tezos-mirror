@@ -763,20 +763,34 @@ let register state =
       Monitor.build_directory;
     ]
 
-let launch ~host ~acl ~node ~dir () =
-  RPC_server.launch ~media_types:Media_type.all_media_types ~host ~acl node dir
+let sanitize_cors_headers ~default headers =
+  List.map String.lowercase_ascii headers
+  |> String.Set.of_list
+  |> String.Set.(union (of_list default))
+  |> String.Set.elements
 
-let start configuration state =
+let start_server configuration state =
   let open Lwt_result_syntax in
-  let Node_config.{rpc_addr; _} = configuration in
+  let Node_config.{rpc_addr; cors_origins; cors_headers; _} = configuration in
   let host, rpc_port = rpc_addr in
   let host = P2p_addr.to_string host in
   let dir = register state in
   let node = `TCP (`Port rpc_port) in
   let acl = RPC_server.Acl.allow_all in
+  let cors_headers =
+    sanitize_cors_headers ~default:["Content-Type"] cors_headers
+  in
   Lwt.catch
     (fun () ->
-      let*! rpc_server = launch ~host ~acl ~node ~dir () in
+      let*! rpc_server =
+        RPC_server.launch
+          ~media_types:Media_type.all_media_types
+          ~host
+          ~acl
+          ~cors:{allowed_headers = cors_headers; allowed_origins = cors_origins}
+          node
+          dir
+      in
       let*! () = Event.(emit rpc_server_is_ready) rpc_addr in
       return rpc_server)
     fail_with_exn
