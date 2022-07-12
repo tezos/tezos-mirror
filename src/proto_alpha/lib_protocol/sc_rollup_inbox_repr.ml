@@ -239,7 +239,6 @@ module V1 = struct
       "@[<hov 2>{ rollup = %a@;\
        level = %a@;\
        current messages hash  = %a@;\
-       nb_available_messages = %Ld@;\
        nb_messages_in_commitment_period = %s@;\
        starting_level_of_current_commitment_period = %a@;\
        message_counter = %a@;\
