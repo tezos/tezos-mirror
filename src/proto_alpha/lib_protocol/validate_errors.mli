@@ -99,7 +99,20 @@ module Voting : sig
     | Proposals_contain_duplicate of {proposal : Protocol_hash.t}
     | Too_many_proposals
     | Already_proposed of {proposal : Protocol_hash.t}
+    | Conflict_too_many_proposals of {
+        max_allowed : int;
+        count_previous_blocks : int;
+        count_current_block : int;
+        count_operation : int;
+        conflicting_operations : Operation_hash.t list;
+      }
+    | Conflict_already_proposed of {
+        proposal : Protocol_hash.t;
+        conflicting_operation : Operation_hash.t;
+      }
+    | Conflicting_dictator_proposals of Operation_hash.t
     | Testnet_dictator_multiple_proposals
+    | Testnet_dictator_conflicting_operation
     | (* Ballot errors *)
         Ballot_for_wrong_proposal of {
         current : Protocol_hash.t;

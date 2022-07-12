@@ -152,6 +152,165 @@ let may_start_new_voting_period ctxt =
 
 open Validate_errors.Voting
 
+(** This state is maintained in memory during the validation of a
+    block, or until a change of head block in mempool mode. This
+    state's purpose is to detect potential conflicts between the new
+    voting operation to validate, and all the voting operations that
+    have already been validated in the current block or mempool. *)
+module Validation_state = struct
+  (** Summary of previously validated Proposals operations by a given
+      proposer in the current block/mempool. *)
+  type proposer_history = {
+    count : int;
+        (** Total number of protocols submitted by the proposer in
+            previously validated operations. *)
+    operations : Operation_hash.t list;
+        (** Hashes of the previously validated Proposals operations from
+            the proposer. *)
+    proposed : Operation_hash.t Protocol_hash.Map.t;
+        (** A map indexed by the protocols that have been submitted by the
+            proposer in previously validated operations. Each protocol
+            points to the operation in which it was proposed. *)
+  }
+
+  type t = {
+    proposals_validated : proposer_history Signature.Public_key_hash.Map.t;
+        (** Summary of all Proposals operations validated in the current
+            block/mempool, indexed by the operation's source aka
+            proposer. *)
+    dictator_proposals_validated : Operation_hash.t option;
+        (** If a testnet dictotor Proposals operation has been validated
+            in the current block/mempool, then its hash is recorded
+            here. Since such an operation can change the voting period
+            kind, it is mutually exclusive with any other voting operation
+            in a single block (otherwise we would loose the commutativity
+            of validated operation application: see
+            {!Validate_operation}). *)
+  }
+
+  let empty =
+    {
+      proposals_validated = Signature.Public_key_hash.Map.empty;
+      dictator_proposals_validated = None;
+    }
+
+  let check_count_conflict ~count_previous_blocks ~count_operation
+      proposer_history =
+    let max_allowed = Constants.max_proposals_per_delegate in
+    let count_before_op = count_previous_blocks + proposer_history.count in
+    (* [count_before_op] should never have been increased above
+       [max_proposals_per_delegate]. *)
+    assert (Compare.Int.(count_before_op <= max_allowed)) ;
+    error_unless
+      Compare.Int.(count_before_op + count_operation <= max_allowed)
+      (Conflict_too_many_proposals
+         {
+           max_allowed;
+           count_previous_blocks;
+           count_current_block = proposer_history.count;
+           count_operation;
+           conflicting_operations = proposer_history.operations;
+         })
+
+  (** Check that a regular (ie. non-dictator) Proposals operation is
+      compatible with previously validated voting operations in the
+      current block/mempool, and update the [state] with this
+      operation.
+
+      @return [Error Conflict_too_many_proposals] if the total number
+      of proposals by [proposer] in previously applied operations in
+      [ctxt], in previously validated operations in the current
+      block/mempool, and in the operation to validate, exceeds
+      {!Constants.max_proposals_per_delegate}.
+
+      @return [Error Conflict_already_proposed] if one of the
+      operation's [proposals] has already been submitted by [proposer]
+      in the current block/mempool.
+
+      @return [Error Conflicting_dictator_proposals] if the current
+      block/mempool already contains a testnet dictator Proposals
+      operation (see {!recfield:dictator_proposals_validated}).
+
+      Note that this function is designed to be called in addition to
+      {!check_proposal_list_sanity} and {!check_count} further below,
+      not instead of them: that's why nothing is done when the
+      [proposer] is not in {!recfield:proposals_validated}. More
+      precisely, this function should be called {e after} the
+      aforementioned functions, whose potential errors
+      e.g. [Proposals_contain_duplicate] or [Too_many_proposals] should
+      take precedence because they are independent from the validation
+      [state]. *)
+  let check_proposals_and_update (state : t) oph proposer proposals
+      ~count_in_ctxt ~proposals_length =
+    let open Tzresult_syntax in
+    let* new_proposer_history =
+      match
+        Signature.Public_key_hash.Map.find proposer state.proposals_validated
+      with
+      | None ->
+          let proposed =
+            List.fold_left
+              (fun acc proposal -> Protocol_hash.Map.add proposal oph acc)
+              Protocol_hash.Map.empty
+              proposals
+          in
+          return {count = proposals_length; operations = [oph]; proposed}
+      | Some proposer_history ->
+          let* () =
+            check_count_conflict
+              ~count_previous_blocks:count_in_ctxt
+              ~count_operation:proposals_length
+              proposer_history
+          in
+          let add_proposal proposed_map proposal =
+            match Protocol_hash.Map.find proposal proposer_history.proposed with
+            | Some conflicting_operation ->
+                error
+                  (Conflict_already_proposed {proposal; conflicting_operation})
+            | None -> ok (Protocol_hash.Map.add proposal oph proposed_map)
+          in
+          let* proposed =
+            List.fold_left_e add_proposal proposer_history.proposed proposals
+          in
+          return
+            {
+              count = proposer_history.count + proposals_length;
+              operations = oph :: proposer_history.operations;
+              proposed;
+            }
+    in
+    let* () =
+      match state.dictator_proposals_validated with
+      | None -> ok ()
+      | Some dictator_oph -> error (Conflicting_dictator_proposals dictator_oph)
+    in
+    let proposals_validated =
+      Signature.Public_key_hash.Map.add
+        proposer
+        new_proposer_history
+        state.proposals_validated
+    in
+    return {state with proposals_validated}
+
+  (** Check that a Proposals operation from a testnet dictator is
+      compatible with previously validated voting operations in the
+      current block/mempool (ie. that no other voting operation has
+      been validated), and update the [state] with this operation.
+
+      @return [Error Testnet_dictator_conflicting_operation] if the
+      current block or mempool already contains any validated voting
+      operation. *)
+  let check_dictator_proposals_and_update state oph =
+    let open Tzresult_syntax in
+    let* () =
+      error_unless
+        (Signature.Public_key_hash.Map.is_empty state.proposals_validated
+        && Option.is_none state.dictator_proposals_validated)
+        Testnet_dictator_conflicting_operation
+    in
+    return {state with dictator_proposals_validated = Some oph}
+end
+
 (** Helpers to validate and apply Proposals operations from a
     registered dictator of a test chain. These operations let the
     dictator immediately change the current voting period's kind, and
@@ -255,15 +414,13 @@ let check_in_listings ctxt source =
   let*! in_listings = Vote.in_listings ctxt source in
   fail_unless in_listings Source_not_in_vote_listings
 
-let check_count ctxt proposer proposals =
-  let open Lwt_tzresult_syntax in
-  let* count = Vote.get_delegate_proposal_count ctxt proposer in
-  (* [count] should never have been increased above
-     [max_proposals_per_delegate]. *)
-  assert (Compare.Int.(count <= Constants.max_proposals_per_delegate)) ;
-  fail_unless
-    Compare.List_length_with.(
-      proposals <= Constants.max_proposals_per_delegate - count)
+let check_count ~count_in_ctxt ~proposals_length =
+  (* The proposal count of the proposer in the context should never
+     have been increased above [max_proposals_per_delegate]. *)
+  assert (Compare.Int.(count_in_ctxt <= Constants.max_proposals_per_delegate)) ;
+  error_unless
+    Compare.Int.(
+      count_in_ctxt + proposals_length <= Constants.max_proposals_per_delegate)
     Too_many_proposals
 
 let check_already_proposed ctxt proposer proposals =
@@ -274,15 +431,7 @@ let check_already_proposed ctxt proposer proposals =
       fail_when already_proposed (Already_proposed {proposal}))
     proposals
 
-(* For now, this function is still called directly by
-   [apply_proposals], and so [ctxt] is still the context at
-   application time (where previous operations from the current block
-   have been applied).
-
-   In the next commit, this function will be called by
-   [Validate_operation.validate_operation] instead (and will need to
-   be updated because [ctxt] will not be the same). *)
-let validate_proposals ctxt chain_id ~should_check_signature
+let validate_proposals ctxt chain_id state ~should_check_signature oph
     (operation : Kind.proposals operation) =
   let open Lwt_tzresult_syntax in
   let (Single (Proposals {source; period; proposals})) =
@@ -290,51 +439,57 @@ let validate_proposals ctxt chain_id ~should_check_signature
   in
   let* current_period = Voting_period.get_current ctxt in
   let*? () = check_period_index ~expected:current_period.index period in
-  let* () =
+  let* state =
     if Testnet_dictator.is_testnet_dictator ctxt chain_id source then
-      Lwt.return (Testnet_dictator.check_proposals chain_id proposals)
+      let*? () = Testnet_dictator.check_proposals chain_id proposals in
+      Lwt.return
+        (Validation_state.check_dictator_proposals_and_update state oph)
     else
       let*? () = check_proposal_list_sanity proposals in
       let*? () = check_period_kind_for_proposals current_period in
       let* () = check_in_listings ctxt source in
-      let* () = check_count ctxt source proposals in
-      check_already_proposed ctxt source proposals
+      let* count_in_ctxt = Vote.get_delegate_proposal_count ctxt source in
+      let proposals_length = List.length proposals in
+      let*? () = check_count ~count_in_ctxt ~proposals_length in
+      let* () = check_already_proposed ctxt source proposals in
+      Lwt.return
+        (Validation_state.check_proposals_and_update
+           state
+           oph
+           source
+           proposals
+           ~count_in_ctxt
+           ~proposals_length)
   in
   (* The signature check is done last because it is more costly than
      most checks. *)
-  when_ should_check_signature (fun () ->
-      (* Retrieving the public key cannot fail. Indeed, we have
-         already checked that the delegate is in the vote listings
-         (or is a testnet dictator), which implies that it is a
-         manager with a revealed key. *)
-      let* public_key = Delegate.pubkey ctxt source in
-      Lwt.return (Operation.check_signature public_key chain_id operation))
-
-let record_proposals ctxt proposer proposals =
-  let open Lwt_tzresult_syntax in
-  let* count = Vote.get_delegate_proposal_count ctxt proposer in
-  let new_count = count + List.length proposals in
-  let*! ctxt = Vote.set_delegate_proposal_count ctxt proposer new_count in
-  let*! ctxt =
-    List.fold_left_s
-      (fun ctxt proposal -> Vote.add_proposal ctxt proposer proposal)
-      ctxt
-      proposals
-  in
-  return ctxt
-
-let apply_proposals ctxt chain_id (operation : Kind.proposals operation) =
-  let open Lwt_tzresult_syntax in
   let* () =
-    validate_proposals ctxt chain_id ~should_check_signature:true operation
+    when_ should_check_signature (fun () ->
+        (* Retrieving the public key cannot fail. Indeed, we have
+           already checked that the delegate is in the vote listings
+           (or is a testnet dictator), which implies that it is a
+           manager with a revealed key. *)
+        let* public_key = Delegate.pubkey ctxt source in
+        Lwt.return (Operation.check_signature public_key chain_id operation))
   in
-  let (Single (Proposals {source; period = _; proposals})) =
-    operation.protocol_data.contents
-  in
+  return state
+
+let apply_proposals ctxt chain_id (Proposals {source; period = _; proposals}) =
+  let open Lwt_tzresult_syntax in
   let* ctxt =
     if Testnet_dictator.is_testnet_dictator ctxt chain_id source then
       Testnet_dictator.record_proposals ctxt chain_id proposals
-    else record_proposals ctxt source proposals
+    else
+      let* count = Vote.get_delegate_proposal_count ctxt source in
+      let new_count = count + List.length proposals in
+      let*! ctxt = Vote.set_delegate_proposal_count ctxt source new_count in
+      let*! ctxt =
+        List.fold_left_s
+          (fun ctxt proposal -> Vote.add_proposal ctxt source proposal)
+          ctxt
+          proposals
+      in
+      return ctxt
   in
   return (ctxt, Apply_results.Single_result Proposals_result)
 

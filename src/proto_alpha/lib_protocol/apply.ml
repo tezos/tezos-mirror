@@ -2127,7 +2127,8 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
       Token.transfer ctxt src (`Contract contract) amount
       >>=? fun (ctxt, bupds) ->
       return (ctxt, Single_result (Activate_account_result bupds))
-  | Single (Proposals _) -> Amendment.apply_proposals ctxt chain_id operation
+  | Single (Proposals _ as contents) ->
+      Amendment.apply_proposals ctxt chain_id contents
   | Single (Ballot _) -> Amendment.apply_ballot ctxt chain_id operation
   | Single (Failing_noop _) ->
       (* Failing_noop _ always fails *)

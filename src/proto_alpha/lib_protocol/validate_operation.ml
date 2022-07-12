@@ -222,7 +222,7 @@ let init_manager_state ctxt =
 type mode = Block | Mempool
 
 type validate_operation_info = {
-  ctxt : t;  (** The context at the beginning of the block. *)
+  ctxt : t;  (** The context at the beginning of the block or mempool. *)
   mode : mode;
   chain_id : Chain_id.t;  (** Needed for signature checks. *)
   current_level : Level.t;
@@ -232,6 +232,7 @@ type validate_operation_info = {
 
 type validate_operation_state = {
   consensus_state : consensus_state;
+  voting_state : Amendment.Validation_state.t;
   anonymous_state : anonymous_state;
   manager_state : manager_state;
 }
@@ -251,6 +252,7 @@ let init_validate_operation_info ctxt mode chain_id
 let init_validate_operation_state ctxt =
   {
     consensus_state = empty_consensus_state;
+    voting_state = Amendment.Validation_state.empty;
     anonymous_state = empty_anonymous_state;
     manager_state = init_manager_state ctxt;
   }
@@ -725,6 +727,23 @@ module Consensus = struct
       Dal_apply.validate_data_availability vi.ctxt slot_availability
     in
     return (update_validity_state_dal_slot_availabitiy vs endorser)
+end
+
+(** Validation of voting operations: proposals and ballot.
+    (Validation pass [1]) *)
+module Voting = struct
+  let validate_proposals vi vs ~should_check_signature oph operation =
+    let open Lwt_tzresult_syntax in
+    let* voting_state =
+      Amendment.validate_proposals
+        vi.ctxt
+        vi.chain_id
+        vs.voting_state
+        ~should_check_signature
+        oph
+        operation
+    in
+    return {vs with voting_state}
 end
 
 module Anonymous = struct
@@ -1506,6 +1525,8 @@ let validate_operation (vi : validate_operation_info)
           vs
           ~should_check_signature
           operation
+    | Single (Proposals _) ->
+        Voting.validate_proposals vi vs ~should_check_signature oph operation
     | Single (Activate_account _ as contents) ->
         Anonymous.validate_activate_account vi vs oph contents
     | Single (Double_preendorsement_evidence _ as contents) ->
@@ -1534,7 +1555,7 @@ let validate_operation (vi : validate_operation_info)
           source
           oph
           operation
-    | Single (Proposals _) | Single (Ballot _) | Single (Failing_noop _) ->
+    | Single (Ballot _) | Single (Failing_noop _) ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/2603
 
            There is no separate validation phase for non-manager

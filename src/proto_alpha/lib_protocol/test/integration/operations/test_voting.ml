@@ -368,6 +368,18 @@ let already_proposed already_proposed_proposal loc = function
         already_proposed_proposal
   | err -> wrong_error "Already_proposed" err loc
 
+let conflict_too_many_proposals loc = function
+  | [Environment.Ecoproto_error (Conflict_too_many_proposals _)] -> return_unit
+  | err -> wrong_error "Conflict_too_many_proposals" err loc
+
+let conflict_already_proposed already_proposed_proposal loc = function
+  | [Environment.Ecoproto_error (Conflict_already_proposed {proposal; _})] ->
+      Assert.equal_protocol_hash
+        ~loc:(append_loc ~caller_loc:loc __LOC__)
+        proposal
+        already_proposed_proposal
+  | err -> wrong_error "Conflict_already_proposed" err loc
+
 let ballot_for_wrong_proposal ~current_proposal ~op_proposal loc = function
   | [
       Environment.Ecoproto_error (Ballot_for_wrong_proposal {current; submitted});
@@ -1437,6 +1449,65 @@ let test_already_proposed () =
     operation
     block
 
+(** Test that a Proposals operation fails when it would make the total
+    count of proposals submitted by the proposer exceed the
+    [max_proposals_per_delegate] protocol constant, because of
+    previously validated operations in the current block/mempool. *)
+let test_conflict_too_many_proposals () =
+  let open Lwt_result_syntax in
+  let* block, proposer = context_init1 () in
+  let n_proposals_in_previous_blocks = 5 in
+  assert (Array.length protos >= Constants.max_proposals_per_delegate + 1) ;
+  let proposals_in_previous_blocks =
+    List.map (Array.get protos) (1 -- n_proposals_in_previous_blocks)
+  in
+  let* operation =
+    Op.proposals (B block) proposer proposals_in_previous_blocks
+  in
+  let* block = Block.bake block ~operation in
+  let* current_block_state = Incremental.begin_construction block in
+  let proposals_in_current_block =
+    List.map
+      (Array.get protos)
+      (n_proposals_in_previous_blocks + 1
+     -- Constants.max_proposals_per_delegate)
+  in
+  let* op_in_current_block =
+    Op.proposals (B block) proposer proposals_in_current_block
+  in
+  let* current_block_state =
+    Incremental.validate_operation current_block_state op_in_current_block
+  in
+  let* op = Op.proposals (B block) proposer [protos.(0)] in
+  let* _i =
+    Incremental.validate_operation
+      ~expect_failure:(conflict_too_many_proposals __LOC__)
+      current_block_state
+      op
+  in
+  return_unit
+
+(** Test that a Proposals operation fails when one of its proposals
+    has already been submitted by the same proposer in a previously
+    validated operation of the current block/mempool. *)
+let test_conflict_already_proposed () =
+  let open Lwt_result_syntax in
+  let* block, proposer = context_init1 () in
+  let proposal = protos.(0) in
+  let* current_block_state = Incremental.begin_construction block in
+  let* op_in_current_block = Op.proposals (B block) proposer [proposal] in
+  let* current_block_state =
+    Incremental.validate_operation current_block_state op_in_current_block
+  in
+  let* op = Op.proposals (B block) proposer [proposal] in
+  let* _i =
+    Incremental.validate_operation
+      ~expect_failure:(conflict_already_proposed proposal __LOC__)
+      current_block_state
+      op
+  in
+  return_unit
+
 (** {3 Proposals -- Positive test}
 
     A Proposals operation is valid when:
@@ -1939,6 +2010,14 @@ let tests =
       "A proposal had already been proposed"
       `Quick
       test_already_proposed;
+    Tztest.tztest
+      "Conflict: too many proposals in current block/mempool"
+      `Quick
+      test_conflict_too_many_proposals;
+    Tztest.tztest
+      "Conflict: proposal already proposed in current block/mempool"
+      `Quick
+      test_conflict_already_proposed;
     Tztest.tztest "Valid Proposals operations" `Quick test_valid_proposals;
     (* Validity tests on Ballot *)
     Tztest.tztest

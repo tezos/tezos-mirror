@@ -86,7 +86,20 @@ val may_start_new_voting_period : context -> context tzresult Lwt.t
       (or pass). This operation is only accepted during an Exploration
       or Promotion period (see above). *)
 
-(** Update the [context] with the effects of a Proposals operation.
+(** A state containing a summary of previously validated voting
+    operations. It should be maintained in memory during the validation
+    of a block, or until a change of head block in mempool mode. It is
+    used to check for conflicts between an operation to validate and
+    the already validated operations of the current block/mempool. *)
+module Validation_state : sig
+  (** A state as described right above. *)
+  type t
+
+  (** The empty state (for the initialization of a new block or mempool). *)
+  val empty : t
+end
+
+(** Check that a Proposals operation can be safely applied.
 
     @return [Error Wrong_voting_period_index] if the operation's
     period and the [context]'s current period do not have the same
@@ -110,17 +123,64 @@ val may_start_new_voting_period : context -> context tzresult Lwt.t
     @return [Error Already_proposed] if one of the proposals has
     already been proposed by the source.
 
+    @return [Error Conflict_too_many_proposals] if the total count of
+    proposals submitted by the source in previous blocks, in previously
+    validated operations of the current block/mempool, and in the
+    operation to validate, exceeds
+    {!Constants.max_proposals_per_delegate}.
+
+    @return [Error Conflict_already_proposed] if one of the
+    operation's proposals has already been submitted by the source in
+    the current block/mempool.
+
+    @return [Error Conflicting_dictator_proposals] if a testnet
+    dictator Proposals operation has already been validated in the
+    current block/mempool.
+
     @return [Error Testnet_dictator_multiple_proposals] if the source
     is a testnet dictator and the operation contains more than one
     proposal.
 
+    @return [Error Testnet_dictator_conflicting_operation] if the
+    source is a testnet dictator and the current block or mempool
+    already contains any validated voting operation.
+
     @return [Error Operation.Missing_signature] or [Error
     Operation.Invalid_signature] if the operation is unsigned or
     incorrectly signed. *)
+val validate_proposals :
+  context ->
+  Chain_id.t ->
+  Validation_state.t ->
+  should_check_signature:bool ->
+  Operation_hash.t ->
+  Kind.proposals operation ->
+  Validation_state.t tzresult Lwt.t
+
+(** Update the [context] with the effects of a Proposals operation:
+
+    - Its proposals are added to the source's recorded proposals.
+
+    - The recorded proposal count of the source is increased by the
+      number of proposals in the operation.
+
+    Note that a Proposals operation from a testnet dictator (which may
+    be set up when a test chain is initialized) has completely
+    different effects:
+
+    - If the operation contains no proposal, then the current voting
+      period is immediately and forcibly set to a Proposal period.
+
+    - If the operation contains exactly one proposal, then the current
+      voting period is immediately and forcibly set to an Adoption period
+      for this proposal.
+
+    {!validate_proposals} must have been called beforehand, and is
+    responsible for ensuring that [apply_proposals] cannot fail. *)
 val apply_proposals :
   context ->
   Chain_id.t ->
-  Kind.proposals operation ->
+  Kind.proposals contents ->
   (context * Kind.proposals Apply_results.contents_result_list) tzresult Lwt.t
 
 (** Update the [context] with the effects of a Ballot operation.

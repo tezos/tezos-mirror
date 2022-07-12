@@ -397,7 +397,20 @@ module Voting = struct
     | Proposals_contain_duplicate of {proposal : Protocol_hash.t}
     | Too_many_proposals
     | Already_proposed of {proposal : Protocol_hash.t}
+    | Conflict_too_many_proposals of {
+        max_allowed : int;
+        count_previous_blocks : int;
+        count_current_block : int;
+        count_operation : int;
+        conflicting_operations : Operation_hash.t list;
+      }
+    | Conflict_already_proposed of {
+        proposal : Protocol_hash.t;
+        conflicting_operation : Operation_hash.t;
+      }
+    | Conflicting_dictator_proposals of Operation_hash.t
     | Testnet_dictator_multiple_proposals
+    | Testnet_dictator_conflicting_operation
     | (* Ballot errors *)
         Ballot_for_wrong_proposal of {
         current : Protocol_hash.t;
@@ -520,6 +533,113 @@ module Voting = struct
       Data_encoding.(obj1 (req "proposal" Protocol_hash.encoding))
       (function Already_proposed {proposal} -> Some proposal | _ -> None)
       (fun proposal -> Already_proposed {proposal}) ;
+    register_error_kind
+      `Temporary
+      ~id:"validate_operation.conflict_too_many_proposals"
+      ~title:"Conflict too many proposals"
+      ~description:
+        "The delegate exceeded the maximum number of allowed proposals due to, \
+         among others, previous Proposals operations in the current \
+         block/mempool."
+      ~pp:
+        (fun ppf
+             ( max_allowed,
+               count_previous_blocks,
+               count_current_block,
+               count_operation,
+               conflicting_operations ) ->
+        Format.fprintf
+          ppf
+          "The delegate has submitted too many proposals (the maximum allowed \
+           is %d): %d in previous blocks, %d in the considered operation, and \
+           %d in the following validated operations of the current \
+           block/mempool: %a."
+          max_allowed
+          count_previous_blocks
+          count_operation
+          count_current_block
+          (Format.pp_print_list Operation_hash.pp)
+          conflicting_operations)
+      Data_encoding.(
+        obj5
+          (req "max_allowed" int8)
+          (req "count_previous_blocks" int8)
+          (req "count_current_block" int8)
+          (req "count_operation" int8)
+          (req "conflicting_operations" (list Operation_hash.encoding)))
+      (function
+        | Conflict_too_many_proposals
+            {
+              max_allowed;
+              count_previous_blocks;
+              count_current_block;
+              count_operation;
+              conflicting_operations;
+            } ->
+            Some
+              ( max_allowed,
+                count_previous_blocks,
+                count_current_block,
+                count_operation,
+                conflicting_operations )
+        | _ -> None)
+      (fun ( max_allowed,
+             count_previous_blocks,
+             count_current_block,
+             count_operation,
+             conflicting_operations ) ->
+        Conflict_too_many_proposals
+          {
+            max_allowed;
+            count_previous_blocks;
+            count_current_block;
+            count_operation;
+            conflicting_operations;
+          }) ;
+    register_error_kind
+      `Temporary
+      ~id:"validate_operation.conflict_already_proposed"
+      ~title:"Conflict already proposed"
+      ~description:
+        "The delegate has already submitted one of the operation's proposals \
+         in a previously validated operation of the current block or mempool."
+      ~pp:(fun ppf (proposal, conflicting_oph) ->
+        Format.fprintf
+          ppf
+          "The delegate has already proposed the protocol hash %a in the \
+           previously validated operation %a of the current block or mempool."
+          Protocol_hash.pp
+          proposal
+          Operation_hash.pp
+          conflicting_oph)
+      Data_encoding.(
+        obj2
+          (req "proposal" Protocol_hash.encoding)
+          (req "conflicting_operation" Operation_hash.encoding))
+      (function
+        | Conflict_already_proposed {proposal; conflicting_operation} ->
+            Some (proposal, conflicting_operation)
+        | _ -> None)
+      (fun (proposal, conflicting_operation) ->
+        Conflict_already_proposed {proposal; conflicting_operation}) ;
+    register_error_kind
+      `Branch
+      ~id:"validate_operation.conflicting_dictator_proposals"
+      ~title:"Conflicting dictator proposals"
+      ~description:
+        "The current block/mempool already contains a testnest dictator \
+         proposals operation, so it cannot have any other voting operation."
+      ~pp:(fun ppf dictator_operation ->
+        Format.fprintf
+          ppf
+          "The current block/mempool already contains the testnest dictator \
+           proposals operation %a, so it cannot have any other voting \
+           operation."
+          Operation_hash.pp
+          dictator_operation)
+      Data_encoding.(obj1 (req "dictator_operation" Operation_hash.encoding))
+      (function Conflicting_dictator_proposals oph -> Some oph | _ -> None)
+      (fun oph -> Conflicting_dictator_proposals oph) ;
     let description =
       "A testnet dictator cannot submit more than one proposal at a time."
     in
@@ -532,6 +652,19 @@ module Voting = struct
       Data_encoding.empty
       (function Testnet_dictator_multiple_proposals -> Some () | _ -> None)
       (fun () -> Testnet_dictator_multiple_proposals) ;
+    let description =
+      "A testnet dictator proposals operation cannot be included in a block or \
+       mempool that already contains any other voting operation."
+    in
+    register_error_kind
+      `Branch
+      ~id:"validate_operation.testnet_dictator_conflicting_operation"
+      ~title:"Testnet dictator conflicting operation"
+      ~description
+      ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+      Data_encoding.empty
+      (function Testnet_dictator_conflicting_operation -> Some () | _ -> None)
+      (fun () -> Testnet_dictator_conflicting_operation) ;
 
     (* Ballot errors *)
     register_error_kind
