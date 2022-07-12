@@ -838,6 +838,15 @@ module Make (Context : P) :
 
   let get_is_stuck = result_of ~default:None @@ is_stuck
 
+  let start_parsing : unit t =
+    let open Monad.Syntax in
+    let* () = Status.set Parsing in
+    let* () = ParsingResult.set None in
+    let* () = ParserState.set SkipLayout in
+    let* () = LexerState.set (0, 0) in
+    let* () = Code.clear in
+    return ()
+
   let set_input_monadic {PS.inbox_level; message_counter; payload} =
     let open Monad.Syntax in
     let payload =
@@ -856,6 +865,7 @@ module Make (Context : P) :
         let* () = CurrentLevel.set inbox_level in
         let* () = MessageCounter.set (Some message_counter) in
         let* () = NextMessage.set (Some msg) in
+        let* () = start_parsing in
         return ()
     | None ->
         let* () = CurrentLevel.set inbox_level in
@@ -906,15 +916,6 @@ module Make (Context : P) :
     let open Monad.Syntax in
     let* s = lexeme in
     Code.inject (IStore s)
-
-  let start_parsing : unit t =
-    let open Monad.Syntax in
-    let* () = Status.set Parsing in
-    let* () = ParsingResult.set None in
-    let* () = ParserState.set SkipLayout in
-    let* () = LexerState.set (0, 0) in
-    let* () = Code.clear in
-    return ()
 
   let start_evaluating : unit t =
     let open Monad.Syntax in
