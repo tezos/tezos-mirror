@@ -3076,7 +3076,7 @@ let octez_protocol_compiler_tezos_protocol_packer =
 
 let _octez_embedded_protocol_packer =
   public_exe
-    "tezos-embedded-protocol-packer"
+    "octez-embedded-protocol-packer"
     ~path:"src/lib_protocol_compiler/bin"
     ~opam:"octez-protocol-compiler"
     ~internal_name:"main_embedded_packer"
@@ -3949,7 +3949,7 @@ module Protocol = Protocol
                         S "%{workspace_root}";
                         [
                           S "run";
-                          S "%{bin:tezos-embedded-protocol-packer}";
+                          S "%{bin:octez-embedded-protocol-packer}";
                           S "%{src_dir}";
                           S name_underscore;
                         ];
