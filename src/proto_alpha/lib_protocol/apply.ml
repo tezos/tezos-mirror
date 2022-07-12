@@ -3098,7 +3098,7 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                 entrypoint. *)
              {
                source = liquidity_baking_cpmm_contract;
-               payer = liquidity_baking_cpmm_contract;
+               payer = Contract.Implicit Signature.Public_key_hash.zero;
                self = liquidity_baking_cpmm_contract_hash;
                amount = liquidity_baking_subsidy;
                balance;
