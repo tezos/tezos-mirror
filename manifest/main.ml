@@ -1469,23 +1469,6 @@ let octez_scoru_wasm =
         data_encoding;
       ]
 
-let _octez_scoru_wasm_tests =
-  test
-    "test_scoru_wasm"
-    ~path:"src/lib_scoru_wasm/test"
-    ~opam:"tezos-scoru-wasm-test"
-    ~synopsis:"Tests for the scoru-wasm functionality"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_base_unix;
-        octez_base_test_helpers |> open_;
-        octez_test_helpers;
-        octez_scoru_wasm;
-        qcheck_alcotest;
-        alcotest_lwt;
-      ]
-
 let octez_context_encoding =
   public_lib
     "tezos-context.encoding"
@@ -1559,6 +1542,24 @@ let octez_context_disk =
         octez_context_encoding;
         octez_context_memory;
         octez_context_dump;
+      ]
+
+let _octez_scoru_wasm_tests =
+  test
+    "test_scoru_wasm"
+    ~path:"src/lib_scoru_wasm/test"
+    ~opam:"tezos-scoru-wasm-test"
+    ~synopsis:"Tests for the scoru-wasm functionality"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_context_disk;
+        octez_base_test_helpers |> open_;
+        octez_test_helpers;
+        octez_scoru_wasm;
+        qcheck_alcotest;
+        alcotest_lwt;
       ]
 
 let octez_context =

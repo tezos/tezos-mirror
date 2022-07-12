@@ -23,15 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Lib_scoru_wasm
-    Invocation:   dune runtest src/lib_scoru_wasm/
-    Subject:      Tests for the tezos-scoru-wasm library
-*)
-
-let () =
-  Alcotest_lwt.run
-    "test lib scoru wasm"
-    [("Input", Test_input.tests); ("Encodings", Test_encoding.tests)]
-  |> Lwt_main.run
+let tests = []
