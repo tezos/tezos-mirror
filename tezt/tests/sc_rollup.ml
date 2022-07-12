@@ -2012,7 +2012,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window variant
   let* () = Sc_rollup_node.run sc_rollup_node
   and* () = Sc_rollup_node.run sc_rollup_node2 in
 
-  let* start_level = Client.level client in
+  let start_level = Node.get_level node in
 
   let stop_loser level =
     if List.mem level stop_loser_at then
