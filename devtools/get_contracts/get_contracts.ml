@@ -647,8 +647,24 @@ let run get_main =
   let (module Main : Sigs.MAIN) = get_main proto_hash in
   Main.main ~output_dir ctxt ~head
 
-let main module_main =
-  let get_main (_proto_hash : Protocol_hash.t) = module_main in
+let () =
+  let get_main proto_hash =
+    match
+      List.find
+        (fun (module Proto : Sigs.PROTOCOL) ->
+          Protocol_hash.(Proto.hash = proto_hash))
+        (Known_protocols.get_all ())
+    with
+    | None ->
+        Format.kasprintf
+          invalid_arg
+          "Unknown protocol: %a"
+          Protocol_hash.pp
+          proto_hash
+    | Some (module Proto) ->
+        let module Main = Make (Proto) in
+        (module Main : Sigs.MAIN)
+  in
   match Lwt_main.run (run get_main) with
   | Ok () -> ()
   | Error trace -> Format.printf "ERROR: %a%!" Error_monad.pp_print_trace trace

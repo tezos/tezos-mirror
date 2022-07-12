@@ -252,6 +252,4 @@ module Proto = struct
   let code_storage_type ({storage_type; _} : Translator.toplevel) = storage_type
 end
 
-module Main = Get_contracts.Make (Proto)
-
-let () = Get_contracts.main (module Main)
+let () = Known_protocols.register (module Proto)

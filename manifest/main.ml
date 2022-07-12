@@ -5108,60 +5108,70 @@ let _git_gas_diff =
 let remove_if_exists fname = if Sys.file_exists fname then Sys.remove fname
 
 let get_contracts_lib =
+  let get_contracts_module proto =
+    "devtools" // "get_contracts"
+    // (sf "get_contracts_%s.ml" @@ Protocol.name_underscore proto)
+  in
+  let protocols =
+    List.filter_map
+      (fun proto ->
+        let get_contracts_ml = get_contracts_module proto in
+        match (Protocol.status proto, Protocol.client proto) with
+        | Active, Some client ->
+            (if not @@ Sys.file_exists get_contracts_ml then
+             let contents =
+               file_content @@ get_contracts_module Protocol.alpha
+             in
+             let contents =
+               Str.global_replace
+                 (Str.regexp_string "open Tezos_protocol_alpha")
+                 ("open Tezos_protocol_" ^ Protocol.name_underscore proto)
+                 contents
+             in
+             let contents =
+               Str.global_replace
+                 (Str.regexp_string "open Tezos_client_alpha")
+                 ("open Tezos_client_" ^ Protocol.name_underscore proto)
+                 contents
+             in
+             write get_contracts_ml (fun fmt ->
+                 Format.pp_print_string fmt contents)) ;
+            Some [Protocol.main proto; client]
+        | _ ->
+            remove_if_exists get_contracts_ml ;
+            None)
+      Protocol.all
+  in
   private_lib
-    "get_contracts"
+    "get_contracts_lib"
     ~path:("devtools" // "get_contracts")
     ~synopsis:"Generic tool to extract smart contracts from node's context."
+    ~opam:""
+    ~deps:
+      ([
+         octez_micheline |> open_;
+         octez_base |> open_ ~m:"TzPervasives";
+         octez_store;
+       ]
+      @ List.flatten protocols)
+    ~all_modules_except:["get_contracts"]
+    ~bisect_ppx:false
+    ~linkall:true
+
+let _get_contracts =
+  private_exe
+    "get_contracts"
+    ~path:("devtools" // "get_contracts")
+    ~synopsis:"A script to extract smart contracts from a node."
     ~opam:""
     ~deps:
       [
         octez_micheline |> open_;
         octez_base |> open_ ~m:"TzPervasives";
-        octez_stdlib_unix |> open_;
-        octez_client_base_unix;
-        octez_store;
+        get_contracts_lib |> open_;
       ]
-    ~modules:
-      ["config"; "get_contracts"; "sigs"; "storage_helpers"; "contract_size"]
+    ~modules:["get_contracts"]
     ~bisect_ppx:false
-
-let _get_contracts =
-  let path = "devtools" // "get_contracts" in
-  let get_contracts_module proto =
-    path // (sf "get_contracts_%s.ml" @@ Protocol.name_underscore proto)
-  in
-  List.filter_map
-    (fun proto ->
-      let name = "get_contracts_" ^ Protocol.name_underscore proto in
-      let main_module = get_contracts_module proto in
-      match (Protocol.status proto, Protocol.client proto) with
-      | Active, Some client ->
-          let main = Protocol.main proto in
-          if not @@ Sys.file_exists main_module then
-            ignore @@ Sys.command
-            @@ Format.sprintf
-                 "cp %s %s"
-                 (get_contracts_module Protocol.alpha)
-                 main_module ;
-          Some
-            (private_exe
-               name
-               ~path
-               ~synopsis:"A script to extract smart contracts from a node."
-               ~opam:""
-               ~deps:
-                 [
-                   octez_base |> open_ ~m:"TzPervasives";
-                   main;
-                   client;
-                   get_contracts_lib;
-                 ]
-               ~modules:[name]
-               ~bisect_ppx:false)
-      | _ ->
-          remove_if_exists main_module ;
-          None)
-    Protocol.all
 
 let yes_wallet_lib =
   let get_delegates_module proto =
