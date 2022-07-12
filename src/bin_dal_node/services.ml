@@ -34,7 +34,8 @@ let split_slot () =
     ~description:"Split and store a slot"
     ~query:split_query
     ~input:Data_encoding.string
-    ~output:Cryptobox.commitment_encoding
+    ~output:Data_encoding.string
+      (* see [Slot_manager.Slot_header.to_b58check] *)
     RPC_path.(open_root / "slot" / "split")
 
 let slot_query =
@@ -61,11 +62,11 @@ let shard () =
       open_root / "shard" /: Slot_manager.Slot_header.rpc_arg /: shard_arg)
 
 let handle_split_slot cryptobox_setup store fill slot =
+  let open Lwt_result_syntax in
   let slot = String.to_bytes slot in
   let slot = if fill then Slot_manager.Utils.fill_x00 slot else slot in
-  Slot_manager.split_and_store cryptobox_setup store slot
-
-type error += Invalid_slot_header of string (* FIXME: registration *)
+  let+ commitment = Slot_manager.split_and_store cryptobox_setup store slot in
+  Slot_manager.Slot_header.to_b58check commitment
 
 let handle_slot store (_, commitment) trim () =
   let open Lwt_result_syntax in

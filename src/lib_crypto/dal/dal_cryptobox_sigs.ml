@@ -51,6 +51,17 @@ module type SRS = sig
     slot_size:int ->
     shards_amount:int ->
     srs
+
+  (** [load_srs ()] loads a trusted [srs]. If the [srs] is already
+     loaded, it is given directly. Otherwise, the trusted [srs] is
+     read from some files. The [srs] depends on the [slot_size]
+     parameters. Loading the first time an srs is consequently costly
+     while the other times would be cheap.
+
+      We assume the [srs] won't change many times. The shell ensures
+     that a bounded and small number of [srs] can be loaded at the
+     same time. *)
+  val load_srs : unit -> srs Error_monad.tzresult
 end
 
 module type COMMITMENT = sig
