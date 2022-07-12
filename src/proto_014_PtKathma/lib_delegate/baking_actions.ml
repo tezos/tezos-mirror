@@ -340,6 +340,9 @@ let inject_preendorsements ~state_recorder state ~preendorsements ~updated_state
   (* N.b. signing a lot of operations may take some time *)
   (* Don't parallelize signatures: the signer might not be able to
      handle concurrent requests *)
+  let block_location =
+    Baking_files.resolve_location ~chain_id `Highwatermarks
+  in
   List.filter_map_es
     (fun (delegate, consensus_content) ->
       Events.(emit signing_preendorsement delegate) >>= fun () ->
@@ -352,10 +355,8 @@ let inject_preendorsements ~state_recorder state ~preendorsements ~updated_state
       let contents = Single (Preendorsement consensus_content) in
       let level = Raw_level.to_int32 consensus_content.level in
       let round = consensus_content.round in
+      let sk_uri = delegate.secret_key_uri in
       cctxt#with_lock (fun () ->
-          let block_location =
-            Baking_files.resolve_location ~chain_id `Highwatermarks
-          in
           let delegate = delegate.public_key_hash in
           Baking_highwatermarks.may_sign_preendorsement
             cctxt
@@ -382,9 +383,7 @@ let inject_preendorsements ~state_recorder state ~preendorsements ~updated_state
            Operation.unsigned_encoding
            unsigned_operation
        in
-       (* TODO: do we want to reload the sk uri or not ? *)
-       Client_keys.get_key cctxt delegate.public_key_hash >>=? fun (_, _, sk) ->
-       Client_keys.sign cctxt ~watermark sk unsigned_operation_bytes
+       Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
       else
         fail (Baking_highwatermarks.Block_previously_preendorsed {round; level}))
       >>= function
@@ -427,6 +426,9 @@ let sign_endorsements state endorsements =
   (* N.b. signing a lot of operations may take some time *)
   (* Don't parallelize signatures: the signer might not be able to
      handle concurrent requests *)
+  let block_location =
+    Baking_files.resolve_location ~chain_id `Highwatermarks
+  in
   List.filter_map_es
     (fun (delegate, consensus_content) ->
       Events.(emit signing_endorsement delegate) >>= fun () ->
@@ -442,14 +444,13 @@ let sign_endorsements state endorsements =
       in
       let level = Raw_level.to_int32 consensus_content.level in
       let round = consensus_content.round in
+      let sk_uri = delegate.secret_key_uri in
       cctxt#with_lock (fun () ->
-          let block_location =
-            Baking_files.resolve_location ~chain_id `Highwatermarks
-          in
+          let delegate = delegate.public_key_hash in
           Baking_highwatermarks.may_sign_endorsement
             cctxt
             block_location
-            ~delegate:delegate.public_key_hash
+            ~delegate
             ~level
             ~round
           >>=? function
@@ -457,7 +458,7 @@ let sign_endorsements state endorsements =
               Baking_highwatermarks.record_endorsement
                 cctxt
                 block_location
-                ~delegate:delegate.public_key_hash
+                ~delegate
                 ~level
                 ~round
               >>=? fun () -> return_true
@@ -471,11 +472,8 @@ let sign_endorsements state endorsements =
            Operation.unsigned_encoding
            unsigned_operation
        in
-       (* TODO: do we want to reload the sk uri or not ? *)
-       Client_keys.get_key cctxt delegate.public_key_hash >>=? fun (_, _, sk) ->
-       Client_keys.sign cctxt ~watermark sk unsigned_operation_bytes
-      else
-        fail (Baking_highwatermarks.Block_previously_preendorsed {round; level}))
+       Client_keys.sign cctxt ~watermark sk_uri unsigned_operation_bytes
+      else fail (Baking_highwatermarks.Block_previously_endorsed {round; level}))
       >>= function
       | Error err ->
           Events.(emit skipping_endorsement (delegate, err)) >>= fun () ->
