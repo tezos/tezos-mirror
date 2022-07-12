@@ -41,7 +41,7 @@ else
     exit 1
 fi
 
-tarball_copy=$(mktemp tezos_tarball.XXXXXXXX --tmpdir)
+tarball_copy=$(mktemp tezos_tarball.XXXXXXXX --tmpdir || mktemp tezos_tarball.XXXXXXXX -p "$TMPDIR" || mktemp tezos_tarball.XXXXXXXX -p /tmp)
 
 clean_tarball() {
     log "Cleaning up..."
