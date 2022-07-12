@@ -188,7 +188,6 @@ let run_script_view (cctxt : #Protocol_client_context.rpc_context)
   } =
     params
   in
-  let payer = Option.map (fun c -> Contract.Implicit c) payer in
   Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
   Plugin.RPC.Scripts.run_script_view
     cctxt

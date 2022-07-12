@@ -233,7 +233,7 @@ module Scripts = struct
            (dft "unlimited_gas" bool false)
            (req "chain_id" Chain_id.encoding)
            (opt "source" Contract.encoding)
-           (opt "payer" Contract.encoding)
+           (opt "payer" Contract.implicit_encoding)
            (opt "gas" Gas.Arith.z_integral_encoding)
            (req "unparsing_mode" unparsing_mode_encoding)
            (opt "now" Script_timestamp.encoding))
@@ -1239,8 +1239,8 @@ module Scripts = struct
             input,
             unlimited_gas,
             chain_id,
-            source,
-            payer,
+            src_opt,
+            pay_opt,
             gas,
             unparsing_mode,
             now ),
@@ -1258,11 +1258,7 @@ module Scripts = struct
         >>=? fun (input_ty, output_ty) ->
         Contract.get_balance ctxt contract >>=? fun balance ->
         let source, payer =
-          match (source, payer) with
-          | Some source, Some payer -> (source, payer)
-          | Some source, None -> (source, source)
-          | None, Some payer -> (payer, payer)
-          | None, None -> (contract, contract)
+          source_and_payer ~src_opt ~pay_opt ~default_src:contract_hash
         in
         let now =
           match now with None -> Script_timestamp.now ctxt | Some t -> t
@@ -1292,7 +1288,7 @@ module Scripts = struct
         let step_constants =
           {
             Script_interpreter.source;
-            payer;
+            payer = Contract.Implicit payer;
             self = contract_hash;
             amount = Tez.zero;
             balance;
