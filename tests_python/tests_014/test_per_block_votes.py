@@ -6,6 +6,8 @@ import time
 
 from typing import Optional, Iterator
 
+import os
+
 import pytest
 
 from launchers.sandbox import Sandbox
@@ -29,6 +31,36 @@ def run_vote_file(sandbox: Sandbox, filename: str, default_vote: str) -> None:
             '--liquidity-baking-toggle-vote',
             default_vote,
         ],
+    )
+    if not sandbox.log_dir:
+        pytest.skip()
+    time.sleep(SLEEP)
+    assert sandbox.logs
+
+
+def run_vote_file_with_path(sandbox: Sandbox, filename: str) -> None:
+    sandbox.rm_baker(0, proto=protocol.DAEMON)
+    sandbox.add_baker(
+        0,
+        [f'bootstrap{i}' for i in range(1, 6)],
+        proto=protocol.DAEMON,
+        run_params=[
+            "--votefile",
+            filename,
+        ],
+    )
+    if not sandbox.log_dir:
+        pytest.skip()
+    time.sleep(SLEEP)
+    assert sandbox.logs
+
+
+def run_vote_file_no_options(sandbox: Sandbox) -> None:
+    sandbox.rm_baker(0, proto=protocol.DAEMON)
+    sandbox.add_baker(
+        0,
+        [f'bootstrap{i}' for i in range(1, 6)],
+        proto=protocol.DAEMON,
     )
     if not sandbox.log_dir:
         pytest.skip()
@@ -164,6 +196,34 @@ class TestAllPerBlockVotes:
     def test_invalid_json(self, sandbox: Sandbox):
         filename = "tests_014/per_block_vote_files/invalid.json"
         run_invalid_file_test(sandbox, filename, 'pass')
+
+    def test_default_file_location(self, sandbox: Sandbox):
+        votefile = open("per_block_votes.json", 'w')
+        votefile.write('{"liquidity_baking_toggle_vote": "on"}')
+        votefile.close()
+        run_vote_file_no_options(sandbox)
+        assert get_what_the_baker_votes_from_its_logs(sandbox) == 'on'
+        os.remove("per_block_votes.json")
+
+    def test_vote_caching(self, sandbox: Sandbox):
+        votefile = open("per_block_votes.json", 'w')
+        votefile.write('{"liquidity_baking_toggle_vote": "on"}')
+        votefile.close()
+        run_vote_file_no_options(sandbox)
+        time.sleep(1)
+        os.remove("per_block_votes.json")
+        time.sleep(1)
+        assert get_what_the_baker_votes_from_its_logs(sandbox) == 'on'
+
+    def test_path_overrides_default_location(self, sandbox: Sandbox):
+        votefile = open("per_block_votes.json", 'w')
+        votefile.write('{"liquidity_baking_toggle_vote": "on"}')
+        votefile.close()
+        run_vote_file_with_path(
+            sandbox, "tests_014/per_block_vote_files/off.json"
+        )
+        assert get_what_the_baker_votes_from_its_logs(sandbox) == 'off'
+        os.remove("per_block_votes.json")
 
     # Tests that using booleans (which was possible until Ithaca) is
     # not possible anymore.

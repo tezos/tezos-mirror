@@ -69,21 +69,23 @@ blocks if 80% do, 3583 blocks if 60% do etc. Recall for comparison
 that assuming two blocks per minute there are 2880 blocks per day.
 
 When producing blocks using Octez baking daemon ``tezos-baker``, there
-are two command-line options affecting toggle vote. The mandatory
-``--liquidity-baking-toggle-vote <on|off|pass>`` option sets the
-default value for the flag.
-Note that this option must be placed **after** ``run`` on the command-line.
-Moreover, the path of a JSON file can be
-given to the optional ``--votefile <path>`` option
+are two command-line options affecting toggle vote. The
+``--liquidity-baking-toggle-vote <on|off|pass>`` option sets a static
+value to be used in each block. Note that this option must be placed
+**after** ``run`` on the command-line. Moreover, the path of a JSON file
+can be given to the ``--votefile <path>`` option
 e.g. ``tezos-baker-<protocol codename> run with local node
 ~/.tezos-node alice --liquidity-baking-toggle-vote on --votefile
-"per_block_votes.json"``. The content of the JSON file will be
-repeatedly submitted on each baked block, where
-``per_block_votes.json`` contains just
+"per_block_votes.json"``, or placed in a default location:
+``per_block_votes.json`` in the current working directory. The content
+of the JSON file will be repeatedly submitted on each baked block,
+where ``per_block_votes.json`` contains just
 ``{"liquidity_baking_toggle_vote": "pass"}`` (to abstain),
 ``{"liquidity_baking_toggle_vote": "off"}`` (to request ending the
 subsidy), or ``{"liquidity_baking_toggle_vote": "on"}`` (to request
 continuing the subsidy). When the ``--votefile`` option is present it
-takes precedence over ``--liquidity-baking-toggle-vote`` which is only
-used in case an error occurs while attempting to read the vote
-file. See also the :ref:`baker man page<baker_manual_jakarta>`.
+takes precedence over ``--liquidity-baking-toggle-vote``. If the JSON
+file is deleted or becomes malformed while the baker is running, the
+last valid value read is used. If neither a valid vote file is provided
+nor a CLI value given, the baker will fail on the first block after it
+was started. See also the :ref:`baker man page<baker_manual_jakarta>`.

@@ -117,7 +117,7 @@ let default_state_recorder_config = Filesystem
 
 let default_extra_operations = None
 
-let default_per_block_vote_file = None
+let default_per_block_vote_file = "per_block_votes.json"
 
 let default_config =
   {
@@ -130,7 +130,7 @@ let default_config =
     force = default_force;
     state_recorder = default_state_recorder_config;
     extra_operations = default_extra_operations;
-    per_block_vote_file = default_per_block_vote_file;
+    per_block_vote_file = None;
   }
 
 let make ?(minimal_fees = default_fees_config.minimal_fees)
