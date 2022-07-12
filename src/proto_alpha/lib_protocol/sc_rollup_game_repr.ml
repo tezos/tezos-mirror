@@ -492,10 +492,13 @@ let check_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
           check
             (not (Option.equal State_hash.equal b stop_chunk.state_hash))
             (match stop_chunk.state_hash with
-            | None -> "The stop hash should be None."
+            (* If the [b] state is equal to [stop_chunk], that means we
+               agree on the after state of the section. But, we're trying
+               to dispute it, it doesn't make sense. *)
+            | None -> "The stop hash should not be None."
             | Some stop ->
                 Format.asprintf
-                  "The stop hash should be equal to %a"
+                  "The stop hash should not be equal to %a"
                   State_hash.pp
                   stop)
         in
