@@ -4576,10 +4576,10 @@ module Protocol = Protocol
     let _sc_rollup_client =
       only_if (active && N.(number >= 013)) @@ fun () ->
       public_exe
-        (sf "tezos-sc-rollup-client-%s" name_dash)
+        (sf "octez-sc-rollup-client-%s" name_dash)
         ~internal_name:(sf "main_sc_rollup_client_%s" name_underscore)
         ~path:(path // "bin_sc_rollup_client")
-        ~synopsis:"Tezos/Protocol: `tezos-sc-rollup-client-alpha` client binary"
+        ~synopsis:"Tezos/Protocol: `octez-sc-rollup-client-alpha` client binary"
         ~release:true
         ~deps:
           [
@@ -4601,7 +4601,7 @@ module Protocol = Protocol
     let _sc_rollup_node =
       only_if (active && N.(number >= 013)) @@ fun () ->
       public_exe
-        (sf "tezos-sc-rollup-node-%s" name_dash)
+        (sf "octez-sc-rollup-node-%s" name_dash)
         ~internal_name:(sf "main_sc_rollup_node_%s" name_underscore)
         ~path:(path // "bin_sc_rollup_node")
         ~synopsis:"Tezos/Protocol: Smart Contract Rollup node binary"
@@ -4678,10 +4678,10 @@ module Protocol = Protocol
     let _tx_rollup_client =
       only_if (active && N.(number >= 013)) @@ fun () ->
       public_exe
-        (sf "tezos-tx-rollup-client-%s" name_dash)
+        (sf "octez-tx-rollup-client-%s" name_dash)
         ~internal_name:(sf "main_tx_rollup_client_%s" name_underscore)
         ~path:(path // "bin_tx_rollup_client")
-        ~synopsis:"Tezos/Protocol: `tezos-tx-rollup-client-alpha` client binary"
+        ~synopsis:"Tezos/Protocol: `octez-tx-rollup-client-alpha` client binary"
         ~release:true
         ~deps:
           [
@@ -4700,7 +4700,7 @@ module Protocol = Protocol
     let _tx_rollup_node =
       only_if (active && N.(number >= 013)) @@ fun () ->
       public_exe
-        (sf "tezos-tx-rollup-node-%s" name_dash)
+        (sf "octez-tx-rollup-node-%s" name_dash)
         ~internal_name:(sf "main_tx_rollup_node_%s" name_underscore)
         ~path:(path // "bin_tx_rollup_node")
         ~synopsis:"Tezos/Protocol: Transaction Rollup node binary"
