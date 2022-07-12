@@ -48,7 +48,7 @@
     a given [inbox_level] and contains a given [payload].
 
     According the rollup management protocol, the payload must be obtained
-    through {!Sc_rollup_inbox_message_repr.to_bytes} which follows a documented
+    through {!Sc_rollup_inbox_message_repr.serialize} which follows a documented
     format. *)
 type input = {
   inbox_level : Raw_level_repr.t;
