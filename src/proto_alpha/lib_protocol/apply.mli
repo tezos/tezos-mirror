@@ -43,6 +43,7 @@ type error +=
   | Tx_rollup_invalid_transaction_ticket_amount
   | Sc_rollup_feature_disabled
   | Empty_transaction of Contract.t
+  | Unrequired_denunciation
 
 val begin_partial_construction :
   context ->

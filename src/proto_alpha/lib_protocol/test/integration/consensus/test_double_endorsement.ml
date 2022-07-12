@@ -430,6 +430,37 @@ let test_freeze_more_with_low_balance =
     Context.Delegate.info (B e1) account1 >>=? fun info6 ->
     Assert.equal_bool ~loc:__LOC__ info6.deactivated true
 
+(** Injecting a valid double endorsement multiple times raises an error. *)
+let test_two_double_endorsement_evidences_leads_to_unreqired_denunciation () =
+  Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, _contracts) ->
+  block_fork genesis >>=? fun (blk_1, blk_2) ->
+  Block.bake blk_1 >>=? fun blk_a ->
+  Block.bake blk_2 >>=? fun blk_b ->
+  Context.get_endorser (B blk_a) >>=? fun (delegate, _) ->
+  Op.endorsement ~endorsed_block:blk_a (B blk_1) () >>=? fun endorsement_a ->
+  Op.endorsement ~endorsed_block:blk_b (B blk_2) () >>=? fun endorsement_b ->
+  let operation = double_endorsement (B genesis) endorsement_a endorsement_b in
+  let operation2 = double_endorsement (B genesis) endorsement_b endorsement_a in
+  Context.get_bakers (B blk_a) >>=? fun bakers ->
+  let baker = Context.get_first_different_baker delegate bakers in
+  Context.Delegate.full_balance (B blk_a) baker >>=? fun _full_balance ->
+  Block.bake
+    ~policy:(By_account baker)
+    ~operations:[operation; operation2]
+    blk_a
+  >>= fun e ->
+  Assert.proto_error ~loc:__LOC__ e (function
+      | Apply.Unrequired_denunciation -> true
+      | _ -> false)
+  >>=? fun () ->
+  Block.bake ~policy:(By_account baker) ~operation blk_a
+  >>=? fun blk_with_evidence1 ->
+  Block.bake ~policy:(By_account baker) ~operation blk_with_evidence1
+  >>= fun e ->
+  Assert.proto_error ~loc:__LOC__ e (function
+      | Apply.Unrequired_denunciation -> true
+      | _ -> false)
+
 let tests =
   [
     Tztest.tztest
@@ -440,6 +471,10 @@ let tests =
       "2 valid double endorsement evidences lead to not being able to bake"
       `Quick
       test_two_double_endorsement_evidences_leadsto_no_bake;
+    Tztest.tztest
+      "valid double endorsement injected multiple time"
+      `Quick
+      test_two_double_endorsement_evidences_leads_to_unreqired_denunciation;
     Tztest.tztest
       "invalid double endorsement evidence"
       `Quick

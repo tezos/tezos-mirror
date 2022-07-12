@@ -283,6 +283,53 @@ end = struct
       ~loc:__LOC__
       ()
 
+  let double_preendorsement ctxt ?(correct_order = true) op1 op2 =
+    let e1, e2 = order_preendorsements ~correct_order op1 op2 in
+    Op.double_preendorsement ctxt e1 e2
+
+  let block_fork b =
+    Context.get_first_different_bakers (B b) >>=? fun (baker_1, baker_2) ->
+    Block.bake ~policy:(By_account baker_1) b >>=? fun blk_a ->
+    Block.bake ~policy:(By_account baker_2) b >|=? fun blk_b -> (blk_a, blk_b)
+
+  (** Injecting a valid double preendorsement multiple time raises an error. *)
+  let test_two_double_preendorsement_evidences_leads_to_unreqired_denunciation
+      () =
+    Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, _contracts) ->
+    block_fork genesis >>=? fun (blk_1, blk_2) ->
+    Block.bake blk_1 >>=? fun blk_a ->
+    Block.bake blk_2 >>=? fun blk_b ->
+    Context.get_endorser (B blk_a) >>=? fun (delegate, _) ->
+    Op.preendorsement ~endorsed_block:blk_a (B blk_1) ()
+    >>=? fun preendorsement_a ->
+    Op.preendorsement ~endorsed_block:blk_b (B blk_2) ()
+    >>=? fun preendorsement_b ->
+    let operation =
+      double_preendorsement (B genesis) preendorsement_a preendorsement_b
+    in
+    let operation2 =
+      double_preendorsement (B genesis) preendorsement_b preendorsement_a
+    in
+    Context.get_bakers (B blk_a) >>=? fun bakers ->
+    let baker = Context.get_first_different_baker delegate bakers in
+    Context.Delegate.full_balance (B blk_a) baker >>=? fun _full_balance ->
+    Block.bake
+      ~policy:(By_account baker)
+      ~operations:[operation; operation2]
+      blk_a
+    >>= fun e ->
+    Assert.proto_error ~loc:__LOC__ e (function
+        | Apply.Unrequired_denunciation -> true
+        | _ -> false)
+    >>=? fun () ->
+    Block.bake ~policy:(By_account baker) ~operation blk_a
+    >>=? fun blk_with_evidence1 ->
+    Block.bake ~policy:(By_account baker) ~operation blk_with_evidence1
+    >>= fun e ->
+    Assert.proto_error ~loc:__LOC__ e (function
+        | Apply.Unrequired_denunciation -> true
+        | _ -> false)
+
   let my_tztest title test =
     Tztest.tztest (Format.sprintf "%s: %s" name title) test
 
@@ -322,6 +369,10 @@ end = struct
         "double_preendorsement_denunciation_after_slashing_period"
         `Quick
         double_preendorsement_denunciation_after_slashing_period;
+      my_tztest
+        "valid double preendorsement injected multiple times"
+        `Quick
+        test_two_double_preendorsement_evidences_leads_to_unreqired_denunciation;
     ]
 end
 
