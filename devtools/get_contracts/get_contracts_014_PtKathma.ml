@@ -24,6 +24,8 @@
 (*****************************************************************************)
 
 module Proto = struct
+  let hash = hash
+
   let wrap_tzresult = Environment.wrap_tzresult
 
   module Context = struct
