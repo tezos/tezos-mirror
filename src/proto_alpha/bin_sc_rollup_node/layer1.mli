@@ -88,11 +88,13 @@ val current_head_hash : Store.t -> Block_hash.t option Lwt.t
 val current_level : Store.t -> int32 option Lwt.t
 
 (** [hash_of_level store level] returns the current block hash for a
-    given [level]. *)
+   given [level]. Raise [Invalid_argument] if [hash] does not belong
+   to [store]. *)
 val hash_of_level : Store.t -> int32 -> Block_hash.t Lwt.t
 
 (** [level_of_hash store hash] returns the level for a given block
-    [hash]. *)
+   [hash]. Raise [Invalid_argument] if [hash] does not belong to
+   [store]. *)
 val level_of_hash : Store.t -> Block_hash.t -> int32 Lwt.t
 
 (** [predecessor store head] returns the hash of the head's predecessor block] *)
