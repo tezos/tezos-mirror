@@ -51,6 +51,10 @@ type vdf_solution = Vdf.result * Vdf.proof
 
 val pp_solution : Format.formatter -> vdf_solution -> unit
 
+(** Compare only the first element of two vdf_solution, that are
+    of [Vdf.result]. *)
+val compare_vdf_solution : vdf_solution -> vdf_solution -> int
+
 val generate_vdf_setup :
   seed_discriminant:seed -> seed_challenge:seed -> vdf_setup
 

@@ -1345,6 +1345,9 @@ module Seed : sig
   (** See {!Seed_storage.update_seed}. *)
   val update_seed : context -> vdf_solution -> context tzresult Lwt.t
 
+  (** See {!Seed_repr.compare_vdf_solution}. *)
+  val compare_vdf_solution : vdf_solution -> vdf_solution -> int
+
   val compute_randao : context -> context tzresult Lwt.t
 
   val cycle_end :

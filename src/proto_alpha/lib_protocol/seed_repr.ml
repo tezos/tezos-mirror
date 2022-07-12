@@ -258,3 +258,10 @@ let seed_status_encoding =
   let to_bool = function RANDAO_seed -> false | VDF_seed -> true in
   let of_bool t = if t then VDF_seed else RANDAO_seed in
   Data_encoding.conv to_bool of_bool Data_encoding.bool
+
+let compare_vdf_solution solution solution' =
+  let result, _ = solution in
+  let result', _ = solution' in
+  Compare.Bytes.compare
+    (Vdf.result_to_bytes result)
+    (Vdf.result_to_bytes result')
