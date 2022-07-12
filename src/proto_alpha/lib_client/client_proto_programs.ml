@@ -219,7 +219,6 @@ let run (cctxt : #Protocol_client_context.rpc_context)
   } =
     params
   in
-  let payer = Option.map (fun c -> Contract.Implicit c) payer in
   let amount = Option.value ~default:Tez.fifty_cents amount in
   Plugin.RPC.Scripts.run_code
     cctxt
@@ -253,7 +252,6 @@ let trace (cctxt : #Protocol_client_context.rpc_context)
   } =
     params
   in
-  let payer = Option.map (fun c -> Contract.Implicit c) payer in
   let amount = Option.value ~default:Tez.fifty_cents amount in
   Plugin.RPC.Scripts.trace_code
     cctxt

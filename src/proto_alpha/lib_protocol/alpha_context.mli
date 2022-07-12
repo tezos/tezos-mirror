@@ -1633,6 +1633,8 @@ module Contract : sig
 
   include BASIC_DATA with type t := t
 
+  val implicit_encoding : Signature.public_key_hash Data_encoding.t
+
   val originated_encoding : Contract_hash.t Data_encoding.t
 
   val in_memory_size : t -> Cache_memory_helpers.sint

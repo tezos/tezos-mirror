@@ -164,7 +164,7 @@ module Scripts = struct
            (opt "balance" Tez.encoding)
            (req "chain_id" Chain_id.encoding)
            (opt "source" Contract.encoding)
-           (opt "payer" Contract.encoding)
+           (opt "payer" Contract.implicit_encoding)
            (opt "self" Contract.originated_encoding)
            (dft "entrypoint" Entrypoint.simple_encoding Entrypoint.default))
         (obj4
@@ -901,7 +901,7 @@ module Scripts = struct
   type run_code_config = {
     balance : Tez.t;
     self : Contract_hash.t;
-    payer : Contract.t;
+    payer : Signature.public_key_hash;
     source : Contract.t;
   }
 
@@ -945,9 +945,9 @@ module Scripts = struct
         match (src_opt, pay_opt) with
         | None, None ->
             let self = Contract.Originated self in
-            (self, Contract.Implicit Signature.Public_key_hash.zero)
-        | Some c, None -> (c, Contract.Implicit Signature.Public_key_hash.zero)
-        | None, Some c -> (c, c)
+            (self, Signature.Public_key_hash.zero)
+        | Some c, None -> (c, Signature.Public_key_hash.zero)
+        | None, Some c -> (Contract.Implicit c, c)
         | Some src, Some pay -> (src, pay)
       in
       return (ctxt, {balance; self; source; payer})
@@ -1028,6 +1028,7 @@ module Scripts = struct
           | Some z -> z
         in
         let step_constants =
+          let payer = Contract.Implicit payer in
           let open Script_interpreter in
           {source; payer; self; amount; balance; chain_id; now; level}
         in
@@ -1098,6 +1099,7 @@ module Scripts = struct
           | Some z -> z
         in
         let step_constants =
+          let payer = Contract.Implicit payer in
           let open Script_interpreter in
           {source; payer; self; amount; balance; chain_id; now; level}
         in
