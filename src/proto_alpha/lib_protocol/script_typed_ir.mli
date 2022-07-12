@@ -31,7 +31,7 @@ open Dependent_bool
 
 type step_constants = {
   source : Contract.t;
-  payer : Contract.t;
+  payer : Signature.public_key_hash;
   self : Contract_hash.t;
   amount : Tez.t;
   balance : Tez.t;

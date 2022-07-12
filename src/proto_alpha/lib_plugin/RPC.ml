@@ -1030,7 +1030,6 @@ module Scripts = struct
           | Some z -> z
         in
         let step_constants =
-          let payer = Contract.Implicit payer in
           let open Script_interpreter in
           {source; payer; self; amount; balance; chain_id; now; level}
         in
@@ -1101,7 +1100,6 @@ module Scripts = struct
           | Some z -> z
         in
         let step_constants =
-          let payer = Contract.Implicit payer in
           let open Script_interpreter in
           {source; payer; self; amount; balance; chain_id; now; level}
         in
@@ -1187,7 +1185,7 @@ module Scripts = struct
           let open Script_interpreter in
           {
             source;
-            payer = Contract.Implicit payer;
+            payer;
             self = contract_hash;
             amount = Tez.zero;
             balance;
@@ -1284,7 +1282,7 @@ module Scripts = struct
         let step_constants =
           {
             Script_interpreter.source;
-            payer = Contract.Implicit payer;
+            payer;
             self = contract_hash;
             amount = Tez.zero;
             balance;
