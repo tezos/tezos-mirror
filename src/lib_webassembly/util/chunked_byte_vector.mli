@@ -36,7 +36,7 @@ module type S = sig
   val create : ?get_chunk:(int64 -> Chunk.t effect) -> int64 -> t
 
   (** [of_string str] creates a chunked byte vector from the given [str]. *)
-  val of_string : string -> t effect
+  val of_string : string -> t
 
   (** [of_bytes bytes] creates a chunked byte vector from the given [bytes]. The
       underlying memory is effectively copied - further modifications to [bytes]
@@ -77,7 +77,7 @@ module type S = sig
     val add_byte : t -> int -> t effect
 
     (** [of_string str] creates a chunked byte vector from the given [str]. *)
-    val of_string : string -> t effect
+    val of_string : string -> t
 
     (** [to_string_unstable buffer] creates a string from the given buffer
         [buffer].

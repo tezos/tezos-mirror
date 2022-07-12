@@ -367,7 +367,10 @@ and elem_segment' = {
 
 type data_segment = data_segment' Source.phrase
 
-and data_segment' = {dinit : Chunked_byte_vector.Buffer.t; dmode : segment_mode}
+and data_segment' = {
+  dinit : Chunked_byte_vector.Lwt.Buffer.t;
+  dmode : segment_mode;
+}
 
 (* Modules *)
 

@@ -4,7 +4,10 @@ let instr oc width e = Sexpr.output oc width (Arrange.instr e)
 
 let func oc width f = Sexpr.output oc width (Arrange.func f)
 
-let module_ oc width m = Sexpr.output oc width (Arrange.module_ m)
+let module_ oc width m =
+  let open Lwt.Syntax in
+  let* m = Arrange.module_ m in
+  Sexpr.output oc width m
 
 let script oc width mode s =
   let open Lwt.Syntax in

@@ -885,12 +885,8 @@ let create_elem (inst : module_inst) (seg : elem_segment) : elem_inst Lwt.t =
 
 let create_data (inst : module_inst) (seg : data_segment) : data_inst Lwt.t =
   let {dinit; _} = seg.it in
-  (* TODO: #3076
-     Conversion from [Chunked_byte_vector.Buffer.t] to
-     [Chunked_byte_vector.Lwt.t] is currently not efficiently supported. *)
-  let data = Chunked_byte_vector.Buffer.to_string_unstable dinit in
-  let+ data = Chunked_byte_vector.Lwt.of_string data in
-  ref data
+  let data = Chunked_byte_vector.Lwt.Buffer.to_byte_vector dinit in
+  Lwt.return (ref data)
 
 let add_import (m : module_) (ext : extern) (im : import) (inst : module_inst) :
     module_inst Lwt.t =
@@ -951,7 +947,7 @@ let run_data i data =
             (I32
                (Int32.of_int
                   (Int64.to_int
-                     (Chunked_byte_vector.Buffer.length data.it.dinit)))
+                     (Chunked_byte_vector.Lwt.Buffer.length data.it.dinit)))
             @@ at)
           @@ at;
           MemoryInit x @@ at;

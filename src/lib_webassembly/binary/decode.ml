@@ -161,20 +161,25 @@ let sized f s =
 (** Incremental chunked byte vector creation (from implicit input). *)
 type byte_vector_kont =
   | VKStart  (** Initial step. *)
-  | VKRead of Chunked_byte_vector.Buffer.t * int * int
+  | VKRead of Chunked_byte_vector.Lwt.Buffer.t * int * int
       (** Reading step, containing the current position in the string and the
       length, reading byte per byte. *)
-  | VKStop of Chunked_byte_vector.Buffer.t  (** Final step, cannot reduce. *)
+  | VKStop of Chunked_byte_vector.Lwt.Buffer.t
+      (** Final step, cannot reduce. *)
 
-let byte_vector_step s = function
+let byte_vector_step s =
+  let open Lwt.Syntax in
+  function
   | VKStart ->
       let len = len32 s in
-      let vector = len |> Int64.of_int |> Chunked_byte_vector.Buffer.create in
-      VKRead (vector, 0, len)
-  | VKRead (vector, index, len) when index >= len -> VKStop vector
+      let vector =
+        len |> Int64.of_int |> Chunked_byte_vector.Lwt.Buffer.create
+      in
+      VKRead (vector, 0, len) |> Lwt.return
+  | VKRead (vector, index, len) when index >= len -> VKStop vector |> Lwt.return
   | VKRead (vector, index, len) ->
       let c = get s in
-      let vector = Chunked_byte_vector.Buffer.add_byte vector c in
+      let+ vector = Chunked_byte_vector.Lwt.Buffer.add_byte vector c in
       VKRead (vector, index + 1, len)
   (* Final step, cannot reduce *)
   | VKStop vector -> assert false
@@ -1510,20 +1515,24 @@ let data_start s =
       DKMode {left; index; offset_kont = (left_offset, [IKNext []])}
   | _ -> error s (pos s - 1) "malformed data segment kind"
 
-let data_step s = function
-  | DKStart -> data_start s
+let data_step s =
+  let open Lwt.Syntax in
+  function
+  | DKStart -> data_start s |> Lwt.return
   | DKMode {left; index; offset_kont = left_offset, [IKStop offset]} ->
       end_ s ;
       let right = pos s in
       let offset = Source.(offset @@ region s left_offset right) in
       let dmode = Source.(Active {index; offset} @@ region s left right) in
-      DKInit {dmode; init_kont = VKStart}
+      DKInit {dmode; init_kont = VKStart} |> Lwt.return
   | DKMode {left; index; offset_kont = left_offset, k} ->
       let k' = instr_block_step s k in
-      DKMode {left; index; offset_kont = (left_offset, k')}
-  | DKInit {dmode; init_kont = VKStop dinit} -> DKStop {dmode; dinit}
+      DKMode {left; index; offset_kont = (left_offset, k')} |> Lwt.return
+  | DKInit {dmode; init_kont = VKStop dinit} ->
+      DKStop {dmode; dinit} |> Lwt.return
   | DKInit {dmode; init_kont} ->
-      DKInit {dmode; init_kont = byte_vector_step s init_kont}
+      let+ init_kont = byte_vector_step s init_kont in
+      DKInit {dmode; init_kont}
   | DKStop _ -> assert false (* final step, cannot reduce *)
 
 (* DataCount section *)
@@ -1882,7 +1891,8 @@ let module_step state =
       let data = Source.(data @@ region s left (pos s)) in
       next @@ MKField (DataField, size, lazy_vec_step data vec)
   | MKData (data_kont, pos, size, curr_vec) ->
-      next @@ MKData (data_step s data_kont, pos, size, curr_vec)
+      let* data_kont = data_step s data_kont in
+      next @@ MKData (data_kont, pos, size, curr_vec)
   | MKCode (CKStop func, left, size, vec) ->
       next @@ MKField (CodeField, size, lazy_vec_step func vec)
   | MKCode (code_kont, pos, size, curr_vec) ->
