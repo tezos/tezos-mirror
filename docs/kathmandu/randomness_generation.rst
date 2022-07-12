@@ -36,10 +36,10 @@ is discarded, otherwise it is accepted.
 Once the revelation phase is finished, nonces are combined to generate the
 seed. More precisely, the nonces are hashed together in the same order as the
 commitment publication. In the case of a rolling RANDAO, the previous seed may
-be used to initilialise the hash.
+be used to initialize the hash.
 
 We make the assumption that at least one participant is honest, that is, it
-has indeed chosen a random value and this values was revealed. This is a
+has indeed chosen a random value and this value was revealed. This is a
 necessary condition for the seed to be random. The randomness could however be
 biased as this protocol suffers from the following low-impact weakness:
 if a malicious participant can make sure she is the last revealer, then she
@@ -49,9 +49,9 @@ two different predetermined seeds.
 Verifiable Delay Function
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Verifiable Delay Functions, also called VDF, are a recent cryptographic
-primitive formalised in 2018. They can be seen as a trapdoor-less timelock:
-the goal of VDF is making sure a party cannot compute a value before a
+Verifiable Delay Functions, also called VDFs, are a recent cryptographic
+primitive formalized in 2018. They can be seen as a trapdoor-less timelock:
+the goal of a VDF is making sure a party cannot compute a value before a
 specific time.
 
 This new cryptographic building block is based on modular squaring in a group
@@ -59,13 +59,13 @@ of unknown order (e.g. class groups or MPC-generated RSA groups) that is
 believed to be expensive and hard to parallelize.
 
 More precisely, the goal of a VDF is for a user to compute a certain value
-h = g^2^T mod N ∈ G and a proof of correctness π_h by recursive modular
-squarings of h. The variables g, h and T are respectively called the challenge,
-solution, and difficulfy parameter. The main difference between VDF and
-timelocks is that the latter offers a backdoor to efficiently generate the
-challenge from the solution.
+``h = g^2^T mod N ∈ G`` and a proof of correctness ``π_h`` by recursive modular
+squarings of ``h``. The variables ``g``, ``h``, ``T`` and ``N`` are respectively the *challenge*,
+*solution* (or *output*), the *difficulty parameter* and the -unknown- *group order*. The main
+difference between VDF and timelocks is that the latter offers a backdoor to
+efficiently generate the challenge from the solution.
 
-To this day, two main schemes exist for generating the VDF proofs:
+To this day, two main schemes exist for generating VDF proofs:
 `Wesolowski <https://eprint.iacr.org/2018/623>`_ and
 `Pietrzak <https://eprint.iacr.org/2018/627>`_.
 The former presents shorter proofs and is based on a stronger security
@@ -78,9 +78,10 @@ Protocol
 Randomness generation overview
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The randomness generation can be summed up as follows. We first use RANDAO to
+The randomness generation uses both RANDAO and VDF, based on class groups and
+using Wesolowski proofs. It can be summed up as follows. We first use RANDAO to
 produce biasable entropy which is used as a VDF challenge to generate an
-unbiasable seed (given the adversary cannot compute the VDF before the reveal
+unbiasable seed (given the adversary cannot compute the VDF solution before the reveal
 time ends). To ensure liveness, we fallback to RANDAO entropy if no VDF output
 was published and verified on-chain.
 
@@ -114,11 +115,20 @@ with transactions for block space. Up to ``MAX_ANON_OPS_PER_BLOCK`` revelations,
 wallet activations and denunciations can be contained in any given block.
 
 During the rest of the cycle, informally called the VDF revelation period, any
-party can query the protocol for the *seed computation status* to compute the
-VDF solution and publish it on-chain together with a proof of randomness.
-If the verification of the solution and proof succeeds, the seed for cycle
-``n`` is then updated with the solution: its value is set to be the hash of
-the RANDAO output and the solution.
+party can query the protocol for the *seed computation status*, which can be
+one of the following:(1) the VDF revelation period has not yet started, i.e.
+the nonce revelation phase is still ongoing, (2) a VDF solution has already
+been successfully submitted, and (3) no VDF solution has been submitted. In
+this latter case, the status also provides the information needed to compute
+the VDF solution:  hash seeds for computing the VDF discriminant (a prime
+number defining the class group) and the VDF challenge; more precisely the
+random seed of cycle ``n-1``  for the VDF discriminant and the current RANDAO
+output for the VDF challenge. Any party can compute a VDF solution and publish
+it on-chain together with a proof of correctness. If the verification of the
+solution and proof succeeds, the seed for cycle ``n`` is then updated with the
+solution: its value is set to be the hash of the RANDAO output and the VDF
+solution.
+
 
 A *VDF revelation* is an operation. A reward ``SEED_NONCE_REVELATION_TIP`` is
 given for the first correct VDF revelation, subsequent VDF revelation
@@ -138,7 +148,7 @@ Randomness generation parameters
    * - ``BLOCKS_PER_COMMITMENT``
      - 64 blocks
    * - ``NONCE_REVELATION_THRESHOLD``
-     - 64 blocks
+     - 32 blocks
    * -  ``MAX_ANON_OPS_PER_BLOCK``
      - 132 revelations
    * - ``SEED_NONCE_REVELATION_TIP``
