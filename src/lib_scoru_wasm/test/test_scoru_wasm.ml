@@ -70,7 +70,7 @@ let read_input () =
   in
   module_inst := {!module_inst with memories} ;
   let* result =
-    aux_write_input_in_memory
+    Host_funcs.Internal_for_tests.aux_write_input_in_memory
       ~input_buffer
       ~module_inst
       ~rtype_offset:0L
@@ -121,7 +121,7 @@ let test_host_fun () =
       ]
   in
   let* module_inst, result =
-    Eval.invoke ~module_inst ~input Tezos_scoru_wasm.read_input values
+    Eval.invoke ~module_inst ~input Host_funcs.read_input values
   in
   let* memory =
     Tezos_webassembly_interpreter.Lazy_vector.LwtInt32Vector.get

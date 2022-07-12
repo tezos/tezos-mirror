@@ -1126,7 +1126,7 @@ struct
     module Make
         (Tree : Context.TREE with type key = string list and type value = bytes) =
     struct
-      module Wasm = Tezos_scoru_wasm.Make (Tree)
+      module Wasm = Tezos_scoru_wasm.Wasm_pvm.Make (Tree)
 
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3214
          The rest of the module is pure boilerplate converting between
@@ -1142,7 +1142,8 @@ struct
       let get_output {outbox_level; message_index} (tree : Tree.tree) =
         Wasm.get_output {outbox_level; message_index} tree
 
-      let convert_input : Tezos_scoru_wasm.input -> input = function
+      let convert_input : Tezos_scoru_wasm.Wasm_pvm_sig.input_info -> input =
+        function
         | {inbox_level; message_counter} -> {inbox_level; message_counter}
 
       let get_info (tree : Tree.tree) =

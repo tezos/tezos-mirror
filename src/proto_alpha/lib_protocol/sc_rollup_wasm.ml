@@ -211,7 +211,10 @@ module V2_0_0 = struct
       Lwt.return state
 
     let install_boot_sector state boot_sector =
-      Tree.add state ["boot-sector"] (Bytes.of_string boot_sector)
+      Tree.add
+        state
+        ["boot-sector"]
+        Data_encoding.(Binary.to_bytes_exn string boot_sector)
 
     let state_hash state =
       let context_hash = Tree.hash state in

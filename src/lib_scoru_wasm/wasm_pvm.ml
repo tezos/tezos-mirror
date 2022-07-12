@@ -23,41 +23,44 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [lookup name] retrieves or instantiates a host function by the given
-    [name]. *)
-val lookup : string -> ('input, 'inst) Tezos_webassembly_interpreter.Func.t
+(*
 
-exception Bad_input
+  This library acts as a dependency to the protocol environment. Everything that
+  must be exposed to the protocol via the environment shall be added here.
 
-(** [read_input] is a host function. It has to be invoked with a list
-    of 5 values representing rtype_offset, level_offset, id_offset,
-    dst and max_bytes, otherwise it raises the [Bad_input] exception.
+*)
 
-    When invoked, it write the content of an input message into the
-    memory of a [module_inst]. It also checks that the input payload
-    is no larger than the input is not too large. Finally, it returns
-    returns a singleton value list containing the size of the
-    input_buffer payload. *)
-val read_input :
-  ( Tezos_webassembly_interpreter.Input_buffer.t,
-    Tezos_webassembly_interpreter.Instance.module_inst ref )
-  Tezos_webassembly_interpreter.Func.func
+module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
+  include
+    Gather_floppies.Make
+      (T)
+      (struct
+        type tree = T.tree
 
-module Internal_for_tests : sig
-  (** [aux_write_memory ~input_buffer ~module_inst ~rtype_offset
-       ~level_offset ~id_offset ~dst ~max_bytes] reads `input_buffer`
-       and writes its components to the memory of `module_inst` based
-       on the memory addreses offsets described. It also checks that
-       the input payload is no larger than `max_input` and crashes
-       with `input too large` otherwise. It returns the size of the
-       payload.*)
-  val aux_write_input_in_memory :
-    input_buffer:Tezos_webassembly_interpreter.Input_buffer.t ->
-    module_inst:Tezos_webassembly_interpreter.Instance.module_inst ref ->
-    rtype_offset:int64 ->
-    level_offset:int64 ->
-    id_offset:int64 ->
-    dst:int64 ->
-    max_bytes:int64 ->
-    int Lwt.t
+        module Decodings = Wasm_decodings.Make (T)
+
+        let compute_step = Lwt.return
+
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/3092
+           Implement handling of input logic.
+        *)
+        let set_input_step _ _ = Lwt.return
+
+        let get_output _ _ = Lwt.return ""
+
+        let get_info _ =
+          Lwt.return
+            Wasm_pvm_sig.
+              {
+                current_tick = Z.of_int 0;
+                last_input_read = None;
+                input_request = No_input_required;
+              }
+
+        let _module_instance_of_tree modules =
+          Decodings.run (Decodings.module_instance_decoding modules)
+
+        let _module_instances_of_tree =
+          Decodings.run Decodings.module_instances_decoding
+      end)
 end

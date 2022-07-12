@@ -51,10 +51,35 @@ let test_initial_state_hash_wasm_pvm () =
       Sc_rollup.State_hash.pp
       hash
 
+let test_incomplete_kernel_chunk_limit () =
+  let open Lwt_result_syntax in
+  let operator =
+    match Account.generate_accounts 1 with
+    | [(account, _, _)] -> account
+    | _ -> assert false
+  in
+  let chunk_size = Tezos_scoru_wasm.Gather_floppies.chunk_size in
+  let chunk_too_big = Bytes.make (chunk_size + 10) 'a' in
+  let signature = Signature.sign operator.Account.sk chunk_too_big in
+  let floppy =
+    Tezos_scoru_wasm.Gather_floppies.{chunk = chunk_too_big; signature}
+  in
+  match
+    Data_encoding.Binary.to_string_opt
+      Tezos_scoru_wasm.Gather_floppies.floppy_encoding
+      floppy
+  with
+  | None -> return_unit
+  | Some _ -> failwith "encoding of a floppy with a chunk too large should fail"
+
 let tests =
   [
     Tztest.tztest
       "initial state hash for Wasm"
       `Quick
       test_initial_state_hash_wasm_pvm;
+    Tztest.tztest
+      "encoding of a floppy with a chunk too large should fail"
+      `Quick
+      test_incomplete_kernel_chunk_limit;
   ]
