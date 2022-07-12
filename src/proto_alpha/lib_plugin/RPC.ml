@@ -928,6 +928,14 @@ module Scripts = struct
         balance
       >>=? fun (ctxt, _) -> return (ctxt, dummy_contract_hash)
     in
+    let source_and_payer ~src_opt ~pay_opt ~default_src =
+      match (src_opt, pay_opt) with
+      | None, None ->
+          (Contract.Originated default_src, Signature.Public_key_hash.zero)
+      | Some c, None -> (c, Signature.Public_key_hash.zero)
+      | None, Some c -> (Contract.Implicit c, c)
+      | Some src, Some pay -> (src, pay)
+    in
     let configure_contracts ctxt script balance ~src_opt ~pay_opt ~self_opt =
       (match self_opt with
       | None ->
@@ -942,13 +950,7 @@ module Scripts = struct
           >>=? fun bal -> return (ctxt, addr, bal))
       >>=? fun (ctxt, self, balance) ->
       let source, payer =
-        match (src_opt, pay_opt) with
-        | None, None ->
-            let self = Contract.Originated self in
-            (self, Signature.Public_key_hash.zero)
-        | Some c, None -> (c, Signature.Public_key_hash.zero)
-        | None, Some c -> (Contract.Implicit c, c)
-        | Some src, Some pay -> (src, pay)
+        source_and_payer ~src_opt ~pay_opt ~default_src:self
       in
       return (ctxt, {balance; self; source; payer})
     in
