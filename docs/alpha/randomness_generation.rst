@@ -148,13 +148,13 @@ Randomness generation parameters
    * - ``BLOCKS_PER_COMMITMENT``
      - 64 blocks
    * - ``NONCE_REVELATION_THRESHOLD``
-     - 32 blocks
+     - 256 blocks
    * -  ``MAX_ANON_OPS_PER_BLOCK``
      - 132 revelations
    * - ``SEED_NONCE_REVELATION_TIP``
      -  1/8 ꜩ
    * - ``VDF_DIFFICULTY``
-     - 1,000,000,000
+     - 8,000,000,000
 
 The variables ``BLOCKS_PER_CYCLE`` and ``PRESERVED_CYCLES`` are already defined
 in the :doc:`proof of stake <proof_of_stake>` page.
