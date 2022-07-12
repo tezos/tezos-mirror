@@ -91,8 +91,8 @@ let commands () =
       ()
   in
   let payer_arg =
-    ContractAlias.destination_arg
-      ~name:"payer"
+    Client_keys.Public_key_hash.source_arg
+      ~long:"payer"
       ~doc:"name of the payer (i.e. SOURCE) contract for the transaction"
       ()
   in
@@ -279,6 +279,9 @@ let commands () =
         Lwt.return @@ Micheline_parser.no_parsing_error program
         >>=? fun program ->
         let show_source = not no_print_source in
+        let payer =
+          Option.map (fun c -> Alpha_context.Contract.Implicit c) payer
+        in
         if trace_exec then
           trace
             cctxt
@@ -961,6 +964,9 @@ let commands () =
            contract
            input
            cctxt ->
+        let payer =
+          Option.map (fun c -> Alpha_context.Contract.Implicit c) payer
+        in
         Client_proto_programs.run_view
           cctxt
           ~chain:cctxt#chain
@@ -997,6 +1003,9 @@ let commands () =
         Micheline_parser.no_parsing_error
         @@ Michelson_v1_parser.parse_expression "Unit"
         >>?= fun input ->
+        let payer =
+          Option.map (fun c -> Alpha_context.Contract.Implicit c) payer
+        in
         Client_proto_programs.run_script_view
           cctxt
           ~chain:cctxt#chain
@@ -1037,6 +1046,9 @@ let commands () =
            contract
            input
            cctxt ->
+        let payer =
+          Option.map (fun c -> Alpha_context.Contract.Implicit c) payer
+        in
         Client_proto_programs.run_script_view
           cctxt
           ~chain:cctxt#chain
