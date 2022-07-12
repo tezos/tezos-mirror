@@ -141,6 +141,7 @@ let register_K_plus_tests () =
   Events.register ~protocols:[Alpha] ;
   Ghostnet_dictator_migration.register ~protocols:[Alpha] ;
   Increase_paid_storage.register ~protocols ;
+  Operation_validation.register ~protocols ;
   Sc_rollup.register ~protocols:[Alpha] ;
   Test_contract_bls12_381.register ~protocols:[Alpha] ;
   Testnet_dictator.register ~protocols:[Alpha] ;
