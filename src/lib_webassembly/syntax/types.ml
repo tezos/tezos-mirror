@@ -11,7 +11,7 @@ type value_type =
   | VecType of vec_type
   | RefType of ref_type
 
-type result_type = value_type list
+type result_type = value_type Lazy_vector.LwtInt32Vector.t
 
 type func_type = FuncType of result_type * result_type
 
@@ -84,7 +84,35 @@ let match_limits lim1 lim2 =
   | None, Some _ -> false
   | Some i, Some j -> I32.le_u i j
 
-let match_func_type ft1 ft2 = ft1 = ft2
+let func_type_empty (FuncType (ins, out)) =
+  Lazy_vector.LwtInt32Vector.num_elements ins = 0l
+  && Lazy_vector.LwtInt32Vector.num_elements out = 0l
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3387
+
+   This function should probably be tickified, or the check removed from the
+   evaluation. *)
+let func_types_equal (FuncType (ins, out)) (FuncType (ins', out')) =
+  let open Lwt.Syntax in
+  let ins_len = Lazy_vector.LwtInt32Vector.num_elements ins in
+  let out_len = Lazy_vector.LwtInt32Vector.num_elements out in
+  if
+    ins_len <> Lazy_vector.LwtInt32Vector.num_elements ins'
+    || out_len <> Lazy_vector.LwtInt32Vector.num_elements out'
+  then Lwt.return_false
+  else
+    let rec for_all acc i len vec vec' =
+      if i >= len || not acc then Lwt.return acc
+      else
+        let* t = Lazy_vector.LwtInt32Vector.get i vec in
+        let* t' = Lazy_vector.LwtInt32Vector.get i vec' in
+        for_all (t = t') (Int32.succ i) len vec vec'
+    in
+    let* ins_eq = for_all true 0l ins_len ins ins' in
+    let+ out_eq = for_all true 0l out_len out out' in
+    ins_eq && out_eq
+
+let match_func_type ft1 ft2 = func_types_equal ft1 ft2
 
 let match_table_type (TableType (lim1, et1)) (TableType (lim2, et2)) =
   et1 = et2 && match_limits lim1 lim2
@@ -97,10 +125,13 @@ let match_global_type gt1 gt2 = gt1 = gt2
 let match_extern_type et1 et2 =
   match (et1, et2) with
   | ExternFuncType ft1, ExternFuncType ft2 -> match_func_type ft1 ft2
-  | ExternTableType tt1, ExternTableType tt2 -> match_table_type tt1 tt2
-  | ExternMemoryType mt1, ExternMemoryType mt2 -> match_memory_type mt1 mt2
-  | ExternGlobalType gt1, ExternGlobalType gt2 -> match_global_type gt1 gt2
-  | _, _ -> false
+  | ExternTableType tt1, ExternTableType tt2 ->
+      Lwt.return (match_table_type tt1 tt2)
+  | ExternMemoryType mt1, ExternMemoryType mt2 ->
+      Lwt.return (match_memory_type mt1 mt2)
+  | ExternGlobalType gt1, ExternGlobalType gt2 ->
+      Lwt.return (match_global_type gt1 gt2)
+  | _, _ -> Lwt.return_false
 
 (* String conversion *)
 
@@ -143,6 +174,12 @@ let string_of_global_type = function
   | GlobalType (t, Mutable) -> "(mut " ^ string_of_value_type t ^ ")"
 
 let string_of_result_type ts =
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3378
+
+     Ensure `string_of_*` functions are never used in the PVM, since it will be
+     wrong on partial values. It can only be used during the execution of the
+     testsuite. *)
+  let ts = List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings ts) in
   "[" ^ String.concat " " (List.map string_of_value_type ts) ^ "]"
 
 let string_of_func_type (FuncType (ins, out)) =

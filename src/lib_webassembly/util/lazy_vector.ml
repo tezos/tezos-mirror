@@ -55,6 +55,10 @@ module type S = sig
 
   val create : ?values:'a Map.Map.t -> ?produce_value:'a producer -> key -> 'a t
 
+  val empty : unit -> 'a t
+
+  val singleton : 'a -> 'a t
+
   val of_list : 'a list -> 'a t
 
   val get : key -> 'a t -> 'a effect
@@ -76,11 +80,11 @@ module ZZ : KeyS with type t = Z.t = struct
   include Z
 
   (** Note that, in fixed sized integers we need to use a specialized `unsigned`
-       version of compare. This is because, internally, some keys can be 
-       represented by negative integers (using wraparound). For example after a 
-       while the value of num_elements will surpass max_int and so it will 
-       become negative Nevertheless we still want this to represent large 
-       unsigned integers (up until 2*max_int). In the case of Z this is not an 
+       version of compare. This is because, internally, some keys can be
+       represented by negative integers (using wraparound). For example after a
+       while the value of num_elements will surpass max_int and so it will
+       become negative Nevertheless we still want this to represent large
+       unsigned integers (up until 2*max_int). In the case of Z this is not an
        issue as there is no wraparound.*)
   let unsigned_compare = Z.compare
 end
@@ -116,6 +120,8 @@ module Make (Effect : Effect.S) (Key : KeyS) :
     let values = Map.create ?values ?produce_value () in
     {first = Key.zero; num_elements; values}
 
+  let empty () = create Key.zero
+
   let of_list values =
     let fold (map, len) value = (Map.Map.add len value map, Key.succ len) in
     let values, num_elements =
@@ -134,6 +140,8 @@ module Make (Effect : Effect.S) (Key : KeyS) :
     if invalid_key key map then raise Memory_exn.Bounds ;
     let key = Key.add map.first key in
     {map with values = Map.set key value map.values}
+
+  let singleton value = create Key.(succ zero) |> set Key.zero value
 
   let cons value map =
     let first = Key.pred map.first in
@@ -185,7 +193,6 @@ module Make (Effect : Effect.S) (Key : KeyS) :
   let to_list map =
     let open Effect in
     let rec unroll acc index =
-      Format.printf "index: %s\n%!" (Key.to_string index) ;
       if Key.unsigned_compare index Key.zero > 0 then
         let* prefix = get index map in
         (unroll [@ocaml.tailcall]) (prefix :: acc) (Key.pred index)

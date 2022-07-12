@@ -5,11 +5,11 @@ module NameMap =
   Lazy_map.Make
     (Lazy_map.Effect.Lwt)
     (struct
-      type t = Ast.name
+      type t = Ast.name_list
 
       let compare = List.compare Int.compare
 
-      let to_string = Utf8.encode
+      let to_string = Utf8.encode_list
     end)
 
 type module_inst = {

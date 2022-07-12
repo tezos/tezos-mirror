@@ -32,7 +32,7 @@ val table : Ast.table -> t
 
 val memory : Ast.memory -> t
 
-val elem : Ast.elem_segment -> t
+val elem : Ast.elem_segment -> t Lwt.t
 
 val data : Ast.data_segment -> t
 

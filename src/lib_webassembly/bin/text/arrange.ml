@@ -37,7 +37,9 @@ let bytes = string_with String.iter add_hex_char
 
 let string = string_with String.iter add_char
 
-let name = string_with List.iter add_unicode_char
+let name n =
+  let n = Lazy_vector.LwtInt32Vector.loaded_bindings n in
+  string_with List.iter (fun buf (_, uc) -> add_unicode_char buf uc) n
 
 let list_of_opt = function None -> [] | Some x -> [x]
 
@@ -80,6 +82,8 @@ let value_type t = string_of_value_type t
 let decls kind ts = tab kind (atom value_type) ts
 
 let func_type (FuncType (ins, out)) =
+  let ins = lazy_vector Fun.id ins in
+  let out = lazy_vector Fun.id out in
   Node ("func", decls "param" ins @ decls "result" out)
 
 let struct_type = func_type
@@ -542,6 +546,7 @@ let const head c =
 
 let func_with_name name f =
   let {ftype; locals; body} = f.it in
+  let locals = lazy_vector Fun.id locals in
   Node
     ( "func" ^ name,
       [Node ("type " ^ var ftype, [])] @ decls "local" locals @ list instr body
@@ -581,6 +586,7 @@ let segment_mode category mode =
 
 let elem i seg =
   let {etype; einit; emode} = seg.it in
+  let einit = lazy_vector Fun.id einit in
   Node
     ( "elem $" ^ nat i,
       segment_mode "table" emode

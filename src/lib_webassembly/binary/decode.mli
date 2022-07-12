@@ -25,9 +25,6 @@ type ('a, 'b) vec_map_kont =
   | Collect of int * 'a list
   | Rev of 'a list * 'b list * int
 
-(** Vector accumulator without mapping. *)
-type 'a vec_kont = ('a, 'a) vec_map_kont
-
 (** Lazy vector accumulator, with the current offset to write the next value in
     the vector. *)
 type 'a lazy_vec_kont = Lazy_vec of {offset : int32; vector : 'a Vector.t}
@@ -48,16 +45,20 @@ type byte_vector_kont =
 
 type name_step =
   | NKStart  (** UTF8 name starting point. *)
-  | NKParse of pos * (int, int) vec_map_kont  (** UTF8 char parsing. *)
-  | NKStop of int list  (** UTF8 name final step.*)
+  | NKParse of pos * int lazy_vec_kont * int  (** UTF8 char parsing. *)
+  | NKStop of Ast.name  (** UTF8 name final step.*)
 
-type utf8 = int list
+type func_type_kont =
+  | FKStart
+  | FKIns of Types.value_type lazy_vec_kont
+  | FKOut of Types.value_type Vector.t * Types.value_type lazy_vec_kont
+  | FKStop of Types.func_type
 
 type import_kont =
   | ImpKStart  (** Import parsing starting point. *)
   | ImpKModuleName of name_step
       (** Import module name parsing UTF8 char per char step. *)
-  | ImpKItemName of utf8 * name_step
+  | ImpKItemName of Ast.name * name_step
       (** Import item name parsing UTF8 char per char step. *)
   | ImpKStop of Ast.import'  (** Import final step. *)
 
@@ -69,17 +70,25 @@ type export_kont =
 (** Code section parsing. *)
 type code_kont =
   | CKStart  (** Starting point of a function parsing. *)
-  | CKLocals of {
+  | CKLocalsParse of {
       left : pos;
       size : size;
       pos : pos;
-      vec_kont : (int32 * Types.value_type, Types.value_type) vec_map_kont;
+      vec_kont : (int32 * Types.value_type) lazy_vec_kont;
       locals_size : Int64.t;
-    }  (** Parsing step of local values of a function. *)
+    }  (** Parse a local value with its number of occurences. *)
+  | CKLocalsAccumulate of {
+      left : pos;
+      size : size;
+      pos : pos;
+      type_vec : (int32 * Types.value_type) lazy_vec_kont;
+      curr_type : (int32 * Types.value_type) option;
+      vec_kont : Types.value_type lazy_vec_kont;
+    }  (** Accumulate local values. *)
   | CKBody of {
       left : pos;
       size : size;
-      locals : Types.value_type list;
+      locals : Types.value_type Vector.t;
       const_kont : instr_block_kont list;
     }  (** Parsing step of the body of a function. *)
   | CKStop of Ast.func  (** Final step of a parsed function, irreducible. *)
@@ -98,13 +107,13 @@ type elem_kont =
   | EKInitIndexed of {
       mode : Ast.segment_mode;
       ref_type : Types.ref_type;
-      einit_vec : Ast.const vec_kont;
+      einit_vec : Ast.const lazy_vec_kont;
     }
       (** Element segment initialization code parsing step for referenced values. *)
   | EKInitConst of {
       mode : Ast.segment_mode;
       ref_type : Types.ref_type;
-      einit_vec : Ast.const vec_kont;
+      einit_vec : Ast.const lazy_vec_kont;
       einit_kont : pos * instr_block_kont list;
     }
       (** Element segment initialization code parsing step for constant values. *)
@@ -176,6 +185,8 @@ type module_kont =
       invariants. *)
   | MKStop of Ast.module_' (* TODO (#3120): actually, should be module_ *)
       (** Final step of the parsing, cannot reduce. *)
+  | MKTypes of func_type_kont * pos * size * Ast.type_ lazy_vec_kont
+      (** Function types section parsing. *)
   | MKImport of import_kont * pos * size * Ast.import lazy_vec_kont
       (** Import section parsing. *)
   | MKExport of export_kont * pos * size * Ast.export lazy_vec_kont

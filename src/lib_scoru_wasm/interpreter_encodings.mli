@@ -34,9 +34,12 @@ module Types : sig
 
   val value_type_encoding : value_type Data_encoding.t
 
-  val result_type_encoding : result_type Data_encoding.t
+  val result_type_encoding : value_type list Data_encoding.t
 
-  val func_type_encoding : func_type Data_encoding.t
+  val func_type_encoding :
+    params_encoding:result_type Data_encoding.t ->
+    result_encoding:result_type Data_encoding.t ->
+    func_type Data_encoding.t
 
   val mutability_encoding : mutability Data_encoding.t
 

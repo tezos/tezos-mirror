@@ -256,7 +256,9 @@ type num = Values.num Source.phrase
 
 type vec = Values.vec Source.phrase
 
-type name = int list
+type name = int Vector.t
+
+type name_list = int list
 
 type block_type = VarBlockType of var | ValBlockType of value_type option
 
@@ -336,7 +338,7 @@ and global' = {gtype : global_type; ginit : const}
 
 type func = func' Source.phrase
 
-and func' = {ftype : var; locals : value_type list; body : instr list}
+and func' = {ftype : var; locals : value_type Vector.t; body : instr list}
 
 (* Tables & Memories *)
 
@@ -357,7 +359,11 @@ and segment_mode' =
 
 type elem_segment = elem_segment' Source.phrase
 
-and elem_segment' = {etype : ref_type; einit : const list; emode : segment_mode}
+and elem_segment' = {
+  etype : ref_type;
+  einit : const Vector.t;
+  emode : segment_mode;
+}
 
 type data_segment = data_segment' Source.phrase
 
@@ -490,8 +496,9 @@ let export_type (m : module_) (ex : export) : extern_type Lwt.t =
       ExternGlobalType (nth gts x.it)
 
 let string_of_name n =
+  let n = Vector.loaded_bindings n in
   let b = Buffer.create 16 in
-  let escape uc =
+  let escape (_, uc) =
     if uc < 0x20 || uc >= 0x7f then
       Buffer.add_string b (Printf.sprintf "\\u{%02x}" uc)
     else

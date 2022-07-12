@@ -36,7 +36,9 @@ let string s =
         let j = !i + 2 in
         i := String.index_from s j '}';
         let n = int_of_string ("0x" ^ String.sub s j (!i - j)) in
-        let bs = Utf8.encode [n] in
+        (* Inlining of [Utf8.encode] to avoid going back and forth from
+           lazy_vector *)
+        let bs = Lib.String.implode (List.map Char.chr (Utf8.encode_int n)) in
         Buffer.add_substring b bs 0 (String.length bs - 1);
         bs.[String.length bs - 1]
       | h ->
@@ -165,7 +167,7 @@ let character =
     [^'"''\\''\x00'-'\x1f''\x7f'-'\xff']
   | utf8enc
   | '\\'escape
-  | '\\'hexdigit hexdigit 
+  | '\\'hexdigit hexdigit
   | "\\u{" hexnum '}'
 
 let nat = num | "0x" hexnum

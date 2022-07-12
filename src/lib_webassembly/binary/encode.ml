@@ -1,3 +1,8 @@
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3378
+
+   This module should never be part of the PVM since it assumes lazy vectors are
+   fully loaded. *)
+
 (* Version *)
 
 let version = 1l
@@ -96,7 +101,7 @@ struct
     len (String.length bs) ;
     put_string s bs
 
-  let name n = string (Utf8.encode n)
+  let name n = string (Utf8.encode_unsafe n)
 
   let list f xs = List.iter f xs
 
@@ -145,9 +150,12 @@ struct
 
   let func_type = function
     | FuncType (ts1, ts2) ->
+        let to_list m =
+          List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings m)
+        in
         vs7 (-0x20) ;
-        vec value_type ts1 ;
-        vec value_type ts2
+        vec value_type (to_list ts1) ;
+        vec value_type (to_list ts2)
 
   let limits vu {min; max} =
     bool (max <> None) ;
@@ -1027,6 +1035,9 @@ struct
 
   let code f =
     let {locals; body; _} = f.it in
+    let locals =
+      List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings locals)
+    in
     let g = gap32 () in
     let p = pos s in
     vec local (compress locals) ;
@@ -1049,6 +1060,9 @@ struct
 
   let elem seg =
     let {etype; einit; emode} = seg.it in
+    let einit =
+      List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings einit)
+    in
     if is_elem_kind etype && List.for_all is_elem_index einit then (
       match emode.it with
       | Passive ->

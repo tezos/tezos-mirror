@@ -37,21 +37,39 @@ let print_value v =
 let print (FuncType (_, out)) _m _v vs =
   List.iter print_value vs ;
   flush_all () ;
-  Lwt.return @@ List.map default_value out
+  List.map
+    (fun (_, t) -> default_value t)
+    (Lazy_vector.LwtInt32Vector.loaded_bindings out)
+  |> Lwt.return
 
 let lookup name t =
-  match (Utf8.encode name, t) with
-  | "print", _ -> ExternFunc (func print (FuncType ([], [])))
-  | "print_i32", _ -> ExternFunc (func print (FuncType ([NumType I32Type], [])))
-  | "print_i64", _ -> ExternFunc (func print (FuncType ([NumType I64Type], [])))
-  | "print_f32", _ -> ExternFunc (func print (FuncType ([NumType F32Type], [])))
-  | "print_f64", _ -> ExternFunc (func print (FuncType ([NumType F64Type], [])))
+  let open Lwt.Syntax in
+  let+ name = Utf8.encode name in
+  let empty () = Lazy_vector.LwtInt32Vector.create 0l in
+  let singleton i = Lazy_vector.LwtInt32Vector.(create 1l |> set 0l i) in
+  let two i j =
+    Lazy_vector.LwtInt32Vector.(create 2l |> set 0l i |> set 1l j)
+  in
+  match (name, t) with
+  | "print", _ -> ExternFunc (func print (FuncType (empty (), empty ())))
+  | "print_i32", _ ->
+      ExternFunc (func print (FuncType (singleton (NumType I32Type), empty ())))
+  | "print_i64", _ ->
+      ExternFunc (func print (FuncType (singleton (NumType I64Type), empty ())))
+  | "print_f32", _ ->
+      ExternFunc (func print (FuncType (singleton (NumType F32Type), empty ())))
+  | "print_f64", _ ->
+      ExternFunc (func print (FuncType (singleton (NumType F64Type), empty ())))
   | "print_i32_f32", _ ->
       ExternFunc
-        (func print (FuncType ([NumType I32Type; NumType F32Type], [])))
+        (func
+           print
+           (FuncType (two (NumType I32Type) (NumType F32Type), empty ())))
   | "print_f64_f64", _ ->
       ExternFunc
-        (func print (FuncType ([NumType F64Type; NumType F64Type], [])))
+        (func
+           print
+           (FuncType (two (NumType F64Type) (NumType F64Type), empty ())))
   | "global_i32", _ ->
       ExternGlobal (global (GlobalType (NumType I32Type, Immutable)))
   | "global_i64", _ ->

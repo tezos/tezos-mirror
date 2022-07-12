@@ -34,7 +34,9 @@ let abort _input _mod_inst vs =
 let exit _input (_mod_inst : module_inst ref) vs = exit (int (single vs))
 
 let lookup name t =
-  match (Utf8.encode name, t) with
+  let open Lwt.Syntax in
+  let+ name = Utf8.encode name in
+  match (name, t) with
   | "abort", ExternFuncType t -> ExternFunc (Func.alloc_host t abort)
   | "exit", ExternFuncType t -> ExternFunc (Func.alloc_host t exit)
   | _ -> raise Not_found

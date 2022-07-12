@@ -352,6 +352,7 @@ let lookup_module = lookup "module" modules
 let lookup_instance = lookup "module" instances
 
 let lookup_registry module_name item_name _t =
+  let* item_name = Lazy_vector.LwtInt32Vector.to_list item_name in
   let+ value = Instance.export (Map.find module_name !registry) item_name in
   match value with Some ext -> ext | None -> raise Not_found
 
@@ -375,20 +376,22 @@ let run_action act : Values.value list Lwt.t =
         trace_lwt ("Invoking function \"" ^ Ast.string_of_name name ^ "\"...")
       in
       let inst = lookup_instance x_opt act.at in
+      let* name = Lazy_vector.LwtInt32Vector.to_list name in
       let* export = Instance.export inst name in
       match export with
       | Some (Instance.ExternFunc f) ->
           let (Types.FuncType (ins, out)) = Func.type_of f in
-          if List.length vs <> List.length ins then
+          let* ins_l = Lazy_vector.LwtInt32Vector.to_list ins in
+          if List.length vs <> List.length ins_l then
             Script.error act.at "wrong number of arguments" ;
           List.iter2
             (fun v t ->
               if Values.type_of_value v.it <> t then
                 Script.error v.at "wrong type of argument")
             vs
-            ins ;
-          let* _, result = Eval.invoke f (List.map (fun v -> v.it) vs) in
-          Lwt.return result
+            ins_l ;
+          let+ _, result = Eval.invoke f (List.map (fun v -> v.it) vs) in
+          result
       | Some _ -> Assert.error act.at "export is not a function"
       | None -> Assert.error act.at "undefined export")
   | Get (x_opt, name) -> (
@@ -396,6 +399,7 @@ let run_action act : Values.value list Lwt.t =
         trace_lwt ("Getting global \"" ^ Ast.string_of_name name ^ "\"...")
       in
       let inst = lookup_instance x_opt act.at in
+      let* name = Lazy_vector.LwtInt32Vector.to_list name in
       let+ export = Instance.export inst name in
       match export with
       | Some (Instance.ExternGlobal gl) -> [Global.load gl]
@@ -576,9 +580,10 @@ let rec run_command cmd : unit Lwt.t =
       if not !Flags.dry then (
         trace ("Registering module \"" ^ Ast.string_of_name name ^ "\"...") ;
         let inst = lookup_instance x_opt cmd.at in
-        registry := Map.add (Utf8.encode name) inst !registry ;
-        Import.register name (lookup_registry (Utf8.encode name))) ;
-      Lwt.return_unit
+        let* utf8_name = Utf8.encode name in
+        registry := Map.add utf8_name inst !registry ;
+        Import.register name (lookup_registry utf8_name))
+      else Lwt.return_unit
   | Action act ->
       quote := cmd :: !quote ;
       if not !Flags.dry then (

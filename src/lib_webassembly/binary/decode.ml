@@ -208,16 +208,6 @@ let value_type s =
   | Some n when n >= -0x0f land 0x7f -> VecType (vec_type s)
   | _ -> RefType (ref_type s)
 
-let result_type s = vec value_type s
-
-let func_type s =
-  match vs7 s with
-  | -0x20 ->
-      let ins = result_type s in
-      let out = result_type s in
-      FuncType (ins, out)
-  | _ -> error s (pos s - 1) "malformed function type"
-
 let limits vu s =
   let has_max = bool s in
   let min = vu s in
@@ -950,8 +940,6 @@ type ('a, 'b) vec_map_kont =
   | Collect of int * 'a list
   | Rev of 'a list * 'b list * int
 
-type 'a vec_kont = ('a, 'a) vec_map_kont
-
 type 'a lazy_vec_kont = Lazy_vec of {offset : int32; vector : 'a Vector.t}
 
 let is_end_of_vec (Lazy_vec {offset; vector}) =
@@ -977,23 +965,22 @@ let check_size {size; start} s =
 
 type name_step =
   | NKStart  (** UTF8 name starting point. *)
-  | NKParse of pos * (int, int) vec_map_kont  (** UTF8 char parsing. *)
-  | NKStop of int list  (** UTF8 name final step.*)
+  | NKParse of pos * int lazy_vec_kont * int  (** UTF8 char parsing. *)
+  | NKStop of int Vector.t  (** UTF8 name final step.*)
 
 let name_step s = function
   | NKStart ->
       let pos = pos s in
       let len = len32 s in
-      NKParse (pos, Collect (len, []))
-  | NKParse (pos, Collect (i, l)) when i <= 0 -> NKParse (pos, Rev (l, [], 0))
-  | NKParse (pos, Collect (n, l)) ->
+      NKParse (pos, init_lazy_vec 0l, len)
+  | NKParse (pos, Lazy_vec {vector; _}, 0) -> NKStop vector
+  | NKParse (pos, Lazy_vec lv, len) ->
       let d, offset =
         try Utf8.decode_step get s
         with Utf8 -> error s pos "malformed UTF-8 encoding"
       in
-      NKParse (pos, Collect (n - offset, d :: l))
-  | NKParse (pos, Rev ([], l, _)) -> NKStop l
-  | NKParse (pos, Rev (c :: l, l', n)) -> NKParse (pos, Rev (l, c :: l', n + 1))
+      let vec = Lazy_vec {lv with vector = Vector.grow 1l lv.vector} in
+      NKParse (pos, lazy_vec_step d vec, len - offset)
   | NKStop l -> assert false (* final step, cannot reduce. *)
 
 let name s =
@@ -1049,7 +1036,33 @@ let section tag f default s = section_with_size tag (fun _ -> f) default s
 
 (* Type section *)
 
-let type_ s = at func_type s
+type func_type_kont =
+  | FKStart
+  | FKIns of value_type lazy_vec_kont
+  | FKOut of value_type Vector.t * value_type lazy_vec_kont
+  | FKStop of func_type
+
+let func_type_step s = function
+  | FKStart ->
+      let tag = vs7 s in
+      let len = len32 s in
+      if tag = -0x20 then FKIns (init_lazy_vec (Int32.of_int len))
+      else error s (pos s - 1) "malformed function type"
+  | FKIns (Lazy_vec {vector = ins; _} as vec) when is_end_of_vec vec ->
+      let len = len32 s in
+      FKOut (ins, init_lazy_vec (Int32.of_int len))
+  | FKIns ins ->
+      let vt = value_type s in
+      FKIns (lazy_vec_step vt ins)
+  | FKOut (ins, (Lazy_vec {vector = out; _} as out_vec))
+    when is_end_of_vec out_vec ->
+      FKStop (FuncType (ins, out))
+  | FKOut (ins, out_vec) ->
+      let vt = value_type s in
+      FKOut (ins, lazy_vec_step vt out_vec)
+  | FKStop _ -> assert false (* cannot reduce *)
+
+(* let _type_ s = at func_type s *)
 
 (* Import section *)
 
@@ -1061,13 +1074,11 @@ let import_desc s =
   | 0x03 -> GlobalImport (global_type s)
   | _ -> error s (pos s - 1) "malformed import kind"
 
-type utf8 = int list
-
 type import_kont =
   | ImpKStart  (** Import parsing starting point. *)
   | ImpKModuleName of name_step
       (** Import module name parsing UTF8 char per char step. *)
-  | ImpKItemName of utf8 * name_step
+  | ImpKItemName of Ast.name * name_step
       (** Import item name parsing UTF8 char per char step. *)
   | ImpKStop of import'  (** Import final step. *)
 
@@ -1134,17 +1145,25 @@ let local s =
 (** Code section parsing. *)
 type code_kont =
   | CKStart  (** Starting point of a function parsing. *)
-  | CKLocals of {
+  | CKLocalsParse of {
       left : pos;
       size : size;
       pos : pos;
-      vec_kont : (int32 * value_type, value_type) vec_map_kont;
+      vec_kont : (int32 * value_type) lazy_vec_kont;
       locals_size : Int64.t;
-    }  (** Parsing step of local values of a function. *)
+    }  (** Parse a local value with its number of occurences. *)
+  | CKLocalsAccumulate of {
+      left : pos;
+      size : size;
+      pos : pos;
+      type_vec : (int32 * value_type) lazy_vec_kont;
+      curr_type : (int32 * value_type) option;
+      vec_kont : value_type lazy_vec_kont;
+    }  (** Accumulate local values. *)
   | CKBody of {
       left : pos;
       size : size;
-      locals : value_type list;
+      locals : value_type Vector.t;
       const_kont : instr_block_kont list;
     }  (** Parsing step of the body of a function. *)
   | CKStop of func  (** Final step of a parsed function, irreducible. *)
@@ -1153,7 +1172,9 @@ let at' left s x =
   let right = pos s in
   Source.(x @@ region s left right)
 
-let code_step s = function
+let code_step s =
+  let open Lwt.Syntax in
+  function
   | CKStart ->
       (* `at` left *)
       let left = pos s in
@@ -1161,44 +1182,92 @@ let code_step s = function
       let pos = pos s in
       (* `vec` size *)
       let n = len32 s in
-      CKLocals {left; size; pos; vec_kont = Collect (n, []); locals_size = 0L}
-  | CKLocals {left; size; pos; vec_kont = Collect (0, l); locals_size} ->
+      CKLocalsParse
+        {
+          left;
+          size;
+          pos;
+          locals_size = 0L;
+          vec_kont = init_lazy_vec (Int32.of_int n);
+        }
+      |> Lwt.return
+  | CKLocalsParse
+      {
+        left;
+        size;
+        pos;
+        vec_kont = Lazy_vec {vector = types; _} as vec_kont;
+        locals_size;
+      }
+    when is_end_of_vec vec_kont ->
       require (I64.lt_u locals_size 0x1_0000_0000L) s pos "too many locals" ;
-      CKLocals {left; size; pos; vec_kont = Rev (l, [], 0); locals_size}
-  | CKLocals {left; size; pos; vec_kont = Collect (n, l); locals_size} ->
+      let vec_kont = init_lazy_vec (Int64.to_int32 locals_size) in
+      CKLocalsAccumulate
+        {
+          left;
+          size;
+          pos;
+          vec_kont;
+          type_vec = Lazy_vec {offset = 0l; vector = types};
+          curr_type = None;
+        }
+      |> Lwt.return
+  | CKLocalsParse {left; size; pos; vec_kont; locals_size} ->
       let local = local s in
       (* small enough to fit in a tick *)
       let locals_size =
         I64.add locals_size (I64_convert.extend_i32_u (fst local))
       in
-      CKLocals
-        {left; size; pos; vec_kont = Collect (n - 1, local :: l); locals_size}
-  | CKLocals {left; size; pos; vec_kont = Rev ([], locals, _len); locals_size}
-    ->
-      CKBody {left; size; locals; const_kont = [IKNext []]}
-  | CKLocals
-      {left; size; pos; vec_kont = Rev ((0l, t) :: l, l', len); locals_size} ->
-      CKLocals {left; size; pos; vec_kont = Rev (l, l', len); locals_size}
-  | CKLocals
-      {left; size; pos; vec_kont = Rev ((n, t) :: l, l', len); locals_size} ->
-      let n' = I32.sub n 1l in
-      CKLocals
+      CKLocalsParse
+        {left; size; pos; vec_kont = lazy_vec_step local vec_kont; locals_size}
+      |> Lwt.return
+  | CKLocalsAccumulate
+      {left; size; pos; vec_kont = Lazy_vec {vector = locals; _} as vec_kont; _}
+    when is_end_of_vec vec_kont ->
+      CKBody {left; size; locals; const_kont = [IKNext []]} |> Lwt.return
+  | CKLocalsAccumulate
+      {
+        left;
+        size;
+        pos;
+        vec_kont;
+        curr_type = None | Some (0l, _);
+        type_vec = Lazy_vec {offset = n; vector = types};
+      } ->
+      let+ next_type = Vector.get n types in
+      CKLocalsAccumulate
         {
           left;
           size;
           pos;
-          vec_kont = Rev ((n', t) :: l, t :: l', len + 1);
-          locals_size;
+          vec_kont;
+          curr_type = Some next_type;
+          type_vec = Lazy_vec {offset = Int32.succ n; vector = types};
         }
+  | CKLocalsAccumulate
+      {left; size; pos; vec_kont; curr_type = Some (occurences, ty); type_vec}
+    ->
+      let remaining_occurences = Int32.pred occurences in
+      CKLocalsAccumulate
+        {
+          left;
+          size;
+          pos;
+          vec_kont = lazy_vec_step ty vec_kont;
+          curr_type = Some (remaining_occurences, ty);
+          type_vec;
+        }
+      |> Lwt.return
   | CKBody {left; size; locals; const_kont = [IKStop body]} ->
       end_ s ;
       check_size size s ;
       let func =
         at' left s @@ {locals; body; ftype = Source.(-1l @@ Source.no_region)}
       in
-      CKStop func
+      CKStop func |> Lwt.return
   | CKBody {left; size; locals; const_kont} ->
       CKBody {left; size; locals; const_kont = instr_block_step s const_kont}
+      |> Lwt.return
   | CKStop _ -> assert false (* final step, cannot reduce *)
 
 (* Element section *)
@@ -1226,13 +1295,13 @@ type elem_kont =
   | EKInitIndexed of {
       mode : segment_mode;
       ref_type : ref_type;
-      einit_vec : const vec_kont;
+      einit_vec : const lazy_vec_kont;
     }
       (** Element segment initialization code parsing step for referenced values. *)
   | EKInitConst of {
       mode : segment_mode;
       ref_type : ref_type;
-      einit_vec : const vec_kont;
+      einit_vec : const lazy_vec_kont;
       einit_kont : pos * instr_block_kont list;
     }
       (** Element segment initialization code parsing step for constant values. *)
@@ -1259,7 +1328,7 @@ let ek_start s =
       let ref_type = elem_kind s in
       let n = len32 s in
       let mode = Source.(Passive @@ region s mode_pos mode_pos) in
-      EKInitIndexed {mode; ref_type; einit_vec = Collect (n, [])}
+      EKInitIndexed {mode; ref_type; einit_vec = init_lazy_vec (Int32.of_int n)}
   | 0x02l ->
       (* active *)
       let left = pos s in
@@ -1279,7 +1348,7 @@ let ek_start s =
       let mode = Source.(Declarative @@ region s mode_pos mode_pos) in
       let ref_type = elem_kind s in
       let n = len32 s in
-      EKInitIndexed {mode; ref_type; einit_vec = Collect (n, [])}
+      EKInitIndexed {mode; ref_type; einit_vec = init_lazy_vec (Int32.of_int n)}
   | 0x04l ->
       (* active_zero *)
       let index = Source.(0l @@ Source.no_region) in
@@ -1303,7 +1372,7 @@ let ek_start s =
         {
           mode;
           ref_type;
-          einit_vec = Collect (n, []);
+          einit_vec = init_lazy_vec (Int32.of_int n);
           einit_kont = (left, [IKNext []]);
         }
   | 0x06l ->
@@ -1330,7 +1399,7 @@ let ek_start s =
         {
           mode;
           ref_type;
-          einit_vec = Collect (n, []);
+          einit_vec = init_lazy_vec (Int32.of_int n);
           einit_kont = (left, [IKNext []]);
         }
   | _ -> error s (pos s - 1) "malformed elements segment kind"
@@ -1357,14 +1426,15 @@ let elem_step s = function
       (* `vec` size *)
       let n = len32 s in
       if index_kind = Indexed then
-        EKInitIndexed {mode; ref_type; einit_vec = Collect (n, [])}
+        EKInitIndexed
+          {mode; ref_type; einit_vec = init_lazy_vec (Int32.of_int n)}
       else
         let left = pos s in
         EKInitConst
           {
             mode;
             ref_type;
-            einit_vec = Collect (n, []);
+            einit_vec = init_lazy_vec (Int32.of_int n);
             einit_kont = (left, [IKNext []]);
           }
   | EKMode
@@ -1378,25 +1448,21 @@ let elem_step s = function
           early_ref_type;
           offset_kont = (left_offset, k');
         }
-  (* COLLECT Indexed *)
-  | EKInitIndexed {mode; ref_type; einit_vec = Collect (0, l)} ->
-      EKInitIndexed {mode; ref_type; einit_vec = Rev (l, [], 0)}
-  | EKInitIndexed {mode; ref_type; einit_vec = Collect (n, l)} ->
+  (* End of initialization parsing *)
+  | EKInitConst
+      {mode; ref_type; einit_vec = Lazy_vec {vector = einit; _} as einit_vec; _}
+  | EKInitIndexed
+      {mode; ref_type; einit_vec = Lazy_vec {vector = einit; _} as einit_vec}
+    when is_end_of_vec einit_vec ->
+      EKStop {etype = ref_type; einit; emode = mode}
+  (* Indexed *)
+  | EKInitIndexed {mode; ref_type; einit_vec} ->
       let elem_index = at elem_index s in
       EKInitIndexed
-        {mode; ref_type; einit_vec = Collect (n - 1, elem_index :: l)}
-  (* COLLECT CONST *)
-  | EKInitConst
-      {mode; ref_type; einit_vec = Collect (0, l); einit_kont = left, _} ->
-      EKInitConst
-        {mode; ref_type; einit_vec = Rev (l, [], 0); einit_kont = (left, [])}
-  | EKInitConst
-      {
-        mode;
-        ref_type;
-        einit_vec = Collect (n, l);
-        einit_kont = left, [IKStop einit];
-      } ->
+        {mode; ref_type; einit_vec = lazy_vec_step elem_index einit_vec}
+  (* Const *)
+  | EKInitConst {mode; ref_type; einit_vec; einit_kont = left, [IKStop einit]}
+    ->
       end_ s ;
       let right = pos s in
       let einit = Source.(einit @@ region s left right) in
@@ -1404,24 +1470,12 @@ let elem_step s = function
         {
           mode;
           ref_type;
-          einit_vec = Collect (n - 1, einit :: l);
+          einit_vec = lazy_vec_step einit einit_vec;
           einit_kont = (right, [IKNext []]);
         }
-  | EKInitConst
-      {mode; ref_type; einit_vec = Collect (n, l); einit_kont = left, k} ->
+  | EKInitConst {mode; ref_type; einit_vec; einit_kont = left, k} ->
       let k' = instr_block_step s k in
-      EKInitConst
-        {mode; ref_type; einit_vec = Collect (n, l); einit_kont = (left, k')}
-  (* REV *)
-  | EKInitConst {mode; ref_type; einit_vec = Rev ([], einit, _len); _}
-  | EKInitIndexed {mode; ref_type; einit_vec = Rev ([], einit, _len)} ->
-      EKStop {etype = ref_type; einit; emode = mode}
-  | EKInitConst {mode; ref_type; einit_vec = Rev (c :: l, l', len); einit_kont}
-    ->
-      EKInitConst
-        {mode; ref_type; einit_vec = Rev (l, c :: l', len + 1); einit_kont}
-  | EKInitIndexed {mode; ref_type; einit_vec = Rev (c :: l, l', len)} ->
-      EKInitIndexed {mode; ref_type; einit_vec = Rev (l, c :: l', len + 1)}
+      EKInitConst {mode; ref_type; einit_vec; einit_kont = (left, k')}
   | EKStop _ -> assert false (* Final step, cannot reduce *)
 
 (* Data section *)
@@ -1542,6 +1596,8 @@ type module_kont =
       invariants. *)
   | MKStop of module_'  (** Final step of the parsing, cannot reduce. *)
     (* TODO (https://gitlab.com/tezos/tezos/-/issues/3120): actually, should be module_ *)
+  | MKTypes of func_type_kont * pos * size * type_ lazy_vec_kont
+      (** Function types section parsing. *)
   | MKImport of import_kont * pos * size * import lazy_vec_kont
       (** Import section parsing. *)
   | MKExport of export_kont * pos * size * export lazy_vec_kont
@@ -1766,10 +1822,7 @@ let module_step state =
         (MKSkipCustom None)
   | MKField (ty, size, vec) -> (
       match ty with
-      | TypeField ->
-          let f = type_ s in
-          (* TODO (https://gitlab.com/tezos/tezos/-/issues/3096): check if small enough to fit in a tick *)
-          next @@ MKField (ty, size, lazy_vec_step f vec)
+      | TypeField -> next @@ MKTypes (FKStart, pos s, size, vec)
       | ImportField -> next @@ MKImport (ImpKStart, pos s, size, vec)
       | FuncField ->
           let f = at var s in
@@ -1795,8 +1848,14 @@ let module_step state =
           (* not a vector *)
           assert false
       | CodeField -> next @@ MKCode (CKStart, pos s, size, vec)
-      | DataField -> next @@ MKData (DKStart, pos s, size, vec))
-  (* These sections have a distinct step mechanism. *)
+      | DataField ->
+          next @@ MKData (DKStart, pos s, size, vec)
+          (* These sections have a distinct step mechanism. *))
+  | MKTypes (FKStop func_type, left, size, vec) ->
+      let f = Source.(func_type @@ region s left (pos s)) in
+      next @@ MKField (TypeField, size, lazy_vec_step f vec)
+  | MKTypes (k, pos, size, curr_vec) ->
+      next @@ MKTypes (func_type_step s k, pos, size, curr_vec)
   | MKImport (ImpKStop import, left, size, vec) ->
       let f = Source.(import @@ region s left (pos s)) in
       next @@ MKField (ImportField, size, lazy_vec_step f vec)
@@ -1827,7 +1886,8 @@ let module_step state =
   | MKCode (CKStop func, left, size, vec) ->
       next @@ MKField (CodeField, size, lazy_vec_step func vec)
   | MKCode (code_kont, pos, size, curr_vec) ->
-      next @@ MKCode (code_step s code_kont, pos, size, curr_vec)
+      let* code_kont = code_step s code_kont in
+      next @@ MKCode (code_kont, pos, size, curr_vec)
   | MKElaborateFunc
       (ft, fb, (Lazy_vec {vector = func_types; _} as vec), no_datas_in_func)
     when is_end_of_vec vec ->
@@ -1842,6 +1902,9 @@ let module_step state =
            ( fts,
              fbs,
              lazy_vec_step fb' vec,
+             (* TODO: https://gitlab.com/tezos/tezos/-/issues/3387
+
+                `Free` shouldn't be part of the PVM.*)
              no_datas_in_func && Free.((func fb').datas = Set.empty) )
   | MKBuild (funcs, no_datas_in_func) ->
       let fields = state.building_state in
