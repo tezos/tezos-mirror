@@ -618,7 +618,7 @@ let ensure_target_dir_exists () =
         dir
     | _ -> exit 0)
 
-let run (module Main : Sigs.MAIN) =
+let run get_main =
   let open Lwt_result_syntax in
   let data_dir = Sys.argv.(1) in
   let output_dir = ensure_target_dir_exists () in
@@ -644,9 +644,11 @@ let run (module Main : Sigs.MAIN) =
   Format.printf "Protocol hash: %a\n%!" Protocol_hash.pp proto_hash ;
   let*! ctxt = Tezos_store.Store.Block.context_exn chain_store head in
   print_endline "Pre-preparing raw context..." ;
+  let (module Main : Sigs.MAIN) = get_main proto_hash in
   Main.main ~output_dir ctxt ~head
 
-let main (module Main : Sigs.MAIN) =
-  match Lwt_main.run (run (module Main)) with
+let main module_main =
+  let get_main (_proto_hash : Protocol_hash.t) = module_main in
+  match Lwt_main.run (run get_main) with
   | Ok () -> ()
   | Error trace -> Format.printf "ERROR: %a%!" Error_monad.pp_print_trace trace
