@@ -2009,8 +2009,8 @@ let test_refutation_scenario ?commitment_period ?challenge_window variant
   let* _configuration_filename =
     Sc_rollup_node.config_init ~loser_mode sc_rollup_node2 sc_rollup_address
   in
-  let* () = Sc_rollup_node.run sc_rollup_node in
-  let* () = Sc_rollup_node.run sc_rollup_node2 in
+  let* () = Sc_rollup_node.run sc_rollup_node
+  and* () = Sc_rollup_node.run sc_rollup_node2 in
 
   let* start_level = Client.level client in
 
