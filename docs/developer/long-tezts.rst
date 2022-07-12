@@ -85,8 +85,8 @@ The ``Long_test`` module also provides function
 ``update_grafana_dashboard`` called in
 :src:`tezt/long_tests/main.ml` with a specification to create/overwrite a dashboard
 in `Nomadic Labs' Grafana <https://grafana.nomadic-labs.cloud/d/longtezts>`_.
-Default is named `Long Tezts` but you can add additional dashboards using the
-`Long_test.update_grafana_dashboard` function. To add a dashboard for your tests, define
+Default is named ``Long Tezts`` but you can add additional dashboards using the
+``Long_test.update_grafana_dashboard`` function. To add a dashboard for your tests, define
 it next to your test (in the same file), and declare it in the call to
 ``update_grafana_dashboard`` in :src:`tezt/long_tests/main.ml`.
 
@@ -152,7 +152,7 @@ framework, it can be useful to test it using development backends so that
 your tests does not impact production ones.
 
 The Performance Regression Test framework now contains a setup that can
-automatically provision and configure InfuxDB and Grafana instances using
+automatically provision and configure InfluxDB and Grafana instances using
 Docker Compose.
 
 Provisioning InfluxDB and Grafana
@@ -166,7 +166,9 @@ on this subject, please refer to:
 - https://docs.docker.com/compose/
 
 From the root folder of ``tezos`` run the following commands from a terminal
-to start the Docker containers in background::
+to start the Docker containers in background:
+
+.. code-block:: shell
 
     docker-compose -f tezt/lib_performance_regression/local-sandbox/docker-compose.yml up -d
 
@@ -175,7 +177,9 @@ that the ``performance_regression`` database has been automatically created::
 
     curl --get http://localhost:8086/query\?pretty\=true --data-urlencode "q=show databases"
 
-The command should display the following::
+The command should display the following:
+
+.. code-block:: json
 
     {
         "results": [
@@ -202,12 +206,13 @@ The command should display the following::
     }
 
 Also, you should be able to connect to the Grafana web UI by connecting to
-``http://localhost:3000`` on your browser. By going to the ``Datasources`` menu in the
-webapp configuration, you can see that an InfluxDB datasource has been pre-configured
-and is connected to the ``performance_regression``.
+http://localhost:3000 in your browser. By going to the ``Datasources`` menu in the
+webapp configuration (http://localhost:3000/datasources),
+you can see that an InfluxDB datasource has been pre-configured
+and is connected to the ``performance_regression`` database.
 
 Note that as security does not really matter for tests, it has been disable for ease.
-This is why you can connect to the Graphana web app with full privileges or send requests
+This is why you can connect to the Grafana web app with full privileges or send requests
 to InfluxDB without having to authenticate.
 
 To stop the container, simply run::
@@ -216,7 +221,7 @@ To stop the container, simply run::
 
 The created containers use persistent Docker volumes, so that data stored in the database
 and created dashboards will be preserved between container runs. To permanently remove these
-docker volumes, run the command `docker volume rm local-sandbox_influxdb local-sandbox_grafana`.
+docker volumes, run the command ``docker volume rm local-sandbox_influxdb local-sandbox_grafana``.
 
 Configuring and Running Tezt Long Tests
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -224,7 +229,7 @@ Configuring and Running Tezt Long Tests
 For more information about how to use the configuration file, please refer
 to the `Long test module API <https://tezos.gitlab.io/api/odoc/_html/tezt-performance-regression/Tezt_performance_regression/>`__.
 
-A predefined configuration has already been shiped in :src:`tezt/lib_performance_regression/local-sandbox/tezt_config.json`.
+A predefined configuration has already been shipped in :src:`tezt/lib_performance_regression/local-sandbox/tezt_config.json`.
 It allows to use the InfluxDB and Grafana instances set up by the
 Docker compose file presented in the previous section.
 
