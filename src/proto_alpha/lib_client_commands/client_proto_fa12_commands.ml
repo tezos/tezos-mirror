@@ -163,7 +163,6 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
           let action =
             Client_proto_fa12.Get_balance (addr, (dummy_callback, None))
           in
-          let payer = Option.map (fun c -> Contract.Implicit c) payer in
           Client_proto_fa12.run_view_action
             cctxt
             ~chain:cctxt#chain
@@ -200,7 +199,6 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
             Client_proto_fa12.Get_allowance
               (source, destination, (dummy_callback, None))
           in
-          let payer = Option.map (fun c -> Contract.Implicit c) payer in
           Client_proto_fa12.run_view_action
             cctxt
             ~chain:cctxt#chain
@@ -227,7 +225,6 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
           let action =
             Client_proto_fa12.Get_total_supply (dummy_callback, None)
           in
-          let payer = Option.map (fun c -> Contract.Implicit c) payer in
           Client_proto_fa12.run_view_action
             cctxt
             ~chain:cctxt#chain
