@@ -656,7 +656,7 @@ let test_rollup_inbox_current_messages_hash =
           Check.((nb_available_messages = 0) int)
             ~error_msg:"0 messages expected in the inbox"
         in
-        let* expected = Sc_rollup_inbox.predict_current_messages_hash 2l [] in
+        let* expected = Sc_rollup_inbox.predict_current_messages_hash 0l [] in
         let () =
           Check.(
             (Inbox.Hash.to_b58check expected = pristine_hash)
