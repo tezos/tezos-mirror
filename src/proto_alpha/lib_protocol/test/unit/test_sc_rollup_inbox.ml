@@ -255,9 +255,8 @@ let node_proof_to_protocol_proof p =
   let open Data_encoding.Binary in
   let enc = serialized_proof_encoding in
   let bytes = Node.to_serialized_proof p |> to_bytes_exn enc in
-  of_bytes_exn enc bytes |> of_serialized_proof |> function
-  | None -> assert false
-  | Some r -> r
+  of_bytes_exn enc bytes |> of_serialized_proof
+  |> WithExceptions.Option.get ~loc:__LOC__
 
 (** This is basically identical to {!setup_inbox_with_messages}, except
     that it uses the {!Node} instance instead of the protocol instance. *)
@@ -403,7 +402,9 @@ let test_empty_inbox_proof (level, n) =
   let* history, history_proof =
     Node.form_history_proof ctxt history inbox None
   in
-  let* result = Node.produce_proof ctxt history history_proof (level, n) in
+  let* result =
+    Node.produce_proof ctxt history history_proof (Raw_level_repr.root, n)
+  in
   match result with
   | Ok (proof, input) -> (
       (* We now switch to a protocol inbox for verification. *)
@@ -412,7 +413,9 @@ let test_empty_inbox_proof (level, n) =
       let* inbox = empty ctxt rollup level in
       let snapshot = take_snapshot inbox in
       let proof = node_proof_to_protocol_proof proof in
-      let* verification = verify_proof (level, n) snapshot proof in
+      let* verification =
+        verify_proof (Raw_level_repr.root, n) snapshot proof
+      in
       match verification with
       | Ok v_input ->
           fail_unless
