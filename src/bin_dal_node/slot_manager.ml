@@ -94,21 +94,52 @@ let wrap_encoding_error =
 
 let encode enc v = Data_encoding.Binary.to_string enc v |> wrap_encoding_error
 
-let slot_header_of_hex slot_header =
-  let open Result_syntax in
-  try
-    let slot_header = Hex.to_bytes_exn (`Hex slot_header) in
-    Ok (Bls12_381.G1.of_compressed_bytes_exn slot_header)
-  with
-  | Bls12_381.G1.Not_on_curve _ ->
-      fail [Invalid_slot_header ("Not on curve", slot_header)]
-  | Invalid_argument _ ->
-      fail [Invalid_slot_header ("Not an hexadecimal string", slot_header)]
+module Slot_header = struct
+  type t = Cryptobox.commitment
+
+  type Base58.data += Data of t
+
+  let to_string commitment =
+    Cryptobox.commitment_to_bytes commitment |> Bytes.to_string
+
+  let of_string_opt str =
+    Cryptobox.commitment_of_bytes_opt (String.to_bytes str)
+
+  let b58check_encoding =
+    Base58.register_encoding
+      ~prefix:"\255\255"
+      ~length:2
+      ~to_raw:to_string
+      ~of_raw:of_string_opt
+      ~wrap:(fun x -> Data x)
+
+  let name = "slot_header_encoding"
+
+  let to_b58check c = Base58.simple_encode b58check_encoding c
+
+  let of_b58check_opt b = Base58.simple_decode b58check_encoding b
+
+  let rpc_arg =
+    RPC_arg.make
+      ~name
+      ~descr:(Format.asprintf "%s (Base58Check-encoded)" name)
+      ~destruct:(fun s ->
+        match of_b58check_opt s with
+        | None ->
+            Error
+              (Format.asprintf
+                 "failed to decode Base58Check-encoded data (%s): %S"
+                 name
+                 s)
+        | Some v -> Ok v)
+      ~construct:to_b58check
+      ()
+end
 
 let share_path slot_header shard_id = [slot_header; string_of_int shard_id]
 
 let decode_share s =
-  Data_encoding.Binary.of_string Cryptobox.Encoding.share_encoding s
+  Data_encoding.Binary.of_string Cryptobox.share_encoding s
   |> Result.map_error (fun e ->
          [Tezos_base.Data_encoding_wrapper.Decoding_error e])
 
@@ -118,7 +149,7 @@ let save store slot_header shards =
   Cryptobox.IntMap.iter_es
     (fun i share ->
       let path = share_path slot_header i in
-      let*? share = encode Cryptobox.Encoding.share_encoding share in
+      let*? share = encode Cryptobox.share_encoding share in
       let*! metadata = Store.set ~msg:"Share stored" store path share in
       return metadata)
     shards
@@ -126,14 +157,14 @@ let save store slot_header shards =
 let split_and_store cryptobox_setup store slot =
   let r =
     let open Result_syntax in
-    let* polynomial = Cryptobox.polynomial_from_bytes slot in
+    let* polynomial = Cryptobox.polynomial_from_slot slot in
     let* commitment = Cryptobox.commit cryptobox_setup polynomial in
     return (polynomial, commitment)
   in
   let open Lwt_result_syntax in
   match r with
   | Ok (polynomial, commitment) ->
-      let shards = Cryptobox.to_shards polynomial in
+      let shards = Cryptobox.shards_from_polynomial polynomial in
       let* () = save store commitment shards in
       let*! () =
         Event.(
@@ -155,7 +186,7 @@ let get_shard store slot_header shard_id =
         | Invalid_argument _ -> fail [Slot_not_found] | e -> fail [Exn e])
   in
   let*? share = decode_share share in
-  return (shard_id, share)
+  return Cryptobox.{index = shard_id; share}
 
 let check_shards shards =
   let open Result_syntax in
@@ -187,7 +218,7 @@ let get_slot store slot_header =
       shards
   in
   let*? polynomial =
-    match Cryptobox.from_shards shards with
+    match Cryptobox.polynomial_from_shards shards with
     | Ok p -> Ok p
     | Error (`Invert_zero msg | `Not_enough_shards msg) ->
         Error [Merging_failed msg]
