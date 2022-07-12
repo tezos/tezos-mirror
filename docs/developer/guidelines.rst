@@ -155,9 +155,10 @@ You must instantiate the ``README.md`` file with the following template::
   <!-- Summary line: One sentence about this component. -->
 
   ## API Documentation
-  <!--
-  - Link to the external API.
-  -->
+  <!-- Link to the external API. -->
+
+  ## Installation
+  <!-- Describe how this component can be installed (if applicable). -->
 
   ## Overview
   <!--
