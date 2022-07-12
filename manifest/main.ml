@@ -5475,10 +5475,10 @@ let _octez_proxy_server =
 
 let _octez_snoop =
   public_exe
-    "tezos-snoop"
+    "octez-snoop"
     ~path:"src/bin_snoop"
     ~internal_name:"main_snoop"
-    ~synopsis:"Tezos: `tezos-snoop` binary"
+    ~synopsis:"Tezos: `octez-snoop` binary"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -5500,7 +5500,7 @@ let _octez_snoop =
         [
           S "cram"
           :: G [S "deps" :: [S "main_snoop.exe"]]
-          :: [S "package" :: [S "tezos-snoop"]];
+          :: [S "package" :: [S "octez-snoop"]];
         ]
 
 (* We use Dune's select statement and keep uTop optional *)
