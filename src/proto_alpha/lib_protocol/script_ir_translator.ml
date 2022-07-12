@@ -2064,7 +2064,7 @@ let rec parse_data :
   (* Lambdas *)
   | Lambda_t (ta, tr, _ty_name), (Seq (_loc, _) as script_instr) ->
       traced
-      @@ parse_returning
+      @@ parse_kdescr
            Tc_context.data
            ~elab_conf
            ~stack_depth:(stack_depth + 1)
@@ -2072,11 +2072,12 @@ let rec parse_data :
            ta
            tr
            script_instr
+      >|=? fun (kdescr, ctxt) -> (Lam (kdescr, script_instr), ctxt)
   | ( Lambda_t (ta, tr, _ty_name),
-      Prim (loc, I_LAMBDA_REC, [_; _; (Seq (_loc, _) as script_instr)], []) ) ->
+      Prim (loc, I_LAMBDA_REC, [(Seq (_loc, _) as script_instr)], []) ) ->
       traced
       @@ ( lambda_t loc ta tr >>?= fun lambda_rec_ty ->
-           parse_returning_rec
+           parse_lam_rec
              Tc_context.(add_lambda data)
              ~elab_conf
              ~stack_depth:(stack_depth + 1)
@@ -2392,7 +2393,7 @@ and parse_views :
   in
   Script_map.map_es_in_context aux ctxt views
 
-and parse_returning :
+and parse_kdescr :
     type arg argc ret retc.
     elab_conf:elab_conf ->
     stack_depth:int ->
@@ -2401,7 +2402,7 @@ and parse_returning :
     (arg, argc) ty ->
     (ret, retc) ty ->
     Script.node ->
-    ((arg, ret) lambda * context) tzresult Lwt.t =
+    ((arg, end_of_stack, ret, end_of_stack) kdescr * context) tzresult Lwt.t =
  fun ~elab_conf ~stack_depth tc_context ctxt arg ret script_instr ->
   parse_instr
     ~elab_conf
@@ -2422,18 +2423,19 @@ and parse_returning :
          @@ ty_eq ~error_details ty ret
          >>? fun (eq, ctxt) ->
          eq >|? fun Eq ->
-         ((Lam (close_descr descr, script_instr) : (arg, ret) lambda), ctxt))
+         ( (close_descr descr : (arg, end_of_stack, ret, end_of_stack) kdescr),
+           ctxt ))
   | Typed {loc; aft = stack_ty; _}, ctxt ->
       let ret = serialize_ty_for_error ret in
       let stack_ty = serialize_stack_for_error ctxt stack_ty in
       fail @@ Bad_return (loc, stack_ty, ret)
   | Failed {descr}, ctxt ->
       return
-        ( (Lam (close_descr (descr (Item_t (ret, Bot_t))), script_instr)
-            : (arg, ret) lambda),
+        ( (close_descr (descr (Item_t (ret, Bot_t)))
+            : (arg, end_of_stack, ret, end_of_stack) kdescr),
           ctxt )
 
-and parse_returning_rec :
+and parse_lam_rec :
     type arg argc ret retc.
     elab_conf:elab_conf ->
     stack_depth:int ->
@@ -3353,7 +3355,7 @@ and parse_instr :
       >>?= fun (Ex_ty ret, ctxt) ->
       check_kind [Seq_kind] code >>?= fun () ->
       check_var_annot loc annot >>?= fun () ->
-      parse_returning
+      parse_kdescr
         (Tc_context.add_lambda tc_context)
         ~elab_conf
         ~stack_depth:(stack_depth + 1)
@@ -3361,8 +3363,8 @@ and parse_instr :
         arg
         ret
         code
-      >>=? fun (lambda, ctxt) ->
-      let instr = {apply = (fun k -> ILambda (loc, lambda, k))} in
+      >>=? fun (kdescr, ctxt) ->
+      let instr = {apply = (fun k -> ILambda (loc, Lam (kdescr, code), k))} in
       lambda_t loc arg ret >>?= fun ty ->
       let stack = Item_t (ty, stack) in
       typed ctxt loc instr stack
@@ -3375,7 +3377,7 @@ and parse_instr :
       check_kind [Seq_kind] lambda_expr >>?= fun () ->
       check_var_annot loc annot >>?= fun () ->
       lambda_t loc arg ret >>?= fun lambda_rec_ty ->
-      parse_returning_rec
+      parse_lam_rec
         Tc_context.(add_lambda tc_context)
         ~elab_conf
         ~stack_depth:(stack_depth + 1)
@@ -3386,8 +3388,7 @@ and parse_instr :
         lambda_expr
       >>=? fun (code, ctxt) ->
       let instr = {apply = (fun k -> ILambda (loc, code, k))} in
-      lambda_t loc arg ret >>?= fun lambda_ty ->
-      let stack = Item_t (lambda_ty, stack) in
+      let stack = Item_t (lambda_rec_ty, stack) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_EXEC, [], annot),
       Item_t (arg, Item_t (Lambda_t (param, ret, _), rest)) ) ->
@@ -3922,7 +3923,7 @@ and parse_instr :
       >>?= fun (Ty_ex_c ret_type_full) ->
       trace
         (Ill_typed_contract (canonical_code, []))
-        (parse_returning
+        (parse_kdescr
            (Tc_context.toplevel ~storage_type ~param_type:arg_type ~entrypoints)
            ctxt
            ~elab_conf
@@ -3931,37 +3932,7 @@ and parse_instr :
            ret_type_full
            code_field)
       >>=? function
-      | ( Lam ({kbef = Item_t (arg, Bot_t); kaft = Item_t (ret, Bot_t); _}, _),
-          ctxt ) ->
-          let views_result = parse_views ctxt ~elab_conf storage_type views in
-          trace (Ill_typed_contract (canonical_code, [])) views_result
-          >>=? fun (_typed_views, ctxt) ->
-          (let error_details = Informative loc in
-           Gas_monad.run ctxt
-           @@
-           let open Gas_monad.Syntax in
-           let* Eq = ty_eq ~error_details arg arg_type_full in
-           let* Eq = ty_eq ~error_details ret ret_type_full in
-           ty_eq ~error_details storage_type ginit)
-          >>?= fun (storage_eq, ctxt) ->
-          storage_eq >>?= fun Eq ->
-          let instr =
-            {
-              apply =
-                (fun k ->
-                  ICreate_contract {loc; storage_type; code = canonical_code; k});
-            }
-          in
-          let stack = Item_t (operation_t, Item_t (address_t, rest)) in
-          typed ctxt loc instr stack
-      | ( LamRec
-            ( {
-                kbef = Item_t (arg, Item_t (Lambda_t (_, _, _), Bot_t));
-                kaft = Item_t (ret, Bot_t);
-                _;
-              },
-              _ ),
-          ctxt ) ->
+      | {kbef = Item_t (arg, Bot_t); kaft = Item_t (ret, Bot_t); _}, ctxt ->
           let views_result = parse_views ctxt ~elab_conf storage_type views in
           trace (Ill_typed_contract (canonical_code, [])) views_result
           >>=? fun (_typed_views, ctxt) ->
@@ -4682,7 +4653,7 @@ let parse_code :
   >>?= fun (Ty_ex_c ret_type_full) ->
   trace
     (Ill_typed_contract (code, []))
-    (parse_returning
+    (parse_kdescr
        Tc_context.(toplevel ~storage_type ~param_type:arg_type ~entrypoints)
        ~elab_conf
        ctxt
@@ -4690,7 +4661,8 @@ let parse_code :
        arg_type_full
        ret_type_full
        code_field)
-  >>=? fun (code, ctxt) ->
+  >>=? fun (kdescr, ctxt) ->
+  let code = Lam (kdescr, code_field) in
   Lwt.return
     ( code_size ctxt code views >>? fun (code_size, ctxt) ->
       ok
@@ -4791,7 +4763,7 @@ let typecheck_code :
   let type_logger = if show_types then Some type_logger else None in
   let elab_conf = Script_ir_translator_config.make ~legacy ?type_logger () in
   let result =
-    parse_returning
+    parse_kdescr
       (Tc_context.toplevel ~storage_type ~param_type:arg_type ~entrypoints)
       ctxt
       ~elab_conf
@@ -4800,21 +4772,21 @@ let typecheck_code :
       ret_type_full
       code_field
   in
-  trace (Ill_typed_contract (code, !type_map)) result >>=? function
-  | Lam _, ctxt | LamRec _, ctxt ->
-      let views_result = parse_views ctxt ~elab_conf storage_type views in
-      trace (Ill_typed_contract (code, !type_map)) views_result
-      >|=? fun (typed_views, ctxt) ->
-      ( Typechecked_code_internal
-          {
-            toplevel;
-            arg_type;
-            storage_type;
-            entrypoints;
-            typed_views;
-            type_map = !type_map;
-          },
-        ctxt )
+  trace (Ill_typed_contract (code, !type_map)) result
+  >>=? fun ((_ : (_, _, _, _) kdescr), ctxt) ->
+  let views_result = parse_views ctxt ~elab_conf storage_type views in
+  trace (Ill_typed_contract (code, !type_map)) views_result
+  >|=? fun (typed_views, ctxt) ->
+  ( Typechecked_code_internal
+      {
+        toplevel;
+        arg_type;
+        storage_type;
+        entrypoints;
+        typed_views;
+        type_map = !type_map;
+      },
+    ctxt )
 
 (* Uncarbonated because used only in RPCs *)
 let list_entrypoints_uncarbonated (type full fullc) (full : (full, fullc) ty)

@@ -487,19 +487,21 @@ and iexec : type a b c d e f g. (a, b, c, d, e, f, g) iexec_type =
  fun instrument logger g gas cont_sty k ks accu stack ->
   let arg = accu and code, stack = stack in
   let log_code b =
-    match logger with
-    | None -> b.kinstr
-    | Some logger ->
-        Script_interpreter_logging.log_kinstr logger b.kbef b.kinstr
+    let body =
+      match logger with
+      | None -> b.kinstr
+      | Some logger ->
+          Script_interpreter_logging.log_kinstr logger b.kbef b.kinstr
+    in
+    let ks = instrument @@ KReturn (stack, cont_sty, KCons (k, ks)) in
+    (body, ks)
   in
   match code with
   | Lam (body, _) ->
-      let body = log_code body in
-      let ks = instrument @@ KReturn (stack, cont_sty, KCons (k, ks)) in
+      let body, ks = log_code body in
       (step [@ocaml.tailcall]) g gas body ks arg (EmptyCell, EmptyCell)
   | LamRec (body, _) ->
-      let body = log_code body in
-      let ks = instrument @@ KReturn (stack, cont_sty, KCons (k, ks)) in
+      let body, ks = log_code body in
       (step [@ocaml.tailcall]) g gas body ks arg (code, (EmptyCell, EmptyCell))
 
 and iview : type a b c d e f i o. (a, b, c, d, e, f, i, o) iview_type =
