@@ -73,7 +73,7 @@ val start :
   (t * Protocol.Alpha_context.Sc_rollup.Kind.t) tzresult Lwt.t
 
 (** Reconnect (and retry with delay) to the Tezos node. *)
-val reconnect : ?delay:float -> t -> Store.t -> t tzresult Lwt.t
+val reconnect : Configuration.t -> t -> Store.t -> t tzresult Lwt.t
 
 (** [current_head_hash store] is the current hash of the head of the
    Tezos chain as far as the smart-contract rollup node knows from the

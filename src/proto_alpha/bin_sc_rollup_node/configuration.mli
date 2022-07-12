@@ -47,6 +47,7 @@ type t = {
   sc_rollup_node_operators : operators;
   rpc_addr : string;
   rpc_port : int;
+  reconnection_delay : float;
   fee_parameter : Injection.fee_parameter;
   mode : mode;
   loser_mode : Loser_mode.t;
@@ -78,6 +79,9 @@ val default_rpc_addr : string
 
 (** [default_rpc_port] is the default value for [rpc_port]. *)
 val default_rpc_port : int
+
+(** [default_reconnection_delay] is the default value for [reconnection_delay]. *)
+val default_reconnection_delay : float
 
 (** [default_fee_parameter] is the default value for [fee_parameter] *)
 val default_fee_parameter : Injection.fee_parameter

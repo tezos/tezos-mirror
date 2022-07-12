@@ -230,6 +230,26 @@ let loser_mode =
          | Some t -> return t
          | None -> failwith "Invalid syntax for failure points"))
 
+let reconnection_delay_arg =
+  let default =
+    Format.sprintf "%.1f" Configuration.default_reconnection_delay
+  in
+  let doc =
+    Format.asprintf
+      "The first reconnection delay, in seconds, to wait before reconnecting \
+       to the Tezos node. The default delay is %s.\n\
+       The actual delay varies to follow a randomized exponential backoff \
+       (capped to 1.5h): [1.5^reconnection_attempt * delay ± 50%%]."
+      default
+  in
+  Clic.default_arg
+    ~long:"reconnection-delay"
+    ~placeholder:"delay"
+    ~doc
+    ~default
+    (Clic.parameter (fun _ p ->
+         try return (float_of_string p) with _ -> failwith "Cannot read float"))
+
 let group =
   {
     Clic.name = "sc_rollup.node";
@@ -242,7 +262,7 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure the smart-contract rollup node."
-    (args10
+    (args11
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -252,7 +272,8 @@ let config_init_command =
        force_low_fee_arg
        fee_cap_arg
        burn_cap_arg
-       loser_mode)
+       loser_mode
+       reconnection_delay_arg)
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
     @@ sc_rollup_address_param
@@ -267,7 +288,8 @@ let config_init_command =
            force_low_fee,
            fee_cap,
            burn_cap,
-           loser_mode )
+           loser_mode,
+           reconnection_delay )
          mode
          sc_rollup_address
          sc_rollup_node_operators
@@ -298,6 +320,7 @@ let config_init_command =
           sc_rollup_node_operators;
           rpc_addr;
           rpc_port;
+          reconnection_delay;
           fee_parameter =
             {
               minimal_fees;

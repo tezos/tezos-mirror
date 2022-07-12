@@ -302,7 +302,7 @@ module Make (PVM : Pvm.S) = struct
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2895
      Use Lwt_stream.fold_es once it is exposed. *)
-  let daemonize node_ctxt store l1_ctxt =
+  let daemonize configuration node_ctxt store =
     let open Lwt_result_syntax in
     let rec loop (l1_ctxt : Layer1.t) =
       let*! () =
@@ -326,10 +326,10 @@ module Make (PVM : Pvm.S) = struct
           l1_ctxt.events
       in
       let*! () = Event.connection_lost () in
-      let* l1_ctxt = Layer1.reconnect l1_ctxt store in
+      let* l1_ctxt = Layer1.reconnect configuration l1_ctxt store in
       loop l1_ctxt
     in
-    protect @@ fun () -> Lwt.no_cancel @@ loop l1_ctxt
+    protect @@ fun () -> Lwt.no_cancel @@ loop node_ctxt.l1_ctxt
 
   let install_finalizer store rpc_server (l1_ctxt : Layer1.t) =
     let open Lwt_syntax in
@@ -381,7 +381,7 @@ module Make (PVM : Pvm.S) = struct
           ~rpc_addr:configuration.rpc_addr
           ~rpc_port:configuration.rpc_port
       in
-      daemonize node_ctxt store node_ctxt.l1_ctxt
+      daemonize configuration node_ctxt store
     in
     start ()
 end
