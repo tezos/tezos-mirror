@@ -401,6 +401,9 @@ let test_double_evidence () =
   block_fork (c1, c2) blk >>=? fun (blk_a, blk_b) ->
   Block.bake_until_cycle_end blk_a >>=? fun blk ->
   double_baking (B blk) blk_a.header blk_b.header |> fun evidence ->
+  Block.bake ~operations:[evidence; evidence] blk >>= fun e ->
+  Assert.proto_error_with_info ~loc:__LOC__ e "Unrequired denunciation"
+  >>=? fun () ->
   Block.bake ~operation:evidence blk >>=? fun blk ->
   double_baking (B blk) blk_b.header blk_a.header |> fun evidence ->
   Block.bake ~operation:evidence blk >>= fun e ->
