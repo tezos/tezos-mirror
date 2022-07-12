@@ -4265,6 +4265,11 @@ module Operation : sig
 
   val pack : 'kind operation -> packed_operation
 
+  val compare :
+    Operation_hash.t * packed_operation ->
+    Operation_hash.t * packed_operation ->
+    int
+
   type ('a, 'b) eq = Eq : ('a, 'a) eq
 
   val equal : 'a operation -> 'b operation -> ('a, 'b) eq option

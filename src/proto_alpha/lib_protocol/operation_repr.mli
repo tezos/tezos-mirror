@@ -606,6 +606,69 @@ val hash_packed : packed_operation -> Operation_hash.t
 
 val acceptable_passes : packed_operation -> int list
 
+(** [compare (oph1,op1) (oph2,op2)] defines a total ordering relation
+   on operations.
+
+   The following requirements must be satisfied: [oph1] is the
+   [Operation.hash op1], [oph2] is [Operation.hash op2], and that
+   [op1] and [op2] are valid in the same context.
+
+   [compare (oph1,op1) (oph2,op2) = 0] happens only if
+   [Operation_hash.compare oph1 oph2 = 0], meaning when [op1] and
+   [op2] are structurally identical.
+
+   Two valid operations of different [validation_pass] are compared
+   according to {!acceptable_passes}: the one with the smaller pass
+   being the greater.
+
+   Two valid operations of the same [validation_pass] are compared
+   according to a [weight], computed thanks to their static
+   information.
+
+   The global order is as follows:
+
+   {!Endorsement} and {!Preendorsement} > {!Dal_slot_availability} >
+   {!Proposals} > {!Ballot} > {!Double_preendorsement_evidence} >
+   {!Double_endorsement_evidence} > {!Double_baking_evidence} >
+   {!Vdf_revelation} > {!Seed_nonce_revelation} > {!Activate_account}
+   > {!Manager_operation}.
+
+   {!Endorsement} and {!Preendorsement} are compared by the pair of
+   their [level] and [round] such as the farther to the current state
+   [level] and [round] is greater;e.g. the greater pair in
+   lexicographic order being the better. When equal and both
+   operations being of the same kind, we compare their [slot]: the
+   The smaller begin the better; assuming that the more an endorser has
+   slots, the smaller is its smaller [slot]. When the pair is equal
+   and comparing an {!Endorsement] to a {!Preendorsement}, the
+   {!Endorsement} is better.
+
+   Two {!Dal_slot_availability} are compared in the lexicographic
+   order of the pair of their number of endorsed slots as available
+   and their endorsers.
+
+   Two voting operations are compared in the lexicographic order of
+   the pair of their [period] and [source]. A {!Proposals} is better
+   than a {!Ballot}.
+
+   Two denunciations of the same kind are compared such as the farther
+   to the current state the better. For {!Double_baking_evidence}
+   in the case of equality, they are compared by the hashes of their first
+   denounced block_header.
+
+   Two {!Vdf_revelation} are compared as their [solution].
+
+   Two {!Seed_nonce_relevation} are compared as their [level].
+
+   Two {!Activate_account} are compared as their [id].
+
+   Two {!Manager_operation} are compared in the lexicographic order of
+   the pair of their [fee]/[gas_limit] ratios and [source]. *)
+val compare :
+  Operation_hash.t * packed_operation ->
+  Operation_hash.t * packed_operation ->
+  int
+
 type error += Missing_signature (* `Permanent *)
 
 type error += Invalid_signature (* `Permanent *)
