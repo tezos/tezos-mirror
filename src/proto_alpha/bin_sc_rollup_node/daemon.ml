@@ -287,6 +287,19 @@ module Make (PVM : Pvm.S) = struct
     let*! () = Layer1.processed chain_event in
     return_unit
 
+  let is_connection_error trace =
+    TzTrace.fold
+      (fun yes error ->
+        yes
+        ||
+        match error with
+        | Tezos_rpc_http.RPC_client_errors.(
+            Request_failed {error = Connection_failed _; _}) ->
+            true
+        | _ -> false)
+      false
+      trace
+
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2895
      Use Lwt_stream.fold_es once it is exposed. *)
   let daemonize node_ctxt store l1_ctxt =
@@ -299,6 +312,13 @@ module Make (PVM : Pvm.S) = struct
             let* res = on_layer_1_chain_event node_ctxt store event in
             match res with
             | Ok () -> return_unit
+            | Error trace when is_connection_error trace ->
+                Format.eprintf
+                  "@[<v 2>Connection error:@ %a@]@."
+                  pp_print_trace
+                  trace ;
+                l1_ctxt.stopper () ;
+                return_unit
             | Error e ->
                 Format.eprintf "%a@.Exiting.@." pp_print_trace e ;
                 let* _ = Lwt_exit.exit_and_wait 1 in
