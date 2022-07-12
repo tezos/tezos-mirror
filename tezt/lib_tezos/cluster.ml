@@ -77,16 +77,13 @@ let star = meta_star symmetric_add_peer
 let wait_for_connections node connections =
   let counter = ref 0 in
   let waiter, resolver = Lwt.task () in
-  Node.on_event node (fun {name; value} ->
-      if name = "node_chain_validator.v0" then
-        match JSON.(value |=> 1 |-> "event" |-> "kind" |> as_string_opt) with
-        | None -> ()
-        | Some "connection" ->
-            incr counter ;
-            if !counter = connections then Lwt.wakeup resolver ()
-        | Some "disconnection" ->
-            Log.warn "The topology of the test has changed"
-        | Some _ -> ()) ;
+  Node.on_event node (fun {name; _} ->
+      match name with
+      | "connection.v0" ->
+          incr counter ;
+          if !counter = connections then Lwt.wakeup resolver ()
+      | "disconnection.v0" -> Log.warn "The topology of the test has changed"
+      | _ -> ()) ;
   let* () = Node.wait_for_ready node in
   waiter
 

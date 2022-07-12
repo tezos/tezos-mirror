@@ -33,38 +33,22 @@ let is_connected node ~peer_id =
 
 let wait_for_unknown_ancestor node =
   let filter json =
-    match
-      JSON.(json |=> 1 |-> "event" |-> "error" |=> 0 |-> "id" |> as_string_opt)
-    with
-    | None ->
-        (* Not all node_peer_validator.v0 events have an "error" field. *)
-        None
-    | Some id ->
-        if id = "node.peer_validator.unknown_ancestor" then Some () else None
+    let err_id = JSON.(json |-> "error" |=> 0 |-> "id" |> as_string) in
+    if err_id = "node.peer_validator.unknown_ancestor" then Some () else None
   in
   Node.wait_for
     node
-    "node_peer_validator.v0"
+    "request_error.v0"
     ~where:"[1].event.error[0].id is node.peer_validator.unknown_ancestor"
     filter
 
 (* FIXME: this is not robust since we cannot catch the bootstrapped event precisely. *)
 let bootstrapped_event =
   let fulfilled = ref false in
-  fun resolver Node.{name; value} ->
-    let filter json =
-      let json = JSON.(json |=> 1 |-> "event") in
-      (* We check is_null first otherwise as_object_opt may also return `Some []` for this case *)
-      if JSON.is_null json then false
-      else
-        match JSON.as_object_opt json with
-        | Some [("bootstrapped", _)] -> true
-        | _ -> false
-    in
-    if name = "node_chain_validator.v0" && filter value then
-      if not !fulfilled then (
-        fulfilled := true ;
-        Lwt.wakeup resolver ())
+  fun resolver Node.{name; _} ->
+    if name = "bootstrapped.v0" && not !fulfilled then (
+      fulfilled := true ;
+      Lwt.wakeup resolver ())
 
 (* This test replicates part of the flextesa test "command_node_synchronization".
    It checks the synchronization of two nodes depending on their history mode.

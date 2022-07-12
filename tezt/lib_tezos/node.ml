@@ -412,22 +412,13 @@ let update_identity node identity =
 let handle_event node {name; value} =
   match name with
   | "node_is_ready.v0" -> set_ready node
-  | "node_chain_validator.v0" -> (
-      match JSON.as_list_opt value with
-      | Some [_timestamp; details] -> (
-          match
-            JSON.(
-              details |-> "event" |-> "processed_block" |-> "level"
-              |> as_int_opt)
-          with
-          | None ->
-              (* There are several kinds of [node_chain_validator.v0] events
-                 and maybe this one is not the one with the level: ignore it. *)
-              ()
-          | Some level -> update_level node level)
-      | _ ->
-          (* Other kind of node_chain_validator event that we don't care about. *)
-          ())
+  | "head_increment.v0" | "branch_switch.v0" -> (
+      match JSON.(value |-> "level" |> as_int_opt) with
+      | None ->
+          (* There are several kinds of events and maybe
+             this one is not the one with the level: ignore it. *)
+          ()
+      | Some level -> update_level node level)
   | "read_identity.v0" -> update_identity node (JSON.as_string value)
   | _ -> ()
 
@@ -458,7 +449,7 @@ let wait_for_level node level =
         (level, resolver) :: node.persistent_state.pending_level ;
       check_event
         node
-        "node_chain_validator.v0"
+        "head_increment.v0 / branch_switch.v0"
         ~where:("level >= " ^ string_of_int level)
         promise
 
