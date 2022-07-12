@@ -5,10 +5,12 @@
 # shellcheck disable=SC2034
 architectures='x86_64 arm64'
 
-current_dir=$(cd "$(dirname "${0}")" && pwd)
+ci_dir=$(cd "$(dirname "${0}")" && pwd)
+scripts_dir=$(dirname "$ci_dir")
+root_dir=$(dirname "$scripts_dir")
 
-# shellcheck source=./binaries-for-release
-binaries="$(cat "${current_dir}/../../binaries-for-release")"
+# shellcheck source=./script-inputs/binaries-for-release
+binaries="$(cat "${root_dir}/script-inputs/binaries-for-release")"
 
 ### Compute GitLab release names
 
