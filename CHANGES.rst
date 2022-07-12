@@ -29,31 +29,29 @@ Node
   pipelining of manager operations, improved randomness generation, event
   logging and support for permanent testnets.
 
-- Fix a bug that leads to forgetting the trusted status of peers when connection
-  is lost
+- Fixed a bug that lead to forgetting the trusted status of peers when connection
+  is lost.
 
 - Added store metrics to expose the amount of data written while
   storing the last block and the completion time of the last merge.
 
-- Added a block validator metric to expose the number of operation per
+- Added a block validator metric to expose the number of operations per
   pass for each new block validated.
 
-- Added a protocol specific metrics, head_cycle, head_consumed_gas and
-  head_round.
+- Added protocol metrics: ``head_cycle``, ``head_consumed_gas`` and ``head_round``.
 
 - Added a store metric to expose the number of blocks considered as invalid.
 
-- Fixed the `tezos-node config reset` command which did not actually reset
+- Fixed the ``tezos-node config reset`` command which did not actually reset
   the configuration file to its default values.
 
-- Added metrics to observe the bootstrapped and synchronisation
-  status.
+- Added metrics to observe the bootstrapped and synchronisation status.
 
-- Added metrics to track the peer validator requests.
+- Added metrics to track peer validator requests.
 
-- Added an optional query parameter ``metadata`` to the GET
-  /chains/<chain>/blocks/<block>/ and GET
-  /chains/<chain>/blocks/<block>/operations/ RPCs. Passing this
+- Added an optional query parameter ``metadata`` to the
+  ``GET /chains/<chain>/blocks/<block>/`` and
+  ``GET /chains/<chain>/blocks/<block>/operations/`` RPCs. Passing this
   parameter with value ``always`` overrides the metadata size limit
   configuration, and forces the re-computation of operation metadata
   whose size was beyond the limit, and therefore not stored. The
@@ -63,14 +61,14 @@ Node
   lighter requests. If the query string is not used, the configured
   metadata size limit policy is used.
 
-- Deprecated the ``force_metadata`` query paramater for the the GET
-  /chains/<chain>/blocks/<block>/ and GET
-  /chains/<chain>/blocks/<block>/operations/ RPCs. To get a similar
+- Deprecated the ``force_metadata`` query parameter for the
+  ``GET /chains/<chain>/blocks/<block>/`` and
+  ``GET /chains/<chain>/blocks/<block>/operations/`` RPCs. To get a similar
   behaviour, use the ``metadata`` query string with the value
   ``always``.
 
-- Deprecated the CLI argument `--enable-testchain` and the corresponding
-  configuration-file option `p2p.enable_testchain`.
+- Deprecated the CLI argument ``--enable-testchain`` and the corresponding
+  configuration-file option ``p2p.enable_testchain``.
 
 - Added metrics to track the pending requests of chain validator, block
   validator and prevalidator workers.
@@ -89,19 +87,17 @@ Node
 
 - Added the built-in network alias for Ghostnet (``--network ghostnet``).
 
-- Updated the encoding of worker events json messages.
+- Updated the encoding of worker events JSON messages.
 
-- Fix a bug preventing the ``replay`` command to run in readonly
-  mode. As a side effect, the ``replay`` command was actually writing
-  data to the context store.
+- Fixed a bug that caused the ``replay`` command to write into the context store.
 
 Client
 ------
 
-- Client allows to simulate failing operations with ``--simulation
+- Client now allows to simulate failing operations with ``--simulation
   --force``, and report errors without specifying limits.
 
-- Added `--ignore-case` option to the `tezos-client gen vanity keys` command
+- Added ``--ignore-case`` option to the ``tezos-client gen vanity keys`` command
   to allow case-insensitive search for the given pattern.
 
 Accuser
@@ -110,14 +106,17 @@ Accuser
 Signer
 ------
 
-Proxy server
+Proxy Server
 ------------
-- Changed the proxy server's handling of requests it doesn't know how to serve:
-  it now forwards the client to the full node at the given `--endpoint`, by
+
+- Changed the proxy server's handling of requests it does not know how to serve:
+  it now forwards the client to the full node at the given ``--endpoint``, by
   responding with a ``301 Moved Permanently`` redirect.
 
 Protocol Compiler And Environment
 ---------------------------------
+
+- Added protocol environment V6.
 
 Codec
 -----
@@ -132,12 +131,12 @@ Docker Images
 
 - ``tezos-codec`` is now included in Docker images.
 
-Rollup Binaries
----------------
+Rollups
+-------
 
 - Included the Transaction Rollups (TORU) and Smart-contract Rollups
-  (SCORU) binaries in the Docker images of Octez.  These binaries are
-  **experimental**.  They are provided solely for testing-purposes,
+  (SCORU) executables in the Docker images of Octez.  These executables are
+  **experimental**.  They are provided solely for testing,
   and should not be used in production.  Besides, they should not be
   considered as being part of Octez, and as a consequence will not be
   provided with the same degree of maintenance.  However, developers
