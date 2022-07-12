@@ -22,6 +22,9 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+open Tezos_protocol_014_PtKathma
+open Tezos_client_014_PtKathma
+open Protocol
 
 module Proto = struct
   let hash = hash

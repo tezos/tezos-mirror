@@ -5152,8 +5152,8 @@ let _get_contracts =
                ~deps:
                  [
                    octez_base |> open_ ~m:"TzPervasives";
-                   main |> open_ |> open_ ~m:"Protocol";
-                   client |> open_;
+                   main;
+                   client;
                    get_contracts_lib;
                  ]
                ~modules:[name]

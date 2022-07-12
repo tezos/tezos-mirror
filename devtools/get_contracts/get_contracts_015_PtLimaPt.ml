@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_protocol_015_PtLimaPt
+open Tezos_client_015_PtLimaPt
+open Protocol
+
 module Proto = struct
   let hash = hash
 

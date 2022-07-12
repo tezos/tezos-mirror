@@ -22,6 +22,9 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+open Tezos_protocol_alpha
+open Tezos_client_alpha
+open Protocol
 
 module Proto = struct
   let hash = hash
