@@ -796,6 +796,29 @@ let sc_rollup_node_stops_scenario _protocol sc_rollup_node sc_rollup _node
   let* _ = Sc_rollup_node.wait_for_level sc_rollup_node expected_level in
   return ()
 
+let sc_rollup_node_disconnects_scenario _protocol sc_rollup_node sc_rollup node
+    client =
+  let num_messages = 2 in
+  let level = Node.get_level node in
+  Log.info "we are at level %d" level ;
+  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = send_messages num_messages sc_rollup client in
+  let* level =
+    Sc_rollup_node.wait_for_level sc_rollup_node (level + num_messages)
+  in
+  Log.info "Terminating Tezos node" ;
+  let* () = Node.terminate node in
+  Log.info "Waiting before restarting Tezos node" ;
+  let* () = Lwt_unix.sleep 3. in
+  Log.info "Restarting Tezos node" ;
+  let* () = Node.run node Node.[Connections 0; Synchronisation_threshold 0] in
+  let* () = Node.wait_for_ready node in
+  let* () = send_messages num_messages sc_rollup client in
+  let* _ =
+    Sc_rollup_node.wait_for_level sc_rollup_node (level + num_messages)
+  in
+  return ()
+
 let sc_rollup_node_handles_chain_reorg protocol sc_rollup_node sc_rollup node
     client =
   let num_messages = 1 in
@@ -2601,6 +2624,11 @@ let register ~kind ~protocols =
     ~kind
     "stops"
     sc_rollup_node_stops_scenario
+    protocols ;
+  test_rollup_inbox_of_rollup_node
+    ~kind
+    "disconnects"
+    sc_rollup_node_disconnects_scenario
     protocols ;
   test_rollup_inbox_of_rollup_node
     ~kind
