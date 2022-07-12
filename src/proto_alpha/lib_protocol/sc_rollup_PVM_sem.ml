@@ -63,22 +63,26 @@ let input_request_encoding =
       case
         ~title:"No_input_required"
         (Tag 0)
-        (obj1 (req "no_input_required" unit))
+        (obj1 (req "kind" (constant "no_input_required")))
         (function No_input_required -> Some () | _ -> None)
         (fun () -> No_input_required);
       case
         ~title:"Initial"
         (Tag 1)
-        (obj1 (req "initial" unit))
+        (obj1 (req "kind" (constant "initial")))
         (function Initial -> Some () | _ -> None)
         (fun () -> Initial);
       case
         ~title:"First_after"
         (Tag 2)
-        (obj2 (req "level" Raw_level_repr.encoding) (req "counter" n))
+        (obj3
+           (req "kind" (constant "first_after"))
+           (req "level" Raw_level_repr.encoding)
+           (req "counter" n))
         (function
-          | First_after (level, counter) -> Some (level, counter) | _ -> None)
-        (fun (level, counter) -> First_after (level, counter));
+          | First_after (level, counter) -> Some ((), level, counter)
+          | _ -> None)
+        (fun ((), level, counter) -> First_after (level, counter));
     ]
 
 let pp_input_request fmt request =
