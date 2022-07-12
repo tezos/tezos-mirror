@@ -45,6 +45,10 @@ val empty : t
 (** Symetric difference (union(a, b) - intersection(a, b)) *)
 val symmetric_diff : t -> t -> t
 
+(** Build a value of type {!t} from a json returned by
+   {!RPC.get_mempool_pending_operations}. *)
+val of_json : JSON.t -> t
+
 (** Call [RPC.get_mempool_pending_operations] and wrap the result in a
     value of type [Mempool.t] *)
 val get_mempool :
@@ -58,3 +62,17 @@ val get_mempool :
   ?outdated:bool ->
   Client.t ->
   t Lwt.t
+
+(** Check that each field of [t] contains the same elements as the
+    argument of the same name. Ordening does not matter. Omitted
+    arguments default to the empty list. This is useful when we expect a
+    sparse mempool. *)
+val check_mempool :
+  ?applied:string list ->
+  ?branch_delayed:string list ->
+  ?branch_refused:string list ->
+  ?refused:string list ->
+  ?outdated:string list ->
+  ?unprocessed:string list ->
+  t ->
+  unit

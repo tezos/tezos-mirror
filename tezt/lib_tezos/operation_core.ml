@@ -149,6 +149,28 @@ let inject_operations ?(request = `Inject) ?(force = false) ?error t client :
       let* () = Process.check_error ~msg process in
       Lwt_list.map_s (fun op -> hash op client) t
 
+let make_run_operation_input ?chain_id t client =
+  let* chain_id =
+    match chain_id with
+    | Some chain_id -> return chain_id
+    | None -> RPC.(Client.call client (get_chain_chain_id ()))
+  in
+  (* The [run_operation] RPC does not check the signature. *)
+  let signature = Tezos_crypto.Signature.zero in
+  return
+    (`O
+      [
+        ( "operation",
+          `O
+            [
+              ("branch", `String t.branch);
+              ("contents", t.contents);
+              ( "signature",
+                `String (Tezos_crypto.Signature.to_b58check signature) );
+            ] );
+        ("chain_id", `String chain_id);
+      ])
+
 module Consensus = struct
   type t = Slot_availability of {endorsement : bool array}
 
@@ -191,10 +213,13 @@ end
 
 module Manager = struct
   type payload =
+    | Reveal of Account.key
     | Transfer of {amount : int; dest : Account.key}
     | Dal_publish_slot_header of {level : int; index : int; header : int}
     | Sc_rollup_dal_slot_subscribe of {rollup : string; slot_index : int}
     | Delegation of {delegate : Account.key}
+
+  let reveal account = Reveal account
 
   let transfer ?(dest = Constant.bootstrap2) ?(amount = 1_000_000) () =
     Transfer {amount; dest}
@@ -233,6 +258,8 @@ module Manager = struct
     return (1 + JSON.as_int json)
 
   let json_payload_binding = function
+    | Reveal account ->
+        [("kind", `String "reveal"); ("public_key", `String account.public_key)]
     | Transfer {amount; dest} ->
         [
           ("kind", `String "transaction");
@@ -308,8 +335,8 @@ module Manager = struct
         let gas_limit = Option.value gas_limit ~default:1_040 in
         let storage_limit = Option.value storage_limit ~default:257 in
         {source; counter; fee; gas_limit; storage_limit; payload}
-    | Dal_publish_slot_header _ | Delegation _ | Sc_rollup_dal_slot_subscribe _
-      ->
+    | Reveal _ | Dal_publish_slot_header _ | Delegation _
+    | Sc_rollup_dal_slot_subscribe _ ->
         let fee = Option.value fee ~default:1_000 in
         let gas_limit = Option.value gas_limit ~default:1_040 in
         let storage_limit = Option.value storage_limit ~default:0 in

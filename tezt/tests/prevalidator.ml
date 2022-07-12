@@ -35,8 +35,6 @@
    Some refactorisation is needed. All new tests should be in the Revamped
    module (which will be erased once we have rewrote all the Legacy tests. *)
 
-module Mempool = Tezt_tezos.Mempool
-
 module Revamped = struct
   let log_step counter msg =
     let color = Log.Color.(bold ++ FG.blue) in
@@ -112,26 +110,23 @@ module Revamped = struct
     let* _ = RPC.mempool_request_operations client in
     mempool_notify_waiter
 
-  let check_mempool ?(applied = []) ?(branch_delayed = [])
-      ?(branch_refused = []) ?(refused = []) ?(outdated = [])
-      ?(unprocessed = []) client =
+  (* Call the [/chains/[chain]/mempool/pending_operations] RPC and
+     check that in the returned mempool, each field [applied],
+     [branch_delayed], etc. contains exactly the operation hashes
+     listed in the argument of the same name. Omitted arguments
+     default to the empty list. *)
+  let check_mempool ?applied ?branch_delayed ?branch_refused ?refused ?outdated
+      ?unprocessed client =
     let* mempool = Mempool.get_mempool client in
-    let expected_mempool =
-      Mempool.
-        {
-          applied;
-          branch_delayed;
-          branch_refused;
-          refused;
-          outdated;
-          unprocessed;
-        }
-    in
-    Check.(
-      (expected_mempool = mempool)
-        Mempool.classified_typ
-        ~error_msg:"Expected mempool %L, got %R") ;
-    unit
+    return
+      (Mempool.check_mempool
+         ?applied
+         ?branch_delayed
+         ?branch_refused
+         ?refused
+         ?outdated
+         ?unprocessed
+         mempool)
 
   (** {2 Tests } *)
 
@@ -1984,13 +1979,58 @@ module Revamped = struct
         inject_operations ~force:true [List.nth ops 0; List.nth ops 4] client)
     in
     let injected_ops2 = List.map (fun (`OpHash op) -> op) injected_ops2 in
-    let* () =
-      check_mempool
-        ~applied:((List.nth injected_ops2 1 :: injected_ops) @ mempool.applied)
-        ~branch_refused:[List.nth injected_ops2 0]
-        client
+    check_mempool
+      ~applied:((List.nth injected_ops2 1 :: injected_ops) @ mempool.applied)
+      ~branch_refused:[List.nth injected_ops2 0]
+      client
+
+  (** This test injects a well-formed batch of manager operations and
+      checks that it is [applied] in the mempool. *)
+  let test_inject_manager_batch =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Inject manager batch"
+      ~tags:["mempool"; "manager"; "batch"; "injection"; "applied"]
+    @@ fun protocol ->
+    log_step 1 "Initialize a node and a client." ;
+    let* _node, client =
+      Client.init_with_protocol
+        ~nodes_args:[Synchronisation_threshold 0]
+        ~protocol
+        `Client
+        ()
     in
 
+    let n_transactions = 3 in
+    log_step 2 "Inject a well-formed batch of %d transactions." n_transactions ;
+    let* (`OpHash oph) =
+      let payload = Operation.Manager.transfer ~dest:Constant.bootstrap2 () in
+      let source = Constant.bootstrap1 in
+      let* counter = Operation.Manager.get_next_counter ~source client in
+      let batch =
+        Operation.Manager.make_batch
+          ~source
+          ~counter
+          (List.init n_transactions (fun _ -> payload))
+      in
+      Operation.Manager.inject batch client
+    in
+
+    log_step 3 "Check that the batch is correctly [applied] in the mempool." ;
+    let* mempool_json = RPC.get_mempool_pending_operations client in
+    let mempool = Mempool.of_json mempool_json in
+    Mempool.check_mempool ~applied:[oph] mempool ;
+    Log.info
+      "The mempool contains exactly one [applied] operation with the correct \
+       hash." ;
+    let batch_payloads =
+      JSON.(mempool_json |-> "applied" |=> 0 |-> "contents" |> as_list)
+    in
+    Check.(
+      (List.compare_length_with batch_payloads n_transactions = 0)
+        int
+        ~error_msg:"The [applied] batch has a wrong number of manager payloads.") ;
+    Log.info "The [applied] batch as the correct number of manager payloads." ;
     unit
 end
 
@@ -2167,169 +2207,8 @@ let forge_and_inject_operation ~branch ~fee ~gas_limit ~source ~destination
   let signature = Operation.sign_manager_op_hex ~signer op_str_hex in
   inject_operation ~client op_str_hex signature
 
-let forge_and_inject_n_operations ~branch ~fee ~gas_limit ~source ~destination
-    ~counter ~signer ~client ~node n =
-  let rec loop ((oph_list, counter) as acc) = function
-    | 0 -> return acc
-    | n ->
-        let transfer_1 = wait_for_injection node in
-        let* oph =
-          forge_and_inject_operation
-            ~branch
-            ~fee
-            ~gas_limit
-            ~source
-            ~destination
-            ~counter
-            ~signer
-            ~client
-        in
-        let* () = transfer_1 in
-        let oph_list = oph :: oph_list in
-        loop (oph_list, counter + 1) (pred n)
-  in
-  loop ([], counter + 1) n
-
-(** Bakes with an empty mempool to force synchronisation between nodes. *)
-let bake_empty_block ?endpoint ~protocol client =
-  let mempool = Client.empty_mempool_file () in
-  Client.bake_for_and_wait ~protocol ?endpoint ~mempool client
-
-(** [bake_empty_mempool_and_wait_for_flush client node] bakes for [client]
-    with an empty mempool, then waits for a [flush] event on [node] (which
-    will usually be the node corresponding to [client], but could be any
-    node with a connection path to it). *)
-let _bake_empty_block_and_wait_for_flush ?(log = false) ~protocol client node =
-  let waiter = wait_for_flush node in
-  let* () = bake_empty_block ~protocol client in
-  if log then
-    Log.info "Baked for %s with an empty mempool." (Client.name client) ;
-  waiter
-
 (* TODO: add a test than ensure that we cannot have more than 1000
    branch delayed/branch refused/refused *)
-
-let forge_run_and_inject_n_batched_operation n ~branch ~fee ~gas_limit ~source
-    ~destination ~counter ~signer ~client =
-  let ops_json =
-    String.concat ", "
-    @@ List.map
-         (fun counter ->
-           operation_json ~fee ~gas_limit ~source ~destination ~counter)
-         (range (counter + 1) (counter + n))
-  in
-  let op_json_branch = operation_json_branch ~branch ops_json in
-  let* op_hex =
-    RPC.post_forge_operations ~data:(Ezjsonm.from_string op_json_branch) client
-  in
-  let op_str_hex = JSON.as_string op_hex in
-  let signature =
-    Operation.sign_manager_op_bytes ~signer (Hex.to_bytes (`Hex op_str_hex))
-  in
-  let* _run =
-    let* chain_id = RPC.Client.call client @@ RPC.get_chain_chain_id () in
-    let op_runnable =
-      (* Please don't do that. Build [JSON.u] values and use [JSON.encode_u]. *)
-      Format.asprintf
-        {|{ "operation":
-            {"branch": "%s",
-             "contents": [ %s ],
-             "signature": "%a" },
-            "chain_id": %s }|}
-        branch
-        ops_json
-        Tezos_crypto.Signature.pp
-        signature
-        (JSON.encode_u (`String chain_id))
-    in
-    RPC.Client.call client
-    @@ RPC.post_run_operation (Ezjsonm.from_string op_runnable)
-  in
-  let (`Hex signature) = Tezos_crypto.Signature.to_hex signature in
-  let signed_op = op_str_hex ^ signature in
-  RPC.Client.call client @@ RPC.post_injection_operation (`String signed_op)
-
-let check_batch_operations_are_in_applied_mempool ops oph n =
-  let open JSON in
-  let ops_list = as_list (ops |-> "applied") in
-  let res =
-    List.exists
-      (fun e ->
-        let contents = as_list (e |-> "contents") in
-        let h = as_string (e |-> "hash") in
-        List.compare_length_with contents n = 0 && h = as_string oph)
-      ops_list
-  in
-  if not res then
-    Test.fail
-      "Batch Operation %s was not found in the mempool or it does not contain \
-       %d operations"
-      (JSON.encode oph)
-      n
-
-(** This test tries to run manually forged operations before injecting them
-
-   Scenario:
-
-   + Node 1 activates a protocol
-
-   + Retrieve the counter and the branch for bootstrap1
-
-   + Forge, run and inject <n> operations in the node
-
-   + Check that the batch is correctly injected
- *)
-let run_batched_operation =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"Run batched operations before injecting them"
-    ~tags:["forge"; "mempool"; "batch"; "run_operation"]
-  @@ fun protocol ->
-  (* Step 1 *)
-  (* A Node is started and we activate the protocol and wait for the node to be synced *)
-  let* node_1 = Node.init [Synchronisation_threshold 0] in
-  let* client_1 = Client.init ~endpoint:(Node node_1) () in
-  let* () = Client.activate_protocol ~protocol client_1 in
-  Log.info "Activated protocol." ;
-  let* _ = Node.wait_for_level node_1 1 in
-  Log.info "Node is at level %d." 1 ;
-  (* Step 2 *)
-  (* Get the counter and the current branch *)
-  let*! counter =
-    RPC.Contracts.get_counter
-      ~contract_id:Constant.bootstrap1.public_key_hash
-      client_1
-  in
-  let counter = JSON.as_int counter in
-  let* branch = RPC.get_branch client_1 in
-  let branch = JSON.as_string branch in
-  (* Step 3 *)
-  (* Forge operations, run and inject them *)
-  let number_of_transactions = 3 in
-  let* oph =
-    forge_run_and_inject_n_batched_operation
-      number_of_transactions
-      ~branch
-      ~fee:1000 (* Minimal fees to successfully apply the transfer *)
-      ~gas_limit:1040 (* Minimal gas to successfully apply the transfer *)
-      ~source:Constant.bootstrap2.public_key_hash
-      ~destination:Constant.bootstrap1.public_key_hash
-      ~counter
-      ~signer:Constant.bootstrap2
-      ~client:client_1
-  in
-  Log.info "Operations forged, signed, run and injected" ;
-  (* Step 4 *)
-  (* Check that the batch is correctly injected *)
-  let* mempool_after_batch = RPC.get_mempool_pending_operations client_1 in
-  check_batch_operations_are_in_applied_mempool
-    mempool_after_batch
-    oph
-    number_of_transactions ;
-  Log.info
-    "%d operations are applied as a batch in the mempool"
-    number_of_transactions ;
-  unit
 
 let check_if_op_is_in_mempool client ~classification oph =
   let* ops = RPC.get_mempool_pending_operations ~version:"1" client in
@@ -4156,7 +4035,7 @@ let register ~protocols =
   Revamped.precheck_with_empty_balance [Protocol.Ithaca]
   (* FIXME: handle the case for Alpha. *) ;
   Revamped.inject_operations protocols ;
-  run_batched_operation protocols ;
+  Revamped.test_inject_manager_batch protocols ;
   propagation_future_endorsement protocols ;
   forge_pre_filtered_operation protocols ;
   refetch_failed_operation protocols ;

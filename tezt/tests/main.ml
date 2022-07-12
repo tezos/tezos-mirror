@@ -104,7 +104,6 @@ let register_protocol_agnostic_tests () =
   Monitor_operations.register ~protocols:[Alpha] ;
   Node_event_level.register ~protocols:[Alpha] ;
   Normalize.register ~protocols:[Alpha] ;
-  Op_validation.register ~protocols ;
   Precheck.register ~protocols ;
   Prevalidator.register ~protocols ;
   Protocol_limits.register ~protocols:[Alpha] ;
@@ -115,6 +114,7 @@ let register_protocol_agnostic_tests () =
   Replace_by_fees.register ~protocols ;
   Rpc_config_logging.register ~protocols:[Alpha] ;
   RPC_test.register protocols ;
+  Run_operation_RPC.register ~protocols ;
   Runtime_script_failure.register ~protocols ;
   Signer_test.register ~protocols:[Alpha] ;
   Stresstest_command.register ~protocols:[Alpha] ;

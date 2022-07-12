@@ -222,11 +222,16 @@ val post_injection_operation : ?async:bool -> JSON.u -> JSON.t t
 (** RPC: [POST /private/injection/operation] *)
 val post_private_injection_operation : ?async:bool -> JSON.u -> JSON.t t
 
-(** RPC: [POST /chains/[chain]/blocks/[block]/helpers/scripts/run_operation]
+(** RPC: [POST /chains/<chain>/blocks/<block>/helpers/scripts/run_operation]
+
+    Tries to validate and apply the operation represented by the given
+    json, directly on top of the [block]. Only skips signature
+    checks. If successful, returns the operation together with the
+    metadata produced by its application.
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
-val post_run_operation :
+val post_chain_block_helpers_scripts_run_operation :
   ?chain:string -> ?block:string -> ?async:bool -> JSON.u -> JSON.t t
 
 (** RPC: [GET /chains/[chain]/chain_id]

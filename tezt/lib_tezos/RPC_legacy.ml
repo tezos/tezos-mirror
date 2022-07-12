@@ -195,13 +195,6 @@ let post_forge_operations ?endpoint ?hooks ?(chain = "main") ?(block = "head")
   in
   Client.rpc ?endpoint ?hooks ~data POST path client
 
-let post_run_operation ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    ~data client =
-  let path =
-    ["chains"; chain; "blocks"; block; "helpers"; "scripts"; "run_operation"]
-  in
-  Client.rpc ?endpoint ?hooks ~data POST path client
-
 let post_simulate_operation ?endpoint ?hooks ?(chain = "main") ?(block = "head")
     ~data client =
   let path =

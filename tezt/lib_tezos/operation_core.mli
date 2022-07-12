@@ -134,6 +134,24 @@ val inject_operations :
   Client.t ->
   [`OpHash of string] list Lwt.t
 
+(** Craft a json representing the full operation, in a format that is
+   compatible with the [run_operation] RPC
+   ({!RPC.post_chain_block_helpers_scripts_run_operation}).
+
+   This json contains many more fields than the one produced by the
+   {!json} function above.
+
+   The operation is signed with {!Tezos_crypto.Signature.zero},
+   because the [run_operation] RPC skips signature checks anyway.
+
+   @param chain_id Allows to manually provide the [chain_id]. If
+   omitted, the [chain_id] is retrieved via RPC using the provided
+   [client].
+
+   @param client The {!Client.t} argument is used to retrieve the
+   [chain_id] when it is not provided. *)
+val make_run_operation_input : ?chain_id:string -> t -> Client.t -> JSON.u Lwt.t
+
 module Consensus : sig
   (** A representation of a consensus operation. *)
   type t
@@ -174,6 +192,12 @@ module Manager : sig
   (** Payload of a manager operation. This excludes generic parameters
      common to all manager operations. See {!type:t}. *)
   type payload
+
+  (** Build a public key revelation.
+
+     The [Account.key] argument has no default value because it will
+     typically be a fresh account. *)
+  val reveal : Account.key -> payload
 
   (** [transfer ?(dest=Constant.bootstrap2) ~amount:1_000_000 ()]
      builds a transfer operation. Note that the amount is expressed in
