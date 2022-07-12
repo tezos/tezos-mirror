@@ -3062,7 +3062,7 @@ let _octez_protocol_compiler_bin =
 
 let octez_protocol_compiler_tezos_protocol_packer =
   public_exe
-    "octez-protocol-compiler.tezos-protocol-packer"
+    "octez-protocol-compiler.octez-protocol-packer"
     ~path:"src/lib_protocol_compiler/bin"
     ~opam:"octez-protocol-compiler"
     ~internal_name:"main_packer"
