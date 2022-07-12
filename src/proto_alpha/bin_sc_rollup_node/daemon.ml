@@ -289,18 +289,27 @@ module Make (PVM : Pvm.S) = struct
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2895
      Use Lwt_stream.fold_es once it is exposed. *)
-  let iter_stream stream handle =
-    let rec go () =
-      Lwt.bind (Lwt_stream.get stream) @@ fun tok ->
-      match tok with
-      | None -> return_unit
-      | Some element -> Lwt_result.bind (handle element) go
+  let daemonize node_ctxt store l1_ctxt =
+    let open Lwt_result_syntax in
+    let rec loop (l1_ctxt : Layer1.t) =
+      let*! () =
+        Lwt_stream.iter_s
+          (fun event ->
+            let open Lwt_syntax in
+            let* res = on_layer_1_chain_event node_ctxt store event in
+            match res with
+            | Ok () -> return_unit
+            | Error e ->
+                Format.eprintf "%a@.Exiting.@." pp_print_trace e ;
+                let* _ = Lwt_exit.exit_and_wait 1 in
+                return_unit)
+          l1_ctxt.events
+      in
+      let*! () = Event.connection_lost () in
+      let* l1_ctxt = Layer1.reconnect l1_ctxt store in
+      loop l1_ctxt
     in
-    go ()
-
-  let daemonize node_ctxt store (l1_ctxt : Layer1.t) =
-    Lwt.no_cancel @@ iter_stream l1_ctxt.events
-    @@ on_layer_1_chain_event node_ctxt store
+    protect @@ fun () -> Lwt.no_cancel @@ loop l1_ctxt
 
   let install_finalizer store rpc_server (l1_ctxt : Layer1.t) =
     let open Lwt_syntax in
@@ -371,13 +380,12 @@ let run ~data_dir (cctxt : Protocol_client_context.full) =
       configuration.sc_rollup_node_operators
   in
   let*! store = Store.load configuration in
-  let* l1_ctxt, genesis_info, kind = Layer1.start configuration cctxt store in
+  let* l1_ctxt, kind = Layer1.start configuration cctxt store in
   let* node_ctxt =
     Node_context.init
       cctxt
       l1_ctxt
       configuration.sc_rollup_address
-      genesis_info
       kind
       configuration.sc_rollup_node_operators
       configuration.fee_parameter

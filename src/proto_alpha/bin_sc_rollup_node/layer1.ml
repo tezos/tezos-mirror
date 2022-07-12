@@ -223,6 +223,7 @@ type t = {
   events : chain_event Lwt_stream.t;
   cctxt : Protocol_client_context.full;
   stopper : RPC_context.stopper;
+  genesis_info : Sc_rollup.Commitment.genesis_info;
 }
 
 (**
@@ -409,6 +410,18 @@ let discard_pre_origination_blocks
   in
   Lwt_stream.filter_map at_or_after_origination chain_events
 
+let rec connect ?(delay = 2.) ?(count = 0) cctxt genesis_info store =
+  let open Lwt_syntax in
+  let* res = chain_events cctxt store `Main in
+  match res with
+  | Ok (event_stream, stopper) ->
+      let events = discard_pre_origination_blocks genesis_info event_stream in
+      return_ok (events, stopper)
+  | Error e ->
+      let* () = Event.cannot_connect ~count ~delay e in
+      let* () = Lwt_unix.sleep delay in
+      connect ~delay ~count:(count + 1) cctxt genesis_info store
+
 let start configuration (cctxt : Protocol_client_context.full) store =
   let open Lwt_result_syntax in
   let*! () = Layer1_event.starting () in
@@ -426,11 +439,22 @@ let start configuration (cctxt : Protocol_client_context.full) store =
       (cctxt#chain, cctxt#block)
       configuration.sc_rollup_address
   in
-  let+ event_stream, stopper = chain_events cctxt store `Main in
-  let events = discard_pre_origination_blocks genesis_info event_stream in
-  ( {cctxt; events; blocks_cache = State.Blocks_cache.create 32; stopper},
-    genesis_info,
+  let+ events, stopper = connect cctxt genesis_info store in
+  ( {
+      cctxt;
+      events;
+      blocks_cache = State.Blocks_cache.create 32;
+      stopper;
+      genesis_info;
+    },
     kind )
+
+let reconnect ?(delay = 2.0) l1_ctxt store =
+  let open Lwt_result_syntax in
+  let* events, stopper =
+    connect ~delay l1_ctxt.cctxt l1_ctxt.genesis_info store
+  in
+  return {l1_ctxt with events; stopper}
 
 let current_head_hash store =
   let open Lwt_syntax in
