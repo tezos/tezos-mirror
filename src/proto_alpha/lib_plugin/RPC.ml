@@ -945,8 +945,9 @@ module Scripts = struct
         match (src_opt, pay_opt) with
         | None, None ->
             let self = Contract.Originated self in
-            (self, self)
-        | Some c, None | None, Some c -> (c, c)
+            (self, Contract.Implicit Signature.Public_key_hash.zero)
+        | Some c, None -> (c, Contract.Implicit Signature.Public_key_hash.zero)
+        | None, Some c -> (c, c)
         | Some src, Some pay -> (src, pay)
       in
       return (ctxt, {balance; self; source; payer})
