@@ -3489,8 +3489,8 @@ let finalize_application ctxt (mode : finalize_application_mode) protocol_data
   (if Level.may_compute_randao ctxt then Seed.compute_randao ctxt
   else return ctxt)
   >>=? fun ctxt ->
-  (* end of cycle *)
-  (if Level.may_snapshot_rolls ctxt then Stake_distribution.snapshot ctxt
+  (if Level.may_snapshot_stake_distribution ctxt then
+   Stake_distribution.snapshot ctxt
   else return ctxt)
   >>=? fun ctxt ->
   may_start_new_cycle ctxt

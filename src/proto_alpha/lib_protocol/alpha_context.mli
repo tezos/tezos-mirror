@@ -1230,7 +1230,7 @@ module Level : sig
 
   val dawn_of_a_new_cycle : context -> Cycle.t option
 
-  val may_snapshot_rolls : context -> bool
+  val may_snapshot_stake_distribution : context -> bool
 
   val may_compute_randao : context -> bool
 end
