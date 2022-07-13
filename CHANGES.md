@@ -1,3 +1,6 @@
+v0.10:
+
+feature: Merge for dynamic and dynamic tails directories
 
 v0.9:
 
