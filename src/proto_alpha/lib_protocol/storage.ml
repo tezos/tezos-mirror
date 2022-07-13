@@ -1048,10 +1048,12 @@ module Stake = struct
       (Public_key_hash_index)
       (Tez_repr)
 
-  module Active_delegate_with_one_roll =
+  module Active_delegates_with_minimal_stake =
     Make_indexed_data_snapshotable_storage
       (Make_subcontext (Registered) (Raw_context)
          (struct
+           (* This name is for historical reasons, when the stake was
+              expressed in rolls (that is, pre-Ithaca). *)
            let name = ["active_delegate_with_one_roll"]
          end))
          (Int31_index)

@@ -92,7 +92,7 @@ val clear_at_cycle_end :
 val get :
   Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 
-val fold_on_active_delegates_with_rolls :
+val fold_on_active_delegates_with_minimal_stake :
   Raw_context.t ->
   order:[`Sorted | `Undefined] ->
   init:'a ->

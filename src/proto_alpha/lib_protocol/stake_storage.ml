@@ -79,11 +79,11 @@ let remove_stake ctxt delegate amount =
   if Tez_repr.(staking_balance_before >= tokens_per_roll) then
     Delegate_activation_storage.is_inactive ctxt delegate >>=? fun inactive ->
     if (not inactive) && Tez_repr.(staking_balance < tokens_per_roll) then
-      Storage.Stake.Active_delegate_with_one_roll.remove ctxt delegate
+      Storage.Stake.Active_delegates_with_minimal_stake.remove ctxt delegate
       >>= fun ctxt -> return ctxt
     else return ctxt
   else
-    (* The delegate was not in Stake.Active_delegate_with_one_roll,
+    (* The delegate was not in Stake.Active_delegates_with_minimal_stake,
        either because it was inactive, or because it did not have a
        roll, in which case it still does not have a roll. *)
     return ctxt
@@ -99,22 +99,22 @@ let add_stake ctxt delegate amount =
     if inactive || Tez_repr.(staking_balance_before >= tokens_per_roll) then
       return ctxt
     else
-      Storage.Stake.Active_delegate_with_one_roll.add ctxt delegate ()
+      Storage.Stake.Active_delegates_with_minimal_stake.add ctxt delegate ()
       >>= fun ctxt -> return ctxt
   else
-    (* The delegate was not in Stake.Active_delegate_with_one_roll,
+    (* The delegate was not in Stake.Active_delegates_with_minimal_stake,
        because it did not have a roll (as otherwise it would have a
        roll now). *)
     return ctxt
 
 let deactivate_only_call_from_delegate_storage ctxt delegate =
-  Storage.Stake.Active_delegate_with_one_roll.remove ctxt delegate
+  Storage.Stake.Active_delegates_with_minimal_stake.remove ctxt delegate
 
 let activate_only_call_from_delegate_storage ctxt delegate =
   get_initialized_stake ctxt delegate >>=? fun (staking_balance, ctxt) ->
   let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
   if Tez_repr.(staking_balance >= tokens_per_roll) then
-    Storage.Stake.Active_delegate_with_one_roll.add ctxt delegate ()
+    Storage.Stake.Active_delegates_with_minimal_stake.add ctxt delegate ()
     >>= fun ctxt -> return ctxt
   else return ctxt
 
@@ -122,7 +122,7 @@ let snapshot ctxt =
   Storage.Stake.Last_snapshot.get ctxt >>=? fun index ->
   Storage.Stake.Last_snapshot.update ctxt (index + 1) >>=? fun ctxt ->
   Storage.Stake.Staking_balance.snapshot ctxt index >>=? fun ctxt ->
-  Storage.Stake.Active_delegate_with_one_roll.snapshot ctxt index
+  Storage.Stake.Active_delegates_with_minimal_stake.snapshot ctxt index
 
 let max_snapshot_index = Storage.Stake.Last_snapshot.get
 
@@ -132,7 +132,7 @@ let set_selected_distribution_for_cycle ctxt cycle stakes total_stake =
   Storage.Total_active_stake.add ctxt cycle total_stake >>= fun ctxt ->
   (* cleanup snapshots *)
   Storage.Stake.Staking_balance.Snapshot.clear ctxt >>= fun ctxt ->
-  Storage.Stake.Active_delegate_with_one_roll.Snapshot.clear ctxt
+  Storage.Stake.Active_delegates_with_minimal_stake.Snapshot.clear ctxt
   >>= fun ctxt -> Storage.Stake.Last_snapshot.update ctxt 0
 
 let clear_cycle ctxt cycle =
@@ -140,7 +140,7 @@ let clear_cycle ctxt cycle =
   Selected_distribution_for_cycle.remove_existing ctxt cycle
 
 let fold ctxt ~f ~order init =
-  Storage.Stake.Active_delegate_with_one_roll.fold
+  Storage.Stake.Active_delegates_with_minimal_stake.fold
     ctxt
     ~order
     ~init:(Ok init)
@@ -150,7 +150,7 @@ let fold ctxt ~f ~order init =
       f (delegate, stake) acc)
 
 let fold_snapshot ctxt ~index ~f ~init =
-  Storage.Stake.Active_delegate_with_one_roll.fold_snapshot
+  Storage.Stake.Active_delegates_with_minimal_stake.fold_snapshot
     ctxt
     index
     ~order:`Sorted
@@ -166,12 +166,13 @@ let clear_at_cycle_end ctxt ~new_cycle =
   | Some cycle_to_clear -> clear_cycle ctxt cycle_to_clear
 
 let get ctxt delegate =
-  Storage.Stake.Active_delegate_with_one_roll.mem ctxt delegate >>= function
+  Storage.Stake.Active_delegates_with_minimal_stake.mem ctxt delegate
+  >>= function
   | true -> get_staking_balance ctxt delegate
   | false -> return Tez_repr.zero
 
-let fold_on_active_delegates_with_rolls =
-  Storage.Stake.Active_delegate_with_one_roll.fold
+let fold_on_active_delegates_with_minimal_stake =
+  Storage.Stake.Active_delegates_with_minimal_stake.fold
 
 let get_selected_distribution = Selected_distribution_for_cycle.get
 

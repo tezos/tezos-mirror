@@ -366,7 +366,7 @@ module Stake : sig
 
   (** This is a set, encoded in a map with value unit. This should be
      fairly small compared to staking balance *)
-  module Active_delegate_with_one_roll :
+  module Active_delegates_with_minimal_stake :
     Indexed_data_snapshotable_storage
       with type key = Signature.Public_key_hash.t
        and type value = unit
