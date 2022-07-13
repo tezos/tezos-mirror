@@ -45,6 +45,12 @@ module State = struct
 
   let add_history = Store.Histories.add
 
+  (** [inbox_of_hash node_ctxt store block_hash] returns the latest
+      inbox at the given [block_hash]. This function always returns
+      [Some inbox] for all levels after the rollup genesis even when
+      no messages has been issued at this specific [block_hash]. In
+      this case, the inbox is the same as the one found in the level
+      when the latest message has been inserted. *)
   let inbox_of_hash node_ctxt store block_hash =
     let open Lwt_result_syntax in
     let open Node_context in
