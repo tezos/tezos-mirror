@@ -147,8 +147,8 @@ let sc_rollup_node_rpc sc_node service =
 type test = {variant : string; tags : string list; description : string}
 
 (** This helper injects an SC rollup origination via tezos-client. Then it
-bakes to include the origination in a block. It returns the address of the
-originated rollup *)
+    bakes to include the origination in a block. It returns the address of the
+    originated rollup *)
 let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))
     ?(src = "bootstrap1") ?(kind = "arith") ?(parameters_ty = "string")
     ?(boot_sector = "") client =
@@ -160,23 +160,13 @@ let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))
   return sc_rollup
 
 let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
-  let* sc_rollup =
-    Client.Sc_rollup.originate
-      ~hooks
-      ~burn_cap:Tez.(of_int 9999999)
-      ~src:bootstrap1_key
-      ~kind:"arith"
-      ~boot_sector:""
-      ~parameters_ty:"string"
-      tezos_client
-  in
+  let* sc_rollup = originate_sc_rollup ~src:bootstrap1_key tezos_client in
   let sc_rollup_node =
     Sc_rollup_node.create tezos_node tezos_client ~operator_pkh:bootstrap1_key
   in
   let* configuration_filename =
     Sc_rollup_node.config_init sc_rollup_node sc_rollup
   in
-  let* () = Client.bake_for_and_wait tezos_client in
   f sc_rollup sc_rollup_node configuration_filename
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2933
@@ -277,34 +267,17 @@ let test_origination =
     "origination of a SCORU executes without error"
     (fun protocol ->
       setup ~protocol @@ fun _node client bootstrap1_key ->
-      let* _sc_rollup =
-        Client.Sc_rollup.originate
-          ~hooks
-          ~burn_cap:Tez.(of_int 9999999)
-          ~src:bootstrap1_key
-          ~kind:"arith"
-          ~parameters_ty:"string"
-          ~boot_sector:""
-          client
-      in
-      Client.bake_for_and_wait client)
+      let* _sc_rollup = originate_sc_rollup ~src:bootstrap1_key client in
+      unit)
 
 (* Configuration of a rollup node
    ------------------------------
 
    A rollup node has a configuration file that must be initialized.
 *)
-let with_fresh_rollup ?(boot_sector = "") f tezos_node tezos_client
-    bootstrap1_key =
+let with_fresh_rollup ?boot_sector f tezos_node tezos_client bootstrap1_key =
   let* sc_rollup =
-    Client.Sc_rollup.originate
-      ~hooks
-      ~burn_cap:Tez.(of_int 9999999)
-      ~src:bootstrap1_key
-      ~kind:"arith"
-      ~parameters_ty:"string"
-      ~boot_sector
-      tezos_client
+    originate_sc_rollup ~src:bootstrap1_key ?boot_sector tezos_client
   in
   let sc_rollup_node =
     Sc_rollup_node.create tezos_node tezos_client ~operator_pkh:bootstrap1_key
@@ -312,7 +285,6 @@ let with_fresh_rollup ?(boot_sector = "") f tezos_node tezos_client
   let* configuration_filename =
     Sc_rollup_node.config_init sc_rollup_node sc_rollup
   in
-  let* () = Client.bake_for_and_wait tezos_client in
   f sc_rollup sc_rollup_node configuration_filename
 
 let with_fresh_rollups n f node client bootstrap1 =
@@ -1966,20 +1938,10 @@ let test_consecutive_commitments =
     "consecutive commitments"
     (fun protocol ->
       setup ~protocol @@ fun _node client bootstrap1_key ->
-      let* sc_rollup =
-        Client.Sc_rollup.originate
-          ~hooks
-          ~burn_cap:Tez.(of_int 9999999)
-          ~src:bootstrap1_key
-          ~kind:"arith"
-          ~parameters_ty:"string"
-          ~boot_sector:""
-          client
-      in
-      let operator = Constant.bootstrap1.public_key_hash in
       let* inbox_level = Client.level client in
+      let* sc_rollup = originate_sc_rollup ~src:bootstrap1_key client in
+      let operator = Constant.bootstrap1.public_key_hash in
       let* {commitment_period_in_blocks; _} = get_sc_rollup_constants client in
-      let* () = Client.bake_for_and_wait client in
       (* As we did no publish any commitment yet, this is supposed to fail. *)
       let*? process =
         RPC.Client.spawn client
