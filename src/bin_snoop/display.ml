@@ -273,9 +273,33 @@ let plot_scatter opts title input_columns outputs =
    together with timings:
      [| 2879 ; 768 |] *)
 
+(* Plotting the full dataset makes plot generation slow. We bin the data
+   and plot nonempty bins. [bin_data] works in linear time. *)
+let bin_data bins data =
+  let min, max =
+    Array.fold_left
+      (fun (min, max) x -> (Float.min x min, Float.max x max))
+      (Float.max_float, -.Float.max_float)
+      data
+  in
+  let range = max -. min in
+  let width = range /. float_of_int bins in
+  let spec = Stats.Binning.regular ~origin:min ~width ~truncate:None in
+  let binned = Stats.Binning.from_empirical spec data in
+  let acc = ref [] in
+  Stats.Fin.Float.iter_mes binned (fun bin qty ->
+      match Stats.Binning.map_from_bin spec bin with
+      | None ->
+          (* Cannot happen because [truncate] is set to [None]*)
+          assert false
+      | Some x when qty > 0.0 -> acc := x :: !acc
+      | _ -> ()) ;
+  Array.of_list !acc
+
 let process_empirical_data empirical_plot data =
   match empirical_plot with
-  | Empirical_plot_full -> data
+  | Empirical_plot_full ->
+      if Array.length data > 500 then bin_data 500 data else data
   | Empirical_plot_quantiles qs ->
       List.map (fun q -> Stats.Emp.quantile (module Float) data q) qs
       |> Array.of_list
