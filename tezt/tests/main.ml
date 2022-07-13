@@ -92,6 +92,7 @@ let register_protocol_agnostic_tests () =
   Client_config.register ~protocols:[Alpha] ;
   Client_commands.register ~protocols ;
   Client_run_view.register ~protocols ;
+  Contract_hash_fun.register ~protocols ;
   Dal.register ~protocols:[Alpha] ;
   Deposits_limit.register ~protocols ;
   Double_bake.register ~protocols:[Alpha] ;
