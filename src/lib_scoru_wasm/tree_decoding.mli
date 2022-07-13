@@ -28,6 +28,10 @@ type key = string list
 (** Raised when a requested key is not present. *)
 exception Key_not_found of key
 
+(** Raised when an encoder produced by [tagged_union] does not contain a
+    matching branch. *)
+exception No_tag_matched_on_decoding
+
 (** Raised when data-encoding fails to decode a certain value. *)
 exception Decode_error of {key : key; error : Data_encoding.Binary.read_error}
 
@@ -37,7 +41,11 @@ module type S = sig
   (** Tree decoder type *)
   type 'a t
 
-  (** [run decoder tree] runs the tree decoder against the tree. *)
+  (** Represents a partial encoder for a specific constructor of a sum-type. *)
+  type ('tag, 'a) case
+
+  (** [run decoder tree] runs the tree decoder against the tree. May raise a
+      [Key_not_found] or a [No_tag_matched] exception. *)
   val run : 'a t -> tree -> 'a Lwt.t
 
   (** [raw key] retrieves the raw value at the given [key].
@@ -54,11 +62,11 @@ module type S = sig
   *)
   val value : key -> 'a Data_encoding.t -> 'a t
 
-  (** [tree key decoder] apply a tree decoder for a provided [key].
+  (** [scope key decoder] applies a tree decoder for a provided [key].
 
       @raises Key_not_found when the requested key is not presented
   *)
-  val tree : key -> 'a t -> 'a t
+  val scope : key -> 'a t -> 'a t
 
   (** [lazy_mapping to_key decoder] decodes to a function [f] that can be called
       to look up keyed values in the current tree.
@@ -72,6 +80,29 @@ module type S = sig
 
   (** [of_lwt p] lifts the promise [p] into a decoding value. *)
   val of_lwt : 'a Lwt.t -> 'a t
+
+  (** [map f d] maps over the result of the decoder [d] with function [f]. *)
+  val map : ('a -> 'b) -> 'a t -> 'b t
+
+  (** [map_lwt f d] maps over the result of the decoder [d] with the effectful
+      function [f]. *)
+  val map_lwt : ('a -> 'b Lwt.t) -> 'a t -> 'b t
+
+  (** [case tag dec f] returns a partial decoder that represents a case in a
+      variant type. The decoder hides the (existentially bound) type of the
+      parameter to the specific case, provided a converter function [f] and
+      base decoder [dec]. *)
+  val case : 'tag -> 'b t -> ('b -> 'a) -> ('tag, 'a) case
+
+  (** [tagged_union tag_dec cases] returns a decoder that use [tag_dec] for
+      decoding the value of a field [tag]. The decoder searches through the list
+      of cases for a matching branch. When a matching branch is found, it uses
+      its embedded decoder for the value. This function is used for constructing
+      decoders for sum-types.
+
+      If an insufficient list of cases are provided, the resulting encoder may
+      fail with a [No_tag_matched] error when [run].  *)
+  val tagged_union : 'tag t -> ('tag, 'a) case list -> 'a t
 
   (** Syntax module for the {!Tree_decoding}. This is intended to be opened
       locally in functions. Within the scope of this module, the code can

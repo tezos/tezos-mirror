@@ -6,6 +6,7 @@
  (libraries
   tezos-base
   tezos-base.unix
+  tezos-context.disk
   tezos-base-test-helpers
   tezos-test-helpers
   tezos-scoru-wasm

@@ -51,9 +51,16 @@ module type S = sig
 
   val to_string : ('a -> string) -> 'a t -> string
 
+  val string_of_key : key -> string
+
   val num_elements : 'a t -> key
 
-  val create : ?values:'a Map.Map.t -> ?produce_value:'a producer -> key -> 'a t
+  val create :
+    ?first_key:key ->
+    ?values:'a Map.Map.t ->
+    ?produce_value:'a producer ->
+    key ->
+    'a t
 
   val empty : unit -> 'a t
 
@@ -74,6 +81,8 @@ module type S = sig
   val to_list : 'a t -> 'a list effect
 
   val loaded_bindings : 'a t -> (key * 'a) list
+
+  val first_key : 'a t -> key
 end
 
 module ZZ : KeyS with type t = Z.t = struct
@@ -114,11 +123,13 @@ module Make (Effect : Effect.S) (Key : KeyS) :
     let pp_value fmt value = Format.pp_print_string fmt (show_value value) in
     Format.asprintf "%a" (pp pp_value) map
 
+  let string_of_key = Key.to_string
+
   let num_elements map = map.num_elements
 
-  let create ?values ?produce_value num_elements =
+  let create ?(first_key = Key.zero) ?values ?produce_value num_elements =
     let values = Map.create ?values ?produce_value () in
-    {first = Key.zero; num_elements; values}
+    {first = first_key; num_elements; values}
 
   let empty () = create Key.zero
 
@@ -207,6 +218,8 @@ module Make (Effect : Effect.S) (Key : KeyS) :
     else (unroll [@ocaml.tailcall]) [] (Key.pred map.num_elements)
 
   let loaded_bindings m = Map.loaded_bindings m.values
+
+  let first_key vector = vector.first
 end
 
 module Int = struct
