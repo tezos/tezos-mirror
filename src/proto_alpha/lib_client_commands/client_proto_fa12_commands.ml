@@ -66,8 +66,8 @@ let as_arg =
     ()
 
 let payer_arg =
-  Client_proto_contracts.ContractAlias.destination_arg
-    ~name:"payer"
+  Client_keys.Public_key_hash.source_arg
+    ~long:"payer"
     ~doc:"name of the payer (i.e. SOURCE) contract for the transaction"
     ()
 

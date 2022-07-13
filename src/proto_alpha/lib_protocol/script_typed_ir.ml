@@ -41,7 +41,7 @@ open Dependent_bool
 type step_constants = {
   source : Contract.t;
       (** The address calling this contract, as returned by SENDER. *)
-  payer : Contract.t;
+  payer : Signature.public_key_hash;
       (** The address of the implicit account that initiated the chain of contract calls, as returned by SOURCE. *)
   self : Contract_hash.t;
       (** The address of the contract being executed, as returned by SELF and SELF_ADDRESS.

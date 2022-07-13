@@ -58,9 +58,9 @@ let make ~rng_state =
   let level = Script_int.zero_n in
   let open Script_interpreter in
   (match context with
-  | `Mem_block (block, (bs1, bs2, _, _, _)) ->
+  | `Mem_block (block, (bs1, _, _, _, _)) ->
       let source = bs1 in
-      let payer = bs2 in
+      let payer = Contract_helpers.default_payer in
       let self = Contract_helpers.default_self in
       let step_constants =
         {

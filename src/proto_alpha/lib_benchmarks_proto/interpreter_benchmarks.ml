@@ -2978,11 +2978,10 @@ module Registration_section = struct
         ~cont_and_stack_sampler:(fun _cfg _rng_state ->
           let open Script_typed_ir in
           let open Alpha_context in
-          let zero = Contract.Implicit Signature.Public_key_hash.zero in
           let step_constants =
             {
-              source = zero;
-              payer = zero;
+              source = Contract.Implicit Signature.Public_key_hash.zero;
+              payer = Signature.Public_key_hash.zero;
               self = Contract_hash.zero;
               amount = Tez.zero;
               balance = Tez.zero;

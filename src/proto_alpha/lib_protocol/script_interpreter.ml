@@ -91,7 +91,7 @@ module S = Saturation_repr
 
 type step_constants = Script_typed_ir.step_constants = {
   source : Contract.t;
-  payer : Contract.t;
+  payer : Signature.public_key_hash;
   self : Contract_hash.t;
   amount : Tez.t;
   balance : Tez.t;
@@ -1208,7 +1208,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let hash = Raw_hashes.sha512 bytes in
           (step [@ocaml.tailcall]) g gas k ks hash stack
       | ISource (_, k) ->
-          let destination : Destination.t = Contract sc.payer in
+          let destination : Destination.t = Contract (Implicit sc.payer) in
           let res = {destination; entrypoint = Entrypoint.default} in
           (step [@ocaml.tailcall]) g gas k ks res (accu, stack)
       | ISender (_, k) ->

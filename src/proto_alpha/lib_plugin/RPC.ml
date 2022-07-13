@@ -164,7 +164,7 @@ module Scripts = struct
            (opt "balance" Tez.encoding)
            (req "chain_id" Chain_id.encoding)
            (opt "source" Contract.encoding)
-           (opt "payer" Contract.encoding)
+           (opt "payer" Contract.implicit_encoding)
            (opt "self" Contract.originated_encoding)
            (dft "entrypoint" Entrypoint.simple_encoding Entrypoint.default))
         (obj4
@@ -217,7 +217,7 @@ module Scripts = struct
         (req "input" Script.expr_encoding)
         (req "chain_id" Chain_id.encoding)
         (opt "source" Contract.encoding)
-        (opt "payer" Contract.encoding)
+        (opt "payer" Contract.implicit_encoding)
         (opt "gas" Gas.Arith.z_integral_encoding)
         (req "unparsing_mode" unparsing_mode_encoding)
         (opt "now" Script_timestamp.encoding)
@@ -233,7 +233,7 @@ module Scripts = struct
            (dft "unlimited_gas" bool false)
            (req "chain_id" Chain_id.encoding)
            (opt "source" Contract.encoding)
-           (opt "payer" Contract.encoding)
+           (opt "payer" Contract.implicit_encoding)
            (opt "gas" Gas.Arith.z_integral_encoding)
            (req "unparsing_mode" unparsing_mode_encoding)
            (opt "now" Script_timestamp.encoding))
@@ -901,7 +901,7 @@ module Scripts = struct
   type run_code_config = {
     balance : Tez.t;
     self : Contract_hash.t;
-    payer : Contract.t;
+    payer : Signature.public_key_hash;
     source : Contract.t;
   }
 
@@ -928,6 +928,14 @@ module Scripts = struct
         balance
       >>=? fun (ctxt, _) -> return (ctxt, dummy_contract_hash)
     in
+    let source_and_payer ~src_opt ~pay_opt ~default_src =
+      match (src_opt, pay_opt) with
+      | None, None ->
+          (Contract.Originated default_src, Signature.Public_key_hash.zero)
+      | Some c, None -> (c, Signature.Public_key_hash.zero)
+      | None, Some c -> (Contract.Implicit c, c)
+      | Some src, Some pay -> (src, pay)
+    in
     let configure_contracts ctxt script balance ~src_opt ~pay_opt ~self_opt =
       (match self_opt with
       | None ->
@@ -942,12 +950,7 @@ module Scripts = struct
           >>=? fun bal -> return (ctxt, addr, bal))
       >>=? fun (ctxt, self, balance) ->
       let source, payer =
-        match (src_opt, pay_opt) with
-        | None, None ->
-            let self = Contract.Originated self in
-            (self, self)
-        | Some c, None | None, Some c -> (c, c)
-        | Some src, Some pay -> (src, pay)
+        source_and_payer ~src_opt ~pay_opt ~default_src:self
       in
       return (ctxt, {balance; self; source; payer})
     in
@@ -1134,8 +1137,8 @@ module Scripts = struct
           entrypoint,
           input,
           chain_id,
-          source,
-          payer,
+          src_opt,
+          pay_opt,
           gas,
           unparsing_mode,
           now,
@@ -1160,11 +1163,7 @@ module Scripts = struct
              Tez.zero
         >>=? fun (ctxt, viewer_contract) ->
         let source, payer =
-          match (source, payer) with
-          | Some source, Some payer -> (source, payer)
-          | Some source, None -> (source, source)
-          | None, Some payer -> (payer, payer)
-          | None, None -> (contract, contract)
+          source_and_payer ~src_opt ~pay_opt ~default_src:contract_hash
         in
         let gas =
           Option.value
@@ -1234,8 +1233,8 @@ module Scripts = struct
             input,
             unlimited_gas,
             chain_id,
-            source,
-            payer,
+            src_opt,
+            pay_opt,
             gas,
             unparsing_mode,
             now ),
@@ -1253,11 +1252,7 @@ module Scripts = struct
         >>=? fun (input_ty, output_ty) ->
         Contract.get_balance ctxt contract >>=? fun balance ->
         let source, payer =
-          match (source, payer) with
-          | Some source, Some payer -> (source, payer)
-          | Some source, None -> (source, source)
-          | None, Some payer -> (payer, payer)
-          | None, None -> (contract, contract)
+          source_and_payer ~src_opt ~pay_opt ~default_src:contract_hash
         in
         let now =
           match now with None -> Script_timestamp.now ctxt | Some t -> t

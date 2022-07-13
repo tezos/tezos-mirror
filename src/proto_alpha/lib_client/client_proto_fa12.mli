@@ -155,7 +155,7 @@ val run_view_action :
   ?source:Contract.t ->
   contract:Contract_hash.t ->
   action:action ->
-  ?payer:Contract.t ->
+  ?payer:Signature.public_key_hash ->
   ?gas:Gas.Arith.integral ->
   unparsing_mode:Script_ir_translator.unparsing_mode ->
   unit ->
