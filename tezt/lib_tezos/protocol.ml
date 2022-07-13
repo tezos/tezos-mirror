@@ -54,7 +54,7 @@ let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | Ithaca -> "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
   | Jakarta -> "PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY"
-  | Kathmandu -> "PtKathmaXYPEsBau83zRwXK19HAQRzZSj6pCXnvtyLZFjRxdQxt"
+  | Kathmandu -> "PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg"
 
 let genesis_hash = "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 

@@ -40,7 +40,7 @@ let protocols =
     ( "kathmandu",
       "Kathmandu",
       Some "/include/rpc_introduction.rst.inc",
-      "PtKathmaXYPEsBau83zRwXK19HAQRzZSj6pCXnvtyLZFjRxdQxt" );
+      "PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg" );
   ]
 
 let pp_name ppf = function

@@ -259,7 +259,7 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtKathmaXYPEsBau83zRwXK19HAQRzZSj6pCXnvtyLZFjRxdQxt\"\nlet name = Tezos_protocol_environment_014_PtKathma.Name.name\ninclude Tezos_raw_protocol_014_PtKathma\ninclude Tezos_raw_protocol_014_PtKathma.Main\n")))
+   "\nlet hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg\"\nlet name = Tezos_protocol_environment_014_PtKathma.Name.name\ninclude Tezos_raw_protocol_014_PtKathma\ninclude Tezos_raw_protocol_014_PtKathma.Main\n")))
 
 (rule
  (targets tezos_protocol_014_PtKathma.ml)
