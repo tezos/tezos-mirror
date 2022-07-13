@@ -469,7 +469,7 @@ let send_message client sc_rollup msg =
   let* () =
     Client.Sc_rollup.send_message
       ~hooks
-      ~src:"bootstrap1"
+      ~src:Constant.bootstrap2.alias
       ~dst:sc_rollup
       ~msg
       client
