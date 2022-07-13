@@ -44,3 +44,8 @@ v0.5.2:
 v0.5.3:  
 - fix bug wherein the binary description of zeroable encodings was invalid RST
 - make compact encodings JSON output identical to that of vanilla encodings
+
+v0.6:  
+- OCaml 4.14 support (including CI tests)
+- new tutorial
+- fix pathological performance issues when generating some binary descriptions for `mu`+`union` encodings
