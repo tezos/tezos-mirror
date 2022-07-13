@@ -79,7 +79,7 @@ let constants_mainnet =
     Constants.Parametric.preserved_cycles = 5;
     blocks_per_cycle = 8192l;
     blocks_per_commitment = 64l;
-    nonce_revelation_threshold = 32l;
+    nonce_revelation_threshold = 256l;
     blocks_per_stake_snapshot = 512l;
     cycles_per_voting_period = 5l;
     hard_gas_limit_per_operation = Gas.Arith.(integral_of_int_exn 1_040_000);
@@ -87,13 +87,13 @@ let constants_mainnet =
     proof_of_work_threshold = Int64.(sub (shift_left 1L 46) 1L);
     tokens_per_roll = Tez.(mul_exn one 6_000);
     (* VDF's difficulty must be a multiple of `nonce_revelation_threshold` times
-       the block time. At the moment it is equal to 1B = 1000 * 5 * .2M with
-          - 1000 ~= 32 * 30 that is nonce_revelation_threshold * block time
+       the block time. At the moment it is equal to 8B = 8000 * 5 * .2M with
+          - 8000 ~= 256 * 30 that is nonce_revelation_threshold * block time
           - .2M  ~= number of modular squaring per second on benchmark machine
          with 2.8GHz CPU
           - 5: security factor (strictly higher than the ratio between highest CPU
          clock rate and benchmark machine that is 8.43/2.8 ~= 3 *)
-    vdf_difficulty = 1_000_000_000L;
+    vdf_difficulty = 8_000_000_000L;
     seed_nonce_revelation_tip =
       (match Tez.(one /? 8L) with Ok c -> c | Error _ -> assert false);
     origination_size = 257;

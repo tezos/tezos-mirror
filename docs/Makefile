@@ -19,7 +19,7 @@ PROTOCOLS     = $(NAMED_PROTOS) alpha
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
 jakarta_long  = PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
-kathmandu_long = PtKathmaXYPEsBau83zRwXK19HAQRzZSj6pCXnvtyLZFjRxdQxt
+kathmandu_long = PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 jakarta_short = 013-PtJakart
