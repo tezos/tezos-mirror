@@ -18,6 +18,7 @@
 (rule
  (targets tutorial.mld)
  (deps tutorial.md)
+ (mode promote)
  (action
   (with-stdout-to
    %{targets}
