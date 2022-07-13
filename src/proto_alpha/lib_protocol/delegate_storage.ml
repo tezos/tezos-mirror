@@ -628,7 +628,7 @@ let compute_snapshot_index_for_seed ~max_snapshot_index seed =
   |> fst |> Int32.to_int |> return
 
 let compute_snapshot_index ctxt cycle ~max_snapshot_index =
-  Storage.Seed.For_cycle.get ctxt cycle >>=? fun seed ->
+  Seed_storage.for_cycle ctxt cycle >>=? fun seed ->
   compute_snapshot_index_for_seed ~max_snapshot_index seed
 
 let select_distribution_for_cycle ctxt cycle =
@@ -770,7 +770,7 @@ module Random = struct
       [Raw_context.set_sampler_for_cycle]. *)
   let sampler_for_cycle ctxt cycle =
     let read ctxt =
-      Storage.Seed.For_cycle.get ctxt cycle >>=? fun seed ->
+      Seed_storage.for_cycle ctxt cycle >>=? fun seed ->
       Delegate_sampler_state.get ctxt cycle >>=? fun state ->
       return (seed, state)
     in
