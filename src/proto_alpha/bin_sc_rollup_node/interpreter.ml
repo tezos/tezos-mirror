@@ -85,9 +85,8 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         return (state, failing_ticks')
       in
       match failing_ticks with
-      | xtick :: failing_ticks' ->
-          if xtick = tick then failure_insertion_eval state failing_ticks'
-          else normal_eval state
+      | xtick :: failing_ticks' when xtick = tick ->
+          failure_insertion_eval state failing_ticks'
       | _ -> normal_eval state
     in
     let rec go fuel tick failing_ticks state =
