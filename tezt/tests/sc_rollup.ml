@@ -108,10 +108,11 @@ let regression_test ~__FILE__ ?(tags = []) title f =
   let tags = "sc_rollup" :: tags in
   Protocol.register_regression_test ~__FILE__ ~title ~tags f
 
-let setup ?commitment_period ?challenge_window f ~protocol =
+let setup ?commitment_period ?challenge_window ?timeout f ~protocol =
   let parameters =
     make_parameter "sc_rollup_commitment_period_in_blocks" commitment_period
     @ make_parameter "sc_rollup_challenge_window_in_blocks" challenge_window
+    @ make_parameter "sc_rollup_timeout_period_in_blocks" timeout
     @ [(["sc_rollup_enable"], Some "true")]
   in
   let base = Either.right (protocol, None) in
@@ -167,7 +168,7 @@ let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2933
    Many tests can be refactored using test_scenario. *)
-let test_scenario ?commitment_period ?challenge_window
+let test_scenario ?commitment_period ?challenge_window ?timeout
     {variant; tags; description} scenario =
   let tags = tags @ [variant] in
   regression_test
@@ -175,7 +176,8 @@ let test_scenario ?commitment_period ?challenge_window
     ~tags
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
-      setup ?commitment_period ?challenge_window ~protocol @@ fun node client ->
+      setup ?commitment_period ?challenge_window ?timeout ~protocol
+      @@ fun node client ->
       ( with_fresh_rollup @@ fun sc_rollup sc_rollup_node _filename ->
         scenario protocol sc_rollup_node sc_rollup node client )
         node
@@ -1993,6 +1995,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window variant
     (loser_mode, inputs, final_level, empty_levels, stop_loser_at) =
   test_scenario
     ?commitment_period
+    ~timeout:10
     ?challenge_window
     {
       tags = ["refutation"; "node"];
@@ -2073,17 +2076,17 @@ let inputs_for n =
 let test_refutation protocols =
   let challenge_window = 10 in
   [
-    ("inbox_proof_at_genesis", ("3 0 0", inputs_for 10, 30, [], []));
-    ("pvm_proof_at_genesis", ("3 0 1", inputs_for 10, 30, [], []));
-    ("inbox_proof", ("5 0 0", inputs_for 10, 30, [], []));
-    ("inbox_proof_one_empty_level", ("6 0 0", inputs_for 10, 40, [2], []));
+    ("inbox_proof_at_genesis", ("3 0 0", inputs_for 10, 80, [], []));
+    ("pvm_proof_at_genesis", ("3 0 1", inputs_for 10, 80, [], []));
+    ("inbox_proof", ("5 0 0", inputs_for 10, 80, [], []));
+    ("inbox_proof_one_empty_level", ("6 0 0", inputs_for 10, 80, [2], []));
     ( "inbox_proof_many_empty_levels",
-      ("9 0 0", inputs_for 10, 40, [2; 3; 4], []) );
-    ("pvm_proof_0", ("5 0 1", inputs_for 10, 30, [], []));
-    ("pvm_proof_1", ("7 1 2", inputs_for 10, 30, [], []));
-    ("pvm_proof_2", ("7 2 5", inputs_for 7, 30, [], []));
-    ("pvm_proof_3", ("9 2 5", inputs_for 7, 30, [4; 5], []));
-    ("timeout", ("5 0 1", inputs_for 10, 40, [], [35]));
+      ("9 0 0", inputs_for 10, 80, [2; 3; 4], []) );
+    ("pvm_proof_0", ("5 0 1", inputs_for 10, 80, [], []));
+    ("pvm_proof_1", ("7 1 2", inputs_for 10, 80, [], []));
+    ("pvm_proof_2", ("7 2 5", inputs_for 7, 80, [], []));
+    ("pvm_proof_3", ("9 2 5", inputs_for 7, 80, [4; 5], []));
+    ("timeout", ("5 0 1", inputs_for 10, 80, [], [35]));
   ]
   |> List.iter (fun (variant, inputs) ->
          test_refutation_scenario ~challenge_window variant inputs protocols)
