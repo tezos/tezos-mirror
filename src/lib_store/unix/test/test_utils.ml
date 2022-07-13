@@ -348,6 +348,19 @@ let make_raw_block ?min_lafl ?(max_operations_ttl = default_max_operations_ttl)
     | Some min_lafl -> Compare.Int32.max min_lafl last_allowed_fork_level
     | None -> last_allowed_fork_level
   in
+  let operations =
+    List.map
+      (fun _ ->
+        Stdlib.List.init (Random.int 10) (fun _i ->
+            Operation.
+              {
+                shell = {branch = pred_block_hash};
+                proto =
+                  Data_encoding.(
+                    Binary.to_bytes_exn int31 Random.(int (bits ())));
+              }))
+      Tezos_protocol_alpha.Protocol.Main.validation_passes
+  in
   let metadata =
     Some
       {
@@ -357,24 +370,36 @@ let make_raw_block ?min_lafl ?(max_operations_ttl = default_max_operations_ttl)
         block_metadata = Bytes.create 1;
         operations_metadata =
           List.map
-            (fun _ -> [])
-            Tezos_protocol_alpha.Protocol.Main.validation_passes;
+            (List.map (fun _ ->
+                 if Random.bool () then Block_validation.Too_large_metadata
+                 else
+                   Metadata
+                     Data_encoding.(
+                       Binary.to_bytes_exn int31 Random.(int (bits ())))))
+            operations;
       }
   in
-  let operations =
-    List.map (fun _ -> []) Tezos_protocol_alpha.Protocol.Main.validation_passes
+  let b =
+    {
+      Block_repr.hash;
+      contents =
+        {
+          header;
+          operations;
+          block_metadata_hash =
+            (if Random.bool () then Some Block_metadata_hash.zero else None);
+          operations_metadata_hashes =
+            (if Random.bool () then
+             Some
+               (List.map
+                  (List.map (fun _ -> Operation_metadata_hash.zero))
+                  operations)
+            else None);
+        };
+      metadata;
+    }
   in
-  {
-    Block_repr.hash;
-    contents =
-      {
-        header;
-        operations;
-        block_metadata_hash = None;
-        operations_metadata_hashes = None;
-      };
-    metadata;
-  }
+  b
 
 let prune_block block = block.Block_repr.metadata <- None
 
