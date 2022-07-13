@@ -69,7 +69,7 @@ let of_chunks (MemoryType lim as ty) content =
   if not (valid_limits lim) then raise Type ;
   {ty; content}
 
-let bound mem = Int64.to_int32 @@ Chunked.total_size mem.content
+let bound mem = Chunked.total_size mem.content
 
 let size mem = Chunked.total_pages mem.content
 
@@ -87,19 +87,18 @@ let grow mem delta =
   if not (valid_limits lim') then raise SizeLimit else mem.ty <- MemoryType lim' ;
   Chunked.grow delta mem.content
 
-let load_byte mem address =
-  Chunked.load_byte mem.content (Int64.of_int32 address)
+let load_byte mem = Chunked.load_byte mem.content
 
-let store_byte mem address =
-  Chunked.store_byte mem.content @@ Int64.of_int32 address
+let store_byte mem = Chunked.store_byte mem.content
 
 (* Copied from [Memory] module *)
 let load_bytes mem a n =
+  let a = I64_convert.extend_i32_u a in
   let open Lwt.Syntax in
   let buf = Buffer.create n in
   let+ () =
     List.init n (fun i ->
-        let+ c = load_byte mem Int32.(add a (of_int i)) in
+        let+ c = load_byte mem Int64.(add a (of_int i)) in
         Buffer.add_char buf (Char.chr c))
     |> Lwt.join
   in
@@ -107,14 +106,16 @@ let load_bytes mem a n =
 
 (* Copied from [Memory] module *)
 let store_bytes mem a bs =
+  let a = I64_convert.extend_i32_u a in
   List.init (String.length bs) (fun i ->
-      store_byte mem Int32.(add a (of_int i)) (Char.code bs.[i]))
+      store_byte mem Int64.(add a (of_int i)) (Char.code bs.[i]))
   |> Lwt.join
 
 let store_bytes_from_bytes mem address bs =
+  let address = I64_convert.extend_i32_u address in
   List.init (Bytes.length bs) (fun offset ->
       let value = Char.code (Bytes.get bs offset) in
-      store_byte mem Int32.(add address (of_int offset)) value)
+      store_byte mem Int64.(add address (of_int offset)) value)
   |> Lwt.join
 
 (* Copied from [Memory] module *)
@@ -130,12 +131,13 @@ let loadn mem a o n =
   let rec loop a n =
     if n = 0 then Lwt.return 0L
     else
-      let* x0 = loop (Int32.add a 1l) (n - 1) in
+      let* x0 = loop (Int64.add a 1L) (n - 1) in
       let x = Int64.shift_left x0 8 in
       let+ v = load_byte mem a in
       Int64.logor (Int64.of_int v) x
   in
-  loop (effective_address a o) n
+  let a = I64_convert.extend_i32_u (effective_address a o) in
+  loop a n
 
 (* Copied from [Memory] module *)
 let storen mem a o n x =
@@ -143,11 +145,12 @@ let storen mem a o n x =
   assert (n > 0 && n <= 8) ;
   let rec loop a n x =
     if n > 0 then
-      let* () = Int32.(loop (add a 1l) (n - 1) (Int64.shift_right x 8)) in
+      let* () = Int64.(loop (add a 1L) (n - 1) (Int64.shift_right x 8)) in
       store_byte mem a (Int64.to_int x land 0xff)
     else Lwt.return_unit
   in
-  loop (effective_address a o) n x
+  let a = I64_convert.extend_i32_u (effective_address a o) in
+  loop a n x
 
 (* Copied from [Memory] module *)
 let load_num mem a o t =

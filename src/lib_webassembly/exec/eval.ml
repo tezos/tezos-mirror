@@ -166,7 +166,9 @@ let drop n (vs : 'a stack) at =
 
 let mem_oob frame x i n =
   let+ mem = memory frame.inst x in
-  I32.gt_u (I32.add i n) (Memory.bound mem)
+  I64.gt_u
+    (I64.add (I64_convert.extend_i32_u i) (I64_convert.extend_i32_u n))
+    (Memory.bound mem)
 
 let data_oob frame x i n =
   let+ data = data frame.inst x in
