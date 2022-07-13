@@ -152,12 +152,16 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     let open Lwt_result_syntax in
     let _start_hash, start_tick = ok in
     let our_state, stop_tick = our_view in
+    let Node_context.{protocol_constants; _} = node_ctxt in
     (* TODO: #3200
        We should not rely on an hard-coded constant here but instead
        introduce a protocol constant for the maximum number of sections
        in a dissection.
     *)
-    let max_number_of_sections = Z.of_int 32 in
+    let max_number_of_sections =
+      Z.of_int
+        protocol_constants.parametric.sc_rollup.number_of_sections_in_dissection
+    in
     let trace_length = Z.succ (Sc_rollup.Tick.distance stop_tick start_tick) in
     let number_of_sections = Z.min max_number_of_sections trace_length in
     let section_length =
