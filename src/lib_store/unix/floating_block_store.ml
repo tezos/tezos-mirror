@@ -47,6 +47,8 @@ type t = {
    `log_size * log_entry` where a `log_entry` is roughly 56 bytes. *)
 let floating_blocks_log_size = 10_000
 
+let default_block_buffer_size = 500_000
+
 open Floating_block_index.Block_info
 
 let kind {kind; _} = kind
@@ -225,6 +227,172 @@ let iter_s f floating_store = fold_left_s (fun () e -> f e) () floating_store
 let iter_with_pred_s f floating_store =
   fold_left_with_pred_s (fun () e -> f e) () floating_store
 
+let retrieve_block_from_stores floating_stores block_hash =
+  let open Lwt_result_syntax in
+  List.find_map
+    (fun floating_store ->
+      try
+        Some
+          ( Floating_block_index.find
+              floating_store.floating_block_index
+              block_hash,
+            floating_store )
+      with _ -> None)
+    floating_stores
+  |> function
+  | None ->
+      tzfail (Store_errors.Block_not_found {hash = block_hash; distance = 0})
+  | Some x -> return x
+
+let raw_copy_block ~block_buffer ~src_floating_stores ~block_hash
+    ~dst_floating_store =
+  let open Lwt_result_syntax in
+  protect (fun () ->
+      let* {offset; predecessors}, src_floating_store =
+        retrieve_block_from_stores src_floating_stores block_hash
+      in
+      let length_size = 4 in
+      let*! () =
+        Lwt_utils_unix.read_bytes
+          ~file_offset:offset (* = pread *)
+          ~pos:0
+          ~len:length_size
+          src_floating_store.fd
+          !block_buffer
+      in
+      let block_length = Bytes.get_int32_be !block_buffer 0 |> Int32.to_int in
+      let buffer_length = Bytes.length !block_buffer in
+      let required_length = block_length + length_size in
+      (* Resize the buffer if needs be *)
+      if buffer_length < required_length then
+        block_buffer := Bytes.create required_length ;
+      let*! () =
+        Lwt_utils_unix.read_bytes
+          ~file_offset:offset (* = pread *)
+          ~pos:0
+          ~len:required_length
+          src_floating_store.fd
+          !block_buffer
+      in
+      let*! new_offset = Lwt_unix.lseek dst_floating_store.fd 0 Unix.SEEK_END in
+      let*! () =
+        Lwt_utils_unix.write_bytes
+          ~pos:0
+          ~len:required_length
+          dst_floating_store.fd
+          !block_buffer
+      in
+      Floating_block_index.replace
+        dst_floating_store.floating_block_index
+        block_hash
+        {offset = new_offset; predecessors} ;
+      return_unit)
+
+let raw_copy_all ~src_floating_stores ~block_hashes ~dst_floating_store =
+  Lwt_idle_waiter.force_idle dst_floating_store.scheduler (fun () ->
+      let block_buffer = ref (Bytes.create default_block_buffer_size) in
+      List.iter_es
+        (fun block_hash ->
+          raw_copy_block
+            ~block_buffer
+            ~src_floating_stores
+            ~block_hash
+            ~dst_floating_store)
+        block_hashes)
+
+let raw_retrieve_blocks_seq ~src_floating_stores ~block_hashes =
+  let open Lwt_result_syntax in
+  let block_buffer = ref (Bytes.create default_block_buffer_size) in
+  List.to_seq block_hashes
+  |> Seq.map (fun block_hash ->
+         protect (fun () ->
+             let* {offset; predecessors = _}, src_floating_store =
+               retrieve_block_from_stores src_floating_stores block_hash
+             in
+             let length_size = 4 in
+             let*! () =
+               Lwt_utils_unix.read_bytes
+                 ~file_offset:offset (* = pread *)
+                 ~pos:0
+                 ~len:length_size
+                 src_floating_store.fd
+                 !block_buffer
+             in
+             let block_length =
+               Bytes.get_int32_be !block_buffer 0 |> Int32.to_int
+             in
+             let buffer_length = Bytes.length !block_buffer in
+             let required_length = block_length + length_size in
+             (* Resize the buffer if needs be *)
+             if buffer_length < required_length then
+               block_buffer := Bytes.create required_length ;
+             let*! () =
+               Lwt_utils_unix.read_bytes
+                 ~file_offset:offset (* = pread *)
+                 ~pos:0
+                 ~len:required_length
+                 src_floating_store.fd
+                 !block_buffer
+             in
+             return (block_hash, required_length, !block_buffer)))
+
+let raw_iterate f floating_store =
+  let open Lwt_result_syntax in
+  let block_buffer = ref (Bytes.create default_block_buffer_size) in
+  let block_size_buffer = Bytes.create 4 in
+  let iterate fd =
+    let*! end_of_file_offset = Lwt_unix.lseek fd 0 Unix.SEEK_END in
+    let rec loop current_offset =
+      if current_offset = end_of_file_offset then return_unit
+      else
+        let*! () =
+          Lwt_utils_unix.read_bytes
+            ~file_offset:current_offset
+            ~pos:0
+            ~len:4
+            fd
+            block_size_buffer
+        in
+        let block_length =
+          Bytes.get_int32_be block_size_buffer 0 |> Int32.to_int
+        in
+        let required_length = block_length + 4 in
+        let buffer_length = Bytes.length !block_buffer in
+        if buffer_length < required_length then
+          block_buffer := Bytes.create required_length ;
+        let*! () =
+          Lwt_utils_unix.read_bytes
+            ~file_offset:current_offset
+            ~pos:0
+            ~len:required_length
+            fd
+            !block_buffer
+        in
+        let* () = f (!block_buffer, required_length) in
+        loop (current_offset + required_length)
+    in
+    loop 0
+  in
+  protect (fun () -> folder iterate floating_store)
+
+let raw_append floating_store
+    (block_hash, block_bytes, required_length, predecessors) =
+  let open Lwt_result_syntax in
+  protect @@ fun () ->
+  let*! new_offset = Lwt_unix.lseek floating_store.fd 0 Unix.SEEK_END in
+  let*! () =
+    Lwt_utils_unix.write_bytes
+      ~pos:0
+      ~len:required_length
+      floating_store.fd
+      block_bytes
+  in
+  Floating_block_index.replace
+    floating_store.floating_block_index
+    block_hash
+    {offset = new_offset; predecessors} ;
+  return_unit
+
 let init chain_dir ~readonly kind =
   let open Lwt_syntax in
   let flag, perms =
@@ -258,7 +426,7 @@ let init chain_dir ~readonly kind =
       (Naming.dir_path floating_index_dir)
   in
   let scheduler = Lwt_idle_waiter.create () in
-  Lwt.return {floating_block_index; fd; floating_blocks_dir; kind; scheduler}
+  return {floating_block_index; fd; floating_blocks_dir; kind; scheduler}
 
 let close {floating_block_index; fd; scheduler; _} =
   let open Lwt_syntax in
