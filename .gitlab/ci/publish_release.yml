@@ -21,6 +21,8 @@ gitlab:release:
 
 opam:release:
   extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
     - .rules_template__release_tag
   # https://gitlab.com/tezos/docker-images/ci-release
   image: "${CI_REGISTRY}/tezos/docker-images/ci-release:v1.1.0"
