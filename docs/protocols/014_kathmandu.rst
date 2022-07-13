@@ -53,6 +53,14 @@ Data Availability Layer (ongoing)
 Distribution of rollup operations data off-chain.  (MRs :gl:`!5371`,
 :gl:`!5501`, :gl:`!5508`, :gl:`!5527`, :gl:`!5423`)
 
+Updated randomness generation
+-----------------------------
+
+Introduce a new randomness generation protocol based on Verifiable Delay
+Functions (VDFs). See :doc:`Randomness generation <../kathmandu/randomness_generation>`
+for an explanation of how this protocol works.
+(MRs :gl:`!5064`, :gl:`!5848`)
+
 Contract Event Logging
 ----------------------
 
@@ -90,7 +98,9 @@ Breaking Changes
   block containing more than one operation from the same manager will
   now fail. (MR :gl:`!5557`)
 
-- VDF phase added after RANDAO in randomness generation. (MR :gl:`!5064`)
+- VDF phase added after RANDAO in randomness generation. Nonces for generating
+  the random seed must now be revealed in the first 256 blocks of a cycle
+  instead of anytime in a cycle. (MRs :gl:`!5064`, :gl:`!5848`)
 
 RPC Changes
 -----------
