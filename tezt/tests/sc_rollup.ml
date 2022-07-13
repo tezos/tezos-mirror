@@ -146,6 +146,19 @@ let sc_rollup_node_rpc sc_node service =
 
 type test = {variant : string; tags : string list; description : string}
 
+(** This helper injects an SC rollup origination via tezos-client. Then it
+bakes to include the origination in a block. It returns the address of the
+originated rollup *)
+let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))
+    ?(src = "bootstrap1") ?(kind = "arith") ?(parameters_ty = "string")
+    ?(boot_sector = "") client =
+  let* sc_rollup =
+    Client.Sc_rollup.(
+      originate ~hooks ~burn_cap ~src ~kind ~parameters_ty ~boot_sector client)
+  in
+  let* () = Client.bake_for_and_wait client in
+  return sc_rollup
+
 let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
   let* sc_rollup =
     Client.Sc_rollup.originate
