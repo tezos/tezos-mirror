@@ -1,12 +1,13 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name main)
+(executables
+ (names main test_1m_restriction)
  (libraries
   alcotest-lwt
   tezos-base
   tezos-protocol-014-PtKathma
+  qcheck-alcotest
   tezos-client-014-PtKathma
   tezos-014-PtKathma-test-helpers
   tezos-base-test-helpers)
@@ -23,3 +24,8 @@
  (alias runtest)
  (package tezos-protocol-014-PtKathma-tests)
  (action (run %{dep:./main.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-014-PtKathma-tests)
+ (action (run %{dep:./test_1m_restriction.exe})))

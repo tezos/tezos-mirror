@@ -25,20 +25,20 @@
 
 (** Testing
     -------
-    Component:  Protocol (precheck manager)
+    Component:  Protocol (validate manager)
     Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/precheck/main.exe \
+                src/proto_014_PtKathma/lib_protocol/test/integration/validate/main.exe \
                 -- test "^Batched"
-    Subject:    Precheck manager operation.
+    Subject:    Validation of batched manager operation.
 *)
 
 open Protocol
 open Alpha_context
 open Manager_operation_helpers
 
-(* Tests on operation batches. *)
+(** {2 Tests on operation batches} *)
 
-(* Revelation should not occur elsewhere than in first position
+(** Revelation should not occur elsewhere than in first position
    in a batch.*)
 let batch_reveal_in_the_middle_diagnostic (infos : infos) op =
   let expect_failure errs =
@@ -54,40 +54,62 @@ let batch_reveal_in_the_middle_diagnostic (infos : infos) op =
           Error_monad.pp_print_trace
           err
   in
-  precheck_ko_diagnostic infos op expect_failure
+  validate_ko_diagnostic infos op expect_failure
 
 let test_batch_reveal_in_the_middle kind1 kind2 () =
   let open Lwt_result_syntax in
-  let* infos = init_context () in
-  let* counter = Context.Contract.counter (B infos.block) infos.contract1 in
-  let counter = counter in
-  let fee = Tez.one_mutez in
-  let counter = Z.succ counter in
-  let* operation1 =
-    select_op ~counter ~force_reveal:false ~source:infos.contract1 kind1 infos
+  let* infos = default_init_ctxt () in
+  let* counter =
+    Context.Contract.counter
+      (B infos.ctxt.block)
+      (contract_of infos.accounts.source)
   in
   let counter = Z.succ counter in
-  let* reveal = mk_reveal ~fee ~counter ~source:infos.contract1 infos in
+  let* operation1 =
+    select_op
+      {
+        (operation_req_default kind1) with
+        force_reveal = Some false;
+        counter = Some counter;
+      }
+      infos
+  in
+  let counter = Z.succ counter in
+  let* reveal =
+    mk_reveal
+      {
+        (operation_req_default K_Reveal) with
+        fee = Some Tez.one_mutez;
+        counter = Some counter;
+      }
+      infos
+  in
   let counter = Z.succ counter in
   let* operation2 =
-    select_op ~counter ~force_reveal:false ~source:infos.contract1 kind2 infos
+    select_op
+      {
+        (operation_req_default kind2) with
+        force_reveal = Some false;
+        counter = Some counter;
+      }
+      infos
   in
   let* batch =
     Op.batch_operations
       ~recompute_counters:false
-      ~source:infos.contract1
-      (Context.B infos.block)
+      ~source:(contract_of infos.accounts.source)
+      (Context.B infos.ctxt.block)
       [operation1; reveal; operation2]
   in
-  batch_reveal_in_the_middle_diagnostic infos batch
+  batch_reveal_in_the_middle_diagnostic infos [batch]
 
 let generate_batches_reveal_in_the_middle () =
   create_Tztest_batches
     test_batch_reveal_in_the_middle
-    "reveal should occur only at the beginning of a batch."
+    "Reveal should only occur at the beginning of a batch."
     revealed_subjects
 
-(* A batch of manager operation contains at most one Revelation.*)
+(** A batch of manager operation contains at most one Revelation.*)
 let batch_two_reveals_diagnostic (infos : infos) op =
   let expected_failure errs =
     match errs with
@@ -102,30 +124,54 @@ let batch_two_reveals_diagnostic (infos : infos) op =
           Error_monad.pp_print_trace
           err
   in
-  precheck_ko_diagnostic infos op expected_failure
+  validate_ko_diagnostic infos op expected_failure
 
 let test_batch_two_reveals kind () =
   let open Lwt_result_syntax in
-  let* infos = init_context () in
-  let* counter = Context.Contract.counter (B infos.block) infos.contract1 in
-  let counter = counter in
-  let fee = Tez.one_mutez in
+  let* infos = default_init_ctxt () in
+  let* counter =
+    Context.Contract.counter
+      (B infos.ctxt.block)
+      (contract_of infos.accounts.source)
+  in
   let counter = Z.succ counter in
-  let* reveal = mk_reveal ~fee ~counter ~source:infos.contract1 infos in
+  let* reveal =
+    mk_reveal
+      {
+        (operation_req_default K_Reveal) with
+        fee = Some Tez.one_mutez;
+        counter = Some counter;
+      }
+      infos
+  in
   let counter = Z.succ counter in
-  let* reveal1 = mk_reveal ~fee ~counter ~source:infos.contract1 infos in
+  let* reveal1 =
+    mk_reveal
+      {
+        (operation_req_default K_Reveal) with
+        fee = Some Tez.one_mutez;
+        counter = Some counter;
+      }
+      infos
+  in
   let counter = Z.succ counter in
   let* operation =
-    select_op ~counter ~force_reveal:false ~source:infos.contract1 kind infos
+    select_op
+      {
+        (operation_req_default kind) with
+        force_reveal = Some false;
+        counter = Some counter;
+      }
+      infos
   in
   let* batch =
     Op.batch_operations
       ~recompute_counters:false
-      ~source:infos.contract1
-      (Context.B infos.block)
+      ~source:(contract_of infos.accounts.source)
+      (Context.B infos.ctxt.block)
       [reveal; reveal1; operation]
   in
-  batch_two_reveals_diagnostic infos batch
+  batch_two_reveals_diagnostic infos [batch]
 
 let generate_tests_batches_two_reveals () =
   create_Tztest
@@ -133,7 +179,7 @@ let generate_tests_batches_two_reveals () =
     "Only one revelation per batch."
     revealed_subjects
 
-(* Every manager operation in a batch concerns the same source.*)
+(** Every manager operation in a batch concerns the same source.*)
 let batch_two_sources_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
@@ -147,27 +193,42 @@ let batch_two_sources_diagnostic (infos : infos) op =
           Error_monad.pp_print_trace
           err
   in
-  precheck_ko_diagnostic infos op expect_failure
+  validate_ko_diagnostic infos op expect_failure
 
 let test_batch_two_sources kind1 kind2 () =
   let open Lwt_result_syntax in
-  let* infos = init_context () in
-  let* counter = Context.Contract.counter (B infos.block) infos.contract1 in
+  let* infos = default_init_ctxt () in
+  let source = contract_of infos.accounts.source in
+  let* counter = Context.Contract.counter (B infos.ctxt.block) source in
   let counter = Z.succ counter in
   let* operation1 =
-    select_op ~counter ~force_reveal:true ~source:infos.contract1 kind1 infos
+    select_op
+      {
+        (operation_req_default kind1) with
+        force_reveal = Some true;
+        counter = Some counter;
+      }
+      infos
+  in
+  let infos =
+    let source2 =
+      match infos.accounts.del with None -> assert false | Some s -> s
+    in
+    {infos with accounts = {infos.accounts with source = source2}}
   in
   let* operation2 =
-    select_op ~force_reveal:false ~source:infos.contract2 kind2 infos
+    select_op
+      {(operation_req_default kind2) with force_reveal = Some false}
+      infos
   in
   let* batch =
     Op.batch_operations
       ~recompute_counters:false
-      ~source:infos.contract1
-      (Context.B infos.block)
+      ~source
+      (Context.B infos.ctxt.block)
       [operation1; operation2]
   in
-  batch_two_sources_diagnostic infos batch
+  batch_two_sources_diagnostic infos [batch]
 
 let generate_batches_two_sources () =
   create_Tztest_batches
@@ -175,21 +236,29 @@ let generate_batches_two_sources () =
     "Only one source per batch."
     revealed_subjects
 
-(* Counters in a batch should be a sequence from the successor of
+(** Counters in a batch should be a sequence from the successor of
    the stored counter associated to source in the initial context. *)
 let test_batch_inconsistent_counters kind1 kind2 () =
   let open Lwt_result_syntax in
-  let* infos = init_context () in
-  let* counter = Context.Contract.counter (B infos.block) infos.contract1 in
-  let fee = Tez.one_mutez in
-  let* reveal = mk_reveal ~fee ~counter ~source:infos.contract1 infos in
+  let* infos = default_init_ctxt () in
+  let source = contract_of infos.accounts.source in
+  let* counter = Context.Contract.counter (B infos.ctxt.block) source in
+  let fee = Some Tez.one_mutez in
+  let op_infos = operation_req_default K_Reveal in
+  let op_infos = {{op_infos with fee} with counter = Some counter} in
+  let* reveal = mk_reveal op_infos infos in
   let counter0 = counter in
   let counter = Z.succ counter in
   let counter2 = Z.succ counter in
   let counter3 = Z.succ counter2 in
-  let source = infos.contract1 in
   let operation counter kind =
-    select_op ~counter ~force_reveal:false ~source kind infos
+    select_op
+      {
+        (operation_req_default kind) with
+        counter = Some counter;
+        force_reveal = Some false;
+      }
+      infos
   in
   let op_counter = operation counter in
   let op_counter0 = operation counter0 in
@@ -201,7 +270,7 @@ let test_batch_inconsistent_counters kind1 kind2 () =
     Op.batch_operations
       ~recompute_counters:false
       ~source
-      (Context.B infos.block)
+      (Context.B infos.ctxt.block)
       [reveal; op1; op2]
   in
   let* op1 = op_counter2 kind1 in
@@ -210,7 +279,7 @@ let test_batch_inconsistent_counters kind1 kind2 () =
     Op.batch_operations
       ~recompute_counters:false
       ~source
-      (Context.B infos.block)
+      (Context.B infos.ctxt.block)
       [reveal; op1; op2]
   in
   let* op1 = op_counter kind1 in
@@ -219,7 +288,7 @@ let test_batch_inconsistent_counters kind1 kind2 () =
     Op.batch_operations
       ~recompute_counters:false
       ~source
-      (Context.B infos.block)
+      (Context.B infos.ctxt.block)
       [reveal; op1; op2]
   in
   let* op1 = op_counter2 kind1 in
@@ -228,7 +297,7 @@ let test_batch_inconsistent_counters kind1 kind2 () =
     Op.batch_operations
       ~recompute_counters:false
       ~source
-      (Context.B infos.block)
+      (Context.B infos.ctxt.block)
       [reveal; op1; op2]
   in
   let* op1 = op_counter0 kind1 in
@@ -237,7 +306,7 @@ let test_batch_inconsistent_counters kind1 kind2 () =
     Op.batch_operations
       ~recompute_counters:false
       ~source
-      (Context.B infos.block)
+      (Context.B infos.ctxt.block)
       [reveal; op1; op2]
   in
   let expect_failure errs =
@@ -252,7 +321,7 @@ let test_batch_inconsistent_counters kind1 kind2 () =
           Error_monad.pp_print_trace
           err
   in
-  let* i = Incremental.begin_construction infos.block in
+  let* i = Incremental.begin_construction infos.ctxt.block in
   let* _ = Incremental.add_operation ~expect_failure i batch_same in
   let* _ = Incremental.add_operation ~expect_failure i batch_in_the_future in
   let* _ = Incremental.add_operation ~expect_failure i batch_missing_one in
@@ -266,23 +335,41 @@ let generate_batches_inconsistent_counters () =
     "Counters in a batch should be a sequence."
     revealed_subjects
 
-(* A batch that consumes all the balance for fees can only face the total
+(** A batch that consumes all the balance for fees can only face the total
    consumption at the end of the batch. *)
 let test_batch_emptying_balance_in_the_middle kind1 kind2 () =
   let open Lwt_result_syntax in
-  let* infos = init_context () in
-  let* counter = Context.Contract.counter (B infos.block) infos.contract1 in
-  let* init_bal = Context.Contract.balance (B infos.block) infos.contract1 in
+  let* infos = default_init_ctxt () in
+  let source = contract_of infos.accounts.source in
+  let* counter = Context.Contract.counter (B infos.ctxt.block) source in
+  let* init_bal = Context.Contract.balance (B infos.ctxt.block) source in
   let counter = counter in
-  let source = infos.contract1 in
-  let* reveal = mk_reveal ~counter ~source infos in
+  let* reveal =
+    mk_reveal
+      {(operation_req_default K_Reveal) with counter = Some counter}
+      infos
+  in
   let counter = Z.succ counter in
   let operation fee =
-    select_op ~fee ~counter ~force_reveal:false ~source kind1 infos
+    select_op
+      {
+        (operation_req_default kind1) with
+        force_reveal = Some false;
+        counter = Some counter;
+        fee = Some fee;
+      }
+      infos
   in
   let counter = Z.succ counter in
   let operation2 fee =
-    select_op ~fee ~counter ~force_reveal:false ~source kind2 infos
+    select_op
+      {
+        (operation_req_default kind2) with
+        force_reveal = Some false;
+        counter = Some counter;
+        fee = Some fee;
+      }
+      infos
   in
   let* op_case1 = operation init_bal in
   let* op2_case1 = operation2 Tez.zero in
@@ -290,10 +377,10 @@ let test_batch_emptying_balance_in_the_middle kind1 kind2 () =
     Op.batch_operations
       ~recompute_counters:false
       ~source
-      (Context.B infos.block)
+      (Context.B infos.ctxt.block)
       [reveal; op_case1; op2_case1]
   in
-  let* i = Incremental.begin_construction infos.block in
+  let* i = Incremental.begin_construction infos.ctxt.block in
   let expect_failure errs =
     match errs with
     | [Environment.Ecoproto_error (Contract_storage.Empty_implicit_contract _)]
@@ -314,36 +401,44 @@ let generate_batches_emptying_balance_in_the_middle () =
     "Fee payment emptying balance should occurs at the end of the batch."
     revealed_subjects
 
-(* A batch of manager operation must not exceed the initial available gas in the block. *)
+(** A batch of manager operation must not exceed the initial available gas in the block. *)
 let test_batch_exceeding_block_gas ~mempool_mode kind1 kind2 () =
   let open Lwt_result_syntax in
-  let* infos = init_context ~hard_gas_limit_per_block:gb_limit () in
-  let* counter = Context.Contract.counter (B infos.block) infos.contract1 in
+  let ctxt_req =
+    {ctxt_req_default with hard_gas_limit_per_block = Some gb_limit}
+  in
+  let* infos = init_ctxt ctxt_req in
+  let source = contract_of infos.accounts.source in
+  let* counter = Context.Contract.counter (B infos.ctxt.block) source in
   let g_limit = Gas.Arith.add gb_limit Gas.Arith.(integral_of_int_exn 1) in
   let half_limit =
     Gas.Arith.add half_gb_limit Gas.Arith.(integral_of_int_exn 1)
   in
-  let counter = counter in
-  let source = infos.contract1 in
-  let* reveal = mk_reveal ~counter ~source infos in
+  let* reveal =
+    mk_reveal
+      {(operation_req_default K_Reveal) with counter = Some counter}
+      infos
+  in
   let counter = Z.succ counter in
   let operation gas_limit =
     select_op
-      ~gas_limit:(Custom_gas gas_limit)
-      ~counter
-      ~force_reveal:false
-      ~source
-      kind1
+      {
+        (operation_req_default kind1) with
+        force_reveal = Some false;
+        counter = Some counter;
+        gas_limit = Some (Custom_gas gas_limit);
+      }
       infos
   in
   let counter = Z.succ counter in
   let operation2 gas_limit =
     select_op
-      ~gas_limit:(Custom_gas gas_limit)
-      ~counter
-      ~force_reveal:false
-      ~source
-      kind2
+      {
+        (operation_req_default kind2) with
+        force_reveal = Some false;
+        counter = Some counter;
+        gas_limit = Some (Custom_gas gas_limit);
+      }
       infos
   in
   let* op_case1 = operation g_limit in
@@ -356,24 +451,24 @@ let test_batch_exceeding_block_gas ~mempool_mode kind1 kind2 () =
     Op.batch_operations
       ~recompute_counters:false
       ~source
-      (Context.B infos.block)
+      (Context.B infos.ctxt.block)
       [reveal; op_case1; op2_case1]
   in
   let* case3 =
     Op.batch_operations
       ~recompute_counters:false
       ~source
-      (Context.B infos.block)
+      (Context.B infos.ctxt.block)
       [reveal; op_case3; op2_case3]
   in
   let* case2 =
     Op.batch_operations
       ~recompute_counters:false
       ~source
-      (Context.B infos.block)
+      (Context.B infos.ctxt.block)
       [reveal; op_case2; op2_case2]
   in
-  let* i = Incremental.begin_construction infos.block ~mempool_mode in
+  let* i = Incremental.begin_construction infos.ctxt.block ~mempool_mode in
   let expect_failure errs =
     match errs with
     | [Environment.Ecoproto_error Gas.Block_quota_exceeded]
@@ -408,24 +503,41 @@ let generate_batches_exceeding_block_gas_mp_mode () =
     "Too much gas consumption in mempool mode."
     revealed_subjects
 
-(* A batch that consumes all the balance for fees only at the end of
-   the batch passes precheck.*)
+(** A batch that consumes all the balance for fees only at the end of
+   the batch passes validate.*)
 let test_batch_balance_just_enough kind1 kind2 () =
   let open Lwt_result_syntax in
-  let* infos = init_context () in
-  let* counter = Context.Contract.counter (B infos.block) infos.contract1 in
-  let* init_bal = Context.Contract.balance (B infos.block) infos.contract1 in
+  let* infos = default_init_ctxt () in
+  let source = contract_of infos.accounts.source in
+  let* counter = Context.Contract.counter (B infos.ctxt.block) source in
+  let* init_bal = Context.Contract.balance (B infos.ctxt.block) source in
   let*? half_init_bal = Environment.wrap_tzresult @@ Tez.(init_bal /? 2L) in
-  let counter = counter in
-  let source = infos.contract1 in
-  let* reveal = mk_reveal ~counter ~source infos in
+  let* reveal =
+    mk_reveal
+      {(operation_req_default K_Reveal) with counter = Some counter}
+      infos
+  in
   let counter = Z.succ counter in
   let operation fee =
-    select_op ~fee ~counter ~force_reveal:false ~source kind1 infos
+    select_op
+      {
+        (operation_req_default kind1) with
+        force_reveal = Some false;
+        counter = Some counter;
+        fee = Some fee;
+      }
+      infos
   in
   let counter = Z.succ counter in
   let operation2 fee =
-    select_op ~fee ~counter ~force_reveal:false ~source kind2 infos
+    select_op
+      {
+        (operation_req_default kind2) with
+        force_reveal = Some false;
+        counter = Some counter;
+        fee = Some fee;
+      }
+      infos
   in
   let* op_case2 = operation Tez.zero in
   let* op2_case2 = operation2 init_bal in
@@ -435,47 +547,63 @@ let test_batch_balance_just_enough kind1 kind2 () =
     Op.batch_operations
       ~recompute_counters:false
       ~source
-      (Context.B infos.block)
+      (Context.B infos.ctxt.block)
       [reveal; op_case3; op2_case3]
   in
   let* case2 =
     Op.batch_operations
       ~recompute_counters:false
       ~source
-      (Context.B infos.block)
+      (Context.B infos.ctxt.block)
       [reveal; op_case2; op2_case2]
   in
-  let* _ = precheck_diagnostic infos case2 in
-  precheck_diagnostic infos case3
+  let* _ = validate_diagnostic infos [case2] in
+  let* _ = validate_diagnostic infos [case3] in
+  return_unit
 
 let generate_batches_balance_just_enough () =
   create_Tztest_batches
     test_batch_balance_just_enough
-    "(Positive test) Fee payment emptying balance in a batch."
+    "Fee payment emptying balance in a batch."
     revealed_subjects
 
-(* Simple reveal followed by a transaction. *)
+(** Simple reveal followed by a transaction. *)
 let test_batch_reveal_transaction_ok () =
   let open Lwt_result_syntax in
-  let* infos = init_context () in
-  let* counter = Context.Contract.counter (B infos.block) infos.contract1 in
+  let* infos = default_init_ctxt () in
+  let source = contract_of infos.accounts.source in
+  let* counter = Context.Contract.counter (B infos.ctxt.block) source in
   let counter = counter in
   let fee = Tez.one_mutez in
-  let source = infos.contract1 in
-  let* reveal = mk_reveal ~fee ~counter ~source infos in
+  let* reveal =
+    mk_reveal
+      {
+        (operation_req_default K_Reveal) with
+        fee = Some fee;
+        counter = Some counter;
+      }
+      infos
+  in
   let counter = Z.succ counter in
   let* transaction =
-    mk_transaction ~counter ~force_reveal:false ~source infos
+    mk_transaction
+      {
+        (operation_req_default K_Reveal) with
+        counter = Some counter;
+        force_reveal = Some false;
+      }
+      infos
   in
   let* batch =
     Op.batch_operations
       ~recompute_counters:false
       ~source
-      (Context.B infos.block)
+      (Context.B infos.ctxt.block)
       [reveal; transaction]
   in
-  let* _i = Incremental.begin_construction infos.block in
-  precheck_diagnostic infos batch
+  let* _i = Incremental.begin_construction infos.ctxt.block in
+  let* _ = validate_diagnostic infos [batch] in
+  return_unit
 
 let contract_tests =
   generate_batches_reveal_in_the_middle ()
@@ -484,7 +612,7 @@ let contract_tests =
   @ generate_batches_inconsistent_counters ()
   @ [
       Tztest.tztest
-        "Prechecked a batch with a reveal and a transaction."
+        "Validate a batch with a reveal and a transaction."
         `Quick
         test_batch_reveal_transaction_ok;
     ]

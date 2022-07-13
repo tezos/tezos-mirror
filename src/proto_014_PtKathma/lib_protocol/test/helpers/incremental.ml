@@ -170,10 +170,10 @@ let apply_operation ?(check_size = true) st op =
              Constants_repr.max_operation_data_length))) ;
   apply_operation st.state op >|= Environment.wrap_tzresult
 
-let precheck_operation ?expect_failure ?check_size st op =
+let validate_operation ?expect_failure ?check_size st op =
   apply_operation ?check_size st op >>= fun result ->
   match (expect_failure, result) with
-  | Some _, Ok _ -> failwith "Error expected while prechecking operation"
+  | Some _, Ok _ -> failwith "Error expected while validating operation"
   | Some f, Error err -> f err >|=? fun () -> st
   | None, Error err -> failwith "Error %a was not expected" pp_print_trace err
   | None, Ok (state, (Operation_metadata _ as metadata))

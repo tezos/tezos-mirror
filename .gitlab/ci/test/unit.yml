@@ -119,6 +119,7 @@ unit:014_PtKathma:
     proto_014_PtKathma__lib_protocol__2: >
         @src/proto_014_PtKathma/lib_protocol/test/integration/michelson/runtest
         @src/proto_014_PtKathma/lib_protocol/test/integration/operations/runtest
+        @src/proto_014_PtKathma/lib_protocol/test/integration/validate/runtest
     proto_014_PtKathma__lib_protocol__3: >
         @src/proto_014_PtKathma/lib_protocol/test/pbt/runtest
         @src/proto_014_PtKathma/lib_protocol/test/unit/runtest
@@ -151,6 +152,7 @@ unit:alpha:
     proto_alpha__lib_protocol__2: >
         @src/proto_alpha/lib_protocol/test/integration/michelson/runtest
         @src/proto_alpha/lib_protocol/test/integration/operations/runtest
+        @src/proto_alpha/lib_protocol/test/integration/validate/runtest
     proto_alpha__lib_protocol__3: >
         @src/proto_alpha/lib_protocol/test/pbt/runtest
         @src/proto_alpha/lib_protocol/test/unit/runtest

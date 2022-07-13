@@ -69,6 +69,9 @@ type gas_limit =
   | Zero
   | Custom_gas of Gas.Arith.integral
 
+(** Pretty printer for gas_limit type. *)
+val pp_gas_limit : Format.formatter -> gas_limit -> unit
+
 val transaction :
   ?force_reveal:bool ->
   ?counter:Z.t ->

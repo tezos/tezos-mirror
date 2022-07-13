@@ -170,6 +170,15 @@ let resolve_gas_limit ctxt = function
   | Zero -> return Gas.Arith.zero
   | Custom_gas x -> return x
 
+let pp_gas_limit fmt = function
+  | Max -> Format.fprintf fmt "Max"
+  | High ->
+      Format.fprintf fmt "High: %a" Gas.Arith.pp_integral default_high_gas_limit
+  | Low ->
+      Format.fprintf fmt "Low: %a" Gas.Arith.pp_integral default_low_gas_limit
+  | Zero -> Format.fprintf fmt "Zero: %a" Gas.Arith.pp_integral Gas.Arith.zero
+  | Custom_gas x -> Format.fprintf fmt "Custom: %a" Gas.Arith.pp_integral x
+
 let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
     (packed_operations : packed_operation list) =
   assert (match packed_operations with [] -> false | _ :: _ -> true) ;

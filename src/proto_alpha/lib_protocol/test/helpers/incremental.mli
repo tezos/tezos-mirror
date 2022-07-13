@@ -57,23 +57,23 @@ val begin_construction :
   Block.t ->
   incremental tzresult Lwt.t
 
-(** [precheck_operation ?expect_failure ?check_size i op] tries to
-    precheck [op] in the validation state of [i]. If the precheck
+(** [validate_operation ?expect_failure ?check_size i op] tries to
+    validate [op] in the validation state of [i]. If the validation
     succeeds, the function returns the incremental value with a
-    validation state updated after the precheck. Otherwise raise the
-    error from the prechecking of [op].
+    validation state updated after the validate. Otherwise raise the
+    error from the validation of [op].
 
     Optional arguments allow to override defaults:
 
     {ul {li [?expect_failure:(error list -> unit tzresult Lwt.t)]:
-    precheck of [op] is expected to fail and [expect_failure] should
-    handle the error. In case precheck does not fail and an
-    [expect_failure] is provided, [precheck_operation] fails.}
+    validation of [op] is expected to fail and [expect_failure] should
+    handle the error. In case validate does not fail and an
+    [expect_failure] is provided, [validate_operation] fails.}
 
     {li [?check_size:bool]: enable the check that an operation size
     should not exceed [Constants_repr.max_operation_data_length].
     Enabled (set to [true]) by default. }} *)
-val precheck_operation :
+val validate_operation :
   ?expect_failure:(error list -> unit tzresult Lwt.t) ->
   ?check_size:bool ->
   incremental ->
@@ -82,16 +82,16 @@ val precheck_operation :
 
 (** [add_operation ?expect_failure ?expect_apply_failure ?check_size i
     op] tries to apply [op] in the validation state of [i]. If the
-    precheck of [op] succeeds, the function returns the incremental
+    validation of [op] succeeds, the function returns the incremental
     value with a validation state updated after the application of
-    [op]. Otherwise raise the error from the prechecking of [op].
+    [op]. Otherwise raise the error from the validation of [op].
 
     Optional arguments allow to override defaults:
 
     {ul {li [?expect_failure:(error list -> unit tzresult Lwt.t)]:
-    precheck of [op] is expected to fail and [expect_failure] should
-    handle the error. In case precheck does not fail and
-    [expect_failure] is provided, [precheck_operation] fails.}
+    validation of [op] is expected to fail and [expect_failure] should
+    handle the error. In case validate does not fail and
+    [expect_failure] is provided, [validate_operation] fails.}
 
     {ul {li [?expect_apply_failure:(error list -> unit tzresult
     Lwt.t)]: application of [op] is expected to fail and

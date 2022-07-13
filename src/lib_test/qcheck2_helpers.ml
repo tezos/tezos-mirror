@@ -26,6 +26,24 @@
 let qcheck_wrap ?verbose ?long ?rand =
   List.map (QCheck_alcotest.to_alcotest ?verbose ?long ?rand)
 
+let qcheck_make_result ?count ?print ?pp_error ?check ~name
+    ~(gen : 'a QCheck2.Gen.t) (f : 'a -> (bool, 'b) result) =
+  let check =
+    match check with
+    | Some check -> check
+    | None -> (
+        function
+        | Ok b -> b
+        | Error err -> (
+            match pp_error with
+            | Some pp_error ->
+                QCheck2.Test.fail_reportf "Test failed:@,%a" pp_error err
+            | None ->
+                QCheck2.Test.fail_reportf
+                  "Test failed but no pretty printer was provided."))
+  in
+  QCheck2.Test.make ~name ?print ?count gen (fun x -> f x |> check)
+
 let qcheck_eq ?pp ?cmp ?eq expected actual =
   let pass =
     match (eq, cmp) with

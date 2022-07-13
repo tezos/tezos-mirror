@@ -1,12 +1,13 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name main)
+(executables
+ (names main test_1m_restriction)
  (libraries
   alcotest-lwt
   tezos-base
   tezos-protocol-alpha
+  qcheck-alcotest
   tezos-client-alpha
   tezos-alpha-test-helpers
   tezos-base-test-helpers)
@@ -23,3 +24,8 @@
  (alias runtest)
  (package tezos-protocol-alpha-tests)
  (action (run %{dep:./main.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{dep:./test_1m_restriction.exe})))

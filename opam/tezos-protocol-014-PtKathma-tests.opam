@@ -20,10 +20,10 @@ depends: [
   "tezos-micheline" {with-test}
   "tezos-benchmark-014-PtKathma" {with-test}
   "tezos-benchmark-type-inference-014-PtKathma" {with-test}
+  "qcheck-alcotest" { with-test & >= "0.18" }
   "tezos-context" {with-test}
   "tezos-test-helpers" {with-test}
   "alcotest" { with-test & >= "1.5.0" }
-  "qcheck-alcotest" { with-test & >= "0.18" }
   "tezos-client-base" {with-test}
   "tezos-protocol-environment" {with-test}
   "tezos-stdlib-unix" {with-test}

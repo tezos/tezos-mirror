@@ -3256,11 +3256,11 @@ end = struct
               octez_base_test_helpers |> open_;
             ]
       in
-      let _integration_precheck =
+      let _integration_validate =
         only_if N.(number >= 014) @@ fun () ->
-        test
-          "main"
-          ~path:(path // "lib_protocol/test/integration/precheck")
+        tests
+          ["main"; "test_1m_restriction"]
+          ~path:(path // "lib_protocol/test/integration/validate")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~deps:
             [
@@ -3268,6 +3268,7 @@ end = struct
               octez_base |> open_ ~m:"TzPervasives"
               |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
               main |> open_;
+              qcheck_alcotest;
               client |> if_some |> open_;
               test_helpers |> if_some |> open_;
               octez_base_test_helpers |> open_;
