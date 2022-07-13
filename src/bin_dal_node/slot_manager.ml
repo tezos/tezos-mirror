@@ -230,6 +230,10 @@ let get_slot store slot_header =
   in
   return slot
 
+(* FIXME https://gitlab.com/tezos/tezos/-/issues/3405
+
+   This can work only if a slot never ends with a `\000`. But I am not
+   sure in general such thing is required. *)
 module Utils = struct
   let trim_x00 b =
     let len = ref 0 in

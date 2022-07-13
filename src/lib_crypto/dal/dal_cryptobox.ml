@@ -120,7 +120,12 @@ module SRS_ring =
       let hash = Hashtbl.hash
     end)
 
-let srs_ring = SRS_ring.create 2
+(* FIXME https://gitlab.com/tezos/tezos/-/issues/3408
+
+   We use [3] because a priori, we only need to support [2] protocols
+   at the same time. In case of an hard fork, we give one protocol
+   more for security. *)
+let srs_ring = SRS_ring.create 3
 
 module Make (C : CONSTANTS) = struct
   open Kate_amortized
@@ -292,6 +297,9 @@ module Make (C : CONSTANTS) = struct
     (* Shards must contain at least two elements. *)
     assert (n > C.shards_amount)
 
+  (* FIXME https://gitlab.com/tezos/tezos/-/issues/3410
+
+     This function should be factored out with the one of sapling. *)
   let find_trusted_setup ?(getenv_opt = Sys.getenv_opt) ?(getcwd = Sys.getcwd)
       ?(file_exists = Sys.file_exists) () =
     let ( // ) = Filename.concat in
@@ -331,7 +339,12 @@ module Make (C : CONSTANTS) = struct
     | Some directory ->
         let srs_g1_file = directory // srs_g1 in
         let srs_g2_file = directory // srs_g2 in
-        (* FIXME 21 should be computed somehow *)
+        (* FIXME https://gitlab.com/tezos/tezos/-/issues/3409
+
+           An integrity check should ensure that only one SRS file is
+           expected. The `21` constant is the logarithmic size of this
+           file. A refactorisation, should ensure that this constant
+           is not needed or could be computed. *)
         Ok {srs_g1_file; srs_g2_file; logarithm_size = 21}
 
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/3400
@@ -344,6 +357,10 @@ module Make (C : CONSTANTS) = struct
     in
     let g2_size_compressed = Bls12_381.G2.size_in_bytes / 2 in
     let buf = Bytes.create g2_size_compressed in
+    (* FIXME https://gitlab.com/tezos/tezos/-/issues/3416
+
+       The reading is not in `Lwt`. Hence it can be an issue that this
+       reading is blocking. *)
     let read ic =
       Stdlib.really_input ic buf 0 g2_size_compressed ;
       Bls12_381.G2.of_compressed_bytes_exn buf
