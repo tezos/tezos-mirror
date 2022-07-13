@@ -26,6 +26,49 @@
 open Error_monad
 include Dal_cryptobox_sigs
 
+type error +=
+  | Failed_to_load_trusted_setup of string
+  | No_trusted_setup of string list
+  | Trusted_setup_too_small of
+      int (* FIXME:  "SRS asked (%d) too big for %s" d srsfile *)
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.trusted_setup_loading_failed"
+    ~title:"Trusted setup loading failed"
+    ~description:"Trusted setup failed to load"
+    ~pp:(fun ppf msg ->
+      Format.fprintf ppf "Trusted setup failed to load: %s" msg)
+    Data_encoding.(obj1 (req "msg" string))
+    (function
+      | Failed_to_load_trusted_setup parameter -> Some parameter | _ -> None)
+    (fun parameter -> Failed_to_load_trusted_setup parameter) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.trusted_setup_not_found"
+    ~title:"No trusted setup found"
+    ~description:"No trusted setup found in the explored paths"
+    ~pp:(fun ppf locations ->
+      Format.fprintf
+        ppf
+        "@[<v>cannot find Trusted setup in any of:@,%a@]@."
+        (Format.pp_print_list (fun fmt -> Format.fprintf fmt "- %s"))
+        locations)
+    Data_encoding.(obj1 (req "paths" (list string)))
+    (function No_trusted_setup parameter -> Some parameter | _ -> None)
+    (fun parameter -> No_trusted_setup parameter)
+
+(* The srs is an initialisation setup required by many primitives of
+   the cryptobox. For production code, this initialisation setup is
+   provided via files of size ~300MB. Loading those files can be done
+   once by the shell. However, the [srs] value depends on the
+   [slot_size] which is determined by the protocol.
+
+   What we provide here is a mechanism to store at most two different
+   [srs] depending on two different slot sizes. using the [Ringo]
+   library (see {!val:srs_ring}). We also provide a cache mechanism to
+   avoid recomputing the [srs] if it was already computed once. *)
 type srs = {
   srs_g1 : Bls12_381.G1.t array;
   srs_g2 : Bls12_381.G2.t array;
@@ -68,6 +111,21 @@ let srs ~redundancy_factor ~segment_size ~slot_size ~shards_amount : srs =
     kate_amortized_srs_g2_segments =
       Array.get srs_g2 (1 lsl Z.(log2up (of_int segment_len)));
   }
+
+module SRS_ring =
+  (val Ringo.(map_maker ~replacement:FIFO ~overflow:Strong ~accounting:Precise))
+    (struct
+      include Int
+
+      let hash = Hashtbl.hash
+    end)
+
+(* FIXME https://gitlab.com/tezos/tezos/-/issues/3408
+
+   We use [3] because a priori, we only need to support [2] protocols
+   at the same time. In case of an hard fork, we give one protocol
+   more for security. *)
+let srs_ring = SRS_ring.create 3
 
 module Make (C : CONSTANTS) = struct
   open Kate_amortized
@@ -132,9 +190,12 @@ module Make (C : CONSTANTS) = struct
         Bls12_381.G1.of_compressed_bytes_exn
         bytes
 
-    let commitment_to_bytes = Bls12_381.G1.to_bytes
+    let commitment_to_bytes = Bls12_381.G1.to_compressed_bytes
 
-    let commitment_of_bytes_opt = Bls12_381.G1.of_bytes_opt
+    let commitment_of_bytes_opt = Bls12_381.G1.of_compressed_bytes_opt
+
+    (* We divide by two because we use the compressed representation. *)
+    let commitment_size = Bls12_381.G1.size_in_bytes / 2
 
     let commitment_encoding = g1_encoding
 
@@ -236,30 +297,83 @@ module Make (C : CONSTANTS) = struct
     (* Shards must contain at least two elements. *)
     assert (n > C.shards_amount)
 
-  let _build_trusted_setup_instance = function
-    | `Unsafe_for_test_only ->
-        let module Scalar = Bls12_381.Fr in
-        let build_array init next len =
-          let xi = ref init in
-          Array.init len (fun _ ->
-              let i = !xi in
-              xi := next !xi ;
-              i)
-        in
-        let create_srs :
-            type t.
-            (module Bls12_381.CURVE with type t = t) ->
-            int ->
-            Scalar.t ->
-            t array =
-         fun (module G) d x -> build_array G.(copy one) (fun g -> G.(mul g x)) d
-        in
-        let secret =
-          Scalar.of_string
-            "20812168509434597367146703229805575690060615791308155437936410982393987532344"
-        in
-        let srs_g1 = create_srs (module Bls12_381.G1) k secret in
-        let srs_g2 = create_srs (module Bls12_381.G2) k secret in
+  (* FIXME https://gitlab.com/tezos/tezos/-/issues/3410
+
+     This function should be factored out with the one of sapling. *)
+  let find_trusted_setup ?(getenv_opt = Sys.getenv_opt) ?(getcwd = Sys.getcwd)
+      ?(file_exists = Sys.file_exists) () =
+    let ( // ) = Filename.concat in
+    let env ?split name path =
+      match getenv_opt name with
+      | None -> []
+      | Some value -> (
+          match split with
+          | None -> [Filename.concat value path]
+          | Some char ->
+              List.map
+                (fun dir -> dir // path)
+                (String.split_on_char char value))
+    in
+    let cwd path = try [getcwd () // path] with Sys_error _ -> [] in
+    let candidate_directories =
+      env "XDG_DATA_HOME" ".local/share/dal-trusted-setup"
+      @ env ~split:':' "XDG_DATA_DIRS" "dal-trusted-setup"
+      @ env "OPAM_SWITCH_PREFIX" "share/dal-trusted-setup"
+      @ env "PWD" "_opam/share/dal-trusted-setup"
+      @ cwd "_opam/share/dal-trusted-setup"
+      @ env "HOME" ".dal-trusted-setup"
+      @ env "HOME" ".local/share/dal-trusted-setup"
+      @ env "HOMEBREW_PREFIX" "share/dal-trusted-setup"
+      @ ["/usr/local/share/dal-trusted-setup"; "/usr/share/dal-trusted-setup"]
+    in
+    (* Files we are looking for. *)
+    let srs_g1 = "srs_zcash_g1" in
+    let srs_g2 = "srs_zcash_g2" in
+
+    (* Find the first candidate directory that contains the expected files. *)
+    let contains_trusted_setup_files directory =
+      file_exists (directory // srs_g1) && file_exists (directory // srs_g2)
+    in
+    match List.find_opt contains_trusted_setup_files candidate_directories with
+    | None -> Error [No_trusted_setup candidate_directories]
+    | Some directory ->
+        let srs_g1_file = directory // srs_g1 in
+        let srs_g2_file = directory // srs_g2 in
+        (* FIXME https://gitlab.com/tezos/tezos/-/issues/3409
+
+           An integrity check should ensure that only one SRS file is
+           expected. The `21` constant is the logarithmic size of this
+           file. A refactorisation, should ensure that this constant
+           is not needed or could be computed. *)
+        Ok {srs_g1_file; srs_g2_file; logarithm_size = 21}
+
+  (* FIXME https://gitlab.com/tezos/tezos/-/issues/3400
+
+     An integrity check is run to ensure the validity of the files. *)
+  let build_trusted_setup_instance ~srs_g1_file ~srs_g2_file ~logarithm_size =
+    assert (k < 1 lsl logarithm_size) ;
+    let srs_g1 =
+      Bls12_381_polynomial.Srs.M.(to_array (load_from_file srs_g1_file k))
+    in
+    let g2_size_compressed = Bls12_381.G2.size_in_bytes / 2 in
+    let buf = Bytes.create g2_size_compressed in
+    (* FIXME https://gitlab.com/tezos/tezos/-/issues/3416
+
+       The reading is not in `Lwt`. Hence it can be an issue that this
+       reading is blocking. *)
+    let read ic =
+      Stdlib.really_input ic buf 0 g2_size_compressed ;
+      Bls12_381.G2.of_compressed_bytes_exn buf
+    in
+    let ic = open_in srs_g2_file in
+    let file_size = in_channel_length ic in
+    if file_size < k * g2_size_compressed then (
+      close_in ic ;
+      Error [Trusted_setup_too_small file_size])
+    else
+      let srs_g2 = Array.init k (fun _ -> read ic) in
+      close_in ic ;
+      Ok
         {
           srs_g1;
           srs_g2;
@@ -268,40 +382,28 @@ module Make (C : CONSTANTS) = struct
           kate_amortized_srs_g2_segments =
             Array.get srs_g2 (1 lsl Z.(log2up (of_int segment_len)));
         }
-    | `Files {srs_g1_file; srs_g2_file; logarithm_size} ->
-        assert (k < 1 lsl logarithm_size) ;
-        let srs_g1 =
-          Bls12_381_polynomial.Srs.M.(to_array (load_from_file srs_g1_file k))
-        in
-        let import_srs_g2 d srsfile =
-          let g2_size_compressed = Bls12_381.G2.size_in_bytes / 2 in
-          let buf = Bytes.create g2_size_compressed in
-          let read ic =
-            Stdlib.really_input ic buf 0 g2_size_compressed ;
-            Bls12_381.G2.of_compressed_bytes_exn buf
-          in
-          let ic = open_in srsfile in
-          try
-            if in_channel_length ic < d * g2_size_compressed then
-              raise
-                (Failure
-                   (Printf.sprintf "SRS asked (%d) too big for %s" d srsfile)) ;
-            let res = Array.init d (fun _ -> read ic) in
-            close_in ic ;
-            res
-          with e ->
-            close_in ic ;
-            raise e
-        in
-        let srs_g2 = import_srs_g2 k srs_g2_file in
-        {
-          srs_g1;
-          srs_g2;
-          kate_amortized_srs_g2_shards =
-            Array.get srs_g2 (1 lsl evaluations_per_proof_log);
-          kate_amortized_srs_g2_segments =
-            Array.get srs_g2 (1 lsl Z.(log2up (of_int segment_len)));
-        }
+
+  (* FIXME https://gitlab.com/tezos/tezos/-/issues/3399
+
+           The reading of the files should be done beforehand. This
+     would ease the assumptions made by the protocol, and especially
+     avoid the issue that [load_srs] may fail because the file was not
+     found which is the responsibility of the shell. *)
+  let load_srs_from_file () =
+    match find_trusted_setup () with
+    | Ok {srs_g1_file; srs_g2_file; logarithm_size} ->
+        build_trusted_setup_instance ~srs_g1_file ~srs_g2_file ~logarithm_size
+    | Error err -> Error err
+
+  let load_srs () =
+    match SRS_ring.find_opt srs_ring k with
+    | None -> (
+        match load_srs_from_file () with
+        | Ok srs ->
+            SRS_ring.replace srs_ring k srs ;
+            Ok srs
+        | Error err -> Error err)
+    | Some k -> Ok k
 
   let srs = srs
 

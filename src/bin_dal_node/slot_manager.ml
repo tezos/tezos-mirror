@@ -107,8 +107,8 @@ module Slot_header = struct
 
   let b58check_encoding =
     Base58.register_encoding
-      ~prefix:"\255\255"
-      ~length:2
+      ~prefix:Base58.Prefix.slot_header
+      ~length:Cryptobox.commitment_size
       ~to_raw:to_string
       ~of_raw:of_string_opt
       ~wrap:(fun x -> Data x)
@@ -145,7 +145,7 @@ let decode_share s =
 
 let save store slot_header shards =
   let open Lwt_result_syntax in
-  let*? slot_header = encode Dal_types.slot_header_encoding slot_header in
+  let slot_header = Slot_header.to_b58check slot_header in
   Cryptobox.IntMap.iter_es
     (fun i share ->
       let path = share_path slot_header i in
@@ -197,7 +197,7 @@ let check_shards shards =
 
 let get_slot store slot_header =
   let open Lwt_result_syntax in
-  let*? slot_header = encode Dal_types.slot_header_encoding slot_header in
+  let slot_header = Slot_header.to_b58check slot_header in
   let*! shards = Store.list store [slot_header] in
   let*? () = check_shards shards in
   let* shards =
@@ -230,6 +230,10 @@ let get_slot store slot_header =
   in
   return slot
 
+(* FIXME https://gitlab.com/tezos/tezos/-/issues/3405
+
+   This can work only if a slot never ends with a `\000`. But I am not
+   sure in general such thing is required. *)
 module Utils = struct
   let trim_x00 b =
     let len = ref 0 in
