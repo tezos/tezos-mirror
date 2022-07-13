@@ -130,6 +130,8 @@ Docker Images
   since version 13.0. It is recommended to write your own docker-compose file instead.
   ``scripts/docker/docker-compose-generic.yml`` is an example of such file.
 
+- ``tezos-codec`` is now included in Docker images.
+
 Rollup Binaries
 ---------------
 
