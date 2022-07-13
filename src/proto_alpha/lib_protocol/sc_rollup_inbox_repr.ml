@@ -580,12 +580,12 @@ struct
     Format.fprintf
       fmt
       "@[<hov 2>History:@;\
-      \ { bound: %s;@;\
-      \ counter : %s;@;\
+      \ { bound: %Ld;@;\
+      \ counter : %Ld;@;\
       \ bindings: %a;@;\
       \ sequence: %a; }@]"
-      (Int64.to_string history.bound)
-      (Int64.to_string history.counter)
+      history.bound
+      history.counter
       (Format.pp_print_list pp_binding)
       bindings
       (Format.pp_print_list pp_sequence_binding)
