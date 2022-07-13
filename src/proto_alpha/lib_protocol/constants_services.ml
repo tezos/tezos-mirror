@@ -45,6 +45,13 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Alpha_context.Constants.encoding
       custom_root
+
+  let parametric =
+    RPC_service.get_service
+      ~description:"Parametric constants"
+      ~query:RPC_query.empty
+      ~output:Alpha_context.Constants.Parametric.encoding
+      RPC_path.(custom_root / "parametric")
 end
 
 let register () =
@@ -52,8 +59,12 @@ let register () =
   register0_noctxt ~chunked:true S.errors (fun () () ->
       return Data_encoding.Json.(schema error_encoding)) ;
   register0 ~chunked:false S.all (fun ctxt () () ->
-      return @@ Constants.all ctxt)
+      return @@ Constants.all ctxt) ;
+  register0 ~chunked:false S.parametric (fun ctxt () () ->
+      return @@ Constants.parametric ctxt)
 
 let errors ctxt block = RPC_context.make_call0 S.errors ctxt block () ()
 
 let all ctxt block = RPC_context.make_call0 S.all ctxt block () ()
+
+let parametric ctxt block = RPC_context.make_call0 S.parametric ctxt block () ()
