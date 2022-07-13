@@ -362,8 +362,18 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       (Raw_level.to_int32 published_at_level)
       (sc_rollup_challenge_window node_ctxt)
 
-  let can_be_cemented earliest_cementing_level head_level =
-    earliest_cementing_level <= head_level
+  let can_be_cemented node_ctxt earliest_cementing_level head_level
+      commitment_hash =
+    let {Node_context.cctxt; rollup_address; _} = node_ctxt in
+    let open Lwt_result_syntax in
+    if earliest_cementing_level <= head_level then
+      Plugin.RPC.Sc_rollup.can_be_cemented
+        cctxt
+        (cctxt#chain, cctxt#block)
+        rollup_address
+        commitment_hash
+        ()
+    else return_false
 
   let cement_commitment ({Node_context.cctxt; rollup_address; _} as node_ctxt)
       ({Sc_rollup.Commitment.inbox_level; _} as commitment) commitment_hash
@@ -431,7 +441,14 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
            has previously published `commitment`, which means that the rollup
            is indirectly staked on it. *)
         | Some earliest_cementing_level ->
-            if can_be_cemented earliest_cementing_level head_level then
+            let* green_flag =
+              can_be_cemented
+                node_ctxt
+                earliest_cementing_level
+                head_level
+                commitment_hash
+            in
+            if green_flag then
               cement_commitment node_ctxt commitment commitment_hash store
             else return ()
         | None -> return ())

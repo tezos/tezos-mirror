@@ -1928,6 +1928,22 @@ module Sc_rollup = struct
         ~query
         ~output
         RPC_path.(path /: Sc_rollup.Address.rpc_arg / "timeout_reached")
+
+    let can_be_cemented =
+      let query =
+        let open RPC_query in
+        query Sc_rollup.Commitment.Hash.of_b58check_exn
+        |+ field "commitment" RPC_arg.string "" (fun x ->
+               Format.asprintf "%a" Sc_rollup.Commitment.Hash.pp x)
+        |> seal
+      in
+      let output = Data_encoding.bool in
+      RPC_service.get_service
+        ~description:
+          "Returns true if and only if the provided commitment can be cemented."
+        ~query
+        ~output
+        RPC_path.(path /: Sc_rollup.Address.rpc_arg / "can_be_cemented")
   end
 
   let kind ctxt block sc_rollup_address =
@@ -2042,6 +2058,20 @@ module Sc_rollup = struct
         | Ok (outcome, _context) -> return_some outcome.loser
         | Error _ -> return_none)
 
+  let register_can_be_cemented () =
+    Registration.register1
+      ~chunked:false
+      S.can_be_cemented
+      (fun context rollup commitment_hash () ->
+        let open Lwt_tzresult_syntax in
+        let*! res =
+          Sc_rollup.Stake_storage.cement_commitment
+            context
+            rollup
+            commitment_hash
+        in
+        match res with Ok _context -> return_true | Error _ -> return_false)
+
   let register () =
     register_kind () ;
     register_inbox () ;
@@ -2054,7 +2084,8 @@ module Sc_rollup = struct
     register_root () ;
     register_ongoing_refutation_game () ;
     register_conflicts () ;
-    register_timeout_reached ()
+    register_timeout_reached () ;
+    register_can_be_cemented ()
 
   let list ctxt block = RPC_context.make_call0 S.root ctxt block () ()
 
@@ -2102,6 +2133,14 @@ module Sc_rollup = struct
       sc_rollup_address
       staker1
       staker2
+
+  let can_be_cemented ctxt block sc_rollup_address commitment_hash =
+    RPC_context.make_call1
+      S.can_be_cemented
+      ctxt
+      block
+      sc_rollup_address
+      commitment_hash
 end
 
 module Tx_rollup = struct
