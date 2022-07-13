@@ -997,7 +997,16 @@ let mu name ?title ?description fix =
     in
     let fixed_precursor = fix precursor in
     match classify fixed_precursor with
-    | `Fixed _ | `Dynamic -> fixed_precursor
+    | `Fixed _ | `Dynamic ->
+        (*
+            One could wonder why we return [precursor] instead of [fixed_precursor].
+            For full historical context, check out
+            https://gitlab.com/nomadic-labs/data-encoding/-/merge_requests/88
+            TL;DR: when [mu] is used in conjunction with a [union] (common case),
+            the [fixed_precursor] has one level expanded which makes for an
+            unecessarily large [encoding] value.
+        *)
+        precursor
     | `Variable -> raise Exit
   with
   | (Out_of_memory | Stack_overflow) as e -> raise e
@@ -1007,7 +1016,8 @@ let mu name ?title ?description fix =
       in
       let fixed_precursor = fix precursor in
       ignore (classify fixed_precursor : Kind.t) ;
-      fixed_precursor
+      (* See comment above about [precursor] versus [fixed_precursor] *)
+      precursor
 
 let result ok_enc error_enc =
   let ok_enc = obj1 (req "ok" ok_enc) in
