@@ -55,7 +55,7 @@ let get_first_2_accounts_contracts (a1, a2) =
       Delegate.staking_balance
 
    - active stake = the amount of tez with which a delegate participates in
-      consensus; it must be greater than 1 roll and less or equal the staking
+      consensus; it must be greater than [minimal_stake] and less or equal the staking
       balance; it is computed in [Delegate_storage.select_distribution_for_cycle]
 
    - frozen deposits = represents frozen_deposits_percentage of the maximum stake during

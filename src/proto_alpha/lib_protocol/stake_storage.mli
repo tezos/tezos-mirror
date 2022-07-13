@@ -49,8 +49,8 @@ val get_staking_balance :
 
 val snapshot : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
-(** [fold ctxt ~f ~order init] folds [f] on the list of active delegates with at
-    least one roll. The folding process starts with [init]. Each element of the
+(** [fold ctxt ~f ~order init] folds [f] on the list of active delegates having the
+    minimal required stake. The folding process starts with [init]. Each element of the
     list is a pair [pkh, stake], where [pkh] is the public key hash of the
     delegate and [stake] is the staking balance of the delegate. *)
 val fold :
@@ -61,7 +61,7 @@ val fold :
   'a tzresult Lwt.t
 
 (** [fold_snapshot ctxt ~index ~f ~init] folds [f] on the list of active
-    delegates with at least one roll for the given snapshot [index]. The folding
+    delegates having the minimal required stake for the given snapshot [index]. The folding
     process starts with [init]. Each element of the list is a pair [pkh, stake],
     where [pkh] is the public key hash of the delegate and [stake] is the staking
     balance of the delegate for the given snapshot [index]. *)

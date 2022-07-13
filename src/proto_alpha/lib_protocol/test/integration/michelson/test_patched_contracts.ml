@@ -161,7 +161,7 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
   let typecheck_patched_script code () =
     (* Number 3 below controls how many accounts should be
        created. This number shouldn't be too small or the context
-       won't have enough tokens to form a roll. *)
+       won't have enough at least [minimal_stake] tokens. *)
     let* block, _contracts = Context.init3 () in
     let* inc = Incremental.begin_construction block in
     let ctxt = Incremental.alpha_ctxt inc in

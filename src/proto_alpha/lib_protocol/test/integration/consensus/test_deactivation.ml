@@ -25,7 +25,7 @@
 
 (** Testing
     -------
-    Component:  Protocol (rolls)
+    Component:  Protocol
     Invocation: dune exec \
                 src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
                 -- test "^deactivation$"
@@ -44,8 +44,8 @@ let wrap e = Lwt.return (Environment.wrap_tzresult e)
 (** Check that [Delegate.staking_balance] is the same as [Delegate.full_balance]
    (this is not true in general, but in these tests it is because they only deal
    with self-delegation. Also, check that [Delegate.staking_balance] coincides
-   with [Stake_storage.get] when the account is active and it has at least one
-   roll. *)
+   with [Stake_storage.get] when the account is active and it has the minimal
+   required stake. *)
 let check_stake ~loc (b : Block.t) (account : Account.t) =
   Context.Delegate.staking_balance (B b) account.pkh >>=? fun staking_balance ->
   Context.Delegate.full_balance (B b) account.pkh >>=? fun full_balance ->

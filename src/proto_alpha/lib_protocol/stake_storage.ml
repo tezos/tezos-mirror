@@ -85,7 +85,7 @@ let remove_stake ctxt delegate amount =
   else
     (* The delegate was not in Stake.Active_delegates_with_minimal_stake,
        either because it was inactive, or because it did not have a
-       roll, in which case it still does not have a roll. *)
+       the minimal required stake, in which case it still does not have it. *)
     return ctxt
 
 let add_stake ctxt delegate amount =
@@ -103,8 +103,8 @@ let add_stake ctxt delegate amount =
       >>= fun ctxt -> return ctxt
   else
     (* The delegate was not in Stake.Active_delegates_with_minimal_stake,
-       because it did not have a roll (as otherwise it would have a
-       roll now). *)
+       because it did not have the minimal required stake (as otherwise it
+       would also have it now). *)
     return ctxt
 
 let deactivate_only_call_from_delegate_storage ctxt delegate =

@@ -69,9 +69,9 @@ val listings_encoding :
   (Signature.Public_key_hash.t * int64) list Data_encoding.t
 
 (** Populates [!Storage.Vote.Listings] using the currently existing
-    staking power and sets `Voting_power_in_listings`. Inactive
-    delegates or delegates without rolls are not included in the
-    listings. *)
+   staking power and sets `Voting_power_in_listings`. Inactive
+   delegates or delegates without the minimal required stake are not
+   included in the listings. *)
 val update_listings : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 (** Verifies the presence of a delegate in the listing. *)
