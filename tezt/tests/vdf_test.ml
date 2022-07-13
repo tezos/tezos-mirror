@@ -39,19 +39,27 @@ type seed_computation_status =
   | Vdf_revelation_stage
   | Computation_finished
 
-let get_seed_computation_status client level =
+let get_seed_computation_status ?(info = false) client level =
   let* seed_status =
     RPC.Seed.get_seed_status ~block:(string_of_int level) client
   in
-  return
-    (match List.map fst (JSON.as_object seed_status) with
+  let status =
+    match List.map fst (JSON.as_object seed_status) with
     | ["nonce_revelation_stage"] -> Nonce_revelation_stage
     | ["seed_discriminant"; "seed_challenge"] -> Vdf_revelation_stage
     | ["computation_finished"] -> Computation_finished
-    | _ -> assert false)
+    | _ -> assert false
+  in
+  let pp_status = function
+    | Nonce_revelation_stage -> "nonce revelation stage"
+    | Vdf_revelation_stage -> "vdf revelation stage"
+    | Computation_finished -> "computation finished"
+  in
+  if info then Log.info "At level %d we are in %s" level (pp_status status) ;
+  return status
 
-let assert_computation_status client level status =
-  let* current_status = get_seed_computation_status client level in
+let assert_computation_status ?(info = false) client level status =
+  let* current_status = get_seed_computation_status ~info client level in
   return @@ assert (current_status = status)
 
 let assert_level actual expected =
