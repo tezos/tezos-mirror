@@ -648,14 +648,30 @@ let data_dir_param = Clic.string ~name:"data-dir" ~desc:"Path to context"
 let list_target_dir_param =
   Clic.seq_of_param @@ Clic.string ~name:"target-dir" ~desc:"Output path"
 
+let network_parameter =
+  Clic.parameter (fun () network_name ->
+      match
+        List.assoc ~equal:String.equal network_name Config.known_networks
+      with
+      | None -> failwith "Unknown network name"
+      | Some n -> Lwt_result_syntax.return n)
+
+let network_arg =
+  Clic.default_arg
+    ~doc:"Network to use"
+    ~long:"network"
+    ~placeholder:"network name"
+    ~default:"mainnet"
+    network_parameter
+
 let commands =
   let open Clic in
   [
     command
       ~desc:"Extracts all contracts from the storage"
-      no_options
+      (args1 network_arg)
       (data_dir_param @@ list_target_dir_param)
-      (fun () data_dir list_target_dir () ->
+      (fun genesis data_dir list_target_dir () ->
         let open Lwt_result_syntax in
         let output_dir = ensure_target_dir_exists list_target_dir in
         Printf.printf "Initializing store from data dir '%s'...\n%!" data_dir ;
@@ -665,7 +681,7 @@ let commands =
             ~context_dir:(Filename.concat data_dir "context")
             ~allow_testchains:true
             ~readonly:true
-            Config.mainnet_genesis
+            genesis
         in
         Printf.printf "Getting main chain storage and head...\n%!" ;
         let chain_store = Tezos_store.Store.main_chain_store store in
