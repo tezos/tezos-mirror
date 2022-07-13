@@ -44,7 +44,7 @@ module type S = sig
 
   val value : key -> 'a Data_encoding.t -> 'a t
 
-  val tree : key -> 'a t -> 'a t
+  val scope : key -> 'a t -> 'a t
 
   val lazy_mapping : ('i -> key) -> 'a t -> ('i -> 'a Lwt.t) t
 
@@ -139,11 +139,11 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
         | Error error -> raise (Decode_error {key; error}))
     | None -> raise (Key_not_found key)
 
-  let tree key dec tree prefix = dec tree (append_key prefix key)
+  let scope key dec tree prefix = dec tree (append_key prefix key)
 
   let lazy_mapping to_key field_enc input_tree input_prefix =
     let produce_value index =
-      tree (to_key index) field_enc input_tree input_prefix
+      scope (to_key index) field_enc input_tree input_prefix
     in
     Lwt.return produce_value
 
@@ -151,12 +151,12 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
 
   let tagged_union decode_tag cases input_tree prefix =
     let open Lwt_syntax in
-    let* target_tag = tree ["tag"] decode_tag input_tree prefix in
+    let* target_tag = scope ["tag"] decode_tag input_tree prefix in
     (* Search through the cases to find a matching branch. *)
     cases
     |> List.find_map (fun (Case {tag; decode; extract}) ->
            if tag = target_tag then
-             Some (map extract (tree ["value"] decode) input_tree prefix)
+             Some (map extract (scope ["value"] decode) input_tree prefix)
            else None)
     |> Option.value_f ~default:(fun _ -> raise No_tag_matched_on_decoding)
 end

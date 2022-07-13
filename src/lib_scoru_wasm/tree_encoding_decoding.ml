@@ -62,7 +62,7 @@ module type S = sig
 
   val value : key -> 'a Data_encoding.t -> 'a t
 
-  val tree : key -> 'a t -> 'a t
+  val scope : key -> 'a t -> 'a t
 
   val lazy_mapping : 'a t -> 'a map t
 
@@ -129,8 +129,8 @@ module Make
 
   let value key de = {encode = E.value key de; decode = D.value key de}
 
-  let tree key {encode; decode} =
-    {encode = E.tree key encode; decode = D.tree key decode}
+  let scope key {encode; decode} =
+    {encode = E.scope key encode; decode = D.scope key decode}
 
   let lazy_mapping value =
     let to_key k = [M.string_of_key k] in
@@ -152,8 +152,8 @@ module Make
           (V.loaded_bindings vector, V.num_elements vector, V.first_key vector))
         (E.tup3
            (E.lazy_mapping to_key value.encode)
-           (E.tree ["length"] with_key.encode)
-           (E.tree ["head"] with_key.encode))
+           (E.scope ["length"] with_key.encode)
+           (E.scope ["head"] with_key.encode))
     in
     let decode =
       D.map
@@ -161,8 +161,8 @@ module Make
           V.create ~produce_value ~first_key:head len)
         (let open D.Syntax in
         let+ x = D.lazy_mapping to_key value.decode
-        and+ y = D.tree ["length"] with_key.decode
-        and+ z = D.tree ["head"] with_key.decode in
+        and+ y = D.scope ["length"] with_key.decode
+        and+ z = D.scope ["head"] with_key.decode in
         (x, y, z))
     in
     {encode; decode}

@@ -113,7 +113,7 @@ module Make (T : Tree.S) = struct
     let+ min_pages = value ["min"] Data_encoding.int32
     and+ max_pages = value ["max"] Data_encoding.int32
     and+ get_chunk =
-      tree
+      scope
         ["chunks"]
         (lazy_mapping
            (fun index -> [Int64.to_string index])
@@ -128,7 +128,7 @@ module Make (T : Tree.S) = struct
     let+ min = value ["min"] Data_encoding.int32
     and+ max = value ["max"] Data_encoding.int32
     and+ get_ref =
-      tree
+      scope
         ["refs"]
         (lazy_mapping
            (fun index -> [Int32.to_string index])
@@ -141,7 +141,7 @@ module Make (T : Tree.S) = struct
   let global_decoding modules =
     let open Syntax in
     let+ type_ = value ["type"] Interpreter_encodings.Types.mutability_encoding
-    and+ value = tree ["value"] (value_decoding modules) in
+    and+ value = scope ["value"] (value_decoding modules) in
     let ty = GlobalType (Values.type_of_value value, type_) in
     Global.alloc ty value
 
@@ -149,7 +149,7 @@ module Make (T : Tree.S) = struct
     let open Syntax in
     let+ count = value ["num-" ^ field_name] Data_encoding.int32
     and+ get_instance =
-      tree
+      scope
         [field_name]
         (lazy_mapping (fun index -> [Int32.to_string index]) tree_encoding)
     in
@@ -196,18 +196,18 @@ module Make (T : Tree.S) = struct
       | "Block" ->
           let+ type_ =
             value ["$1"] Interpreter_encodings.Ast.block_type_encoding
-          and+ instrs = tree ["$2"] (instruction_list_decoding ()) in
+          and+ instrs = scope ["$2"] (instruction_list_decoding ()) in
           Block (type_, instrs)
       | "Loop" ->
           let+ type_ =
             value ["$1"] Interpreter_encodings.Ast.block_type_encoding
-          and+ instrs = tree ["$2"] (instruction_list_decoding ()) in
+          and+ instrs = scope ["$2"] (instruction_list_decoding ()) in
           Loop (type_, instrs)
       | "If" ->
           let+ type_ =
             value ["$1"] Interpreter_encodings.Ast.block_type_encoding
-          and+ instrs_if = tree ["$2"] (instruction_list_decoding ())
-          and+ instrs_else = tree ["$3"] (instruction_list_decoding ()) in
+          and+ instrs_if = scope ["$2"] (instruction_list_decoding ())
+          and+ instrs_else = scope ["$3"] (instruction_list_decoding ()) in
           If (type_, instrs_if, instrs_else)
       | "Br" ->
           let+ var = value ["$1"] Interpreter_encodings.Ast.var_encoding in
@@ -216,7 +216,7 @@ module Make (T : Tree.S) = struct
           let+ var = value ["$1"] Interpreter_encodings.Ast.var_encoding in
           BrIf var
       | "BrTable" ->
-          let+ table = tree ["$1"] var_list_decoding
+          let+ table = scope ["$1"] var_list_decoding
           and+ target = value ["$2"] Interpreter_encodings.Ast.var_encoding in
           BrTable (table, target)
       | "Return" -> return Return

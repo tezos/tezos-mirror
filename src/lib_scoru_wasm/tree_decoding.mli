@@ -62,11 +62,11 @@ module type S = sig
   *)
   val value : key -> 'a Data_encoding.t -> 'a t
 
-  (** [tree key decoder] apply a tree decoder for a provided [key].
+  (** [scope key decoder] applies a tree decoder for a provided [key].
 
       @raises Key_not_found when the requested key is not presented
   *)
-  val tree : key -> 'a t -> 'a t
+  val scope : key -> 'a t -> 'a t
 
   (** [lazy_mapping to_key decoder] decodes to a function [f] that can be called
       to look up keyed values in the current tree.

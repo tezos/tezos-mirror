@@ -42,7 +42,7 @@ module type S = sig
 
   val value : key -> 'a Data_encoding.t -> 'a t
 
-  val tree : key -> 'a t -> 'a t
+  val scope : key -> 'a t -> 'a t
 
   val lazy_mapping : ('k -> key) -> 'v t -> ('k * 'v) list t
 
@@ -101,7 +101,7 @@ module Make (T : Tree.S) = struct
   let value suffix enc =
     contramap (Data_encoding.Binary.to_bytes_exn enc) (raw suffix)
 
-  let tree key enc value prefix tree = enc value (append_key prefix key) tree
+  let scope key enc value prefix tree = enc value (append_key prefix key) tree
 
   let lazy_mapping to_key enc_value bindings prefix tree =
     List.fold_left_s
@@ -123,12 +123,12 @@ module Make (T : Tree.S) = struct
 
   let tagged_union encode_tag cases value prefix target_tree =
     let open Lwt_syntax in
-    let encode_tag = tree ["tag"] encode_tag in
+    let encode_tag = scope ["tag"] encode_tag in
     let match_case (Case {probe; tag; encode}) =
       match probe value with
       | Some value ->
           let* target_tree = encode_tag tag prefix target_tree in
-          let* x = tree ["value"] encode value prefix target_tree in
+          let* x = scope ["value"] encode value prefix target_tree in
           return (Some x)
       | None -> return None
     in

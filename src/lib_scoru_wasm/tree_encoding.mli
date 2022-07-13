@@ -58,8 +58,9 @@ module type S = sig
       [enc] encoder for the value. *)
   val value : key -> 'a Data_encoding.t -> 'a t
 
-  (** [tree key enc] applies a tree encoder for a provided [key]. *)
-  val tree : key -> 'a t -> 'a t
+  (** [scope key enc] moves the given encoder [enc] to encode values under a
+      branch [key]. *)
+  val scope : key -> 'a t -> 'a t
 
   (** [lazy_mapping to_key enc] returns a key-value list encoder that
       encodes values from a given key-value list using the key-mapping function
