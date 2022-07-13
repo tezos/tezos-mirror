@@ -72,7 +72,9 @@ val start :
   Store.t ->
   (t * Protocol.Alpha_context.Sc_rollup.Kind.t) tzresult Lwt.t
 
-(** Reconnect (and retry with delay) to the Tezos node. *)
+(** [reconnect cfg l1_ctxt store] reconnects (and retries with delay) to the
+    Tezos node. The delay for each reconnection is increased with a randomized
+    exponential backoff (capped to 1.5h) . *)
 val reconnect : Configuration.t -> t -> Store.t -> t tzresult Lwt.t
 
 (** [current_head_hash store] is the current hash of the head of the

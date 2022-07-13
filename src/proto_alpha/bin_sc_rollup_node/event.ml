@@ -73,16 +73,22 @@ module Simple = struct
       ()
 
   let cannot_connect =
-    declare_3
+    declare_2
       ~section
       ~name:"sc_rollup_daemon_cannot_connect"
-      ~msg:
-        "cannot connect to Tezos node ({count}), will retry in {delay}s {error}"
+      ~msg:"cannot connect to Tezos node ({count}) {error}"
       ~level:Warning
       ("count", Data_encoding.int31)
-      ("delay", Data_encoding.float)
       ("error", trace_encoding)
-      ~pp3:pp_print_trace
+      ~pp2:pp_print_trace
+
+  let wait_reconnect =
+    declare_1
+      ~section
+      ~name:"sc_rollup_daemon_wait_reconnect"
+      ~msg:"Retrying to connect in {delay}s"
+      ~level:Warning
+      ("delay", Data_encoding.float)
 end
 
 let starting_node = Simple.(emit starting_node)
@@ -98,5 +104,6 @@ let rollup_exists ~addr ~kind =
 
 let connection_lost () = Simple.(emit connection_lost) ()
 
-let cannot_connect ~count ~delay error =
-  Simple.(emit cannot_connect) (count, delay, error)
+let cannot_connect ~count error = Simple.(emit cannot_connect) (count, error)
+
+let wait_reconnect delay = Simple.(emit wait_reconnect) delay

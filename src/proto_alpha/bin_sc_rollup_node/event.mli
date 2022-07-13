@@ -44,5 +44,10 @@ val shutdown_node : int -> unit Lwt.t
 (** Emits the event that the connection to the Tezos node has been lost. *)
 val connection_lost : unit -> unit Lwt.t
 
-(** Emits the event that the rollup node cannot connect to the  Tezos node. *)
-val cannot_connect : count:int -> delay:float -> tztrace -> unit Lwt.t
+(** [cannot_connect ~count error] emits the event that the rollup node cannot
+    connect to the Tezos node because of [error] for the [count]'s time. *)
+val cannot_connect : count:int -> tztrace -> unit Lwt.t
+
+(** [wait_reconnect delay] emits the event that the rollup will wait [delay]
+    seconds before attempting to reconnect to the Tezos node . *)
+val wait_reconnect : float -> unit Lwt.t
