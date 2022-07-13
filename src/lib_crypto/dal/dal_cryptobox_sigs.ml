@@ -74,8 +74,12 @@ module type COMMITMENT = sig
   (** An encoding for a commitment. *)
   val commitment_encoding : commitment Data_encoding.t
 
-  (** [commitment_to_bytes commitment] returns a byte representation of [commitment]. *)
+  (** [commitment_to_bytes commitment] returns a byte representation
+     of [commitment]. *)
   val commitment_to_bytes : commitment -> Bytes.t
+
+  (** [commitment_size] is the size in bytes of the commitment. *)
+  val commitment_size : int
 
   (** [commitment_of_bytes_opt bytes] computes a commitment from its
      bytes representation. Returns [None] if [bytes] is not a valid

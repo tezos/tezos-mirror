@@ -185,9 +185,12 @@ module Make (C : CONSTANTS) = struct
         Bls12_381.G1.of_compressed_bytes_exn
         bytes
 
-    let commitment_to_bytes = Bls12_381.G1.to_bytes
+    let commitment_to_bytes = Bls12_381.G1.to_compressed_bytes
 
-    let commitment_of_bytes_opt = Bls12_381.G1.of_bytes_opt
+    let commitment_of_bytes_opt = Bls12_381.G1.of_compressed_bytes_opt
+
+    (* We divide by two because we use the compressed representation. *)
+    let commitment_size = Bls12_381.G1.size_in_bytes / 2
 
     let commitment_encoding = g1_encoding
 
