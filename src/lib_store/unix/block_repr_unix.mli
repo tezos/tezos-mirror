@@ -49,3 +49,32 @@ val pread_block_exn : Lwt_unix.file_descr -> file_offset:int -> (t * int) Lwt.t
     was an error. *)
 val pread_block :
   Lwt_unix.file_descr -> file_offset:int -> (t * int) option Lwt.t
+
+(**/**)
+
+(** Unsafe set of functions intended for internal data manipulation.
+    Must not be used outside of the [Tezos_store]. *)
+
+(** [prune_raw_block_bytes block_buffer] prunes the block contained in
+    [block_buffer] and returns [metadata_offset] such that
+    [decode Block_repr.encoding (Bytes.sub block_bytes 0 metadata_offset)]
+    is consistent and returns a [Block_repr.t] where [metadata = None]. *)
+val prune_raw_block_bytes : bytes -> int
+
+(** [raw_get_block_hash block_buffer] introspects the hash of the
+    block contained in [block_buffer]. *)
+val raw_get_block_hash : bytes -> Block_hash.t
+
+(** [raw_get_block_level block_buffer] introspects the level of the
+    block contained in [block_buffer]. *)
+val raw_get_block_level : bytes -> int32
+
+(** [raw_get_block_predecessor block_buffer] introspects the
+    predecessor's hash of the block contained in [block_buffer]. *)
+val raw_get_block_predecessor : bytes -> Block_hash.t
+
+(** [raw_get_last_allowed_fork_level block_buffer] introspects the
+    last allowed fork level of the block's metadata contained in
+    [block_buffer] if there is any. Returns [None] if no metadata is
+    present. *)
+val raw_get_last_allowed_fork_level : bytes -> int -> int32 option
