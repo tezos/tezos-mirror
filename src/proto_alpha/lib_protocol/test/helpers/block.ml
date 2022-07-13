@@ -413,7 +413,7 @@ let genesis_with_parameters parameters =
 let validate_initial_accounts
     (initial_accounts :
       (Account.t * Tez.t * Signature.Public_key_hash.t option) list)
-    tokens_per_roll =
+    minimal_stake =
   if initial_accounts = [] then
     Stdlib.failwith "Must have one account with a roll to bake" ;
   (* Check there is at least one roll *)
@@ -422,7 +422,7 @@ let validate_initial_accounts
       List.fold_left_es
         (fun acc (_, amount, _) ->
           Environment.wrap_tzresult @@ Tez.( +? ) acc amount >>?= fun acc ->
-          if acc >= tokens_per_roll then raise Exit else return acc)
+          if acc >= minimal_stake then raise Exit else return acc)
         Tez.zero
         initial_accounts
       >>=? fun _ ->
@@ -539,7 +539,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       List.fold_left_es
         (fun acc (_, amount, _) ->
           Environment.wrap_tzresult @@ Tez.( +? ) acc amount >>?= fun acc ->
-          if acc >= constants.tokens_per_roll then raise Exit else return acc)
+          if acc >= constants.minimal_stake then raise Exit else return acc)
         Tez.zero
         initial_accounts
       >>=? fun _ ->
@@ -567,7 +567,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       ~fitness
       ~operations_hash:Operation_list_list_hash.zero
   in
-  validate_initial_accounts initial_accounts constants.tokens_per_roll
+  validate_initial_accounts initial_accounts constants.minimal_stake
   (* Perhaps this could return a new type  signifying its name *)
   >|=? fun _initial_accounts -> (constants, shell, hash)
 

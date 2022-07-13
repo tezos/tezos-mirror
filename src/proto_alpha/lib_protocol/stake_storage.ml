@@ -75,10 +75,10 @@ let remove_stake ctxt delegate amount =
   Tez_repr.(staking_balance_before -? amount) >>?= fun staking_balance ->
   Storage.Stake.Staking_balance.update ctxt delegate staking_balance
   >>=? fun ctxt ->
-  let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
-  if Tez_repr.(staking_balance_before >= tokens_per_roll) then
+  let minimal_stake = Constants_storage.minimal_stake ctxt in
+  if Tez_repr.(staking_balance_before >= minimal_stake) then
     Delegate_activation_storage.is_inactive ctxt delegate >>=? fun inactive ->
-    if (not inactive) && Tez_repr.(staking_balance < tokens_per_roll) then
+    if (not inactive) && Tez_repr.(staking_balance < minimal_stake) then
       Storage.Stake.Active_delegates_with_minimal_stake.remove ctxt delegate
       >>= fun ctxt -> return ctxt
     else return ctxt
@@ -93,10 +93,10 @@ let add_stake ctxt delegate amount =
   Tez_repr.(amount +? staking_balance_before) >>?= fun staking_balance ->
   Storage.Stake.Staking_balance.update ctxt delegate staking_balance
   >>=? fun ctxt ->
-  let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
-  if Tez_repr.(staking_balance >= tokens_per_roll) then
+  let minimal_stake = Constants_storage.minimal_stake ctxt in
+  if Tez_repr.(staking_balance >= minimal_stake) then
     Delegate_activation_storage.is_inactive ctxt delegate >>=? fun inactive ->
-    if inactive || Tez_repr.(staking_balance_before >= tokens_per_roll) then
+    if inactive || Tez_repr.(staking_balance_before >= minimal_stake) then
       return ctxt
     else
       Storage.Stake.Active_delegates_with_minimal_stake.add ctxt delegate ()
@@ -112,8 +112,8 @@ let deactivate_only_call_from_delegate_storage ctxt delegate =
 
 let activate_only_call_from_delegate_storage ctxt delegate =
   get_initialized_stake ctxt delegate >>=? fun (staking_balance, ctxt) ->
-  let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
-  if Tez_repr.(staking_balance >= tokens_per_roll) then
+  let minimal_stake = Constants_storage.minimal_stake ctxt in
+  if Tez_repr.(staking_balance >= minimal_stake) then
     Storage.Stake.Active_delegates_with_minimal_stake.add ctxt delegate ()
     >>= fun ctxt -> return ctxt
   else return ctxt

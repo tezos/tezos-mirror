@@ -136,7 +136,7 @@ type t = {
   hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
   proof_of_work_threshold : int64;
-  tokens_per_roll : Tez_repr.t;
+  minimal_stake : Tez_repr.t;
   vdf_difficulty : int64;
   seed_nonce_revelation_tip : Tez_repr.t;
   origination_size : int;
@@ -311,7 +311,7 @@ let encoding =
           c.hard_gas_limit_per_operation,
           c.hard_gas_limit_per_block,
           c.proof_of_work_threshold,
-          c.tokens_per_roll ),
+          c.minimal_stake ),
         ( ( c.vdf_difficulty,
             c.seed_nonce_revelation_tip,
             c.origination_size,
@@ -351,7 +351,7 @@ let encoding =
              hard_gas_limit_per_operation,
              hard_gas_limit_per_block,
              proof_of_work_threshold,
-             tokens_per_roll ),
+             minimal_stake ),
            ( ( vdf_difficulty,
                seed_nonce_revelation_tip,
                origination_size,
@@ -392,7 +392,7 @@ let encoding =
         hard_gas_limit_per_operation;
         hard_gas_limit_per_block;
         proof_of_work_threshold;
-        tokens_per_roll;
+        minimal_stake;
         vdf_difficulty;
         seed_nonce_revelation_tip;
         origination_size;
@@ -441,7 +441,7 @@ let encoding =
              "hard_gas_limit_per_block"
              Gas_limit_repr.Arith.z_integral_encoding)
           (req "proof_of_work_threshold" int64)
-          (req "tokens_per_roll" Tez_repr.encoding))
+          (req "minimal_stake" Tez_repr.encoding))
        (merge_objs
           (obj9
              (req "vdf_difficulty" int64)

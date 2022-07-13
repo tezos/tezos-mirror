@@ -68,9 +68,9 @@ let proof_of_work_threshold c =
   let constants = Raw_context.constants c in
   constants.proof_of_work_threshold
 
-let tokens_per_roll c =
+let minimal_stake c =
   let constants = Raw_context.constants c in
-  constants.tokens_per_roll
+  constants.minimal_stake
 
 let vdf_difficulty c =
   let constants = Raw_context.constants c in

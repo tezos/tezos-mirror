@@ -304,8 +304,8 @@ let test_rewards_block_and_payload_producer () =
 let test_enough_active_stake_to_bake ~has_active_stake () =
   Context.init1 () >>=? fun (b_for_constants, _contract) ->
   Context.get_constants (B b_for_constants)
-  >>=? fun Constants.{parametric = {tokens_per_roll; _}; _} ->
-  let tpr = Tez.to_mutez tokens_per_roll in
+  >>=? fun Constants.{parametric = {minimal_stake; _}; _} ->
+  let tpr = Tez.to_mutez minimal_stake in
   (* N.B. setting the balance has an impact on the active stake; without
      delegation, the full balance is the same as the staking balance and the
      active balance is less or equal the staking balance (see
@@ -329,7 +329,7 @@ let test_enough_active_stake_to_bake ~has_active_stake () =
     in
     Assert.equal_tez ~loc:__LOC__ bal expected_bal
   else
-    (* pkh1 has less than tokens_per_roll so it will have no slots, thus it
+    (* pkh1 has less than minimal_stake so it will have no slots, thus it
        cannot be a proposer, thus it cannot bake. Precisely, bake fails because
        get_next_baker_by_account fails with "No slots found for pkh1" *)
     Assert.error ~loc:__LOC__ b1 (fun _ -> true)

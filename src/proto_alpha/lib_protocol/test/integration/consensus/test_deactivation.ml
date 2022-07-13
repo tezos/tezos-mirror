@@ -296,7 +296,7 @@ let test_deactivation_then_empty_then_self_delegation_then_recredit () =
 
 (** Initialize a block with two contracts/accounts. A third new account is also
    created. The first account is self-delegated. First account sends to third
-   one tokens_per_roll tez (so that, once it is active, it can appear in
+   one minimal_stake tez (so that, once it is active, it can appear in
    [Active_delegate_with_minimal_stake]. The third account has no delegate and is
    consistent for baking rights. Then, it is self-delegated and is supposed to
    be activated. Again, consistency for baking rights are preserved for the
@@ -313,7 +313,7 @@ let test_delegation () =
   | None -> assert false
   | Some pkh -> assert (Signature.Public_key_hash.equal pkh m1.pkh)) ;
   let constants = Default_parameters.constants_test in
-  let minimal_stake = constants.tokens_per_roll in
+  let minimal_stake = constants.minimal_stake in
   Op.transaction ~force_reveal:true (B b) a1 a3 minimal_stake
   >>=? fun transact ->
   Block.bake ~policy:(By_account m2.pkh) b ~operation:transact >>=? fun b ->

@@ -824,7 +824,7 @@ module Constants : sig
       hard_gas_limit_per_operation : Gas.Arith.integral;
       hard_gas_limit_per_block : Gas.Arith.integral;
       proof_of_work_threshold : int64;
-      tokens_per_roll : Tez.t;
+      minimal_stake : Tez.t;
       vdf_difficulty : int64;
       seed_nonce_revelation_tip : Tez.t;
       origination_size : int;
@@ -903,7 +903,7 @@ module Constants : sig
 
   val proof_of_work_threshold : context -> int64
 
-  val tokens_per_roll : context -> Tez.t
+  val minimal_stake : context -> Tez.t
 
   val vdf_difficulty : context -> int64
 

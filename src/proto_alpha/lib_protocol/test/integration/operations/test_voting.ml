@@ -697,7 +697,7 @@ let test_multiple_identical_proposals_count_as_one () =
   | None -> failwith "%s - Missing proposal" __LOC__
 
 (** Assume the initial balance of accounts allocated by Context.init_n is at
-    least 4 times the value of the tokens_per_roll constant. *)
+    least 4 times the value of the minimal_stake constant. *)
 let test_supermajority_in_proposal there_is_a_winner () =
   let min_proposal_quorum = 0l in
   let initial_balance = 1L in
@@ -707,7 +707,7 @@ let test_supermajority_in_proposal there_is_a_winner () =
     10
     ()
   >>=? fun (b, delegates) ->
-  Context.get_constants (B b) >>=? fun {parametric = {tokens_per_roll; _}; _} ->
+  Context.get_constants (B b) >>=? fun {parametric = {minimal_stake; _}; _} ->
   let del1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0 in
   let del2 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 1 in
   let del3 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 2 in
@@ -719,17 +719,17 @@ let test_supermajority_in_proposal there_is_a_winner () =
     (B b)
     (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 3)
     del1
-    tokens_per_roll
+    minimal_stake
   >>=? fun op1 ->
   Op.transaction
     (B b)
     (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 4)
     del2
-    tokens_per_roll
+    minimal_stake
   >>=? fun op2 ->
-  (if there_is_a_winner then Test_tez.( *? ) tokens_per_roll 3L
+  (if there_is_a_winner then Test_tez.( *? ) minimal_stake 3L
   else
-    Test_tez.( *? ) tokens_per_roll 2L
+    Test_tez.( *? ) minimal_stake 2L
     >>? Test_tez.( +? ) (Test_tez.of_mutez_exn initial_balance))
   >>?= fun bal3 ->
   Op.transaction
