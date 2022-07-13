@@ -32,6 +32,13 @@ Node
 - Fixed a bug in the p2p layer that prevented a fast regulation of the
   number of connections (when having too few or too many connections)
 
+- Improved the octez store merging mechanism performed on each new
+  cycle. The node's memory consumption should not differ from a normal
+  usage where, in the past, it could take up to several gigabytes of
+  memory to perform a store merge. It also takes less time to perform
+  a merge and shouldn't impact normal node operations as much as it
+  previously did; especially on light architectures.
+
 Client
 ------
 
