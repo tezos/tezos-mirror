@@ -909,8 +909,8 @@ let prepare_first_block ~level ~timestamp ctxt =
             blocks_per_cycle = c.blocks_per_cycle;
             blocks_per_commitment = c.blocks_per_commitment;
             nonce_revelation_threshold =
-              (if Compare.Int32.(32l < c.blocks_per_commitment) then 32l
-              else c.blocks_per_commitment);
+              (if Compare.Int32.(256l < c.blocks_per_cycle) then 256l
+              else (* not on mainnet *) Int32.div c.blocks_per_cycle 2l);
             blocks_per_stake_snapshot = c.blocks_per_stake_snapshot;
             cycles_per_voting_period = c.cycles_per_voting_period;
             hard_gas_limit_per_operation = c.hard_gas_limit_per_operation;
@@ -918,9 +918,8 @@ let prepare_first_block ~level ~timestamp ctxt =
             proof_of_work_threshold = c.proof_of_work_threshold;
             tokens_per_roll = c.tokens_per_roll;
             vdf_difficulty =
-              (if Compare.Int32.(32l < c.blocks_per_commitment) then
-               1_000_000_000L
-              else 50_000L);
+              (if Compare.Int32.(256l < c.blocks_per_cycle) then 8_000_000_000L
+              else (* not on mainnet *) 50_000L);
             seed_nonce_revelation_tip = c.seed_nonce_revelation_tip;
             origination_size = c.origination_size;
             max_operations_time_to_live = c.max_operations_time_to_live;
