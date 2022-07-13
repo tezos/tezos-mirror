@@ -25,7 +25,7 @@ of `resto` into `opam`:
    ```bash
    git checkout master
    git pull origin master 
-   git checkout -b release v<XXX>
+   git checkout -b release-v<XXX>
    ```
 
 3. Update the `CHANGES.md` file by prepending the new version and a list
@@ -39,7 +39,7 @@ of `resto` into `opam`:
    git commit -am "CHANGES v<XXX>"
    git tag v<XXX>
    git push origin v<XXX>
-   opam publish "https://gitlab.com/nomadic-labs/resto/-/archive/v0.9/resto-v0.9.tar.gz" .
+   opam publish "https://gitlab.com/nomadic-labs/resto/-/archive/v<XXX>/resto-v<XXX>.tar.gz" .
    ```
  
 6. When the prompt is requiring it, past your token and press enter.
