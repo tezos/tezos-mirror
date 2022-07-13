@@ -248,12 +248,25 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     if Z.(equal chosen_section_len one) then final_move choice
     else return {choice; step = Dissection dissection}
 
+  let try_ f =
+    let open Lwt_result_syntax in
+    let*! _res = f () in
+    return_unit
+
   let play_next_move node_ctxt store game opponent =
     let open Lwt_result_syntax in
     let* refutation = next_move node_ctxt store game in
+    (* FIXME: #3008
+
+       We currently do not remember that we already have
+       injected a refutation move but it is not included yet.
+       Hence, we ignore errors here temporarily, waiting for
+       the injector to enter the scene.
+    *)
+    try_ @@ fun () ->
     inject_next_move node_ctxt ~refutation:(Some refutation) ~opponent
 
-  let try_timeout node_ctxt players =
+  let play_timeout node_ctxt players =
     let Sc_rollup.Game.Index.{alice; bob} = players in
     let open Node_context in
     let open Lwt_result_syntax in
@@ -314,7 +327,8 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     | Our_turn {opponent} -> play_next_move node_ctxt store game opponent
     | Their_turn ->
         let* timeout_reached = timeout_reached head_block node_ctxt players in
-        unless timeout_reached @@ fun () -> try_timeout node_ctxt index
+        unless timeout_reached @@ fun () ->
+        try_ @@ fun () -> play_timeout node_ctxt index
 
   let ongoing_game head_block node_ctxt =
     let Node_context.{rollup_address; cctxt; operator; _} = node_ctxt in
