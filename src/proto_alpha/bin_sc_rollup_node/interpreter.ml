@@ -197,13 +197,13 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         in
         return (state, num_messages, inbox_level, fuel)
 
-  let genesis_state node_ctxt store =
+  let genesis_state head_block node_ctxt store =
     let open Node_context in
     let open Lwt_result_syntax in
     let* boot_sector =
       Plugin.RPC.Sc_rollup.boot_sector
         node_ctxt.cctxt
-        (node_ctxt.cctxt#chain, node_ctxt.cctxt#block)
+        (node_ctxt.cctxt#chain, head_block)
         node_ctxt.rollup_address
     in
     let*! initial_state = PVM.initial_state store in
@@ -212,20 +212,22 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
 
   let state_of_hash node_ctxt store hash =
     let open Lwt_result_syntax in
+    let head_block = `Hash (hash, 0) in
     let*! state = Store.PVMState.find store hash in
     match state with
-    | None -> genesis_state node_ctxt store
+    | None -> genesis_state head_block node_ctxt store
     | Some state -> return state
 
   (** [transition_pvm node_ctxt store predecessor_hash hash] runs a PVM at the previous state from block
       [predecessor_hash] by consuming as many messages as possible from block [hash]. *)
   let transition_pvm node_ctxt store predecessor_hash hash =
     let open Lwt_result_syntax in
+    let head_block = `Hash (hash, 0) in
     (* Retrieve the previous PVM state from store. *)
     let*! predecessor_state = Store.PVMState.find store predecessor_hash in
     let* predecessor_state =
       match predecessor_state with
-      | None -> genesis_state node_ctxt store
+      | None -> genesis_state head_block node_ctxt store
       | Some predecessor_state -> return predecessor_state
     in
 
