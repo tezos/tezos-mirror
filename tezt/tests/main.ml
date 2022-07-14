@@ -126,6 +126,7 @@ let register_protocol_agnostic_tests () =
   Stresstest_command.register ~protocols:[Alpha] ;
   Synchronisation_heuristic.register ~protocols:[Alpha] ;
   Tenderbake.register ~protocols:[Alpha] ;
+  Test_contract_bls12_381.register ~protocols:[Alpha] ;
   Timelock.register ~protocols ;
   Tx_rollup.register ~protocols ;
   Tx_rollup_l2_node.register ~protocols ;
@@ -141,7 +142,6 @@ let register_K_plus_tests () =
   Increase_paid_storage.register ~protocols ;
   Operation_validation.register ~protocols ;
   Sc_rollup.register ~protocols:[Alpha] ;
-  Test_contract_bls12_381.register ~protocols:[Alpha] ;
   Testnet_dictator.register ~protocols ;
   Vdf_test.register ~protocols
 
