@@ -5,7 +5,7 @@ open Values
 
 type size = int32 (* number of pages *)
 
-type address = int64
+type address = int32
 
 type offset = int32
 
@@ -93,6 +93,7 @@ let store_byte mem = Chunked.store_byte mem.content
 
 (* Copied from [Memory] module *)
 let load_bytes mem a n =
+  let a = I64_convert.extend_i32_u a in
   let open Lwt.Syntax in
   let buf = Buffer.create n in
   let+ () =
@@ -105,11 +106,13 @@ let load_bytes mem a n =
 
 (* Copied from [Memory] module *)
 let store_bytes mem a bs =
+  let a = I64_convert.extend_i32_u a in
   List.init (String.length bs) (fun i ->
       store_byte mem Int64.(add a (of_int i)) (Char.code bs.[i]))
   |> Lwt.join
 
 let store_bytes_from_bytes mem address bs =
+  let address = I64_convert.extend_i32_u address in
   List.init (Bytes.length bs) (fun offset ->
       let value = Char.code (Bytes.get bs offset) in
       store_byte mem Int64.(add address (of_int offset)) value)
@@ -117,8 +120,8 @@ let store_bytes_from_bytes mem address bs =
 
 (* Copied from [Memory] module *)
 let effective_address a o =
-  let ea = Int64.(add a (of_int32 o)) in
-  if I64.lt_u ea a then raise Bounds ;
+  let ea = Int32.add a o in
+  if I32.lt_u ea a then raise Bounds ;
   ea
 
 (* Copied from [Memory] module *)
@@ -133,7 +136,8 @@ let loadn mem a o n =
       let+ v = load_byte mem a in
       Int64.logor (Int64.of_int v) x
   in
-  loop (effective_address a o) n
+  let a = I64_convert.extend_i32_u (effective_address a o) in
+  loop a n
 
 (* Copied from [Memory] module *)
 let storen mem a o n x =
@@ -141,11 +145,12 @@ let storen mem a o n x =
   assert (n > 0 && n <= 8) ;
   let rec loop a n x =
     if n > 0 then
-      let* () = Int64.(loop (add a 1L) (n - 1) (shift_right x 8)) in
+      let* () = Int64.(loop (add a 1L) (n - 1) (Int64.shift_right x 8)) in
       store_byte mem a (Int64.to_int x land 0xff)
     else Lwt.return_unit
   in
-  loop (effective_address a o) n x
+  let a = I64_convert.extend_i32_u (effective_address a o) in
+  loop a n x
 
 (* Copied from [Memory] module *)
 let load_num mem a o t =

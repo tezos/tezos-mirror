@@ -106,24 +106,24 @@ let read_input () =
     Host_funcs.Internal_for_tests.aux_write_input_in_memory
       ~input_buffer
       ~module_inst
-      ~rtype_offset:0L
-      ~level_offset:4L
-      ~id_offset:10L
-      ~dst:50L
-      ~max_bytes:36000L
+      ~rtype_offset:0l
+      ~level_offset:4l
+      ~id_offset:10l
+      ~dst:50l
+      ~max_bytes:36000l
   in
   let* memory =
     Tezos_webassembly_interpreter.Instance.Vector.get 0l !module_inst.memories
   in
   assert (Input_buffer.num_elements input_buffer = Z.zero) ;
   assert (result = 5) ;
-  let* m = Memory.load_bytes memory 0L 1 in
+  let* m = Memory.load_bytes memory 0l 1 in
   assert (m = "\001") ;
-  let* m = Memory.load_bytes memory 4L 1 in
+  let* m = Memory.load_bytes memory 4l 1 in
   assert (m = "\002") ;
-  let* m = Memory.load_bytes memory 10L 1 in
+  let* m = Memory.load_bytes memory 10l 1 in
   assert (m = "\002") ;
-  let* m = Memory.load_bytes memory 50L 5 in
+  let* m = Memory.load_bytes memory 50l 5 in
   assert (m = "hello") ;
   Lwt.return @@ Result.return_unit
 
@@ -150,7 +150,7 @@ let test_host_fun () =
   let values =
     Values.
       [
-        Num (I64 0L); Num (I64 4L); Num (I64 10L); Num (I64 50L); Num (I64 3600L);
+        Num (I32 0l); Num (I32 4l); Num (I32 10l); Num (I32 50l); Num (I32 3600l);
       ]
   in
   let* module_inst, result =
@@ -162,13 +162,13 @@ let test_host_fun () =
       module_inst.memories
   in
   assert (Input_buffer.num_elements input = Z.zero) ;
-  let* m = Memory.load_bytes memory 0L 1 in
+  let* m = Memory.load_bytes memory 0l 1 in
   assert (m = "\001") ;
-  let* m = Memory.load_bytes memory 4L 1 in
+  let* m = Memory.load_bytes memory 4l 1 in
   assert (m = "\002") ;
-  let* m = Memory.load_bytes memory 10L 1 in
+  let* m = Memory.load_bytes memory 10l 1 in
   assert (m = "\002") ;
-  let* m = Memory.load_bytes memory 50L 5 in
+  let* m = Memory.load_bytes memory 50l 5 in
   assert (m = "hello") ;
   assert (result = Values.[Num (I32 5l)]) ;
   Lwt.return @@ Result.return_unit

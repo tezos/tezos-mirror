@@ -8,7 +8,7 @@ module type S = sig
 
   type size = int32 (* number of pages *)
 
-  type address = int64
+  type address = int32
 
   type offset = int32
 
@@ -32,14 +32,14 @@ module type S = sig
 
   val size : memory -> size
 
-  val bound : memory -> address
+  val bound : memory -> int64
 
   val grow : memory -> size -> unit
   (* raises SizeLimit, SizeOverflow, OutOfMemory *)
 
-  val load_byte : memory -> address -> int Lwt.t (* raises Bounds *)
+  val load_byte : memory -> int64 -> int Lwt.t (* raises Bounds *)
 
-  val store_byte : memory -> address -> int -> unit Lwt.t (* raises Bounds *)
+  val store_byte : memory -> int64 -> int -> unit Lwt.t (* raises Bounds *)
 
   val load_bytes : memory -> address -> int -> string Lwt.t (* raises Bounds *)
 
