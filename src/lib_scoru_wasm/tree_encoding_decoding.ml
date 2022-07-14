@@ -60,6 +60,40 @@ module type S = sig
 
   val tup3 : 'a t -> 'b t -> 'c t -> ('a * 'b * 'c) t
 
+  val tup4 : 'a t -> 'b t -> 'c t -> 'd t -> ('a * 'b * 'c * 'd) t
+
+  val tup5 : 'a t -> 'b t -> 'c t -> 'd t -> 'e t -> ('a * 'b * 'c * 'd * 'e) t
+
+  val tup6 :
+    'a t ->
+    'b t ->
+    'c t ->
+    'd t ->
+    'e t ->
+    'f t ->
+    ('a * 'b * 'c * 'd * 'e * 'f) t
+
+  val tup7 :
+    'a t ->
+    'b t ->
+    'c t ->
+    'd t ->
+    'e t ->
+    'f t ->
+    'g t ->
+    ('a * 'b * 'c * 'd * 'e * 'f * 'g) t
+
+  val tup8 :
+    'a t ->
+    'b t ->
+    'c t ->
+    'd t ->
+    'e t ->
+    'f t ->
+    'g t ->
+    'h t ->
+    ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h) t
+
   val raw : key -> bytes t
 
   val value : key -> 'a Data_encoding.t -> 'a t
@@ -119,17 +153,47 @@ module Make
   let conv_lwt d e {encode; decode} =
     {encode = E.contramap_lwt e encode; decode = D.map_lwt d decode}
 
-  let tup2 lhs rhs =
+  let tup2 a b =
     {
-      encode = E.tup2 lhs.encode rhs.encode;
-      decode = D.Syntax.both lhs.decode rhs.decode;
+      encode = E.tup2 a.encode b.encode;
+      decode = D.Syntax.both a.decode b.decode;
     }
 
-  let tup3 one two three =
+  let tup3 a b c =
     conv
       (fun (a, (b, c)) -> (a, b, c))
       (fun (a, b, c) -> (a, (b, c)))
-      (tup2 one (tup2 two three))
+      (tup2 a (tup2 b c))
+
+  let tup4 a b c d =
+    conv
+      (fun (a, (b, c, d)) -> (a, b, c, d))
+      (fun (a, b, c, d) -> (a, (b, c, d)))
+      (tup2 a (tup3 b c d))
+
+  let tup5 a b c d e =
+    conv
+      (fun (a, (b, c, d, e)) -> (a, b, c, d, e))
+      (fun (a, b, c, d, e) -> (a, (b, c, d, e)))
+      (tup2 a (tup4 b c d e))
+
+  let tup6 a b c d e f =
+    conv
+      (fun (a, (b, c, d, e, f)) -> (a, b, c, d, e, f))
+      (fun (a, b, c, d, e, f) -> (a, (b, c, d, e, f)))
+      (tup2 a (tup5 b c d e f))
+
+  let tup7 a b c d e f g =
+    conv
+      (fun (a, (b, c, d, e, f, g)) -> (a, b, c, d, e, f, g))
+      (fun (a, b, c, d, e, f, g) -> (a, (b, c, d, e, f, g)))
+      (tup2 a (tup6 b c d e f g))
+
+  let tup8 a b c d e f g h =
+    conv
+      (fun (a, (b, c, d, e, f, g, h)) -> (a, b, c, d, e, f, g, h))
+      (fun (a, b, c, d, e, f, g, h) -> (a, (b, c, d, e, f, g, h)))
+      (tup2 a (tup7 b c d e f g h))
 
   let encode {encode; _} value tree = E.run encode value tree
 

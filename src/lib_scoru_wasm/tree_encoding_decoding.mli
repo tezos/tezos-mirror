@@ -85,9 +85,53 @@ module type S = sig
   (** [tup2 e1 e2] combines [e1] and [e2] into an encoder for pairs. *)
   val tup2 : 'a t -> 'b t -> ('a * 'b) t
 
-  (** [tup3 e1 e2 e3] combines [e1], [e2], and [e3] into an encoder for
-      triples. *)
+  (** [tup3 e1 e2 e3] combines the given encoders [e1 .. e3] into an
+      encoder for a tuple of three elements. *)
   val tup3 : 'a t -> 'b t -> 'c t -> ('a * 'b * 'c) t
+
+  (** [tup4 e1 e2 e3 e4] combines the given encoders [e1 .. e4] into an
+      encoder for a tuple of four elements. *)
+  val tup4 : 'a t -> 'b t -> 'c t -> 'd t -> ('a * 'b * 'c * 'd) t
+
+  (** [tup5 e1 e2 e3 e4 e5] combines the given encoders [e1 .. e5] into an
+      encoder for a tuple of five elements. *)
+  val tup5 : 'a t -> 'b t -> 'c t -> 'd t -> 'e t -> ('a * 'b * 'c * 'd * 'e) t
+
+  (** [tup6 e1 e2 e3 e4 e5 e6] combines the given encoders [e1 .. e6] into an
+      encoder for a tuple of six elements. *)
+  val tup6 :
+    'a t ->
+    'b t ->
+    'c t ->
+    'd t ->
+    'e t ->
+    'f t ->
+    ('a * 'b * 'c * 'd * 'e * 'f) t
+
+  (** [tup7 e1 e2 e3 e4 e5 e6 e7] combines the given encoders [e1 .. e7] into an
+      encoder for a tuple of seven elements. *)
+  val tup7 :
+    'a t ->
+    'b t ->
+    'c t ->
+    'd t ->
+    'e t ->
+    'f t ->
+    'g t ->
+    ('a * 'b * 'c * 'd * 'e * 'f * 'g) t
+
+  (** [tup8 e1 e2 e3 e4 e5 e6 e7 e8] combines the given encoders [e1 .. e8] into
+       an encoder for a tuple of eight elements. *)
+  val tup8 :
+    'a t ->
+    'b t ->
+    'c t ->
+    'd t ->
+    'e t ->
+    'f t ->
+    'g t ->
+    'h t ->
+    ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h) t
 
   (** [raw key] is an encoder for bytes under the given [key]. *)
   val raw : key -> bytes t
