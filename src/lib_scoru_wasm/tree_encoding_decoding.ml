@@ -56,15 +56,24 @@ module type S = sig
 
   val conv_lwt : ('a -> 'b Lwt.t) -> ('b -> 'a Lwt.t) -> 'a t -> 'b t
 
-  val tup2 : 'a t -> 'b t -> ('a * 'b) t
+  val tup2 : flatten:bool -> 'a t -> 'b t -> ('a * 'b) t
 
-  val tup3 : 'a t -> 'b t -> 'c t -> ('a * 'b * 'c) t
+  val tup3 : flatten:bool -> 'a t -> 'b t -> 'c t -> ('a * 'b * 'c) t
 
-  val tup4 : 'a t -> 'b t -> 'c t -> 'd t -> ('a * 'b * 'c * 'd) t
+  val tup4 :
+    flatten:bool -> 'a t -> 'b t -> 'c t -> 'd t -> ('a * 'b * 'c * 'd) t
 
-  val tup5 : 'a t -> 'b t -> 'c t -> 'd t -> 'e t -> ('a * 'b * 'c * 'd * 'e) t
+  val tup5 :
+    flatten:bool ->
+    'a t ->
+    'b t ->
+    'c t ->
+    'd t ->
+    'e t ->
+    ('a * 'b * 'c * 'd * 'e) t
 
   val tup6 :
+    flatten:bool ->
     'a t ->
     'b t ->
     'c t ->
@@ -74,6 +83,7 @@ module type S = sig
     ('a * 'b * 'c * 'd * 'e * 'f) t
 
   val tup7 :
+    flatten:bool ->
     'a t ->
     'b t ->
     'c t ->
@@ -84,6 +94,7 @@ module type S = sig
     ('a * 'b * 'c * 'd * 'e * 'f * 'g) t
 
   val tup8 :
+    flatten:bool ->
     'a t ->
     'b t ->
     'c t ->
@@ -153,47 +164,109 @@ module Make
   let conv_lwt d e {encode; decode} =
     {encode = E.contramap_lwt e encode; decode = D.map_lwt d decode}
 
-  let tup2 a b =
+  let scope key {encode; decode} =
+    {encode = E.scope key encode; decode = D.scope key decode}
+
+  let tup2_ a b =
     {
       encode = E.tup2 a.encode b.encode;
       decode = D.Syntax.both a.decode b.decode;
     }
 
-  let tup3 a b c =
+  let tup3_ a b c =
     conv
       (fun (a, (b, c)) -> (a, b, c))
       (fun (a, b, c) -> (a, (b, c)))
-      (tup2 a (tup2 b c))
+      (tup2_ a (tup2_ b c))
 
-  let tup4 a b c d =
+  let tup4_ a b c d =
     conv
       (fun (a, (b, c, d)) -> (a, b, c, d))
       (fun (a, b, c, d) -> (a, (b, c, d)))
-      (tup2 a (tup3 b c d))
+      (tup2_ a (tup3_ b c d))
 
-  let tup5 a b c d e =
+  let tup5_ a b c d e =
     conv
       (fun (a, (b, c, d, e)) -> (a, b, c, d, e))
       (fun (a, b, c, d, e) -> (a, (b, c, d, e)))
-      (tup2 a (tup4 b c d e))
+      (tup2_ a (tup4_ b c d e))
 
-  let tup6 a b c d e f =
+  let tup6_ a b c d e f =
     conv
       (fun (a, (b, c, d, e, f)) -> (a, b, c, d, e, f))
       (fun (a, b, c, d, e, f) -> (a, (b, c, d, e, f)))
-      (tup2 a (tup5 b c d e f))
+      (tup2_ a (tup5_ b c d e f))
 
-  let tup7 a b c d e f g =
+  let tup7_ a b c d e f g =
     conv
       (fun (a, (b, c, d, e, f, g)) -> (a, b, c, d, e, f, g))
       (fun (a, b, c, d, e, f, g) -> (a, (b, c, d, e, f, g)))
-      (tup2 a (tup6 b c d e f g))
+      (tup2_ a (tup6_ b c d e f g))
 
-  let tup8 a b c d e f g h =
+  let tup8_ a b c d e f g h =
     conv
       (fun (a, (b, c, d, e, f, g, h)) -> (a, b, c, d, e, f, g, h))
       (fun (a, b, c, d, e, f, g, h) -> (a, (b, c, d, e, f, g, h)))
-      (tup2 a (tup7 b c d e f g h))
+      (tup2_ a (tup7_ b c d e f g h))
+
+  (* This is to allow for either flat composition of tuples or  where each
+     element of the tuple is wrapped under an index node. *)
+  let flat_or_wrap ~flatten ix enc =
+    if flatten then enc else scope [string_of_int ix] enc
+
+  let tup2 ~flatten a b =
+    tup2_ (flat_or_wrap ~flatten 1 a) (flat_or_wrap ~flatten 2 b)
+
+  let tup3 ~flatten a b c =
+    tup3_
+      (flat_or_wrap ~flatten 1 a)
+      (flat_or_wrap ~flatten 2 b)
+      (flat_or_wrap ~flatten 3 c)
+
+  let tup4 ~flatten a b c d =
+    tup4_
+      (flat_or_wrap ~flatten 1 a)
+      (flat_or_wrap ~flatten 2 b)
+      (flat_or_wrap ~flatten 3 c)
+      (flat_or_wrap ~flatten 4 d)
+
+  let tup5 ~flatten a b c d e =
+    tup5_
+      (flat_or_wrap ~flatten 1 a)
+      (flat_or_wrap ~flatten 2 b)
+      (flat_or_wrap ~flatten 3 c)
+      (flat_or_wrap ~flatten 4 d)
+      (flat_or_wrap ~flatten 5 e)
+
+  let tup6 ~flatten a b c d e f =
+    tup6_
+      (flat_or_wrap ~flatten 1 a)
+      (flat_or_wrap ~flatten 2 b)
+      (flat_or_wrap ~flatten 3 c)
+      (flat_or_wrap ~flatten 4 d)
+      (flat_or_wrap ~flatten 5 e)
+      (flat_or_wrap ~flatten 6 f)
+
+  let tup7 ~flatten a b c d e f g =
+    tup7_
+      (flat_or_wrap ~flatten 1 a)
+      (flat_or_wrap ~flatten 2 b)
+      (flat_or_wrap ~flatten 3 c)
+      (flat_or_wrap ~flatten 4 d)
+      (flat_or_wrap ~flatten 5 e)
+      (flat_or_wrap ~flatten 6 f)
+      (flat_or_wrap ~flatten 7 g)
+
+  let tup8 ~flatten a b c d e f g h =
+    tup8_
+      (flat_or_wrap ~flatten 1 a)
+      (flat_or_wrap ~flatten 2 b)
+      (flat_or_wrap ~flatten 3 c)
+      (flat_or_wrap ~flatten 4 d)
+      (flat_or_wrap ~flatten 5 e)
+      (flat_or_wrap ~flatten 6 f)
+      (flat_or_wrap ~flatten 7 g)
+      (flat_or_wrap ~flatten 8 h)
 
   let encode {encode; _} value tree = E.run encode value tree
 
@@ -202,9 +275,6 @@ module Make
   let raw key = {encode = E.raw key; decode = D.raw key}
 
   let value key de = {encode = E.value key de; decode = D.value key de}
-
-  let scope key {encode; decode} =
-    {encode = E.scope key encode; decode = D.scope key decode}
 
   let lazy_mapping value =
     let to_key k = [M.string_of_key k] in
