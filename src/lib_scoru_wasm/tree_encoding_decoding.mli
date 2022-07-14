@@ -187,8 +187,8 @@ module type S = sig
       [enc] for encoding values. *)
   val lazy_mapping : 'a t -> 'a map t
 
-  (** [lazy_vector enc] produces an encoder for [vector]s that uses the given
-      [enc] for encoding values. *)
+  (** [lazy_vector key_enc enc] produces an encoder for [vector]s that uses the
+      given [key_enc] for encoding keys and [enc] for the values. *)
   val lazy_vector : vector_key t -> 'a t -> 'a vector t
 
   (** [chunk] is an encoder for the chunks used by [chunked_by_vector]. *)
