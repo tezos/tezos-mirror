@@ -36,6 +36,8 @@ module type S = sig
 
   type 'a vector
 
+  type chunked_byte_vector
+
   type ('tag, 'a) case
 
   module Decoding : Tree_decoding.S with type tree = tree
@@ -68,6 +70,10 @@ module type S = sig
 
   val lazy_vector : vector_key t -> 'a t -> 'a vector t
 
+  val chunk : Chunked_byte_vector.Chunk.t t
+
+  val chunked_byte_vector : chunked_byte_vector t
+
   val case : 'tag -> 'b t -> ('a -> 'b option) -> ('b -> 'a) -> ('tag, 'a) case
 
   val tagged_union : 'tag t -> ('tag, 'a) case list -> 'a t
@@ -76,12 +82,14 @@ end
 module Make
     (M : Lazy_map.S with type 'a effect = 'a Lwt.t)
     (V : Lazy_vector.S with type 'a effect = 'a Lwt.t)
+    (C : Chunked_byte_vector.S with type 'a effect = 'a Lwt.t)
     (T : Tree.S) :
   S
     with type tree = T.tree
      and type 'a map = 'a M.t
      and type vector_key = V.key
-     and type 'a vector = 'a V.t = struct
+     and type 'a vector = 'a V.t
+     and type chunked_byte_vector = C.t = struct
   module Encoding = Tree_encoding.Make (T)
   module Decoding = Tree_decoding.Make (T)
   module E = Encoding
@@ -94,6 +102,8 @@ module Make
   type 'a vector = 'a V.t
 
   type 'a map = 'a M.t
+
+  type chunked_byte_vector = C.t
 
   type 'a encoding = 'a E.t
 
@@ -164,6 +174,29 @@ module Make
         and+ y = D.scope ["length"] with_key.decode
         and+ z = D.scope ["head"] with_key.decode in
         (x, y, z))
+    in
+    {encode; decode}
+
+  let chunk =
+    let open Chunked_byte_vector.Chunk in
+    conv of_bytes to_bytes (raw [])
+
+  let chunked_byte_vector =
+    let to_key k = [Int64.to_string k] in
+    let encode =
+      E.contramap
+        (fun vector -> (C.loaded_chunks vector, C.length vector))
+        (E.tup2
+           (E.lazy_mapping to_key chunk.encode)
+           (E.value ["length"] Data_encoding.int64))
+    in
+    let decode =
+      D.map
+        (fun (get_chunk, len) -> C.create ~get_chunk len)
+        (let open D.Syntax in
+        let+ x = D.lazy_mapping to_key chunk.decode
+        and+ y = D.value ["length"] Data_encoding.int64 in
+        (x, y))
     in
     {encode; decode}
 

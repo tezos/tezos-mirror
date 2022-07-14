@@ -5,6 +5,9 @@ module Chunk : sig
   (** Create a chunk and copy the given bytes into it. *)
   val of_bytes : bytes -> t
 
+  (** Copy the contents of a chunk into a fresh [bytes]. *)
+  val to_bytes : t -> bytes
+
   (** Size of a chunk in bytes - with 12 bits of address space the chunk is 4KiB *)
   val size : int64
 
@@ -60,6 +63,11 @@ module type S = sig
   (** [store_bytes vector offset bytes] set the bytes from [offset] to the given
       [bytes]. *)
   val store_bytes : t -> int64 -> bytes -> unit effect
+
+  (** [loaded_chunks vector] returns the chunks of [vector] that have
+      been cached in-memory since [vector] has been created, either by
+      reading its contents, or by modifying it. *)
+  val loaded_chunks : t -> (int64 * Chunk.t) list
 
   module Buffer : sig
     type vector := t

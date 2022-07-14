@@ -43,6 +43,9 @@ module type S = sig
   (** The vector structure used. *)
   type 'a vector
 
+  (** The chunked byte vector structure used. *)
+  type chunked_byte_vector
+
   (** Represents a partial encoder for a specific constructor of a sum-type. *)
   type ('tag, 'a) case
 
@@ -105,6 +108,12 @@ module type S = sig
       [enc] for encoding values. *)
   val lazy_vector : vector_key t -> 'a t -> 'a vector t
 
+  (** [chunk] is an encoder for the chunks used by [chunked_by_vector]. *)
+  val chunk : Chunked_byte_vector.Chunk.t t
+
+  (** [chunked_byte_vector] is an encoder for [chunked_byte_vector]. *)
+  val chunked_byte_vector : chunked_byte_vector t
+
   (** [case tag enc f] returns a partial encoder that represents a case in a
       sum-type. The encoder hides the (existentially bound) type of the
       parameter to the specific case, provided a converter function [f] and
@@ -124,9 +133,11 @@ end
 module Make
     (M : Lazy_map.S with type 'a effect = 'a Lwt.t)
     (V : Lazy_vector.S with type 'a effect = 'a Lwt.t)
+    (C : Chunked_byte_vector.S with type 'a effect = 'a Lwt.t)
     (T : Tree.S) :
   S
     with type tree = T.tree
      and type 'a map = 'a M.t
      and type vector_key = V.key
      and type 'a vector = 'a V.t
+     and type chunked_byte_vector = C.t
