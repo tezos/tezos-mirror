@@ -35,7 +35,11 @@ type error +=
   | (* `Temporary *) Sc_rollup_remove_lcc
   | (* `Temporary *) Sc_rollup_staker_backtracked
   | (* `Temporary *) Sc_rollup_too_far_ahead
-  | (* `Temporary *) Sc_rollup_too_recent
+  | (* `Temporary *)
+      Sc_rollup_commitment_too_recent of {
+      current_level : Raw_level_repr.t;
+      min_level : Raw_level_repr.t;
+    }
   | (* `Temporary *)
       Sc_rollup_unknown_commitment of
       Sc_rollup_commitment_repr.Hash.t
@@ -303,13 +307,28 @@ let () =
   in
   register_error_kind
     `Temporary
-    ~id:"Sc_rollup_too_recent"
+    ~id:"Sc_rollup_commitment_too_recent"
     ~title:"Commitment too recent"
     ~description
-    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
-    Data_encoding.empty
-    (function Sc_rollup_too_recent -> Some () | _ -> None)
-    (fun () -> Sc_rollup_too_recent) ;
+    ~pp:(fun ppf (current_level, min_level) ->
+      Format.fprintf
+        ppf
+        "%s@ Current level: %a,@ minimal level: %a"
+        description
+        Raw_level_repr.pp
+        current_level
+        Raw_level_repr.pp
+        min_level)
+    Data_encoding.(
+      obj2
+        (req "current_level" Raw_level_repr.encoding)
+        (req "min_level" Raw_level_repr.encoding))
+    (function
+      | Sc_rollup_commitment_too_recent {current_level; min_level} ->
+          Some (current_level, min_level)
+      | _ -> None)
+    (fun (current_level, min_level) ->
+      Sc_rollup_commitment_too_recent {current_level; min_level}) ;
   let description = "Unknown commitment." in
   register_error_kind
     `Temporary

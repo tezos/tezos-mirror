@@ -103,7 +103,7 @@ val publish_commitment :
       {li [Sc_rollup_does_not_exist] if [rollup] does not exist}
       {li [Sc_rollup_unknown_commitment] if [commitment] does not exist}
       {li [Sc_rollup_parent_not_lcc] if [commitment] is not the child of the last cemented commitment}
-      {li [Sc_rollup_too_recent] if [commitment] has not passed its deadline}
+      {li [Sc_rollup_commitment_too_recent] if [commitment] has not passed its deadline}
       {li [Sc_rollup_no_stakers] if there are zero stakers}
       {li [Sc_rollup_disputed] if at least one staker is not staked on [commitment]}
     } *)

@@ -930,7 +930,7 @@ let test_cement_fail_too_recent () =
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c1, _level, ctxt =
+  let* c1, level, ctxt =
     lift
     @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
          ctxt
@@ -938,20 +938,24 @@ let test_cement_fail_too_recent () =
          staker
          commitment
   in
+  let min_cementation_level = Raw_level_repr.add level challenge_window in
   let* () =
     assert_fails_with
       ~loc:__LOC__
       (Sc_rollup_stake_storage.cement_commitment ctxt rollup c1)
-      Sc_rollup_errors.Sc_rollup_too_recent
+      (Sc_rollup_errors.Sc_rollup_commitment_too_recent
+         {current_level = level; min_level = min_cementation_level})
   in
   let ctxt =
     Raw_context.Internal_for_tests.add_level ctxt (challenge_window - 1)
   in
+  let level = (Raw_context.current_level ctxt).level in
   let* () =
     assert_fails_with
       ~loc:__LOC__
       (Sc_rollup_stake_storage.cement_commitment ctxt rollup c1)
-      Sc_rollup_errors.Sc_rollup_too_recent
+      (Sc_rollup_errors.Sc_rollup_commitment_too_recent
+         {current_level = level; min_level = min_cementation_level})
   in
   assert_true ctxt
 
