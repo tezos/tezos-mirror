@@ -165,6 +165,19 @@ let is_none ~loc ~pp = function
   | Some x -> failwith "Unexpected (Some %a) (%s)" pp x loc
   | None -> return_unit
 
+let equal_result ~loc ~pp_ok ~pp_error eq_ok eq_error a b =
+  equal
+    ~loc
+    (Result.equal ~ok:eq_ok ~error:eq_error)
+    "Results are not equal"
+    (Format.pp_print_result ~ok:pp_ok ~error:pp_error)
+    a
+    b
+
+let is_error ~loc ~pp = function
+  | Ok x -> failwith "Unexpected (Ok %a) (%s)" pp x loc
+  | Error _ -> return_unit
+
 open Context
 
 (* Some asserts for account operations *)

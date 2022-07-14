@@ -35,4 +35,10 @@ val encoding : t Data_encoding.t
 
 include Compare.S with type t := t
 
+module Internal_for_test : sig
+  val destruct : string -> (t, string) result
+
+  val construct : t -> string
+end
+
 module Index : Storage_description.INDEX with type t = t
