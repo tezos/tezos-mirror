@@ -115,7 +115,7 @@ let input_from get_script run =
       | Script.Error (at, msg) -> error at "script error" msg
       | IO (at, msg) -> error at "i/o error" msg
       | Assert (at, msg) -> error at "assertion failure" msg
-      | Abort _ -> Lwt.return_false
+      | Abort (at, msg) -> error at "unexpected error" msg
       | Lazy_map.UnexpectedAccess ->
           error no_region "unexpected access" "Unexpected access in lazy map"
       | exn -> raise exn)
