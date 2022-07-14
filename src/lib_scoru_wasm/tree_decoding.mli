@@ -94,6 +94,10 @@ module type S = sig
       base decoder [dec]. *)
   val case : 'tag -> 'b t -> ('b -> 'a) -> ('tag, 'a) case
 
+  (** [case_lwt tag enc f] same as [case tag enc f] except that [f] produces
+      an [Lwt] value. *)
+  val case_lwt : 'tag -> 'b t -> ('b -> 'a Lwt.t) -> ('tag, 'a) case
+
   (** [tagged_union tag_dec cases] returns a decoder that use [tag_dec] for
       decoding the value of a field [tag]. The decoder searches through the list
       of cases for a matching branch. When a matching branch is found, it uses

@@ -197,11 +197,20 @@ module type S = sig
   (** [chunked_byte_vector] is an encoder for [chunked_byte_vector]. *)
   val chunked_byte_vector : chunked_byte_vector t
 
-  (** [case tag enc f] returns a partial encoder that represents a case in a
-      sum-type. The encoder hides the (existentially bound) type of the
-      parameter to the specific case, provided a converter function [f] and
-      base encoder [enc]. *)
+  (** [case tag enc inj proj] returns a partial encoder that represents a case
+      in a sum-type. The encoder hides the (existentially bound) type of the
+      parameter to the specific case, provided converter functions [inj] and
+      [proj] for the base encoder [enc]. *)
   val case : 'tag -> 'b t -> ('a -> 'b option) -> ('b -> 'a) -> ('tag, 'a) case
+
+  (** [case_lwt tag enc inj proj] same as [case tag enc inj proj] but where
+      [inj] and [proj] returns in lwt values. *)
+  val case_lwt :
+    'tag ->
+    'b t ->
+    ('a -> 'b Lwt.t option) ->
+    ('b -> 'a Lwt.t) ->
+    ('tag, 'a) case
 
   (** [tagged_union tag_enc cases] returns an encoder that use [tag_enc] for
       encoding the value of a field [tag]. The encoder searches through the list

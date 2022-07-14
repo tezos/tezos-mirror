@@ -121,6 +121,13 @@ module type S = sig
 
   val case : 'tag -> 'b t -> ('a -> 'b option) -> ('b -> 'a) -> ('tag, 'a) case
 
+  val case_lwt :
+    'tag ->
+    'b t ->
+    ('a -> 'b Lwt.t option) ->
+    ('b -> 'a Lwt.t) ->
+    ('tag, 'a) case
+
   val tagged_union : 'tag t -> ('tag, 'a) case list -> 'a t
 end
 
@@ -337,20 +344,27 @@ module Make
   type ('tag, 'a) case =
     | Case : {
         tag : 'tag;
-        probe : 'a -> 'b option;
-        extract : 'b -> 'a;
+        probe : 'a -> 'b Lwt.t option;
+        extract : 'b -> 'a Lwt.t;
         delegate : 'b t;
       }
         -> ('tag, 'a) case
 
-  let case tag delegate probe extract = Case {tag; delegate; probe; extract}
+  let case_lwt tag delegate probe extract = Case {tag; delegate; probe; extract}
+
+  let case tag delegate probe extract =
+    case_lwt
+      tag
+      delegate
+      (fun x -> Option.map Lwt.return @@ probe x)
+      (fun x -> Lwt.return @@ extract x)
 
   let tagged_union {encode; decode} cases =
     let to_encode_case (Case {tag; delegate; probe; extract = _}) =
-      E.case tag delegate.encode probe
+      E.case_lwt tag delegate.encode probe
     in
     let to_decode_case (Case {tag; delegate; extract; probe = _}) =
-      D.case tag delegate.decode extract
+      D.case_lwt tag delegate.decode extract
     in
     let encode = E.tagged_union encode (List.map to_encode_case cases) in
     let decode = D.tagged_union decode (List.map to_decode_case cases) in
