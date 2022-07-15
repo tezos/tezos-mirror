@@ -123,4 +123,61 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
     let encoding =
       tagged_union tag_encoding [nkstart_case; nkparse_case; nkstop_case]
   end
+
+  module Func_type = struct
+    type tags = FKStart | FKIns | FKOut | FKStop
+
+    let value_type_encoding =
+      value [] Interpreter_encodings.Types.value_type_encoding
+
+    let fkstart_case =
+      case
+        "FKStart"
+        (value [] Data_encoding.unit)
+        (function Decode.FKStart -> Some () | _ -> None)
+        (fun () -> FKStart)
+
+    let fkins_case =
+      let lazy_vec =
+        scope ["ins_kont"] (Lazy_vec.encoding value_type_encoding)
+      in
+      case
+        "FKIns"
+        lazy_vec
+        (function Decode.FKIns vec -> Some vec | _ -> None)
+        (fun vec -> FKIns vec)
+
+    let fkout_case =
+      let params = scope ["params"] (vector_encoding value_type_encoding) in
+      let lazy_vec =
+        scope ["lazy_kont"] (Lazy_vec.encoding value_type_encoding)
+      in
+      case
+        "FKOut"
+        (tup2 ~flatten:true params lazy_vec)
+        (function Decode.FKOut (p, vec) -> Some (p, vec) | _ -> None)
+        (fun (p, vec) -> FKOut (p, vec))
+
+    let func_type_encoding =
+      let params = scope ["params"] (vector_encoding value_type_encoding) in
+      let result = scope ["result"] (vector_encoding value_type_encoding) in
+      conv
+        (fun (params, result) -> Types.FuncType (params, result))
+        (fun (Types.FuncType (params, result)) -> (params, result))
+        (tup2 ~flatten:true params result)
+
+    let fkstop_case =
+      case
+        "FKStop"
+        func_type_encoding
+        (function Decode.FKStop ft -> Some ft | _ -> None)
+        (fun ft -> FKStop ft)
+
+    let tag_encoding = Data_encoding.string |> value []
+
+    let encoding =
+      tagged_union
+        tag_encoding
+        [fkstart_case; fkins_case; fkout_case; fkstop_case]
+  end
 end

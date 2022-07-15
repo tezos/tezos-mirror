@@ -272,4 +272,57 @@ module Names = struct
   let tests = [tztest "Names" `Quick (make_test Parser.Name.encoding gen check)]
 end
 
-let tests = Byte_vector.tests @ Vec.tests @ LazyVec.tests @ Names.tests
+module Func_type = struct
+  open Utils
+
+  let func_type_gen =
+    let open QCheck2.Gen in
+    let* ins = Vec.gen Ast_generators.value_type_gen in
+    let+ out = Vec.gen Ast_generators.value_type_gen in
+    Types.FuncType (ins, out)
+
+  let gen =
+    let open QCheck2.Gen in
+    let start = return Decode.FKStart in
+    let ins =
+      let+ ins = LazyVec.gen Ast_generators.value_type_gen in
+      Decode.FKIns ins
+    in
+    let out =
+      let* ins = Vec.gen Ast_generators.value_type_gen in
+      let+ out = LazyVec.gen Ast_generators.value_type_gen in
+      Decode.FKOut (ins, out)
+    in
+    let stop =
+      let+ ft = func_type_gen in
+      Decode.FKStop ft
+    in
+    oneof [start; ins; out; stop]
+
+  let func_type_check (Types.FuncType (ins, out)) (Types.FuncType (ins', out'))
+      =
+    let open Lwt_result_syntax in
+    let eq_value_types t t' = return Stdlib.(t = t') in
+    let* eq_ins = Vec.check eq_value_types ins ins' in
+    let+ eq_out = Vec.check eq_value_types out out' in
+    eq_ins && eq_out
+
+  let check fk fk' =
+    let open Lwt_result_syntax in
+    let eq_value_types t t' = return Stdlib.(t = t') in
+    match (fk, fk') with
+    | Decode.FKStart, Decode.FKStart -> return true
+    | FKIns ins, FKIns ins' -> LazyVec.check eq_value_types ins ins'
+    | FKOut (ins, out), FKOut (ins', out') ->
+        let* eq_ins = Vec.check eq_value_types ins ins' in
+        let+ eq_out = LazyVec.check eq_value_types out out' in
+        eq_ins && eq_out
+    | FKStop ft, FKStop ft' -> func_type_check ft ft'
+    | _, _ -> return false
+
+  let tests =
+    [tztest "Func_type" `Quick (make_test Parser.Func_type.encoding gen check)]
+end
+
+let tests =
+  Byte_vector.tests @ Vec.tests @ LazyVec.tests @ Names.tests @ Func_type.tests
