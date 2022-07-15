@@ -3235,6 +3235,8 @@ module Sc_rollup : sig
 
     val hash : t -> Hash.t
 
+    val hash_carbonated : context -> t -> (context * Hash.t) tzresult
+
     val genesis_commitment :
       origination_level:Raw_level.t -> genesis_state_hash:State_hash.t -> t
 

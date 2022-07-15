@@ -382,6 +382,13 @@ let originate_contract incr ~script ~baker ~storage ~source_contract =
   let* incr = Incremental.begin_construction block in
   return (contract, incr)
 
+let hash_commitment incr commitment =
+  let ctxt = Incremental.alpha_ctxt incr in
+  let+ ctxt, hash =
+    wrap @@ Lwt.return (Sc_rollup.Commitment.hash_carbonated ctxt commitment)
+  in
+  (Incremental.set_alpha_ctxt incr ctxt, hash)
+
 let publish_and_cement_commitment incr ~baker ~originator rollup commitment =
   let* operation = Op.sc_rollup_publish (I incr) originator rollup commitment in
   let* incr = Incremental.add_operation incr operation in
