@@ -45,30 +45,65 @@ module State = struct
 
   let add_history = Store.Histories.add
 
+  (** [inbox_of_hash node_ctxt store block_hash] returns the latest
+      inbox at the given [block_hash]. This function always returns
+      [Some inbox] for all levels after the rollup genesis even when
+      no messages has been issued at this specific [block_hash]. In
+      this case, the inbox is the same as the one found in the level
+      when the latest message has been inserted. *)
   let inbox_of_hash node_ctxt store block_hash =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     let open Node_context in
-    let* possible_inbox = Store.Inboxes.find store block_hash in
+    let*! possible_inbox = Store.Inboxes.find store block_hash in
     match possible_inbox with
     | None ->
         (* We won't find inboxes for blocks before the rollup origination level.
            Fortunately this case will only ever be called once when dealing with
            the rollup origination block. After that we would always find an
            inbox. *)
-        Store.Inbox.empty
-          store
-          node_ctxt.rollup_address
-          node_ctxt.genesis_info.level
+        let*! block_level = Layer1.level_of_hash store block_hash in
+        let block_level = Raw_level.of_int32_exn block_level in
+        if Raw_level.(block_level <= node_ctxt.genesis_info.level) then
+          let*! inbox =
+            Store.Inbox.empty store node_ctxt.rollup_address Raw_level.root
+          in
+          return inbox
+        else
+          failwith
+            "The inbox for block hash %a (level = %a) is missing."
+            Block_hash.pp
+            block_hash
+            Raw_level.pp
+            block_level
     | Some inbox -> return inbox
 
-  let history_of_hash store block_hash =
-    Store.Histories.find_with_default store block_hash ~on_default:(fun () ->
-        Store.Inbox.history_at_genesis ~bound:(Int64.of_int 60000))
+  let history_of_hash node_ctxt store block_hash =
+    let open Lwt_result_syntax in
+    let open Node_context in
+    let*! res = Store.Histories.find store block_hash in
+    match res with
+    | Some history -> return history
+    | None ->
+        (* We won't find inboxes for blocks before the rollup origination level.
+           Fortunately this case will only ever be called once when dealing with
+           the rollup origination block. After that we would always find an
+           inbox. *)
+        let*! block_level = Layer1.level_of_hash store block_hash in
+        let block_level = Raw_level.of_int32_exn block_level in
+        if Raw_level.(block_level <= node_ctxt.genesis_info.level) then
+          return @@ Store.Inbox.history_at_genesis ~bound:(Int64.of_int 60000)
+        else
+          failwith
+            "The inbox history for hash %a is missing."
+            Block_hash.pp
+            block_hash
 
   let find_message_tree = Store.MessageTrees.find
 
   let set_message_tree = Store.MessageTrees.set
 end
+
+let find_message_tree = State.find_message_tree
 
 let get_messages Node_context.{l1_ctxt; rollup_address; _} head =
   let open Lwt_result_syntax in
@@ -124,7 +159,6 @@ let process_head node_ctxt store Layer1.(Head {level; hash = head_hash} as head)
   let*! res = get_messages node_ctxt head_hash in
   match res with
   | Error e -> head_processing_failure e
-  | Ok [] -> return_unit
   | Ok messages ->
       let*! () =
         Inbox_event.get_messages head_hash level (List.length messages)
@@ -138,26 +172,33 @@ let process_head node_ctxt store Layer1.(Head {level; hash = head_hash} as head)
 
       *)
       let*! predecessor = Layer1.predecessor store head in
-      let*! inbox = State.inbox_of_hash node_ctxt store predecessor in
+      let* inbox = State.inbox_of_hash node_ctxt store predecessor in
+      let* history = State.history_of_hash node_ctxt store predecessor in
       lift
-      @@ let*! history = State.history_of_hash store predecessor in
-         let*! messages_tree = State.find_message_tree store predecessor in
+      @@ let*! messages_tree = State.find_message_tree store predecessor in
          let*? level = Raw_level.of_int32 level in
          let*? messages = List.map_e Store.Inbox.Message.serialize messages in
-         let* messages_tree, history, inbox =
-           Store.Inbox.add_messages
-             store
-             history
-             inbox
-             level
-             messages
-             messages_tree
+         let* history, inbox =
+           if messages = [] then return (history, inbox)
+           else
+             let* messages_tree, history, inbox =
+               Store.Inbox.add_messages
+                 store
+                 history
+                 inbox
+                 level
+                 messages
+                 messages_tree
+             in
+             let*! () = State.set_message_tree store head_hash messages_tree in
+             return (history, inbox)
          in
-         let*! () = State.set_message_tree store head_hash messages_tree in
          let*! () = State.add_inbox store head_hash inbox in
          let*! () = State.add_history store head_hash history in
          return_unit
 
 let inbox_of_hash = State.inbox_of_hash
+
+let history_of_hash = State.history_of_hash
 
 let start () = Inbox_event.starting ()

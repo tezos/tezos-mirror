@@ -424,6 +424,11 @@ let current_level store =
 
 let hash_of_level = State.hash_of_level
 
+let level_of_hash store hash =
+  let open Lwt_syntax in
+  let* (Block {level; _}) = State.block_of_hash store hash in
+  return level
+
 let predecessor store (Head {hash; _}) =
   let open Lwt_syntax in
   let+ (Block {predecessor; _}) = State.block_of_hash store hash in
@@ -438,6 +443,11 @@ let processed = function
   | Rollback {new_head} -> processed_head new_head
 
 let mark_processed_head store head = State.mark_processed_head store head
+
+let last_processed_head_hash store =
+  let open Lwt_syntax in
+  let+ info = State.last_processed_head store in
+  Option.map (fun (Head {hash; _}) -> hash) info
 
 (* We forget about the last seen heads that are not processed so that
    the rollup node can process them when restarted. Notice that this

@@ -91,7 +91,7 @@ module Common = struct
       (fun () () ->
         Layer1.current_head_hash store >>= function
         | Some head_hash ->
-            let*! inbox = Inbox.inbox_of_hash node_ctxt store head_hash in
+            let* inbox = Inbox.inbox_of_hash node_ctxt store head_hash in
             return_some inbox
         | None -> return None)
 

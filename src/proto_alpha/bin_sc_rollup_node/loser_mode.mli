@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,37 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {
-  data_dir : string;
-  sc_rollup_address : Protocol.Alpha_context.Sc_rollup.t;
-  sc_rollup_node_operator : Signature.Public_key_hash.t;
-  rpc_addr : string;
-  rpc_port : int;
-  fee_parameter : Injection.fee_parameter;
-  loser_mode : Loser_mode.t;
-}
+(** A list of failures. *)
+type t
 
-(** [default_data_dir] is the default value for [data_dir]. *)
-val default_data_dir : string
+val encoding : t Data_encoding.t
 
-(** [default_storage_dir] returns the default value of the storage dir
-    given a [data_dir]. *)
-val default_storage_dir : string -> string
+(** [no_failures] are planned. *)
+val no_failures : t
 
-(** [default_rpc_addr] is the default value for [rpc_addr]. *)
-val default_rpc_addr : string
+(** [make s] parses a list of integers separated by spaces that is a
+   periodic sequence of triple [level message_index message_tick]
+   representing a failure that the rollup node is supposed to make.
+   This function returns [None] if the input string is not syntactically
+   correct. *)
+val make : string -> t option
 
-(** [default_rpc_port] is the default value for [rpc_port]. *)
-val default_rpc_port : int
-
-(** [default_fee_parameter] is the default value for [fee_parameter] *)
-val default_fee_parameter : Injection.fee_parameter
-
-(** [filename configuration] returns the [configuration] filename. *)
-val filename : t -> string
-
-(** [save configuration] overwrites [configuration] file. *)
-val save : t -> unit tzresult Lwt.t
-
-(** [load ~data_dir] loads a configuration stored in [data_dir]. *)
-val load : data_dir:string -> t tzresult Lwt.t
+(** [is_failure failures ~level ~message_index] returns [message_ticks]
+   where a failure is supposed to happen at the point
+   of the rollup node processing of a given inbox [level], a given
+   [message_index] and for all [message_ticks]. Ticks are sorted by
+   increasing order. *)
+val is_failure : t -> level:int -> message_index:int -> int list

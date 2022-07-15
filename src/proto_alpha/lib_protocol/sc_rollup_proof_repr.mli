@@ -59,7 +59,7 @@ open Sc_rollup_repr
     match up with [pvm_step] to give a valid refutation proof. *)
 type t = {
   pvm_step : Sc_rollups.wrapped_proof;
-  inbox : Sc_rollup_inbox_repr.proof option;
+  inbox : Sc_rollup_inbox_repr.serialized_proof option;
 }
 
 type error += Sc_rollup_proof_check of string
@@ -104,6 +104,18 @@ module type PVM_with_context_and_state = sig
   val context : context
 
   val state : state
+
+  val proof_encoding : proof Data_encoding.t
+
+  module Inbox_with_history : sig
+    include
+      Sc_rollup_inbox_repr.MerkelizedOperations
+        with type inbox_context = context
+
+    val inbox : Sc_rollup_inbox_repr.history_proof
+
+    val history : history
+  end
 end
 
 (** [produce pvm_and_state inbox_context inbox_history commit_level]
@@ -122,9 +134,4 @@ end
     encodable [wrapped_proof] if possible. See the [wrap_proof] function
     in [Sc_rollups]. *)
 val produce :
-  (module PVM_with_context_and_state) ->
-  Sc_rollup_inbox_repr.inbox_context ->
-  Sc_rollup_inbox_repr.history ->
-  Sc_rollup_inbox_repr.history_proof ->
-  Raw_level_repr.t ->
-  t tzresult Lwt.t
+  (module PVM_with_context_and_state) -> Raw_level_repr.t -> t tzresult Lwt.t

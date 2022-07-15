@@ -202,6 +202,9 @@ module V2_0_0 = struct
 
     type state = State.state
 
+    let pp _state =
+      Lwt.return @@ fun fmt () -> Format.pp_print_string fmt "<wasm-state>"
+
     open Monad
 
     let initial_state ctxt =
@@ -429,6 +432,14 @@ module V2_0_0 = struct
           return {output_proof; output_proof_state; output_proof_output}
       | Some (_, false) -> fail Wasm_invalid_claim_about_outbox
       | None -> fail Wasm_output_proof_production_failed
+
+    module Internal_for_tests = struct
+      let insert_failure state =
+        let add n = Tree.add state ["failures"; string_of_int n] Bytes.empty in
+        let open Lwt_syntax in
+        let* n = Tree.length state ["failures"] in
+        add n
+    end
   end
 
   module ProtocolImplementation = Make (struct

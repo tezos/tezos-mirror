@@ -2814,6 +2814,10 @@ module Sc_rollup : sig
       val to_context_hash : t -> Context_hash.t
     end
 
+    type serialized_proof
+
+    val serialized_proof_encoding : serialized_proof Data_encoding.t
+
     module type MerkelizedOperations = sig
       type tree
 
@@ -2878,7 +2882,9 @@ module Sc_rollup : sig
 
       val pp_proof : Format.formatter -> proof -> unit
 
-      val proof_encoding : proof Data_encoding.t
+      val to_serialized_proof : proof -> serialized_proof
+
+      val of_serialized_proof : serialized_proof -> proof option
 
       val verify_proof :
         Raw_level.t * Z.t ->
@@ -3013,6 +3019,8 @@ module Sc_rollup : sig
 
       type state
 
+      val pp : state -> (Format.formatter -> unit -> unit) Lwt.t
+
       type context
 
       type hash = State_hash.t
@@ -3063,6 +3071,10 @@ module Sc_rollup : sig
 
       val produce_output_proof :
         context -> state -> output -> (output_proof, error) result Lwt.t
+
+      module Internal_for_tests : sig
+        val insert_failure : state -> state Lwt.t
+      end
     end
 
     type t = (module S)
@@ -3274,7 +3286,7 @@ module Sc_rollup : sig
   val wrapped_proof_module : wrapped_proof -> (module PVM_with_proof)
 
   module Proof : sig
-    type t = {pvm_step : wrapped_proof; inbox : Inbox.proof option}
+    type t = {pvm_step : wrapped_proof; inbox : Inbox.serialized_proof option}
 
     module type PVM_with_context_and_state = sig
       include PVM.S
@@ -3282,23 +3294,37 @@ module Sc_rollup : sig
       val context : context
 
       val state : state
+
+      val proof_encoding : proof Data_encoding.t
+
+      module Inbox_with_history : sig
+        include Inbox.MerkelizedOperations with type inbox_context = context
+
+        val inbox : Inbox.history_proof
+
+        val history : history
+      end
     end
 
     type error += Sc_rollup_proof_check of string
 
-    val produce :
-      (module PVM_with_context_and_state) ->
-      Inbox.inbox_context ->
-      Inbox.history ->
+    val valid :
       Inbox.history_proof ->
       Raw_level.t ->
-      t tzresult Lwt.t
+      pvm_name:string ->
+      t ->
+      bool tzresult Lwt.t
+
+    val produce :
+      (module PVM_with_context_and_state) -> Raw_level.t -> t tzresult Lwt.t
   end
 
   module Game : sig
     type player = Alice | Bob
 
     val player_equal : player -> player -> bool
+
+    val player_encoding : player Data_encoding.t
 
     type dissection_chunk = {state_hash : State_hash.t option; tick : Tick.t}
 
@@ -3316,6 +3342,8 @@ module Sc_rollup : sig
     module Index : sig
       type t = private {alice : Staker.t; bob : Staker.t}
 
+      val encoding : t Data_encoding.t
+
       val make : Staker.t -> Staker.t -> t
     end
 
@@ -3326,6 +3354,8 @@ module Sc_rollup : sig
     type step = Dissection of dissection_chunk list | Proof of Proof.t
 
     type refutation = {choice : Tick.t; step : step}
+
+    val refutation_encoding : refutation Data_encoding.t
 
     val pp_refutation : Format.formatter -> refutation -> unit
 

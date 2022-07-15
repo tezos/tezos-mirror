@@ -207,6 +207,10 @@ end
     preserve the laziness. *)
 val current_level_hash : t -> Hash.t
 
+type serialized_proof
+
+val serialized_proof_encoding : serialized_proof Data_encoding.t
+
 (** The following operations are subject to cross-validation between
     rollup nodes and the layer 1. *)
 module type MerkelizedOperations = sig
@@ -340,7 +344,7 @@ module type MerkelizedOperations = sig
   (** [number_of_proof_steps proof] returns the length of [proof]. *)
   val number_of_proof_steps : inclusion_proof -> int
 
-  (** [produce_inclusion_proof history a b] exploits [history] to produce 
+  (** [produce_inclusion_proof history a b] exploits [history] to produce
       a self-contained proof that [a] is an older version of [b]. *)
   val produce_inclusion_proof :
     history -> history_proof -> history_proof -> inclusion_proof option
@@ -373,7 +377,9 @@ module type MerkelizedOperations = sig
 
   val pp_proof : Format.formatter -> proof -> unit
 
-  val proof_encoding : proof Data_encoding.t
+  val to_serialized_proof : proof -> serialized_proof
+
+  val of_serialized_proof : serialized_proof -> proof option
 
   (** See the docstring for the [proof] type for details of proof semantics.
 

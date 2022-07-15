@@ -87,9 +87,15 @@ val current_head_hash : Store.t -> Block_hash.t option Lwt.t
    made. *)
 val current_level : Store.t -> int32 option Lwt.t
 
-(** [hash_of_level level] returns the current block hash for a given
-   [level]. *)
+(** [hash_of_level store level] returns the current block hash for a
+   given [level]. Raise [Invalid_argument] if [hash] does not belong
+   to [store]. *)
 val hash_of_level : Store.t -> int32 -> Block_hash.t Lwt.t
+
+(** [level_of_hash store hash] returns the level for a given block
+   [hash]. Raise [Invalid_argument] if [hash] does not belong to
+   [store]. *)
+val level_of_hash : Store.t -> Block_hash.t -> int32 Lwt.t
 
 (** [predecessor store head] returns the hash of the head's predecessor block] *)
 val predecessor : Store.t -> head -> Block_hash.t Lwt.t
@@ -105,6 +111,10 @@ val processed : chain_event -> unit Lwt.t
     is processed. The system should not have to come back to
     it. *)
 val mark_processed_head : Store.t -> head -> unit Lwt.t
+
+(** [last_processed_head_hash store] returns the hash of
+    the last processed head. *)
+val last_processed_head_hash : Store.t -> Block_hash.t option Lwt.t
 
 (** [shutdown store] properly shut the layer 1 down. *)
 val shutdown : Store.t -> unit Lwt.t

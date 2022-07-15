@@ -133,6 +133,13 @@ end
 
 module Skip_list = Skip_list_repr.Make (Skip_list_parameters)
 
+let hash_skip_list_cell cell =
+  let current_level_hash = Skip_list.content cell in
+  let back_pointers_hashes = Skip_list.back_pointers cell in
+  Hash.to_bytes current_level_hash
+  :: List.map Hash.to_bytes back_pointers_hashes
+  |> Hash.hash_bytes
+
 module V1 = struct
   type history_proof = (Hash.t, Hash.t) Skip_list.cell
 
@@ -141,7 +148,15 @@ module V1 = struct
   let history_proof_encoding : history_proof Data_encoding.t =
     Skip_list.encoding Hash.encoding Hash.encoding
 
-  let pp_history_proof = Skip_list.pp ~pp_content:Hash.pp ~pp_ptr:Hash.pp
+  let pp_history_proof fmt history =
+    let history_hash = hash_skip_list_cell history in
+    Format.fprintf
+      fmt
+      "@[hash : %a@;%a@]"
+      Hash.pp
+      history_hash
+      (Skip_list.pp ~pp_content:Hash.pp ~pp_ptr:Hash.pp)
+      history
 
   (*
 
@@ -221,15 +236,14 @@ module V1 = struct
       } =
     Format.fprintf
       fmt
-      {|
-         rollup = %a
-         level = %a
-         current messages hash  = %a
-         nb_messages_in_commitment_period = %s
-         starting_level_of_current_commitment_period = %a
-         message_counter = %a
-         old_levels_messages = %a
-    |}
+      "@[<hov 2>{ rollup = %a@;\
+       level = %a@;\
+       current messages hash  = %a@;\
+       nb_messages_in_commitment_period = %s@;\
+       starting_level_of_current_commitment_period = %a@;\
+       message_counter = %a@;\
+       old_levels_messages = %a@;\
+       }@]"
       Sc_rollup_repr.Address.pp
       rollup
       Raw_level_repr.pp
@@ -338,6 +352,10 @@ let key_of_message ix =
 
 let level_key = ["level"]
 
+type serialized_proof = bytes
+
+let serialized_proof_encoding = Data_encoding.bytes
+
 module type MerkelizedOperations = sig
   type inbox_context
 
@@ -402,7 +420,9 @@ module type MerkelizedOperations = sig
 
   val pp_proof : Format.formatter -> proof -> unit
 
-  val proof_encoding : proof Data_encoding.t
+  val to_serialized_proof : proof -> serialized_proof
+
+  val of_serialized_proof : serialized_proof -> proof option
 
   val verify_proof :
     Raw_level_repr.t * Z.t ->
@@ -513,13 +533,6 @@ struct
            Sc_rollup_inbox_message_repr.unsafe_of_string (Bytes.to_string bs))
          bytes
 
-  let hash_skip_list_cell cell =
-    let current_level_hash = Skip_list.content cell in
-    let back_pointers_hashes = Skip_list.back_pointers cell in
-    Hash.to_bytes current_level_hash
-    :: List.map Hash.to_bytes back_pointers_hashes
-    |> Hash.hash_bytes
-
   module Int64_map = Map.Make (Int64)
 
   type history = {
@@ -551,16 +564,32 @@ struct
 
   let pp_history fmt history =
     Hash.Map.bindings history.events |> fun bindings ->
+    Int64_map.bindings history.sequence |> fun sequence_bindings ->
     let pp_binding fmt (hash, history_proof) =
       Format.fprintf
         fmt
-        "@[%a -> %a@]"
+        "@[%a -> %a@;@]"
         Hash.pp
         hash
         pp_history_proof
         history_proof
     in
-    Format.pp_print_list pp_binding fmt bindings
+    let pp_sequence_binding fmt (counter, hash) =
+      Format.fprintf fmt "@[%s -> %a@;@]" (Int64.to_string counter) Hash.pp hash
+    in
+    Format.fprintf
+      fmt
+      "@[<hov 2>History:@;\
+      \ { bound: %Ld;@;\
+      \ counter : %Ld;@;\
+      \ bindings: %a;@;\
+      \ sequence: %a; }@]"
+      history.bound
+      history.counter
+      (Format.pp_print_list pp_binding)
+      bindings
+      (Format.pp_print_list pp_sequence_binding)
+      sequence_bindings
 
   let history_at_genesis ~bound =
     {events = Hash.Map.empty; sequence = Int64_map.empty; bound; counter = 0L}
@@ -912,6 +941,10 @@ struct
               });
       ]
 
+  let of_serialized_proof = Data_encoding.Binary.of_bytes_opt proof_encoding
+
+  let to_serialized_proof = Data_encoding.Binary.to_bytes_exn proof_encoding
+
   let proof_error reason =
     let open Lwt_tzresult_syntax in
     fail (Inbox_proof_error reason)
@@ -1164,7 +1197,7 @@ struct
 
   let empty context rollup level =
     let open Lwt_syntax in
-    let* initial_level = new_level_tree context level in
+    let* initial_level = new_level_tree context Raw_level_repr.root in
     let initial_hash = hash_level_tree initial_level in
     return
       {

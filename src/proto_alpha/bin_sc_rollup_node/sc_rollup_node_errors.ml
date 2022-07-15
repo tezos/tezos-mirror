@@ -29,6 +29,11 @@ type error += Bad_minimal_fees of string
 
 type error += Commitment_predecessor_should_be_LCC of Sc_rollup.Commitment.t
 
+type error += Unreliable_tezos_node_returning_inconsistent_game
+
+type error +=
+  | Cannot_produce_proof of Store.Inbox.t * Store.Inbox.history * Raw_level.t
+
 let () =
   register_error_kind
     `Permanent
@@ -58,4 +63,48 @@ let () =
     (function
       | Commitment_predecessor_should_be_LCC commitment -> Some commitment
       | _ -> None)
-    (fun commitment -> Commitment_predecessor_should_be_LCC commitment)
+    (fun commitment -> Commitment_predecessor_should_be_LCC commitment) ;
+
+  register_error_kind
+    `Permanent
+    ~id:"internal.unreliable_tezos_node"
+    ~title:"Internal error: Tezos node seems unreliable"
+    ~description:
+      "Internal error: The game invariant states that the dissection from the \
+       opponent must contain a tick we disagree with. If the retrieved game \
+       does not respect this, we cannot trust the Tezos node we are connected \
+       to and prefer to stop here."
+    ~pp:(fun _ppf () -> ())
+    Data_encoding.unit
+    (function
+      | Unreliable_tezos_node_returning_inconsistent_game -> Some () | _ -> None)
+    (fun () -> Unreliable_tezos_node_returning_inconsistent_game) ;
+
+  register_error_kind
+    `Permanent
+    ~id:"internal.cannnot_produce_proof"
+    ~title:"Internal error: Rollup node cannot produce refutation proof"
+    ~description:
+      "The rollup node is in a state that prevent it from produce refutation \
+       proofs."
+    ~pp:(fun ppf (inbox, history, level) ->
+      Format.fprintf
+        ppf
+        "cannot produce proof for inbox %a of level %a with history %a"
+        Store.Inbox.pp
+        inbox
+        Raw_level.pp
+        level
+        Store.Inbox.pp_history
+        history)
+    Data_encoding.(
+      obj3
+        (req "inbox" Store.Inbox.encoding)
+        (req "history" Store.Inbox.history_encoding)
+        (req "level" Raw_level.encoding))
+    (function
+      | Cannot_produce_proof (inbox, history, level) ->
+          Some (inbox, history, level)
+      | _ -> None)
+    (fun (inbox, history, level) ->
+      Cannot_produce_proof (inbox, history, level))

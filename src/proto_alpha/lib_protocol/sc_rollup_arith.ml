@@ -753,13 +753,6 @@ module Make (Context : P) :
 
   type state = State.state
 
-  let pp state =
-    let open Lwt_syntax in
-    let* _, pp = Monad.run pp state in
-    match pp with
-    | None -> return @@ fun fmt _ -> Format.fprintf fmt "<opaque>"
-    | Some pp -> return pp
-
   open Monad
 
   let initial_state ctxt =
@@ -786,6 +779,16 @@ module Make (Context : P) :
   let state_hash state =
     let context_hash = Tree.hash state in
     Lwt.return @@ State_hash.context_hash_to_state_hash context_hash
+
+  let pp state =
+    let open Lwt_syntax in
+    let* _, pp = Monad.run pp state in
+    match pp with
+    | None -> return @@ fun fmt _ -> Format.fprintf fmt "<opaque>"
+    | Some pp ->
+        let* state_hash = state_hash state in
+        return (fun fmt () ->
+            Format.fprintf fmt "@[%a: %a@]" State_hash.pp state_hash pp ())
 
   let boot =
     let open Monad.Syntax in
@@ -835,6 +838,15 @@ module Make (Context : P) :
 
   let get_is_stuck = result_of ~default:None @@ is_stuck
 
+  let start_parsing : unit t =
+    let open Monad.Syntax in
+    let* () = Status.set Parsing in
+    let* () = ParsingResult.set None in
+    let* () = ParserState.set SkipLayout in
+    let* () = LexerState.set (0, 0) in
+    let* () = Code.clear in
+    return ()
+
   let set_input_monadic {PS.inbox_level; message_counter; payload} =
     let open Monad.Syntax in
     let payload =
@@ -853,6 +865,7 @@ module Make (Context : P) :
         let* () = CurrentLevel.set inbox_level in
         let* () = MessageCounter.set (Some message_counter) in
         let* () = NextMessage.set (Some msg) in
+        let* () = start_parsing in
         return ()
     | None ->
         let* () = CurrentLevel.set inbox_level in
@@ -903,15 +916,6 @@ module Make (Context : P) :
     let open Monad.Syntax in
     let* s = lexeme in
     Code.inject (IStore s)
-
-  let start_parsing : unit t =
-    let open Monad.Syntax in
-    let* () = Status.set Parsing in
-    let* () = ParsingResult.set None in
-    let* () = ParserState.set SkipLayout in
-    let* () = LexerState.set (0, 0) in
-    let* () = Code.clear in
-    return ()
 
   let start_evaluating : unit t =
     let open Monad.Syntax in
@@ -1189,6 +1193,14 @@ module Make (Context : P) :
         return {output_proof; output_proof_state; output_proof_output}
     | Some (_, false) -> fail Arith_invalid_claim_about_outbox
     | None -> fail Arith_output_proof_production_failed
+
+  module Internal_for_tests = struct
+    let insert_failure state =
+      let add n = Tree.add state ["failures"; string_of_int n] Bytes.empty in
+      let open Lwt_syntax in
+      let* n = Tree.length state ["failures"] in
+      add n
+  end
 end
 
 module ProtocolImplementation = Make (struct

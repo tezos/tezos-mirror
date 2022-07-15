@@ -31,21 +31,39 @@ module Simple = struct
   let section = ["sc_rollup_node"; "interpreter"]
 
   let transitioned_pvm =
-    declare_3
+    declare_4
       ~section
       ~name:"sc_rollup_node_interpreter_transitioned_pvm"
       ~msg:
-        "Transitioned PVM to {state_hash} at tick {ticks} with {num_messages} \
-         messages"
+        "Transitioned PVM at inbox level {inbox_level} to {state_hash} at tick \
+         {ticks} with {num_messages} messages"
       ~level:Notice
+      ("inbox_level", Protocol.Alpha_context.Raw_level.encoding)
       ("state_hash", State_hash.encoding)
       ("ticks", Tick.encoding)
       ("num_messages", Data_encoding.z)
+
+  let intended_failure =
+    declare_4
+      ~section
+      ~name:"sc_rollup_node_interpreter_intended_failure"
+      ~msg:
+        "Intended failure at level {level} for message indexed {message_index} \
+         and at the tick {message_tick} of message processing (internal = \
+         {internal})."
+      ~level:Notice
+      ("level", Data_encoding.int31)
+      ("message_index", Data_encoding.int31)
+      ("message_tick", Data_encoding.int31)
+      ("internal", Data_encoding.bool)
 end
 
-let transitioned_pvm state num_messages =
+let transitioned_pvm inbox_level state num_messages =
   let open Lwt_syntax in
   (* TODO (#3094): is this code path taken for Wasm_2_0_0_pvm. Do we need to abstract? *)
   let* hash = Arith_pvm.state_hash state in
   let* ticks = Arith_pvm.get_tick state in
-  Simple.(emit transitioned_pvm (hash, ticks, num_messages))
+  Simple.(emit transitioned_pvm (inbox_level, hash, ticks, num_messages))
+
+let intended_failure ~level ~message_index ~message_tick ~internal =
+  Simple.(emit intended_failure (level, message_index, message_tick, internal))

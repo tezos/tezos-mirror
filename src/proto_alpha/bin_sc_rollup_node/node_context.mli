@@ -46,6 +46,9 @@ type t = {
       (** Fee parameter to use when injecting operations in layer 1. *)
   protocol_constants : Constants.t;
       (** Protocol constants retrieved from the Tezos node. *)
+  loser_mode : Loser_mode.t;
+      (** If different from [Loser_mode.no_failures], the rollup node
+          issues wrong commitments (for tests). *)
 }
 
 (** [get_operator_keys cctxt] returns a triple [(pkh, pk, sk)] corresponding
@@ -69,4 +72,5 @@ val init :
   Protocol.Alpha_context.Sc_rollup.Kind.t ->
   Signature.Public_key_hash.t ->
   Injection.fee_parameter ->
+  loser_mode:Loser_mode.t ->
   t tzresult Lwt.t

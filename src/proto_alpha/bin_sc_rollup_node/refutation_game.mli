@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,37 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {
-  data_dir : string;
-  sc_rollup_address : Protocol.Alpha_context.Sc_rollup.t;
-  sc_rollup_node_operator : Signature.Public_key_hash.t;
-  rpc_addr : string;
-  rpc_port : int;
-  fee_parameter : Injection.fee_parameter;
-  loser_mode : Loser_mode.t;
-}
+(** This module implements the refutation game logic of the rollup
+    node. *)
+module type S = sig
+  module PVM : Pvm.S
 
-(** [default_data_dir] is the default value for [data_dir]. *)
-val default_data_dir : string
+  val process :
+    Layer1.head -> Node_context.t -> PVM.context -> unit tzresult Lwt.t
+end
 
-(** [default_storage_dir] returns the default value of the storage dir
-    given a [data_dir]. *)
-val default_storage_dir : string -> string
-
-(** [default_rpc_addr] is the default value for [rpc_addr]. *)
-val default_rpc_addr : string
-
-(** [default_rpc_port] is the default value for [rpc_port]. *)
-val default_rpc_port : int
-
-(** [default_fee_parameter] is the default value for [fee_parameter] *)
-val default_fee_parameter : Injection.fee_parameter
-
-(** [filename configuration] returns the [configuration] filename. *)
-val filename : t -> string
-
-(** [save configuration] overwrites [configuration] file. *)
-val save : t -> unit tzresult Lwt.t
-
-(** [load ~data_dir] loads a configuration stored in [data_dir]. *)
-val load : data_dir:string -> t tzresult Lwt.t
+module Make (PVM : Pvm.S) : S with module PVM = PVM
