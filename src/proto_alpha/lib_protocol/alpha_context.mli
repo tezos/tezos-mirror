@@ -3233,7 +3233,7 @@ module Sc_rollup : sig
 
     val pp : Format.formatter -> t -> unit
 
-    val hash : t -> Hash.t
+    val hash_uncarbonated : t -> Hash.t
 
     val hash_carbonated : context -> t -> (context * Hash.t) tzresult
 

@@ -877,7 +877,7 @@ let mk_sc_rollup_cement (oinfos : operation_req) (infos : infos) =
     (B infos.ctxt.block)
     (contract_of infos.accounts.source)
     sc_rollup
-    (Sc_rollup.Commitment.hash sc_dummy_commitment)
+    (Sc_rollup.Commitment.hash_uncarbonated sc_dummy_commitment)
 
 let mk_sc_rollup_refute (oinfos : operation_req) (infos : infos) =
   let open Lwt_result_syntax in
@@ -944,7 +944,7 @@ let mk_sc_rollup_execute_outbox_message (oinfos : operation_req) (infos : infos)
     (B infos.ctxt.block)
     (contract_of infos.accounts.source)
     sc_rollup
-    (Sc_rollup.Commitment.hash sc_dummy_commitment)
+    (Sc_rollup.Commitment.hash_uncarbonated sc_dummy_commitment)
     ~output_proof:""
 
 let mk_sc_rollup_return_bond (oinfos : operation_req) (infos : infos) =

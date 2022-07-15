@@ -64,7 +64,7 @@ module V1 : sig
 
   val encoding : t Data_encoding.t
 
-  val hash : t -> Hash.t
+  val hash_uncarbonated : t -> Hash.t
 
   (** [genesis_commitment ~origination_level ~genesis_state_hash] is the
       commitment that the protocol "publish" and "cement" when originating a new
