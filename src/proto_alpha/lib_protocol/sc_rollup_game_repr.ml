@@ -34,6 +34,20 @@ module V1 = struct
     tick : Sc_rollup_tick_repr.t;
   }
 
+  let pp_state_hash =
+    let open Format in
+    pp_print_option ~none:(fun ppf () -> fprintf ppf "None") State_hash.pp
+
+  let pp_dissection_chunk ppf {state_hash; tick} =
+    let open Format in
+    fprintf
+      ppf
+      "State hash:%a@ Tick: %a"
+      pp_state_hash
+      state_hash
+      Sc_rollup_tick_repr.pp
+      tick
+
   type t = {
     turn : player;
     inbox_snapshot : Sc_rollup_inbox_repr.history_proof;
@@ -157,11 +171,11 @@ module V1 = struct
       (fun ppf {state_hash; tick} ->
         Format.fprintf
           ppf
-          "  %a @ %a"
-          (Format.pp_print_option State_hash.pp)
-          state_hash
+          "%a: %a"
           Sc_rollup_tick_repr.pp
-          tick)
+          tick
+          pp_state_hash
+          state_hash)
       ppf
       d
 

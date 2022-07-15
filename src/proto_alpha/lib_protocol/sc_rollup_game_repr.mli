@@ -137,6 +137,8 @@ module V1 : sig
     tick : Sc_rollup_tick_repr.t;
   }
 
+  val pp_dissection_chunk : Format.formatter -> dissection_chunk -> unit
+
   (** A game state is characterized by:
 
     - [turn], the player that must provide the next move.

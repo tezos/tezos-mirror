@@ -3339,6 +3339,8 @@ module Sc_rollup : sig
 
     type dissection_chunk = {state_hash : State_hash.t option; tick : Tick.t}
 
+    val pp_dissection_chunk : Format.formatter -> dissection_chunk -> unit
+
     type t = {
       turn : player;
       inbox_snapshot : Inbox.history_proof;
@@ -3347,6 +3349,8 @@ module Sc_rollup : sig
       dissection : dissection_chunk list;
       default_number_of_sections : int;
     }
+
+    val pp_dissection : Format.formatter -> dissection_chunk list -> unit
 
     val pp : Format.formatter -> t -> unit
 
