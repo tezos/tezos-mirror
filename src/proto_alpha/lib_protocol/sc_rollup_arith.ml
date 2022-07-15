@@ -128,7 +128,7 @@ let proof_encoding : 'a Data_encoding.t -> 'a proof Data_encoding.t =
     (fun (tree_proof, given, requested) -> {tree_proof; given; requested})
     (obj3
        (req "tree_proof" encoding)
-       (req "given" (option PS.input_encoding))
+       (opt "given" PS.input_encoding)
        (req "requested" PS.input_request_encoding))
 
 module Make (Context : P) :
