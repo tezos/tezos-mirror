@@ -336,7 +336,7 @@ let rollup_node_subscribes_to_dal_slots _protocol sc_rollup_node
   *)
   let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.Sc_rollup.get_genesis_info sc_rollup_address
+    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup_address
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
   let* () = Sc_rollup_node.run sc_rollup_node in

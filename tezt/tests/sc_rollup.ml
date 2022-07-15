@@ -193,7 +193,9 @@ let number_of_ticks (_hash, (commitment : Sc_rollup_client.commitment), _level)
 let last_cemented_commitment_hash_with_level ~sc_rollup client =
   let* json =
     RPC.Client.call client
-    @@ RPC.Sc_rollup.get_last_cemented_commitment_hash_with_level sc_rollup
+    @@ RPC
+       .get_chain_block_context_sc_rollup_last_cemented_commitment_hash_with_level
+         sc_rollup
   in
   let hash = JSON.(json |-> "hash" |> as_string) in
   let level = JSON.(json |-> "level" |> as_int) in
@@ -202,7 +204,9 @@ let last_cemented_commitment_hash_with_level ~sc_rollup client =
 let get_staked_on_commitment ~sc_rollup ~staker client =
   let* json =
     RPC.Client.call client
-    @@ RPC.Sc_rollup.get_staked_on_commitment ~sc_rollup staker
+    @@ RPC.get_chain_block_context_sc_rollup_staker_staked_on_commitment
+         ~sc_rollup
+         staker
   in
   let hash = JSON.(json |-> "hash" |> as_string) in
   return hash
@@ -414,7 +418,8 @@ let test_rollup_get_genesis_info =
            from the current level. *)
         let* _ = repeat 10 (fun () -> Client.bake_for_and_wait client) in
         let* genesis_info =
-          RPC.Client.call client @@ RPC.Sc_rollup.get_genesis_info sc_rollup
+          RPC.Client.call client
+          @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
         in
         (* 1 Block for activating alpha + 1 block for originating the rollup
            the rollup initial level should be 2 *)
@@ -437,7 +442,8 @@ let test_rollup_get_genesis_info =
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2944
    Revisit this test once the rollup node can cement commitments. *)
-let test_rollup_get_last_cemented_commitment_hash_with_level =
+let test_rollup_get_chain_block_context_sc_rollup_last_cemented_commitment_hash_with_level
+    =
   regression_test
     ~__FILE__
     ~tags:["lcc_hash_with_level"]
@@ -454,7 +460,8 @@ let test_rollup_get_last_cemented_commitment_hash_with_level =
           last_cemented_commitment_hash_with_level ~sc_rollup client
         in
         let* genesis_info =
-          RPC.Client.call client @@ RPC.Sc_rollup.get_genesis_info sc_rollup
+          RPC.Client.call client
+          @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
         in
         let genesis_hash =
           JSON.(genesis_info |-> "commitment_hash" |> as_string)
@@ -525,7 +532,10 @@ let parse_inbox json =
        (Printexc.to_string exn))
 
 let get_inbox_from_tezos_node sc_rollup client =
-  let* inbox = RPC.Client.call client @@ RPC.Sc_rollup.get_inbox sc_rollup in
+  let* inbox =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_sc_rollup_inbox sc_rollup
+  in
   parse_inbox inbox
 
 let get_inbox_from_sc_rollup_node sc_rollup_node =
@@ -839,7 +849,9 @@ let sc_rollup_node_handles_chain_reorg protocol sc_rollup_node sc_rollup node
 let test_rollup_list =
   let open Lwt.Syntax in
   let go node client bootstrap1 =
-    let* rollups = RPC.Client.call client @@ RPC.Sc_rollup.list () in
+    let* rollups =
+      RPC.Client.call client @@ RPC.get_chain_block_context_sc_rollup ()
+    in
     let rollups = JSON.as_list rollups in
     let () =
       match rollups with
@@ -852,7 +864,9 @@ let test_rollup_list =
       10
       (fun scoru_addresses ->
         let* () = Client.bake_for_and_wait client in
-        let+ rollups = RPC.Client.call client @@ RPC.Sc_rollup.list () in
+        let+ rollups =
+          RPC.Client.call client @@ RPC.get_chain_block_context_sc_rollup ()
+        in
         let rollups =
           JSON.as_list rollups |> List.map JSON.as_string |> String_set.of_list
         in
@@ -880,7 +894,8 @@ let test_rollup_list =
 let test_rollup_node_boots_into_initial_state =
   let go client sc_rollup sc_rollup_node =
     let* genesis_info =
-      RPC.Client.call ~hooks client @@ RPC.Sc_rollup.get_genesis_info sc_rollup
+      RPC.Client.call ~hooks client
+      @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
     in
     let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
@@ -926,7 +941,8 @@ let test_rollup_node_boots_into_initial_state =
 let test_rollup_node_advances_pvm_state protocols =
   let go ~internal client sc_rollup sc_rollup_node =
     let* genesis_info =
-      RPC.Client.call ~hooks client @@ RPC.Sc_rollup.get_genesis_info sc_rollup
+      RPC.Client.call ~hooks client
+      @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
     in
     let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
@@ -1131,7 +1147,8 @@ let commitment_stored _protocol sc_rollup_node sc_rollup _node client =
      levels_to_finalise`.
   *)
   let* genesis_info =
-    RPC.Client.call ~hooks client @@ RPC.Sc_rollup.get_genesis_info sc_rollup
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
@@ -1195,7 +1212,8 @@ let commitment_not_stored_if_non_final _protocol sc_rollup_node sc_rollup _node
      neither stored nor published.
   *)
   let* genesis_info =
-    RPC.Client.call ~hooks client @@ RPC.Sc_rollup.get_genesis_info sc_rollup
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
@@ -1252,7 +1270,8 @@ let commitments_messages_reset _protocol sc_rollup_node sc_rollup _node client =
      commitments are stored and published by the rollup node.
   *)
   let* genesis_info =
-    RPC.Client.call ~hooks client @@ RPC.Sc_rollup.get_genesis_info sc_rollup
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
@@ -1319,7 +1338,8 @@ let commitments_reorgs protocol sc_rollup_node sc_rollup node client =
      no messages and no ticks.
   *)
   let* genesis_info =
-    RPC.Client.call ~hooks client @@ RPC.Sc_rollup.get_genesis_info sc_rollup
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
@@ -1483,7 +1503,8 @@ let commitment_before_lcc_not_published _protocol sc_rollup_node sc_rollup node
   let challenge_window = constants.challenge_window_in_blocks in
   (* Rollup node 1 processes messages, produces and publishes two commitments. *)
   let* genesis_info =
-    RPC.Client.call ~hooks client @@ RPC.Sc_rollup.get_genesis_info sc_rollup
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
@@ -1647,7 +1668,8 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup node
     client =
   (* Rollup node 1 processes messages, produces and publishes two commitments. *)
   let* genesis_info =
-    RPC.Client.call ~hooks client @@ RPC.Sc_rollup.get_genesis_info sc_rollup
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
   let* commitment_period = get_sc_rollup_commitment_period_in_blocks client in
@@ -1739,7 +1761,8 @@ let test_rollup_origination_boot_sector =
 
   let go client sc_rollup =
     let* client_boot_sector =
-      RPC.Client.call ~hooks client @@ RPC.Sc_rollup.get_boot_sector sc_rollup
+      RPC.Client.call ~hooks client
+      @@ RPC.get_chain_block_context_sc_rollup_boot_sector sc_rollup
     in
     let client_boot_sector = JSON.as_string client_boot_sector in
     Check.(boot_sector = client_boot_sector)
@@ -1769,7 +1792,8 @@ let test_rollup_origination_boot_sector =
 let test_rollup_node_uses_boot_sector =
   let go_boot client sc_rollup sc_rollup_node =
     let* genesis_info =
-      RPC.Client.call ~hooks client @@ RPC.Sc_rollup.get_genesis_info sc_rollup
+      RPC.Client.call ~hooks client
+      @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
     in
     let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
@@ -1946,7 +1970,9 @@ let test_consecutive_commitments =
       (* As we did no publish any commitment yet, this is supposed to fail. *)
       let*? process =
         RPC.Client.spawn client
-        @@ RPC.Sc_rollup.get_staked_on_commitment ~sc_rollup operator
+        @@ RPC.get_chain_block_context_sc_rollup_staker_staked_on_commitment
+             ~sc_rollup
+             operator
       in
       let* () = Process.check_error ~msg:(rex "Unknown staker") process in
       let* predecessor, _ =
@@ -2098,7 +2124,8 @@ let register ~protocols =
   test_rollup_client_gets_address protocols ;
   test_rollup_list protocols ;
   test_rollup_get_genesis_info protocols ;
-  test_rollup_get_last_cemented_commitment_hash_with_level protocols ;
+  test_rollup_get_chain_block_context_sc_rollup_last_cemented_commitment_hash_with_level
+    protocols ;
   test_rollup_inbox_size protocols ;
   test_rollup_inbox_current_messages_hash protocols ;
   test_rollup_inbox_of_rollup_node "basic" basic_scenario protocols ;
