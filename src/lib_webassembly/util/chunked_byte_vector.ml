@@ -31,6 +31,10 @@ module Chunk = struct
     done ;
     chunk
 
+  let to_bytes chunk =
+    let len = Array1.size_in_bytes chunk in
+    Bytes.init len (fun i -> Char.chr @@ Array1.get chunk i)
+
   let num_needed length =
     if Int64.compare length 0L > 0 then
       (* [pred length] is used to cover the edge cases where [length] is an exact
@@ -81,6 +85,8 @@ module type S = sig
   val store_byte : t -> int64 -> int -> unit effect
 
   val store_bytes : t -> int64 -> bytes -> unit effect
+
+  val loaded_chunks : t -> (int64 * Chunk.t) list
 
   module Buffer : sig
     type vector := t
@@ -187,6 +193,9 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
     let vector = Bytes.length bytes |> Int64.of_int |> create in
     let+ () = store_bytes vector 0L bytes in
     vector
+
+  let loaded_chunks vector =
+    Vector.Vector.loaded_bindings (Vector.snapshot vector.chunks)
 
   module Buffer = struct
     type nonrec t = {vector : t; offset : int64}

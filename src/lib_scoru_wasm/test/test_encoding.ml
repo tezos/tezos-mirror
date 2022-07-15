@@ -67,7 +67,9 @@ module Map =
     end)
 
 module Merklizer =
-  Tree_encoding_decoding.Make (Map) (Lazy_vector.LwtIntVector) (Tree)
+  Tree_encoding_decoding.Make (Map) (Lazy_vector.LwtIntVector)
+    (Chunked_byte_vector.Lwt)
+    (Tree)
 
 let empty_tree () =
   let open Lwt_syntax in
@@ -208,6 +210,24 @@ let test_lazy_vector () =
     = Lazy_vector.LwtIntVector.to_string Fun.id decoded_vector) ;
   return_unit
 
+let test_chunked_byte_vector () =
+  let open Merklizer in
+  let open Lwt_result_syntax in
+  let vector =
+    Chunked_byte_vector.Lwt.of_string
+      (String.make 10_000 'a' ^ String.make 10_000 'b')
+  in
+  let*! value = Chunked_byte_vector.Lwt.load_byte vector 5L in
+  assert (Char.chr value = 'a') ;
+  let*! value = Chunked_byte_vector.Lwt.load_byte vector 10_005L in
+  assert (Char.chr value = 'b') ;
+  let*! decoded_vector = encode_decode chunked_byte_vector vector in
+  let*! value = Chunked_byte_vector.Lwt.load_byte decoded_vector 5L in
+  assert (Char.chr value = 'a') ;
+  let*! value = Chunked_byte_vector.Lwt.load_byte decoded_vector 10_005L in
+  assert (Char.chr value = 'b') ;
+  return_unit
+
 let tests =
   [
     tztest "String" `Quick test_string;
@@ -222,4 +242,5 @@ let tests =
       `Quick
       test_add_to_decoded_empty_map;
     tztest "Lazy vector" `Quick test_lazy_vector;
+    tztest "Chunked byte vector" `Quick test_chunked_byte_vector;
   ]
