@@ -109,7 +109,7 @@ Docker Images
 Rollups
 -------
 
-- Included the Transaction Rollups (TORU) and Smart-contract Rollups
+- Included the Transaction Rollups (TORU) and Smart Contract Rollups
   (SCORU) executables in the Docker images of Octez.  These executables are
   **experimental**.  They are provided solely for testing,
   and should not be used in production.  Besides, they should not be
