@@ -385,7 +385,7 @@ let originate_contract incr ~script ~baker ~storage ~source_contract =
 let hash_commitment incr commitment =
   let ctxt = Incremental.alpha_ctxt incr in
   let+ ctxt, hash =
-    wrap @@ Lwt.return (Sc_rollup.Commitment.hash_carbonated ctxt commitment)
+    wrap @@ Lwt.return (Sc_rollup.Commitment.hash ctxt commitment)
   in
   (Incremental.set_alpha_ctxt incr ctxt, hash)
 

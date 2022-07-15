@@ -198,5 +198,5 @@ val get_predecessor_unsafe :
   (Commitment_hash.t * Raw_context.t) tzresult Lwt.t
 
 (** Hash a commitment and account for gas spent. *)
-val hash_carbonated :
+val hash :
   Raw_context.t -> Commitment.t -> (Raw_context.t * Commitment_hash.t) tzresult

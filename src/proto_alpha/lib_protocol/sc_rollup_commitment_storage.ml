@@ -75,7 +75,7 @@ let get_predecessor_unsafe ctxt rollup node =
   let* commitment, ctxt = get_commitment_unsafe ctxt rollup node in
   return (commitment.predecessor, ctxt)
 
-let hash_carbonated ctxt commitment =
+let hash ctxt commitment =
   let open Tzresult_syntax in
   let* ctxt =
     Raw_context.consume_gas

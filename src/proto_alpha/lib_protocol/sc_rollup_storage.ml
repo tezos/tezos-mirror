@@ -32,7 +32,7 @@ module Commitment_hash = Commitment.Hash
 let originate ctxt ~kind ~boot_sector ~parameters_ty ~genesis_commitment =
   let open Lwt_tzresult_syntax in
   let*? ctxt, genesis_commitment_hash =
-    Sc_rollup_commitment_storage.hash_carbonated ctxt genesis_commitment
+    Sc_rollup_commitment_storage.hash ctxt genesis_commitment
   in
   let*? ctxt, nonce = Raw_context.increment_origination_nonce ctxt in
   let level = Raw_context.current_level ctxt in
