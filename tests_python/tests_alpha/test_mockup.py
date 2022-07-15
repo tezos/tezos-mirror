@@ -622,7 +622,7 @@ def _test_create_mockup_init_show_roundtrip(
                 "origination_size": 258,
                 "vdf_difficulty": "1000000000",
                 "seed_nonce_revelation_tip": "125001",
-                "testnet_dictator": None,
+                "testnet_dictator": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
                 "tokens_per_roll": "8000000001",
                 "proof_of_work_threshold": "-2",
                 "hard_gas_limit_per_block": "10400001",
