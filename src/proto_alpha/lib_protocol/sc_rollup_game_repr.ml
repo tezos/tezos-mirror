@@ -28,12 +28,12 @@ open Sc_rollup_repr
 
 type player = Alice | Bob
 
-type dissection_chunk = {
-  state_hash : State_hash.t option;
-  tick : Sc_rollup_tick_repr.t;
-}
-
 module V1 = struct
+  type dissection_chunk = {
+    state_hash : State_hash.t option;
+    tick : Sc_rollup_tick_repr.t;
+  }
+
   type t = {
     turn : player;
     inbox_snapshot : Sc_rollup_inbox_repr.history_proof;
