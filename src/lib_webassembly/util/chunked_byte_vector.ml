@@ -123,7 +123,12 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
       let current_chunks = Vector.num_elements vector.chunks in
       let chunk_count_delta = Int64.sub new_chunks current_chunks in
       if Int64.compare chunk_count_delta 0L > 0 then
-        Vector.grow chunk_count_delta vector.chunks ;
+        (* We cannot make any assumption on the previous value of
+           [produce_value]. In particular, it may very well raise an
+           error in case of absent value (which is the case when
+           growing the chunked byte vector requires to allocate new
+           chunks). *)
+        Vector.grow ~produce_value:def_get_chunk chunk_count_delta vector.chunks ;
       vector.length <- new_size)
 
   let length vector = vector.length

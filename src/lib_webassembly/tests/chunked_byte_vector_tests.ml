@@ -41,6 +41,33 @@ let grow_works =
       in
       check1 && check2 && check3)
 
+let can_write_after_grow =
+  Test.make
+    ~name:"can write after grow"
+    Gen.(string_size (101 -- 1_000))
+    (fun append_str ->
+      let chunk_size = Chunked_byte_vector.Chunk.size in
+      (* We initialize the vector with a string of a size slightly
+         under [chunk_size]. This is to be sure that the previous
+         value remains accessible after [store_bytes] on the last
+         chunk of [vector], that was filled in the process. *)
+      let init_size = Int64.(sub chunk_size 100L) in
+      let vector =
+        create
+          ~get_chunk:(function
+            | 0L -> Chunk.of_bytes @@ Bytes.make (Int64.to_int chunk_size) 'a'
+            | _otherwise -> assert false)
+          init_size
+      in
+      assert (load_byte vector 0L = Char.code 'a') ;
+      grow vector (String.length append_str |> Int64.of_int) ;
+      store_bytes vector init_size @@ Bytes.of_string append_str ;
+      assert (load_byte vector 0L = Char.code 'a') ;
+      assert (load_byte vector init_size = Char.code (String.get append_str 0)) ;
+      assert (
+        load_byte vector chunk_size = Char.code (String.get append_str 100)) ;
+      true)
+
 let internal_num_pages_edge_case =
   let test () =
     let open Alcotest in
@@ -56,5 +83,6 @@ let tests =
     to_alcotest create_works;
     to_alcotest store_load_byte_works;
     to_alcotest grow_works;
+    to_alcotest can_write_after_grow;
     internal_num_pages_edge_case;
   ]
