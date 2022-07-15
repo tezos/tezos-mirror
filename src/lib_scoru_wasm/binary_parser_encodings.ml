@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,20 +23,51 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Lib_scoru_wasm
-    Invocation:   dune runtest src/lib_scoru_wasm/
-    Subject:      Tests for the tezos-scoru-wasm library
-*)
+open Tezos_webassembly_interpreter
+open Lazy_containers
 
-let () =
-  Alcotest_lwt.run
-    "test lib scoru wasm"
-    [
-      ("Input", Test_input.tests);
-      ("AST Generators", Test_ast_generators.tests);
-      ("WASM Encodings", Test_wasm_encoding.tests);
-      ("Parser encodings", Test_parser_encoding.tests);
-    ]
-  |> Lwt_main.run
+module Make (Tree_encoding : Tree_encoding.S) = struct
+  module V = Instance.Vector
+  module M = Instance.NameMap
+  module C = Chunked_byte_vector.Lwt
+  module Wasm_encoding = Wasm_encoding.Make (Tree_encoding)
+  include Tree_encoding
+
+  module Byte_vector = struct
+    type t' = Decode.byte_vector_kont
+
+    let vkstart_case =
+      case
+        "VKStart"
+        (value [] Data_encoding.unit)
+        (function Decode.VKStart -> Some () | _ -> None)
+        (fun () -> Decode.VKStart)
+
+    let vkread_case =
+      let value_enc =
+        let pos = value ["pos"] Data_encoding.int64 in
+        let length = value ["length"] Data_encoding.int64 in
+        let data_label =
+          value ["data_label"] Interpreter_encodings.Ast.data_label_encoding
+        in
+        tup3 ~flatten:true data_label pos length
+      in
+      case
+        "VKRead"
+        value_enc
+        (function Decode.VKRead (b, p, l) -> Some (b, p, l) | _ -> None)
+        (fun (b, p, l) -> Decode.VKRead (b, p, l))
+
+    let vkstop_case =
+      case
+        "VKStop"
+        (value ["data_label"] Interpreter_encodings.Ast.data_label_encoding)
+        (function Decode.VKStop b -> Some b | _ -> None)
+        (fun b -> Decode.VKStop b)
+
+    let tag_encoding = value [] Data_encoding.string
+
+    let encoding =
+      tagged_union tag_encoding [vkstart_case; vkread_case; vkstop_case]
+  end
+end

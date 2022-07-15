@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,20 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Lib_scoru_wasm
-    Invocation:   dune runtest src/lib_scoru_wasm/
-    Subject:      Tests for the tezos-scoru-wasm library
-*)
-
-let () =
-  Alcotest_lwt.run
-    "test lib scoru wasm"
-    [
-      ("Input", Test_input.tests);
-      ("AST Generators", Test_ast_generators.tests);
-      ("WASM Encodings", Test_wasm_encoding.tests);
-      ("Parser encodings", Test_parser_encoding.tests);
-    ]
-  |> Lwt_main.run
+val tests : unit Alcotest_lwt.test_case list

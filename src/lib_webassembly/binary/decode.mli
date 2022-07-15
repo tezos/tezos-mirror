@@ -54,7 +54,7 @@ type block_kont =
 type 'a lazy_vec_kont = LazyVec of {offset : int32; vector : 'a Vector.t}
 
 (** Position of a value on the stream. *)
-type pos = private int
+type pos = int
 
 (** Size checking version of {!sized} for CPS-style parsing. *)
 type size = {size : int; start : pos}
