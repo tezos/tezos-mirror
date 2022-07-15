@@ -309,37 +309,87 @@ let get_stats_gc = make GET ["stats"; "gc"] Fun.id
 
 let get_stats_memory = make GET ["stats"; "memory"] Fun.id
 
-module Sc_rollup = struct
-  let root_path ~chain ~block =
-    ["chains"; chain; "blocks"; block; "context"; "sc_rollup"]
+let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 
-  let list ?(chain = "main") ?(block = "head") () =
-    make GET (root_path ~chain ~block) Fun.id
+let get_chain_block_context_sc_rollup_inbox ?(chain = "main") ?(block = "head")
+    sc_rollup =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "sc_rollup";
+      sc_rollup;
+      "inbox";
+    ]
+    Fun.id
 
-  let path ~chain ~block sc_rollup_address =
-    root_path ~chain ~block @ [sc_rollup_address]
+let get_chain_block_context_sc_rollup_genesis_info ?(chain = "main")
+    ?(block = "head") sc_rollup =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "sc_rollup";
+      sc_rollup;
+      "genesis_info";
+    ]
+    Fun.id
 
-  let get_inbox ?(chain = "main") ?(block = "head") sc_rollup_address =
-    make GET (path ~chain ~block sc_rollup_address @ ["inbox"]) Fun.id
+let get_chain_block_context_sc_rollup_boot_sector ?(chain = "main")
+    ?(block = "head") sc_rollup =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "sc_rollup";
+      sc_rollup;
+      "boot_sector";
+    ]
+    Fun.id
 
-  let get_genesis_info ?(chain = "main") ?(block = "head") sc_rollup_address =
-    make GET (path ~chain ~block sc_rollup_address @ ["genesis_info"]) Fun.id
+let get_chain_block_context_sc_rollup_last_cemented_commitment_hash_with_level
+    ?(chain = "main") ?(block = "head") sc_rollup =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "sc_rollup";
+      sc_rollup;
+      "last_cemented_commitment_hash_with_level";
+    ]
+    Fun.id
 
-  let get_boot_sector ?(chain = "main") ?(block = "head") sc_rollup_address =
-    make GET (path ~chain ~block sc_rollup_address @ ["boot_sector"]) Fun.id
-
-  let get_last_cemented_commitment_hash_with_level ?(chain = "main")
-      ?(block = "head") sc_rollup_address =
-    make
-      GET
-      (path ~chain ~block sc_rollup_address
-      @ ["last_cemented_commitment_hash_with_level"])
-      Fun.id
-
-  let get_staked_on_commitment ?(chain = "main") ?(block = "head") ~sc_rollup
-      staker =
-    make
-      GET
-      (path ~chain ~block sc_rollup @ ["staker"; staker; "staked_on_commitment"])
-      Fun.id
-end
+let get_chain_block_context_sc_rollup_staker_staked_on_commitment
+    ?(chain = "main") ?(block = "head") ~sc_rollup staker =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "sc_rollup";
+      sc_rollup;
+      "staker";
+      staker;
+      "staked_on_commitment";
+    ]
+    Fun.id
