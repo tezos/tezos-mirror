@@ -31,6 +31,8 @@ module S_syntax = struct
   let ( + ) = S.add
 
   let ( * ) = S.mul
+
+  let ( lsr ) = S.shift_right
 end
 
 module Constants = struct
@@ -56,6 +58,21 @@ module Constants = struct
      by the number of characters of a pkh, i.e. 70/35. To be updated when
      benchmarking is completed. *)
   let cost_encode_string_per_byte = S.safe_int 2
+
+  (* Cost of serializing a state hash. *)
+  let cost_serialize_state_hash =
+    let len = S.safe_int State_hash.size in
+    S_syntax.(cost_encode_string_per_byte * len)
+
+  (* Cost of serializing a commitment hash. *)
+  let cost_serialize_commitment_hash =
+    let len = S.safe_int Sc_rollup_commitment_repr.Hash.size in
+    S_syntax.(cost_encode_string_per_byte * len)
+
+  (* Cost of serializing a commitment. The cost of serializing the level and
+     number of ticks (both int32) is negligible. *)
+  let cost_serialize_commitment =
+    S_syntax.(cost_serialize_state_hash + cost_serialize_commitment_hash)
 end
 
 (* We assume that the gas cost of adding messages [[ m_1; ... ; m_n]] at level
@@ -103,3 +120,9 @@ let cost_deserialize_output_proof ~bytes_len =
 let cost_serialize_external_inbox_message ~bytes_len =
   let len = S.safe_int bytes_len in
   S_syntax.(Constants.cost_encode_string_per_byte * len)
+
+(* Equal to Michelson_v1_gas.Cost_of.Interpreter.blake2b. *)
+let cost_hash_bytes ~bytes_len =
+  let open S_syntax in
+  let v0 = S.safe_int bytes_len in
+  S.safe_int 430 + v0 + (v0 lsr 3)
