@@ -113,7 +113,7 @@ struct
             @@ ceil (log (float_of_int x) /. log (float_of_int basis))
           in
           let log_ij = log_basis (i - j + 1) in
-          let expected = 2 + (log_ij * basis) in
+          let expected = log_ij * basis in
           fail_unless
             (len <= expected)
             (err
