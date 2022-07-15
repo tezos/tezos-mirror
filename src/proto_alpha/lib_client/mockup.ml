@@ -32,413 +32,25 @@ open Alpha_context
 
 (** Protocol constants overriding logic. *)
 module Protocol_constants_overrides = struct
-  (** Equivalent of [Constants.parametric] with additionally [chain_id] and [timestamp] but each field is wrapped in an [option].
-      [Some] is an override, [None] means "Use the default value".
-  *)
-  type tx_rollup = {
-    enable : bool option;
-    origination_size : int option;
-    hard_size_limit_per_inbox : int option;
-    hard_size_limit_per_message : int option;
-    max_withdrawals_per_batch : int option;
-    commitment_bond : Tez.t option;
-    finality_period : int option;
-    max_inboxes_count : int option;
-    withdraw_period : int option;
-    max_messages_per_inbox : int option;
-    max_commitments_count : int option;
-    cost_per_byte_ema_factor : int option;
-    max_ticket_payload_size : int option;
-    rejection_max_proof_size : int option;
-    sunset_level : int32 option;
-  }
-
-  type sc_rollup = {
-    enable : bool option;
-    origination_size : int option;
-    challenge_window_in_blocks : int option;
-    max_number_of_messages_per_commitment_period : int option;
-    stake_amount : Tez.t option;
-    commitment_period_in_blocks : int option;
-    max_lookahead_in_blocks : int32 option;
-    max_active_outbox_levels : int32 option;
-    max_outbox_messages_per_level : int option;
-    number_of_sections_in_dissection : int option;
-    timeout_period_in_blocks : int option;
-  }
-
+  (** Equivalent of [Constants.parametric] with additionally [chain_id] and [timestamp]. *)
   type t = {
-    preserved_cycles : int option;
-    blocks_per_cycle : int32 option;
-    blocks_per_commitment : int32 option;
-    nonce_revelation_threshold : int32 option;
-    blocks_per_stake_snapshot : int32 option;
-    cycles_per_voting_period : int32 option;
-    hard_gas_limit_per_operation : Gas.Arith.integral option;
-    hard_gas_limit_per_block : Gas.Arith.integral option;
-    proof_of_work_threshold : int64 option;
-    tokens_per_roll : Tez.t option;
-    vdf_difficulty : int64 option;
-    seed_nonce_revelation_tip : Tez.t option;
-    origination_size : int option;
-    baking_reward_fixed_portion : Tez.t option;
-    baking_reward_bonus_per_slot : Tez.t option;
-    endorsing_reward_per_slot : Tez.t option;
-    cost_per_byte : Tez.t option;
-    hard_storage_limit_per_operation : Z.t option;
-    quorum_min : int32 option;
-    quorum_max : int32 option;
-    min_proposal_quorum : int32 option;
-    liquidity_baking_subsidy : Tez.t option;
-    liquidity_baking_sunset_level : int32 option;
-    liquidity_baking_toggle_ema_threshold : int32 option;
-    max_operations_time_to_live : int option;
-    minimal_block_delay : Period.t option;
-    delay_increment_per_round : Period.t option;
-    minimal_participation_ratio : Ratio.t option;
-    consensus_committee_size : int option;
-    consensus_threshold : int option;
-    max_slashing_period : int option;
-    frozen_deposits_percentage : int option;
-    double_baking_punishment : Tez.t option;
-    ratio_of_frozen_deposits_slashed_per_double_endorsement : Ratio.t option;
-    testnet_dictator : Signature.Public_key_hash.t option option;
-    cache_script_size : int option;
-    cache_stake_distribution_cycles : int option;
-    cache_sampler_state_cycles : int option;
-    tx_rollup : tx_rollup;
-    dal : Constants.Parametric.dal option;
-    sc_rollup : sc_rollup;
-    (* Additional, "bastard" parameters (they are not protocol constants but partially treated the same way). *)
+    parametric : Constants.Parametric.t;
     chain_id : Chain_id.t option;
     timestamp : Time.Protocol.t option;
-    initial_seed : State_hash.t option option;
   }
-
-  (** Shamefully copied from [Constants_parametric_repr.encoding] and adapted ([opt] instead of [req]). *)
-  let tx_rollup_encoding =
-    let open Data_encoding in
-    conv
-      (fun (c : tx_rollup) ->
-        ( ( c.enable,
-            c.origination_size,
-            c.hard_size_limit_per_inbox,
-            c.hard_size_limit_per_message,
-            c.max_withdrawals_per_batch,
-            c.commitment_bond,
-            c.finality_period,
-            c.withdraw_period,
-            c.max_inboxes_count,
-            c.max_messages_per_inbox ),
-          ( c.max_commitments_count,
-            c.cost_per_byte_ema_factor,
-            c.max_ticket_payload_size,
-            c.rejection_max_proof_size,
-            c.sunset_level ) ))
-      (fun ( ( tx_rollup_enable,
-               tx_rollup_origination_size,
-               tx_rollup_hard_size_limit_per_inbox,
-               tx_rollup_hard_size_limit_per_message,
-               tx_rollup_max_withdrawals_per_batch,
-               tx_rollup_commitment_bond,
-               tx_rollup_finality_period,
-               tx_rollup_withdraw_period,
-               tx_rollup_max_inboxes_count,
-               tx_rollup_max_messages_per_inbox ),
-             ( tx_rollup_max_commitments_count,
-               tx_rollup_cost_per_byte_ema_factor,
-               tx_rollup_max_ticket_payload_size,
-               tx_rollup_rejection_max_proof_size,
-               tx_rollup_sunset_level ) ) ->
-        {
-          enable = tx_rollup_enable;
-          origination_size = tx_rollup_origination_size;
-          hard_size_limit_per_inbox = tx_rollup_hard_size_limit_per_inbox;
-          hard_size_limit_per_message = tx_rollup_hard_size_limit_per_message;
-          max_withdrawals_per_batch = tx_rollup_max_withdrawals_per_batch;
-          commitment_bond = tx_rollup_commitment_bond;
-          finality_period = tx_rollup_finality_period;
-          withdraw_period = tx_rollup_withdraw_period;
-          max_inboxes_count = tx_rollup_max_inboxes_count;
-          max_messages_per_inbox = tx_rollup_max_messages_per_inbox;
-          max_commitments_count = tx_rollup_max_commitments_count;
-          cost_per_byte_ema_factor = tx_rollup_cost_per_byte_ema_factor;
-          max_ticket_payload_size = tx_rollup_max_ticket_payload_size;
-          rejection_max_proof_size = tx_rollup_rejection_max_proof_size;
-          sunset_level = tx_rollup_sunset_level;
-        })
-      (merge_objs
-         (obj10
-            (opt "tx_rollup_enable" bool)
-            (opt "tx_rollup_origination_size" int31)
-            (opt "tx_rollup_hard_size_limit_per_inbox" int31)
-            (opt "tx_rollup_hard_size_limit_per_message" int31)
-            (opt "tx_rollup_max_withdrawals_per_batch" int31)
-            (opt "tx_rollup_commitment_bond" Tez.encoding)
-            (opt "tx_rollup_finality_period" int31)
-            (opt "tx_rollup_withdraw_period" int31)
-            (opt "tx_rollup_max_inboxes_count" int31)
-            (opt "tx_rollup_max_messages_per_inbox" int31))
-         (obj5
-            (opt "tx_rollup_max_commitments_count" int31)
-            (opt "tx_rollup_cost_per_byte_ema_factor" int31)
-            (opt "tx_rollup_max_ticket_payload_size" int31)
-            (opt "tx_rollup_rejection_max_proof_size" int31)
-            (opt "tx_rollup_sunset_level" int32)))
-
-  let sc_rollup_encoding =
-    let open Data_encoding in
-    conv
-      (fun (c : sc_rollup) ->
-        ( ( c.enable,
-            c.origination_size,
-            c.challenge_window_in_blocks,
-            c.max_number_of_messages_per_commitment_period,
-            c.stake_amount,
-            c.commitment_period_in_blocks,
-            c.max_lookahead_in_blocks,
-            c.max_active_outbox_levels,
-            c.max_outbox_messages_per_level,
-            c.number_of_sections_in_dissection ),
-          c.timeout_period_in_blocks ))
-      (fun ( ( sc_rollup_enable,
-               sc_rollup_origination_size,
-               sc_rollup_challenge_window_in_blocks,
-               sc_rollup_max_number_of_messages_per_commitment_period,
-               sc_rollup_stake_amount,
-               sc_rollup_commitment_period_in_blocks,
-               sc_rollup_max_lookahead_in_blocks,
-               sc_rollup_max_active_outbox_levels,
-               sc_rollup_max_outbox_messages_per_level,
-               sc_rollup_number_of_sections_in_dissection ),
-             sc_rollup_timeout_period_in_blocks ) ->
-        {
-          enable = sc_rollup_enable;
-          origination_size = sc_rollup_origination_size;
-          challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
-          max_number_of_messages_per_commitment_period =
-            sc_rollup_max_number_of_messages_per_commitment_period;
-          stake_amount = sc_rollup_stake_amount;
-          commitment_period_in_blocks = sc_rollup_commitment_period_in_blocks;
-          max_lookahead_in_blocks = sc_rollup_max_lookahead_in_blocks;
-          max_active_outbox_levels = sc_rollup_max_active_outbox_levels;
-          max_outbox_messages_per_level =
-            sc_rollup_max_outbox_messages_per_level;
-          number_of_sections_in_dissection =
-            sc_rollup_number_of_sections_in_dissection;
-          timeout_period_in_blocks = sc_rollup_timeout_period_in_blocks;
-        })
-      (merge_objs
-         (obj10
-            (opt "sc_rollup_enable" bool)
-            (opt "sc_rollup_origination_size" int31)
-            (opt "sc_rollup_challenge_window_in_blocks" int31)
-            (opt "sc_rollup_max_number_of_messages_per_commitment_period" int31)
-            (opt "sc_rollup_stake_amount" Tez.encoding)
-            (opt "sc_rollup_commitment_period_in_blocks" int31)
-            (opt "sc_rollup_max_lookahead_in_blocks" int32)
-            (opt "sc_rollup_max_active_outbox_levels" int32)
-            (opt "sc_rollup_max_outbox_messages_per_level" int31)
-            (opt "sc_rollup_number_of_sections_in_dissection" uint8))
-         (obj1 (opt "sc_rollup_timeout_period_in_blocks" int31)))
 
   let encoding =
     let open Data_encoding in
     conv
-      (fun c ->
-        ( ( c.preserved_cycles,
-            c.blocks_per_cycle,
-            c.blocks_per_commitment,
-            c.nonce_revelation_threshold,
-            c.blocks_per_stake_snapshot,
-            c.cycles_per_voting_period,
-            c.hard_gas_limit_per_operation,
-            c.hard_gas_limit_per_block,
-            c.proof_of_work_threshold,
-            c.tokens_per_roll ),
-          ( ( c.vdf_difficulty,
-              c.seed_nonce_revelation_tip,
-              c.origination_size,
-              c.baking_reward_fixed_portion,
-              c.baking_reward_bonus_per_slot,
-              c.endorsing_reward_per_slot,
-              c.cost_per_byte,
-              c.hard_storage_limit_per_operation,
-              c.quorum_min ),
-            ( ( c.quorum_max,
-                c.min_proposal_quorum,
-                c.liquidity_baking_subsidy,
-                c.liquidity_baking_sunset_level,
-                c.liquidity_baking_toggle_ema_threshold,
-                c.max_operations_time_to_live,
-                c.minimal_block_delay,
-                c.delay_increment_per_round,
-                c.consensus_committee_size,
-                c.consensus_threshold ),
-              ( ( c.minimal_participation_ratio,
-                  c.max_slashing_period,
-                  c.frozen_deposits_percentage,
-                  c.double_baking_punishment,
-                  c.ratio_of_frozen_deposits_slashed_per_double_endorsement,
-                  c.testnet_dictator,
-                  c.chain_id,
-                  c.timestamp,
-                  c.initial_seed ),
-                ( ( c.cache_script_size,
-                    c.cache_stake_distribution_cycles,
-                    c.cache_sampler_state_cycles ),
-                  (c.tx_rollup, (c.dal, c.sc_rollup)) ) ) ) ) ))
-      (fun ( ( preserved_cycles,
-               blocks_per_cycle,
-               blocks_per_commitment,
-               nonce_revelation_threshold,
-               blocks_per_stake_snapshot,
-               cycles_per_voting_period,
-               hard_gas_limit_per_operation,
-               hard_gas_limit_per_block,
-               proof_of_work_threshold,
-               tokens_per_roll ),
-             ( ( vdf_difficulty,
-                 seed_nonce_revelation_tip,
-                 origination_size,
-                 baking_reward_fixed_portion,
-                 baking_reward_bonus_per_slot,
-                 endorsing_reward_per_slot,
-                 cost_per_byte,
-                 hard_storage_limit_per_operation,
-                 quorum_min ),
-               ( ( quorum_max,
-                   min_proposal_quorum,
-                   liquidity_baking_subsidy,
-                   liquidity_baking_sunset_level,
-                   liquidity_baking_toggle_ema_threshold,
-                   max_operations_time_to_live,
-                   minimal_block_delay,
-                   delay_increment_per_round,
-                   consensus_committee_size,
-                   consensus_threshold ),
-                 ( ( minimal_participation_ratio,
-                     max_slashing_period,
-                     frozen_deposits_percentage,
-                     double_baking_punishment,
-                     ratio_of_frozen_deposits_slashed_per_double_endorsement,
-                     testnet_dictator,
-                     chain_id,
-                     timestamp,
-                     initial_seed ),
-                   ( ( cache_script_size,
-                       cache_stake_distribution_cycles,
-                       cache_sampler_state_cycles ),
-                     (tx_rollup, (dal, sc_rollup)) ) ) ) ) ) ->
-        {
-          preserved_cycles;
-          blocks_per_cycle;
-          blocks_per_commitment;
-          nonce_revelation_threshold;
-          blocks_per_stake_snapshot;
-          cycles_per_voting_period;
-          hard_gas_limit_per_operation;
-          hard_gas_limit_per_block;
-          proof_of_work_threshold;
-          tokens_per_roll;
-          vdf_difficulty;
-          seed_nonce_revelation_tip;
-          origination_size;
-          baking_reward_fixed_portion;
-          baking_reward_bonus_per_slot;
-          endorsing_reward_per_slot;
-          cost_per_byte;
-          hard_storage_limit_per_operation;
-          quorum_min;
-          quorum_max;
-          min_proposal_quorum;
-          liquidity_baking_subsidy;
-          liquidity_baking_sunset_level;
-          liquidity_baking_toggle_ema_threshold;
-          max_operations_time_to_live;
-          minimal_block_delay;
-          delay_increment_per_round;
-          minimal_participation_ratio;
-          max_slashing_period;
-          consensus_committee_size;
-          consensus_threshold;
-          frozen_deposits_percentage;
-          double_baking_punishment;
-          ratio_of_frozen_deposits_slashed_per_double_endorsement;
-          testnet_dictator;
-          cache_script_size;
-          cache_stake_distribution_cycles;
-          cache_sampler_state_cycles;
-          tx_rollup;
-          dal;
-          sc_rollup;
-          chain_id;
-          timestamp;
-          initial_seed;
-        })
+      (fun {parametric; chain_id; timestamp} ->
+        (parametric, (chain_id, timestamp)))
+      (fun (parametric, (chain_id, timestamp)) ->
+        {parametric; chain_id; timestamp})
       (merge_objs
-         (obj10
-            (opt "preserved_cycles" uint8)
-            (opt "blocks_per_cycle" int32)
-            (opt "blocks_per_commitment" int32)
-            (opt "nonce_revelation_threshold" int32)
-            (opt "blocks_per_stake_snapshot" int32)
-            (opt "cycles_per_voting_period" int32)
-            (opt "hard_gas_limit_per_operation" Gas.Arith.z_integral_encoding)
-            (opt "hard_gas_limit_per_block" Gas.Arith.z_integral_encoding)
-            (opt "proof_of_work_threshold" int64)
-            (opt "tokens_per_roll" Tez.encoding))
-         (merge_objs
-            (obj9
-               (opt "vdf_difficulty" int64)
-               (opt "seed_nonce_revelation_tip" Tez.encoding)
-               (opt "origination_size" int31)
-               (opt "baking_reward_fixed_portion" Tez.encoding)
-               (opt "baking_reward_bonus_per_slot" Tez.encoding)
-               (opt "endorsing_reward_per_slot" Tez.encoding)
-               (opt "cost_per_byte" Tez.encoding)
-               (opt "hard_storage_limit_per_operation" z)
-               (opt "quorum_min" int32))
-            (merge_objs
-               (obj10
-                  (opt "quorum_max" int32)
-                  (opt "min_proposal_quorum" int32)
-                  (opt "liquidity_baking_subsidy" Tez.encoding)
-                  (opt "liquidity_baking_sunset_level" int32)
-                  (opt "liquidity_baking_toggle_ema_threshold" int32)
-                  (opt "max_operations_time_to_live" int16)
-                  (opt "minimal_block_delay" Period.encoding)
-                  (opt "delay_increment_per_round" Period.encoding)
-                  (opt "consensus_committee_size" int31)
-                  (opt "consensus_threshold" int31))
-               (merge_objs
-                  (obj9
-                     (opt "minimal_participation_ratio" Ratio.encoding)
-                     (opt "max_slashing_period" int31)
-                     (opt "frozen_deposits_percentage" int31)
-                     (opt "double_baking_punishment" Tez.encoding)
-                     (opt
-                        "ratio_of_frozen_deposits_slashed_per_double_endorsement"
-                        Ratio.encoding)
-                     (opt
-                        "testnet_dictator"
-                        (option Signature.Public_key_hash.encoding))
-                     (opt "chain_id" Chain_id.encoding)
-                     (opt "initial_timestamp" Time.Protocol.encoding)
-                     (opt "initial_seed" (option State_hash.encoding)))
-                  (merge_objs
-                     (obj3
-                        (opt "cache_script_size" int31)
-                        (opt "cache_stake_distribution_cycles" int8)
-                        (opt "cache_sampler_state_cycles" int8))
-                     (merge_objs
-                        tx_rollup_encoding
-                        (merge_objs
-                           (obj1
-                              (opt
-                                 "dal_parametric"
-                                 Constants.Parametric.dal_encoding))
-                           sc_rollup_encoding)))))))
+         Constants.Parametric.encoding
+         (obj2
+            (opt "chain_id" Chain_id.encoding)
+            (opt "initial_timestamp" Time.Protocol.encoding)))
 
   let default_value (cctxt : Tezos_client_base.Client_context.full) :
       t tzresult Lwt.t =
@@ -454,732 +66,10 @@ module Protocol_constants_overrides = struct
     >>=? fun header ->
     return
       {
-        preserved_cycles = Some parametric.preserved_cycles;
-        blocks_per_cycle = Some parametric.blocks_per_cycle;
-        blocks_per_commitment = Some parametric.blocks_per_commitment;
-        nonce_revelation_threshold = Some parametric.nonce_revelation_threshold;
-        blocks_per_stake_snapshot = Some parametric.blocks_per_stake_snapshot;
-        cycles_per_voting_period = Some parametric.cycles_per_voting_period;
-        hard_gas_limit_per_operation =
-          Some parametric.hard_gas_limit_per_operation;
-        hard_gas_limit_per_block = Some parametric.hard_gas_limit_per_block;
-        proof_of_work_threshold = Some parametric.proof_of_work_threshold;
-        tokens_per_roll = Some parametric.tokens_per_roll;
-        vdf_difficulty = Some parametric.vdf_difficulty;
-        seed_nonce_revelation_tip = Some parametric.seed_nonce_revelation_tip;
-        origination_size = Some parametric.origination_size;
-        baking_reward_fixed_portion =
-          Some parametric.baking_reward_fixed_portion;
-        baking_reward_bonus_per_slot =
-          Some parametric.baking_reward_bonus_per_slot;
-        endorsing_reward_per_slot = Some parametric.endorsing_reward_per_slot;
-        cost_per_byte = Some parametric.cost_per_byte;
-        hard_storage_limit_per_operation =
-          Some parametric.hard_storage_limit_per_operation;
-        quorum_min = Some parametric.quorum_min;
-        quorum_max = Some parametric.quorum_max;
-        min_proposal_quorum = Some parametric.min_proposal_quorum;
-        liquidity_baking_subsidy = Some parametric.liquidity_baking_subsidy;
-        liquidity_baking_sunset_level =
-          Some parametric.liquidity_baking_sunset_level;
-        liquidity_baking_toggle_ema_threshold =
-          Some parametric.liquidity_baking_toggle_ema_threshold;
-        max_operations_time_to_live =
-          Some parametric.max_operations_time_to_live;
-        minimal_block_delay = Some parametric.minimal_block_delay;
-        delay_increment_per_round = Some parametric.delay_increment_per_round;
-        minimal_participation_ratio =
-          Some parametric.minimal_participation_ratio;
-        consensus_committee_size = Some parametric.consensus_committee_size;
-        (* mockup mode does not support endorsing commands *)
-        consensus_threshold = Some 0;
-        max_slashing_period = Some parametric.max_slashing_period;
-        frozen_deposits_percentage = Some parametric.frozen_deposits_percentage;
-        double_baking_punishment = Some parametric.double_baking_punishment;
-        ratio_of_frozen_deposits_slashed_per_double_endorsement =
-          Some
-            parametric.ratio_of_frozen_deposits_slashed_per_double_endorsement;
-        testnet_dictator = Some parametric.testnet_dictator;
-        cache_script_size = Some parametric.cache_script_size;
-        cache_stake_distribution_cycles =
-          Some parametric.cache_stake_distribution_cycles;
-        cache_sampler_state_cycles = Some parametric.cache_sampler_state_cycles;
-        sc_rollup =
-          {
-            enable = Some parametric.sc_rollup.enable;
-            origination_size = Some parametric.sc_rollup.origination_size;
-            challenge_window_in_blocks =
-              Some parametric.sc_rollup.challenge_window_in_blocks;
-            max_number_of_messages_per_commitment_period =
-              Some
-                parametric.sc_rollup
-                  .max_number_of_messages_per_commitment_period;
-            stake_amount = Some parametric.sc_rollup.stake_amount;
-            commitment_period_in_blocks =
-              Some parametric.sc_rollup.commitment_period_in_blocks;
-            max_lookahead_in_blocks =
-              Some parametric.sc_rollup.max_lookahead_in_blocks;
-            max_active_outbox_levels =
-              Some parametric.sc_rollup.max_active_outbox_levels;
-            max_outbox_messages_per_level =
-              Some parametric.sc_rollup.max_outbox_messages_per_level;
-            number_of_sections_in_dissection =
-              Some parametric.sc_rollup.number_of_sections_in_dissection;
-            timeout_period_in_blocks =
-              Some parametric.sc_rollup.timeout_period_in_blocks;
-          };
-        dal = Some parametric.dal;
-        tx_rollup =
-          {
-            enable = Some parametric.tx_rollup.enable;
-            origination_size = Some parametric.tx_rollup.origination_size;
-            hard_size_limit_per_inbox =
-              Some parametric.tx_rollup.hard_size_limit_per_inbox;
-            hard_size_limit_per_message =
-              Some parametric.tx_rollup.hard_size_limit_per_message;
-            max_withdrawals_per_batch =
-              Some parametric.tx_rollup.max_withdrawals_per_batch;
-            commitment_bond = Some parametric.tx_rollup.commitment_bond;
-            finality_period = Some parametric.tx_rollup.finality_period;
-            max_inboxes_count = Some parametric.tx_rollup.max_inboxes_count;
-            withdraw_period = Some parametric.tx_rollup.withdraw_period;
-            max_messages_per_inbox =
-              Some parametric.tx_rollup.max_messages_per_inbox;
-            max_commitments_count =
-              Some parametric.tx_rollup.max_commitments_count;
-            cost_per_byte_ema_factor =
-              Some parametric.tx_rollup.cost_per_byte_ema_factor;
-            max_ticket_payload_size =
-              Some parametric.tx_rollup.max_ticket_payload_size;
-            rejection_max_proof_size =
-              Some parametric.tx_rollup.rejection_max_proof_size;
-            sunset_level = Some parametric.tx_rollup.sunset_level;
-          };
-        (* Bastard additional parameters. *)
+        parametric;
         chain_id = to_chain_id_opt cpctxt#chain;
         timestamp = Some header.timestamp;
-        initial_seed = Some parametric.initial_seed;
       }
-
-  let no_overrides : t =
-    {
-      preserved_cycles = None;
-      blocks_per_cycle = None;
-      blocks_per_commitment = None;
-      nonce_revelation_threshold = None;
-      blocks_per_stake_snapshot = None;
-      cycles_per_voting_period = None;
-      hard_gas_limit_per_operation = None;
-      hard_gas_limit_per_block = None;
-      proof_of_work_threshold = None;
-      tokens_per_roll = None;
-      vdf_difficulty = None;
-      seed_nonce_revelation_tip = None;
-      origination_size = None;
-      baking_reward_fixed_portion = None;
-      baking_reward_bonus_per_slot = None;
-      endorsing_reward_per_slot = None;
-      cost_per_byte = None;
-      hard_storage_limit_per_operation = None;
-      quorum_min = None;
-      quorum_max = None;
-      min_proposal_quorum = None;
-      liquidity_baking_subsidy = None;
-      liquidity_baking_sunset_level = None;
-      liquidity_baking_toggle_ema_threshold = None;
-      max_operations_time_to_live = None;
-      minimal_block_delay = None;
-      delay_increment_per_round = None;
-      minimal_participation_ratio = None;
-      consensus_committee_size = None;
-      (* Let consensus threshold be overridable for Tenderbake mockup
-         simulator tests. *)
-      consensus_threshold = None;
-      max_slashing_period = None;
-      frozen_deposits_percentage = None;
-      double_baking_punishment = None;
-      ratio_of_frozen_deposits_slashed_per_double_endorsement = None;
-      testnet_dictator = None;
-      cache_script_size = None;
-      cache_stake_distribution_cycles = None;
-      cache_sampler_state_cycles = None;
-      sc_rollup =
-        {
-          enable = None;
-          origination_size = None;
-          challenge_window_in_blocks = None;
-          max_number_of_messages_per_commitment_period = None;
-          stake_amount = None;
-          commitment_period_in_blocks = None;
-          max_lookahead_in_blocks = None;
-          max_active_outbox_levels = None;
-          max_outbox_messages_per_level = None;
-          number_of_sections_in_dissection = None;
-          timeout_period_in_blocks = None;
-        };
-      dal = None;
-      tx_rollup =
-        {
-          enable = None;
-          origination_size = None;
-          hard_size_limit_per_inbox = None;
-          hard_size_limit_per_message = None;
-          max_withdrawals_per_batch = None;
-          commitment_bond = None;
-          finality_period = None;
-          max_inboxes_count = None;
-          withdraw_period = None;
-          max_messages_per_inbox = None;
-          max_commitments_count = None;
-          cost_per_byte_ema_factor = None;
-          max_ticket_payload_size = None;
-          rejection_max_proof_size = None;
-          sunset_level = None;
-        };
-      chain_id = None;
-      timestamp = None;
-      initial_seed = None;
-    }
-
-  (** Existential wrapper to support heterogeneous lists/maps. *)
-  type field =
-    | O : {
-        name : string;
-        override_value : 'a option;
-        pp : Format.formatter -> 'a -> unit;
-      }
-        -> field
-
-  let field_pp ppf (O {name; override_value; pp; _}) =
-    match override_value with
-    | None -> ()
-    | Some value -> Format.fprintf ppf "@[<h>%s: %a@]" name pp value
-
-  let apply_overrides (cctxt : Tezos_client_base.Client_context.printer) (o : t)
-      (c : Constants.Parametric.t) : Constants.Parametric.t tzresult Lwt.t =
-    let open Format in
-    let pp_print_int32 ppf i = fprintf ppf "%li" i in
-    let pp_print_int64 ppf i = fprintf ppf "%Li" i in
-    let fields : field list =
-      [
-        O
-          {
-            name = "preserved_cycles";
-            override_value = o.preserved_cycles;
-            pp = pp_print_int;
-          };
-        O
-          {
-            name = "blocks_per_cycle";
-            override_value = o.blocks_per_cycle;
-            pp = pp_print_int32;
-          };
-        O
-          {
-            name = "blocks_per_commitment";
-            override_value = o.blocks_per_commitment;
-            pp = pp_print_int32;
-          };
-        O
-          {
-            name = "nonce_revelation_threshold";
-            override_value = o.nonce_revelation_threshold;
-            pp = pp_print_int32;
-          };
-        O
-          {
-            name = "blocks_per_stake_snapshot";
-            override_value = o.blocks_per_stake_snapshot;
-            pp = pp_print_int32;
-          };
-        O
-          {
-            name = "cycles_per_voting_period";
-            override_value = o.cycles_per_voting_period;
-            pp = pp_print_int32;
-          };
-        O
-          {
-            name = "hard_gas_limit_per_operation";
-            override_value = o.hard_gas_limit_per_operation;
-            pp = Gas.Arith.pp_integral;
-          };
-        O
-          {
-            name = "hard_gas_limit_per_block";
-            override_value = o.hard_gas_limit_per_block;
-            pp = Gas.Arith.pp_integral;
-          };
-        O
-          {
-            name = "proof_of_work_threshold";
-            override_value = o.proof_of_work_threshold;
-            pp = pp_print_int64;
-          };
-        O
-          {
-            name = "tokens_per_roll";
-            override_value = o.tokens_per_roll;
-            pp = Tez.pp;
-          };
-        O
-          {
-            name = "vdf_difficulty";
-            override_value = o.vdf_difficulty;
-            pp = pp_print_int64;
-          };
-        O
-          {
-            name = "seed_nonce_revelation_tip";
-            override_value = o.seed_nonce_revelation_tip;
-            pp = Tez.pp;
-          };
-        O
-          {
-            name = "origination_size";
-            override_value = o.origination_size;
-            pp = pp_print_int;
-          };
-        O
-          {
-            name = "baking_reward_fixed_portion";
-            override_value = o.baking_reward_fixed_portion;
-            pp = Tez.pp;
-          };
-        O
-          {
-            name = "baking_reward_bonus_per_slot";
-            override_value = o.baking_reward_bonus_per_slot;
-            pp = Tez.pp;
-          };
-        O
-          {
-            name = "endorsing_reward_per_slot";
-            override_value = o.endorsing_reward_per_slot;
-            pp = Tez.pp;
-          };
-        O
-          {
-            name = "cost_per_byte";
-            override_value = o.cost_per_byte;
-            pp = Tez.pp;
-          };
-        O
-          {
-            name = "hard_storage_limit_per_operation";
-            override_value = o.hard_storage_limit_per_operation;
-            pp = Z.pp_print;
-          };
-        O
-          {
-            name = "quorum_min";
-            override_value = o.quorum_min;
-            pp = pp_print_int32;
-          };
-        O
-          {
-            name = "quorum_max";
-            override_value = o.quorum_max;
-            pp = pp_print_int32;
-          };
-        O
-          {
-            name = "min_proposal_quorum";
-            override_value = o.min_proposal_quorum;
-            pp = pp_print_int32;
-          };
-        O
-          {
-            name = "liquidity_baking_subsidy";
-            override_value = o.liquidity_baking_subsidy;
-            pp = Tez.pp;
-          };
-        O
-          {
-            name = "liquidity_baking_sunset_level";
-            override_value = o.liquidity_baking_sunset_level;
-            pp = pp_print_int32;
-          };
-        O
-          {
-            name = "liquidity_baking_toggle_ema_threshold";
-            override_value = o.liquidity_baking_toggle_ema_threshold;
-            pp = pp_print_int32;
-          };
-        O
-          {
-            name = "minimal_block_delay";
-            override_value = o.minimal_block_delay;
-            pp = Period.pp;
-          };
-        O
-          {
-            name = "delay_increment_per_round";
-            override_value = o.delay_increment_per_round;
-            pp = Period.pp;
-          };
-        O
-          {
-            name = "minimal_participation_ratio";
-            override_value = o.minimal_participation_ratio;
-            pp = Ratio.pp;
-          };
-        O
-          {
-            name = "consensus_committee_size";
-            override_value = o.consensus_committee_size;
-            pp = pp_print_int;
-          };
-        O
-          {
-            name = "consensus_threshold";
-            override_value = o.consensus_threshold;
-            pp = pp_print_int;
-          };
-        O
-          {
-            name = "max_slashing_period";
-            override_value = o.max_slashing_period;
-            pp = pp_print_int;
-          };
-        O
-          {
-            name = "frozen_deposits_percentage";
-            override_value = o.frozen_deposits_percentage;
-            pp = pp_print_int;
-          };
-        O
-          {
-            name = "double_baking_punishment";
-            override_value = o.double_baking_punishment;
-            pp = Tez.pp;
-          };
-        O
-          {
-            name = "ratio_of_frozen_deposits_slashed_per_double_endorsement";
-            override_value =
-              o.ratio_of_frozen_deposits_slashed_per_double_endorsement;
-            pp = Ratio.pp;
-          };
-        O
-          {
-            name = "sc_rollup_enable";
-            override_value = o.sc_rollup.enable;
-            pp = pp_print_bool;
-          };
-        O
-          {
-            name = "sc_rollup_origination_size";
-            override_value = o.sc_rollup.origination_size;
-            pp = pp_print_int;
-          };
-        O
-          {
-            name = "sc_rollup_challenge_window_in_blocks";
-            override_value = o.sc_rollup.challenge_window_in_blocks;
-            pp = pp_print_int;
-          };
-        O {name = "chain_id"; override_value = o.chain_id; pp = Chain_id.pp};
-        O
-          {
-            name = "timestamp";
-            override_value = o.timestamp;
-            pp = Time.Protocol.pp_hum;
-          };
-        O
-          {
-            name = "tx_rollup_enable";
-            override_value = o.tx_rollup.enable;
-            pp = pp_print_bool;
-          };
-        O
-          {
-            name = "tx_rollup_origination_size";
-            override_value = o.tx_rollup.origination_size;
-            pp = pp_print_int;
-          };
-        O
-          {
-            name = "tx_rollup_hard_size_limit_per_inbox";
-            override_value = o.tx_rollup.hard_size_limit_per_inbox;
-            pp = pp_print_int;
-          };
-        O
-          {
-            name = "tx_rollup_hard_size_limit_per_message";
-            override_value = o.tx_rollup.hard_size_limit_per_message;
-            pp = pp_print_int;
-          };
-        O
-          {
-            name = "tx_rollup_commitment_bond";
-            override_value = o.tx_rollup.commitment_bond;
-            pp = Tez.pp;
-          };
-        O
-          {
-            name = "tx_rollup_cost_per_byte_ema_factor";
-            override_value = o.tx_rollup.cost_per_byte_ema_factor;
-            pp = pp_print_int;
-          };
-        O
-          {
-            name = "tx_rollup_rejection_max_proof_size";
-            override_value = o.tx_rollup.rejection_max_proof_size;
-            pp = pp_print_int;
-          };
-        O
-          {
-            name = "tx_rollup_sunset_level";
-            override_value = o.tx_rollup.sunset_level;
-            pp = pp_print_int32;
-          };
-      ]
-    in
-    let fields_with_override =
-      fields
-      |> List.filter (fun (O {override_value; _}) ->
-             Option.is_some override_value)
-    in
-    (if fields_with_override <> [] then
-     cctxt#message
-       "@[<v>mockup client uses protocol overrides:@,%a@]@?"
-       (pp_print_list field_pp)
-       fields_with_override
-    else Lwt.return_unit)
-    >>= fun () ->
-    return
-      ({
-         minimal_block_delay =
-           Option.value ~default:c.minimal_block_delay o.minimal_block_delay;
-         delay_increment_per_round =
-           Option.value
-             ~default:c.delay_increment_per_round
-             o.delay_increment_per_round;
-         consensus_committee_size =
-           Option.value
-             ~default:c.consensus_committee_size
-             o.consensus_committee_size;
-         consensus_threshold =
-           Option.value ~default:c.consensus_threshold o.consensus_threshold;
-         initial_seed = Option.value ~default:c.initial_seed o.initial_seed;
-         preserved_cycles =
-           Option.value ~default:c.preserved_cycles o.preserved_cycles;
-         blocks_per_cycle =
-           Option.value ~default:c.blocks_per_cycle o.blocks_per_cycle;
-         blocks_per_commitment =
-           Option.value ~default:c.blocks_per_commitment o.blocks_per_commitment;
-         nonce_revelation_threshold =
-           Option.value
-             ~default:c.nonce_revelation_threshold
-             o.nonce_revelation_threshold;
-         blocks_per_stake_snapshot =
-           Option.value
-             ~default:c.blocks_per_stake_snapshot
-             o.blocks_per_stake_snapshot;
-         cycles_per_voting_period =
-           Option.value
-             ~default:c.cycles_per_voting_period
-             o.cycles_per_voting_period;
-         hard_gas_limit_per_operation =
-           Option.value
-             ~default:c.hard_gas_limit_per_operation
-             o.hard_gas_limit_per_operation;
-         hard_gas_limit_per_block =
-           Option.value
-             ~default:c.hard_gas_limit_per_block
-             o.hard_gas_limit_per_block;
-         proof_of_work_threshold =
-           Option.value
-             ~default:c.proof_of_work_threshold
-             o.proof_of_work_threshold;
-         tokens_per_roll =
-           Option.value ~default:c.tokens_per_roll o.tokens_per_roll;
-         vdf_difficulty =
-           Option.value ~default:c.vdf_difficulty o.vdf_difficulty;
-         seed_nonce_revelation_tip =
-           Option.value
-             ~default:c.seed_nonce_revelation_tip
-             o.seed_nonce_revelation_tip;
-         origination_size =
-           Option.value ~default:c.origination_size o.origination_size;
-         baking_reward_fixed_portion =
-           Option.value
-             ~default:c.baking_reward_fixed_portion
-             o.baking_reward_fixed_portion;
-         baking_reward_bonus_per_slot =
-           Option.value
-             ~default:c.baking_reward_bonus_per_slot
-             o.baking_reward_bonus_per_slot;
-         endorsing_reward_per_slot =
-           Option.value
-             ~default:c.endorsing_reward_per_slot
-             o.endorsing_reward_per_slot;
-         cost_per_byte = Option.value ~default:c.cost_per_byte o.cost_per_byte;
-         hard_storage_limit_per_operation =
-           Option.value
-             ~default:c.hard_storage_limit_per_operation
-             o.hard_storage_limit_per_operation;
-         quorum_min = Option.value ~default:c.quorum_min o.quorum_min;
-         quorum_max = Option.value ~default:c.quorum_max o.quorum_max;
-         min_proposal_quorum =
-           Option.value ~default:c.min_proposal_quorum o.min_proposal_quorum;
-         liquidity_baking_subsidy =
-           Option.value
-             ~default:c.liquidity_baking_subsidy
-             o.liquidity_baking_subsidy;
-         liquidity_baking_sunset_level =
-           Option.value
-             ~default:c.liquidity_baking_sunset_level
-             o.liquidity_baking_sunset_level;
-         liquidity_baking_toggle_ema_threshold =
-           Option.value
-             ~default:c.liquidity_baking_toggle_ema_threshold
-             o.liquidity_baking_toggle_ema_threshold;
-         max_operations_time_to_live =
-           Option.value
-             ~default:c.max_operations_time_to_live
-             o.max_operations_time_to_live;
-         minimal_participation_ratio =
-           Option.value
-             ~default:c.minimal_participation_ratio
-             o.minimal_participation_ratio;
-         max_slashing_period =
-           Option.value ~default:c.max_slashing_period o.max_slashing_period;
-         frozen_deposits_percentage =
-           Option.value
-             ~default:c.frozen_deposits_percentage
-             o.frozen_deposits_percentage;
-         double_baking_punishment =
-           Option.value
-             ~default:c.double_baking_punishment
-             o.double_baking_punishment;
-         ratio_of_frozen_deposits_slashed_per_double_endorsement =
-           Option.value
-             ~default:c.ratio_of_frozen_deposits_slashed_per_double_endorsement
-             o.ratio_of_frozen_deposits_slashed_per_double_endorsement;
-         testnet_dictator =
-           Option.value ~default:c.testnet_dictator o.testnet_dictator;
-         (* Notice that the chain_id and the timestamp are not used here
-            as they are not protocol constants... *)
-         cache_script_size =
-           Option.value ~default:c.cache_script_size o.cache_script_size;
-         cache_stake_distribution_cycles =
-           Option.value
-             ~default:c.cache_stake_distribution_cycles
-             o.cache_stake_distribution_cycles;
-         cache_sampler_state_cycles =
-           Option.value
-             ~default:c.cache_sampler_state_cycles
-             o.cache_sampler_state_cycles;
-         sc_rollup =
-           {
-             enable = Option.value ~default:c.sc_rollup.enable o.sc_rollup.enable;
-             origination_size =
-               Option.value
-                 ~default:c.sc_rollup.origination_size
-                 o.sc_rollup.origination_size;
-             challenge_window_in_blocks =
-               Option.value
-                 ~default:c.sc_rollup.challenge_window_in_blocks
-                 o.sc_rollup.challenge_window_in_blocks;
-             max_number_of_messages_per_commitment_period =
-               Option.value
-                 ~default:
-                   c.sc_rollup.max_number_of_messages_per_commitment_period
-                 o.sc_rollup.max_number_of_messages_per_commitment_period;
-             stake_amount =
-               Option.value
-                 ~default:c.sc_rollup.stake_amount
-                 o.sc_rollup.stake_amount;
-             commitment_period_in_blocks =
-               Option.value
-                 ~default:c.sc_rollup.commitment_period_in_blocks
-                 o.sc_rollup.commitment_period_in_blocks;
-             max_lookahead_in_blocks =
-               Option.value
-                 ~default:c.sc_rollup.max_lookahead_in_blocks
-                 o.sc_rollup.max_lookahead_in_blocks;
-             max_active_outbox_levels =
-               Option.value
-                 ~default:c.sc_rollup.max_active_outbox_levels
-                 o.sc_rollup.max_active_outbox_levels;
-             max_outbox_messages_per_level =
-               Option.value
-                 ~default:c.sc_rollup.max_outbox_messages_per_level
-                 o.sc_rollup.max_outbox_messages_per_level;
-             number_of_sections_in_dissection =
-               Option.value
-                 ~default:c.sc_rollup.number_of_sections_in_dissection
-                 o.sc_rollup.number_of_sections_in_dissection;
-             timeout_period_in_blocks =
-               Option.value
-                 ~default:c.sc_rollup.timeout_period_in_blocks
-                 o.sc_rollup.timeout_period_in_blocks;
-           };
-         dal = Option.value ~default:c.dal o.dal;
-         tx_rollup =
-           {
-             enable = Option.value ~default:c.tx_rollup.enable o.tx_rollup.enable;
-             origination_size =
-               Option.value
-                 ~default:c.tx_rollup.origination_size
-                 o.tx_rollup.origination_size;
-             hard_size_limit_per_inbox =
-               Option.value
-                 ~default:c.tx_rollup.hard_size_limit_per_inbox
-                 o.tx_rollup.hard_size_limit_per_inbox;
-             hard_size_limit_per_message =
-               Option.value
-                 ~default:c.tx_rollup.hard_size_limit_per_message
-                 o.tx_rollup.hard_size_limit_per_message;
-             max_withdrawals_per_batch =
-               Option.value
-                 ~default:c.tx_rollup.max_withdrawals_per_batch
-                 o.tx_rollup.max_withdrawals_per_batch;
-             commitment_bond =
-               Option.value
-                 ~default:c.tx_rollup.commitment_bond
-                 o.tx_rollup.commitment_bond;
-             finality_period =
-               Option.value
-                 ~default:c.tx_rollup.finality_period
-                 o.tx_rollup.finality_period;
-             max_inboxes_count =
-               Option.value
-                 ~default:c.tx_rollup.max_inboxes_count
-                 o.tx_rollup.max_inboxes_count;
-             withdraw_period =
-               Option.value
-                 ~default:c.tx_rollup.withdraw_period
-                 o.tx_rollup.withdraw_period;
-             max_messages_per_inbox =
-               Option.value
-                 ~default:c.tx_rollup.max_messages_per_inbox
-                 o.tx_rollup.max_messages_per_inbox;
-             max_commitments_count =
-               Option.value
-                 ~default:c.tx_rollup.max_commitments_count
-                 o.tx_rollup.max_commitments_count;
-             cost_per_byte_ema_factor =
-               Option.value
-                 ~default:c.tx_rollup.cost_per_byte_ema_factor
-                 o.tx_rollup.cost_per_byte_ema_factor;
-             max_ticket_payload_size =
-               Option.value
-                 ~default:c.tx_rollup.max_ticket_payload_size
-                 o.tx_rollup.max_ticket_payload_size;
-             rejection_max_proof_size =
-               Option.value
-                 ~default:c.tx_rollup.rejection_max_proof_size
-                 o.tx_rollup.rejection_max_proof_size;
-             sunset_level =
-               Option.value
-                 ~default:c.tx_rollup.sunset_level
-                 o.tx_rollup.sunset_level;
-           };
-       }
-        : Constants.Parametric.t)
 end
 
 module Parsed_account = struct
@@ -1501,17 +391,84 @@ let mem_init :
   let hash = genesis_block_hash in
   (* Need to read this Json file before since timestamp modification may be in
      there *)
-  (match constants_overrides_json with
-  | None -> return Protocol_constants_overrides.no_overrides
-  | Some json -> (
-      match Data_encoding.Json.destruct lib_parameters_json_encoding json with
-      | _, x -> return x
-      | exception error ->
-          failwith
-            "cannot read protocol constants overrides: %a"
-            (Data_encoding.Json.print_error ?print_unknown:None)
-            error))
-  >>=? fun protocol_overrides ->
+  let override_protocol_parameters
+      (constants_overrides_json : Data_encoding.json option)
+      (parameters : Protocol_parameters.t) :
+      Protocol_constants_overrides.t tzresult Lwt.t =
+    (* [merge_objects v1 v2] recursively overrides [v1] with [v2], and
+       point-wise if [v1] and [v2] are objects.
+
+       If [v1] and [v2] are objects, then the resulting value is an object where
+         - each field that is only present in either v1 and v2 is copied as is.
+           however, if the value in [v2] is explicitly [Some `Null], then the field is
+           absent in the result.
+         - if a field is present in both [v1] and [v2], then its value in the
+           result is merge recursively. *)
+    let rec merge_objects (v1 : Data_encoding.Json.t)
+        (v2 : Data_encoding.Json.t) : Data_encoding.Json.t =
+      match (v1, v2) with
+      | `O fs1, `O fs2 ->
+          let fields =
+            let tbl = String.Hashtbl.of_seq (List.to_seq fs1) in
+            List.iter
+              (fun (k2, v2) ->
+                match (String.Hashtbl.find_opt tbl k2, v2) with
+                | _, `Null -> String.Hashtbl.remove tbl k2
+                | Some v1, v2 ->
+                    String.Hashtbl.replace tbl k2 (merge_objects v1 v2)
+                | None, v2 -> String.Hashtbl.add tbl k2 v2)
+              fs2 ;
+            List.of_seq (String.Hashtbl.to_seq tbl)
+          in
+          `O fields
+      | _, v2 -> v2
+    in
+    match constants_overrides_json with
+    | Some json ->
+        let parameters_json =
+          Data_encoding.Json.construct
+            Constants.Parametric.encoding
+            parameters.constants
+        in
+        let parameters_overriden = merge_objects parameters_json json in
+        (match
+           Data_encoding.Json.destruct
+             lib_parameters_json_encoding
+             parameters_overriden
+         with
+        | _, x -> return x
+        | exception error ->
+            failwith
+              "cannot read protocol constants overrides: %a"
+              (Data_encoding.Json.print_error ?print_unknown:None)
+              error)
+        >>=? fun protocol_overrides ->
+        let fields_with_override = match json with `O fs -> fs | _ -> [] in
+        let field_pp ppf (name, value) =
+          Format.fprintf ppf "@[<h>%s: %a@]" name Data_encoding.Json.pp value
+        in
+        (if fields_with_override <> [] then
+         cctxt#message
+           "@[<v>mockup client uses protocol overrides:@,%a@]@?"
+           (Format.pp_print_list field_pp)
+           fields_with_override
+        else Lwt.return_unit)
+        >>= fun () -> return protocol_overrides
+    | None ->
+        return
+          Protocol_constants_overrides.
+            {
+              parametric = parameters.constants;
+              timestamp = None;
+              chain_id = None;
+            }
+  in
+  override_protocol_parameters constants_overrides_json parameters
+  >>=? fun (protocol_overrides : Protocol_constants_overrides.t) ->
+  let chain_id =
+    Tezos_mockup_registration.Mockup_args.Chain_id.choose
+      ~from_config_file:protocol_overrides.chain_id
+  in
   let default = parameters.initial_timestamp in
   let timestamp = Option.value ~default protocol_overrides.timestamp in
   (if not @@ Time.Protocol.equal default timestamp then
@@ -1534,11 +491,6 @@ let mem_init :
       ~fitness
       ~operations_hash:Operation_list_list_hash.zero
   in
-  Protocol_constants_overrides.apply_overrides
-    (cctxt :> Tezos_client_base.Client_context.printer)
-    protocol_overrides
-    parameters.constants
-  >>=? fun protocol_custom ->
   (match bootstrap_accounts_json with
   | None -> return None
   | Some json -> (
@@ -1566,10 +518,6 @@ let mem_init :
             (Data_encoding.Json.print_error ?print_unknown:None)
             error))
   >>=? fun bootstrap_accounts_custom ->
-  let chain_id =
-    Tezos_mockup_registration.Mockup_args.Chain_id.choose
-      ~from_config_file:protocol_overrides.chain_id
-  in
   initial_context
     chain_id
     shell_header
@@ -1579,13 +527,9 @@ let mem_init :
         Option.value
           ~default:parameters.bootstrap_accounts
           bootstrap_accounts_custom;
-      constants = protocol_custom;
+      constants = protocol_overrides.parametric;
     }
   >>=? fun context ->
-  let chain_id =
-    Tezos_mockup_registration.Mockup_args.Chain_id.choose
-      ~from_config_file:protocol_overrides.chain_id
-  in
   let protocol_data =
     let payload_hash =
       Protocol.Block_payload_hash.hash_bytes
