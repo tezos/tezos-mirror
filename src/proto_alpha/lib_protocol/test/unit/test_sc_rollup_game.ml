@@ -53,8 +53,8 @@ let check_reason ~loc (outcome : Sc_rollup_game_repr.outcome option) s =
             String.equal
             "Compare invalid_move reasons"
             Format.pp_print_string
-            r
-            s)
+            (Format.asprintf "%a" G.pp_invalid_move r)
+            (Format.asprintf "%a" G.pp_invalid_move s))
 
 let tick_of_int_exn n =
   match Tick.of_int n with None -> assert false | Some t -> t
@@ -167,11 +167,7 @@ let test_poorly_distributed_dissection () =
   let* outcome, _ctxt =
     T.lift @@ R.game_move ctxt rollup ~player:refuter ~opponent:defender move
   in
-  let expected_reason =
-    "Maximum tick increment in dissection must be less than half total \
-     dissection length"
-  in
-  check_reason ~loc:__LOC__ outcome expected_reason
+  check_reason ~loc:__LOC__ outcome Dissection_invalid_distribution
 
 let test_single_valid_game_move () =
   let* ctxt, rollup, refuter, defender = two_stakers_in_conflict () in
