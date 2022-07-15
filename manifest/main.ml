@@ -126,7 +126,7 @@ let data_encoding =
     ~js_compatible:true
     ~main_module:"Data_encoding"
     "data-encoding"
-    V.(at_least "0.5.3" && less_than "0.6")
+    V.(at_least "0.6" && less_than "0.7")
 
 let digestif = external_lib ~js_compatible:true "digestif" V.(at_least "0.7.3")
 

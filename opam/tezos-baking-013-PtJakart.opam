@@ -29,7 +29,7 @@ depends: [
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "lwt-exit"
   "uri" { >= "2.2.0" }
-  "data-encoding" { >= "0.5.3" & < "0.6" }
+  "data-encoding" { >= "0.6" & < "0.7" }
   "tezos-client-base-unix"
   "tezos-mockup"
   "tezos-mockup-proxy"

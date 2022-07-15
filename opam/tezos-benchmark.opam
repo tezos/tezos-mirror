@@ -13,7 +13,7 @@ depends: [
   "tezos-stdlib-unix"
   "tezos-micheline"
   "tezos-clic"
-  "data-encoding" { >= "0.5.3" & < "0.6" }
+  "data-encoding" { >= "0.6" & < "0.7" }
   "prbnmcn-cgrph" { = "0.0.2" }
   "prbnmcn-dagger" { = "0.0.2" }
   "prbnmcn-dagger-stats" { = "0.0.2" }
