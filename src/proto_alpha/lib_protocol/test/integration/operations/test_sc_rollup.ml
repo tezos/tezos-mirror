@@ -397,10 +397,10 @@ let publish_and_cement_commitment incr ~baker ~originator rollup commitment =
   let* block =
     Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks block
   in
-  let hash = Sc_rollup.Commitment.hash commitment in
   let* incr =
     Incremental.begin_construction ~policy:Block.(By_account baker) block
   in
+  let* incr, hash = hash_commitment incr commitment in
   let* cement_op = Op.sc_rollup_cement (I incr) originator rollup hash in
   let* incr = Incremental.add_operation incr cement_op in
   let* block = Incremental.finalize_block incr in
@@ -584,7 +584,7 @@ let test_publish_cement_and_recover_bond () =
     Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks b
   in
   let* i = Incremental.begin_construction b in
-  let hash = Sc_rollup.Commitment.hash c in
+  let* i, hash = hash_commitment i c in
   (* stake not on LCC *)
   let* () = recover_bond_not_lcc i contract rollup in
   let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
@@ -658,7 +658,7 @@ let test_cement_fails_on_conflict () =
     Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks b
   in
   let* i = Incremental.begin_construction b in
-  let hash = Sc_rollup.Commitment.hash commitment1 in
+  let* i, hash = hash_commitment i commitment1 in
   let* cement_op = Op.sc_rollup_cement (I i) contract1 rollup hash in
   let expect_apply_failure = function
     | Environment.Ecoproto_error (Sc_rollup_errors.Sc_rollup_disputed as e) :: _
@@ -680,7 +680,7 @@ let commit_and_cement_after_n_bloc ?expect_apply_failure block contract rollup n
   (* This pattern would add an additional block, so we decrement [n] by one. *)
   let* b = Block.bake_n (n - 1) b in
   let* i = Incremental.begin_construction b in
-  let hash = Sc_rollup.Commitment.hash commitment in
+  let* i, hash = hash_commitment i commitment in
   let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
   let* _ = Incremental.add_operation ?expect_apply_failure i cement_op in
   return_unit

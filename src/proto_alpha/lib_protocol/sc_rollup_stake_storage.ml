@@ -255,7 +255,9 @@ let refine_stake ctxt rollup staker staked_on commitment =
   let open Lwt_tzresult_syntax in
   let* lcc, ctxt = Commitment_storage.last_cemented_commitment ctxt rollup in
   let* ctxt = assert_refine_conditions_met ctxt rollup lcc commitment in
-  let new_hash = Commitment.hash commitment in
+  let*? ctxt, new_hash =
+    Sc_rollup_commitment_storage.hash_carbonated ctxt commitment
+  in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2559
      Add a test checking that L2 nodes can catch up after going offline. *)
   let rec go node ctxt =
