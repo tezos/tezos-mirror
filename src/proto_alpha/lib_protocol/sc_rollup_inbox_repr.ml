@@ -1197,7 +1197,11 @@ struct
 
   let empty context rollup level =
     let open Lwt_syntax in
-    let* initial_level = new_level_tree context Raw_level_repr.root in
+    let pre_genesis_level = Raw_level_repr.root in
+    let* initial_level = new_level_tree context pre_genesis_level in
+    let* () =
+      P.commit_tree context [key_of_level pre_genesis_level] initial_level
+    in
     let initial_hash = hash_level_tree initial_level in
     return
       {
