@@ -57,7 +57,7 @@ let script_hash_testable =
     be tested should be placed in a module conformal to the signature
     [LEGACY_SCRIPT_PATCHES]. It should contain a list of patches and for
     each patch it has to provide a hash of the patched contract and the
-    new code (as Micheline).
+    new code (as binary-encoded Micheline).
 
     Additionally for each patch 3 files need to be placed in
     [patched_contracts] subdirectory:
@@ -203,7 +203,8 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
 end
 
 (* List modules containing patched scripts here: *)
-let test_modules : (module LEGACY_SCRIPT_PATCHES) list = []
+let test_modules : (module LEGACY_SCRIPT_PATCHES) list =
+  [(module Legacy_script_patches)]
 
 let tests =
   List.concat_map
