@@ -412,6 +412,37 @@ let allocations_gen =
   let+ datas = datas_table_gen in
   Ast.{blocks; datas}
 
+let limit_gen gen =
+  let* min = gen in
+  let* max = opt gen in
+  return {Types.min; Types.max}
+
+let table_type_gen =
+  let* limit = limit_gen int32 in
+  let* ref_type = ref_type_gen in
+  return @@ Types.TableType (limit, ref_type)
+
+let memory_type_gen =
+  let+ limit = limit_gen int32 in
+  Types.MemoryType limit
+
+let global_type_gen =
+  let* vt = value_type_gen in
+  let* mt = oneofl [Types.Immutable; Types.Mutable] in
+  return @@ Types.GlobalType (vt, mt)
+
+let import_desc_gen =
+  let+ idesc =
+    oneof
+      [
+        map (fun v -> Ast.FuncImport v) var_gen;
+        map (fun tt -> Ast.TableImport tt) table_type_gen;
+        map (fun mt -> Ast.MemoryImport mt) memory_type_gen;
+        map (fun gt -> Ast.GlobalImport gt) global_type_gen;
+      ]
+  in
+  no_region idesc
+
 let module_key_and_instance_gen ?module_reg () =
   let module_reg =
     match module_reg with

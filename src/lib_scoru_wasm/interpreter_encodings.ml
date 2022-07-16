@@ -108,6 +108,34 @@ module Types = struct
         unit_case_incr "ExtSplat" ExtSplat;
         unit_case_incr "ExtZero" ExtZero;
       ]
+
+  let global_type_encoding =
+    let open Data_encoding in
+    conv
+      (fun (Types.GlobalType (v, m)) -> (v, m))
+      (fun (v, m) -> Types.GlobalType (v, m))
+      (tup2 value_type_encoding mutability_encoding)
+
+  let limits_encoding value_encoding =
+    let open Data_encoding in
+    conv
+      (fun {min; max} -> (min, max))
+      (fun (min, max) -> {min; max})
+      (tup2 value_encoding (option value_encoding))
+
+  let table_type_encoding =
+    let open Data_encoding in
+    conv
+      (fun (TableType (l, r)) -> (l, r))
+      (fun (l, r) -> TableType (l, r))
+      (tup2 (limits_encoding int32) ref_type_encoding)
+
+  let memory_type_encoding =
+    let open Data_encoding in
+    conv
+      (fun (MemoryType l) -> l)
+      (fun l -> MemoryType l)
+      (limits_encoding int32)
 end
 
 module Values = struct
@@ -571,4 +599,37 @@ module Ast = struct
     let open Data_encoding in
     let open Ast in
     conv (fun (Data_label l) -> l) (fun l -> Data_label l) int32
+
+  let import_desc_encoding =
+    let open Data_encoding in
+    let open Ast in
+    let unannotated_encoding =
+      union_incr
+        [
+          case_incr
+            "FuncImport"
+            var_encoding
+            (function FuncImport v -> Some v | _ -> None)
+            (fun v -> FuncImport v);
+          case_incr
+            "TableImport"
+            Types.table_type_encoding
+            (function TableImport t -> Some t | _ -> None)
+            (fun t -> TableImport t);
+          case_incr
+            "MemoryImport"
+            Types.memory_type_encoding
+            (function MemoryImport m -> Some m | _ -> None)
+            (fun m -> MemoryImport m);
+          case_incr
+            "GlobalImport"
+            Types.global_type_encoding
+            (function GlobalImport g -> Some g | _ -> None)
+            (fun g -> GlobalImport g);
+        ]
+    in
+    conv
+      (fun v -> v.Source.it)
+      (fun v -> Source.(v @@ no_region))
+      unannotated_encoding
 end

@@ -324,5 +324,60 @@ module Func_type = struct
     [tztest "Func_type" `Quick (make_test Parser.Func_type.encoding gen check)]
 end
 
+module Imports = struct
+  open Utils
+
+  let import_gen =
+    let open QCheck2.Gen in
+    let* modl = Vec.gen Names.gen_utf8 in
+    let* item = Vec.gen Names.gen_utf8 in
+    let+ idesc = Ast_generators.import_desc_gen in
+    Ast.{module_name = modl; item_name = item; idesc}
+
+  let gen =
+    let open QCheck2.Gen in
+    let start = return Decode.ImpKStart in
+    let module_name =
+      let+ modl = Names.gen in
+      Decode.ImpKModuleName modl
+    in
+    let item_name =
+      let* modl = Vec.gen Names.gen_utf8 in
+      let+ item = Names.gen in
+      Decode.ImpKItemName (modl, item)
+    in
+    let stop =
+      let+ import = import_gen in
+      Decode.ImpKStop import
+    in
+    oneof [start; module_name; item_name; stop]
+
+  let import_check import import' =
+    let open Lwt_result_syntax in
+    let eq_value x y = return (x = y) in
+    let* eq_m =
+      Vec.check eq_value import.Ast.module_name import'.Ast.module_name
+    in
+    let+ eq_i = Vec.check eq_value import.item_name import'.item_name in
+    eq_m && eq_i && import.idesc = import'.idesc
+
+  let check import import' =
+    let open Lwt_result_syntax in
+    match (import, import') with
+    | Decode.ImpKStart, Decode.ImpKStart -> return true
+    | ImpKModuleName m, ImpKModuleName m' -> Names.check m m'
+    | ImpKItemName (m, i), ImpKItemName (m', i') ->
+        let eq_value x y = return (x = y) in
+        let* eq_m = Vec.check eq_value m m' in
+        let+ eq_i = Names.check i i' in
+        eq_m && eq_i
+    | ImpKStop imp, ImpKStop imp' -> import_check imp imp'
+    | _, _ -> return false
+
+  let tests =
+    [tztest "Imports" `Quick (make_test Parser.Import.encoding gen check)]
+end
+
 let tests =
   Byte_vector.tests @ Vec.tests @ LazyVec.tests @ Names.tests @ Func_type.tests
+  @ Imports.tests

@@ -180,4 +180,55 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
         tag_encoding
         [fkstart_case; fkins_case; fkout_case; fkstop_case]
   end
+
+  module Import = struct
+    let impkstart_case =
+      let tag = "ImpKStart" in
+      case
+        tag
+        (value [] (Data_encoding.constant tag))
+        (function Decode.ImpKStart -> Some () | _ -> None)
+        (fun () -> ImpKStart)
+
+    let impkmodulename_case =
+      case
+        "ImpKModuleName"
+        Name.encoding
+        (function Decode.ImpKModuleName n -> Some n | _ -> None)
+        (fun n -> ImpKModuleName n)
+
+    let name_encoding = vector_encoding Name.utf8
+
+    let impkitemname_case =
+      case
+        "ImpKItemName"
+        (tup2 ~flatten:true name_encoding Name.encoding)
+        (function Decode.ImpKItemName (m, i) -> Some (m, i) | _ -> None)
+        (fun (m, i) -> ImpKItemName (m, i))
+
+    let import_encoding =
+      conv
+        (fun (module_name, item_name, idesc) ->
+          Ast.{module_name; item_name; idesc})
+        (fun {module_name; item_name; idesc} -> (module_name, item_name, idesc))
+        (tup3
+           ~flatten:true
+           (scope ["module_name"] name_encoding)
+           (scope ["item_name"] name_encoding)
+           (value ["idesc"] Interpreter_encodings.Ast.import_desc_encoding))
+
+    let impkstop_case =
+      case
+        "ImpKStop"
+        import_encoding
+        (function Decode.ImpKStop i -> Some i | _ -> None)
+        (fun i -> ImpKStop i)
+
+    let tag_encoding = value [] Data_encoding.string
+
+    let encoding =
+      tagged_union
+        tag_encoding
+        [impkstart_case; impkmodulename_case; impkitemname_case; impkstop_case]
+  end
 end
