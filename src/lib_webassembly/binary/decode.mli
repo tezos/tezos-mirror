@@ -38,11 +38,10 @@ type size = {size : int; start : pos}
 (** Incremental chunked byte vector creation (from implicit input). *)
 type byte_vector_kont =
   | VKStart  (** Initial step. *)
-  | VKRead of Chunked_byte_vector.Lwt.Buffer.t * pos * int
+  | VKRead of Chunked_byte_vector.Lwt.t * int64 * int64
       (** Reading step, containing the current position in the string and the
       length, reading byte per byte. *)
-  | VKStop of Chunked_byte_vector.Lwt.Buffer.t
-      (** Final step, cannot reduce. *)
+  | VKStop of Chunked_byte_vector.Lwt.t  (** Final step, cannot reduce. *)
 
 type name_step =
   | NKStart  (** UTF8 name starting point. *)

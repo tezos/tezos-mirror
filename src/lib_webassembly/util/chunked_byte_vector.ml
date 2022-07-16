@@ -76,6 +76,10 @@ module type S = sig
 
   val of_bytes : bytes -> t effect
 
+  val to_string : t -> string effect
+
+  val to_bytes : t -> bytes effect
+
   val grow : t -> int64 -> unit
 
   val length : t -> int64
@@ -87,24 +91,6 @@ module type S = sig
   val store_bytes : t -> int64 -> bytes -> unit effect
 
   val loaded_chunks : t -> (int64 * Chunk.t) list
-
-  module Buffer : sig
-    type vector := t
-
-    type t
-
-    val create : Int64.t -> t
-
-    val length : t -> int64
-
-    val add_byte : t -> int -> t effect
-
-    val of_string : string -> t
-
-    val to_string_unstable : t -> string effect
-
-    val to_byte_vector : t -> vector
-  end
 end
 
 module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
@@ -194,48 +180,48 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
     let+ () = store_bytes vector 0L bytes in
     vector
 
+  let to_bytes vector =
+    let open Effect in
+    let chunks_number = Vector.num_elements vector.chunks in
+    if vector.length > Int64.of_int Sys.max_string_length then
+      raise Memory_exn.Bounds ;
+    (* Once we ensure the vector can be contained in a string, we can safely
+       convert everything to int, since the size of the vector is contained in
+       a `nativeint`. See {!of_string} comment. *)
+    let buffer = Bytes.create (Int64.to_int vector.length) in
+    let add_chunk index chunk =
+      let rem =
+        (* The last chunk (at `length - 1`) is not necessarily of size
+           [Chunk.size], i.e. if the length of the chunked_byte_vector is not a
+           multiple of [Chunk.size]. *)
+        if index >= Int64.pred chunks_number then
+          Int64.rem vector.length Chunk.size
+        else Chunk.size
+      in
+      for offset = 0 to Int64.to_int rem - 1 do
+        let address =
+          Chunk.address ~index ~offset:(Int64.of_int offset) |> Int64.to_int
+        in
+        Bytes.set buffer address (Char.chr @@ Array1.get chunk offset)
+      done
+    in
+    let rec fold index =
+      if index >= chunks_number then Effect.return ()
+      else
+        let* chunk = Vector.get index vector.chunks in
+        add_chunk index chunk ;
+        fold (Int64.succ index)
+    in
+    let+ () = fold 0L in
+    buffer
+
+  let to_string vector =
+    let open Effect in
+    let+ buffer = to_bytes vector in
+    Bytes.to_string buffer
+
   let loaded_chunks vector =
     Vector.Vector.loaded_bindings (Vector.snapshot vector.chunks)
-
-  module Buffer = struct
-    type nonrec t = {vector : t; offset : int64}
-
-    let length {vector; _} = length vector
-
-    let add_byte {vector; offset} b =
-      let open Effect in
-      let+ () = store_byte vector offset b in
-      {vector; offset = Int64.succ offset}
-
-    let of_string str =
-      let offset = String.length str |> Int64.of_int in
-      let vector = of_string str in
-      {vector; offset}
-
-    let create length = {vector = create length; offset = 0L}
-
-    (* This function makes a lot of conversion from Int64 to native int but it
-       should be called only when converting a parsed data segment into a string
-       (when writing a parsed module into its binary or text representation).
-
-       @raise Invalid_argument "Chunked_byte.vector.to_string" if the size of the
-       vector is greater than [Sys.max_string_length]. *)
-    let to_string_unstable {vector; offset} =
-      let open Effect in
-      if offset > Int64.of_int Sys.max_string_length then
-        invalid_arg "Chunked_byte_vector.to_string"
-      else
-        let buff = Bytes.create (Int64.to_int offset) in
-        let+ () =
-          List.init (Int64.to_int offset) (fun i ->
-              let+ b = load_byte vector (Int64.of_int i) in
-              Bytes.set buff i (Char.chr b))
-          |> join
-        in
-        Bytes.to_string buff
-
-    let to_byte_vector {vector; _} = vector
-  end
 end
 
 include Make (Effect.Identity)

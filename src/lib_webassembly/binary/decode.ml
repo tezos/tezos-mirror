@@ -161,26 +161,24 @@ let sized f s =
 (** Incremental chunked byte vector creation (from implicit input). *)
 type byte_vector_kont =
   | VKStart  (** Initial step. *)
-  | VKRead of Chunked_byte_vector.Lwt.Buffer.t * int * int
+  | VKRead of Chunked_byte_vector.Lwt.t * int64 * int64
       (** Reading step, containing the current position in the string and the
       length, reading byte per byte. *)
-  | VKStop of Chunked_byte_vector.Lwt.Buffer.t
-      (** Final step, cannot reduce. *)
+  | VKStop of Chunked_byte_vector.Lwt.t  (** Final step, cannot reduce. *)
 
 let byte_vector_step s =
   let open Lwt.Syntax in
   function
   | VKStart ->
-      let len = len32 s in
-      let vector =
-        len |> Int64.of_int |> Chunked_byte_vector.Lwt.Buffer.create
-      in
-      VKRead (vector, 0, len) |> Lwt.return
-  | VKRead (vector, index, len) when index >= len -> VKStop vector |> Lwt.return
+      let len = len32 s |> Int64.of_int in
+      let vector = Chunked_byte_vector.Lwt.create len in
+      VKRead (vector, 0L, len) |> Lwt.return
+  | VKRead (vector, index, len) when Int64.compare index len >= 0 ->
+      VKStop vector |> Lwt.return
   | VKRead (vector, index, len) ->
       let c = get s in
-      let+ vector = Chunked_byte_vector.Lwt.Buffer.add_byte vector c in
-      VKRead (vector, index + 1, len)
+      let+ () = Chunked_byte_vector.Lwt.store_byte vector index c in
+      VKRead (vector, Int64.succ index, len)
   (* Final step, cannot reduce *)
   | VKStop vector -> assert false
 
