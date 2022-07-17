@@ -65,12 +65,6 @@ module Address = struct
       (function Error_sc_rollup_address_generation -> Some () | _ -> None)
       (fun () -> Error_sc_rollup_address_generation)
 
-  let from_nonce nonce =
-    Data_encoding.Binary.to_bytes_opt Origination_nonce.encoding nonce
-    |> function
-    | None -> error Error_sc_rollup_address_generation
-    | Some nonce -> ok @@ hash_bytes [nonce]
-
   let of_b58data = function H.Data h -> Some h | _ -> None
 end
 
