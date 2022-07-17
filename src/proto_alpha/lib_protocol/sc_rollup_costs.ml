@@ -73,6 +73,15 @@ module Constants = struct
      number of ticks (both int32) is negligible. *)
   let cost_serialize_commitment =
     S_syntax.(cost_serialize_state_hash + cost_serialize_commitment_hash)
+
+  (* Cost of serializing an operation hash. *)
+  let cost_serialize_operation_hash =
+    let len = S.safe_int Operation_hash.size in
+    S_syntax.(cost_encode_string_per_byte * len)
+
+  (* Cost of serializing a nonce. The cost of serializing the index (an int32)
+     is negligible. *)
+  let cost_serialize_nonce = cost_serialize_operation_hash
 end
 
 (* We assume that the gas cost of adding messages [[ m_1; ... ; m_n]] at level
