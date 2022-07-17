@@ -218,6 +218,10 @@ module type S = sig
       its embedded encoder for the value. This function is used for constructing
       encoders for sum-types. *)
   val tagged_union : 'tag t -> ('tag, 'a) case list -> 'a t
+
+  (** [option enc] lifts the given encoding [enc] to one that can encode
+      optional values. *)
+  val option : 'a t -> 'a option t
 end
 
 (** Produces an encoder/decoder module with the provided map, vector and tree

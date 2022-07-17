@@ -129,6 +129,8 @@ module type S = sig
     ('tag, 'a) case
 
   val tagged_union : 'tag t -> ('tag, 'a) case list -> 'a t
+
+  val option : 'a t -> 'a option t
 end
 
 module Make
@@ -369,4 +371,16 @@ module Make
     let encode = E.tagged_union encode (List.map to_encode_case cases) in
     let decode = D.tagged_union decode (List.map to_decode_case cases) in
     {encode; decode}
+
+  let option enc =
+    tagged_union
+      (value [] Data_encoding.string)
+      [
+        case "Some" enc Fun.id Option.some;
+        case
+          "None"
+          (value [] Data_encoding.unit)
+          (function None -> Some () | _ -> None)
+          (fun () -> None);
+      ]
 end
