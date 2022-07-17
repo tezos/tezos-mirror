@@ -32,9 +32,20 @@ module Commitment_hash = Commitment.Hash
 (** [address_from_nonce ctxt nonce] produces an address completely determined by
     an operation hash and an origination counter, and accounts for gas spent. *)
 let address_from_nonce ctxt nonce =
+  let open Tzresult_syntax in
+  let* ctxt =
+    Raw_context.consume_gas ctxt Sc_rollup_costs.Constants.cost_serialize_nonce
+  in
   match Data_encoding.Binary.to_bytes_opt Origination_nonce.encoding nonce with
   | None -> error Sc_rollup_repr.Address.Error_sc_rollup_address_generation
-  | Some nonce -> ok @@ (ctxt, Sc_rollup_repr.Address.hash_bytes [nonce])
+  | Some nonce_bytes ->
+      let bytes_len = Bytes.length nonce_bytes in
+      let+ ctxt =
+        Raw_context.consume_gas
+          ctxt
+          (Sc_rollup_costs.cost_hash_bytes ~bytes_len)
+      in
+      (ctxt, Sc_rollup_repr.Address.hash_bytes [nonce_bytes])
 
 let originate ctxt ~kind ~boot_sector ~parameters_ty ~genesis_commitment =
   let open Lwt_tzresult_syntax in
