@@ -44,8 +44,10 @@
 module Address : sig
   include S.HASH
 
+  type error += (* `Permanent *) Error_sc_rollup_address_generation
+
   (** [from_nonce nonce] produces an address completely determined by
-     an operation hash and an origination counter. *)
+      an operation hash and an origination counter. *)
   val from_nonce : Origination_nonce.t -> t tzresult
 
   (** [encoded_size] is the number of bytes needed to represent an address. *)
