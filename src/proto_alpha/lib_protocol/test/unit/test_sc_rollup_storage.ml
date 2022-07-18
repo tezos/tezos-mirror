@@ -1076,7 +1076,9 @@ let test_genesis_info_of_rollup () =
   let level_before_rollup = (Raw_context.current_level ctxt).level in
   let* rollup, _genesis_hash, ctxt = lift @@ new_sc_rollup ctxt in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt 10 in
-  let* genesis_info = lift @@ Sc_rollup_storage.genesis_info ctxt rollup in
+  let* _ctxt, genesis_info =
+    lift @@ Sc_rollup_storage.genesis_info ctxt rollup
+  in
   let initial_level = genesis_info.level in
   Assert.equal_int32
     ~loc:__LOC__
