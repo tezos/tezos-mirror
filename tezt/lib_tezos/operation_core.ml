@@ -337,8 +337,8 @@ module Manager = struct
         {source; counter; fee; gas_limit; storage_limit; payload}
     | Reveal _ | Dal_publish_slot_header _ | Delegation _
     | Sc_rollup_dal_slot_subscribe _ ->
-        let fee = Option.value fee ~default:1_000 in
-        let gas_limit = Option.value gas_limit ~default:1_040 in
+        let fee = Option.value fee ~default:1_450 in
+        let gas_limit = Option.value gas_limit ~default:1_490 in
         let storage_limit = Option.value storage_limit ~default:0 in
         {source; counter; fee; gas_limit; storage_limit; payload}
 
