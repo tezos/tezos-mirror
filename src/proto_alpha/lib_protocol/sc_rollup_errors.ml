@@ -68,6 +68,7 @@ type error +=
       min_expected_balance : Tez_repr.t;
     }
   | (* `Temporary *) Sc_rollup_bad_commitment_serialization
+  | (* `Permanent *) Sc_rollup_address_generation
 
 let () =
   register_error_kind
@@ -442,4 +443,14 @@ let () =
     Data_encoding.empty
     (function Sc_rollup_bad_commitment_serialization -> Some () | _ -> None)
     (fun () -> Sc_rollup_bad_commitment_serialization) ;
+  let description = "Error while generating rollup address" in
+  register_error_kind
+    `Permanent
+    ~id:"rollup.error_smart_contract_rollup_address_generation"
+    ~title:description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    ~description
+    Data_encoding.empty
+    (function Sc_rollup_address_generation -> Some () | _ -> None)
+    (fun () -> Sc_rollup_address_generation) ;
   ()

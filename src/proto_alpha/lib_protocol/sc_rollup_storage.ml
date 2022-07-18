@@ -37,7 +37,7 @@ let address_from_nonce ctxt nonce =
     Raw_context.consume_gas ctxt Sc_rollup_costs.Constants.cost_serialize_nonce
   in
   match Data_encoding.Binary.to_bytes_opt Origination_nonce.encoding nonce with
-  | None -> error Sc_rollup_repr.Address.Error_sc_rollup_address_generation
+  | None -> error Sc_rollup_address_generation
   | Some nonce_bytes ->
       let bytes_len = Bytes.length nonce_bytes in
       let+ ctxt =

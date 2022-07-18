@@ -44,8 +44,6 @@
 module Address : sig
   include S.HASH
 
-  type error += (* `Permanent *) Error_sc_rollup_address_generation
-
   (** [encoded_size] is the number of bytes needed to represent an address. *)
   val encoded_size : int
 
