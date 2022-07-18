@@ -860,3 +860,15 @@ module Internal_for_tests = struct
 
   let check_dissection = check_dissection
 end
+
+type timeout = {alice : int; bob : int; last_turn_level : Raw_level_repr.t}
+
+let timeout_encoding =
+  let open Data_encoding in
+  conv
+    (fun {alice; bob; last_turn_level} -> (alice, bob, last_turn_level))
+    (fun (alice, bob, last_turn_level) -> {alice; bob; last_turn_level})
+    (obj3
+       (req "alice" int31)
+       (req "bob" int31)
+       (req "last_turn_level" Raw_level_repr.encoding))

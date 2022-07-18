@@ -371,6 +371,24 @@ val outcome_encoding : outcome Data_encoding.t
     being provided this returns an [outcome]. *)
 val play : t -> refutation -> (outcome, t) Either.t Lwt.t
 
+(** A type that represents the number of blocks left for players to play. Each
+    player has her timeout value. `timeout` is expressed in the number of
+    blocks.
+
+    Timeout logic is similar to a chess clock. Each player starts with the same
+    timeout. Each game move updates the timeout of the current player by
+    decreasing it by the amount of time she took to play, i.e. number of blocks
+    since the opponent last move. See {!Sc_rollup_refutation_storage.game_move}
+    to see the implementation.
+*)
+type timeout = {
+  alice : int;  (** Timeout of [Alice]. *)
+  bob : int;  (** Timeout of [Bob]. *)
+  last_turn_level : Raw_level_repr.t;  (** Block level of the last turn move. *)
+}
+
+val timeout_encoding : timeout Data_encoding.t
+
 module Internal_for_tests : sig
   (** Checks that the tick count chosen by the current move is one of
     the ones in the current dissection. Returns a tuple containing

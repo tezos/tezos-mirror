@@ -84,8 +84,7 @@ val start_game :
     that [player] is the player whose turn it is; if so, it applies
     [refutation] using the [play] function.
 
-    If the result is a new game, this is stored and the timeout level is
-    updated.
+    If the result is a new game, this is stored and the timeout is updated.
 
     If the result is an [outcome], this will be returned.
 
