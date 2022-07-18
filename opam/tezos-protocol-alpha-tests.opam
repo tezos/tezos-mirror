@@ -21,6 +21,7 @@ depends: [
   "tezos-benchmark-alpha" {with-test}
   "tezos-benchmark-type-inference-alpha" {with-test}
   "qcheck-alcotest" { with-test & >= "0.18" }
+  "tezt" {with-test}
   "tezos-context" {with-test}
   "tezos-test-helpers" {with-test}
   "alcotest" { with-test & >= "1.5.0" }
@@ -28,7 +29,6 @@ depends: [
   "tezos-protocol-environment" {with-test}
   "tezos-stdlib-unix" {with-test}
   "tezos-stdlib" {with-test}
-  "tezt" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors"]

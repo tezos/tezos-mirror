@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2022 Trili Tech <contact@trili.tech>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -3282,6 +3283,7 @@ end = struct
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~deps:
             [
+              (if N.(number >= 015) then Some tezt_lib else None) |> if_some;
               octez_context;
               alcotest_lwt;
               octez_base |> open_ ~m:"TzPervasives"
@@ -3293,6 +3295,7 @@ end = struct
               test_helpers |> if_some |> open_;
               octez_base_test_helpers |> open_;
             ]
+          ~dep_globs:(if N.(number >= 015) then ["wasm_kernel/*.wasm"] else [])
       in
       let _pbt =
         tests
