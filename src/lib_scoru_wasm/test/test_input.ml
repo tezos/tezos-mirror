@@ -181,9 +181,36 @@ let test_host_fun () =
   assert (result = Values.[Num (I32 5l)]) ;
   Lwt.return @@ Result.return_unit
 
+module Wasm = Wasm_pvm.Make (Test_encoding.Tree)
+
+let test_set_input () =
+  let open Lwt_syntax in
+  let* tree = Test_encoding.empty_tree () in
+  let* tree =
+    Test_encoding.Tree.add tree ["pvm"; "status"]
+    @@ Data_encoding.Binary.to_bytes_exn
+         Gather_floppies.internal_status_encoding
+         Gather_floppies.Not_gathering_floppies
+  in
+  let zero =
+    match Bounded.Int32.NonNegative.of_int32 0l with
+    | Some x -> x
+    | _ -> assert false
+  in
+  let* tree =
+    Wasm.set_input_step
+      {inbox_level = zero; message_counter = Z.of_int 1}
+      "hello"
+      tree
+  in
+  let* result_input = Test_encoding.Tree.find tree ["input"; "0"; "1"] in
+  assert (result_input = Some (Bytes.of_string "hello")) ;
+  Lwt_result_syntax.return_unit
+
 let tests =
   [
     tztest "Write input" `Quick write_input;
     tztest "Read input" `Quick read_input;
     tztest "Host read input" `Quick test_host_fun;
+    tztest "Host" `Quick test_set_input;
   ]

@@ -67,7 +67,7 @@ module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
               {
                 current_tick = Z.of_int 0;
                 last_input_read = None;
-                input_request = No_input_required;
+                input_request = Input_required;
               }
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/3226
            Implement handling of input logic.
