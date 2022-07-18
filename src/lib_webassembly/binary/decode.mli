@@ -4,15 +4,13 @@ exception Code of Source.region * string
 
 (** Instruction parsing continuations. *)
 type instr_block_kont =
-  | IKStop of Ast.instr list  (** Final step of a block parsing. *)
-  | IKRev of Ast.instr list * Ast.instr list
-      (** Reversal of lists of instructions. *)
-  | IKNext of Ast.instr list
+  | IKStop of Ast.block_label  (** Final step of a block parsing. *)
+  | IKNext of Ast.block_label
       (** Tag parsing, containing the accumulation of already parsed values. *)
   | IKBlock of Ast.block_type * int  (** Block parsing step. *)
   | IKLoop of Ast.block_type * int  (** Loop parsing step. *)
   | IKIf1 of Ast.block_type * int  (** If parsing step. *)
-  | IKIf2 of Ast.block_type * int * Ast.instr list
+  | IKIf2 of Ast.block_type * int * Ast.block_label
       (** If .. else parsing step. *)
 
 (** Vector and size continuations *)
@@ -216,16 +214,30 @@ type module_kont =
 (** Parsed bytes with the current reading position. *)
 type stream = {name : string; bytes : string; pos : pos ref}
 
+(** Allocation state of basic blocks. The type relies on the mutable state
+    internaly, but making it private avoids being able to modify it externally.
+*)
+type block_state = private {mutable new_blocks : Ast.instr Vector.t Vector.t}
+
 (** Decoding continuation step. *)
 type decode_kont = {
   building_state : field Vector.t;
       (** Accumulated parsed sections, used to build the final module. *)
   module_kont : module_kont;  (** Module continuation. *)
   stream : stream;  (** Parsed stream. *)
+  block_state : block_state;  (** Basic blocks allocated. *)
 }
 
 (** [make_stream filename bytes] returns a new stream to decode. *)
 val make_stream : name:string -> bytes:string -> stream
+
+(** [make_empty_block_state ()] returns a new block allocation state. *)
+val make_empty_block_state : unit -> block_state
+
+(** [make_block_state blocks] returns a new block allocation state from already
+    existing blocks allocation. This function is used to build block state during
+    tree decoding. *)
+val make_block_state : Ast.instr Vector.t Vector.t -> block_state
 
 (** [module_step kont] takes one step of parsing from a continuation and returns
    a new continuation. Fails when the contination of the module is [MKStop]

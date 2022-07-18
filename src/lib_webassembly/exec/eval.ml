@@ -62,6 +62,7 @@ type code = value stack * admin_instr list
 and admin_instr = admin_instr' phrase
 
 and admin_instr' =
+  | From_block of block_label * int32
   | Plain of instr'
   | Refer of ref_
   | Invoke of func_inst
@@ -189,10 +190,27 @@ let elem_oob frame x i n =
     (Int64.of_int32 (Instance.Vector.num_elements !elem))
 
 let rec step (c : config) : config Lwt.t =
-  let {frame; code = vs, es; input; _} = c in
-  let e = List.hd es in
+  let {frame; code = vs, es; _} = c in
+  match es with
+  | {it = From_block (Block_label b, i); at} :: es ->
+      let* block = Vector.get b frame.inst.Instance.blocks in
+      let length = Vector.num_elements block in
+      if i = length then Lwt.return {c with code = (vs, es)}
+      else
+        let* e, es =
+          let* instr = Vector.get i block in
+          Lwt.return
+            ( Plain instr.it @@ instr.at,
+              {it = From_block (Block_label b, Int32.succ i); at} :: es )
+        in
+        step_resolved c frame vs e es
+  | e :: es -> step_resolved c frame vs e es
+  | [] -> Lwt.return c
+
+and step_resolved (c : config) frame vs e es : config Lwt.t =
   let+ vs', es' =
     match (e.it, vs) with
+    | From_block _, _ -> assert false (* resolved by [step] *)
     | Plain e', vs -> (
         match (e', vs) with
         | Unreachable, vs ->
@@ -203,12 +221,18 @@ let rec step (c : config) : config Lwt.t =
             let n1 = Lazy_vector.LwtInt32Vector.num_elements ts1 in
             let n2 = Lazy_vector.LwtInt32Vector.num_elements ts2 in
             let args, vs' = (take n1 vs e.at, drop n1 vs e.at) in
-            (vs', [Label (n2, [], (args, List.map plain es')) @@ e.at])
+            ( vs',
+              [Label (n2, [], (args, [From_block (es', 0l) @@ e.at])) @@ e.at]
+            )
         | Loop (bt, es'), vs ->
             let+ (FuncType (ts1, ts2)) = block_type frame.inst bt in
             let n1 = Lazy_vector.LwtInt32Vector.num_elements ts1 in
             let args, vs' = (take n1 vs e.at, drop n1 vs e.at) in
-            (vs', [Label (n1, [e' @@ e.at], (args, List.map plain es')) @@ e.at])
+            ( vs',
+              [
+                Label (n1, [e' @@ e.at], (args, [From_block (es', 0l) @@ e.at]))
+                @@ e.at;
+              ] )
         | If (bt, es1, es2), Num (I32 i) :: vs' ->
             Lwt.return
               (if i = 0l then (vs', [Plain (Block (bt, es2)) @@ e.at])
@@ -770,19 +794,22 @@ let rec step (c : config) : config Lwt.t =
             let locals' = List.rev args @ List.map default_value locals in
             let frame' = {inst = !inst'; locals = List.map ref locals'} in
             let instr' =
-              [Label (n2, [], ([], List.map plain f.it.body)) @@ f.at]
+              [
+                Label (n2, [], ([], [From_block (f.it.body, 0l) @@ f.at]))
+                @@ f.at;
+              ]
             in
             (vs', [Frame (n2, frame', ([], instr')) @@ e.at])
         | Func.HostFunc (t, f) ->
             let inst = ref frame.inst in
             Lwt.catch
               (fun () ->
-                let+ res = f input inst (List.rev args) in
+                let+ res = f c.input inst (List.rev args) in
                 (List.rev res @ vs', []))
               (function
                 | Crash (_, msg) -> Crash.error e.at msg | exn -> raise exn))
   in
-  {c with code = (vs', es' @ List.tl es)}
+  {c with code = (vs', es' @ es)}
 
 let rec eval (c : config) : value stack Lwt.t =
   match c.code with
@@ -806,8 +833,14 @@ let invoke ?(module_inst = empty_module_inst) ?(input = Input_buffer.alloc ())
   (* TODO: tickify? *)
   if not (List.for_all2 (fun v -> ( = ) (type_of_value v)) vs ins_l) then
     Crash.error at "wrong types of arguments" ;
-
-  let c = config ~input module_inst (List.rev vs) [Invoke func @@ at] in
+  let blocks =
+    match func with
+    | Func.AstFunc (_, {contents = {blocks; _}}, _) -> blocks
+    | Func.HostFunc _ -> Instance.Vector.create 0l
+  in
+  let c =
+    config ~input {module_inst with blocks} (List.rev vs) [Invoke func @@ at]
+  in
   Lwt.catch
     (fun () ->
       let+ values = eval c in
@@ -817,7 +850,7 @@ let invoke ?(module_inst = empty_module_inst) ?(input = Input_buffer.alloc ())
       | exn -> Lwt.fail exn)
 
 let eval_const (inst : module_inst) (const : const) : value Lwt.t =
-  let c = config inst [] (List.map plain const.it) in
+  let c = config inst [] [From_block (const.it, 0l) @@ const.at] in
   let+ vs = eval c in
   match vs with
   | [v] -> v
@@ -909,45 +942,51 @@ let init_func (inst : module_inst) (func : func_inst) =
   | Func.AstFunc (_, inst_ref, _) -> inst_ref := inst
   | _ -> assert false
 
-let run_elem i elem =
+let run_elem inst i elem =
   let at = elem.it.emode.at in
   let x = i @@ at in
   match elem.it.emode.it with
   | Passive -> []
   | Active {index; offset} ->
-      offset.it
-      @ [
-          Const (I32 0l @@ at) @@ at;
-          Const
-            (I32 (Lazy_vector.LwtInt32Vector.num_elements elem.it.einit) @@ at)
-          @@ at;
-          TableInit (index, x) @@ at;
-          ElemDrop x @@ at;
-        ]
-  | Declarative -> [ElemDrop x @@ at]
+      (From_block (offset.it, 0l) @@ offset.at)
+      :: List.map
+           plain
+           [
+             Const (I32 0l @@ at) @@ at;
+             Const
+               (I32 (Lazy_vector.LwtInt32Vector.num_elements elem.it.einit)
+               @@ at)
+             @@ at;
+             TableInit (index, x) @@ at;
+             ElemDrop x @@ at;
+           ]
+  | Declarative -> List.map plain [ElemDrop x @@ at]
 
-let run_data i data =
+let run_data inst i data =
   let at = data.it.dmode.at in
   let x = i @@ at in
   match data.it.dmode.it with
   | Passive -> []
   | Active {index; offset} ->
       assert (index.it = 0l) ;
-      offset.it
-      @ [
-          Const (I32 0l @@ at) @@ at;
-          Const
-            (I32
-               (Int32.of_int
-                  (Int64.to_int (Chunked_byte_vector.Lwt.length data.it.dinit)))
-            @@ at)
-          @@ at;
-          MemoryInit x @@ at;
-          DataDrop x @@ at;
-        ]
+      (From_block (offset.it, 0l) @@ offset.at)
+      :: List.map
+           plain
+           [
+             Const (I32 0l @@ at) @@ at;
+             Const
+               (I32
+                  (Int32.of_int
+                     (Int64.to_int
+                        (Chunked_byte_vector.Lwt.length data.it.dinit)))
+               @@ at)
+             @@ at;
+             MemoryInit x @@ at;
+             DataDrop x @@ at;
+           ]
   | Declarative -> assert false
 
-let run_start start = [Call start.it.sfunc @@ start.at]
+let run_start start = List.map plain [Call start.it.sfunc @@ start.at]
 
 let init (m : module_) (exts : extern list) : module_inst Lwt.t =
   let open Lwt.Syntax in
@@ -962,6 +1001,7 @@ let init (m : module_) (exts : extern list) : module_inst Lwt.t =
     elems;
     datas;
     start;
+    blocks;
   } =
     m.it
   in
@@ -1004,6 +1044,7 @@ let init (m : module_) (exts : extern list) : module_inst Lwt.t =
            [types] should be a lazy structure so we can avoid traversing it
            whole. *)
         List.map (fun type_ -> type_.it) types |> Vector.of_list;
+      blocks;
     }
   in
   let* fs = TzStdLib.List.map_s (create_func inst0) funcs in
@@ -1065,10 +1106,10 @@ let init (m : module_) (exts : extern list) : module_inst Lwt.t =
     }
   in
   List.iter (init_func inst) fs ;
-  let es_elem = List.concat (Lib.List32.mapi run_elem elems) in
-  let es_data = List.concat (Lib.List32.mapi run_data datas) in
+  let es_elem = List.concat (Lib.List32.mapi (run_elem inst) elems) in
+  let es_data = List.concat (Lib.List32.mapi (run_data inst) datas) in
   let es_start = Lib.Option.get (Lib.Option.map run_start start) [] in
   let+ (_ : Values.value stack) =
-    eval (config inst [] (List.map plain (es_elem @ es_data @ es_start)))
+    eval (config inst [] (es_elem @ es_data @ es_start))
   in
   inst

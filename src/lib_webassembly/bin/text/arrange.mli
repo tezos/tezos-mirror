@@ -1,8 +1,11 @@
 open Sexpr
+module Vector := Lazy_vector.Int32Vector
 
-val instr : Ast.instr -> sexpr
+type block_table = Ast.instr Vector.t Vector.t
 
-val func : Ast.func -> sexpr
+val instr : block_table -> Ast.instr -> sexpr
+
+val func : block_table -> Ast.func -> sexpr
 
 val module_ : Ast.module_ -> sexpr Lwt.t
 

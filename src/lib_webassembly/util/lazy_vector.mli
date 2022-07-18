@@ -115,6 +115,12 @@ module type S = sig
       if provided, starting with [Key.zero] for the new values. *)
   val grow : ?produce_value:'a producer -> key -> 'a t -> 'a t
 
+  (** [append elt vector] creates a new lazy vector that has one
+      more item than [vector] whose value is [elt]. This is a shortcut
+      for [vector |> grow Key.(succ zero) |> set (num_elements vector) elt].
+      Also returns the key of the added element. *)
+  val append : 'a -> 'a t -> 'a t * key
+
   (** [concat lhs rhs] Concatenates two lazy vectors. *)
   val concat : 'a t -> 'a t -> 'a t
 
@@ -175,6 +181,8 @@ module Mutable : sig
     val set : key -> 'a -> 'a t -> unit
 
     val grow : ?produce_value:'a Vector.producer -> key -> 'a t -> unit
+
+    val append : 'a -> 'a t -> key
 
     val cons : 'a -> 'a t -> unit
 

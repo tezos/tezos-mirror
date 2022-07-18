@@ -561,4 +561,9 @@ module Ast = struct
           (function ValBlockType x -> Some x | _ -> None)
           (fun var -> ValBlockType var);
       ]
+
+  let block_label_encoding =
+    let open Data_encoding in
+    let open Ast in
+    conv (fun (Block_label l) -> l) (fun l -> Block_label l) int32
 end

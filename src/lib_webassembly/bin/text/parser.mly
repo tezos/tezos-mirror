@@ -106,15 +106,32 @@ type context =
   { types : types; tables : space; memories : space;
     funcs : space; locals : space; globals : space;
     datas : space; elems : space;
-    labels : int32 VarMap.t; deferred_locals : (unit -> unit) list ref
+    labels : int32 VarMap.t; deferred_locals : (unit -> unit) list ref;
+    new_blocks : instr Vector.t Vector.t ref;
   }
 
-let empty_context () =
-  { types = empty_types (); tables = empty (); memories = empty ();
+
+let with_blocks f =
+  let c =  {
+    types = empty_types (); tables = empty (); memories = empty ();
     funcs = empty (); locals = empty (); globals = empty ();
     datas = empty (); elems = empty ();
-    labels = VarMap.empty; deferred_locals = ref []
+    labels = VarMap.empty; deferred_locals = ref [];
+    new_blocks = ref (Vector.create 0l);
   }
+  in
+  let res = f c in
+  {res.it with Ast.blocks = !(c.new_blocks)}
+  @@ res.at
+
+
+let alloc_block c es =
+  let new_blocks, b = Vector.append (Vector.of_list es) !(c.new_blocks) in
+  c.new_blocks := new_blocks ;
+  Block_label b
+
+let empty_block =
+  Block_label 0l
 
 let force_locals (c : context) =
   List.fold_right Stdlib.(@@) !(c.deferred_locals) ();
@@ -260,7 +277,7 @@ let empty_parsed_module =
 let to_module_ pm =
   let
     { p_types; p_imports; p_tables; p_memories; p_globals; p_funcs; p_start; p_elems; p_datas;
-      p_exports } = pm.it
+      p_exports; } = pm.it
   in
   let types = Vector.of_list p_types in
   let imports = Vector.of_list p_imports in
@@ -282,6 +299,7 @@ let to_module_ pm =
     elems;
     datas;
     start = p_start;
+    blocks = Vector.create 0l;
   } @@ pm.at
 %}
 
@@ -648,14 +666,14 @@ call_instr_results_instr :
 
 block_instr :
   | BLOCK labeling_opt block END labeling_end_opt
-    { fun c -> let c' = $2 c $5 in let bt, es = $3 c' in block bt es }
+    { fun c -> let c' = $2 c $5 in let bt, es = $3 c' in block bt (alloc_block c es) }
   | LOOP labeling_opt block END labeling_end_opt
-    { fun c -> let c' = $2 c $5 in let bt, es = $3 c' in loop bt es }
+    { fun c -> let c' = $2 c $5 in let bt, es = $3 c' in loop bt (alloc_block c es) }
   | IF labeling_opt block END labeling_end_opt
-    { fun c -> let c' = $2 c $5 in let bt, es = $3 c' in if_ bt es [] }
+    { fun c -> let c' = $2 c $5 in let bt, es = $3 c' in if_ bt (alloc_block c es) (empty_block) }
   | IF labeling_opt block ELSE labeling_end_opt instr_list END labeling_end_opt
     { fun c -> let c' = $2 c ($5 @ $8) in
-      let ts, es1 = $3 c' in if_ ts es1 ($6 c') }
+      let ts, es1 = $3 c' in if_ ts (alloc_block c es1) (alloc_block c ($6 c')) }
 
 block :
   | type_use block_param_body
@@ -704,12 +722,12 @@ expr1 :  /* Sugar */
     { let at1 = ati 1 in
       fun c -> let x, es = $2 c in es, call_indirect (0l @@ at1) x }
   | BLOCK labeling_opt block
-    { fun c -> let c' = $2 c [] in let bt, es = $3 c' in [], block bt es }
+    { fun c -> let c' = $2 c [] in let bt, es = $3 c' in [], block bt (alloc_block c es) }
   | LOOP labeling_opt block
-    { fun c -> let c' = $2 c [] in let bt, es = $3 c' in [], loop bt es }
+    { fun c -> let c' = $2 c [] in let bt, es = $3 c' in [], loop bt (alloc_block c es) }
   | IF labeling_opt if_block
     { fun c -> let c' = $2 c [] in
-      let bt, (es, es1, es2) = $3 c c' in es, if_ bt es1 es2 }
+      let bt, (es, es1, es2) = $3 c c' in es, if_ bt (alloc_block c es1) (alloc_block c es2) }
 
 select_expr_results :
   | LPAR RESULT value_type_list RPAR select_expr_results
@@ -795,7 +813,7 @@ expr_list :
   | expr expr_list { fun c -> $1 c @ $2 c }
 
 const_expr :
-  | instr_list { let at = at () in fun c -> $1 c @@ at }
+  | instr_list { let at = at () in fun c -> alloc_block c ($1 c) @@ at }
 
 
 /* Functions */
@@ -866,7 +884,7 @@ func_result_body :
 func_body :
   | instr_list
     { fun c -> let c' = anon_label c in
-      {ftype = -1l @@ at(); locals = Vector.empty (); body = $1 c'} }
+      {ftype = -1l @@ at(); locals = Vector.empty (); body = alloc_block c ($1 c')} }
   | LPAR LOCAL value_type_vector RPAR func_body
     { fun c -> anon_locals_vector c (lazy $3); let f = $5 c in
       {f with locals = Vector.concat $3 f.locals} }
@@ -885,14 +903,14 @@ memory_use :
 
 offset :
   | LPAR OFFSET const_expr RPAR { $3 }
-  | expr { let at = at () in fun c -> $1 c @@ at }  /* Sugar */
+  | expr { let at = at () in fun c -> alloc_block c ($1 c) @@ at }  /* Sugar */
 
 elem_kind :
   | FUNC { FuncRefType }
 
 elem_expr :
   | LPAR ITEM const_expr RPAR { $3 }
-  | expr { let at = at () in fun c -> $1 c @@ at }  /* Sugar */
+  | expr { let at = at () in fun c -> alloc_block c ($1 c) @@ at }  /* Sugar */
 
 elem_expr_list :
   | /* empty */ { fun c -> [] }
@@ -900,8 +918,8 @@ elem_expr_list :
 
 elem_var_list :
   | var_list
-    { let f = function {at; _} as x -> [ref_func x @@ at] @@ at in
-      fun c lookup -> List.map f ($1 c lookup) }
+    { let f c = function {at; _} as x -> alloc_block c [ref_func x @@ at] @@ at in
+      fun c lookup -> List.map (f c) ($1 c lookup) }
 
 elem_list :
   | elem_kind elem_var_list
@@ -959,7 +977,7 @@ table_fields :
       tabs, elems, ims, $1 (TableExport x) c :: exs }
   | ref_type LPAR ELEM elem_var_list RPAR  /* Sugar */
     { fun c x at ->
-      let offset = [i32_const (0l @@ at) @@ at] @@ at in
+      let offset = alloc_block c [i32_const (0l @@ at) @@ at] @@ at in
       let einit = Vector.of_list ($4 c func) in
       let size = Vector.num_elements einit in
       let emode = Active {index = x; offset} @@ at in
@@ -968,7 +986,7 @@ table_fields :
       [], [] }
   | ref_type LPAR ELEM elem_expr elem_expr_list RPAR  /* Sugar */
     { fun c x at ->
-      let offset = [i32_const (0l @@ at) @@ at] @@ at in
+      let offset = alloc_block c [i32_const (0l @@ at) @@ at] @@ at in
       let einit = Vector.of_list ((fun c -> $4 c :: $5 c) c) in
       let size = Vector.num_elements einit in
       let emode = Active {index = x; offset} @@ at in
@@ -1011,7 +1029,7 @@ memory_fields :
       mems, data, ims, $1 (MemoryExport x) c :: exs }
   | LPAR DATA string_list RPAR  /* Sugar */
     { fun c x at ->
-      let offset = [i32_const (0l @@ at) @@ at] @@ at in
+      let offset = alloc_block c [i32_const (0l @@ at) @@ at] @@ at in
       let size = Int32.(div (add (of_int (String.length $3)) 65535l) 65536l) in
       [{mtype = MemoryType {min = size; max = Some size}} @@ at],
       [{dinit = Chunked_byte_vector.Lwt.of_string $3; dmode = Active {index = x; offset} @@ at} @@ at],
@@ -1162,13 +1180,13 @@ module_var_opt :
 
 module_ :
   | LPAR MODULE module_var_opt module_fields RPAR
-    { $3, Textual (($4 (empty_context ()) () @@ at ()) |> to_module_) @@ at () }
+    { $3, Textual (with_blocks (fun c -> $4 c () @@ at () |> to_module_)) @@ at () }
 
 inline_module :  /* Sugar */
-  | module_fields { Textual (($1 (empty_context ()) () @@ at ()) |> to_module_) @@ at () }
+  | module_fields { Textual (with_blocks (fun c -> $1 c () @@ at () |> to_module_)) @@ at () }
 
 inline_module1 :  /* Sugar */
-  | module_fields1 { Textual (($1 (empty_context ()) () @@ at ()) |> to_module_) @@ at () }
+  | module_fields1 { Textual (with_blocks (fun c -> $1 c () @@ at () |> to_module_)) @@ at () }
 
 
 /* Scripts */

@@ -173,7 +173,10 @@ module Make (T : Tree.S) = struct
 
   let data_instance_decoding = lazy_vector_decoding "datas" data_decoding
 
-  let rec instruction_decoding () =
+  let block_label_decoding =
+    value [] Interpreter_encodings.Ast.block_label_encoding
+
+  let instruction_decoding =
     let open Ast in
     let open Syntax in
     let* tag = value ["tag"] Data_encoding.string in
@@ -196,18 +199,18 @@ module Make (T : Tree.S) = struct
       | "Block" ->
           let+ type_ =
             value ["$1"] Interpreter_encodings.Ast.block_type_encoding
-          and+ instrs = scope ["$2"] (instruction_list_decoding ()) in
+          and+ instrs = scope ["$2"] block_label_decoding in
           Block (type_, instrs)
       | "Loop" ->
           let+ type_ =
             value ["$1"] Interpreter_encodings.Ast.block_type_encoding
-          and+ instrs = scope ["$2"] (instruction_list_decoding ()) in
+          and+ instrs = scope ["$2"] block_label_decoding in
           Loop (type_, instrs)
       | "If" ->
           let+ type_ =
             value ["$1"] Interpreter_encodings.Ast.block_type_encoding
-          and+ instrs_if = scope ["$2"] (instruction_list_decoding ())
-          and+ instrs_else = scope ["$3"] (instruction_list_decoding ()) in
+          and+ instrs_if = scope ["$2"] block_label_decoding
+          and+ instrs_else = scope ["$3"] block_label_decoding in
           If (type_, instrs_if, instrs_else)
       | "Br" ->
           let+ var = value ["$1"] Interpreter_encodings.Ast.var_encoding in
@@ -402,12 +405,6 @@ module Make (T : Tree.S) = struct
     in
     Source.(instr @@ no_region)
 
-  and instruction_list_decoding () =
-    (* TODO: #3149
-       Rewrite instruction list encoding using virtual "instruction block"
-       pointers. *)
-    list_decoding (instruction_decoding ())
-
   let func_type_decoding () =
     let open Syntax in
     let* params =
@@ -440,7 +437,7 @@ module Make (T : Tree.S) = struct
           "locals"
           (value [] Interpreter_encodings.Types.value_type_encoding)
       in
-      let+ body = instruction_list_decoding () in
+      let+ body = block_label_decoding in
       let func = Ast.{ftype; locals; body} in
       Func.AstFunc (type_, current_module, Source.(func @@ no_region))
 
@@ -528,6 +525,12 @@ module Make (T : Tree.S) = struct
     in
     Instance.NameMap.create ~produce_value:get_export ()
 
+  let instruction_instance_decoding =
+    lazy_vector_decoding "instructions" instruction_decoding
+
+  let block_instance_decoding =
+    lazy_vector_decoding "blocks" instruction_instance_decoding
+
   let module_instance_decoding modules =
     let open Syntax in
     let current_module = ref Instance.empty_module_inst in
@@ -538,9 +541,11 @@ module Make (T : Tree.S) = struct
     let* types = type_instance_decoding in
     let* funcs = function_instance_decoding current_module in
     let* elems = elem_instance_decoding funcs in
-    let+ exports = export_instance_decoding funcs tables memories globals in
+    let* exports = export_instance_decoding funcs tables memories globals in
+    let+ blocks = block_instance_decoding in
     let modul =
-      Instance.{memories; tables; globals; datas; types; funcs; elems; exports}
+      Instance.
+        {memories; tables; globals; datas; types; funcs; elems; exports; blocks}
     in
     current_module := modul ;
     modul

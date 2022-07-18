@@ -211,4 +211,6 @@ module Ast : sig
   val vec_encoding : V128.t Values.vecop Source.phrase Data_encoding.t
 
   val block_type_encoding : Ast.block_type Data_encoding.t
+
+  val block_label_encoding : Ast.block_label Data_encoding.t
 end

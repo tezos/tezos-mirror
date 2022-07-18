@@ -506,17 +506,20 @@ let wrap item_name wrap_action wrap_assertion at =
     |> Lazy_vector.LwtInt32Vector.of_list
   in
   let body =
-    [
-      Block (ValBlockType None, action @ assertion @ [Return @@ at]) @@ at;
-      Unreachable @@ at;
-    ]
+    [Block (ValBlockType None, Block_label 1l) @@ at; Unreachable @@ at]
   in
   let funcs =
-    [{ftype = 0l @@ at; locals; body} @@ at]
+    [{ftype = 0l @@ at; locals; body = Block_label 0l} @@ at]
     |> Lazy_vector.LwtInt32Vector.of_list
   in
-  let m = {empty_module with types; funcs; imports; exports} @@ at in
-  Encode.encode m
+  let blocks =
+    Vector.of_list
+      [
+        Vector.of_list body; Vector.of_list (action @ assertion @ [Return @@ at]);
+      ]
+  in
+  let m = {empty_module with types; funcs; imports; exports; blocks} in
+  Encode.encode (m @@ at)
 
 let is_js_num_type = function
   | I32Type -> true

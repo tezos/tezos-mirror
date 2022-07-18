@@ -1,8 +1,10 @@
 module TzStdLib = Tezos_lwt_result_stdlib.Lwtreslib.Bare
 
-let instr oc width e = Sexpr.output oc width (Arrange.instr e)
+let instr oc lookup_block width e =
+  Sexpr.output oc width (Arrange.instr lookup_block e)
 
-let func oc width f = Sexpr.output oc width (Arrange.func f)
+let func oc lookup_block width f =
+  Sexpr.output oc width (Arrange.func lookup_block f)
 
 let module_ oc width m =
   let open Lwt.Syntax in

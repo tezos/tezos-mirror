@@ -76,6 +76,8 @@ module type S = sig
 
   val grow : ?produce_value:'a producer -> key -> 'a t -> 'a t
 
+  val append : 'a -> 'a t -> 'a t * key
+
   val concat : 'a t -> 'a t -> 'a t
 
   val to_list : 'a t -> 'a list effect
@@ -183,6 +185,10 @@ module Make (Effect : Effect.S) (Key : KeyS) :
     let num_elements = Key.add map.num_elements delta in
     {map with values; num_elements}
 
+  let append elt map =
+    let i = num_elements map in
+    (map |> grow Key.(succ zero) |> set i elt, i)
+
   let concat lhs rhs =
     let boundary = Key.add lhs.first lhs.num_elements in
     let choose_producer rhs_produce_value lhs_produce_value key =
@@ -262,6 +268,8 @@ module Mutable = struct
 
     val grow : ?produce_value:'a Vector.producer -> key -> 'a t -> unit
 
+    val append : 'a -> 'a t -> key
+
     val cons : 'a -> 'a t -> unit
 
     val snapshot : 'a t -> 'a Vector.t
@@ -290,6 +298,11 @@ module Mutable = struct
 
     let grow ?produce_value delta map_ref =
       map_ref := Vector.grow ?produce_value delta !map_ref
+
+    let append elt map_ref =
+      let new_map, i = Vector.append elt !map_ref in
+      map_ref := new_map ;
+      i
 
     let cons a map_ref = map_ref := Vector.cons a !map_ref
 
