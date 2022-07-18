@@ -353,8 +353,8 @@ type invalid_move =
     }
   | Dissection_stop_hash_mismatch of State_hash.t option
   | Dissection_edge_ticks_mismatch of {
-      disection_start_tick : Sc_rollup_tick_repr.t;
-      disection_stop_tick : Sc_rollup_tick_repr.t;
+      dissection_start_tick : Sc_rollup_tick_repr.t;
+      dissection_stop_tick : Sc_rollup_tick_repr.t;
       chunk_start_tick : Sc_rollup_tick_repr.t;
       chunk_stop_tick : Sc_rollup_tick_repr.t;
     }
@@ -412,22 +412,22 @@ let pp_invalid_move fmt =
       Format.fprintf fmt "The stop hash should not be equal to %a" pp_hash_opt h
   | Dissection_edge_ticks_mismatch
       {
-        disection_start_tick;
-        disection_stop_tick;
+        dissection_start_tick;
+        dissection_stop_tick;
         chunk_start_tick;
         chunk_stop_tick;
       } ->
       Sc_rollup_tick_repr.(
         Format.fprintf
           fmt
-          "We should have disection_start_tick(%a) = %a and \
-           disection_stop_tick(%a) = %a"
+          "We should have dissection_start_tick(%a) = %a and \
+           dissection_stop_tick(%a) = %a"
           pp
-          disection_start_tick
+          dissection_start_tick
           pp
           chunk_start_tick
           pp
-          disection_stop_tick
+          dissection_stop_tick
           pp
           chunk_stop_tick)
   | Dissection_ticks_not_increasing ->
@@ -529,28 +529,28 @@ let invalid_move_encoding =
         (Tag 5)
         (obj5
            (req "kind" (constant "dissection_edge_ticks_mismatch"))
-           (req "disection_start_tick" Sc_rollup_tick_repr.encoding)
-           (req "disection_stop_tick" Sc_rollup_tick_repr.encoding)
+           (req "dissection_start_tick" Sc_rollup_tick_repr.encoding)
+           (req "dissection_stop_tick" Sc_rollup_tick_repr.encoding)
            (req "chunk_start_tick" Sc_rollup_tick_repr.encoding)
            (req "chunk_stop_tick" Sc_rollup_tick_repr.encoding))
         (function
           | Dissection_edge_ticks_mismatch e ->
               Some
                 ( (),
-                  e.disection_start_tick,
-                  e.disection_stop_tick,
+                  e.dissection_start_tick,
+                  e.dissection_stop_tick,
                   e.chunk_start_tick,
                   e.chunk_stop_tick )
           | _ -> None)
         (fun ( (),
-               disection_start_tick,
-               disection_stop_tick,
+               dissection_start_tick,
+               dissection_stop_tick,
                chunk_start_tick,
                chunk_stop_tick ) ->
           Dissection_edge_ticks_mismatch
             {
-              disection_start_tick;
-              disection_stop_tick;
+              dissection_start_tick;
+              dissection_stop_tick;
               chunk_start_tick;
               chunk_stop_tick;
             });
@@ -761,8 +761,8 @@ let check_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
             (a_tick = start_chunk.tick && b_tick = stop_chunk.tick)
             (Dissection_edge_ticks_mismatch
                {
-                 disection_start_tick = a_tick;
-                 disection_stop_tick = b_tick;
+                 dissection_start_tick = a_tick;
+                 dissection_stop_tick = b_tick;
                  chunk_start_tick = start_chunk.tick;
                  chunk_stop_tick = stop_chunk.tick;
                }))

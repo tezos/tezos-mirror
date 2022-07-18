@@ -3369,8 +3369,8 @@ module Sc_rollup : sig
         }
       | Dissection_stop_hash_mismatch of State_hash.t option
       | Dissection_edge_ticks_mismatch of {
-          disection_start_tick : Sc_rollup_tick_repr.t;
-          disection_stop_tick : Sc_rollup_tick_repr.t;
+          dissection_start_tick : Sc_rollup_tick_repr.t;
+          dissection_stop_tick : Sc_rollup_tick_repr.t;
           chunk_start_tick : Sc_rollup_tick_repr.t;
           chunk_stop_tick : Sc_rollup_tick_repr.t;
         }
