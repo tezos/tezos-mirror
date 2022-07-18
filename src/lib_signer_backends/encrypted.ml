@@ -169,6 +169,7 @@ module Encodings = struct
 
   let bls12_381 =
     let length =
+      (* 32 + 16 + 8 = 56 *)
       Bls12_381.Signature.sk_size_in_bytes + Crypto_box.tag_length
       + Raw.salt_len
     in
