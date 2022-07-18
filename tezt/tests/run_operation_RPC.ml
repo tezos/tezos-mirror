@@ -179,7 +179,6 @@ let test_batch_inconsistent_sources protocols =
 let test_inconsistent_counters =
   Protocol.register_test
     ~__FILE__
-    ~supports:Protocol.(From_protocol 013)
     ~title:"Run_operation inconsistent counters"
     ~tags:
       (run_operation_tags

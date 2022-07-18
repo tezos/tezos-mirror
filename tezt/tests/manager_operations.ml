@@ -858,8 +858,7 @@ module Deserialisation = struct
 
   (* Gas to execute call to noop contract without deserialization *)
   let gas_to_execute_rest_noop = function
-    | Protocol.Ithaca -> 2049
-    | Jakarta | Kathmandu | Alpha -> 2109
+    | Protocol.Jakarta | Kathmandu | Alpha -> 2109
 
   let inject_call_with_bytes ?(source = Constant.bootstrap5) ?protocol ~contract
       ~size_kB ~gas_limit client =
@@ -975,7 +974,7 @@ module Deserialisation = struct
   let register ~protocols =
     test_deserialization_gas_canary protocols ;
     test_not_enough_gas_deserialization protocols ;
-    test_deserialization_gas_accounting [Ithaca; Alpha]
+    test_deserialization_gas_accounting protocols
 end
 
 module Gas_limits = struct
@@ -1062,7 +1061,7 @@ module Gas_limits = struct
   let register ~protocols =
     block_below_ops_below protocols ;
     block_below_ops_over protocols ;
-    block_over_ops_below [Ithaca; Alpha]
+    block_over_ops_below protocols
 end
 
 module Reveal = struct
@@ -1148,7 +1147,7 @@ module Reveal = struct
   (* After the work in !5182, which enforces that reveal operations
       can only be placed at the head of the batch, this test should
       fail with a permanent, Apply.Incorrect_reveal_position error (see
-      #2774). For Ithaca and Jakarta, we leave the original behaviour
+      #2774). For Jakarta, we leave the original behaviour
       which resulted in an Branch Refused error. *)
   let revealed_twice_in_batch protocols =
     revealed_twice_in_batch
@@ -1208,7 +1207,7 @@ module Reveal = struct
   (* After the work in !5182, which enforces that reveal operations
      can only be placed at the head of the batch, this test should
      fail with a permanent, Apply.Incorrect_reveal_position error (see
-     #2774). For Ithaca and Jakarta, we leave the original behaviour
+     #2774). For Jakarta, we leave the original behaviour
      which resulted in an Branch Refused error. *)
   let revealed_twice_in_batch_bad_second_key protocols =
     revealed_twice_in_batch_bad_second_key
@@ -1799,10 +1798,10 @@ module Simple_transfers = struct
     test_simple_transfer_low_balance_to_pay_allocation_1 protocols ;
     test_simple_transfer_low_balance_to_pay_allocation_2 protocols ;
     test_simple_transfer_of_the_whole_balance protocols ;
-    test_simple_transfers_successive_wrong_counters [Ithaca; Alpha] ;
+    test_simple_transfers_successive_wrong_counters protocols ;
     test_simple_transfers_successive_wrong_counters_no_op_pre protocols ;
-    test_batch_simple_transfers_wrong_counters [Alpha] ;
-    test_batch_simple_transfers_wrong_counters_2 [Alpha]
+    test_batch_simple_transfers_wrong_counters protocols ;
+    test_batch_simple_transfers_wrong_counters_2 protocols
 end
 
 module Simple_contract_calls = struct

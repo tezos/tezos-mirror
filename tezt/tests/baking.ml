@@ -521,82 +521,11 @@ let wrong_branch_operation_dismissal =
   Log.info "Checking that the transfer is not included in the current head." ;
   check_op_not_in_baked_block client oph
 
-let baking_operation_exception_ithaca =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"ensure we can still bake with a faulty operation"
-    ~tags:["baking"; "exception"]
-    ~supports:Protocol.(Between_protocols (number Ithaca, number Ithaca))
-  @@ fun protocol ->
-  let* node, client = Client.init_with_protocol `Client ~protocol () in
-  let data_dir = Node.data_dir node in
-  let wait_injection = Node.wait_for_request ~request:`Inject node in
-  let* new_account = Client.gen_and_show_keys client in
-  let* () =
-    Client.transfer
-      ~giver:"bootstrap1"
-      ~receiver:new_account.alias
-      ~amount:(Tez.of_int 10)
-      ~burn_cap:Tez.one
-      client
-  in
-  let* () = wait_injection in
-  (* We use [context_path] to ensure the baker will not use the
-     preapply RPC. Indeed, this test was introduced because of a bug
-     that happens when the baker does not use the preapply RPC. *)
-  let* () =
-    Client.bake_for_and_wait ~context_path:(data_dir // "context") client
-  in
-  let wait_injection = Node.wait_for_request ~request:`Inject node in
-  let*! () = Client.reveal ~fee:Tez.one ~src:new_account.alias client in
-  let* () = wait_injection in
-  let* () =
-    Client.bake_for_and_wait ~context_path:(data_dir // "context") client
-  in
-  let*! json_balance =
-    RPC.Contracts.get_balance ~contract_id:new_account.public_key_hash client
-  in
-  let _balance = JSON.as_string json_balance in
-  let* branch = RPC.get_branch client in
-  let branch = Block_hash.of_b58check_exn (JSON.as_string branch) in
-  let operation =
-    {
-      shell_header = {branch};
-      protocol_data =
-        {
-          contents =
-            [
-              {
-                kind = "transaction";
-                source = new_account.Account.public_key_hash;
-                fee = "0";
-                counter = string_of_int 1;
-                gas_limit = string_of_int 2000;
-                storage_limit = string_of_int 0;
-                amount = string_of_int 0;
-                destination = Constant.bootstrap1.public_key_hash;
-              };
-            ];
-          signature = None;
-        };
-    }
-  in
-  let* mempool =
-    mempool_from_list_of_ops
-      client
-      (Protocol_hash.of_b58check_exn (Protocol.hash protocol))
-      [(new_account, operation)]
-  in
-  let* () = bake_with_mempool ~protocol:Ithaca node client mempool in
-  let* _ = Node.wait_for_level node 4 in
-  unit
-
 let baking_operation_exception =
   Protocol.register_test
     ~__FILE__
     ~title:"ensure we can still bake with a faulty operation"
     ~tags:["baking"; "exception"]
-    ~supports:Protocol.(From_protocol (number Jakarta))
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol `Client ~protocol () in
   let data_dir = Node.data_dir node in
@@ -644,5 +573,4 @@ let baking_operation_exception =
 let register ~protocols =
   test_ordering protocols ;
   wrong_branch_operation_dismissal protocols ;
-  baking_operation_exception_ithaca protocols ;
   baking_operation_exception protocols
