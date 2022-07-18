@@ -186,12 +186,16 @@ module Validation_state = struct
             in a single block (otherwise we would loose the commutativity
             of validated operation application: see
             {!Validate_operation}). *)
+    ballots_validated : Operation_hash.t Signature.Public_key_hash.Map.t;
+        (** To each delegate that has submitted a ballot in a previously
+            validated operation, associates the hash of this operation.  *)
   }
 
   let empty =
     {
       proposals_validated = Signature.Public_key_hash.Map.empty;
       dictator_proposals_validated = None;
+      ballots_validated = Signature.Public_key_hash.Map.empty;
     }
 
   let check_count_conflict ~count_previous_blocks ~count_operation
@@ -305,10 +309,41 @@ module Validation_state = struct
     let* () =
       error_unless
         (Signature.Public_key_hash.Map.is_empty state.proposals_validated
-        && Option.is_none state.dictator_proposals_validated)
+        && Option.is_none state.dictator_proposals_validated
+        && Signature.Public_key_hash.Map.is_empty state.ballots_validated)
         Testnet_dictator_conflicting_operation
     in
     return {state with dictator_proposals_validated = Some oph}
+
+  (** Check that a Ballot operation is compatible with previously
+      validated voting operations in the current block/mempool.
+
+      @return [Error Conflicting_ballot] if the [delegate] has already
+      submitted a ballot in the current block/mempool.
+
+      @return [Error Conflicting_dictator_proposals] if the current
+      block/mempool already contains a testnet dictator Proposals
+      operation (see {!recfield:dictator_proposals_validated}). *)
+  let check_ballot state voter =
+    let open Tzresult_syntax in
+    let* () =
+      match
+        Signature.Public_key_hash.Map.find voter state.ballots_validated
+      with
+      | None -> ok ()
+      | Some conflicting_operation ->
+          error (Conflicting_ballot {conflicting_operation})
+    in
+    match state.dictator_proposals_validated with
+    | None -> ok ()
+    | Some dictator_oph -> error (Conflicting_dictator_proposals dictator_oph)
+
+  (** Update the [state] when a Ballot operation is validated. *)
+  let update_on_ballot state oph voter =
+    let ballots_validated =
+      Signature.Public_key_hash.Map.add voter oph state.ballots_validated
+    in
+    {state with ballots_validated}
 end
 
 (** Helpers to validate and apply Proposals operations from a
@@ -469,7 +504,7 @@ let validate_proposals ctxt chain_id state ~should_check_signature oph
            already checked that the delegate is in the vote listings
            (or is a testnet dictator), which implies that it is a
            manager with a revealed key. *)
-        let* public_key = Delegate.pubkey ctxt source in
+        let* public_key = Contract.get_manager_key ctxt source in
         Lwt.return (Operation.check_signature public_key chain_id operation))
   in
   return state
@@ -493,34 +528,52 @@ let apply_proposals ctxt chain_id (Proposals {source; period = _; proposals}) =
   in
   return (ctxt, Apply_results.Single_result Proposals_result)
 
-let record_ballot ctxt delegate proposal ballot =
-  Voting_period.get_current_kind ctxt >>=? function
-  | Exploration | Promotion ->
-      Vote.get_current_proposal ctxt >>=? fun current_proposal ->
-      error_unless
-        (Protocol_hash.equal proposal current_proposal)
-        (Ballot_for_wrong_proposal
-           {current = current_proposal; submitted = proposal})
-      >>?= fun () ->
-      Vote.has_recorded_ballot ctxt delegate >>= fun has_ballot ->
-      error_when has_ballot Already_submitted_a_ballot >>?= fun () ->
-      Vote.in_listings ctxt delegate >>= fun in_listings ->
-      if in_listings then Vote.record_ballot ctxt delegate ballot
-      else fail Source_not_in_vote_listings
+let check_period_kind_for_ballot current_period =
+  match current_period.Voting_period.kind with
+  | Exploration | Promotion -> ok ()
   | (Cooldown | Proposal | Adoption) as current ->
-      fail
+      error
         (Wrong_voting_period_kind {current; expected = [Exploration; Promotion]})
 
-let apply_ballot ctxt chain_id (operation : Kind.ballot operation) =
-  let (Single (Ballot {source; period; proposal; ballot})) =
+let check_current_proposal ctxt op_proposal =
+  let open Lwt_tzresult_syntax in
+  let* current_proposal = Vote.get_current_proposal ctxt in
+  fail_unless
+    (Protocol_hash.equal op_proposal current_proposal)
+    (Ballot_for_wrong_proposal
+       {current = current_proposal; submitted = op_proposal})
+
+let check_source_has_not_already_voted ctxt source =
+  let open Lwt_tzresult_syntax in
+  let*! has_ballot = Vote.has_recorded_ballot ctxt source in
+  fail_when has_ballot Already_submitted_a_ballot
+
+let validate_ballot ctxt chain_id state ~should_check_signature oph
+    (operation : Kind.ballot operation) =
+  let open Lwt_tzresult_syntax in
+  let (Single (Ballot {source; period; proposal; ballot = _})) =
     operation.protocol_data.contents
   in
-  Delegate.pubkey ctxt source >>=? fun delegate ->
-  Operation.check_signature delegate chain_id operation >>?= fun () ->
-  Voting_period.get_current ctxt >>=? fun {index = current_period; _} ->
-  error_unless
-    Compare.Int32.(current_period = period)
-    (Wrong_voting_period_index {expected = current_period; provided = period})
-  >>?= fun () ->
-  record_ballot ctxt source proposal ballot >|=? fun ctxt ->
-  (ctxt, Apply_results.Single_result Ballot_result)
+  let*? () = Validation_state.check_ballot state source in
+  let* current_period = Voting_period.get_current ctxt in
+  let*? () = check_period_index ~expected:current_period.index period in
+  let*? () = check_period_kind_for_ballot current_period in
+  let* () = check_current_proposal ctxt proposal in
+  let* () = check_source_has_not_already_voted ctxt source in
+  let* () = check_in_listings ctxt source in
+  (* The signature check is done last because it is more costly than
+     most checks. *)
+  let* () =
+    when_ should_check_signature (fun () ->
+        (* Retrieving the public key cannot fail. Indeed, we have
+           already checked that the delegate is in the vote listings,
+           which implies that it is a manager with a revealed key. *)
+        let* public_key = Contract.get_manager_key ctxt source in
+        Lwt.return (Operation.check_signature public_key chain_id operation))
+  in
+  return (Validation_state.update_on_ballot state oph source)
+
+let apply_ballot ctxt (Ballot {source; period = _; proposal = _; ballot}) =
+  let open Lwt_tzresult_syntax in
+  let* ctxt = Vote.record_ballot ctxt source ballot in
+  return (ctxt, Apply_results.Single_result Ballot_result)

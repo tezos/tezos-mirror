@@ -287,9 +287,9 @@ let context_init2 = context_init_tup Context.T2
     blocks in order to move on to an Exploration period. Return a
     block, a delegate (distinct from the one who submitted the
     Proposals), and the current proposal. *)
-let context_init_exploration ?(proposal = protos.(0)) () =
+let context_init_exploration ?(proposal = protos.(0)) ?blocks_per_cycle () =
   let open Lwt_result_syntax in
-  let* block, (proposer, other_delegate) = context_init2 () in
+  let* block, (proposer, other_delegate) = context_init2 ?blocks_per_cycle () in
   let* operation = Op.proposals (B block) proposer [proposal] in
   let* block = Block.bake block ~operation in
   let* block = bake_until_first_block_of_next_period block in
@@ -308,11 +308,6 @@ let wrong_error expected_error_name actual_error_trace loc =
     expected_error_name
     Error_monad.pp_print_trace
     actual_error_trace
-
-let unregistered_delegate delegate loc = function
-  | [Environment.Ecoproto_error (Delegate_storage.Unregistered_delegate pkh)] ->
-      Assert.equal_pkh ~loc:(append_loc ~caller_loc:loc __LOC__) pkh delegate
-  | err -> wrong_error "Unregistered_delegate" err loc
 
 let missing_signature loc = function
   | [Environment.Ecoproto_error Operation.Missing_signature] -> return_unit
@@ -400,6 +395,10 @@ let ballot_for_wrong_proposal ~current_proposal ~op_proposal loc = function
 let already_submitted_a_ballot loc = function
   | [Environment.Ecoproto_error Already_submitted_a_ballot] -> return_unit
   | err -> wrong_error "Already_submitted_a_ballot" err loc
+
+let conflicting_ballot loc = function
+  | [Environment.Ecoproto_error (Conflicting_ballot _)] -> return_unit
+  | err -> wrong_error "Conflicting_ballot" err loc
 
 let assert_validate_proposals_fails ~expected_error ~proposer ~proposals ?period
     block loc =
@@ -1326,6 +1325,8 @@ let test_proposals_wrong_voting_period_kind () =
     source is from being a delegate with voting rights). *)
 let test_proposals_source_not_in_vote_listings () =
   let open Lwt_result_syntax in
+  (* The chosen [blocks_per_cycle] is an arbitrary value that we will
+     not reach with the blocks baked in this test. *)
   let* block, funder = context_init1 ~blocks_per_cycle:10l () in
   let fresh_account = Account.new_account () in
   let proposer = Contract.Implicit fresh_account.pkh in
@@ -1660,20 +1661,6 @@ let test_valid_proposals () =
 
 (** {3 Ballot -- Negative tests} *)
 
-(** Test that a Ballot operation fails when its source is not a
-    registered delegate. *)
-let test_ballot_unregistered_delegate () =
-  let open Lwt_result_syntax in
-  let* block, _delegate, proposal = context_init_exploration () in
-  let fresh_account = Account.new_account () in
-  assert_validate_ballot_fails
-    ~expected_error:(unregistered_delegate fresh_account.pkh)
-    ~voter:(Contract.Implicit fresh_account.pkh)
-    ~proposal
-    ~ballot:Vote.Yay
-    block
-    __LOC__
-
 (** Test that a Ballot operation fails when it is unsigned. *)
 let test_ballot_missing_signature () =
   let open Lwt_result_syntax in
@@ -1784,25 +1771,59 @@ let test_already_submitted_a_ballot () =
     __LOC__
 
 (** Test that a Ballot operation fails when its source is not in the
-    vote listings. *)
+    vote listings (with the same error, no matter how far the source is
+    from being a delegate with voting rights). *)
 let test_ballot_source_not_in_vote_listings () =
   let open Lwt_result_syntax in
-  let* block, funder, proposal = context_init_exploration () in
-  let account = Account.new_account () in
-  let voter = Contract.Implicit account.pkh in
+  let* block, funder, proposal =
+    (* The chosen [blocks_per_cycle] is an arbitrary value that we
+       will not reach with the blocks baked in this test. *)
+    context_init_exploration ~blocks_per_cycle:10l ()
+  in
+  let fresh_account = Account.new_account () in
+  let voter = Contract.Implicit fresh_account.pkh in
+  let assert_fails_with_source_not_in_vote_listings block =
+    assert_validate_ballot_fails
+      ~expected_error:source_not_in_vote_listings
+      ~voter
+      ~proposal
+      ~ballot:Vote.Yay
+      block
+  in
+  (* Fail when the source has no contract in the storage. *)
+  let* () = assert_fails_with_source_not_in_vote_listings block __LOC__ in
   let* operation = Op.transaction (B block) funder voter Tez.one in
   let* block = Block.bake block ~operation in
-  let* operation =
-    Op.delegation ~force_reveal:true (B block) voter (Some account.pkh)
-  in
+  (* Fail when the contract's public key is unreavealed. *)
+  let* () = assert_fails_with_source_not_in_vote_listings block __LOC__ in
+  let* operation = Op.revelation (B block) fresh_account.pk in
   let* block = Block.bake block ~operation in
-  assert_validate_ballot_fails
-    ~expected_error:source_not_in_vote_listings
-    ~voter
-    ~proposal
-    ~ballot:Vote.Yay
-    block
-    __LOC__
+  (* Fail when the source is not a delegate. *)
+  let* () = assert_fails_with_source_not_in_vote_listings block __LOC__ in
+  let* operation = Op.delegation (B block) voter (Some fresh_account.pkh) in
+  let* block = Block.bake block ~operation in
+  (* Fail when the source is a delegate, but not yet in the vote listings. *)
+  assert_fails_with_source_not_in_vote_listings block __LOC__
+
+(** Test that a Ballot operation fails when its source has already
+    submitted a Ballot in a previously validated operation of the
+    current block. *)
+let test_conflicting_ballot () =
+  let open Lwt_result_syntax in
+  let* block, voter, proposal = context_init_exploration () in
+  let* current_block_state = Incremental.begin_construction block in
+  let* op_in_current_block = Op.ballot (B block) voter proposal Vote.Yay in
+  let* current_block_state =
+    Incremental.validate_operation current_block_state op_in_current_block
+  in
+  let* op = Op.ballot (B block) voter proposal Vote.Nay in
+  let* _i =
+    Incremental.validate_operation
+      ~expect_failure:(conflicting_ballot __LOC__)
+      current_block_state
+      op
+  in
+  return_unit
 
 (** {3 Ballot -- Positive test}
 
@@ -1899,6 +1920,8 @@ let observe_ballot pre_state post_state op caller_loc =
 
 let test_valid_ballot () =
   let open Lwt_result_syntax in
+  (* The chosen [blocks_per_cycle] is an arbitrary value that we will
+     not reach with the blocks baked in this test. *)
   let* block, delegates = context_init ~blocks_per_cycle:10l 4 () in
   let* proposer, voter1, voter2, voter3 =
     match delegates with
@@ -2021,10 +2044,6 @@ let tests =
     Tztest.tztest "Valid Proposals operations" `Quick test_valid_proposals;
     (* Validity tests on Ballot *)
     Tztest.tztest
-      "Ballot from unregistered delegate"
-      `Quick
-      test_ballot_unregistered_delegate;
-    Tztest.tztest
       "Ballot missing signature"
       `Quick
       test_ballot_missing_signature;
@@ -2052,5 +2071,9 @@ let tests =
       "Ballot source not in vote listings"
       `Quick
       test_ballot_source_not_in_vote_listings;
+    Tztest.tztest
+      "Conflicting ballot in current block/mempool"
+      `Quick
+      test_conflicting_ballot;
     Tztest.tztest "Valid Ballot operations" `Quick test_valid_ballot;
   ]

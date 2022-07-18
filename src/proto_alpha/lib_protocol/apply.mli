@@ -108,15 +108,6 @@ type apply_mode =
     For non-manager operations, the application of a validated
     operation should always fully succeed.
 
-    TODO: https://gitlab.com/tezos/tezos/-/issues/2603
-
-    Currently, {!Validate_operation.validate_operation} does nothing
-    on voting operations. The "validation" of these operations is
-    instead handled by [apply_operation], which may thus return an
-    error if the operation is ill-formed. Once [validate_operation] has
-    been extended to every kind of operation, [apply_operation] should
-    never return an error.
-
     For manager operations, the application has two stages. The first
     stage consists in updating the context to:
 

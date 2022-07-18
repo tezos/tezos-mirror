@@ -744,6 +744,19 @@ module Voting = struct
         operation
     in
     return {vs with voting_state}
+
+  let validate_ballot vi vs ~should_check_signature oph operation =
+    let open Lwt_tzresult_syntax in
+    let* voting_state =
+      Amendment.validate_ballot
+        vi.ctxt
+        vi.chain_id
+        vs.voting_state
+        ~should_check_signature
+        oph
+        operation
+    in
+    return {vs with voting_state}
 end
 
 module Anonymous = struct
@@ -1508,7 +1521,7 @@ let begin_no_predecessor_info ctxt chain_id =
 let validate_operation (vi : validate_operation_info)
     (vs : validate_operation_state) ?(should_check_signature = true) oph
     (type kind) (operation : kind operation) =
-  let open Lwt_result_syntax in
+  let open Lwt_tzresult_syntax in
   let* vs =
     match operation.protocol_data.contents with
     | Single (Preendorsement _) ->
@@ -1527,6 +1540,8 @@ let validate_operation (vi : validate_operation_info)
           operation
     | Single (Proposals _) ->
         Voting.validate_proposals vi vs ~should_check_signature oph operation
+    | Single (Ballot _) ->
+        Voting.validate_ballot vi vs ~should_check_signature oph operation
     | Single (Activate_account _ as contents) ->
         Anonymous.validate_activate_account vi vs oph contents
     | Single (Double_preendorsement_evidence _ as contents) ->
@@ -1555,18 +1570,7 @@ let validate_operation (vi : validate_operation_info)
           source
           oph
           operation
-    | Single (Ballot _) | Single (Failing_noop _) ->
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/2603
-
-           There is no separate validation phase for non-manager
-           operations yet: all checks are currently done during
-           application in {!Apply}.
-
-           When the validation of other operations is implemented, we
-           should also update
-           {!TMP_for_plugin.precheck_manager__do_nothing_on_non_manager_op}
-           (if has not been removed yet). *)
-        return vs
+    | Single (Failing_noop _) -> fail Validate_errors.Failing_noop_error
   in
   return (vs, Operation_validated_stamp)
 

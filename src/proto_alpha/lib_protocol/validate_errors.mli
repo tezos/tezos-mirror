@@ -119,6 +119,7 @@ module Voting : sig
         submitted : Protocol_hash.t;
       }
     | Already_submitted_a_ballot
+    | Conflicting_ballot of {conflicting_operation : Operation_hash.t}
 end
 
 (** Errors that may arise while validating an anonymous operation. *)
@@ -178,3 +179,5 @@ module Manager : sig
     | Tx_rollup_feature_disabled
     | Sc_rollup_feature_disabled
 end
+
+type error += Failing_noop_error

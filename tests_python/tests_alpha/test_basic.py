@@ -152,7 +152,7 @@ class TestRawContext:
             '/chains/main/blocks/head/helpers/scripts/run_operation'
         )
         with assert_run_failure(
-            'The failing_noop operation cannot be executed by the protocol'
+            'A failing_noop operation can never be validated'
         ):
             client.rpc('post', run_operation_path, data=run_json)
 

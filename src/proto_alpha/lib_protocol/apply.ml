@@ -43,7 +43,6 @@ type error +=
   | Internal_operation_replay of
       Apply_internal_results.packed_internal_operation
   | Multiple_revelation
-  | Failing_noop_error
   | Zero_frozen_deposits of Signature.Public_key_hash.t
   | Invalid_transfer_to_sc_rollup_from_implicit_account
 
@@ -222,20 +221,6 @@ let () =
     Data_encoding.empty
     (function Multiple_revelation -> Some () | _ -> None)
     (fun () -> Multiple_revelation) ;
-  register_error_kind
-    `Permanent
-    ~id:"operation.failing_noop"
-    ~title:"Failing_noop operations are not executed by the protocol"
-    ~description:
-      "The failing_noop operation is an operation that is not and never will \
-       be executed by the protocol."
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "The failing_noop operation cannot be executed by the protocol")
-    Data_encoding.empty
-    (function Failing_noop_error -> Some () | _ -> None)
-    (fun () -> Failing_noop_error) ;
   register_error_kind
     `Permanent
     ~id:"delegate.zero_frozen_deposits"
@@ -2066,8 +2051,7 @@ let punish_double_baking ctxt (bh1 : Block_header.t) ~payload_producer =
     (fun balance_updates -> Double_baking_evidence_result balance_updates)
 
 let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
-    ~payload_producer op_validated_stamp (operation : kind operation)
-    (contents_list : kind contents_list) :
+    ~payload_producer op_validated_stamp (contents_list : kind contents_list) :
     (context * kind contents_result_list) tzresult Lwt.t =
   let mempool_mode =
     match apply_mode with
@@ -2129,10 +2113,11 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
       return (ctxt, Single_result (Activate_account_result bupds))
   | Single (Proposals _ as contents) ->
       Amendment.apply_proposals ctxt chain_id contents
-  | Single (Ballot _) -> Amendment.apply_ballot ctxt chain_id operation
+  | Single (Ballot _ as contents) -> Amendment.apply_ballot ctxt contents
   | Single (Failing_noop _) ->
-      (* Failing_noop _ always fails *)
-      fail Failing_noop_error
+      (* This operation always fails. It should already have been
+         rejected by {!Validate_operation.validate_operation}. *)
+      fail Validate_errors.Failing_noop_error
   | Single (Manager_operation _) ->
       apply_manager_operations
         ctxt
@@ -2160,7 +2145,6 @@ let apply_operation ctxt chain_id (apply_mode : apply_mode) ~payload_producer
     apply_mode
     ~payload_producer
     op_validated_stamp
-    operation
     operation.protocol_data.contents
   >|=? fun (ctxt, result) ->
   let ctxt = Gas.set_unlimited ctxt in

@@ -417,6 +417,7 @@ module Voting = struct
         submitted : Protocol_hash.t;
       }
     | Already_submitted_a_ballot
+    | Conflicting_ballot of {conflicting_operation : Operation_hash.t}
 
   let () =
     (* Shared voting errors *)
@@ -702,7 +703,27 @@ module Voting = struct
       ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
       Data_encoding.empty
       (function Already_submitted_a_ballot -> Some () | _ -> None)
-      (fun () -> Already_submitted_a_ballot)
+      (fun () -> Already_submitted_a_ballot) ;
+    register_error_kind
+      `Temporary
+      ~id:"validate_operation.conflicting_ballot"
+      ~title:"Conflicting ballot"
+      ~description:
+        "The delegate has already submitted a ballot in a previously validated \
+         operation of the current block or mempool."
+      ~pp:(fun ppf conflicting_oph ->
+        Format.fprintf
+          ppf
+          "The delegate has already submitted a ballot in the previously \
+           validated operation %a of the current block or mempool."
+          Operation_hash.pp
+          conflicting_oph)
+      Data_encoding.(obj1 (req "conflicting_operation" Operation_hash.encoding))
+      (function
+        | Conflicting_ballot {conflicting_operation} ->
+            Some conflicting_operation
+        | _ -> None)
+      (fun conflicting_operation -> Conflicting_ballot {conflicting_operation})
 end
 
 module Anonymous = struct
@@ -1141,3 +1162,17 @@ module Manager = struct
       (function Sc_rollup_feature_disabled -> Some () | _ -> None)
       (fun () -> Sc_rollup_feature_disabled)
 end
+
+type error += Failing_noop_error
+
+let () =
+  let description = "A failing_noop operation can never be validated." in
+  register_error_kind
+    `Permanent
+    ~id:"validate_operation.failing_noop_error"
+    ~title:"Failing_noop error"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    Data_encoding.empty
+    (function Failing_noop_error -> Some () | _ -> None)
+    (fun () -> Failing_noop_error)

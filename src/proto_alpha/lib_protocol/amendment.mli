@@ -183,14 +183,14 @@ val apply_proposals :
   Kind.proposals contents ->
   (context * Kind.proposals Apply_results.contents_result_list) tzresult Lwt.t
 
-(** Update the [context] with the effects of a Ballot operation.
+(** Check that a Ballot operation can be safely applied.
 
-    @return [Error Delegate_storage.Unregistered_delegate] if the
-    source's contract does not exist or its public key is unreavealed.
+    @return [Error Conflicting_ballot] if the source has already
+    submitted a ballot in the current block/mempool.
 
-    @return [Error Operation.Missing_signature] or [Error
-    Operation.Invalid_signature] if the operation is unsigned or
-    incorrectly signed.
+    @return [Error Conflicting_dictator_proposals] if the current
+    block/mempool already contains a validated testnet dictator
+    Proposals operation.
 
     @return [Error Wrong_voting_period_index] if the operation's
     period and the [context]'s current period do not have the same
@@ -206,9 +206,27 @@ val apply_proposals :
     already voted.
 
     @return [Error Source_not_in_vote_listings] if the source is not
-    in the vote listings. *)
-val apply_ballot :
+    in the vote listings.
+
+    @return [Error Operation.Missing_signature] or [Error
+    Operation.Invalid_signature] if the operation is unsigned or
+    incorrectly signed. *)
+val validate_ballot :
   context ->
   Chain_id.t ->
+  Validation_state.t ->
+  should_check_signature:bool ->
+  Operation_hash.t ->
   Kind.ballot operation ->
+  Validation_state.t tzresult Lwt.t
+
+(** Update the [context] with the effects of a Ballot operation:
+
+    The couple (source of the operation, submitted ballot) is recorded.
+
+    {!validate_ballot} must have been called beforehand, and is
+    responsible for ensuring that [apply_ballot] cannot fail. *)
+val apply_ballot :
+  context ->
+  Kind.ballot contents ->
   (context * Kind.ballot Apply_results.contents_result_list) tzresult Lwt.t
