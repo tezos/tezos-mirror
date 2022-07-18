@@ -85,13 +85,8 @@ to delegates proportionally to their :ref:`active stake<active_stake>`,
 which usually is the same as their staking balance,
 that is, their own balance plus their delegated balance.
 
-A minimum active stake of one roll
+A :ref:`minimal active stake<glossary_minimal_stake>` of 6kꜩ
 is required for participating in consensus and in governance.
-A :ref:`roll<glossary_roll>` is just an amount of 6kꜩ and all
-computations with rolls are rounded to the nearest lower integer
-e.g. if you have 15kꜩ it amounts to 2 rolls. Rolls are used as a unit
-to determine delegates' voting rights in governance, while rights in
-consensus are not roll-based, they are based on the actual, non-approximated stake.
 
 Delegates are required to freeze around 10% of their active stake into
 a security deposit (more precisely, it's 10% of the maximum active
@@ -109,11 +104,11 @@ frozen deposits with the following command:
    tezos-client set deposits limit for <delegate> to <limit>
 
 
-On testnets, when you obtain coins from :ref:`the faucet<faucet>`, if you
-are lucky to obtain more than one roll, you can register a delegate
-using this identity.
-Otherwise, you need to ask the faucet for more accounts and
-delegate them to the first.
+On testnets, when you obtain coins from :ref:`a faucet<faucet>`, if
+you are lucky to obtain more than the minimum required to be a
+delegate, you can register the obtained account as a delegate.
+Otherwise, you need to ask the faucet for more accounts and delegate
+them to the first.
 
 
 .. _DelegateRegistration:

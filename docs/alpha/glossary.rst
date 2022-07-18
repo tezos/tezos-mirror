@@ -128,6 +128,12 @@ _`Implicit account`
 Michelson
     The built-in language used by a `smart contract`_.
 
+.. _glossary_minimal_stake:
+
+_`Minimal stake`
+    An amount of tez (e.g., 6000ꜩ) serving as a minimal amount for a
+    delegate to have baking_ and voting rights in a cycle_.
+
 _`Operations`
     The main operations in the protocol are transactions (to transfer funds
     or to execute smart contracts), accusations, activations, delegations,
@@ -147,13 +153,8 @@ _`Round`
     the round's corresponding time span. Baking_ outside of one's designated
     round results in an invalid block_.
 
-.. _glossary_roll_alpha:
-
 _`Roll`
-    An amount of tez (e.g., 6000ꜩ) serving as a minimal amount for a
-    delegate to have baking_ and voting rights in a cycle_. However,
-    rolls are not used as a unit for baking_ or voting rights, these are based
-    on the actual, non-approximated stake.
+    deprecated; see `Minimal stake`_.
 
 _`Smart contract`
     Account_ which is associated to a :ref:`Michelson <glossary_michelson_alpha>` script. They are
