@@ -27,7 +27,8 @@
   qcheck-alcotest
   tezos-benchmark
   tezos-benchmark-alpha
-  tezos-benchmark-type-inference-alpha)
+  tezos-benchmark-type-inference-alpha
+  tezos-sc-rollup-alpha)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -37,7 +38,8 @@
   -open Tezos_protocol_alpha
   -open Tezos_alpha_test_helpers
   -open Tezos_benchmark_alpha
-  -open Tezos_benchmark_type_inference_alpha))
+  -open Tezos_benchmark_type_inference_alpha
+  -open Tezos_sc_rollup_alpha))
 
 (rule
  (alias runtest)

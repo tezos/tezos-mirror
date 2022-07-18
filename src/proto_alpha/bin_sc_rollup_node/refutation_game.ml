@@ -136,48 +136,24 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     r
 
   let new_dissection node_ctxt store last_level ok our_view =
-    let open Lwt_result_syntax in
+    let state_hash_from_tick tick =
+      let open Lwt_result_syntax in
+      let* r = Interpreter.state_of_tick node_ctxt store tick last_level in
+      return (Option.map snd r)
+    in
     let start_hash, start_tick = ok in
-    let our_state, stop_tick = our_view in
+    let start_chunk = {state_hash = Some start_hash; tick = start_tick} in
+    let start_hash, start_tick = our_view in
+    let our_stop_chunk = {state_hash = start_hash; tick = start_tick} in
     let Node_context.{protocol_constants; _} = node_ctxt in
-    let max_number_of_sections =
-      Z.of_int
-        protocol_constants.parametric.sc_rollup.number_of_sections_in_dissection
+    let default_number_of_sections =
+      protocol_constants.parametric.sc_rollup.number_of_sections_in_dissection
     in
-    let trace_length = Z.succ (Sc_rollup.Tick.distance stop_tick start_tick) in
-    let number_of_sections = Z.min max_number_of_sections trace_length in
-    let rem = Z.(rem trace_length number_of_sections) in
-    let first_section_length, section_length =
-      if Z.Compare.(trace_length < max_number_of_sections) then
-        (* In this case, every section is of length one. *)
-        Z.(one, one)
-      else
-        let section_length =
-          Z.(max one (div trace_length number_of_sections))
-        in
-        if Z.Compare.(section_length = Z.one) && not Z.Compare.(rem = Z.zero)
-        then
-          (* If we put [section_length] in this situation, we will most likely
-             have a very long last section. *)
-          (rem, section_length)
-        else (section_length, section_length)
-    in
-    (* [k] is the number of sections in [rev_dissection]. *)
-    let rec make rev_dissection k tick =
-      if Z.(equal k (pred number_of_sections)) then
-        return
-        @@ List.rev
-             ({state_hash = our_state; tick = stop_tick} :: rev_dissection)
-      else
-        let* r = Interpreter.state_of_tick node_ctxt store tick last_level in
-        let state_hash = Option.map snd r in
-        let next_tick = Sc_rollup.Tick.jump tick section_length in
-        make ({state_hash; tick} :: rev_dissection) (Z.succ k) next_tick
-    in
-    make
-      [{state_hash = Some start_hash; tick = start_tick}]
-      Z.one
-      (Sc_rollup.Tick.jump start_tick first_section_length)
+    Game_helpers.new_dissection
+      ~start_chunk
+      ~our_stop_chunk
+      ~default_number_of_sections
+      ~state_hash_from_tick
 
   (** [generate_from_dissection node_ctxt store game]
       traverses the current [game.dissection] and returns a move which

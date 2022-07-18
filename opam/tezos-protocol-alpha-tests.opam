@@ -25,6 +25,7 @@ depends: [
   "tezos-context" {with-test}
   "tezos-test-helpers" {with-test}
   "alcotest" { with-test & >= "1.5.0" }
+  "tezos-sc-rollup-alpha" {with-test}
   "tezos-client-base" {with-test}
   "tezos-protocol-environment" {with-test}
   "tezos-stdlib-unix" {with-test}
