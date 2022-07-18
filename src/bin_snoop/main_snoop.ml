@@ -335,13 +335,6 @@ and get_all_workload_data_files directory =
   in
   loop []
 
-let cull_outliers_cmd workload_data nsigmas save_file =
-  let measure = Measure.load ~filename:workload_data in
-  match measure with
-  | Measure.Measurement (bench, {bench_opts; workload_data; date = _}) ->
-      let workload_data = Measure.cull_outliers ~nsigmas workload_data in
-      Measure.save ~filename:save_file ~options:bench_opts ~bench ~workload_data
-
 let codegen_cmd solution model_name codegen_options =
   let sol = Codegen.load_solution solution in
   match Registration.find_model model_name with
@@ -416,8 +409,6 @@ let () =
   | Some outcome -> (
       match outcome with
       | Cmdline.No_command -> exit 0
-      | Cmdline.Cull_outliers {workload_data; nsigmas; save_file} ->
-          cull_outliers_cmd workload_data nsigmas save_file
       | Cmdline.Benchmark {bench_name; bench_opts} ->
           benchmark_cmd bench_name bench_opts
       | Cmdline.Infer {model_name; workload_data; solver; infer_opts} ->

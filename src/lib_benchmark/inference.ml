@@ -25,23 +25,23 @@
 (*****************************************************************************)
 
 open Costlang
-
-type constrnt = Full of (Costlang.affine * quantity)
-
-and quantity = Quantity of float
-
+open Maths
 module NMap = Stats.Finbij.Make (Free_variable)
+
+type constrnt = Full of (Costlang.affine * measure)
+
+and measure = Measure of vector
 
 type problem =
   | Non_degenerate of {
       lines : constrnt list;
-      input : Matrix.t;
-      output : Matrix.t;
+      input : matrix;
+      output : matrix;
       nmap : NMap.t;
     }
-  | Degenerate of {predicted : Matrix.t; measured : Matrix.t}
+  | Degenerate of {predicted : matrix; measured : matrix}
 
-type solution = {mapping : (Free_variable.t * float) list; weights : Matrix.t}
+type solution = {mapping : (Free_variable.t * float) list; weights : matrix}
 
 type solver =
   | Ridge of {alpha : float; normalize : bool}
@@ -69,24 +69,23 @@ let establish_bijection (lines : constrnt list) : NMap.t =
 let line_list_to_ols (lines : constrnt list) =
   let nmap = establish_bijection lines in
   let lcount = List.length lines in
-  let inputs = Matrix.create ~lines:lcount ~cols:(NMap.support nmap) in
-  let outputs = Matrix.create ~lines:lcount ~cols:1 in
+  let inputs = Array.make_matrix lcount (NMap.support nmap) 0.0 in
+  let outputs = Array.make_matrix lcount 1 0.0 in
   (* initialize inputs *)
   List.iteri
     (fun i line ->
       match line with
-      | Full (affine, Quantity qty) ->
+      | Full (affine, Measure vec) ->
           Free_variable.Sparse_vec.iter
             (fun variable multiplicity ->
               let dim = NMap.idx_exn nmap variable in
-              Matrix.set inputs i dim multiplicity)
+              inputs.(i).(dim) <- multiplicity)
             affine.linear_comb ;
-          Matrix.set outputs i 0 (qty -. affine.const) ;
-          Tezos_stdlib_unix.Utils.display_progress (fun m ->
-              m "Initializing matrices %d/%d%!" (i + 1) lcount))
+          let vec = Vector.map (fun qty -> qty -. affine.const) vec in
+          outputs.(i) <- vector_to_array vec)
     lines ;
   Tezos_stdlib_unix.Utils.display_progress_end () ;
-  (inputs, outputs, nmap)
+  (matrix_of_array_array inputs, matrix_of_array_array outputs, nmap)
 
 (* -------------------------------------------------------------------------- *)
 (* Computing prediction error *)
@@ -116,16 +115,11 @@ let pp_error_statistics fmtr err_stat =
     err_stat.avg_l2
     err_stat.underestimated_measured
 
-let column_to_floatarray column =
-  assert (Matrix.dim2 column = 1) ;
-  let rows = Matrix.dim1 column in
-  Array.init rows (fun i -> Matrix.get column i 0)
-
-let compute_error_statistics ~predicted ~measured =
-  assert (Matrix.shape predicted = Matrix.shape measured) ;
-  assert (Matrix.dim2 predicted = 1) ;
-  let predicted = column_to_floatarray predicted in
-  let measured = column_to_floatarray measured in
+let compute_error_statistics ~(predicted : matrix) ~(measured : matrix) =
+  assert (Linalg.Tensor.Int.equal (Matrix.idim predicted) (Matrix.idim measured)) ;
+  assert (Maths.col_dim predicted = 1) ;
+  let predicted = vector_to_array (Matrix.col predicted 1) in
+  let measured = vector_to_array (Matrix.col measured 1) in
   let error = Array.map2 ( -. ) measured predicted in
   let rows = Array.length error in
   let n = float_of_int rows in
@@ -151,7 +145,7 @@ let compute_error_statistics ~predicted ~measured =
 
 let make_problem_from_workloads :
     type workload.
-    data:(workload * float) list ->
+    data:(workload * vector) list ->
     overrides:(Free_variable.t -> float option) ->
     evaluate:(workload -> Eval_to_vector.size Eval_to_vector.repr) ->
     problem =
@@ -171,12 +165,14 @@ let make_problem_from_workloads :
   (* This function has to _preserve the order of workloads_. *)
   let lines =
     List.fold_left
-      (fun lines (workload, time) ->
+      (fun lines (workload, measures) ->
         model_progress () ;
         let res = Eval_to_vector.prj (evaluate workload) in
         let res = Hash_cons_vector.prj res in
         let affine = Eval_linear_combination_impl.run overrides res in
-        let line = Full (affine, Quantity time) in
+        (* We hardcode determinization of the empirical timing distribution
+           using the median statistic. *)
+        let line = Full (affine, Measure measures) in
         line :: lines)
       []
       data
@@ -190,18 +186,15 @@ let make_problem_from_workloads :
       lines
   then
     let predicted, measured =
-      List.map (fun (Full (affine, Quantity q)) -> (affine.const, q)) lines
+      List.map (fun (Full (affine, Measure vec)) -> (affine.const, vec)) lines
       |> List.split
     in
     let measured =
-      let measured = Array.of_list measured in
-      Matrix.init ~lines:(Array.length measured) ~cols:1 ~f:(fun l _c ->
-          measured.(l))
+      matrix_of_array_array (Array.of_list (List.map vector_to_array measured))
     in
     let predicted =
-      let predicted = Array.of_list predicted in
-      Matrix.init ~lines:(Array.length predicted) ~cols:1 ~f:(fun l _c ->
-          predicted.(l))
+      matrix_of_array_array
+        (Array.of_list predicted |> Array.map (fun x -> [|x|]))
     in
     Degenerate {predicted; measured}
   else
@@ -214,7 +207,9 @@ let make_problem :
     overrides:(Free_variable.t -> float option) ->
     problem =
  fun ~data ~model ~overrides ->
-  let data = List.map (fun {Measure.workload; qty} -> (workload, qty)) data in
+  let data =
+    List.map (fun {Measure.workload; measures} -> (workload, measures)) data
+  in
   match model with
   | Model.Packaged {conv; model} ->
       let module M = (val model) in
@@ -232,28 +227,16 @@ let make_problem :
 
 let fv_to_string fv = Format.asprintf "%a" Free_variable.pp fv
 
-let to_list_of_rows (m : Matrix.t) : float list list =
-  let lines, cols = Matrix.shape m in
-  let init n f =
-    List.init ~when_negative_length:() n f
-    |> (* lines/column count cannot be negative *)
-    WithExceptions.Result.get_ok ~loc:__LOC__
-  in
-  init lines (fun l -> init cols (fun c -> Matrix.get m l c))
+let to_list_of_rows (m : matrix) : float list list =
+  let cols = Maths.col_dim m in
+  let rows = Maths.row_dim m in
+  List.init ~when_negative_length:() rows (fun r ->
+      List.init ~when_negative_length:() cols (fun c -> Matrix.get m (c, r))
+      |> WithExceptions.Result.get_ok ~loc:__LOC__)
+  |> WithExceptions.Result.get_ok ~loc:__LOC__
 
-let of_list_of_rows (m : float list list) : Matrix.t =
-  let lines = List.length m in
-  let cols =
-    List.length (WithExceptions.Option.get ~loc:__LOC__ @@ List.hd m)
-  in
-  let mat = Matrix.create ~lines ~cols in
-  List.iteri
-    (fun l row -> List.iteri (fun c elt -> Matrix.set mat l c elt) row)
-    m ;
-  mat
-
-let model_matrix_to_csv (m : Matrix.t) (nmap : NMap.t) : Csv.csv =
-  let _, cols = Matrix.shape m in
+let model_matrix_to_csv (m : matrix) (nmap : NMap.t) : Csv.csv =
+  let cols = Maths.col_dim m in
   let names =
     List.init ~when_negative_length:() cols (fun i ->
         fv_to_string (NMap.nth_exn nmap i))
@@ -264,7 +247,7 @@ let model_matrix_to_csv (m : Matrix.t) (nmap : NMap.t) : Csv.csv =
   let rows = List.map (List.map string_of_float) rows in
   names :: rows
 
-let timing_matrix_to_csv colname (m : Matrix.t) : Csv.csv =
+let timing_matrix_to_csv colname (m : matrix) : Csv.csv =
   let rows = to_list_of_rows m in
   let rows = List.map (List.map string_of_float) rows in
   [colname] :: rows
@@ -291,28 +274,61 @@ let solution_to_csv : solution -> Csv.csv option =
 (* -------------------------------------------------------------------------- *)
 (* Solving problems *)
 
+(* Create a [matrix] overlay over a Python matrix.
+   Note how we switch from row major to column major in
+   order to comply to [Linalg]'s defaults. *)
+let of_scipy m =
+  let r = Scikit_matrix.dim1 m in
+  let c = Scikit_matrix.dim2 m in
+  Matrix.make (Linalg.Tensor.Int.rank_two c r) @@ fun (c, r) ->
+  Scikit_matrix.get m r c
+
+(* Convert a matrix overlay to a Python matrix. *)
+let to_scipy m =
+  let cols = Maths.col_dim m in
+  let rows = Maths.row_dim m in
+  Scikit_matrix.init ~lines:rows ~cols ~f:(fun l c -> Matrix.get m (c, l))
+
+let wrap_python_solver ~input ~output solver =
+  (* Scipy's solvers expect a column vector on output. *)
+  let output =
+    Matrix.of_col
+    @@ map_rows
+         (fun row ->
+           Stats.Emp.quantile (module Float) (vector_to_array row) 0.5)
+         output
+  in
+  let input = to_scipy input in
+  let output = to_scipy output in
+  solver input output |> of_scipy
+
+let ridge ~alpha ~normalize ~input ~output =
+  wrap_python_solver ~input ~output (fun input output ->
+      Scikit.LinearModel.ridge ~alpha ~normalize ~input ~output ())
+
+let lasso ~alpha ~normalize ~positive ~input ~output =
+  wrap_python_solver ~input ~output (fun input output ->
+      Scikit.LinearModel.lasso ~alpha ~normalize ~positive ~input ~output ())
+
+let nnls ~input ~output =
+  wrap_python_solver ~input ~output (fun input output ->
+      Scikit.LinearModel.nnls ~input ~output)
+
 let solve_problem : problem -> solver -> solution =
  fun problem solver ->
   match problem with
-  | Degenerate _ -> {mapping = []; weights = Matrix.create ~lines:0 ~cols:0}
+  | Degenerate _ -> {mapping = []; weights = empty_matrix}
   | Non_degenerate {input; output; nmap; _} ->
       let weights =
         match solver with
-        | Ridge {alpha; normalize} ->
-            Scikit.LinearModel.ridge ~alpha ~normalize ~input ~output ()
+        | Ridge {alpha; normalize} -> ridge ~alpha ~normalize ~input ~output
         | Lasso {alpha; normalize; positive} ->
-            Scikit.LinearModel.lasso
-              ~alpha
-              ~normalize
-              ~positive
-              ~input
-              ~output
-              ()
-        | NNLS -> Scikit.LinearModel.nnls ~input ~output
+            lasso ~alpha ~normalize ~positive ~input ~output
+        | NNLS -> nnls ~input ~output
       in
-      let lines = Matrix.dim1 weights in
+      let lines = Maths.row_dim weights in
       if lines <> NMap.support nmap then
-        let cols = Matrix.dim2 weights in
+        let cols = Maths.col_dim weights in
         let dims = Format.asprintf "%d x %d" lines cols in
         let err =
           Format.asprintf
@@ -325,7 +341,7 @@ let solve_problem : problem -> solver -> solution =
         let mapping =
           NMap.fold
             (fun variable dim acc ->
-              let param = Matrix.get weights dim 0 in
+              let param = Matrix.get weights (0, dim) in
               (variable, param) :: acc)
             nmap
             []

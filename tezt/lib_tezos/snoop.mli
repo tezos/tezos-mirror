@@ -31,16 +31,10 @@ type t
 (** Create a tezos-snoop state *)
 val create : ?path:string -> ?color:Log.Color.t -> unit -> t
 
-(** Empirical timing distributions must be converted to definite times, using
-    either [Percentile i] for [i] in [0; 100], or by taking the [Mean]. *)
-type determinizer = Percentile of int | Mean
-
 (** Runs the benchmark command.
 
     This performs benchmark [bench_name], asking for [bench_num] points.
-    Each point is obtained by measuring execution time [nsamples] times and
-    determinizing the resulting timing distribution using [determinizer].
-    [determinizer] defaults to [Percentile 50], ie the median.
+    Each point is obtained by measuring execution time [nsamples] times.
     The result of benchmarking is saved to [save_to].
 
     For the meaning of the other optional parameters, see the documentation
@@ -50,7 +44,6 @@ val benchmark :
   bench_name:string ->
   bench_num:int ->
   nsamples:int ->
-  determinizer:determinizer ->
   save_to:string ->
   ?seed:int ->
   ?config_dir:string ->

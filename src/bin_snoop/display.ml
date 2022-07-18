@@ -45,13 +45,52 @@
 
 open Plot
 
+type empirical_plot =
+  | Empirical_plot_full
+  | Empirical_plot_quantiles of float list
+
 type options = {
   save_directory : string;
   point_size : float;
   qt_target_pixel_size : (int * int) option;
   pdf_target_cm_size : (float * float) option;
   reduced_plot_verbosity : bool;
+  plot_raw_workload : bool;
+  empirical_plot : empirical_plot;
 }
+
+let default_empirical_plot = Empirical_plot_quantiles [0.5]
+
+let nonempty_list_of_quantiles_encoding =
+  let open Data_encoding in
+  conv_with_guard
+    Fun.id
+    (fun list ->
+      match list with
+      | [] -> Error "Display.nonempty_list_of_quantiles: empty"
+      | qs ->
+          if List.exists (fun q -> q < 0.0 || q > 1.0) qs then
+            Error "Display.nonempty_list_of_quantiles: invalid"
+          else Ok qs)
+    (list float)
+
+let empirical_plot_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"Empirical_plot_full"
+        (Tag 0)
+        unit
+        (function Empirical_plot_full -> Some () | _ -> None)
+        (fun () -> Empirical_plot_full);
+      case
+        ~title:"Empirical_plot_quantiles"
+        (Tag 1)
+        nonempty_list_of_quantiles_encoding
+        (function Empirical_plot_quantiles list -> Some list | _ -> None)
+        (fun list -> Empirical_plot_quantiles list);
+    ]
 
 let options_encoding =
   let open Data_encoding in
@@ -62,30 +101,40 @@ let options_encoding =
            qt_target_pixel_size;
            pdf_target_cm_size;
            reduced_plot_verbosity;
+           plot_raw_workload;
+           empirical_plot;
          } ->
       ( save_directory,
         point_size,
         qt_target_pixel_size,
         pdf_target_cm_size,
-        reduced_plot_verbosity ))
+        reduced_plot_verbosity,
+        plot_raw_workload,
+        empirical_plot ))
     (fun ( save_directory,
            point_size,
            qt_target_pixel_size,
            pdf_target_cm_size,
-           reduced_plot_verbosity ) ->
+           reduced_plot_verbosity,
+           plot_raw_workload,
+           empirical_plot ) ->
       {
         save_directory;
         point_size;
         qt_target_pixel_size;
         pdf_target_cm_size;
         reduced_plot_verbosity;
+        plot_raw_workload;
+        empirical_plot;
       })
-    (obj5
+    (obj7
        (req "save_directory" string)
        (req "point_size" float)
        (opt "qt_target_pixel_size" (tup2 int31 int31))
        (opt "pdf_target_cm_size" (tup2 float float))
-       (dft "reduced_plot_verbosity" bool true))
+       (dft "reduced_plot_verbosity" bool true)
+       (dft "plot_raw_workload" bool false)
+       (dft "empirical_plot" empirical_plot_encoding default_empirical_plot))
 
 let default_options =
   {
@@ -94,6 +143,8 @@ let default_options =
     qt_target_pixel_size = None;
     pdf_target_cm_size = None;
     reduced_plot_verbosity = true;
+    plot_raw_workload = false;
+    empirical_plot = default_empirical_plot;
   }
 
 let point_size opts = opts.point_size
@@ -103,13 +154,21 @@ let qt_pixel_size opts = opts.qt_target_pixel_size
 let pdf_cm_size opts = opts.pdf_target_cm_size
 
 (* A [raw_row] is consists in a list of named values called a workload
-   (corresponding to time measurement of events) together with the
+   (corresponding to the size of some computational jobs) together with the
    corresponding measured execution time. Hence, if [n] is the length
    of the workload, there are [n+1] columns. *)
-type raw_row = {workload : (string * float) list; qty : float}
+type raw_row = {workload : (string * float) list; qty : float array}
 
 (* Gnuplot interprets by default underscores as subscript symbols *)
 let underscore_to_dash = String.map (fun c -> if c = '_' then '-' else c)
+
+(* Workload contains all sample but by default, we only plot the median. *)
+let convert_workload_data :
+    (Sparse_vec.String.t * float array) list -> raw_row list =
+ fun workload_data ->
+  List.map
+    (fun (vec, qty) -> {workload = Sparse_vec.String.to_list vec; qty})
+    workload_data
 
 let style opts i =
   let open Style in
@@ -128,9 +187,14 @@ let style opts i =
 let scatterplot_2d opts title (xaxis, input) outputs =
   let plots =
     List.mapi
-      (fun i output ->
+      (fun i (output : float array array) ->
         let style = style opts i in
-        let points = Data.of_array @@ Array.map2 Plot.r2 input output in
+        let xs = Array.to_seq input in
+        let ys = Array.to_seq output in
+        let points =
+          Seq.map2 (fun x ys -> Array.map (fun y -> Plot.r2 x y) ys) xs ys
+          |> List.of_seq |> Array.concat |> Data.of_array
+        in
         Scatter.points_2d ~points ~style ())
       outputs
   in
@@ -147,12 +211,15 @@ let rec map3 f l1 l2 l3 () =
 let scatterplot_3d opts title (xaxis, input_x) (yaxis, input_y) outputs =
   let plots =
     List.mapi
-      (fun i output ->
+      (fun i (output : float array array) ->
         let style = style opts i in
         let xs = Array.to_seq input_x in
         let ys = Array.to_seq input_y in
         let zs = Array.to_seq output in
-        let points = map3 Plot.r3 xs ys zs |> Data.of_seq in
+        let points =
+          map3 (fun x y zs -> Array.map (fun z -> Plot.r3 x y z) zs) xs ys zs
+          |> List.of_seq |> Array.concat |> Data.of_array
+        in
         Scatter.points_3d ~points ~style ())
       outputs
   in
@@ -206,36 +273,62 @@ let plot_scatter opts title input_columns outputs =
    together with timings:
      [| 2879 ; 768 |] *)
 
-let convert_workload_data : (Sparse_vec.String.t * float) list -> raw_row list =
- fun workload_data ->
-  List.map
-    (fun (vec, qty) -> {workload = Sparse_vec.String.to_list vec; qty})
-    workload_data
+(* Plotting the full dataset makes plot generation slow. We bin the data
+   and plot nonempty bins. [bin_data] works in linear time. *)
+let bin_data bins data =
+  let min, max =
+    Array.fold_left
+      (fun (min, max) x -> (Float.min x min, Float.max x max))
+      (Float.max_float, -.Float.max_float)
+      data
+  in
+  let range = max -. min in
+  let width = range /. float_of_int bins in
+  let spec = Stats.Binning.regular ~origin:min ~width ~truncate:None in
+  let binned = Stats.Binning.from_empirical spec data in
+  let acc = ref [] in
+  Stats.Fin.Float.iter_mes binned (fun bin qty ->
+      match Stats.Binning.map_from_bin spec bin with
+      | None ->
+          (* Cannot happen because [truncate] is set to [None]*)
+          assert false
+      | Some x when qty > 0.0 -> acc := x :: !acc
+      | _ -> ()) ;
+  Array.of_list !acc
 
-let empirical_data (workload_data : (Sparse_vec.String.t * float) list) =
+let process_empirical_data empirical_plot data =
+  match empirical_plot with
+  | Empirical_plot_full ->
+      if Array.length data > 500 then bin_data 500 data else data
+  | Empirical_plot_quantiles qs ->
+      List.map (fun q -> Stats.Emp.quantile (module Float) data q) qs
+      |> Array.of_list
+
+let empirical_data opts
+    (workload_data : (Sparse_vec.String.t * float array) list) =
   let samples = convert_workload_data workload_data in
   (* Extract name of variables and check well-formedness *)
   let variables =
-    List.map (fun {workload; _} -> List.map fst workload) samples
+    List.rev_map (fun {workload; _} -> List.rev_map fst workload) samples
   in
   let variables = List.sort_uniq Stdlib.compare variables in
   match variables with
   | [] | _ :: _ :: _ ->
       Format.kasprintf
         Result.error
-        "Display.empirical_data: variables not named consistenly@."
+        "Display.empirical_data: variables not named consistently@."
   | [vars] ->
       let rows = List.length samples in
       let input_dims = List.length vars in
-      let columns = Array.init input_dims (fun _ -> Array.make rows 0.0) in
-      let timings = Array.make rows 0.0 in
+      let columns = Array.make_matrix input_dims rows 0.0 in
+      let timings = Array.make rows [||] in
       List.iteri
         (fun i {workload; qty} ->
           assert (Compare.List_length_with.(workload = input_dims)) ;
           List.iteri
             (fun input_dim (_, size) -> columns.(input_dim).(i) <- size)
             workload ;
-          timings.(i) <- qty)
+          timings.(i) <- process_empirical_data opts.empirical_plot qty)
         samples ;
       let columns = Array.to_list columns in
       let named_columns =
@@ -245,59 +338,63 @@ let empirical_data (workload_data : (Sparse_vec.String.t * float) list) =
       in
       Ok (named_columns, timings)
 
-let column_is_constant (m : Matrix.t) =
-  let rows, cols = Matrix.shape m in
-  assert (cols = 1) ;
-  let fst = Matrix.get m 0 0 in
+let column_is_constant (v : Maths.vector) =
+  let rows = Maths.vec_dim v in
+  assert (rows > 0) ;
+  let fst = Maths.Vector.get v 0 in
   let flg = ref true in
   for i = 1 to rows - 1 do
-    let v = Matrix.get m i 0 in
+    let v = Maths.Vector.get v i in
     flg := !flg && v = fst
   done ;
   !flg
 
 (* Prune the dimensions of the input matrix which are constant. *)
-let prune_problem problem : (Free_variable.t * Matrix.t) list * Matrix.t =
-  match problem with
-  | Inference.Degenerate _ -> assert false
-  | Inference.Non_degenerate {input; output; nmap; _} ->
-      let _, cols = Matrix.shape input in
-      let named_columns =
-        List.init ~when_negative_length:() cols (fun c ->
-            let name = Inference.NMap.nth_exn nmap c in
-            let col = Matrix.column input c in
-            (name, col))
-        |> (* column count cannot be negative *)
-        WithExceptions.Result.get_ok ~loc:__LOC__
-      in
-      let columns =
-        List.filter (fun (_, col) -> not (column_is_constant col)) named_columns
-      in
-      (columns, output)
+let prune_problem input nmap : (Free_variable.t * Maths.vector) list =
+  let cols = Maths.col_dim input in
+  let named_columns =
+    List.init ~when_negative_length:() cols (fun c ->
+        let name = Inference.NMap.nth_exn nmap c in
+        let col = Maths.Matrix.col input c in
+        (name, col))
+    |> (* column count cannot be negative *)
+    WithExceptions.Result.get_ok ~loc:__LOC__
+  in
+  List.filter (fun (_, col) -> not (column_is_constant col)) named_columns
 
-let column_to_array (m : Matrix.t) =
-  let rows = Matrix.dim1 m in
-  let cols = Matrix.dim2 m in
+let column_to_array (m : Maths.matrix) =
+  let rows = Maths.row_dim m in
+  let cols = Maths.col_dim m in
   assert (cols = 1) ;
-  Array.init rows (fun i -> Matrix.get m i 0)
+  Array.init rows (fun i -> Maths.Matrix.get m (0, i))
+
+let vector_to_array = Maths.vector_to_array
 
 let validator opts (problem : Inference.problem) (solution : Inference.solution)
     =
   let open Result_syntax in
   match problem with
   | Inference.Degenerate _ -> Error "Display.validator: degenerate plot"
-  | Inference.Non_degenerate {input; _} ->
+  | Inference.Non_degenerate {input; output; nmap; _} ->
       let {Inference.weights; _} = solution in
-      let predicted = Matrix.numpy_mul input weights in
-      let columns, timings = prune_problem problem in
+      let predicted = Maths.Matrix.mm input weights in
+      let columns = prune_problem input nmap in
       let columns =
         List.map
           (fun (c, m) ->
-            (Format.asprintf "%a" Free_variable.pp c, column_to_array m))
+            (Format.asprintf "%a" Free_variable.pp c, vector_to_array m))
           columns
       in
-      let timings = column_to_array timings in
-      let predicted = column_to_array predicted in
+      let rows = Maths.row_dim output in
+      let timings = Array.make rows [||] in
+      for i = 0 to rows - 1 do
+        let row = Maths.vector_to_array (Maths.Matrix.row output i) in
+        timings.(i) <- process_empirical_data opts.empirical_plot row
+      done ;
+      let predicted =
+        vector_to_array (Maths.Matrix.col predicted 0)
+        |> Array.map (fun x -> [|x|])
+      in
       let* plots =
         plot_scatter
           opts
@@ -307,13 +404,31 @@ let validator opts (problem : Inference.problem) (solution : Inference.solution)
       in
       return plots
 
-let empirical opts (workload_data : (Sparse_vec.String.t * float) list) =
+let is_trivial_workload workload = Array.for_all (fun x -> x = 1.0) workload
+
+let empirical opts (workload_data : (Sparse_vec.String.t * float array) list) =
   let open Result_syntax in
   if opts.reduced_plot_verbosity then return []
   else
-    let* columns, timings = empirical_data workload_data in
-    let* plots = plot_scatter opts "Empirical" columns [timings] in
-    return plots
+    let* columns, timings = empirical_data opts workload_data in
+    (* If the data is non-trivial, we produce a scatter plot.
+       Otherwise, we produce a histogram of the data. *)
+    match columns with
+    | [(name, workload)] when is_trivial_workload workload ->
+        let data = timings |> Array.to_list |> Array.concat in
+        let std = Maths.std (Maths.vector_of_array data) in
+        let points = data |> Array.map Plot.r1 |> Data.of_array in
+        let plot =
+          plot2
+            ~xaxis:name
+            ~yaxis:"freq"
+            ~title:"Empirical (histogram)"
+            [Histogram.hist ~binwidth:(std *. 0.1) ~points ()]
+        in
+        return [plot]
+    | _ ->
+        let* plots = plot_scatter opts "Empirical" columns [timings] in
+        return plots
 
 let eval_mset (mset : Free_variable.Sparse_vec.t)
     (eval : Free_variable.t -> float) =
@@ -346,13 +461,39 @@ let validator_empirical opts workload_data (problem : Inference.problem)
         in
         Array.of_list predicted_list
   in
-  let* columns, timings = empirical_data workload_data in
+  let* columns, timings = empirical_data opts workload_data in
   let* plots =
-    plot_scatter opts "Validation (raw)" columns [timings; predicted]
+    plot_scatter
+      opts
+      "Validation (raw)"
+      columns
+      [timings; predicted |> Array.map (fun x -> [|x|])]
   in
   return plots
 
 type plot_target = Save | Show
+
+let raw_workload (workload_data : (Sparse_vec.String.t * float array) list) =
+  let open Plot in
+  List.map
+    (fun (workload, data) ->
+      let workload = Sparse_vec.String.to_list workload in
+      let title =
+        Format.asprintf
+          "%a"
+          (Format.pp_print_list
+             ~pp_sep:(fun fmtr () -> Format.fprintf fmtr "-")
+             (fun fmtr (k, v) -> Format.fprintf fmtr "%s=%d" k (int_of_float v)))
+          workload
+        |> underscore_to_dash
+      in
+      let points = data |> Array.to_seq |> Seq.map r1 |> Data.of_seq in
+      plot2
+        ~xaxis:"time"
+        ~yaxis:"freq"
+        ~title
+        [Histogram.hist ~binwidth:50.0 ~points ()])
+    workload_data
 
 let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
   let (Measure.Measurement ((module Bench), measurement)) = measure in
@@ -366,10 +507,21 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
   in
   let workload_data =
     List.map
-      (fun {Measure.workload; qty} -> (Bench.workload_to_vector workload, qty))
+      (fun {Measure.workload; measures} ->
+        (Bench.workload_to_vector workload, Maths.vector_to_array measures))
       measurement.workload_data
   in
-  let try_plot kind plot_result =
+  let get_targets =
+    let res = ref None in
+    fun () ->
+      match !res with
+      | Some res -> res
+      | None ->
+          let targets = Plot.get_targets () in
+          res := Some targets ;
+          targets
+  in
+  let try_plot plot_target kind plot_result =
     match plot_result with
     | Ok [] -> []
     | Ok plots -> (
@@ -384,7 +536,7 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
               plots
         | Show ->
             let target =
-              match Plot.get_targets () with
+              match get_targets () with
               | None ->
                   Format.eprintf
                     "Failed performing plot: could not get list of terminal \
@@ -406,7 +558,18 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
         Format.eprintf "Failed performing plot: %s@." msg ;
         []
   in
-  (try_plot "emp" @@ empirical options workload_data)
-  @ (try_plot "validation" @@ validator options problem solution)
-  @ try_plot "emp-validation"
-  @@ validator_empirical options workload_data problem solution
+  let raw =
+    if options.plot_raw_workload then
+      List.mapi
+        (fun i plot ->
+          let kind = Format.asprintf "raw-%.2d" i in
+          try_plot Save kind (Result.ok [plot]))
+        (raw_workload workload_data)
+      |> List.flatten
+    else []
+  in
+  (try_plot plot_target "emp" @@ empirical options workload_data)
+  @ (try_plot plot_target "validation" @@ validator options problem solution)
+  @ (try_plot plot_target "emp-validation"
+    @@ validator_empirical options workload_data problem solution)
+  @ raw

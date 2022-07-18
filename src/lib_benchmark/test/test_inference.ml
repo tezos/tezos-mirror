@@ -49,7 +49,8 @@ module T () = struct
       (fun (Input x as workload) ->
         (* This 'noise' is crappy but you get the idea *)
         let noise = Random.State.float rng_state 2.0 -. 1. in
-        Measure.{workload; qty = noise +. truth x})
+        Measure.
+          {workload; measures = Maths.vector_of_array [|noise +. truth x|]})
       input
     |> Array.to_list
 

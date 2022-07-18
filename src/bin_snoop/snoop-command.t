@@ -11,7 +11,6 @@ Missing config file prints
   { options = { seed=self-init;
                 bench #=1;
                 nsamples/bench=3000;
-                determinizer=percentile 50;
                 minor_heap_size=262144 words;
                 config directory=__nosuchdir };
      save_file = output.json;
