@@ -7,6 +7,8 @@ open Sexpr
 module TzStdLib = Tezos_lwt_result_stdlib.Lwtreslib.Bare
 module Vector = Lazy_vector.Int32Vector
 
+type block_table = Ast.instr Vector.t Vector.t
+
 (* Generic formatting *)
 
 let nat n = I32.to_string_u (I32.of_int_u n)

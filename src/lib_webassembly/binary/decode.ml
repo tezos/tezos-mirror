@@ -7,7 +7,7 @@ type stream = {name : string; bytes : string; pos : int ref}
 
 let make_stream ~name ~bytes = {name; bytes; pos = ref 0}
 
-type block_state = {mutable new_blocks : Ast.instr Vector.t Vector.t}
+type block_state = {mutable new_blocks : Ast.block_table}
 
 let make_empty_block_state () = {new_blocks = Vector.(singleton (empty ()))}
 

@@ -403,6 +403,8 @@ type start = start' Source.phrase
 
 and start' = {sfunc : var}
 
+type block_table = instr Vector.t Vector.t
+
 type module_ = module_' Source.phrase
 
 and module_' = {
@@ -416,7 +418,7 @@ and module_' = {
   datas : data_segment Vector.t;
   imports : import Vector.t;
   exports : export Vector.t;
-  blocks : instr Vector.t Vector.t;
+  blocks : block_table;
 }
 
 (* Auxiliary functions *)

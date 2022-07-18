@@ -21,7 +21,7 @@ type module_inst = {
   exports : extern NameMap.t;
   elems : elem_inst Vector.t;
   datas : data_inst Vector.t;
-  blocks : Ast.instr Vector.t Vector.t;
+  blocks : Ast.block_table;
 }
 
 and func_inst = (input_inst, module_inst ref) Func.t
