@@ -114,7 +114,7 @@ module V2_0_0 = struct
       (fun (tree_proof, given, requested) -> {tree_proof; given; requested})
       (obj3
          (req "tree_proof" e)
-         (req "given" (option PS.input_encoding))
+         (opt "given" PS.input_encoding)
          (req "requested" PS.input_request_encoding))
 
   module Make (Context : P) :

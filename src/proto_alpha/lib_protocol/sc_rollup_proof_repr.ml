@@ -36,7 +36,7 @@ let encoding =
     (fun (pvm_step, inbox) -> {pvm_step; inbox})
     (obj2
        (req "pvm_step" Sc_rollups.wrapped_proof_encoding)
-       (req "inbox" (option Sc_rollup_inbox_repr.serialized_proof_encoding)))
+       (opt "inbox" Sc_rollup_inbox_repr.serialized_proof_encoding))
 
 let pp ppf _ = Format.fprintf ppf "Refutation game proof"
 
