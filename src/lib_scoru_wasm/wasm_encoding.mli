@@ -68,7 +68,7 @@ module Make
     current_module:Instance.module_inst ref Lazy.t ->
     Global.global Instance.Vector.t t
 
-  val chunked_byte_vector_ref_encoding : Chunked_byte_vector.Lwt.t ref t
+  val data_label_ref_encoding : Ast.data_label ref t
 
   val function_vector_encoding :
     current_module:Instance.module_inst ref Lazy.t ->
@@ -89,6 +89,10 @@ module Make
     Values.ref_ Instance.Vector.t ref Instance.Vector.t t
 
   val block_table_encoding : Ast.block_table t
+
+  val datas_table_encoding : Ast.datas_table t
+
+  val allocations_encoding : Ast.allocations t
 
   val module_instance_encoding : Instance.module_inst t
 end

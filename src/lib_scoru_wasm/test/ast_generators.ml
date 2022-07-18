@@ -56,6 +56,10 @@ let block_label_gen =
   let+ l = int32 in
   Ast.Block_label l
 
+let data_label_gen =
+  let+ l = int32 in
+  Ast.Data_label l
+
 let block_type_gen =
   let open Ast in
   oneof
@@ -381,8 +385,8 @@ let elems_gen =
   ref v
 
 let datas_gen =
-  let+ chunk = chunked_byte_vector_gen in
-  ref @@ chunk
+  let+ lbl = data_label_gen in
+  ref @@ lbl
 
 let blocks_table_gen = vector_gen (vector_gen instr_gen)
 

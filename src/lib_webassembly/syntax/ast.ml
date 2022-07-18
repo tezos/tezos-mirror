@@ -409,7 +409,7 @@ type block_table = instr Vector.t Vector.t
 
 type datas_table = Chunked_byte_vector.Lwt.t Vector.t
 
-type allocations = {blocks : block_table; datas : datas_table}
+type allocations = {blocks : block_table; mutable datas : datas_table}
 
 type module_ = module_' Source.phrase
 

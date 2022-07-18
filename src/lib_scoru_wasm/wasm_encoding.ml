@@ -73,6 +73,9 @@ struct
   let block_label_encoding =
     value [] Interpreter_encodings.Ast.block_label_encoding
 
+  let data_label_encoding =
+    value [] Interpreter_encodings.Ast.data_label_encoding
+
   let instruction_encoding =
     let unit_encoding = value [] Data_encoding.unit in
     let open Ast in
@@ -587,8 +590,8 @@ struct
   let global_vector_encoding ~current_module =
     lazy_vector_encoding "globals" (global_encoding ~current_module)
 
-  let chunked_byte_vector_ref_encoding =
-    conv (fun x -> ref x) (fun r -> !r) chunked_byte_vector
+  let data_label_ref_encoding =
+    conv (fun x -> ref x) (fun r -> !r) data_label_encoding
 
   let function_vector_encoding ~current_module =
     lazy_vector_encoding "functions" (function_encoding ~current_module)
@@ -635,7 +638,7 @@ struct
          (value_ref_vector_encoding ~current_module))
 
   let data_instance_encoding =
-    lazy_vector_encoding "datas" chunked_byte_vector_ref_encoding
+    lazy_vector_encoding "datas" data_label_ref_encoding
 
   let block_table_encoding =
     lazy_vector_encoding

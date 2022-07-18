@@ -91,6 +91,9 @@ let pp_value_type_list = pp_list pp_value_type
 let pp_block_label out (Ast.Block_label l) =
   Format.fprintf out "Block_label @[<hv 2>(%ld)@]" l
 
+let pp_data_label out (Ast.Data_label l) =
+  Format.fprintf out "Data_label @[<hv 2>(%ld)@]" l
+
 let pp_opt pp out = function
   | Some x -> Format.fprintf out "Some @[<hv 2>(%a)@]" pp x
   | None -> Format.fprintf out "None"
@@ -485,7 +488,7 @@ let pp_allocations out allocations =
     pp_datas_table
     allocations.Ast.datas
 
-let pp_data_inst out ref = pp_chunk_byte_vector out !ref
+let pp_data_inst out ref = pp_data_label out !ref
 
 let pp_module out
     {
@@ -509,7 +512,7 @@ let pp_module out
      exports = %a;@;\
      elems = %a;@;\
      datas = %a;@;\
-     blocks = %a;@;\
+     allocations = %a;@;\
      }@]"
     (pp_vector pp_func_type)
     types

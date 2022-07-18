@@ -173,10 +173,11 @@ let mem_oob frame x i n =
     (Memory.bound mem)
 
 let data_oob frame x i n =
-  let+ data = data frame.inst x in
+  let* data_label = data frame.inst x in
+  let+ data = Ast.get_data !data_label frame.inst.allocations.datas in
   I64.gt_u
     (I64.add (I64_convert.extend_i32_u i) (I64_convert.extend_i32_u n))
-    (Chunked_byte_vector.Lwt.length !data)
+    (Chunked_byte_vector.Lwt.length data)
 
 let table_oob frame x i n =
   let+ tbl = table frame.inst x in
@@ -621,8 +622,9 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
             else if n = 0l then Lwt.return (vs', [])
             else
               let* seg = data frame.inst x in
+              let* seg = Ast.get_data !seg frame.inst.allocations.datas in
               let+ b =
-                Chunked_byte_vector.Lwt.load_byte !seg (Int64.of_int32 s)
+                Chunked_byte_vector.Lwt.load_byte seg (Int64.of_int32 s)
               in
               let b = Int32.of_int b in
               ( vs',
@@ -646,7 +648,7 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
                   ] )
         | DataDrop x, vs ->
             let+ seg = data frame.inst x in
-            seg := Chunked_byte_vector.Lwt.create 0L ;
+            seg := Data_label 0l ;
             (vs, [])
         | RefNull t, vs' -> Lwt.return (Ref (NullRef t) :: vs', [])
         | RefIsNull, Ref r :: vs' ->
@@ -923,9 +925,8 @@ let create_elem (inst : module_inst) (seg : elem_segment) : elem_inst Lwt.t =
   in
   ref (Instance.Vector.of_list init)
 
-let create_data (inst : module_inst) (seg : data_segment) : data_inst Lwt.t =
+let create_data (inst : module_inst) (seg : data_segment) : data_inst =
   let {dinit; _} = seg.it in
-  let+ dinit = Ast.get_data dinit inst.allocations.datas in
   ref dinit
 
 let add_import (m : module_) (ext : extern) (im : import) (inst : module_inst) :
@@ -1094,7 +1095,7 @@ let init host_funcs (m : module_) (exts : extern list) : module_inst Lwt.t =
   in
   let* new_exports = TzStdLib.List.map_s (create_export inst2) exports in
   let* new_elems = TzStdLib.List.map_s (create_elem inst2) elems in
-  let* new_datas = TzStdLib.List.map_s (create_data inst2) datas in
+  let new_datas = List.map (create_data inst2) datas in
   let* exports =
     (* TODO: #3076
        [new_exports]/[exports] should be lazy structures. *)

@@ -38,7 +38,7 @@ and export_inst = Ast.name * extern
 
 and elem_inst = Values.ref_ Vector.t ref
 
-and data_inst = Chunked_byte_vector.Lwt.t ref
+and data_inst = Ast.data_label ref
 
 and extern =
   | ExternFunc of func_inst
