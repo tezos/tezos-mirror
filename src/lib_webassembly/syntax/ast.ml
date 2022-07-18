@@ -367,6 +367,8 @@ and elem_segment' = {
   emode : segment_mode;
 }
 
+type data_label = Data_label of int32
+
 type data_segment = data_segment' Source.phrase
 
 and data_segment' = {dinit : Chunked_byte_vector.Lwt.t; dmode : segment_mode}
@@ -404,6 +406,8 @@ type start = start' Source.phrase
 and start' = {sfunc : var}
 
 type block_table = instr Vector.t Vector.t
+
+type datas_table = Chunked_byte_vector.Lwt.t Vector.t
 
 type module_ = module_' Source.phrase
 

@@ -62,7 +62,7 @@ type size = {size : int; start : pos}
 (** Incremental chunked byte vector creation (from implicit input). *)
 type byte_vector_kont =
   | VKStart  (** Initial step. *)
-  | VKRead of Chunked_byte_vector.Lwt.t * int64 * int64
+  | VKRead of Ast.data_label * int64 * int64
       (** Reading step, containing the current position in the string and the
       length, reading byte per byte. *)
   | VKStop of Chunked_byte_vector.Lwt.t  (** Final step, cannot reduce. *)
@@ -263,13 +263,19 @@ type building_state = {
   datas : Ast.data_segment Vector.t;
 }
 
+type data_state = private {
+  mutable new_data : Chunked_byte_vector.Lwt.t Vector.t;
+}
+
+type vectors_state = {blocks : block_state; datas : data_state}
+
 (** Decoding continuation step. *)
 type decode_kont = {
   building_state : building_state;
       (** Accumulated parsed sections, used to build the final module. *)
   module_kont : module_kont;  (** Module continuation. *)
   stream : stream;  (** Parsed stream. *)
-  block_state : block_state;  (** Basic blocks allocated. *)
+  vectors_state : vectors_state;  (** Basic blocks allocated. *)
 }
 
 (** [make_stream filename bytes] returns a new stream to decode. *)
@@ -282,6 +288,14 @@ val make_empty_block_state : unit -> block_state
     existing blocks allocation. This function is used to build block state during
     tree decoding. *)
 val make_block_state : Ast.instr Vector.t Vector.t -> block_state
+
+(** [make_empty_data_state ()] returns a new data allocation state. *)
+val make_empty_data_state : unit -> data_state
+
+(** [make_data_state data] returns a new data allocation state from already
+    existing data allocation. This function is used to build data state during
+    tree decoding. *)
+val make_data_state : Chunked_byte_vector.Lwt.t Vector.t -> data_state
 
 (** [module_step kont] takes one step of parsing from a continuation and returns
    a new continuation. Fails when the contination of the module is [MKStop]

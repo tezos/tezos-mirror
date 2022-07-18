@@ -184,26 +184,46 @@ let sized f s =
   require (pos s = start + size) s start "section size mismatch" ;
   x
 
+type data_state = {mutable new_data : Ast.datas_table}
+
+let make_empty_data_state () =
+  {new_data = Vector.(singleton (Chunked_byte_vector.Lwt.create 0L))}
+
+let make_data_state data = {new_data = data}
+
+let alloc_data s len =
+  let datas, d =
+    Vector.append (Chunked_byte_vector.Lwt.create len) s.new_data
+  in
+  s.new_data <- datas ;
+  Ast.Data_label d
+
+let add_to_data s (Ast.Data_label d) index byte =
+  let open Lwt.Syntax in
+  let* data = Vector.get d s.new_data in
+  Chunked_byte_vector.Lwt.store_byte data index byte
+
 (** Incremental chunked byte vector creation (from implicit input). *)
 type byte_vector_kont =
   | VKStart  (** Initial step. *)
-  | VKRead of Chunked_byte_vector.Lwt.t * int64 * int64
+  | VKRead of Ast.data_label * int64 * int64
       (** Reading step, containing the current position in the string and the
       length, reading byte per byte. *)
   | VKStop of Chunked_byte_vector.Lwt.t  (** Final step, cannot reduce. *)
 
-let byte_vector_step s =
+let byte_vector_step vecs s =
   let open Lwt.Syntax in
   function
   | VKStart ->
       let len = len32 s |> Int64.of_int in
-      let vector = Chunked_byte_vector.Lwt.create len in
+      let vector = alloc_data vecs len in
       VKRead (vector, 0L, len) |> Lwt.return
-  | VKRead (vector, index, len) when Int64.compare index len >= 0 ->
-      VKStop vector |> Lwt.return
+  | VKRead (Data_label d, index, len) when Int64.compare index len >= 0 ->
+      let+ vector = Vector.get d vecs.new_data in
+      VKStop vector
   | VKRead (vector, index, len) ->
       let c = get s in
-      let+ () = Chunked_byte_vector.Lwt.store_byte vector index c in
+      let+ () = add_to_data vecs vector index c in
       VKRead (vector, Int64.succ index, len)
   (* Final step, cannot reduce *)
   | VKStop vector -> assert false
@@ -1620,7 +1640,7 @@ let data_start s bs =
       DKMode {left; index; offset_kont = (left_offset, BlockStart)}
   | _ -> error s (pos s - 1) "malformed data segment kind"
 
-let data_step s bs =
+let data_step s bs data =
   let open Lwt.Syntax in
   function
   | DKStart -> data_start s bs |> Lwt.return
@@ -1636,7 +1656,7 @@ let data_step s bs =
   | DKInit {dmode; init_kont = VKStop dinit} ->
       DKStop {dmode; dinit} |> Lwt.return
   | DKInit {dmode; init_kont} ->
-      let+ init_kont = byte_vector_step s init_kont in
+      let+ init_kont = byte_vector_step data s init_kont in
       DKInit {dmode; init_kont}
   | DKStop _ -> assert false (* final step, cannot reduce *)
 
@@ -1783,11 +1803,13 @@ let add_field field state =
   | VecField (CodeField, code) -> {state with code}
   | VecField (DataField, datas) -> {state with datas}
 
+type vectors_state = {blocks : block_state; datas : data_state}
+
 type decode_kont = {
   building_state : building_state;  (** Accumulated parsed sections. *)
   module_kont : module_kont;
   stream : stream;
-  block_state : block_state;
+  vectors_state : vectors_state;
 }
 
 let vec_field ty (LazyVec {vector; _}) = VecField (ty, vector)
@@ -1804,7 +1826,8 @@ let module_step state =
       }
   in
   let s = state.stream in
-  let bs = state.block_state in
+  let bs = state.vectors_state.blocks in
+  let data = state.vectors_state.datas in
   match state.module_kont with
   | MKStart ->
       (* Module header *)
@@ -1983,7 +2006,7 @@ let module_step state =
       let data = Source.(data @@ region s left (pos s)) in
       next @@ MKField (DataField, size, lazy_vec_step data vec)
   | MKData (data_kont, pos, size, curr_vec) ->
-      let* data_kont = data_step s bs data_kont in
+      let* data_kont = data_step s bs data data_kont in
       next @@ MKData (data_kont, pos, size, curr_vec)
   | MKCode (CKStop func, left, size, vec) ->
       next @@ MKField (CodeField, size, lazy_vec_step func vec)
@@ -2078,12 +2101,15 @@ let module_ stream =
         let* next_state = module_step k in
         loop next_state
   in
+  let vectors_state =
+    {blocks = make_empty_block_state (); datas = make_empty_data_state ()}
+  in
   loop
     {
       building_state = empty_building_state;
       module_kont = MKStart;
       stream;
-      block_state = make_empty_block_state ();
+      vectors_state;
     }
 
 let decode ~name ~bytes =
