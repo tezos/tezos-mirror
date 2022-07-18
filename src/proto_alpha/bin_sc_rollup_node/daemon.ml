@@ -98,7 +98,6 @@ module Make (PVM : Pvm.S) = struct
   let process_finalized_l1_operation (type kind) _node_ctxt _store ~source:_
       (_operation : kind manager_operation)
       (_result : kind successful_manager_operation_result) =
-    (* TODO: log finalization and perform relevant actions *)
     Lwt.return_unit
 
   let process_l1_operation (type kind) ~finalized node_ctxt store ~source
@@ -127,6 +126,7 @@ module Make (PVM : Pvm.S) = struct
     if not (is_for_my_rollup operation) then return_unit
     else
       (* Only look at operations that are for the node's rollup *)
+      let* () = Daemon_event.included_operation ~finalized operation result in
       match result with
       | Applied success_result ->
           let process =
@@ -134,29 +134,9 @@ module Make (PVM : Pvm.S) = struct
             else process_included_l1_operation
           in
           process node_ctxt store ~source operation success_result
-      | _ when finalized ->
-          (* No action for finalized non successful operations  *)
+      | _ ->
+          (* No action for non successful operations  *)
           return_unit
-      | _ -> (
-          match operation with
-          | Sc_rollup_publish {commitment; _} -> (
-              match result with
-              | Applied _ -> assert false (* TODO: refactor these events *)
-              | Failed _ ->
-                  Commitment_event.publish_commitment_failed commitment
-              | Backtracked _ ->
-                  Commitment_event.publish_commitment_backtracked commitment
-              | Skipped _ ->
-                  Commitment_event.publish_commitment_skipped commitment)
-          | Sc_rollup_cement {commitment; _} -> (
-              match result with
-              | Applied _ -> assert false (* TODO: refactor these events *)
-              | Failed _ -> Commitment_event.cement_commitment_failed commitment
-              | Backtracked _ ->
-                  Commitment_event.cement_commitment_backtracked commitment
-              | Skipped _ ->
-                  Commitment_event.cement_commitment_skipped commitment)
-          | _ -> return_unit)
 
   let process_l1_block_operations ~finalized node_ctxt store
       (Layer1.Head {hash; _}) =
