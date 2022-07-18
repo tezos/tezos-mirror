@@ -65,7 +65,7 @@ type byte_vector_kont =
   | VKRead of Ast.data_label * int64 * int64
       (** Reading step, containing the current position in the string and the
       length, reading byte per byte. *)
-  | VKStop of Chunked_byte_vector.Lwt.t  (** Final step, cannot reduce. *)
+  | VKStop of Ast.data_label  (** Final step, cannot reduce. *)
 
 type name_step =
   | NKStart  (** UTF8 name starting point. *)
@@ -263,9 +263,7 @@ type building_state = {
   datas : Ast.data_segment Vector.t;
 }
 
-type data_state = private {
-  mutable new_data : Chunked_byte_vector.Lwt.t Vector.t;
-}
+type data_state = private {mutable new_data : Ast.datas_table}
 
 type vectors_state = {blocks : block_state; datas : data_state}
 
@@ -295,7 +293,7 @@ val make_empty_data_state : unit -> data_state
 (** [make_data_state data] returns a new data allocation state from already
     existing data allocation. This function is used to build data state during
     tree decoding. *)
-val make_data_state : Chunked_byte_vector.Lwt.t Vector.t -> data_state
+val make_data_state : Ast.datas_table -> data_state
 
 (** [module_step kont] takes one step of parsing from a continuation and returns
    a new continuation. Fails when the contination of the module is [MKStop]

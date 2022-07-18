@@ -632,9 +632,10 @@ let elem blocks i seg =
         atom elem_kind etype :: list (elem_index blocks) einit
       else atom ref_type etype :: list (const blocks "item") einit )
 
-let data blocks i seg =
+let data blocks datas i seg =
   let open Lwt.Syntax in
   let {dinit; dmode} = seg.it in
+  let* dinit = Ast.get_data dinit datas in
   let+ dinit = Chunked_byte_vector.Lwt.to_string dinit in
   Node ("data $" ^ nat i, segment_mode blocks "memory" dmode @ break_bytes dinit)
 
@@ -696,12 +697,14 @@ let module_with_var_opt x_opt m =
   let gx = ref 0 in
   let imports = lazy_vector (import fx tx mx gx) m.it.imports in
   let* blocks =
-    let* bls = Ast.Vector.to_list m.it.blocks in
+    let* bls = Ast.Vector.to_list m.it.allocations.blocks in
     let+ bls_l = TzStdLib.List.map_s Ast.Vector.to_list bls in
     let bls_v = List.map Vector.of_list bls_l in
     Vector.of_list bls_v
   in
-  let+ datas = lazy_vectori_lwt (data blocks) m.it.datas in
+  let+ datas =
+    lazy_vectori_lwt (data blocks m.it.allocations.datas) m.it.datas
+  in
   Node
     ( "module" ^ var_opt x_opt,
       lazy_vectori typedef m.it.types

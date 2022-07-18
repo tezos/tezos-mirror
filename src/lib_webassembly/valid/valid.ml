@@ -757,7 +757,7 @@ let check_module (m : module_) =
     elems;
     datas;
     exports;
-    blocks;
+    allocations = {blocks; datas = allocated_datas};
   } =
     m.it
   in
@@ -767,7 +767,9 @@ let check_module (m : module_) =
     let bls_v = List.map Vector.of_list bls_l in
     Vector.of_list bls_v
   in
+
   let* blocks = build_blocks blocks in
+  let* allocated_datas = Ast.Vector.to_list allocated_datas in
   let types = vec_to_list types in
   let imports = vec_to_list imports in
   let tables = vec_to_list tables in

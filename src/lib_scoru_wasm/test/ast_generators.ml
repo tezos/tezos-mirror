@@ -386,6 +386,13 @@ let datas_gen =
 
 let blocks_table_gen = vector_gen (vector_gen instr_gen)
 
+let datas_table_gen = vector_gen chunked_byte_vector_gen
+
+let allocations_gen =
+  let* blocks = blocks_table_gen in
+  let+ datas = datas_table_gen in
+  Ast.{blocks; datas}
+
 let module_gen () =
   let current_module = ref None in
   let get_current_module () =
@@ -401,7 +408,7 @@ let module_gen () =
   let* exports = map_gen (extern_gen get_current_module) in
   let* elems = vector_gen elems_gen in
   let* datas = vector_gen datas_gen in
-  let* blocks = blocks_table_gen in
+  let* allocations = allocations_gen in
   let module_ =
     {
       Instance.types;
@@ -412,7 +419,7 @@ let module_gen () =
       exports;
       elems;
       datas;
-      blocks;
+      allocations;
     }
   in
   current_module := Some (ref module_) ;

@@ -642,6 +642,15 @@ struct
       "block-table"
       (lazy_vector_encoding "instructions" instruction_encoding)
 
+  let datas_table_encoding =
+    lazy_vector_encoding "datas-table" chunked_byte_vector
+
+  let allocations_encoding =
+    conv
+      (fun (blocks, datas) -> Ast.{blocks; datas})
+      (fun {blocks; datas} -> (blocks, datas))
+      (tup2 ~flatten:false block_table_encoding datas_table_encoding)
+
   let module_instance_encoding =
     let open Lwt_syntax in
     let gen_encoding current_module =
@@ -655,7 +664,7 @@ struct
                exports,
                elems,
                datas,
-               blocks ) ->
+               allocations ) ->
           let open Lwt_syntax in
           return
             {
@@ -667,7 +676,7 @@ struct
               exports;
               elems;
               datas;
-              blocks;
+              allocations;
             })
         (fun {
                Instance.types;
@@ -678,7 +687,7 @@ struct
                exports;
                elems;
                datas;
-               blocks;
+               allocations;
              } ->
           return
             ( types,
@@ -689,7 +698,7 @@ struct
               exports,
               elems,
               datas,
-              blocks ))
+              allocations ))
         (tup9
            ~flatten:false
            function_type_vector_encoding
@@ -700,7 +709,7 @@ struct
            (extern_map_encoding ~current_module)
            (value_ref_vector_vector_encoding ~current_module)
            data_instance_encoding
-           block_table_encoding)
+           allocations_encoding)
     in
     scope ["module"] @@ with_self_reference gen_encoding
 end

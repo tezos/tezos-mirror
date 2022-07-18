@@ -50,6 +50,8 @@ module List32 : sig
   val drop : int32 -> 'a list -> 'a list (* raises Failure *)
 
   val mapi : (int32 -> 'a -> 'b) -> 'a list -> 'b list
+
+  val mapi_s : (int32 -> 'a -> 'b Lwt.t) -> 'a list -> 'b list Lwt.t
 end
 
 module Array32 : sig

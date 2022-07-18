@@ -371,7 +371,7 @@ type data_label = Data_label of int32
 
 type data_segment = data_segment' Source.phrase
 
-and data_segment' = {dinit : Chunked_byte_vector.Lwt.t; dmode : segment_mode}
+and data_segment' = {dinit : data_label; dmode : segment_mode}
 
 (* Modules *)
 
@@ -409,6 +409,8 @@ type block_table = instr Vector.t Vector.t
 
 type datas_table = Chunked_byte_vector.Lwt.t Vector.t
 
+type allocations = {blocks : block_table; datas : datas_table}
+
 type module_ = module_' Source.phrase
 
 and module_' = {
@@ -422,10 +424,12 @@ and module_' = {
   datas : data_segment Vector.t;
   imports : import Vector.t;
   exports : export Vector.t;
-  blocks : block_table;
+  allocations : allocations;
 }
 
 (* Auxiliary functions *)
+
+let empty_allocations = {blocks = Vector.create 0l; datas = Vector.create 0l}
 
 let empty_module =
   {
@@ -439,10 +443,12 @@ let empty_module =
     datas = Vector.create 0l;
     imports = Vector.create 0l;
     exports = Vector.create 0l;
-    blocks = Vector.create 0l;
+    allocations = empty_allocations;
   }
 
 open Source
+
+let get_data (Data_label d) datas = Vector.get d datas
 
 let func_type_for (m : module_) (x : var) : func_type Lwt.t =
   let open Lwt.Syntax in

@@ -213,4 +213,6 @@ module Ast : sig
   val block_type_encoding : Ast.block_type Data_encoding.t
 
   val block_label_encoding : Ast.block_label Data_encoding.t
+
+  val data_label_encoding : Ast.data_label Data_encoding.t
 end

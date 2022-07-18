@@ -209,7 +209,7 @@ type byte_vector_kont =
   | VKRead of Ast.data_label * int64 * int64
       (** Reading step, containing the current position in the string and the
       length, reading byte per byte. *)
-  | VKStop of Chunked_byte_vector.Lwt.t  (** Final step, cannot reduce. *)
+  | VKStop of Ast.data_label  (** Final step, cannot reduce. *)
 
 let byte_vector_step vecs s =
   let open Lwt.Syntax in
@@ -218,9 +218,8 @@ let byte_vector_step vecs s =
       let len = len32 s |> Int64.of_int in
       let vector = alloc_data vecs len in
       VKRead (vector, 0L, len) |> Lwt.return
-  | VKRead (Data_label d, index, len) when Int64.compare index len >= 0 ->
-      let+ vector = Vector.get d vecs.new_data in
-      VKStop vector
+  | VKRead (vector, index, len) when Int64.compare index len >= 0 ->
+      VKStop vector |> Lwt.return
   | VKRead (vector, index, len) ->
       let c = get s in
       let+ () = add_to_data vecs vector index c in
@@ -2087,7 +2086,7 @@ let module_step state =
               elems;
               datas;
               start;
-              blocks = bs.new_blocks;
+              allocations = {blocks = bs.new_blocks; datas = data.new_data};
             };
       }
       |> Lwt.return

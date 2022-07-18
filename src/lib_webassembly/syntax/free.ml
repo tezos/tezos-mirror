@@ -164,7 +164,8 @@ let segment_mode blocks f (m : segment_mode) =
 let elem blocks (s : elem_segment) =
   vector_s (const blocks) s.it.einit ++* segment_mode blocks tables s.it.emode
 
-let data blocks (s : data_segment) = segment_mode blocks memories s.it.dmode
+let data blocks _data (s : data_segment) =
+  segment_mode blocks memories s.it.dmode
 
 let type_ (t : type_) = empty
 
@@ -190,12 +191,12 @@ let start (s : start) = funcs (var s.it.sfunc)
 
 let module_ (m : module_) =
   vector type_ m.it.types
-  ++* vector_s (global m.it.blocks) m.it.globals
+  ++* vector_s (global m.it.allocations.blocks) m.it.globals
   ++* vector table m.it.tables
   ++* vector memory m.it.memories
-  ++* vector_s (func m.it.blocks) m.it.funcs
+  ++* vector_s (func m.it.allocations.blocks) m.it.funcs
   ++* opt start m.it.start
-  ++* vector_s (elem m.it.blocks) m.it.elems
-  ++* vector_s (data m.it.blocks) m.it.datas
+  ++* vector_s (elem m.it.allocations.blocks) m.it.elems
+  ++* vector_s (data m.it.allocations.blocks m.it.allocations.datas) m.it.datas
   ++* vector_s import m.it.imports
   ++* vector_s export m.it.exports
