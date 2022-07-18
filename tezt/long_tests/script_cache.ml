@@ -904,8 +904,8 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
    ----------------
 
 *)
-let register ~executors () =
-  (Protocol.[Ithaca; Alpha]
+let register ~executors ~protocols =
+  (protocols
   |> List.iter @@ fun protocol ->
      check_contract_cache_lowers_gas_consumption ~protocol ~executors ;
      check_full_cache ~protocol ~executors ;
@@ -913,7 +913,7 @@ let register ~executors () =
      check_cache_backtracking_during_chain_reorganization ~protocol ~executors ;
      check_cache_reloading_is_not_too_slow ~protocol ~executors ;
      check_simulation_takes_cache_into_account ~protocol ~executors) ;
-  Protocol.[Ithaca; Alpha]
+  protocols
   |> List.iter @@ fun migrate_from ->
      check_simulation_close_to_protocol_user_activation
        ~executors
