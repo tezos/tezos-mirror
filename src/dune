@@ -13,7 +13,7 @@
   (pps ppx_hash)))
 
 (documentation
- (mld_files tutorial))
+ (mld_files index tutorial))
 
 (rule
  (targets tutorial.mld)
