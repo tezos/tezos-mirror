@@ -12,7 +12,6 @@ purpose only: tx-rollup nodes and clients as well as sc-rollup nodes and
 clients.
 
 
-
 Update Instructions
 -------------------
 
