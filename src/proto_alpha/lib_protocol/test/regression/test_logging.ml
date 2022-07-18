@@ -155,12 +155,26 @@ let test_context () =
   let ctxt = Incremental.alpha_ctxt inc in
   return @@ Alpha_context.Origination_nonce.init ctxt Operation_hash.zero
 
-let with_logger f =
+(* [with_logger ~mask f] creates a fresh logger and passes it to [f].
+   After [f] finishes, logs are gathered and each occurrence of each
+   string in [mask] list is being replaced with asterisks. Thus processed
+   log is captured as regression output. *)
+let with_logger ?(mask = []) f =
   let get_log, logger = logger () in
   let* () = f logger in
   let* log = get_log () in
+  let capture s =
+    List.fold_left
+      (fun s to_mask ->
+        let r = Re.Str.(regexp_string to_mask) in
+        let m = String.(init (length to_mask) (fun _ -> '*')) in
+        Re.Str.global_replace r m s)
+      s
+      mask
+    |> Regression.capture
+  in
   Format.kasprintf
-    Regression.capture
+    capture
     "@,@[<v 2>trace@,%a@]"
     (Format.pp_print_list pp_trace)
     log ;
@@ -196,12 +210,34 @@ let run_script {filename; amount; storage; parameter} () =
       ~internal:true (* Allow for forged values (e.g. tickets). *)
       ()
   in
-  let* log = get_log () in
-  Format.kasprintf
-    Regression.capture
-    "@,@[<v 2>trace@,%a@]"
-    (Format.pp_print_list pp_trace)
-    log ;
+  return_unit
+
+let originate_lib_and_run_script lib_script script () =
+  let* block, baker, _contract, _src2 = Contract_helpers.init () in
+  let sender = Contract.Implicit baker in
+  let* lib, _script, block =
+    Contract_helpers.originate_contract_from_string_hash
+      ~baker
+      ~source_contract:sender
+      ~script:(read_code lib_script)
+      ~storage:"0"
+      block
+  in
+  let* incr = Incremental.begin_construction block in
+  let ctxt = Incremental.alpha_ctxt incr in
+  with_logger ~mask:[Format.asprintf "%a" Contract_hash.pp lib] @@ fun logger ->
+  let parameter = Format.asprintf "Pair 8 \"%a\"" Contract_hash.pp lib in
+  let* _res, _ctxt =
+    Contract_helpers.run_script
+      ctxt
+      (read_code script)
+      ~logger
+      ~storage:"0"
+      ~parameter
+      ~step_constants:Contract_helpers.default_step_constants
+      ~internal:true (* Allow for forged values (e.g. tickets). *)
+      ()
+  in
   return_unit
 
 let fail_on_error f () =
@@ -424,4 +460,11 @@ let () =
         parameter = "7";
         storage = "Some 3";
       };
-    |]
+    |] ;
+  Regression.register
+    ~__FILE__
+    ~title:(protocol ^ ": view_fib")
+    ~tags:["protocol"; "regression"; "logging"]
+    ~file:"view_fib"
+    (fail_on_error
+    @@ originate_lib_and_run_script "view_toplevel_lib" "view_fib")
