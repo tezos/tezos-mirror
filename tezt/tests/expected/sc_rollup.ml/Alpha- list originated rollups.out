@@ -19,7 +19,10 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000654
       payload fees(the block proposer) ....... +ꜩ0.000654
-    Originate smart contract rollup of kind arith and type string with boot sector ''
+    Smart contract rollup origination:
+      Kind: arith
+      Parameter type: string
+      Boot sector: ''
       This smart contract rollup origination was successfully applied
       Consumed gas: 2909.116
       Storage size: 6616 bytes
@@ -50,7 +53,10 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000654
       payload fees(the block proposer) ....... +ꜩ0.000654
-    Originate smart contract rollup of kind arith and type string with boot sector ''
+    Smart contract rollup origination:
+      Kind: arith
+      Parameter type: string
+      Boot sector: ''
       This smart contract rollup origination was successfully applied
       Consumed gas: 2909.116
       Storage size: 6616 bytes
@@ -81,7 +87,10 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000654
       payload fees(the block proposer) ....... +ꜩ0.000654
-    Originate smart contract rollup of kind arith and type string with boot sector ''
+    Smart contract rollup origination:
+      Kind: arith
+      Parameter type: string
+      Boot sector: ''
       This smart contract rollup origination was successfully applied
       Consumed gas: 2909.116
       Storage size: 6616 bytes
@@ -112,7 +121,10 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000654
       payload fees(the block proposer) ....... +ꜩ0.000654
-    Originate smart contract rollup of kind arith and type string with boot sector ''
+    Smart contract rollup origination:
+      Kind: arith
+      Parameter type: string
+      Boot sector: ''
       This smart contract rollup origination was successfully applied
       Consumed gas: 2909.116
       Storage size: 6616 bytes
@@ -143,7 +155,10 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000654
       payload fees(the block proposer) ....... +ꜩ0.000654
-    Originate smart contract rollup of kind arith and type string with boot sector ''
+    Smart contract rollup origination:
+      Kind: arith
+      Parameter type: string
+      Boot sector: ''
       This smart contract rollup origination was successfully applied
       Consumed gas: 2909.116
       Storage size: 6616 bytes
@@ -174,7 +189,10 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000654
       payload fees(the block proposer) ....... +ꜩ0.000654
-    Originate smart contract rollup of kind arith and type string with boot sector ''
+    Smart contract rollup origination:
+      Kind: arith
+      Parameter type: string
+      Boot sector: ''
       This smart contract rollup origination was successfully applied
       Consumed gas: 2909.116
       Storage size: 6616 bytes
@@ -205,7 +223,10 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000654
       payload fees(the block proposer) ....... +ꜩ0.000654
-    Originate smart contract rollup of kind arith and type string with boot sector ''
+    Smart contract rollup origination:
+      Kind: arith
+      Parameter type: string
+      Boot sector: ''
       This smart contract rollup origination was successfully applied
       Consumed gas: 2909.116
       Storage size: 6616 bytes
@@ -236,7 +257,10 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000654
       payload fees(the block proposer) ....... +ꜩ0.000654
-    Originate smart contract rollup of kind arith and type string with boot sector ''
+    Smart contract rollup origination:
+      Kind: arith
+      Parameter type: string
+      Boot sector: ''
       This smart contract rollup origination was successfully applied
       Consumed gas: 2909.116
       Storage size: 6616 bytes
@@ -267,7 +291,10 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000654
       payload fees(the block proposer) ....... +ꜩ0.000654
-    Originate smart contract rollup of kind arith and type string with boot sector ''
+    Smart contract rollup origination:
+      Kind: arith
+      Parameter type: string
+      Boot sector: ''
       This smart contract rollup origination was successfully applied
       Consumed gas: 2909.116
       Storage size: 6616 bytes
@@ -298,7 +325,10 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000654
       payload fees(the block proposer) ....... +ꜩ0.000654
-    Originate smart contract rollup of kind arith and type string with boot sector ''
+    Smart contract rollup origination:
+      Kind: arith
+      Parameter type: string
+      Boot sector: ''
       This smart contract rollup origination was successfully applied
       Consumed gas: 2909.116
       Storage size: 6616 bytes

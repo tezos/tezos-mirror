@@ -66,8 +66,10 @@ module V1 = struct
   let pp fmt {compressed_state; inbox_level; predecessor; number_of_ticks} =
     Format.fprintf
       fmt
-      "@[<v 2>SCORU Commitment:@ compressed_state: %a@ inbox_level: %a@ \
-       predecessor: %a@ number_of_ticks: %ld@]"
+      "compressed_state: %a@,\
+       inbox_level: %a@,\
+       predecessor: %a@,\
+       number_of_ticks: %ld"
       State_hash.pp
       compressed_state
       Raw_level_repr.pp

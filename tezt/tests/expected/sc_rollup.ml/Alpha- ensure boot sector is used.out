@@ -19,7 +19,10 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000666
       payload fees(the block proposer) ....... +ꜩ0.000666
-    Originate smart contract rollup of kind arith and type string with boot sector '10 10 10 + +'
+    Smart contract rollup origination:
+      Kind: arith
+      Parameter type: string
+      Boot sector: '10 10 10 + +'
       This smart contract rollup origination was successfully applied
       Consumed gas: 2909.164
       Storage size: 6628 bytes
@@ -54,7 +57,8 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000453
       payload fees(the block proposer) ....... +ꜩ0.000453
-    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+    Smart contract rollup messages submission:
+      Address: [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1651.710
       Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
@@ -95,7 +99,10 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000656
       payload fees(the block proposer) ....... +ꜩ0.000656
-    Originate smart contract rollup of kind arith and type string with boot sector '31'
+    Smart contract rollup origination:
+      Kind: arith
+      Parameter type: string
+      Boot sector: '31'
       This smart contract rollup origination was successfully applied
       Consumed gas: 2909.124
       Storage size: 6618 bytes
@@ -130,7 +137,8 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000453
       payload fees(the block proposer) ....... +ꜩ0.000453
-    Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
+    Smart contract rollup messages submission:
+      Address: [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1651.710
       Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
