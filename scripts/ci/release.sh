@@ -6,9 +6,12 @@
 architectures='x86_64 arm64'
 
 current_dir=$(cd "$(dirname "${0}")" && pwd)
+scripts_dir=$(dirname "$current_dir")
+src_dir=$(dirname "$scripts_dir")
+script_inputs_dir="$src_dir/script-inputs"
 
 # shellcheck source=./binaries-for-release
-binaries="$(cat "${current_dir}/../../binaries-for-release")"
+binaries="$(cat "$script_inputs_dir/binaries-for-release")"
 
 ### Compute GitLab release names
 
