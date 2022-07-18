@@ -155,15 +155,27 @@ let test_context () =
   let ctxt = Incremental.alpha_ctxt inc in
   return @@ Alpha_context.Origination_nonce.init ctxt Operation_hash.zero
 
-let run_script {filename; amount; storage; parameter} () =
+let with_logger f =
   let get_log, logger = logger () in
-  let script =
-    let filename =
-      project_root // Filename.dirname __FILE__ // "contracts"
-      // (filename ^ ".tz")
-    in
-    Contract_helpers.read_file filename
+  let* () = f logger in
+  let* log = get_log () in
+  Format.kasprintf
+    Regression.capture
+    "@,@[<v 2>trace@,%a@]"
+    (Format.pp_print_list pp_trace)
+    log ;
+  return_unit
+
+let read_code filename =
+  let filename =
+    project_root // Filename.dirname __FILE__ // "contracts"
+    // (filename ^ ".tz")
   in
+  Contract_helpers.read_file filename
+
+let run_script {filename; amount; storage; parameter} () =
+  with_logger @@ fun logger ->
+  let script = read_code filename in
   let* ctxt = test_context () in
   let step_constants =
     Contract_helpers.
