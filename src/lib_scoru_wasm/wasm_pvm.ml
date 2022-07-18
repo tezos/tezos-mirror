@@ -30,6 +30,8 @@
 
 *)
 
+exception Set_input_step_expected_input
+
 module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
   include
     Gather_floppies.Make
@@ -38,6 +40,8 @@ module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
         type tree = T.tree
 
         module Decodings = Wasm_decodings.Make (T)
+        module Thunk = Thunk.Make (T)
+        module Decoding = Tree_decoding.Make (T)
 
         let compute_step s =
           let open Lwt.Syntax in
@@ -55,11 +59,6 @@ module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
           Host_funcs.register_host_funcs host_funcs_registry ;
           Lwt.return s
 
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/3092
-           Implement handling of input logic.
-        *)
-        let set_input_step _ _ = Lwt.return
-
         let get_output _ _ = Lwt.return ""
 
         let get_info _ =
@@ -70,6 +69,22 @@ module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
                 last_input_read = None;
                 input_request = No_input_required;
               }
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/3226
+           Implement handling of input logic.
+        *)
+
+        let set_input_step input_info message tree =
+          let open Lwt_syntax in
+          let open Wasm_pvm_sig in
+          let* {input_request; _} = get_info tree in
+          let {inbox_level; message_counter} = input_info in
+          let level =
+            Int32.to_string @@ Bounded.Int32.NonNegative.to_int32 inbox_level
+          in
+          let id = Z.to_string message_counter in
+          match input_request with
+          | No_input_required -> raise Set_input_step_expected_input
+          | _ -> T.add tree ["input"; level; id] @@ Bytes.of_string message
 
         let _module_instance_of_tree modules =
           Decodings.run (Decodings.module_instance_decoding modules)
