@@ -274,10 +274,65 @@ val pp_refutation : Format.formatter -> refutation -> unit
 
 val refutation_encoding : refutation Data_encoding.t
 
+(** An invalid game move during a dissection or a proof step has one of the
+    following values: *)
+type invalid_move =
+  | Dissection_choice_not_found of Sc_rollup_tick_repr.t
+      (** The given choice in a refutation is not a starting tick of any of
+          the sections in the current dissection. *)
+  | Dissection_number_of_sections_mismatch of {expected : Z.t; given : Z.t}
+      (** There are more or less than the expected number of sections in the
+          given dissection. *)
+  | Dissection_invalid_number_of_sections of Z.t
+      (** There are less than two sections in the given dissection, which is
+          not valid. *)
+  | Dissection_start_hash_mismatch of {
+      expected : State_hash.t option;
+      given : State_hash.t option;
+    }
+      (** The given start hash in a dissection is [None] or doesn't match the
+          expected one.*)
+  | Dissection_stop_hash_mismatch of State_hash.t option
+      (** The given stop state hash in a dissection should not match the last
+          hash of the section being refuted. *)
+  | Dissection_edge_ticks_mismatch of {
+      dissection_start_tick : Sc_rollup_tick_repr.t;
+      dissection_stop_tick : Sc_rollup_tick_repr.t;
+      chunk_start_tick : Sc_rollup_tick_repr.t;
+      chunk_stop_tick : Sc_rollup_tick_repr.t;
+    }
+      (** The given dissection's edge ticks don't match the edge ticks of the
+          section being refuted. *)
+  | Dissection_ticks_not_increasing
+      (** Invalid provided dissection because ticks are not increasing between
+          two successive sections. *)
+  | Dissection_invalid_distribution
+      (** Invalid provided dissection because ticks split is not well balanced
+          across sections *)
+  | Dissection_invalid_successive_states_shape
+      (** A dissection cannot have a section with no state hash after another
+          section with some state hash. *)
+  | Proof_unpexpected_section_size of Z.t
+      (** Invalid proof step because there is more than one tick. *)
+  | Proof_start_state_hash_mismatch of {
+      start_state_hash : State_hash.t option;
+      start_proof : State_hash.t;
+    }  (** The given proof's starting state doesn't match the expected one. *)
+  | Proof_stop_state_hash_mismatch of {
+      stop_state_hash : State_hash.t option;
+      stop_proof : State_hash.t option;
+    }
+      (** The given proof's ending state should not match the state being
+          refuted. *)
+  | Proof_invalid of string  (** The given proof is not valid. *)
+
+(** Pretty-printer for values of [invalid_move] type *)
+val pp_invalid_move : Format.formatter -> invalid_move -> unit
+
 (** A game ends for one of three reasons: the conflict has been
     resolved via a proof, a player has been timed out, or a player has
     forfeited because of attempting to make an invalid move. *)
-type reason = Conflict_resolved | Invalid_move of string | Timeout
+type reason = Conflict_resolved | Invalid_move of invalid_move | Timeout
 
 val pp_reason : Format.formatter -> reason -> unit
 
