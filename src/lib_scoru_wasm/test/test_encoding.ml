@@ -309,6 +309,29 @@ let test_value_option () =
   let* () = assert_round_trip enc None Stdlib.( = ) in
   return_unit
 
+type cyclic = {name : string; self : unit -> cyclic}
+
+let test_with_self_ref () =
+  let open Merklizer in
+  let open Lwt_result_syntax in
+  let enc () =
+    with_self_reference (fun cycle ->
+        conv
+          (fun name -> {name; self = (fun () -> Lazy.force cycle)})
+          (fun {name; _} -> name)
+          (value [] Data_encoding.string))
+  in
+  (* A cycle is a value with a (lazy) self-reference. *)
+  let rec cycle = {name = "Cycle"; self = (fun () -> cycle)} in
+  (* Encode using an encoder and an empty tree. *)
+  let*! empty_tree = empty_tree () in
+  let*! tree = Merklizer.encode (enc ()) cycle empty_tree in
+  (* Decode using a new encoder value and the tree from above. *)
+  let*! ({name; self} as cycle) = Merklizer.decode (enc ()) tree in
+  assert (name = "Cycle") ;
+  assert (cycle == self ()) ;
+  return_unit
+
 let tests =
   [
     tztest "String" `Quick test_string;
@@ -327,4 +350,5 @@ let tests =
     tztest "Tuples" `Quick test_tuples;
     tztest "Option" `Quick test_option;
     tztest "Value Option" `Quick test_value_option;
+    tztest "Self ref" `Quick test_with_self_ref;
   ]
