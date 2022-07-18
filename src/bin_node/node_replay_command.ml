@@ -172,133 +172,124 @@ let replay_one_block main_chain_store validator_process block =
   let*! predecessor_opt =
     Store.Block.read_block_opt main_chain_store predecessor_hash
   in
-  match predecessor_opt with
-  | None -> tzfail Cannot_replay_orphan
-  | Some predecessor ->
-      let*! _, savepoint_level = Store.Chain.savepoint main_chain_store in
-      if Store.Block.level block <= savepoint_level then
-        tzfail Cannot_replay_below_savepoint
-      else
-        let expected_context_hash = Store.Block.context_hash block in
-        let* metadata = Store.Block.get_block_metadata main_chain_store block in
-        let expected_block_receipt_bytes =
-          Store.Block.block_metadata metadata
+  let*? predecessor =
+    Result.of_option ~error:(TzTrace.make Cannot_replay_orphan) predecessor_opt
+  in
+  let*! _, savepoint_level = Store.Chain.savepoint main_chain_store in
+  if Store.Block.level block <= savepoint_level then
+    tzfail Cannot_replay_below_savepoint
+  else
+    let expected_context_hash = Store.Block.context_hash block in
+    let* metadata = Store.Block.get_block_metadata main_chain_store block in
+    let expected_block_receipt_bytes = Store.Block.block_metadata metadata in
+    let expected_operation_receipts =
+      Store.Block.operations_metadata metadata
+    in
+    let operations = Store.Block.operations block in
+    let header = Store.Block.header block in
+    let start_time = Time.System.now () in
+    let*! () =
+      Event.(emit block_validation_start)
+        (block_alias, Store.Block.hash block, Store.Block.level block)
+    in
+    let* result =
+      Block_validator_process.apply_block
+        ~simulate:true
+        validator_process
+        main_chain_store
+        ~predecessor
+        header
+        operations
+    in
+    let now = Time.System.now () in
+    let*! () = Event.(emit block_validation_end) (Ptime.diff now start_time) in
+    let*! () =
+      if
+        not
+          (Context_hash.equal
+             expected_context_hash
+             result.validation_store.context_hash)
+      then
+        Event.(emit inconsistent_context_hash)
+          (expected_context_hash, result.validation_store.context_hash)
+      else Lwt.return_unit
+    in
+    let block_metadata_bytes = fst result.block_metadata in
+    let* () =
+      if not (Bytes.equal expected_block_receipt_bytes block_metadata_bytes)
+      then
+        let* protocol = Store.Block.protocol_hash main_chain_store block in
+        let* (module Proto) = Registered_protocol.get_result protocol in
+        let to_json block =
+          Data_encoding.Json.construct Proto.block_header_metadata_encoding
+          @@ Data_encoding.Binary.of_bytes_exn
+               Proto.block_header_metadata_encoding
+               block
         in
-        let expected_operation_receipts =
-          Store.Block.operations_metadata metadata
-        in
-        let operations = Store.Block.operations block in
-        let header = Store.Block.header block in
-        let start_time = Time.System.now () in
-        let*! () =
-          Event.(emit block_validation_start)
-            (block_alias, Store.Block.hash block, Store.Block.level block)
-        in
-        let* result =
-          Block_validator_process.apply_block
-            ~simulate:true
-            validator_process
-            main_chain_store
-            ~predecessor
-            header
-            operations
-        in
-        let now = Time.System.now () in
-        let*! () =
-          Event.(emit block_validation_end) (Ptime.diff now start_time)
-        in
-        let*! () =
-          if
-            not
-              (Context_hash.equal
-                 expected_context_hash
-                 result.validation_store.context_hash)
-          then
-            Event.(emit inconsistent_context_hash)
-              (expected_context_hash, result.validation_store.context_hash)
-          else Lwt.return_unit
-        in
-        let block_metadata_bytes = fst result.block_metadata in
-        let* () =
-          if not (Bytes.equal expected_block_receipt_bytes block_metadata_bytes)
-          then
-            let* protocol = Store.Block.protocol_hash main_chain_store block in
-            let* (module Proto) = Registered_protocol.get_result protocol in
-            let to_json block =
-              Data_encoding.Json.construct Proto.block_header_metadata_encoding
-              @@ Data_encoding.Binary.of_bytes_exn
-                   Proto.block_header_metadata_encoding
-                   block
+        let exp = to_json expected_block_receipt_bytes in
+        let got = to_json block_metadata_bytes in
+        let*! () = Event.(emit inconsistent_block_receipt) (exp, got) in
+        return_unit
+      else return_unit
+    in
+    let rec check_receipts i j
+        (exp : Block_validation.operation_metadata list list)
+        (got : Block_validation.operation_metadata list list) =
+      match (exp, got) with
+      | [], [] -> return_unit
+      | [], _ :: _ | _ :: _, [] -> assert false
+      | [] :: exps, [] :: gots -> check_receipts (succ i) 0 exps gots
+      | (_ :: _) :: _, [] :: _ | [] :: _, (_ :: _) :: _ -> assert false
+      | (exp :: exps) :: expss, (got :: gots) :: gotss ->
+          let* () =
+            let equal a b =
+              match (a, b) with
+              | Block_validation.(Metadata a, Metadata b) -> Bytes.equal a b
+              | Too_large_metadata, Too_large_metadata -> true
+              | _ -> false
             in
-            let exp = to_json expected_block_receipt_bytes in
-            let got = to_json block_metadata_bytes in
-            let*! () = Event.(emit inconsistent_block_receipt) (exp, got) in
-            return_unit
-          else return_unit
-        in
-        let rec check_receipts i j
-            (exp : Block_validation.operation_metadata list list)
-            (got : Block_validation.operation_metadata list list) =
-          match (exp, got) with
-          | [], [] -> return_unit
-          | [], _ :: _ | _ :: _, [] -> assert false
-          | [] :: exps, [] :: gots -> check_receipts (succ i) 0 exps gots
-          | (_ :: _) :: _, [] :: _ | [] :: _, (_ :: _) :: _ -> assert false
-          | (exp :: exps) :: expss, (got :: gots) :: gotss ->
-              let* () =
-                let equal a b =
-                  match (a, b) with
-                  | Block_validation.(Metadata a, Metadata b) -> Bytes.equal a b
-                  | Too_large_metadata, Too_large_metadata -> true
-                  | _ -> false
-                in
-                if not (equal exp got) then
-                  let* protocol =
-                    Store.Block.protocol_hash main_chain_store block
-                  in
-                  let* (module Proto) =
-                    Registered_protocol.get_result protocol
-                  in
-                  let op =
-                    operations
-                    |> (fun l -> List.nth_opt l i)
-                    |> WithExceptions.Option.get ~loc:__LOC__
-                    |> (fun l -> List.nth_opt l j)
-                    |> WithExceptions.Option.get ~loc:__LOC__
-                    |> fun {proto; _} -> proto
-                  in
-                  let to_json receipt =
-                    let receipt =
-                      match receipt with
-                      | Block_validation.Metadata receipt -> receipt
-                      | Too_large_metadata -> Bytes.empty
-                    in
-                    Data_encoding.Json.construct
-                      Proto.operation_data_and_receipt_encoding
-                      Data_encoding.Binary.
-                        ( of_bytes_exn Proto.operation_data_encoding op,
-                          of_bytes_exn Proto.operation_receipt_encoding receipt
-                        )
-                  in
-                  let exp = to_json exp in
-                  let got = to_json got in
-                  let*! () =
-                    Event.(emit inconsistent_operation_receipt)
-                      ((i, j), exp, got)
-                  in
-                  return_unit
-                else return_unit
+            if not (equal exp got) then
+              let* protocol =
+                Store.Block.protocol_hash main_chain_store block
               in
-              check_receipts i (succ j) (exps :: expss) (gots :: gotss)
-        in
-        check_receipts
-          0
-          0
-          expected_operation_receipts
-          (match result.ops_metadata with
-          | Block_validation.No_metadata_hash ops_metadata -> ops_metadata
-          | Block_validation.Metadata_hash ops_metadata ->
-              List.map (List.map fst) ops_metadata)
+              let* (module Proto) = Registered_protocol.get_result protocol in
+              let op =
+                operations
+                |> (fun l -> List.nth_opt l i)
+                |> WithExceptions.Option.get ~loc:__LOC__
+                |> (fun l -> List.nth_opt l j)
+                |> WithExceptions.Option.get ~loc:__LOC__
+                |> fun {proto; _} -> proto
+              in
+              let to_json receipt =
+                let receipt =
+                  match receipt with
+                  | Block_validation.Metadata receipt -> receipt
+                  | Too_large_metadata -> Bytes.empty
+                in
+                Data_encoding.Json.construct
+                  Proto.operation_data_and_receipt_encoding
+                  Data_encoding.Binary.
+                    ( of_bytes_exn Proto.operation_data_encoding op,
+                      of_bytes_exn Proto.operation_receipt_encoding receipt )
+              in
+              let exp = to_json exp in
+              let got = to_json got in
+              let*! () =
+                Event.(emit inconsistent_operation_receipt) ((i, j), exp, got)
+              in
+              return_unit
+            else return_unit
+          in
+          check_receipts i (succ j) (exps :: expss) (gots :: gotss)
+    in
+    let actual_receipts =
+      match result.ops_metadata with
+      | Block_validation.No_metadata_hash ops_metadata -> ops_metadata
+      | Block_validation.Metadata_hash ops_metadata ->
+          List.map (List.map fst) ops_metadata
+    in
+    check_receipts 0 0 expected_operation_receipts actual_receipts
 
 let replay ~singleprocess (config : Node_config_file.t) blocks =
   let open Lwt_result_syntax in
@@ -363,12 +354,30 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
   let main_chain_store = Store.main_chain_store store in
   Lwt.finalize
     (fun () ->
-      List.iter_es (replay_one_block main_chain_store validator_process) blocks)
+      List.iter_es
+        (function
+          | Block_services.Block b ->
+              replay_one_block main_chain_store validator_process b
+          | Range (`Level starts, `Level ends) ->
+              if Int32.compare starts ends > 0 then return_unit
+              else if Int32.compare starts ends = 0 then
+                replay_one_block
+                  main_chain_store
+                  validator_process
+                  (`Level starts)
+              else
+                Seq.iter_es
+                  (replay_one_block main_chain_store validator_process)
+                  (Seq.unfold
+                     (fun l ->
+                       if l <= ends then Some (`Level l, Int32.succ l) else None)
+                     starts))
+        blocks)
     (fun () ->
       let*! () = Block_validator_process.close validator_process in
       Store.close_store store)
 
-let run ?verbosity ~singleprocess (config : Node_config_file.t) block =
+let run ?verbosity ~singleprocess (config : Node_config_file.t) blocks =
   let open Lwt_result_syntax in
   let* () = Node_data_version.ensure_data_dir config.data_dir in
   Lwt_lock_file.try_with_lock
@@ -391,7 +400,7 @@ let run ?verbosity ~singleprocess (config : Node_config_file.t) block =
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
   Lwt_exit.(
     wrap_and_exit
-    @@ let*! res = protect (fun () -> replay ~singleprocess config block) in
+    @@ let*! res = protect (fun () -> replay ~singleprocess config blocks) in
        let*! () = Tezos_base_unix.Internal_event_unix.close () in
        Lwt.return res)
 
@@ -406,7 +415,7 @@ let check_data_dir dir =
          msg = Some (Format.sprintf "directory '%s' does not exists" dir);
        })
 
-let process verbosity singleprocess block args =
+let process verbosity singleprocess blocks args =
   let verbosity =
     let open Internal_event in
     match verbosity with [] -> None | [_] -> Some Info | _ -> Some Debug
@@ -416,7 +425,7 @@ let process verbosity singleprocess block args =
     let* data_dir = Node_shared_arg.read_data_dir args in
     let* () = check_data_dir data_dir in
     let* config = Node_shared_arg.read_and_patch_config_file args in
-    run ?verbosity ~singleprocess config block
+    run ?verbosity ~singleprocess config blocks
   in
   match Lwt_main.run run with
   | Ok () -> `Ok ()
@@ -434,28 +443,41 @@ module Term = struct
       value & flag_all
       & info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["v"])
 
-  let block =
+  let blocks =
     let open Cmdliner in
     let doc =
       "A sequence of blocks to replay. It may either be a b58 encoded block \
        hash, a level as an integer or an alias such as $(i,caboose), \
-       $(i,checkpoint), $(i,savepoint) or $(i,head)."
+       $(i,checkpoint), $(i,savepoint), $(i,head), or a range (bounds \
+       included) of the form $(i,level..level)."
     in
     let block =
       Arg.conv
         ( (fun s ->
-            match Tezos_shell_services.Block_services.parse_block s with
-            | Ok r -> Ok r
+            match
+              Tezos_shell_services.Block_services.parse_block_or_range s
+            with
+            | Ok b -> Ok b
             | Error _ -> Error (`Msg "cannot decode block argument")),
           fun ppf b ->
-            Format.fprintf
-              ppf
-              "%s"
-              (Tezos_shell_services.Block_services.to_string b) )
+            match b with
+            | Block_services.Block b ->
+                Format.fprintf
+                  ppf
+                  "%s"
+                  (Tezos_shell_services.Block_services.to_string b)
+            | Range (starts, ends) ->
+                Format.fprintf
+                  ppf
+                  "%s..%s"
+                  (Tezos_shell_services.Block_services.to_string
+                     (starts :> Tezos_shell_services.Block_services.block))
+                  (Tezos_shell_services.Block_services.to_string
+                     (ends :> Tezos_shell_services.Block_services.block)) )
     in
     Arg.(
       value
-      & pos_all block [`Head 0]
+      & pos_all block [Block_services.Block (`Head 0)]
       & info
           ~docs:Node_shared_arg.Manpage.misc_section
           ~doc
@@ -476,7 +498,7 @@ module Term = struct
   let term =
     Cmdliner.Term.(
       ret
-        (const process $ verbosity $ singleprocess $ block
+        (const process $ verbosity $ singleprocess $ blocks
        $ Node_shared_arg.Term.args))
 end
 

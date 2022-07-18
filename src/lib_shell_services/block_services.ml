@@ -145,6 +145,32 @@ let parse_block s =
     | _ -> raise Exit
   with _ -> Error ("Cannot parse block identifier: " ^ s)
 
+type range = [`Level of Int32.t] * [`Level of Int32.t]
+
+let parse_block_range r =
+  try
+    match String.split '.' r with
+    | [starts; ""; ends] ->
+        let to_level s =
+          let l = Int32.of_string s in
+          if Compare.Int32.(l < 0l) then raise Exit ;
+          `Level l
+        in
+        Ok (to_level starts, to_level ends)
+    | _ -> raise Exit
+  with _ ->
+    Error
+      (Format.asprintf
+         "Cannot parse block range: %S (expected <level>..<level>)"
+         r)
+
+type block_or_range = Block of block | Range of range
+
+let parse_block_or_range r =
+  if String.contains r '.' then
+    Result.map (fun r -> Range r) (parse_block_range r)
+  else Result.map (fun b -> Block b) (parse_block r)
+
 let alias_to_string = function
   | `Checkpoint -> "checkpoint"
   | `Savepoint -> "savepoint"

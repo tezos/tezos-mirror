@@ -57,6 +57,16 @@ type block =
 
 val parse_block : string -> (block, string) result
 
+type range = [`Level of Int32.t] * [`Level of Int32.t]
+
+(** A block range in the form [level..level]. Currently, this function supports
+    only [level..level]. *)
+val parse_block_range : string -> (range, string) result
+
+type block_or_range = Block of block | Range of range
+
+val parse_block_or_range : string -> (block_or_range, string) result
+
 val to_string : block -> string
 
 type prefix = (unit * chain) * block
