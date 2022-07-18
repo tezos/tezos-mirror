@@ -23,19 +23,22 @@
  (modules Embedded_cmis_env Embedded_cmis_register Packer Compiler Defaults))
 
 (rule
+ (targets embedded-interfaces-env)
+ (deps (package tezos-protocol-environment))
+ (action
+  (with-stdout-to
+   %{targets}
+   (run
+    bin/cmis_of_cma.exe
+    %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs.cmxa}))))
+
+(rule
  (targets embedded_cmis_env.ml)
+ (deps (package tezos-protocol-environment))
  (action
   (run
    %{bin:ocp-ocamlres} -format variants -o %{targets}
-   %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs.cmi}
-   %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V0.cmi}
-   %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V1.cmi}
-   %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V2.cmi}
-   %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V3.cmi}
-   %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V4.cmi}
-   %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V5.cmi}
-   %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V6.cmi}
-   %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V7.cmi})))
+   %{read-strings:embedded-interfaces-env})))
 
 (rule
  (targets embedded_cmis_register.ml)

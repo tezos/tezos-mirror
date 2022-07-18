@@ -1969,6 +1969,14 @@ let octez_protocol_compiler_registerer =
       [octez_base |> open_ ~m:"TzPervasives"; tezos_protocol_environment_sigs]
     ~flags:(Flags.standard ~opaque:true ())
 
+let _octez_protocol_compiler_cmis_of_cma =
+  private_exe
+    "cmis_of_cma"
+    ~path:"src/lib_protocol_compiler/bin"
+    ~opam:"tezos-protocol-compiler"
+    ~deps:[compiler_libs_common]
+    ~modules:["cmis_of_cma"]
+
 let octez_protocol_compiler_lib =
   public_lib
     "tezos-protocol-compiler"
@@ -2003,7 +2011,25 @@ let octez_protocol_compiler_lib =
       Dune.
         [
           targets_rule
+            ["embedded-interfaces-env"]
+            ~deps:[Dune.(H [[S "package"; S "tezos-protocol-environment"]])]
+            ~action:
+              [
+                S "with-stdout-to";
+                S "%{targets}";
+                [
+                  S "run";
+                  S "bin/cmis_of_cma.exe";
+                  V
+                    [
+                      S
+                        "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs.cmxa}";
+                    ];
+                ];
+              ];
+          targets_rule
             ["embedded_cmis_env.ml"]
+            ~deps:[Dune.(H [[S "package"; S "tezos-protocol-environment"]])]
             ~action:
               [
                 S "run";
@@ -2015,24 +2041,7 @@ let octez_protocol_compiler_lib =
                     S "-o";
                     S "%{targets}";
                   ];
-                S
-                  "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs.cmi}";
-                S
-                  "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V0.cmi}";
-                S
-                  "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V1.cmi}";
-                S
-                  "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V2.cmi}";
-                S
-                  "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V3.cmi}";
-                S
-                  "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V4.cmi}";
-                S
-                  "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V5.cmi}";
-                S
-                  "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V6.cmi}";
-                S
-                  "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V7.cmi}";
+                S "%{read-strings:embedded-interfaces-env}";
               ];
           targets_rule
             ["embedded_cmis_register.ml"]

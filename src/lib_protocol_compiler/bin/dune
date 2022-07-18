@@ -2,6 +2,13 @@
 ; Edit file manifest/main.ml instead.
 
 (executable
+ (name cmis_of_cma)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  compiler-libs.common)
+ (modules cmis_of_cma))
+
+(executable
  (name main_native)
  (public_name tezos-protocol-compiler)
  (package tezos-protocol-compiler)
