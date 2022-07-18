@@ -604,7 +604,7 @@ let elem i seg =
 let data i seg =
   let open Lwt.Syntax in
   let {dinit; dmode} = seg.it in
-  let+ dinit = Chunked_byte_vector.Lwt.Buffer.to_string_unstable dinit in
+  let+ dinit = Chunked_byte_vector.Lwt.to_string dinit in
   Node ("data $" ^ nat i, segment_mode "memory" dmode @ break_bytes dinit)
 
 (* Modules *)

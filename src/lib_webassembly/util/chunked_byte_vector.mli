@@ -47,6 +47,12 @@ module type S = sig
       turning your [bytes] into a [string] would be potentially expensive. *)
   val of_bytes : bytes -> t effect
 
+  (** [to_string vector] creates a string from the given [vector]. *)
+  val to_string : t -> string effect
+
+  (** [to_bytes vector] creates a bytes from the given [vector]. *)
+  val to_bytes : t -> bytes effect
+
   (** [grow vector length_delta] increases the byte vector length by
       [length_delta]. *)
   val grow : t -> int64 -> unit
@@ -68,42 +74,6 @@ module type S = sig
       been cached in-memory since [vector] has been created, either by
       reading its contents, or by modifying it. *)
   val loaded_chunks : t -> (int64 * Chunk.t) list
-
-  module Buffer : sig
-    type vector := t
-
-    (** Type of buffer using an underlying chunked byte vector. *)
-    type t
-
-    (** [create length] creates a buffer that has capacity for [length] bytes. *)
-    val create : Int64.t -> t
-
-    (** [length buffer] returns the length of [buffer] in bytes. *)
-    val length : t -> int64
-
-    (** [add_byte buffer byte] set the next byte in the buffer [buffer] to [byte]. *)
-    val add_byte : t -> int -> t effect
-
-    (** [of_string str] creates a chunked byte vector from the given [str]. *)
-    val of_string : string -> t
-
-    (** [to_string_unstable buffer] creates a string from the given buffer
-        [buffer].
-
-        This function should never be called after converting a buffer to a byte
-        vector, since the byte vector is only dereferenced and never copied. See
-        {!to_byte_vector}.
-
-        @raise [Invalid_argument "Chunked_byte.vector.to_string_unstable"] if the
-          size of the vector is greater than [Sys.max_string_length]. *)
-    val to_string_unstable : t -> string effect
-
-    (** [to_byte_vector buffer] returns the underlying byte vector from the buffer
-        [buffer]. Note that it only dereferences the byte vector, not making a
-        copy. As such, it is unsafe to continue to add bytes to the buffer since
-        it will affect the byte vector. *)
-    val to_byte_vector : t -> vector
-  end
 end
 
 include S with type 'a effect = 'a

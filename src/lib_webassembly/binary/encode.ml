@@ -1128,7 +1128,7 @@ struct
   let data seg =
     let open Lwt.Syntax in
     let {dinit; dmode} = seg.it in
-    let+ dinit = Chunked_byte_vector.Lwt.Buffer.to_string_unstable dinit in
+    let+ dinit = Chunked_byte_vector.Lwt.to_string dinit in
     match dmode.it with
     | Passive ->
         vu32 0x01l ;
