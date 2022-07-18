@@ -126,8 +126,8 @@ let with_blocks f =
 
 
 let alloc_block c es =
-  let b = Vector.num_elements !(c.new_blocks) in
-  c.new_blocks := Vector.grow 1l !(c.new_blocks) |> Vector.set b (Vector.of_list es);
+  let new_blocks, b = Vector.append (Vector.of_list es) !(c.new_blocks) in
+  c.new_blocks := new_blocks ;
   Block_label b
 
 let empty_block =

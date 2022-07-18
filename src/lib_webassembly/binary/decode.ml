@@ -14,15 +14,14 @@ let make_empty_block_state () = {new_blocks = Vector.(singleton (empty ()))}
 let make_block_state blocks = {new_blocks = blocks}
 
 let alloc_block s =
-  let b = Vector.num_elements s.new_blocks in
-  s.new_blocks <- Vector.(grow 1l s.new_blocks |> set b (empty ())) ;
+  let new_blocks, b = Vector.(append (empty ()) s.new_blocks) in
+  s.new_blocks <- new_blocks ;
   Ast.Block_label b
 
 let add_to_block s (Ast.Block_label b) instr =
   let open Lwt.Syntax in
   let+ block = Vector.get b s.new_blocks in
-  let i = Vector.num_elements block in
-  let block = Vector.(grow 1l block |> set i instr) in
+  let block, _ = Vector.(append instr block) in
   s.new_blocks <- Vector.set b block s.new_blocks
 
 let empty_block = Ast.Block_label 0l
