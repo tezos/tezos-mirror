@@ -3,8 +3,8 @@
 Changelog
 '''''''''
 
-Version 14.0
-============
+Version 14.0~rc1
+================
 
 Node
 ----
@@ -117,7 +117,6 @@ Rollups
   provided with the same degree of maintenance.  However, developers
   interested in implementing their own rollup nodes and clients are
   more than welcome to leverage them.
-
 
 Version 13.0
 ============
