@@ -68,6 +68,8 @@ module Manager_operation = struct
            make sc_rollup_refute_case;
            make sc_rollup_timeout_case;
            make sc_rollup_execute_outbox_message_case;
+           make sc_rollup_recover_bond_case;
+           make sc_rollup_dal_slot_subscribe_case;
          ]
 
   let get_case :
