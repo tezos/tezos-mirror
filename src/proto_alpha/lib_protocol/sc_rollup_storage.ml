@@ -117,7 +117,7 @@ let genesis_info ctxt rollup =
   let* genesis_info = Store.Genesis_info.find ctxt rollup in
   match genesis_info with
   | None -> fail (Sc_rollup_does_not_exist rollup)
-  | Some genesis_info -> return genesis_info
+  | Some genesis_info -> return (ctxt, genesis_info)
 
 let get_boot_sector ctxt rollup =
   let open Lwt_tzresult_syntax in

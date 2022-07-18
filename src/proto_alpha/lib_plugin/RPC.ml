@@ -1965,9 +1965,13 @@ module Sc_rollup = struct
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2688 *)
   let register_genesis_info () =
+    let open Lwt_result_syntax in
     Registration.register1 ~chunked:true S.genesis_info
     @@ fun ctxt address () () ->
-    Alpha_context.Sc_rollup.genesis_info ctxt address
+    let+ _ctxt, genesis_info =
+      Alpha_context.Sc_rollup.genesis_info ctxt address
+    in
+    genesis_info
 
   let register_boot_sector () =
     Registration.register1 ~chunked:true S.boot_sector
