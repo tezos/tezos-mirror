@@ -60,6 +60,8 @@ module Parameters :
     | Publish -> 1
     | Add_messages -> 100
     | Cement -> 1
+    | Timeout -> 1
+    | Refute -> 1
 
   let fee_parameter {Node_context.fee_parameter; _} _ = fee_parameter
 
@@ -89,18 +91,21 @@ module Parameters :
       type kind.
       kind manager_operation -> [`Ignore_keep | `Ignore_drop | `Don't_ignore] =
     function
+    | Sc_rollup_timeout _ | Sc_rollup_refute _ ->
+        (* Failing timeout and refutation operations can be ignored. *)
+        `Ignore_drop
     | _ -> `Don't_ignore
 
   (** Returns [true] if an included operation should be re-queued for injection
     when the block in which it is included is reverted (due to a
     reorganization). *)
-  let requeue_reverted_operation (type kind) _
+  let requeue_reverted_operation (type kind) _node_ctxt
       (operation : kind manager_operation) =
     let open Lwt_syntax in
     match operation with
     | Sc_rollup_publish _ ->
         (* Commitments are always produced on finalized blocks. They don't need
-           to be recomputed. *)
+           to be recomputed, and as such are valid in another branch. *)
         return_true
     | Sc_rollup_cement _ ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/3348
@@ -113,6 +118,17 @@ module Parameters :
         (* Messages posted to an inbox should be re-emitted (i.e. re-queued) in
            case of a fork. *)
         return_true
+    | Sc_rollup_timeout _ ->
+        (* Timeout should be re-submitted as the timeout may be reached as well
+           on the other branch *)
+        return_true
+    | Sc_rollup_refute _ ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/3459
+           maybe check if game exists on other branch as well.
+
+           Refutation should be re-submitted in case of fork.
+        *)
+        return_true
     | Reveal _ | Transaction _ | Origination _ | Delegation _
     | Register_global_constant _ | Set_deposits_limit _
     | Increase_paid_storage _ | Tx_rollup_origination | Tx_rollup_submit_batch _
@@ -121,7 +137,7 @@ module Parameters :
     | Tx_rollup_rejection _ | Tx_rollup_dispatch_tickets _ | Transfer_ticket _
     | Dal_publish_slot_header _ | Sc_rollup_originate _
     | Sc_rollup_execute_outbox_message _ | Sc_rollup_recover_bond _
-    | Sc_rollup_dal_slot_subscribe _ | Sc_rollup_timeout _ | Sc_rollup_refute _ ->
+    | Sc_rollup_dal_slot_subscribe _ ->
         (* These operations should never be handled by this injector *)
         assert false
 
@@ -131,6 +147,8 @@ module Parameters :
     | Sc_rollup_add_messages _ -> Some Add_messages
     | Sc_rollup_cement _ -> Some Cement
     | Sc_rollup_publish _ -> Some Publish
+    | Sc_rollup_timeout _ -> Some Timeout
+    | Sc_rollup_refute _ -> Some Refute
     | _ -> None
 end
 

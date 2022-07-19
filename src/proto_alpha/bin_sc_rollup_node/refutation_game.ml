@@ -76,27 +76,13 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
 
   (** [inject_next_move node_ctxt signer ~refuation ~opponent] submits an L1
       operation (signed by [signer]) to issue the next move in the refutation
-      game. [node_ctxt] provides the connection to the Tezos node. *)
-  let inject_next_move node_ctxt (source, src_pk, src_sk) ~refutation ~opponent
-      =
-    let open Node_context in
-    let open Lwt_result_syntax in
-    let {rollup_address; cctxt; _} = node_ctxt in
-    let* _oph, _op, _results =
-      Client_proto_context.sc_rollup_refute
-        cctxt
-        ~chain:cctxt#chain
-        ~block:cctxt#block
-        ~refutation
-        ~opponent
-        ~source
-        ~rollup:rollup_address
-        ~src_pk
-        ~src_sk
-        ~fee_parameter:Configuration.default_fee_parameter
-        ()
+      game. *)
+  let inject_next_move (node_ctxt : Node_context.t) (source, _src_pk, _src_sk)
+      ~refutation ~opponent =
+    let refute_operation =
+      Sc_rollup_refute {rollup = node_ctxt.rollup_address; refutation; opponent}
     in
-    return_unit
+    Injector.add_pending_operation ~source refute_operation
 
   let generate_proof node_ctxt store game start_state =
     let open Lwt_result_syntax in
@@ -226,44 +212,17 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     if Z.(equal chosen_section_len one) then final_move choice
     else return {choice; step = Dissection dissection}
 
-  let try_ f =
-    let open Lwt_result_syntax in
-    let*! _res = f () in
-    return_unit
-
   let play_next_move node_ctxt store game signer opponent =
     let open Lwt_result_syntax in
     let* refutation = next_move node_ctxt store game in
-    (* FIXME: #3008
-
-       We currently do not remember that we already have
-       injected a refutation move but it is not included yet.
-       Hence, we ignore errors here temporarily, waiting for
-       the injector to enter the scene.
-    *)
-    try_ @@ fun () ->
     inject_next_move node_ctxt signer ~refutation:(Some refutation) ~opponent
 
-  let play_timeout node_ctxt (source, src_pk, src_sk) players =
-    let Sc_rollup.Game.Index.{alice; bob} = players in
-    let open Node_context in
-    let open Lwt_result_syntax in
-    let {rollup_address; cctxt; _} = node_ctxt in
-    let* _oph, _op, _results =
-      Client_proto_context.sc_rollup_timeout
-        cctxt
-        ~chain:cctxt#chain
-        ~block:cctxt#block
-        ~source
-        ~alice
-        ~bob
-        ~rollup:rollup_address
-        ~src_pk
-        ~src_sk
-        ~fee_parameter:Configuration.default_fee_parameter
-        ()
+  let play_timeout (node_ctxt : Node_context.t) (source, _src_pk, _src_sk)
+      stakers =
+    let timeout_operation =
+      Sc_rollup_timeout {rollup = node_ctxt.rollup_address; stakers}
     in
-    return_unit
+    Injector.add_pending_operation ~source timeout_operation
 
   let timeout_reached ~self head_block node_ctxt players =
     let open Lwt_result_syntax in
@@ -295,8 +254,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         let* timeout_reached =
           timeout_reached ~self head_block node_ctxt players
         in
-        unless timeout_reached @@ fun () ->
-        try_ @@ fun () -> play_timeout node_ctxt signer index
+        unless timeout_reached @@ fun () -> play_timeout node_ctxt signer index
 
   let ongoing_game head_block node_ctxt self =
     let Node_context.{rollup_address; cctxt; _} = node_ctxt in
