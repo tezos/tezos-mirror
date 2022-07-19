@@ -2292,6 +2292,9 @@ module Sc_rollup = struct
 end
 
 module Dal = struct
+  let path : RPC_context.t RPC_path.context =
+    RPC_path.(open_root / "context" / "dal")
+
   module S = struct
     let dal_confirmed_slot_headers_history =
       let output = Data_encoding.option Dal.Slots_history.encoding in
@@ -2302,8 +2305,22 @@ module Dal = struct
            DAL is enabled, or [None] otherwise."
         ~output
         ~query
-        RPC_path.(
-          open_root / "context" / "dal" / "confirmed_slot_headers_history")
+        RPC_path.(path / "confirmed_slot_headers_history")
+
+    let shards_query =
+      RPC_query.(
+        query (fun level -> level)
+        |+ opt_field "level" Raw_level.rpc_arg (fun t -> t)
+        |> seal)
+
+    let shards =
+      RPC_service.get_service
+        ~description:"Get the shard assignements for a given level"
+        ~query:shards_query
+        ~output:
+          Data_encoding.(
+            list (tup2 Signature.Public_key_hash.encoding (tup2 int16 int16)))
+        RPC_path.(path / "shards")
   end
 
   let register_dal_confirmed_slot_headers_history () =
@@ -2315,10 +2332,17 @@ module Dal = struct
           Dal.Slots_storage.get_slot_headers_history ctxt >|=? Option.some
         else return None)
 
-  let register () = register_dal_confirmed_slot_headers_history ()
-
   let dal_confirmed_slots_history ctxt block =
     RPC_context.make_call0 S.dal_confirmed_slot_headers_history ctxt block () ()
+
+  let register_shards () =
+    Registration.register0 ~chunked:true S.shards @@ fun ctxt level () ->
+    let level = Option.value level ~default:(Raw_level.of_int32_exn 0l) in
+    Dal_services.shards ctxt ~level
+
+  let register () =
+    register_dal_confirmed_slot_headers_history () ;
+    register_shards ()
 end
 
 module Tx_rollup = struct
