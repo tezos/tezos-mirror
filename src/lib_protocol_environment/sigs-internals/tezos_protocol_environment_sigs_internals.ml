@@ -26,6 +26,6 @@
 (* Type equalities for the restricted typing environment of the
    economic protocols *)
 
-module CamlinternalFormatBasics : module type of struct
+module CamlinternalFormatBasics = struct
   include CamlinternalFormatBasics
 end

@@ -25,9 +25,7 @@
 
 val camlinternalFormatBasics_cmi : string
 
-val tezos_protocol_environment_sigs_stdlib_compat_cmi : string
-
-val tezos_protocol_environment_sigs_stdlib_compat__V_all_cmi : string
+val tezos_protocol_environment_sigs_internals_cmi : string
 
 val tezos_protocol_environment_sigs_cmi : string
 
