@@ -45,7 +45,7 @@ let print (FuncType (_, out)) _m _v vs =
     (Lazy_vector.LwtInt32Vector.loaded_bindings out)
   |> Lwt.return
 
-let lookup module_name name t =
+let lookup module_name name =
   let open Lwt.Syntax in
   let+ name = Utf8.encode name in
   let empty () = Lazy_vector.LwtInt32Vector.create 0l in
@@ -54,34 +54,34 @@ let lookup module_name name t =
     Lazy_vector.LwtInt32Vector.(create 2l |> set 0l i |> set 1l j)
   in
   let func = func module_name name in
-  match (name, t) with
-  | "print", _ -> ExternFunc (func print (FuncType (empty (), empty ())))
-  | "print_i32", _ ->
+  match name with
+  | "print" -> ExternFunc (func print (FuncType (empty (), empty ())))
+  | "print_i32" ->
       ExternFunc (func print (FuncType (singleton (NumType I32Type), empty ())))
-  | "print_i64", _ ->
+  | "print_i64" ->
       ExternFunc (func print (FuncType (singleton (NumType I64Type), empty ())))
-  | "print_f32", _ ->
+  | "print_f32" ->
       ExternFunc (func print (FuncType (singleton (NumType F32Type), empty ())))
-  | "print_f64", _ ->
+  | "print_f64" ->
       ExternFunc (func print (FuncType (singleton (NumType F64Type), empty ())))
-  | "print_i32_f32", _ ->
+  | "print_i32_f32" ->
       ExternFunc
         (func
            print
            (FuncType (two (NumType I32Type) (NumType F32Type), empty ())))
-  | "print_f64_f64", _ ->
+  | "print_f64_f64" ->
       ExternFunc
         (func
            print
            (FuncType (two (NumType F64Type) (NumType F64Type), empty ())))
-  | "global_i32", _ ->
+  | "global_i32" ->
       ExternGlobal (global (GlobalType (NumType I32Type, Immutable)))
-  | "global_i64", _ ->
+  | "global_i64" ->
       ExternGlobal (global (GlobalType (NumType I64Type, Immutable)))
-  | "global_f32", _ ->
+  | "global_f32" ->
       ExternGlobal (global (GlobalType (NumType F32Type, Immutable)))
-  | "global_f64", _ ->
+  | "global_f64" ->
       ExternGlobal (global (GlobalType (NumType F64Type, Immutable)))
-  | "table", _ -> ExternTable table
-  | "memory", _ -> ExternMemory memory
+  | "table" -> ExternTable table
+  | "memory" -> ExternMemory memory
   | _ -> raise Not_found

@@ -351,7 +351,7 @@ let lookup_module = lookup "module" modules
 
 let lookup_instance = lookup "module" instances
 
-let lookup_registry module_name item_name _t =
+let lookup_registry module_name item_name =
   let* item_name = Lazy_vector.LwtInt32Vector.to_list item_name in
   let+ value = Instance.export (Map.find module_name !registry) item_name in
   match value with Some ext -> ext | None -> raise Not_found

@@ -5,11 +5,9 @@ let version = "2.0"
 let configure () =
   let open Lwt.Syntax in
   let* () =
-    Import.register (Utf8.decode "spectest") (fun name type_ ->
-        Spectest.lookup "spectest" name type_)
+    Import.register (Utf8.decode "spectest") (Spectest.lookup "spectest")
   in
-  Import.register (Utf8.decode "env") (fun name type_ ->
-      Env.lookup "env" name type_)
+  Import.register (Utf8.decode "env") (Env.lookup "env")
 
 let banner () = print_endline (name ^ " " ^ version ^ " reference interpreter")
 

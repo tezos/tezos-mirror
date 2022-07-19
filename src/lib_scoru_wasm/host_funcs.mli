@@ -29,7 +29,6 @@
 val lookup :
   string ->
   Tezos_webassembly_interpreter.Ast.name ->
-  Tezos_webassembly_interpreter.Types.func_type ->
   Tezos_webassembly_interpreter.Instance.extern Lwt.t
 
 (** Plugs {!lookup} into the WASN interpreter module system. *)
