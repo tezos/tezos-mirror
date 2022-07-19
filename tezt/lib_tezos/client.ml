@@ -791,7 +791,8 @@ let transfer ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
   |> Process.check ?expect_failure
 
 let spawn_multiple_transfers ?log_output ?endpoint ?(wait = "none") ?burn_cap
-    ?fee_cap ?gas_limit ?storage_limit ?counter ?arg ~giver ~json_batch client =
+    ?fee_cap ?gas_limit ?storage_limit ?counter ?(simulation = false)
+    ?(force = false) ~giver ~json_batch client =
   spawn_command
     ?log_output
     ?endpoint
@@ -806,10 +807,11 @@ let spawn_multiple_transfers ?log_output ?endpoint ?(wait = "none") ?burn_cap
     @ optional_arg "gas-limit" string_of_int gas_limit
     @ optional_arg "storage-limit" string_of_int storage_limit
     @ optional_arg "counter" string_of_int counter
-    @ optional_arg "arg" Fun.id arg)
+    @ (if simulation then ["--simulation"] else [])
+    @ if force then ["--force"] else [])
 
 let multiple_transfers ?log_output ?endpoint ?wait ?burn_cap ?fee_cap ?gas_limit
-    ?storage_limit ?counter ?arg ~giver ~json_batch client =
+    ?storage_limit ?counter ?simulation ?force ~giver ~json_batch client =
   spawn_multiple_transfers
     ?log_output
     ?endpoint
@@ -819,7 +821,8 @@ let multiple_transfers ?log_output ?endpoint ?wait ?burn_cap ?fee_cap ?gas_limit
     ?gas_limit
     ?storage_limit
     ?counter
-    ?arg
+    ?simulation
+    ?force
     ~giver
     ~json_batch
     client

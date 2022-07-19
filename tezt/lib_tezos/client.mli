@@ -630,7 +630,8 @@ val multiple_transfers :
   ?gas_limit:int ->
   ?storage_limit:int ->
   ?counter:int ->
-  ?arg:string ->
+  ?simulation:bool ->
+  ?force:bool ->
   giver:string ->
   json_batch:string ->
   t ->
@@ -646,7 +647,8 @@ val spawn_multiple_transfers :
   ?gas_limit:int ->
   ?storage_limit:int ->
   ?counter:int ->
-  ?arg:string ->
+  ?simulation:bool ->
+  ?force:bool ->
   giver:string ->
   json_batch:string ->
   t ->
