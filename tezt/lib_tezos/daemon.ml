@@ -423,6 +423,7 @@ module Make (X : PARAMETERS) = struct
               return
               @@ Observe
                    (fun () ->
+                     Process.kill process ;
                      let* dump = get_trace () in
                      let* peak =
                        from_command
