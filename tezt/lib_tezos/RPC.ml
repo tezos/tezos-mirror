@@ -1109,4 +1109,17 @@ let get_chain_block_votes_total_voting_power ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "votes"; "total_voting_power"]
     Fun.id
 
+let get_chain_block_context_dal_shards ?(chain = "main") ?(block = "head")
+    ?level () =
+  let query_string =
+    match level with
+    | None -> []
+    | Some offset -> [("level", string_of_int offset)]
+  in
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "dal"; "shards"]
+    ~query_string
+    Fun.id
+
 let make = RPC_core.make

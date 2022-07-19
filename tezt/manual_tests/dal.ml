@@ -52,16 +52,25 @@ let dal_distribution =
     Client.init_with_protocol ~parameter_file ~protocol `Client ()
   in
   let* () = Client.bake_for_and_wait client in
-  let number_of_shards = 256 (* FIXME *) in
+  let* number_of_shards =
+    let* constants =
+      RPC.Client.call client (RPC.get_chain_block_context_constants ())
+    in
+    JSON.(constants |-> "dal" |-> "number_of_shards" |> as_int) |> return
+  in
   let results =
     Array.init levels (fun _ ->
         Array.make number_of_shards Constant.bootstrap1.public_key_hash)
   in
+  let* current_level =
+    RPC.Client.call client (RPC.get_chain_block_helper_current_level ())
+  in
   let rec iter offset =
+    let level = current_level.level + offset in
     if offset < 0 then unit
     else
       let* json =
-        RPC.(call node @@ get_chain_block_context_dal_shards ~offset ())
+        RPC.(call node @@ get_chain_block_context_dal_shards ~level ())
       in
       List.iter
         (fun json ->
