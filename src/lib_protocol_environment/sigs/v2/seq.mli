@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 G.B. Fefe <gb.fefe@protonmail.com>                     *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,13 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Type equalities for the restricted typing environment of the
-   economic protocols *)
+type 'a t = unit -> 'a node
 
-module Stdlib : sig
-  module Seq : sig
-    type 'a t = unit -> 'a node
-
-    and +'a node = 'a Stdlib.Seq.node = Nil | Cons of 'a * 'a t
-  end
-end
+and +'a node = Nil | Cons of 'a * 'a t

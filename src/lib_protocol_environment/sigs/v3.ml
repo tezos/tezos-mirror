@@ -4156,13 +4156,11 @@ end
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_protocol_environment_sigs_stdlib_compat.V3
-
 (* From Lwtreslib *)
 
 type 'a t = unit -> 'a node
 
-and +'a node = 'a Stdlib.Seq.node = Nil | Cons of 'a * 'a t
+and +'a node = Nil | Cons of 'a * 'a t
 
 val empty : 'a t
 
@@ -4341,11 +4339,9 @@ end
     variants may return [Ok _] even though the arguments have different lengths.
 *)
 
-open Tezos_protocol_environment_sigs_stdlib_compat.V3
-
 (** {3 Trivial values} *)
 
-type 'a t = 'a Stdlib.List.t = [] | ( :: ) of 'a * 'a list
+type 'a t = 'a list = [] | ( :: ) of 'a * 'a list
 
 (** in-monad, preallocated nil *)
 
@@ -5163,8 +5159,6 @@ end
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_protocol_environment_sigs_stdlib_compat.V3
-
 (* From Lwtreslib *)
 
 module type S = sig
@@ -5252,13 +5246,13 @@ module type S = sig
 
   val of_list : elt list -> t
 
-  val to_seq_from : elt -> t -> elt Stdlib.Seq.t
+  val to_seq_from : elt -> t -> elt Seq.t
 
-  val to_seq : t -> elt Stdlib.Seq.t
+  val to_seq : t -> elt Seq.t
 
-  val add_seq : elt Stdlib.Seq.t -> t -> t
+  val add_seq : elt Seq.t -> t -> t
 
-  val of_seq : elt Stdlib.Seq.t -> t
+  val of_seq : elt Seq.t -> t
 
   val iter_ep :
     (elt -> (unit, 'error Error_monad.trace) result Lwt.t) ->
@@ -5452,8 +5446,6 @@ end
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_protocol_environment_sigs_stdlib_compat.V3
-
 (** Signature from Lwtreslib's option module *)
 
 type 'a t = 'a option = None | Some of 'a
@@ -5536,7 +5528,7 @@ val of_result : ('a, 'e) result -> 'a option
 
 val to_list : 'a option -> 'a list
 
-val to_seq : 'a option -> 'a Stdlib.Seq.t
+val to_seq : 'a option -> 'a Seq.t
 
 (** [catch f] is [Some (f ())] if [f] does not raise an exception, it is
     [None] otherwise.
@@ -5601,8 +5593,6 @@ end
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
-open Tezos_protocol_environment_sigs_stdlib_compat.V3
 
 type ('a, 'e) t = ('a, 'e) result = Ok of 'a | Error of 'e (***)
 
@@ -5686,7 +5676,7 @@ val of_option : error:'e -> 'a option -> ('a, 'e) result
 
 val to_list : ('a, 'e) result -> 'a list
 
-val to_seq : ('a, 'e) result -> 'a Stdlib.Seq.t
+val to_seq : ('a, 'e) result -> 'a Seq.t
 
 (** [catch f] is [try Ok (f ()) with e -> Error e]: it is [Ok x] if [f ()]
     evaluates to [x], and it is [Error e] if [f ()] raises [e].

@@ -1744,7 +1744,7 @@ let tezos_protocol_environment_sigs_stdlib_compat =
   public_lib
     "tezos-protocol-environment.sigs.stdlib-compat"
     ~path:"src/lib_protocol_environment/sigs/stdlib_compat"
-    ~modules_without_implementation:["V_all"; "V2"; "V3"; "V4"]
+    ~modules_without_implementation:["V_all"]
 
 let tezos_protocol_environment_sigs =
   public_lib
@@ -1948,12 +1948,6 @@ let octez_protocol_compiler_lib =
                   "%{lib:tezos-protocol-environment.sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat.cmi}";
                 S
                   "%{lib:tezos-protocol-environment.sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V_all.cmi}";
-                S
-                  "%{lib:tezos-protocol-environment.sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V2.cmi}";
-                S
-                  "%{lib:tezos-protocol-environment.sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V3.cmi}";
-                S
-                  "%{lib:tezos-protocol-environment.sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V4.cmi}";
                 S
                   "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs.cmi}";
                 S

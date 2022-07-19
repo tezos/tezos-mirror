@@ -81,11 +81,9 @@
     variants may return [Ok _] even though the arguments have different lengths.
 *)
 
-open Tezos_protocol_environment_sigs_stdlib_compat.V3
-
 (** {3 Trivial values} *)
 
-type 'a t = 'a Stdlib.List.t = [] | ( :: ) of 'a * 'a list
+type 'a t = 'a list = [] | ( :: ) of 'a * 'a list
 
 (** in-monad, preallocated nil *)
 

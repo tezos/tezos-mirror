@@ -5,6 +5,8 @@ module type T = sig
 
   open Pervasives
 
+  module Seq : [%sig "v2/seq.mli"]
+
   module List : [%sig "v2/list.mli"]
 
   module String : [%sig "v2/string.mli"]

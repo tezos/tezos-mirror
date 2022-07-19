@@ -23,13 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_protocol_environment_sigs_stdlib_compat.V3
-
 (* From Lwtreslib *)
 
 type 'a t = unit -> 'a node
 
-and +'a node = 'a Stdlib.Seq.node = Nil | Cons of 'a * 'a t
+and +'a node = Nil | Cons of 'a * 'a t
 
 val empty : 'a t
 
