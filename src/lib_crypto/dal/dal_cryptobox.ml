@@ -851,5 +851,5 @@ module Inner = struct
            proof)
 end
 
+include Inner
 module Verifier = Inner
-module Full = Inner
