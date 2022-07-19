@@ -1,1 +1,1 @@
-include Table_sig.S
+include module type of Partial_table
