@@ -89,42 +89,15 @@ let load_embedded_cmis cmis = List.iter load_embedded_cmi cmis
 
 *)
 
-let tezos_protocol_env =
-  let open Embedded_cmis in
-  [
-    ("CamlinternalFormatBasics", camlinternalFormatBasics_cmi);
-    ( "Tezos_protocol_environment_sigs_stdlib_compat",
-      tezos_protocol_environment_sigs_stdlib_compat_cmi );
-    ( "Tezos_protocol_environment_sigs_stdlib_compat__V_all",
-      tezos_protocol_environment_sigs_stdlib_compat__V_all_cmi );
-    ( "Tezos_protocol_environment_sigs_stdlib_compat__V2",
-      tezos_protocol_environment_sigs_stdlib_compat__V2_cmi );
-    ( "Tezos_protocol_environment_sigs_stdlib_compat__V3",
-      tezos_protocol_environment_sigs_stdlib_compat__V3_cmi );
-    ( "Tezos_protocol_environment_sigs_stdlib_compat__V4",
-      tezos_protocol_environment_sigs_stdlib_compat__V4_cmi );
-    ("Tezos_protocol_environment_sigs", tezos_protocol_environment_sigs_cmi);
-    ( "Tezos_protocol_environment_sigs__V0",
-      tezos_protocol_environment_sigs__V0_cmi );
-    ( "Tezos_protocol_environment_sigs__V1",
-      tezos_protocol_environment_sigs__V1_cmi );
-    ( "Tezos_protocol_environment_sigs__V2",
-      tezos_protocol_environment_sigs__V2_cmi );
-    ( "Tezos_protocol_environment_sigs__V3",
-      tezos_protocol_environment_sigs__V3_cmi );
-    ( "Tezos_protocol_environment_sigs__V4",
-      tezos_protocol_environment_sigs__V4_cmi );
-    ( "Tezos_protocol_environment_sigs__V5",
-      tezos_protocol_environment_sigs__V5_cmi );
-    ( "Tezos_protocol_environment_sigs__V6",
-      tezos_protocol_environment_sigs__V6_cmi );
-    ( "Tezos_protocol_environment_sigs__V7",
-      tezos_protocol_environment_sigs__V7_cmi );
-  ]
+let all_files l =
+  List.map
+    (fun (`File (fname, content)) ->
+      (String.capitalize_ascii (Filename.chop_suffix fname ".cmi"), content))
+    l
 
-let register_env =
-  let open Embedded_cmis in
-  [("tezos_protocol_registerer", tezos_protocol_registerer_cmi)]
+let tezos_protocol_env = all_files Embedded_cmis_env.root
+
+let register_env = all_files Embedded_cmis_register.root
 
 (** Helpers *)
 
