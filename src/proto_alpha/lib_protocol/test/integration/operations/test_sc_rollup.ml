@@ -411,9 +411,9 @@ let publish_and_cement_dummy_commitment incr ~baker ~originator rollup =
    is also published and cemented). *)
 let publish_commitments_until_min_inbox_level incr rollup ~baker ~originator
     ~min_inbox_level ~cemented_commitment_hash ~cemented_commitment =
-  let commitment_freq =
-    Constants_storage.sc_rollup_commitment_period_in_blocks
-      (Alpha_context.Internal_for_tests.to_raw @@ Incremental.alpha_ctxt incr)
+  let* constants = Context.get_constants (I incr) in
+  let Constants.Parametric.{commitment_period_in_blocks = commitment_freq; _} =
+    constants.parametric.sc_rollup
   in
   let rec aux incr hash ({Sc_rollup.Commitment.inbox_level; _} as commitment) =
     let level = Raw_level.to_int32 inbox_level in
