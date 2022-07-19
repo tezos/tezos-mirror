@@ -63,7 +63,8 @@ module type S = sig
 
   (** [set_input_step] forwards the VM by one input tick. If the VM is not
       expecting input, it gets stuck. If the VM is already stuck, this function
-      may raise an exception. *)
+      may raise an exception. TODO: at this point the function raises an 
+      exception if the  VM is not expecting input. WHen we implement astuck state this needs to be slightly changed.*)
   val set_input_step : input_info -> string -> tree -> tree Lwt.t
 
   (** [get_output output state] returns the payload associated with the given

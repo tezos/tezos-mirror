@@ -182,29 +182,99 @@ let test_host_fun () =
   Lwt.return @@ Result.return_unit
 
 module Wasm = Wasm_pvm.Make (Test_encoding.Tree)
+module Decoding = Tree_decoding.Make (Test_encoding.Tree)
+module Encoding = Tree_encoding.Make (Test_encoding.Tree)
 
-let test_set_input () =
+let current_tick_encoding =
+  Encoding.value ["wasm"; "current_tick"] Data_encoding.z
+
+let current_tick_decoding =
+  Decoding.value ["wasm"; "current_tick"] Data_encoding.z
+
+let status_encoding = Encoding.value ["input"; "consuming"] Data_encoding.bool
+
+let status_decoding = Decoding.value ["input"; "consuming"] Data_encoding.bool
+
+let floppy_encoding =
+  Encoding.value ["pvm"; "status"] Gather_floppies.internal_status_encoding
+
+let level_encoding =
+  Encoding.value ["input"; "level"] Bounded.Int32.NonNegative.encoding
+
+let initialise_tree () =
   let open Lwt_syntax in
+  let id_encoding = Encoding.value ["input"; "id"] Data_encoding.z in
+
   let* tree = Test_encoding.empty_tree () in
+  let* tree = Encoding.run current_tick_encoding Z.zero tree in
   let* tree =
-    Test_encoding.Tree.add tree ["pvm"; "status"]
-    @@ Data_encoding.Binary.to_bytes_exn
-         Gather_floppies.internal_status_encoding
-         Gather_floppies.Not_gathering_floppies
+    Encoding.run floppy_encoding Gather_floppies.Not_gathering_floppies tree
   in
   let zero =
     match Bounded.Int32.NonNegative.of_int32 0l with
     | Some x -> x
     | _ -> assert false
   in
+  let* tree = Encoding.run status_encoding true tree in
+  let* tree = Encoding.run level_encoding zero tree in
+  let* tree = Encoding.run id_encoding Z.zero tree in
+  Lwt.return tree
+
+let test_get_info () =
+  let open Lwt_syntax in
+  let* tree = initialise_tree () in
+  let zero =
+    match Bounded.Int32.NonNegative.of_int32 0l with
+    | Some x -> x
+    | _ -> assert false
+  in
+  let last_input_read =
+    Some Wasm_pvm_sig.{inbox_level = zero; message_counter = Z.zero}
+  in
+  let expected_info =
+    Wasm_pvm_sig.
+      {current_tick = Z.zero; last_input_read; input_request = Input_required}
+  in
+  let* actual_info = Wasm.get_info tree in
+  assert (actual_info = expected_info) ;
+  Lwt_result_syntax.return_unit
+
+let test_set_input () =
+  let open Lwt_syntax in
+  let* tree = initialise_tree () in
+  let* tree = Encoding.run status_encoding false tree in
+  let zero =
+    match Bounded.Int32.NonNegative.of_int32 0l with
+    | Some x -> x
+    | _ -> assert false
+  in
+  let () =
+    Alcotest.check_raises
+      "Expected [Invalid_argument] exception"
+      Wasm_pvm.Set_input_step_expected_input
+      (fun () ->
+        let _ =
+          Wasm.set_input_step
+            {inbox_level = zero; message_counter = Z.of_int 1}
+            "hello"
+            tree
+        in
+        ())
+  in
+  let* tree = Encoding.run status_encoding true tree in
   let* tree =
     Wasm.set_input_step
       {inbox_level = zero; message_counter = Z.of_int 1}
       "hello"
       tree
   in
-  let* result_input = Test_encoding.Tree.find tree ["input"; "0"; "1"] in
-  assert (result_input = Some (Bytes.of_string "hello")) ;
+  let inp_decoding = Decoding.value ["input"; "0"; "1"] Data_encoding.string in
+  let* result_input = Decoding.run inp_decoding tree in
+  let* waiting_for_input = Decoding.run status_decoding tree in
+  let* current_tick = Decoding.run current_tick_decoding tree in
+  assert (current_tick = Z.one) ;
+  assert (not waiting_for_input) ;
+  assert (result_input = "hello") ;
   Lwt_result_syntax.return_unit
 
 let tests =

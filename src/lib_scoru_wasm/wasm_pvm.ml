@@ -40,8 +40,8 @@ module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
         type tree = T.tree
 
         module Decodings = Wasm_decodings.Make (T)
-        module Thunk = Thunk.Make (T)
         module Decoding = Tree_decoding.Make (T)
+        module Encoding = Tree_encoding.Make (T)
 
         let compute_step s =
           let open Lwt.Syntax in
@@ -61,14 +61,54 @@ module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
 
         let get_output _ _ = Lwt.return ""
 
-        let get_info _ =
-          Lwt.return
-            Wasm_pvm_sig.
-              {
-                current_tick = Z.of_int 0;
-                last_input_read = None;
-                input_request = Input_required;
-              }
+        let current_tick_decoding =
+          Decoding.value ["wasm"; "current_tick"] Data_encoding.z
+
+        let current_tick_encoding =
+          Encoding.value ["wasm"; "current_tick"] Data_encoding.z
+
+        let level_decoding =
+          Decoding.value ["input"; "level"] Bounded.Int32.NonNegative.encoding
+
+        let id_decoding = Decoding.value ["input"; "id"] Data_encoding.z
+
+        let status_encoding =
+          Encoding.value ["input"; "consuming"] Data_encoding.bool
+
+        let status_decoding =
+          Decoding.value ["input"; "consuming"] Data_encoding.bool
+
+        let get_info tree =
+          let open Lwt_syntax in
+          let* waiting =
+            try Decoding.run status_decoding tree with _ -> Lwt.return false
+          in
+          let input_request =
+            if waiting then Wasm_pvm_sig.Input_required
+            else Wasm_pvm_sig.No_input_required
+          in
+          let* inbox_level =
+            try Decoding.run level_decoding tree
+            with _ ->
+              Lwt.return
+                (match Bounded.Int32.NonNegative.of_int32 0l with
+                | Some x -> x
+                | _ -> assert false)
+          in
+          let* message_counter =
+            try Decoding.run id_decoding tree
+            with _ -> Lwt.return (Z.of_int (-1))
+          in
+          let last_input_read =
+            if message_counter = Z.of_int (-1) then None
+            else Some Wasm_pvm_sig.{inbox_level; message_counter}
+          in
+          let* current_tick =
+            try Decoding.run current_tick_decoding tree
+            with _ -> Lwt.return Z.zero
+          in
+          Lwt.return Wasm_pvm_sig.{current_tick; last_input_read; input_request}
+
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/3226
            Implement handling of input logic.
         *)
@@ -82,9 +122,18 @@ module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
             Int32.to_string @@ Bounded.Int32.NonNegative.to_int32 inbox_level
           in
           let id = Z.to_string message_counter in
+          let inp_encoding =
+            Encoding.value ["input"; level; id] Data_encoding.string
+          in
           match input_request with
           | No_input_required -> raise Set_input_step_expected_input
-          | _ -> T.add tree ["input"; level; id] @@ Bytes.of_string message
+          | _ ->
+              let* current_tick = Decoding.run current_tick_decoding tree in
+              let* tree =
+                Encoding.run current_tick_encoding (Z.succ current_tick) tree
+              in
+              let* tree = Encoding.run status_encoding false tree in
+              Encoding.run inp_encoding message tree
 
         let _module_instance_of_tree modules =
           Decodings.run (Decodings.module_instance_decoding modules)
