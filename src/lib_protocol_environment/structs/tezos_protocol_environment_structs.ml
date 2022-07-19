@@ -93,3 +93,8 @@ module V6 = struct
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Plonk = V6_plonk
 end
+
+module V7 = struct
+  module Error_monad_infix_globals = V0_error_monad_infix_globals
+  module Plonk = V7_plonk
+end

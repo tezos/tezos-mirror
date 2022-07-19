@@ -137,6 +137,11 @@ struct
         Stdlib.exit 1
 
   include Stdlib
+
+  (* The modules provided in the [_struct.V3.M] pack are meant specifically to
+     shadow modules from [Stdlib]/[Base]/etc. with backwards compatible
+     versions. Thus we open the module, hiding the incompatible, newer modules.
+  *)
   open Tezos_protocol_environment_structs.V3
   module Pervasives = Stdlib
 
