@@ -709,7 +709,7 @@ module Make (Rollup : PARAMETERS) = struct
                 (fun op -> Op_queue.remove state.queue op.L1_operation.hash)
                 injected_operations
             in
-            add_injected_operations state oph operations_to_inject
+            add_injected_operations state oph injected_operations
         | `Ignored operations_to_drop ->
             (* Injection failed but we ignore the failure. *)
             let* () =
