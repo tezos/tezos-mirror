@@ -63,12 +63,48 @@ module Simulation = struct
       client
     |> k
 
+  let multiple_transfers ~args ?simulation ?force k protocol =
+    let* _node, client = Client.init_with_protocol `Client ~protocol () in
+    let* contract = Helpers.originate_fail_on_false client in
+    let batches =
+      Ezjsonm.list
+        (fun arg ->
+          `O
+            [
+              ("destination", `String contract);
+              ("amount", `String "2");
+              ("arg", `String arg);
+            ])
+        args
+    in
+    let file = Temp.file "batch.json" in
+    let oc = open_out file in
+    Ezjsonm.to_channel oc batches ;
+    close_out oc ;
+    Client.spawn_multiple_transfers
+      ~giver:Constant.bootstrap1.public_key_hash
+      ~json_batch:file
+      ?simulation
+      ?force
+      client
+    |> k
+
   let successful =
     Protocol.register_test
       ~__FILE__
       ~title:"Simulation of successful operation"
       ~tags:["client"; "simulation"; "success"]
     @@ transfer ~arg:"True" ~simulation:true Process.check
+
+  let successful_multiple =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simulation of successful operation batch"
+      ~tags:["client"; "simulation"; "success"; "multiple"; "batch"]
+    @@ multiple_transfers
+         ~args:["True"; "True"; "True"]
+         ~simulation:true
+         Process.check
 
   let failing =
     Protocol.register_test
@@ -90,6 +126,25 @@ module Simulation = struct
       Test.fail "Did not report operation failure" ;
     unit
 
+  let failing_multiple_force =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Simulation of failing batch with force"
+      ~tags:["client"; "simulation"; "failing"; "multiple"; "batch"; "force"]
+    @@ multiple_transfers
+         ~args:["True"; "False"; "True"]
+         ~simulation:true
+         ~force:true
+    @@ fun p ->
+    let* stdout = Process.check_and_read_stdout ~expect_failure:false p in
+    if
+      stdout
+      =~! rex
+            "This transaction was BACKTRACKED[\\S\\s.]*This operation \
+             FAILED[\\S\\s.]*This operation was skipped"
+    then Test.fail "Did not report operation backtracked/failure/skipping" ;
+    unit
+
   let injection_force =
     Protocol.register_test
       ~__FILE__
@@ -100,11 +155,24 @@ module Simulation = struct
          ~exit_code:1
          ~msg:(rex "--gas-limit option is required")
 
+  let injection_multiple_force =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Injecting of failing operations batch with force"
+      ~tags:["client"; "injection"; "failing"; "force"; "multiple"; "batch"]
+    @@ multiple_transfers ~args:["True"; "False"; "True"] ~force:true
+    @@ Process.check_error
+         ~exit_code:1
+         ~msg:(rex "--gas-limit option is required")
+
   let register protocol =
     successful protocol ;
+    successful_multiple protocol ;
     failing protocol ;
     failing_force protocol ;
-    injection_force protocol
+    failing_multiple_force [Alpha] ;
+    injection_force protocol ;
+    injection_multiple_force [Alpha]
 end
 
 module Transfer = struct
