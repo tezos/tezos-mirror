@@ -11,8 +11,11 @@ integration:compiler-rejections:
 ## Stage: run scripts to check they are working properly  ##
 ############################################################
 
+# Note: those two jobs actually probably don't need the build_x86_64 job
+# to have finished, but we don't want to start before build_x86_64 has finished either.
 script:prepare_migration_test:
   extends: .test_template
+  needs: ["build_x86_64"]
   before_script:
     - last_proto_name=$(find src -name "proto_[0-9][0-9][0-9]_*" | awk -F'/' '{print $NF}' | sort -r | head -1)
     - last_proto_version=$(echo $last_proto_name | cut -d'_' -f2)
@@ -25,6 +28,7 @@ script:prepare_migration_test:
 
 script:snapshot_alpha_and_link:
   extends: .test_template
+  needs: ["build_x86_64"]
   script:
     # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
     - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
