@@ -315,32 +315,32 @@ let estimated_gas_single (type kind)
     match result with
     | Applied res | Backtracked (res, _) -> (
         match res with
-        | Transaction_result (Transaction_to_contract_result {consumed_gas; _})
-        | Transaction_result (Transaction_to_tx_rollup_result {consumed_gas; _})
-          ->
-            Ok consumed_gas
-        | Origination_result {consumed_gas; _} -> Ok consumed_gas
-        | Reveal_result {consumed_gas} -> Ok consumed_gas
-        | Delegation_result {consumed_gas} -> Ok consumed_gas
-        | Register_global_constant_result {consumed_gas; _} -> Ok consumed_gas
-        | Set_deposits_limit_result {consumed_gas} -> Ok consumed_gas
-        | Tx_rollup_origination_result {consumed_gas; _} -> Ok consumed_gas
-        | Tx_rollup_submit_batch_result {consumed_gas; _} -> Ok consumed_gas
-        | Tx_rollup_commit_result {consumed_gas; _} -> Ok consumed_gas
-        | Tx_rollup_return_bond_result {consumed_gas; _} -> Ok consumed_gas
-        | Tx_rollup_finalize_commitment_result {consumed_gas; _} ->
-            Ok consumed_gas
-        | Tx_rollup_remove_commitment_result {consumed_gas; _} ->
-            Ok consumed_gas
-        | Tx_rollup_rejection_result {consumed_gas; _} -> Ok consumed_gas
-        | Tx_rollup_dispatch_tickets_result {consumed_gas; _} -> Ok consumed_gas
-        | Transfer_ticket_result {consumed_gas; _} -> Ok consumed_gas
-        | Sc_rollup_originate_result {consumed_gas; _} -> Ok consumed_gas
-        | Sc_rollup_add_messages_result {consumed_gas; _} -> Ok consumed_gas
-        | Sc_rollup_cement_result {consumed_gas; _} -> Ok consumed_gas
-        | Sc_rollup_publish_result {consumed_gas; _} -> Ok consumed_gas)
+        | Transaction_result
+            ( Transaction_to_contract_result {consumed_gas; _}
+            | Transaction_to_tx_rollup_result {consumed_gas; _} )
+        | Origination_result {consumed_gas; _}
+        | Reveal_result {consumed_gas}
+        | Delegation_result {consumed_gas}
+        | Register_global_constant_result {consumed_gas; _}
+        | Set_deposits_limit_result {consumed_gas}
+        | Tx_rollup_origination_result {consumed_gas; _}
+        | Tx_rollup_submit_batch_result {consumed_gas; _}
+        | Tx_rollup_commit_result {consumed_gas; _}
+        | Tx_rollup_return_bond_result {consumed_gas; _}
+        | Tx_rollup_finalize_commitment_result {consumed_gas; _}
+        | Tx_rollup_remove_commitment_result {consumed_gas; _}
+        | Tx_rollup_rejection_result {consumed_gas; _}
+        | Tx_rollup_dispatch_tickets_result {consumed_gas; _}
+        | Transfer_ticket_result {consumed_gas; _}
+        | Sc_rollup_originate_result {consumed_gas; _}
+        | Sc_rollup_add_messages_result {consumed_gas; _}
+        | Sc_rollup_cement_result {consumed_gas; _}
+        | Sc_rollup_publish_result {consumed_gas; _} ->
+            Ok consumed_gas)
     | Skipped _ ->
-        Ok Gas.Arith.zero (* there must be another error for this to happen *)
+        error_with "Cannot estimate gas of skipped operation"
+        (* There must be another error for this to happen, and it should not
+           surface (the force mode catches it). *)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
   in
   consumed_gas operation_result >>? fun gas ->
@@ -364,43 +364,39 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
             if allocated_destination_contract then
               Ok (Z.add paid_storage_size_diff origination_size)
             else Ok paid_storage_size_diff
+        | Origination_result {paid_storage_size_diff; _} ->
+            Ok (Z.add paid_storage_size_diff origination_size)
+        | Register_global_constant_result {size_of_constant; _} ->
+            Ok size_of_constant
+        | Tx_rollup_origination_result _ -> Ok tx_rollup_origination_size
+        | Tx_rollup_submit_batch_result {paid_storage_size_diff; _}
+        | Tx_rollup_dispatch_tickets_result {paid_storage_size_diff; _}
+        | Transfer_ticket_result {paid_storage_size_diff; _} ->
+            Ok paid_storage_size_diff
+        | Sc_rollup_originate_result {size; _} -> Ok size
         | Transaction_result (Transaction_to_tx_rollup_result _) ->
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
                Storage fees for transaction rollup.
                We need to charge for newly allocated storage (as we do for
                Michelson’s big map). *)
             Ok Z.zero
-        | Origination_result {paid_storage_size_diff; _} ->
-            Ok (Z.add paid_storage_size_diff origination_size)
-        | Reveal_result _ -> Ok Z.zero
-        | Delegation_result _ -> Ok Z.zero
-        | Register_global_constant_result {size_of_constant; _} ->
-            Ok size_of_constant
-        | Set_deposits_limit_result _ -> Ok Z.zero
-        | Tx_rollup_origination_result _ -> Ok tx_rollup_origination_size
-        | Tx_rollup_submit_batch_result {paid_storage_size_diff; _} ->
-            Ok paid_storage_size_diff
-        | Tx_rollup_commit_result _ -> Ok Z.zero
-        | Tx_rollup_return_bond_result _ -> Ok Z.zero
-        | Tx_rollup_finalize_commitment_result _ -> Ok Z.zero
-        | Tx_rollup_remove_commitment_result _ -> Ok Z.zero
-        | Tx_rollup_rejection_result _ -> Ok Z.zero
-        | Tx_rollup_dispatch_tickets_result {paid_storage_size_diff; _} ->
-            Ok paid_storage_size_diff
-        | Transfer_ticket_result {paid_storage_size_diff; _} ->
-            Ok paid_storage_size_diff
-        | Sc_rollup_originate_result {size; _} -> Ok size
-        | Sc_rollup_add_messages_result _ -> Ok Z.zero
+        | Reveal_result _ | Delegation_result _ | Set_deposits_limit_result _
+        | Tx_rollup_commit_result _ | Tx_rollup_return_bond_result _
+        | Tx_rollup_finalize_commitment_result _
+        | Tx_rollup_remove_commitment_result _ | Tx_rollup_rejection_result _
+        | Sc_rollup_add_messages_result _
         (* The following Sc_rollup operations have zero storage cost because we
            consider them to be paid in the stake deposit.
 
            TODO: https://gitlab.com/tezos/tezos/-/issues/2686
            Document why this is safe.
         *)
-        | Sc_rollup_cement_result _ -> Ok Z.zero
-        | Sc_rollup_publish_result _ -> Ok Z.zero)
+        | Sc_rollup_cement_result _ | Sc_rollup_publish_result _ ->
+            Ok Z.zero)
     | Skipped _ ->
-        Ok Z.zero (* there must be another error for this to happen *)
+        error_with "Cannot estimate storage of skipped operation"
+        (* There must be another error for this to happen, and it should not
+           surface (the force mode catches it). *)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
   in
   storage_size_diff operation_result >>? fun storage ->
@@ -438,29 +434,24 @@ let originated_contracts_single (type kind)
     | Applied res | Backtracked (res, _) -> (
         match res with
         | Transaction_result
-            (Transaction_to_contract_result {originated_contracts; _}) ->
-            Ok originated_contracts
-        | Transaction_result (Transaction_to_tx_rollup_result _) -> Ok []
+            (Transaction_to_contract_result {originated_contracts; _})
         | Origination_result {originated_contracts; _} ->
             Ok originated_contracts
-        | Register_global_constant_result _ -> Ok []
-        | Reveal_result _ -> Ok []
-        | Delegation_result _ -> Ok []
-        | Set_deposits_limit_result _ -> Ok []
-        | Tx_rollup_origination_result _ -> Ok []
-        | Tx_rollup_submit_batch_result _ -> Ok []
-        | Tx_rollup_commit_result _ -> Ok []
-        | Tx_rollup_return_bond_result _ -> Ok []
-        | Tx_rollup_finalize_commitment_result _ -> Ok []
-        | Tx_rollup_remove_commitment_result _ -> Ok []
-        | Tx_rollup_rejection_result _ -> Ok []
-        | Tx_rollup_dispatch_tickets_result _ -> Ok []
-        | Transfer_ticket_result _ -> Ok []
-        | Sc_rollup_originate_result _ -> Ok []
-        | Sc_rollup_add_messages_result _ -> Ok []
-        | Sc_rollup_cement_result _ -> Ok []
-        | Sc_rollup_publish_result _ -> Ok [])
-    | Skipped _ -> Ok [] (* there must be another error for this to happen *)
+        | Transaction_result (Transaction_to_tx_rollup_result _)
+        | Register_global_constant_result _ | Reveal_result _
+        | Delegation_result _ | Set_deposits_limit_result _
+        | Tx_rollup_origination_result _ | Tx_rollup_submit_batch_result _
+        | Tx_rollup_commit_result _ | Tx_rollup_return_bond_result _
+        | Tx_rollup_finalize_commitment_result _
+        | Tx_rollup_remove_commitment_result _ | Tx_rollup_rejection_result _
+        | Tx_rollup_dispatch_tickets_result _ | Transfer_ticket_result _
+        | Sc_rollup_originate_result _ | Sc_rollup_add_messages_result _
+        | Sc_rollup_cement_result _ | Sc_rollup_publish_result _ ->
+            Ok [])
+    | Skipped _ ->
+        error_with "Cannot know originated contracts of skipped operation"
+        (* There must be another error for this to happen, and it should not
+           surface (the force mode catches it). *)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
   in
   originated_contracts operation_result >>? fun contracts ->
