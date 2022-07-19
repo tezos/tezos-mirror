@@ -339,7 +339,7 @@ let check_full_cache ~protocol =
       in
       aux contracts size nremoved (k - 1) (counter + 1)
   in
-  aux [] 0 0 80 counter
+  aux [] 0 0 120 counter
 
 (*
 
