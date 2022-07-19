@@ -545,10 +545,15 @@ struct
     capacity : int64;
         (** The max number of the entries in the structure. Once the maximum size
             is reached, older entries are deleted to free space for  new ones. *)
-    (* TODO: The current implementation likely needs a fix.
-       See: https://gitlab.com/tezos/tezos/-/issues/2981*)
     next_index : int64;
         (** The index to use for the next entry to add in the structure *)
+    oldest_index : int64;
+        (** The oldest index of the (oldest) entry that has been added to the
+            data structure. If the history is empty, [oldest_index] is
+            equal to [next_index]. *)
+    size : int64;
+        (** Counts the number of entries that are stored in history. It
+            satisfies the invariant: `0 <= size <= capacity` *)
   }
 
   let history_encoding : history Data_encoding.t =
@@ -561,15 +566,17 @@ struct
         (list (tup2 int64 Hash.encoding))
     in
     conv
-      (fun {events; sequence; capacity; next_index} ->
-        (events, sequence, capacity, next_index))
-      (fun (events, sequence, capacity, next_index) ->
-        {events; sequence; capacity; next_index})
-      (obj4
+      (fun {events; sequence; capacity; next_index; oldest_index; size} ->
+        (events, sequence, capacity, next_index, oldest_index, size))
+      (fun (events, sequence, capacity, next_index, oldest_index, size) ->
+        {events; sequence; capacity; next_index; oldest_index; size})
+      (obj6
          (req "events" events_encoding)
          (req "sequence" sequence_encoding)
          (req "capacity" int64)
-         (req "next_index" int64))
+         (req "next_index" int64)
+         (req "oldest_index" int64)
+         (req "size" int64))
 
   let pp_history fmt history =
     Hash.Map.bindings history.events |> fun bindings ->
@@ -590,10 +597,14 @@ struct
       fmt
       "@[<hov 2>History:@;\
       \ { capacity: %Ld;@;\
+      \ current size: %Ld;@;\
+      \ oldest index: %Ld;@;\
       \ next_index : %Ld;@;\
       \ bindings: %a;@;\
       \ sequence: %a; }@]"
       history.capacity
+      history.size
+      history.oldest_index
       history.next_index
       (Format.pp_print_list pp_binding)
       bindings
@@ -601,11 +612,14 @@ struct
       sequence_bindings
 
   let history_at_genesis ~capacity =
+    let next_index = 0L in
     {
       events = Hash.Map.empty;
       sequence = Int64_map.empty;
       capacity;
-      next_index = 0L;
+      next_index;
+      oldest_index = next_index;
+      size = 0L;
     }
 
   (** [no_history] creates an empty history with [capacity] set to
@@ -631,24 +645,34 @@ struct
           sequence = Int64_map.add current_index ptr history.sequence;
           capacity = history.capacity;
           next_index;
+          oldest_index = history.oldest_index;
+          size = Int64.succ history.size;
         }
       in
-      if Int64.(equal history.next_index history.capacity) then
-        match Int64_map.min_binding history.sequence with
+      (* A negative size means that [history.capacity] is set to [Int64.max_int]
+         and that the structure is full, so adding a new entry makes the size
+         overflows. In this case, we remove an element in the else branch to
+         keep the size of the history equal to [Int64.max_int] at most. *)
+      if Compare.Int64.(history.size > 0L && history.size <= history.capacity)
+      then history
+      else
+        let l = history.oldest_index in
+        match Int64_map.find l history.sequence with
         | None ->
-            (* This case is impossible as the map [history.sequence] was
-               added to a few lines earlier. *)
+            (* If history.size > history.capacity > 0, there is necessarily
+               an entry whose index is history.oldest_index in [sequence]. *)
             assert false
-        | Some (l, h) ->
+        | Some h ->
             let sequence = Int64_map.remove l history.sequence in
             let events = Hash.Map.remove h events in
             {
-              next_index = Int64.pred history.next_index;
+              next_index = history.next_index;
               capacity = history.capacity;
+              size = history.capacity;
+              oldest_index = Int64.succ history.oldest_index;
               sequence;
               events;
             }
-      else history
 
   let take_snapshot inbox =
     let prev_cell = inbox.old_levels_messages in
