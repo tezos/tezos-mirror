@@ -54,8 +54,8 @@ let get_operations client =
 
 let read_consumed_gas operation =
   JSON.(
-    operation |> get "metadata" |> get "operation_result" |> get "consumed_gas"
-    |> as_int)
+    operation |> get "metadata" |> get "operation_result"
+    |> get "consumed_milligas" |> as_int)
 
 let get_consumed_gas client =
   JSON.(
