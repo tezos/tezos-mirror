@@ -308,13 +308,13 @@ let step_encoding =
 let pp_step ppf step =
   match step with
   | Dissection states ->
-      Format.fprintf ppf "dissection:\n" ;
+      Format.fprintf ppf "Dissection:@ " ;
       Format.pp_print_list
         ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ";\n\n")
         (fun ppf {state_hash; tick} ->
           Format.fprintf
             ppf
-            "tick = %a, state = %a\n"
+            "Tick: %a,@ State: %a\n"
             Sc_rollup_tick_repr.pp
             tick
             (Format.pp_print_option State_hash.pp)
@@ -325,14 +325,14 @@ let pp_step ppf step =
 
 type refutation = {choice : Sc_rollup_tick_repr.t; step : step}
 
-let pp_refutation ppf refutation =
+let pp_refutation ppf {choice; step} =
   Format.fprintf
     ppf
-    "Refute from tick %a with %a.\n"
+    "Tick: %a@ Step: %a"
     Sc_rollup_tick_repr.pp
-    refutation.choice
+    choice
     pp_step
-    refutation.step
+    step
 
 let refutation_encoding =
   let open Data_encoding in
