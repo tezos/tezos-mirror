@@ -478,6 +478,7 @@ module Opam = struct
     maintainer : string;
     authors : string list;
     homepage : string;
+    doc : string;
     bug_reports : string;
     dev_repo : string;
     licenses : string list;
@@ -495,6 +496,7 @@ module Opam = struct
         maintainer;
         authors;
         homepage;
+        doc;
         bug_reports;
         dev_repo;
         licenses;
@@ -689,8 +691,9 @@ module Opam = struct
     pp_line "opam-version: \"2.0\"" ;
     pp_line "maintainer: %a" pp_string maintainer ;
     pp_line "%a" (pp_list ~prefix:"authors: " pp_string) authors ;
-    pp_line "homepage: %a" pp_string homepage ;
-    pp_line "bug-reports: %a" pp_string bug_reports ;
+    if homepage <> "" then pp_line "homepage: %a" pp_string homepage ;
+    if doc <> "" then pp_line "doc: %a" pp_string doc ;
+    if bug_reports <> "" then pp_line "bug-reports: %a" pp_string bug_reports ;
     pp_line "dev-repo: %a" pp_string dev_repo ;
     (match licenses with
     | [license] -> pp_line "license: %a" pp_string license
@@ -915,6 +918,9 @@ module Target = struct
     modules_without_implementation : string list;
     ocaml : Version.constraints option;
     opam : string option;
+    opam_bug_reports : string option;
+    opam_doc : string option;
+    opam_homepage : string option;
     opam_with_test : with_test;
     opens : string list;
     path : string;
@@ -1067,6 +1073,9 @@ module Target = struct
     ?npm_deps:Npm.t list ->
     ?ocaml:Version.constraints ->
     ?opam:string ->
+    ?opam_bug_reports:string ->
+    ?opam_doc:string ->
+    ?opam_homepage:string ->
     ?opam_with_test:with_test ->
     ?preprocess:preprocessor list ->
     ?preprocessor_deps:preprocessor_dep list ->
@@ -1140,12 +1149,12 @@ module Target = struct
       ?(dune = Dune.[]) ?flags ?foreign_stubs ?implements ?inline_tests
       ?js_compatible ?js_of_ocaml ?documentation ?(linkall = false) ?modes
       ?modules ?(modules_without_implementation = []) ?(npm_deps = []) ?ocaml
-      ?opam ?(opam_with_test = Always) ?(preprocess = [])
-      ?(preprocessor_deps = []) ?(private_modules = []) ?(opam_only_deps = [])
-      ?(release = false) ?static ?synopsis ?description
-      ?(time_measurement_ppx = false) ?(virtual_modules = [])
-      ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
-      ~path names =
+      ?opam ?opam_bug_reports ?opam_doc ?opam_homepage
+      ?(opam_with_test = Always) ?(preprocess = []) ?(preprocessor_deps = [])
+      ?(private_modules = []) ?(opam_only_deps = []) ?(release = false) ?static
+      ?synopsis ?description ?(time_measurement_ppx = false)
+      ?(virtual_modules = []) ?default_implementation ?(cram = false) ?license
+      ?(extra_authors = []) ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1432,6 +1441,9 @@ module Target = struct
         modules_without_implementation;
         ocaml;
         opam;
+        opam_bug_reports;
+        opam_doc;
+        opam_homepage;
         opam_with_test;
         opens;
         path;
@@ -2126,18 +2138,25 @@ let generate_opam ?release for_package (internals : Target.internal list) :
       (as_opam_dependency ~fix_version:false ~for_package ~with_test:Never)
       internal.conflicts
   in
-  let synopsis =
-    let all =
-      List.filter_map (fun (i : Target.internal) -> i.synopsis) internals
-    in
-    let () =
-      match all with
-      | [_] -> ()
-      | [] -> error "No synopsis declared for package %s\n" for_package
-      | _ :: _ :: _ ->
-          error "Too many synopsis declared for package %s\n" for_package
-    in
-    String.concat " " all
+  let get_consistent_value ~name ?default
+      (get : Target.internal -> string option) =
+    match
+      List.filter_map get internals |> String_set.of_list |> String_set.elements
+    with
+    | [] -> (
+        match default with
+        | None ->
+            error "No %s declared for package %s\n" name for_package ;
+            ""
+        | Some value -> value)
+    | [value] -> value
+    | value :: _ :: _ as list ->
+        error
+          "Package %s was declared with multiple different values for %s: %s\n"
+          for_package
+          name
+          (String.concat ", " (List.map (Format.sprintf "%S") list)) ;
+        value
   in
   let description =
     let descriptions =
@@ -2219,14 +2238,24 @@ let generate_opam ?release for_package (internals : Target.internal list) :
   {
     maintainer = "contact@tezos.com";
     authors = "Tezos devteam" :: extra_authors;
-    homepage = "https://www.tezos.com/";
-    bug_reports = "https://gitlab.com/tezos/tezos/issues";
+    homepage =
+      get_consistent_value
+        ~name:"opam_homepage"
+        (fun x -> x.opam_homepage)
+        ~default:"https://www.tezos.com/";
+    doc =
+      get_consistent_value ~name:"opam_doc" (fun x -> x.opam_doc) ~default:"";
+    bug_reports =
+      get_consistent_value
+        ~name:"opam_bug_reports"
+        (fun x -> x.opam_bug_reports)
+        ~default:"https://gitlab.com/tezos/tezos/issues";
     dev_repo = "git+https://gitlab.com/tezos/tezos.git";
     licenses;
     depends;
     conflicts;
     build;
-    synopsis;
+    synopsis = get_consistent_value ~name:"synopsis" (fun x -> x.synopsis);
     url = Option.map (fun {url; _} -> url) release;
     description;
     x_opam_monorepo_opam_provided;
