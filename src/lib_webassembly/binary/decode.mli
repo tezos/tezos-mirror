@@ -37,6 +37,11 @@ type instr_block_kont =
   | IKIf2 of Ast.block_type * int * Ast.block_label
       (** If .. else parsing step. *)
 
+type block_kont =
+  | BlockStart
+  | BlockParse of instr_block_kont lazy_stack
+  | BlockStop of Ast.block_label
+
 (** Vector and size continuations *)
 
 (** Vector accumulator, used in two steps: first accumulating the values, then
@@ -111,7 +116,7 @@ type code_kont =
       left : pos;
       size : size;
       locals : Types.value_type Vector.t;
-      const_kont : instr_block_kont list;
+      const_kont : block_kont;
     }  (** Parsing step of the body of a function. *)
   | CKStop of Ast.func  (** Final step of a parsed function, irreducible. *)
 
@@ -124,7 +129,7 @@ type elem_kont =
       index : int32 Source.phrase;
       index_kind : index_kind;
       early_ref_type : Types.ref_type option;
-      offset_kont : pos * instr_block_kont list;
+      offset_kont : pos * block_kont;
     }  (** Element segment mode parsing step. *)
   | EKInitIndexed of {
       mode : Ast.segment_mode;
@@ -136,7 +141,7 @@ type elem_kont =
       mode : Ast.segment_mode;
       ref_type : Types.ref_type;
       einit_vec : Ast.const lazy_vec_kont;
-      einit_kont : pos * instr_block_kont list;
+      einit_kont : pos * block_kont;
     }
       (** Element segment initialization code parsing step for constant values. *)
   | EKStop of Ast.elem_segment'  (** Final step of a segment parsing. *)
@@ -146,7 +151,7 @@ type data_kont =
   | DKMode of {
       left : pos;
       index : int32 Source.phrase;
-      offset_kont : pos * instr_block_kont list;
+      offset_kont : pos * block_kont;
     }  (** Data segment mode parsing step. *)
   | DKInit of {dmode : Ast.segment_mode; init_kont : byte_vector_kont}
   | DKStop of Ast.data_segment'  (** Final step of a data segment parsing. *)
@@ -214,11 +219,7 @@ type module_kont =
   | MKExport of export_kont * pos * size * Ast.export lazy_vec_kont
       (** Export section parsing. *)
   | MKGlobal of
-      Types.global_type
-      * int
-      * instr_block_kont list
-      * size
-      * Ast.global lazy_vec_kont
+      Types.global_type * int * block_kont * size * Ast.global lazy_vec_kont
       (** Globals section parsing, containing the starting position, the
       continuation of the current global block instruction, and the size of the
       section. *)
