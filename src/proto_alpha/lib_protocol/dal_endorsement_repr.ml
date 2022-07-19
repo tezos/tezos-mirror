@@ -78,6 +78,14 @@ let expected_size_in_bits ~max_index =
   | Error _ -> (* Happens if max_index < 1 *) 0
   | Ok t -> occupied_size_in_bits t
 
+type shard_index = int
+
+module Shard_map = Map.Make (struct
+  type t = shard_index
+
+  let compare = Compare.Int.compare
+end)
+
 module Accountability = struct
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3109
 
@@ -85,8 +93,6 @@ module Accountability = struct
      optimized.
   *)
   type t = Bitset.t list
-
-  type shard = int
 
   let init ~length =
     let l =

@@ -171,6 +171,7 @@ let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
       ~endorsement_level:predecessor_level
       ~preendorsement_level
   in
+  Dal_apply.initialisation ~level:predecessor_level ctxt >>=? fun ctxt ->
   return
     ( ctxt,
       migration_balance_updates,

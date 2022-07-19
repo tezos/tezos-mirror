@@ -2837,6 +2837,10 @@ module Dal : sig
   module Endorsement : sig
     type t
 
+    type shard_index = int
+
+    module Shard_map : Map.S with type key = shard_index
+
     val encoding : t Data_encoding.t
 
     val empty : t
@@ -2847,9 +2851,22 @@ module Dal : sig
 
     val expected_size_in_bits : max_index:Slot_index.t -> int
 
-    val shards : context -> endorser:public_key_hash -> int list
+    val shards_of_endorser :
+      context -> endorser:public_key_hash -> shard_index list option
 
     val record_available_shards : context -> t -> int list -> context
+
+    type committee = {
+      pkh_to_shards : (shard_index * int) Signature.Public_key_hash.Map.t;
+      shard_to_pkh : Signature.Public_key_hash.t Shard_map.t;
+    }
+
+    val compute_committee :
+      context ->
+      (Slot.t -> (context * Signature.Public_key_hash.t) tzresult Lwt.t) ->
+      committee tzresult Lwt.t
+
+    val init_committee : context -> committee -> context
   end
 
   type slot_id = {published_level : Raw_level.t; index : Slot_index.t}
@@ -2969,6 +2986,10 @@ module Dal_errors : sig
     | Dal_publish_slot_header_candidate_with_low_fees of {proposed_fees : Tez.t}
     | Dal_endorsement_size_limit_exceeded of {maximum_size : int; got : int}
     | Dal_publish_slot_header_duplicate of {slot_header : Dal.Slot.Header.t}
+    | Dal_data_availibility_endorser_not_in_committee of {
+        endorser : Signature.Public_key_hash.t;
+        level : Level.t;
+      }
 end
 
 (** This module re-exports definitions from {!Sc_rollup_storage} and

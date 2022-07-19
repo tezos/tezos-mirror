@@ -57,10 +57,13 @@ let validate_data_availability ctxt data_availability =
     (Dal_endorsement_size_limit_exceeded {maximum_size; got = size})
 
 let apply_data_availability ctxt data_availability ~endorser =
-  assert_dal_feature_enabled ctxt >>?= fun () ->
-  let shards = Dal.Endorsement.shards ctxt ~endorser in
-  Dal.Endorsement.record_available_shards ctxt data_availability shards
-  |> return
+  assert_dal_feature_enabled ctxt >>? fun () ->
+  match Dal.Endorsement.shards_of_endorser ctxt ~endorser with
+  | None ->
+      let level = Level.current ctxt in
+      error (Dal_data_availibility_endorser_not_in_committee {endorser; level})
+  | Some shards ->
+      Ok (Dal.Endorsement.record_available_shards ctxt data_availability shards)
 
 let validate_publish_slot_header ctxt Dal.Slot.Header.{id = {index; _}; _} =
   assert_dal_feature_enabled ctxt >>? fun () ->
@@ -81,7 +84,7 @@ let apply_publish_slot_header ctxt slot_header =
   if updated then ok ctxt
   else error (Dal_publish_slot_header_duplicate {slot_header})
 
-let dal_finalisation ctxt =
+let finalisation ctxt =
   only_if_dal_feature_enabled
     ctxt
     ~default:(fun ctxt -> return (ctxt, None))
@@ -104,3 +107,22 @@ let dal_finalisation ctxt =
       *)
       Dal.Slot.finalize_pending_slot_headers ctxt
       >|=? fun (ctxt, slot_availability) -> (ctxt, Some slot_availability))
+
+let initialisation ctxt ~level =
+  let open Lwt_tzresult_syntax in
+  only_if_dal_feature_enabled
+    ctxt
+    ~default:(fun ctxt -> return ctxt)
+    (fun ctxt ->
+      let pkh_from_tenderbake_slot slot =
+        Stake_distribution.slot_owner ctxt level slot
+        >|=? fun (ctxt, consensus_pk1) -> (ctxt, consensus_pk1.delegate)
+      in
+      (* This committee is cached because it is the one we will use
+         for the validation of the DAL endorsements. *)
+      let* committee =
+        Alpha_context.Dal.Endorsement.compute_committee
+          ctxt
+          pkh_from_tenderbake_slot
+      in
+      return (Alpha_context.Dal.Endorsement.init_committee ctxt committee))
