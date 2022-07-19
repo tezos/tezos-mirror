@@ -278,6 +278,12 @@ let test_tuples () =
       ((1, 2), (3, 4))
       Stdlib.( = )
   in
+  let* () =
+    assert_round_trip
+      (tup9 ~flatten:false int int int int int int int int int)
+      (1, 2, 3, 4, 5, 6, 7, 8, 9)
+      Stdlib.( = )
+  in
   (* Without flatten we override the element since the tree [int]s are all
      stored under the same key [my_int]. *)
   let*! t3 = encode_decode (tup3 ~flatten:true int int int) (1, 2, 3) in

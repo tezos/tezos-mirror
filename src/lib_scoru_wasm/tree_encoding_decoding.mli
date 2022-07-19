@@ -174,6 +174,21 @@ module type S = sig
     'h t ->
     ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h) t
 
+  (** [tup9 ~flatten e1 e2 e3 e4 e5 e6 e7 e8 e9] combines the given encoders
+      [e1 .. e9] into an encoder for a tuple of nine elements. *)
+  val tup9 :
+    flatten:bool ->
+    'a t ->
+    'b t ->
+    'c t ->
+    'd t ->
+    'e t ->
+    'f t ->
+    'g t ->
+    'h t ->
+    'i t ->
+    ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i) t
+
   (** [raw key] is an encoder for bytes under the given [key]. *)
   val raw : key -> bytes t
 
