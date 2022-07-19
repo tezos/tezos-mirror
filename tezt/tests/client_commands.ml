@@ -371,6 +371,6 @@ module Dry_run = struct
 end
 
 let register ~protocols =
-  Simulation.register [Jakarta; Alpha] ;
+  Simulation.register protocols ;
   Transfer.register protocols ;
   Dry_run.register protocols
