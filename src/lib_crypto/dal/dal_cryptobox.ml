@@ -199,24 +199,24 @@ module Inner = struct
       let logx = Z.(log2 (of_int x)) in
       1 lsl logx = x
     in
-
-    (* According to the specification the lengths of a slot a slot segment are
-       in MiB *)
-    assert (is_pow_of_two t.slot_size) ;
-    assert (is_pow_of_two t.segment_size) ;
-
-    assert (is_pow_of_two t.n) ;
-
-    (* n must be at most 2^32, the biggest subgroup of 2^i roots of unity in the
-       multiplicative group of Fr, because the FFTs operate on such groups. *)
-    assert (Z.(log2 (of_int t.n)) <= 32) ;
-
-    assert (is_pow_of_two t.k) ;
-    assert (t.n > t.k) ;
-
-    assert (is_pow_of_two t.shards_amount) ;
-    (* Shards must contain at least two elements. *)
-    assert (t.n > t.shards_amount)
+    if
+      not
+        (is_pow_of_two t.slot_size
+        && is_pow_of_two t.segment_size
+        && is_pow_of_two t.n)
+    then
+      (* According to the specification the lengths of a slot a slot segment are
+         in MiB *)
+      invalid_arg "Wrong slot size: expected MiB"
+    else if not (Z.(log2 (of_int t.n)) <= 32 && is_pow_of_two t.k && t.n > t.k)
+    then
+      (* n must be at most 2^32, the biggest subgroup of 2^i roots of unity in the
+         multiplicative group of Fr, because the FFTs operate on such groups. *)
+      invalid_arg "Wrong computed size for n"
+    else if not (is_pow_of_two t.shards_amount && t.n > t.shards_amount) then
+      invalid_arg "Shards not containing at least two elements"
+    else ()
+  (* Shards must contain at least two elements. *)
 
   let make ~redundancy_factor ~slot_size ~segment_size ~shards_amount =
     let k = 1 lsl Z.(log2up (of_int slot_size / of_int scalar_bytes_amount)) in
