@@ -427,8 +427,22 @@ module Make (T : Tree.S) = struct
         (Data_encoding.string_enum [("host", true); ("native", false)])
     in
     if is_host_func then
-      let+ name = value ["name"] Data_encoding.string in
-      Host_funcs.lookup name
+      let* module_name =
+        lazy_vector_decoding "module_name" (value [] Data_encoding.int31)
+      in
+      let* name =
+        lazy_vector_decoding "func_name" (value [] Data_encoding.int31)
+      in
+      let* t = scope ["func_type"] (func_type_decoding ()) in
+      of_lwt
+        (Lwt.bind
+           (Tezos_webassembly_interpreter.Import.lookup
+              module_name
+              name
+              (ExternFuncType t))
+           (function
+            | ExternFunc extern -> Lwt.return extern
+            | _ -> assert false))
     else
       let* type_ = func_type_decoding () in
       let* ftype = value ["ftype"] Interpreter_encodings.Ast.var_encoding in

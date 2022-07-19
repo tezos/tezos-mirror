@@ -26,9 +26,6 @@
 open Tezos_webassembly_interpreter
 open Instance
 
-let lookup name =
-  Stdlib.failwith (Printf.sprintf "Unknown host function %s" name)
-
 exception Bad_input
 
 let aux_write_input_in_memory ~input_buffer ~module_inst ~rtype_offset
@@ -106,6 +103,16 @@ let read_input =
       func_name = "read_input";
       implem = f;
     }
+
+let lookup _module_name name _t =
+  let open Lwt.Syntax in
+  let+ name = Utf8.encode name in
+  match name with
+  | "read_input" -> ExternFunc read_input (* TODO: typecheck *)
+  | _ -> raise Not_found
+
+let configure () =
+  Import.register (Utf8.decode "tezos") (fun name t -> lookup "tezos" name t)
 
 module Internal_for_tests = struct
   let aux_write_input_in_memory = aux_write_input_in_memory

@@ -23,9 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [lookup name] retrieves or instantiates a host function by the given
-    [name]. *)
-val lookup : string -> ('input, 'inst) Tezos_webassembly_interpreter.Func.t
+(** [lookup module_name name] retrieves or instantiates a host
+    function by the given [name] in the given [module_name].
+    Currently dispatches [Tezos.read_input] to {!read_input}. *)
+val lookup :
+  string ->
+  Tezos_webassembly_interpreter.Ast.name ->
+  Tezos_webassembly_interpreter.Types.func_type ->
+  Tezos_webassembly_interpreter.Instance.extern Lwt.t
+
+(** Plugs {!lookup} into the WASN interpreter module system. *)
+val configure : unit -> unit Lwt.t
 
 exception Bad_input
 

@@ -39,7 +39,10 @@ module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
 
         module Decodings = Wasm_decodings.Make (T)
 
-        let compute_step = Lwt.return
+        let compute_step s =
+          let open Lwt.Syntax in
+          let* () = Host_funcs.configure () in
+          Lwt.return s
 
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/3092
            Implement handling of input logic.

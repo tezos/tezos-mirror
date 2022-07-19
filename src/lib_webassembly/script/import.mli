@@ -8,3 +8,9 @@ val register :
   Types.extern_type ->
   Instance.extern Lwt.t (* raises Not_found *)) ->
   unit Lwt.t
+
+val lookup :
+  Ast.name ->
+  Ast.name ->
+  Types.extern_type ->
+  Instance.extern Lwt.t (* raises Not_found *)

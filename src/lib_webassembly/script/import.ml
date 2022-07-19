@@ -25,7 +25,7 @@ let register name lookup =
   registry := Registry.add name lookup !registry ;
   Lwt.return_unit
 
-let lookup (m : module_) (im : import) : Instance.extern Lwt.t =
+let link_one (m : module_) (im : import) : Instance.extern Lwt.t =
   let open Lwt.Syntax in
   let {module_name; item_name; idesc} = im.it in
   let* module_name_l = from_ast_name module_name in
@@ -44,4 +44,11 @@ let lookup (m : module_) (im : import) : Instance.extern Lwt.t =
 let link m =
   let open Lwt.Syntax in
   let* imports = Lazy_vector.LwtInt32Vector.to_list m.it.imports in
-  TzStdLib.List.map_s (lookup m) imports
+  TzStdLib.List.map_s (link_one m) imports
+
+let lookup (module_name : Ast.name) (item_name : Ast.name)
+    (t : Types.extern_type) : Instance.extern Lwt.t =
+  let open Lwt.Syntax in
+  let* module_name_l = from_ast_name module_name in
+  let* item_name_l = from_ast_name item_name in
+  Registry.find module_name_l !registry item_name_l t
