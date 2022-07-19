@@ -99,7 +99,13 @@ let read_input =
         Lwt.return [Values.(Num (I32 (I32.of_int_s x)))]
     | _ -> raise Bad_input
   in
-  Func.HostFunc (fun_type, f)
+  Func.HostFunc
+    {
+      func_type = fun_type;
+      module_name = "tezos";
+      func_name = "read_input";
+      implem = f;
+    }
 
 module Internal_for_tests = struct
   let aux_write_input_in_memory = aux_write_input_in_memory

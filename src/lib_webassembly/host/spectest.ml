@@ -26,7 +26,8 @@ let table =
 
 let memory = Memory.alloc (MemoryType {min = 1l; max = Some 2l})
 
-let func f t = Func.alloc_host t (f t)
+let func module_name func_name f t =
+  Func.alloc_host ~module_name ~func_name t (f t)
 
 let print_value v =
   Printf.printf
@@ -42,7 +43,7 @@ let print (FuncType (_, out)) _m _v vs =
     (Lazy_vector.LwtInt32Vector.loaded_bindings out)
   |> Lwt.return
 
-let lookup name t =
+let lookup module_name name t =
   let open Lwt.Syntax in
   let+ name = Utf8.encode name in
   let empty () = Lazy_vector.LwtInt32Vector.create 0l in
@@ -50,6 +51,7 @@ let lookup name t =
   let two i j =
     Lazy_vector.LwtInt32Vector.(create 2l |> set 0l i |> set 1l j)
   in
+  let func = func module_name name in
   match (name, t) with
   | "print", _ -> ExternFunc (func print (FuncType (empty (), empty ())))
   | "print_i32", _ ->

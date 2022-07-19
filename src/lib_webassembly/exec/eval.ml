@@ -138,7 +138,7 @@ let func_ref inst x i at =
 
 let func_type_of = function
   | Func.AstFunc (t, inst, f) -> t
-  | Func.HostFunc (t, _) -> t
+  | Func.HostFunc {func_type = t; _} -> t
 
 let block_type inst bt =
   let empty () = Lazy_vector.LwtInt32Vector.create 0l in
@@ -800,7 +800,7 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
               ]
             in
             (vs', [Frame (n2, frame', ([], instr')) @@ e.at])
-        | Func.HostFunc (t, f) ->
+        | Func.HostFunc {func_type = t; implem = f; _} ->
             let inst = ref frame.inst in
             Lwt.catch
               (fun () ->
