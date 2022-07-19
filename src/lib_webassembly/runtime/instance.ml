@@ -24,7 +24,7 @@ type module_inst = {
   blocks : Ast.block_table;
 }
 
-and func_inst = (input_inst, module_inst ref) Func.t
+and func_inst = module_inst ref Func.t
 
 and table_inst = Table.t
 

@@ -800,10 +800,11 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
               ]
             in
             (vs', [Frame (n2, frame', ([], instr')) @@ e.at])
-        | Func.HostFunc {func_type = t; implem = f; _} ->
+        | Func.HostFunc {module_name; func_name; func_type = _} ->
             let inst = ref frame.inst in
             Lwt.catch
               (fun () ->
+                let f = Host_funcs.lookup ~module_name ~func_name in
                 let+ res = f c.input inst (List.rev args) in
                 (List.rev res @ vs', []))
               (function

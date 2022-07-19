@@ -59,8 +59,7 @@ let aux_write_input_in_memory ~input_buffer ~module_inst ~rtype_offset
     in
     Lwt.return input_size
 
-let read_input =
-  let open Lwt.Syntax in
+let read_input_desc =
   let input_types =
     Types.
       [
@@ -74,44 +73,40 @@ let read_input =
   in
   let output_types = Types.[NumType I32Type] |> Vector.of_list in
   let fun_type = Types.FuncType (input_types, output_types) in
-  let f input_buffer module_inst inputs =
-    match inputs with
-    | [
-     Values.(Num (I32 rtype_offset));
-     Values.(Num (I32 level_offset));
-     Values.(Num (I32 id_offset));
-     Values.(Num (I32 dst));
-     Values.(Num (I32 max_bytes));
-    ] ->
-        let* x =
-          aux_write_input_in_memory
-            ~input_buffer
-            ~module_inst
-            ~rtype_offset
-            ~level_offset
-            ~id_offset
-            ~dst
-            ~max_bytes
-        in
-        Lwt.return [Values.(Num (I32 (I32.of_int_s x)))]
-    | _ -> raise Bad_input
-  in
-  Func.HostFunc
-    {
-      func_type = fun_type;
-      module_name = "tezos";
-      func_name = "read_input";
-      implem = f;
-    }
+  {Func.func_type = fun_type; module_name = "tezos"; func_name = "read_input"}
+
+let read_input input_buffer module_inst inputs =
+  let open Lwt.Syntax in
+  match inputs with
+  | [
+   Values.(Num (I32 rtype_offset));
+   Values.(Num (I32 level_offset));
+   Values.(Num (I32 id_offset));
+   Values.(Num (I32 dst));
+   Values.(Num (I32 max_bytes));
+  ] ->
+      let* x =
+        aux_write_input_in_memory
+          ~input_buffer
+          ~module_inst
+          ~rtype_offset
+          ~level_offset
+          ~id_offset
+          ~dst
+          ~max_bytes
+      in
+      Lwt.return [Values.(Num (I32 (I32.of_int_s x)))]
+  | _ -> raise Bad_input
 
 let lookup _module_name name _t =
   let open Lwt.Syntax in
   let+ name = Utf8.encode name in
   match name with
-  | "read_input" -> ExternFunc read_input (* TODO: typecheck *)
+  | "read_input" -> ExternFunc (HostFunc read_input_desc)
   | _ -> raise Not_found
 
 let configure () =
+  Host_funcs.register ~module_name:"tezos" ~func_name:"read_input" read_input ;
   Import.register (Utf8.decode "tezos") (fun name t -> lookup "tezos" name t)
 
 module Internal_for_tests = struct

@@ -46,10 +46,10 @@ exception Bad_input
     is no larger than the input is not too large. Finally, it returns
     returns a singleton value list containing the size of the
     input_buffer payload. *)
-val read_input :
-  ( Tezos_webassembly_interpreter.Input_buffer.t,
-    Tezos_webassembly_interpreter.Instance.module_inst ref )
-  Tezos_webassembly_interpreter.Func.func
+val read_input : Tezos_webassembly_interpreter.Host_funcs.host_func
+
+(** Host function descriptor for {!read_input} *)
+val read_input_desc : Tezos_webassembly_interpreter.Func.host_func_desc
 
 module Internal_for_tests : sig
   (** [aux_write_memory ~input_buffer ~module_inst ~rtype_offset

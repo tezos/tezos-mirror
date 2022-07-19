@@ -38,7 +38,9 @@ let lookup module_name name t =
   let+ name = Utf8.encode name in
   match (name, t) with
   | "abort", ExternFuncType t ->
-      ExternFunc (Func.alloc_host ~module_name ~func_name:name t abort)
+      Host_funcs.register ~module_name ~func_name:"abort" abort ;
+      ExternFunc (Func.alloc_host ~module_name ~func_name:name t)
   | "exit", ExternFuncType t ->
-      ExternFunc (Func.alloc_host ~module_name ~func_name:name t exit)
+      Host_funcs.register ~module_name ~func_name:"exit" exit ;
+      ExternFunc (Func.alloc_host ~module_name ~func_name:name t)
   | _ -> raise Not_found

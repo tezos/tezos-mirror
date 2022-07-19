@@ -27,7 +27,8 @@ let table =
 let memory = Memory.alloc (MemoryType {min = 1l; max = Some 2l})
 
 let func module_name func_name f t =
-  Func.alloc_host ~module_name ~func_name t (f t)
+  Host_funcs.register ~module_name ~func_name (f t) ;
+  Func.alloc_host ~module_name ~func_name t
 
 let print_value v =
   Printf.printf
