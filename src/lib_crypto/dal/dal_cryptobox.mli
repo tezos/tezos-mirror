@@ -25,10 +25,12 @@
 
 open Dal_cryptobox_intf
 
-(** A precomputed set of constants *)
+(** Encapsulates parameters required to use the cryptographic primitives exported
+    by this module. *)
 type t
 
-(** [make] precomputes the set of values needed by cryptographic primitives *)
+(** [make] precomputes the set of values needed by cryptographic primitives
+    defined in this module and store them in a value of type [t] *)
 val make :
   redundancy_factor:int ->
   slot_size:int ->
@@ -78,8 +80,8 @@ type scalar
       1. A commitment ensures that the size of the [slot] has a
      bounded size (typically [slot_size]).
 
-      2. A commitment ensures that a segment of fixed size (typically
-     [segment_size]) is part of the original slot. *)
+      2. A commitment can be used to verify that a segment of fixed size
+      (typically [segment_size]) is part of the original slot. *)
 type polynomial
 
 (** [polynomial_degree polynomial] returns the degree of the
