@@ -355,10 +355,13 @@ let cement_commitment ctxt rollup new_lcc =
     Store.Commitment_added.get (ctxt, rollup) new_lcc
   in
   let* () =
+    let current_level = (Raw_context.current_level ctxt).level in
+    let min_level =
+      Raw_level_repr.add new_lcc_added refutation_deadline_blocks
+    in
     fail_when
-      (let level = (Raw_context.current_level ctxt).level in
-       Raw_level_repr.(level < add new_lcc_added refutation_deadline_blocks))
-      Sc_rollup_too_recent
+      Raw_level_repr.(current_level < min_level)
+      (Sc_rollup_commitment_too_recent {current_level; min_level})
   in
   (* update LCC *)
   let* ctxt, lcc_size_diff =

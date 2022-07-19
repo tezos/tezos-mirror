@@ -694,11 +694,14 @@ let test_challenge_window_period_boundaries () =
      challenge window period. *)
   let* () =
     let expect_apply_failure = function
-      | Environment.Ecoproto_error (Sc_rollup_errors.Sc_rollup_too_recent as e)
+      | Environment.Ecoproto_error
+          (Sc_rollup_errors.Sc_rollup_commitment_too_recent _ as e)
         :: _ ->
           Assert.test_error_encodings e ;
           return_unit
-      | _ -> failwith "It should have failed with [Sc_rollup_too_recent]"
+      | _ ->
+          failwith
+            "It should have failed with [Sc_rollup_commitment_too_recent]"
     in
     commit_and_cement_after_n_bloc
       ~expect_apply_failure
