@@ -904,7 +904,7 @@ let register ~executors ~protocols =
      check_cache_backtracking_during_chain_reorganization ~protocol ~executors ;
      check_cache_reloading_is_not_too_slow ~protocol ~executors ;
      check_simulation_takes_cache_into_account ~protocol ~executors) ;
-  protocols
+  Protocol.[Kathmandu; Alpha]
   |> List.iter @@ fun migrate_from ->
      check_simulation_close_to_protocol_user_activation
        ~executors
