@@ -221,6 +221,9 @@ module Sc_rollup : sig
     Sc_rollup.t ->
     Sc_rollup.Commitment.Hash.t ->
     Sc_rollup.Commitment.t tzresult Lwt.t
+
+  val genesis_info :
+    t -> Sc_rollup.t -> Sc_rollup.Commitment.genesis_info tzresult Lwt.t
 end
 
 type (_, _) tup =

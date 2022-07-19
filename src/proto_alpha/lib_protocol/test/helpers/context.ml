@@ -384,6 +384,15 @@ module Sc_rollup = struct
       hash
       ()
       ()
+
+  let genesis_info ctxt sc_rollup =
+    Environment.RPC_context.make_call1
+      Plugin.RPC.Sc_rollup.S.genesis_info
+      rpc_ctxt
+      ctxt
+      sc_rollup
+      ()
+      ()
 end
 
 type (_, _) tup =
