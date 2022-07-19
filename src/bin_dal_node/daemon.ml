@@ -23,25 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type ctxt = {config : Configuration.t; srs : Cryptobox.srs}
+type ctxt = {
+  config : Configuration.t;
+  srs : Cryptobox.srs;
+  dal_constants : Cryptobox.t;
+}
 
 module RPC_server = struct
   let register_split_slot ctxt store dir =
     RPC_directory.register0
       dir
       (Services.split_slot ())
-      (Services.handle_split_slot ctxt store)
+      (Services.handle_split_slot ctxt.dal_constants ctxt.srs store)
 
-  let register_show_slot store dir =
-    RPC_directory.register dir (Services.slot ()) (Services.handle_slot store)
+  let register_show_slot ctxt store dir =
+    RPC_directory.register
+      dir
+      (Services.slot ())
+      (Services.handle_slot ctxt.dal_constants store)
 
   let register_shard store dir =
     RPC_directory.register dir (Services.shard ()) (Services.handle_shard store)
 
   let register ctxt store =
     RPC_directory.empty
-    |> register_split_slot ctxt.srs store
-    |> register_show_slot store |> register_shard store
+    |> register_split_slot ctxt store
+    |> register_show_slot ctxt store
+    |> register_shard store
 
   let start configuration dir =
     let open Lwt_syntax in
@@ -79,8 +87,9 @@ let run ~data_dir ~no_trusted_setup:_ _ctxt =
   let* config = Configuration.load ~data_dir in
   let config = {config with data_dir} in
   let*! store = Store.init config in
-  let*? srs = Cryptobox.load_srs () in
-  let ctxt = {config; srs} in
+  let dal_constants = Cryptobox.init () in
+  let*? srs = Cryptobox.load_srs dal_constants in
+  let ctxt = {config; srs; dal_constants} in
   let* rpc_server = RPC_server.(start config (register ctxt store)) in
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () =

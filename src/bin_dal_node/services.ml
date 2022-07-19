@@ -61,16 +61,16 @@ let shard () =
     RPC_path.(
       open_root / "shard" /: Slot_manager.Slot_header.rpc_arg /: shard_arg)
 
-let handle_split_slot cryptobox_setup store fill slot =
+let handle_split_slot dal_constants srs store fill slot =
   let open Lwt_result_syntax in
   let slot = String.to_bytes slot in
   let slot = if fill then Slot_manager.Utils.fill_x00 slot else slot in
-  let+ commitment = Slot_manager.split_and_store cryptobox_setup store slot in
+  let+ commitment = Slot_manager.split_and_store dal_constants srs store slot in
   Slot_manager.Slot_header.to_b58check commitment
 
-let handle_slot store (_, commitment) trim () =
+let handle_slot dal_constants store (_, commitment) trim () =
   let open Lwt_result_syntax in
-  let* slot = Slot_manager.get_slot store commitment in
+  let* slot = Slot_manager.get_slot dal_constants store commitment in
   let slot = if trim then Slot_manager.Utils.trim_x00 slot else slot in
   return (String.of_bytes slot)
 

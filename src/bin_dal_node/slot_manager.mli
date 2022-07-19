@@ -30,9 +30,11 @@
    - reading a slot means rebuild it from the shards
    *)
 
-(** [split_and_store ts store slot] splits [slot] in shards, stores it onto the
-    disk and returns the corresponding [slot_header], using trusted setup [ts] *)
+(** [split_and_store cb_constants ts store slot] splits [slot] in shards, stores
+    it onto the disk and returns the corresponding [slot_header], using
+    [cb_constants] and trusted setup [ts] *)
 val split_and_store :
+  Cryptobox.t ->
   Cryptobox.srs ->
   Store.t ->
   Dal_types.slot ->
@@ -43,9 +45,13 @@ val split_and_store :
 val get_shard :
   Store.t -> Dal_types.slot_header -> int -> Cryptobox.shard tzresult Lwt.t
 
-(** [get_slot store slot_header] fetches from disk the shards associated to
+(** [get_slot cb_constants store slot_header] fetches from disk the shards associated to
     [slot_header], gathers them, rebuilds and returns the [slot]. *)
-val get_slot : Store.t -> Dal_types.slot_header -> Dal_types.slot tzresult Lwt.t
+val get_slot :
+  Cryptobox.t ->
+  Store.t ->
+  Dal_types.slot_header ->
+  Dal_types.slot tzresult Lwt.t
 
 module Slot_header : sig
   type t = Cryptobox.commitment

@@ -36,4 +36,8 @@ module Constants = struct
   let trusted_setup_logarithm_size = 21
 end
 
-include Dal_cryptobox.Builder (Constants)
+include Dal_cryptobox
+
+let init () =
+  let open Constants in
+  make ~redundancy_factor ~segment_size ~slot_size ~shards_amount
