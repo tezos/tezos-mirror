@@ -542,7 +542,16 @@ def _test_create_mockup_init_show_roundtrip(
         assert ba_sent == ba_input
 
     if protocol_constants_json:
-        pc_input = json.loads(protocol_constants_json)
+        # A hack? If the user-provided overrides contains a `null` for
+        # an optional field (corresponding to `None` in Python), then
+        # that field will simply be absent in the output
+        # `pc_sent`. Therefore, we filter such values from the
+        # comparison.
+        pc_input = {
+            k: v
+            for k, v in json.loads(protocol_constants_json).items()
+            if v is not None
+        }
         assert pc_sent == pc_input
 
     # 3/ Pass obtained json to a new mockup instance, to check json
@@ -622,7 +631,7 @@ def _test_create_mockup_init_show_roundtrip(
                 "origination_size": 258,
                 "vdf_difficulty": "1000000000",
                 "seed_nonce_revelation_tip": "125001",
-                "testnet_dictator": None,
+                "testnet_dictator": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
                 "tokens_per_roll": "8000000001",
                 "proof_of_work_threshold": "-2",
                 "hard_gas_limit_per_block": "10400001",
