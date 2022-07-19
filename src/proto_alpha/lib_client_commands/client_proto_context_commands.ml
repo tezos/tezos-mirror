@@ -1054,11 +1054,12 @@ let commands_rw () =
       ~desc:
         "Execute multiple transfers from a single source account.\n\
          If one of the transfers fails, none of them get executed."
-      (args12
+      (args13
          default_fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
+         force_switch
          default_gas_limit_arg
          default_storage_limit_arg
          counter_arg
@@ -1087,6 +1088,7 @@ let commands_rw () =
              dry_run,
              verbose_signing,
              simulation,
+             force,
              gas_limit,
              storage_limit,
              counter,
@@ -1098,6 +1100,22 @@ let commands_rw () =
            source
            operations_json
            cctxt ->
+        (* When --force is used we want to inject the transfer even if it fails.
+           In that case we cannot rely on simulation to compute limits and fees
+           so we require the corresponding options to be set. *)
+        let check_force_dependency name = function
+          | None ->
+              cctxt#error
+                "When the --force switch is used, the %s option is required."
+                name
+          | _ -> Lwt.return_unit
+        in
+        (if force && not simulation then
+         check_force_dependency "--gas-limit" gas_limit >>= fun () ->
+         check_force_dependency "--storage-limit" storage_limit >>= fun () ->
+         check_force_dependency "--fee" fee
+        else Lwt.return_unit)
+        >>= fun () ->
         let prepare i =
           prepare_batch_operation
             cctxt
@@ -1139,6 +1157,7 @@ let commands_rw () =
               ~dry_run
               ~verbose_signing
               ~simulation
+              ~force
               ~source
               ~fee:(Limit.of_option fee)
               ~gas_limit:(Limit.of_option gas_limit)
