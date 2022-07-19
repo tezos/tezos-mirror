@@ -82,12 +82,95 @@ module type S = sig
       effectful (produce lwt promises). *)
   val conv_lwt : ('a -> 'b Lwt.t) -> ('b -> 'a Lwt.t) -> 'a t -> 'b t
 
-  (** [tup2 e1 e2] combines [e1] and [e2] into an encoder for pairs. *)
-  val tup2 : 'a t -> 'b t -> ('a * 'b) t
+  (** [tup2 ~flatten e1 e2] combines [e1] and [e2] into an encoder for pairs.
+      If [flatten] is true, the elements are encoded directly under the given
+      tree, otherwise each element is wrapped under an index node to avoid
+      colliding keys.
 
-  (** [tup3 e1 e2 e3] combines [e1], [e2], and [e3] into an encoder for
-      triples. *)
-  val tup3 : 'a t -> 'b t -> 'c t -> ('a * 'b * 'c) t
+      Example:
+        [encode
+          (tup2
+            ~flatten:false
+             (value [] Data_encoding.string)
+             (value [] Data_encoding.string))
+          (("A", "B"))]
+
+      Gives a tree:
+        "A"
+        "B"
+
+      While
+        [encode
+            (tup2
+                ~flatten:true
+                (value [] Data_encoding.string)
+                (value [] Data_encoding.string))
+            (("A", "B"))]
+
+      Gives a tree:
+        [1] -> "A"
+        [2] -> "B"
+    *)
+  val tup2 : flatten:bool -> 'a t -> 'b t -> ('a * 'b) t
+
+  (** [tup3 ?flatten e1 e2 e3] combines the given encoders [e1 .. e3] into an
+        encoder for a tuple of three elements. *)
+  val tup3 : flatten:bool -> 'a t -> 'b t -> 'c t -> ('a * 'b * 'c) t
+
+  (** [tup4 ?flatten  e1 e2 e3 e4] combines the given encoders [e1 .. e4] into an
+        encoder for a tuple of four elements. *)
+  val tup4 :
+    flatten:bool -> 'a t -> 'b t -> 'c t -> 'd t -> ('a * 'b * 'c * 'd) t
+
+  (** [tup5 ?flatten e1 e2 e3 e4 e5] combines the given encoders [e1 .. e5] into
+        an encoder for a tuple of five elements. *)
+  val tup5 :
+    flatten:bool ->
+    'a t ->
+    'b t ->
+    'c t ->
+    'd t ->
+    'e t ->
+    ('a * 'b * 'c * 'd * 'e) t
+
+  (** [tup6 ?flatten e1 e2 e3 e4 e5 e6] combines the given encoders [e1 .. e6]
+        into an encoder for a tuple of six elements. *)
+  val tup6 :
+    flatten:bool ->
+    'a t ->
+    'b t ->
+    'c t ->
+    'd t ->
+    'e t ->
+    'f t ->
+    ('a * 'b * 'c * 'd * 'e * 'f) t
+
+  (** [tup7 ?flatten e1 e2 e3 e4 e5 e6 e7] combines the given encoders
+        [e1 .. e7] into an encoder for a tuple of seven elements. *)
+  val tup7 :
+    flatten:bool ->
+    'a t ->
+    'b t ->
+    'c t ->
+    'd t ->
+    'e t ->
+    'f t ->
+    'g t ->
+    ('a * 'b * 'c * 'd * 'e * 'f * 'g) t
+
+  (** [tup8 ?flatten e1 e2 e3 e4 e5 e6 e7 e8] combines the given encoders
+        [e1 .. e8] into an encoder for a tuple of eight elements. *)
+  val tup8 :
+    flatten:bool ->
+    'a t ->
+    'b t ->
+    'c t ->
+    'd t ->
+    'e t ->
+    'f t ->
+    'g t ->
+    'h t ->
+    ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h) t
 
   (** [raw key] is an encoder for bytes under the given [key]. *)
   val raw : key -> bytes t
@@ -95,6 +178,12 @@ module type S = sig
   (** [value key enc] creates an encoder under the given [key] using the
       provided data-encoding [enc] for encoding/decoding values. *)
   val value : key -> 'a Data_encoding.t -> 'a t
+
+  (** [value_option key enc] creates an encoder for optional values under the
+      given [key] using the provided data-encoding [enc]. Note that the value is
+      encoded as an option at the leaf level, in contrast to the {!option}
+      combinator that encodes the value under a new key (Some/None). *)
+  val value_option : key -> 'a Data_encoding.t -> 'a option t
 
   (** [scope key enc] moves the given encoder [enc] to encode values under a
       branch [key]. *)
@@ -104,8 +193,8 @@ module type S = sig
       [enc] for encoding values. *)
   val lazy_mapping : 'a t -> 'a map t
 
-  (** [lazy_vector enc] produces an encoder for [vector]s that uses the given
-      [enc] for encoding values. *)
+  (** [lazy_vector key_enc enc] produces an encoder for [vector]s that uses the
+      given [key_enc] for encoding keys and [enc] for the values. *)
   val lazy_vector : vector_key t -> 'a t -> 'a vector t
 
   (** [chunk] is an encoder for the chunks used by [chunked_by_vector]. *)
@@ -114,11 +203,20 @@ module type S = sig
   (** [chunked_byte_vector] is an encoder for [chunked_byte_vector]. *)
   val chunked_byte_vector : chunked_byte_vector t
 
-  (** [case tag enc f] returns a partial encoder that represents a case in a
-      sum-type. The encoder hides the (existentially bound) type of the
-      parameter to the specific case, provided a converter function [f] and
-      base encoder [enc]. *)
+  (** [case tag enc inj proj] returns a partial encoder that represents a case
+      in a sum-type. The encoder hides the (existentially bound) type of the
+      parameter to the specific case, provided converter functions [inj] and
+      [proj] for the base encoder [enc]. *)
   val case : 'tag -> 'b t -> ('a -> 'b option) -> ('b -> 'a) -> ('tag, 'a) case
+
+  (** [case_lwt tag enc inj proj] same as [case tag enc inj proj] but where
+      [inj] and [proj] returns in lwt values. *)
+  val case_lwt :
+    'tag ->
+    'b t ->
+    ('a -> 'b Lwt.t option) ->
+    ('b -> 'a Lwt.t) ->
+    ('tag, 'a) case
 
   (** [tagged_union tag_enc cases] returns an encoder that use [tag_enc] for
       encoding the value of a field [tag]. The encoder searches through the list
@@ -126,6 +224,10 @@ module type S = sig
       its embedded encoder for the value. This function is used for constructing
       encoders for sum-types. *)
   val tagged_union : 'tag t -> ('tag, 'a) case list -> 'a t
+
+  (** [option enc] lifts the given encoding [enc] to one that can encode
+      optional values. *)
+  val option : 'a t -> 'a option t
 end
 
 (** Produces an encoder/decoder module with the provided map, vector and tree

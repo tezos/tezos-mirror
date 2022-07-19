@@ -56,6 +56,8 @@ module type S = sig
 
   val case : 'tag -> 'b t -> ('b -> 'a) -> ('tag, 'a) case
 
+  val case_lwt : 'tag -> 'b t -> ('b -> 'a Lwt.t) -> ('tag, 'a) case
+
   val tagged_union : 'tag t -> ('tag, 'a) case list -> 'a t
 
   module Syntax : sig
@@ -95,7 +97,12 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
   type 'a t = Tree.tree -> prefix_key -> 'a Lwt.t
 
   type ('tag, 'a) case =
-    | Case : {tag : 'tag; extract : 'b -> 'a; decode : 'b t} -> ('tag, 'a) case
+    | Case : {
+        tag : 'tag;
+        extract : 'b -> 'a Lwt.t;
+        decode : 'b t;
+      }
+        -> ('tag, 'a) case
 
   let of_lwt lwt _tree _prefix = lwt
 
@@ -147,7 +154,10 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
     in
     Lwt.return produce_value
 
-  let case tag decode extract = Case {tag; decode; extract}
+  let case_lwt tag decode extract = Case {tag; decode; extract}
+
+  let case tag decode extract =
+    case_lwt tag decode (fun x -> Lwt.return @@ extract x)
 
   let tagged_union decode_tag cases input_tree prefix =
     let open Lwt_syntax in
@@ -156,7 +166,7 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
     cases
     |> List.find_map (fun (Case {tag; decode; extract}) ->
            if tag = target_tag then
-             Some (map extract (scope ["value"] decode) input_tree prefix)
+             Some (map_lwt extract (scope ["value"] decode) input_tree prefix)
            else None)
     |> Option.value_f ~default:(fun _ -> raise No_tag_matched_on_decoding)
 end

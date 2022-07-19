@@ -73,6 +73,10 @@ module type S = sig
       base encoder [enc]. *)
   val case : 'tag -> 'b t -> ('a -> 'b option) -> ('tag, 'a) case
 
+  (** [case_lwt tag enc f] same as [case tag enc f] except that [f] produces
+      an [Lwt] on a successful match. *)
+  val case_lwt : 'tag -> 'b t -> ('a -> 'b Lwt.t option) -> ('tag, 'a) case
+
   (** [tagged_union tag_enc cases] returns an encoder that uses [tag_enc] for
       encoding the value of a field [tag]. The encoder searches through the list
       of cases for a matching branch. When a matching branch is found, it

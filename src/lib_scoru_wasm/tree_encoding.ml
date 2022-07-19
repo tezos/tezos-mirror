@@ -50,6 +50,8 @@ module type S = sig
 
   val case : 'tag -> 'b t -> ('a -> 'b option) -> ('tag, 'a) case
 
+  val case_lwt : 'a -> 'b t -> ('c -> 'b Lwt.t option) -> ('a, 'c) case
+
   val tagged_union : 'tag t -> ('tag, 'a) case list -> 'a t
 
   val lwt : 'a t -> 'a Lwt.t t
@@ -114,20 +116,25 @@ module Make (T : Tree.S) = struct
   type ('tag, 'a) case =
     | Case : {
         tag : 'tag;
-        probe : 'a -> 'b option;
+        probe : 'a -> 'b Lwt.t option;
         encode : 'b t;
       }
         -> ('tag, 'a) case
 
-  let case tag encode probe = Case {tag; encode; probe}
+  let case_lwt tag encode probe = Case {tag; encode; probe}
+
+  let case tag encode probe =
+    let probe x = Option.map Lwt.return @@ probe x in
+    case_lwt tag encode probe
 
   let tagged_union encode_tag cases value prefix target_tree =
     let open Lwt_syntax in
     let encode_tag = scope ["tag"] encode_tag in
     let match_case (Case {probe; tag; encode}) =
       match probe value with
-      | Some value ->
+      | Some res ->
           let* target_tree = encode_tag tag prefix target_tree in
+          let* value = res in
           let* x = scope ["value"] encode value prefix target_tree in
           return (Some x)
       | None -> return None
