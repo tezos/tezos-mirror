@@ -184,7 +184,7 @@
                                         //console.log(v["operations"][i]["errors"]);
 
 
-                                        if ("expected_max" in v["operations"][i]["errors"][0]) {
+                                        if ("expected_max" in v["operations"][i]["errors"][0]&&"provided" in v["operations"][i]["errors"][0]) {
 
                                             if (("kind" in v["operations"][i])) { // preendo  if (round_cib != round_bloc) { <= aller chercher round cib
 
@@ -206,7 +206,7 @@
                                                                 //console.log(t_baker[round_cib]);
                                                                 //console.log(v["operations"][i]["reception_time"]);
                                                                 //console.log();
-                                                                t_op_pre_retard_i[v["operations"][i]["errors"][0]["expected_max"]].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
+                                                                t_op_pre_valide_i[v["operations"][i]["errors"][0]["provided"]].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
                                                                 ////ano_desc[round_cib]["pre_approbations"]["invalide"].push([v["delegate"], v["operations"][i]["errors"][0]["id"]])
                                                             }
                                                         }
@@ -224,7 +224,7 @@
                                                         if (("reception_time" in v["operations"][i])) {
                                                             if (v["operations"][i]["reception_time"] != null) {
                                                                 //ajouter à t_op_error[retard][t_preendo]
-                                                                t_op_retard_i[v["operations"][i]["errors"][0]["expected_max"]].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
+                                                                t_op_valide_i[v["operations"][i]["errors"][0]["provided"]].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
                                                                 ////ano_desc[round_cib]["pre_approbations"]["invalide"].push([v["delegate"], v["operations"][i]["errors"][0]["id"]])
                                                             }
                                                         }
@@ -234,6 +234,101 @@
 
                                             }
                                         }
+                                        else if ("expected" in v["operations"][i]["errors"][0]&&"provided" in v["operations"][i]["errors"][0]) {              //Les erreurs "temporary" sont la conséquence de la réception d'une preendo avant le block candidat par le noeud !
+                                            if (v["operations"][i]["errors"][0]["kind"] == "temporary") {
+                                                var block_cib = (v["operations"][i]["errors"][0]["provided"]).toString();
+                                                var round_cib = v["operations"][i]["round"];
+                                                if (block_cib == va) {
+                                                    //console.log(v["operations"]);
+                                                    console.log("A3");
+                                                    if (round_cib in t_baker) {
+                                                        if ("kind" in v["operations"][i]) { // c'est un preendo
+                                                            t_op_pre_valide_i[0].push(0);
+                                                        }
+                                                        else {
+                                                            t_op_valide_i[0].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
+                                                        }
+                                                    }
+                                                }
+
+                                            }
+                                        }
+                                        else {
+                                            if (("kind" in v["operations"][i])) { // preendo  if (round_cib != round_bloc) { <= aller chercher round cib
+                                                if (round_bloc == round_cib) {
+                                                    if (round_cib in t_baker) {
+
+                                                        if (("reception_time" in v["operations"][i])) {
+                                                            if (v["operations"][i]["reception_time"] != null) {
+                                                                //ajouter à t_op_error[retard][t_preendo]
+                                                                t_op_erreur_i["retard"]["t_pre_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
+                                                                //ano_desc[round_cib]["pre_approbations"]["invalide"].push([v["delegate"], v["operations"][i]["errors"][0]["id"]])
+                                                            }
+                                                        }
+
+                                                    }
+                                                }
+                                                else {
+                                                    //console.log
+
+                                                    if (("reception_time" in v["operations"][i])) {
+                                                        if (v["operations"][i]["reception_time"] != null) {
+                                                            //ajouter à t_op_erreur[round_cib][t_preendo]
+                                                            if (round_cib in t_baker) {
+                                                                t_op_erreur_i[round_cib]["t_pre_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
+                                                                //ano_desc[round_cib]["pre_approbations"]["invalide"].push([v["delegate"], v["operations"][i]["errors"][0]["id"]])
+                                                            }
+                                                        }
+
+
+                                                    }
+
+                                                }
+
+
+                                            }
+                                            else {//endo
+                                                if (round_cib in t_baker) {
+                                                    if (round_bloc == round_cib) {
+
+                                                        if (("reception_time" in v["operations"][i])) {
+                                                            if (v["operations"][i]["reception_time"] != null) {
+
+
+                                                                if (("included_in_blocks" in v["operations"][i])) {
+                                                                    //t_op_error[retard][t_endo]
+                                                                    t_op_erreur_i["retard"]["t_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
+                                                                    //ano_desc[round_cib]["approbations"]["invalide"].push([v["delegate"], v["operations"][i]["errors"][0]["id"]])
+
+
+                                                                }
+
+
+
+                                                            }
+
+                                                        }
+
+                                                    }
+                                                    else {
+
+                                                        if (("reception_time" in v["operations"][i])) {
+                                                            if (v["operations"][i]["reception_time"] != null) {
+                                                                //ajouter à t_op_erreur[round_cib][t_endo]
+                                                                t_op_erreur_i[round_cib]["t_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
+                                                                //ano_desc[round_cib]["approbations"]["invalide"].push([v["delegate"], v["operations"][i]["errors"][0]["id"]]);
+
+
+                                                            }
+
+
+                                                        }
+                                                    }
+
+                                                }
+                                            }
+                                        }
+                                        
 
                                     }
                                     else { //L'OP est valide ?
@@ -299,62 +394,7 @@
 
                     });
 
-                    //On commence la recherche des retards dans le bloc suivant ici, (pour voir si ça correspond à ce qu'on veut, on peut regarder: si expected est dans erreur, si expected= bloc, si kind= temporary)
 
-                    Object.entries(directories).forEach(([k, v]) => {
-
-                        if ((+va_1) <= v[1] && (+va_1) >= v[0]) {
-                            //console.log("The key: ", k);
-                            //console.log("min: ", v[0]);
-                            //console.log("max: ", v[1]);
-                            $.getJSON(server_adress + "/" + k + "/" + va_1 + ".json", null, function (json_data) { //traitement du reste
-                                var item_i = [];
-                                dict_data[va_1] = json_data
-                                //console.log(t_baker);
-                                try { // traitement de l'info du fichier correspondant au bloc
-                                    //Info relatives aux (pre)approbations valides du bloc va
-                                    Object.entries(dict_data[va_1]["endorsements"]).forEach(([k, v]) => {
-                                        try {
-                                            //console.log(v);
-                                            if ("operations" in v) {
-                                                for (let i = 0; i < v["operations"].length; i++) {//
-                                                    if ((("errors" in v["operations"][i]))) { //dès lors qu'on trouve une erreur, on vérifier qu'il s'agit d'une erreur concernant le block ciblé(va) et son round.
-                                                        if (v["operations"][i]["errors"][0]["kind"] == "temporary") {
-                                                            var block_cib = (v["operations"][i]["errors"][0]["expected"]).toString();
-                                                            var round_cib = v["operations"][i]["round"];
-                                                            if (block_cib == va) {
-                                                                //console.log(v["operations"]);
-                                                                //console.log(round_cib);
-                                                                if (round_cib in t_baker) {
-                                                                    if ("kind" in v["operations"][i]) { // c'est un preendo
-                                                                        t_op_pre_retard_i[round_cib].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
-                                                                    }
-                                                                    else {
-                                                                        console.log(v["operations"][i]["errors"][0]["expected_max"]);
-                                                                        t_op_retard_i[round_cib].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
-                                                                    }
-                                                                }
-                                                            }
-
-                                                        }
-                                                    }
-
-                                                }
-                                            }
-
-                                        }
-                                        catch (error) {
-                                            console.log(error); // endo manqués
-                                        }
-                                    });
-
-                                }
-                                catch (error) {
-                                    console.log(error);
-                                }
-                            });
-                        }
-                    });
 
                     /*console.log("t_op_pre_retard_i");
                     console.log(t_op_pre_retard_i);
@@ -385,13 +425,94 @@
                                 round_cib = v["operations"][i]["round"];
                                 if ("errors" in v["operations"][i]) { // L'OP n'est pas valide ?
                                     //console.log(v["operations"][i]["errors"]);
-                                    if ("provided" in v["operations"][i]["errors"][0]) {
+                                    
                                         //console.log("provided");
-                                        if (v["operations"][i]["errors"][0]["provided"] == 1 | v["operations"][i]["errors"][0]["provided"] == 0) {
+                                        if ("provided" in v["operations"][i]["errors"][0] && "expected_max" in v["operations"][i]["errors"][0]) {
                                             //console.log("provided=1");
                                             //L'erreur concerne le bloc
 
+                                            if (("kind" in v["operations"][i])) { // preendo  if (round_cib != round_bloc) { <= aller chercher round cib
+                                                if (v["operations"][i]["errors"][0]["provided"] in t_baker) {
 
+                                                    if (("reception_time" in v["operations"][i])) {
+                                                        if (v["operations"][i]["reception_time"] != null) {
+                                                            //ajouter à t_op_error[retard][t_preendo]
+                                                            t_op_pre_valide_i[v["operations"][i]["errors"][0]["provided"]]["t_pre_approbations"].push(0);
+                                                            //ano_desc[round_cib]["pre_approbations"]["invalide"].push([v["delegate"], v["operations"][i]["errors"][0]["id"]])
+                                                        }
+                                                    }
+
+                                                }
+                                            }
+                                            else {//endo
+                                                if (v["operations"][i]["errors"][0]["provided"] in t_baker) {
+                                                    if (("reception_time" in v["operations"][i])) {
+                                                        if (v["operations"][i]["reception_time"] != null) {
+
+
+                                                            if (("included_in_blocks" in v["operations"][i])) {
+                                                                //t_op_error[retard][t_endo]
+                                                                t_op_valide_i[v["operations"][i]["errors"][0]["provided"]].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
+                                                                //ano_desc[round_cib]["approbations"]["invalide"].push([v["delegate"], v["operations"][i]["errors"][0]["id"]])
+
+
+                                                            }
+
+
+
+                                                        }
+
+                                                    }
+
+
+
+                                                }
+                                            }
+
+
+                                        }
+                                        else if ("provided" in v["operations"][i]["errors"][0] && "expected" in v["operations"][i]["errors"][0]) {
+
+                                            if (("kind" in v["operations"][i])) { // preendo  if (round_cib != round_bloc) { <= aller chercher round cib
+
+
+                                                if (("reception_time" in v["operations"][i])) {
+                                                    if (v["operations"][i]["reception_time"] != null) {
+                                                        //ajouter à t_op_error[retard][t_preendo]
+                                                        t_op_pre_valide_i[0]["t_pre_approbations"].push(0);
+                                                        //ano_desc[round_cib]["pre_approbations"]["invalide"].push([v["delegate"], v["operations"][i]["errors"][0]["id"]])
+                                                    }
+                                                }
+
+
+                                            }
+                                            else {//endo
+
+                                                if (("reception_time" in v["operations"][i])) {
+                                                    if (v["operations"][i]["reception_time"] != null) {
+
+
+                                                        if (("included_in_blocks" in v["operations"][i])) {
+                                                            //t_op_error[retard][t_endo]
+                                                            t_op_valide_i[0].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
+                                                            //ano_desc[round_cib]["approbations"]["invalide"].push([v["delegate"], v["operations"][i]["errors"][0]["id"]])
+
+
+                                                        }
+
+
+
+                                                    }
+
+                                                }
+
+
+
+
+                                            }
+
+                                        }
+                                        else {
                                             if (("kind" in v["operations"][i])) { // preendo  if (round_cib != round_bloc) { <= aller chercher round cib
                                                 if (round_bloc == round_cib) {
                                                     if (round_cib in t_baker) {
@@ -399,7 +520,7 @@
                                                         if (("reception_time" in v["operations"][i])) {
                                                             if (v["operations"][i]["reception_time"] != null) {
                                                                 //ajouter à t_op_error[retard][t_preendo]
-                                                                t_op_erreur["retard"]["t_pre_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
+                                                                t_op_erreur_i["retard"]["t_pre_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
                                                                 //ano_desc[round_cib]["pre_approbations"]["invalide"].push([v["delegate"], v["operations"][i]["errors"][0]["id"]])
                                                             }
                                                         }
@@ -413,7 +534,7 @@
                                                         if (v["operations"][i]["reception_time"] != null) {
                                                             //ajouter à t_op_erreur[round_cib][t_preendo]
                                                             if (round_cib in t_baker) {
-                                                                t_op_erreur[round_cib]["t_pre_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
+                                                                t_op_erreur_i[round_cib]["t_pre_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
                                                                 //ano_desc[round_cib]["pre_approbations"]["invalide"].push([v["delegate"], v["operations"][i]["errors"][0]["id"]])
                                                             }
                                                         }
@@ -435,7 +556,7 @@
 
                                                                 if (("included_in_blocks" in v["operations"][i])) {
                                                                     //t_op_error[retard][t_endo]
-                                                                    t_op_erreur["retard"]["t_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
+                                                                    t_op_erreur_i["retard"]["t_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
                                                                     //ano_desc[round_cib]["approbations"]["invalide"].push([v["delegate"], v["operations"][i]["errors"][0]["id"]])
 
 
@@ -453,7 +574,7 @@
                                                         if (("reception_time" in v["operations"][i])) {
                                                             if (v["operations"][i]["reception_time"] != null) {
                                                                 //ajouter à t_op_erreur[round_cib][t_endo]
-                                                                t_op_erreur[round_cib]["t_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
+                                                                t_op_erreur_i[round_cib]["t_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
                                                                 //ano_desc[round_cib]["approbations"]["invalide"].push([v["delegate"], v["operations"][i]["errors"][0]["id"]]);
 
 
@@ -465,18 +586,9 @@
 
                                                 }
                                             }
-
-
-
-
-
-
-
-
-
                                         }
 
-                                    }
+                                    
 
                                 }
                                 else { //L'OP est valide ?
@@ -621,69 +733,7 @@
 
                     });
 
-                    Object.entries(directories).forEach(([k, v]) => {
 
-                        if ((+va_1) <= v[1] && (+va_1) >= v[0]) {
-                            //console.log("The key: ", k);
-                            //console.log("min: ", v[0]);
-                            //console.log("max: ", v[1]);
-                            $.getJSON(server_adress + "/" + k + "/" + va_1 + ".json", null, function (json_data) { //traitement du reste
-                                var item_i = [];
-                                dict_data[va_1] = json_data
-                                //console.log(t_baker);
-                                try { // traitement de l'info du fichier correspondant au bloc
-                                    //Info relatives aux (pre)approbations valides du bloc va
-                                    Object.entries(dict_data[va_1]["endorsements"]).forEach(([k, v]) => {
-                                        try {
-                                            if ("operations" in v) {
-                                                for (let i = 0; i < (v["operations"]).length; i++) {//
-                                                    if ((("errors" in v["operations"][i]))) { //dès lors qu'on trouve une erreur, on vérifier qu'il s'agit d'une erreur concernant le block ciblé(va) et son round.
-                                                        if (v["operations"][i]["errors"][0]["kind"] == "temporary") {
-                                                            console.log(v["operations"][i]["errors"][0]["expected"], typeof (v["operations"][i]["errors"][0]["expected"]));
-
-                                                            var block_cib = v["operations"][i]["errors"][0]["expected"] + "";
-                                                            var round_cib = v["operations"][i]["round"];
-                                                            if (round_cib in t_baker) {
-                                                                if (block_cib == va) {
-                                                                    if ("kind" in v["operations"][i]) { // c'est un preendo
-                                                                        //console.log(t_baker[round_cib]);
-                                                                        //console.log(v["operations"][i]["reception_time"]);
-                                                                        t_op_pre_retard_i[round_cib].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
-                                                                    }
-                                                                    else {
-                                                                        t_op_retard_i[round_cib].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
-                                                                    }
-                                                                }
-                                                            }
-
-                                                        }
-                                                    }
-
-                                                }
-                                            }
-                                        }
-                                        catch (e) {
-                                            console.log(e);
-                                        }
-
-
-
-                                    });
-
-                                }
-                                catch (error) {
-                                    console.log(error);
-                                }
-
-
-
-
-                            }
-
-
-                            );
-                        }
-                    });
 
 
                     t_op_pre_retard[va] = t_op_pre_retard_i;
@@ -735,8 +785,9 @@
                             });// trier le vecteur de délais de récep, par ordre croissant
                             seuil_validation = block_fin[Math.ceil(qd_ * l_)]; // Date à laquelle on a le nombre min de preendo pour que le round soit valide 
                             t_min_[bloc] = seuil_validation;
-                            if(isNaN(seuil_validation)==false){
-                            d3_t_min_.push({ bloc: (+bloc), t: (+seuil_validation) });}
+                            if (isNaN(seuil_validation) == false) {
+                                d3_t_min_.push({ bloc: (+bloc), t: (+seuil_validation) });
+                            }
                         }
                         catch (e) {
                             console.log(bloc, ": ", e)
