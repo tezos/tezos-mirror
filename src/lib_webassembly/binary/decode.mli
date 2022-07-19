@@ -2,6 +2,30 @@ module Vector = Lazy_vector.LwtInt32Vector
 
 exception Code of Source.region * string
 
+(** Lazy stack using an underlying lazy vector, and a pointer on the head of the
+    stack. *)
+type 'a lazy_stack = LazyStack of {length : int32; vector : 'a Vector.t}
+
+(** [empty_stack ()] returns a new empty stack. *)
+val empty_stack : unit -> 'a lazy_stack
+
+(** [push_stack v s] pushes value [v] on the stack [s] at index [s.length] and
+    updates the length. If [s.vector] is full, it appends the value to the vector
+    (growing it by 1), otherwise it set the value in the vector. *)
+val push_stack : 'a -> 'a lazy_stack -> 'a lazy_stack
+
+(** [push_rev_values vs s] pushes values in [vs] on the stack [s], starting from
+    the end of the list. *)
+val push_rev_values : 'a list -> 'a lazy_stack -> 'a lazy_stack
+
+(** [pop_stack s] returns the value at [s.length - 1] and a new stack with
+    length decreased by one. *)
+val pop_stack : 'a lazy_stack -> ('a * 'a lazy_stack) option Lwt.t
+
+(** [pop_at_most n s] returns at most the [n] values on top of the stack, and
+    the resulting stack. *)
+val pop_at_most : int -> 'a lazy_stack -> ('a list * 'a lazy_stack) Lwt.t
+
 (** Instruction parsing continuations. *)
 type instr_block_kont =
   | IKStop of Ast.block_label  (** Final step of a block parsing. *)
@@ -15,7 +39,7 @@ type instr_block_kont =
 
 (** Vector and size continuations *)
 
-(** Vector accumulator, used in two step: first accumulating the values, then
+(** Vector accumulator, used in two steps: first accumulating the values, then
     reversing them and possibly mapping them, counting the number of values in
     the list. Continuation passing style transformation of {!List.map} also
     returning length. *)

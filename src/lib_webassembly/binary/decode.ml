@@ -290,6 +290,41 @@ let block_type s =
   | Some b when b land 0xc0 = 0x40 -> ValBlockType (Some (value_type s))
   | _ -> VarBlockType (at vs33 s)
 
+type 'a lazy_stack = LazyStack of {length : int32; vector : 'a Vector.t}
+
+let empty_stack () = LazyStack {length = 0l; vector = Vector.empty ()}
+
+let push_stack v (LazyStack {length; vector}) =
+  let vector, length =
+    if length >= Vector.num_elements vector then Vector.append v vector
+    else (Vector.set length v vector, length)
+  in
+  LazyStack {length = Int32.succ length; vector}
+
+let push_rev_values values stack =
+  List.fold_left (fun stack v -> push_stack v stack) stack (List.rev values)
+
+let pop_stack (LazyStack {length; vector}) =
+  let open Lwt.Syntax in
+  if length = 0l then Lwt.return_none
+  else
+    let length = Int32.pred length in
+    let+ value = Vector.get length vector in
+    Some (value, LazyStack {length; vector})
+
+let pop_at_most n stack =
+  let open Lwt.Syntax in
+  let rec fold acc n stack =
+    if n = 0 then Lwt.return (acc, stack)
+    else
+      let* value = pop_stack stack in
+      match value with
+      | None -> Lwt.return (acc, stack)
+      | Some (v, stack) -> (fold [@ocaml.tailcall]) (v :: acc) (n - 1) stack
+  in
+  let+ values, stack = fold [] n stack in
+  (List.rev values, stack)
+
 (** Instruction parsing continuations. *)
 type instr_block_kont =
   | IKStop of block_label  (** Final step of a block parsing. *)
