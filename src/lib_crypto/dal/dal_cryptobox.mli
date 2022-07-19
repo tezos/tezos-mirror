@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Dal_cryptobox_sigs
+open Dal_cryptobox_intf
 
 (** A precomputed set of constants *)
 type t

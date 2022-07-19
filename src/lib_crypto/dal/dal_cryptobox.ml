@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Error_monad
-include Dal_cryptobox_sigs
+include Dal_cryptobox_intf
 
 type error +=
   | Failed_to_load_trusted_setup of string
