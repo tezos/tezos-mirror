@@ -301,6 +301,14 @@ let test_option () =
   let* () = assert_round_trip enc None Stdlib.( = ) in
   return_unit
 
+let test_value_option () =
+  let open Merklizer in
+  let open Lwt_result_syntax in
+  let enc = value_option [] Data_encoding.int31 in
+  let* () = assert_round_trip enc (Some 1) Stdlib.( = ) in
+  let* () = assert_round_trip enc None Stdlib.( = ) in
+  return_unit
+
 let tests =
   [
     tztest "String" `Quick test_string;
@@ -318,4 +326,5 @@ let tests =
     tztest "Chunked byte vector" `Quick test_chunked_byte_vector;
     tztest "Tuples" `Quick test_tuples;
     tztest "Option" `Quick test_option;
+    tztest "Value Option" `Quick test_value_option;
   ]
