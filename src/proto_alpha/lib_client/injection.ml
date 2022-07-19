@@ -342,7 +342,9 @@ let estimated_gas_single (type kind)
         | Sc_rollup_dal_slot_subscribe_result {consumed_gas; _} ->
             Ok consumed_gas)
     | Skipped _ ->
-        Ok Gas.Arith.zero (* there must be another error for this to happen *)
+        error_with "Cannot estimate gas of skipped operation"
+        (* There must be another error for this to happen, and it should not
+           surface (the force mode catches it). *)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
   in
   let internal_consumed_gas (type kind)
@@ -427,7 +429,9 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
         | Sc_rollup_recover_bond_result _ -> Ok Z.zero
         | Sc_rollup_dal_slot_subscribe_result _ -> Ok Z.zero)
     | Skipped _ ->
-        Ok Z.zero (* there must be another error for this to happen *)
+        error_with "Cannot estimate storage of skipped operation"
+        (* There must be another error for this to happen, and it should not
+           surface (the force mode catches it). *)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
   in
   let internal_storage_size_diff (type kind)
@@ -522,7 +526,10 @@ let originated_contracts_single (type kind)
         | Sc_rollup_execute_outbox_message_result _ -> Ok []
         | Sc_rollup_recover_bond_result _ -> Ok []
         | Sc_rollup_dal_slot_subscribe_result _ -> Ok [])
-    | Skipped _ -> Ok [] (* there must be another error for this to happen *)
+    | Skipped _ ->
+        error_with "Cannot know originated contracts of skipped operation"
+        (* There must be another error for this to happen, and it should not
+           surface (the force mode catches it). *)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
   in
   let internal_originated_contracts (type kind)
