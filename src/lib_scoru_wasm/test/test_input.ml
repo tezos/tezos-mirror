@@ -153,10 +153,13 @@ let test_host_fun () =
         Num (I32 0l); Num (I32 4l); Num (I32 10l); Num (I32 50l); Num (I32 3600l);
       ]
   in
-  let* () = Host_funcs.configure () in
+  let host_funcs_registry = Tezos_webassembly_interpreter.Host_funcs.empty () in
+  Host_funcs.register_host_funcs host_funcs_registry ;
+
   let* module_inst, result =
     let read_input_type, read_input_name = Host_funcs.read_input_desc in
     Eval.invoke
+      host_funcs_registry
       ~module_inst
       ~input
       (Func.HostFunc (read_input_type, read_input_name))

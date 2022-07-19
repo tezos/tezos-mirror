@@ -33,20 +33,22 @@ let abort _input _mod_inst vs =
 
 let exit _input (_mod_inst : module_inst ref) vs = exit (int (single vs))
 
-let lookup module_name name =
+let register_host_funcs registry =
+  Host_funcs.register ~global_name:"abort" abort registry ;
+  Host_funcs.register ~global_name:"abort" exit registry
+
+let lookup name =
   let open Lwt.Syntax in
   let+ name = Utf8.encode name in
   match name with
   | "abort" ->
       let global_name = "env_abort" in
-      Host_funcs.register ~global_name abort ;
       ExternFunc
         (Func.alloc_host
            ~global_name
            (FuncType (Vector.of_list [], Vector.of_list [])))
   | "exit" ->
       let global_name = "env_exit" in
-      Host_funcs.register ~global_name exit ;
       ExternFunc
         (Func.alloc_host
            ~global_name

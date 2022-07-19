@@ -26,26 +26,27 @@ let table =
 
 let memory = Memory.alloc (MemoryType {min = 1l; max = Some 2l})
 
-let func module_name func_name f t =
-  let global_name = module_name ^ "_" ^ func_name in
-  Host_funcs.register ~global_name (f t) ;
-  Func.alloc_host ~global_name t
-
 let print_value v =
   Printf.printf
     "%s : %s\n"
     (Values.string_of_value v)
     (Types.string_of_value_type (Values.type_of_value v))
 
-let print (FuncType (_, out)) _m _v vs =
+let print _i _m vs =
   List.iter print_value vs ;
   flush_all () ;
-  List.map
-    (fun (_, t) -> default_value t)
-    (Lazy_vector.LwtInt32Vector.loaded_bindings out)
-  |> Lwt.return
+  Lwt.return_nil
 
-let lookup module_name name =
+let register_host_funcs registry =
+  Host_funcs.register ~global_name:"spectest_print" print registry ;
+  Host_funcs.register ~global_name:"spectest_print_i32" print registry ;
+  Host_funcs.register ~global_name:"spectest_print_i64" print registry ;
+  Host_funcs.register ~global_name:"spectest_print_f32" print registry ;
+  Host_funcs.register ~global_name:"spectest_print_f64" print registry ;
+  Host_funcs.register ~global_name:"spectest_print_i32_f32" print registry ;
+  Host_funcs.register ~global_name:"spectest_print_f64_f64" print registry
+
+let lookup name =
   let open Lwt.Syntax in
   let+ name = Utf8.encode name in
   let empty () = Lazy_vector.LwtInt32Vector.create 0l in
@@ -53,26 +54,41 @@ let lookup module_name name =
   let two i j =
     Lazy_vector.LwtInt32Vector.(create 2l |> set 0l i |> set 1l j)
   in
-  let func = func module_name name in
   match name with
-  | "print" -> ExternFunc (func print (FuncType (empty (), empty ())))
+  | "print" ->
+      ExternFunc
+        (Func.alloc_host
+           ~global_name:"spectest_print"
+           (FuncType (empty (), empty ())))
   | "print_i32" ->
-      ExternFunc (func print (FuncType (singleton (NumType I32Type), empty ())))
+      ExternFunc
+        (Func.alloc_host
+           ~global_name:"spectest_print_i32"
+           (FuncType (singleton (NumType I32Type), empty ())))
   | "print_i64" ->
-      ExternFunc (func print (FuncType (singleton (NumType I64Type), empty ())))
+      ExternFunc
+        (Func.alloc_host
+           ~global_name:"spectest_print_i64"
+           (FuncType (singleton (NumType I64Type), empty ())))
   | "print_f32" ->
-      ExternFunc (func print (FuncType (singleton (NumType F32Type), empty ())))
+      ExternFunc
+        (Func.alloc_host
+           ~global_name:"spectest_print_f32"
+           (FuncType (singleton (NumType F32Type), empty ())))
   | "print_f64" ->
-      ExternFunc (func print (FuncType (singleton (NumType F64Type), empty ())))
+      ExternFunc
+        (Func.alloc_host
+           ~global_name:"spectest_print_f64"
+           (FuncType (singleton (NumType F64Type), empty ())))
   | "print_i32_f32" ->
       ExternFunc
-        (func
-           print
+        (Func.alloc_host
+           ~global_name:"spectest_print_i32_f32"
            (FuncType (two (NumType I32Type) (NumType F32Type), empty ())))
   | "print_f64_f64" ->
       ExternFunc
-        (func
-           print
+        (Func.alloc_host
+           ~global_name:"spectest_print_f64_f64"
            (FuncType (two (NumType F64Type) (NumType F64Type), empty ())))
   | "global_i32" ->
       ExternGlobal (global (GlobalType (NumType I32Type, Immutable)))

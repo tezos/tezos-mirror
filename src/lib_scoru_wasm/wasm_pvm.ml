@@ -41,7 +41,17 @@ module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
 
         let compute_step s =
           let open Lwt.Syntax in
-          let* () = Host_funcs.configure () in
+          (* register the PVM host funcs wrappers in a module ["tezos"] into the WASM linker *)
+          let* () =
+            Tezos_webassembly_interpreter.(
+              Import.register (Utf8.decode "tezos"))
+              Host_funcs.lookup
+          in
+          (* build the registry of host functions (to be passed to the interpreter via its config *)
+          let host_funcs_registry =
+            Tezos_webassembly_interpreter.Host_funcs.empty ()
+          in
+          Host_funcs.register_host_funcs host_funcs_registry ;
           Lwt.return s
 
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/3092

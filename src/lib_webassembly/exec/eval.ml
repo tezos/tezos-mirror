@@ -76,13 +76,14 @@ type config = {
   frame : frame;
   input : input_inst;
   code : code;
+  host_funcs : Host_funcs.registry;
   budget : int; (* to model stack overflow *)
 }
 
 let frame inst locals = {inst; locals}
 
-let config ?(input = Input_buffer.alloc ()) inst vs es =
-  {frame = frame inst []; input; code = (vs, es); budget = 300}
+let config ?(input = Input_buffer.alloc ()) host_funcs inst vs es =
+  {frame = frame inst []; input; code = (vs, es); budget = 300; host_funcs}
 
 let plain e = Plain e.it @@ e.at
 
@@ -772,6 +773,7 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
               code = code';
               budget = c.budget - 1;
               input = c.input;
+              host_funcs = c.host_funcs;
             }
         in
         (vs, [Frame (n, c'.frame, c'.code) @@ e.at])
@@ -804,7 +806,7 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
             let inst = ref frame.inst in
             Lwt.catch
               (fun () ->
-                let f = Host_funcs.lookup ~global_name in
+                let f = Host_funcs.lookup ~global_name c.host_funcs in
                 let+ res = f c.input inst (List.rev args) in
                 (List.rev res @ vs', []))
               (function
@@ -823,7 +825,8 @@ let rec eval (c : config) : value stack Lwt.t =
 (* Functions & Constants *)
 
 let invoke ?(module_inst = empty_module_inst) ?(input = Input_buffer.alloc ())
-    (func : func_inst) (vs : value list) : (module_inst * value list) Lwt.t =
+    host_funcs (func : func_inst) (vs : value list) :
+    (module_inst * value list) Lwt.t =
   let at = match func with Func.AstFunc (_, _, f) -> f.at | _ -> no_region in
   let (FuncType (ins, out)) = Func.type_of func in
   let* ins_l = Lazy_vector.LwtInt32Vector.to_list ins in
@@ -840,7 +843,12 @@ let invoke ?(module_inst = empty_module_inst) ?(input = Input_buffer.alloc ())
     | Func.HostFunc _ -> Instance.Vector.create 0l
   in
   let c =
-    config ~input {module_inst with blocks} (List.rev vs) [Invoke func @@ at]
+    config
+      ~input
+      host_funcs
+      {module_inst with blocks}
+      (List.rev vs)
+      [Invoke func @@ at]
   in
   Lwt.catch
     (fun () ->
@@ -851,7 +859,9 @@ let invoke ?(module_inst = empty_module_inst) ?(input = Input_buffer.alloc ())
       | exn -> Lwt.fail exn)
 
 let eval_const (inst : module_inst) (const : const) : value Lwt.t =
-  let c = config inst [] [From_block (const.it, 0l) @@ const.at] in
+  let c =
+    config (Host_funcs.empty ()) inst [] [From_block (const.it, 0l) @@ const.at]
+  in
   let+ vs = eval c in
   match vs with
   | [v] -> v
@@ -989,7 +999,7 @@ let run_data inst i data =
 
 let run_start start = List.map plain [Call start.it.sfunc @@ start.at]
 
-let init (m : module_) (exts : extern list) : module_inst Lwt.t =
+let init host_funcs (m : module_) (exts : extern list) : module_inst Lwt.t =
   let open Lwt.Syntax in
   let {
     imports;
@@ -1111,6 +1121,6 @@ let init (m : module_) (exts : extern list) : module_inst Lwt.t =
   let es_data = List.concat (Lib.List32.mapi (run_data inst) datas) in
   let es_start = Lib.Option.get (Lib.Option.map run_start start) [] in
   let+ (_ : Values.value stack) =
-    eval (config inst [] (es_elem @ es_data @ es_start))
+    eval (config host_funcs inst [] (es_elem @ es_data @ es_start))
   in
   inst

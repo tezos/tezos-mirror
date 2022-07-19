@@ -102,18 +102,15 @@ let read_input input_buffer module_inst inputs =
       Lwt.return [Values.(Num (I32 (I32.of_int_s x)))]
   | _ -> raise Bad_input
 
-let lookup _module_name name =
+let lookup name =
   let open Lwt.Syntax in
   let+ name = Utf8.encode name in
   match name with
   | "read_input" -> ExternFunc (HostFunc (read_input_type, read_input_name))
   | _ -> raise Not_found
 
-let configure () =
-  (* register the host function implementation *)
-  Host_funcs.register ~global_name:read_input_name read_input ;
-  (* register the [tezos] module containing the PVM host functions in the linker *)
-  Import.register (Utf8.decode "tezos") (lookup "tezos")
+let register_host_funcs registry =
+  Host_funcs.register ~global_name:read_input_name read_input registry
 
 module Internal_for_tests = struct
   let aux_write_input_in_memory = aux_write_input_in_memory

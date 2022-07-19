@@ -23,16 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [lookup module_name name] retrieves or instantiates a host
-    function by the given [name] in the given [module_name].
-    Currently dispatches [Tezos.read_input] to {!read_input}. *)
+(** [lookup name] retrieves or instantiates a host function by the given [name].
+    Currently dispatches [read_input] to {!read_input} using host function global
+    names as registered by {!register_host_funcs}.
+    Used to plug host function wrappers in the WASN interpreter linker. *)
 val lookup :
-  string ->
   Tezos_webassembly_interpreter.Ast.name ->
   Tezos_webassembly_interpreter.Instance.extern Lwt.t
 
-(** Plugs {!lookup} into the WASN interpreter module system. *)
-val configure : unit -> unit Lwt.t
+(** [register_host_funcs] registers all the PVMs host functions into a WASM
+    interpreter's registry, using the names expected by {!lookup}. *)
+val register_host_funcs :
+  Tezos_webassembly_interpreter.Host_funcs.registry -> unit
 
 exception Bad_input
 

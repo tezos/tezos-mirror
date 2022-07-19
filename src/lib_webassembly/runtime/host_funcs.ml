@@ -6,9 +6,11 @@ type host_func =
 
 module Registry = Map.Make (String)
 
-let registry : host_func Registry.t ref = ref Registry.empty
+type registry = host_func Registry.t ref
 
-let register ~global_name implem =
+let empty () = ref Registry.empty
+
+let register ~global_name implem registry =
   registry := Registry.add global_name implem !registry
 
-let lookup ~global_name = Registry.find global_name !registry
+let lookup ~global_name registry = Registry.find global_name !registry

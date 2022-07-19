@@ -4,10 +4,10 @@ let version = "2.0"
 
 let configure () =
   let open Lwt.Syntax in
-  let* () =
-    Import.register (Utf8.decode "spectest") (Spectest.lookup "spectest")
-  in
-  Import.register (Utf8.decode "env") (Env.lookup "env")
+  let* () = Import.register (Utf8.decode "spectest") Spectest.lookup in
+  let+ () = Import.register (Utf8.decode "env") Env.lookup in
+  Spectest.register_host_funcs Run.host_funcs_registry ;
+  Env.register_host_funcs Run.host_funcs_registry
 
 let banner () = print_endline (name ^ " " ^ version ^ " reference interpreter")
 
@@ -47,7 +47,7 @@ let run () =
   let open Lwt.Syntax in
   Lwt.catch
     (fun () ->
-      let* () = configure () in
+      let* registry = configure () in
       Arg.parse
         argspec
         (fun file -> add_arg ("(input " ^ quote file ^ ")"))
