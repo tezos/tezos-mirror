@@ -109,6 +109,8 @@ module type S = sig
 
   val value : key -> 'a Data_encoding.t -> 'a t
 
+  val value_option : key -> 'a Data_encoding.t -> 'a option t
+
   val scope : key -> 'a t -> 'a t
 
   val lazy_mapping : 'a t -> 'a map t
@@ -284,6 +286,8 @@ module Make
   let raw key = {encode = E.raw key; decode = D.raw key}
 
   let value key de = {encode = E.value key de; decode = D.value key de}
+
+  let value_option key de = value key (Data_encoding.option de)
 
   let lazy_mapping value =
     let to_key k = [M.string_of_key k] in
