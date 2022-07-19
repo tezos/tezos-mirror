@@ -290,7 +290,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       Store.Commitments.mem store next_level_to_publish
     in
     if is_commitment_available then
-      let*! commitment, commitment_hash =
+      let*! commitment, _commitment_hash =
         Store.Commitments.get store next_level_to_publish
       in
       let* predecessor_published =
@@ -338,11 +338,6 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
             Store.Last_published_commitment_level.set
               store
               commitment.inbox_level
-          in
-          let*! () =
-            Commitment_event.publish_commitment_injected
-              commitment_hash
-              commitment
           in
           return_unit
     else return_unit
@@ -421,9 +416,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
           Sc_rollup_cement
             {rollup = node_ctxt.rollup_address; commitment = commitment_hash}
         in
-        let* () = Injector.add_pending_operation ~source cement_operation in
-        let*! () = Commitment_event.cement_commitment_injected commitment in
-        return_unit
+        Injector.add_pending_operation ~source cement_operation
 
   let cement_commitment_if_possible node_ctxt store
       (Layer1.Head {level = head_level; _}) =
@@ -441,7 +434,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     match commitment_with_hash with
     (* If `commitment_with_hash` is defined, the commitment to be cemented has
        been stored but not necessarily published by the rollup node. *)
-    | Some (commitment, commitment_hash) -> (
+    | Some (_commitment, commitment_hash) -> (
         let*! earliest_cementing_level =
           earliest_cementing_level node_ctxt store commitment_hash
         in
@@ -457,8 +450,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
                 head_level
                 commitment_hash
             in
-            if green_flag then
-              cement_commitment node_ctxt commitment commitment_hash
+            if green_flag then cement_commitment node_ctxt commitment_hash
             else return ()
         | None -> return ())
     | None -> return ()
