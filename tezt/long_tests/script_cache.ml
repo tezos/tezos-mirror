@@ -355,7 +355,10 @@ let check_full_cache ~protocol =
 
 *)
 let check_block_impact_on_cache ~protocol =
-  check "one cannot violate the cache size limit" ~protocol ~tags:["memory"]
+  check
+    "one cannot violate the cache size limit"
+    ~protocol
+    ~tags:["memory"; "limit"]
   @@ fun () ->
   let* node, client = init1 ~protocol in
 
