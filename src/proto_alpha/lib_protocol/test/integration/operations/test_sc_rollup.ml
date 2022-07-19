@@ -103,7 +103,7 @@ let test_disable_feature_flag () =
   let kind = Sc_rollup.Kind.Example_arith in
   let* op, _ =
     let parameters_ty = Script.lazy_expr @@ Expr.from_string "unit" in
-    Op.sc_rollup_origination (I i) contract kind "" parameters_ty
+    Op.sc_rollup_origination (I i) contract kind ~boot_sector:"" ~parameters_ty
   in
   let expect_apply_failure = function
     | Environment.Ecoproto_error
@@ -140,8 +140,8 @@ let sc_originate ?(boot_sector = "") ?origination_proof block contract
       (B block)
       contract
       kind
-      boot_sector
-      (Script.lazy_expr @@ Expr.from_string parameters_ty)
+      ~boot_sector
+      ~parameters_ty:(Script.lazy_expr @@ Expr.from_string parameters_ty)
   in
   let* incr = Incremental.begin_construction block in
   let* incr = Incremental.add_operation incr operation in
