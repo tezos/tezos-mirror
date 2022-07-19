@@ -45,22 +45,38 @@ open Dal_cryptobox_sigs
    that both the [Verifier] and the [Builder] as instantiated with the
    same parameters and use the same trusted setup. *)
 
-module Verifier : functor (C : CONSTANTS) -> sig
+module Verifier : sig
   include SRS
 
-  include COMMITMENT with type srs := srs
+  include COMMITMENT with type srs := srs and type t := t
 
-  include SEGMENT with type commitment := commitment and type srs := srs
+  include
+    SEGMENT
+      with type commitment := commitment
+       and type srs := srs
+       and type t := t
+
+  val make :
+    redundancy_factor:int ->
+    slot_size:int ->
+    segment_size:int ->
+    shards_amount:int ->
+    t
 end
 
-module Builder (C : CONSTANTS) : sig
-  include module type of Verifier (C)
+module Full : sig
+  include module type of Verifier
 
-  include POLYNOMIAL with type srs := srs and type commitment := commitment
+  include
+    POLYNOMIAL
+      with type srs := srs
+       and type t := t
+       and type commitment := commitment
 
   include
     SHARD
       with type srs := srs
+       and type t := t
        and type polynomial := polynomial
        and type commitment := commitment
        and module IntMap := IntMap
@@ -68,9 +84,11 @@ module Builder (C : CONSTANTS) : sig
   include
     PROOF
       with type srs := srs
+       and type t := t
        and type commitment := commitment
        and type polynomial := polynomial
        and type commitment_proof := commitment_proof
        and type segment_proof := segment_proof
        and type shard_proof := shard_proof
+       and type segment := segment
 end

@@ -39,18 +39,16 @@ module type CONSTANTS = sig
 end
 
 module type SRS = sig
+  (** A precomputed set of constants *)
+  type t
+
   (** A trusted setup. *)
   type srs
 
   (** FIXME https://gitlab.com/tezos/tezos/-/issues/3390
 
      This is unsafe but can be used for testing. *)
-  val srs :
-    redundancy_factor:int ->
-    segment_size:int ->
-    slot_size:int ->
-    shards_amount:int ->
-    srs
+  val srs : t -> srs
 
   (** [load_srs ()] loads a trusted [srs]. If the [srs] is already
      loaded, it is given directly. Otherwise, the trusted [srs] is
@@ -61,10 +59,13 @@ module type SRS = sig
       We assume the [srs] won't change many times. The shell ensures
      that a bounded and small number of [srs] can be loaded at the
      same time. *)
-  val load_srs : unit -> srs Error_monad.tzresult
+  val load_srs : t -> srs Error_monad.tzresult
 end
 
 module type COMMITMENT = sig
+  (** A precomputed set of constants *)
+  type t
+
   (** A trusted setup. *)
   type srs
 
@@ -107,6 +108,9 @@ end
 module type POLYNOMIAL = sig
   module IntMap : Tezos_error_monad.TzLwtreslib.Map.S with type key = int
 
+  (** A precomputed set of constants *)
+  type t
+
   (** A trusted setup. *)
   type srs
 
@@ -137,15 +141,15 @@ module type POLYNOMIAL = sig
   (** [polynomial_evaluate polynomial x] evaluates [polynomial(x)]. *)
   val polynomial_evaluate : polynomial -> scalar -> scalar
 
-  (** [polynomial_from_slot slot] returns a polynomial from the a slot [slot].
+  (** [polynomial_from_slot t slot] returns a polynomial from the a slot [slot].
 
       Fail with [`Slot_wrong_size] when the slot size is different from
       [CONFIGURATION.slot_size]. *)
   val polynomial_from_slot :
-    bytes -> (polynomial, [> `Slot_wrong_size of string]) Result.t
+    t -> bytes -> (polynomial, [> `Slot_wrong_size of string]) Result.t
 
-  (** [polynomial_to_slot polynomial] returns a slot from a [polynomial]. *)
-  val polynomial_to_bytes : polynomial -> bytes
+  (** [polynomial_to_slot t polynomial] returns a slot from a [polynomial]. *)
+  val polynomial_to_bytes : t -> polynomial -> bytes
 
   (** [commit polynomial] returns the commitment associated to a
      polynomial [p].
@@ -159,6 +163,9 @@ module type POLYNOMIAL = sig
 end
 
 module type SEGMENT = sig
+  (** A precomputed set of constants *)
+  type t
+
   (** A trusted setup. *)
   type srs
 
@@ -177,13 +184,14 @@ module type SEGMENT = sig
   (** An encoding for the proof of a segment. *)
   val segment_proof_encoding : segment_proof Data_encoding.t
 
-  (** [verify_segment commitment segment segment_proof] returns [Ok
+  (** [verify_segment t commitment segment segment_proof] returns [Ok
      true] if the [proof] certifies that the [slot_segment] is indeed
      included in the slot committed with commitment
      [comitment]. Returns [Ok false] otherwise.
 
       Fails if the index of the segment is out of range. *)
   val verify_segment :
+    t ->
     srs ->
     commitment ->
     segment ->
@@ -193,6 +201,9 @@ end
 
 module type SHARD = sig
   module IntMap : Tezos_error_monad.TzLwtreslib.Map.S with type key = int
+
+  (** A precomputed set of constants *)
+  type t
 
   (** A trusted setup. *)
   type srs
@@ -219,34 +230,38 @@ module type SHARD = sig
   (** An encoding for a map of shares. *)
   val shards_encoding : share IntMap.t Data_encoding.t
 
-  (** [polynomial_from_shards shares] computes the original polynomial
+  (** [polynomial_from_shards t shares] computes the original polynomial
      from [shares]. The proportion of shares needed is [1] over
      [C.redundancy_factor] the total number of shards. It is
      guaranteed that for any share with different indices, if there is
      more than the number of required shards, then the original data
      can be recomputed. *)
   val polynomial_from_shards :
+    t ->
     share IntMap.t ->
     ( polynomial,
       [> `Invert_zero of string | `Not_enough_shards of string] )
     result
 
-  (** [shards_from_polynomial polynomial] compute all the shards
+  (** [shards_from_polynomial t polynomial] compute all the shards
      encoding the original [polynomial]. *)
-  val shards_from_polynomial : polynomial -> share IntMap.t
+  val shards_from_polynomial : t -> polynomial -> share IntMap.t
 
   (** A proof that a shard belong to some commitment. *)
   type shard_proof
 
-  (** [verify_shard srs commitment shard proof] allows to check
+  (** [verify_shard t srs commitment shard proof] allows to check
      whether [shard] is a porition of the data corresopding to the
      [commitment] using [proof]. The verification time is
      constant. The [srs] should be the same as the one used to produce
      the commitment. *)
-  val verify_shard : srs -> commitment -> shard -> shard_proof -> bool
+  val verify_shard : t -> srs -> commitment -> shard -> shard_proof -> bool
 end
 
 module type PROOF = sig
+  (** A precomputed set of constants *)
+  type t
+
   (** A trusted setup. *)
   type srs
 
@@ -281,6 +296,7 @@ module type PROOF = sig
      is part of a commitment. This segment corresponds to the original
      data and are split into [C.segment_size]. *)
   val prove_segment :
+    t ->
     srs ->
     polynomial ->
     int ->
@@ -292,5 +308,5 @@ module type PROOF = sig
      each [shard] is a valid piece of data associated to a polynomial
      and its commitment. Only the commitment is needed to check the
      proof. *)
-  val prove_shards : srs -> polynomial -> shard_proof array
+  val prove_shards : t -> srs -> polynomial -> shard_proof array
 end

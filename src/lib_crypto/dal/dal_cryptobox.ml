@@ -59,75 +59,7 @@ let () =
     (function No_trusted_setup parameter -> Some parameter | _ -> None)
     (fun parameter -> No_trusted_setup parameter)
 
-(* The srs is an initialisation setup required by many primitives of
-   the cryptobox. For production code, this initialisation setup is
-   provided via files of size ~300MB. Loading those files can be done
-   once by the shell. However, the [srs] value depends on the
-   [slot_size] which is determined by the protocol.
-
-   What we provide here is a mechanism to store at most two different
-   [srs] depending on two different slot sizes. using the [Ringo]
-   library (see {!val:srs_ring}). We also provide a cache mechanism to
-   avoid recomputing the [srs] if it was already computed once. *)
-type srs = {
-  srs_g1 : Bls12_381.G1.t array;
-  srs_g2 : Bls12_381.G2.t array;
-  kate_amortized_srs_g2_shards : Bls12_381.G2.t;
-  kate_amortized_srs_g2_segments : Bls12_381.G2.t;
-}
-
-let srs ~redundancy_factor ~segment_size ~slot_size ~shards_amount : srs =
-  let module Scalar = Bls12_381.Fr in
-  let scalar_bytes_amount = Scalar.size_in_bytes - 1 in
-  let k = 1 lsl Z.(log2up (of_int slot_size / of_int scalar_bytes_amount)) in
-  let n = redundancy_factor * k in
-  let shard_size = n / shards_amount in
-  let evaluations_per_proof_log = Z.(log2 (of_int shard_size)) in
-  let scalar_bytes_amount = Scalar.size_in_bytes - 1 in
-  let segment_len = Int.div segment_size scalar_bytes_amount + 1 in
-  let build_array init next len =
-    let xi = ref init in
-    Array.init len (fun _ ->
-        let i = !xi in
-        xi := next !xi ;
-        i)
-  in
-  let create_srs :
-      type t.
-      (module Bls12_381.CURVE with type t = t) -> int -> Scalar.t -> t array =
-   fun (module G) d x -> build_array G.(copy one) (fun g -> G.(mul g x)) d
-  in
-  let secret =
-    Scalar.of_string
-      "20812168509434597367146703229805575690060615791308155437936410982393987532344"
-  in
-  let srs_g1 = create_srs (module Bls12_381.G1) slot_size secret in
-  let srs_g2 = create_srs (module Bls12_381.G2) slot_size secret in
-  {
-    srs_g1;
-    srs_g2;
-    kate_amortized_srs_g2_shards =
-      Array.get srs_g2 (1 lsl evaluations_per_proof_log);
-    kate_amortized_srs_g2_segments =
-      Array.get srs_g2 (1 lsl Z.(log2up (of_int segment_len)));
-  }
-
-module SRS_ring =
-  (val Ringo.(map_maker ~replacement:FIFO ~overflow:Strong ~accounting:Precise))
-    (struct
-      include Int
-
-      let hash = Hashtbl.hash
-    end)
-
-(* FIXME https://gitlab.com/tezos/tezos/-/issues/3408
-
-   We use [3] because a priori, we only need to support [2] protocols
-   at the same time. In case of an hard fork, we give one protocol
-   more for security. *)
-let srs_ring = SRS_ring.create 3
-
-module Make (C : CONSTANTS) = struct
+module Inner = struct
   open Kate_amortized
 
   (* Scalars are elements of the prime field Fr from BLS. *)
@@ -141,8 +73,6 @@ module Make (C : CONSTANTS) = struct
   module Domains = Polynomial.Domain
   module Polynomials = Polynomial.Polynomial
   module IntMap = Tezos_error_monad.TzLwtreslib.Map.Make (Int)
-
-  type nonrec srs = srs
 
   type slot = bytes
 
@@ -231,49 +161,40 @@ module Make (C : CONSTANTS) = struct
      r~2^255, we restrict ourselves to 248-bit integers (31 bytes). *)
   let scalar_bytes_amount = Scalar.size_in_bytes - 1
 
-  (* k and n are the parameters of the erasure code. *)
-  let k = 1 lsl Z.(log2up (of_int C.slot_size / of_int scalar_bytes_amount))
-
-  let n = C.redundancy_factor * k
-
-  let _erasure_encoding_length = n
+  (* Builds group of nth roots of unity, a valid domain for the FFT. *)
+  let make_domain n = Domains.build ~log:Z.(log2up (of_int n))
 
   (* Memoize intermediate domains for the FFTs. *)
   let intermediate_domains : Evaluations.domain IntMap.t ref = ref IntMap.empty
 
-  (* Builds group of nth roots of unity, a valid domain for the FFT. *)
-  let make_domain n = Domains.build ~log:Z.(log2up (of_int n))
+  type t = {
+    redundancy_factor : int;
+    slot_size : int;
+    segment_size : int;
+    shards_amount : int;
+    k : int;
+    n : int;
+    (* k and n are the parameters of the erasure code. *)
+    domain_k : Domains.t;
+    (* Domain for the FFT on slots as polynomials to be erasure encoded. *)
+    domain_2k : Domains.t;
+    domain_n : Domains.t;
+    (* Domain for the FFT on erasure encoded slots (as polynomials). *)
+    shard_size : int;
+    (* Length of a shard in terms of scalar elements. *)
+    nb_segments : int;
+    (* Number of slot segments. *)
+    segment_len : int;
+    remaining_bytes : int;
+    evaluations_log : int;
+    (* Log of the number of evaluations that constitute an erasure encoded
+       polynomial. *)
+    evaluations_per_proof_log : int;
+    (* Log of the number of evaluations contained in a shard. *)
+    proofs_log : int; (* Log of th number of shards proofs. *)
+  }
 
-  (* Domain for the FFT on slots as polynomials to be erasure encoded. *)
-  let domain_k = make_domain k
-
-  let domain_2k = make_domain (2 * k)
-
-  (* Domain for the FFT on erasure encoded slots (as polynomials). *)
-  let domain_n = make_domain n
-
-  (* Length of a shard in terms of scalar elements. *)
-  let shard_size = C.(n / shards_amount)
-
-  (* Number of slot segments. *)
-  let nb_segments = C.(slot_size / segment_size)
-
-  let segment_len = Int.div C.segment_size scalar_bytes_amount + 1
-
-  let remaining_bytes = C.segment_size mod scalar_bytes_amount
-
-  (* Log of the number of evaluations that constitute an erasure encoded
-     polynomial. *)
-  let evaluations_log = Z.(log2 (of_int n))
-
-  (* Log of the number of evaluations contained in a shard. *)
-  let evaluations_per_proof_log = Z.(log2 (of_int shard_size))
-
-  (* Log of th number of shards proofs. *)
-  let proofs_log = evaluations_log - evaluations_per_proof_log
-
-  (* Check code parameters. *)
-  let () =
+  let check_params t =
     let is_pow_of_two x =
       let logx = Z.(log2 (of_int x)) in
       1 lsl logx = x
@@ -281,21 +202,112 @@ module Make (C : CONSTANTS) = struct
 
     (* According to the specification the lengths of a slot a slot segment are
        in MiB *)
-    assert (is_pow_of_two C.slot_size) ;
-    assert (is_pow_of_two C.segment_size) ;
+    assert (is_pow_of_two t.slot_size) ;
+    assert (is_pow_of_two t.segment_size) ;
 
-    assert (is_pow_of_two n) ;
+    assert (is_pow_of_two t.n) ;
 
     (* n must be at most 2^32, the biggest subgroup of 2^i roots of unity in the
        multiplicative group of Fr, because the FFTs operate on such groups. *)
-    assert (Z.(log2 (of_int n)) <= 32) ;
+    assert (Z.(log2 (of_int t.n)) <= 32) ;
 
-    assert (is_pow_of_two k) ;
-    assert (n > k) ;
+    assert (is_pow_of_two t.k) ;
+    assert (t.n > t.k) ;
 
-    assert (is_pow_of_two C.shards_amount) ;
+    assert (is_pow_of_two t.shards_amount) ;
     (* Shards must contain at least two elements. *)
-    assert (n > C.shards_amount)
+    assert (t.n > t.shards_amount)
+
+  let make ~redundancy_factor ~slot_size ~segment_size ~shards_amount =
+    let k = 1 lsl Z.(log2up (of_int slot_size / of_int scalar_bytes_amount)) in
+    let n = redundancy_factor * k in
+    let shard_size = n / shards_amount in
+    let evaluations_log = Z.(log2 (of_int n)) in
+    let evaluations_per_proof_log = Z.(log2 (of_int shard_size)) in
+    let t =
+      {
+        redundancy_factor;
+        slot_size;
+        segment_size;
+        shards_amount;
+        k;
+        n;
+        domain_k = make_domain k;
+        domain_2k = make_domain (2 * k);
+        domain_n = make_domain n;
+        shard_size;
+        nb_segments = slot_size / segment_size;
+        segment_len = Int.div segment_size scalar_bytes_amount + 1;
+        remaining_bytes = segment_size mod scalar_bytes_amount;
+        evaluations_log;
+        evaluations_per_proof_log;
+        proofs_log = evaluations_log - evaluations_per_proof_log;
+      }
+    in
+    check_params t ;
+    t
+
+  (* The srs is an initialisation setup required by many primitives of
+     the cryptobox. For production code, this initialisation setup is
+     provided via files of size ~300MB. Loading those files can be done
+     once by the shell. However, the [srs] value depends on the
+     [slot_size] which is determined by the protocol.
+
+     What we provide here is a mechanism to store at most two different
+     [srs] depending on two different slot sizes. using the [Ringo]
+     library (see {!val:srs_ring}). We also provide a cache mechanism to
+     avoid recomputing the [srs] if it was already computed once. *)
+  type srs = {
+    srs_g1 : Bls12_381.G1.t array;
+    srs_g2 : Bls12_381.G2.t array;
+    kate_amortized_srs_g2_shards : Bls12_381.G2.t;
+    kate_amortized_srs_g2_segments : Bls12_381.G2.t;
+  }
+
+  let srs t : srs =
+    let module Scalar = Bls12_381.Fr in
+    let build_array init next len =
+      let xi = ref init in
+      Array.init len (fun _ ->
+          let i = !xi in
+          xi := next !xi ;
+          i)
+    in
+    let create_srs :
+        type t.
+        (module Bls12_381.CURVE with type t = t) -> int -> Scalar.t -> t array =
+     fun (module G) d x -> build_array G.(copy one) (fun g -> G.(mul g x)) d
+    in
+    let secret =
+      Scalar.of_string
+        "20812168509434597367146703229805575690060615791308155437936410982393987532344"
+    in
+    let srs_g1 = create_srs (module Bls12_381.G1) t.slot_size secret in
+    let srs_g2 = create_srs (module Bls12_381.G2) t.slot_size secret in
+    {
+      srs_g1;
+      srs_g2;
+      kate_amortized_srs_g2_shards =
+        Array.get srs_g2 (1 lsl t.evaluations_per_proof_log);
+      kate_amortized_srs_g2_segments =
+        Array.get srs_g2 (1 lsl Z.(log2up (of_int t.segment_len)));
+    }
+
+  module SRS_ring =
+    (val Ringo.(
+           map_maker ~replacement:FIFO ~overflow:Strong ~accounting:Precise))
+      (struct
+        include Int
+
+        let hash = Hashtbl.hash
+      end)
+
+  (* FIXME https://gitlab.com/tezos/tezos/-/issues/3408
+
+     We use [3] because a priori, we only need to support [2] protocols
+     at the same time. In case of an hard fork, we give one protocol
+     more for security. *)
+  let srs_ring = SRS_ring.create 3
 
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/3410
 
@@ -350,10 +362,10 @@ module Make (C : CONSTANTS) = struct
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/3400
 
      An integrity check is run to ensure the validity of the files. *)
-  let build_trusted_setup_instance ~srs_g1_file ~srs_g2_file ~logarithm_size =
-    assert (k < 1 lsl logarithm_size) ;
+  let build_trusted_setup_instance t ~srs_g1_file ~srs_g2_file ~logarithm_size =
+    assert (t.k < 1 lsl logarithm_size) ;
     let srs_g1 =
-      Bls12_381_polynomial.Srs.M.(to_array (load_from_file srs_g1_file k))
+      Bls12_381_polynomial.Srs.M.(to_array (load_from_file srs_g1_file t.k))
     in
     let g2_size_compressed = Bls12_381.G2.size_in_bytes / 2 in
     let buf = Bytes.create g2_size_compressed in
@@ -367,20 +379,20 @@ module Make (C : CONSTANTS) = struct
     in
     let ic = open_in srs_g2_file in
     let file_size = in_channel_length ic in
-    if file_size < k * g2_size_compressed then (
+    if file_size < t.k * g2_size_compressed then (
       close_in ic ;
       Error [Trusted_setup_too_small file_size])
     else
-      let srs_g2 = Array.init k (fun _ -> read ic) in
+      let srs_g2 = Array.init t.k (fun _ -> read ic) in
       close_in ic ;
       Ok
         {
           srs_g1;
           srs_g2;
           kate_amortized_srs_g2_shards =
-            Array.get srs_g2 (1 lsl evaluations_per_proof_log);
+            Array.get srs_g2 (1 lsl t.evaluations_per_proof_log);
           kate_amortized_srs_g2_segments =
-            Array.get srs_g2 (1 lsl Z.(log2up (of_int segment_len)));
+            Array.get srs_g2 (1 lsl Z.(log2up (of_int t.segment_len)));
         }
 
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/3399
@@ -389,18 +401,18 @@ module Make (C : CONSTANTS) = struct
      would ease the assumptions made by the protocol, and especially
      avoid the issue that [load_srs] may fail because the file was not
      found which is the responsibility of the shell. *)
-  let load_srs_from_file () =
+  let load_srs_from_file t =
     match find_trusted_setup () with
     | Ok {srs_g1_file; srs_g2_file; logarithm_size} ->
-        build_trusted_setup_instance ~srs_g1_file ~srs_g2_file ~logarithm_size
+        build_trusted_setup_instance t ~srs_g1_file ~srs_g2_file ~logarithm_size
     | Error err -> Error err
 
-  let load_srs () =
-    match SRS_ring.find_opt srs_ring k with
+  let load_srs t =
+    match SRS_ring.find_opt srs_ring t.k with
     | None -> (
-        match load_srs_from_file () with
+        match load_srs_from_file t with
         | Ok srs ->
-            SRS_ring.replace srs_ring k srs ;
+            SRS_ring.replace srs_ring t.k srs ;
             Ok srs
         | Error err -> Error err)
     | Some k -> Ok k
@@ -419,7 +431,7 @@ module Make (C : CONSTANTS) = struct
   (* Divide & conquer polynomial multiplication with FFTs, assuming leaves are
      polynomials of equal length. For n the degree of the returned polynomial,
      k = |ps|, runs in time O(n log n log k). *)
-  let poly_mul ps =
+  let poly_mul t ps =
     let split = List.fold_left (fun (l, r) x -> (x :: r, l)) ([], []) in
     let rec poly_mul_aux ps =
       match ps with
@@ -435,7 +447,9 @@ module Make (C : CONSTANTS) = struct
             | Some d -> d
             | None ->
                 let d =
-                  Domains.subgroup ~log:(Z.log2up (Z.of_int (2 * deg))) domain_n
+                  Domains.subgroup
+                    ~log:(Z.log2up (Z.of_int (2 * deg)))
+                    t.domain_n
                 in
                 intermediate_domains := IntMap.add deg d !intermediate_domains ;
                 d
@@ -447,55 +461,55 @@ module Make (C : CONSTANTS) = struct
   (* We encode by segments of [segment_size] bytes each.  The segments
      are arranged in cosets to evaluate in batch with Kate
      amortized. *)
-  let polynomial_from_bytes' slot =
-    if Bytes.length slot <> C.slot_size then
+  let polynomial_from_bytes' t slot =
+    if Bytes.length slot <> t.slot_size then
       Error
         (`Slot_wrong_size
-          (Printf.sprintf "message must be %d bytes long" C.slot_size))
+          (Printf.sprintf "message must be %d bytes long" t.slot_size))
     else
       let offset = ref 0 in
-      let res = Array.init k (fun _ -> Scalar.(copy zero)) in
-      for segment = 0 to nb_segments - 1 do
-        for elt = 0 to segment_len - 1 do
-          if !offset > C.slot_size then ()
-          else if elt = segment_len - 1 then (
-            let dst = Bytes.create remaining_bytes in
-            Bytes.blit slot !offset dst 0 remaining_bytes ;
-            offset := !offset + remaining_bytes ;
-            res.((elt * nb_segments) + segment) <- Scalar.of_bytes_exn dst)
+      let res = Array.init t.k (fun _ -> Scalar.(copy zero)) in
+      for segment = 0 to t.nb_segments - 1 do
+        for elt = 0 to t.segment_len - 1 do
+          if !offset > t.slot_size then ()
+          else if elt = t.segment_len - 1 then (
+            let dst = Bytes.create t.remaining_bytes in
+            Bytes.blit slot !offset dst 0 t.remaining_bytes ;
+            offset := !offset + t.remaining_bytes ;
+            res.((elt * t.nb_segments) + segment) <- Scalar.of_bytes_exn dst)
           else
             let dst = Bytes.create scalar_bytes_amount in
             Bytes.blit slot !offset dst 0 scalar_bytes_amount ;
             offset := !offset + scalar_bytes_amount ;
-            res.((elt * nb_segments) + segment) <- Scalar.of_bytes_exn dst
+            res.((elt * t.nb_segments) + segment) <- Scalar.of_bytes_exn dst
         done
       done ;
       Ok res
 
-  let polynomial_from_slot slot =
+  let polynomial_from_slot t slot =
     let open Result_syntax in
-    let* data = polynomial_from_bytes' slot in
-    Ok (Evaluations.interpolation_fft2 domain_k data)
+    let* data = polynomial_from_bytes' t slot in
+    Ok (Evaluations.interpolation_fft2 t.domain_k data)
 
-  let eval_coset_array eval segment =
+  let eval_coset_array t eval segment =
     let coset =
       Array.init
-        (1 lsl Z.(log2up (of_int segment_len)))
+        (1 lsl Z.(log2up (of_int t.segment_len)))
         (fun _ -> Scalar.(copy zero))
     in
-    for elt = 0 to segment_len - 1 do
-      let idx = (elt * nb_segments) + segment in
+    for elt = 0 to t.segment_len - 1 do
+      let idx = (elt * t.nb_segments) + segment in
       coset.(elt) <- Array.get eval idx
     done ;
     coset
 
-  let eval_coset eval slot offset segment =
-    for elt = 0 to segment_len - 1 do
-      let idx = (elt * nb_segments) + segment in
+  let eval_coset t eval slot offset segment =
+    for elt = 0 to t.segment_len - 1 do
+      let idx = (elt * t.nb_segments) + segment in
       let coeff = Scalar.to_bytes (Array.get eval idx) in
-      if elt = segment_len - 1 then (
-        Bytes.blit coeff 0 slot !offset remaining_bytes ;
-        offset := !offset + remaining_bytes)
+      if elt = t.segment_len - 1 then (
+        Bytes.blit coeff 0 slot !offset t.remaining_bytes ;
+        offset := !offset + t.remaining_bytes)
       else (
         Bytes.blit coeff 0 slot !offset scalar_bytes_amount ;
         offset := !offset + scalar_bytes_amount)
@@ -503,51 +517,51 @@ module Make (C : CONSTANTS) = struct
 
   (* The segments are arranged in cosets to evaluate in batch with Kate
      amortized. *)
-  let polynomial_to_bytes p =
-    let eval = Evaluations.(evaluation_fft domain_k p |> to_array) in
-    let slot = Bytes.init C.slot_size (fun _ -> '0') in
+  let polynomial_to_bytes t p =
+    let eval = Evaluations.(evaluation_fft t.domain_k p |> to_array) in
+    let slot = Bytes.init t.slot_size (fun _ -> '0') in
     let offset = ref 0 in
-    for segment = 0 to nb_segments - 1 do
-      eval_coset eval slot offset segment
+    for segment = 0 to t.nb_segments - 1 do
+      eval_coset t eval slot offset segment
     done ;
     slot
 
-  let encode p = Evaluations.(evaluation_fft domain_n p |> to_array)
+  let encode t p = Evaluations.(evaluation_fft t.domain_n p |> to_array)
 
   (* The shards are arranged in cosets to evaluate in batch with Kate
      amortized. *)
-  let shards_from_polynomial p =
-    let codeword = encode p in
-    let len_shard = n / C.shards_amount in
+  let shards_from_polynomial t p =
+    let codeword = encode t p in
+    let len_shard = t.n / t.shards_amount in
     let rec loop i map =
       match i with
-      | i when i = C.shards_amount -> map
+      | i when i = t.shards_amount -> map
       | _ ->
           let shard = Array.init len_shard (fun _ -> Scalar.(copy zero)) in
           for j = 0 to len_shard - 1 do
-            shard.(j) <- codeword.((C.shards_amount * j) + i)
+            shard.(j) <- codeword.((t.shards_amount * j) + i)
           done ;
           loop (i + 1) (IntMap.add i shard map)
     in
     loop 0 IntMap.empty
 
   (* Computes the polynomial N(X) := \sum_{i=0}^{k-1} n_i x_i^{-1} X^{z_i}. *)
-  let compute_n eval_a' shards =
-    let w = Domains.get domain_n 1 in
-    let n_poly = Array.init n (fun _ -> Scalar.(copy zero)) in
+  let compute_n t eval_a' shards =
+    let w = Domains.get t.domain_n 1 in
+    let n_poly = Array.init t.n (fun _ -> Scalar.(copy zero)) in
     let open Result_syntax in
     let c = ref 0 in
     let* () =
       IntMap.iter_e
         (fun z_i arr ->
-          if !c >= k then Ok ()
+          if !c >= t.k then Ok ()
           else
             let rec loop j =
               match j with
               | j when j = Array.length arr -> Ok ()
               | _ -> (
                   let c_i = arr.(j) in
-                  let z_i = (C.shards_amount * j) + z_i in
+                  let z_i = (t.shards_amount * j) + z_i in
                   let x_i = Scalar.pow w (Z.of_int z_i) in
                   let tmp = Evaluations.get eval_a' z_i in
                   Scalar.mul_inplace tmp tmp x_i ;
@@ -564,13 +578,13 @@ module Make (C : CONSTANTS) = struct
     in
     Ok n_poly
 
-  let polynomial_from_shards shards =
-    if k > IntMap.cardinal shards * shard_size then
+  let polynomial_from_shards t shards =
+    if t.k > IntMap.cardinal shards * t.shard_size then
       Error
         (`Not_enough_shards
           (Printf.sprintf
              "there must be at least %d shards to decode"
-             (k / shard_size)))
+             (t.k / t.shard_size)))
     else
       (* 1. Computing A(x) = prod_{i=0}^{k-1} (x - w^{z_i}).
          Let w be a primitive nth root of unity and
@@ -598,34 +612,34 @@ module Make (C : CONSTANTS) = struct
       let factors =
         IntMap.bindings shards
         (* We always consider the first k codeword vector components. *)
-        |> Tezos_stdlib.TzList.take_n (k / shard_size)
+        |> Tezos_stdlib.TzList.take_n (t.k / t.shard_size)
         |> List.rev_map (fun (i, _) ->
                Polynomials.of_coefficients
                  [
-                   (Scalar.negate (Domains.get domain_n (i * shard_size)), 0);
-                   (Scalar.(copy one), shard_size);
+                   (Scalar.negate (Domains.get t.domain_n (i * t.shard_size)), 0);
+                   (Scalar.(copy one), t.shard_size);
                  ])
       in
-      let a_poly = poly_mul factors in
+      let a_poly = poly_mul t factors in
 
       (* 2. Computing formal derivative of A(x). *)
       let a' = Polynomials.derivative a_poly in
 
       (* 3. Computing A'(w^i) = A_i(w^i). *)
-      let eval_a' = Evaluations.evaluation_fft domain_n a' in
+      let eval_a' = Evaluations.evaluation_fft t.domain_n a' in
 
       (* 4. Computing N(x). *)
       let open Result_syntax in
-      let* n_poly = compute_n eval_a' shards in
+      let* n_poly = compute_n t eval_a' shards in
 
       (* 5. Computing B(x). *)
-      let b = Evaluations.interpolation_fft2 domain_n n_poly in
-      let b = Polynomials.copy ~len:k b in
-      Polynomials.mul_by_scalar_inplace b (Scalar.of_int n) b ;
+      let b = Evaluations.interpolation_fft2 t.domain_n n_poly in
+      let b = Polynomials.copy ~len:t.k b in
+      Polynomials.mul_by_scalar_inplace b (Scalar.of_int t.n) b ;
 
       (* 6. Computing Lagrange interpolation polynomial P(x). *)
-      let p = fft_mul domain_2k [a_poly; b] in
-      let p = Polynomials.copy ~len:k p in
+      let p = fft_mul t.domain_2k [a_poly; b] in
+      let p = Polynomials.copy ~len:t.k p in
       Polynomials.opposite_inplace p ;
       Ok p
 
@@ -684,11 +698,11 @@ module Make (C : CONSTANTS) = struct
 
   let eval_to_array e = Array.init (Domains.length e) (Domains.get e)
 
-  let precompute_shards_proofs trusted_setup =
+  let precompute_shards_proofs t trusted_setup =
     let eval, m =
       Kate_amortized.preprocess_multi_reveals
-        ~chunk_len:evaluations_per_proof_log
-        ~degree:k
+        ~chunk_len:t.evaluations_per_proof_log
+        ~degree:t.k
         (trusted_setup.srs_g1, trusted_setup.kate_amortized_srs_g2_shards)
     in
     (eval_to_array eval, m)
@@ -716,19 +730,19 @@ module Make (C : CONSTANTS) = struct
     In_channel.close_noerr chan ;
     precomp
 
-  let prove_shards srs p =
-    let preprocess = precompute_shards_proofs srs in
+  let prove_shards t srs p =
+    let preprocess = precompute_shards_proofs t srs in
     Kate_amortized.multiple_multi_reveals
-      ~chunk_len:evaluations_per_proof_log
-      ~chunk_count:proofs_log
-      ~degree:k
+      ~chunk_len:t.evaluations_per_proof_log
+      ~chunk_count:t.proofs_log
+      ~degree:t.k
       ~preprocess
       (Polynomials.to_dense_coefficients p |> Array.to_list)
 
-  let verify_shard trusted_setup cm
+  let verify_shard t trusted_setup cm
       {index = shard_index; share = shard_evaluations} proof =
-    let d_n = Kate_amortized.Domain.build ~log:evaluations_log in
-    let domain = Kate_amortized.Domain.build ~log:evaluations_per_proof_log in
+    let d_n = Kate_amortized.Domain.build ~log:t.evaluations_log in
+    let domain = Kate_amortized.Domain.build ~log:t.evaluations_per_proof_log in
     Kate_amortized.verify
       cm
       (trusted_setup.srs_g1, trusted_setup.kate_amortized_srs_g2_shards)
@@ -758,35 +772,36 @@ module Make (C : CONSTANTS) = struct
       - Polynomial.degree p = k
       - (x^l - z) | p(x)
      Computes the quotient of the division of p(x) by (x^l - z). *)
-  let compute_quotient p l z =
-    let div = Array.init (k - l + 1) (fun _ -> Scalar.(copy zero)) in
+  let compute_quotient t p l z =
+    let div = Array.init (t.k - l + 1) (fun _ -> Scalar.(copy zero)) in
     let i = ref 0 in
     (* Computes 1/(x^l - z) mod x^{k - l + 1}
        = \sum_{i=0}^{+\infty} -z^{-1}^{i+1} X^{i\times l} mod x^{k - l + 1}. *)
-    while !i * l < k - l + 1 do
+    while !i * l < t.k - l + 1 do
       div.(!i * l) <-
         Scalar.negate (Scalar.inverse_exn (Scalar.pow z (Z.of_int (!i + 1)))) ;
       i := !i + 1
     done ;
     let div = Polynomials.of_dense div in
     (* p(x) * 1/(x^l - z) mod x^{k - l + 1} = q(x) since deg q <= k - l. *)
-    fft_mul domain_2k [p; div] |> Polynomials.copy ~len:(k - l + 1)
+    fft_mul t.domain_2k [p; div] |> Polynomials.copy ~len:(t.k - l + 1)
 
-  let prove_segment trusted_setup p segment_index =
-    if segment_index < 0 || segment_index >= nb_segments then
+  let prove_segment t trusted_setup p segment_index =
+    if segment_index < 0 || segment_index >= t.nb_segments then
       Error `Segment_index_out_of_range
     else
-      let l = 1 lsl Z.(log2up (of_int segment_len)) in
-      let wi = Domains.get domain_k segment_index in
-      let domain = Domains.build ~log:Z.(log2up (of_int segment_len)) in
-      let eval_p = Evaluations.(evaluation_fft domain_k p |> to_array) in
-      let eval_coset = eval_coset_array eval_p segment_index in
+      let l = 1 lsl Z.(log2up (of_int t.segment_len)) in
+      let wi = Domains.get t.domain_k segment_index in
+      let domain = Domains.build ~log:Z.(log2up (of_int t.segment_len)) in
+      let eval_p = Evaluations.(evaluation_fft t.domain_k p |> to_array) in
+      let eval_coset = eval_coset_array t eval_p segment_index in
       let remainder =
         Kate_amortized.interpolation_h_poly wi domain eval_coset
         |> Array.of_list |> Polynomials.of_dense
       in
       let quotient =
         compute_quotient
+          t
           (Polynomials.sub p remainder)
           l
           (Scalar.pow wi (Z.of_int l))
@@ -795,19 +810,19 @@ module Make (C : CONSTANTS) = struct
 
   (* Parses the [slot_segment] to get the evaluations that it contains. The
      evaluation points are given by the [slot_segment_index]. *)
-  let verify_segment trusted_setup cm
+  let verify_segment t trusted_setup cm
       {index = slot_segment_index; content = slot_segment} proof =
-    if slot_segment_index < 0 || slot_segment_index >= nb_segments then
+    if slot_segment_index < 0 || slot_segment_index >= t.nb_segments then
       Error `Slot_segment_index_out_of_range
     else
       let domain =
-        Kate_amortized.Domain.build ~log:Z.(log2up (of_int segment_len))
+        Kate_amortized.Domain.build ~log:Z.(log2up (of_int t.segment_len))
       in
       let slot_segment_evaluations =
         Array.init
-          (1 lsl Z.(log2up (of_int segment_len)))
+          (1 lsl Z.(log2up (of_int t.segment_len)))
           (function
-            | i when i < segment_len - 1 ->
+            | i when i < t.segment_len - 1 ->
                 let dst = Bytes.create scalar_bytes_amount in
                 Bytes.blit
                   slot_segment
@@ -816,14 +831,14 @@ module Make (C : CONSTANTS) = struct
                   0
                   scalar_bytes_amount ;
                 Scalar.of_bytes_exn dst
-            | i when i = segment_len - 1 ->
-                let dst = Bytes.create remaining_bytes in
+            | i when i = t.segment_len - 1 ->
+                let dst = Bytes.create t.remaining_bytes in
                 Bytes.blit
                   slot_segment
                   (i * scalar_bytes_amount)
                   dst
                   0
-                  remaining_bytes ;
+                  t.remaining_bytes ;
                 Scalar.of_bytes_exn dst
             | _ -> Scalar.(copy zero))
       in
@@ -832,9 +847,9 @@ module Make (C : CONSTANTS) = struct
            cm
            (trusted_setup.srs_g1, trusted_setup.kate_amortized_srs_g2_segments)
            domain
-           (Domains.get domain_k slot_segment_index, slot_segment_evaluations)
+           (Domains.get t.domain_k slot_segment_index, slot_segment_evaluations)
            proof)
 end
 
-module Verifier (C : CONSTANTS) = Make (C)
-module Builder (C : CONSTANTS) = Make (C)
+module Verifier = Inner
+module Full = Inner
