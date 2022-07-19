@@ -38,9 +38,11 @@ let lookup module_name name t =
   let+ name = Utf8.encode name in
   match (name, t) with
   | "abort", ExternFuncType t ->
-      Host_funcs.register ~module_name ~func_name:"abort" abort ;
-      ExternFunc (Func.alloc_host ~module_name ~func_name:name t)
+      let global_name = "env_abort" in
+      Host_funcs.register ~global_name abort ;
+      ExternFunc (Func.alloc_host ~global_name t)
   | "exit", ExternFuncType t ->
-      Host_funcs.register ~module_name ~func_name:"exit" exit ;
-      ExternFunc (Func.alloc_host ~module_name ~func_name:name t)
+      let global_name = "env_exit" in
+      Host_funcs.register ~global_name exit ;
+      ExternFunc (Func.alloc_host ~global_name t)
   | _ -> raise Not_found

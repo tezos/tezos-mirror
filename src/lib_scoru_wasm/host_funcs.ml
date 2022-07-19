@@ -59,7 +59,7 @@ let aux_write_input_in_memory ~input_buffer ~module_inst ~rtype_offset
     in
     Lwt.return input_size
 
-let read_input_desc =
+let read_input_type =
   let input_types =
     Types.
       [
@@ -73,7 +73,11 @@ let read_input_desc =
   in
   let output_types = Types.[NumType I32Type] |> Vector.of_list in
   let fun_type = Types.FuncType (input_types, output_types) in
-  {Func.func_type = fun_type; module_name = "tezos"; func_name = "read_input"}
+  fun_type
+
+let read_input_name = "tezos_read_input"
+
+let read_input_desc = (read_input_type, read_input_name)
 
 let read_input input_buffer module_inst inputs =
   let open Lwt.Syntax in
@@ -102,11 +106,11 @@ let lookup _module_name name _t =
   let open Lwt.Syntax in
   let+ name = Utf8.encode name in
   match name with
-  | "read_input" -> ExternFunc (HostFunc read_input_desc)
+  | "read_input" -> ExternFunc (HostFunc (read_input_type, read_input_name))
   | _ -> raise Not_found
 
 let configure () =
-  Host_funcs.register ~module_name:"tezos" ~func_name:"read_input" read_input ;
+  Host_funcs.register ~global_name:read_input_name read_input ;
   Import.register (Utf8.decode "tezos") (fun name t -> lookup "tezos" name t)
 
 module Internal_for_tests = struct

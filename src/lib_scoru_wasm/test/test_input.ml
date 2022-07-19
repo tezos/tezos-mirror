@@ -155,10 +155,11 @@ let test_host_fun () =
   in
   let* () = Host_funcs.configure () in
   let* module_inst, result =
+    let read_input_type, read_input_name = Host_funcs.read_input_desc in
     Eval.invoke
       ~module_inst
       ~input
-      (Func.HostFunc Host_funcs.read_input_desc)
+      (Func.HostFunc (read_input_type, read_input_name))
       values
   in
   let* memory =

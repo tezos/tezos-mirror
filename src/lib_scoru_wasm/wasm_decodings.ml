@@ -427,10 +427,9 @@ module Make (T : Tree.S) = struct
         (Data_encoding.string_enum [("host", true); ("native", false)])
     in
     if is_host_func then
-      let* module_name = value ["module_name"] Data_encoding.string in
-      let* func_name = value ["func_name"] Data_encoding.string in
+      let* global_name = value ["global_name"] Data_encoding.string in
       let+ func_type = scope ["func_type"] (func_type_decoding ()) in
-      Func.HostFunc {module_name; func_name; func_type}
+      Func.HostFunc (func_type, global_name)
     else
       let* type_ = func_type_decoding () in
       let* ftype = value ["ftype"] Interpreter_encodings.Ast.var_encoding in

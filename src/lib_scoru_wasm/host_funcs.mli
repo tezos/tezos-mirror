@@ -48,8 +48,8 @@ exception Bad_input
     input_buffer payload. *)
 val read_input : Tezos_webassembly_interpreter.Host_funcs.host_func
 
-(** Host function descriptor for {!read_input} *)
-val read_input_desc : Tezos_webassembly_interpreter.Func.host_func_desc
+(** Host function type and global name for {!read_input} *)
+val read_input_desc : Tezos_webassembly_interpreter.Types.func_type * string
 
 module Internal_for_tests : sig
   (** [aux_write_memory ~input_buffer ~module_inst ~rtype_offset
