@@ -58,7 +58,9 @@ let rpc_context st =
   }
 
 let rpc_ctxt =
-  new Environment.proto_rpc_context_of_directory rpc_context rpc_services
+  new Environment.proto_rpc_context_of_directory
+    rpc_context
+    Plugin.RPC.rpc_services
 
 let alpha_ctxt st = st.state.ctxt
 
