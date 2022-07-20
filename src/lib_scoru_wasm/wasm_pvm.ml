@@ -44,7 +44,7 @@ module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
           (* register the PVM host funcs wrappers in a module ["tezos"] into the WASM linker *)
           let* () =
             Tezos_webassembly_interpreter.(
-              Import.register (Utf8.decode "tezos"))
+              Import.register ~module_name:(Utf8.decode "tezos"))
               Host_funcs.lookup
           in
           (* build the registry of host functions (to be passed to the interpreter via its config *)

@@ -4,8 +4,10 @@ let version = "2.0"
 
 let configure () =
   let open Lwt.Syntax in
-  let* () = Import.register (Utf8.decode "spectest") Spectest.lookup in
-  let+ () = Import.register (Utf8.decode "env") Env.lookup in
+  let* () =
+    Import.register ~module_name:(Utf8.decode "spectest") Spectest.lookup
+  in
+  let+ () = Import.register ~module_name:(Utf8.decode "env") Env.lookup in
   Spectest.register_host_funcs Run.host_funcs_registry ;
   Env.register_host_funcs Run.host_funcs_registry
 

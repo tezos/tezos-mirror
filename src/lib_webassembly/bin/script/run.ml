@@ -586,7 +586,7 @@ let rec run_command cmd : unit Lwt.t =
         let inst = lookup_instance x_opt cmd.at in
         let* utf8_name = Utf8.encode name in
         registry := Map.add utf8_name inst !registry ;
-        Import.register name (lookup_registry utf8_name))
+        Import.register ~module_name:name (lookup_registry utf8_name))
       else Lwt.return_unit
   | Action act ->
       quote := cmd :: !quote ;
