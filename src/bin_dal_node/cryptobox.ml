@@ -38,6 +38,12 @@ end
 
 include Dal_cryptobox
 
+type slot = bytes
+
+type slot_header = commitment
+
+let slot_header_encoding = commitment_encoding
+
 let init () =
   let open Constants in
   make ~redundancy_factor ~segment_size ~slot_size ~shards_amount

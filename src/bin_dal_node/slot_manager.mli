@@ -37,21 +37,21 @@ val split_and_store :
   Cryptobox.t ->
   Cryptobox.srs ->
   Store.t ->
-  Dal_types.slot ->
-  Dal_types.slot_header tzresult Lwt.t
+  Cryptobox.slot ->
+  Cryptobox.slot_header tzresult Lwt.t
 
 (** [get_shard store slot_header shard_id] gets the shard associated to
     [slot_header] at the range [shard_id] *)
 val get_shard :
-  Store.t -> Dal_types.slot_header -> int -> Cryptobox.shard tzresult Lwt.t
+  Store.t -> Cryptobox.slot_header -> int -> Cryptobox.shard tzresult Lwt.t
 
 (** [get_slot cb_constants store slot_header] fetches from disk the shards associated to
     [slot_header], gathers them, rebuilds and returns the [slot]. *)
 val get_slot :
   Cryptobox.t ->
   Store.t ->
-  Dal_types.slot_header ->
-  Dal_types.slot tzresult Lwt.t
+  Cryptobox.slot_header ->
+  Cryptobox.slot tzresult Lwt.t
 
 module Slot_header : sig
   type t = Cryptobox.commitment

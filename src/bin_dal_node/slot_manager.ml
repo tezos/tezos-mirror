@@ -176,7 +176,7 @@ let split_and_store cb_constants srs store slot =
 
 let get_shard store slot_header shard_id =
   let open Lwt_result_syntax in
-  let*? slot_header = encode Dal_types.slot_header_encoding slot_header in
+  let*? slot_header = encode Cryptobox.slot_header_encoding slot_header in
   let* share =
     Lwt.catch
       (fun () ->
