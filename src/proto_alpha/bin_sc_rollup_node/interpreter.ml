@@ -196,40 +196,42 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         in
         return (state, num_messages, inbox_level, fuel)
 
-  let genesis_state head_block node_ctxt store =
+  let genesis_state block_hash node_ctxt store =
     let open Node_context in
     let open Lwt_result_syntax in
     let* boot_sector =
       Plugin.RPC.Sc_rollup.boot_sector
         node_ctxt.cctxt
-        (node_ctxt.cctxt#chain, head_block)
+        (node_ctxt.cctxt#chain, `Hash (block_hash, 0))
         node_ctxt.rollup_address
     in
     let*! initial_state = PVM.initial_state store in
     let*! genesis_state = PVM.install_boot_sector initial_state boot_sector in
     return genesis_state
 
-  let state_of_hash node_ctxt store hash =
+  let state_of_hash node_ctxt store hash level =
     let open Lwt_result_syntax in
-    let head_block = `Hash (hash, 0) in
-    let*! state = Store.PVMState.find store hash in
-    match state with
-    | None -> genesis_state head_block node_ctxt store
-    | Some state -> return state
+    if Raw_level.(level = node_ctxt.Node_context.genesis_info.level) then
+      genesis_state hash node_ctxt store
+    else
+      let*! state = Store.PVMState.find store hash in
+      match state with
+      | None -> tzfail (Sc_rollup_node_errors.Missing_PVM_state (hash, level))
+      | Some state -> return state
 
-  (** [transition_pvm node_ctxt store predecessor_hash hash] runs a PVM at the previous state from block
-      [predecessor_hash] by consuming as many messages as possible from block [hash]. *)
-  let transition_pvm node_ctxt store predecessor_hash hash =
+  (** [transition_pvm node_ctxt store predecessor_hash head] runs a PVM at the
+      previous state from block [predecessor_hash] by consuming as many messages
+      as possible from block [head]. *)
+  let transition_pvm node_ctxt store predecessor_hash
+      (Layer1.Head {hash; level}) =
     let open Lwt_result_syntax in
-    let head_block = `Hash (hash, 0) in
     (* Retrieve the previous PVM state from store. *)
-    let*! predecessor_state = Store.PVMState.find store predecessor_hash in
+    let pred_level = Int32.pred level |> Raw_level.of_int32_exn in
     let* predecessor_state =
-      match predecessor_state with
-      | None -> genesis_state head_block node_ctxt store
-      | Some predecessor_state -> return predecessor_state
+      if Raw_level.(pred_level <= node_ctxt.Node_context.genesis_info.level)
+      then genesis_state hash node_ctxt store
+      else state_of_hash node_ctxt store predecessor_hash pred_level
     in
-
     let* state, num_messages, inbox_level, _fuel =
       eval_block_inbox node_ctxt.loser_mode store hash predecessor_state
     in
@@ -271,17 +273,20 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     return_unit
 
   (** [process_head node_ctxt store head] runs the PVM for the given head. *)
-  let process_head node_ctxt store (Layer1.Head {hash; _} as head) =
+  let process_head node_ctxt store head =
     let open Lwt_result_syntax in
     let*! predecessor_hash = Layer1.predecessor store head in
-    transition_pvm node_ctxt store predecessor_hash hash
+    transition_pvm node_ctxt store predecessor_hash head
 
   (** [run_for_ticks node_ctxt store predecessor_hash hash
       tick_distance] starts the evaluation of the inbox at block [hash]
       for at most [tick_distance]. *)
-  let run_for_ticks node_ctxt store predecessor_hash hash tick_distance =
+  let run_for_ticks node_ctxt store predecessor_hash hash level tick_distance =
     let open Lwt_result_syntax in
-    let* state = state_of_hash node_ctxt store predecessor_hash in
+    let pred_level =
+      WithExceptions.Option.get ~loc:__LOC__ (Raw_level.pred level)
+    in
+    let* state = state_of_hash node_ctxt store predecessor_hash pred_level in
     let* state, _counter, _level, _fuel =
       eval_block_inbox node_ctxt.loser_mode ~fuel:tick_distance store hash state
     in
@@ -316,6 +321,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
               store
               event.predecessor_hash
               event.block_hash
+              event.level
               tick_distance
           in
           let*! hash = PVM.state_hash state in
