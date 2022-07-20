@@ -26,6 +26,8 @@
 module String_map = Map.Make (String)
 module String_set = Set.Make (String)
 
+let list_iter l f = List.iter f l
+
 let ( // ) = Filename.concat
 
 let has_error = ref false
@@ -988,6 +990,7 @@ module Target = struct
     preprocess : preprocessor list;
     preprocessor_deps : preprocessor_dep list;
     private_modules : string list;
+    profile : string option;
     opam_only_deps : t list;
     release : bool;
     static : bool;
@@ -1147,6 +1150,7 @@ module Target = struct
     ?preprocess:preprocessor list ->
     ?preprocessor_deps:preprocessor_dep list ->
     ?private_modules:string list ->
+    ?profile:string ->
     ?opam_only_deps:t option list ->
     ?release:bool ->
     ?static:bool ->
@@ -1218,8 +1222,8 @@ module Target = struct
       ?modules ?(modules_without_implementation = []) ?(npm_deps = []) ?ocaml
       ?opam ?opam_bug_reports ?opam_doc ?opam_homepage
       ?(opam_with_test = Always) ?(optional = false) ?(preprocess = [])
-      ?(preprocessor_deps = []) ?(private_modules = []) ?(opam_only_deps = [])
-      ?(release = false) ?static ?synopsis ?description
+      ?(preprocessor_deps = []) ?(private_modules = []) ?profile
+      ?(opam_only_deps = []) ?(release = false) ?static ?synopsis ?description
       ?(time_measurement_ppx = false) ?(virtual_modules = [])
       ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
       ~path names =
@@ -1519,6 +1523,7 @@ module Target = struct
         preprocess;
         preprocessor_deps;
         private_modules;
+        profile;
         opam_only_deps;
         release;
         static;
@@ -2730,7 +2735,6 @@ let check_js_of_ocaml () =
    [B0 .. Bn] do not belong to Package A. If such paths exist, we
    report one path with the minimum length. *)
 let check_circular_opam_deps () =
-  let list_iter l f = List.iter f l in
   let name i = Target.name_for_errors (Internal i) in
   let deps_of (t : Target.internal) =
     List.filter_map Target.get_internal (Target.all_internal_deps t)
@@ -3030,7 +3034,106 @@ let generate_opam_ci () =
            delayed_by
            package_name)
 
-let generate ~make_tezt_exe =
+let generate_profiles ~default_profile =
+  let deps : Version.constraints String_map.t String_map.t ref =
+    (* [!deps |> String_map.find profile |> String_map.find pkg]
+       are the version constraints for package [pkg] in profile [profile]. *)
+    ref String_map.empty
+  in
+  let conflicts : Version.constraints String_map.t String_map.t ref =
+    ref String_map.empty
+  in
+  let rec add_target_to deps profile = function
+    | Target.Internal _ ->
+        (* No need to recurse on dependencies because we'll iterate on all internal
+           dependencies anyway. *)
+        ()
+    | Vendored _ ->
+        (* It is the developer's duty to integrate the dependencies of
+           vendored libraries, manually, into the generated .opam / lock file. *)
+        ()
+    | External {opam = Some name; version; _} | Opam_only {name; version; _} ->
+        let profile_deps =
+          String_map.find_opt profile !deps
+          |> Option.value ~default:String_map.empty
+        in
+        let version =
+          match String_map.find_opt name profile_deps with
+          | None -> version
+          | Some old_version ->
+              if old_version <> version then Version.(version && old_version)
+              else version
+        in
+        let profile_deps = String_map.add name version profile_deps in
+        deps := String_map.add profile profile_deps !deps
+    | External {opam = None; _} ->
+        (* This corresponds to libs from the stdlib, like dynlink, compiler-libs etc.
+           There is no opam package to add to the lock file. *)
+        ()
+    | Optional target | Select {package = target; _} | Open (target, _) ->
+        add_target_to deps profile target
+  in
+  ( Target.iter_internal_by_path @@ fun _ internals ->
+    list_iter internals @@ fun internal ->
+    let profile = internal.profile |> Option.value ~default:default_profile in
+    list_iter (Target.all_internal_deps internal) (add_target_to deps profile) ;
+    list_iter internal.conflicts (add_target_to conflicts profile) ) ;
+  let generate_profile profile (profile_deps, profile_conflicts) =
+    let depends =
+      String_map.bindings profile_deps
+      |> List.map @@ fun (package, version) ->
+         {Opam.package; version; with_test = Never; optional = false}
+    in
+    let conflicts =
+      String_map.bindings profile_conflicts
+      |> List.map @@ fun (package, version) ->
+         {Opam.package; version; with_test = Never; optional = false}
+    in
+    let opam : Opam.t =
+      {
+        maintainer = "contact@tezos.com";
+        authors = ["Tezos devteam"];
+        homepage = "https://www.tezos.com/";
+        doc = "";
+        bug_reports = "https://gitlab.com/tezos/tezos/issues";
+        dev_repo = "git+https://gitlab.com/tezos/tezos.git";
+        licenses = ["MIT"];
+        depends;
+        conflicts;
+        build = [];
+        synopsis =
+          Printf.sprintf
+            "Virtual package depending on Octez dependencies (profile: %s)"
+            profile;
+        url = None;
+        description =
+          Some
+            "Install this package to install all dependencies needed to build \
+             Octez.";
+        x_opam_monorepo_opam_provided = [];
+      }
+    in
+    write ("opam/" ^ profile ^ ".opam") @@ fun fmt ->
+    Format.fprintf
+      fmt
+      "# This file was automatically generated, do not edit.@.# Edit file \
+       manifest/main.ml instead.@.%a"
+      Opam.pp
+      opam
+  in
+  let merged =
+    let merge _profile m1 m2 =
+      match (m1, m2) with
+      | None, None -> None
+      | None, Some m -> Some (String_map.empty, m)
+      | Some m, None -> Some (m, String_map.empty)
+      | Some m1, Some m2 -> Some (m1, m2)
+    in
+    String_map.merge merge !deps !conflicts
+  in
+  String_map.iter generate_profile merged
+
+let generate ~make_tezt_exe ~default_profile =
   Printexc.record_backtrace true ;
   try
     register_tezt_targets ~make_tezt_exe ;
@@ -3041,6 +3144,7 @@ let generate ~make_tezt_exe =
     generate_static_packages () ;
     generate_opam_ci () ;
     generate_binaries_for_release () ;
+    generate_profiles ~default_profile ;
     Option.iter (generate_opam_files_for_release packages_dir) release
   with exn ->
     Printexc.print_backtrace stderr ;

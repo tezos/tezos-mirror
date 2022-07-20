@@ -5926,7 +5926,7 @@ let () =
     in
     test "main" ~alias:"" ~path:"tezt/tests" ~opam:"" ~deps:(deps @ test_libs)
   in
-  generate ~make_tezt_exe
+  generate ~make_tezt_exe ~default_profile:"octez-deps"
 
 (* Generate a dunw-workspace file at the root of the repo *)
 let () =
