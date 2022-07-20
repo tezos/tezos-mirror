@@ -371,7 +371,7 @@ module type MerkelizedOperations = sig
 
   val pp_history : Format.formatter -> history -> unit
 
-  val history_at_genesis : bound:int64 -> history
+  val history_at_genesis : capacity:int64 -> history
 
   val add_messages :
     inbox_context ->
@@ -537,9 +537,18 @@ struct
 
   type history = {
     events : history_proof Hash.Map.t;
+        (** The of history proofs stored in the history structure, indexed by
+            inboxes hashes. *)
     sequence : Hash.t Int64_map.t;
-    bound : int64;
-    counter : int64;
+        (** An additional map from int64 indexes to inboxes hashes, to be able
+            to remove old entries when the structure is full.  *)
+    capacity : int64;
+        (** The max number of the entries in the structure. Once the maximum size
+            is reached, older entries are deleted to free space for  new ones. *)
+    (* TODO: The current implementation likely needs a fix.
+       See: https://gitlab.com/tezos/tezos/-/issues/2981*)
+    next_index : int64;
+        (** The index to use for the next entry to add in the structure *)
   }
 
   let history_encoding : history Data_encoding.t =
@@ -552,15 +561,15 @@ struct
         (list (tup2 int64 Hash.encoding))
     in
     conv
-      (fun {events; sequence; bound; counter} ->
-        (events, sequence, bound, counter))
-      (fun (events, sequence, bound, counter) ->
-        {events; sequence; bound; counter})
+      (fun {events; sequence; capacity; next_index} ->
+        (events, sequence, capacity, next_index))
+      (fun (events, sequence, capacity, next_index) ->
+        {events; sequence; capacity; next_index})
       (obj4
          (req "events" events_encoding)
          (req "sequence" sequence_encoding)
-         (req "bound" int64)
-         (req "counter" int64))
+         (req "capacity" int64)
+         (req "next_index" int64))
 
   let pp_history fmt history =
     Hash.Map.bindings history.events |> fun bindings ->
@@ -580,45 +589,51 @@ struct
     Format.fprintf
       fmt
       "@[<hov 2>History:@;\
-      \ { bound: %Ld;@;\
-      \ counter : %Ld;@;\
+      \ { capacity: %Ld;@;\
+      \ next_index : %Ld;@;\
       \ bindings: %a;@;\
       \ sequence: %a; }@]"
-      history.bound
-      history.counter
+      history.capacity
+      history.next_index
       (Format.pp_print_list pp_binding)
       bindings
       (Format.pp_print_list pp_sequence_binding)
       sequence_bindings
 
-  let history_at_genesis ~bound =
-    {events = Hash.Map.empty; sequence = Int64_map.empty; bound; counter = 0L}
+  let history_at_genesis ~capacity =
+    {
+      events = Hash.Map.empty;
+      sequence = Int64_map.empty;
+      capacity;
+      next_index = 0L;
+    }
 
-  (** [no_history] creates an empty history with [bound] set to
+  (** [no_history] creates an empty history with [capacity] set to
       zero---this makes the [remember] function a no-op. We want this
       behaviour in the protocol because we don't want to store
       previous levels of the inbox. *)
-  let no_history = history_at_genesis ~bound:0L
+  let no_history = history_at_genesis ~capacity:0L
 
   (** [remember ptr cell history] extends [history] with a new
       mapping from [ptr] to [cell]. If [history] is full, the
-      oldest mapping is removed. If the history bound is less
+      oldest mapping is removed. If the history capacity is less
       or equal to zero, then this function returns [history]
       untouched. *)
   let remember ptr cell history =
-    if Compare.Int64.(history.bound <= 0L) then history
+    if Compare.Int64.(history.capacity <= 0L) then history
     else
       let events = Hash.Map.add ptr cell history.events in
-      let counter = Int64.succ history.counter in
+      let current_index = history.next_index in
+      let next_index = Int64.succ current_index in
       let history =
         {
           events;
-          sequence = Int64_map.add history.counter ptr history.sequence;
-          bound = history.bound;
-          counter;
+          sequence = Int64_map.add current_index ptr history.sequence;
+          capacity = history.capacity;
+          next_index;
         }
       in
-      if Int64.(equal history.counter history.bound) then
+      if Int64.(equal history.next_index history.capacity) then
         match Int64_map.min_binding history.sequence with
         | None ->
             (* This case is impossible as the map [history.sequence] was
@@ -628,8 +643,8 @@ struct
             let sequence = Int64_map.remove l history.sequence in
             let events = Hash.Map.remove h events in
             {
-              counter = Int64.pred history.counter;
-              bound = history.bound;
+              next_index = Int64.pred history.next_index;
+              capacity = history.capacity;
               sequence;
               events;
             }
@@ -670,7 +685,7 @@ struct
       messages. If [new_level] is a higher level than the current inbox,
       we create a new inbox level tree at that level in which to start
       adding messages, and archive the earlier levels depending on the
-      [history] parameter's [bound]. If [level_tree] is [None] (this
+      [history] parameter's [capacity]. If [level_tree] is [None] (this
       happens when the inbox is first created) we similarly create a new
       empty level tree with the right [level] key.
 

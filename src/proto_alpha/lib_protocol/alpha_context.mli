@@ -2833,7 +2833,7 @@ module Sc_rollup : sig
 
       val pp_history : Format.formatter -> history -> unit
 
-      val history_at_genesis : bound:int64 -> history
+      val history_at_genesis : capacity:int64 -> history
 
       val add_messages :
         inbox_context ->
