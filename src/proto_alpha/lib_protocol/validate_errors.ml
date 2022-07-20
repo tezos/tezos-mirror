@@ -47,17 +47,23 @@ module Consensus = struct
 
   (** This type is only used in consensus operation errors to make
       them more informative. *)
-  type consensus_operation_kind = Preendorsement
+  type consensus_operation_kind =
+    | Preendorsement
+    | Endorsement
+    | Grandparent_endorsement
 
   let consensus_operation_kind_encoding =
-    Data_encoding.(
-      conv
-        (fun Preendorsement -> ())
-        (fun () -> Preendorsement)
-        (constant "Preendorsement"))
+    Data_encoding.string_enum
+      [
+        ("Preendorsement", Preendorsement);
+        ("Endorsement", Endorsement);
+        ("Grandparent_endorsement", Grandparent_endorsement);
+      ]
 
   let consensus_operation_kind_pp fmt = function
     | Preendorsement -> Format.fprintf fmt "Preendorsement"
+    | Endorsement -> Format.fprintf fmt "Endorsement"
+    | Grandparent_endorsement -> Format.fprintf fmt "Grandparent endorsement"
 
   (** Errors for preendorsements and endorsements. *)
   type error +=
@@ -92,6 +98,7 @@ module Consensus = struct
         provided : Block_payload_hash.t;
       }
     | Unexpected_preendorsement_in_block
+    | Unexpected_endorsement_in_block
     | Preendorsement_round_too_high of {
         block_round : Round.t;
         provided : Round.t;
@@ -276,6 +283,15 @@ module Consensus = struct
       Data_encoding.empty
       (function Unexpected_preendorsement_in_block -> Some () | _ -> None)
       (fun () -> Unexpected_preendorsement_in_block) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.unexpected_endorsement_in_block"
+      ~title:"Unexpected endorsement in block"
+      ~description:"Unexpected endorsement in block."
+      ~pp:(fun ppf () -> Format.fprintf ppf "Unexpected endorsement in block.")
+      Data_encoding.empty
+      (function Unexpected_endorsement_in_block -> Some () | _ -> None)
+      (fun () -> Unexpected_endorsement_in_block) ;
     register_error_kind
       `Permanent
       ~id:"validate.preendorsement_round_too_high"

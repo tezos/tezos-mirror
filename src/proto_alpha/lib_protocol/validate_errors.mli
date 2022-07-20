@@ -25,7 +25,10 @@
 
 (** Errors that may arise while validating a consensus operation. *)
 module Consensus : sig
-  type consensus_operation_kind = Preendorsement
+  type consensus_operation_kind =
+    | Preendorsement
+    | Endorsement
+    | Grandparent_endorsement
 
   (** Errors for preendorsements and endorsements. *)
   type error +=
@@ -62,6 +65,7 @@ module Consensus : sig
         provided : Block_payload_hash.t;
       }
     | Unexpected_preendorsement_in_block
+    | Unexpected_endorsement_in_block
     | Preendorsement_round_too_high of {
         block_round : Alpha_context.Round.t;
         provided : Alpha_context.Round.t;

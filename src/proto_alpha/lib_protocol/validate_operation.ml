@@ -542,9 +542,143 @@ module Consensus = struct
          consensus_content.round
          voting_power)
 
-  let validate_endorsement _vi vs ~should_check_signature:_
-      (_operation : Kind.endorsement operation) =
-    return vs
+  let ensure_conflict_free_grandparent_endorsement vs delegate =
+    error_unless
+      (not
+         (Signature.Public_key_hash.Set.mem
+            delegate
+            vs.consensus_state.grandparent_endorsements_seen))
+      (Conflicting_consensus_operation {kind = Grandparent_endorsement})
+
+  let update_validity_state_grandparent_endorsement vs delegate =
+    {
+      vs with
+      consensus_state =
+        {
+          vs.consensus_state with
+          grandparent_endorsements_seen =
+            Signature.Public_key_hash.Set.add
+              delegate
+              vs.consensus_state.grandparent_endorsements_seen;
+        };
+    }
+
+  (** Validate an endorsement pointing to the grandparent block. This
+      function will only be called in [Mempool] mode. *)
+  let validate_grandparent_endorsement vi vs ~should_check_signature expected
+      (consensus_content : consensus_content) (operation : 'kind operation) =
+    let open Lwt_result_syntax in
+    let kind = Grandparent_endorsement in
+    let level = Level.from_raw vi.ctxt consensus_content.level in
+    let* _ctxt, (delegate_pk, delegate_pkh) =
+      Stake_distribution.slot_owner vi.ctxt level consensus_content.slot
+    in
+    let*? () = ensure_conflict_free_grandparent_endorsement vs delegate_pkh in
+    let*? () =
+      check_consensus_features vs kind expected consensus_content operation
+    in
+    let*? () =
+      if should_check_signature then
+        Operation.check_signature delegate_pk vi.chain_id operation
+      else ok ()
+    in
+    return (update_validity_state_grandparent_endorsement vs delegate_pkh)
+
+  let ensure_conflict_free_endorsement vs slot =
+    error_unless
+      (not (Slot.Set.mem slot vs.consensus_state.endorsements_seen))
+      (Conflicting_consensus_operation {kind = Endorsement})
+
+  let update_validity_state_endorsement vs slot voting_power =
+    {
+      vs with
+      consensus_state =
+        {
+          vs.consensus_state with
+          endorsements_seen =
+            Slot.Set.add slot vs.consensus_state.endorsements_seen;
+          endorsement_power =
+            vs.consensus_state.endorsement_power + voting_power;
+        };
+    }
+
+  let get_expected_endorsements_features consensus_info consensus_content =
+    match consensus_info.all_expected_features.expected_endorsement with
+    | Expected_endorsement {expected_features} -> ok expected_features
+    | No_expected_branch_for_block_endorsement ->
+        error Unexpected_endorsement_in_block
+    | No_expected_branch_for_mempool_endorsement {expected_level} ->
+        error
+          (Consensus_operation_for_future_level
+             {
+               kind = Endorsement;
+               expected = expected_level;
+               provided = consensus_content.Alpha_context.level;
+             })
+    | No_predecessor_info_cannot_validate_endorsement ->
+        error Consensus_operation_not_allowed
+
+  (** Validate an endorsement pointing to the predecessor, aka a
+      "normal" endorsement. Only this kind of endorsement may be found
+      during block validation or construction. *)
+  let validate_normal_endorsement vi vs ~should_check_signature
+      (consensus_content : consensus_content) (operation : 'kind operation) =
+    let open Lwt_result_syntax in
+    let kind = Endorsement in
+    let*? () = ensure_conflict_free_endorsement vs consensus_content.slot in
+    let*? expected_features =
+      get_expected_endorsements_features vi.consensus_info consensus_content
+    in
+    let*? () =
+      check_consensus_features
+        vs
+        kind
+        expected_features
+        consensus_content
+        operation
+    in
+    let*? delegate_pk, delegate_pkh, voting_power =
+      get_delegate_details
+        vi.consensus_info.endorsement_slot_map
+        kind
+        consensus_content
+    in
+    let* () = check_frozen_deposits_are_positive vi.ctxt delegate_pkh in
+    let*? () =
+      if should_check_signature then
+        Operation.check_signature delegate_pk vi.chain_id operation
+      else ok ()
+    in
+    return
+      (update_validity_state_endorsement vs consensus_content.slot voting_power)
+
+  let validate_endorsement vi vs ~should_check_signature
+      (operation : Kind.endorsement operation) =
+    let (Single (Endorsement consensus_content)) =
+      operation.protocol_data.contents
+    in
+    match
+      vi.consensus_info.all_expected_features
+        .expected_grandparent_endorsement_for_mempool
+    with
+    | Some expected_grandparent_endorsement
+      when Raw_level.(
+             consensus_content.level = expected_grandparent_endorsement.level)
+      ->
+        validate_grandparent_endorsement
+          vi
+          vs
+          ~should_check_signature
+          expected_grandparent_endorsement
+          consensus_content
+          operation
+    | _ ->
+        validate_normal_endorsement
+          vi
+          vs
+          ~should_check_signature
+          consensus_content
+          operation
 
   let validate_dal_slot_availability _vi vs ~should_check_signature:_
       (_operation : Kind.dal_slot_availability operation) =

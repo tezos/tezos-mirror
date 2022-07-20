@@ -27,8 +27,7 @@ open Protocol
 open Alpha_context
 
 let test_consensus_operation ?construction_mode ?level ?block_payload_hash ?slot
-    ?round ~endorsed_block ?error ?error_title ~is_preendorsement ~context ~loc
-    () =
+    ?round ~endorsed_block ~error ~is_preendorsement ~context ~loc () =
   (if is_preendorsement then
    Op.preendorsement
      ~endorsed_block
@@ -50,18 +49,7 @@ let test_consensus_operation ?construction_mode ?level ?block_payload_hash ?slot
       ()
     >|=? fun op -> Operation.pack op)
   >>=? fun op ->
-  let assert_error res =
-    (* In the next commit, argument [error_title] will be removed and
-       [error] will become mandatory. This is a temporary workaround
-       so that we do not need to update test_endorsement.ml yet. *)
-    (match error with
-    | Some error -> Assert.proto_error ~loc res error
-    | None -> return_unit)
-    >>=? fun () ->
-    match error_title with
-    | Some error_title -> Assert.proto_error_with_info ~loc res error_title
-    | None -> return_unit
-  in
+  let assert_error res = Assert.proto_error ~loc res error in
   match construction_mode with
   | None ->
       (* meaning Application mode *)
