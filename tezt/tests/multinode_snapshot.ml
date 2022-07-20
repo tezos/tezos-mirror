@@ -291,8 +291,7 @@ let test_storage_snapshot =
   in
 
   (* Bake a few blocks *)
-  let* head_level = bake_batch 1 node_archive client nodes_group1 batch_1 in
-  let snapshot_level = head_level in
+  let* snapshot_level = bake_batch 1 node_archive client nodes_group1 batch_1 in
 
   (* ########################################################################### *)
   Log.info "Export all kinds of snapshots" ;
