@@ -117,6 +117,7 @@ type consensus_state = {
   endorsement_power : int;
   grandparent_endorsements_seen : Signature.Public_key_hash.Set.t;
   locked_round_evidence : (Round.t * int) option;
+  dal_slot_availability_seen : Signature.Public_key_hash.Set.t;
 }
 
 let empty_consensus_state =
@@ -126,6 +127,7 @@ let empty_consensus_state =
     endorsement_power = 0;
     grandparent_endorsements_seen = Signature.Public_key_hash.Set.empty;
     locked_round_evidence = None;
+    dal_slot_availability_seen = Signature.Public_key_hash.Set.empty;
   }
 
 module Double_evidence = Map.Make (struct
@@ -680,9 +682,49 @@ module Consensus = struct
           consensus_content
           operation
 
-  let validate_dal_slot_availability _vi vs ~should_check_signature:_
-      (_operation : Kind.dal_slot_availability operation) =
-    return vs
+  let ensure_conflict_free_dal_slot_availability vs endorser =
+    error_unless
+      (not
+         (Signature.Public_key_hash.Set.mem
+            endorser
+            vs.consensus_state.dal_slot_availability_seen))
+      (Conflicting_dal_slot_availability {endorser})
+
+  let update_validity_state_dal_slot_availabitiy vs endorser =
+    {
+      vs with
+      consensus_state =
+        {
+          vs.consensus_state with
+          dal_slot_availability_seen =
+            Signature.Public_key_hash.Set.add
+              endorser
+              vs.consensus_state.dal_slot_availability_seen;
+        };
+    }
+
+  let validate_dal_slot_availability vi vs ~should_check_signature:_
+      (operation : Kind.dal_slot_availability operation) =
+    (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
+
+       This is a temporary operation. Some checks are missing for the
+       moment. In particular, the signature is not
+       checked. Consequently, it is really important to ensure this
+       operation cannot be included into a block when the feature flag
+       is not set. This is done in order to avoid modifying the
+       endorsement encoding. However, once the DAL is ready, this
+       operation should be merged with an endorsement or at least
+       refined. *)
+    let open Lwt_result_syntax in
+    let (Single (Dal_slot_availability (endorser, slot_availability))) =
+      operation.protocol_data.contents
+    in
+    let*? () = ensure_conflict_free_dal_slot_availability vs endorser in
+    let*? () =
+      (* Note that this function checks the dal feature flag. *)
+      Dal_apply.validate_data_availability vi.ctxt slot_availability
+    in
+    return (update_validity_state_dal_slot_availabitiy vs endorser)
 end
 
 module Anonymous = struct

@@ -354,6 +354,30 @@ module Consensus = struct
       Data_encoding.empty
       (function Consensus_operation_not_allowed -> Some () | _ -> None)
       (fun () -> Consensus_operation_not_allowed)
+
+  type error +=
+    | Conflicting_dal_slot_availability of {
+        endorser : Signature.Public_key_hash.t;
+      }
+
+  let () =
+    register_error_kind
+      `Temporary
+      ~id:"validate.conflicting_dal_slot_availability"
+      ~title:"Conflicting Dal slot availability"
+      ~description:"Conflicting Dal slot availability."
+      ~pp:(fun ppf endorser ->
+        Format.fprintf
+          ppf
+          "Dal slot availability for %a has already been validated for the \
+           current validation state."
+          Signature.Public_key_hash.pp
+          endorser)
+      Data_encoding.(obj1 (req "endorser" Signature.Public_key_hash.encoding))
+      (function
+        | Conflicting_dal_slot_availability {endorser} -> Some endorser
+        | _ -> None)
+      (fun endorser -> Conflicting_dal_slot_availability {endorser})
 end
 
 module Anonymous = struct

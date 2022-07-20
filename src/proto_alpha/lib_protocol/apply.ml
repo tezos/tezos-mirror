@@ -2102,7 +2102,6 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
          endorsement encoding. However, once the DAL will be ready, this
          operation should be merged with an endorsement or at least
          refined. *)
-      Dal_apply.validate_data_availability ctxt slot_availability >>?= fun () ->
       Dal_apply.apply_data_availability ctxt slot_availability ~endorser
       >>=? fun ctxt ->
       return

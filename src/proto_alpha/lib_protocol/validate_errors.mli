@@ -74,6 +74,9 @@ module Consensus : sig
         kind : consensus_operation_kind;
       }
     | Conflicting_consensus_operation of {kind : consensus_operation_kind}
+    | Conflicting_dal_slot_availability of {
+        endorser : Signature.Public_key_hash.t;
+      }
 end
 
 (** Errors that may arise while validating an anonymous operation. *)
