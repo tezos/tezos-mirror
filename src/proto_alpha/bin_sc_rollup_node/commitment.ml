@@ -98,13 +98,6 @@ let last_commitment_with_hash
   in
   return commitment_with_hash
 
-let last_commitment (module Last_commitment_level : Mutable_level_store) store =
-  let open Lwt_option_syntax in
-  let+ commitment, _hash =
-    last_commitment_with_hash (module Last_commitment_level) store
-  in
-  commitment
-
 let next_commitment_level node_ctxt
     (module Last_commitment_level : Mutable_level_store) store =
   let open Lwt_syntax in
@@ -124,9 +117,11 @@ let next_commitment_level node_ctxt
 let last_commitment_hash node_ctxt
     (module Last_commitment_level : Mutable_level_store) store =
   let open Lwt_syntax in
-  let+ last_commitment = last_commitment (module Last_commitment_level) store in
+  let+ last_commitment =
+    last_commitment_with_hash (module Last_commitment_level) store
+  in
   match last_commitment with
-  | Some commitment -> Sc_rollup.Commitment.hash_uncarbonated commitment
+  | Some (_commitment, hash) -> hash
   | None ->
       node_ctxt.Node_context.genesis_info.Sc_rollup.Commitment.commitment_hash
 
