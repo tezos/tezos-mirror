@@ -32,10 +32,12 @@ let print_value v =
     (Values.string_of_value v)
     (Types.string_of_value_type (Values.type_of_value v))
 
-let print _i _m vs =
-  List.iter print_value vs ;
-  flush_all () ;
-  Lwt.return_nil
+let print =
+  Host_funcs.Host_func
+    (fun _i _m vs ->
+      List.iter print_value vs ;
+      flush_all () ;
+      Lwt.return_nil)
 
 let register_host_funcs registry =
   Host_funcs.register ~global_name:"spectest_print" print registry ;

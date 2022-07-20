@@ -1,8 +1,10 @@
 type host_func =
-  Input_buffer.t ->
-  Instance.module_inst ref ->
-  Values.value list ->
-  Values.value list Lwt.t
+  | Host_func of
+      (Input_buffer.t ->
+      Instance.module_inst ref ->
+      Values.value list ->
+      Values.value list Lwt.t)
+[@@ocaml.unboxed]
 
 module Registry = Map.Make (String)
 

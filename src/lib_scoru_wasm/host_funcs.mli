@@ -32,25 +32,23 @@ val lookup :
   Tezos_webassembly_interpreter.Instance.extern Lwt.t
 
 (** [register_host_funcs] registers all the PVMs host functions into a WASM
-    interpreter's registry, using the names expected by {!lookup}. *)
+    interpreter's registry, using the names expected by {!lookup}.
+
+    Currently, the registered functions are:
+    - [read_input]:
+      It has to be invoked with a list
+      of 5 values representing rtype_offset, level_offset, id_offset,
+      dst and max_bytes, otherwise it raises the [Bad_input] exception.
+
+      When invoked, it write the content of an input message into the
+      memory of a [module_inst]. It also checks that the input payload
+      is no larger than the input is not too large. Finally, it returns
+      returns a singleton value list containing the size of the
+      input_buffer payload. *)
 val register_host_funcs :
   Tezos_webassembly_interpreter.Host_funcs.registry -> unit
 
 exception Bad_input
-
-(** [read_input] is a host function. It has to be invoked with a list
-    of 5 values representing rtype_offset, level_offset, id_offset,
-    dst and max_bytes, otherwise it raises the [Bad_input] exception.
-
-    When invoked, it write the content of an input message into the
-    memory of a [module_inst]. It also checks that the input payload
-    is no larger than the input is not too large. Finally, it returns
-    returns a singleton value list containing the size of the
-    input_buffer payload. *)
-val read_input : Tezos_webassembly_interpreter.Host_funcs.host_func
-
-(** Host function type and global name for {!read_input} *)
-val read_input_desc : Tezos_webassembly_interpreter.Types.func_type * string
 
 module Internal_for_tests : sig
   (** [aux_write_memory ~input_buffer ~module_inst ~rtype_offset
@@ -69,4 +67,6 @@ module Internal_for_tests : sig
     dst:int32 ->
     max_bytes:int32 ->
     int Lwt.t
+
+  val read_input : Tezos_webassembly_interpreter.Instance.func_inst
 end

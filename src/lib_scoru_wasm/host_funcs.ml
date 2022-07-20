@@ -72,35 +72,34 @@ let read_input_type =
     |> Vector.of_list
   in
   let output_types = Types.[NumType I32Type] |> Vector.of_list in
-  let fun_type = Types.FuncType (input_types, output_types) in
-  fun_type
+  Types.FuncType (input_types, output_types)
 
 let read_input_name = "tezos_read_input"
 
-let read_input_desc = (read_input_type, read_input_name)
-
-let read_input input_buffer module_inst inputs =
-  let open Lwt.Syntax in
-  match inputs with
-  | [
-   Values.(Num (I32 rtype_offset));
-   Values.(Num (I32 level_offset));
-   Values.(Num (I32 id_offset));
-   Values.(Num (I32 dst));
-   Values.(Num (I32 max_bytes));
-  ] ->
-      let* x =
-        aux_write_input_in_memory
-          ~input_buffer
-          ~module_inst
-          ~rtype_offset
-          ~level_offset
-          ~id_offset
-          ~dst
-          ~max_bytes
-      in
-      Lwt.return [Values.(Num (I32 (I32.of_int_s x)))]
-  | _ -> raise Bad_input
+let read_input =
+  Host_funcs.Host_func
+    (fun input_buffer module_inst inputs ->
+      let open Lwt.Syntax in
+      match inputs with
+      | [
+       Values.(Num (I32 rtype_offset));
+       Values.(Num (I32 level_offset));
+       Values.(Num (I32 id_offset));
+       Values.(Num (I32 dst));
+       Values.(Num (I32 max_bytes));
+      ] ->
+          let* x =
+            aux_write_input_in_memory
+              ~input_buffer
+              ~module_inst
+              ~rtype_offset
+              ~level_offset
+              ~id_offset
+              ~dst
+              ~max_bytes
+          in
+          Lwt.return [Values.(Num (I32 (I32.of_int_s x)))]
+      | _ -> raise Bad_input)
 
 let lookup name =
   let open Lwt.Syntax in
@@ -114,4 +113,6 @@ let register_host_funcs registry =
 
 module Internal_for_tests = struct
   let aux_write_input_in_memory = aux_write_input_in_memory
+
+  let read_input = Func.HostFunc (read_input_type, read_input_name)
 end

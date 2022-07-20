@@ -26,12 +26,16 @@ let int = function
   | Num (I32 i) -> Int32.to_int i
   | v -> type_error v (NumType I32Type)
 
-let abort _input _mod_inst vs =
-  empty vs ;
-  print_endline "Abort!" ;
-  exit (-1)
+let abort =
+  Host_funcs.Host_func
+    (fun _input _mod_inst vs ->
+      empty vs ;
+      print_endline "Abort!" ;
+      exit (-1))
 
-let exit _input (_mod_inst : module_inst ref) vs = exit (int (single vs))
+let exit =
+  Host_funcs.Host_func
+    (fun _input (_mod_inst : module_inst ref) vs -> exit (int (single vs)))
 
 let register_host_funcs registry =
   Host_funcs.register ~global_name:"abort" abort registry ;

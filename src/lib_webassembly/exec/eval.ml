@@ -806,7 +806,9 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
             let inst = ref frame.inst in
             Lwt.catch
               (fun () ->
-                let f = Host_funcs.lookup ~global_name c.host_funcs in
+                let (Host_funcs.Host_func f) =
+                  Host_funcs.lookup ~global_name c.host_funcs
+                in
                 let+ res = f c.input inst (List.rev args) in
                 (List.rev res @ vs', []))
               (function
