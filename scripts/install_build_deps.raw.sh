@@ -8,7 +8,7 @@ src_dir="$(dirname "$script_dir")"
 #shellcheck source=scripts/version.sh
 . "$script_dir"/version.sh
 
-opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" "$src_dir/opam" -name \*.opam -print)
+opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" "$src_dir/opam" -name \*.opam \! -name octez\*-deps.opam\* -print)
 
 
 export OPAMYES="${OPAMYES:=true}"
