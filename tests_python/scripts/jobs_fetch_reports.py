@@ -127,7 +127,9 @@ def fetch_and_merge_reports(
 
     jobs = gitlab_api_project_pipeline_jobs(project_id, pipeline_id)
     junit_reports = []
-    integration_job_re = re.compile(r'integration:pytest (\d+)/(\d+)')
+    integration_job_re = re.compile(
+        r'integration:pytest(?:_old_protocols)? (\d+)/(\d+)'
+    )
     for job in jobs:
         match = integration_job_re.match(job['name'])
         if match is None:
