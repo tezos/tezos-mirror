@@ -68,3 +68,6 @@ val commitment_secret : Blinded_public_key_hash.activation_code
 
 val new_commitment :
   ?seed:Bytes.t -> unit -> (account * Commitment.t) tzresult Lwt.t
+
+(** Fails if the contract is not an implicit one  *)
+val pkh_of_contract_exn : Contract.t -> Signature.Public_key_hash.t

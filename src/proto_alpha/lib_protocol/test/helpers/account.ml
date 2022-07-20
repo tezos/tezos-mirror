@@ -123,3 +123,7 @@ let new_commitment ?seed () =
   Lwt.return
     ( (Environment.wrap_tzresult @@ Tez.(one *? 4_000L)) >|? fun amount ->
       (unactivated_account, {blinded_public_key_hash = bpkh; amount}) )
+
+let pkh_of_contract_exn = function
+  | Contract.Implicit pkh -> pkh
+  | Originated _ -> assert false
