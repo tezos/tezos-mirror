@@ -104,8 +104,10 @@ let start ?(public = false) ?event_level ?event_sections_levels
         (if public then [] else [Private_mode])
     in
     let waiter =
-      if wait_connections then wait_for_connections node n
-      else Node.wait_for_ready node
+      let* () =
+        if wait_connections then wait_for_connections node n else unit
+      in
+      Node.wait_for_ready node
     in
     waiter
   in
