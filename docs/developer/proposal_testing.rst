@@ -396,7 +396,7 @@ keys actually encode the same bytes as their corresponding public keys. By
 adding to the yes-wallet the existing accounts of Mainnet bakers, we would have
 enough rights to bake blocks at will. We can do so by running::
 
-  $ dune exec scripts/yes-wallet/yes_wallet.exe -- create from context /tmp/tezos-node-mainnet in /tmp/yes-wallet --active-bakers-only
+  $ dune exec devtools/yes_wallet/yes_wallet.exe -- create from context /tmp/tezos-node-mainnet in /tmp/yes-wallet --active-bakers-only
 
 This command creates a yes-wallet and places its folder in the
 system's temp directory (in our example, ``/tmp``) as given by the path argument
@@ -410,7 +410,7 @@ power), you can also use the ``--staking-share`` option to provide a
 limit. For instance, the first largest bakers with an accumulated
 stake of at least 75 percent can be kept with::
 
-  $ dune exec scripts/yes-wallet/yes_wallet.exe -- create from context /tmp/tezos-node-mainnet in /tmp/yes-wallet --active-bakers-only --staking-share 75
+  $ dune exec devtools/yes_wallet/yes_wallet.exe -- create from context /tmp/tezos-node-mainnet in /tmp/yes-wallet --active-bakers-only --staking-share 75
 
 .. note::
    Prior to switching to the Tenderbake consensus algorithm it was
@@ -718,7 +718,7 @@ invoking the following eight commands)::
   $ make
   $ ./tezos-node snapshot import ~/mainnet.rolling --data-dir /tmp/tezos-node-mainnet
   $ ./tezos-node identity generate --data-dir /tmp/tezos-node-mainnet
-  $ dune exec scripts/yes-wallet/yes_wallet.exe -- create from context /tmp/tezos-node-mainnet in /tmp/yes-wallet --active-bakers-only
+  $ dune exec devtools/yes_wallet/yes_wallet.exe -- create from context /tmp/tezos-node-mainnet in /tmp/yes-wallet --active-bakers-only
 
 Copy original folder into test folder::
 

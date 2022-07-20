@@ -4788,10 +4788,12 @@ let _git_gas_diff =
     ~static:false
     ~bisect_ppx:false
 
+let remove_if_exists fname = if Sys.file_exists fname then Sys.remove fname
+
 let get_contracts_lib =
   private_lib
     "get_contracts"
-    ~path:"devtools/get_contracts"
+    ~path:("devtools" // "get_contracts")
     ~synopsis:"Generic tool to extract smart contracts from node's context."
     ~opam:""
     ~deps:
@@ -4803,51 +4805,127 @@ let get_contracts_lib =
         octez_store;
       ]
     ~modules:["get_contracts"; "sigs"; "storage_helpers"; "contract_size"]
-    ~static:false
     ~bisect_ppx:false
 
 let _get_contracts =
-  let mk_path = function
-    | [] -> "."
-    | p :: ps -> List.fold_left Filename.concat p ps
+  let path = "devtools" // "get_contracts" in
+  let get_contracts_module proto =
+    path // (sf "get_contracts_%s.ml" @@ Protocol.name_underscore proto)
   in
-  let path = mk_path ["devtools"; "get_contracts"] in
-  Protocol.all_optionally
-    [
+  List.filter_map
+    (fun proto ->
+      let name = "get_contracts_" ^ Protocol.name_underscore proto in
+      let main_module = get_contracts_module proto in
+      match (Protocol.status proto, Protocol.client proto) with
+      | Active, Some client ->
+          let main = Protocol.main proto in
+          if not @@ Sys.file_exists main_module then
+            ignore @@ Sys.command
+            @@ Format.sprintf
+                 "cp %s %s"
+                 (get_contracts_module Protocol.alpha)
+                 main_module ;
+          Some
+            (private_exe
+               name
+               ~path
+               ~synopsis:"A script to extract smart contracts from a node."
+               ~opam:""
+               ~deps:
+                 [
+                   octez_base |> open_ ~m:"TzPervasives";
+                   main |> open_ |> open_ ~m:"Protocol";
+                   client |> open_;
+                   get_contracts_lib;
+                 ]
+               ~modules:[name]
+               ~bisect_ppx:false)
+      | _ ->
+          remove_if_exists main_module ;
+          None)
+    Protocol.all
+
+let yes_wallet_lib =
+  let get_delegates_module proto =
+    "devtools" // "yes_wallet"
+    // (sf "get_delegates_%s.ml" @@ Protocol.name_underscore proto)
+  in
+  let protocols =
+    List.filter_map
       (fun proto ->
-        let proto_version = Protocol.name_underscore proto in
-        let name = "get_contracts_" ^ proto_version in
-        let main_module = mk_path [path; name ^ ".ml"] in
-        match (Protocol.status proto, Protocol.client proto) with
-        | Active, Some client ->
-            let main = Protocol.main proto in
-            if not @@ Sys.file_exists main_module then
-              ignore @@ Sys.command
-              @@ Format.sprintf
-                   "cp %s %s"
-                   (mk_path [path; "get_contracts_alpha.ml"])
-                   main_module ;
-            Some
-              (private_exe
-                 name
-                 ~path
-                 ~synopsis:"A script to extract smart contracts from a node."
-                 ~opam:""
-                 ~deps:
-                   [
-                     octez_base |> open_ ~m:"TzPervasives";
-                     main |> open_ |> open_ ~m:"Protocol";
-                     client |> open_;
-                     get_contracts_lib;
-                   ]
-                 ~modules:[name]
-                 ~static:false
-                 ~bisect_ppx:false)
+        let get_delegates_ml = get_delegates_module proto in
+        match Protocol.status proto with
+        | Active ->
+            (if not @@ Sys.file_exists get_delegates_ml then
+             let contents =
+               file_content @@ get_delegates_module Protocol.alpha
+             in
+             let contents =
+               Str.global_replace
+                 (Str.regexp_string "open Tezos_protocol_alpha")
+                 ("open Tezos_protocol_" ^ Protocol.name_underscore proto)
+                 contents
+             in
+             write get_delegates_ml (fun fmt ->
+                 Format.pp_print_string fmt contents)) ;
+            Some (Protocol.main proto)
         | _ ->
-            if Sys.file_exists main_module then
-              ignore @@ Sys.command @@ Format.sprintf "rm %s" main_module ;
-            None);
-    ]
+            remove_if_exists get_delegates_ml ;
+            None)
+      Protocol.all
+  in
+  private_lib
+    "yes_wallet_lib"
+    ~path:("devtools" // "yes_wallet")
+    ~synopsis:"Generic tool to extract smart contracts from node's context."
+    ~opam:""
+    ~deps:
+      ([
+         octez_base |> open_ ~m:"TzPervasives";
+         octez_base_unix;
+         lwt_unix;
+         ezjsonm;
+         octez_store;
+         octez_shell_context;
+         octez_context;
+       ]
+      @ protocols)
+    ~all_modules_except:["yes_wallet"]
+    ~bisect_ppx:false
+    ~linkall:true
+
+let _yes_wallet =
+  private_exe
+    "yes_wallet"
+    ~path:("devtools" // "yes_wallet")
+    ~synopsis:
+      "A script extracting delegates' keys from a context into a wallet."
+    ~opam:""
+    ~deps:[yes_wallet_lib |> open_]
+    ~modules:["yes_wallet"]
+    ~bisect_ppx:false
+
+let _yes_wallet_test =
+  private_exe
+    "bench_signature_perf"
+    ~path:("devtools" // "yes_wallet" // "test")
+    ~synopsis:"Tests for yes_wallet tool"
+    ~opam:""
+    ~deps:
+      [
+        octez_error_monad |> open_ ~m:"TzLwtreslib";
+        octez_crypto |> open_;
+        zarith;
+        zarith_stubs_js;
+        data_encoding |> open_;
+        alcotest;
+        alcotest_lwt;
+        lwt_unix;
+        qcheck_alcotest;
+        octez_test_helpers;
+        ptime;
+      ]
+    ~bisect_ppx:false
 
 let _ppinclude =
   private_exe
