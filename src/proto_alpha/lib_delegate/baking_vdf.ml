@@ -29,7 +29,9 @@ module Events = Baking_events.VDF
 module D_Events = Delegate_events.Denunciator
 open Client_baking_blocks
 
-type status = Not_started | Started | Finished
+type vdf_solution = Environment.Vdf.result * Environment.Vdf.proof
+
+type status = Not_started | Started | Finished of vdf_solution | Injected
 
 type 'a state = {
   cctxt : Protocol_client_context.full;
@@ -70,7 +72,7 @@ let is_in_nonce_revelation_period state level =
   let position_in_cycle =
     Int32.(sub level (mul current_cycle blocks_per_cycle))
   in
-  Int32.compare position_in_cycle nonce_revelation_threshold < 0
+  Int32.compare position_in_cycle nonce_revelation_threshold <= 0
 
 let check_new_cycle state level =
   let current_cycle = Cycle_repr.of_int32_exn (cycle_of_level state level) in
@@ -80,6 +82,21 @@ let check_new_cycle state level =
       if Cycle_repr.(succ cycle = current_cycle) then (
         state.cycle <- Some current_cycle ;
         state.computation_status <- Not_started)
+
+let inject_vdf_revelation cctxt hash chain_id solution =
+  let open Lwt_result_syntax in
+  let chain = `Hash chain_id in
+  let block = `Hash (hash, 0) in
+  let* bytes =
+    Plugin.RPC.Forge.vdf_revelation
+      cctxt
+      (chain, block)
+      ~branch:hash
+      ~solution
+      ()
+  in
+  let bytes = Signature.concat bytes Signature.zero in
+  Shell_services.Injection.operation cctxt ~chain bytes
 
 let process_new_block (cctxt : #Protocol_client_context.full) state
     {hash; chain_id; protocol; next_protocol; level; _} =
@@ -92,60 +109,46 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
     Events.(emit vdf_info)
       ("Skipping, still in nonce revelation period (level " ^ level_str ^ ")")
     >>= fun _ -> return_unit
-  else if state.computation_status = Finished then
-    Events.(emit vdf_info)
-      ("Skipping, computation finished (level " ^ level_str ^ ")")
-    >>= fun _ -> return_unit
+    (* enter main loop if we are not in the nonce revelation period and
+       the expected protocol has been activated *)
   else
-    let chain = `Hash chain_id in
-    let block = `Hash (hash, 0) in
-    Alpha_services.Seed_computation.get cctxt (chain, block) >>=? fun x ->
-    (match x with
-    | Vdf_revelation_stage {seed_discriminant; seed_challenge} ->
-        if state.computation_status = Started then
-          Events.(emit vdf_info)
-            ("Skipping, computation already started (level " ^ level_str ^ ")")
-          >>= fun () -> return_unit
-        else
-          Events.(emit vdf_info)
-            ("Started to compute VDF (level " ^ level_str ^ ")")
-          >>= fun () ->
-          state.computation_status <- Started ;
-          let discriminant, challenge =
-            Seed.generate_vdf_setup ~seed_discriminant ~seed_challenge
-          in
-          let solution =
-            Environment.Vdf.prove
-              discriminant
-              challenge
-              state.constants.parametric.vdf_difficulty
-          in
-          let* bytes =
-            Plugin.RPC.Forge.vdf_revelation
-              cctxt
-              (chain, block)
-              ~branch:hash
-              ~solution
-              ()
-          in
-          let bytes = Signature.concat bytes Signature.zero in
-          let* op_hash =
-            Shell_services.Injection.operation cctxt ~chain bytes
-          in
-          Events.(emit vdf_revelation_injected)
-            (cycle_of_level state level, Chain_services.to_string chain, op_hash)
-          >>= fun () -> return_unit
-    | Nonce_revelation_stage ->
-        (* this should never actually happen *)
-        Events.(emit vdf_info)
-          ("Nonce revelation stage (level " ^ level_str ^ ")")
-        >>= fun () -> return_unit
-    | Computation_finished ->
-        (* this should happen at most once per cycle *)
-        state.computation_status <- Finished ;
-        Events.(emit vdf_info) ("Computation finished (level " ^ level_str ^ ")")
-        >>= fun () -> return_unit)
-    >>= fun _ -> return_unit
+    match state.computation_status with
+    | Started -> return_unit
+    | Not_started -> (
+        let chain = `Hash chain_id in
+        let block = `Hash (hash, 0) in
+        Alpha_services.Seed_computation.get cctxt (chain, block) >>=? fun x ->
+        match x with
+        | Vdf_revelation_stage {seed_discriminant; seed_challenge} ->
+            Events.(emit vdf_info)
+              ("Started to compute VDF (level " ^ level_str ^ ")")
+            >>= fun () ->
+            state.computation_status <- Started ;
+            let discriminant, challenge =
+              Seed.generate_vdf_setup ~seed_discriminant ~seed_challenge
+            in
+            let solution =
+              Environment.Vdf.prove
+                discriminant
+                challenge
+                state.constants.parametric.vdf_difficulty
+            in
+            state.computation_status <- Finished solution ;
+            Events.(emit vdf_info)
+              ("Finished to compute VDF (level " ^ level_str ^ ")")
+            >>= fun _ -> return_unit
+        | Nonce_revelation_stage | Computation_finished ->
+            (* this should never actually happen if computation
+               has not been started *)
+            assert false)
+    | Finished solution ->
+        let chain = `Hash chain_id in
+        let* op_hash = inject_vdf_revelation cctxt hash chain_id solution in
+        state.computation_status <- Injected ;
+        Events.(emit vdf_revelation_injected)
+          (cycle_of_level state level, Chain_services.to_string chain, op_hash)
+        >>= fun _ -> return_unit
+    | Injected -> return_unit
 
 let start_vdf_worker (cctxt : Protocol_client_context.full) ~canceler constants
     (block_stream : Client_baking_blocks.block_info tzresult Lwt_stream.t) =
