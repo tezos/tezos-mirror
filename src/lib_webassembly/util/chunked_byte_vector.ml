@@ -74,7 +74,7 @@ module type S = sig
 
   val of_string : string -> t
 
-  val of_bytes : bytes -> t effect
+  val of_bytes : bytes -> t
 
   val to_string : t -> string effect
 
@@ -109,7 +109,7 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
     {length; chunks}
 
   let grow vector size_delta =
-    if Int64.compare size_delta 0L > 0 then (
+    if 0L < size_delta then (
       let new_size = Int64.add vector.length size_delta in
       let new_chunks = Chunk.num_needed new_size in
       let current_chunks = Vector.num_elements vector.chunks in
@@ -175,9 +175,25 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
     vector
 
   let of_bytes bytes =
-    let open Effect in
-    let vector = Bytes.length bytes |> Int64.of_int |> create in
-    let+ () = store_bytes vector 0L bytes in
+    (* See [of_string] heading comment *)
+    let len = Bytes.length bytes in
+    let vector = create (Int64.of_int len) in
+    let _ =
+      List.init
+        (Vector.num_elements vector.chunks |> Int64.to_int)
+        (fun index ->
+          let index = Int64.of_int index in
+          let chunk = Chunk.alloc () in
+          let _ =
+            List.init (Chunk.size |> Int64.to_int) (fun offset ->
+                let offset = Int64.of_int offset in
+                let address = Chunk.address ~index ~offset |> Int64.to_int in
+                if address < len then
+                  let c = Bytes.get bytes address in
+                  Array1_64.set chunk offset (Char.code c))
+          in
+          Vector.set index chunk vector.chunks)
+    in
     vector
 
   let to_bytes vector =

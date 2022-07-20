@@ -195,7 +195,9 @@ let current_tick_encoding =
 let status_encoding = EncDec.value ["input"; "consuming"] Data_encoding.bool
 
 let floppy_encoding =
-  EncDec.value ["pvm"; "status"] Gather_floppies.internal_status_encoding
+  EncDec.value
+    ["gather-floppies"; "status"]
+    Gather_floppies.internal_status_encoding
 
 let level_encoding =
   EncDec.value ["input"; "level"] Bounded.Int32.NonNegative.encoding
@@ -214,7 +216,18 @@ let zero =
     [gather_floppies] *)
 let initialise_tree () =
   let open Lwt_syntax in
-  let* tree = Test_encoding.empty_tree () in
+  let* empty_tree = Test_encoding.empty_tree () in
+  let boot_sector =
+    Data_encoding.Binary.to_string_exn
+      Gather_floppies.origination_message_encoding
+      (Complete_kernel (Bytes.of_string "some boot sector"))
+  in
+  let* tree =
+    Wasm.Internal_for_tests.initial_tree_from_boot_sector
+      ~empty_tree
+      boot_sector
+  in
+
   let* tree = EncDec.encode current_tick_encoding Z.zero tree in
   let* tree =
     EncDec.encode floppy_encoding Gather_floppies.Not_gathering_floppies tree
@@ -240,7 +253,7 @@ let test_get_info () =
   let expected_info =
     let open Wasm_pvm_sig in
     let last_input_read = Some {inbox_level = zero; message_counter = Z.zero} in
-    {current_tick = Z.zero; last_input_read; input_request = Input_required}
+    {current_tick = Z.one; last_input_read; input_request = Input_required}
   in
   let* actual_info = Wasm.get_info tree in
   assert (actual_info.last_input_read = None) ;
@@ -269,7 +282,11 @@ let test_set_input () =
   let expected_info =
     let open Wasm_pvm_sig in
     let last_input_read = Some {inbox_level = zero; message_counter = Z.zero} in
-    {current_tick = Z.one; last_input_read; input_request = No_input_required}
+    {
+      current_tick = Z.(succ one);
+      last_input_read;
+      input_request = No_input_required;
+    }
   in
   let* actual_info = Wasm.get_info tree in
   assert (actual_info = expected_info) ;

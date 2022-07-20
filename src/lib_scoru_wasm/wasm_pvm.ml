@@ -32,7 +32,7 @@
 
 open Tezos_webassembly_interpreter
 
-module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
+module Make (T : Tree.S) : Gather_floppies.S with type tree = T.tree = struct
   include
     Gather_floppies.Make
       (T)
