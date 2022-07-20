@@ -1029,11 +1029,13 @@ type strategy =
       (** A perfect player, never lies, always win.
           GSW 73-9 2014-2015 mindset. *)
   | Lazy  (** A lazy player will not execute all messages. *)
+  | Eager  (** A eager player will not cheat until a certain point. *)
 
 let pp_strategy fmt = function
   | Random -> Format.pp_print_string fmt "Random"
   | Perfect -> Format.pp_print_string fmt "Perfect"
   | Lazy -> Format.pp_print_string fmt "Lazy"
+  | Eager -> Format.pp_print_string fmt "Eager"
 
 type player = {
   pkh : Signature.Public_key_hash.t;
@@ -1185,6 +1187,32 @@ module Player_client = struct
         let* remove_k = 1 -- n in
         let new_levels_and_inputs =
           List.take_n (n - remove_k) levels_and_inputs
+        in
+        let _state, tick, our_states = eval_inputs new_levels_and_inputs in
+        return (tick, our_states, new_levels_and_inputs)
+    | Eager ->
+        (* Eager player executes correctly the inbox until a certain point. *)
+        let nb_of_input =
+          List.fold_left
+            (fun acc (_level, inputs) -> acc + List.length inputs)
+            0
+            levels_and_inputs
+        in
+        let* corrupt_at_k = 0 -- (nb_of_input - 1) in
+        let new_input = "42 7 +" in
+        (* Once an input is corrupted, everything after will be corrupted
+           as well. *)
+        let new_levels_and_inputs =
+          let idx = ref (-1) in
+          List.map
+            (fun (level, inputs) ->
+              ( level,
+                List.map
+                  (fun input ->
+                    incr idx ;
+                    if !idx = corrupt_at_k then new_input else input)
+                  inputs ))
+            levels_and_inputs
         in
         let _state, tick, our_states = eval_inputs new_levels_and_inputs in
         return (tick, our_states, new_levels_and_inputs)
@@ -1593,6 +1621,12 @@ let test_perfect_against_lazy =
 let test_lazy_against_perfect =
   test_game ~nonempty_inputs:true ~p1_strategy:Lazy ~p2_strategy:Perfect ()
 
+let test_perfect_against_eager =
+  test_game ~nonempty_inputs:true ~p1_strategy:Perfect ~p2_strategy:Eager ()
+
+let test_eager_against_perfect =
+  test_game ~nonempty_inputs:true ~p1_strategy:Eager ~p2_strategy:Perfect ()
+
 let tests =
   ( "Refutation",
     qcheck_wrap
@@ -1601,6 +1635,8 @@ let tests =
         test_random_against_perfect;
         test_perfect_against_lazy;
         test_lazy_against_perfect;
+        test_perfect_against_eager;
+        test_eager_against_perfect;
       ] )
 
 (** {2 Entry point} *)
