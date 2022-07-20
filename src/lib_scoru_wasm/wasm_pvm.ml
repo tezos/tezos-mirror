@@ -32,6 +32,8 @@
 
 exception Set_input_step_expected_input
 
+open Tezos_webassembly_interpreter
+
 module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
   include
     Gather_floppies.Make
@@ -40,8 +42,12 @@ module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
         type tree = T.tree
 
         module Decodings = Wasm_decodings.Make (T)
-        module Decoding = Tree_decoding.Make (T)
-        module Encoding = Tree_encoding.Make (T)
+        module EncDec =
+          Tree_encoding_decoding.Make
+            (Lazy_map.LwtInt32Map)
+            (Lazy_vector.LwtInt32Vector)
+            (Chunked_byte_vector.Lwt)
+            (T)
 
         let compute_step s =
           let open Lwt.Syntax in
@@ -61,50 +67,47 @@ module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
 
         let get_output _ _ = Lwt.return ""
 
-        let current_tick_decoding =
-          Decoding.value ["wasm"; "current_tick"] Data_encoding.z
-
         let current_tick_encoding =
-          Encoding.value ["wasm"; "current_tick"] Data_encoding.z
+          EncDec.value ["wasm"; "current_tick"] Data_encoding.z
 
-        let level_decoding =
-          Decoding.value ["input"; "level"] Bounded.Int32.NonNegative.encoding
+        let level_encoding =
+          EncDec.value ["input"; "level"] Bounded.Int32.NonNegative.encoding
 
-        let id_decoding = Decoding.value ["input"; "id"] Data_encoding.z
+        let id_encoding = EncDec.value ["input"; "id"] Data_encoding.z
+
+        let last_input_read_encoder =
+          EncDec.tup2 ~flatten:true level_encoding id_encoding
 
         let status_encoding =
-          Encoding.value ["input"; "consuming"] Data_encoding.bool
+          EncDec.value ["input"; "consuming"] Data_encoding.bool
 
-        let status_decoding =
-          Decoding.value ["input"; "consuming"] Data_encoding.bool
+        let inp_encoding level id =
+          EncDec.value ["input"; level; id] Data_encoding.string
 
         let get_info tree =
           let open Lwt_syntax in
           let* waiting =
-            try Decoding.run status_decoding tree with _ -> Lwt.return false
+            try EncDec.decode status_encoding tree with _ -> Lwt.return false
           in
           let input_request =
             if waiting then Wasm_pvm_sig.Input_required
             else Wasm_pvm_sig.No_input_required
           in
-          let* inbox_level =
-            try Decoding.run level_decoding tree
-            with _ ->
-              Lwt.return
-                (match Bounded.Int32.NonNegative.of_int32 0l with
-                | Some x -> x
-                | _ -> assert false)
-          in
-          let* message_counter =
-            try Decoding.run id_decoding tree
-            with _ -> Lwt.return (Z.of_int (-1))
+          let* input =
+            try
+              let* t = EncDec.decode last_input_read_encoder tree in
+              Lwt.return @@ Some t
+            with _ -> Lwt.return_none
           in
           let last_input_read =
-            if message_counter = Z.of_int (-1) then None
-            else Some Wasm_pvm_sig.{inbox_level; message_counter}
+            Option.map
+              (fun (inbox_level, message_counter) ->
+                Wasm_pvm_sig.{inbox_level; message_counter})
+              input
           in
+
           let* current_tick =
-            try Decoding.run current_tick_decoding tree
+            try EncDec.decode current_tick_encoding tree
             with _ -> Lwt.return Z.zero
           in
           Lwt.return Wasm_pvm_sig.{current_tick; last_input_read; input_request}
@@ -116,24 +119,17 @@ module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
         let set_input_step input_info message tree =
           let open Lwt_syntax in
           let open Wasm_pvm_sig in
-          let* {input_request; _} = get_info tree in
           let {inbox_level; message_counter} = input_info in
           let level =
             Int32.to_string @@ Bounded.Int32.NonNegative.to_int32 inbox_level
           in
           let id = Z.to_string message_counter in
-          let inp_encoding =
-            Encoding.value ["input"; level; id] Data_encoding.string
+          let* current_tick = EncDec.decode current_tick_encoding tree in
+          let* tree =
+            EncDec.encode current_tick_encoding (Z.succ current_tick) tree
           in
-          match input_request with
-          | No_input_required -> raise Set_input_step_expected_input
-          | _ ->
-              let* current_tick = Decoding.run current_tick_decoding tree in
-              let* tree =
-                Encoding.run current_tick_encoding (Z.succ current_tick) tree
-              in
-              let* tree = Encoding.run status_encoding false tree in
-              Encoding.run inp_encoding message tree
+          let* tree = EncDec.encode status_encoding false tree in
+          EncDec.encode (inp_encoding level id) message tree
 
         let _module_instance_of_tree modules =
           Decodings.run (Decodings.module_instance_decoding modules)
