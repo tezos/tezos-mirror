@@ -310,8 +310,9 @@ module V5 = struct
 end
 
 module V6 = V5
+module V7 = V6
 
-module type S = V6.S
+module type S = V7.S
 
 module type Sigs = sig
   module V2 = V2
@@ -319,6 +320,7 @@ module type Sigs = sig
   module V4 = V4
   module V5 = V5
   module V6 = V6
+  module V7 = V7
 
   module type VIEW = VIEW
 

@@ -1743,7 +1743,7 @@ let tezos_protocol_environment_sigs =
                  ];
                ])
        in
-       let latest_environment_number = 6 in
+       let latest_environment_number = 7 in
        List.init (latest_environment_number + 1) gen |> Dune.of_list)
 
 let octez_protocol_environment_structs =
@@ -1909,6 +1909,8 @@ let octez_protocol_compiler_registerer =
                   "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V5.cmi}";
                 S
                   "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V6.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V7.cmi}";
               ];
         ]
 

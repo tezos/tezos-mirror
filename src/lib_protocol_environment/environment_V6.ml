@@ -155,11 +155,6 @@ struct
         Stdlib.exit 1
 
   include Stdlib
-
-  (* The modules provided in the [_struct.V6.M] pack are meant specifically to
-     shadow modules from [Stdlib]/[Base]/etc. with backwards compatible
-     versions. Thus we open the module, hiding the incompatible, newer modules.
-  *)
   module Pervasives = Stdlib
 
   module Logging = struct
