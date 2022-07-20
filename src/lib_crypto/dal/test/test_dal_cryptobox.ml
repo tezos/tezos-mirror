@@ -36,39 +36,33 @@ module Test = struct
     let open Tezos_error_monad.Error_monad.Result_syntax in
     List.iter
       (fun redundancy_factor ->
-        let module Constants = struct
-          let redundancy_factor = redundancy_factor
-
-          let slot_size = slot_size
-
-          let segment_size = segment_size
-
-          let shards_amount = shards_amount
-        end in
-        let module DAL_crypto = Dal_cryptobox.Builder (Constants) in
-        let trusted_setup =
-          DAL_crypto.srs
+        let t =
+          Dal_cryptobox.make
             ~redundancy_factor
             ~slot_size
             ~segment_size
             ~shards_amount
+        in
+        let trusted_setup =
+          Dal_cryptobox.srs t
           (*(`Files {srs_g1_file; srs_g2_file; logarithm_size = 21})*)
         in
 
         match
-          let* p = DAL_crypto.polynomial_from_slot msg in
-          let* cm = DAL_crypto.commit trusted_setup p in
-          let* pi = DAL_crypto.prove_segment trusted_setup p 1 in
+          let* p = Dal_cryptobox.polynomial_from_slot t msg in
+          let* cm = Dal_cryptobox.commit trusted_setup p in
+          let* pi = Dal_cryptobox.prove_segment t trusted_setup p 1 in
           let segment = Bytes.sub msg segment_size segment_size in
           let* check =
-            DAL_crypto.verify_segment
+            Dal_cryptobox.verify_segment
+              t
               trusted_setup
               cm
               {index = 1; content = segment}
               pi
           in
           assert check ;
-          let enc_shards = DAL_crypto.shards_from_polynomial p in
+          let enc_shards = Dal_cryptobox.shards_from_polynomial t p in
 
           (* Only take half of the buckets *)
           let c_indices =
@@ -79,47 +73,50 @@ module Test = struct
           in
 
           let c =
-            DAL_crypto.IntMap.filter
+            Dal_cryptobox.IntMap.filter
               (fun i _ -> Array.mem i c_indices)
               enc_shards
           in
 
-          let* dec = DAL_crypto.polynomial_from_shards c in
+          let* dec = Dal_cryptobox.polynomial_from_shards t c in
           assert (
             Bytes.compare
               msg
               (Bytes.sub
-                 (DAL_crypto.polynomial_to_bytes dec)
+                 (Dal_cryptobox.polynomial_to_bytes t dec)
                  0
                  (min slot_size msg_size))
             = 0) ;
 
-          let* comm = DAL_crypto.commit trusted_setup p in
+          let* comm = Dal_cryptobox.commit trusted_setup p in
 
-          let shard_proofs = DAL_crypto.prove_shards trusted_setup p in
-          match DAL_crypto.IntMap.find 0 enc_shards with
+          let shard_proofs = Dal_cryptobox.prove_shards t trusted_setup p in
+          match Dal_cryptobox.IntMap.find 0 enc_shards with
           | None -> Ok ()
           | Some eval ->
               assert (
-                DAL_crypto.verify_shard
+                Dal_cryptobox.verify_shard
+                  t
                   trusted_setup
                   comm
                   {index = 0; share = eval}
                   shard_proofs.(0)) ;
 
-              let* pi = DAL_crypto.prove_commitment trusted_setup p in
-              let* check = DAL_crypto.verify_commitment trusted_setup comm pi in
+              let* pi = Dal_cryptobox.prove_commitment trusted_setup p in
+              let* check =
+                Dal_cryptobox.verify_commitment trusted_setup comm pi
+              in
               assert check ;
               Ok ()
           (* let point = Scalar.random () in *)
-          (* let+ pi_slot = DAL_crypto.prove_single trusted_setup p point in
-           * 
+          (* let+ pi_slot = Dal_cryptobox.prove_single trusted_setup p point in
+           *
            * assert (
-           *   DAL_crypto.verify_single
+           *   Dal_cryptobox.verify_single
            *     trusted_setup
            *     comm
            *     ~point
-           *     ~evaluation:(DAL_crypto.polynomial_evaluate p point)
+           *     ~evaluation:(Dal_cryptobox.polynomial_evaluate p point)
            *     pi_slot) *)
         with
         | Ok () -> ()

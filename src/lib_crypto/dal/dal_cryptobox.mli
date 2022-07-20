@@ -23,7 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Dal_cryptobox_sigs
+open Dal_cryptobox_intf
+
+(** Encapsulates parameters required to use the cryptographic primitives exported
+    by this module. *)
+type t
+
+(** [make] precomputes the set of values needed by cryptographic primitives
+    defined in this module and store them in a value of type [t] *)
+val make :
+  redundancy_factor:int ->
+  slot_size:int ->
+  segment_size:int ->
+  shards_amount:int ->
+  t
+
+(** A trusted setup. *)
+type srs
 
 (** Because of the shell/protocol separation, cryptographic primitives
    need to be splitted. An interface, called the {!module:Verifier}
@@ -45,32 +61,119 @@ open Dal_cryptobox_sigs
    that both the [Verifier] and the [Builder] as instantiated with the
    same parameters and use the same trusted setup. *)
 
-module Verifier : functor (C : CONSTANTS) -> sig
-  include SRS
+module Verifier : VERIFIER
 
-  include COMMITMENT with type srs := srs
+include VERIFIER with type srs := srs and type t := t
 
-  include SEGMENT with type commitment := commitment and type srs := srs
-end
+module IntMap : Tezos_error_monad.TzLwtreslib.Map.S with type key = int
 
-module Builder (C : CONSTANTS) : sig
-  include module type of Verifier (C)
+(** A slot is just some data represented as bytes. *)
+type slot = bytes
 
-  include POLYNOMIAL with type srs := srs and type commitment := commitment
+(** The field used by the polynomial. *)
+type scalar
 
-  include
-    SHARD
-      with type srs := srs
-       and type polynomial := polynomial
-       and type commitment := commitment
-       and module IntMap := IntMap
+(** A polynomial is another representation for a slot. One advantage
+     of this representation is that a commitment can be computed from
+     a polynomial. A commitment has nice properties:
 
-  include
-    PROOF
-      with type srs := srs
-       and type commitment := commitment
-       and type polynomial := polynomial
-       and type commitment_proof := commitment_proof
-       and type segment_proof := segment_proof
-       and type shard_proof := shard_proof
-end
+      1. A commitment ensures that the size of the [slot] has a
+     bounded size (typically [slot_size]).
+
+      2. A commitment can be used to verify that a segment of fixed size
+      (typically [segment_size]) is part of the original slot. *)
+type polynomial
+
+(** [polynomial_degree polynomial] returns the degree of the
+     polynomial. *)
+val polynomial_degree : polynomial -> int
+
+(** [polynomial_evaluate polynomial x] evaluates [polynomial(x)]. *)
+val polynomial_evaluate : polynomial -> scalar -> scalar
+
+(** [polynomial_from_slot t slot] returns a polynomial from the a slot [slot].
+
+      Fail with [`Slot_wrong_size] when the slot size is different from
+      [CONFIGURATION.slot_size]. *)
+val polynomial_from_slot :
+  t -> bytes -> (polynomial, [> `Slot_wrong_size of string]) Result.t
+
+(** [polynomial_to_slot t polynomial] returns a slot from a [polynomial]. *)
+val polynomial_to_bytes : t -> polynomial -> bytes
+
+(** [commit polynomial] returns the commitment associated to a
+     polynomial [p].
+
+      Fail with [`Degree_exceeds_srs_length] if the degree of [p]
+     exceeds the SRS size. *)
+val commit :
+  srs ->
+  polynomial ->
+  (commitment, [> `Degree_exceeds_srs_length of string]) Result.t
+
+(** A portion of the data represented by a polynomial. *)
+type share
+
+(** Encoding of a share. *)
+val share_encoding : share Data_encoding.t
+
+(** A shard is share with its index (see
+     {!val:shards_from_polynomial}). *)
+type shard = {index : int; share : share}
+
+(** An encoding of a share. *)
+val shard_encoding : shard Data_encoding.t
+
+(** An encoding for a map of shares. *)
+val shards_encoding : share IntMap.t Data_encoding.t
+
+(** [polynomial_from_shards t shares] computes the original polynomial
+     from [shares]. The proportion of shares needed is [1] over
+     [C.redundancy_factor] the total number of shards. It is
+     guaranteed that for any share with different indices, if there is
+     more than the number of required shards, then the original data
+     can be recomputed. *)
+val polynomial_from_shards :
+  t ->
+  share IntMap.t ->
+  (polynomial, [> `Invert_zero of string | `Not_enough_shards of string]) result
+
+(** [shards_from_polynomial t polynomial] compute all the shards
+     encoding the original [polynomial]. *)
+val shards_from_polynomial : t -> polynomial -> share IntMap.t
+
+(** A proof that a shard belong to some commitment. *)
+type shard_proof
+
+(** [verify_shard t srs commitment shard proof] allows to check
+     whether [shard] is a porition of the data corresopding to the
+     [commitment] using [proof]. The verification time is
+     constant. The [srs] should be the same as the one used to produce
+     the commitment. *)
+val verify_shard : t -> srs -> commitment -> shard -> shard_proof -> bool
+
+(** [prove_commitment srs polynomial] produces a proof that the
+     commitment produced by the function [commit] is indeed a
+     commitment of the polynomial. *)
+val prove_commitment :
+  srs ->
+  polynomial ->
+  (commitment_proof, [> `Degree_exceeds_srs_length of string]) result
+
+(** [prove_segment] produces a proof that the [n]th segment computed
+     is part of a commitment. This segment corresponds to the original
+     data and are split into [C.segment_size]. *)
+val prove_segment :
+  t ->
+  srs ->
+  polynomial ->
+  int ->
+  ( segment_proof,
+    [> `Degree_exceeds_srs_length of string | `Segment_index_out_of_range] )
+  result
+
+(** [prove_shards] computes the proofs for all the [shards] that
+     each [shard] is a valid piece of data associated to a polynomial
+     and its commitment. Only the commitment is needed to check the
+     proof. *)
+val prove_shards : t -> srs -> polynomial -> shard_proof array

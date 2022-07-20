@@ -154,17 +154,17 @@ let save store slot_header shards =
       return metadata)
     shards
 
-let split_and_store cryptobox_setup store slot =
+let split_and_store cb_constants srs store slot =
   let r =
     let open Result_syntax in
-    let* polynomial = Cryptobox.polynomial_from_slot slot in
-    let* commitment = Cryptobox.commit cryptobox_setup polynomial in
+    let* polynomial = Cryptobox.polynomial_from_slot cb_constants slot in
+    let* commitment = Cryptobox.commit srs polynomial in
     return (polynomial, commitment)
   in
   let open Lwt_result_syntax in
   match r with
   | Ok (polynomial, commitment) ->
-      let shards = Cryptobox.shards_from_polynomial polynomial in
+      let shards = Cryptobox.shards_from_polynomial cb_constants polynomial in
       let* () = save store commitment shards in
       let*! () =
         Event.(
@@ -176,7 +176,7 @@ let split_and_store cryptobox_setup store slot =
 
 let get_shard store slot_header shard_id =
   let open Lwt_result_syntax in
-  let*? slot_header = encode Dal_types.slot_header_encoding slot_header in
+  let*? slot_header = encode Cryptobox.slot_header_encoding slot_header in
   let* share =
     Lwt.catch
       (fun () ->
@@ -195,7 +195,7 @@ let check_shards shards =
   then Ok ()
   else fail [Missing_shards]
 
-let get_slot store slot_header =
+let get_slot cb_constants store slot_header =
   let open Lwt_result_syntax in
   let slot_header = Slot_header.to_b58check slot_header in
   let*! shards = Store.list store [slot_header] in
@@ -218,12 +218,12 @@ let get_slot store slot_header =
       shards
   in
   let*? polynomial =
-    match Cryptobox.polynomial_from_shards shards with
+    match Cryptobox.polynomial_from_shards cb_constants shards with
     | Ok p -> Ok p
     | Error (`Invert_zero msg | `Not_enough_shards msg) ->
         Error [Merging_failed msg]
   in
-  let slot = Cryptobox.polynomial_to_bytes polynomial in
+  let slot = Cryptobox.polynomial_to_bytes cb_constants polynomial in
   let*! () =
     Event.(
       emit fetched_slot (Bytes.length slot, Cryptobox.IntMap.cardinal shards))
