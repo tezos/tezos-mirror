@@ -1,39 +1,39 @@
 
 trace
   - DUP (interp) @ location: 15
-    [ (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+    [ (Pair (Left "[PUBLIC_KEY_HASH]") {}) ]
   - DUP (entry) @ location: 15
-    [ (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+    [ (Pair (Left "[PUBLIC_KEY_HASH]") {}) ]
     - log/CAR (exit) @ location: 15
-      [ (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {})
-        (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+      [ (Pair (Left "[PUBLIC_KEY_HASH]") {})
+        (Pair (Left "[PUBLIC_KEY_HASH]") {}) ]
   - CAR (entry) @ location: 16
-    [ (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {})
-      (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+    [ (Pair (Left "[PUBLIC_KEY_HASH]") {})
+      (Pair (Left "[PUBLIC_KEY_HASH]") {}) ]
     - log/IF_LEFT (exit) @ location: 16
-      [ (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
-        (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+      [ (Left "[PUBLIC_KEY_HASH]")
+        (Pair (Left "[PUBLIC_KEY_HASH]") {}) ]
   - IF_LEFT (entry) @ location: 17
-    [ (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
-      (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+    [ (Left "[PUBLIC_KEY_HASH]")
+      (Pair (Left "[PUBLIC_KEY_HASH]") {}) ]
     - log/DUP (exit) @ location: 17
-      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
-        (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+      [ "[PUBLIC_KEY_HASH]"
+        (Pair (Left "[PUBLIC_KEY_HASH]") {}) ]
   - DUP (entry) @ location: 19
-    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
-      (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+    [ "[PUBLIC_KEY_HASH]"
+      (Pair (Left "[PUBLIC_KEY_HASH]") {}) ]
     - log/DIP (exit) @ location: 19
-      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
-        "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
-        (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+      [ "[PUBLIC_KEY_HASH]"
+        "[PUBLIC_KEY_HASH]"
+        (Pair (Left "[PUBLIC_KEY_HASH]") {}) ]
   - DIP (entry) @ location: 20
-    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
-      "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
-      (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+    [ "[PUBLIC_KEY_HASH]"
+      "[PUBLIC_KEY_HASH]"
+      (Pair (Left "[PUBLIC_KEY_HASH]") {}) ]
     - log/CDR (exit) @ location: 20
-      [ (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+      [ (Pair (Left "[PUBLIC_KEY_HASH]") {}) ]
   - CDR (entry) @ location: 23
-    [ (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+    [ (Pair (Left "[PUBLIC_KEY_HASH]") {}) ]
     - log/DUP (exit) @ location: 23
       [ {} ]
   - DUP (entry) @ location: 24
@@ -49,69 +49,69 @@ trace
       [ {}
         {} ]
       - log/CONST (exit) @ location: 20
-        [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        [ "[PUBLIC_KEY_HASH]"
           {}
           {} ]
     - CONST (entry) @ location: 20
-      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      [ "[PUBLIC_KEY_HASH]"
         {}
         {} ]
       - log/log/log/DIP (exit) @ location: 20
-        [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
-          "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        [ "[PUBLIC_KEY_HASH]"
+          "[PUBLIC_KEY_HASH]"
           {}
           {} ]
     - log/DIP (exit) @ location: 20
-      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
-        "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      [ "[PUBLIC_KEY_HASH]"
+        "[PUBLIC_KEY_HASH]"
         {}
         {} ]
   - DIP (entry) @ location: 25
-    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
-      "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+    [ "[PUBLIC_KEY_HASH]"
+      "[PUBLIC_KEY_HASH]"
       {}
       {} ]
     - log/SWAP (exit) @ location: 25
-      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      [ "[PUBLIC_KEY_HASH]"
         {}
         {} ]
   - SWAP (entry) @ location: 27
-    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+    [ "[PUBLIC_KEY_HASH]"
       {}
       {} ]
     - log/[halt] (exit) @ location: 27
       [ {}
-        "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        "[PUBLIC_KEY_HASH]"
         {} ]
   - [halt] (entry) @ location: 27
     [ {}
-      "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      "[PUBLIC_KEY_HASH]"
       {} ]
     - control: KUndip
     - control: KCons
     - log/GET (exit) @ location: 25
-      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      [ "[PUBLIC_KEY_HASH]"
         {}
-        "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        "[PUBLIC_KEY_HASH]"
         {} ]
   - GET (entry) @ location: 28
-    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+    [ "[PUBLIC_KEY_HASH]"
       {}
-      "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      "[PUBLIC_KEY_HASH]"
       {} ]
     - log/IF_NONE (exit) @ location: 28
       [ None
-        "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        "[PUBLIC_KEY_HASH]"
         {} ]
   - IF_NONE (entry) @ location: 30
     [ None
-      "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      "[PUBLIC_KEY_HASH]"
       {} ]
     - log/DIP (exit) @ location: 30
-      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      [ "[PUBLIC_KEY_HASH]"
         {} ]
   - DIP (entry) @ location: 32
-    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+    [ "[PUBLIC_KEY_HASH]"
       {} ]
     - log/AMOUNT (exit) @ location: 32
       [ {} ]
@@ -132,35 +132,35 @@ trace
     - control: KUndip
     - control: KCons
     - log/UPDATE (exit) @ location: 32
-      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      [ "[PUBLIC_KEY_HASH]"
         (Some 0)
         {} ]
   - UPDATE (entry) @ location: 36
-    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+    [ "[PUBLIC_KEY_HASH]"
       (Some 0)
       {} ]
     - log/NIL (exit) @ location: 36
-      [ { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 } ]
+      [ { Elt "[PUBLIC_KEY_HASH]" 0 } ]
   - NIL (entry) @ location: 37
-    [ { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 } ]
+    [ { Elt "[PUBLIC_KEY_HASH]" 0 } ]
     - log/PAIR (exit) @ location: 37
       [ {}
-        { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 } ]
+        { Elt "[PUBLIC_KEY_HASH]" 0 } ]
   - PAIR (entry) @ location: 39
     [ {}
-      { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 } ]
+      { Elt "[PUBLIC_KEY_HASH]" 0 } ]
     - log/[halt] (exit) @ location: 39
-      [ (Pair {} { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 }) ]
+      [ (Pair {} { Elt "[PUBLIC_KEY_HASH]" 0 }) ]
   - [halt] (entry) @ location: 14
-    [ (Pair {} { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 }) ]
+    [ (Pair {} { Elt "[PUBLIC_KEY_HASH]" 0 }) ]
     - control: KCons
     - log/[halt] (exit) @ location: 30
-      [ (Pair {} { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 }) ]
+      [ (Pair {} { Elt "[PUBLIC_KEY_HASH]" 0 }) ]
   - [halt] (entry) @ location: 14
-    [ (Pair {} { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 }) ]
+    [ (Pair {} { Elt "[PUBLIC_KEY_HASH]" 0 }) ]
     - control: KCons
     - log/[halt] (exit) @ location: 17
-      [ (Pair {} { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 }) ]
+      [ (Pair {} { Elt "[PUBLIC_KEY_HASH]" 0 }) ]
   - [halt] (entry) @ location: 14
-    [ (Pair {} { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 }) ]
+    [ (Pair {} { Elt "[PUBLIC_KEY_HASH]" 0 }) ]
     - control: KNil

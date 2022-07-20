@@ -15,24 +15,24 @@ trace
   - SELF (entry) @ location: 10
     [ 60 ]
     - log/ADDRESS (exit) @ location: 10
-      [ "KT1FAKEFAKEFAKEFAKEFAKEFAKEFAKGGSE2x"
+      [ "[CONTRACT_HASH]"
         60 ]
   - ADDRESS (entry) @ location: 11
-    [ "KT1FAKEFAKEFAKEFAKEFAKEFAKEFAKGGSE2x"
+    [ "[CONTRACT_HASH]"
       60 ]
     - log/SENDER (exit) @ location: 11
-      [ "KT1FAKEFAKEFAKEFAKEFAKEFAKEFAKGGSE2x"
+      [ "[CONTRACT_HASH]"
         60 ]
   - SENDER (entry) @ location: 12
-    [ "KT1FAKEFAKEFAKEFAKEFAKEFAKEFAKGGSE2x"
+    [ "[CONTRACT_HASH]"
       60 ]
     - log/COMPARE (exit) @ location: 12
-      [ "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
-        "KT1FAKEFAKEFAKEFAKEFAKEFAKEFAKGGSE2x"
+      [ "[PUBLIC_KEY_HASH]"
+        "[CONTRACT_HASH]"
         60 ]
   - COMPARE (entry) @ location: 14
-    [ "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
-      "KT1FAKEFAKEFAKEFAKEFAKEFAKEFAKGGSE2x"
+    [ "[PUBLIC_KEY_HASH]"
+      "[CONTRACT_HASH]"
       60 ]
     - log/EQ (exit) @ location: 14
       [ -1
@@ -200,25 +200,25 @@ trace
   - SELF (entry) @ location: 62
     [  ]
     - log/CONST (exit) @ location: 62
-      [ "KT1FAKEFAKEFAKEFAKEFAKEFAKEFAKGGSE2x" ]
+      [ "[CONTRACT_HASH]" ]
   - CONST (entry) @ location: 63
-    [ "KT1FAKEFAKEFAKEFAKEFAKEFAKEFAKGGSE2x" ]
+    [ "[CONTRACT_HASH]" ]
     - log/[halt] (exit) @ location: 63
       [ 0
-        "KT1FAKEFAKEFAKEFAKEFAKEFAKEFAKGGSE2x" ]
+        "[CONTRACT_HASH]" ]
   - [halt] (entry) @ location: 61
     [ 0
-      "KT1FAKEFAKEFAKEFAKEFAKEFAKEFAKGGSE2x" ]
+      "[CONTRACT_HASH]" ]
     - control: KUndip
     - control: KCons
     - log/TRANSFER_TOKENS (exit) @ location: 60
       [ 1
         0
-        "KT1FAKEFAKEFAKEFAKEFAKEFAKEFAKGGSE2x" ]
+        "[CONTRACT_HASH]" ]
   - TRANSFER_TOKENS (entry) @ location: 66
     [ 1
       0
-      "KT1FAKEFAKEFAKEFAKEFAKEFAKEFAKGGSE2x" ]
+      "[CONTRACT_HASH]" ]
     - log/NIL (exit) @ location: 66
       [ 0x014828e9aa0b3e6e970da0515b5c5d8ccf502875890000000100014828e9aa0b3e6e970da0515b5c5d8ccf5028758900ff00000000020001 ]
   - NIL (entry) @ location: 67

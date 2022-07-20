@@ -1,82 +1,82 @@
 
 trace
   - UNPAIR (interp) @ location: 7
-    [ (Pair "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" "2020-01-01T00:00:00Z") ]
+    [ (Pair "[PUBLIC_KEY_HASH]" "[TIMESTAMP]") ]
   - UNPAIR (entry) @ location: 7
-    [ (Pair "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" "2020-01-01T00:00:00Z") ]
+    [ (Pair "[PUBLIC_KEY_HASH]" "[TIMESTAMP]") ]
     - log/SWAP (exit) @ location: 7
-      [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"
-        "2020-01-01T00:00:00Z" ]
+      [ "[PUBLIC_KEY_HASH]"
+        "[TIMESTAMP]" ]
   - SWAP (entry) @ location: 8
-    [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"
-      "2020-01-01T00:00:00Z" ]
+    [ "[PUBLIC_KEY_HASH]"
+      "[TIMESTAMP]" ]
     - log/CONST (exit) @ location: 8
-      [ "2020-01-01T00:00:00Z"
-        "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+      [ "[TIMESTAMP]"
+        "[PUBLIC_KEY_HASH]" ]
   - CONST (entry) @ location: 9
-    [ "2020-01-01T00:00:00Z"
-      "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+    [ "[TIMESTAMP]"
+      "[PUBLIC_KEY_HASH]" ]
     - log/ADD (exit) @ location: 9
       [ 300
-        "2020-01-01T00:00:00Z"
-        "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+        "[TIMESTAMP]"
+        "[PUBLIC_KEY_HASH]" ]
   - ADD (entry) @ location: 12
     [ 300
-      "2020-01-01T00:00:00Z"
-      "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+      "[TIMESTAMP]"
+      "[PUBLIC_KEY_HASH]" ]
     - log/NOW (exit) @ location: 12
-      [ "2020-01-01T00:05:00Z"
-        "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+      [ "[TIMESTAMP]"
+        "[PUBLIC_KEY_HASH]" ]
   - NOW (entry) @ location: 13
-    [ "2020-01-01T00:05:00Z"
-      "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+    [ "[TIMESTAMP]"
+      "[PUBLIC_KEY_HASH]" ]
     - log/COMPARE (exit) @ location: 13
-      [ "2022-04-14T12:32:39Z"
-        "2020-01-01T00:05:00Z"
-        "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+      [ "[TIMESTAMP]"
+        "[TIMESTAMP]"
+        "[PUBLIC_KEY_HASH]" ]
   - COMPARE (entry) @ location: 16
-    [ "2022-04-14T12:32:39Z"
-      "2020-01-01T00:05:00Z"
-      "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+    [ "[TIMESTAMP]"
+      "[TIMESTAMP]"
+      "[PUBLIC_KEY_HASH]" ]
     - log/GE (exit) @ location: 16
       [ 1
-        "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+        "[PUBLIC_KEY_HASH]" ]
   - GE (entry) @ location: 17
     [ 1
-      "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+      "[PUBLIC_KEY_HASH]" ]
     - log/IF (exit) @ location: 17
       [ True
-        "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+        "[PUBLIC_KEY_HASH]" ]
   - IF (entry) @ location: 18
     [ True
-      "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+      "[PUBLIC_KEY_HASH]" ]
     - log/[halt] (exit) @ location: 18
-      [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+      [ "[PUBLIC_KEY_HASH]" ]
   - [halt] (entry) @ location: 24
-    [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+    [ "[PUBLIC_KEY_HASH]" ]
     - control: KCons
     - log/IMPLICIT_ACCOUNT (exit) @ location: 18
-      [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+      [ "[PUBLIC_KEY_HASH]" ]
   - IMPLICIT_ACCOUNT (entry) @ location: 24
-    [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+    [ "[PUBLIC_KEY_HASH]" ]
     - log/CONST (exit) @ location: 24
-      [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+      [ "[PUBLIC_KEY_HASH]" ]
   - CONST (entry) @ location: 25
-    [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+    [ "[PUBLIC_KEY_HASH]" ]
     - log/CONST (exit) @ location: 25
       [ 1000000
-        "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+        "[PUBLIC_KEY_HASH]" ]
   - CONST (entry) @ location: 28
     [ 1000000
-      "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+      "[PUBLIC_KEY_HASH]" ]
     - log/TRANSFER_TOKENS (exit) @ location: 28
       [ Unit
         1000000
-        "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+        "[PUBLIC_KEY_HASH]" ]
   - TRANSFER_TOKENS (entry) @ location: 29
     [ Unit
       1000000
-      "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+      "[PUBLIC_KEY_HASH]" ]
     - log/NIL (exit) @ location: 29
       [ 0x014828e9aa0b3e6e970da0515b5c5d8ccf5028758900000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 ]
   - NIL (entry) @ location: 30
@@ -102,21 +102,21 @@ trace
   - NOW (entry) @ location: 36
     [  ]
     - log/[halt] (exit) @ location: 36
-      [ "2022-04-14T12:32:39Z" ]
+      [ "[TIMESTAMP]" ]
   - [halt] (entry) @ location: 36
-    [ "2022-04-14T12:32:39Z" ]
+    [ "[TIMESTAMP]" ]
     - control: KUndip
     - control: KCons
     - log/PAIR (exit) @ location: 34
       [ { 0x014828e9aa0b3e6e970da0515b5c5d8ccf5028758900000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 }
-        "2022-04-14T12:32:39Z" ]
+        "[TIMESTAMP]" ]
   - PAIR (entry) @ location: 37
     [ { 0x014828e9aa0b3e6e970da0515b5c5d8ccf5028758900000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 }
-      "2022-04-14T12:32:39Z" ]
+      "[TIMESTAMP]" ]
     - log/[halt] (exit) @ location: 37
       [ (Pair { 0x014828e9aa0b3e6e970da0515b5c5d8ccf5028758900000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 }
-              "2022-04-14T12:32:39Z") ]
+              "[TIMESTAMP]") ]
   - [halt] (entry) @ location: 6
     [ (Pair { 0x014828e9aa0b3e6e970da0515b5c5d8ccf5028758900000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 }
-            "2022-04-14T12:32:39Z") ]
+            "[TIMESTAMP]") ]
     - control: KNil

@@ -3376,6 +3376,7 @@ end = struct
             ~deps:
               [
                 octez_base |> open_ ~m:"TzPervasives";
+                tezt_tezos |> open_;
                 main |> open_;
                 client |> if_some |> open_;
                 plugin |> if_some |> open_;

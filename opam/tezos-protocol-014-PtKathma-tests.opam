@@ -29,6 +29,7 @@ depends: [
   "tezos-stdlib-unix" {with-test}
   "tezos-stdlib" {with-test}
   "tezt" {with-test}
+  "tezt-tezos" {with-test}
 ]
 build: [
   ["rm" "-r" "vendors"]

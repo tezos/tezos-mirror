@@ -178,20 +178,11 @@ let logger () :
    After [f] finishes, logs are gathered and each occurrence of each
    string in [mask] list is being replaced with asterisks. Thus processed
    log is captured as regression output. *)
-let with_logger ?(mask = []) f =
+let with_logger f =
   let get_log, logger = logger () in
   let* () = f logger in
   let* log = get_log () in
-  let capture s =
-    List.fold_left
-      (fun s to_mask ->
-        let r = Re.Str.(regexp_string to_mask) in
-        let m = String.(make (length to_mask) '*') in
-        Re.Str.global_replace r m s)
-      s
-      mask
-    |> Regression.capture
-  in
+  let capture s = Tezos_regression.replace_variables s |> Regression.capture in
   Format.kasprintf
     capture
     "@,@[<v 2>trace@,%a@]"
@@ -208,7 +199,7 @@ let read_code filename =
 
 let run_script transaction () =
   let script = read_code @@ filename transaction in
-  let* parameter, to_mask, ctxt =
+  let* parameter, ctxt =
     match transaction with
     | With_lib {lib = {filename; storage}; parameter; _} ->
         let* block, baker, _contract, _src2 = Contract_helpers.init () in
@@ -222,7 +213,7 @@ let run_script transaction () =
             block
         in
         let* incr = Incremental.begin_construction block in
-        return (parameter src_addr, [src_addr], Incremental.alpha_ctxt incr)
+        return (parameter src_addr, Incremental.alpha_ctxt incr)
     | Simple {parameter; _} ->
         let* b, _contract = Context.init1 ~consensus_threshold:0 () in
         let* inc = Incremental.begin_construction b in
@@ -230,11 +221,9 @@ let run_script transaction () =
         let ctxt =
           Alpha_context.Origination_nonce.init ctxt Operation_hash.zero
         in
-        return (parameter, [], ctxt)
+        return (parameter, ctxt)
   in
-
-  let mask = List.map (Format.asprintf "%a" Contract_hash.pp) to_mask in
-  with_logger ~mask @@ fun logger ->
+  with_logger @@ fun logger ->
   let step_constants =
     Contract_helpers.
       {
