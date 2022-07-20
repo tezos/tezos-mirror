@@ -237,8 +237,8 @@ module type MerkelizedOperations = sig
 
       A subtlety of this [history] type is that it is customizable
       depending on how much of the inbox history you actually want to
-      remember, using the [bound] parameter. In the L1 we use this with
-      [bound] set to zero, which makes it immediately forget an old
+      remember, using the [capacity] parameter. In the L1 we use this with
+      [capacity] set to zero, which makes it immediately forget an old
       level as soon as we move to the next. By contrast, the rollup node
       uses a history that is sufficiently large to be able to take part
       in all potential refutation games occurring during the challenge
@@ -249,10 +249,10 @@ module type MerkelizedOperations = sig
 
   val pp_history : Format.formatter -> history -> unit
 
-  (** Construct an empty initial [history] with a given [bound]. If you
-      are running a rollup node, [bound] needs to be large enough to
+  (** Construct an empty initial [history] with a given [capacity]. If you
+      are running a rollup node, [capacity] needs to be large enough to
       remember any levels for which you may need to produce proofs. *)
-  val history_at_genesis : bound:int64 -> history
+  val history_at_genesis : capacity:int64 -> history
 
   (** [add_messages ctxt history inbox level payloads level_tree] inserts
       a list of [payloads] as new messages in the [level_tree] of the

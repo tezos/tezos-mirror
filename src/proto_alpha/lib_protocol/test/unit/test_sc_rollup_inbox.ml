@@ -58,7 +58,7 @@ let setup_inbox_with_messages list_of_payloads f =
   let open Lwt_syntax in
   create_context () >>=? fun ctxt ->
   let* inbox = empty ctxt rollup level in
-  let history = history_at_genesis ~bound:10000L in
+  let history = history_at_genesis ~capacity:10000L in
   let rec aux level history inbox inboxes level_tree = function
     | [] -> return (ok (level_tree, history, inbox, inboxes))
     | [] :: ps ->
@@ -266,7 +266,7 @@ let setup_node_inbox_with_messages list_of_payloads f =
   let* index = Tezos_context_memory.Context.init "foo" in
   let ctxt = Tezos_context_memory.Context.empty index in
   let* inbox = empty ctxt rollup level in
-  let history = history_at_genesis ~bound:10000L in
+  let history = history_at_genesis ~capacity:10000L in
   let rec aux level history inbox inboxes level_tree = function
     | [] -> return (ok (level_tree, history, inbox, inboxes))
     | payloads :: ps -> (
@@ -398,7 +398,7 @@ let test_empty_inbox_proof (level, n) =
   let* index = Tezos_context_memory.Context.init "foo" in
   let ctxt = Tezos_context_memory.Context.empty index in
   let* inbox = Node.empty ctxt rollup level in
-  let history = Node.history_at_genesis ~bound:10000L in
+  let history = Node.history_at_genesis ~capacity:10000L in
   let* history, history_proof =
     Node.form_history_proof ctxt history inbox None
   in
