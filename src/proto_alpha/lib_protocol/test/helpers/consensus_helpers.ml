@@ -27,7 +27,8 @@ open Protocol
 open Alpha_context
 
 let test_consensus_operation ?construction_mode ?level ?block_payload_hash ?slot
-    ?round ~endorsed_block ~error_title ~is_preendorsement ~context ~loc () =
+    ?round ~endorsed_block ?error ?error_title ~is_preendorsement ~context ~loc
+    () =
   (if is_preendorsement then
    Op.preendorsement
      ~endorsed_block
@@ -49,17 +50,27 @@ let test_consensus_operation ?construction_mode ?level ?block_payload_hash ?slot
       ()
     >|=? fun op -> Operation.pack op)
   >>=? fun op ->
+  let assert_error res =
+    (* In the next commit, argument [error_title] will be removed and
+       [error] will become mandatory. This is a temporary workaround
+       so that we do not need to update test_endorsement.ml yet. *)
+    (match error with
+    | Some error -> Assert.proto_error ~loc res error
+    | None -> return_unit)
+    >>=? fun () ->
+    match error_title with
+    | Some error_title -> Assert.proto_error_with_info ~loc res error_title
+    | None -> return_unit
+  in
   match construction_mode with
   | None ->
       (* meaning Application mode *)
-      Block.bake ~operations:[op] endorsed_block >>= fun res ->
-      Assert.proto_error_with_info ~loc res error_title
+      Block.bake ~operations:[op] endorsed_block >>= assert_error
   | Some (pred, protocol_data) ->
       (* meaning partial construction or full construction mode, depending on
          [protocol_data] *)
       Block.get_construction_vstate ~protocol_data pred >>=? fun vstate ->
-      apply_operation vstate op >|= Environment.wrap_tzresult >>= fun res ->
-      Assert.proto_error_with_info ~loc res error_title
+      apply_operation vstate op >|= Environment.wrap_tzresult >>= assert_error
 
 let delegate_of_first_slot b =
   let module V = Plugin.RPC.Validators in

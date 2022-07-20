@@ -370,9 +370,177 @@ module Consensus = struct
       expected_grandparent_endorsement_for_mempool;
     }
 
-  let validate_preendorsement _vi vs ~should_check_signature:_
-      (_operation : Kind.preendorsement operation) =
-    return vs
+  open Validate_errors.Consensus
+
+  let check_frozen_deposits_are_positive ctxt delegate_pkh =
+    let open Lwt_result_syntax in
+    let* frozen_deposits = Delegate.frozen_deposits ctxt delegate_pkh in
+    fail_unless
+      Tez.(frozen_deposits.current_amount > zero)
+      (Zero_frozen_deposits delegate_pkh)
+
+  let check_level_equal kind expected_features
+      (consensus_content : consensus_content) =
+    let expected = expected_features.level in
+    let provided = consensus_content.level in
+    error_unless
+      (Raw_level.equal expected provided)
+      (if Raw_level.(expected > provided) then
+       Consensus_operation_for_old_level {kind; expected; provided}
+      else Consensus_operation_for_future_level {kind; expected; provided})
+
+  let check_round_equal vs kind expected_features
+      (consensus_content : consensus_content) =
+    let check expected =
+      let provided = consensus_content.round in
+      error_unless
+        (Round.equal expected provided)
+        (if Round.(expected > provided) then
+         Consensus_operation_for_old_round {kind; expected; provided}
+        else Consensus_operation_for_future_round {kind; expected; provided})
+    in
+    match expected_features.round with
+    | Some expected -> check expected
+    | None -> (
+        (* For preendorsements in block construction mode,
+           [expected_features.round] has been set to [None] because we
+           could not know yet whether there is a locked round. *)
+        match vs.consensus_state.locked_round_evidence with
+        | None ->
+            (* This is the first validated preendorsement in
+               construction mode: there is nothing to check. *)
+            ok ()
+        | Some (expected, _power) ->
+            (* Other preendorsements have already been validated: we
+               check that the current operation has the same round as
+               them. *)
+            check expected)
+
+  let check_branch_equal kind expected_features (operation : 'a operation) =
+    let expected = expected_features.branch in
+    let provided = operation.shell.branch in
+    error_unless
+      (Block_hash.equal expected provided)
+      (Wrong_consensus_operation_branch {kind; expected; provided})
+
+  let check_payload_hash_equal kind expected_features
+      (consensus_content : consensus_content) =
+    let expected = expected_features.payload_hash in
+    let provided = consensus_content.block_payload_hash in
+    error_unless
+      (Block_payload_hash.equal expected provided)
+      (Wrong_payload_hash_for_consensus_operation {kind; expected; provided})
+
+  let check_consensus_features vs kind (expected : expected_features)
+      (consensus_content : consensus_content) (operation : 'a operation) =
+    let open Result_syntax in
+    let* () = check_level_equal kind expected consensus_content in
+    let* () = check_round_equal vs kind expected consensus_content in
+    let* () = check_branch_equal kind expected operation in
+    check_payload_hash_equal kind expected consensus_content
+
+  let ensure_conflict_free_preendorsement vs slot =
+    error_unless
+      (not (Slot.Set.mem slot vs.consensus_state.preendorsements_seen))
+      (Conflicting_consensus_operation {kind = Preendorsement})
+
+  let update_validity_state_preendorsement vs slot round voting_power =
+    let locked_round_evidence =
+      match vs.consensus_state.locked_round_evidence with
+      | None -> Some (round, voting_power)
+      | Some (_stored_round, evidences) -> Some (round, evidences + voting_power)
+      (* In mempool mode, round and stored_round can be different when
+         one of them corresponds to a grandparent preendorsement; this
+         doesn't matter because quorum certificates are not used in
+         mempool mode. For other cases, {!check_round_equal} ensures
+         that all preendorsements have the same round. Indeed, during
+         block validation, they are all checked to be the same
+         {!recfield:expected_features.round}; and during block
+         construction, the round of the first validated preendorsement
+         is stored in [locked_round_evidence] then all subsequent
+         preendorsements are checked to have the same round in
+         {!check_round_equal}. *)
+    in
+    let preendorsements_seen =
+      Slot.Set.add slot vs.consensus_state.preendorsements_seen
+    in
+    {
+      vs with
+      consensus_state =
+        {vs.consensus_state with locked_round_evidence; preendorsements_seen};
+    }
+
+  let get_expected_preendorsements_features consensus_info consensus_content =
+    match consensus_info.all_expected_features.expected_preendorsement with
+    | Expected_preendorsement {expected_features; block_round} ->
+        ok (expected_features, block_round)
+    | No_locked_round_for_block_validation_preendorsement
+    | Fresh_proposal_for_block_construction_preendorsement ->
+        error Unexpected_preendorsement_in_block
+    | No_expected_branch_for_mempool_preendorsement {expected_level} ->
+        error
+          (Consensus_operation_for_future_level
+             {
+               kind = Preendorsement;
+               expected = expected_level;
+               provided = consensus_content.Alpha_context.level;
+             })
+    | No_predecessor_info_cannot_validate_preendorsement ->
+        error Consensus_operation_not_allowed
+
+  let check_round_not_too_high ~block_round ~provided =
+    match block_round with
+    | None -> ok ()
+    | Some block_round ->
+        error_unless
+          Round.(provided < block_round)
+          (Preendorsement_round_too_high {block_round; provided})
+
+  let get_delegate_details slot_map kind consensus_content =
+    Result.of_option
+      (Slot.Map.find consensus_content.slot slot_map)
+      ~error:(trace_of_error (Wrong_slot_used_for_consensus_operation {kind}))
+
+  let validate_preendorsement vi vs ~should_check_signature
+      (operation : Kind.preendorsement operation) =
+    let open Lwt_result_syntax in
+    let (Single (Preendorsement consensus_content)) =
+      operation.protocol_data.contents
+    in
+    let kind = Preendorsement in
+    let*? () = ensure_conflict_free_preendorsement vs consensus_content.slot in
+    let*? expected_features, block_round =
+      get_expected_preendorsements_features vi.consensus_info consensus_content
+    in
+    let*? () =
+      check_round_not_too_high ~block_round ~provided:consensus_content.round
+    in
+    let*? () =
+      check_consensus_features
+        vs
+        kind
+        expected_features
+        consensus_content
+        operation
+    in
+    let*? delegate_pk, delegate_pkh, voting_power =
+      get_delegate_details
+        vi.consensus_info.preendorsement_slot_map
+        kind
+        consensus_content
+    in
+    let* () = check_frozen_deposits_are_positive vi.ctxt delegate_pkh in
+    let*? () =
+      if should_check_signature then
+        Operation.check_signature delegate_pk vi.chain_id operation
+      else ok ()
+    in
+    return
+      (update_validity_state_preendorsement
+         vs
+         consensus_content.slot
+         consensus_content.round
+         voting_power)
 
   let validate_endorsement _vi vs ~should_check_signature:_
       (_operation : Kind.endorsement operation) =

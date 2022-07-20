@@ -56,7 +56,11 @@ let test_consensus_operation_preendorsement_for_future_level () =
     ~is_preendorsement:true
     ~endorsed_block:pred
     ~level
-    ~error_title:"Consensus operation for future level"
+    ~error:(function
+      | Validate_errors.Consensus.Consensus_operation_for_future_level {kind; _}
+        when kind = Validate_errors.Consensus.Preendorsement ->
+          true
+      | _ -> false)
     ~context:(Context.B genesis)
     ~construction_mode:(pred, None)
     ()
@@ -71,7 +75,11 @@ let test_consensus_operation_preendorsement_for_old_level () =
     ~is_preendorsement:true
     ~endorsed_block:pred
     ~level
-    ~error_title:"Consensus operation for old level"
+    ~error:(function
+      | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
+        when kind = Validate_errors.Consensus.Preendorsement ->
+          true
+      | _ -> false)
     ~context:(Context.B genesis)
     ~construction_mode:(pred, None)
     ()
@@ -85,7 +93,11 @@ let test_consensus_operation_preendorsement_for_future_round () =
     ~is_preendorsement:true
     ~endorsed_block:pred
     ~round
-    ~error_title:"Consensus operation for future round"
+    ~error:(function
+      | Validate_errors.Consensus.Consensus_operation_for_future_round {kind; _}
+        when kind = Validate_errors.Consensus.Preendorsement ->
+          true
+      | _ -> false)
     ~context:(Context.B genesis)
     ~construction_mode:(pred, None)
     ()
@@ -99,7 +111,11 @@ let test_consensus_operation_preendorsement_for_old_round () =
     ~is_preendorsement:true
     ~endorsed_block:pred
     ~round
-    ~error_title:"Consensus operation for old round"
+    ~error:(function
+      | Validate_errors.Consensus.Consensus_operation_for_old_round {kind; _}
+        when kind = Validate_errors.Consensus.Preendorsement ->
+          true
+      | _ -> false)
     ~context:(Context.B genesis)
     ~construction_mode:(pred, None)
     ()
@@ -112,7 +128,12 @@ let test_consensus_operation_preendorsement_on_competing_proposal () =
     ~is_preendorsement:true
     ~endorsed_block:pred
     ~block_payload_hash:Block_payload_hash.zero
-    ~error_title:"Consensus operation on competing proposal"
+    ~error:(function
+      | Validate_errors.Consensus.Wrong_payload_hash_for_consensus_operation
+          {kind; _}
+        when kind = Validate_errors.Consensus.Preendorsement ->
+          true
+      | _ -> false)
     ~context:(Context.B genesis)
     ~construction_mode:(pred, None)
     ()
@@ -124,7 +145,9 @@ let test_unexpected_preendorsements_in_blocks () =
     ~loc:__LOC__
     ~is_preendorsement:true
     ~endorsed_block:pred
-    ~error_title:"Unexpected preendorsement in block"
+    ~error:(function
+      | Validate_errors.Consensus.Unexpected_preendorsement_in_block -> true
+      | _ -> false)
     ~context:(Context.B genesis)
     ()
 
@@ -140,7 +163,9 @@ let test_too_high_round () =
     ~endorsed_block:pred
     ~round
     ~level
-    ~error_title:"Preendorsement round too high"
+    ~error:(function
+      | Validate_errors.Consensus.Preendorsement_round_too_high _ -> true
+      | _ -> false)
     ~context:(Context.B genesis)
     ~construction_mode:(pred, Some pred.header.protocol_data)
     ()
