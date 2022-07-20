@@ -1030,12 +1030,14 @@ type strategy =
           GSW 73-9 2014-2015 mindset. *)
   | Lazy  (** A lazy player will not execute all messages. *)
   | Eager  (** A eager player will not cheat until a certain point. *)
+  | Keen  (** A keen player will execute more messages. *)
 
 let pp_strategy fmt = function
   | Random -> Format.pp_print_string fmt "Random"
   | Perfect -> Format.pp_print_string fmt "Perfect"
   | Lazy -> Format.pp_print_string fmt "Lazy"
   | Eager -> Format.pp_print_string fmt "Eager"
+  | Keen -> Format.pp_print_string fmt "Keen"
 
 type player = {
   pkh : Signature.Public_key_hash.t;
@@ -1213,6 +1215,19 @@ module Player_client = struct
                     if !idx = corrupt_at_k then new_input else input)
                   inputs ))
             levels_and_inputs
+        in
+        let _state, tick, our_states = eval_inputs new_levels_and_inputs in
+        return (tick, our_states, new_levels_and_inputs)
+    | Keen ->
+        (* Keen player will add more messages. *)
+        let* new_levels_and_inputs =
+          gen_arith_pvm_inputs_for_levels ?level_min ?level_max ()
+        in
+        let new_levels_and_inputs = new_levels_and_inputs @ levels_and_inputs in
+        let new_levels_and_inputs =
+          List.sort_uniq
+            (fun (l, _) (l', _) -> Compare.Int.compare l l')
+            new_levels_and_inputs
         in
         let _state, tick, our_states = eval_inputs new_levels_and_inputs in
         return (tick, our_states, new_levels_and_inputs)
@@ -1627,6 +1642,12 @@ let test_perfect_against_eager =
 let test_eager_against_perfect =
   test_game ~nonempty_inputs:true ~p1_strategy:Eager ~p2_strategy:Perfect ()
 
+let test_perfect_against_keen =
+  test_game ~p1_strategy:Perfect ~p2_strategy:Keen ()
+
+let test_keen_against_perfect =
+  test_game ~p1_strategy:Keen ~p2_strategy:Perfect ()
+
 let tests =
   ( "Refutation",
     qcheck_wrap
@@ -1637,6 +1658,8 @@ let tests =
         test_lazy_against_perfect;
         test_perfect_against_eager;
         test_eager_against_perfect;
+        test_perfect_against_keen;
+        test_keen_against_perfect;
       ] )
 
 (** {2 Entry point} *)
