@@ -40,12 +40,16 @@ module Traced_interpreter = Plugin.RPC.Scripts.Traced_interpreter (struct
   let unparsing_mode = Script_ir_translator.Readable
 end)
 
-type contract = {
-  filename : string;
-  amount : Tez.t;
-  storage : string;
-  parameter : string;
-}
+type contract = {filename : string; storage : string}
+
+type transaction =
+  | Simple of {dst : contract; amount : Tez.t; parameter : string}
+  | With_lib of {
+      dst : contract;
+      lib : contract;
+      amount : Tez.t;
+      parameter : Contract_hash.t -> string;
+    }
 
 type element_kind = Interp | Entry | Exit
 
@@ -69,6 +73,28 @@ type trace_element =
       * element_kind
       -> trace_element
   | TCtrl : ('a, 'b, 'c, 'd) Script_typed_ir.continuation -> trace_element
+
+let transaction ?(amount = Tez.zero) ~parameter ~storage filename =
+  Simple {amount; parameter; dst = {filename; storage}}
+
+let with_lib ?(amount = Tez.zero) ~parameter ~storage ~lib ~lib_storage filename
+    =
+  With_lib
+    {
+      amount;
+      parameter;
+      dst = {storage; filename};
+      lib = {filename = lib; storage = lib_storage};
+    }
+
+let filename = function
+  | Simple {dst = {filename; _}; _} | With_lib {dst = {filename; _}; _} ->
+      filename
+
+let amount = function Simple {amount; _} | With_lib {amount; _} -> amount
+
+let storage = function
+  | Simple {dst = {storage; _}; _} | With_lib {dst = {storage; _}; _} -> storage
 
 let with_indentation fmt = function
   | Interp ->
@@ -148,13 +174,6 @@ let logger () :
   in
   (assemble_log, {log_exit; log_entry; log_interp; get_log; log_control})
 
-let test_context () =
-  let open Environment.Error_monad in
-  let* b, _contract = Context.init1 ~consensus_threshold:0 () in
-  let* inc = Incremental.begin_construction b in
-  let ctxt = Incremental.alpha_ctxt inc in
-  return @@ Alpha_context.Origination_nonce.init ctxt Operation_hash.zero
-
 (* [with_logger ~mask f] creates a fresh logger and passes it to [f].
    After [f] finishes, logs are gathered and each occurrence of each
    string in [mask] list is being replaced with asterisks. Thus processed
@@ -167,7 +186,7 @@ let with_logger ?(mask = []) f =
     List.fold_left
       (fun s to_mask ->
         let r = Re.Str.(regexp_string to_mask) in
-        let m = String.(init (length to_mask) (fun _ -> '*')) in
+        let m = String.(make (length to_mask) '*') in
         Re.Str.global_replace r m s)
       s
       mask
@@ -187,15 +206,40 @@ let read_code filename =
   in
   Contract_helpers.read_file filename
 
-let run_script {filename; amount; storage; parameter} () =
-  with_logger @@ fun logger ->
-  let script = read_code filename in
-  let* ctxt = test_context () in
+let run_script transaction () =
+  let script = read_code @@ filename transaction in
+  let* parameter, to_mask, ctxt =
+    match transaction with
+    | With_lib {lib = {filename; storage}; parameter; _} ->
+        let* block, baker, _contract, _src2 = Contract_helpers.init () in
+        let sender = Contract.Implicit baker in
+        let* src_addr, _script, block =
+          Contract_helpers.originate_contract_from_string_hash
+            ~baker
+            ~source_contract:sender
+            ~script:(read_code filename)
+            ~storage
+            block
+        in
+        let* incr = Incremental.begin_construction block in
+        return (parameter src_addr, [src_addr], Incremental.alpha_ctxt incr)
+    | Simple {parameter; _} ->
+        let* b, _contract = Context.init1 ~consensus_threshold:0 () in
+        let* inc = Incremental.begin_construction b in
+        let ctxt = Incremental.alpha_ctxt inc in
+        let ctxt =
+          Alpha_context.Origination_nonce.init ctxt Operation_hash.zero
+        in
+        return (parameter, [], ctxt)
+  in
+
+  let mask = List.map (Format.asprintf "%a" Contract_hash.pp) to_mask in
+  with_logger ~mask @@ fun logger ->
   let step_constants =
     Contract_helpers.
       {
         default_step_constants with
-        amount;
+        amount = amount transaction;
         now = Script_timestamp.of_int64 1649939559L;
       }
   in
@@ -204,37 +248,9 @@ let run_script {filename; amount; storage; parameter} () =
       ctxt
       script
       ~logger
-      ~storage
+      ~storage:(storage transaction)
       ~parameter
       ~step_constants
-      ~internal:true (* Allow for forged values (e.g. tickets). *)
-      ()
-  in
-  return_unit
-
-let originate_lib_and_run_script lib_script script () =
-  let* block, baker, _contract, _src2 = Contract_helpers.init () in
-  let sender = Contract.Implicit baker in
-  let* lib, _script, block =
-    Contract_helpers.originate_contract_from_string_hash
-      ~baker
-      ~source_contract:sender
-      ~script:(read_code lib_script)
-      ~storage:"0"
-      block
-  in
-  let* incr = Incremental.begin_construction block in
-  let ctxt = Incremental.alpha_ctxt incr in
-  with_logger ~mask:[Format.asprintf "%a" Contract_hash.pp lib] @@ fun logger ->
-  let parameter = Format.asprintf "Pair 8 \"%a\"" Contract_hash.pp lib in
-  let* _res, _ctxt =
-    Contract_helpers.run_script
-      ctxt
-      (read_code script)
-      ~logger
-      ~storage:"0"
-      ~parameter
-      ~step_constants:Contract_helpers.default_step_constants
       ~internal:true (* Allow for forged values (e.g. tickets). *)
       ()
   in
@@ -255,15 +271,16 @@ let protocol =
       Stdlib.failwith ("failed to extract protocol name from path: " ^ __FILE__)
   | Some name -> name
 
-let register_script contract =
+let register_script transaction =
   (* [~title] must be unique across the codebase, so we prefix it with the protocol name.
      [~file] however is better kept the same across protocols to simplify snapshotting. *)
+  let file = filename transaction in
   Regression.register
     ~__FILE__
-    ~title:(protocol ^ ": " ^ contract.filename)
+    ~title:(protocol ^ ": " ^ file)
     ~tags:["protocol"; "regression"; "logging"]
-    ~file:contract.filename
-    (fail_on_error @@ run_script contract)
+    ~file
+    (fail_on_error @@ run_script transaction)
 
 (* These tests should always cover:
     - every instruction type, which means an example of each group of instructions
@@ -277,194 +294,110 @@ let () =
   Array.iter
     register_script
     [|
-      {
-        filename = "accounts";
-        amount = Tez.zero;
-        parameter = "Left \"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\"";
-        storage = "{}";
-      };
-      {
-        filename = "append";
-        amount = Tez.zero;
-        parameter = "Pair {7; 8; 9} {4; 5; 6}";
-        storage = "{1; 2; 3}";
-      };
-      {
-        filename = "auction";
-        amount = Tez.of_mutez_exn 100_000_000L;
-        parameter = "\"tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv\"";
-        storage =
+      transaction
+        ~storage:"{}"
+        ~parameter:"Left \"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\""
+        "accounts";
+      transaction
+        ~storage:"{1; 2; 3}"
+        ~parameter:"Pair {7; 8; 9} {4; 5; 6}"
+        "append";
+      transaction
+        ~amount:(Tez.of_mutez_exn 100_000_000L)
+        ~parameter:"\"tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv\""
+        ~storage:
           "Pair \"2099-12-31T23:59:59Z\" (Pair 50000000 \
-           \"tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU\")";
-      };
-      {
-        filename = "big_map_union";
-        amount = Tez.zero;
-        parameter = "{Pair \"string\" 12; Pair \"abc\" 99; Pair \"def\" 3}";
-        storage = "Pair { Elt \"123\" 123 } Unit";
-      };
-      {
-        filename = "check_signature";
-        amount = Tez.zero;
-        parameter = "\"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav\"";
-        storage =
+           \"tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU\")"
+        "auction";
+      transaction
+        ~parameter:"{Pair \"string\" 12; Pair \"abc\" 99; Pair \"def\" 3}"
+        ~storage:"Pair { Elt \"123\" 123 } Unit"
+        "big_map_union";
+      transaction
+        ~parameter:"\"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav\""
+        ~storage:
           "Pair \
            \"edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1\" \
-           \"TEZOS\"";
-      };
-      {
-        filename = "comb-get";
-        amount = Tez.zero;
-        parameter = "Pair 1 4 2 Unit";
-        storage = "Unit";
-      };
-      {
-        filename = "comb-set";
-        amount = Tez.zero;
-        parameter = "Unit";
-        storage = "Pair 1 4 2 Unit";
-      };
-      {
-        filename = "concat";
-        amount = Tez.zero;
-        parameter = "\"abcd\"";
-        storage = "\"efgh\"";
-      };
-      {
-        filename = "conditionals";
-        amount = Tez.zero;
-        parameter = "Right (Some 23)";
-        storage = "\"\"";
-      };
-      {
-        filename = "cps_fact";
-        amount = Tez.zero;
-        parameter = "2";
-        storage = "60";
-      };
-      {
-        filename = "dign";
-        amount = Tez.zero;
-        parameter = "Pair (Pair (Pair (Pair 0 1) 2) 3) 4";
-        storage = "7";
-      };
-      {
-        filename = "dipn";
-        amount = Tez.zero;
-        parameter = "Pair (Pair (Pair (Pair 0 1) 2) 3) 4";
-        storage = "7";
-      };
-      {
-        filename = "dugn";
-        amount = Tez.zero;
-        parameter = "Pair (Pair (Pair (Pair 0 1) 2) 3) 4";
-        storage = "7";
-      };
-      {
-        filename = "ediv";
-        amount = Tez.zero;
-        parameter = "Pair 127 11";
-        storage = "Pair None None None None";
-      };
-      {
-        filename = "faucet";
-        amount = Tez.zero;
-        parameter = "\"tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU\"";
-        storage = "\"2020-01-01T00:00:00Z\"";
-      };
-      {
-        filename = "get_and_update_map";
-        amount = Tez.zero;
-        parameter = "\"abc\"";
-        storage = "Pair (Some 321) {Elt \"def\" 123}";
-      };
-      {filename = "if"; amount = Tez.zero; parameter = "True"; storage = "None"};
-      {
-        filename = "insertion_sort";
-        amount = Tez.zero;
-        parameter = "{8; 3; 2; 7; 6; 9; 5; 1; 4; 0}";
-        storage = "{}";
-      };
-      {
-        filename = "list_map_block";
-        amount = Tez.zero;
-        parameter = "{1; 2; 3; 4; 5; 6; 7}";
-        storage = "{}";
-      };
-      {
-        filename = "loop_left";
-        amount = Tez.zero;
-        parameter = "{\"abc\"; \"xyz\"}";
-        storage = "{\"zyx\"; \"cba\"}";
-      };
-      {
-        filename = "packunpack";
-        amount = Tez.zero;
-        parameter =
+           \"TEZOS\""
+        "check_signature";
+      transaction ~parameter:"Pair 1 4 2 Unit" ~storage:"Unit" "comb-get";
+      transaction ~parameter:"Unit" ~storage:"Pair 1 4 2 Unit" "comb-set";
+      transaction ~parameter:"\"abcd\"" ~storage:"\"efgh\"" "concat";
+      transaction ~parameter:"Right (Some 23)" ~storage:"\"\"" "conditionals";
+      transaction ~parameter:"2" ~storage:"60" "cps_fact";
+      transaction
+        ~parameter:"Pair (Pair (Pair (Pair 0 1) 2) 3) 4"
+        ~storage:"7"
+        "dign";
+      transaction
+        ~parameter:"Pair (Pair (Pair (Pair 0 1) 2) 3) 4"
+        ~storage:"7"
+        "dipn";
+      transaction
+        ~parameter:"Pair (Pair (Pair (Pair 0 1) 2) 3) 4"
+        ~storage:"7"
+        "dugn";
+      transaction
+        ~parameter:"Pair 127 11"
+        ~storage:"Pair None None None None"
+        "ediv";
+      transaction
+        ~parameter:"\"tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU\""
+        ~storage:"\"2020-01-01T00:00:00Z\""
+        "faucet";
+      transaction
+        ~parameter:"\"abc\""
+        ~storage:"Pair (Some 321) {Elt \"def\" 123}"
+        "get_and_update_map";
+      transaction ~parameter:"True" ~storage:"None" "if";
+      transaction
+        ~parameter:"{8; 3; 2; 7; 6; 9; 5; 1; 4; 0}"
+        ~storage:"{}"
+        "insertion_sort";
+      transaction
+        ~parameter:"{1; 2; 3; 4; 5; 6; 7}"
+        ~storage:"{}"
+        "list_map_block";
+      transaction
+        ~parameter:"{\"abc\"; \"xyz\"}"
+        ~storage:"{\"zyx\"; \"cba\"}"
+        "loop_left";
+      transaction
+        ~parameter:
           "Pair (Pair (Pair \"abc\" {1; 2; 3}) {4; 5; 6}) \
-           0x0507070707010000000361626302000000060001000200030200000006000400050006";
-        storage = "Unit";
-      };
-      {filename = "pexec"; amount = Tez.zero; parameter = "7"; storage = "77"};
-      {
-        filename = "reverse_loop";
-        amount = Tez.zero;
-        parameter = "{\"abc\" ; \"def\" ; \"ghi\"}";
-        storage = "{}";
-      };
-      {
-        filename = "set_delegate";
-        amount = Tez.zero;
-        parameter = "Some \"tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN\"";
-        storage = "Unit";
-      };
-      {
-        filename = "shifts";
-        amount = Tez.zero;
-        parameter = "Right (Pair 3 2)";
-        storage = "None";
-      };
-      {
-        filename = "spawn_identities";
-        amount = Tez.of_mutez_exn 1_200_00L;
-        parameter = "7";
-        storage = "{}";
-      };
-      {
-        filename = "ticket_join";
-        amount = Tez.zero;
-        parameter = "Pair \"KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v\" 17 3";
-        storage = "None";
-      };
-      {
-        filename = "ticket_split";
-        amount = Tez.zero;
-        parameter = "Pair \"KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v\" 17 3";
-        storage = "Unit";
-      };
-      {
-        filename = "view_toplevel_lib";
-        amount = Tez.zero;
-        parameter = "5";
-        storage = "3";
-      };
-      {
-        filename = "xor";
-        amount = Tez.zero;
-        parameter = "Left (Pair True False)";
-        storage = "None";
-      };
-      {
-        filename = "opt_map";
-        amount = Tez.zero;
-        parameter = "7";
-        storage = "Some 3";
-      };
-    |] ;
-  Regression.register
-    ~__FILE__
-    ~title:(protocol ^ ": view_fib")
-    ~tags:["protocol"; "regression"; "logging"]
-    ~file:"view_fib"
-    (fail_on_error
-    @@ originate_lib_and_run_script "view_toplevel_lib" "view_fib")
+           0x0507070707010000000361626302000000060001000200030200000006000400050006"
+        ~storage:"Unit"
+        "packunpack";
+      transaction ~parameter:"7" ~storage:"77" "pexec";
+      transaction
+        ~parameter:"{\"abc\"; \"def\" ; \"ghi\"}"
+        ~storage:"{}"
+        "reverse_loop";
+      transaction
+        ~parameter:"Some \"tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN\""
+        ~storage:"Unit"
+        "set_delegate";
+      transaction ~parameter:"Right (Pair 3 2)" ~storage:"None" "shifts";
+      transaction
+        ~amount:(Tez.of_mutez_exn 1_200_00L)
+        ~parameter:"7"
+        ~storage:"{}"
+        "spawn_identities";
+      transaction
+        ~parameter:"Pair \"KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v\" 17 3"
+        ~storage:"None"
+        "ticket_join";
+      transaction
+        ~parameter:"Pair \"KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v\" 17 3"
+        ~storage:"Unit"
+        "ticket_split";
+      transaction ~parameter:"5" ~storage:"3" "view_toplevel_lib";
+      transaction ~parameter:"Left (Pair True False)" ~storage:"None" "xor";
+      transaction ~parameter:"7" ~storage:"Some 3" "opt_map";
+      with_lib
+        ~parameter:(Format.asprintf "Pair 8 \"%a\"" Contract_hash.pp)
+        ~storage:"0"
+        ~lib:"view_toplevel_lib"
+        ~lib_storage:"0"
+        "view_fib";
+    |]
