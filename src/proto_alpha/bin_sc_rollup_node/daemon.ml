@@ -64,11 +64,6 @@ module Make (PVM : Pvm.S) = struct
   module Components = Components.Make (PVM)
 
   let process_head node_ctxt store head_state =
-    (* Because we keep track of finalized heads using transaction finality time,
-       rather than block finality time, it is possible that heads with the same
-       level are processed as finalized. Individual modules that process heads
-       when finalized, such as Commitment, need to take this into account.
-    *)
     let open Lwt_result_syntax in
     let {finalized; seen_before; head} = head_state in
     let* () =
@@ -93,8 +88,7 @@ module Make (PVM : Pvm.S) = struct
       Components.Commitment.process_head node_ctxt store head
     in
     (* Publishing a commitment when one is available does not depend on the state of
-       the current head, but we still need to ensure that the node only published
-       one commitment per block. *)
+       the current head. *)
     let* () = Components.Commitment.publish_commitment node_ctxt store in
     let* () =
       Components.Commitment.cement_commitment_if_possible node_ctxt store head
@@ -109,22 +103,29 @@ module Make (PVM : Pvm.S) = struct
         let*! () = Layer1.mark_processed_head store head in
         return ())
 
-  (* [on_layer_1_chain_event node_ctxt store chain_event old_heads] processes a
-     list of heads, coming from either a list of [old_heads] or from the current
-     [chain_event]. [old_heads] is the list of heads returned by the previous
-     iteration of [on_layer_1_chain_event] in the [daemonize function]. These are
-     heads included in the branch currently tracked by the rollup node, and that
+  (* [on_layer_1_chain_event node_ctxt store chain_event] processes a
+     list of heads, coming either from a list of [old_heads] persisted in the
+     store, or from the current [chain_event]. [old_heads] is a list of heads
+     that have not been recognised as finalised by the rollup node. This list
+     has been set by the last iteration of [on_layer_1_chain_event] in
+     the {!daemonize} function, or it is the empty list if the rollup node is
+     executing [on_layer_1_chain_event] for the very first time.
+     These are heads included in
+     the branch currently tracked by the rollup node, and that
      have only been partially processed, due to the rollup  node not being able
-     to establish their finality. The function returns a list of heads from the
-     current branch tracked by the rollup node, whose finality cannot be
-     established at the time the function is invoked. Those heads will be
-     processed again at the next iteration of [on_layer_1_chain_event] in the
-     [daemonize] function. If [chain_event] is a rollback event, then no head
-     needs to be returned to be included as the rollup node started tracking a
-     new branch.
+     to establish their finality. The function persists to disk the list of
+     heads from the current branch tracked by the rollup node,
+     whose finality cannot be established at the time the function is invoked.
+     Those heads will be processed again at the next iteration of
+     [on_layer_1_chain_event] in the [daemonize] function. If [chain_event] is
+     a rollback event, then the list of heads persisted to disk is reset to the
+     empty list, as the rollup node started tracking a new branch.
+     Because heads that still have not been processed as finalized are
+     persisted to disk, this function is robust against interruptions.
   *)
-  let on_layer_1_chain_event node_ctxt store chain_event old_heads =
+  let on_layer_1_chain_event node_ctxt store chain_event =
     let open Lwt_result_syntax in
+    let*! old_heads = Layer1.get_heads_not_finalized store in
     let open Layer1 in
     let* () =
       (* Get information about the last cemented commitment to determine the
@@ -137,17 +138,11 @@ module Make (PVM : Pvm.S) = struct
     let* non_final_heads =
       match chain_event with
       | SameBranch {new_head; intermediate_heads} ->
+          let new_heads = intermediate_heads @ [new_head] in
           let*! () =
-            Daemon_event.processing_heads_iteration
-              old_heads
-              (intermediate_heads @ [new_head])
+            Daemon_event.processing_heads_iteration old_heads new_heads
           in
-          let head_states =
-            categorise_heads
-              node_ctxt
-              old_heads
-              (intermediate_heads @ [new_head])
-          in
+          let head_states = categorise_heads node_ctxt old_heads new_heads in
           let* () = List.iter_es (process_head node_ctxt store) head_states in
           (* Return new_head to be processed as finalized head if the
              next chain event is of type SameBranch.
@@ -186,19 +181,20 @@ module Make (PVM : Pvm.S) = struct
           in
           []
     in
+    let*! () = Layer1.set_heads_not_finalized store non_final_heads in
     let*! () = Layer1.processed chain_event in
-    return non_final_heads
+    return_unit
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2895
      Use Lwt_stream.fold_es once it is exposed. *)
   let iter_stream stream handle =
-    let rec go heads =
+    let rec go () =
       Lwt.bind (Lwt_stream.get stream) @@ fun tok ->
       match tok with
       | None -> return_unit
-      | Some element -> Lwt_result.bind (handle element heads) go
+      | Some element -> Lwt_result.bind (handle element) go
     in
-    go []
+    go ()
 
   let daemonize node_ctxt store (l1_ctxt : Layer1.t) =
     Lwt.no_cancel @@ iter_stream l1_ctxt.events

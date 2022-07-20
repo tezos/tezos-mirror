@@ -46,32 +46,31 @@ open Alpha_context
 module type Mutable_level_store =
   Store.Mutable_value with type value = Raw_level.t
 
-(* We keep the number of messages and ticks to be included in the
-   next commitment in memory. Note that we do not risk to increase
+(* We persist the number of ticks to be included in the
+   next commitment on disk, in a map that is indexed by
+   inbox level. Note that we do not risk to increase
    these counters when the wrong branch is tracked by the rollup
    node, as only finalized heads are processed to build commitments.
 *)
+module Number_of_ticks = Store.Make_append_only_map (struct
+  let path = ["commitments"; "in_progress"; "number_of_ticks"]
 
-(* FIXME: #3203
+  (* We only access the number of ticks for either the
+     current or previous level being processed by the
+     commitment module. Therefore, by keeping the
+     last two entries in memory, we ensure that
+     the information about ticks is always recovered
+     from the main memory. *)
+  let keep_last_n_entries_in_memory = 2
 
-   Using these global variables is fragile considering chain
-   reorganizations and interruptions. We should use a more persistent
-   representations for this piece of information. *)
-module Mutable_counter = struct
-  module Make () = struct
-    let x = ref Z.zero
+  type key = Raw_level.t
 
-    let add z = x := Z.add !x z
+  let string_of_key l = Int32.to_string @@ Raw_level.to_int32 l
 
-    let reset () = x := Z.zero
+  type value = Z.t
 
-    let get () = !x
-  end
-end
-
-module Number_of_messages = Mutable_counter.Make ()
-
-module Number_of_ticks = Mutable_counter.Make ()
+  let value_encoding = Data_encoding.z
+end)
 
 let sc_rollup_commitment_period node_ctxt =
   Int32.of_int
@@ -182,7 +181,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
             "PVM state for block hash not available %s"
             (Block_hash.to_string block_hash)
     in
-    let number_of_ticks = Number_of_ticks.get () in
+    let*! number_of_ticks = Number_of_ticks.get store inbox_level in
     let+ number_of_ticks =
       match
         Sc_rollup.Number_of_ticks.of_int32 @@ Z.to_int32 number_of_ticks
@@ -191,11 +190,6 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       | None ->
           failwith "Invalid number of ticks %s" (Z.to_string number_of_ticks)
     in
-    (* Reset counters for messages as the commitment to be published
-       has been built.
-    *)
-    let () = Number_of_messages.reset () in
-    let () = Number_of_ticks.reset () in
     Sc_rollup.Commitment.
       {predecessor; inbox_level; number_of_ticks; compressed_state}
 
@@ -212,17 +206,50 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       return_unit
     else return_unit
 
-  let update_ticks_and_messages store block_hash =
+  let update_ticks store node_ctxt current_level block_hash =
     let open Lwt_result_syntax in
-    let*! {num_messages; num_ticks; _} = Store.StateInfo.get store block_hash in
-    let () = Number_of_messages.add num_messages in
-    return @@ Number_of_ticks.add num_ticks
+    let*! last_stored_commitment_level_opt =
+      last_commitment_level (module Store.Last_stored_commitment_level) store
+    in
+    let last_stored_commitment_level =
+      Option.value
+        ~default:node_ctxt.Node_context.genesis_info.level
+        last_stored_commitment_level_opt
+    in
+    let*! previous_level_num_ticks =
+      match Raw_level.pred current_level with
+      | None ->
+          (* This happens if the current_level is zero: it is safe to assume
+             that there are 0 ticks computed so far. *)
+          Lwt.return Z.zero
+      | Some level ->
+          if Raw_level.(level = last_stored_commitment_level) then
+            (* We are at the first level of a new commitment, so the initial amount
+               of ticks should be 0. *)
+            Lwt.return Z.zero
+          else if Raw_level.(level < node_ctxt.Node_context.genesis_info.level)
+          then
+            (* If the previous level was before the genesis level, then the
+               number of ticks at that level should be 0. *)
+            Lwt.return Z.zero
+          else
+            (* Otherwise we need to increment the number of ticks from the number
+               of ticks for the previous level. The number of ticks for such a
+               level should be in the store, otherwise the state of the rollup node
+               is corrupted. *)
+            Number_of_ticks.get store level
+    in
+    let*! {num_ticks; _} = Store.StateInfo.get store block_hash in
+    Number_of_ticks.add
+      store
+      current_level
+      (Z.add previous_level_num_ticks num_ticks)
 
   let process_head (node_ctxt : Node_context.t) store
       Layer1.(Head {level; hash}) =
     let open Lwt_result_syntax in
     let current_level = Raw_level.of_int32_exn level in
-    let* () = update_ticks_and_messages store hash in
+    let*! () = update_ticks store node_ctxt current_level hash in
     store_commitment_if_necessary node_ctxt store current_level hash
 
   let sync_last_cemented_commitment_hash_with_level
