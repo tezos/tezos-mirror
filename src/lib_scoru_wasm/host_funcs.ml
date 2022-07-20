@@ -26,9 +26,6 @@
 open Tezos_webassembly_interpreter
 open Instance
 
-let lookup name =
-  Stdlib.failwith (Printf.sprintf "Unknown host function %s" name)
-
 exception Bad_input
 
 let aux_write_input_in_memory ~input_buffer ~module_inst ~rtype_offset
@@ -62,8 +59,7 @@ let aux_write_input_in_memory ~input_buffer ~module_inst ~rtype_offset
     in
     Lwt.return input_size
 
-let read_input =
-  let open Lwt.Syntax in
+let read_input_type =
   let input_types =
     Types.
       [
@@ -76,31 +72,47 @@ let read_input =
     |> Vector.of_list
   in
   let output_types = Types.[NumType I32Type] |> Vector.of_list in
-  let fun_type = Types.FuncType (input_types, output_types) in
-  let f input_buffer module_inst inputs =
-    match inputs with
-    | [
-     Values.(Num (I32 rtype_offset));
-     Values.(Num (I32 level_offset));
-     Values.(Num (I32 id_offset));
-     Values.(Num (I32 dst));
-     Values.(Num (I32 max_bytes));
-    ] ->
-        let* x =
-          aux_write_input_in_memory
-            ~input_buffer
-            ~module_inst
-            ~rtype_offset
-            ~level_offset
-            ~id_offset
-            ~dst
-            ~max_bytes
-        in
-        Lwt.return [Values.(Num (I32 (I32.of_int_s x)))]
-    | _ -> raise Bad_input
-  in
-  Func.HostFunc (fun_type, f)
+  Types.FuncType (input_types, output_types)
+
+let read_input_name = "tezos_read_input"
+
+let read_input =
+  Host_funcs.Host_func
+    (fun input_buffer module_inst inputs ->
+      let open Lwt.Syntax in
+      match inputs with
+      | [
+       Values.(Num (I32 rtype_offset));
+       Values.(Num (I32 level_offset));
+       Values.(Num (I32 id_offset));
+       Values.(Num (I32 dst));
+       Values.(Num (I32 max_bytes));
+      ] ->
+          let* x =
+            aux_write_input_in_memory
+              ~input_buffer
+              ~module_inst
+              ~rtype_offset
+              ~level_offset
+              ~id_offset
+              ~dst
+              ~max_bytes
+          in
+          Lwt.return [Values.(Num (I32 (I32.of_int_s x)))]
+      | _ -> raise Bad_input)
+
+let lookup name =
+  let open Lwt.Syntax in
+  let+ name = Utf8.encode name in
+  match name with
+  | "read_input" -> ExternFunc (HostFunc (read_input_type, read_input_name))
+  | _ -> raise Not_found
+
+let register_host_funcs registry =
+  Host_funcs.register ~global_name:read_input_name read_input registry
 
 module Internal_for_tests = struct
   let aux_write_input_in_memory = aux_write_input_in_memory
+
+  let read_input = Func.HostFunc (read_input_type, read_input_name)
 end

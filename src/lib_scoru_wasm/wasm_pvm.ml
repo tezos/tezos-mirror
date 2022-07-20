@@ -39,7 +39,20 @@ module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
 
         module Decodings = Wasm_decodings.Make (T)
 
-        let compute_step = Lwt.return
+        let compute_step s =
+          let open Lwt.Syntax in
+          (* register the PVM host funcs wrappers in a module ["tezos"] into the WASM linker *)
+          let* () =
+            Tezos_webassembly_interpreter.(
+              Import.register ~module_name:(Utf8.decode "tezos"))
+              Host_funcs.lookup
+          in
+          (* build the registry of host functions (to be passed to the interpreter via its config *)
+          let host_funcs_registry =
+            Tezos_webassembly_interpreter.Host_funcs.empty ()
+          in
+          Host_funcs.register_host_funcs host_funcs_registry ;
+          Lwt.return s
 
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/3092
            Implement handling of input logic.

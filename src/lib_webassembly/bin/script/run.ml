@@ -320,6 +320,8 @@ let print_results rs =
 
 (* Configuration *)
 
+let host_funcs_registry = Host_funcs.empty ()
+
 module Map = Map.Make (String)
 
 let quote : script ref = ref []
@@ -351,7 +353,7 @@ let lookup_module = lookup "module" modules
 
 let lookup_instance = lookup "module" instances
 
-let lookup_registry module_name item_name _t =
+let lookup_registry module_name item_name =
   let* item_name = Lazy_vector.LwtInt32Vector.to_list item_name in
   let+ value = Instance.export (Map.find module_name !registry) item_name in
   match value with Some ext -> ext | None -> raise Not_found
@@ -390,7 +392,9 @@ let run_action act : Values.value list Lwt.t =
                 Script.error v.at "wrong type of argument")
             vs
             ins_l ;
-          let+ _, result = Eval.invoke f (List.map (fun v -> v.it) vs) in
+          let+ _, result =
+            Eval.invoke host_funcs_registry f (List.map (fun v -> v.it) vs)
+          in
           result
       | Some _ -> Assert.error act.at "export is not a function"
       | None -> Assert.error act.at "undefined export")
@@ -509,7 +513,7 @@ let run_assertion ass : unit Lwt.t =
       Lwt.try_bind
         (fun () ->
           let* imports = Import.link m in
-          Eval.init m imports)
+          Eval.init host_funcs_registry m imports)
         (fun _ -> Assert.error ass.at "expected linking error")
         (function
           | Import.Unknown (_, msg) | Eval.Link (_, msg) ->
@@ -524,7 +528,7 @@ let run_assertion ass : unit Lwt.t =
       Lwt.try_bind
         (fun () ->
           let* imports = Import.link m in
-          Eval.init m imports)
+          Eval.init host_funcs_registry m imports)
         (fun _ -> Assert.error ass.at "expected instantiation error")
         (function
           | Eval.Trap (_, msg) -> assert_message ass.at "instantiation" msg re
@@ -572,7 +576,7 @@ let rec run_command cmd : unit Lwt.t =
       if not !Flags.dry then
         let* () = trace_lwt "Initializing..." in
         let* imports = Import.link m in
-        let+ inst = Eval.init m imports in
+        let+ inst = Eval.init host_funcs_registry m imports in
         bind instances x_opt inst
       else Lwt.return_unit
   | Register (name, x_opt) ->
@@ -582,7 +586,7 @@ let rec run_command cmd : unit Lwt.t =
         let inst = lookup_instance x_opt cmd.at in
         let* utf8_name = Utf8.encode name in
         registry := Map.add utf8_name inst !registry ;
-        Import.register name (lookup_registry utf8_name))
+        Import.register ~module_name:name (lookup_registry utf8_name))
       else Lwt.return_unit
   | Action act ->
       quote := cmd :: !quote ;

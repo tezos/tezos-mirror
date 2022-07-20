@@ -23,25 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [lookup name] retrieves or instantiates a host function by the given
-    [name]. *)
-val lookup : string -> ('input, 'inst) Tezos_webassembly_interpreter.Func.t
+(** [lookup name] retrieves or instantiates a host function by the given [name].
+    Currently dispatches [read_input] to {!read_input} using host function global
+    names as registered by {!register_host_funcs}.
+    Used to plug host function wrappers in the WASN interpreter linker. *)
+val lookup :
+  Tezos_webassembly_interpreter.Ast.name ->
+  Tezos_webassembly_interpreter.Instance.extern Lwt.t
+
+(** [register_host_funcs] registers all the PVMs host functions into a WASM
+    interpreter's registry, using the names expected by {!lookup}.
+
+    Currently, the registered functions are:
+    - [read_input]:
+      It has to be invoked with a list
+      of 5 values representing rtype_offset, level_offset, id_offset,
+      dst and max_bytes, otherwise it raises the [Bad_input] exception.
+
+      When invoked, it write the content of an input message into the
+      memory of a [module_inst]. It also checks that the input payload
+      is no larger than the input is not too large. Finally, it returns
+      returns a singleton value list containing the size of the
+      input_buffer payload. *)
+val register_host_funcs :
+  Tezos_webassembly_interpreter.Host_funcs.registry -> unit
 
 exception Bad_input
-
-(** [read_input] is a host function. It has to be invoked with a list
-    of 5 values representing rtype_offset, level_offset, id_offset,
-    dst and max_bytes, otherwise it raises the [Bad_input] exception.
-
-    When invoked, it write the content of an input message into the
-    memory of a [module_inst]. It also checks that the input payload
-    is no larger than the input is not too large. Finally, it returns
-    returns a singleton value list containing the size of the
-    input_buffer payload. *)
-val read_input :
-  ( Tezos_webassembly_interpreter.Input_buffer.t,
-    Tezos_webassembly_interpreter.Instance.module_inst ref )
-  Tezos_webassembly_interpreter.Func.func
 
 module Internal_for_tests : sig
   (** [aux_write_memory ~input_buffer ~module_inst ~rtype_offset
@@ -60,4 +67,6 @@ module Internal_for_tests : sig
     dst:int32 ->
     max_bytes:int32 ->
     int Lwt.t
+
+  val read_input : Tezos_webassembly_interpreter.Instance.func_inst
 end

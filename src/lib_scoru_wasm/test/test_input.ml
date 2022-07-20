@@ -153,8 +153,16 @@ let test_host_fun () =
         Num (I32 0l); Num (I32 4l); Num (I32 10l); Num (I32 50l); Num (I32 3600l);
       ]
   in
+  let host_funcs_registry = Tezos_webassembly_interpreter.Host_funcs.empty () in
+  Host_funcs.register_host_funcs host_funcs_registry ;
+
   let* module_inst, result =
-    Eval.invoke ~module_inst ~input Host_funcs.read_input values
+    Eval.invoke
+      host_funcs_registry
+      ~module_inst
+      ~input
+      Host_funcs.Internal_for_tests.read_input
+      values
   in
   let* memory =
     Tezos_webassembly_interpreter.Lazy_vector.LwtInt32Vector.get

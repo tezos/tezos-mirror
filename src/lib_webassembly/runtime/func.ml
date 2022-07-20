@@ -1,14 +1,13 @@
 open Types
-open Values
 
-type ('input, 'inst) t = ('input, 'inst) func
+type 'inst t = 'inst func
 
-and ('input, 'inst) func =
+and 'inst func =
   | AstFunc of func_type * 'inst * Ast.func
-  | HostFunc of func_type * ('input -> 'inst -> value list -> value list Lwt.t)
+  | HostFunc of func_type * string
 
 let alloc ft inst f = AstFunc (ft, inst, f)
 
-let alloc_host ft f = HostFunc (ft, f)
+let alloc_host ~global_name ft = HostFunc (ft, global_name)
 
 let type_of = function AstFunc (ft, _, _) -> ft | HostFunc (ft, _) -> ft

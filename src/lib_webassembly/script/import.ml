@@ -18,10 +18,10 @@ let registry = ref Registry.empty
 
 let from_ast_name name = Lazy_vector.LwtInt32Vector.to_list name
 
-let register name lookup =
+let register ~module_name lookup =
   let open Lwt.Syntax in
   let lookup name = lookup (Lazy_vector.LwtInt32Vector.of_list name) in
-  let* name = from_ast_name name in
+  let* name = from_ast_name module_name in
   registry := Registry.add name lookup !registry ;
   Lwt.return_unit
 
@@ -30,9 +30,8 @@ let lookup (m : module_) (im : import) : Instance.extern Lwt.t =
   let {module_name; item_name; idesc} = im.it in
   let* module_name_l = from_ast_name module_name in
   let* item_name_l = from_ast_name item_name in
-  let* t = import_type m im in
   Lwt.catch
-    (fun () -> Registry.find module_name_l !registry item_name_l t)
+    (fun () -> Registry.find module_name_l !registry item_name_l)
     (function
       | Not_found ->
           Unknown.error
