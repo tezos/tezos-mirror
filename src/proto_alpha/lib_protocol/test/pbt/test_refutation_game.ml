@@ -336,14 +336,22 @@ let gen_arith_pvm_inputs_for_level ?(level_min = 0) ?(level_max = 1_000) () =
   return (level, input :: inputs)
 
 (** Generate a list of level and associated arith pvm inputs. *)
-let gen_arith_pvm_inputs_for_levels ?level_min ?level_max () =
+let gen_arith_pvm_inputs_for_levels ?(nonempty_inputs = false) ?level_min
+    ?level_max () =
   let open QCheck2.Gen in
-  let+ inputs_per_level =
-    small_list (gen_arith_pvm_inputs_for_level ?level_min ?level_max ())
+  let rec aux () =
+    let* res =
+      let+ inputs_per_level =
+        small_list (gen_arith_pvm_inputs_for_level ?level_min ?level_max ())
+      in
+      List.sort_uniq
+        (fun (l, _) (l', _) -> Compare.Int.compare l l')
+        inputs_per_level
+    in
+    if nonempty_inputs && Compare.List_length_with.(res = 0) then aux ()
+    else return res
   in
-  List.sort_uniq
-    (fun (l, _) (l', _) -> Compare.Int.compare l l')
-    inputs_per_level
+  aux ()
 
 (** Dissection helpers and tests *)
 module Dissection = struct
@@ -1020,10 +1028,12 @@ type strategy =
   | Perfect
       (** A perfect player, never lies, always win.
           GSW 73-9 2014-2015 mindset. *)
+  | Lazy  (** A lazy player will not execute all messages. *)
 
 let pp_strategy fmt = function
   | Random -> Format.pp_print_string fmt "Random"
   | Perfect -> Format.pp_print_string fmt "Perfect"
+  | Lazy -> Format.pp_print_string fmt "Lazy"
 
 type player = {
   pkh : Signature.Public_key_hash.t;
@@ -1166,6 +1176,15 @@ module Player_client = struct
         (* Random player generates its own list of inputs. *)
         let* new_levels_and_inputs =
           gen_arith_pvm_inputs_for_levels ?level_min ?level_max ()
+        in
+        let _state, tick, our_states = eval_inputs new_levels_and_inputs in
+        return (tick, our_states, new_levels_and_inputs)
+    | Lazy ->
+        (* Lazy player removes inputs from [levels_and_inputs]. *)
+        let n = List.length levels_and_inputs in
+        let* remove_k = 1 -- n in
+        let new_levels_and_inputs =
+          List.take_n (n - remove_k) levels_and_inputs
         in
         let _state, tick, our_states = eval_inputs new_levels_and_inputs in
         return (tick, our_states, new_levels_and_inputs)
@@ -1370,7 +1389,7 @@ let make_players ~p1_strategy ~contract1 ~p2_strategy ~contract2 =
     It generates inputs for the rollup, and creates the players' interpretation
     of these inputs in a {!player_client} for [p1_strategy] and [p2_strategy].
 *)
-let gen_game ~p1_strategy ~p2_strategy =
+let gen_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
   let open QCheck2.Gen in
   (* If there is no good player, we do not care about the outcome. *)
   assert (p1_strategy = Perfect || p2_strategy = Perfect) ;
@@ -1401,7 +1420,7 @@ let gen_game ~p1_strategy ~p2_strategy =
   let level_min = origination_level + 1 in
   let level_max = origination_level + commitment_period - 1 in
   let* levels_and_inputs =
-    gen_arith_pvm_inputs_for_levels ~level_min ~level_max ()
+    gen_arith_pvm_inputs_for_levels ?nonempty_inputs ~level_min ~level_max ()
   in
   let* p1_client =
     Player_client.gen
@@ -1456,7 +1475,7 @@ let prepare_game block rollup lcc commitment_level p1_client p2_client contract
 (** Create a test of [p1_strategy] against [p2_strategy]. One of them
     must be a {!Perfect} player, otherwise, we do not care about which
     cheater wins. *)
-let test_game ~p1_strategy ~p2_strategy =
+let test_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
   let name =
     Format.asprintf
       "%a against %a"
@@ -1509,7 +1528,7 @@ let test_game ~p1_strategy ~p2_strategy =
         levels_and_inputs)
     ~count:1_000
     ~name
-    ~gen:(gen_game ~p1_strategy ~p2_strategy)
+    ~gen:(gen_game ?nonempty_inputs ~p1_strategy ~p2_strategy ())
     (fun ( block,
            rollup,
            commitment_level,
@@ -1563,14 +1582,26 @@ let test_game ~p1_strategy ~p2_strategy =
       | Refuter_wins -> return (refuter.player.strategy = Perfect))
 
 let test_perfect_against_random =
-  test_game ~p1_strategy:Perfect ~p2_strategy:Random
+  test_game ~p1_strategy:Perfect ~p2_strategy:Random ()
 
 let test_random_against_perfect =
-  test_game ~p1_strategy:Random ~p2_strategy:Perfect
+  test_game ~p1_strategy:Random ~p2_strategy:Perfect ()
+
+let test_perfect_against_lazy =
+  test_game ~nonempty_inputs:true ~p1_strategy:Perfect ~p2_strategy:Lazy ()
+
+let test_lazy_against_perfect =
+  test_game ~nonempty_inputs:true ~p1_strategy:Lazy ~p2_strategy:Perfect ()
 
 let tests =
   ( "Refutation",
-    qcheck_wrap [test_perfect_against_random; test_random_against_perfect] )
+    qcheck_wrap
+      [
+        test_perfect_against_random;
+        test_random_against_perfect;
+        test_perfect_against_lazy;
+        test_lazy_against_perfect;
+      ] )
 
 (** {2 Entry point} *)
 
