@@ -41,26 +41,52 @@ type validate_operation_info
     It lives in memory, not in the storage. *)
 type validate_operation_state
 
-(** Circumstances of the call to {!validate_operation}:
-
-    - [Block]: called during the validation or application of a block
-      (received from a peer of freshly constructed). Corresponds to
-      [Application], [Partial_application], and [Full_construction] modes
-      of {!Main.validation_mode}.
-
-    - [Mempool]: called by the mempool (either directly or through the
-      plugin). Corresponds to [Partial_construction] of
-      {!Main.validation_mode}. *)
-type mode = Block | Mempool
+open Alpha_context
 
 (** Initialize the {!validate_operation_info} and
-    {!validate_operation_state} that are needed in
-    {!validate_operation}. *)
-val init_info_and_state :
-  Alpha_context.t ->
-  mode ->
+    {!validate_operation_state} for the validation of an existing block
+    (in preparation for its future application). *)
+val begin_block_validation :
+  context ->
   Chain_id.t ->
+  predecessor_level:Level.t ->
+  predecessor_round:Round.t ->
+  predecessor_hash:Block_hash.t ->
+  Fitness.t ->
+  Block_payload_hash.t ->
   validate_operation_info * validate_operation_state
+
+(** Initialize the {!validate_operation_info} and
+    {!validate_operation_state} for the construction of a fresh
+    block. *)
+val begin_block_construction :
+  context ->
+  Chain_id.t ->
+  predecessor_level:Level.t ->
+  predecessor_round:Round.t ->
+  predecessor_hash:Block_hash.t ->
+  Round.t ->
+  Block_payload_hash.t ->
+  validate_operation_info * validate_operation_state
+
+(** Initialize the {!validate_operation_info} and
+    {!validate_operation_state} for a mempool. *)
+val begin_mempool :
+  context ->
+  Chain_id.t ->
+  predecessor_level:Level.t ->
+  predecessor_round:Round.t ->
+  predecessor_hash:Block_hash.t ->
+  grandparent_round:Round.t ->
+  validate_operation_info * validate_operation_state
+
+(** Initialize the {!validate_operation_info} and
+    {!validate_operation_state} without providing any predecessor
+    information. This will cause any preendorsement or endorsement
+    operation to fail, since we lack the information needed to validate
+    it. *)
+val begin_no_predecessor_info :
+  context -> Chain_id.t -> validate_operation_info * validate_operation_state
 
 (** A receipt to guarantee that an operation is always validated
     before it is applied.
@@ -133,9 +159,8 @@ type stamp
 
     TODO: https://gitlab.com/tezos/tezos/-/issues/2603
 
-    This function currently does nothing for operations other than
-    anonymous or manager operation. (instead, the validity of a
-    consensus or voting operation is decided by calling
+    This function currently does nothing for voting operations.
+    (instead, the validity of a voting operation is decided by calling
     {!Apply.apply_operation} to check whether it returns an error).
     We should specify and implement the validation of every kind of
     operation. *)
@@ -144,7 +169,7 @@ val validate_operation :
   validate_operation_state ->
   ?should_check_signature:bool ->
   Operation_hash.t ->
-  'kind Alpha_context.operation ->
+  'kind operation ->
   (validate_operation_state * stamp) tzresult Lwt.t
 
 (** Functions for the plugin.
@@ -161,7 +186,7 @@ module TMP_for_plugin : sig
       We could have used an [option], but this makes calls to
       {!precheck_manager} more readable. *)
   type 'a should_check_signature =
-    | Check_signature of 'a Alpha_context.operation
+    | Check_signature of 'a operation
     | Skip_signature_check
 
   (** Similar to {!validate_operation}, but do not check the
@@ -187,7 +212,7 @@ module TMP_for_plugin : sig
   val precheck_manager :
     validate_operation_info ->
     validate_operation_state ->
-    'a Alpha_context.Kind.manager Alpha_context.contents_list ->
-    'a Alpha_context.Kind.manager should_check_signature ->
+    'a Kind.manager contents_list ->
+    'a Kind.manager should_check_signature ->
     stamp tzresult Lwt.t
 end

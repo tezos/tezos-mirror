@@ -851,10 +851,7 @@ module Scripts = struct
     let operation : _ operation = {shell; protocol_data} in
     let oph = Operation.hash operation in
     let validate_operation_info, validate_operation_state =
-      Validate_operation.init_info_and_state
-        ctxt
-        Validate_operation.Mempool
-        chain_id
+      Validate_operation.begin_no_predecessor_info ctxt chain_id
     in
     Validate_operation.validate_operation
       validate_operation_info

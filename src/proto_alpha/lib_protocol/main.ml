@@ -180,7 +180,14 @@ let begin_partial_application ~chain_id ~ancestor_context:ctxt
       }
   in
   let validate_operation_info, validate_operation_state =
-    Validate_operation.init_info_and_state ctxt Block chain_id
+    Validate_operation.begin_block_validation
+      ctxt
+      chain_id
+      ~predecessor_level
+      ~predecessor_round
+      ~predecessor_hash:block_header.shell.predecessor
+      fitness
+      block_header.protocol_data.contents.payload_hash
   in
   return
     {
@@ -241,7 +248,14 @@ let begin_application ~chain_id ~predecessor_context:ctxt ~predecessor_timestamp
       }
   in
   let validate_operation_info, validate_operation_state =
-    Validate_operation.init_info_and_state ctxt Block chain_id
+    Validate_operation.begin_block_validation
+      ctxt
+      chain_id
+      ~predecessor_level
+      ~predecessor_round
+      ~predecessor_hash:block_header.shell.predecessor
+      fitness
+      block_header.protocol_data.contents.payload_hash
   in
   return
     {
@@ -288,8 +302,16 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
             predecessor_round;
           }
       in
+      Alpha_context.Fitness.predecessor_round_from_raw predecessor_fitness
+      >>?= fun grandparent_round ->
       let validate_operation_info, validate_operation_state =
-        Validate_operation.init_info_and_state ctxt Mempool chain_id
+        Validate_operation.begin_mempool
+          ctxt
+          chain_id
+          ~predecessor_level
+          ~predecessor_round
+          ~predecessor_hash:predecessor
+          ~grandparent_round
       in
       return
         ( mode,
@@ -341,7 +363,14 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
           }
       in
       let validate_operation_info, validate_operation_state =
-        Validate_operation.init_info_and_state ctxt Block chain_id
+        Validate_operation.begin_block_construction
+          ctxt
+          chain_id
+          ~predecessor_level
+          ~predecessor_round
+          ~predecessor_hash:predecessor
+          round
+          proto_header.contents.payload_hash
       in
       return
         ( mode,
