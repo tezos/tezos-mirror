@@ -37,10 +37,15 @@ type instr_block_kont =
   | IKIf2 of Ast.block_type * int * Ast.block_label
       (** If .. else parsing step. *)
 
+(** Block parsing continuations. *)
 type block_kont =
   | BlockStart
+      (** Initial step of a block parsing, allocating the block in the block table. *)
   | BlockParse of instr_block_kont lazy_stack
+      (** Parsing of a block, with the continuation stack. *)
   | BlockStop of Ast.block_label
+      (** End of a block, returning the label corresponding to the allocated block
+          at the beginning. *)
 
 (** Vector and size continuations *)
 
