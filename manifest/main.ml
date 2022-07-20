@@ -1124,7 +1124,6 @@ let _octez_print_version_exe =
     "tezos-version"
     ~internal_name:"tezos_print_version"
     ~path:"src/lib_version/exe"
-    ~opam:"tezos-version"
     ~deps:[octez_version |> open_; octez_base_unix]
     ~modules:["tezos_print_version"]
     ~bisect_ppx:false
@@ -1447,7 +1446,6 @@ let octez_context_sigs =
   public_lib
     "tezos-context.sigs"
     ~path:"src/lib_context/sigs"
-    ~opam:"tezos-context"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -1500,7 +1498,6 @@ let octez_context_dump =
   public_lib
     "tezos-context.dump"
     ~path:"src/lib_context/dump"
-    ~opam:"tezos-context"
     ~deps:
       [octez_base |> open_ ~m:"TzPervasives"; octez_stdlib_unix |> open_; fmt]
 
@@ -1524,7 +1521,6 @@ let octez_context_disk =
   public_lib
     "tezos-context.disk"
     ~path:"src/lib_context/disk"
-    ~opam:"tezos-context"
     ~deps:
       [
         octez_shell_services |> open_;
@@ -2017,7 +2013,6 @@ let octez_store_shared =
   public_lib
     "tezos-store.shared"
     ~path:"src/lib_store/shared"
-    ~opam:"tezos-store"
     ~deps:
       [
         octez_base |> open_ |> open_ ~m:"TzPervasives";
@@ -2039,7 +2034,6 @@ let octez_store_unix =
   public_lib
     "tezos-store.unix"
     ~path:"src/lib_store/unix"
-    ~opam:"tezos-store"
     ~deps:
       [
         octez_shell_services |> open_;
@@ -2081,7 +2075,6 @@ let octez_store_unix_reconstruction =
   public_lib
     "tezos-store.unix-reconstruction"
     ~path:"src/lib_store/unix"
-    ~opam:"tezos-store"
     ~deps:
       [
         octez_base |> open_ |> open_ ~m:"TzPervasives";
@@ -2099,7 +2092,6 @@ let octez_store_unix_snapshots =
   public_lib
     "tezos-store.unix-snapshots"
     ~path:"src/lib_store/unix"
-    ~opam:"tezos-store"
     ~deps:
       [
         octez_base |> open_ |> open_ ~m:"TzPervasives";
@@ -2138,7 +2130,6 @@ let _octez_store_real =
   public_lib
     "tezos-store.real"
     ~path:"src/lib_store/real"
-    ~opam:"tezos-store"
     ~deps:[octez_store_unix |> open_]
     ~implements:octez_store
 
@@ -2146,7 +2137,6 @@ let _octez_store_mocked =
   public_lib
     "tezos-store.mocked"
     ~path:"src/lib_store/mocked"
-    ~opam:"tezos-store"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -2430,7 +2420,6 @@ let octez_signer_backends_unix =
   public_lib
     "tezos-signer-backends.unix"
     ~path:"src/lib_signer_backends/unix"
-    ~opam:"tezos-signer-backends"
     ~deps:
       [
         ocplib_endian_bigstring;

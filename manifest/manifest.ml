@@ -2233,14 +2233,8 @@ let generate_opam ?release for_package (internals : Target.internal list) :
   }
 
 let generate_opam_files () =
-  (* Note:
-     - dune files are not always in the same directory of their corresponding .opam
-       (usually the .opam is not in a subdir though);
-     - there can be multiple .opam in the same directory, for a single dune file
-       (or even multiple dune files when some of those dune are in subdirectories).
-     So each [Target.t] comes with an [opam] path, which defaults to being in the
-     same directory as the dune file, with the package as filename (suffixed with .opam),
-     but one can specify a custom .opam path too. *)
+  (* We store all opam files in the predefined directory <ROOT>/opam.
+     That way, `opam pin` can work out of the box. *)
   Target.iter_internal_by_opam @@ fun package internals ->
   let opam = generate_opam package internals in
   write ("opam/" ^ package ^ ".opam") @@ fun fmt ->
