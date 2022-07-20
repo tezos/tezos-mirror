@@ -294,6 +294,15 @@ let game_move ctxt rollup ~player ~opponent refutation =
       let* ctxt = update_timeout ctxt rollup game idx in
       return (None, ctxt)
 
+let get_timeout ctxt rollup stakers =
+  let open Lwt_tzresult_syntax in
+  let* ctxt, timeout_opt =
+    Storage.Sc_rollup.Game_timeout.find (ctxt, rollup) stakers
+  in
+  match timeout_opt with
+  | Some timeout -> return (timeout, ctxt)
+  | None -> fail Sc_rollup_no_game
+
 let timeout ctxt rollup stakers =
   let open Lwt_tzresult_syntax in
   let level = (Raw_context.current_level ctxt).level in

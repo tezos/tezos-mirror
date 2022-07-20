@@ -146,6 +146,14 @@ val timeout :
   Sc_rollup_game_repr.Index.t ->
   (Sc_rollup_game_repr.outcome * Raw_context.t) tzresult Lwt.t
 
+(** [get_timeout ctxt rollup stakers] returns the current timeout values of both
+    players. *)
+val get_timeout :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  Sc_rollup_game_repr.Index.t ->
+  (Sc_rollup_game_repr.timeout * Raw_context.t) tzresult Lwt.t
+
 (** [apply_outcome ctxt rollup outcome] takes an [outcome] produced
     by [timeout] or [game_move] and performs the necessary end-of-game
     cleanup: remove the game itself from the store and punish the losing
