@@ -1664,6 +1664,6 @@ let tests =
 
 (** {2 Entry point} *)
 
-let tests = tests :: Dissection.tests :: Test_refutation_game_legacy.tests
+let tests = [tests; Dissection.tests]
 
 let () = Alcotest.run "Refutation_game" tests
