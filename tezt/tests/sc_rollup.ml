@@ -2323,6 +2323,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window variant ~kind
   in
   let* () = Sc_rollup_node.run sc_rollup_node
   and* () = Sc_rollup_node.run sc_rollup_node2 in
+  let sc_client1 = Sc_rollup_client.create sc_rollup_node in
 
   let start_level = Node.get_level node in
 
@@ -2372,6 +2373,9 @@ let test_refutation_scenario ?commitment_period ?challenge_window variant ~kind
     (JSON.as_int loser_deposit = 0)
       int
       ~error_msg:"expecting loss for dishonest participant = %R, got %L") ;
+  Log.info "Checking that we can still retrieve state from rollup node" ;
+  (* This is a way to make sure the rollup node did not crash *)
+  let* _value = Sc_rollup_client.state_hash ~hooks sc_client1 in
   return ()
 
 let rec swap i l =
