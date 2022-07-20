@@ -273,7 +273,7 @@ module PVMState = struct
 
   let find store block_hash = IStore.find_tree store (key block_hash)
 
-  let exists store block_hash = IStore.mem store (key block_hash)
+  let exists store block_hash = IStore.mem_tree store (key block_hash)
 
   let set store block_hash state =
     IStore.set_tree_exn
