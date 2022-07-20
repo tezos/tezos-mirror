@@ -47,18 +47,9 @@ let level =
 let create_context () =
   Context.init1 () >>=? fun (block, _contract) -> return block.context
 
-let test_empty () =
-  create_context () >>=? fun ctxt ->
-  empty ctxt rollup level >>= fun inbox ->
-  fail_unless
-    Compare.Int64.(equal (number_of_messages_during_commitment_period inbox) 0L)
-    (err "An empty inbox should have no available message.")
-
-let setup_inbox_with_messages list_of_payloads f =
+let populate_inboxes ctxt level history inbox inboxes level_tree
+    list_of_payloads =
   let open Lwt_syntax in
-  create_context () >>=? fun ctxt ->
-  let* inbox = empty ctxt rollup level in
-  let history = history_at_genesis ~capacity:10000L in
   let rec aux level history inbox inboxes level_tree = function
     | [] -> return (ok (level_tree, history, inbox, inboxes))
     | [] :: ps ->
@@ -78,7 +69,21 @@ let setup_inbox_with_messages list_of_payloads f =
         let level = Raw_level_repr.succ level in
         aux level history inbox' (inbox :: inboxes) (Some level_tree) ps
   in
-  aux level history inbox [] None list_of_payloads
+  aux level history inbox inboxes level_tree list_of_payloads
+
+let test_empty () =
+  create_context () >>=? fun ctxt ->
+  empty ctxt rollup level >>= fun inbox ->
+  fail_unless
+    Compare.Int64.(equal (number_of_messages_during_commitment_period inbox) 0L)
+    (err "An empty inbox should have no available message.")
+
+let setup_inbox_with_messages list_of_payloads f =
+  let open Lwt_syntax in
+  create_context () >>=? fun ctxt ->
+  let* inbox = empty ctxt rollup level in
+  let history = history_at_genesis ~capacity:10000L in
+  populate_inboxes ctxt level history inbox [] None list_of_payloads
   >>=? fun (level_tree, history, inbox, inboxes) ->
   match level_tree with
   | None -> fail (err "setup_inbox_with_messages called with no messages")
