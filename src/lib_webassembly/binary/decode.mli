@@ -44,17 +44,9 @@ type block_kont =
 
 (** Vector and size continuations *)
 
-(** Vector accumulator, used in two steps: first accumulating the values, then
-    reversing them and possibly mapping them, counting the number of values in
-    the list. Continuation passing style transformation of {!List.map} also
-    returning length. *)
-type ('a, 'b) vec_map_kont =
-  | Collect of int * 'a list
-  | Rev of 'a list * 'b list * int
-
 (** Lazy vector accumulator, with the current offset to write the next value in
     the vector. *)
-type 'a lazy_vec_kont = Lazy_vec of {offset : int32; vector : 'a Vector.t}
+type 'a lazy_vec_kont = LazyVec of {offset : int32; vector : 'a Vector.t}
 
 (** Position of a value on the stream. *)
 type pos = private int

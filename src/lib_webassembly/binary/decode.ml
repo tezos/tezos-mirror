@@ -1042,23 +1042,15 @@ let block_step s bs =
 
 (** Vector and size continuations *)
 
-(** Vector accumulator, used in two steps: first accumulating the values, then
-    reversing them and possibly mapping them, counting the number of values in
-    the list. Continuation passing style transformation of {!List.map} also
-    returning length. *)
-type ('a, 'b) vec_map_kont =
-  | Collect of int * 'a list
-  | Rev of 'a list * 'b list * int
+type 'a lazy_vec_kont = LazyVec of {offset : int32; vector : 'a Vector.t}
 
-type 'a lazy_vec_kont = Lazy_vec of {offset : int32; vector : 'a Vector.t}
-
-let is_end_of_vec (Lazy_vec {offset; vector}) =
+let is_end_of_vec (LazyVec {offset; vector}) =
   Vector.num_elements vector <= offset
 
-let init_lazy_vec n = Lazy_vec {offset = 0l; vector = Vector.create n}
+let init_lazy_vec n = LazyVec {offset = 0l; vector = Vector.create n}
 
-let lazy_vec_step v (Lazy_vec {offset; vector}) =
-  Lazy_vec {offset = Int32.add offset 1l; vector = Vector.set offset v vector}
+let lazy_vec_step v (LazyVec {offset; vector}) =
+  LazyVec {offset = Int32.add offset 1l; vector = Vector.set offset v vector}
 
 type pos = int
 
@@ -1083,13 +1075,13 @@ let name_step s = function
       let pos = pos s in
       let len = len32 s in
       NKParse (pos, init_lazy_vec 0l, len)
-  | NKParse (pos, Lazy_vec {vector; _}, 0) -> NKStop vector
-  | NKParse (pos, Lazy_vec lv, len) ->
+  | NKParse (pos, LazyVec {vector; _}, 0) -> NKStop vector
+  | NKParse (pos, LazyVec lv, len) ->
       let d, offset =
         try Utf8.decode_step get s
         with Utf8 -> error s pos "malformed UTF-8 encoding"
       in
-      let vec = Lazy_vec {lv with vector = Vector.grow 1l lv.vector} in
+      let vec = LazyVec {lv with vector = Vector.grow 1l lv.vector} in
       NKParse (pos, lazy_vec_step d vec, len - offset)
   | NKStop l -> assert false (* final step, cannot reduce. *)
 
@@ -1158,13 +1150,13 @@ let func_type_step s = function
       let len = len32 s in
       if tag = -0x20 then FKIns (init_lazy_vec (Int32.of_int len))
       else error s (pos s - 1) "malformed function type"
-  | FKIns (Lazy_vec {vector = ins; _} as vec) when is_end_of_vec vec ->
+  | FKIns (LazyVec {vector = ins; _} as vec) when is_end_of_vec vec ->
       let len = len32 s in
       FKOut (ins, init_lazy_vec (Int32.of_int len))
   | FKIns ins ->
       let vt = value_type s in
       FKIns (lazy_vec_step vt ins)
-  | FKOut (ins, (Lazy_vec {vector = out; _} as out_vec))
+  | FKOut (ins, (LazyVec {vector = out; _} as out_vec))
     when is_end_of_vec out_vec ->
       FKStop (FuncType (ins, out))
   | FKOut (ins, out_vec) ->
@@ -1306,7 +1298,7 @@ let code_step s bs =
         left;
         size;
         pos;
-        vec_kont = Lazy_vec {vector = types; _} as vec_kont;
+        vec_kont = LazyVec {vector = types; _} as vec_kont;
         locals_size;
       }
     when is_end_of_vec vec_kont ->
@@ -1318,7 +1310,7 @@ let code_step s bs =
           size;
           pos;
           vec_kont;
-          type_vec = Lazy_vec {offset = 0l; vector = types};
+          type_vec = LazyVec {offset = 0l; vector = types};
           curr_type = None;
         }
       |> Lwt.return
@@ -1332,7 +1324,7 @@ let code_step s bs =
         {left; size; pos; vec_kont = lazy_vec_step local vec_kont; locals_size}
       |> Lwt.return
   | CKLocalsAccumulate
-      {left; size; pos; vec_kont = Lazy_vec {vector = locals; _} as vec_kont; _}
+      {left; size; pos; vec_kont = LazyVec {vector = locals; _} as vec_kont; _}
     when is_end_of_vec vec_kont ->
       CKBody {left; size; locals; const_kont = BlockStart} |> Lwt.return
   | CKLocalsAccumulate
@@ -1342,7 +1334,7 @@ let code_step s bs =
         pos;
         vec_kont;
         curr_type = None | Some (0l, _);
-        type_vec = Lazy_vec {offset = n; vector = types};
+        type_vec = LazyVec {offset = n; vector = types};
       } ->
       let+ next_type = Vector.get n types in
       CKLocalsAccumulate
@@ -1352,7 +1344,7 @@ let code_step s bs =
           pos;
           vec_kont;
           curr_type = Some next_type;
-          type_vec = Lazy_vec {offset = Int32.succ n; vector = types};
+          type_vec = LazyVec {offset = Int32.succ n; vector = types};
         }
   | CKLocalsAccumulate
       {left; size; pos; vec_kont; curr_type = Some (occurences, ty); type_vec}
@@ -1567,9 +1559,9 @@ let elem_step s bs =
         }
   (* End of initialization parsing *)
   | EKInitConst
-      {mode; ref_type; einit_vec = Lazy_vec {vector = einit; _} as einit_vec; _}
+      {mode; ref_type; einit_vec = LazyVec {vector = einit; _} as einit_vec; _}
   | EKInitIndexed
-      {mode; ref_type; einit_vec = Lazy_vec {vector = einit; _} as einit_vec}
+      {mode; ref_type; einit_vec = LazyVec {vector = einit; _} as einit_vec}
     when is_end_of_vec einit_vec ->
       EKStop {etype = ref_type; einit; emode = mode} |> Lwt.return
   (* Indexed *)
@@ -1814,7 +1806,7 @@ let find_vec ty fields = find_vec' ty 0l fields
 
 let find_single ty fields = find_single' ty 0l fields
 
-let vec_field ty (Lazy_vec {vector; _}) = VecField (ty, vector)
+let vec_field ty (LazyVec {vector; _}) = VecField (ty, vector)
 
 let module_step state =
   let open Lwt.Syntax in
@@ -2015,10 +2007,10 @@ let module_step state =
       let* code_kont = code_step s bs code_kont in
       next @@ MKCode (code_kont, pos, size, curr_vec)
   | MKElaborateFunc
-      (ft, fb, (Lazy_vec {vector = func_types; _} as vec), no_datas_in_func)
+      (ft, fb, (LazyVec {vector = func_types; _} as vec), no_datas_in_func)
     when is_end_of_vec vec ->
       next @@ MKBuild (Some func_types, no_datas_in_func)
-  | MKElaborateFunc (fts, fbs, (Lazy_vec {offset; _} as vec), no_datas_in_func)
+  | MKElaborateFunc (fts, fbs, (LazyVec {offset; _} as vec), no_datas_in_func)
     ->
       let* ft = Vector.get offset fts in
       let* fb = Vector.get offset fbs in
