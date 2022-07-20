@@ -369,6 +369,18 @@ module Consensus = struct
       expected_endorsement;
       expected_grandparent_endorsement_for_mempool;
     }
+
+  let validate_preendorsement _vi vs ~should_check_signature:_
+      (_operation : Kind.preendorsement operation) =
+    return vs
+
+  let validate_endorsement _vi vs ~should_check_signature:_
+      (_operation : Kind.endorsement operation) =
+    return vs
+
+  let validate_dal_slot_availability _vi vs ~should_check_signature:_
+      (_operation : Kind.dal_slot_availability operation) =
+    return vs
 end
 
 module Anonymous = struct
@@ -1136,6 +1148,20 @@ let validate_operation (vi : validate_operation_info)
   let open Lwt_result_syntax in
   let* vs =
     match operation.protocol_data.contents with
+    | Single (Preendorsement _) ->
+        Consensus.validate_preendorsement
+          vi
+          vs
+          ~should_check_signature
+          operation
+    | Single (Endorsement _) ->
+        Consensus.validate_endorsement vi vs ~should_check_signature operation
+    | Single (Dal_slot_availability _) ->
+        Consensus.validate_dal_slot_availability
+          vi
+          vs
+          ~should_check_signature
+          operation
     | Single (Activate_account _ as contents) ->
         Anonymous.validate_activate_account vi vs oph contents
     | Single (Double_preendorsement_evidence _ as contents) ->
@@ -1164,12 +1190,7 @@ let validate_operation (vi : validate_operation_info)
           source
           oph
           operation
-    | Single (Preendorsement _)
-    | Single (Endorsement _)
-    | Single (Dal_slot_availability _)
-    | Single (Proposals _)
-    | Single (Ballot _)
-    | Single (Failing_noop _) ->
+    | Single (Proposals _) | Single (Ballot _) | Single (Failing_noop _) ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/2603
 
            There is no separate validation phase for non-manager
