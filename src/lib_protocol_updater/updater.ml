@@ -97,10 +97,10 @@ let do_compile hash p =
 
 let compile hash p =
   let open Lwt_syntax in
-  if Tezos_protocol_registerer.Registerer.mem hash then Lwt.return_true
+  if Tezos_protocol_registerer.mem hash then Lwt.return_true
   else
     let* success = do_compile hash p in
-    let loaded = Tezos_protocol_registerer.Registerer.mem hash in
+    let loaded = Tezos_protocol_registerer.mem hash in
     if success && not loaded then
       let* () = Events.(emit internal_error) hash in
       Lwt.return loaded

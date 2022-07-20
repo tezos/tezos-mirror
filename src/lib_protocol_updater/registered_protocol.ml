@@ -41,7 +41,7 @@ end
 type t = (module T)
 
 let build hash =
-  match Tezos_protocol_registerer.Registerer.get hash with
+  match Tezos_protocol_registerer.get hash with
   | None -> None
   | Some (V0 protocol) ->
       let (module F) = protocol in
@@ -211,8 +211,7 @@ let versions : (module T) VersionTable.t = VersionTable.create 20
 let sources : Protocol.t VersionTable.t = VersionTable.create 20
 
 let mem hash =
-  VersionTable.mem versions hash
-  || Tezos_protocol_registerer.Registerer.mem hash
+  VersionTable.mem versions hash || Tezos_protocol_registerer.mem hash
 
 let get hash =
   match VersionTable.find versions hash with

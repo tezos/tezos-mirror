@@ -124,10 +124,7 @@ let tezos_protocol_env =
 
 let register_env =
   let open Embedded_cmis in
-  [
-    ( "tezos_protocol_registerer__Registerer",
-      tezos_protocol_registerer__Registerer_cmi );
-  ]
+  [("tezos_protocol_registerer", tezos_protocol_registerer_cmi)]
 
 (** Helpers *)
 
@@ -308,8 +305,8 @@ let main {compile_ml; pack_objects; link_shared} =
         register_file
         (Printf.sprintf
            "module Name = struct let name = %S end\n\
-           \ let () = Tezos_protocol_registerer__Registerer.register Name.name \
-            (%s (module %s.Make))"
+           \ let () = Tezos_protocol_registerer.register Name.name (%s (module \
+            %s.Make))"
            (Protocol_hash.to_b58check hash)
            (Protocol.module_name_of_env_version protocol.expected_env)
            functor_unit) ;
