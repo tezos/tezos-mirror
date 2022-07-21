@@ -40,6 +40,17 @@ end
 
 module OfCohttp (Client : Cohttp_lwt.S.Client) : CALL
 
+(** Whether or not an operation should follow redirects.
+
+    Given a [limit], operations accepting a [redirect_behaviour] will follow up
+    to that many redirects, inclusive, and fail with a [Too_many_redirects] error
+    above that. If the [limit] parameter is negative, redirects will not be
+    followed, just as if the behaviour were set to [Do_not_follow_redirects],
+    but the error will be [Too_many_redirects] instead. *)
+type redirect_behaviour =
+  | Do_not_follow_redirects
+  | Follow_redirects of {limit : int}
+
 (** [Make(Encoding)(Client)] is a module that allows you to make calls to
     various [Resto] (or [EzResto]) services.
 
@@ -84,7 +95,10 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) : sig
       (** Failure at one of the levels lower than HTTP (e.g., network) *)
     | `OCaml_exception of string
       (** Exception raised whilst decoding the result. *)
-    | `Unauthorized_host of string option  (** CORS-related error *) ]
+    | `Unauthorized_host of string option  (** CORS-related error *)
+    | `Too_many_redirects of string  (** 310 *)
+    | `Redirect_without_location of string
+      (** Redirect did not have a Location header *) ]
 
   (** A [LOGGER] module is used for logging only *)
   module type LOGGER = sig
@@ -121,6 +135,7 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) : sig
       service defined, prefer making call to a defined service. *)
   val generic_call :
     [< Resto.meth] ->
+    ?redirect_behaviour:redirect_behaviour ->
     ?headers:(string * string) list ->
     ?accept:Media_type.Make(Encoding).t list ->
     ?body:Cohttp_lwt.Body.t ->
@@ -148,6 +163,7 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) : sig
       the service. *)
   val call_service :
     Media_type.Make(Encoding).t list ->
+    ?redirect_behaviour:redirect_behaviour ->
     ?logger:logger ->
     ?headers:(string * string) list ->
     ?base:Uri.t ->
@@ -172,6 +188,7 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) : sig
       the service. *)
   val call_streamed_service :
     Media_type.Make(Encoding).t list ->
+    ?redirect_behaviour:redirect_behaviour ->
     ?logger:logger ->
     ?headers:(string * string) list ->
     ?base:Uri.t ->
