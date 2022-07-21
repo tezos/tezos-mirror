@@ -103,7 +103,7 @@ let test_disable_feature_flag () =
   let kind = Sc_rollup.Kind.Example_arith in
   let* op, _ =
     let parameters_ty = Script.lazy_expr @@ Expr.from_string "unit" in
-    Op.sc_rollup_origination (I i) contract kind "" parameters_ty
+    Op.sc_rollup_origination (I i) contract kind ~boot_sector:"" ~parameters_ty
   in
   let expect_apply_failure = function
     | Environment.Ecoproto_error
@@ -140,8 +140,8 @@ let sc_originate ?(boot_sector = "") ?origination_proof block contract
       (B block)
       contract
       kind
-      boot_sector
-      (Script.lazy_expr @@ Expr.from_string parameters_ty)
+      ~boot_sector
+      ~parameters_ty:(Script.lazy_expr @@ Expr.from_string parameters_ty)
   in
   let* incr = Incremental.begin_construction block in
   let* incr = Incremental.add_operation incr operation in
@@ -166,20 +166,17 @@ let number_of_ticks_exn n =
   | None -> Stdlib.failwith "Bad Number_of_ticks"
 
 let dummy_commitment ctxt rollup =
-  let ctxt = Incremental.alpha_ctxt ctxt in
-  let* genesis_info =
-    Sc_rollup.genesis_info ctxt rollup >|= Environment.wrap_tzresult
-  in
+  let* genesis_info = Context.Sc_rollup.genesis_info ctxt rollup in
   let predecessor = genesis_info.commitment_hash in
-  let* {compressed_state; _}, ctxt =
-    Sc_rollup.Commitment.get_commitment ctxt rollup genesis_info.commitment_hash
-    >|= Environment.wrap_tzresult
+  let* {compressed_state; _} =
+    Context.Sc_rollup.commitment ctxt rollup genesis_info.commitment_hash
   in
   let root_level = genesis_info.level in
-  let inbox_level =
-    let commitment_freq =
-      Constants_storage.sc_rollup_commitment_period_in_blocks
-        (Alpha_context.Internal_for_tests.to_raw ctxt)
+  let* inbox_level =
+    let+ constants = Context.get_constants ctxt in
+    let Constants.Parametric.{commitment_period_in_blocks = commitment_freq; _}
+        =
+      constants.parametric.sc_rollup
     in
     Raw_level.of_int32_exn
       (Int32.add (Raw_level.to_int32 root_level) (Int32.of_int commitment_freq))
@@ -406,7 +403,7 @@ let publish_and_cement_commitment incr ~baker ~originator rollup commitment =
   return (hash, incr)
 
 let publish_and_cement_dummy_commitment incr ~baker ~originator rollup =
-  let* commitment = dummy_commitment incr rollup in
+  let* commitment = dummy_commitment (I incr) rollup in
   publish_and_cement_commitment incr ~baker ~originator rollup commitment
 
 (* Publishes repeated cemented commitments until a commitment with
@@ -414,19 +411,16 @@ let publish_and_cement_dummy_commitment incr ~baker ~originator rollup =
    is also published and cemented). *)
 let publish_commitments_until_min_inbox_level incr rollup ~baker ~originator
     ~min_inbox_level ~cemented_commitment_hash ~cemented_commitment =
-  let commitment_freq =
-    Constants_storage.sc_rollup_commitment_period_in_blocks
-      (Alpha_context.Internal_for_tests.to_raw @@ Incremental.alpha_ctxt incr)
+  let* constants = Context.get_constants (I incr) in
+  let Constants.Parametric.{commitment_period_in_blocks = commitment_freq; _} =
+    constants.parametric.sc_rollup
   in
   let rec aux incr hash ({Sc_rollup.Commitment.inbox_level; _} as commitment) =
-    let level = Int32.to_int @@ Raw_level.to_int32 inbox_level in
-    if level >= min_inbox_level then return (hash, incr)
+    let level = Raw_level.to_int32 inbox_level in
+    if level >= Int32.of_int min_inbox_level then return (hash, incr)
     else
       let next_inbox_level =
-        Raw_level.of_int32_exn
-          (Int32.add
-             (Raw_level.to_int32 inbox_level)
-             (Int32.of_int commitment_freq))
+        Raw_level.of_int32_exn (Int32.add level (Int32.of_int commitment_freq))
       in
       let commitment =
         {commitment with predecessor = hash; inbox_level = next_inbox_level}
@@ -438,20 +432,23 @@ let publish_commitments_until_min_inbox_level incr rollup ~baker ~originator
   in
   aux incr cemented_commitment_hash cemented_commitment
 
-let deposit_ticket_token incr rollup ticket_token delta =
-  wrap
-    (let ctxt = Incremental.alpha_ctxt incr in
-     let* rollup_red_token_hash, ctxt =
-       Ticket_balance_key.of_ex_token
-         ctxt
-         ~owner:(Destination.Sc_rollup rollup)
-         ticket_token
-     in
-     let* _, ctxt =
-       Ticket_balance.adjust_balance ctxt rollup_red_token_hash ~delta
-     in
-     let incr = Incremental.set_alpha_ctxt incr ctxt in
-     return incr)
+let adjust_ticket_token_balance_of_rollup ctxt rollup ticket_token ~delta =
+  let* incr =
+    Context.(
+      match ctxt with
+      | I incr -> return incr
+      | B block -> Incremental.begin_construction block)
+  in
+  let alpha_ctxt = Incremental.alpha_ctxt incr in
+  let* hash, alpha_ctxt =
+    Ticket_helpers.adjust_ticket_token_balance
+      alpha_ctxt
+      (Destination.Sc_rollup rollup)
+      ticket_token
+      ~delta
+  in
+  let incr = Incremental.set_alpha_ctxt incr alpha_ctxt in
+  return (hash, incr)
 
 (** A version of execute outbox message that output ignores proof validation. *)
 let execute_outbox_message_without_proof_validation incr rollup
@@ -484,15 +481,14 @@ let execute_outbox_message incr ~originator rollup ~output_proof
   let* block = Incremental.finalize_block incr in
   Incremental.begin_construction block
 
-let get_balance ctxt ~token ~owner =
-  let* key_hash, ctxt =
-    wrap @@ Ticket_balance_key.of_ex_token ctxt ~owner token
-  in
-  wrap (Ticket_balance.get_balance ctxt key_hash)
-
 let assert_ticket_token_balance ~loc incr token owner expected =
   let ctxt = Incremental.alpha_ctxt incr in
-  let* balance, _ = get_balance ctxt ~token ~owner in
+  let* balance, _ =
+    let* key_hash, ctxt =
+      wrap @@ Ticket_balance_key.of_ex_token ctxt ~owner token
+    in
+    wrap (Ticket_balance.get_balance ctxt key_hash)
+  in
   match (balance, expected) with
   | Some b, Some e -> Assert.equal_int ~loc (Z.to_int b) e
   | Some b, None ->
@@ -567,13 +563,13 @@ let recover_bond_with_success i contract rollup =
     The comitter tries to withdraw stake before and after cementing. Only the
     second attempt is expected to succeed. *)
 let test_publish_cement_and_recover_bond () =
-  let* ctxt, contracts, rollup = init_and_originate Context.T2 "unit" in
+  let* block, contracts, rollup = init_and_originate Context.T2 "unit" in
   let _, contract = contracts in
-  let* i = Incremental.begin_construction ctxt in
+  let* i = Incremental.begin_construction block in
   (* not staked yet *)
   let* () = recover_bond_not_staked i contract rollup in
-  let* c = dummy_commitment i rollup in
-  let* operation = Op.sc_rollup_publish (B ctxt) contract rollup c in
+  let* c = dummy_commitment (I i) rollup in
+  let* operation = Op.sc_rollup_publish (B block) contract rollup c in
   let* i = Incremental.add_operation i operation in
   let* b = Incremental.finalize_block i in
   let* constants = Context.get_constants (B b) in
@@ -609,7 +605,7 @@ let test_publish_fails_on_backtrack () =
   let* ctxt, contracts, rollup = init_and_originate Context.T2 "unit" in
   let _, contract = contracts in
   let* i = Incremental.begin_construction ctxt in
-  let* commitment1 = dummy_commitment i rollup in
+  let* commitment1 = dummy_commitment (I i) rollup in
   let commitment2 =
     {commitment1 with number_of_ticks = number_of_ticks_exn 3001l}
   in
@@ -637,7 +633,7 @@ let test_cement_fails_on_conflict () =
   let* ctxt, contracts, rollup = init_and_originate Context.T3 "unit" in
   let _, contract1, contract2 = contracts in
   let* i = Incremental.begin_construction ctxt in
-  let* commitment1 = dummy_commitment i rollup in
+  let* commitment1 = dummy_commitment (I i) rollup in
   let commitment2 =
     {commitment1 with number_of_ticks = number_of_ticks_exn 3001l}
   in
@@ -667,11 +663,11 @@ let test_cement_fails_on_conflict () =
   let* _ = Incremental.add_operation ~expect_apply_failure i cement_op in
   return_unit
 
-let commit_and_cement_after_n_bloc ?expect_apply_failure ctxt contract rollup n
+let commit_and_cement_after_n_bloc ?expect_apply_failure block contract rollup n
     =
-  let* i = Incremental.begin_construction ctxt in
-  let* commitment = dummy_commitment i rollup in
-  let* operation = Op.sc_rollup_publish (B ctxt) contract rollup commitment in
+  let* i = Incremental.begin_construction block in
+  let* commitment = dummy_commitment (I i) rollup in
+  let* operation = Op.sc_rollup_publish (B block) contract rollup commitment in
   let* i = Incremental.add_operation i operation in
   let* b = Incremental.finalize_block i in
   (* This pattern would add an additional block, so we decrement [n] by one. *)
@@ -903,7 +899,9 @@ let test_single_transaction_batch () =
   in
   let output = make_output ~outbox_level:0 ~message_index:0 transactions in
   (* Set up the balance so that the self contract owns one ticket. *)
-  let* incr = deposit_ticket_token incr rollup red_token Z.one in
+  let* _ticket_hash, incr =
+    adjust_ticket_token_balance_of_rollup (I incr) rollup red_token ~delta:Z.one
+  in
   let* Sc_rollup_operations.{operations; _}, incr =
     execute_outbox_message_without_proof_validation
       incr
@@ -989,7 +987,13 @@ let test_multi_transaction_batch () =
   (* Create an atomic batch message. *)
   let output = make_output ~outbox_level:0 ~message_index:0 transactions in
   (* Set up the balance so that the rollup owns 10 units of red tokens. *)
-  let* incr = deposit_ticket_token incr rollup red_token (Z.of_int 10) in
+  let* _ticket_hash, incr =
+    adjust_ticket_token_balance_of_rollup
+      (I incr)
+      rollup
+      red_token
+      ~delta:(Z.of_int 10)
+  in
   let* Sc_rollup_operations.{operations; _}, incr =
     execute_outbox_message_without_proof_validation
       incr
@@ -1205,7 +1209,7 @@ let test_execute_message_override_applied_messages_slot () =
     in
     return (paid_storage_size_diff, incr)
   in
-  let* cemented_commitment = dummy_commitment incr rollup in
+  let* cemented_commitment = dummy_commitment (I incr) rollup in
   let* cemented_commitment_hash, incr =
     publish_and_cement_commitment
       incr
@@ -1358,21 +1362,20 @@ let test_insufficient_ticket_balances () =
   (* Set up the balance so that the rollup owns 7 units of red tokens.
      This is insufficient wrt the set of transactions above.
   *)
-  let* incr = deposit_ticket_token incr rollup red_token (Z.of_int 7) in
-  let* key, ctxt =
-    wrap
-      (Ticket_balance_key.of_ex_token
-         (Incremental.alpha_ctxt incr)
-         ~owner:(Destination.Sc_rollup rollup)
-         red_token)
+  let* ticket_hash, incr =
+    adjust_ticket_token_balance_of_rollup
+      (I incr)
+      rollup
+      red_token
+      ~delta:(Z.of_int 7)
   in
-  let incr = Incremental.set_alpha_ctxt incr ctxt in
   (* Executing the batch fails because the rollup only has 7 units of tickets
      but attempts to transfer 10 units. *)
   assert_fails
     ~loc:__LOC__
     ~error:
-      (Ticket_balance.Negative_ticket_balance {key; balance = Z.of_int (-3)})
+      (Ticket_balance.Negative_ticket_balance
+         {key = ticket_hash; balance = Z.of_int (-3)})
     (execute_outbox_message_without_proof_validation
        incr
        rollup

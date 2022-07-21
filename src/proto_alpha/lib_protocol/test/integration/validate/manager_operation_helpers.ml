@@ -351,8 +351,8 @@ let originate_sc_rollup block rollup_account =
       (B block)
       rollup_contract
       Sc_rollup.Kind.Example_arith
-      ""
-      (Script.lazy_expr (Expr.from_string "1"))
+      ~boot_sector:""
+      ~parameters_ty:(Script.lazy_expr (Expr.from_string "1"))
   in
   let+ block = Block.bake ~operation:rollup_origination block in
   (block, sc_rollup)
@@ -832,8 +832,8 @@ let mk_sc_rollup_origination (oinfos : operation_req) (infos : infos) =
       (B infos.ctxt.block)
       (contract_of infos.accounts.source)
       Sc_rollup.Kind.Example_arith
-      ""
-      (Script.lazy_expr (Expr.from_string "1"))
+      ~boot_sector:""
+      ~parameters_ty:(Script.lazy_expr (Expr.from_string "1"))
   in
   op
 
