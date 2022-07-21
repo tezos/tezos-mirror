@@ -56,7 +56,8 @@ let tree_gen =
         | Tezos_proxy.Proxy.Value acc' -> (mk_tree [@ocaml.tailcall]) acc' tl)
   in
   let mk_tree acc sets = Lwt_main.run @@ mk_tree acc sets in
-  QCheck2.Gen.(map (mk_tree Tree.empty) (list (pair key_gen raw_context_gen)))
+  QCheck2.Gen.(
+    map (mk_tree Tree.empty) (small_list (pair key_gen raw_context_gen)))
 
 (** [Tree.add_leaf] then [Tree.get] should return the inserted data *)
 let test_add_leaf_get =
