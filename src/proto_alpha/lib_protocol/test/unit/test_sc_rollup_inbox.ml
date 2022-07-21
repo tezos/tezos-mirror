@@ -430,6 +430,215 @@ let test_empty_inbox_proof (level, n) =
       | Error _ -> fail (err "Proof verification failed"))
   | Error _ -> fail (err "Proof production failed")
 
+(** This helper function initializes inboxes and histories with different
+    capacities and populates them. *)
+let init_inboxes_histories_with_different_capacities
+    (nb_levels, default_capacity, small_capacity, next_index) =
+  let open Lwt_result_syntax in
+  let* () =
+    fail_when
+      Int64.(of_int nb_levels <= small_capacity)
+      (err
+         (Format.sprintf
+            "Bad inputs: nb_levels = %d should be greater than small_capacity \
+             = %Ld"
+            nb_levels
+            small_capacity))
+  in
+  let* () =
+    fail_when
+      Int64.(of_int nb_levels >= default_capacity)
+      (err
+         (Format.sprintf
+            "Bad inputs: nb_levels = %d should be smaller than \
+             default_capacity = %Ld"
+            nb_levels
+            default_capacity))
+  in
+  let*? payloads =
+    List.init ~when_negative_length:[] nb_levels (fun i -> [string_of_int i])
+  in
+  let mk_history ?(next_index = 0L) ~capacity () =
+    let open Lwt_syntax in
+    create_context () >>=? fun ctxt ->
+    let* inbox = empty ctxt rollup level in
+    let history =
+      Sc_rollup_inbox_repr.Internal_for_tests.history_at_genesis
+        ~capacity
+        ~next_index
+    in
+    populate_inboxes ctxt level history inbox [] None payloads
+  in
+  (* Here, we have `~capacity:0L`. So no history is kept *)
+  mk_history ~capacity:0L () >>=? fun no_history ->
+  (* Here, we set a [default_capacity] supposed to be greater than [nb_levels],
+     and keep the default [next_index]. This history will serve as a witeness *)
+  mk_history ~capacity:default_capacity () >>=? fun big_history ->
+  (* Here, we choose a small capacity supposed to be smaller than [nb_levels] to
+     cover cases where the history is full and older elements should be removed.
+     We also set a non-default [next_index] value to cover cases where the
+     incremented index may overflow or is negative. *)
+  mk_history ~next_index ~capacity:small_capacity () >>=? fun small_history ->
+  return (no_history, small_history, big_history)
+
+(** In this test, we mainly check that the number of entries in histories
+    doesn't exceed their respective capacities. *)
+let test_history_length
+    ((_nb_levels, default_capacity, small_capacity, _next_index) as params) =
+  let open Lwt_result_syntax in
+  let module I = Sc_rollup_inbox_repr in
+  let err expected given ~exact =
+    err
+    @@ Format.sprintf
+         "We expect a history of %Ld capacity (%s), but we got %d elements"
+         expected
+         (if exact then "exactly" else "at most")
+         given
+  in
+  let no_capacity = 0L in
+  let* no_history, small_history, big_history =
+    init_inboxes_histories_with_different_capacities params
+  in
+  let _level_tree0, history0, _inbox0, _inboxes0 = no_history in
+  let _level_tree1, history1, _inbox1, _inboxes1 = small_history in
+  let _level_tree2, history2, _inbox2, _inboxes2 = big_history in
+  let hh0 = I.Internal_for_tests.history_hashes history0 in
+  let hh1 = I.Internal_for_tests.history_hashes history1 in
+  let hh2 = I.Internal_for_tests.history_hashes history2 in
+  (* The first history is supposed to have exactly 0 elements *)
+  let* () =
+    let len = List.length hh0 in
+    fail_unless
+      Int64.(equal no_capacity (of_int @@ len))
+      (err no_capacity len ~exact:true)
+  in
+  (* The second history is supposed to have exactly [small_capacity], because
+     we are supposed to add _nb_level > small_capacity entries. *)
+  let* () =
+    let len = List.length hh1 in
+    fail_unless
+      Int64.(small_capacity = of_int len)
+      (err small_capacity len ~exact:false)
+  in
+  (* The third history's capacity, named [default_capacity], is supposed to be
+     greater than _nb_level. So, we don't expect this history to be full. *)
+  let* () =
+    let len = List.length hh2 in
+    fail_unless
+      Int64.(default_capacity > of_int len)
+      (err default_capacity len ~exact:true)
+  in
+  return ()
+
+(** In this test, we check that for two inboxes of the same content, the entries
+    of the history with the lower capacity, taken in the insertion order, is a
+    prefix of the entries of the history with the higher capacity. *)
+let test_history_prefix params =
+  let open Lwt_result_syntax in
+  let module I = Sc_rollup_inbox_repr in
+  let* no_history, small_history, big_history =
+    init_inboxes_histories_with_different_capacities params
+  in
+  let _level_tree0, history0, _inbox0, _inboxes0 = no_history in
+  let _level_tree1, history1, _inbox1, _inboxes1 = small_history in
+  let _level_tree2, history2, _inbox2, _inboxes2 = big_history in
+  let hh0 = I.Internal_for_tests.history_hashes history0 in
+  let hh1 = I.Internal_for_tests.history_hashes history1 in
+  let hh2 = I.Internal_for_tests.history_hashes history2 in
+  let check_is_suffix sub super =
+    let rec aux super to_remove =
+      let* () =
+        fail_unless
+          (to_remove >= 0)
+          (err "A bigger list cannot be a suffix of a smaller one.")
+      in
+      if to_remove = 0 then
+        fail_unless
+          (List.for_all2 ~when_different_lengths:false I.Hash.equal sub super
+          = Ok true)
+          (err "The smaller list is not a prefix the bigger one.")
+      else
+        match List.tl super with
+        | None -> assert false
+        | Some super -> aux super (to_remove - 1)
+    in
+    aux super (List.length super - List.length sub)
+  in
+  (* The empty history's hashes list is supposed to be a suffix of a history
+     with bigger capacity. *)
+  let* () = check_is_suffix hh0 hh1 in
+  (* The history's hashes list of the smaller capacity should be a prefix of
+     the history's hashes list of a bigger capacity. *)
+  check_is_suffix hh1 hh2
+
+(** In this test, we make some checks on production and verification of
+    inclusion proofs depending on histories' capacity. *)
+let test_inclusion_proofs_depending_on_history_capacity
+    ((_nb_levels, _default_capacity, _small_capacity, _next_index) as params) =
+  let open Lwt_result_syntax in
+  let module I = Sc_rollup_inbox_repr in
+  let* no_history, small_history, big_history =
+    init_inboxes_histories_with_different_capacities params
+  in
+  let _level_tree0, history0, inbox0, _inboxes0 = no_history in
+  let _level_tree1, history1, inbox1, _inboxes1 = small_history in
+  let _level_tree2, history2, inbox2, _inboxes2 = big_history in
+  let hp0 = I.old_levels_messages inbox0 in
+  let hp1 = I.old_levels_messages inbox1 in
+  let (hp2 as hp) = I.old_levels_messages inbox2 in
+  let* () =
+    fail_unless
+      (I.equal_history_proof hp0 hp1 && I.equal_history_proof hp1 hp2)
+      (err
+         "History proof of equal inboxes shouldn't depend on the capacity of \
+          history.")
+  in
+  let proof s v =
+    Option.to_result ~none:[err (s ^ ": Expecting some inclusion proof.")] v
+  in
+  (* Producing inclusion proofs using history1 and history2 should succeeed.
+     But, we should not be able to produce any proof with history0 as bound
+     is 0. *)
+  let ip0 = I.produce_inclusion_proof history0 hp hp in
+  let*? ip1 = proof "history1" @@ I.produce_inclusion_proof history1 hp hp in
+  let*? ip2 = proof "history2" @@ I.produce_inclusion_proof history2 hp hp in
+  let* () =
+    fail_unless
+      (Option.is_none ip0)
+      (err
+         "Should not be able to get inbox inclusion proofs without a history \
+          (i.e., a history with no capacity). ")
+  in
+  fail_unless
+    (I.verify_inclusion_proof ip1 hp hp && I.verify_inclusion_proof ip2 hp hp)
+    (err "Inclusion proofs are expected to be valid.")
+
+(** This test checks that inboxes of the same levels that are supposed to contain
+    the same messages are equal. It also check the level trees obtained from
+    the last calls to add_messages are equal. *)
+let test_for_successive_add_messages_with_different_histories_capacities
+    ((_nb_levels, _default_capacity, _small_capacity, _next_index) as params) =
+  let open Lwt_result_syntax in
+  let module I = Sc_rollup_inbox_repr in
+  let* no_history, small_history, big_history =
+    init_inboxes_histories_with_different_capacities params
+  in
+  let level_tree0, _history0, _inbox0, inboxes0 = no_history in
+  let level_tree1, _history1, _inbox1, inboxes1 = small_history in
+  let level_tree2, _history2, _inbox2, inboxes2 = big_history in
+  (* The latest inbox's value shouldn't depend on the value of [bound]. *)
+  let eq_inboxes_list = List.for_all2 ~when_different_lengths:false I.equal in
+  let* () =
+    fail_unless
+      (eq_inboxes_list inboxes0 inboxes1 = Ok true
+      && eq_inboxes_list inboxes1 inboxes2 = Ok true)
+      (err "Inboxes at the same level with the same content should be equal.")
+  in
+  fail_unless
+    (Option.equal I.Internal_for_tests.eq_tree level_tree0 level_tree1
+    && Option.equal I.Internal_for_tests.eq_tree level_tree1 level_tree2)
+    (err "Trees of (supposedly) equal inboxes should be equal.")
+
 let tests =
   let msg_size = QCheck2.Gen.(0 -- 100) in
   let bounded_string = QCheck2.Gen.string_size msg_size in
@@ -466,6 +675,25 @@ let tests =
       let* n = 0 -- (List.length at + 3) in
       return (payloads, level_of_int level, Z.of_int n))
   in
+  let gen_history_params =
+    QCheck2.Gen.(
+      (* We fix the number of levels/ inboxes. *)
+      let* nb_levels = pure 30 in
+      (* The default capacity is intentionally very big compared to [nb_levels]. *)
+      let* default_capacity =
+        frequencyl [(1, Int64.of_int (1000 * nb_levels)); (1, Int64.max_int)]
+      in
+      (* The small capacity is intended to be smaller than nb_levels
+         (but greater than zero). *)
+      let* small_capacity = 3 -- (nb_levels / 2) in
+      let* next_index_delta = -5000 -- 5000 in
+      let big_next_index = Int64.(add max_int (of_int next_index_delta)) in
+      (* for the [next_index] counter of the history, we test both default values
+         (i.e., 0L) and values close to [max_int]. *)
+      let* next_index = frequencyl [(1, 0L); (1, big_next_index)] in
+      return
+        (nb_levels, default_capacity, Int64.of_int small_capacity, next_index))
+  in
   [
     Tztest.tztest_qcheck2
       ~name:"Produce inclusion proof between two related inboxes."
@@ -492,4 +720,26 @@ let tests =
         let* m = 0 -- 1000 in
         return (level_of_int n, Z.of_int m))
       test_empty_inbox_proof;
+    Tztest.tztest_qcheck2
+      ~count:10
+      ~name:"Checking inboxes history length"
+      gen_history_params
+      test_history_length;
+    Tztest.tztest_qcheck2
+      ~count:10
+      ~name:"Checking inboxes history content and order"
+      gen_history_params
+      test_history_prefix;
+    Tztest.tztest_qcheck2
+      ~count:10
+      ~name:"Checking inclusion proofs validity depending on history capacity"
+      gen_history_params
+      test_inclusion_proofs_depending_on_history_capacity;
+    Tztest.tztest_qcheck2
+      ~count:10
+      ~name:
+        "Checking results of add_messages when histories have different \
+         capacities"
+      gen_history_params
+      test_for_successive_add_messages_with_different_histories_capacities;
   ]
