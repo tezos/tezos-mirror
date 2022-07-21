@@ -82,6 +82,10 @@ module Crypto = struct
     Bytes.blit msg 0 payload extrabytes msg_length ;
     P2p_io_scheduler.write ?canceler fd payload
 
+  (** Read and decypher data from the fd.
+
+      Returned buffer's size is lesser than [bufsize] - [tag_length].
+  *)
   let read_chunk ?canceler fd cryptobox_data =
     let open Lwt_result_syntax in
     let open P2p_buffer_reader in
