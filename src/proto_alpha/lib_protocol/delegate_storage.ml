@@ -246,7 +246,7 @@ let set c contract delegate =
             else return_unit
         | Originated _ -> return_unit)
         >>=? fun () ->
-        Storage.Contract.Spendable_balance.mem c contract >>= fun exists ->
+        Contract_storage.allocated c contract >>= fun exists ->
         error_when
           (self_delegation && not exists)
           (Empty_delegate_account delegate)

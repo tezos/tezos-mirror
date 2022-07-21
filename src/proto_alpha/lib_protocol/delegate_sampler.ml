@@ -154,9 +154,8 @@ let get_stakes_for_selected_index ctxt index =
       let open Tez_repr in
       let open Lwt_result_syntax in
       let* frozen_deposits_limit =
-        Storage.Contract.Frozen_deposits_limit.find ctxt delegate_contract
+        Delegate_storage.frozen_deposits_limit ctxt delegate
       in
-
       let* balance_and_frozen_bonds =
         Contract_storage.get_balance_and_frozen_bonds ctxt delegate_contract
       in
