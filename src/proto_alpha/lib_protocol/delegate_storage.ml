@@ -181,16 +181,7 @@ let set_active ctxt delegate =
   if not inactive then return ctxt
   else Stake_storage.activate_only_call_from_delegate_storage ctxt delegate
 
-let staking_balance ctxt delegate =
-  Contract_delegate_storage.registered ctxt delegate >>=? fun is_registered ->
-  if is_registered then Stake_storage.get_staking_balance ctxt delegate
-  else return Tez_repr.zero
-
-let pubkey ctxt delegate =
-  Contract_manager_storage.get_manager_key
-    ctxt
-    delegate
-    ~error:(Unregistered_delegate delegate)
+let deactivated = Delegate_activation_storage.is_inactive
 
 let init ctxt contract delegate =
   Contract_manager_storage.is_manager_key_revealed ctxt delegate
@@ -271,6 +262,17 @@ let set c contract delegate =
           Storage.Delegates.add c delegate >>= fun c -> set_active c delegate
         else return c
 
+(* The fact that this succeeds iff [registered ctxt pkh] returns true is an
+   invariant of the [set] function. *)
+let check_delegate ctxt pkh =
+  Storage.Delegates.mem ctxt pkh >>= function
+  | true -> return_unit
+  | false -> fail (Not_registered pkh)
+
+let fold = Storage.Delegates.fold
+
+let list = Storage.Delegates.elements
+
 let frozen_deposits_limit ctxt delegate =
   Storage.Contract.Frozen_deposits_limit.find
     ctxt
@@ -282,12 +284,17 @@ let set_frozen_deposits_limit ctxt delegate limit =
     (Contract_repr.Implicit delegate)
     limit
 
+let frozen_deposits ctxt delegate =
+  Frozen_deposits_storage.get ctxt (Contract_repr.Implicit delegate)
+
 let balance ctxt delegate =
   let contract = Contract_repr.Implicit delegate in
   Storage.Contract.Spendable_balance.get ctxt contract
 
-let frozen_deposits ctxt delegate =
-  Frozen_deposits_storage.get ctxt (Contract_repr.Implicit delegate)
+let staking_balance ctxt delegate =
+  Contract_delegate_storage.registered ctxt delegate >>=? fun is_registered ->
+  if is_registered then Stake_storage.get_staking_balance ctxt delegate
+  else return Tez_repr.zero
 
 let full_balance ctxt delegate =
   frozen_deposits ctxt delegate >>=? fun frozen_deposits ->
@@ -297,20 +304,13 @@ let full_balance ctxt delegate =
   Lwt.return
     Tez_repr.(frozen_deposits.current_amount +? balance_and_frozen_bonds)
 
-let deactivated = Delegate_activation_storage.is_inactive
-
 let delegated_balance ctxt delegate =
   staking_balance ctxt delegate >>=? fun staking_balance ->
   full_balance ctxt delegate >>=? fun self_staking_balance ->
   Lwt.return Tez_repr.(staking_balance -? self_staking_balance)
 
-let fold = Storage.Delegates.fold
-
-let list = Storage.Delegates.elements
-
-(* The fact that this succeeds iff [registered ctxt pkh] returns true is an
-   invariant of the [set] function. *)
-let check_delegate ctxt pkh =
-  Storage.Delegates.mem ctxt pkh >>= function
-  | true -> return_unit
-  | false -> fail (Not_registered pkh)
+let pubkey ctxt delegate =
+  Contract_manager_storage.get_manager_key
+    ctxt
+    delegate
+    ~error:(Unregistered_delegate delegate)

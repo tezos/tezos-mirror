@@ -39,6 +39,29 @@ type error +=
     }
   | (* `Temporary *) Not_registered of Signature.Public_key_hash.t
 
+val set_active :
+  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
+
+val set_inactive :
+  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
+
+val deactivated :
+  Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
+
+(** Allow to register a delegate when creating an account. *)
+val init :
+  Raw_context.t ->
+  Contract_repr.t ->
+  Signature.Public_key_hash.t ->
+  Raw_context.t tzresult Lwt.t
+
+(** Allow to set the delegate of an account. *)
+val set :
+  Raw_context.t ->
+  Contract_repr.t ->
+  Signature.Public_key_hash.t option ->
+  Raw_context.t tzresult Lwt.t
+
 (** Check that a given implicit account is a registered delegate. *)
 val check_delegate :
   Raw_context.t -> Signature.Public_key_hash.t -> unit tzresult Lwt.t
@@ -82,10 +105,6 @@ val balance :
 val staking_balance :
   Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 
-(** Only use this function for RPCs: this is expensive. *)
-val delegated_balance :
-  Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
-
 (** Returns the full 'balance' of the implicit contract associated to
     a given key, i.e. the sum of the spendable balance (given by [balance] or
     [Contract_storage.get_balance]) and of the frozen balance. The frozen
@@ -97,30 +116,11 @@ val delegated_balance :
 val full_balance :
   Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 
-(** Allow to register a delegate when creating an account. *)
-val init :
-  Raw_context.t ->
-  Contract_repr.t ->
-  Signature.Public_key_hash.t ->
-  Raw_context.t tzresult Lwt.t
-
-(** Allow to set the delegate of an account. *)
-val set :
-  Raw_context.t ->
-  Contract_repr.t ->
-  Signature.Public_key_hash.t option ->
-  Raw_context.t tzresult Lwt.t
+(** Only use this function for RPCs: this is expensive. *)
+val delegated_balance :
+  Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 
 val pubkey :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Signature.Public_key.t tzresult Lwt.t
-
-val set_active :
-  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
-
-val set_inactive :
-  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
-
-val deactivated :
-  Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t

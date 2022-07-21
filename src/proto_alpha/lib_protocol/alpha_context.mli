@@ -2514,7 +2514,9 @@ module Receipt : sig
   val group_balance_updates : balance_updates -> balance_updates tzresult
 end
 
-(** This module re-exports definitions from {!Delegate_storage}. *)
+(** This module re-exports definitions from {!Delegate_storage},
+   {!Delegate_missed_endorsements_storage},
+   {!Delegate_slashed_deposits_storage}, {!Delegate_cycles}. *)
 module Delegate : sig
   val init :
     context ->
