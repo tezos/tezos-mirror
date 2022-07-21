@@ -41,10 +41,11 @@ module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
 
         let compute_step s =
           let open Lwt.Syntax in
-          (* register the PVM host funcs wrappers in a module ["tezos"] into the WASM linker *)
+          (* register the PVM host funcs wrappers in a module ["rollup_safe_core"]
+             into the WASM linker *)
           let* () =
             Tezos_webassembly_interpreter.(
-              Import.register ~module_name:(Utf8.decode "tezos"))
+              Import.register ~module_name:(Utf8.decode "rollup_safe_core"))
               Host_funcs.lookup
           in
           (* build the registry of host functions (to be passed to the interpreter via its config *)
