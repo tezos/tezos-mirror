@@ -23,39 +23,39 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let hooks =
-  (* Replace variables that may change between different runs by constants. *)
-  let replace_variables string =
-    let replacements =
-      [
-        ("tz[123]\\w{33}\\b", "[PUBLIC_KEY_HASH]");
-        ("\\bB\\w{50}\\b", "[BLOCK_HASH]");
-        ("Co\\w{50}\\b", "[CONTEXT_HASH]");
-        ("txr1\\w{33}\\b", "[TX_ROLLUP_HASH]");
-        ("tz4\\w{33}\\b", "[TX_ROLLUP_PUBLIC_KEY_HASH]");
-        ("txi\\w{50}\\b", "[TX_ROLLUP_INBOX_HASH]");
-        ("txmr\\w{50}\\b", "[TX_ROLLUP_MESSAGE_RESULT_HASH]");
-        ("txm\\w{50}\\b", "[TX_ROLLUP_MESSAGE_HASH]");
-        ("txmr\\w{50}\\b", "[TX_ROLLUP_MESSAGE_RESULT_HASH]");
-        ("txM\\w{50}\\b", "[TX_ROLLUP_MESSAGE_RESULT_LIST_HASH]");
-        ("txc\\w{50}\\b", "[TX_ROLLUP_COMMITMENT_HASH]");
-        ("scr1\\w{33}\\b", "[SC_ROLLUP_HASH]");
-        ("scc1\\w{50}\\b", "[SC_ROLLUP_COMMITMENT_HASH]");
-        ("scib1\\w{50}\\b", "[SC_ROLLUP_INBOX_HASH]");
-        ("edpk\\w{50}\\b", "[PUBLIC_KEY]");
-        ("KT1\\w{33}\\b", "[CONTRACT_HASH]");
-        ("\\bo\\w{50}\\b", "[OPERATION_HASH]");
-        ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]");
-        (* Ports are non-deterministic when using -j. *)
-        ("/localhost:\\d{4,5}/", "/localhost:[PORT]/");
-      ]
-    in
-    List.fold_left
-      (fun string (replace, by) ->
-        replace_string ~all:true (rex replace) ~by string)
-      string
-      replacements
+(* Replace variables that may change between different runs by constants. *)
+let replace_variables string =
+  let replacements =
+    [
+      ("tz[123]\\w{33}\\b", "[PUBLIC_KEY_HASH]");
+      ("\\bB\\w{50}\\b", "[BLOCK_HASH]");
+      ("Co\\w{50}\\b", "[CONTEXT_HASH]");
+      ("txr1\\w{33}\\b", "[TX_ROLLUP_HASH]");
+      ("tz4\\w{33}\\b", "[TX_ROLLUP_PUBLIC_KEY_HASH]");
+      ("txi\\w{50}\\b", "[TX_ROLLUP_INBOX_HASH]");
+      ("txmr\\w{50}\\b", "[TX_ROLLUP_MESSAGE_RESULT_HASH]");
+      ("txm\\w{50}\\b", "[TX_ROLLUP_MESSAGE_HASH]");
+      ("txmr\\w{50}\\b", "[TX_ROLLUP_MESSAGE_RESULT_HASH]");
+      ("txM\\w{50}\\b", "[TX_ROLLUP_MESSAGE_RESULT_LIST_HASH]");
+      ("txc\\w{50}\\b", "[TX_ROLLUP_COMMITMENT_HASH]");
+      ("scr1\\w{33}\\b", "[SC_ROLLUP_HASH]");
+      ("scc1\\w{50}\\b", "[SC_ROLLUP_COMMITMENT_HASH]");
+      ("scib1\\w{50}\\b", "[SC_ROLLUP_INBOX_HASH]");
+      ("edpk\\w{50}\\b", "[PUBLIC_KEY]");
+      ("KT1\\w{33}\\b", "[CONTRACT_HASH]");
+      ("\\bo\\w{50}\\b", "[OPERATION_HASH]");
+      ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]");
+      (* Ports are non-deterministic when using -j. *)
+      ("/localhost:\\d{4,5}/", "/localhost:[PORT]/");
+    ]
   in
+  List.fold_left
+    (fun string (replace, by) ->
+      replace_string ~all:true (rex replace) ~by string)
+    string
+    replacements
+
+let hooks =
   let on_spawn command arguments =
     (* Remove arguments that shouldn't be captured in regression output. *)
     let arguments, _ =
