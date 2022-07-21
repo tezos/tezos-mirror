@@ -210,7 +210,7 @@ let set_frozen_deposits_limit ctxt delegate limit =
 let frozen_deposits ctxt delegate =
   Frozen_deposits_storage.get ctxt (Contract_repr.Implicit delegate)
 
-let balance ctxt delegate =
+let spendable_balance ctxt delegate =
   let contract = Contract_repr.Implicit delegate in
   Storage.Contract.Spendable_balance.get ctxt contract
 
