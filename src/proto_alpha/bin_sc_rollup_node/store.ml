@@ -498,7 +498,7 @@ module Last_cemented_commitment_hash = Make_mutable_value (struct
   let value_encoding = Sc_rollup.Commitment.Hash.encoding
 end)
 
-module Commitments_published_at_level = Make_append_only_map (struct
+module Commitments_published_at_level = Make_updatable_map (struct
   let path = ["commitments"; "published_at_level"]
 
   let keep_last_n_entries_in_memory = 10
