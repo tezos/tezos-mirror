@@ -144,120 +144,11 @@ let start_new_voting_period ctxt =
       Vote.clear_current_proposal ctxt >>=? Voting_period.reset)
   >>=? fun ctxt -> Vote.update_listings ctxt
 
-type error +=
-  | (* `Branch *)
-      Invalid_proposal
-  | Unexpected_proposal
-  | Unauthorized_proposal
-  | Too_many_proposals
-  | Empty_proposal
-  | Unexpected_ballot
-  | Unauthorized_ballot
-  | Duplicate_ballot
-  | (* `Permanent *)
-      Invalid_dictator_proposal
-
-let () =
-  let open Data_encoding in
-  (* Invalid proposal *)
-  register_error_kind
-    `Branch
-    ~id:"invalid_proposal"
-    ~title:"Invalid proposal"
-    ~description:"Ballot provided for a proposal that is not the current one."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Invalid proposal")
-    empty
-    (function Invalid_proposal -> Some () | _ -> None)
-    (fun () -> Invalid_proposal) ;
-  (* Unexpected proposal *)
-  register_error_kind
-    `Branch
-    ~id:"unexpected_proposal"
-    ~title:"Unexpected proposal"
-    ~description:"Proposal recorded outside of a proposal period."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Unexpected proposal")
-    empty
-    (function Unexpected_proposal -> Some () | _ -> None)
-    (fun () -> Unexpected_proposal) ;
-  (* Unauthorized proposal *)
-  register_error_kind
-    `Branch
-    ~id:"unauthorized_proposal"
-    ~title:"Unauthorized proposal"
-    ~description:
-      "The delegate provided for the proposal is not in the voting listings."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Unauthorized proposal")
-    empty
-    (function Unauthorized_proposal -> Some () | _ -> None)
-    (fun () -> Unauthorized_proposal) ;
-  (* Unexpected ballot *)
-  register_error_kind
-    `Branch
-    ~id:"unexpected_ballot"
-    ~title:"Unexpected ballot"
-    ~description:"Ballot recorded outside of a voting period."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Unexpected ballot")
-    empty
-    (function Unexpected_ballot -> Some () | _ -> None)
-    (fun () -> Unexpected_ballot) ;
-  (* Unauthorized ballot *)
-  register_error_kind
-    `Branch
-    ~id:"unauthorized_ballot"
-    ~title:"Unauthorized ballot"
-    ~description:
-      "The delegate provided for the ballot is not in the voting listings."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Unauthorized ballot")
-    empty
-    (function Unauthorized_ballot -> Some () | _ -> None)
-    (fun () -> Unauthorized_ballot) ;
-  (* Duplicate ballot *)
-  register_error_kind
-    `Branch
-    ~id:"duplicate_ballot"
-    ~title:"Duplicate ballot"
-    ~description:"The delegate has already submitted a ballot."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Duplicate ballot")
-    empty
-    (function Duplicate_ballot -> Some () | _ -> None)
-    (fun () -> Duplicate_ballot) ;
-  (* Too many proposals *)
-  register_error_kind
-    `Branch
-    ~id:"too_many_proposals"
-    ~title:"Too many proposals"
-    ~description:"The delegate reached the maximum number of allowed proposals."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Too many proposals")
-    empty
-    (function Too_many_proposals -> Some () | _ -> None)
-    (fun () -> Too_many_proposals) ;
-  (* Empty proposal *)
-  register_error_kind
-    `Branch
-    ~id:"empty_proposal"
-    ~title:"Empty proposal"
-    ~description:"Proposal lists cannot be empty."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Empty proposal")
-    empty
-    (function Empty_proposal -> Some () | _ -> None)
-    (fun () -> Empty_proposal) ;
-  (* Invalid dictator proposal *)
-  register_error_kind
-    `Permanent
-    ~id:"invalid_dictator_proposal"
-    ~title:"Invalid dictator proposal"
-    ~description:"A testnet dictator can only submit one proposal at a time."
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "A testnet dictator can only submit one proposal at a time.")
-    empty
-    (function Invalid_dictator_proposal -> Some () | _ -> None)
-    (fun () -> Invalid_dictator_proposal)
+open Validate_errors.Voting
 
 let record_delegate_proposals ctxt delegate proposals =
   (match proposals with
-  | [] -> error Empty_proposal
+  | [] -> error Empty_proposals
   | _ :: _ -> Result.return_unit)
   >>?= fun () ->
   Voting_period.get_current_kind ctxt >>=? function
@@ -279,8 +170,9 @@ let record_delegate_proposals ctxt delegate proposals =
           (fun ctxt proposal -> Vote.record_proposal ctxt proposal delegate)
           ctxt
           proposals)
-      else fail Unauthorized_proposal
-  | Exploration | Cooldown | Promotion | Adoption -> fail Unexpected_proposal
+      else fail Source_not_in_vote_listings
+  | (Exploration | Cooldown | Promotion | Adoption) as current ->
+      fail (Wrong_voting_period_kind {current; expected = [Proposal]})
 
 let record_testnet_dictator_proposals ctxt chain_id proposals =
   Vote.clear_ballots ctxt >>= fun ctxt ->
@@ -298,7 +190,7 @@ let record_testnet_dictator_proposals ctxt chain_id proposals =
         ctxt
         chain_id
         Adoption
-  | _ :: _ :: _ -> fail Invalid_dictator_proposal
+  | _ :: _ :: _ -> fail Testnet_dictator_multiple_proposals
 
 let is_testnet_dictator ctxt chain_id delegate =
   (* This function should always, ALWAYS, return false on mainnet!!!! *)
@@ -318,14 +210,17 @@ let record_ballot ctxt delegate proposal ballot =
       Vote.get_current_proposal ctxt >>=? fun current_proposal ->
       error_unless
         (Protocol_hash.equal proposal current_proposal)
-        Invalid_proposal
+        (Ballot_for_wrong_proposal
+           {current = current_proposal; submitted = proposal})
       >>?= fun () ->
       Vote.has_recorded_ballot ctxt delegate >>= fun has_ballot ->
-      error_when has_ballot Duplicate_ballot >>?= fun () ->
+      error_when has_ballot Already_submitted_a_ballot >>?= fun () ->
       Vote.in_listings ctxt delegate >>= fun in_listings ->
       if in_listings then Vote.record_ballot ctxt delegate ballot
-      else fail Unauthorized_ballot
-  | Cooldown | Proposal | Adoption -> fail Unexpected_ballot
+      else fail Source_not_in_vote_listings
+  | (Cooldown | Proposal | Adoption) as current ->
+      fail
+        (Wrong_voting_period_kind {current; expected = [Exploration; Promotion]})
 
 let may_start_new_voting_period ctxt =
   Voting_period.is_last_block ctxt >>=? fun is_last ->

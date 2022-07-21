@@ -380,6 +380,165 @@ module Consensus = struct
       (fun endorser -> Conflicting_dal_slot_availability {endorser})
 end
 
+module Voting = struct
+  type error +=
+    | (* Shared voting errors *)
+        Wrong_voting_period_index of {
+        expected : int32;
+        provided : int32;
+      }
+    | Wrong_voting_period_kind of {
+        current : Voting_period.kind;
+        expected : Voting_period.kind list;
+      }
+    | Source_not_in_vote_listings
+    | (* Proposals errors *)
+        Empty_proposals
+    | Too_many_proposals
+    | Testnet_dictator_multiple_proposals
+    | (* Ballot errors *)
+        Ballot_for_wrong_proposal of {
+        current : Protocol_hash.t;
+        submitted : Protocol_hash.t;
+      }
+    | Already_submitted_a_ballot
+
+  let () =
+    (* Shared voting errors *)
+    register_error_kind
+      `Temporary
+      ~id:"validate_operation.wrong_voting_period_index"
+      ~title:"Wrong voting period index"
+      ~description:
+        "The voting operation contains a voting period index different from \
+         the current one."
+      ~pp:(fun ppf (expected, provided) ->
+        Format.fprintf
+          ppf
+          "The voting operation is meant for voting period %ld, whereas the \
+           current period is %ld."
+          provided
+          expected)
+      Data_encoding.(
+        obj2 (req "current_index" int32) (req "provided_index" int32))
+      (function
+        | Wrong_voting_period_index {expected; provided} ->
+            Some (expected, provided)
+        | _ -> None)
+      (fun (expected, provided) ->
+        Wrong_voting_period_index {expected; provided}) ;
+    register_error_kind
+      `Temporary
+      ~id:"validate_operation.wrong_voting_period_kind"
+      ~title:"Wrong voting period kind"
+      ~description:
+        "The voting operation is incompatible the current voting period kind."
+      ~pp:(fun ppf (current, expected) ->
+        Format.fprintf
+          ppf
+          "The voting operation is only valid during a %a voting period, but \
+           we are currently in a %a period."
+          (Format.pp_print_list
+             ~pp_sep:(fun fmt () -> Format.fprintf fmt " or ")
+             Voting_period.pp_kind)
+          expected
+          Voting_period.pp_kind
+          current)
+      Data_encoding.(
+        obj2
+          (req "current" Voting_period.kind_encoding)
+          (req "expected" (list Voting_period.kind_encoding)))
+      (function
+        | Wrong_voting_period_kind {current; expected} ->
+            Some (current, expected)
+        | _ -> None)
+      (fun (current, expected) -> Wrong_voting_period_kind {current; expected}) ;
+    let description = "The delegate is not in the vote listings." in
+    register_error_kind
+      `Temporary
+      ~id:"validate_operation.source_not_in_vote_listings"
+      ~title:"Source not in vote listings"
+      ~description
+      ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+      Data_encoding.empty
+      (function Source_not_in_vote_listings -> Some () | _ -> None)
+      (fun () -> Source_not_in_vote_listings) ;
+
+    (* Proposals errors *)
+    let description = "Proposal list cannot be empty." in
+    register_error_kind
+      `Permanent
+      ~id:"validate_operation.empty_proposals"
+      ~title:"Empty proposals"
+      ~description
+      ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+      Data_encoding.empty
+      (function Empty_proposals -> Some () | _ -> None)
+      (fun () -> Empty_proposals) ;
+    let description =
+      "The proposer exceeded the maximum number of allowed proposals."
+    in
+    register_error_kind
+      `Branch
+      ~id:"validate_operation.too_many_proposals"
+      ~title:"Too many proposals"
+      ~description
+      ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+      Data_encoding.empty
+      (function Too_many_proposals -> Some () | _ -> None)
+      (fun () -> Too_many_proposals) ;
+    let description =
+      "A testnet dictator cannot submit more than one proposal at a time."
+    in
+    register_error_kind
+      `Permanent
+      ~id:"validate_operation.testnet_dictator_multiple_proposals"
+      ~title:"Testnet dictator multiple proposals"
+      ~description
+      ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+      Data_encoding.empty
+      (function Testnet_dictator_multiple_proposals -> Some () | _ -> None)
+      (fun () -> Testnet_dictator_multiple_proposals) ;
+
+    (* Ballot errors *)
+    register_error_kind
+      `Branch
+      ~id:"validate_operation.ballot_for_wrong_proposal"
+      ~title:"Ballot for wrong proposal"
+      ~description:"Ballot provided for a proposal that is not the current one."
+      ~pp:(fun ppf (current, submitted) ->
+        Format.fprintf
+          ppf
+          "Ballot provided for proposal %a whereas the current proposal is %a."
+          Protocol_hash.pp
+          submitted
+          Protocol_hash.pp
+          current)
+      Data_encoding.(
+        obj2
+          (req "current_proposal" Protocol_hash.encoding)
+          (req "ballot_proposal" Protocol_hash.encoding))
+      (function
+        | Ballot_for_wrong_proposal {current; submitted} ->
+            Some (current, submitted)
+        | _ -> None)
+      (fun (current, submitted) ->
+        Ballot_for_wrong_proposal {current; submitted}) ;
+    let description =
+      "The delegate has already submitted a ballot for the current voting \
+       period."
+    in
+    register_error_kind
+      `Branch
+      ~id:"validate_operation.already_submitted_a_ballot"
+      ~title:"Already submitted a ballot"
+      ~description
+      ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+      Data_encoding.empty
+      (function Already_submitted_a_ballot -> Some () | _ -> None)
+      (fun () -> Already_submitted_a_ballot)
+end
+
 module Anonymous = struct
   type error +=
     | Invalid_activation of {pkh : Ed25519.Public_key_hash.t}

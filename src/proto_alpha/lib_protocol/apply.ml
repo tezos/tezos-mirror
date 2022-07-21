@@ -40,7 +40,6 @@ type error +=
   | Tx_rollup_invalid_transaction_ticket_amount
   | Cannot_transfer_ticket_to_implicit
   | Sc_rollup_feature_disabled
-  | Wrong_voting_period of {expected : int32; provided : int32}
   | Internal_operation_replay of
       Apply_internal_results.packed_internal_operation
   | Multiple_revelation
@@ -197,20 +196,6 @@ let () =
     (function Sc_rollup_feature_disabled -> Some () | _ -> None)
     (fun () -> Sc_rollup_feature_disabled) ;
 
-  register_error_kind
-    `Temporary
-    ~id:"operation.wrong_voting_period"
-    ~title:"Wrong voting period"
-    ~description:
-      "Trying to include a proposal or ballot meant for another voting period"
-    ~pp:(fun ppf (e, p) ->
-      Format.fprintf ppf "Wrong voting period %ld, current is %ld" p e)
-    Data_encoding.(
-      obj2 (req "current_index" int32) (req "provided_index" int32))
-    (function
-      | Wrong_voting_period {expected; provided} -> Some (expected, provided)
-      | _ -> None)
-    (fun (expected, provided) -> Wrong_voting_period {expected; provided}) ;
   register_error_kind
     `Permanent
     ~id:"internal_operation_replay"
@@ -2148,7 +2133,8 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
       Voting_period.get_current ctxt >>=? fun {index = current_period; _} ->
       error_unless
         Compare.Int32.(current_period = period)
-        (Wrong_voting_period {expected = current_period; provided = period})
+        (Validate_errors.Voting.Wrong_voting_period_index
+           {expected = current_period; provided = period})
       >>?= fun () ->
       Amendment.record_proposals ctxt chain_id source proposals >|=? fun ctxt ->
       (ctxt, Single_result Proposals_result)
@@ -2158,7 +2144,8 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
       Voting_period.get_current ctxt >>=? fun {index = current_period; _} ->
       error_unless
         Compare.Int32.(current_period = period)
-        (Wrong_voting_period {expected = current_period; provided = period})
+        (Validate_errors.Voting.Wrong_voting_period_index
+           {expected = current_period; provided = period})
       >>?= fun () ->
       Amendment.record_ballot ctxt source proposal ballot >|=? fun ctxt ->
       (ctxt, Single_result Ballot_result)

@@ -322,9 +322,11 @@ let invalid_signature loc = function
   | [Environment.Ecoproto_error Operation.Invalid_signature] -> return_unit
   | err -> wrong_error "Invalid_signature" err loc
 
-let wrong_voting_period ~current_index ~op_index loc = function
+open Validate_errors.Voting
+
+let wrong_voting_period_index ~current_index ~op_index loc = function
   | [
-      Environment.Ecoproto_error (Apply.Wrong_voting_period {expected; provided});
+      Environment.Ecoproto_error (Wrong_voting_period_index {expected; provided});
     ] ->
       let open Lwt_result_syntax in
       let make_loc = append_loc ~caller_loc:loc in
@@ -332,39 +334,44 @@ let wrong_voting_period ~current_index ~op_index loc = function
         Assert.equal_int32 ~loc:(make_loc __LOC__) expected current_index
       in
       Assert.equal_int32 ~loc:(make_loc __LOC__) provided op_index
-  | err -> wrong_error "Wrong_voting_period" err loc
+  | err -> wrong_error "Wrong_voting_period_index" err loc
 
-let unexpected_proposal loc = function
-  | [Environment.Ecoproto_error Amendment.Unexpected_proposal] -> return_unit
-  | err -> wrong_error "Unexpected_proposal" err loc
+let wrong_voting_period_kind loc = function
+  | [Environment.Ecoproto_error (Wrong_voting_period_kind _)] -> return_unit
+  | err -> wrong_error "Wrong_voting_period_kind" err loc
 
-let unauthorized_proposal loc = function
-  | [Environment.Ecoproto_error Amendment.Unauthorized_proposal] -> return_unit
-  | err -> wrong_error "Unauthorized_proposal" err loc
+let source_not_in_vote_listings loc = function
+  | [Environment.Ecoproto_error Source_not_in_vote_listings] -> return_unit
+  | err -> wrong_error "Source_not_in_vote_listings" err loc
 
-let empty_proposal loc = function
-  | [Environment.Ecoproto_error Amendment.Empty_proposal] -> return_unit
-  | err -> wrong_error "Empty_proposal" err loc
+let empty_proposals loc = function
+  | [Environment.Ecoproto_error Empty_proposals] -> return_unit
+  | err -> wrong_error "Empty_proposals" err loc
 
 let too_many_proposals loc = function
-  | [Environment.Ecoproto_error Amendment.Too_many_proposals] -> return_unit
+  | [Environment.Ecoproto_error Too_many_proposals] -> return_unit
   | err -> wrong_error "Too_many_proposals" err loc
 
-let unexpected_ballot loc = function
-  | [Environment.Ecoproto_error Amendment.Unexpected_ballot] -> return_unit
-  | err -> wrong_error "Unexpected_ballot" err loc
+let ballot_for_wrong_proposal ~current_proposal ~op_proposal loc = function
+  | [
+      Environment.Ecoproto_error (Ballot_for_wrong_proposal {current; submitted});
+    ] ->
+      let open Lwt_result_syntax in
+      let* () =
+        Assert.equal_protocol_hash
+          ~loc:(append_loc ~caller_loc:loc __LOC__)
+          current_proposal
+          current
+      in
+      Assert.equal_protocol_hash
+        ~loc:(append_loc ~caller_loc:loc __LOC__)
+        op_proposal
+        submitted
+  | err -> wrong_error "Ballot_for_wrong_proposal" err loc
 
-let invalid_proposal loc = function
-  | [Environment.Ecoproto_error Amendment.Invalid_proposal] -> return_unit
-  | err -> wrong_error "Invalid_proposal" err loc
-
-let duplicate_ballot loc = function
-  | [Environment.Ecoproto_error Amendment.Duplicate_ballot] -> return_unit
-  | err -> wrong_error "Duplicate_ballot" err loc
-
-let unauthorized_ballot loc = function
-  | [Environment.Ecoproto_error Amendment.Unauthorized_ballot] -> return_unit
-  | err -> wrong_error "Unauthorized_ballot" err loc
+let already_submitted_a_ballot loc = function
+  | [Environment.Ecoproto_error Already_submitted_a_ballot] -> return_unit
+  | err -> wrong_error "Already_submitted_a_ballot" err loc
 
 let assert_validate_proposals_fails ~expected_error ~proposer ~proposals ?period
     block loc =
@@ -483,7 +490,7 @@ let test_successful_vote num_delegates () =
   >>=? fun () ->
   (* proposing less than one proposal fails *)
   assert_validate_proposals_fails
-    ~expected_error:empty_proposal
+    ~expected_error:empty_proposals
     ~proposer:del1
     ~proposals:[]
     b
@@ -533,7 +540,7 @@ let test_successful_vote num_delegates () =
      belongs to [delegates_p2], so they have already sent a ballot
      during the unanimous vote right above). *)
   assert_validate_ballot_fails
-    ~expected_error:duplicate_ballot
+    ~expected_error:already_submitted_a_ballot
     ~voter:del1
     ~proposal:Protocol_hash.zero
     ~ballot:Vote.Nay
@@ -1275,14 +1282,14 @@ let test_proposals_invalid_signature () =
 
 (** Test that a Proposals operation fails when the period index
     provided in the operation is not the current voting period index. *)
-let test_proposals_wrong_voting_period () =
+let test_proposals_wrong_voting_period_index () =
   let open Lwt_result_syntax in
   let* block, proposer = context_init1 () in
   let* current_period = Context.Vote.get_current_period (B block) in
   let current_index = current_period.voting_period.index in
   let op_index = Int32.succ current_index in
   assert_validate_proposals_fails
-    ~expected_error:(wrong_voting_period ~current_index ~op_index)
+    ~expected_error:(wrong_voting_period_index ~current_index ~op_index)
     ~proposer
     ~proposals:[Protocol_hash.zero]
     ~period:op_index
@@ -1291,13 +1298,13 @@ let test_proposals_wrong_voting_period () =
 
 (** Test that a Proposals operation fails when it occurs in a
     non-Proposal voting period. *)
-let test_unexpected_proposal () =
+let test_proposals_wrong_voting_period_kind () =
   let open Lwt_result_syntax in
   let* block, proposer = context_init1 () in
   let proposal = protos.(0) in
   let assert_proposals_fails_with_unexpected_proposal =
     assert_validate_proposals_fails
-      ~expected_error:unexpected_proposal
+      ~expected_error:wrong_voting_period_kind
       ~proposer
       ~proposals:[proposal]
   in
@@ -1332,7 +1339,7 @@ let test_unexpected_proposal () =
 
 (** Test that a Proposals operation fails when the proposer is not in
     the vote listings. *)
-let test_unauthorized_proposal () =
+let test_proposals_source_not_in_vote_listings () =
   let open Lwt_result_syntax in
   let* block, funder = context_init1 () in
   let account = Account.new_account () in
@@ -1344,7 +1351,7 @@ let test_unauthorized_proposal () =
   in
   let* block = Block.bake block ~operation in
   assert_validate_proposals_fails
-    ~expected_error:unauthorized_proposal
+    ~expected_error:source_not_in_vote_listings
     ~proposer
     ~proposals:[Protocol_hash.zero]
     block
@@ -1352,11 +1359,11 @@ let test_unauthorized_proposal () =
 
 (** Test that a Proposals operation fails when its proposal list is
     empty. *)
-let test_empty_proposal () =
+let test_empty_proposals () =
   let open Lwt_result_syntax in
   let* block, proposer = context_init1 () in
   assert_validate_proposals_fails
-    ~expected_error:empty_proposal
+    ~expected_error:empty_proposals
     ~proposer
     ~proposals:[]
     block
@@ -1608,14 +1615,14 @@ let test_ballot_invalid_signature () =
 
 (** Test that a Ballot operation fails when the period index provided
     in the operation is not the current voting period index. *)
-let test_ballot_wrong_voting_period () =
+let test_ballot_wrong_voting_period_index () =
   let open Lwt_result_syntax in
   let* block, voter = context_init1 () in
   let* current_period = Context.Vote.get_current_period (B block) in
   let current_index = current_period.voting_period.index in
   let op_index = Int32.succ current_index in
   assert_validate_ballot_fails
-    ~expected_error:(wrong_voting_period ~current_index ~op_index)
+    ~expected_error:(wrong_voting_period_index ~current_index ~op_index)
     ~voter
     ~proposal:protos.(0)
     ~ballot:Vote.Yay
@@ -1625,13 +1632,13 @@ let test_ballot_wrong_voting_period () =
 
 (** Test that a Ballot operation fails when it occurs outside of an
     Exploration or Promotion voting period. *)
-let test_unexpected_ballot () =
+let test_ballot_wrong_voting_period_kind () =
   let open Lwt_result_syntax in
   let* block, voter = context_init1 () in
   let proposal = protos.(0) in
   let assert_ballot_fails_with_unexpected_ballot =
     assert_validate_ballot_fails
-      ~expected_error:unexpected_ballot
+      ~expected_error:wrong_voting_period_kind
       ~voter
       ~proposal
       ~ballot:Vote.Nay
@@ -1664,28 +1671,29 @@ let test_unexpected_ballot () =
 
 (** Test that a Ballot operation fails when its proposal is not the
     current proposal. *)
-let test_ballot_on_invalid_proposal () =
+let test_ballot_for_wrong_proposal () =
   let open Lwt_result_syntax in
-  let* block, voter, _proposal =
+  let* block, voter, current_proposal =
     context_init_exploration ~proposal:protos.(0) ()
   in
+  let op_proposal = protos.(1) in
   assert_validate_ballot_fails
-    ~expected_error:invalid_proposal
+    ~expected_error:(ballot_for_wrong_proposal ~current_proposal ~op_proposal)
     ~voter
-    ~proposal:protos.(1)
+    ~proposal:op_proposal
     ~ballot:Vote.Yay
     block
     __LOC__
 
 (** Test that a Ballot operation fails when its source has already
     submitted a Ballot. *)
-let test_duplicate_ballot () =
+let test_already_submitted_a_ballot () =
   let open Lwt_result_syntax in
   let* block, voter, proposal = context_init_exploration () in
   let* operation = Op.ballot (B block) voter proposal Vote.Yay in
   let* block = Block.bake ~operation block in
   assert_validate_ballot_fails
-    ~expected_error:duplicate_ballot
+    ~expected_error:already_submitted_a_ballot
     ~voter
     ~proposal
     ~ballot:Vote.Nay
@@ -1694,7 +1702,7 @@ let test_duplicate_ballot () =
 
 (** Test that a Ballot operation fails when its source is not in the
     vote listings. *)
-let test_unauthorized_ballot () =
+let test_ballot_source_not_in_vote_listings () =
   let open Lwt_result_syntax in
   let* block, funder, proposal = context_init_exploration () in
   let account = Account.new_account () in
@@ -1706,7 +1714,7 @@ let test_unauthorized_ballot () =
   in
   let* block = Block.bake block ~operation in
   assert_validate_ballot_fails
-    ~expected_error:unauthorized_ballot
+    ~expected_error:source_not_in_vote_listings
     ~voter
     ~proposal
     ~ballot:Vote.Yay
@@ -1899,12 +1907,18 @@ let tests =
       `Quick
       test_proposals_invalid_signature;
     Tztest.tztest
-      "Proposals wrong voting period"
+      "Proposals wrong voting period index"
       `Quick
-      test_proposals_wrong_voting_period;
-    Tztest.tztest "Unexpected proposals" `Quick test_unexpected_proposal;
-    Tztest.tztest "Unauthorized proposal" `Quick test_unauthorized_proposal;
-    Tztest.tztest "Empty proposal" `Quick test_empty_proposal;
+      test_proposals_wrong_voting_period_index;
+    Tztest.tztest
+      "Proposals wrong voting period kind"
+      `Quick
+      test_proposals_wrong_voting_period_kind;
+    Tztest.tztest
+      "Proposals source not in vote listings"
+      `Quick
+      test_proposals_source_not_in_vote_listings;
+    Tztest.tztest "Empty proposals" `Quick test_empty_proposals;
     Tztest.tztest
       "Operation has too many proposals"
       `Quick
@@ -1929,15 +1943,24 @@ let tests =
       `Quick
       test_ballot_invalid_signature;
     Tztest.tztest
-      "Ballot wrong voting period"
+      "Ballot wrong voting period index"
       `Quick
-      test_ballot_wrong_voting_period;
-    Tztest.tztest "Unexpected ballot" `Quick test_unexpected_ballot;
+      test_ballot_wrong_voting_period_index;
     Tztest.tztest
-      "Ballot on invalid proposal"
+      "Ballot wrong voting period kind"
       `Quick
-      test_ballot_on_invalid_proposal;
-    Tztest.tztest "Duplicate ballot" `Quick test_duplicate_ballot;
-    Tztest.tztest "Unauthorized ballot" `Quick test_unauthorized_ballot;
+      test_ballot_wrong_voting_period_kind;
+    Tztest.tztest
+      "Ballot for wrong proposal"
+      `Quick
+      test_ballot_for_wrong_proposal;
+    Tztest.tztest
+      "Delegate has already submitted a ballot"
+      `Quick
+      test_already_submitted_a_ballot;
+    Tztest.tztest
+      "Ballot source not in vote listings"
+      `Quick
+      test_ballot_source_not_in_vote_listings;
     Tztest.tztest "Valid Ballot operations" `Quick test_valid_ballot;
   ]

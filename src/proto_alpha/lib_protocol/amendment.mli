@@ -75,8 +75,8 @@ open Alpha_context
 val may_start_new_voting_period : context -> context tzresult Lwt.t
 
 (** Records a list of proposals for a delegate.
-    @raise Unexpected_proposal if [ctxt] is not in a proposal period.
-    @raise Unauthorized_proposal if [delegate] is not in the listing. *)
+    @raise Wrong_voting_period_kind if [ctxt] is not in a proposal period.
+    @raise Source_not_in_vote_listings if [delegate] is not in the listing. *)
 val record_proposals :
   context ->
   Chain_id.t ->
@@ -84,22 +84,13 @@ val record_proposals :
   Protocol_hash.t list ->
   context tzresult Lwt.t
 
-type error +=
-  | Invalid_proposal
-  | Unexpected_proposal
-  | Unauthorized_proposal
-  | Too_many_proposals
-  | Empty_proposal
-  | Unexpected_ballot
-  | Unauthorized_ballot
-  | Duplicate_ballot
-
 (** Records a vote for a delegate if the current voting period is
     Exploration or Promotion.
-    @raise Invalid_proposal if [proposal] ≠ [current_proposal].
-    @raise Duplicate_ballot if delegate already voted.
-    @raise Unauthorized_ballot if delegate is not listed to vote,
-    or if current period differs from Exploration or Promotion.
+    @raise Ballot_for_wrong_proposal if [proposal] ≠ [current_proposal].
+    @raise Already_submitted_a_ballot if delegate already voted.
+    @raise Source_not_in_vote_listings if delegate is not listed to vote.
+    @raise Wrong_voting_period_kind if current period is not Exploration
+    or Promotion.
 *)
 val record_ballot :
   context ->
