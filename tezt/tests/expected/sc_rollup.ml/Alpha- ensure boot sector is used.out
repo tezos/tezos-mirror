@@ -1,7 +1,7 @@
 
 ./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string booting with '10 10 10 + +' --burn-cap 9999999
 Node is bootstrapped.
-Estimated gas: 3109.947 units (will add 100 for safety)
+Estimated gas: 3110.481 units (will add 100 for safety)
 Estimated storage: 6664 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -12,19 +12,19 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000686
+    Fee to the baker: ꜩ0.000687
     Expected counter: 1
-    Gas limit: 3210
+    Gas limit: 3211
     Storage limit: 6684 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000686
-      payload fees(the block proposer) ....... +ꜩ0.000686
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000687
+      payload fees(the block proposer) ....... +ꜩ0.000687
     Smart contract rollup origination:
       Kind: arith
       Parameter type: string
       Boot sector: '10 10 10 + +'
       This smart contract rollup origination was successfully applied
-      Consumed gas: 3109.947
+      Consumed gas: 3110.481
       Storage size: 6664 bytes
       Address: [SC_ROLLUP_HASH]
       Genesis commitment hash: [SC_ROLLUP_COMMITMENT_HASH]
@@ -81,7 +81,7 @@ This sequence of operations was run:
 
 ./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string booting with 31 --burn-cap 9999999
 Node is bootstrapped.
-Estimated gas: 3109.907 units (will add 100 for safety)
+Estimated gas: 3110.441 units (will add 100 for safety)
 Estimated storage: 6654 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -92,19 +92,19 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000676
+    Fee to the baker: ꜩ0.000677
     Expected counter: 3
-    Gas limit: 3210
+    Gas limit: 3211
     Storage limit: 6674 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000676
-      payload fees(the block proposer) ....... +ꜩ0.000676
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000677
+      payload fees(the block proposer) ....... +ꜩ0.000677
     Smart contract rollup origination:
       Kind: arith
       Parameter type: string
       Boot sector: '31'
       This smart contract rollup origination was successfully applied
-      Consumed gas: 3109.907
+      Consumed gas: 3110.441
       Storage size: 6654 bytes
       Address: [SC_ROLLUP_HASH]
       Genesis commitment hash: [SC_ROLLUP_COMMITMENT_HASH]
