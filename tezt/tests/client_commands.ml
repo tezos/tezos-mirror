@@ -81,7 +81,7 @@ module Simulation = struct
     let oc = open_out file in
     Ezjsonm.to_channel oc batches ;
     close_out oc ;
-    Client.spawn_multiple_transfers
+    Client.multiple_transfers
       ~giver:Constant.bootstrap1.public_key_hash
       ~json_batch:file
       ?simulation
@@ -104,7 +104,7 @@ module Simulation = struct
     @@ multiple_transfers
          ~args:["True"; "True"; "True"]
          ~simulation:true
-         Process.check
+         Runnable.run
 
   let failing =
     Protocol.register_test
@@ -135,8 +135,8 @@ module Simulation = struct
          ~args:["True"; "False"; "True"]
          ~simulation:true
          ~force:true
-    @@ fun p ->
-    let* stdout = Process.check_and_read_stdout ~expect_failure:false p in
+    @@ fun Runnable.{value; _} ->
+    let* stdout = Process.check_and_read_stdout ~expect_failure:false value in
     if
       stdout
       =~! rex
@@ -161,9 +161,11 @@ module Simulation = struct
       ~title:"Injecting of failing operations batch with force"
       ~tags:["client"; "injection"; "failing"; "force"; "multiple"; "batch"]
     @@ multiple_transfers ~args:["True"; "False"; "True"] ~force:true
-    @@ Process.check_error
-         ~exit_code:1
-         ~msg:(rex "--gas-limit option is required")
+    @@ fun Runnable.{value; _} ->
+    Process.check_error
+      value
+      ~exit_code:1
+      ~msg:(rex "--gas-limit option is required")
 
   let register protocol =
     successful protocol ;

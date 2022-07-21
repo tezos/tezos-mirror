@@ -193,7 +193,7 @@ let call_contract contract_id k client =
 (** [call_contracts calls client] bakes a block with multiple contract
    [calls] using [client]. It returns the amount of consumed gas. *)
 let call_contracts calls client =
-  let* () =
+  let*! () =
     Client.multiple_transfers
       ~log_output:false
       ~fee_cap:Tez.(of_int 9999999)

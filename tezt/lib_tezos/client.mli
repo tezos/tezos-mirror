@@ -635,24 +635,7 @@ val multiple_transfers :
   giver:string ->
   json_batch:string ->
   t ->
-  unit Lwt.t
-
-(** Same as [multiple_transfers], but do not wait for the process to exit. *)
-val spawn_multiple_transfers :
-  ?log_output:bool ->
-  ?endpoint:endpoint ->
-  ?wait:string ->
-  ?burn_cap:Tez.t ->
-  ?fee_cap:Tez.t ->
-  ?gas_limit:int ->
-  ?storage_limit:int ->
-  ?counter:int ->
-  ?simulation:bool ->
-  ?force:bool ->
-  giver:string ->
-  json_batch:string ->
-  t ->
-  Process.t
+  unit Runnable.process
 
 (** Run tezos-client get delegate for <src>. Returns [Some address] if delegate
     is set or [None] otherwise. *)
