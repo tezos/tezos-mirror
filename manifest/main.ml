@@ -1886,12 +1886,19 @@ let octez_protocol_compiler_lib =
         unix;
       ]
     ~opam_only_deps:[octez_protocol_environment]
-    ~modules:["Embedded_cmis"; "Packer"; "Compiler"; "Defaults"]
+    ~modules:
+      [
+        "Embedded_cmis_env";
+        "Embedded_cmis_register";
+        "Packer";
+        "Compiler";
+        "Defaults";
+      ]
     ~dune:
       Dune.
         [
           targets_rule
-            ["embedded_cmis.ml"]
+            ["embedded_cmis_env.ml"]
             ~action:
               [
                 S "run";
@@ -1899,12 +1906,11 @@ let octez_protocol_compiler_lib =
                   [
                     S "%{bin:ocp-ocamlres}";
                     S "-format";
-                    S "ocaml";
+                    S "variants";
                     S "-o";
                     S "%{targets}";
                   ];
                 S "%{lib:stdlib:camlinternalFormatBasics.cmi}";
-                S "%{cmi:registerer/tezos_protocol_registerer}";
                 S
                   "%{lib:tezos-protocol-environment.sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat.cmi}";
                 S
@@ -1933,6 +1939,21 @@ let octez_protocol_compiler_lib =
                   "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V6.cmi}";
                 S
                   "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V7.cmi}";
+              ];
+          targets_rule
+            ["embedded_cmis_register.ml"]
+            ~action:
+              [
+                S "run";
+                G
+                  [
+                    S "%{bin:ocp-ocamlres}";
+                    S "-format";
+                    S "variants";
+                    S "-o";
+                    S "%{targets}";
+                  ];
+                S "%{cmi:registerer/tezos_protocol_registerer}";
               ];
           targets_rule
             ["defaults.ml"]

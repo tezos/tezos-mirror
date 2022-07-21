@@ -20,15 +20,14 @@
   -open Tezos_base.TzPervasives
   -open Tezos_base_unix
   -open Tezos_stdlib_unix)
- (modules Embedded_cmis Packer Compiler Defaults))
+ (modules Embedded_cmis_env Embedded_cmis_register Packer Compiler Defaults))
 
 (rule
- (targets embedded_cmis.ml)
+ (targets embedded_cmis_env.ml)
  (action
   (run
-   %{bin:ocp-ocamlres} -format ocaml -o %{targets}
+   %{bin:ocp-ocamlres} -format variants -o %{targets}
    %{lib:stdlib:camlinternalFormatBasics.cmi}
-   %{cmi:registerer/tezos_protocol_registerer}
    %{lib:tezos-protocol-environment.sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat.cmi}
    %{lib:tezos-protocol-environment.sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V_all.cmi}
    %{lib:tezos-protocol-environment.sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V2.cmi}
@@ -43,6 +42,13 @@
    %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V5.cmi}
    %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V6.cmi}
    %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V7.cmi})))
+
+(rule
+ (targets embedded_cmis_register.ml)
+ (action
+  (run
+   %{bin:ocp-ocamlres} -format variants -o %{targets}
+   %{cmi:registerer/tezos_protocol_registerer})))
 
 (rule
  (targets defaults.ml)
