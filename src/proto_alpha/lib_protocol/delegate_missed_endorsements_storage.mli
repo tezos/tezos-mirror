@@ -52,6 +52,14 @@ val record_baking_activity_and_pay_rewards_and_fees :
   reward_bonus:Tez_repr.t option ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
 
+(** Check that a delegate participated enough in the last cycle
+   (returns [true] if it did), and then reset the participation for
+   preparing the next cycle. *)
+val check_and_reset_delegate_participation :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  (Raw_context.t * bool) tzresult Lwt.t
+
 (** Participation information. We denote by:
     - "static" information that does not change during the cycle
     - "dynamic" information that may change during the cycle *)

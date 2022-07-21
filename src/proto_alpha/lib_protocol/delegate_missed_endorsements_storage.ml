@@ -123,6 +123,15 @@ let record_baking_activity_and_pay_rewards_and_fees ctxt ~payload_producer
   return
     (ctxt, balance_updates_payload_producer @ balance_updates_block_producer)
 
+let check_and_reset_delegate_participation ctxt delegate =
+  let contract = Contract_repr.Implicit delegate in
+  Storage.Contract.Missed_endorsements.find ctxt contract >>=? fun missed ->
+  match missed with
+  | None -> return (ctxt, true)
+  | Some missed_endorsements ->
+      Storage.Contract.Missed_endorsements.remove ctxt contract >>= fun ctxt ->
+      return (ctxt, Compare.Int.(missed_endorsements.remaining_slots >= 0))
+
 type participation_info = {
   expected_cycle_activity : int;
   minimal_cycle_activity : int;
