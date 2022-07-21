@@ -66,10 +66,11 @@ module Map =
       let to_string x = x
     end)
 
-module Merklizer =
-  Tree_encoding_decoding.Make (Map) (Lazy_vector.LwtIntVector)
-    (Chunked_byte_vector.Lwt)
-    (Tree)
+module Merklizer = struct
+  include Tree_encoding_decoding.Make (Tree)
+  include Lazy_vector_encoding_decoding.Int
+  include Lazy_map_encoding_decoding.Make (Map)
+end
 
 let empty_tree () =
   let open Lwt_syntax in
@@ -209,7 +210,7 @@ let test_tagged_union_default () =
 let test_lazy_mapping () =
   let open Merklizer in
   let open Lwt_result_syntax in
-  let enc = lazy_mapping (value ["key"] Data_encoding.string) in
+  let enc = lazy_map (value ["key"] Data_encoding.string) in
   let map = Map.create () in
   let key = "key" in
   let value = "value" in
@@ -227,7 +228,7 @@ let test_lazy_mapping () =
 let test_add_to_decoded_empty_map () =
   let open Merklizer in
   let open Lwt_result_syntax in
-  let enc = lazy_mapping (value ["key"] Data_encoding.string) in
+  let enc = lazy_map (value ["key"] Data_encoding.string) in
   let map = Map.create () in
   let*! decoded_map1 = encode_decode enc map in
   let map = Map.set "key" "value" decoded_map1 in

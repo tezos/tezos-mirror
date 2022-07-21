@@ -38,12 +38,7 @@ module Make (T : Tree.S) : Gather_floppies.S with type tree = T.tree = struct
         type tree = T.tree
 
         module Wasm = Tezos_webassembly_interpreter
-        module EncDec =
-          Tree_encoding_decoding.Make
-            (Wasm.Instance.NameMap)
-            (Wasm.Instance.Vector)
-            (Wasm.Chunked_byte_vector.Lwt)
-            (T)
+        module EncDec = Tree_encoding_decoding.Make (T)
         module Wasm_encoding = Wasm_encoding.Make (EncDec)
 
         let compute_step = Lwt.return

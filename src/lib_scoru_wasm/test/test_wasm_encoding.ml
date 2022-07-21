@@ -32,7 +32,6 @@
 *)
 
 open Tztest
-open Tezos_webassembly_interpreter
 open Tezos_scoru_wasm
 
 let qcheck ?count ?print gen f =
@@ -59,10 +58,7 @@ module Tree = struct
   include Context.Tree
 end
 
-module Merklizer =
-  Tree_encoding_decoding.Make (Instance.NameMap) (Instance.Vector)
-    (Chunked_byte_vector.Lwt)
-    (Tree)
+module Merklizer = Tree_encoding_decoding.Make (Tree)
 module Wasm_encoding = Wasm_encoding.Make (Merklizer)
 
 let empty_tree () =

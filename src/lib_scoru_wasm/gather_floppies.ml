@@ -114,10 +114,7 @@ module Make (T : Tree.S) (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
   type tree = Wasm.tree
 
   open Tezos_webassembly_interpreter
-  module Merklizer =
-    Tree_encoding_decoding.Make (Lazy_map.LwtIntMap) (Lazy_vector.LwtIntVector)
-      (Chunked_byte_vector.Lwt)
-      (T)
+  module Merklizer = Tree_encoding_decoding.Make (T)
 
   (** The tick state of the [Gathering_floppies] instrumentation. *)
   type state = {
