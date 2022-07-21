@@ -100,6 +100,9 @@ module Log = Log
 (** Managing external processes (spawning them, capturing outputs, exit codes, etc). *)
 module Process = Process
 
+(** Process hooks, in particular for use with regression tests. *)
+module Process_hooks = Process_hooks
+
 (** Regression test helpers (run tests, capture output, etc). *)
 module Regression = Regression
 

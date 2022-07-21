@@ -70,4 +70,4 @@ val capture : string -> unit
 
     The hooks will {!capture} the spawned command, its arguments and the output of
     its execution. *)
-val hooks : Process.hooks
+val hooks : Process_hooks.t

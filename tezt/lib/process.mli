@@ -29,7 +29,7 @@
 type t
 
 (** Process can have some hooks attached when {!spawn}ed. *)
-type hooks = {
+type hooks = Process_hooks.t = {
   on_log : string -> unit;
       (** A hook that is called with every line that is being logged. *)
   on_spawn : string -> string list -> unit;

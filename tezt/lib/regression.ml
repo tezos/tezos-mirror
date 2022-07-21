@@ -35,16 +35,15 @@ let capture line =
       output_string channel line ;
       output_string channel "\n"
 
-let hooks =
-  Process.
-    {
-      on_spawn =
-        (fun command arguments ->
-          let message = Log.quote_shell_command command arguments in
-          capture "" ;
-          capture message);
-      on_log = capture;
-    }
+let hooks : Process_hooks.t =
+  {
+    on_spawn =
+      (fun command arguments ->
+        let message = Log.quote_shell_command command arguments in
+        capture "" ;
+        capture message);
+    on_log = capture;
+  }
 
 (* Run [f] and capture the output of ran processes into the [output_file]. *)
 let run_and_capture_output ~output_file (f : unit -> 'a Lwt.t) =
