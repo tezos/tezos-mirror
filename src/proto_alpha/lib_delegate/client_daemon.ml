@@ -129,7 +129,7 @@ module Accuser = struct
         cctxt
         ~chains:[chain]
         ()
-      >>=? fun valid_blocks_stream ->
+      >>=? fun (valid_blocks_stream, _) ->
       let canceler = Lwt_canceler.create () in
       let _ =
         Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
@@ -166,13 +166,6 @@ module VDF = struct
       let* constants =
         Protocol.Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
       in
-      let* block_stream =
-        Client_baking_blocks.monitor_valid_blocks
-          ~next_protocols:(Some [Protocol.hash])
-          cctxt
-          ~chains:[chain]
-          ()
-      in
       let canceler = Lwt_canceler.create () in
       let _ =
         Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
@@ -180,7 +173,7 @@ module VDF = struct
             let*! _ = Lwt_canceler.cancel canceler in
             Lwt.return_unit)
       in
-      Baking_vdf.start_vdf_worker cctxt ~canceler constants block_stream
+      Baking_vdf.start_vdf_worker cctxt ~canceler constants chain
     in
     let* () =
       Client_confirmations.wait_for_bootstrapped

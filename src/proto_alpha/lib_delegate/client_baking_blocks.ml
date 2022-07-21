@@ -145,18 +145,20 @@ end
 
 let monitor_valid_blocks cctxt ?chains ?protocols ~next_protocols () =
   Monitor_services.valid_blocks cctxt ?chains ?protocols ?next_protocols ()
-  >>=? fun (block_stream, _stop) ->
+  >>=? fun (block_stream, stop) ->
   return
-    (Lwt_stream.map_s
-       (fun ((chain, block), header) ->
-         Block_seen_event.(Event.emit (make block header (`Valid_blocks chain)))
-         >>=? fun () ->
-         raw_info
-           cctxt
-           ~chain:(`Hash chain)
-           block
-           header.Tezos_base.Block_header.shell)
-       block_stream)
+    ( Lwt_stream.map_s
+        (fun ((chain, block), header) ->
+          Block_seen_event.(
+            Event.emit (make block header (`Valid_blocks chain)))
+          >>=? fun () ->
+          raw_info
+            cctxt
+            ~chain:(`Hash chain)
+            block
+            header.Tezos_base.Block_header.shell)
+        block_stream,
+      stop )
 
 let monitor_heads cctxt ~next_protocols chain =
   Monitor_services.heads cctxt ?next_protocols chain
