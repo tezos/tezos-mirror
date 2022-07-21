@@ -104,7 +104,7 @@ let add_messages ctxt rollup messages =
     assert_inbox_nb_messages_in_commitment_period ctxt inbox num_messages
   in
   let inbox_level = Sc_rollup_inbox_repr.inbox_level inbox in
-  let* genesis_info = Storage.Sc_rollup.Genesis_info.get ctxt rollup in
+  let* ctxt, genesis_info = Storage.Sc_rollup.Genesis_info.get ctxt rollup in
   let origination_level = genesis_info.level in
   let levels =
     Int32.sub

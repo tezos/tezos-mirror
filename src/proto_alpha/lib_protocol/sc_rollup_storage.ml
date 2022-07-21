@@ -40,7 +40,7 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty ~genesis_commitment =
   let* ctxt, pvm_kind_size, _kind_existed =
     Store.PVM_kind.add ctxt address kind
   in
-  let*! ctxt =
+  let* ctxt, genesis_info_size, _info_existed =
     Store.Genesis_info.add
       ctxt
       address
@@ -96,7 +96,8 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty ~genesis_commitment =
       (origination_size + stored_kind_size + boot_sector_size + addresses_size
      + inbox_size_diff + lcc_size_diff + commitment_size_diff
      + commitment_added_size_diff + commitment_staker_count_size_diff
-     + stakers_size_diff + param_ty_size_diff + pvm_kind_size)
+     + stakers_size_diff + param_ty_size_diff + pvm_kind_size
+     + genesis_info_size)
   in
   return (address, size, genesis_commitment_hash, ctxt)
 
@@ -114,10 +115,10 @@ let list_unaccounted ctxt =
 
 let genesis_info ctxt rollup =
   let open Lwt_tzresult_syntax in
-  let* genesis_info = Store.Genesis_info.find ctxt rollup in
+  let* ctxt, genesis_info = Store.Genesis_info.find ctxt rollup in
   match genesis_info with
   | None -> fail (Sc_rollup_does_not_exist rollup)
-  | Some genesis_info -> return genesis_info
+  | Some genesis_info -> return (ctxt, genesis_info)
 
 let get_boot_sector ctxt rollup =
   let open Lwt_tzresult_syntax in

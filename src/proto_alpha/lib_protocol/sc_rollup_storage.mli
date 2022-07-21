@@ -59,7 +59,7 @@ val list_unaccounted : Raw_context.t -> Sc_rollup_repr.t list tzresult Lwt.t
 val genesis_info :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  Sc_rollup_commitment_repr.genesis_info tzresult Lwt.t
+  (Raw_context.t * Sc_rollup_commitment_repr.genesis_info) tzresult Lwt.t
 
 (** [get_boot_sector ctxt sc_rollup] retrieves the boot sector for [sc_rollup]. *)
 val get_boot_sector :

@@ -716,7 +716,7 @@ module Sc_rollup : sig
        and type t := Raw_context.t
 
   module Genesis_info :
-    Indexed_data_storage
+    Non_iterable_indexed_carbonated_data_storage
       with type key = Sc_rollup_repr.t
        and type value = Sc_rollup_commitment_repr.genesis_info
        and type t := Raw_context.t

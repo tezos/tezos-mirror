@@ -1628,7 +1628,7 @@ module Sc_rollup = struct
       end)
 
   module Genesis_info =
-    Indexed_context.Make_map
+    Indexed_context.Make_carbonated_map
       (struct
         let name = ["genesis_info"]
       end)

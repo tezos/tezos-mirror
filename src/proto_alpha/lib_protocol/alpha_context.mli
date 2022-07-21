@@ -3504,7 +3504,8 @@ module Sc_rollup : sig
 
   val list_unaccounted : context -> t list tzresult Lwt.t
 
-  val genesis_info : context -> rollup -> Commitment.genesis_info tzresult Lwt.t
+  val genesis_info :
+    context -> rollup -> (context * Commitment.genesis_info) tzresult Lwt.t
 
   val get_boot_sector : context -> t -> (context * string) tzresult Lwt.t
 
