@@ -1,7 +1,7 @@
 
 ./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string booting with '10 10 10 + +' --burn-cap 9999999
 Node is bootstrapped.
-Estimated gas: 3109.308 units (will add 100 for safety)
+Estimated gas: 3109.947 units (will add 100 for safety)
 Estimated storage: 6664 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -24,7 +24,7 @@ This sequence of operations was run:
       Parameter type: string
       Boot sector: '10 10 10 + +'
       This smart contract rollup origination was successfully applied
-      Consumed gas: 3109.308
+      Consumed gas: 3109.947
       Storage size: 6664 bytes
       Address: [SC_ROLLUP_HASH]
       Genesis commitment hash: [SC_ROLLUP_COMMITMENT_HASH]
@@ -81,7 +81,7 @@ This sequence of operations was run:
 
 ./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string booting with 31 --burn-cap 9999999
 Node is bootstrapped.
-Estimated gas: 3109.268 units (will add 100 for safety)
+Estimated gas: 3109.907 units (will add 100 for safety)
 Estimated storage: 6654 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -104,7 +104,7 @@ This sequence of operations was run:
       Parameter type: string
       Boot sector: '31'
       This smart contract rollup origination was successfully applied
-      Consumed gas: 3109.268
+      Consumed gas: 3109.907
       Storage size: 6654 bytes
       Address: [SC_ROLLUP_HASH]
       Genesis commitment hash: [SC_ROLLUP_COMMITMENT_HASH]

@@ -53,7 +53,8 @@ let get_dal_slot_subscriptions_exn store =
   | Some slot_subscriptions -> return slot_subscriptions
 
 let commitment_with_hash commitment =
-  (Protocol.Alpha_context.Sc_rollup.Commitment.hash commitment, commitment)
+  ( Protocol.Alpha_context.Sc_rollup.Commitment.hash_uncarbonated commitment,
+    commitment )
 
 module Common = struct
   let register_current_num_messages store dir =

@@ -74,3 +74,26 @@ let get_predecessor_unsafe ctxt rollup node =
   let open Lwt_tzresult_syntax in
   let* commitment, ctxt = get_commitment_unsafe ctxt rollup node in
   return (commitment.predecessor, ctxt)
+
+let hash ctxt commitment =
+  let open Tzresult_syntax in
+  let* ctxt =
+    Raw_context.consume_gas
+      ctxt
+      Sc_rollup_costs.Constants.cost_serialize_commitment
+  in
+  let commitment_bytes_opt =
+    Data_encoding.Binary.to_bytes_opt
+      Sc_rollup_commitment_repr.encoding
+      commitment
+  in
+  let* commitment_bytes =
+    Option.to_result
+      ~none:(trace_of_error Sc_rollup_bad_commitment_serialization)
+      commitment_bytes_opt
+  in
+  let bytes_len = Bytes.length commitment_bytes in
+  let* ctxt =
+    Raw_context.consume_gas ctxt (Sc_rollup_costs.cost_hash_bytes ~bytes_len)
+  in
+  return (ctxt, Sc_rollup_commitment_repr.Hash.hash_bytes [commitment_bytes])

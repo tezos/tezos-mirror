@@ -3233,7 +3233,9 @@ module Sc_rollup : sig
 
     val pp : Format.formatter -> t -> unit
 
-    val hash : t -> Hash.t
+    val hash_uncarbonated : t -> Hash.t
+
+    val hash : context -> t -> (context * Hash.t) tzresult
 
     val genesis_commitment :
       origination_level:Raw_level.t -> genesis_state_hash:State_hash.t -> t

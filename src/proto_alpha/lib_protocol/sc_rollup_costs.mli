@@ -34,6 +34,12 @@ module Constants : sig
   val cost_add_inbox_per_level : Gas_limit_repr.cost
 
   val cost_update_num_and_size_of_messages : Gas_limit_repr.cost
+
+  val cost_serialize_state_hash : Gas_limit_repr.cost
+
+  val cost_serialize_commitment_hash : Gas_limit_repr.cost
+
+  val cost_serialize_commitment : Gas_limit_repr.cost
 end
 
 (** [is_valid_parameters_ty_cost ty] returns the cost of checking whether a type
@@ -69,3 +75,6 @@ val cost_deserialize_output_proof : bytes_len:int -> Gas_limit_repr.cost
     serialization of an external inbox message of length [bytes_len]. It is
     equal to the estimated cost of encoding a byte multiplied by [bytes_len]. *)
 val cost_serialize_external_inbox_message : bytes_len:int -> Gas_limit_repr.cost
+
+(** [cost_hash_bytes ~bytes_len] is the cost of hashing [bytes_len] bytes. *)
+val cost_hash_bytes : bytes_len:int -> Gas_limit_repr.cost

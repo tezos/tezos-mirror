@@ -91,7 +91,7 @@ module V1 = struct
          (req "predecessor" Hash.encoding)
          (req "number_of_ticks" Number_of_ticks.encoding))
 
-  let hash commitment =
+  let hash_uncarbonated commitment =
     let commitment_bytes =
       Data_encoding.Binary.to_bytes_exn encoding commitment
     in

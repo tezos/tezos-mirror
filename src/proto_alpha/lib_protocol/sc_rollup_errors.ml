@@ -67,6 +67,7 @@ type error +=
       staker_balance : Tez_repr.t;
       min_expected_balance : Tez_repr.t;
     }
+  | (* `Temporary *) Sc_rollup_bad_commitment_serialization
 
 let () =
   register_error_kind
@@ -431,4 +432,14 @@ let () =
     (fun (staker, sc_rollup, staker_balance, min_expected_balance) ->
       Sc_rollup_staker_funds_too_low
         {staker; sc_rollup; staker_balance; min_expected_balance}) ;
+  let description = "Could not serialize commitment." in
+  register_error_kind
+    `Temporary
+    ~id:"Sc_rollup_bad_commitment_serialization"
+    ~title:"Could not serialize commitment."
+    ~description:"Unable to hash the commitment serialization."
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    Data_encoding.empty
+    (function Sc_rollup_bad_commitment_serialization -> Some () | _ -> None)
+    (fun () -> Sc_rollup_bad_commitment_serialization) ;
   ()

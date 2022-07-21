@@ -196,3 +196,7 @@ val get_predecessor_unsafe :
   Sc_rollup_repr.t ->
   Commitment_hash.t ->
   (Commitment_hash.t * Raw_context.t) tzresult Lwt.t
+
+(** Hash a commitment and account for gas spent. *)
+val hash :
+  Raw_context.t -> Commitment.t -> (Raw_context.t * Commitment_hash.t) tzresult

@@ -125,7 +125,7 @@ let last_commitment_hash node_ctxt
   let open Lwt_syntax in
   let+ last_commitment = last_commitment (module Last_commitment_level) store in
   match last_commitment with
-  | Some commitment -> Sc_rollup.Commitment.hash commitment
+  | Some commitment -> Sc_rollup.Commitment.hash_uncarbonated commitment
   | None ->
       node_ctxt.Node_context.genesis_info.Sc_rollup.Commitment.commitment_hash
 
@@ -141,7 +141,7 @@ let must_store_commitment node_ctxt current_level store =
 
 let update_last_stored_commitment store (commitment : Sc_rollup.Commitment.t) =
   let open Lwt_syntax in
-  let commitment_hash = Sc_rollup.Commitment.hash commitment in
+  let commitment_hash = Sc_rollup.Commitment.hash_uncarbonated commitment in
   let inbox_level = commitment.inbox_level in
   let* lcc_level = Store.Last_cemented_commitment_level.get store in
   (* Do not change the order of these two operations. This guarantees that
