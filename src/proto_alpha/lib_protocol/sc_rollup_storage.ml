@@ -29,6 +29,24 @@ module Store = Storage.Sc_rollup
 module Commitment = Sc_rollup_commitment_repr
 module Commitment_hash = Commitment.Hash
 
+(** [address_from_nonce ctxt nonce] produces an address completely determined by
+    an operation hash and an origination counter, and accounts for gas spent. *)
+let address_from_nonce ctxt nonce =
+  let open Tzresult_syntax in
+  let* ctxt =
+    Raw_context.consume_gas ctxt Sc_rollup_costs.Constants.cost_serialize_nonce
+  in
+  match Data_encoding.Binary.to_bytes_opt Origination_nonce.encoding nonce with
+  | None -> error Sc_rollup_address_generation
+  | Some nonce_bytes ->
+      let bytes_len = Bytes.length nonce_bytes in
+      let+ ctxt =
+        Raw_context.consume_gas
+          ctxt
+          (Sc_rollup_costs.cost_hash_bytes ~bytes_len)
+      in
+      (ctxt, Sc_rollup_repr.Address.hash_bytes [nonce_bytes])
+
 let originate ctxt ~kind ~boot_sector ~parameters_ty ~genesis_commitment =
   let open Lwt_tzresult_syntax in
   let*? ctxt, genesis_commitment_hash =
@@ -36,7 +54,7 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty ~genesis_commitment =
   in
   let*? ctxt, nonce = Raw_context.increment_origination_nonce ctxt in
   let level = Raw_context.current_level ctxt in
-  let*? address = Sc_rollup_repr.Address.from_nonce nonce in
+  let*? ctxt, address = address_from_nonce ctxt nonce in
   let* ctxt, pvm_kind_size, _kind_existed =
     Store.PVM_kind.add ctxt address kind
   in

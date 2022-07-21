@@ -50,27 +50,6 @@ module Address = struct
 
   include Path_encoding.Make_hex (H)
 
-  type error += (* `Permanent *) Error_sc_rollup_address_generation
-
-  let () =
-    let open Data_encoding in
-    let msg = "Error while generating rollup address" in
-    register_error_kind
-      `Permanent
-      ~id:"rollup.error_smart_contract_rollup_address_generation"
-      ~title:msg
-      ~pp:(fun ppf () -> Format.fprintf ppf "%s" msg)
-      ~description:msg
-      unit
-      (function Error_sc_rollup_address_generation -> Some () | _ -> None)
-      (fun () -> Error_sc_rollup_address_generation)
-
-  let from_nonce nonce =
-    Data_encoding.Binary.to_bytes_opt Origination_nonce.encoding nonce
-    |> function
-    | None -> error Error_sc_rollup_address_generation
-    | Some nonce -> ok @@ hash_bytes [nonce]
-
   let of_b58data = function H.Data h -> Some h | _ -> None
 end
 
