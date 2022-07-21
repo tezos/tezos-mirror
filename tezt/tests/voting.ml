@@ -95,6 +95,16 @@ type period = {
   remaining : int;
 }
 
+let pp_period fmt period =
+  Format.fprintf
+    fmt
+    "{ index: %d; kind: %s; start_position: %d; position: %d; remaining: %d }"
+    period.index
+    (period_kind_to_string period.kind)
+    period.start_position
+    period.position
+    period.remaining
+
 let period_type : period Check.typ =
   Check.convert
     (fun {index; kind; start_position; position; remaining} ->

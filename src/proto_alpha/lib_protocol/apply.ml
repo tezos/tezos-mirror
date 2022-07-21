@@ -125,6 +125,7 @@ type error +=
   | Failing_noop_error
   | Zero_frozen_deposits of Signature.Public_key_hash.t
   | Invalid_transfer_to_sc_rollup_from_implicit_account
+  | Mode_forbids_consensus_operations
 
 let () =
   register_error_kind
@@ -756,7 +757,19 @@ let () =
     (function
       | Invalid_transfer_to_sc_rollup_from_implicit_account -> Some ()
       | _ -> None)
-    (fun () -> Invalid_transfer_to_sc_rollup_from_implicit_account)
+    (fun () -> Invalid_transfer_to_sc_rollup_from_implicit_account) ;
+  let mode_forbids_consens_description =
+    "The application mode does not support consensus operations."
+  in
+  register_error_kind
+    `Permanent
+    ~id:"mode_forbids_consensus_operations"
+    ~title:"Mode forbids consensus operations"
+    ~description:mode_forbids_consens_description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" mode_forbids_consens_description)
+    Data_encoding.empty
+    (function Mode_forbids_consensus_operations -> Some () | _ -> None)
+    (fun () -> Mode_forbids_consensus_operations)
 
 open Apply_results
 open Apply_operation_result
@@ -2392,12 +2405,14 @@ type apply_mode =
       predecessor_round : Round.t;
       grand_parent_round : Round.t;
     }
+  | Mempool_no_consensus_op
 
 let get_predecessor_level = function
   | Application {predecessor_level; _}
   | Full_construction {predecessor_level; _}
   | Partial_construction {predecessor_level; _} ->
-      predecessor_level
+      ok predecessor_level
+  | Mempool_no_consensus_op -> error Mode_forbids_consensus_operations
 
 let record_operation (type kind) ctxt hash (operation : kind operation) :
     context =
@@ -2440,7 +2455,7 @@ let compute_expected_consensus_content (type consensus_op_kind)
               fail
                 (Consensus_operation_for_future_level
                    {expected = proposal_level.level; provided = operation_level})
-          )
+          | Mempool_no_consensus_op -> fail Mode_forbids_consensus_operations)
       | Some (branch, payload_hash) -> (
           match application_mode with
           | Application {predecessor_round; _}
@@ -2453,7 +2468,8 @@ let compute_expected_consensus_content (type consensus_op_kind)
                     branch;
                     level = proposal_level;
                     round = predecessor_round;
-                  } )))
+                  } )
+          | Mempool_no_consensus_op -> fail Mode_forbids_consensus_operations))
   | Preendorsement -> (
       match application_mode with
       | Application {locked_round = None; _} ->
@@ -2496,7 +2512,8 @@ let compute_expected_consensus_content (type consensus_op_kind)
                   operation_round )
             | Some round -> (ctxt, round)
           in
-          return (ctxt', {payload_hash; branch; level = current_level; round}))
+          return (ctxt', {payload_hash; branch; level = current_level; round})
+      | Mempool_no_consensus_op -> fail Mode_forbids_consensus_operations)
 
 let check_level (apply_mode : apply_mode) ~expected ~provided =
   match apply_mode with
@@ -2514,6 +2531,7 @@ let check_level (apply_mode : apply_mode) ~expected ~provided =
       error_when
         Raw_level.(expected < provided)
         (Consensus_operation_for_future_level {expected; provided})
+  | Mempool_no_consensus_op -> error Mode_forbids_consensus_operations
 
 let check_payload_hash (apply_mode : apply_mode) ~expected ~provided =
   match apply_mode with
@@ -2525,6 +2543,7 @@ let check_payload_hash (apply_mode : apply_mode) ~expected ~provided =
       error_unless
         (Block_payload_hash.equal expected provided)
         (Consensus_operation_on_competing_proposal {expected; provided})
+  | Mempool_no_consensus_op -> error Mode_forbids_consensus_operations
 
 let check_operation_branch ~expected ~provided =
   error_unless
@@ -2554,6 +2573,7 @@ let check_round (type kind) (operation_kind : kind consensus_operation_type)
       error_unless
         (Round.equal expected provided)
         (Wrong_round_for_consensus_operation {expected; provided})
+  | Mempool_no_consensus_op -> error Mode_forbids_consensus_operations
 
 let check_consensus_content (type kind) (apply_mode : apply_mode)
     (content : consensus_content) (operation_branch : Block_hash.t)
@@ -2590,7 +2610,7 @@ let validate_consensus_contents (type kind) ctxt chain_id
     (content : consensus_content) :
     (context * public_key_hash * int) tzresult Lwt.t =
   let current_level = Level.current ctxt in
-  let proposal_level = get_predecessor_level apply_mode in
+  get_predecessor_level apply_mode >>?= fun proposal_level ->
   let slot_map =
     match operation_kind with
     | Preendorsement -> Consensus.allowed_preendorsements ctxt
@@ -2831,7 +2851,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
     (context * kind contents_result_list) tzresult Lwt.t =
   let mempool_mode =
     match apply_mode with
-    | Partial_construction _ -> true
+    | Partial_construction _ | Mempool_no_consensus_op -> true
     | Full_construction _ | Application _ -> false
   in
   match contents_list with
@@ -2860,7 +2880,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
                  preendorsement_power = voting_power;
                }) )
   | Single (Endorsement consensus_content) -> (
-      let proposal_level = get_predecessor_level apply_mode in
+      get_predecessor_level apply_mode >>?= fun proposal_level ->
       match apply_mode with
       | Partial_construction {grand_parent_round; _}
         when is_parent_endorsement

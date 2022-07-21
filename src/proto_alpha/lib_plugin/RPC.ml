@@ -369,12 +369,18 @@ module Scripts = struct
         ~query:RPC_query.empty
         RPC_path.(path / "normalize_type")
 
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3401
+
+       Contrary to its description, this RPC currently does check the
+       signature of voting operations. This is in the process of being
+       fixed. *)
     let run_operation =
       RPC_service.post_service
         ~description:
           "Run an operation with the context of the given block and without \
            signature checks. Return the operation application result, \
-           including the consumed gas."
+           including the consumed gas. This RPC does not support consensus \
+           operations."
         ~query:RPC_query.empty
         ~input:
           (obj2
@@ -809,6 +815,24 @@ module Scripts = struct
       | ILog (_, _, _, _, instr) ->
           Format.fprintf fmt "log/%a" pp_instr_name instr
 
+  type error += Run_operation_does_not_support_consensus_operations
+
+  let () =
+    let description =
+      "The run_operation RPC does not support consensus operations."
+    in
+    register_error_kind
+      `Permanent
+      ~id:"run_operation_does_not_support_consensus_operations"
+      ~title:"Run operation does not support consensus operations"
+      ~description
+      ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+      Data_encoding.empty
+      (function
+        | Run_operation_does_not_support_consensus_operations -> Some ()
+        | _ -> None)
+      (fun () -> Run_operation_does_not_support_consensus_operations)
+
   let run_operation_service ctxt ()
       ({shell; protocol_data = Operation_data protocol_data}, chain_id) =
     (* this code is a duplicate of Apply without signature check *)
@@ -827,6 +851,10 @@ module Scripts = struct
       Skip_signature_check
     >>=? fun op_validated_stamp ->
     match protocol_data.contents with
+    | Single (Preendorsement _)
+    | Single (Endorsement _)
+    | Single (Dal_slot_availability _) ->
+        fail Run_operation_does_not_support_consensus_operations
     | Single (Manager_operation _) as op ->
         Apply.apply_manager_operations
           ctxt
@@ -846,23 +874,19 @@ module Scripts = struct
           op
         >|=? fun (_ctxt, result) -> ret result
     | _ ->
-        let predecessor_level =
-          match
-            Alpha_context.Level.pred ctxt (Alpha_context.Level.current ctxt)
-          with
-          | Some level -> level
-          | None -> assert false
+        let apply_mode =
+          (* To simulate the injection of an operation in the mempool,
+             we want a mode that behaves similarly to
+             {!Apply.Partial_construction}. However, we don't have
+             access to information such as the [predecessor_round]. So
+             we use a mode that doesn't need this information, and
+             consequently doesn't support consensus operations. *)
+          Apply.Mempool_no_consensus_op
         in
-        Alpha_context.Round.get ctxt >>=? fun predecessor_round ->
         Apply.apply_contents_list
           ctxt
           chain_id
-          (Partial_construction
-             {
-               predecessor_level;
-               predecessor_round;
-               grand_parent_round = Round.zero;
-             })
+          apply_mode
           ~payload_producer
           op_validated_stamp
           operation
@@ -1451,6 +1475,9 @@ module Scripts = struct
         >>?= fun (Ex_ty typ, _ctxt) ->
         let normalized = Unparse_types.unparse_ty ~loc:() typ in
         return @@ Micheline.strip_locations normalized) ;
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3364
+
+       Should [run_operation] be registered at successor level? *)
     Registration.register0 ~chunked:true S.run_operation run_operation_service ;
     Registration.register0_successor_level
       ~chunked:true

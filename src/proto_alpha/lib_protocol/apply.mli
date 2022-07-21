@@ -111,6 +111,15 @@ type apply_mode =
       predecessor_round : Round.t;
       grand_parent_round : Round.t;
     }
+  | Mempool_no_consensus_op
+      (** Similar to [Partial_construction], but does not have access to
+          information such as the [predecessor_level]. Makes the operations
+          which need this information (preendorsements and endorsements as
+          of July 2022) return the [Mode_forbids_consensus_operations]
+          error.
+
+          This mode is used by the [run_operation] RPC in
+          [lib_plugin/RPC.ml]. *)
 
 (** Apply an operation, i.e. update the given context in accordance
     with the operation's semantic (or return an error if the operation

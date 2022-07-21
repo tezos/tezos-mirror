@@ -25,7 +25,7 @@
 
 open Runnable.Syntax
 
-type kind = Consensus of {chain_id : string} | Manager
+type kind = Consensus of {chain_id : string} | Voting | Manager
 
 type t = {
   branch : string;
@@ -70,7 +70,7 @@ let sign ({kind; signer; _} as t) client =
     | Consensus {chain_id} ->
         Tezos_crypto.Signature.Endorsement
           (Tezos_crypto.Chain_id.of_b58check_exn chain_id)
-    | Manager -> Tezos_crypto.Signature.Generic_operation
+    | Voting | Manager -> Tezos_crypto.Signature.Generic_operation
   in
   let* hex = hex t client in
   let bytes = Hex.to_bytes hex in
@@ -149,7 +149,7 @@ let inject_operations ?(request = `Inject) ?(force = false) ?error t client :
       let* () = Process.check_error ~msg process in
       Lwt_list.map_s (fun op -> hash op client) t
 
-let make_run_operation_input ?chain_id t client =
+let make_run_operation_input ?chain_id ?(sign_correctly = false) t client =
   let* chain_id =
     match chain_id with
     | Some chain_id -> return chain_id
@@ -157,6 +157,11 @@ let make_run_operation_input ?chain_id t client =
   in
   (* The [run_operation] RPC does not check the signature. *)
   let signature = Tezos_crypto.Signature.zero in
+  (* ...except that it is currently bugged, and it checks the
+     signature of non-manager operations
+     (https://gitlab.com/tezos/tezos/-/issues/3401). So we temporarily
+     provide the option to compute a correct signature. *)
+  let* signature = if sign_correctly then sign t client else return signature in
   return
     (`O
       [
@@ -209,6 +214,51 @@ module Consensus = struct
   let inject ?request ?force ?branch ?chain_id ?error ~signer consensus client =
     let* op = operation ?branch ?chain_id ~signer consensus client in
     inject ?request ?force ?error op client
+end
+
+module Voting = struct
+  type t =
+    | Proposals of {
+        source : Account.key;
+        period : int;
+        proposals : string list;  (** Candidate protocol hashes *)
+      }
+
+  let proposals source period proposals = Proposals {source; period; proposals}
+
+  let get_source_and_make_contents = function
+    | Proposals {source; period; proposals} ->
+        let proposals_contents =
+          [
+            ("kind", `String "proposals");
+            ("source", `String source.Account.public_key_hash);
+            ("period", Ezjsonm.int period);
+            ("proposals", Ezjsonm.list Ezjsonm.string proposals);
+          ]
+        in
+        let contents = `A [`O proposals_contents] in
+        (source, contents)
+
+  let operation ?branch ?client ?signer t =
+    let* branch =
+      match branch with
+      | Some branch -> return branch
+      | None -> (
+          match client with
+          | Some client -> get_branch ~offset:0 client
+          | None ->
+              raise
+                (Invalid_argument
+                   "At least one of arguments [branch] and [client] must be \
+                    provided."))
+    in
+    let source, contents = get_source_and_make_contents t in
+    let signer = Option.value signer ~default:source in
+    return (make ~branch ~signer ~kind:Voting contents)
+
+  let inject ?request ?force ?signature ?error ?branch ?signer t client =
+    let* op = operation ?branch ?signer ~client t in
+    inject ?request ?force ?signature ?error op client
 end
 
 module Manager = struct

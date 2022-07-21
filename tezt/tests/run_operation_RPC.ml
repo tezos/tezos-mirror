@@ -86,6 +86,61 @@ let run_manager_operations_and_check_proto_error ~expected_proto_error
   check_response_contains_proto_error ~expected_proto_error response ;
   unit
 
+(** This test checks that the [run_operation] RPC succeeds on a
+    correct [proposals] operation.
+
+    It only supports protocol versions from 015 on. Before that, the
+    RPC crashed when called both on a non-manager operation and on a
+    level 1 block.
+
+    This test needs the initial voting period (right after protocol
+    activation) to be a [proposal] period. If this changes in the
+    future, this test will need to be reworked. *)
+let test_run_proposals =
+  Protocol.register_test
+    ~__FILE__
+    ~supports:(Protocol.From_protocol 015)
+    ~title:"Run_operation proposals"
+    ~tags:(run_operation_tags @ ["voting"; "proposals"])
+  @@ fun protocol ->
+  Log.info "Initialize a node and a client." ;
+  let* node, client =
+    Client.init_with_protocol
+      ~nodes_args:[Synchronisation_threshold 0]
+      ~protocol
+      `Client
+      ()
+  in
+  Log.info
+    "Retrieve the current voting period and check that it is of the [proposal] \
+     kind." ;
+  let* period = Voting.get_current_period client in
+  Log.info "period: %a" Voting.pp_period period ;
+  (match period.kind with
+  | Proposal -> ()
+  | Exploration | Cooldown | Promotion | Adoption ->
+      Test.fail
+        "This test needs the voting period at level 1 to be of kind \
+         [proposal], but a period of kind [%s] was found."
+        (Voting.period_kind_to_string period.kind)) ;
+  Log.info "Craft a [proposals] operation:" ;
+  let proposals_repr =
+    Operation.Voting.proposals
+      Constant.bootstrap1
+      period.index
+      [Protocol.demo_counter_hash]
+  in
+  let* op = Operation.Voting.operation ~client proposals_repr in
+  let* op_json =
+    Operation.make_run_operation_input ~sign_correctly:true op client
+  in
+  Log.info "%s" (Ezjsonm.value_to_string ~minify:false op_json) ;
+  Log.info "Call the [run_operation] RPC on this operation." ;
+  let* _output =
+    RPC.(call node (post_chain_block_helpers_scripts_run_operation op_json))
+  in
+  unit
+
 (** This test checks that the [run_operation] RPC used to allow
     batches of manager operations containing different sources in
     protocol versions before Kathmandu (014), but rejects them from
@@ -538,6 +593,7 @@ let test_misc_manager_ops_from_fresh_account =
   unit
 
 let register ~protocols =
+  test_run_proposals protocols ;
   test_batch_inconsistent_sources protocols ;
   test_inconsistent_counters protocols ;
   test_bad_revelations protocols ;
