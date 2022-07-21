@@ -36,19 +36,38 @@ type status = Not_started | Started | Finished of vdf_solution | Injected
 type 'a state = {
   cctxt : Protocol_client_context.full;
   constants : Constants.t;
-  block_stream : (block_info, 'a) result Lwt_stream.t;
+  mutable block_stream : (block_info, 'a) result Lwt_stream.t;
+  mutable stream_stopper : RPC_context.stopper;
   mutable cycle : Cycle_repr.t option;
   mutable computation_status : status;
 }
 
-let rec wait_for_first_block ~name stream =
-  Lwt_stream.get stream >>= function
-  | None | Some (Error _) ->
-      Delegate_events.Baking_scheduling.(emit cannot_fetch_event) name
-      >>= fun () ->
-      (* NOTE: this is not a tight loop because of Lwt_stream.get *)
-      wait_for_first_block ~name stream
-  | Some (Ok bi) -> Lwt.return bi
+let init_block_stream_with_stopper cctxt chain =
+  Client_baking_blocks.monitor_valid_blocks
+    ~next_protocols:(Some [Protocol.hash])
+    cctxt
+    ~chains:[chain]
+    ()
+
+let restart_block_stream cctxt chain state =
+  let open Lwt_result_syntax in
+  state.stream_stopper () ;
+  let retries_on_failure = 10 in
+  let rec try_start_block_stream cctxt chain state retries_on_failure =
+    let*! p = init_block_stream_with_stopper cctxt chain in
+    match p with
+    | Ok (block_stream, stream_stopper) ->
+        state.block_stream <- block_stream ;
+        state.stream_stopper <- stream_stopper ;
+        return_unit
+    | Error e ->
+        if retries_on_failure > 0 then
+          let*! () = Lwt_unix.sleep 10. in
+          try_start_block_stream cctxt chain state (retries_on_failure - 1)
+        else fail e
+  in
+  let* () = try_start_block_stream cctxt chain state retries_on_failure in
+  return_unit
 
 let log_errors_and_continue ~name p =
   p >>= function
@@ -113,7 +132,9 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
        the expected protocol has been activated *)
   else
     match state.computation_status with
-    | Started -> return_unit
+    | Started ->
+        Events.(emit vdf_info) ("Already started VDF (level " ^ level_str ^ ")")
+        >>= fun () -> return_unit
     | Not_started -> (
         let chain = `Hash chain_id in
         let block = `Hash (hash, 0) in
@@ -134,35 +155,48 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
                 state.constants.parametric.vdf_difficulty
             in
             state.computation_status <- Finished solution ;
-            Events.(emit vdf_info)
-              ("Finished to compute VDF (level " ^ level_str ^ ")")
-            >>= fun _ -> return_unit
+
+            (* `Vdf.prove` is a long computation. We reset the block stream in
+             * order to not process all the blocks added to the chain during
+             * this time and skip straight to the current head. *)
+            restart_block_stream cctxt chain state
         | Nonce_revelation_stage | Computation_finished ->
             (* this should never actually happen if computation
                has not been started *)
             assert false)
     | Finished solution ->
+        Events.(emit vdf_info) ("Finished VDF (level " ^ level_str ^ ")")
+        >>= fun () ->
         let chain = `Hash chain_id in
         let* op_hash = inject_vdf_revelation cctxt hash chain_id solution in
         state.computation_status <- Injected ;
         Events.(emit vdf_revelation_injected)
           (cycle_of_level state level, Chain_services.to_string chain, op_hash)
         >>= fun _ -> return_unit
-    | Injected -> return_unit
+    | Injected ->
+        Events.(emit vdf_info)
+          ("Skipping, already injected VDF (level " ^ level_str ^ ")")
+        >>= fun () -> return_unit
 
 let start_vdf_worker (cctxt : Protocol_client_context.full) ~canceler constants
-    (block_stream : Client_baking_blocks.block_info tzresult Lwt_stream.t) =
+    chain =
+  let open Lwt_result_syntax in
+  let* block_stream, stream_stopper =
+    init_block_stream_with_stopper cctxt chain
+  in
   let state =
     {
       cctxt;
       constants;
       block_stream;
+      stream_stopper;
       cycle = None;
       computation_status = Not_started;
     }
   in
-  Lwt_canceler.on_cancel canceler (fun () -> Lwt.return_unit) ;
-  wait_for_first_block ~name state.block_stream >>= fun _first_event ->
+  Lwt_canceler.on_cancel canceler (fun () ->
+      state.stream_stopper () ;
+      Lwt.return_unit) ;
   let rec worker_loop () =
     Lwt.choose
       [
@@ -173,8 +207,9 @@ let start_vdf_worker (cctxt : Protocol_client_context.full) ~canceler constants
     | `Termination -> return_unit
     | `Block (None | Some (Error _)) ->
         (* exit when the node is unavailable *)
+        state.stream_stopper () ;
         Events.(emit vdf_daemon_connection_lost) name >>= fun () ->
-        fail Baking_errors.Node_connection_lost
+        tzfail Baking_errors.Node_connection_lost
     | `Block (Some (Ok bi)) ->
         log_errors_and_continue ~name @@ process_new_block cctxt state bi
         >>= fun () -> worker_loop ()

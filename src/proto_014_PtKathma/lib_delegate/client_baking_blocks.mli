@@ -51,7 +51,7 @@ val monitor_valid_blocks :
   ?protocols:Protocol_hash.t list ->
   next_protocols:Protocol_hash.t list option ->
   unit ->
-  block_info tzresult Lwt_stream.t tzresult Lwt.t
+  (block_info tzresult Lwt_stream.t * RPC_context.stopper) tzresult Lwt.t
 
 val monitor_heads :
   #Protocol_client_context.rpc_context ->
