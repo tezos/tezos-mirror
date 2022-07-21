@@ -1,0 +1,14 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_protocol_registerer)
+ (public_name tezos-protocol-compiler.registerer)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-environment.sigs)
+ (flags
+  (:standard)
+  -opaque
+  -open Tezos_base.TzPervasives))

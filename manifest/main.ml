@@ -1858,12 +1858,35 @@ let _octez_protocol_shell_context_tests =
 let octez_protocol_compiler_registerer =
   public_lib
     "tezos-protocol-compiler.registerer"
-    ~path:"src/lib_protocol_compiler"
+    ~path:"src/lib_protocol_compiler/registerer"
     ~internal_name:"tezos_protocol_registerer"
     ~deps:
       [octez_base |> open_ ~m:"TzPervasives"; tezos_protocol_environment_sigs]
-    ~modules:["Registerer"]
     ~flags:(Flags.standard ~opaque:true ())
+
+let octez_protocol_compiler_lib =
+  public_lib
+    "tezos-protocol-compiler"
+    ~path:"src/lib_protocol_compiler"
+    ~synopsis:"Tezos: economic-protocol compiler"
+    ~ocaml:
+      V.(
+        (* Should be in sync with scripts/version.sh *)
+        at_least "4.14.0" && less_than "4.15")
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix |> open_;
+        octez_version;
+        tezos_protocol_environment_sigs;
+        octez_stdlib_unix |> open_;
+        compiler_libs_common;
+        lwt_unix;
+        ocplib_ocamlres;
+        unix;
+      ]
+    ~opam_only_deps:[octez_protocol_environment]
+    ~modules:["Embedded_cmis"; "Packer"; "Compiler"; "Defaults"]
     ~dune:
       Dune.
         [
@@ -1881,8 +1904,7 @@ let octez_protocol_compiler_registerer =
                     S "%{targets}";
                   ];
                 S "%{lib:stdlib:camlinternalFormatBasics.cmi}";
-                S
-                  "%{dep:.tezos_protocol_registerer.objs/byte/tezos_protocol_registerer__Registerer.cmi}";
+                S "%{cmi:registerer/tezos_protocol_registerer}";
                 S
                   "%{lib:tezos-protocol-environment.sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat.cmi}";
                 S
@@ -1912,34 +1934,6 @@ let octez_protocol_compiler_registerer =
                 S
                   "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V7.cmi}";
               ];
-        ]
-
-let octez_protocol_compiler_lib =
-  public_lib
-    "tezos-protocol-compiler"
-    ~path:"src/lib_protocol_compiler"
-    ~synopsis:"Tezos: economic-protocol compiler"
-    ~ocaml:
-      V.(
-        (* Should be in sync with scripts/version.sh *)
-        at_least "4.14.0" && less_than "4.15")
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_base_unix |> open_;
-        octez_version;
-        tezos_protocol_environment_sigs;
-        octez_stdlib_unix |> open_;
-        compiler_libs_common;
-        lwt_unix;
-        ocplib_ocamlres;
-        unix;
-      ]
-    ~opam_only_deps:[octez_protocol_environment]
-    ~modules:["Embedded_cmis"; "Packer"; "Compiler"; "Defaults"]
-    ~dune:
-      Dune.
-        [
           targets_rule
             ["defaults.ml"]
             ~action:
