@@ -49,6 +49,7 @@ type t = {
   loser_mode : Loser_mode.t;
       (** If different from [Loser_mode.no_failures], the rollup node
           issues wrong commitments (for tests). *)
+  store : Store.t;  (** The store for the persistent storage. *)
 }
 
 (** [get_operator cctxt purpose] returns the public key hash for the operator
@@ -57,9 +58,10 @@ type t = {
 val get_operator :
   t -> Configuration.purpose -> Signature.Public_key_hash.t option
 
-(** [init cctxt l1_ctxt sc_rollup operators_pkh] initialises the rollup
-    representation.  The rollup origination level and kind are fetched via an
-    RPC call to the layer1 node that [cctxt] uses for RPC requests.
+(** [init cctxt l1_ctxt sc_rollup genesis_info kind operators fees
+    ~loser_mode store] initialises the rollup representation.  The rollup
+    origination level and kind are fetched via an RPC call to the layer1 node
+    that [cctxt] uses for RPC requests.
 *)
 val init :
   Protocol_client_context.full ->
@@ -69,4 +71,5 @@ val init :
   Configuration.operators ->
   Injection.fee_parameter ->
   loser_mode:Loser_mode.t ->
+  Store.t ->
   t tzresult Lwt.t

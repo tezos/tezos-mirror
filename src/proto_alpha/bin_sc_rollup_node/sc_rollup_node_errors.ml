@@ -161,7 +161,7 @@ let () =
     (fun (layer1_inbox, inbox) -> Inconsistent_inbox {layer1_inbox; inbox}) ;
 
   register_error_kind
-   `Permanent
+    `Permanent
     ~id:"internal.missing_pvm_state"
     ~title:"Internal error: Missing PVM state"
     ~description:"The rollup node cannot retrieve the state of the PVM."

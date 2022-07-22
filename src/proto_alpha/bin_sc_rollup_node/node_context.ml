@@ -37,6 +37,7 @@ type t = {
   fee_parameter : Injection.fee_parameter;
   protocol_constants : Constants.t;
   loser_mode : Loser_mode.t;
+  store : Store.t;
 }
 
 let get_operator node_ctxt purpose =
@@ -52,7 +53,7 @@ let retrieve_constants cctxt =
   Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
 
 let init (cctxt : Protocol_client_context.full) l1_ctxt rollup_address kind
-    operators fee_parameter ~loser_mode =
+    operators fee_parameter ~loser_mode store =
   let open Lwt_result_syntax in
   let+ protocol_constants = retrieve_constants cctxt in
   {
@@ -66,4 +67,5 @@ let init (cctxt : Protocol_client_context.full) l1_ctxt rollup_address kind
     fee_parameter;
     protocol_constants;
     loser_mode;
+    store;
   }

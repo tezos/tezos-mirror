@@ -32,10 +32,9 @@
     The state of subscribed slots per block is persistent.
 *)
 
-(** [process_head node_ctxt store head] fetches the slot indices to which the rollup is
-    subscribed to, and stores them.  *)
-val process_head :
-  Node_context.t -> Store.t -> Layer1.head -> unit tzresult Lwt.t
+(** [process_head node_ctxt head] fetches the slot indices to which the rollup
+    is subscribed to, and stores them.  *)
+val process_head : Node_context.t -> Layer1.head -> unit tzresult Lwt.t
 
 (** [start ()] initializes the Dal_slot_tracker to track the dal slot subscriptions. *)
 val start : unit -> unit Lwt.t

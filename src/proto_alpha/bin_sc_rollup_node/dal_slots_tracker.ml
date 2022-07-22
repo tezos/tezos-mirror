@@ -36,7 +36,7 @@ let get_slot_subscriptions cctxt head rollup =
     rollup
     level
 
-let process_head Node_context.{cctxt; rollup_address; _} store
+let process_head Node_context.{cctxt; rollup_address; store; _}
     Layer1.(Head {level; hash = head_hash}) =
   let open Lwt_result_syntax in
   let* res = get_slot_subscriptions cctxt (head_hash, level) rollup_address in

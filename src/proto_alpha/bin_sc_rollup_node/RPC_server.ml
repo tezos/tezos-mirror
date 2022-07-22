@@ -84,15 +84,15 @@ module Common = struct
       (Sc_rollup_services.Global.current_tezos_level ())
       (fun () () -> Layer1.current_level store >>= return)
 
-  let register_current_inbox node_ctxt store dir =
+  let register_current_inbox node_ctxt dir =
     let open Lwt_result_syntax in
     RPC_directory.opt_register0
       dir
       (Sc_rollup_services.Global.current_inbox ())
       (fun () () ->
-        Layer1.current_head_hash store >>= function
+        Layer1.current_head_hash node_ctxt.Node_context.store >>= function
         | Some head_hash ->
-            let* inbox = Inbox.inbox_of_hash node_ctxt store head_hash in
+            let* inbox = Inbox.inbox_of_hash node_ctxt head_hash in
             return_some inbox
         | None -> return None)
 
@@ -130,14 +130,10 @@ module type S = sig
 
   val shutdown : RPC_server.server -> unit Lwt.t
 
-  val register :
-    Node_context.t -> PVM.context -> Configuration.t -> unit RPC_directory.t
+  val register : Node_context.t -> Configuration.t -> unit RPC_directory.t
 
   val start :
-    Node_context.t ->
-    PVM.context ->
-    Configuration.t ->
-    RPC_server.server tzresult Lwt.t
+    Node_context.t -> Configuration.t -> RPC_server.server tzresult Lwt.t
 end
 
 module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
@@ -233,21 +229,21 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       (Sc_rollup_services.Global.dal_slot_subscriptions ())
       (fun () () -> get_dal_slot_subscriptions_exn store)
 
-  let register node_ctxt store configuration =
+  let register (node_ctxt : Node_context.t) configuration =
     RPC_directory.empty
     |> register_sc_rollup_address configuration
-    |> register_current_tezos_head store
-    |> register_current_inbox node_ctxt store
-    |> register_current_ticks store
-    |> register_current_total_ticks store
-    |> register_current_num_messages store
-    |> register_current_state_hash store
-    |> register_current_state_value store
-    |> register_current_status store
-    |> register_last_stored_commitment store
-    |> register_last_published_commitment store
-    |> register_dal_slot_subscriptions store
+    |> register_current_tezos_head node_ctxt.store
+    |> register_current_inbox node_ctxt
+    |> register_current_ticks node_ctxt.store
+    |> register_current_total_ticks node_ctxt.store
+    |> register_current_num_messages node_ctxt.store
+    |> register_current_state_hash node_ctxt.store
+    |> register_current_state_value node_ctxt.store
+    |> register_current_status node_ctxt.store
+    |> register_last_stored_commitment node_ctxt.store
+    |> register_last_published_commitment node_ctxt.store
+    |> register_dal_slot_subscriptions node_ctxt.store
 
-  let start node_ctxt store configuration =
-    Common.start configuration (register node_ctxt store configuration)
+  let start node_ctxt configuration =
+    Common.start configuration (register node_ctxt configuration)
 end
