@@ -204,6 +204,14 @@ let id_encoding = EncDec.value ["input"; "id"] Data_encoding.z
 
 let inp_encoding = EncDec.value ["input"; "0"; "1"] Data_encoding.string
 
+let zero =
+  WithExceptions.Option.get ~loc:__LOC__ (Bounded.Int32.NonNegative.of_int32 0l)
+
+(** Artificial initialization. Under normal circumstances the changes in
+    [current_tick], [gather_floppies] and [status] will be done by the other
+    PVM operations. for example the [origination_kernel_loading_step] in
+    Gather_floppies will initialize both the [current_tick] and the
+    [gather_floppies] *)
 let initialise_tree () =
   let open Lwt_syntax in
   let* tree = Test_encoding.empty_tree () in
@@ -214,25 +222,21 @@ let initialise_tree () =
   let* tree = EncDec.encode status_encoding true tree in
   Lwt.return tree
 
+(** Artificial initialization of the raw_level and message id. Again, in practice
+    these will normally be initialized  by the origination step and modified by
+    subsequent read_input steps.*)
 let add_level_id tree =
   let open Lwt_syntax in
-  let zero =
-    WithExceptions.Option.get
-      ~loc:__LOC__
-      (Bounded.Int32.NonNegative.of_int32 0l)
-  in
   let* tree = EncDec.encode level_encoding zero tree in
   let* tree = EncDec.encode id_encoding Z.zero tree in
   Lwt.return tree
 
+(** Simple test checking get_info after the initialization. Note that we also
+    check that if the tree has no last_input_read set the response to [get_info]
+    has [None] as [last_input_read *)
 let test_get_info () =
   let open Lwt_syntax in
   let* tree = initialise_tree () in
-  let zero =
-    match Bounded.Int32.NonNegative.of_int32 0l with
-    | Some x -> x
-    | _ -> assert false
-  in
   let expected_info =
     let open Wasm_pvm_sig in
     let last_input_read = Some {inbox_level = zero; message_counter = Z.zero} in
@@ -245,16 +249,13 @@ let test_get_info () =
   assert (actual_info = expected_info) ;
   Lwt_result_syntax.return_unit
 
+(** Tests that, after set_input th resulting tree decodes to the correct values.
+    In particular it does check that [get_info] produces the expected value. *)
 let test_set_input () =
   let open Lwt_syntax in
   let* tree = initialise_tree () in
   let* tree = add_level_id tree in
   let* tree = EncDec.encode status_encoding false tree in
-  let zero =
-    match Bounded.Int32.NonNegative.of_int32 0l with
-    | Some x -> x
-    | _ -> assert false
-  in
   let* tree = EncDec.encode status_encoding true tree in
   let* tree =
     Wasm.set_input_step
@@ -265,6 +266,13 @@ let test_set_input () =
   let* result_input = EncDec.decode inp_encoding tree in
   let* waiting_for_input = EncDec.decode status_encoding tree in
   let* current_tick = EncDec.decode current_tick_encoding tree in
+  let expected_info =
+    let open Wasm_pvm_sig in
+    let last_input_read = Some {inbox_level = zero; message_counter = Z.zero} in
+    {current_tick = Z.one; last_input_read; input_request = No_input_required}
+  in
+  let* actual_info = Wasm.get_info tree in
+  assert (actual_info = expected_info) ;
   assert (current_tick = Z.one) ;
   assert (not waiting_for_input) ;
   assert (result_input = "hello") ;

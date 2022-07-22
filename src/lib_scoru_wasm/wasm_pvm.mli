@@ -24,6 +24,5 @@
 (*****************************************************************************)
 
 (** Builds a WASM VM given a concrete implementation of {!Tree.S}. *)
-exception Set_input_step_expected_input
 
 module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree

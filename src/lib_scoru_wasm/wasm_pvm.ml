@@ -30,8 +30,6 @@
 
 *)
 
-exception Set_input_step_expected_input
-
 open Tezos_webassembly_interpreter
 
 module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
@@ -49,23 +47,20 @@ module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
             (Chunked_byte_vector.Lwt)
             (T)
 
-        let compute_step s =
-          let open Lwt.Syntax in
-          (* register the PVM host funcs wrappers in a module ["rollup_safe_core"]
-             into the WASM linker *)
-          let* () =
-            Tezos_webassembly_interpreter.(
-              Import.register ~module_name:(Utf8.decode "rollup_safe_core"))
-              Host_funcs.lookup
-          in
-          (* build the registry of host functions (to be passed to the interpreter via its config *)
-          let host_funcs_registry =
-            Tezos_webassembly_interpreter.Host_funcs.empty ()
-          in
-          Host_funcs.register_host_funcs host_funcs_registry ;
-          Lwt.return s
+        let compute_step = Lwt.return
 
         let get_output _ _ = Lwt.return ""
+
+        (* TODO: #3444
+           Create a may-fail tree-encoding-decoding combinator.
+           https://gitlab.com/tezos/tezos/-/issues/3444
+        *)
+
+        (* TODO: #3448
+           Remove the mention of exceptions from lib_scoru_wasm Make signature.
+           Add try_with or similar to catch exceptions and put the machine in a
+           stuck state instead. https://gitlab.com/tezos/tezos/-/issues/3448
+        *)
 
         let current_tick_encoding =
           EncDec.value ["wasm"; "current_tick"] Data_encoding.z
@@ -111,10 +106,6 @@ module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
             with _ -> Lwt.return Z.zero
           in
           Lwt.return Wasm_pvm_sig.{current_tick; last_input_read; input_request}
-
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/3226
-           Implement handling of input logic.
-        *)
 
         let set_input_step input_info message tree =
           let open Lwt_syntax in
