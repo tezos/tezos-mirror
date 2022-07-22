@@ -785,7 +785,7 @@ let register ~__FILE__ ~title ~tags body =
     in
     registered := String_map.add title test !registered
 
-module Scheduler : sig
+module type SCHEDULER = sig
   type request = Run_test of {test_title : string}
 
   type response = Test_result of Log.test_result
@@ -804,7 +804,9 @@ module Scheduler : sig
     unit
 
   val get_current_worker_id : unit -> int option
-end = struct
+end
+
+module Scheduler : SCHEDULER = struct
   type request = Run_test of {test_title : string}
 
   type response = Test_result of Log.test_result
@@ -1042,7 +1044,8 @@ type test_instance = {iteration : int; index : int}
 
 let current_worker_id = Scheduler.get_current_worker_id
 
-let run () =
+let run_with_scheduler scheduler =
+  let module Scheduler = (val scheduler : SCHEDULER) in
   List.iter (fun f -> f ()) !before_test_run_functions ;
   (* Check command-line options. *)
   check_existence "--file" known_files Cli.options.files_to_run ;
@@ -1164,3 +1167,5 @@ let run () =
       Option.iter Record.(output_file (current ())) Cli.options.record ;
       if Cli.options.time then display_time_summary () ;
       if !aborted then exit 2 else if !a_test_failed then exit 1
+
+let run () = run_with_scheduler (module Scheduler)

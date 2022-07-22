@@ -81,11 +81,42 @@ val register :
   (unit -> unit Lwt.t) ->
   unit
 
-(** Run registered tests that should be run.
+module type SCHEDULER = sig
+  (** Signature of schedulers to pass to {!run_with_scheduler}. *)
 
-    Call this once you have registered all tests.
-    This will check command-line options and run the tests that have been selected,
-    or display the list of tests. *)
+  (** Requests that schedulers can perform. *)
+  type request = Run_test of {test_title : string}
+
+  (** Request results. *)
+  type response = Test_result of Log.test_result
+
+  (** Run a scheduler that manages several workers.
+
+      This starts [worker_count] workers.
+      As soon as a worker is available, it calls [on_worker_available].
+      [on_worker_available] shall return [None] if there is nothing else to do,
+      in which case the worker is killed, or [Some (request, on_response)],
+      in which case the worker executes [request].
+      The result of this request, [response], is then given to [on_response]. *)
+  val run :
+    on_worker_available:(unit -> (request * (response -> unit)) option) ->
+    worker_count:int ->
+    unit
+
+  (** Get the current worker id. *)
+  val get_current_worker_id : unit -> int option
+end
+
+(** Generic function to run registered tests that should be run.
+
+    Depending on command-line options, this may do something else,
+    such as printing the list of tests.
+
+    Instead of calling this directly, call [Test.run], which is provided
+    by the particular variant of Tezt you are using (Unix or JavaScript). *)
+val run_with_scheduler : (module SCHEDULER) -> unit
+
+(** Run registered tests that should be run. *)
 val run : unit -> unit
 
 (** Get the current worker id.
