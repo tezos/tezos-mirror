@@ -556,7 +556,7 @@ module Scripts = struct
     >>?= fun (Ex_ty exp_ty, ctxt) ->
     trace_eval
       (fun () ->
-        let exp_ty = Script_ir_translator.serialize_ty_for_error exp_ty in
+        let exp_ty = Script_ir_unparser.serialize_ty_for_error exp_ty in
         Script_tc_errors.Ill_typed_data (None, data, exp_ty))
       (let allow_forged =
          true

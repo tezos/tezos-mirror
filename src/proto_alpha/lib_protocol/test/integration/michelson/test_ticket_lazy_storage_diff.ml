@@ -48,7 +48,7 @@ let string_list_of_ex_token_diffs ctxt token_diffs =
       (Ticket_token.Ex_token {ticketer; contents_type; contents}, amount) =
     let* x, ctxt =
       wrap
-      @@ Script_ir_translator.unparse_comparable_data
+      @@ Script_ir_unparser.unparse_comparable_data
            ~loc:()
            ctxt
            Script_ir_unparser.Readable

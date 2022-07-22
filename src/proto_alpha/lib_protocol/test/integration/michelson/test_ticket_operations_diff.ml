@@ -121,7 +121,7 @@ let string_of_ticket_token ctxt
     (Ticket_token.Ex_token {ticketer; contents_type; contents}) =
   let* x, _ =
     wrap
-    @@ Script_ir_translator.unparse_comparable_data
+    @@ Script_ir_unparser.unparse_comparable_data
          ctxt
          ~loc:()
          Script_ir_unparser.Readable

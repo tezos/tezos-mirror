@@ -693,7 +693,7 @@ let parse_ty ctxt node =
     ~allow_ticket:true
     node
 
-let unparse_ty ctxt ty = Script_ir_translator.unparse_ty ~loc:(-1) ctxt ty
+let unparse_ty ctxt ty = Script_ir_unparser.unparse_ty ~loc:(-1) ctxt ty
 
 module Parse_type_benchmark : Benchmark.S = struct
   include Parse_type_shared

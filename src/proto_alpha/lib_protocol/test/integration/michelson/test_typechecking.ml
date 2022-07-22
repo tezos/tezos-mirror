@@ -115,7 +115,7 @@ let test_context_with_nat_nat_big_map ?(sc_rollup_enable = false) () =
   wrap_error_lwt @@ Big_map.fresh ~temporary:false ctxt >>=? fun (ctxt, id) ->
   let nat_ty = Script_typed_ir.nat_t in
   wrap_error_lwt @@ Lwt.return
-  @@ Script_ir_translator.unparse_ty ~loc:() ctxt nat_ty
+  @@ Script_ir_unparser.unparse_ty ~loc:() ctxt nat_ty
   >>=? fun (nat_ty_node, ctxt) ->
   let nat_ty_expr = Micheline.strip_locations nat_ty_node in
   let alloc = Big_map.{key_type = nat_ty_expr; value_type = nat_ty_expr} in
@@ -290,7 +290,7 @@ let test_parse_comb_type () =
 
 let test_unparse_ty loc ctxt expected ty =
   Environment.wrap_tzresult
-    ( Script_ir_translator.unparse_ty ~loc:() ctxt ty >>? fun (actual, ctxt) ->
+    ( Script_ir_unparser.unparse_ty ~loc:() ctxt ty >>? fun (actual, ctxt) ->
       if actual = expected then ok ctxt
       else Alcotest.failf "Unexpected error: %s" loc )
 
@@ -331,7 +331,7 @@ let test_unparse_comparable_ty loc ctxt expected ty =
   let open Script_typed_ir in
   Environment.wrap_tzresult
     ( set_t (-1) ty >>? fun set_ty_ty ->
-      Script_ir_translator.unparse_ty ~loc:() ctxt set_ty_ty
+      Script_ir_unparser.unparse_ty ~loc:() ctxt set_ty_ty
       >>? fun (actual, ctxt) ->
       if actual = Prim ((), T_set, [expected], []) then ok ctxt
       else Alcotest.failf "Unexpected error: %s" loc )

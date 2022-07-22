@@ -931,7 +931,7 @@ let ex_ticket_size :
  fun ctxt (Ex_ticket (ty, ticket)) ->
   (* type *)
   Script_typed_ir.ticket_t Micheline.dummy_location ty >>?= fun ty ->
-  Script_ir_translator.unparse_ty ~loc:Micheline.dummy_location ctxt ty
+  Script_ir_unparser.unparse_ty ~loc:Micheline.dummy_location ctxt ty
   >>?= fun (ty', ctxt) ->
   let ty_nodes, ty_size = Script_typed_ir_size.node_size ty' in
   let ty_size = Saturation_repr.to_int ty_size in

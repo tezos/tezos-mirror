@@ -57,7 +57,7 @@ let string_list_of_ex_token_diffs ctxt token_diffs =
       (Ticket_token.Ex_token {ticketer; contents_type; contents}, amount) =
     let* x, ctxt =
       wrap
-      @@ Script_ir_translator.unparse_comparable_data
+      @@ Script_ir_unparser.unparse_comparable_data
            ~loc:()
            ctxt
            Script_ir_unparser.Readable
@@ -124,7 +124,7 @@ let updates_of_key_values ctxt ~key_type ~value_type key_values =
       in
       let* key_node, ctxt =
         wrap
-          (Script_ir_translator.unparse_comparable_data
+          (Script_ir_unparser.unparse_comparable_data
              ~loc:Micheline.dummy_location
              ctxt
              Script_ir_unparser.Readable
@@ -200,14 +200,11 @@ let setup ctxt ~key_type ~value_type entries =
   in
   let*? key_type_node, ctxt =
     Environment.wrap_tzresult
-    @@ Script_ir_translator.unparse_ty
-         ~loc:Micheline.dummy_location
-         ctxt
-         key_type
+    @@ Script_ir_unparser.unparse_ty ~loc:Micheline.dummy_location ctxt key_type
   in
   let*? value_type_node, ctxt =
     Environment.wrap_tzresult
-    @@ Script_ir_translator.unparse_ty
+    @@ Script_ir_unparser.unparse_ty
          ~loc:Micheline.dummy_location
          ctxt
          value_type

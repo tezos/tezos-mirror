@@ -42,7 +42,7 @@
    careful not to accidentally quantify 'a universally, that is "for all 'a,
    'a ty exists", otherwise you'll get an annoying error about 'a trying to escape
    it's scope. We do this by hiding 'a in an existential type. This is what
-   ex_comparable_ty, ex_ty, ex_stack_ty, etc. do.
+    ex_comparable_ty, ex_ty, ex_stack_ty, etc. do.
 
    2. A set of functions dealing with high-level Michelson types:
    This module also provides functions for interacting with the list, map,
@@ -200,14 +200,6 @@ val unparse_data :
   'a ->
   (Script.node * context) tzresult Lwt.t
 
-val unparse_comparable_data :
-  loc:'loc ->
-  context ->
-  Script_ir_unparser.unparsing_mode ->
-  'a Script_typed_ir.comparable_ty ->
-  'a ->
-  ('loc Script.michelson_node * context) tzresult Lwt.t
-
 val unparse_code :
   context ->
   Script_ir_unparser.unparsing_mode ->
@@ -294,21 +286,8 @@ val parse_ty :
   Script.node ->
   (ex_ty * context) tzresult
 
-val unparse_ty :
-  loc:'loc ->
-  context ->
-  ('a, _) Script_typed_ir.ty ->
-  ('loc Script.michelson_node * context) tzresult
-
 val parse_toplevel :
   context -> legacy:bool -> Script.expr -> (toplevel * context) tzresult Lwt.t
-
-val unparse_parameter_ty :
-  loc:'loc ->
-  context ->
-  ('a, _) Script_typed_ir.ty ->
-  entrypoints:'a Script_typed_ir.entrypoints ->
-  ('loc Script.michelson_node * context) tzresult
 
 (** High-level function to typecheck a Michelson script. This function is not
     used for validating operations but only for the [typecheck_code] RPC.
@@ -321,8 +300,6 @@ val typecheck_code :
   context ->
   Script.expr ->
   (type_map * context) tzresult Lwt.t
-
-val serialize_ty_for_error : ('a, _) Script_typed_ir.ty -> Script.expr
 
 val parse_code :
   ?type_logger:type_logger ->
