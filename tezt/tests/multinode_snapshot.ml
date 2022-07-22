@@ -287,7 +287,11 @@ let test_storage_snapshot =
   let nodes_group1 = [node_archive; node_full; node_rolling] in
 
   let* () =
-    Client.activate_protocol ~endpoint:(Node node_archive) ~protocol client
+    Client.activate_protocol_and_wait
+      ~endpoint:(Node node_archive)
+      ~protocol
+      ~node:node_archive
+      client
   in
 
   (* Bake a few blocks *)
