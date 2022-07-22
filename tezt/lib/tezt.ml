@@ -91,6 +91,9 @@ module Check = Check
 (** Command-line interface options. *)
 module Cli = Cli
 
+(** Compute the difference between two sequences of items. *)
+module Diff = Diff
+
 (** JSON handling (encoding/decoding, accessors, error management, etc). *)
 module JSON = JSON
 
