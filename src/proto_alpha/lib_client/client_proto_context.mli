@@ -38,7 +38,7 @@ val get_storage :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  unparsing_mode:Script_ir_translator.unparsing_mode ->
+  unparsing_mode:Script_ir_unparser.unparsing_mode ->
   Contract_hash.t ->
   Script.expr option tzresult Lwt.t
 
@@ -79,7 +79,7 @@ val get_big_map_value :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  unparsing_mode:Script_ir_translator.unparsing_mode ->
+  unparsing_mode:Script_ir_unparser.unparsing_mode ->
   Big_map.Id.t ->
   Script_expr_hash.t ->
   Script.expr tzresult Lwt.t
@@ -89,7 +89,7 @@ val get_script :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  unparsing_mode:Script_ir_translator.unparsing_mode ->
+  unparsing_mode:Script_ir_unparser.unparsing_mode ->
   normalize_types:bool ->
   Contract_hash.t ->
   Script.t option tzresult Lwt.t

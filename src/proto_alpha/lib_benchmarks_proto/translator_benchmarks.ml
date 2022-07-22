@@ -292,7 +292,7 @@ module Unparsing_data : Benchmark.S = struct
                 Lwt_main.run
                   (Script_ir_translator.unparse_data
                      ctxt
-                     Script_ir_translator.Optimized
+                     Script_ir_unparser.Optimized
                      ty
                      typed)
               with

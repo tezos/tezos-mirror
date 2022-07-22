@@ -201,7 +201,7 @@ let verify_params ctxt ~parameters_ty ~parameters ~unparsed_parameters =
     wrap
       (Script_ir_translator.unparse_data
          ctxt
-         Script_ir_translator.Optimized
+         Script_ir_unparser.Optimized
          parameters_ty
          parameters)
   in

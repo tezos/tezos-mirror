@@ -123,7 +123,7 @@ module Registration = struct
 end
 
 let unparsing_mode_encoding =
-  let open Script_ir_translator in
+  let open Script_ir_unparser in
   let open Data_encoding in
   union
     ~tag_size:`Uint8
@@ -468,7 +468,7 @@ module Scripts = struct
   end
 
   module type UNPARSING_MODE = sig
-    val unparsing_mode : Script_ir_translator.unparsing_mode
+    val unparsing_mode : Script_ir_unparser.unparsing_mode
   end
 
   module Traced_interpreter (Unparsing_mode : UNPARSING_MODE) = struct

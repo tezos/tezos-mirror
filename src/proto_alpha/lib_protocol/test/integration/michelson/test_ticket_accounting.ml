@@ -60,7 +60,7 @@ let string_list_of_ex_token_diffs ctxt token_diffs =
       @@ Script_ir_translator.unparse_comparable_data
            ~loc:()
            ctxt
-           Script_ir_translator.Readable
+           Script_ir_unparser.Readable
            contents_type
            contents
     in
@@ -127,7 +127,7 @@ let updates_of_key_values ctxt ~key_type ~value_type key_values =
           (Script_ir_translator.unparse_comparable_data
              ~loc:Micheline.dummy_location
              ctxt
-             Script_ir_translator.Readable
+             Script_ir_unparser.Readable
              key_type
              key)
       in
@@ -139,7 +139,7 @@ let updates_of_key_values ctxt ~key_type ~value_type key_values =
               wrap
                 (Script_ir_translator.unparse_data
                    ctxt
-                   Script_ir_translator.Readable
+                   Script_ir_unparser.Readable
                    value_type
                    value)
             in
@@ -382,7 +382,7 @@ let transfer_operation ctxt ~src ~destination ~arg_type ~arg =
     wrap
       (Script_ir_translator.unparse_data
          ctxt
-         Script_ir_translator.Readable
+         Script_ir_unparser.Readable
          arg_type
          arg)
   in

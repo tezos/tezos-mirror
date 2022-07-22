@@ -37,7 +37,7 @@ open Alpha_context
 open Tezt
 
 module Traced_interpreter = Plugin.RPC.Scripts.Traced_interpreter (struct
-  let unparsing_mode = Script_ir_translator.Readable
+  let unparsing_mode = Script_ir_unparser.Readable
 end)
 
 type contract = {filename : string; storage : string}

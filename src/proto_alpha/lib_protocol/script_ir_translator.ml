@@ -32,6 +32,7 @@ open Script
 open Script_tc_errors
 open Script_ir_annot
 open Script_typed_ir
+open Script_ir_unparser
 module Typecheck_costs = Michelson_v1_gas.Cost_of.Typechecking
 module Unparse_costs = Michelson_v1_gas.Cost_of.Unparsing
 module Tc_context = Script_tc_context
@@ -89,8 +90,6 @@ let compose_descr :
   }
 
 type tc_context = Tc_context.t
-
-type unparsing_mode = Optimized | Readable | Optimized_legacy
 
 type type_logger =
   Script.location ->

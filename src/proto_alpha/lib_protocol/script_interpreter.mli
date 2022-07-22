@@ -96,7 +96,7 @@ val execute :
   ?logger:logger ->
   Alpha_context.t ->
   cached_script:Script_ir_translator.ex_script option ->
-  Script_ir_translator.unparsing_mode ->
+  Script_ir_unparser.unparsing_mode ->
   step_constants ->
   script:Script.t ->
   entrypoint:Entrypoint.t ->
@@ -114,7 +114,7 @@ val execute_with_typed_parameter :
   ?logger:logger ->
   Alpha_context.context ->
   cached_script:Script_ir_translator.ex_script option ->
-  Script_ir_translator.unparsing_mode ->
+  Script_ir_unparser.unparsing_mode ->
   step_constants ->
   script:Script.t ->
   entrypoint:Entrypoint.t ->

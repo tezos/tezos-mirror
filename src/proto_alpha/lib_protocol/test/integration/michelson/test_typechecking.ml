@@ -578,12 +578,12 @@ let test_parse_address () =
 
 let test_unparse_data loc ctxt ty x ~expected_readable ~expected_optimized =
   wrap_error_lwt
-    ( Script_ir_translator.unparse_data ctxt Script_ir_translator.Readable ty x
+    ( Script_ir_translator.unparse_data ctxt Script_ir_unparser.Readable ty x
     >>=? fun (actual_readable, ctxt) ->
       (if actual_readable = expected_readable then return ctxt
       else Alcotest.failf "Error in readable unparsing: %s" loc)
       >>=? fun ctxt ->
-      Script_ir_translator.unparse_data ctxt Script_ir_translator.Optimized ty x
+      Script_ir_translator.unparse_data ctxt Script_ir_unparser.Optimized ty x
       >>=? fun (actual_optimized, ctxt) ->
       if actual_optimized = expected_optimized then return ctxt
       else Alcotest.failf "Error in optimized unparsing: %s" loc )
@@ -674,11 +674,7 @@ let test_optimal_comb () =
   in
   let check_optimal_comb loc ctxt ty v arity =
     wrap_error_lwt
-      ( Script_ir_translator.unparse_data
-          ctxt
-          Script_ir_translator.Optimized
-          ty
-          v
+      ( Script_ir_translator.unparse_data ctxt Script_ir_unparser.Optimized ty v
       >>=? fun (unparsed, ctxt) ->
         let unparsed_canonical, unparsed_size = size_of_micheline unparsed in
         List.iter_es (fun other_repr ->

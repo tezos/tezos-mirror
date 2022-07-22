@@ -51,7 +51,7 @@ let string_list_of_ex_token_diffs ctxt token_diffs =
       @@ Script_ir_translator.unparse_comparable_data
            ~loc:()
            ctxt
-           Script_ir_translator.Readable
+           Script_ir_unparser.Readable
            contents_type
            contents
     in

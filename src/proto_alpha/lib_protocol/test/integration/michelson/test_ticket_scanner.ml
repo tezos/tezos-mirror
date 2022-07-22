@@ -76,7 +76,7 @@ let string_list_of_ex_tickets ctxt tickets =
       wrap
       @@ Script_ir_translator.unparse_data
            ctxt
-           Script_ir_translator.Readable
+           Script_ir_unparser.Readable
            cty
            contents
     in

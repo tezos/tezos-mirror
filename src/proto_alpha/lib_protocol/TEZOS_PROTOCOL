@@ -188,6 +188,7 @@
         "Apply_operation_result",
         "Apply_internal_results",
         "Apply_results",
+        "Script_ir_unparser",
         "Script_ir_translator",
         "Script_big_map",
         "Script_cache",

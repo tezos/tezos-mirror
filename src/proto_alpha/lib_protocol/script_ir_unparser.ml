@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
-(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,49 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
+(* open Alpha_context *)
+(* open Micheline *)
+(* open Script_typed_ir *)
+(* module Unparse_costs = Michelson_v1_gas.Cost_of.Unparsing *)
 
-(* This function extracts nodes of:
-   - Ticketer
-   - Type of content
-   - Content
-   - Owner
-       to generate at ticket-balance key-hash.*)
-let of_ex_token ctxt ~owner
-    (Ticket_token.Ex_token {ticketer; contents_type; contents}) =
-  let loc = Micheline.dummy_location in
-  Script_ir_translator.unparse_ty ~loc ctxt contents_type
-  >>?= fun (cont_ty_unstripped, ctxt) ->
-  (* We strip the annotations from the content type in order to map
-     tickets with the same content type, but with different annotations, to the
-     same hash. *)
-  Gas.consume ctxt (Script.strip_annotations_cost cont_ty_unstripped)
-  >>?= fun ctxt ->
-  let ty = Script.strip_annotations cont_ty_unstripped in
-  Script_ir_translator.unparse_comparable_data
-    ~loc
-    ctxt
-    Script_ir_unparser.Optimized_legacy
-    contents_type
-    contents
-  >>=? fun (contents, ctxt) ->
-  let ticketer_address =
-    Script_typed_ir.
-      {destination = Contract ticketer; entrypoint = Entrypoint.default}
-  in
-  let owner_address =
-    Script_typed_ir.{destination = owner; entrypoint = Entrypoint.default}
-  in
-  Script_ir_translator.unparse_data
-    ctxt
-    Script_ir_unparser.Optimized_legacy
-    Script_typed_ir.address_t
-    ticketer_address
-  >>=? fun (ticketer, ctxt) ->
-  Script_ir_translator.unparse_data
-    ctxt
-    Script_ir_unparser.Optimized_legacy
-    Script_typed_ir.address_t
-    owner_address
-  >>=? fun (owner, ctxt) ->
-  Lwt.return (Ticket_hash.make ctxt ~ticketer ~ty ~contents ~owner)
+type unparsing_mode = Optimized | Readable | Optimized_legacy

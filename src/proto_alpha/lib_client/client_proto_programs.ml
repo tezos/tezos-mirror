@@ -122,7 +122,7 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
 
 type simulation_params = {
   input : Michelson_v1_parser.parsed;
-  unparsing_mode : Script_ir_translator.unparsing_mode;
+  unparsing_mode : Script_ir_unparser.unparsing_mode;
   now : Script_timestamp.t option;
   level : Script_int.n Script_int.num option;
   source : Contract.t option;
