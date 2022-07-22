@@ -37,17 +37,8 @@
 open Protocol
 open Alpha_context
 
-(* missing stuff in Vote *)
-let ballots_zero = Vote.{yay = 0L; nay = 0L; pass = 0L}
+(** {2 Constants and ratios used in voting}
 
-let ballots_equal b1 b2 =
-  Vote.(b1.yay = b2.yay && b1.nay = b2.nay && b1.pass = b2.pass)
-
-let ballots_pp ppf v =
-  Vote.(
-    Format.fprintf ppf "{ yay = %Ld ; nay = %Ld ; pass = %Ld" v.yay v.nay v.pass)
-
-(* constants and ratios used in voting:
    percent_mul denotes the percent multiplier
    initial_participation is 7000 that is, 7/10 * percent_mul
    the participation EMA ratio pr_ema_weight / den = 7 / 10
@@ -111,7 +102,7 @@ let protos =
       "ProtoALphaALphaALphaALphaALphaALphaALpha841f2cQqajX";
     |]
 
-(** helper functions *)
+(** {2 Helper functions} *)
 
 let assert_period_kind expected_kind kind loc =
   if Stdlib.(expected_kind = kind) then return_unit
@@ -153,48 +144,45 @@ let assert_period_remaining expected_remaining remaining loc =
 
 let assert_period ?expected_kind ?expected_index ?expected_position
     ?expected_remaining b loc =
-  Context.Vote.get_current_period (B b)
-  >>=? fun {voting_period; position; remaining} ->
-  (if Option.is_some expected_kind then
-   assert_period_kind
-     (WithExceptions.Option.get ~loc:__LOC__ expected_kind)
-     voting_period.kind
-     loc
-  else return_unit)
-  >>=? fun () ->
-  (if Option.is_some expected_index then
-   assert_period_index
-     (WithExceptions.Option.get ~loc:__LOC__ expected_index)
-     voting_period.index
-     loc
-  else return_unit)
-  >>=? fun () ->
-  (if Option.is_some expected_position then
-   assert_period_position
-     (WithExceptions.Option.get ~loc:__LOC__ expected_position)
-     position
-     loc
-  else return_unit)
-  >>=? fun () ->
-  if Option.is_some expected_remaining then
-    assert_period_remaining
-      (WithExceptions.Option.get ~loc:__LOC__ expected_remaining)
-      remaining
-      loc
-  else return_unit
+  let open Lwt_result_syntax in
+  let* {voting_period; position; remaining} =
+    Context.Vote.get_current_period (B b)
+  in
+  let* () =
+    match expected_kind with
+    | Some expected_kind ->
+        assert_period_kind expected_kind voting_period.kind loc
+    | None -> return_unit
+  in
+  let* () =
+    match expected_index with
+    | Some expected_index ->
+        assert_period_index expected_index voting_period.index loc
+    | None -> return_unit
+  in
+  let* () =
+    match expected_position with
+    | Some expected_position ->
+        assert_period_position expected_position position loc
+    | None -> return_unit
+  in
+  match expected_remaining with
+  | Some expected_remaining ->
+      assert_period_remaining expected_remaining remaining loc
+  | None -> return_unit
 
 let assert_ballots expected_ballots b loc =
   Context.Vote.get_ballots (B b) >>=? fun ballots ->
   Assert.equal
     ~loc
-    ballots_equal
+    Vote.equal_ballots
     "Unexpected ballots"
-    ballots_pp
+    Vote.pp_ballots
     ballots
     expected_ballots
 
 let assert_empty_ballots b loc =
-  assert_ballots ballots_zero b loc >>=? fun () ->
+  assert_ballots Vote.ballots_zero b loc >>=? fun () ->
   Context.Vote.get_ballot_list (B b) >>=? function
   | [] -> return_unit
   | _ -> failwith "%s - Unexpected ballot list" loc
@@ -261,6 +249,48 @@ let context_init =
     ~baking_reward_bonus_per_slot:Tez.zero
     ~baking_reward_fixed_portion:Tez.zero
     ~nonce_revelation_threshold:2l
+
+(** {3 Expected protocol errors} *)
+
+let wrong_error expected_error_name actual_error_trace loc =
+  failwith
+    "%s:@,Expected error trace [%s], but got:@,%a"
+    loc
+    expected_error_name
+    Error_monad.pp_print_trace
+    actual_error_trace
+
+let empty_proposals loc = function
+  | [Environment.Ecoproto_error Amendment.Empty_proposal] -> return_unit
+  | err -> wrong_error "Empty_proposal" err loc
+
+let too_many_proposals loc = function
+  | [Environment.Ecoproto_error Amendment.Too_many_proposals] -> return_unit
+  | err -> wrong_error "Too_many_proposals" err loc
+
+let duplicate_ballot loc = function
+  | [Environment.Ecoproto_error Amendment.Duplicate_ballot] -> return_unit
+  | err -> wrong_error "Duplicate_ballot" err loc
+
+let assert_validate_proposals_fails ~expected_error ~proposer ~proposals block
+    loc =
+  let open Lwt_result_syntax in
+  let* operation = Op.proposals (B block) proposer proposals in
+  Incremental.assert_validate_operation_fails
+    (expected_error loc)
+    operation
+    block
+
+let assert_validate_ballot_fails ~expected_error ~voter ~proposal ~ballot block
+    loc =
+  let open Lwt_result_syntax in
+  let* operation = Op.ballot (B block) voter proposal ballot in
+  Incremental.assert_validate_operation_fails
+    (expected_error loc)
+    operation
+    block
+
+(** {2 Tests} *)
 
 (** A normal and successful vote sequence. *)
 let test_successful_vote num_delegates () =
@@ -350,14 +380,21 @@ let test_successful_vote num_delegates () =
    | None -> failwith "%s - Missing proposal" __LOC__)
   >>=? fun () ->
   (* proposing more than maximum_proposals fails *)
-  Op.proposals (B b) del1 (Protocol_hash.zero :: props) >>=? fun ops ->
-  Block.bake ~operations:[ops] b >>= fun res ->
-  Assert.proto_error_with_info ~loc:__LOC__ res "Too many proposals"
+  assert_validate_proposals_fails
+    ~expected_error:too_many_proposals
+    ~proposer:del1
+    ~proposals:(Protocol_hash.zero :: props)
+    b
+    __LOC__
   >>=? fun () ->
   (* proposing less than one proposal fails *)
-  Op.proposals (B b) del1 [] >>=? fun ops ->
-  Block.bake ~operations:[ops] b >>= fun res ->
-  Assert.proto_error_with_info ~loc:__LOC__ res "Empty proposal" >>=? fun () ->
+  assert_validate_proposals_fails
+    ~expected_error:empty_proposals
+    ~proposer:del1
+    ~proposals:[]
+    b
+    __LOC__
+  >>=? fun () ->
   (* first block of exploration period *)
   bake_until_first_block_of_next_period b >>=? fun b ->
   (* next block is first block of exploration *)
@@ -387,8 +424,6 @@ let test_successful_vote num_delegates () =
     delegates_p2
   >>=? fun operations ->
   Block.bake ~operations b >>=? fun b ->
-  Op.ballot (B b) del1 Protocol_hash.zero Vote.Nay >>=? fun op ->
-  Block.bake ~operations:[op] b >>= fun res ->
   Context.Delegate.voting_info (B b) pkh1 >>=? fun info1 ->
   assert_equal_info
     ~loc:__LOC__
@@ -400,7 +435,16 @@ let test_successful_vote num_delegates () =
       remaining_proposals = 0;
     }
   >>=? fun () ->
-  Assert.proto_error_with_info ~loc:__LOC__ res "Duplicate ballot"
+  (* Submitting a second ballot for [del1] fails (indeed, [del1]
+     belongs to [delegates_p2], so they have already sent a ballot
+     during the unanimous vote right above). *)
+  assert_validate_ballot_fails
+    ~expected_error:duplicate_ballot
+    ~voter:del1
+    ~proposal:Protocol_hash.zero
+    ~ballot:Vote.Nay
+    b
+    __LOC__
   >>=? fun () ->
   (* Allocate votes from weight of active delegates *)
   List.fold_left (fun acc v -> Int64.(add v acc)) 0L power_p2
@@ -545,8 +589,8 @@ let test_not_enough_quorum_in_exploration num_delegates () =
   let proposer =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0
   in
-  Op.proposals (B b) proposer [Protocol_hash.zero] >>=? fun ops ->
-  Block.bake ~operations:[ops] b >>=? fun b ->
+  Op.proposals (B b) proposer [Protocol_hash.zero] >>=? fun operation ->
+  Block.bake ~operation b >>=? fun b ->
   (* skip to exploration period *)
   bake_until_first_block_of_next_period b >>=? fun b ->
   (* we moved to an exploration period with one proposal *)
@@ -599,8 +643,8 @@ let test_not_enough_quorum_in_promotion num_delegates () =
   let proposer =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0
   in
-  Op.proposals (B b) proposer [Protocol_hash.zero] >>=? fun ops ->
-  Block.bake ~operations:[ops] b >>=? fun b ->
+  Op.proposals (B b) proposer [Protocol_hash.zero] >>=? fun operation ->
+  Block.bake ~operation b >>=? fun b ->
   (* skip to exploration period *)
   bake_until_first_block_of_next_period b >>=? fun b ->
   (* we moved to an exploration period with one proposal *)
@@ -672,8 +716,8 @@ let test_multiple_identical_proposals_count_as_one () =
   assert_period ~expected_kind:Proposal b __LOC__ >>=? fun () ->
   let proposer = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd delegates in
   Op.proposals (B b) proposer [Protocol_hash.zero; Protocol_hash.zero]
-  >>=? fun ops ->
-  Block.bake ~operations:[ops] b >>=? fun b ->
+  >>=? fun operation ->
+  Block.bake ~operation b >>=? fun b ->
   (* compute the weight of proposals *)
   Context.Vote.get_proposals (B b) >>=? fun ps ->
   (* compute the voting power of proposer *)
@@ -774,11 +818,11 @@ let test_quorum_in_proposal has_quorum () =
     Int64.(div (mul total_tokens quorum) 100_00L) |> Test_tez.of_mutez_exn
   in
   Op.transaction (B b) del2 del1 bal >>=? fun op2 ->
-  Block.bake ~policy ~operations:[op2] b >>=? fun b ->
+  Block.bake ~policy ~operation:op2 b >>=? fun b ->
   bake_until_first_block_of_next_period b >>=? fun b ->
   (* make the proposal *)
-  Op.proposals (B b) del1 [protos.(0)] >>=? fun ops ->
-  Block.bake ~policy ~operations:[ops] b >>=? fun b ->
+  Op.proposals (B b) del1 [protos.(0)] >>=? fun operation ->
+  Block.bake ~policy ~operation b >>=? fun b ->
   bake_until_first_block_of_next_period b >>=? fun b ->
   (* we remain in the proposal period when there is no quorum,
      otherwise we move to the cooldown vote period *)
@@ -793,8 +837,8 @@ let test_supermajority_in_exploration supermajority () =
   context_init ~min_proposal_quorum 100 () >>=? fun (b, delegates) ->
   let del1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0 in
   let proposal = protos.(0) in
-  Op.proposals (B b) del1 [proposal] >>=? fun ops1 ->
-  Block.bake ~operations:[ops1] b >>=? fun b ->
+  Op.proposals (B b) del1 [proposal] >>=? fun operation ->
+  Block.bake ~operation b >>=? fun b ->
   bake_until_first_block_of_next_period b >>=? fun b ->
   (* move to exploration *)
   assert_period ~expected_kind:Exploration b __LOC__ >>=? fun () ->
@@ -844,8 +888,8 @@ let test_no_winning_proposal num_delegates () =
   in
   (* all delegates active in p1 propose the same proposals *)
   List.map_es (fun del -> Op.proposals (B b) del props) delegates_p1
-  >>=? fun ops_list ->
-  Block.bake ~operations:ops_list b >>=? fun b ->
+  >>=? fun operations ->
+  Block.bake ~operations b >>=? fun b ->
   (* skip to exploration period *)
   bake_until_first_block_of_next_period b >>=? fun b ->
   (* we stay in the same proposal period because no winning proposal *)
@@ -868,8 +912,8 @@ let test_quorum_capped_maximum num_delegates () =
   let proposer =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0
   in
-  Op.proposals (B b) proposer [protocol] >>=? fun ops ->
-  Block.bake ~operations:[ops] b >>=? fun b ->
+  Op.proposals (B b) proposer [protocol] >>=? fun operation ->
+  Block.bake ~operation b >>=? fun b ->
   (* skip to exploration period *)
   bake_until_first_block_of_next_period b >>=? fun b ->
   (* we moved to an exploration period with one proposal *)
@@ -908,8 +952,8 @@ let test_quorum_capped_minimum num_delegates () =
   let proposer =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0
   in
-  Op.proposals (B b) proposer [protocol] >>=? fun ops ->
-  Block.bake ~operations:[ops] b >>=? fun b ->
+  Op.proposals (B b) proposer [protocol] >>=? fun operation ->
+  Block.bake ~operation b >>=? fun b ->
   (* skip to exploration period *)
   bake_until_first_block_of_next_period b >>=? fun b ->
   (* we moved to an exploration period with one proposal *)
@@ -1006,9 +1050,9 @@ let test_voting_power_updated_each_voting_period () =
   let policy = Block.Excluding [baker1; baker2] in
   (* Transfer 30,000 tez from baker1 to baker2 *)
   let amount = Tez.of_mutez_exn 30_000_000_000L in
-  Op.transaction (B genesis) con1 con2 amount >>=? fun op ->
+  Op.transaction (B genesis) con1 con2 amount >>=? fun operation ->
   (* Bake the block containing the transaction *)
-  Block.bake ~policy ~operations:[op] genesis >>=? fun block ->
+  Block.bake ~policy ~operation genesis >>=? fun block ->
   (* Retrieve balance of con1 *)
   Context.Contract.balance (B block) con1 >>=? fun balance1 ->
   (* Assert balance has changed by deducing the amount *)
