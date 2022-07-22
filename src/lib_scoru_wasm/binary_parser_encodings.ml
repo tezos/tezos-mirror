@@ -136,6 +136,8 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
       tagged_union tag_encoding [nkstart_case; nkparse_case; nkstop_case]
   end
 
+  let name_encoding = vector_encoding Name.utf8
+
   module Func_type = struct
     type tags = FKStart | FKIns | FKOut | FKStop
 
@@ -209,8 +211,6 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
         (function Decode.ImpKModuleName n -> Some n | _ -> None)
         (fun n -> ImpKModuleName n)
 
-    let name_encoding = vector_encoding Name.utf8
-
     let impkitemname_case =
       case
         "ImpKItemName"
@@ -242,5 +242,43 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
       tagged_union
         tag_encoding
         [impkstart_case; impkmodulename_case; impkitemname_case; impkstop_case]
+  end
+
+  module Export = struct
+    let expkstart_case =
+      let tag = "ExpKStart" in
+      case
+        tag
+        (value [] (Data_encoding.constant tag))
+        (function Decode.ExpKStart -> Some () | _ -> None)
+        (fun () -> ExpKStart)
+
+    let expkname_case =
+      case
+        "ExpKName"
+        Name.encoding
+        (function Decode.ExpKName n -> Some n | _ -> None)
+        (fun n -> ExpKName n)
+
+    let export_encoding =
+      conv
+        (fun (name, edesc) -> Ast.{name; edesc})
+        (fun {name; edesc} -> (name, edesc))
+        (tup2
+           ~flatten:true
+           (scope ["name"] name_encoding)
+           (value ["edesc"] Interpreter_encodings.Ast.export_desc_encoding))
+
+    let expkstop_case =
+      case
+        "ExpKStop"
+        export_encoding
+        (function Decode.ExpKStop e -> Some e | _ -> None)
+        (fun e -> ExpKStop e)
+
+    let tags_encoding = value [] Data_encoding.string
+
+    let encoding =
+      tagged_union tags_encoding [expkstart_case; expkname_case; expkstop_case]
   end
 end

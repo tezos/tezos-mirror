@@ -632,4 +632,37 @@ module Ast = struct
       (fun v -> v.Source.it)
       (fun v -> Source.(v @@ no_region))
       unannotated_encoding
+
+  let export_desc_encoding =
+    let open Data_encoding in
+    let open Ast in
+    let unannotated_encoding =
+      union_incr
+        [
+          case_incr
+            "FuncExport"
+            var_encoding
+            (function FuncExport v -> Some v | _ -> None)
+            (fun v -> FuncExport v);
+          case_incr
+            "TableExport"
+            var_encoding
+            (function TableExport t -> Some t | _ -> None)
+            (fun t -> TableExport t);
+          case_incr
+            "MemoryExport"
+            var_encoding
+            (function MemoryExport m -> Some m | _ -> None)
+            (fun m -> MemoryExport m);
+          case_incr
+            "GlobalExport"
+            var_encoding
+            (function GlobalExport g -> Some g | _ -> None)
+            (fun g -> GlobalExport g);
+        ]
+    in
+    conv
+      (fun v -> v.Source.it)
+      (fun v -> Source.(v @@ no_region))
+      unannotated_encoding
 end

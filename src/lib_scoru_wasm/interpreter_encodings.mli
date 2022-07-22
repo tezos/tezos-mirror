@@ -217,4 +217,6 @@ module Ast : sig
   val data_label_encoding : Ast.data_label Data_encoding.t
 
   val import_desc_encoding : Ast.import_desc Data_encoding.t
+
+  val export_desc_encoding : Ast.export_desc Data_encoding.t
 end

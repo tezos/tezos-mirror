@@ -408,6 +408,46 @@ module LazyStack = struct
     ]
 end
 
+module Exports = struct
+  open Utils
+
+  let export_gen =
+    let open QCheck2.Gen in
+    let* name = Vec.gen Names.gen_utf8 in
+    let+ edesc = Ast_generators.export_desc_gen in
+    Ast.{name; edesc}
+
+  let gen =
+    let open QCheck2.Gen in
+    let start = return Decode.ExpKStart in
+    let name =
+      let+ name = Names.gen in
+      Decode.ExpKName name
+    in
+    let stop =
+      let+ export = export_gen in
+      Decode.ExpKStop export
+    in
+    oneof [start; name; stop]
+
+  let export_check exp exp' =
+    let open Lwt_result_syntax in
+    let eq_value x y = return (x = y) in
+    let+ eq_n = Vec.check eq_value exp.Ast.name exp'.Ast.name in
+    eq_n && exp.edesc = exp'.edesc
+
+  let check export export' =
+    let open Lwt_result_syntax in
+    match (export, export') with
+    | Decode.ExpKStart, Decode.ExpKStart -> return true
+    | ExpKName n, ExpKName n' -> Names.check n n'
+    | ExpKStop exp, ExpKStop exp' -> export_check exp exp'
+    | _, _ -> return false
+
+  let tests =
+    [tztest "Exports" `Quick (make_test Parser.Export.encoding gen check)]
+end
+
 let tests =
   Byte_vector.tests @ Vec.tests @ LazyVec.tests @ Names.tests @ Func_type.tests
-  @ Imports.tests @ LazyStack.tests
+  @ Imports.tests @ LazyStack.tests @ Exports.tests

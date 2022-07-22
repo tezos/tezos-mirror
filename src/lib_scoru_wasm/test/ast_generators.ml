@@ -443,6 +443,18 @@ let import_desc_gen =
   in
   no_region idesc
 
+let export_desc_gen =
+  let+ edesc =
+    oneof
+      [
+        map (fun v -> Ast.FuncExport v) var_gen;
+        map (fun v -> Ast.TableExport v) var_gen;
+        map (fun v -> Ast.MemoryExport v) var_gen;
+        map (fun v -> Ast.GlobalExport v) var_gen;
+      ]
+  in
+  no_region edesc
+
 let module_key_and_instance_gen ?module_reg () =
   let module_reg =
     match module_reg with
