@@ -31,42 +31,12 @@ open Alpha_context
 
 type error +=
   | Not_enough_endorsements of {required : int; provided : int}
-  | Wrong_consensus_operation_branch of Block_hash.t * Block_hash.t
-  | Wrong_level_for_consensus_operation of {
-      expected : Raw_level.t;
-      provided : Raw_level.t;
-    }
-  | Wrong_round_for_consensus_operation of {
-      expected : Round.t;
-      provided : Round.t;
-    }
-  | Preendorsement_round_too_high of {block_round : Round.t; provided : Round.t}
   | Unexpected_endorsement_in_block
   | Unexpected_preendorsement_in_block
-  | Wrong_payload_hash_for_consensus_operation of {
-      expected : Block_payload_hash.t;
-      provided : Block_payload_hash.t;
-    }
   | Wrong_slot_used_for_consensus_operation
   | Consensus_operation_for_future_level of {
       expected : Raw_level.t;
       provided : Raw_level.t;
-    }
-  | Consensus_operation_for_future_round of {
-      expected : Round.t;
-      provided : Round.t;
-    }
-  | Consensus_operation_for_old_level of {
-      expected : Raw_level.t;
-      provided : Raw_level.t;
-    }
-  | Consensus_operation_for_old_round of {
-      expected : Round.t;
-      provided : Round.t;
-    }
-  | Consensus_operation_on_competing_proposal of {
-      expected : Block_payload_hash.t;
-      provided : Block_payload_hash.t;
     }
   | Set_deposits_limit_on_unregistered_delegate of Signature.Public_key_hash.t
   | Set_deposits_limit_too_high of {limit : Tez.t; max_limit : Tez.t}
@@ -114,119 +84,6 @@ let () =
       | _ -> None)
     (fun (required, provided) -> Not_enough_endorsements {required; provided}) ;
   register_error_kind
-    `Temporary
-    ~id:"operation.wrong_consensus_operation_branch"
-    ~title:"Wrong consensus operation branch"
-    ~description:
-      "Trying to include an endorsement or preendorsement which points to the \
-       wrong block.\n\
-      \       It should be the predecessor for preendorsements and the \
-       grandfather for endorsements."
-    ~pp:(fun ppf (e, p) ->
-      Format.fprintf
-        ppf
-        "Wrong branch %a, expected %a"
-        Block_hash.pp
-        p
-        Block_hash.pp
-        e)
-    Data_encoding.(
-      obj2
-        (req "expected" Block_hash.encoding)
-        (req "provided" Block_hash.encoding))
-    (function
-      | Wrong_consensus_operation_branch (e, p) -> Some (e, p) | _ -> None)
-    (fun (e, p) -> Wrong_consensus_operation_branch (e, p)) ;
-  register_error_kind
-    `Permanent
-    ~id:"wrong_level_for_consensus_operation"
-    ~title:"Wrong level for consensus operation"
-    ~description:"Wrong level for consensus operation."
-    ~pp:(fun ppf (expected, provided) ->
-      Format.fprintf
-        ppf
-        "Wrong level for consensus operation (expected: %a, provided: %a)."
-        Raw_level.pp
-        expected
-        Raw_level.pp
-        provided)
-    Data_encoding.(
-      obj2
-        (req "expected" Raw_level.encoding)
-        (req "provided" Raw_level.encoding))
-    (function
-      | Wrong_level_for_consensus_operation {expected; provided} ->
-          Some (expected, provided)
-      | _ -> None)
-    (fun (expected, provided) ->
-      Wrong_level_for_consensus_operation {expected; provided}) ;
-  register_error_kind
-    `Permanent
-    ~id:"wrong_round_for_consensus_operation"
-    ~title:"Wrong round for consensus operation"
-    ~description:"Wrong round for consensus operation."
-    ~pp:(fun ppf (expected, provided) ->
-      Format.fprintf
-        ppf
-        "Wrong round for consensus operation (expected: %a, provided: %a)."
-        Round.pp
-        expected
-        Round.pp
-        provided)
-    Data_encoding.(
-      obj2 (req "expected" Round.encoding) (req "provided" Round.encoding))
-    (function
-      | Wrong_round_for_consensus_operation {expected; provided} ->
-          Some (expected, provided)
-      | _ -> None)
-    (fun (expected, provided) ->
-      Wrong_round_for_consensus_operation {expected; provided}) ;
-  register_error_kind
-    `Permanent
-    ~id:"preendorsement_round_too_high"
-    ~title:"Preendorsement round too high"
-    ~description:"Preendorsement round too high."
-    ~pp:(fun ppf (block_round, provided) ->
-      Format.fprintf
-        ppf
-        "Preendorsement round too high (block_round: %a, provided: %a)."
-        Round.pp
-        block_round
-        Round.pp
-        provided)
-    Data_encoding.(
-      obj2 (req "block_round" Round.encoding) (req "provided" Round.encoding))
-    (function
-      | Preendorsement_round_too_high {block_round; provided} ->
-          Some (block_round, provided)
-      | _ -> None)
-    (fun (block_round, provided) ->
-      Preendorsement_round_too_high {block_round; provided}) ;
-  register_error_kind
-    `Permanent
-    ~id:"wrong_payload_hash_for_consensus_operation"
-    ~title:"Wrong payload hash for consensus operation"
-    ~description:"Wrong payload hash for consensus operation."
-    ~pp:(fun ppf (expected, provided) ->
-      Format.fprintf
-        ppf
-        "Wrong payload hash for consensus operation (expected: %a, provided: \
-         %a)."
-        Block_payload_hash.pp_short
-        expected
-        Block_payload_hash.pp_short
-        provided)
-    Data_encoding.(
-      obj2
-        (req "expected" Block_payload_hash.encoding)
-        (req "provided" Block_payload_hash.encoding))
-    (function
-      | Wrong_payload_hash_for_consensus_operation {expected; provided} ->
-          Some (expected, provided)
-      | _ -> None)
-    (fun (expected, provided) ->
-      Wrong_payload_hash_for_consensus_operation {expected; provided}) ;
-  register_error_kind
     `Permanent
     ~id:"unexpected_endorsement_in_block"
     ~title:"Unexpected endorsement in block"
@@ -268,95 +125,6 @@ let () =
       | _ -> None)
     (fun (expected, provided) ->
       Consensus_operation_for_future_level {expected; provided}) ;
-  register_error_kind
-    `Temporary
-    ~id:"consensus_operation_for_future_round"
-    ~title:"Consensus operation for future round"
-    ~description:"Consensus operation for future round."
-    ~pp:(fun ppf (expected, provided) ->
-      Format.fprintf
-        ppf
-        "Consensus operation for future round (expected: %a, provided: %a)."
-        Round.pp
-        expected
-        Round.pp
-        provided)
-    Data_encoding.(
-      obj2 (req "expected_max" Round.encoding) (req "provided" Round.encoding))
-    (function
-      | Consensus_operation_for_future_round {expected; provided} ->
-          Some (expected, provided)
-      | _ -> None)
-    (fun (expected, provided) ->
-      Consensus_operation_for_future_round {expected; provided}) ;
-  register_error_kind
-    `Outdated
-    ~id:"consensus_operation_for_old_level"
-    ~title:"Consensus operation for old level"
-    ~description:"Consensus operation for old level."
-    ~pp:(fun ppf (expected, provided) ->
-      Format.fprintf
-        ppf
-        "Consensus operation for old level (expected: %a, provided: %a)."
-        Raw_level.pp
-        expected
-        Raw_level.pp
-        provided)
-    Data_encoding.(
-      obj2
-        (req "expected" Raw_level.encoding)
-        (req "provided" Raw_level.encoding))
-    (function
-      | Consensus_operation_for_old_level {expected; provided} ->
-          Some (expected, provided)
-      | _ -> None)
-    (fun (expected, provided) ->
-      Consensus_operation_for_old_level {expected; provided}) ;
-  register_error_kind
-    `Branch
-    ~id:"consensus_operation_for_old_round"
-    ~title:"Consensus operation for old round"
-    ~description:"Consensus operation for old round."
-    ~pp:(fun ppf (expected, provided) ->
-      Format.fprintf
-        ppf
-        "Consensus operation for old round (expected_min: %a, provided: %a)."
-        Round.pp
-        expected
-        Round.pp
-        provided)
-    Data_encoding.(
-      obj2 (req "expected_min" Round.encoding) (req "provided" Round.encoding))
-    (function
-      | Consensus_operation_for_old_round {expected; provided} ->
-          Some (expected, provided)
-      | _ -> None)
-    (fun (expected, provided) ->
-      Consensus_operation_for_old_round {expected; provided}) ;
-  register_error_kind
-    `Branch
-    ~id:"consensus_operation_on_competing_proposal"
-    ~title:"Consensus operation on competing proposal"
-    ~description:"Consensus operation on competing proposal."
-    ~pp:(fun ppf (expected, provided) ->
-      Format.fprintf
-        ppf
-        "Consensus operation on competing proposal (expected: %a, provided: \
-         %a)."
-        Block_payload_hash.pp_short
-        expected
-        Block_payload_hash.pp_short
-        provided)
-    Data_encoding.(
-      obj2
-        (req "expected" Block_payload_hash.encoding)
-        (req "provided" Block_payload_hash.encoding))
-    (function
-      | Consensus_operation_on_competing_proposal {expected; provided} ->
-          Some (expected, provided)
-      | _ -> None)
-    (fun (expected, provided) ->
-      Consensus_operation_on_competing_proposal {expected; provided}) ;
   register_error_kind
     `Temporary
     ~id:"operation.set_deposits_limit_on_unregistered_delegate"
@@ -2318,91 +2086,6 @@ let compute_expected_consensus_content (type consensus_op_kind)
           return (ctxt', {payload_hash; branch; level = current_level; round})
       | Mempool_no_consensus_op -> fail Mode_forbids_consensus_operations)
 
-let check_level (apply_mode : apply_mode) ~expected ~provided =
-  match apply_mode with
-  | Application _ | Full_construction _ ->
-      error_unless
-        (Raw_level.equal expected provided)
-        (Wrong_level_for_consensus_operation {expected; provided})
-  | Partial_construction _ ->
-      (* Valid grand parent's endorsements were treated by
-         [validate_grand_parent_endorsement]. *)
-      error_when
-        Raw_level.(expected > provided)
-        (Consensus_operation_for_old_level {expected; provided})
-      >>? fun () ->
-      error_when
-        Raw_level.(expected < provided)
-        (Consensus_operation_for_future_level {expected; provided})
-  | Mempool_no_consensus_op -> error Mode_forbids_consensus_operations
-
-let check_payload_hash (apply_mode : apply_mode) ~expected ~provided =
-  match apply_mode with
-  | Application _ | Full_construction _ ->
-      error_unless
-        (Block_payload_hash.equal expected provided)
-        (Wrong_payload_hash_for_consensus_operation {expected; provided})
-  | Partial_construction _ ->
-      error_unless
-        (Block_payload_hash.equal expected provided)
-        (Consensus_operation_on_competing_proposal {expected; provided})
-  | Mempool_no_consensus_op -> error Mode_forbids_consensus_operations
-
-let check_operation_branch ~expected ~provided =
-  error_unless
-    (Block_hash.equal expected provided)
-    (Wrong_consensus_operation_branch (expected, provided))
-
-let check_round (type kind) (operation_kind : kind consensus_operation_type)
-    (apply_mode : apply_mode) ~(expected : Round.t) ~(provided : Round.t) :
-    unit tzresult =
-  match apply_mode with
-  | Partial_construction _ ->
-      error_when
-        Round.(expected > provided)
-        (Consensus_operation_for_old_round {expected; provided})
-      >>? fun () ->
-      error_when
-        Round.(expected < provided)
-        (Consensus_operation_for_future_round {expected; provided})
-  | Full_construction {round; _} | Application {round; _} ->
-      (match operation_kind with
-      | Preendorsement ->
-          error_when
-            Round.(round <= provided)
-            (Preendorsement_round_too_high {block_round = round; provided})
-      | Endorsement -> Result.return_unit)
-      >>? fun () ->
-      error_unless
-        (Round.equal expected provided)
-        (Wrong_round_for_consensus_operation {expected; provided})
-  | Mempool_no_consensus_op -> error Mode_forbids_consensus_operations
-
-let check_consensus_content (type kind) (apply_mode : apply_mode)
-    (content : consensus_content) (operation_branch : Block_hash.t)
-    (operation_kind : kind consensus_operation_type)
-    (expected_content : kind expected_consensus_content) : unit tzresult =
-  let expected_level = expected_content.level.level in
-  let provided_level = content.level in
-  let expected_round = expected_content.round in
-  let provided_round = content.round in
-  check_level apply_mode ~expected:expected_level ~provided:provided_level
-  >>? fun () ->
-  check_round
-    operation_kind
-    apply_mode
-    ~expected:expected_round
-    ~provided:provided_round
-  >>? fun () ->
-  check_operation_branch
-    ~expected:expected_content.branch
-    ~provided:operation_branch
-  >>? fun () ->
-  check_payload_hash
-    apply_mode
-    ~expected:expected_content.payload_hash
-    ~provided:content.block_payload_hash
-
 (* Validate the 'operation.shell.branch' field of the operation. It MUST point
    to the grandfather: the block hash used in the payload_hash. Otherwise we could produce
    a preendorsement pointing to the direct proposal. This preendorsement wouldn't be able to
@@ -2427,14 +2110,7 @@ let validate_consensus_contents (type kind) ctxt chain_id
     operation_kind
     content.round
     content.level
-  >>=? fun (ctxt, expected_content) ->
-  check_consensus_content
-    apply_mode
-    content
-    operation.shell.branch
-    operation_kind
-    expected_content
-  >>?= fun () ->
+  >>=? fun (ctxt, _expected_content) ->
   match Slot.Map.find content.slot slot_map with
   | None -> fail Wrong_slot_used_for_consensus_operation
   | Some (delegate_pk, delegate_pkh, voting_power) ->
