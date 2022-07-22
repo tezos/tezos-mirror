@@ -174,11 +174,11 @@ let register_test chain_id period =
         "Checking that %s migration occurred..."
         (if chain_id = Chain_id_mainnet then "no" else "a forced") ;
       let expected_protocol =
-        if chain_id = Chain_id_mainnet then Protocol.hash Alpha
+        if chain_id = Chain_id_mainnet then Protocol.hash protocol
         else Protocol.demo_counter_hash
       in
       let* () =
-        Voting.check_protocols client (Protocol.hash Alpha, expected_protocol)
+        Voting.check_protocols client (Protocol.hash protocol, expected_protocol)
       in
       return ())
   in
@@ -188,8 +188,8 @@ let register_test chain_id period =
     Log.info "- submitting proposals %s for %s" proto_hash key.Account.alias ;
     Client.submit_proposals ~key:key.alias ~proto_hash client
   in
-  let* () = submit_proposal ~key:Constant.bootstrap2 (Protocol.hash Alpha) in
-  let* () = submit_proposal ~key:Constant.bootstrap3 (Protocol.hash Alpha) in
+  let* () = submit_proposal ~key:Constant.bootstrap2 (Protocol.hash protocol) in
+  let* () = submit_proposal ~key:Constant.bootstrap3 (Protocol.hash protocol) in
   let* () = bake_until_next_period node client in
   let* () =
     Voting.check_current_period
@@ -208,7 +208,7 @@ let register_test chain_id period =
     Log.info "- submitting ballot for %s" key.Account.alias ;
     Client.submit_ballot
       ~key:key.alias
-      ~proto_hash:(Protocol.hash Alpha)
+      ~proto_hash:(Protocol.hash protocol)
       ballot
       client
   in

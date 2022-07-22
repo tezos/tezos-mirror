@@ -25,16 +25,99 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type dal = {
+  feature_enable : bool;
+  number_of_slots : int;
+  number_of_shards : int;
+  endorsement_lag : int;
+  availability_threshold : int;
+}
+
+let dal_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           feature_enable;
+           number_of_slots;
+           number_of_shards;
+           endorsement_lag;
+           availability_threshold;
+         } ->
+      ( feature_enable,
+        number_of_slots,
+        number_of_shards,
+        endorsement_lag,
+        availability_threshold ))
+    (fun ( feature_enable,
+           number_of_slots,
+           number_of_shards,
+           endorsement_lag,
+           availability_threshold ) ->
+      {
+        feature_enable;
+        number_of_slots;
+        number_of_shards;
+        endorsement_lag;
+        availability_threshold;
+      })
+    (obj5
+       (req "feature_enable" Data_encoding.bool)
+       (req "number_of_slots" Data_encoding.int16)
+       (req "number_of_shards" Data_encoding.int16)
+       (req "endorsement_lag" Data_encoding.int16)
+       (req "availability_threshold" Data_encoding.int16))
+
+(* The encoded representation of this type is stored in the context as
+   bytes. Changing the encoding, or the value of these constants from
+   the previous protocol may break the context migration, or (even
+   worse) yield an incorrect context after migration.
+
+   If you change this encoding compared to `Constants_parametric_previous_repr.t`,
+   you should ensure that there is a proper migration of the constants
+   during context migration. See: `Raw_context.prepare_first_block` *)
+
+type tx_rollup = {
+  enable : bool;
+  origination_size : int;
+  hard_size_limit_per_inbox : int;
+  hard_size_limit_per_message : int;
+  commitment_bond : Tez_repr.t;
+  finality_period : int;
+  withdraw_period : int;
+  max_inboxes_count : int;
+  max_messages_per_inbox : int;
+  max_commitments_count : int;
+  cost_per_byte_ema_factor : int;
+  max_ticket_payload_size : int;
+  max_withdrawals_per_batch : int;
+  rejection_max_proof_size : int;
+  sunset_level : int32;
+}
+
+type sc_rollup = {
+  enable : bool;
+  origination_size : int;
+  challenge_window_in_blocks : int;
+  max_available_messages : int;
+  stake_amount : Tez_repr.t;
+  commitment_period_in_blocks : int;
+  max_lookahead_in_blocks : int32;
+  max_active_outbox_levels : int32;
+  max_outbox_messages_per_level : int;
+}
+
 type t = {
   preserved_cycles : int;
   blocks_per_cycle : int32;
   blocks_per_commitment : int32;
+  nonce_revelation_threshold : int32;
   blocks_per_stake_snapshot : int32;
   cycles_per_voting_period : int32;
   hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
   proof_of_work_threshold : int64;
   tokens_per_roll : Tez_repr.t;
+  vdf_difficulty : int64;
   seed_nonce_revelation_tip : Tez_repr.t;
   origination_size : int;
   baking_reward_fixed_portion : Tez_repr.t;
@@ -58,30 +141,131 @@ type t = {
   frozen_deposits_percentage : int;
   double_baking_punishment : Tez_repr.t;
   ratio_of_frozen_deposits_slashed_per_double_endorsement : Ratio_repr.t;
+  testnet_dictator : Signature.Public_key_hash.t option;
   initial_seed : State_hash.t option;
+  (* If a new cache is added, please also modify the
+     [cache_layout_size] value. *)
   cache_script_size : int;
   cache_stake_distribution_cycles : int;
   cache_sampler_state_cycles : int;
-  tx_rollup_enable : bool;
-  tx_rollup_origination_size : int;
-  tx_rollup_hard_size_limit_per_inbox : int;
-  tx_rollup_hard_size_limit_per_message : int;
-  tx_rollup_commitment_bond : Tez_repr.t;
-  tx_rollup_finality_period : int;
-  tx_rollup_withdraw_period : int;
-  tx_rollup_max_inboxes_count : int;
-  tx_rollup_max_messages_per_inbox : int;
-  tx_rollup_max_commitments_count : int;
-  tx_rollup_cost_per_byte_ema_factor : int;
-  tx_rollup_max_ticket_payload_size : int;
-  tx_rollup_max_withdrawals_per_batch : int;
-  tx_rollup_rejection_max_proof_size : int;
-  tx_rollup_sunset_level : int32;
-  sc_rollup_enable : bool;
-  sc_rollup_origination_size : int;
-  sc_rollup_challenge_window_in_blocks : int;
-  sc_rollup_max_available_messages : int;
+  tx_rollup : tx_rollup;
+  dal : dal;
+  sc_rollup : sc_rollup;
 }
+
+let tx_rollup_encoding =
+  let open Data_encoding in
+  conv
+    (fun (c : tx_rollup) ->
+      ( ( c.enable,
+          c.origination_size,
+          c.hard_size_limit_per_inbox,
+          c.hard_size_limit_per_message,
+          c.max_withdrawals_per_batch,
+          c.commitment_bond,
+          c.finality_period,
+          c.withdraw_period,
+          c.max_inboxes_count,
+          c.max_messages_per_inbox ),
+        ( c.max_commitments_count,
+          c.cost_per_byte_ema_factor,
+          c.max_ticket_payload_size,
+          c.rejection_max_proof_size,
+          c.sunset_level ) ))
+    (fun ( ( tx_rollup_enable,
+             tx_rollup_origination_size,
+             tx_rollup_hard_size_limit_per_inbox,
+             tx_rollup_hard_size_limit_per_message,
+             tx_rollup_max_withdrawals_per_batch,
+             tx_rollup_commitment_bond,
+             tx_rollup_finality_period,
+             tx_rollup_withdraw_period,
+             tx_rollup_max_inboxes_count,
+             tx_rollup_max_messages_per_inbox ),
+           ( tx_rollup_max_commitments_count,
+             tx_rollup_cost_per_byte_ema_factor,
+             tx_rollup_max_ticket_payload_size,
+             tx_rollup_rejection_max_proof_size,
+             tx_rollup_sunset_level ) ) ->
+      {
+        enable = tx_rollup_enable;
+        origination_size = tx_rollup_origination_size;
+        hard_size_limit_per_inbox = tx_rollup_hard_size_limit_per_inbox;
+        hard_size_limit_per_message = tx_rollup_hard_size_limit_per_message;
+        max_withdrawals_per_batch = tx_rollup_max_withdrawals_per_batch;
+        commitment_bond = tx_rollup_commitment_bond;
+        finality_period = tx_rollup_finality_period;
+        withdraw_period = tx_rollup_withdraw_period;
+        max_inboxes_count = tx_rollup_max_inboxes_count;
+        max_messages_per_inbox = tx_rollup_max_messages_per_inbox;
+        max_commitments_count = tx_rollup_max_commitments_count;
+        cost_per_byte_ema_factor = tx_rollup_cost_per_byte_ema_factor;
+        max_ticket_payload_size = tx_rollup_max_ticket_payload_size;
+        rejection_max_proof_size = tx_rollup_rejection_max_proof_size;
+        sunset_level = tx_rollup_sunset_level;
+      })
+    (merge_objs
+       (obj10
+          (req "tx_rollup_enable" bool)
+          (req "tx_rollup_origination_size" int31)
+          (req "tx_rollup_hard_size_limit_per_inbox" int31)
+          (req "tx_rollup_hard_size_limit_per_message" int31)
+          (req "tx_rollup_max_withdrawals_per_batch" int31)
+          (req "tx_rollup_commitment_bond" Tez_repr.encoding)
+          (req "tx_rollup_finality_period" int31)
+          (req "tx_rollup_withdraw_period" int31)
+          (req "tx_rollup_max_inboxes_count" int31)
+          (req "tx_rollup_max_messages_per_inbox" int31))
+       (obj5
+          (req "tx_rollup_max_commitments_count" int31)
+          (req "tx_rollup_cost_per_byte_ema_factor" int31)
+          (req "tx_rollup_max_ticket_payload_size" int31)
+          (req "tx_rollup_rejection_max_proof_size" int31)
+          (req "tx_rollup_sunset_level" int32)))
+
+let sc_rollup_encoding =
+  let open Data_encoding in
+  conv
+    (fun (c : sc_rollup) ->
+      ( c.enable,
+        c.origination_size,
+        c.challenge_window_in_blocks,
+        c.max_available_messages,
+        c.stake_amount,
+        c.commitment_period_in_blocks,
+        c.max_lookahead_in_blocks,
+        c.max_active_outbox_levels,
+        c.max_outbox_messages_per_level ))
+    (fun ( sc_rollup_enable,
+           sc_rollup_origination_size,
+           sc_rollup_challenge_window_in_blocks,
+           sc_rollup_max_available_messages,
+           sc_rollup_stake_amount,
+           sc_rollup_commitment_period_in_blocks,
+           sc_rollup_max_lookahead_in_blocks,
+           sc_rollup_max_active_outbox_levels,
+           sc_rollup_max_outbox_messages_per_level ) ->
+      {
+        enable = sc_rollup_enable;
+        origination_size = sc_rollup_origination_size;
+        challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
+        max_available_messages = sc_rollup_max_available_messages;
+        stake_amount = sc_rollup_stake_amount;
+        commitment_period_in_blocks = sc_rollup_commitment_period_in_blocks;
+        max_lookahead_in_blocks = sc_rollup_max_lookahead_in_blocks;
+        max_active_outbox_levels = sc_rollup_max_active_outbox_levels;
+        max_outbox_messages_per_level = sc_rollup_max_outbox_messages_per_level;
+      })
+    (obj9
+       (req "sc_rollup_enable" bool)
+       (req "sc_rollup_origination_size" int31)
+       (req "sc_rollup_challenge_window_in_blocks" int31)
+       (req "sc_rollup_max_available_messages" int31)
+       (req "sc_rollup_stake_amount" Tez_repr.encoding)
+       (req "sc_rollup_commitment_period_in_blocks" int31)
+       (req "sc_rollup_max_lookahead_in_blocks" int32)
+       (req "sc_rollup_max_active_outbox_levels" int32)
+       (req "sc_rollup_max_outbox_messages_per_level" int31))
 
 let encoding =
   let open Data_encoding in
@@ -90,13 +274,15 @@ let encoding =
       ( ( c.preserved_cycles,
           c.blocks_per_cycle,
           c.blocks_per_commitment,
+          c.nonce_revelation_threshold,
           c.blocks_per_stake_snapshot,
           c.cycles_per_voting_period,
           c.hard_gas_limit_per_operation,
           c.hard_gas_limit_per_block,
           c.proof_of_work_threshold,
           c.tokens_per_roll ),
-        ( ( c.seed_nonce_revelation_tip,
+        ( ( c.vdf_difficulty,
+            c.seed_nonce_revelation_tip,
             c.origination_size,
             c.baking_reward_fixed_portion,
             c.baking_reward_bonus_per_slot,
@@ -119,39 +305,24 @@ let encoding =
                 c.frozen_deposits_percentage,
                 c.double_baking_punishment,
                 c.ratio_of_frozen_deposits_slashed_per_double_endorsement,
+                c.testnet_dictator,
                 c.initial_seed ),
               ( ( c.cache_script_size,
                   c.cache_stake_distribution_cycles,
                   c.cache_sampler_state_cycles ),
-                ( ( ( c.tx_rollup_enable,
-                      c.tx_rollup_origination_size,
-                      c.tx_rollup_hard_size_limit_per_inbox,
-                      c.tx_rollup_hard_size_limit_per_message,
-                      c.tx_rollup_max_withdrawals_per_batch,
-                      c.tx_rollup_commitment_bond,
-                      c.tx_rollup_finality_period,
-                      c.tx_rollup_withdraw_period,
-                      c.tx_rollup_max_inboxes_count,
-                      c.tx_rollup_max_messages_per_inbox ),
-                    ( c.tx_rollup_max_commitments_count,
-                      c.tx_rollup_cost_per_byte_ema_factor,
-                      c.tx_rollup_max_ticket_payload_size,
-                      c.tx_rollup_rejection_max_proof_size,
-                      c.tx_rollup_sunset_level ) ),
-                  ( c.sc_rollup_enable,
-                    c.sc_rollup_origination_size,
-                    c.sc_rollup_challenge_window_in_blocks,
-                    c.sc_rollup_max_available_messages ) ) ) ) ) ) ))
+                (c.tx_rollup, (c.dal, c.sc_rollup)) ) ) ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
+             nonce_revelation_threshold,
              blocks_per_stake_snapshot,
              cycles_per_voting_period,
              hard_gas_limit_per_operation,
              hard_gas_limit_per_block,
              proof_of_work_threshold,
              tokens_per_roll ),
-           ( ( seed_nonce_revelation_tip,
+           ( ( vdf_difficulty,
+               seed_nonce_revelation_tip,
                origination_size,
                baking_reward_fixed_portion,
                baking_reward_bonus_per_slot,
@@ -174,39 +345,24 @@ let encoding =
                    frozen_deposits_percentage,
                    double_baking_punishment,
                    ratio_of_frozen_deposits_slashed_per_double_endorsement,
+                   testnet_dictator,
                    initial_seed ),
                  ( ( cache_script_size,
                      cache_stake_distribution_cycles,
                      cache_sampler_state_cycles ),
-                   ( ( ( tx_rollup_enable,
-                         tx_rollup_origination_size,
-                         tx_rollup_hard_size_limit_per_inbox,
-                         tx_rollup_hard_size_limit_per_message,
-                         tx_rollup_max_withdrawals_per_batch,
-                         tx_rollup_commitment_bond,
-                         tx_rollup_finality_period,
-                         tx_rollup_withdraw_period,
-                         tx_rollup_max_inboxes_count,
-                         tx_rollup_max_messages_per_inbox ),
-                       ( tx_rollup_max_commitments_count,
-                         tx_rollup_cost_per_byte_ema_factor,
-                         tx_rollup_max_ticket_payload_size,
-                         tx_rollup_rejection_max_proof_size,
-                         tx_rollup_sunset_level ) ),
-                     ( sc_rollup_enable,
-                       sc_rollup_origination_size,
-                       sc_rollup_challenge_window_in_blocks,
-                       sc_rollup_max_available_messages ) ) ) ) ) ) ) ->
+                   (tx_rollup, (dal, sc_rollup)) ) ) ) ) ) ->
       {
         preserved_cycles;
         blocks_per_cycle;
         blocks_per_commitment;
+        nonce_revelation_threshold;
         blocks_per_stake_snapshot;
         cycles_per_voting_period;
         hard_gas_limit_per_operation;
         hard_gas_limit_per_block;
         proof_of_work_threshold;
         tokens_per_roll;
+        vdf_difficulty;
         seed_nonce_revelation_tip;
         origination_size;
         baking_reward_fixed_portion;
@@ -230,35 +386,21 @@ let encoding =
         frozen_deposits_percentage;
         double_baking_punishment;
         ratio_of_frozen_deposits_slashed_per_double_endorsement;
+        testnet_dictator;
         initial_seed;
         cache_script_size;
         cache_stake_distribution_cycles;
         cache_sampler_state_cycles;
-        tx_rollup_enable;
-        tx_rollup_origination_size;
-        tx_rollup_hard_size_limit_per_inbox;
-        tx_rollup_hard_size_limit_per_message;
-        tx_rollup_max_withdrawals_per_batch;
-        tx_rollup_commitment_bond;
-        tx_rollup_finality_period;
-        tx_rollup_withdraw_period;
-        tx_rollup_max_inboxes_count;
-        tx_rollup_max_messages_per_inbox;
-        tx_rollup_max_commitments_count;
-        tx_rollup_cost_per_byte_ema_factor;
-        tx_rollup_max_ticket_payload_size;
-        tx_rollup_rejection_max_proof_size;
-        tx_rollup_sunset_level;
-        sc_rollup_enable;
-        sc_rollup_origination_size;
-        sc_rollup_challenge_window_in_blocks;
-        sc_rollup_max_available_messages;
+        tx_rollup;
+        dal;
+        sc_rollup;
       })
     (merge_objs
-       (obj9
+       (obj10
           (req "preserved_cycles" uint8)
           (req "blocks_per_cycle" int32)
           (req "blocks_per_commitment" int32)
+          (req "nonce_revelation_threshold" int32)
           (req "blocks_per_stake_snapshot" int32)
           (req "cycles_per_voting_period" int32)
           (req
@@ -270,7 +412,8 @@ let encoding =
           (req "proof_of_work_threshold" int64)
           (req "tokens_per_roll" Tez_repr.encoding))
        (merge_objs
-          (obj8
+          (obj9
+             (req "vdf_difficulty" int64)
              (req "seed_nonce_revelation_tip" Tez_repr.encoding)
              (req "origination_size" int31)
              (req "baking_reward_fixed_portion" Tez_repr.encoding)
@@ -292,7 +435,7 @@ let encoding =
                 (req "consensus_committee_size" int31)
                 (req "consensus_threshold" int31))
              (merge_objs
-                (obj6
+                (obj7
                    (req "minimal_participation_ratio" Ratio_repr.encoding)
                    (req "max_slashing_period" int31)
                    (req "frozen_deposits_percentage" int31)
@@ -300,6 +443,7 @@ let encoding =
                    (req
                       "ratio_of_frozen_deposits_slashed_per_double_endorsement"
                       Ratio_repr.encoding)
+                   (opt "testnet_dictator" Signature.Public_key_hash.encoding)
                    (opt "initial_seed" State_hash.encoding))
                 (merge_objs
                    (obj3
@@ -307,26 +451,7 @@ let encoding =
                       (req "cache_stake_distribution_cycles" int8)
                       (req "cache_sampler_state_cycles" int8))
                    (merge_objs
+                      tx_rollup_encoding
                       (merge_objs
-                         (obj10
-                            (req "tx_rollup_enable" bool)
-                            (req "tx_rollup_origination_size" int31)
-                            (req "tx_rollup_hard_size_limit_per_inbox" int31)
-                            (req "tx_rollup_hard_size_limit_per_message" int31)
-                            (req "tx_rollup_max_withdrawals_per_batch" int31)
-                            (req "tx_rollup_commitment_bond" Tez_repr.encoding)
-                            (req "tx_rollup_finality_period" int31)
-                            (req "tx_rollup_withdraw_period" int31)
-                            (req "tx_rollup_max_inboxes_count" int31)
-                            (req "tx_rollup_max_messages_per_inbox" int31))
-                         (obj5
-                            (req "tx_rollup_max_commitments_count" int31)
-                            (req "tx_rollup_cost_per_byte_ema_factor" int31)
-                            (req "tx_rollup_max_ticket_payload_size" int31)
-                            (req "tx_rollup_rejection_max_proof_size" int31)
-                            (req "tx_rollup_sunset_level" int32)))
-                      (obj4
-                         (req "sc_rollup_enable" bool)
-                         (req "sc_rollup_origination_size" int31)
-                         (req "sc_rollup_challenge_window_in_blocks" int31)
-                         (req "sc_rollup_max_available_messages" int31))))))))
+                         (obj1 (req "dal_parametric" dal_encoding))
+                         sc_rollup_encoding)))))))
