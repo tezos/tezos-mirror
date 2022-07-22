@@ -860,19 +860,10 @@ module Scripts = struct
       oph
       operation
     >>=? fun (_validate_operation_state, op_validated_stamp) ->
-    let apply_mode =
-      (* To simulate the injection of an operation in the mempool,
-         we want a mode that behaves similarly to
-         {!Apply.Partial_construction}. However, we don't have
-         access to information such as the [predecessor_round]. So
-         we use a mode that doesn't need this information, and
-         consequently doesn't support consensus operations. *)
-      Apply.Mempool_no_consensus_op
-    in
     Apply.apply_operation
       ctxt
       chain_id
-      apply_mode
+      (Apply.Partial_construction {predecessor_level = None})
       ~payload_producer:Signature.Public_key_hash.zero
       op_validated_stamp
       oph

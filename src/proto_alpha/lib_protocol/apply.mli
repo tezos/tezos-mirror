@@ -91,36 +91,12 @@ val begin_application :
   Lwt.t
 
 type apply_mode =
-  | Application of {
-      predecessor_block : Block_hash.t;
-      payload_hash : Block_payload_hash.t;
-      locked_round : Round.t option;
-      predecessor_level : Level.t;
-      predecessor_round : Round.t;
-      round : Round.t;
-    }
-    (* Both partial and normal *)
-  | Full_construction of {
-      predecessor_block : Block_hash.t;
-      payload_hash : Block_payload_hash.t;
-      predecessor_level : Level.t;
-      predecessor_round : Round.t;
-      round : Round.t;
-    }
-  | Partial_construction of {
-      predecessor_level : Level.t;
-      predecessor_round : Round.t;
-      grand_parent_round : Round.t;
-    }
-  | Mempool_no_consensus_op
-      (** Similar to [Partial_construction], but does not have access to
-          information such as the [predecessor_level]. Makes the operations
-          which need this information (preendorsements and endorsements as
-          of July 2022) return the [Mode_forbids_consensus_operations]
-          error.
-
-          This mode is used by the [run_operation] RPC in
-          [lib_plugin/RPC.ml]. *)
+  | Application  (** Both partial and normal *)
+  | Full_construction  (** For a baker *)
+  | Partial_construction of {predecessor_level : Level.t option}
+      (** This mode is mainly intended to be used by a mempool, in which
+          case the [predecessor_level] should be provided. However, an RPC
+          might use it with [None]. *)
 
 (** Apply an operation, i.e. update the given context in accordance
     with the operation's semantic (or return an error if the operation
@@ -130,10 +106,13 @@ type apply_mode =
     operation needs to be validated by {!Validate_operation} before it
     can be applied.
 
+    For non-manager operations, the application of a validated
+    operation should always fully succeed.
+
     TODO: https://gitlab.com/tezos/tezos/-/issues/2603
 
     Currently, {!Validate_operation.validate_operation} does nothing
-    on non-manager operations. The "validation" of these operations is
+    on voting operations. The "validation" of these operations is
     instead handled by [apply_operation], which may thus return an
     error if the operation is ill-formed. Once [validate_operation] has
     been extended to every kind of operation, [apply_operation] should
