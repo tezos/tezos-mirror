@@ -10,6 +10,7 @@
   ezjsonm
   js_of_ocaml
   tezt.core)
+ (js_of_ocaml)
  (flags
   (:standard)
   -open Tezt_core))

@@ -8,4 +8,5 @@
   re
   lwt
   unix
-  ezjsonm))
+  ezjsonm)
+ (js_of_ocaml))

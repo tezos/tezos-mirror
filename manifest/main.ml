@@ -326,6 +326,9 @@ let tls = external_lib "tls" V.(at_least "0.10")
 
 let unix = external_lib ~opam:"base-unix" "unix" V.True
 
+(* Declare that we depend on the JS-compatible part of unix. *)
+let unix_js = external_lib ~opam:"base-unix" "unix" ~js_compatible:true V.True
+
 let uri = external_lib ~js_compatible:true "uri" V.(at_least "2.2.0")
 
 let utop = external_lib "utop" V.(at_least "2.8")
@@ -2942,7 +2945,8 @@ let tezt_core_lib =
     ~path:"tezt/lib_core"
     ~ocaml:V.(at_least "4.12")
     ~bisect_ppx:false
-    ~deps:[re; lwt; unix; ezjsonm]
+    ~js_compatible:true
+    ~deps:[re; lwt; unix_js; ezjsonm]
 
 let tezt_lib =
   public_lib
@@ -2956,20 +2960,26 @@ let tezt_lib =
     ~bisect_ppx:false
     ~deps:[re; lwt_unix; ezjsonm; tezt_core_lib |> open_]
 
-let _tezt_js =
+let tezt_js_lib =
   public_lib
     "tezt.js"
     ~path:"tezt/lib_js"
     ~ocaml:V.(at_least "4.12")
+    ~js_compatible:true
     ~bisect_ppx:false
     ~optional:true
     ~deps:[re; ezjsonm; js_of_ocaml; tezt_core_lib |> open_]
 
-let tezt ~opam ~path ?(deps = []) ?dep_globs l =
+let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs ?synopsis l =
   tezt_without_tezt_lib_dependency
     ~opam
     ~path
-    ~deps:((tezt_lib |> open_ |> open_ ~m:"Base") :: deps)
+    ?synopsis
+    ?js_compatible
+    ?modes
+    ~lib_deps:((tezt_core_lib |> open_ |> open_ ~m:"Base") :: deps)
+    ~exe_deps:[tezt_lib]
+    ~js_deps:[tezt_js_lib]
     ?dep_globs
     l
 

@@ -830,8 +830,13 @@ val tests :
 val tezt :
   opam:string ->
   path:string ->
-  ?deps:target list ->
+  ?js_compatible:bool ->
+  ?modes:Dune.mode list ->
+  ?lib_deps:target list ->
+  ?exe_deps:target list ->
+  ?js_deps:target list ->
   ?dep_globs:string list ->
+  ?synopsis:string ->
   string list ->
   unit
 
