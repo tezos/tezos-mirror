@@ -124,6 +124,19 @@ type t
     Return [None] if no test was [register]ed with this title. *)
 val get_test_by_title : string -> t option
 
+(** Run one test.
+
+    [sleep] is a function such as [Lwt_unix.sleep] or [Lwt_js.sleep].
+    It is used to implement timeouts.
+
+    [clean_up] is a function such as [Process.clean_up] (plus a wrapper
+    to handle exceptions). It is ran at the end of the test. *)
+val run_one :
+  sleep:(float -> unit Lwt.t) ->
+  clean_up:(unit -> unit Lwt.t) ->
+  t ->
+  Log.test_result Lwt.t
+
 (** Run registered tests that should be run. *)
 val run : unit -> unit
 

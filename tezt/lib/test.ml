@@ -287,6 +287,9 @@ let rec really_run_with_retry ~sleep ~clean_up remaining_retry_count test =
       really_run_with_retry ~sleep ~clean_up (remaining_retry_count - 1) test
   | x -> return x
 
+let run_one ~sleep ~clean_up test =
+  really_run_with_retry ~sleep ~clean_up Cli.options.retry test
+
 let test_should_be_run ~file ~title ~tags =
   List.for_all (fun tag -> List.mem tag tags) Cli.options.tags_to_run
   && (not
@@ -867,12 +870,7 @@ module Scheduler : SCHEDULER = struct
           unit
         in
         let test_result =
-          Lwt_main.run
-          @@ really_run_with_retry
-               ~sleep:Lwt_unix.sleep
-               ~clean_up
-               Cli.options.retry
-               test
+          Lwt_main.run @@ run_one ~sleep:Lwt_unix.sleep ~clean_up test
         in
         Test_result test_result
 
