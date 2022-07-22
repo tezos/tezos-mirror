@@ -25,9 +25,9 @@
 
 open Protocol
 open Alpha_context
+open Client_baking_blocks
 module Events = Baking_events.VDF
 module D_Events = Delegate_events.Denunciator
-open Client_baking_blocks
 
 type vdf_solution = Environment.Vdf.result * Environment.Vdf.proof
 
@@ -70,8 +70,10 @@ let restart_block_stream cctxt chain state =
   return_unit
 
 let log_errors_and_continue ~name p =
-  p >>= function
-  | Ok () -> Lwt.return_unit
+  let open Lwt_syntax in
+  let* p = p in
+  match p with
+  | Ok () -> return_unit
   | Error errs -> Events.(emit vdf_daemon_error) (name, errs)
 
 let cycle_of_level state level =
@@ -123,27 +125,36 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
   let level_str = Int32.to_string (Raw_level.to_int32 level) in
   check_new_cycle state level ;
   if Protocol_hash.(protocol <> next_protocol) then
-    D_Events.(emit protocol_change_detected) () >>= fun () -> return_unit
+    let*! () = D_Events.(emit protocol_change_detected) () in
+    return_unit
   else if is_in_nonce_revelation_period state level then
-    Events.(emit vdf_info)
-      ("Skipping, still in nonce revelation period (level " ^ level_str ^ ")")
-    >>= fun _ -> return_unit
+    let*! () =
+      Events.(emit vdf_info)
+        ("Skipping, still in nonce revelation period (level " ^ level_str ^ ")")
+    in
+    return_unit
     (* enter main loop if we are not in the nonce revelation period and
        the expected protocol has been activated *)
   else
     match state.computation_status with
     | Started ->
-        Events.(emit vdf_info) ("Already started VDF (level " ^ level_str ^ ")")
-        >>= fun () -> return_unit
+        let*! () =
+          Events.(emit vdf_info)
+            ("Already started VDF (level " ^ level_str ^ ")")
+        in
+        return_unit
     | Not_started -> (
         let chain = `Hash chain_id in
         let block = `Hash (hash, 0) in
-        Alpha_services.Seed_computation.get cctxt (chain, block) >>=? fun x ->
-        match x with
+        let* seed_computation =
+          Alpha_services.Seed_computation.get cctxt (chain, block)
+        in
+        match seed_computation with
         | Vdf_revelation_stage {seed_discriminant; seed_challenge} ->
-            Events.(emit vdf_info)
-              ("Started to compute VDF (level " ^ level_str ^ ")")
-            >>= fun () ->
+            let*! () =
+              Events.(emit vdf_info)
+                ("Started to compute VDF (level " ^ level_str ^ ")")
+            in
             state.computation_status <- Started ;
             let discriminant, challenge =
               Seed.generate_vdf_setup ~seed_discriminant ~seed_challenge
@@ -165,18 +176,23 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
                has not been started *)
             assert false)
     | Finished solution ->
-        Events.(emit vdf_info) ("Finished VDF (level " ^ level_str ^ ")")
-        >>= fun () ->
+        let*! () =
+          Events.(emit vdf_info) ("Finished VDF (level " ^ level_str ^ ")")
+        in
         let chain = `Hash chain_id in
         let* op_hash = inject_vdf_revelation cctxt hash chain_id solution in
         state.computation_status <- Injected ;
-        Events.(emit vdf_revelation_injected)
-          (cycle_of_level state level, Chain_services.to_string chain, op_hash)
-        >>= fun _ -> return_unit
+        let*! () =
+          Events.(emit vdf_revelation_injected)
+            (cycle_of_level state level, Chain_services.to_string chain, op_hash)
+        in
+        return_unit
     | Injected ->
-        Events.(emit vdf_info)
-          ("Skipping, already injected VDF (level " ^ level_str ^ ")")
-        >>= fun () -> return_unit
+        let*! () =
+          Events.(emit vdf_info)
+            ("Skipping, already injected VDF (level " ^ level_str ^ ")")
+        in
+        return_unit
 
 let start_vdf_worker (cctxt : Protocol_client_context.full) ~canceler constants
     chain =
@@ -198,20 +214,25 @@ let start_vdf_worker (cctxt : Protocol_client_context.full) ~canceler constants
       state.stream_stopper () ;
       Lwt.return_unit) ;
   let rec worker_loop () =
-    Lwt.choose
-      [
-        (Lwt_exit.clean_up_starts >|= fun _ -> `Termination);
-        (Lwt_stream.get state.block_stream >|= fun e -> `Block e);
-      ]
-    >>= function
+    let*! b =
+      Lwt.choose
+        [
+          (Lwt_exit.clean_up_starts >|= fun _ -> `Termination);
+          (Lwt_stream.get state.block_stream >|= fun e -> `Block e);
+        ]
+    in
+    match b with
     | `Termination -> return_unit
     | `Block (None | Some (Error _)) ->
         (* exit when the node is unavailable *)
         state.stream_stopper () ;
-        Events.(emit vdf_daemon_connection_lost) name >>= fun () ->
+        let*! () = Events.(emit vdf_daemon_connection_lost) name in
         tzfail Baking_errors.Node_connection_lost
     | `Block (Some (Ok bi)) ->
-        log_errors_and_continue ~name @@ process_new_block cctxt state bi
-        >>= fun () -> worker_loop ()
+        let*! () =
+          log_errors_and_continue ~name @@ process_new_block cctxt state bi
+        in
+        worker_loop ()
   in
-  Events.(emit vdf_daemon_start) name >>= fun () -> worker_loop ()
+  let*! () = Events.(emit vdf_daemon_start) name in
+  worker_loop ()
