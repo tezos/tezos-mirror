@@ -112,10 +112,13 @@ module type SCHEDULER = sig
       [on_worker_available] shall return [None] if there is nothing else to do,
       in which case the worker is killed, or [Some (request, on_response)],
       in which case the worker executes [request].
-      The result of this request, [response], is then given to [on_response]. *)
+      The result of this request, [response], is then given to [on_response].
+
+      The last argument is a continuation to call once there is nothing left to do. *)
   val run :
     on_worker_available:(unit -> (request * (response -> unit)) option) ->
     worker_count:int ->
+    (unit -> unit) ->
     unit
 
   (** Get the current worker id. *)

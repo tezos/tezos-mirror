@@ -243,11 +243,12 @@ module Scheduler : Test.SCHEDULER = struct
     in
     loop ()
 
-  let run ~on_worker_available ~worker_count =
-    if worker_count = 1 then run_single_process ~on_worker_available
+  let run ~on_worker_available ~worker_count continue =
+    (if worker_count = 1 then run_single_process ~on_worker_available
     else
       try run_multi_process ~on_worker_available ~worker_count
-      with exn -> internal_scheduler_error "%s" (Printexc.to_string exn)
+      with exn -> internal_scheduler_error "%s" (Printexc.to_string exn)) ;
+    continue ()
 
   let get_current_worker_id () = !current_worker_id
 end

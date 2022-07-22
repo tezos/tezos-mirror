@@ -808,6 +808,7 @@ module type SCHEDULER = sig
   val run :
     on_worker_available:(unit -> (request * (response -> unit)) option) ->
     worker_count:int ->
+    (unit -> unit) ->
     unit
 
   val get_current_worker_id : unit -> int option
@@ -939,7 +940,8 @@ let run_with_scheduler scheduler =
             in
             Some (Scheduler.Run_test {test_title = test.title}, on_response)
       in
-      Scheduler.run ~on_worker_available ~worker_count:Cli.options.job_count ;
+      Scheduler.run ~on_worker_available ~worker_count:Cli.options.job_count
+      @@ fun () ->
       (* Output reports. *)
       Option.iter output_junit Cli.options.junit ;
       Option.iter Record.(output_file (current ())) Cli.options.record ;
