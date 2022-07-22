@@ -943,8 +943,6 @@ let parse_memo_size (n : (location, _) Micheline.node) :
 type ex_comparable_ty =
   | Ex_comparable_ty : 'a comparable_ty -> ex_comparable_ty
 
-type ex_ty = Ex_ty : ('a, _) ty -> ex_ty
-
 type ex_parameter_ty_and_entrypoints_node =
   | Ex_parameter_ty_and_entrypoints_node : {
       arg_type : ('a, _) ty;

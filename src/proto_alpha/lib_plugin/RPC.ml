@@ -1451,7 +1451,7 @@ module Scripts = struct
           (Micheline.root script)
         >|=? fun (normalized, _ctxt) -> Micheline.strip_locations normalized) ;
     Registration.register0 ~chunked:true S.normalize_type (fun ctxt () typ ->
-        let open Script_ir_translator in
+        let open Script_typed_ir in
         let ctxt = Gas.set_unlimited ctxt in
         (* Unfortunately, Script_ir_translator.parse_any_ty is not exported *)
         Script_ir_translator.parse_ty

@@ -486,7 +486,9 @@ let register () =
                       entrypoints
                   in
                   Entrypoint.Map.fold_e
-                    (fun entry (Ex_ty ty, original_type_expr) (acc, ctxt) ->
+                    (fun entry
+                         (Script_typed_ir.Ex_ty ty, original_type_expr)
+                         (acc, ctxt) ->
                       (if normalize_types then
                        unparse_ty ~loc:() ctxt ty >|? fun (ty_node, ctxt) ->
                        (Micheline.strip_locations ty_node, ctxt)

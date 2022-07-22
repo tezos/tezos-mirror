@@ -63,14 +63,13 @@
 (** {1 Michelson Existential Witness types} *)
 open Alpha_context
 
+open Script_typed_ir
 open Script_tc_errors
 
 type ('ta, 'tb) eq = Eq : ('same, 'same) eq
 
 type ex_comparable_ty =
   | Ex_comparable_ty : 'a Script_typed_ir.comparable_ty -> ex_comparable_ty
-
-type ex_ty = Ex_ty : ('a, _) Script_typed_ir.ty -> ex_ty
 
 type ex_parameter_ty_and_entrypoints =
   | Ex_parameter_ty_and_entrypoints : {

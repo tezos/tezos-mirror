@@ -127,7 +127,7 @@ let assert_equals_ex_tickets ctxt ~loc ex_tickets expected =
 
 let tickets_of_value ctxt ~include_lazy ~allow_zero_amount_tickets ~type_exp
     ~value_exp =
-  let Script_ir_translator.Ex_ty ty, ctxt =
+  let Script_typed_ir.Ex_ty ty, ctxt =
     let node = Micheline.root @@ Expr.from_string type_exp in
     Result.value_f
       ~default:(fun () -> Stdlib.failwith "Failed to parse")

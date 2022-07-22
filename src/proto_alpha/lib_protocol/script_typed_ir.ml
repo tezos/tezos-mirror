@@ -1416,6 +1416,8 @@ and operation = {
   lazy_storage_diff : Lazy_storage.diffs option;
 }
 
+type ex_ty = Ex_ty : ('a, _) ty -> ex_ty
+
 type ('arg, 'storage) script =
   | Script : {
       code :

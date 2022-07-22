@@ -211,7 +211,7 @@ let test_parse_ty (type exp expc) ctxt node
         ~allow_contract
         ~allow_ticket
         node
-    >>? fun (Script_ir_translator.Ex_ty actual, ctxt) ->
+    >>? fun (Script_typed_ir.Ex_ty actual, ctxt) ->
       Gas_monad.run ctxt
       @@ Script_ir_translator.ty_eq
            ~error_details:(Informative (location node))

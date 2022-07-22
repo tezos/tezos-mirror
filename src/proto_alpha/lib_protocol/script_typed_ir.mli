@@ -1565,6 +1565,8 @@ type ('arg, 'storage) script =
     }
       -> ('arg, 'storage) script
 
+type ex_ty = Ex_ty : ('a, _) ty -> ex_ty
+
 val manager_kind : 'kind internal_operation_contents -> 'kind Kind.manager
 
 val kinstr_location : (_, _, _, _) kinstr -> Script.location

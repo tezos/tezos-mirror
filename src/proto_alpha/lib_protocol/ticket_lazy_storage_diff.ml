@@ -174,7 +174,7 @@ let collect_token_diffs_of_big_map_updates ctxt big_map_id ~value_type updates
      We should have the non-serialized version of the value type.
   *)
   parse_value_type ctxt value_type
-  >>?= fun (Script_ir_translator.Ex_ty value_type, ctxt) ->
+  >>?= fun (Script_typed_ir.Ex_ty value_type, ctxt) ->
   Ticket_scanner.type_has_tickets ctxt value_type
   >>?= fun (has_tickets, ctxt) ->
   List.fold_left_es
@@ -204,7 +204,7 @@ let collect_token_diffs_of_big_map ctxt ~get_token_and_amount big_map_id acc =
          type. It would be more efficient if the value preserved.
       *)
       parse_value_type ctxt value_ty
-      >>?= fun (Script_ir_translator.Ex_ty value_type, ctxt) ->
+      >>?= fun (Script_typed_ir.Ex_ty value_type, ctxt) ->
       Ticket_scanner.type_has_tickets ctxt value_type
       >>?= fun (has_tickets, ctxt) ->
       (* Iterate over big-map items. *)

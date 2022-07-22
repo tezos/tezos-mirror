@@ -34,7 +34,6 @@
 
 open Protocol
 open Alpha_context
-open Script_ir_translator
 open Script_typed_ir
 
 (*
