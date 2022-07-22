@@ -324,7 +324,12 @@ val spawn_import_secret_key :
     timestamp_delay], where [timestamp_delay] is 365 days, which
     allows to bake plenty of blocks before their timestamp reach the
     present (at which point one would have to wait between each block
-    so that peers do not reject them for being in the future). *)
+    so that peers do not reject them for being in the future).
+
+    If you want to wait until the node switches its head to the block
+    activating the given protocol, consider using
+    {!activate_protocol_and_wait} below.
+*)
 val activate_protocol :
   ?endpoint:endpoint ->
   protocol:Protocol.t ->
@@ -332,6 +337,25 @@ val activate_protocol :
   ?key:string ->
   ?timestamp:timestamp ->
   ?parameter_file:string ->
+  t ->
+  unit Lwt.t
+
+(** Same as {!activate_protocol}, but wait until level increases by 1.
+
+    Waiting ensures that the activation block has been produced.
+    This makes your test more deterministic.
+
+    Uses the node provided via argument [node] if any. Otherwise, it
+    searches for a node in the client's mode, and fails if no node is
+    found. *)
+val activate_protocol_and_wait :
+  ?endpoint:endpoint ->
+  protocol:Protocol.t ->
+  ?fitness:int ->
+  ?key:string ->
+  ?timestamp:timestamp ->
+  ?parameter_file:string ->
+  ?node:Node.t ->
   t ->
   unit Lwt.t
 
