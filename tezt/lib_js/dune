@@ -1,0 +1,15 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezt_js)
+ (public_name tezt.js)
+ (optional)
+ (libraries
+  re
+  ezjsonm
+  js_of_ocaml
+  tezt.core)
+ (flags
+  (:standard)
+  -open Tezt_core))

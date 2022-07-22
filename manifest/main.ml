@@ -184,6 +184,12 @@ let irmin_pack_unix = external_sublib irmin_pack "irmin-pack.unix"
 
 let irmin_pack_mem = external_sublib irmin_pack "irmin-pack.mem"
 
+let js_of_ocaml =
+  external_lib
+    ~js_compatible:true
+    "js_of_ocaml"
+    V.(at_least "4.0.0" && less_than "5.0.0")
+
 let json_data_encoding =
   external_lib
     ~js_compatible:true
@@ -2949,6 +2955,15 @@ let tezt_lib =
     ~ocaml:V.(at_least "4.12")
     ~bisect_ppx:false
     ~deps:[re; lwt_unix; ezjsonm; tezt_core_lib |> open_]
+
+let _tezt_js =
+  public_lib
+    "tezt.js"
+    ~path:"tezt/lib_js"
+    ~ocaml:V.(at_least "4.12")
+    ~bisect_ppx:false
+    ~optional:true
+    ~deps:[re; ezjsonm; js_of_ocaml; tezt_core_lib |> open_]
 
 let tezt ~opam ~path ?(deps = []) ?dep_globs l =
   tezt_without_tezt_lib_dependency
