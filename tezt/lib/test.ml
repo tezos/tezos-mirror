@@ -145,12 +145,10 @@ type test = {
   mutable result : Log.test_result option;
 }
 
-let really_run test =
+let really_run sleep test =
   Log.info "Starting test: %s" test.title ;
   List.iter (fun reset -> reset ()) !reset_functions ;
   test.result <- None ;
-  Lwt_main.run
-  @@
   (* It may happen that the promise of the function resolves successfully
      at the same time as a background promise is rejected or that we
      receive SIGINT. To handle those race conditions, setting the value
@@ -213,7 +211,7 @@ let really_run test =
             max 0. (delay -. local_starting_time +. global_starting_time)
           in
           [
-            (let* () = Lwt_unix.sleep remaining_delay in
+            (let* () = sleep remaining_delay in
              fail
                "the set of tests took more than specified global timeout (%gs) \
                 to run"
@@ -225,7 +223,7 @@ let really_run test =
       | None -> []
       | Some delay ->
           [
-            (let* () = Lwt_unix.sleep delay in
+            (let* () = sleep delay in
              fail "test took more than specified timeout (%gs) to run" delay);
           ]
     in
@@ -280,16 +278,17 @@ let really_run test =
   in
   return test_result
 
-let rec really_run_with_retry remaining_retry_count test =
-  match really_run test with
+let rec really_run_with_retry sleep remaining_retry_count test =
+  let* test_result = really_run sleep test in
+  match test_result with
   | Failed _ when remaining_retry_count > 0 ->
       Log.warn
         "%d retry(ies) left for test: %s"
         remaining_retry_count
         test.title ;
       test.session_retries <- test.session_retries + 1 ;
-      really_run_with_retry (remaining_retry_count - 1) test
-  | x -> x
+      really_run_with_retry sleep (remaining_retry_count - 1) test
+  | x -> return x
 
 let test_should_be_run ~file ~title ~tags =
   List.for_all (fun tag -> List.mem tag tags) Cli.options.tags_to_run
@@ -861,7 +860,10 @@ end = struct
            this test"
           test_title
     | Some test ->
-        let test_result = really_run_with_retry Cli.options.retry test in
+        let test_result =
+          Lwt_main.run
+          @@ really_run_with_retry Lwt_unix.sleep Cli.options.retry test
+        in
         Test_result test_result
 
   let rec worker_listen_loop pipe_from_scheduler pipe_to_scheduler =
