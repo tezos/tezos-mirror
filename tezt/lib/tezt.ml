@@ -116,4 +116,9 @@ module Runner = Runner
 module Temp = Temp
 
 (** Base test management (registering, initializations, etc). *)
-module Test = Test
+module Test = struct
+  include Test
+
+  (** Run registered tests that should be run. *)
+  let run = Main.run
+end

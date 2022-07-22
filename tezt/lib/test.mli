@@ -88,9 +88,6 @@ val register :
       uniquely identifies the current worker process that is running the current test. *)
 val current_worker_id : unit -> int option
 
-(** Run registered tests that should be run. *)
-val run : unit -> unit
-
 (** {2 Internals} *)
 
 (** The rest of this module is used by other modules of Tezt.
