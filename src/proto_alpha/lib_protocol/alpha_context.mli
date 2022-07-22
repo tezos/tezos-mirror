@@ -3375,7 +3375,7 @@ module Sc_rollup : sig
     val pp_refutation : Format.formatter -> refutation -> unit
 
     type invalid_move =
-      | Dissection_choice_not_found of Sc_rollup_tick_repr.t
+      | Dissection_choice_not_found of Tick.t
       | Dissection_number_of_sections_mismatch of {expected : Z.t; given : Z.t}
       | Dissection_invalid_number_of_sections of Z.t
       | Dissection_start_hash_mismatch of {
@@ -3384,15 +3384,15 @@ module Sc_rollup : sig
         }
       | Dissection_stop_hash_mismatch of State_hash.t option
       | Dissection_edge_ticks_mismatch of {
-          dissection_start_tick : Sc_rollup_tick_repr.t;
-          dissection_stop_tick : Sc_rollup_tick_repr.t;
-          chunk_start_tick : Sc_rollup_tick_repr.t;
-          chunk_stop_tick : Sc_rollup_tick_repr.t;
+          dissection_start_tick : Tick.t;
+          dissection_stop_tick : Tick.t;
+          chunk_start_tick : Tick.t;
+          chunk_stop_tick : Tick.t;
         }
       | Dissection_ticks_not_increasing
       | Dissection_invalid_distribution
       | Dissection_invalid_successive_states_shape
-      | Proof_unpexpected_section_size of Z.t
+      | Proof_unexpected_section_size of Z.t
       | Proof_start_state_hash_mismatch of {
           start_state_hash : State_hash.t option;
           start_proof : State_hash.t;
@@ -3402,6 +3402,8 @@ module Sc_rollup : sig
           stop_proof : State_hash.t option;
         }
       | Proof_invalid of string
+
+    val pp_invalid_move : Format.formatter -> invalid_move -> unit
 
     type reason = Conflict_resolved | Invalid_move of invalid_move | Timeout
 

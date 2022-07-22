@@ -317,7 +317,7 @@ type invalid_move =
   | Dissection_invalid_successive_states_shape
       (** A dissection cannot have a section with no state hash after another
           section with some state hash. *)
-  | Proof_unpexpected_section_size of Z.t
+  | Proof_unexpected_section_size of Z.t
       (** Invalid proof step because there is more than one tick. *)
   | Proof_start_state_hash_mismatch of {
       start_state_hash : State_hash.t option;

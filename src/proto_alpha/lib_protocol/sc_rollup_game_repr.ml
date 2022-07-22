@@ -375,7 +375,7 @@ type invalid_move =
   | Dissection_ticks_not_increasing
   | Dissection_invalid_distribution
   | Dissection_invalid_successive_states_shape
-  | Proof_unpexpected_section_size of Z.t
+  | Proof_unexpected_section_size of Z.t
   | Proof_start_state_hash_mismatch of {
       start_state_hash : State_hash.t option;
       start_proof : State_hash.t;
@@ -455,7 +455,7 @@ let pp_invalid_move fmt =
         fmt
         "Maximum tick increment in a section cannot be more than half total \
          dissection length"
-  | Proof_unpexpected_section_size n ->
+  | Proof_unexpected_section_size n ->
       Format.fprintf
         fmt
         "dist should be equal to 1 in a proof, but got %a"
@@ -589,14 +589,13 @@ let invalid_move_encoding =
           | Dissection_invalid_successive_states_shape -> Some () | _ -> None)
         (fun () -> Dissection_invalid_successive_states_shape);
       case
-        ~title:"sc_rollup_proof_unpexpected_section_size"
+        ~title:"sc_rollup_proof_unexpected_section_size"
         (Tag 9)
         (obj2
-           (req "kind" (constant "proof_unpexpected_section_size"))
+           (req "kind" (constant "proof_unexpected_section_size"))
            (req "value" n))
-        (function
-          | Proof_unpexpected_section_size n -> Some ((), n) | _ -> None)
-        (fun ((), n) -> Proof_unpexpected_section_size n);
+        (function Proof_unexpected_section_size n -> Some ((), n) | _ -> None)
+        (fun ((), n) -> Proof_unexpected_section_size n);
       case
         ~title:"sc_rollup_proof_start_state_hash_mismatch"
         (Tag 10)
@@ -812,7 +811,7 @@ let check_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
 let check_proof_start_stop ~start_chunk ~stop_chunk proof =
   let open Lwt_result_syntax in
   let dist = Sc_rollup_tick_repr.distance start_chunk.tick stop_chunk.tick in
-  let* () = check Z.(equal dist one) (Proof_unpexpected_section_size dist) in
+  let* () = check Z.(equal dist one) (Proof_unexpected_section_size dist) in
   let start_proof = Sc_rollup_proof_repr.start proof in
   let stop_proof = Sc_rollup_proof_repr.stop proof in
   let* () =
