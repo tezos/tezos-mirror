@@ -320,7 +320,7 @@ let generate_test_keys =
           source_list_encoding
           (List.map (fun (x, _, _, _) -> x) source_list)
       in
-      Format.printf "%a" Data_encoding.Json.pp json ;
+      Format.printf "%a@." Data_encoding.Json.pp json ;
       return_unit)
 
 let aggregate_fail_if_already_registered cctxt force pk_uri name =
