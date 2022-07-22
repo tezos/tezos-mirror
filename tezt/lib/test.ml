@@ -145,7 +145,7 @@ type test = {
   mutable result : Log.test_result option;
 }
 
-let really_run sleep test =
+let really_run ~sleep ~clean_up test =
   Log.info "Starting test: %s" test.title ;
   List.iter (fun reset -> reset ()) !reset_functions ;
   test.result <- None ;
@@ -234,12 +234,7 @@ let really_run sleep test =
           @ test_timeout))
       handle_exception
   in
-  (* Terminate all remaining processes. *)
-  let* () =
-    Lwt.catch Process.clean_up @@ fun exn ->
-    Log.warn "Failed to clean up processes: %s" (Printexc.to_string exn) ;
-    unit
-  in
+  let* () = clean_up () in
   (* Remove temporary files. *)
   let kept_temp =
     try
@@ -278,8 +273,8 @@ let really_run sleep test =
   in
   return test_result
 
-let rec really_run_with_retry sleep remaining_retry_count test =
-  let* test_result = really_run sleep test in
+let rec really_run_with_retry ~sleep ~clean_up remaining_retry_count test =
+  let* test_result = really_run ~sleep ~clean_up test in
   match test_result with
   | Failed _ when remaining_retry_count > 0 ->
       Log.warn
@@ -287,7 +282,7 @@ let rec really_run_with_retry sleep remaining_retry_count test =
         remaining_retry_count
         test.title ;
       test.session_retries <- test.session_retries + 1 ;
-      really_run_with_retry sleep (remaining_retry_count - 1) test
+      really_run_with_retry ~sleep ~clean_up (remaining_retry_count - 1) test
   | x -> return x
 
 let test_should_be_run ~file ~title ~tags =
@@ -860,9 +855,18 @@ end = struct
            this test"
           test_title
     | Some test ->
+        let clean_up () =
+          Lwt.catch Process.clean_up @@ fun exn ->
+          Log.warn "Failed to clean up processes: %s" (Printexc.to_string exn) ;
+          unit
+        in
         let test_result =
           Lwt_main.run
-          @@ really_run_with_retry Lwt_unix.sleep Cli.options.retry test
+          @@ really_run_with_retry
+               ~sleep:Lwt_unix.sleep
+               ~clean_up
+               Cli.options.retry
+               test
         in
         Test_result test_result
 
