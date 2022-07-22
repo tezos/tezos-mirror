@@ -4884,7 +4884,7 @@ let yes_wallet_lib =
   private_lib
     "yes_wallet_lib"
     ~path:("devtools" // "yes_wallet")
-    ~synopsis:"Generic tool to extract smart contracts from node's context."
+    ~synopsis:"A development tool for extracting baker keys from a context."
     ~opam:""
     ~deps:
       ([
