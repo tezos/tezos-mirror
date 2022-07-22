@@ -145,6 +145,8 @@ type test = {
   mutable result : Log.test_result option;
 }
 
+type t = test
+
 let really_run ~sleep ~clean_up test =
   Log.info "Starting test: %s" test.title ;
   List.iter (fun reset -> reset ()) !reset_functions ;
@@ -353,6 +355,8 @@ let map_registered_list f =
   (* By using [list_registered] we ensure the resulting list is
      in order of registration. *)
   List.map f (list_registered ())
+
+let get_test_by_title test_title = String_map.find_opt test_title !registered
 
 let list_tests format =
   match format with
@@ -850,7 +854,7 @@ module Scheduler : SCHEDULER = struct
       x
 
   let perform_request (Run_test {test_title}) =
-    match String_map.find_opt test_title !registered with
+    match get_test_by_title test_title with
     | None ->
         internal_worker_error
           "scheduler requested to run test %S, but worker doesn't know about \
