@@ -378,6 +378,36 @@ module Imports = struct
     [tztest "Imports" `Quick (make_test Parser.Import.encoding gen check)]
 end
 
+module LazyStack = struct
+  open Utils
+
+  let gen gen_values =
+    let open QCheck2.Gen in
+    let* vector = Vec.gen gen_values in
+    let* length =
+      Lib_test.Qcheck2_helpers.int32_range_gen 0l (V.num_elements vector)
+    in
+    return (Decode.LazyStack {vector; length})
+
+  let check eq_value (Decode.LazyStack {vector; length})
+      (Decode.LazyStack {vector = vector'; length = length'}) =
+    let open Lwt_result_syntax in
+    let* eq_lzs = Vec.check eq_value vector vector' in
+    return (eq_lzs && length = length')
+
+  let tests =
+    let eq x y = Lwt.return_ok (Int32.equal x y) in
+    [
+      tztest
+        "LazyStack"
+        `Quick
+        (make_test
+           Parser.Lazy_stack.(encoding (value [] Data_encoding.int32))
+           (gen QCheck2.Gen.int32)
+           (check eq));
+    ]
+end
+
 let tests =
   Byte_vector.tests @ Vec.tests @ LazyVec.tests @ Names.tests @ Func_type.tests
-  @ Imports.tests
+  @ Imports.tests @ LazyStack.tests

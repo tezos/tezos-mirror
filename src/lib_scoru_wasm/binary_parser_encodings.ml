@@ -50,6 +50,18 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
     let encoding value_encoding = raw_encoding (vector_encoding value_encoding)
   end
 
+  module Lazy_stack = struct
+    let encoding value_enc =
+      (* TODO: The stack can be probably encoded in a unique key in the tree,
+         since it is never used concurrently. *)
+      let offset = value ["length"] Data_encoding.int32 in
+      let vector = scope ["vector"] (vector_encoding value_enc) in
+      conv
+        (fun (length, vector) -> Decode.LazyStack {length; vector})
+        (fun (LazyStack {length; vector}) -> (length, vector))
+        (tup2 ~flatten:true offset vector)
+  end
+
   module Byte_vector = struct
     type t' = Decode.byte_vector_kont
 
