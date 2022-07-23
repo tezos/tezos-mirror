@@ -2,6 +2,30 @@ module Vector = Lazy_vector.LwtInt32Vector
 
 exception Code of Source.region * string
 
+(** Lazy stack using an underlying lazy vector, and a pointer on the head of the
+    stack. *)
+type 'a lazy_stack = LazyStack of {length : int32; vector : 'a Vector.t}
+
+(** [empty_stack ()] returns a new empty stack. *)
+val empty_stack : unit -> 'a lazy_stack
+
+(** [push_stack v s] pushes value [v] on the stack [s] at index [s.length] and
+    updates the length. If [s.vector] is full, it appends the value to the vector
+    (growing it by 1), otherwise it set the value in the vector. *)
+val push_stack : 'a -> 'a lazy_stack -> 'a lazy_stack
+
+(** [push_rev_values vs s] pushes values in [vs] on the stack [s], starting from
+    the end of the list. *)
+val push_rev_values : 'a list -> 'a lazy_stack -> 'a lazy_stack
+
+(** [pop_stack s] returns the value at [s.length - 1] and a new stack with
+    length decreased by one. *)
+val pop_stack : 'a lazy_stack -> ('a * 'a lazy_stack) option Lwt.t
+
+(** [pop_at_most n s] returns at most the [n] values on top of the stack, and
+    the resulting stack. *)
+val pop_at_most : int -> 'a lazy_stack -> ('a list * 'a lazy_stack) Lwt.t
+
 (** Instruction parsing continuations. *)
 type instr_block_kont =
   | IKStop of Ast.block_label  (** Final step of a block parsing. *)
@@ -13,19 +37,21 @@ type instr_block_kont =
   | IKIf2 of Ast.block_type * int * Ast.block_label
       (** If .. else parsing step. *)
 
-(** Vector and size continuations *)
+(** Block parsing continuations. *)
+type block_kont =
+  | BlockStart
+      (** Initial step of a block parsing, allocating the block in the block table. *)
+  | BlockParse of instr_block_kont lazy_stack
+      (** Parsing of a block, with the continuation stack. *)
+  | BlockStop of Ast.block_label
+      (** End of a block, returning the label corresponding to the allocated block
+          at the beginning. *)
 
-(** Vector accumulator, used in two step: first accumulating the values, then
-    reversing them and possibly mapping them, counting the number of values in
-    the list. Continuation passing style transformation of {!List.map} also
-    returning length. *)
-type ('a, 'b) vec_map_kont =
-  | Collect of int * 'a list
-  | Rev of 'a list * 'b list * int
+(** Vector and size continuations *)
 
 (** Lazy vector accumulator, with the current offset to write the next value in
     the vector. *)
-type 'a lazy_vec_kont = Lazy_vec of {offset : int32; vector : 'a Vector.t}
+type 'a lazy_vec_kont = LazyVec of {offset : int32; vector : 'a Vector.t}
 
 (** Position of a value on the stream. *)
 type pos = private int
@@ -87,7 +113,7 @@ type code_kont =
       left : pos;
       size : size;
       locals : Types.value_type Vector.t;
-      const_kont : instr_block_kont list;
+      const_kont : block_kont;
     }  (** Parsing step of the body of a function. *)
   | CKStop of Ast.func  (** Final step of a parsed function, irreducible. *)
 
@@ -100,7 +126,7 @@ type elem_kont =
       index : int32 Source.phrase;
       index_kind : index_kind;
       early_ref_type : Types.ref_type option;
-      offset_kont : pos * instr_block_kont list;
+      offset_kont : pos * block_kont;
     }  (** Element segment mode parsing step. *)
   | EKInitIndexed of {
       mode : Ast.segment_mode;
@@ -112,7 +138,7 @@ type elem_kont =
       mode : Ast.segment_mode;
       ref_type : Types.ref_type;
       einit_vec : Ast.const lazy_vec_kont;
-      einit_kont : pos * instr_block_kont list;
+      einit_kont : pos * block_kont;
     }
       (** Element segment initialization code parsing step for constant values. *)
   | EKStop of Ast.elem_segment'  (** Final step of a segment parsing. *)
@@ -122,7 +148,7 @@ type data_kont =
   | DKMode of {
       left : pos;
       index : int32 Source.phrase;
-      offset_kont : pos * instr_block_kont list;
+      offset_kont : pos * block_kont;
     }  (** Data segment mode parsing step. *)
   | DKInit of {dmode : Ast.segment_mode; init_kont : byte_vector_kont}
   | DKStop of Ast.data_segment'  (** Final step of a data segment parsing. *)
@@ -190,11 +216,7 @@ type module_kont =
   | MKExport of export_kont * pos * size * Ast.export lazy_vec_kont
       (** Export section parsing. *)
   | MKGlobal of
-      Types.global_type
-      * int
-      * instr_block_kont list
-      * size
-      * Ast.global lazy_vec_kont
+      Types.global_type * int * block_kont * size * Ast.global lazy_vec_kont
       (** Globals section parsing, containing the starting position, the
       continuation of the current global block instruction, and the size of the
       section. *)
