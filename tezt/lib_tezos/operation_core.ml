@@ -262,35 +262,6 @@ module Voting = struct
 end
 
 module Manager = struct
-  type payload =
-    | Reveal of Account.key
-    | Transfer of {amount : int; dest : Account.key}
-    | Dal_publish_slot_header of {level : int; index : int; header : int}
-    | Sc_rollup_dal_slot_subscribe of {rollup : string; slot_index : int}
-    | Delegation of {delegate : Account.key}
-
-  let reveal account = Reveal account
-
-  let transfer ?(dest = Constant.bootstrap2) ?(amount = 1_000_000) () =
-    Transfer {amount; dest}
-
-  let dal_publish_slot_header ~level ~index ~header =
-    Dal_publish_slot_header {level; index; header}
-
-  let sc_rollup_dal_slot_subscribe ~rollup ~slot_index =
-    Sc_rollup_dal_slot_subscribe {rollup; slot_index}
-
-  let delegation ?(delegate = Constant.bootstrap2) () = Delegation {delegate}
-
-  type t = {
-    source : Account.key;
-    counter : int option;
-    fee : int;
-    gas_limit : int;
-    storage_limit : int;
-    payload : payload;
-  }
-
   let json_of_account account = Ezjsonm.string account.Account.public_key_hash
 
   let json_of_tez n = string_of_int n |> Ezjsonm.string
@@ -306,6 +277,94 @@ module Manager = struct
         client
     in
     return (1 + JSON.as_int json)
+
+  let json_of_option f v = Option.fold ~none:`Null ~some:f v
+
+  let strip_null_fields l =
+    List.fold_left
+      (fun acc e -> match e with _, `Null -> acc | e -> e :: acc)
+      []
+      l
+    |> List.rev
+
+  type sc_rollup_dissection_chunk = {state_hash : string option; tick : int}
+
+  type sc_rollup_proof = Ezjsonm.value
+
+  type sc_rollup_game_refutation_step =
+    | Proof of sc_rollup_proof
+    | Dissection of sc_rollup_dissection_chunk list
+
+  type sc_rollup_refutation = {
+    choice_tick : int;
+    refutation_step : sc_rollup_game_refutation_step;
+  }
+
+  let json_of_sc_rollup_dissection ~dissection =
+    Ezjsonm.list
+      (fun {state_hash; tick} ->
+        let sh = json_of_option Ezjsonm.string state_hash in
+        `O
+          (strip_null_fields
+             [("state", sh); ("tick", json_of_int_as_string tick)]))
+      dissection
+
+  let json_payload_binding_of_sc_rollup_refutation sc_rollup opponent refutation
+      =
+    let json_of_refutation_step {choice_tick; refutation_step} =
+      let step =
+        match refutation_step with
+        | Proof proof -> proof
+        | Dissection dissection -> json_of_sc_rollup_dissection ~dissection
+      in
+      `O [("choice", json_of_int_as_string choice_tick); ("step", step)]
+    in
+    let refutation = json_of_option json_of_refutation_step refutation in
+    strip_null_fields
+      [
+        ("kind", `String "sc_rollup_refute");
+        ("rollup", `String sc_rollup);
+        ("opponent", `String opponent);
+        ("refutation", refutation);
+      ]
+
+  type payload =
+    | Reveal of Account.key
+    | Transfer of {amount : int; dest : Account.key}
+    | Dal_publish_slot_header of {level : int; index : int; header : int}
+    | Sc_rollup_dal_slot_subscribe of {rollup : string; slot_index : int}
+    | Delegation of {delegate : Account.key}
+    | Sc_rollup_refute of {
+        (* See details in {!Operation_repr} module. *)
+        sc_rollup : string;
+        opponent : string;
+        refutation : sc_rollup_refutation option;
+      }
+
+  let reveal account = Reveal account
+
+  let transfer ?(dest = Constant.bootstrap2) ?(amount = 1_000_000) () =
+    Transfer {amount; dest}
+
+  let dal_publish_slot_header ~level ~index ~header =
+    Dal_publish_slot_header {level; index; header}
+
+  let sc_rollup_dal_slot_subscribe ~rollup ~slot_index =
+    Sc_rollup_dal_slot_subscribe {rollup; slot_index}
+
+  let delegation ?(delegate = Constant.bootstrap2) () = Delegation {delegate}
+
+  let sc_rollup_refute ?refutation ~sc_rollup ~opponent () =
+    Sc_rollup_refute {sc_rollup; opponent; refutation}
+
+  type t = {
+    source : Account.key;
+    counter : int option;
+    fee : int;
+    gas_limit : int;
+    storage_limit : int;
+    payload : payload;
+  }
 
   let json_payload_binding = function
     | Reveal account ->
@@ -334,6 +393,11 @@ module Manager = struct
         ]
     | Delegation {delegate} ->
         [("kind", `String "delegation"); ("delegate", json_of_account delegate)]
+    | Sc_rollup_refute {sc_rollup; opponent; refutation} ->
+        json_payload_binding_of_sc_rollup_refutation
+          sc_rollup
+          opponent
+          refutation
 
   let json client {source; counter; fee; gas_limit; storage_limit; payload} =
     let* counter =
@@ -390,6 +454,11 @@ module Manager = struct
         let fee = Option.value fee ~default:1_450 in
         let gas_limit = Option.value gas_limit ~default:1_490 in
         let storage_limit = Option.value storage_limit ~default:0 in
+        {source; counter; fee; gas_limit; storage_limit; payload}
+    | Sc_rollup_refute _ ->
+        let fee = Option.value fee ~default:12_000 in
+        let gas_limit = Option.value gas_limit ~default:12_000 in
+        let storage_limit = Option.value storage_limit ~default:1028 in
         {source; counter; fee; gas_limit; storage_limit; payload}
 
   let make_batch ?source ?fee ?gas_limit ?storage_limit ~counter payloads =
