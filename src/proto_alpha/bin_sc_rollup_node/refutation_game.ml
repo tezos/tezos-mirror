@@ -92,19 +92,24 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     in
     let* history = Inbox.history_of_hash node_ctxt hash in
     let* inbox = Inbox.inbox_of_hash node_ctxt hash in
-    let*! messages_tree = Inbox.find_message_tree node_ctxt.store hash in
+    let* ctxt = Node_context.checkout_context node_ctxt hash in
+    let*! messages_tree = Context.MessageTrees.find ctxt in
     let*! history, history_proof =
-      Store.Inbox.form_history_proof node_ctxt.store history inbox messages_tree
+      Context.Inbox.form_history_proof
+        node_ctxt.context
+        history
+        inbox
+        messages_tree
     in
     let module P = struct
       include PVM
 
-      let context = node_ctxt.store
+      let context = node_ctxt.context
 
       let state = start_state
 
       module Inbox_with_history = struct
-        include Store.Inbox
+        include Context.Inbox
 
         let history = history
 

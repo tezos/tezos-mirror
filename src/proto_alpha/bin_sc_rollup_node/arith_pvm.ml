@@ -32,7 +32,7 @@ open Alpha_context
     It is imperative that this is aligned with the protocol's implementation.
 *)
 module Arith_proof_format = struct
-  open Store
+  open Context
 
   type proof = IStoreProof.Proof.tree IStoreProof.Proof.t
 
@@ -55,21 +55,15 @@ module Arith_proof_format = struct
 
   let commit_info () = IStore.Info.v ~author:"Tezos" 0L ~message:""
 
-  let produce_proof context tree step =
+  let produce_proof index tree step =
     let open Lwt_syntax in
-    let* res = IStore.set_tree ~info:commit_info context ["pvm_state"] tree in
-    match res with
-    | Error _ -> return None
-    | Ok () -> (
-        (* Committing the context is required by Irmin to produce valid proofs. *)
-        let* _commit_key = Store.commit context in
-        match IStoreTree.kinded_key tree with
-        | Some k ->
-            let* p =
-              IStoreProof.produce_tree_proof (IStore.repo context) k step
-            in
-            return (Some p)
-        | None -> return None)
+    (* Committing the context is required by Irmin to produce valid proofs. *)
+    let* _commit_key = Context.raw_commit index tree in
+    match IStoreTree.kinded_key tree with
+    | Some k ->
+        let* p = IStoreProof.produce_tree_proof index.repo k step in
+        return (Some p)
+    | None -> return None
 
   let kinded_hash_to_state_hash :
       IStoreProof.Proof.kinded_hash -> Sc_rollup.State_hash.t = function
@@ -88,10 +82,10 @@ end
 
 module Impl : Pvm.S = struct
   include Sc_rollup.ArithPVM.Make (struct
-    open Store
+    open Context
     module Tree = IStoreTree
 
-    type tree = IStoreTree.tree
+    type tree = Tree.tree
 
     include Arith_proof_format
   end)

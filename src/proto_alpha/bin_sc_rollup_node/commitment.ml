@@ -164,7 +164,8 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     let* inbox_level =
       Lwt.map Environment.wrap_tzresult @@ next_commitment_level node_ctxt lsc
     in
-    let*! pvm_state = Store.PVMState.find node_ctxt.store block_hash in
+    let* ctxt = Node_context.checkout_context node_ctxt block_hash in
+    let*! pvm_state = Context.PVMState.find ctxt in
     let* compressed_state =
       match pvm_state with
       | Some pvm_state ->

@@ -74,6 +74,10 @@ val default_data_dir : string
     given a [data_dir]. *)
 val default_storage_dir : string -> string
 
+(** [default_context_dir] returns the default value of the directory
+    for persisting the context given a [data_dir]. *)
+val default_context_dir : string -> string
+
 (** [default_rpc_addr] is the default value for [rpc_addr]. *)
 val default_rpc_addr : string
 

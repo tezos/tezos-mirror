@@ -32,15 +32,17 @@ open Alpha_context
     It is imperative that this is aligned with the protocol's implementation.
 *)
 module Wasm_2_0_0_proof_format = struct
-  open Store
+  open Context
 
   type proof = IStoreProof.Proof.tree IStoreProof.Proof.t
 
-  let produce_proof context tree step =
+  let produce_proof index tree step =
     let open Lwt_syntax in
+    (* Committing the context is required by Irmin to produce valid proofs. *)
+    let* _commit_key = Context.raw_commit index tree in
     match IStoreTree.kinded_key tree with
     | Some k ->
-        let* p = IStoreProof.produce_tree_proof (IStore.repo context) k step in
+        let* p = IStoreProof.produce_tree_proof index.repo k step in
         return (Some p)
     | None -> return None
 
@@ -74,10 +76,10 @@ end
 
 module Impl : Pvm.S = struct
   include Sc_rollup.Wasm_2_0_0PVM.Make (struct
-    open Store
+    open Context
     module Tree = IStoreTree
 
-    type tree = IStoreTree.tree
+    type tree = Tree.tree
 
     include Wasm_2_0_0_proof_format
   end)

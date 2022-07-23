@@ -172,11 +172,11 @@ module Make (PVM : Pvm.S) = struct
         if finalized then process_l1_block_operations ~finalized node_ctxt head
         else return_unit
       else
-        let* () = Inbox.process_head node_ctxt head in
+        let* ctxt = Inbox.process_head node_ctxt head in
         let* () = process_l1_block_operations ~finalized node_ctxt head in
         (* Avoid storing and publishing commitments if the head is not final *)
         (* Avoid triggering the pvm execution if this has been done before for this head *)
-        let* () = Components.Interpreter.process_head node_ctxt head in
+        let* () = Components.Interpreter.process_head node_ctxt ctxt head in
 
         (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3166
 
@@ -361,7 +361,8 @@ module Make (PVM : Pvm.S) = struct
     let* () = Event.shutdown_node exit_status in
     Tezos_base_unix.Internal_event_unix.close ()
 
-  let check_initial_state_hash {Node_context.cctxt; rollup_address; store; _} =
+  let check_initial_state_hash {Node_context.cctxt; rollup_address; context; _}
+      =
     let open Lwt_result_syntax in
     let* l1_reference_initial_state_hash =
       RPC.Sc_rollup.initial_pvm_state_hash
@@ -369,7 +370,7 @@ module Make (PVM : Pvm.S) = struct
         (cctxt#chain, cctxt#block)
         rollup_address
     in
-    let*! s = PVM.initial_state store in
+    let*! s = PVM.initial_state context in
     let*! l2_initial_state_hash = PVM.state_hash s in
     if
       not
@@ -442,6 +443,7 @@ let run ~data_dir (cctxt : Protocol_client_context.full) =
       configuration.sc_rollup_node_operators
   in
   let*! store = Store.load configuration in
+  let*! context = Context.load configuration in
   let* l1_ctxt, kind = Layer1.start configuration cctxt store in
   let* node_ctxt =
     Node_context.init
@@ -453,6 +455,7 @@ let run ~data_dir (cctxt : Protocol_client_context.full) =
       configuration.fee_parameter
       ~loser_mode:configuration.loser_mode
       store
+      context
   in
   let module Daemon = Make ((val Components.pvm_of_kind node_ctxt.kind)) in
   Daemon.run node_ctxt configuration

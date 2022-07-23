@@ -32,10 +32,11 @@ let get_head_exn store =
   let*! head = Layer1.current_head_hash store in
   match head with None -> failwith "No head" | Some head -> return head
 
-let get_state_exn store =
+let get_state_exn (node_ctxt : Node_context.t) =
   let open Lwt_result_syntax in
-  let* head = get_head_exn store in
-  let*! state = Store.PVMState.find store head in
+  let* head = get_head_exn node_ctxt.store in
+  let* ctxt = Node_context.checkout_context node_ctxt head in
+  let*! state = Context.PVMState.find ctxt in
   match state with None -> failwith "No state" | Some state -> return state
 
 let get_state_info_exn store =
@@ -140,35 +141,35 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   include Common
   module PVM = PVM
 
-  let register_current_total_ticks store dir =
+  let register_current_total_ticks node_ctxt dir =
     RPC_directory.register0
       dir
       (Sc_rollup_services.Global.current_total_ticks ())
       (fun () () ->
         let open Lwt_result_syntax in
-        let* state = get_state_exn store in
+        let* state = get_state_exn node_ctxt in
         let*! tick = PVM.get_tick state in
         return tick)
 
-  let register_current_state_hash store dir =
+  let register_current_state_hash node_ctxt dir =
     RPC_directory.register0
       dir
       (Sc_rollup_services.Global.current_state_hash ())
       (fun () () ->
         let open Lwt_result_syntax in
-        let* state = get_state_exn store in
+        let* state = get_state_exn node_ctxt in
         let*! hash = PVM.state_hash state in
         return hash)
 
-  let register_current_state_value store dir =
+  let register_current_state_value node_ctxt dir =
     RPC_directory.register0
       dir
       (Sc_rollup_services.Local.current_state_value ())
       (fun {key} () ->
         let open Lwt_result_syntax in
-        let* state = get_state_exn store in
+        let* state = get_state_exn node_ctxt in
         let path = String.split_on_char '/' key in
-        let*! value = Store.IStoreTree.find state path in
+        let*! value = Context.IStoreTree.find state path in
         match value with
         | None -> failwith "No such key in PVM state"
         | Some value ->
@@ -213,13 +214,13 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         in
         return result)
 
-  let register_current_status store dir =
+  let register_current_status node_ctxt dir =
     RPC_directory.register0
       dir
       (Sc_rollup_services.Global.current_status ())
       (fun () () ->
         let open Lwt_result_syntax in
-        let* state = get_state_exn store in
+        let* state = get_state_exn node_ctxt in
         let*! status = PVM.get_status state in
         return (PVM.string_of_status status))
 
@@ -235,11 +236,11 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     |> register_current_tezos_head node_ctxt.store
     |> register_current_inbox node_ctxt
     |> register_current_ticks node_ctxt.store
-    |> register_current_total_ticks node_ctxt.store
+    |> register_current_total_ticks node_ctxt
     |> register_current_num_messages node_ctxt.store
-    |> register_current_state_hash node_ctxt.store
-    |> register_current_state_value node_ctxt.store
-    |> register_current_status node_ctxt.store
+    |> register_current_state_hash node_ctxt
+    |> register_current_state_value node_ctxt
+    |> register_current_status node_ctxt
     |> register_last_stored_commitment node_ctxt.store
     |> register_last_published_commitment node_ctxt.store
     |> register_dal_slot_subscriptions node_ctxt.store

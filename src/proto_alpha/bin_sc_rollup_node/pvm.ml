@@ -30,8 +30,8 @@ open Alpha_context
 module type S = sig
   include
     Sc_rollup.PVM.S
-      with type context = Store.t
-       and type state = Store.tree
+      with type context = Context.index
+       and type state = Context.tree
        and type hash = Sc_rollup.State_hash.t
 
   (** [get_tick state] gets the total tick counter for the given PVM state. *)

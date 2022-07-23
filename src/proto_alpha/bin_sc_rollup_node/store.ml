@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3471
+   Use indexed file for append-only instead of Irmin. *)
+
 open Protocol
 open Alpha_context
 module Maker = Irmin_pack_unix.Maker (Tezos_context_encoding.Context.Conf)
@@ -54,13 +57,6 @@ let close store = IStore.Repo.close (IStore.repo store)
 let info message =
   let date = Unix.gettimeofday () |> int_of_float |> Int64.of_int in
   Irmin.Info.Default.v ~author:"Tezos smart-contract rollup node" ~message date
-
-let commit ?(message = "") context =
-  let open Lwt_syntax in
-  let info = IStore.Info.v ~author:"Tezos" 0L ~message in
-  let* tree = IStore.tree context in
-  let* commit = IStore.Commit.v (IStore.repo context) ~info ~parents:[] tree in
-  return @@ IStore.Commit.key commit
 
 module type Mutable_value = sig
   type value
@@ -185,129 +181,7 @@ struct
     Option.map_s decode_value value
 end
 
-module IStoreTree = struct
-  include
-    Tezos_context_helpers.Context.Make_tree
-      (Tezos_context_encoding.Context.Conf)
-      (IStore)
-
-  type t = IStore.t
-
-  type tree = IStore.tree
-
-  type key = path
-
-  type value = bytes
-end
-
-module IStoreProof =
-  Tezos_context_helpers.Context.Make_proof
-    (IStore)
-    (Tezos_context_encoding.Context.Conf)
-
-module Inbox = struct
-  include Sc_rollup.Inbox
-
-  include Sc_rollup.Inbox.Make_hashing_scheme (struct
-    module Tree = IStoreTree
-
-    type t = IStore.t
-
-    type tree = Tree.tree
-
-    let commit_tree store key tree =
-      let open Lwt_syntax in
-      let info () = IStore.Info.v ~author:"Tezos" 0L ~message:"" in
-      let path = "inbox_internal_trees" :: key in
-      let* result = IStore.set_tree ~info store path tree in
-      match result with
-      | Ok () ->
-          let* (_ : IStore.commit) =
-            IStore.Commit.v (IStore.repo store) ~info:(info ()) ~parents:[] tree
-          in
-          return ()
-      | Error _ -> assert false
-
-    let to_inbox_hash kinded_hash =
-      match kinded_hash with `Value h | `Node h -> Hash.of_context_hash h
-
-    let from_inbox_hash inbox_hash =
-      let ctxt_hash = Hash.to_context_hash inbox_hash in
-      let store_hash =
-        IStore.Hash.unsafe_of_raw_string (Context_hash.to_string ctxt_hash)
-      in
-      `Node store_hash
-
-    let lookup_tree store hash =
-      IStore.Tree.of_hash (IStore.repo store) (from_inbox_hash hash)
-
-    type proof = IStoreProof.Proof.tree IStoreProof.Proof.t
-
-    let verify_proof proof f =
-      Lwt.map Result.to_option (IStoreProof.verify_tree_proof proof f)
-
-    let produce_proof store tree f =
-      let open Lwt_syntax in
-      (* TODO: #3381
-         Since committing is required for proof production to work
-         properly, why isn't committing part of the process of proof
-         production? *)
-      let* _commit_key = commit store in
-      match IStoreTree.kinded_key tree with
-      | Some k ->
-          let* p = IStoreProof.produce_tree_proof (IStore.repo store) k f in
-          return (Some p)
-      | None -> return None
-
-    let proof_before proof = to_inbox_hash proof.IStoreProof.Proof.before
-
-    let proof_encoding =
-      Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V1.Tree32
-      .tree_proof_encoding
-  end)
-end
-
-(** State of the PVM that this rollup node deals with *)
-module PVMState = struct
-  let[@inline] key block_hash = ["pvm_state"; Block_hash.to_b58check block_hash]
-
-  let find store block_hash = IStore.find_tree store (key block_hash)
-
-  let exists store block_hash = IStore.mem_tree store (key block_hash)
-
-  let set store block_hash state =
-    IStore.set_tree_exn
-      ~info:(fun () -> info "Update PVM state")
-      store
-      (key block_hash)
-      state
-
-  let init_s store block_hash make_state =
-    let open Lwt_syntax in
-    let* exists = exists store block_hash in
-    if exists then return_unit
-    else
-      let* state = make_state () in
-      set store block_hash state
-end
-
 (** Aggregated collection of messages from the L1 inbox *)
-module MessageTrees = struct
-  let[@inline] key block_hash =
-    ["message_tree"; Block_hash.to_b58check block_hash]
-
-  (** [get store block_hash] retrieves the message tree for [block_hash]. If it is not present, an empty
-      tree is returned. *)
-  let find store block_hash = IStore.find_tree store (key block_hash)
-
-  (** [set store block_hash message_tree] set the message tree for [block_hash]. *)
-  let set store block_hash message_tree =
-    IStore.set_tree_exn
-      ~info:(fun () -> info "Update messages tree")
-      store
-      (key block_hash)
-      message_tree
-end
 
 type state_info = {
   num_messages : Z.t;
@@ -413,10 +287,10 @@ module Messages = Make_append_only_map (struct
 
   let string_of_key = Block_hash.to_b58check
 
-  type value = Inbox.Message.t list
+  type value = Sc_rollup.Inbox.Message.t list
 
   let value_encoding =
-    Data_encoding.(list @@ dynamic_size Inbox.Message.encoding)
+    Data_encoding.(list @@ dynamic_size Sc_rollup.Inbox.Message.encoding)
 end)
 
 (** Inbox state for each block *)
@@ -444,9 +318,9 @@ module Histories = Make_append_only_map (struct
 
   let string_of_key = Block_hash.to_b58check
 
-  type value = Inbox.history
+  type value = Sc_rollup.Inbox.history
 
-  let value_encoding = Inbox.history_encoding
+  let value_encoding = Sc_rollup.Inbox.history_encoding
 end)
 
 module Commitments = Make_append_only_map (struct
@@ -525,4 +399,18 @@ module Dal_slot_subscriptions = Make_append_only_map (struct
   type value = Dal.Slot_index.t list
 
   let value_encoding = Data_encoding.list Dal.Slot_index.encoding
+end)
+
+module Contexts = Make_append_only_map (struct
+  let path = ["contexts"]
+
+  let keep_last_n_entries_in_memory = 10
+
+  type key = Block_hash.t
+
+  let string_of_key = Block_hash.to_b58check
+
+  type value = Context.hash
+
+  let value_encoding = Context.hash_encoding
 end)

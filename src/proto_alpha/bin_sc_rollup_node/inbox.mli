@@ -32,26 +32,23 @@
    The inbox state is persistent.
 
 *)
-open Protocol
+
+open Protocol.Alpha_context
 
 (** [process_head node_ctxt head operations] changes the state of the inbox to
     react to [head]. In particular, this process filters the provided
     [operations] of the [head] block. *)
-val process_head : Node_context.t -> Layer1.head -> unit tzresult Lwt.t
+val process_head : Node_context.t -> Layer1.head -> Context.t tzresult Lwt.t
 
 (** [inbox_of_hash node_ctxt block_hash] returns the rollup inbox at the end of
     the given validation of [block_hash]. *)
 val inbox_of_hash :
-  Node_context.t ->
-  Block_hash.t ->
-  Alpha_context.Sc_rollup.Inbox.t tzresult Lwt.t
+  Node_context.t -> Block_hash.t -> Sc_rollup.Inbox.t tzresult Lwt.t
 
 (** [history_of_hash node_ctxt block_hash] returns the rollup inbox history at
     the end of the given validation of [block_hash]. *)
 val history_of_hash :
-  Node_context.t -> Block_hash.t -> Store.Inbox.history tzresult Lwt.t
-
-val find_message_tree : Store.t -> Block_hash.t -> Store.tree option Lwt.t
+  Node_context.t -> Block_hash.t -> Sc_rollup.Inbox.history tzresult Lwt.t
 
 (** [start ()] initializes the inbox to track the messages being published. *)
 val start : unit -> unit Lwt.t
