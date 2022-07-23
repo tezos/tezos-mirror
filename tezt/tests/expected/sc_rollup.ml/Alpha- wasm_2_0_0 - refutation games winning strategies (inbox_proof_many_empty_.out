@@ -441,3 +441,6 @@ This sequence of operations was run:
     
                                }
 
+
+./tezos-sc-rollup-client-alpha rpc get /global/state_hash
+"scs136rHUnjbxsaBDSpwk7LHF9khiGHu8LR1XYBw2yDEowD3LCjc92"
