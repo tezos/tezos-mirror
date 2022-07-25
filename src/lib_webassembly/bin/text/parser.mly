@@ -113,13 +113,14 @@ type context =
 
 
 let with_blocks f =
+  let allocations = Ast.empty_allocations () in
   let c =  {
     types = empty_types (); tables = empty (); memories = empty ();
     funcs = empty (); locals = empty (); globals = empty ();
     datas = empty (); elems = empty ();
     labels = VarMap.empty; deferred_locals = ref [];
-    new_blocks = ref (Vector.create 0l);
-    new_datas = ref (Vector.create 0l);
+    new_blocks = ref allocations.blocks;
+    new_datas = ref allocations.datas;
   }
   in
   let res = f c in
@@ -307,7 +308,7 @@ let to_module_ pm =
     elems;
     datas;
     start = p_start;
-    allocations = Ast.empty_allocations;
+    allocations = Ast.empty_allocations ();
   } @@ pm.at
 %}
 

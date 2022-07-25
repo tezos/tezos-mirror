@@ -80,7 +80,7 @@ let empty_module_inst =
     exports = NameMap.create ~produce_value:(fun _ -> Lwt.fail Not_found) ();
     elems = Vector.create 0l;
     datas = Vector.create 0l;
-    allocations = Ast.empty_allocations;
+    allocations = Ast.empty_allocations ();
   }
 
 let extern_type_of = function

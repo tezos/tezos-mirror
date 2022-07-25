@@ -844,7 +844,7 @@ let invoke ?(module_inst = empty_module_inst) ?(input = Input_buffer.alloc ())
   let allocations =
     match func with
     | Func.AstFunc (_, {contents = {allocations; _}}, _) -> allocations
-    | Func.HostFunc _ -> Ast.empty_allocations
+    | Func.HostFunc _ -> Ast.empty_allocations ()
   in
   let c =
     config

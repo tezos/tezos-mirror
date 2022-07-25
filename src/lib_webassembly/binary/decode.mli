@@ -242,11 +242,6 @@ type module_kont =
 (** Parsed bytes with the current reading position. *)
 type stream = {name : string; bytes : string; pos : pos ref}
 
-(** Allocation state of basic blocks. The type relies on the mutable state
-    internaly, but making it private avoids being able to modify it externally.
-*)
-type block_state = private {mutable new_blocks : Ast.instr Vector.t Vector.t}
-
 (** Accumulator of parsed fields *)
 type building_state = {
   types : Ast.type_ Vector.t;
@@ -263,37 +258,17 @@ type building_state = {
   datas : Ast.data_segment Vector.t;
 }
 
-type data_state = private {mutable new_data : Ast.datas_table}
-
-type vectors_state = {blocks : block_state; datas : data_state}
-
 (** Decoding continuation step. *)
 type decode_kont = {
   building_state : building_state;
       (** Accumulated parsed sections, used to build the final module. *)
   module_kont : module_kont;  (** Module continuation. *)
   stream : stream;  (** Parsed stream. *)
-  vectors_state : vectors_state;  (** Basic blocks allocated. *)
+  allocation_state : Ast.allocations;  (** Basic blocks allocated. *)
 }
 
 (** [make_stream filename bytes] returns a new stream to decode. *)
 val make_stream : name:string -> bytes:string -> stream
-
-(** [make_empty_block_state ()] returns a new block allocation state. *)
-val make_empty_block_state : unit -> block_state
-
-(** [make_block_state blocks] returns a new block allocation state from already
-    existing blocks allocation. This function is used to build block state during
-    tree decoding. *)
-val make_block_state : Ast.instr Vector.t Vector.t -> block_state
-
-(** [make_empty_data_state ()] returns a new data allocation state. *)
-val make_empty_data_state : unit -> data_state
-
-(** [make_data_state data] returns a new data allocation state from already
-    existing data allocation. This function is used to build data state during
-    tree decoding. *)
-val make_data_state : Ast.datas_table -> data_state
 
 (** [module_step kont] takes one step of parsing from a continuation and returns
    a new continuation. Fails when the contination of the module is [MKStop]
