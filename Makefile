@@ -45,7 +45,7 @@ TEZOS_BIN=octez-node octez-validator octez-client octez-admin-client octez-signe
     $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-node-$p) \
     $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-client-$p)
 
-UNRELEASED_TEZOS_BIN=tezos-dal-node
+UNRELEASED_TEZOS_BIN=octez-dal-node
 
 # See first mention of TEZOS_WITHOUT_OPAM.
 ifndef TEZOS_WITHOUT_OPAM

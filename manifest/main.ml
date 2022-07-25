@@ -5629,10 +5629,10 @@ let _octez_dal_node =
     List.map deps_for_protocol Protocol.all |> List.flatten
   in
   public_exe
-    "tezos-dal-node"
+    "octez-dal-node"
     ~path:"src/bin_dal_node"
     ~internal_name:"main_dal"
-    ~synopsis:"Tezos: `tezos-dal-node` binary"
+    ~synopsis:"Tezos: `octez-dal-node` binary"
     ~deps:
       ([
          octez_base |> open_ ~m:"TzPervasives";
