@@ -95,8 +95,6 @@ module Kate_amortized = struct
     let domain2m = Domain.build ~log:k in
     let precompute_srsj j =
       let quotient = (degree - j) / l in
-      (*if quotient = 0 then None
-        else*)
       let padding = diff_next_power_of_two (2 * quotient) in
       let srsj =
         Array.init
@@ -122,7 +120,7 @@ module Kate_amortized = struct
     assert (2 <= chunk_len) ;
     assert (chunk_len < n) ;
     assert (is_pow_of_two degree) ;
-    assert (1 lsl chunk_len <= degree) ;
+    assert (1 lsl chunk_len < degree) ;
     assert (degree <= 1 lsl n) ;
     let l = 1 lsl chunk_len in
     (* Since we don’t need the first coefficient f₀, we remove it and add a zero
