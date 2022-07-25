@@ -397,10 +397,14 @@ val bake_for :
   t ->
   unit Lwt.t
 
-(** Same as {!bake_for}, but bakes a block and waits until the level of the
-    blockchain in the node increases by 1. It uses the node provided via argument
-    [node] if any. Otherwise, it searches for a node in the client's mode, and
-    fails if no node is found. *)
+(** Same as {!bake_for}, but wait until level increases by 1.
+
+    Waiting ensures that the baked block has been well processed by
+    the node. This makes your test more deterministic.
+
+    Uses the node provided via argument [node] if any. Otherwise, it
+    searches for a node in the client's mode, and fails if no node is
+    found. *)
 val bake_for_and_wait :
   ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
