@@ -257,7 +257,8 @@ module Proto = struct
           List.map (fun g -> function None -> [] | Some v -> g v)
           @@ find_lambda_tys t
       | List_t (t, _) ->
-          List.map (fun g l -> List.flatten @@ List.map g l.elements)
+          List.map (fun g l ->
+              List.flatten @@ List.map g @@ Script_list.to_list l)
           @@ find_lambda_tys t
       | Map_t (_, tv, _) -> find_lambda_tys_map tv
 
