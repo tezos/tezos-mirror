@@ -3,12 +3,17 @@
 This directory contains a test suite for Octez (an implementation of the Tezos blockchain) based on Tezt. Tezt is a
 generic test framework that is used for writing tests in OCaml.
 
-The directory includes the sources of the Tezt framework, its extension with specific support for Tezos, and a whole test suite.
+The directory includes the sources of the Tezt framework, its extension with specific support for Tezos (called Tezt-Tezos), and a whole test suite.
+
+## API Documentation
+
+The user manual of the testsuite is available online at <https://tezos.gitlab.io/developer/tezt.html>.
+
+The APIs of the `tezt` and `tezt-tezos` libraries are documented in the
+interface files (suffix `mli`). Both APIs are also available online at
+<https://tezos.gitlab.io/api/api-inline.html>.
 
 ## Overview
-
-User documentation for this testsuite can be found online at
-<https://tezos.gitlab.io/developer/tezt.html>.
 
 This directory contains the following subdirectories:
 
@@ -77,11 +82,3 @@ much as possible, a test in this testsuite should avoid the use of timeouts
 and instead, should rely on `events` if possible.
 
 The implementation of the `tezt` library is detailed in its own documentation in the `lib/README.md` file.
-
-## API Documentation
-
-The APIs of the `tezt` and `tezt-tezos` libraries are documented in the
-interface files (suffix `mli`). Both APIs are available online at
-<https://tezos.gitlab.io/api/api-inline.html>.
-
-The user manual of this testsuite is also available online at <https://tezos.gitlab.io/developer/tezt.html>.
