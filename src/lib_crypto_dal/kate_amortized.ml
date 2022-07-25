@@ -246,17 +246,13 @@ module Kate_amortized = struct
 
   (* h = polynomial such that h(y×domain[i]) = zi. *)
   let interpolation_h_poly y domain z_list =
-    let h =
-      Array.to_list (Scalar.ifft ~domain:(Domain.inverse domain) ~points:z_list)
-    in
+    Scalar.ifft_inplace ~domain:(Domain.inverse domain) ~points:z_list ;
     let inv_y = Scalar.inverse_exn y in
-    let rec mul_h_coefs (inv_yi, acc) h_list =
-      match h_list with
-      | [] -> List.rev acc
-      | h :: tl ->
-          mul_h_coefs (Scalar.mul inv_yi inv_y, Scalar.mul h inv_yi :: acc) tl
-    in
-    mul_h_coefs (Scalar.(copy one), []) h
+    Array.fold_left_map
+      (fun inv_yi h -> Scalar.(mul inv_yi inv_y, mul h inv_yi))
+      Scalar.(copy one)
+      z_list
+    |> snd
 
   (* Part 3.2 verifier : verifies that f(w×domain.(i)) = evaluations.(i). *)
   let verify cm_f (srs1, srs2l) domain (w, evaluations) proof =
