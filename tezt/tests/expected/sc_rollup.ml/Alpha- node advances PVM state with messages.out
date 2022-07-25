@@ -43,7 +43,7 @@ This sequence of operations was run:
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "0"
 
-./tezos-client --wait none send sc rollup message '["1 6 + value"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message '["1 6 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1876.773 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -57,7 +57,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000482
-    Expected counter: 2
+    Expected counter: 1
     Gas limit: 1977
     Storage limit: 0 bytes
     Balance updates:
@@ -97,7 +97,7 @@ This sequence of operations was run:
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "18"
 
-./tezos-client --wait none send sc rollup message '["2 8 + value"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message '["2 8 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1876.995 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -111,7 +111,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000482
-    Expected counter: 3
+    Expected counter: 2
     Gas limit: 1977
     Storage limit: 0 bytes
     Balance updates:
@@ -152,7 +152,7 @@ This sequence of operations was run:
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "35"
 
-./tezos-client --wait none send sc rollup message '["3 10 + value"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message '["3 10 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1877.219 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -166,7 +166,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000483
-    Expected counter: 4
+    Expected counter: 3
     Gas limit: 1978
     Storage limit: 0 bytes
     Balance updates:
@@ -207,7 +207,7 @@ This sequence of operations was run:
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "53"
 
-./tezos-client --wait none send sc rollup message '["4 12 + value"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message '["4 12 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1877.219 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -221,7 +221,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000483
-    Expected counter: 5
+    Expected counter: 4
     Gas limit: 1978
     Storage limit: 0 bytes
     Balance updates:
@@ -263,7 +263,7 @@ This sequence of operations was run:
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "71"
 
-./tezos-client --wait none send sc rollup message '["5 14 + value"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message '["5 14 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1877.426 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -277,7 +277,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000483
-    Expected counter: 6
+    Expected counter: 5
     Gas limit: 1978
     Storage limit: 0 bytes
     Balance updates:
@@ -319,7 +319,7 @@ This sequence of operations was run:
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "89"
 
-./tezos-client --wait none send sc rollup message '["6 16 + value"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message '["6 16 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1877.426 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -333,7 +333,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000483
-    Expected counter: 7
+    Expected counter: 6
     Gas limit: 1978
     Storage limit: 0 bytes
     Balance updates:
@@ -375,7 +375,7 @@ This sequence of operations was run:
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "107"
 
-./tezos-client --wait none send sc rollup message '["7 18 + value"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message '["7 18 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1877.426 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -389,7 +389,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000483
-    Expected counter: 8
+    Expected counter: 7
     Gas limit: 1978
     Storage limit: 0 bytes
     Balance updates:
@@ -431,7 +431,7 @@ This sequence of operations was run:
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "125"
 
-./tezos-client --wait none send sc rollup message '["8 20 + value"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message '["8 20 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1877.426 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -445,7 +445,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000483
-    Expected counter: 9
+    Expected counter: 8
     Gas limit: 1978
     Storage limit: 0 bytes
     Balance updates:
@@ -488,7 +488,7 @@ This sequence of operations was run:
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "143"
 
-./tezos-client --wait none send sc rollup message '["9 22 + value"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message '["9 22 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1877.633 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -502,7 +502,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000483
-    Expected counter: 10
+    Expected counter: 9
     Gas limit: 1978
     Storage limit: 0 bytes
     Balance updates:
@@ -545,7 +545,7 @@ This sequence of operations was run:
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "161"
 
-./tezos-client --wait none send sc rollup message '["10 24 + value"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message '["10 24 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1877.650 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -559,7 +559,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000484
-    Expected counter: 11
+    Expected counter: 10
     Gas limit: 1978
     Storage limit: 0 bytes
     Balance updates:
