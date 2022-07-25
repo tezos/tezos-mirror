@@ -180,7 +180,7 @@ let clean_up_aux (runner : Runner.t option) runner_fs =
           let dirtype =
             if Option.is_some runner then "Remote directory" else "Directory"
           in
-          Log.warn "%s directory is not empty %s" dirtype dirname)
+          Log.warn "%s is not empty %s" dirtype dirname)
     runner_fs.parents
 
 let clean_up () =
