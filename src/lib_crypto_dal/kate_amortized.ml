@@ -73,56 +73,6 @@ module Kate_amortized = struct
     let res = G1.ifft ~domain:(inverse domain2m) ~points:u in
     Array.sub res 0 (Array.length domain2m / 2)
 
-  (* Complete Toeplitz computation. *)
-  let build_h_list_complete a_list srs (domain2m : Domain.t) m =
-    let domain2m_inv = Domain.inverse domain2m in
-    let domain2m = inverse domain2m_inv in
-    let y = G1.fft ~domain:domain2m ~points:srs in
-    let v = Scalar.fft ~domain:domain2m ~points:a_list in
-    let u = Array.map2 G1.mul y v in
-    let res = G1.ifft ~domain:domain2m_inv ~points:u in
-    Array.sub res 0 m
-
-  (* Part 2 *)
-
-  (** coefs = [f₀, f₁, …, fm-1], where m is degree
-     domain2m = [ω⁰, ω¹, ω², …, ω^(2^k-1)], ω k-th root of unity and 2^k >= 2m
-     srs1 = [[1]₁, [s]₁, [s²]₁, …, [s^(m-1)]₁]
-     no verification in code for sizes. *)
-  let build_ct_list ~nb_proofs ~degree (coefs : Scalar.t list) (srs1, _srs2)
-      domain2m =
-    (* dump f₀ because we don’t need it for computation ; add zero at the end of
-       list to maintain size. *)
-    let coefs = List.tl (coefs @ [Scalar.(copy zero)]) in
-    let h_list =
-      (* Computed following https://alinush.github.io/2020/03/19/multiplying-a-vector-by-a-toeplitz-matrix.html *)
-      let padded_srs =
-        List.rev_append srs1 (List.init degree (fun _ -> G1.(copy zero)))
-      in
-      let y = Array.of_list padded_srs in
-      let a_list =
-        let get_and_remove_last l =
-          let rec aux acc l =
-            match l with
-            | [] -> failwith "Empty list."
-            | [fm] -> (List.rev acc, fm)
-            | fi :: h -> aux (fi :: acc) h
-          in
-          aux [] l
-        in
-        let f_list_without_m, fm = get_and_remove_last coefs in
-        let rec fill_with_zero_and_fm m acc =
-          if m = 0 then fm :: acc
-          else fill_with_zero_and_fm (m - 1) (Scalar.(copy zero) :: acc)
-        in
-        fill_with_zero_and_fm degree f_list_without_m
-      in
-      build_h_list_complete (Array.of_list a_list) y domain2m degree
-    in
-    let domain = Domain.build ~log:nb_proofs in
-    let domain = inverse (Domain.inverse domain) in
-    G1.fft ~domain ~points:h_list
-
   (* part 3.2 *)
 
   let diff_next_power_of_two x =
