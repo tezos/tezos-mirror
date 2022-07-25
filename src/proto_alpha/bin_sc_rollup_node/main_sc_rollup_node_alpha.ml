@@ -86,9 +86,16 @@ let mode_param =
   Clic.param
     ~name:"mode"
     ~desc:
-      (Printf.sprintf
-         "The mode for the rollup node (%s)"
-         (String.concat ", " possible_modes))
+      (Format.asprintf
+         "@[<v 2>The mode for the rollup node (%s)@,%a@]"
+         (String.concat ", " possible_modes)
+         (Format.pp_print_list (fun fmt mode ->
+              Format.fprintf
+                fmt
+                "- %s: %s"
+                (Configuration.string_of_mode mode)
+                (Configuration.description_of_mode mode)))
+         Configuration.modes)
     mode_parameter
 
 let rpc_addr_arg =

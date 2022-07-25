@@ -250,6 +250,17 @@ let mode_of_string = function
   | "custom" -> Ok Custom
   | _ -> Error [Exn (Failure "Invalid mode")]
 
+let description_of_mode = function
+  | Observer -> "Only follows the chain, reconstructs and interprets inboxes"
+  | Batcher ->
+      "Accepts transactions in its queue and batches them on the L1 (TODO)"
+  | Maintenance ->
+      "Follows the chain and publishes commitments, cement and refute"
+  | Operator -> "Equivalent to maintenance + batcher"
+  | Custom ->
+      "In this mode, only operations that have a corresponding operator/signer \
+       are injected"
+
 let mode_encoding =
   Data_encoding.string_enum
     [

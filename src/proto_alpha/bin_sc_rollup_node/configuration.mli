@@ -91,6 +91,9 @@ val string_of_mode : mode -> string
 (** [mode_of_string s] returns the mode represented by string [s] if it exists. *)
 val mode_of_string : string -> mode tzresult
 
+(** [description_of_mode m] returns a textual description of the mode [m]. *)
+val description_of_mode : mode -> string
+
 (** [filename configuration] returns the [configuration] filename. *)
 val filename : t -> string
 
