@@ -2890,10 +2890,9 @@ let file_content filename =
   Buffer.contents buffer
 
 let () =
-  if
-    Sys.file_exists "dune-project"
-    && Sys.file_exists ".git" && Sys.is_directory ".git"
-  then ()
+  (* Note: checking that [.git] is a directory is a bad idea because when using
+     git worktrees, [.git] can be a file. *)
+  if Sys.file_exists "dune-project" && Sys.file_exists ".git" then ()
   else (
     Printf.eprintf "The manifest should be run from the root of the repo\n" ;
     exit 1)
