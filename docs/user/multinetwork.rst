@@ -56,6 +56,8 @@ the following built-in networks:
 
 - ``jakartanet`` (available from version 13.0)
 
+- ``kathmandunet`` (available from version 14.0)
+
 If you did not initialize your node configuration, or if your configuration
 file contains no ``network`` field, the node assumes you want to run Mainnet.
 You can use the ``--network`` option with ``tezos-node run`` to make sure
