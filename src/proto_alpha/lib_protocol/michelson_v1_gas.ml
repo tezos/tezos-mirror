@@ -78,12 +78,12 @@ module Cost_of = struct
 
     let if_cons = atomic_step_cost cost_N_IIf_cons
 
-    let list_map : 'a Script_typed_ir.boxed_list -> Gas.cost =
+    let list_map : 'a Script_list.t -> Gas.cost =
      fun _ -> atomic_step_cost cost_N_IList_map
 
     let list_size = atomic_step_cost cost_N_IList_size
 
-    let list_iter : 'a Script_typed_ir.boxed_list -> Gas.cost =
+    let list_iter : 'a Script_list.t -> Gas.cost =
      fun _ -> atomic_step_cost cost_N_IList_iter
 
     let empty_set = atomic_step_cost cost_N_IEmpty_set
@@ -308,7 +308,7 @@ module Cost_of = struct
 
     let neq = atomic_step_cost cost_N_INeq
 
-    let pairing_check_bls12_381 (l : 'a Script_typed_ir.boxed_list) =
+    let pairing_check_bls12_381 (l : 'a Script_list.t) =
       atomic_step_cost (cost_N_IPairing_check_bls12_381 l.length)
 
     let comb n = atomic_step_cost (cost_N_IComb n)
@@ -633,7 +633,7 @@ module Cost_of = struct
        list of strings to compute the total allocated cost.
        [concat_string_precheck] corresponds to the meta-gas cost of this computation.
     *)
-    let concat_string_precheck (l : 'a Script_typed_ir.boxed_list) =
+    let concat_string_precheck (l : 'a Script_list.t) =
       (* we set the precheck to be slightly more expensive than cost_N_IList_iter *)
       atomic_step_cost (S.mul (S.safe_int l.length) (S.safe_int 10))
 

@@ -408,7 +408,7 @@ let make_ticket (ticketer, contents, amount) =
 
 let make_tickets ts =
   let* elements = List.map_es make_ticket ts in
-  return {elements; length = List.length elements}
+  return @@ Script_list.of_list elements
 
 let transfer_tickets_operation ~incr ~src ~destination tickets =
   let open Lwt_result_syntax in

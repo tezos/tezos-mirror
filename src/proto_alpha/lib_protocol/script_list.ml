@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,9 +25,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Script_typed_ir
+type 'elt t = {elements : 'elt list; length : int}
 
-let empty : 'a boxed_list = {elements = []; length = 0}
+let of_list l = {elements = l; length = List.length l} [@@inline always]
 
-let cons : 'a -> 'a boxed_list -> 'a boxed_list =
+let to_list {elements; length = _} = elements [@@inline always]
+
+let empty : 'a t = {elements = []; length = 0}
+
+let cons : 'a -> 'a t -> 'a t =
  fun elt l -> {length = 1 + l.length; elements = elt :: l.elements}
+
+let length {elements = _; length} = length [@@inline always]
+
+let uncons = function
+  | {elements = []; length = _} -> None
+  | {elements = hd :: tl; length} ->
+      Some (hd, {elements = tl; length = length - 1})
+
+let rev {elements; length} = {elements = List.rev elements; length}
+  [@@inline always]

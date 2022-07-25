@@ -812,9 +812,9 @@ type ('a, 'b, 'c, 'd, 'e, 'i, 'j) klist_exit_type =
   ('i, 'a * 'b, 'j, 'a * 'b) kinstr ->
   'i list ->
   'j list ->
-  ('j boxed_list, 'e) ty option ->
+  ('j Script_list.t, 'e) ty option ->
   int ->
-  ('j boxed_list, 'a * 'b, 'c, 'd) continuation ->
+  ('j Script_list.t, 'a * 'b, 'c, 'd) continuation ->
   'j ->
   'a * 'b ->
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
@@ -826,9 +826,9 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'j) klist_enter_type =
   ('j, 'a * 'c, 'b, 'a * 'c) kinstr ->
   'j list ->
   'b list ->
-  ('b boxed_list, 'f) ty option ->
+  ('b Script_list.t, 'f) ty option ->
   int ->
-  ('b boxed_list, 'a * 'c, 'd, 'e) continuation ->
+  ('b Script_list.t, 'a * 'c, 'd, 'e) continuation ->
   'a ->
   'c ->
   ('d * 'e * outdated_context * local_gas_counter) tzresult Lwt.t
@@ -870,10 +870,10 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) ilist_map_type =
   outdated_context * step_constants ->
   local_gas_counter ->
   ('e, 'a * 'b, 'f, 'a * 'b) kinstr ->
-  ('f boxed_list, 'a * 'b, 'g, 'h) kinstr ->
+  ('f Script_list.t, 'a * 'b, 'g, 'h) kinstr ->
   ('g, 'h, 'c, 'd) continuation ->
-  ('f boxed_list, 'i) ty option ->
-  'e boxed_list ->
+  ('f Script_list.t, 'i) ty option ->
+  'e Script_list.t ->
   'a * 'b ->
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
@@ -885,7 +885,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'cmp) ilist_iter_type =
   ('e, 'cmp) ty option ->
   ('a, 'b, 'f, 'g) kinstr ->
   ('f, 'g, 'c, 'd) continuation ->
-  'e boxed_list ->
+  'e Script_list.t ->
   'a * 'b ->
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 

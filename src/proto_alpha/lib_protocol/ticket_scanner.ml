@@ -85,7 +85,7 @@ module Ticket_inspection = struct
         'a has_tickets * 'b has_tickets
         -> ('a, 'b) Script_typed_ir.union has_tickets
     | Option_ht : 'a has_tickets -> 'a option has_tickets
-    | List_ht : 'a has_tickets -> 'a Script_typed_ir.boxed_list has_tickets
+    | List_ht : 'a has_tickets -> 'a Script_list.t has_tickets
     | Set_ht : 'k has_tickets -> 'k Script_typed_ir.set has_tickets
     | Map_ht :
         'k has_tickets * 'v has_tickets
@@ -375,7 +375,7 @@ module Ticket_collection = struct
               k
         | None -> (k [@ocaml.tailcall]) ctxt acc)
     | List_ht el_hty, List_t (el_ty, _) ->
-        let {elements; _} = x in
+        let elements = Script_list.to_list x in
         (tickets_of_list [@ocaml.tailcall])
           ctxt
           ~include_lazy

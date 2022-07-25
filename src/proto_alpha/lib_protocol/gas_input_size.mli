@@ -34,7 +34,7 @@ include module type of Gas_comparable_input_size
 
 (* ------------------------------------------------------------------------- *)
 
-val list : 'a Script_typed_ir.boxed_list -> t
+val list : 'a Script_list.t -> t
 
 val set : 'a Script_typed_ir.set -> t
 
