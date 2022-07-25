@@ -23,6 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Source : sig
+  open Tezos_webassembly_interpreter.Source
+
+  val phrase_encoding : 'a Data_encoding.t -> 'a phrase Data_encoding.t
+end
+
 module Types : sig
   open Tezos_webassembly_interpreter.Types
 

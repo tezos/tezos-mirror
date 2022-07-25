@@ -32,6 +32,14 @@ let string_enum cases =
   | [(title, value)] -> conv (fun _ -> ()) (fun () -> value) (constant title)
   | cases -> string_enum cases
 
+module Source = struct
+  open Source
+
+  let phrase_encoding encoding =
+    let open Data_encoding in
+    conv (fun x -> x.it) (fun v -> v @@ no_region) encoding
+end
+
 module Types = struct
   open Types
 
@@ -558,16 +566,11 @@ module Ast = struct
             (memop_encoding Types.vec_type_encoding Types.pack_size_encoding))
          (req "lane" int31))
 
-  let region_encoding encoding =
-    let open Data_encoding in
-    let open Source in
-    conv (fun x -> x.it) (fun v -> v @@ no_region) encoding
+  let var_encoding = Source.phrase_encoding Data_encoding.int32
 
-  let var_encoding = region_encoding Data_encoding.int32
+  let num_encoding = Source.phrase_encoding Values.num_encoding
 
-  let num_encoding = region_encoding Values.num_encoding
-
-  let vec_encoding = region_encoding Values.vec_encoding
+  let vec_encoding = Source.phrase_encoding Values.vec_encoding
 
   let block_type_encoding =
     let open Data_encoding in
@@ -623,7 +626,7 @@ module Ast = struct
             (fun g -> GlobalImport g);
         ]
     in
-    region_encoding unannotated_encoding
+    Source.phrase_encoding unannotated_encoding
 
   let export_desc_encoding =
     let open Ast in
@@ -652,9 +655,9 @@ module Ast = struct
             (fun g -> GlobalExport g);
         ]
     in
-    region_encoding unannotated_encoding
+    Source.phrase_encoding unannotated_encoding
 
-  let const_encoding = region_encoding block_label_encoding
+  let const_encoding = Source.phrase_encoding block_label_encoding
 
   let segment_mode_encoding =
     let open Data_encoding in
@@ -679,5 +682,5 @@ module Ast = struct
             (fun () -> Declarative);
         ]
     in
-    region_encoding unannotated_encoding
+    Source.phrase_encoding unannotated_encoding
 end

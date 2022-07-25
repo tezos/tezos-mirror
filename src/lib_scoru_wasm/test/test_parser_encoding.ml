@@ -758,7 +758,71 @@ module Elem = struct
   let tests = [tztest "Elem" `Quick (make_test Parser.Elem.encoding gen check)]
 end
 
+module Data = struct
+  open Utils
+
+  let data_gen =
+    let open QCheck2.Gen in
+    let* dmode = Ast_generators.segment_mode_gen in
+    let+ dinit = Ast_generators.data_label_gen in
+    Ast.{dmode; dinit}
+
+  let gen =
+    let open QCheck2.Gen in
+    let start = return Decode.DKStart in
+    let mode =
+      let* left = small_nat in
+      let* index = int32 in
+      let* offset_kont = small_nat in
+      let+ offset_kont_code = Block.gen in
+      Decode.DKMode
+        {
+          left;
+          index = Source.(index @@ no_region);
+          offset_kont = (offset_kont, offset_kont_code);
+        }
+    in
+    let init =
+      let* dmode = Ast_generators.segment_mode_gen in
+      let+ init_kont = Byte_vector.gen in
+      Decode.DKInit {dmode; init_kont}
+    in
+    let stop =
+      let+ data = data_gen in
+      Decode.DKStop data
+    in
+    oneof [start; mode; init; stop]
+
+  let data_check Ast.{dmode; dinit} Ast.{dmode = dmode'; dinit = dinit'} =
+    let open Lwt_result_syntax in
+    return (dmode = dmode' && dinit = dinit')
+
+  let check dk dk' =
+    let open Lwt_result_syntax in
+    match (dk, dk') with
+    | Decode.DKStart, Decode.DKStart -> return_true
+    | ( DKMode {left; index; offset_kont = offset_kont_pos, offset_kont_code},
+        DKMode
+          {
+            left = left';
+            index = index';
+            offset_kont = offset_kont_pos', offset_kont_code';
+          } ) ->
+        let+ eq_code = Block.check offset_kont_code offset_kont_code' in
+        left = left' && index = index'
+        && offset_kont_pos = offset_kont_pos'
+        && eq_code
+    | DKInit {dmode; init_kont}, DKInit {dmode = dmode'; init_kont = init_kont'}
+      ->
+        let+ eq_init = Byte_vector.check init_kont init_kont' in
+        dmode = dmode' && eq_init
+    | DKStop data, DKStop data' -> data_check data data'
+    | _, _ -> return false
+
+  let tests = [tztest "Data" `Quick (make_test Parser.Data.encoding gen check)]
+end
+
 let tests =
   Byte_vector.tests @ Vec.tests @ LazyVec.tests @ Names.tests @ Func_type.tests
   @ Imports.tests @ LazyStack.tests @ Exports.tests @ Instr_block.tests
-  @ Block.tests @ Size.tests @ Code.tests @ Elem.tests
+  @ Block.tests @ Size.tests @ Code.tests @ Elem.tests @ Data.tests

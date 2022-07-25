@@ -526,7 +526,11 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
 
     let ekmode_case =
       let left = value ["left"] Data_encoding.int31 in
-      let index = value ["index"] (region Data_encoding.int32) in
+      let index =
+        value
+          ["index"]
+          (Interpreter_encodings.Source.phrase_encoding Data_encoding.int32)
+      in
       let index_kind = value ["index_kind"] index_kind_encoding in
       let early_ref_type =
         value_option
@@ -588,7 +592,10 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
         scope
           ["einit_vec"]
           (Lazy_vec.encoding
-             (value [] (region Interpreter_encodings.Ast.block_label_encoding)))
+             (value
+                []
+                (Interpreter_encodings.Source.phrase_encoding
+                   Interpreter_encodings.Ast.block_label_encoding)))
       in
       case
         "EKInitIndexed"
@@ -611,7 +618,10 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
         scope
           ["einit_vec"]
           (Lazy_vec.encoding
-             (value [] (region Interpreter_encodings.Ast.block_label_encoding)))
+             (value
+                []
+                (Interpreter_encodings.Source.phrase_encoding
+                   Interpreter_encodings.Ast.block_label_encoding)))
       in
       let einit_kont_pos = value ["einit_kont_pos"] Data_encoding.int31 in
       let einit_kont_block = scope ["einit_kont_block"] Block.encoding in
@@ -666,5 +676,71 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
           ekinitconst_case;
           ekstop_case;
         ]
+  end
+
+  module Data = struct
+    let dkstart_case =
+      let tag = "DKStart" in
+      case
+        tag
+        (value [] (Data_encoding.constant tag))
+        (function Decode.DKStart -> Some () | _ -> None)
+        (fun () -> DKStart)
+
+    let dkmode_case =
+      let left = value ["left"] Data_encoding.int31 in
+      let index =
+        value
+          ["index"]
+          (Interpreter_encodings.Source.phrase_encoding Data_encoding.int32)
+      in
+      let offset_kont = value ["offset_kont"] Data_encoding.int31 in
+      let offset_kont_code = scope ["offset_kont_code"] Block.encoding in
+      case
+        "DKMode"
+        (tup4 ~flatten:true left index offset_kont offset_kont_code)
+        (function
+          | Decode.DKMode {left; index; offset_kont = pos, block} ->
+              Some (left, index, pos, block)
+          | _ -> None)
+        (fun (left, index, pos, block) ->
+          DKMode {left; index; offset_kont = (pos, block)})
+
+    let dkinit_case =
+      let dmode =
+        value ["dmode"] Interpreter_encodings.Ast.segment_mode_encoding
+      in
+      let init_kont = scope ["init_kont"] Byte_vector.encoding in
+      case
+        "DKInit"
+        (tup2 ~flatten:true dmode init_kont)
+        (function
+          | Decode.DKInit {dmode; init_kont} -> Some (dmode, init_kont)
+          | _ -> None)
+        (fun (dmode, init_kont) -> DKInit {dmode; init_kont})
+
+    let data_segment_encoding =
+      let dmode =
+        value ["dmode"] Interpreter_encodings.Ast.segment_mode_encoding
+      in
+      let dinit =
+        value ["dinit"] Interpreter_encodings.Ast.data_label_encoding
+      in
+      conv
+        (fun (dinit, dmode) -> Ast.{dinit; dmode})
+        (fun {dinit; dmode} -> (dinit, dmode))
+        (tup2 ~flatten:true dinit dmode)
+
+    let dkstop_case =
+      case
+        "DKStop"
+        data_segment_encoding
+        (function Decode.DKStop data_segment -> Some data_segment | _ -> None)
+        (fun data_segment -> DKStop data_segment)
+
+    let encoding =
+      tagged_union
+        (value [] Data_encoding.string)
+        [dkstart_case; dkmode_case; dkinit_case; dkstop_case]
   end
 end
