@@ -29,15 +29,34 @@ open Alpha_context
 open Script_int
 open Dependent_bool
 
+(*
+
+    The step function of the interpreter is parametrized by a bunch of values called the step constants.
+    These values are indeed constants during the call of a smart contract with the notable exception of
+    the IView instruction which modifies `source`, `self`, and `amount` and the KView_exit continuation
+    which restores them.
+    ======================
+
+*)
 type step_constants = {
   source : Contract.t;
+      (** The address calling this contract, as returned by SENDER. *)
   payer : Signature.public_key_hash;
+      (** The address of the implicit account that initiated the chain of contract calls, as returned by SOURCE. *)
   self : Contract_hash.t;
+      (** The address of the contract being executed, as returned by SELF and SELF_ADDRESS.
+     Also used:
+     - as ticketer in TICKET
+     - as caller in VIEW, TRANSFER_TOKENS, and CREATE_CONTRACT *)
   amount : Tez.t;
-  balance : Tez.t;
+      (** The amount of the current transaction, as returned by AMOUNT. *)
+  balance : Tez.t;  (** The balance of the contract as returned by BALANCE. *)
   chain_id : Chain_id.t;
+      (** The chain id of the chain, as returned by CHAIN_ID. *)
   now : Script_timestamp.t;
+      (** The earliest time at which the current block could have been timestamped, as returned by NOW. *)
   level : Script_int.n Script_int.num;
+      (** The level of the current block, as returned by LEVEL. *)
 }
 
 (* Preliminary definitions. *)
