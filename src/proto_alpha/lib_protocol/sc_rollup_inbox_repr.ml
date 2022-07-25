@@ -476,6 +476,14 @@ module type Merkelized_operations = sig
     (proof * Sc_rollup_PVM_sem.input option) tzresult Lwt.t
 
   val empty : inbox_context -> Sc_rollup_repr.t -> Raw_level_repr.t -> t Lwt.t
+
+  module Internal_for_tests : sig
+    val eq_tree : tree -> tree -> bool
+
+    val history_at_genesis : capacity:int64 -> next_index:int64 -> history
+
+    val history_hashes : history -> Hash.t list
+  end
 end
 
 module type P = sig
@@ -1277,6 +1285,33 @@ struct
         current_level_hash = (fun () -> initial_hash);
         old_levels_messages = Skip_list.genesis initial_hash;
       }
+
+  module Internal_for_tests = struct
+    let eq_tree = Tree.equal
+
+    let history_at_genesis ~capacity ~next_index =
+      {
+        (history_at_genesis ~capacity) with
+        next_index;
+        oldest_index = next_index;
+      }
+
+    let history_hashes {sequence; oldest_index; _} =
+      let l = Int64_map.bindings sequence in
+      (* All entries with an index greater than oldest_index are well ordered.
+         There are put in the [lp] list. Entries with an index smaller than
+         oldest_index are also well ordered, but they should come after
+         elements in [lp]. This happens in theory when the index reaches
+         max_int and then overflows. *)
+      let ln, lp =
+        List.partition_map
+          (fun (n, h) ->
+            if Compare.Int64.(n < oldest_index) then Left h else Right h)
+          l
+      in
+      (* do a tail recursive concatenation lp @ ln *)
+      List.rev_append (List.rev lp) ln
+  end
 end
 
 include (

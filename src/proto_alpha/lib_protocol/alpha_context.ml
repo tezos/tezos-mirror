@@ -64,6 +64,11 @@ module Sc_rollup = struct
     include Sc_rollup_inbox_repr
     include Sc_rollup_inbox_storage
     module Message = Sc_rollup_inbox_message_repr
+
+    module Internal_for_tests = struct
+      include Sc_rollup_inbox_repr.Internal_for_tests
+      include Sc_rollup_inbox_storage.Internal_for_tests
+    end
   end
 
   module Proof = Sc_rollup_proof_repr
