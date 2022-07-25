@@ -748,11 +748,6 @@ module Inner = struct
     Array.init n (fun i ->
         if i = 0 then Bls12_381.Fr.(copy one) else Array.get domain (n - i))
 
-  (* First part of Toeplitz computing trick involving srs. *)
-  let build_srs_part_h_list srs domain2m =
-    let domain2m = inverse (Domains.inverse domain2m) in
-    Bls12_381.G1.fft ~domain:domain2m ~points:srs
-
   let build_h_list_with_precomputed_srs a_list (domain2m, precomputed_srs) =
     let y = precomputed_srs in
     let v = Scalar.fft ~domain:domain2m ~points:a_list in
@@ -778,14 +773,14 @@ module Inner = struct
 
   (* Precompute first part of Toeplitz trick, which doesn't depends on the
      polynomial’s coefficients. *)
-  let preprocess_multi_reveals ~chunk_len ~degree (srs1, _srs2) =
+  let preprocess_multi_reveals ~chunk_len ~degree srs1 =
     let l = 1 lsl chunk_len in
     let k =
       let ratio = degree / l in
       let log_inf = Z.log2 (Z.of_int ratio) in
       if 1 lsl log_inf < ratio then log_inf else log_inf + 1
     in
-    let domain2m = Domains.build ~log:k in
+    let domain = Domains.build ~log:k |> Domains.inverse |> inverse in
     let precompute_srsj j =
       let quotient = (degree - j) / l in
       let padding = diff_next_power_of_two (2 * quotient) in
@@ -796,15 +791,15 @@ module Inner = struct
             if i < quotient then srs1.(degree - j - ((i + 1) * l))
             else Bls12_381.G1.(copy zero))
       in
-      build_srs_part_h_list srsj domain2m
+      Bls12_381.G1.fft ~domain ~points:srsj
     in
-    (domain2m, Array.init l precompute_srsj)
+    (domain, Array.init l precompute_srsj)
 
   (** Generate proofs of part 3.2.
   n, r are powers of two, m = 2^(log2(n)-1)
   coefs are f polynomial’s coefficients [f₀, f₁, f₂, …, fm-1]
   domain2m is the set of 2m-th roots of unity, used for Toeplitz computation
-  (domain2m, precomputed_srs_part) = preprocess_multi_reveals r n m (srs1, _srs2)
+  (domain2m, precomputed_srs_part) = preprocess_multi_reveals r n m srs1
    *)
   let multiple_multi_reveals ~chunk_len ~chunk_count ~degree
       ~preprocess:(domain2m, precomputed_srs_part) coefs =
@@ -883,16 +878,11 @@ module Inner = struct
       (Pairing.pairing_check
          [(diff_commits, G2.(copy one)); (proof, sl_min_yl)])
 
-  let eval_to_array e = Array.init (Domains.length e) (Domains.get e)
-
   let precompute_shards_proofs t trusted_setup =
-    let eval, m =
-      preprocess_multi_reveals
-        ~chunk_len:t.evaluations_per_proof_log
-        ~degree:t.k
-        (trusted_setup.srs_g1, trusted_setup.kate_amortized_srs_g2_shards)
-    in
-    (eval_to_array eval, m)
+    preprocess_multi_reveals
+      ~chunk_len:t.evaluations_per_proof_log
+      ~degree:t.k
+      trusted_setup.srs_g1
 
   let _save_precompute_shards_proofs (preprocess : shards_proofs_precomputation)
       filename =
