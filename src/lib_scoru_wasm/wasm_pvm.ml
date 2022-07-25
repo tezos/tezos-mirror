@@ -30,6 +30,8 @@
 
 *)
 
+open Tezos_webassembly_interpreter
+
 module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
   include
     Gather_floppies.Make
@@ -38,38 +40,87 @@ module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree = struct
         type tree = T.tree
 
         module Decodings = Wasm_decodings.Make (T)
+        module EncDec =
+          Tree_encoding_decoding.Make
+            (Lazy_map.LwtInt32Map)
+            (Lazy_vector.LwtInt32Vector)
+            (Chunked_byte_vector.Lwt)
+            (T)
 
-        let compute_step s =
-          let open Lwt.Syntax in
-          (* register the PVM host funcs wrappers in a module ["rollup_safe_core"]
-             into the WASM linker *)
-          let* () =
-            Tezos_webassembly_interpreter.(
-              Import.register ~module_name:(Utf8.decode "rollup_safe_core"))
-              Host_funcs.lookup
-          in
-          (* build the registry of host functions (to be passed to the interpreter via its config *)
-          let host_funcs_registry =
-            Tezos_webassembly_interpreter.Host_funcs.empty ()
-          in
-          Host_funcs.register_host_funcs host_funcs_registry ;
-          Lwt.return s
-
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/3092
-           Implement handling of input logic.
-        *)
-        let set_input_step _ _ = Lwt.return
+        let compute_step = Lwt.return
 
         let get_output _ _ = Lwt.return ""
 
-        let get_info _ =
-          Lwt.return
-            Wasm_pvm_sig.
-              {
-                current_tick = Z.of_int 0;
-                last_input_read = None;
-                input_request = No_input_required;
-              }
+        (* TODO: #3444
+           Create a may-fail tree-encoding-decoding combinator.
+           https://gitlab.com/tezos/tezos/-/issues/3444
+        *)
+
+        (* TODO: #3448
+           Remove the mention of exceptions from lib_scoru_wasm Make signature.
+           Add try_with or similar to catch exceptions and put the machine in a
+           stuck state instead. https://gitlab.com/tezos/tezos/-/issues/3448
+        *)
+
+        let current_tick_encoding =
+          EncDec.value ["wasm"; "current_tick"] Data_encoding.z
+
+        let level_encoding =
+          EncDec.value ["input"; "level"] Bounded.Int32.NonNegative.encoding
+
+        let id_encoding = EncDec.value ["input"; "id"] Data_encoding.z
+
+        let last_input_read_encoder =
+          EncDec.tup2 ~flatten:true level_encoding id_encoding
+
+        let status_encoding =
+          EncDec.value ["input"; "consuming"] Data_encoding.bool
+
+        let inp_encoding level id =
+          EncDec.value ["input"; level; id] Data_encoding.string
+
+        let get_info tree =
+          let open Lwt_syntax in
+          let* waiting =
+            try EncDec.decode status_encoding tree with _ -> Lwt.return false
+          in
+          let input_request =
+            if waiting then Wasm_pvm_sig.Input_required
+            else Wasm_pvm_sig.No_input_required
+          in
+          let* input =
+            try
+              let* t = EncDec.decode last_input_read_encoder tree in
+              Lwt.return @@ Some t
+            with _ -> Lwt.return_none
+          in
+          let last_input_read =
+            Option.map
+              (fun (inbox_level, message_counter) ->
+                Wasm_pvm_sig.{inbox_level; message_counter})
+              input
+          in
+
+          let* current_tick =
+            try EncDec.decode current_tick_encoding tree
+            with _ -> Lwt.return Z.zero
+          in
+          Lwt.return Wasm_pvm_sig.{current_tick; last_input_read; input_request}
+
+        let set_input_step input_info message tree =
+          let open Lwt_syntax in
+          let open Wasm_pvm_sig in
+          let {inbox_level; message_counter} = input_info in
+          let level =
+            Int32.to_string @@ Bounded.Int32.NonNegative.to_int32 inbox_level
+          in
+          let id = Z.to_string message_counter in
+          let* current_tick = EncDec.decode current_tick_encoding tree in
+          let* tree =
+            EncDec.encode current_tick_encoding (Z.succ current_tick) tree
+          in
+          let* tree = EncDec.encode status_encoding false tree in
+          EncDec.encode (inp_encoding level id) message tree
 
         let _module_instance_of_tree modules =
           Decodings.run (Decodings.module_instance_decoding modules)
