@@ -32,7 +32,8 @@ type error += Commitment_predecessor_should_be_LCC of Sc_rollup.Commitment.t
 type error += Unreliable_tezos_node_returning_inconsistent_game
 
 type error +=
-  | Cannot_produce_proof of Store.Inbox.t * Store.Inbox.history * Raw_level.t
+  | Cannot_produce_proof of
+      Sc_rollup.Inbox.t * Sc_rollup.Inbox.history * Raw_level.t
 
 let () =
   register_error_kind
@@ -91,16 +92,16 @@ let () =
       Format.fprintf
         ppf
         "cannot produce proof for inbox %a of level %a with history %a"
-        Store.Inbox.pp
+        Sc_rollup.Inbox.pp
         inbox
         Raw_level.pp
         level
-        Store.Inbox.pp_history
+        Sc_rollup.Inbox.pp_history
         history)
     Data_encoding.(
       obj3
-        (req "inbox" Store.Inbox.encoding)
-        (req "history" Store.Inbox.history_encoding)
+        (req "inbox" Sc_rollup.Inbox.encoding)
+        (req "history" Sc_rollup.Inbox.history_encoding)
         (req "level" Raw_level.encoding))
     (function
       | Cannot_produce_proof (inbox, history, level) ->
