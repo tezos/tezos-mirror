@@ -558,20 +558,16 @@ module Ast = struct
             (memop_encoding Types.vec_type_encoding Types.pack_size_encoding))
          (req "lane" int31))
 
-  let var_encoding =
+  let region_encoding encoding =
     let open Data_encoding in
     let open Source in
-    conv (fun x -> x.it) (fun var -> var @@ no_region) Data_encoding.int32
+    conv (fun x -> x.it) (fun v -> v @@ no_region) encoding
 
-  let num_encoding =
-    let open Data_encoding in
-    let open Source in
-    conv (fun x -> x.it) (fun x -> x @@ no_region) Values.num_encoding
+  let var_encoding = region_encoding Data_encoding.int32
 
-  let vec_encoding =
-    let open Data_encoding in
-    let open Source in
-    conv (fun x -> x.it) (fun vec -> vec @@ no_region) Values.vec_encoding
+  let num_encoding = region_encoding Values.num_encoding
+
+  let vec_encoding = region_encoding Values.vec_encoding
 
   let block_type_encoding =
     let open Data_encoding in
@@ -601,7 +597,6 @@ module Ast = struct
     conv (fun (Data_label l) -> l) (fun l -> Data_label l) int32
 
   let import_desc_encoding =
-    let open Data_encoding in
     let open Ast in
     let unannotated_encoding =
       union_incr
@@ -628,13 +623,9 @@ module Ast = struct
             (fun g -> GlobalImport g);
         ]
     in
-    conv
-      (fun v -> v.Source.it)
-      (fun v -> Source.(v @@ no_region))
-      unannotated_encoding
+    region_encoding unannotated_encoding
 
   let export_desc_encoding =
-    let open Data_encoding in
     let open Ast in
     let unannotated_encoding =
       union_incr
@@ -661,8 +652,32 @@ module Ast = struct
             (fun g -> GlobalExport g);
         ]
     in
-    conv
-      (fun v -> v.Source.it)
-      (fun v -> Source.(v @@ no_region))
-      unannotated_encoding
+    region_encoding unannotated_encoding
+
+  let const_encoding = region_encoding block_label_encoding
+
+  let segment_mode_encoding =
+    let open Data_encoding in
+    let unannotated_encoding =
+      union_incr
+        [
+          case_incr
+            "Passive"
+            (constant "Passive")
+            (function Ast.Passive -> Some () | _ -> None)
+            (fun () -> Passive);
+          case_incr
+            "Active"
+            (tup2 var_encoding const_encoding)
+            (function
+              | Ast.Active {index; offset} -> Some (index, offset) | _ -> None)
+            (fun (index, offset) -> Active {index; offset});
+          case_incr
+            "Declarative"
+            (constant "Declarative")
+            (function Ast.Declarative -> Some () | _ -> None)
+            (fun () -> Declarative);
+        ]
+    in
+    region_encoding unannotated_encoding
 end

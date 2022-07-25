@@ -504,4 +504,167 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
           ckstop_case;
         ]
   end
+
+  module Elem = struct
+    let region enc =
+      Data_encoding.conv
+        (fun p -> p.Source.it)
+        (fun v -> Source.(v @@ no_region))
+        enc
+
+    let index_kind_encoding =
+      Data_encoding.string_enum
+        [("Indexed", Decode.Indexed); ("Const", Decode.Const)]
+
+    let ekstart_case =
+      let tag = "EKStart" in
+      case
+        tag
+        (value [] (Data_encoding.constant "tag"))
+        (function Decode.EKStart -> Some () | _ -> None)
+        (fun () -> EKStart)
+
+    let ekmode_case =
+      let left = value ["left"] Data_encoding.int31 in
+      let index = value ["index"] (region Data_encoding.int32) in
+      let index_kind = value ["index_kind"] index_kind_encoding in
+      let early_ref_type =
+        value_option
+          ["early_ref_type"]
+          Interpreter_encodings.Types.ref_type_encoding
+      in
+      let offset_kont = value ["offset_kont"] Data_encoding.int31 in
+      let offset_kont_code = scope ["offset_kont_code"] Block.encoding in
+      case
+        "EKMode"
+        (tup6
+           ~flatten:true
+           left
+           index
+           index_kind
+           early_ref_type
+           offset_kont
+           offset_kont_code)
+        (function
+          | Decode.EKMode
+              {
+                left;
+                index;
+                index_kind;
+                early_ref_type;
+                offset_kont = offset_kont, offset_kont_code;
+              } ->
+              Some
+                ( left,
+                  index,
+                  index_kind,
+                  early_ref_type,
+                  offset_kont,
+                  offset_kont_code )
+          | _ -> None)
+        (fun ( left,
+               index,
+               index_kind,
+               early_ref_type,
+               offset_kont,
+               offset_kont_code ) ->
+          EKMode
+            {
+              left;
+              index;
+              index_kind;
+              early_ref_type;
+              offset_kont = (offset_kont, offset_kont_code);
+            })
+
+    let ekinitindexed_case =
+      let mode =
+        value ["mode"] Interpreter_encodings.Ast.segment_mode_encoding
+      in
+      let ref_type =
+        value ["ref_type"] Interpreter_encodings.Types.ref_type_encoding
+      in
+      let einit_vec =
+        scope
+          ["einit_vec"]
+          (Lazy_vec.encoding
+             (value [] (region Interpreter_encodings.Ast.block_label_encoding)))
+      in
+      case
+        "EKInitIndexed"
+        (tup3 ~flatten:true mode ref_type einit_vec)
+        (function
+          | Decode.EKInitIndexed {mode; ref_type; einit_vec} ->
+              Some (mode, ref_type, einit_vec)
+          | _ -> None)
+        (fun (mode, ref_type, einit_vec) ->
+          EKInitIndexed {mode; ref_type; einit_vec})
+
+    let ekinitconst_case =
+      let mode =
+        value ["mode"] Interpreter_encodings.Ast.segment_mode_encoding
+      in
+      let ref_type =
+        value ["ref_type"] Interpreter_encodings.Types.ref_type_encoding
+      in
+      let einit_vec =
+        scope
+          ["einit_vec"]
+          (Lazy_vec.encoding
+             (value [] (region Interpreter_encodings.Ast.block_label_encoding)))
+      in
+      let einit_kont_pos = value ["einit_kont_pos"] Data_encoding.int31 in
+      let einit_kont_block = scope ["einit_kont_block"] Block.encoding in
+      case
+        "EKInitConst"
+        (tup5
+           ~flatten:true
+           mode
+           ref_type
+           einit_vec
+           einit_kont_pos
+           einit_kont_block)
+        (function
+          | Decode.EKInitConst
+              {mode; ref_type; einit_vec; einit_kont = pos, block} ->
+              Some (mode, ref_type, einit_vec, pos, block)
+          | _ -> None)
+        (fun (mode, ref_type, einit_vec, pos, block) ->
+          EKInitConst {mode; ref_type; einit_vec; einit_kont = (pos, block)})
+
+    let elem_encoding =
+      let etype =
+        value ["ref_type"] Interpreter_encodings.Types.ref_type_encoding
+      in
+      let einit =
+        scope
+          ["einit"]
+          (vector_encoding (value [] Interpreter_encodings.Ast.const_encoding))
+      in
+      let emode =
+        value ["mode"] Interpreter_encodings.Ast.segment_mode_encoding
+      in
+      conv
+        (fun (etype, einit, emode) -> Ast.{etype; einit; emode})
+        (fun Ast.{etype; einit; emode} -> (etype, einit, emode))
+        (tup3 ~flatten:true etype einit emode)
+
+    let ekstop_case =
+      case
+        "EKStop"
+        elem_encoding
+        (function Decode.EKStop elem -> Some elem | _ -> None)
+        (fun elem -> EKStop elem)
+
+    let encoding =
+      tagged_union
+        (value [] Data_encoding.string)
+        [
+          ekstart_case;
+          ekmode_case;
+          ekinitindexed_case;
+          ekinitconst_case;
+          ekstop_case;
+        ]
+  end
 end

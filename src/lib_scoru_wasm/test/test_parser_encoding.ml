@@ -650,7 +650,115 @@ module Code = struct
   let tests = [tztest "Code" `Quick (make_test Parser.Code.encoding gen check)]
 end
 
+module Elem = struct
+  open Utils
+
+  let elem_gen =
+    let open QCheck2.Gen in
+    let open Ast_generators in
+    let* etype = ref_type_gen in
+    let* emode = segment_mode_gen in
+    let+ einit = Vec.gen const_gen in
+    Ast.{etype; emode; einit}
+
+  let gen =
+    let open QCheck2.Gen in
+    let open Ast_generators in
+    let start = return Decode.EKStart in
+    let mode =
+      let* left = small_nat in
+      let* index = int32 in
+      let* index_kind = oneofl [Decode.Indexed; Decode.Const] in
+      let* early_ref_type = opt ref_type_gen in
+      let* offset_kont = small_nat in
+      let+ offset_kont_code = Block.gen in
+      Decode.EKMode
+        {
+          left;
+          index = Source.(index @@ no_region);
+          index_kind;
+          early_ref_type;
+          offset_kont = (offset_kont, offset_kont_code);
+        }
+    in
+    let initindexed =
+      let* mode = segment_mode_gen in
+      let* ref_type = ref_type_gen in
+      let+ einit_vec = LazyVec.gen const_gen in
+      Decode.EKInitIndexed {mode; ref_type; einit_vec}
+    in
+    let initconst =
+      let* mode = segment_mode_gen in
+      let* ref_type = ref_type_gen in
+      let* einit_vec = LazyVec.gen const_gen in
+      let* pos = small_int in
+      let+ block = Block.gen in
+      Decode.EKInitConst {mode; ref_type; einit_vec; einit_kont = (pos, block)}
+    in
+    let stop =
+      let+ elem = elem_gen in
+      Decode.EKStop elem
+    in
+    oneof [start; mode; initindexed; initconst; stop]
+
+  let elem_check Ast.{emode; einit; etype}
+      Ast.{emode = emode'; einit = einit'; etype = etype'} =
+    let open Lwt_result_syntax in
+    let eq_const c c' = return (c = c') in
+    let* eq_init = Vec.check eq_const einit einit' in
+    return (emode = emode' && eq_init && etype = etype')
+
+  let check ek ek' =
+    let open Lwt_result_syntax in
+    match (ek, ek') with
+    | Decode.EKStart, Decode.EKStart -> return_true
+    | ( EKMode
+          {
+            left;
+            index;
+            index_kind;
+            early_ref_type;
+            offset_kont = offset_kont_pos, offset_kont_code;
+          },
+        EKMode
+          {
+            left = left';
+            index = index';
+            index_kind = index_kind';
+            early_ref_type = early_ref_type';
+            offset_kont = offset_kont_pos', offset_kont_code';
+          } ) ->
+        let+ eq_code = Block.check offset_kont_code offset_kont_code' in
+        left = left' && index = index' && index_kind = index_kind'
+        && early_ref_type = early_ref_type'
+        && offset_kont_pos = offset_kont_pos'
+        && eq_code
+    | ( EKInitIndexed {mode; ref_type; einit_vec},
+        EKInitIndexed
+          {mode = mode'; ref_type = ref_type'; einit_vec = einit_vec'} ) ->
+        let eq_const c c' = return (c = c') in
+        let+ eq_init = LazyVec.check eq_const einit_vec einit_vec' in
+        mode = mode' && ref_type = ref_type' && eq_init
+    | ( EKInitConst {mode; ref_type; einit_vec; einit_kont = pos, block},
+        EKInitConst
+          {
+            mode = mode';
+            ref_type = ref_type';
+            einit_vec = einit_vec';
+            einit_kont = pos', block';
+          } ) ->
+        let eq_const c c' = return (c = c') in
+        let* eq_init = LazyVec.check eq_const einit_vec einit_vec' in
+        let+ eq_block = Block.check block block' in
+        mode = mode' && ref_type = ref_type' && pos = pos' && eq_init
+        && eq_block
+    | EKStop elem, EKStop elem' -> elem_check elem elem'
+    | _, _ -> return_false
+
+  let tests = [tztest "Elem" `Quick (make_test Parser.Elem.encoding gen check)]
+end
+
 let tests =
   Byte_vector.tests @ Vec.tests @ LazyVec.tests @ Names.tests @ Func_type.tests
   @ Imports.tests @ LazyStack.tests @ Exports.tests @ Instr_block.tests
-  @ Block.tests @ Size.tests @ Code.tests
+  @ Block.tests @ Size.tests @ Code.tests @ Elem.tests

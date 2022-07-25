@@ -219,4 +219,8 @@ module Ast : sig
   val import_desc_encoding : Ast.import_desc Data_encoding.t
 
   val export_desc_encoding : Ast.export_desc Data_encoding.t
+
+  val const_encoding : Ast.const Data_encoding.t
+
+  val segment_mode_encoding : Ast.segment_mode Data_encoding.t
 end

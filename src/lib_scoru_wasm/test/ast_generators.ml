@@ -455,6 +455,19 @@ let export_desc_gen =
   in
   no_region edesc
 
+let const_gen = map no_region block_label_gen
+
+let segment_mode_gen =
+  let passive = return Ast.Passive in
+  let active =
+    let* index = var_gen in
+    let+ offset = block_label_gen in
+    Ast.Active {index; offset = no_region offset}
+  in
+  let declarative = return Ast.Declarative in
+  let+ mode = oneof [passive; active; declarative] in
+  no_region mode
+
 let module_key_and_instance_gen ?module_reg () =
   let module_reg =
     match module_reg with
