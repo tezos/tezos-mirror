@@ -171,8 +171,9 @@ module Revamped = struct
         ~base:(Either.right (protocol, None))
         []
     in
-    let* () = Client.activate_protocol ~parameter_file ~protocol client in
-    let* _ = Node.wait_for_level node 1 in
+    let* () =
+      Client.activate_protocol_and_wait ~parameter_file ~protocol client
+    in
 
     log_step 2 "Inject %d transfer operations." number_of_operations ;
     let* _ =
@@ -262,8 +263,8 @@ module Revamped = struct
     let* () = Client.Admin.trust_address client1 ~peer:node2
     and* () = Client.Admin.trust_address client2 ~peer:node1 in
     let* () = Client.Admin.connect_address client1 ~peer:node2 in
-    let* () = Client.activate_protocol ~protocol client1 in
-    let* _ = Node.wait_for_level node1 1 and* _ = Node.wait_for_level node2 1 in
+    let* () = Client.activate_protocol_and_wait ~protocol client1 in
+    let* _ = Node.wait_for_level node2 1 in
 
     log_step 2 "Inject a transfer operation on node1." ;
     let* (`OpHash oph) =
@@ -1137,8 +1138,7 @@ module Revamped = struct
         [Connections 0; Synchronisation_threshold 0]
     in
     let* client = Client.init ~endpoint:(Node node) () in
-    let* () = Client.activate_protocol ~protocol client in
-    let* _ = Node.wait_for_level node 1 in
+    let* () = Client.activate_protocol_and_wait ~protocol client in
 
     log_step
       2
@@ -1291,8 +1291,7 @@ module Revamped = struct
         [Connections 0; Synchronisation_threshold 0]
     in
     let* client = Client.init ~endpoint:(Node node) () in
-    let* () = Client.activate_protocol ~protocol client in
-    let* _ = Node.wait_for_level node 1 in
+    let* () = Client.activate_protocol_and_wait ~protocol client in
 
     log_step 2 "Bake an empty block to be able to endorse it." ;
     let* _ = bake_for ~empty:true ~protocol ~wait_for_flush:true node client in
@@ -1365,8 +1364,8 @@ module Revamped = struct
         ()
     in
     let* () = Client.Admin.connect_address client1 ~peer:node2 in
-    let* () = Client.activate_protocol ~protocol client1 in
-    let* _ = Node.wait_for_level node1 1 and* _ = Node.wait_for_level node2 1 in
+    let* () = Client.activate_protocol_and_wait ~protocol client1 in
+    let* _ = Node.wait_for_level node2 1 in
 
     log_step 2 "Injection of two operations (transfers)." ;
     let notify_in_node2 = Node.wait_for_request ~request:`Notify node2 in
@@ -1457,8 +1456,7 @@ module Revamped = struct
       let wait_for_injection = if wait then Some node1 else None in
       Operation.inject_transfer ?wait_for_injection ~source ~dest client1
     in
-    let* () = Client.activate_protocol ~protocol client1 in
-    let* _ = Node.wait_for_level node1 1 in
+    let* () = Client.activate_protocol_and_wait ~protocol client1 in
 
     log_step 2 "Inject two transfers op1 and op2." ;
     let* (`OpHash oph1) = inject_op ~wait:true `A in
@@ -1546,8 +1544,8 @@ module Revamped = struct
         ()
     in
     let* () = Client.Admin.connect_address client1 ~peer:node2 in
-    let* () = Client.activate_protocol ~protocol client1 in
-    let* _ = Node.wait_for_level node1 1 and* _ = Node.wait_for_level node2 1 in
+    let* () = Client.activate_protocol_and_wait ~protocol client1 in
+    let* _ = Node.wait_for_level node2 1 in
 
     log_step 2 "Inject four transfer operations" ;
     let inject_op ~wait op client =
@@ -1615,8 +1613,8 @@ module Revamped = struct
     let* () = Client.Admin.trust_address client1 ~peer:node2
     and* () = Client.Admin.trust_address client2 ~peer:node1 in
     let* () = Client.Admin.connect_address client1 ~peer:node2 in
-    let* () = Client.activate_protocol ~protocol client1 in
-    let* _ = Node.wait_for_level node1 1 and* _ = Node.wait_for_level node2 1 in
+    let* () = Client.activate_protocol_and_wait ~protocol client1 in
+    let* _ = Node.wait_for_level node2 1 in
 
     log_step
       1
@@ -1797,8 +1795,8 @@ module Revamped = struct
     let* () = Client.Admin.trust_address client1 ~peer:node2
     and* () = Client.Admin.trust_address client2 ~peer:node1 in
     let* () = Client.Admin.connect_address client1 ~peer:node2 in
-    let* () = Client.activate_protocol ~protocol client1 in
-    let* _ = Node.wait_for_level node1 1 and* _ = Node.wait_for_level node2 1 in
+    let* () = Client.activate_protocol_and_wait ~protocol client1 in
+    let* _ = Node.wait_for_level node2 1 in
 
     log_step
       1
@@ -2393,10 +2391,8 @@ let propagation_future_endorsement =
   and* () = Client.Admin.trust_address client_3 ~peer:node_2 in
   let* () = Client.Admin.connect_address client_1 ~peer:node_2
   and* () = Client.Admin.connect_address client_2 ~peer:node_3 in
-  let* () = Client.activate_protocol ~protocol client_1 in
-  let* _ = Node.wait_for_level node_1 1
-  and* _ = Node.wait_for_level node_2 1
-  and* _ = Node.wait_for_level node_3 1 in
+  let* () = Client.activate_protocol_and_wait ~protocol client_1 in
+  let* _ = Node.wait_for_level node_2 1 and* _ = Node.wait_for_level node_3 1 in
   Log.info "%s" step1_msg ;
   let* node_1_id = Node.wait_for_identity node_1
   and* node_2_id = Node.wait_for_identity node_2
@@ -2492,9 +2488,9 @@ let forge_pre_filtered_operation =
   let* () = Client.Admin.trust_address client_1 ~peer:node_2
   and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
   let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
-  let* () = Client.activate_protocol ~protocol client_1 in
+  let* () = Client.activate_protocol_and_wait ~protocol client_1 in
   Log.info "Activated protocol." ;
-  let* _ = Node.wait_for_level node_1 1 and* _ = Node.wait_for_level node_2 1 in
+  let* _ = Node.wait_for_level node_2 1 in
   Log.info "All nodes are at level %d." 1 ;
   (* Step 2 *)
   (* Get the counter and the current branch *)
@@ -2606,9 +2602,9 @@ let refetch_failed_operation =
   let* () = Client.Admin.trust_address client_1 ~peer:node_2
   and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
   let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
-  let* () = Client.activate_protocol ~protocol client_1 in
+  let* () = Client.activate_protocol_and_wait ~protocol client_1 in
   Log.info "Activated protocol." ;
-  let* _ = Node.wait_for_level node_1 1 and* _ = Node.wait_for_level node_2 1 in
+  let* _ = Node.wait_for_level node_2 1 in
   Log.info "All nodes are at level %d." 1 ;
   (* Step 2 *)
   (* get counter and branches *)
@@ -2786,8 +2782,8 @@ let ban_operation_and_check_applied =
   let* client_1 = Client.init ~endpoint:Client.(Node node_1) ()
   and* client_2 = Client.init ~endpoint:Client.(Node node_2) () in
   let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
-  let* () = Client.activate_protocol ~protocol client_1 in
-  let* _ = Node.wait_for_level node_1 1 and* _ = Node.wait_for_level node_2 1 in
+  let* () = Client.activate_protocol_and_wait ~protocol client_1 in
+  let* _ = Node.wait_for_level node_2 1 in
   Log.info "Both nodes are at level 1." ;
   Log.info
     "Step 2: Inject five operations (transfers from five different sources, \
@@ -3034,10 +3030,9 @@ let test_do_not_reclassify =
   let* client1 = Client.init ~endpoint:Client.(Node node1) ()
   and* client2 = Client.init ~endpoint:Client.(Node node2) () in
   let* () = Client.Admin.connect_address client1 ~peer:node2
-  and* () = Client.activate_protocol ~protocol client1 in
+  and* () = Client.activate_protocol_and_wait ~protocol client1 in
   let proto_activation_level = 1 in
-  let* _ = Node.wait_for_level node1 proto_activation_level
-  and* _ = Node.wait_for_level node2 proto_activation_level in
+  let* _ = Node.wait_for_level node2 proto_activation_level in
   Log.info "Both nodes are at level %d." proto_activation_level ;
   Log.info
     ~color:step_color
@@ -3153,9 +3148,8 @@ let test_pending_operation_version =
       [Synchronisation_threshold 0; Private_mode]
   in
   let* client_1 = Client.init ~endpoint:(Node node_1) () in
-  let* () = Client.activate_protocol ~protocol client_1 in
+  let* () = Client.activate_protocol_and_wait ~protocol client_1 in
   Log.info "Activated protocol." ;
-  let* _ = Node.wait_for_level node_1 1 in
   (* Step 2 *)
   (* Inject refused operation *)
   let* branch = RPC.get_branch client_1 >|= JSON.as_string in
@@ -3265,10 +3259,9 @@ let force_operation_injection =
   let* client1 = Client.init ~endpoint:Client.(Node node1) ()
   and* client2 = Client.init ~endpoint:Client.(Node node2) () in
   let* () = Client.Admin.connect_address client2 ~peer:node1
-  and* () = Client.activate_protocol ~protocol client2 in
+  and* () = Client.activate_protocol_and_wait ~protocol client2 in
   let proto_activation_level = 1 in
-  let* _ = Node.wait_for_level node1 proto_activation_level
-  and* _ = Node.wait_for_level node2 proto_activation_level in
+  let* _ = Node.wait_for_level node1 proto_activation_level in
   Log.info "Both nodes are at level %d." proto_activation_level ;
   let open Lwt in
   Log.info "%s" step3_msg ;
@@ -3353,8 +3346,9 @@ let injecting_old_operation_fails =
           Some (string_of_int max_operations_ttl) );
       ]
   in
-  let* () = Client.activate_protocol ~protocol ~parameter_file client in
-  let* _ = Node.wait_for_level node 1 in
+  let* () =
+    Client.activate_protocol_and_wait ~protocol ~parameter_file client
+  in
   log_step 2 step2 ;
   let*! json =
     RPC.Contracts.get_counter
@@ -3575,9 +3569,7 @@ let init_single_node_and_activate_protocol
     ?event_sections_levels protocol =
   let* node = Node.init ?event_sections_levels arguments in
   let* client = Client.init ~endpoint:Client.(Node node) () in
-  let* () = Client.activate_protocol ~protocol client in
-  let proto_activation_level = 1 in
-  let* _ = Node.wait_for_level node proto_activation_level in
+  let* () = Client.activate_protocol_and_wait ~protocol client in
   return (node, client)
 
 (* Probably to be replaced during upcoming mempool tests refactoring *)
@@ -3591,10 +3583,9 @@ let init_two_connected_nodes_and_activate_protocol ?event_sections_levels1
   let* client1 = Client.init ~endpoint:Client.(Node node1) ()
   and* client2 = Client.init ~endpoint:Client.(Node node2) () in
   let* () = Client.Admin.connect_address client1 ~peer:node2
-  and* () = Client.activate_protocol ~protocol client1 in
+  and* () = Client.activate_protocol_and_wait ~protocol client1 in
   let proto_activation_level = 1 in
-  let* _ = Node.wait_for_level node1 proto_activation_level
-  and* _ = Node.wait_for_level node2 proto_activation_level in
+  let* _ = Node.wait_for_level node2 proto_activation_level in
   return (node1, client1, node2, client2)
 
 (* TMP: to be replaced in !3418 *)
@@ -3972,9 +3963,9 @@ let test_request_operations_peer =
   let* () = Client.Admin.trust_address client_1 ~peer:node_2
   and* () = Client.Admin.trust_address client_2 ~peer:node_1 in
   let* () = Client.Admin.connect_address client_1 ~peer:node_2 in
-  let* () = Client.activate_protocol ~protocol client_1 in
+  let* () = Client.activate_protocol_and_wait ~protocol client_1 in
   Log.info "Activated protocol." ;
-  let* _ = Node.wait_for_level node_1 1 and* _ = Node.wait_for_level node_2 1 in
+  let* _ = Node.wait_for_level node_2 1 in
   Log.info "%s" step2_msg ;
   let* node2_identity = Node.wait_for_identity node_2 in
   let* () = Client.Admin.kick_peer ~peer:node2_identity client_1 in

@@ -227,9 +227,9 @@ module Helpers = struct
     in
     Cluster.symmetric_add_peer node1 node2 ;
     let* () = Cluster.start ~event_sections_levels [node1; node2] in
-    let* () = Client.activate_protocol ~protocol client1 in
+    let* () = Client.activate_protocol_and_wait ~protocol client1 in
     Log.info "Activated protocol" ;
-    let* _ = Node.wait_for_level node1 1 and* _ = Node.wait_for_level node2 1 in
+    let* _ = Node.wait_for_level node2 1 in
     let* _ = Events.wait_sync nodes in
     return nodes
 

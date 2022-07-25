@@ -287,12 +287,15 @@ let test_storage_snapshot =
   let nodes_group1 = [node_archive; node_full; node_rolling] in
 
   let* () =
-    Client.activate_protocol ~endpoint:(Node node_archive) ~protocol client
+    Client.activate_protocol_and_wait
+      ~endpoint:(Node node_archive)
+      ~protocol
+      ~node:node_archive
+      client
   in
 
   (* Bake a few blocks *)
-  let* head_level = bake_batch 1 node_archive client nodes_group1 batch_1 in
-  let snapshot_level = head_level in
+  let* snapshot_level = bake_batch 1 node_archive client nodes_group1 batch_1 in
 
   (* ########################################################################### *)
   Log.info "Export all kinds of snapshots" ;

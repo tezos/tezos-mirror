@@ -476,6 +476,39 @@ let activate_protocol ?endpoint ~protocol ?fitness ?key ?timestamp
     client
   |> Process.check
 
+let node_of_endpoint = function Node n -> Some n | Proxy_server _ -> None
+
+let node_of_client_mode = function
+  | Client (Some endpoint, _) -> node_of_endpoint endpoint
+  | Proxy endpoint -> node_of_endpoint endpoint
+  | Light (_, endpoints) -> List.find_map node_of_endpoint endpoints
+  | Client (None, _) -> None
+  | Mockup -> None
+
+let activate_protocol_and_wait ?endpoint ~protocol ?fitness ?key ?timestamp
+    ?parameter_file ?node client =
+  let node =
+    match node with
+    | Some n -> n
+    | None -> (
+        match node_of_client_mode client.mode with
+        | Some n -> n
+        | None -> Test.fail "No node found for activate_protocol_and_wait")
+  in
+  let level_before = Node.get_level node in
+  let* () =
+    activate_protocol
+      ?endpoint
+      ~protocol
+      ?fitness
+      ?key
+      ?timestamp
+      ?parameter_file
+      client
+  in
+  let* _lvl = Node.wait_for_level node (level_before + 1) in
+  unit
+
 let empty_mempool_file ?(filename = "mempool.json") () =
   let mempool_str = "[]" in
   let mempool = Temp.file filename in
@@ -523,15 +556,6 @@ let bake_for ?endpoint ?protocol ?keys ?minimal_fees
     ?protocol
     client
   |> Process.check
-
-let node_of_endpoint = function Node n -> Some n | Proxy_server _ -> None
-
-let node_of_client_mode = function
-  | Client (Some endpoint, _) -> node_of_endpoint endpoint
-  | Proxy endpoint -> node_of_endpoint endpoint
-  | Light (_, endpoints) -> List.find_map node_of_endpoint endpoints
-  | Client (None, _) -> None
-  | Mockup -> None
 
 let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
