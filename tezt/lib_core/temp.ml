@@ -52,7 +52,11 @@ let get_fs ?runner () =
 
 let next_name = ref 0
 
-let base_main_dir () = "tezt-" ^ string_of_int (Unix.getpid ())
+let pid = ref 0
+
+let set_pid value = pid := value
+
+let base_main_dir () = "tezt-" ^ string_of_int !pid
 
 (* [add_file], [add_dir] and [add_parent] select the file system to use.*)
 let add_file ?runner file =

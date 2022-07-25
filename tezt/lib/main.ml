@@ -117,6 +117,7 @@ module Scheduler : Test.SCHEDULER = struct
     if pid = 0 then (
       (* This is now a worker process. *)
       current_worker_id := Some worker_id ;
+      Temp.set_pid (Unix.getpid ()) ;
       Unix.close pipe_to_worker_entrance ;
       Unix.close pipe_from_worker_exit ;
       worker_listen
@@ -145,6 +146,7 @@ module Scheduler : Test.SCHEDULER = struct
         ()
 
   let rec run_single_process ~on_worker_available =
+    Temp.set_pid (Unix.getpid ()) ;
     match on_worker_available () with
     | None -> ()
     | Some (request, on_response) ->
