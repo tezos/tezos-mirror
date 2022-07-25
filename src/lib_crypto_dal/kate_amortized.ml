@@ -88,9 +88,9 @@ module Kate_amortized = struct
   let preprocess_multi_reveals ~chunk_len ~degree (srs1, _srs2) =
     let l = 1 lsl chunk_len in
     let k =
-      let m_sur_l = degree / l in
-      let log_inf = Z.log2 (Z.of_int m_sur_l) in
-      if 1 lsl log_inf < m_sur_l then log_inf else log_inf + 1
+      let ratio = degree / l in
+      let log_inf = Z.log2 (Z.of_int ratio) in
+      if 1 lsl log_inf < ratio then log_inf else log_inf + 1
     in
     let domain2m = Domain.build ~log:k in
     let precompute_srsj j =
