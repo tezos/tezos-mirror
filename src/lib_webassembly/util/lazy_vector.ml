@@ -243,6 +243,8 @@ module LwtInt64Vector = Make (Effect.Lwt) (Int64)
 module LwtZVector = Make (Effect.Lwt) (ZZ)
 
 module Mutable = struct
+  module type ImmutableS = S
+
   module type S = sig
     type key
 
@@ -275,9 +277,12 @@ module Mutable = struct
     val snapshot : 'a t -> 'a Vector.t
   end
 
-  module Make (Effect : Effect.S) (Key : KeyS) :
-    S with type key = Key.t and type 'a effect = 'a Effect.t = struct
-    module Vector = Make (Effect) (Key)
+  module Make (Vector : ImmutableS) :
+    S
+      with type key = Vector.key
+       and type 'a effect = 'a Vector.effect
+       and module Vector = Vector = struct
+    module Vector = Vector
 
     type key = Vector.key
 
@@ -309,11 +314,11 @@ module Mutable = struct
     let snapshot map_ref = !map_ref
   end
 
-  module IntVector = Make (Effect.Identity) (Int)
-  module Int32Vector = Make (Effect.Identity) (Int32)
-  module Int64Vector = Make (Effect.Identity) (Int64)
-  module LwtIntVector = Make (Effect.Lwt) (Int)
-  module LwtInt32Vector = Make (Effect.Lwt) (Int32)
-  module LwtInt64Vector = Make (Effect.Lwt) (Int64)
-  module LwtZVector = Make (Effect.Lwt) (ZZ)
+  module IntVector = Make (IntVector)
+  module Int32Vector = Make (Int32Vector)
+  module Int64Vector = Make (Int64Vector)
+  module LwtIntVector = Make (LwtIntVector)
+  module LwtInt32Vector = Make (LwtInt32Vector)
+  module LwtInt64Vector = Make (LwtInt64Vector)
+  module LwtZVector = Make (LwtZVector)
 end

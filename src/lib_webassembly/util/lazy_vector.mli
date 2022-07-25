@@ -156,6 +156,8 @@ module LwtZVector : S with type key = Z.t and type 'a effect = 'a Lwt.t
 
 (** [Make] generates a lazy vector module using a given [Key] module. *)
 module Mutable : sig
+  module type ImmutableS = S
+
   (** [S] is the signature of a mutable lazy vector module. *)
   module type S = sig
     type key
@@ -189,20 +191,48 @@ module Mutable : sig
     val snapshot : 'a t -> 'a Vector.t
   end
 
-  module Make (Effect : Effect.S) (Key : KeyS) :
-    S with type key = Key.t and type 'a effect = 'a Effect.t
+  module Make (Vector : ImmutableS) :
+    S
+      with type key = Vector.key
+       and type 'a effect = 'a Vector.effect
+       and module Vector = Vector
 
-  module IntVector : S with type key = int and type 'a effect = 'a
+  module IntVector :
+    S with type key = int and type 'a effect = 'a and module Vector = IntVector
 
-  module Int32Vector : S with type key = int32 and type 'a effect = 'a
+  module Int32Vector :
+    S
+      with type key = int32
+       and type 'a effect = 'a
+       and module Vector = Int32Vector
 
-  module Int64Vector : S with type key = int64 and type 'a effect = 'a
+  module Int64Vector :
+    S
+      with type key = int64
+       and type 'a effect = 'a
+       and module Vector = Int64Vector
 
-  module LwtIntVector : S with type key = int and type 'a effect = 'a Lwt.t
+  module LwtIntVector :
+    S
+      with type key = int
+       and type 'a effect = 'a Lwt.t
+       and module Vector = LwtIntVector
 
-  module LwtInt32Vector : S with type key = int32 and type 'a effect = 'a Lwt.t
+  module LwtInt32Vector :
+    S
+      with type key = int32
+       and type 'a effect = 'a Lwt.t
+       and module Vector = LwtInt32Vector
 
-  module LwtInt64Vector : S with type key = int64 and type 'a effect = 'a Lwt.t
+  module LwtInt64Vector :
+    S
+      with type key = int64
+       and type 'a effect = 'a Lwt.t
+       and module Vector = LwtInt64Vector
 
-  module LwtZVector : S with type key = Z.t and type 'a effect = 'a Lwt.t
+  module LwtZVector :
+    S
+      with type key = Z.t
+       and type 'a effect = 'a Lwt.t
+       and module Vector = LwtZVector
 end

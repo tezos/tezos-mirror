@@ -94,7 +94,7 @@ module type S = sig
 end
 
 module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
-  module Vector = Lazy_vector.Mutable.Make (Effect) (Int64)
+  module Vector = Lazy_vector.Mutable.Make (Lazy_vector.Make (Effect) (Int64))
 
   type 'a effect = 'a Effect.t
 
