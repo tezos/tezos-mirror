@@ -2807,6 +2807,8 @@ let tezt_lib =
     ~path:"tezt/lib"
     ~synopsis:
       "Test framework for unit tests, integration tests, and regression tests"
+    ~opam_homepage:"https://gitlab.com/tezos/tezos/-/tree/master/tezt/lib#tezt"
+    ~opam_doc:"https://tezos.gitlab.io/api/odoc/_html/tezt/Tezt/index.html"
     ~ocaml:V.(at_least "4.12")
     ~bisect_ppx:false
     ~deps:[re; lwt_unix; ezjsonm]

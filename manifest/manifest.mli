@@ -592,6 +592,13 @@ type with_test = Always | Never | Only_on_64_arch
       For private libraries, private executables and tests, you must specify
       this argument (you can explicitely set it to [""] to generate no [.opam] file).
 
+    - [opam_bug_reports], [opam_doc] and [opam_homepage]: URLs to put in the [.opam] file
+      in the [bug-reports], [doc] and [homepage] clauses respectively.
+      Clauses are omitted for empty strings.
+      You usually do not want to specify those and keep default values,
+      but there can be some exceptions for packages that are particularly useful
+      on their own outside of Octez.
+
     - [opam_with_test]: whether to add the [dune runtest] command.
       Note that for a given package all targets must have the same value of [opam_with_test].
 
@@ -659,6 +666,9 @@ type 'a maker =
   ?npm_deps:Npm.t list ->
   ?ocaml:Version.constraints ->
   ?opam:string ->
+  ?opam_bug_reports:string ->
+  ?opam_doc:string ->
+  ?opam_homepage:string ->
   ?opam_with_test:with_test ->
   ?preprocess:preprocessor list ->
   ?preprocessor_deps:preprocessor_dep list ->
