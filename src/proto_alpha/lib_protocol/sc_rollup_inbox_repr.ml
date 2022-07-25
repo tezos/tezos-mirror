@@ -93,6 +93,8 @@ let () =
     (function Tried_to_add_zero_messages -> Some () | _ -> None)
     (fun () -> Tried_to_add_zero_messages)
 
+module Int64_map = Map.Make (Int64)
+
 (* 32 *)
 let hash_prefix = "\003\250\174\238\208" (* scib1(55) *)
 
@@ -157,6 +159,27 @@ module V1 = struct
       history_hash
       (Skip_list.pp ~pp_content:Hash.pp ~pp_ptr:Hash.pp)
       history
+
+  type history = {
+    events : history_proof Hash.Map.t;
+        (** The history proofs stored in the history structure, indexed by
+            inboxes hashes. *)
+    sequence : Hash.t Int64_map.t;
+        (** An additional map from int64 indexes to inboxes hashes, to be able
+            to remove old entries when the structure is full.  *)
+    capacity : int64;
+        (** The max number of the entries in the structure. Once the maximum size
+            is reached, older entries are deleted to free space for new ones. *)
+    next_index : int64;
+        (** The index to use for the next entry to add in the structure. *)
+    oldest_index : int64;
+        (** The oldest index of the (oldest) entry that has been added to the
+            data structure. If the history is empty, [oldest_index] is
+            equal to [next_index]. *)
+    size : int64;
+        (** Counts the number of entries that are stored in history. It
+            satisfies the invariant: `0 <= size <= capacity` *)
+  }
 
   (*
 
@@ -365,8 +388,6 @@ module type MerkelizedOperations = sig
 
   val new_level_tree : inbox_context -> Raw_level_repr.t -> tree Lwt.t
 
-  type history
-
   val history_encoding : history Data_encoding.t
 
   val pp_history : Format.formatter -> history -> unit
@@ -532,29 +553,6 @@ struct
          (fun bs ->
            Sc_rollup_inbox_message_repr.unsafe_of_string (Bytes.to_string bs))
          bytes
-
-  module Int64_map = Map.Make (Int64)
-
-  type history = {
-    events : history_proof Hash.Map.t;
-        (** The of history proofs stored in the history structure, indexed by
-            inboxes hashes. *)
-    sequence : Hash.t Int64_map.t;
-        (** An additional map from int64 indexes to inboxes hashes, to be able
-            to remove old entries when the structure is full.  *)
-    capacity : int64;
-        (** The max number of the entries in the structure. Once the maximum size
-            is reached, older entries are deleted to free space for  new ones. *)
-    next_index : int64;
-        (** The index to use for the next entry to add in the structure *)
-    oldest_index : int64;
-        (** The oldest index of the (oldest) entry that has been added to the
-            data structure. If the history is empty, [oldest_index] is
-            equal to [next_index]. *)
-    size : int64;
-        (** Counts the number of entries that are stored in history. It
-            satisfies the invariant: `0 <= size <= capacity` *)
-  }
 
   let history_encoding : history Data_encoding.t =
     let open Data_encoding in
