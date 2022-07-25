@@ -109,13 +109,21 @@ module Kate_amortized = struct
     in
     (domain2m, Array.init l precompute_srsj)
 
+  (* Generate proofs of part 3.2. *)
+
   (** n, r are powers of two, m = 2^(log2(n)-1)
       coefs are f polynomial’s coefficients [f₀, f₁, f₂, …, fm-1]
       domain2m is the set of 2m-th roots of unity, used for Toeplitz computation
       (domain2m, precomputed_srs_part) = preprocess_multi_reveals r n m (srs1, _srs2)
       returns proofs of part 3.2. *)
-  let multiple_multi_reveals_with_preprocessed_srs ~chunk_len ~chunk_count
-      ~degree coefs (domain2m, precomputed_srs_part) =
+  let multiple_multi_reveals ~chunk_len ~chunk_count ~degree
+      ~preprocess:(domain2m, precomputed_srs_part) coefs =
+    let n = chunk_len + chunk_count in
+    assert (2 <= chunk_len) ;
+    assert (chunk_len < n) ;
+    assert (is_pow_of_two degree) ;
+    assert (1 lsl chunk_len <= degree) ;
+    assert (degree <= 1 lsl n) ;
     let l = 1 lsl chunk_len in
     (* Since we don’t need the first coefficient f₀, we remove it and add a zero
        as last coefficient to keep the size unchanged *)
@@ -170,24 +178,6 @@ module Kate_amortized = struct
     let phidomain = Domain.build ~log:chunk_count in
     let phidomain = inverse (Domain.inverse phidomain) in
     G1.fft ~domain:phidomain ~points:hl
-
-  (* Generate proofs of part 3.2. *)
-  let multiple_multi_reveals ~chunk_len ~chunk_count ~degree ~preprocess f =
-    let n = chunk_len + chunk_count in
-    assert (2 <= chunk_len) ;
-    assert (chunk_len < n) ;
-    assert (is_pow_of_two degree) ;
-    assert (1 lsl chunk_len <= degree) ;
-    assert (degree <= 1 lsl n) ;
-    let proof =
-      multiple_multi_reveals_with_preprocessed_srs
-        ~chunk_len
-        ~chunk_count
-        ~degree
-        f
-        preprocess
-    in
-    proof
 
   (* h = polynomial such that h(y×domain[i]) = zi. *)
   let interpolation_h_poly y domain z_list =
