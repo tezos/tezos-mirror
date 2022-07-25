@@ -822,50 +822,37 @@ module Inner = struct
     let compute_h_j j =
       let rest = (degree - j) mod l in
       let quotient = (degree - j) / l in
-      if quotient = 0 then None
-      else
-        (* Padding in case quotient is not a power of 2 to get proper fft in
-           Toeplitz matrix part. *)
-        let padding = diff_next_power_of_two (2 * quotient) in
-        let a_list =
-          (* fm, 0, …, 0, f₁, f₂, …, fm-1 *)
-          let a_array =
-            Array.init
-              ((2 * quotient) + padding)
-              (fun i ->
-                if i <= quotient + (padding / 2) then Scalar.(copy zero)
-                else coefs.(rest + ((i - (quotient + padding)) * l) - 1))
-          in
-          a_array.(0) <- coefs.(degree - j - 1) ;
-          a_array
+      (* Padding in case quotient is not a power of 2 to get proper fft in
+         Toeplitz matrix part. *)
+      let padding = diff_next_power_of_two (2 * quotient) in
+      let a_list =
+        (* fm, 0, …, 0, f₁, f₂, …, fm-1 *)
+        let a_array =
+          Array.init
+            ((2 * quotient) + padding)
+            (fun i ->
+              if i <= quotient + (padding / 2) then Scalar.(copy zero)
+              else coefs.(rest + ((i - (quotient + padding)) * l) - 1))
         in
-        let res =
-          Some
-            (* Toeplitz stuff *)
-            (build_h_list_with_precomputed_srs
-               a_list
-               (domain2m, precomputed_srs_part.(j)))
-        in
-        res
+        a_array.(0) <- coefs.(degree - j - 1) ;
+        a_array
+      in
+      build_h_list_with_precomputed_srs
+        a_list
+        (domain2m, precomputed_srs_part.(j))
     in
-    let hl : segment_proof array =
-      match compute_h_j 0 with
-      | None -> [||]
-      | Some sum ->
-          let rec sum_hj j =
-            if j = l then ()
-            else
-              match compute_h_j j with
-              | None -> ()
-              | Some hj ->
-                  (* sum.(i) <- sum.(i) + hj.(i) *)
-                  Array.iteri
-                    (fun i hij -> sum.(i) <- Bls12_381.G1.add sum.(i) hij)
-                    hj ;
-                  sum_hj (j + 1)
-          in
-          sum_hj 1 ;
-          build_h_list_final sum domain2m
+    let sum = compute_h_j 0 in
+    let hl =
+      let rec sum_hj j =
+        if j = l then ()
+        else
+          let hj = compute_h_j j in
+          (* sum.(i) <- sum.(i) + hj.(i) *)
+          Array.iteri (fun i hij -> sum.(i) <- Bls12_381.G1.add sum.(i) hij) hj ;
+          sum_hj (j + 1)
+      in
+      sum_hj 1 ;
+      build_h_list_final sum domain2m
     in
     let phidomain = Domains.build ~log:chunk_count in
     let phidomain = inverse (Domains.inverse phidomain) in
