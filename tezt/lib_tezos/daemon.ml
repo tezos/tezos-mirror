@@ -431,6 +431,9 @@ module Make (X : PARAMETERS) = struct
                             memory consumption. We do not consider this situation as an
                             error because that's a too strong requirement on CI workers.
                          *)
+                         Log.warn
+                           "kernel.perf_event_paranoid is not permissive \
+                            enough. Aborting memory observation." ;
                          return None
                      | Some dump -> (
                          let* peak =
