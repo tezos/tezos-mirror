@@ -340,8 +340,8 @@ module Inner = struct
       Scalar.of_string
         "20812168509434597367146703229805575690060615791308155437936410982393987532344"
     in
-    let srs_g1 = create_srs (module Bls12_381.G1) t.slot_size secret in
-    let srs_g2 = create_srs (module Bls12_381.G2) t.slot_size secret in
+    let srs_g1 = create_srs (module Bls12_381.G1) t.k secret in
+    let srs_g2 = create_srs (module Bls12_381.G2) t.k secret in
     {
       srs_g1;
       srs_g2;
