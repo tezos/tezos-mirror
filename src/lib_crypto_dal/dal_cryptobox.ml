@@ -551,18 +551,6 @@ module Inner = struct
     let* data = polynomial_from_bytes' t slot in
     Ok (Evaluations.interpolation_fft2 t.domain_k data)
 
-  let eval_coset_array t eval segment =
-    let coset =
-      Array.init
-        (1 lsl Z.(log2up (of_int t.segment_len)))
-        (fun _ -> Scalar.(copy zero))
-    in
-    for elt = 0 to t.segment_len - 1 do
-      let idx = (elt * t.nb_segments) + segment in
-      coset.(elt) <- Array.get eval idx
-    done ;
-    coset
-
   let eval_coset t eval slot offset segment =
     for elt = 0 to t.segment_len - 1 do
       let idx = (elt * t.nb_segments) + segment in
@@ -828,43 +816,14 @@ module Inner = struct
           (proof, G2.(add h_secret (negate (mul (copy one) point))));
         ])
 
-  (* Assumptions:
-      - Polynomial.degree p = k
-      - (x^l - z) | p(x)
-     Computes the quotient of the division of p(x) by (x^l - z). *)
-  let compute_quotient t p l z =
-    let div = Array.init (t.k - l + 1) (fun _ -> Scalar.(copy zero)) in
-    let i = ref 0 in
-    (* Computes 1/(x^l - z) mod x^{k - l + 1}
-       = \sum_{i=0}^{+\infty} -z^{-1}^{i+1} X^{i\times l} mod x^{k - l + 1}. *)
-    while !i * l < t.k - l + 1 do
-      div.(!i * l) <-
-        Scalar.negate (Scalar.inverse_exn (Scalar.pow z (Z.of_int (!i + 1)))) ;
-      i := !i + 1
-    done ;
-    let div = Polynomials.of_dense div in
-    (* p(x) * 1/(x^l - z) mod x^{k - l + 1} = q(x) since deg q <= k - l. *)
-    fft_mul t.domain_2k [p; div] |> Polynomials.copy ~len:(t.k - l + 1)
-
   let prove_segment t trusted_setup p segment_index =
     if segment_index < 0 || segment_index >= t.nb_segments then
       Error `Segment_index_out_of_range
     else
       let l = 1 lsl Z.(log2up (of_int t.segment_len)) in
       let wi = Domains.get t.domain_k segment_index in
-      let domain = Domains.build ~log:Z.(log2up (of_int t.segment_len)) in
-      let eval_p = Evaluations.(evaluation_fft t.domain_k p |> to_array) in
-      let eval_coset = eval_coset_array t eval_p segment_index in
-      let remainder =
-        Kate_amortized.interpolation_h_poly wi domain eval_coset
-        |> Array.of_list |> Polynomials.of_dense
-      in
-      let quotient =
-        compute_quotient
-          t
-          (Polynomials.sub p remainder)
-          l
-          (Scalar.pow wi (Z.of_int l))
+      let quotient, _ =
+        Polynomials.division_xn p l Scalar.(negate (pow wi (Z.of_int l)))
       in
       commit trusted_setup quotient
 
