@@ -39,29 +39,6 @@ module Kate_amortized = struct
 
   type srs = G1.t list * G2.t
 
-  (* For x ∈ F, create [x^i]₁ list, 0 ≤ i < d. *)
-  let create_srs1 d x =
-    let rec encoded_pow_x acc xi i =
-      if i = 0 then List.rev acc
-      else encoded_pow_x (xi :: acc) (G1.mul xi x) (i - 1)
-    in
-    encoded_pow_x [] G1.(copy one) d
-
-  (* Returns ([[x⁰]₁, [x¹]₁, …, [x^(d-1)]₁], [[x^l]₂]) for x ∈ F and d, l int. *)
-  let gen_srs ~l ~size:d x =
-    let xl = Scalar.pow x (Z.of_int l) in
-    let srs2 = G2.(mul (copy one) xl) in
-    let l1 = create_srs1 d x in
-    (l1, srs2)
-
-  (* Returns [[x⁰]₁, [x¹]₁, …, [x^(d-1)]₁] for x ∈ F and d. *)
-  let gen_srs_g1 ~size:d x = create_srs1 d x
-
-  (* Returns [x^l]₂ for x ∈ F and l int. *)
-  let gen_srs_g2 ~l x =
-    let xl = Scalar.pow x (Z.of_int l) in
-    G2.(mul (copy one) xl)
-
   type commitment = G1.t
 
   let commit p (srs1, _) =
