@@ -1,8 +1,8 @@
 tests_alpha/test_liquidity_baking.py::TestAddApproveTransferRemove::test_add_liquidity
 
 Node is bootstrapped.
-Estimated gas: 8553.386 units (will add 100 for safety)
-Estimated storage: 141 bytes added (will add 20 for safety)
+Estimated gas: 8553.406 units (will add 100 for safety)
+Estimated storage: 147 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
 NOT waiting for the operation to be included.
@@ -15,7 +15,7 @@ This sequence of operations was run:
     Fee to the baker: ꜩ0.001221
     Expected counter: [EXPECTED_COUNTER]
     Gas limit: 8654
-    Storage limit: 161 bytes
+    Storage limit: 167 bytes
     Balance updates:
       [CONTRACT_HASH] ... -ꜩ0.001221
       payload fees(the block proposer) ....... +ꜩ0.001221
@@ -27,17 +27,17 @@ This sequence of operations was run:
       Parameter: (Pair "[CONTRACT_HASH]" 0 1000000000 "[TIMESTAMP]")
       This transaction was successfully applied
       Updated storage:
-        { 722 ;
-          9013500100 ;
-          72107 ;
+        { 21599 ;
+          9001416765 ;
+          2159830 ;
           0x01e927f00ef734dfc85919635e9afc9166c83ef9fc00 ;
           0x0115eb0104481a6d7921160bc982c5e0a561cd8a3a00 }
-      Storage size: 4633 bytes
-      Paid storage size diff: 3 bytes
-      Consumed gas: 2274.737
+      Storage size: 4635 bytes
+      Paid storage size diff: 6 bytes
+      Consumed gas: 2274.745
       Balance updates:
-        [CONTRACT_HASH] ... -ꜩ0.00075
-        storage fees ........................... +ꜩ0.00075
+        [CONTRACT_HASH] ... -ꜩ0.0015
+        storage fees ........................... +ꜩ0.0015
         [CONTRACT_HASH] ... -ꜩ9001
         [CONTRACT_HASH] ... +ꜩ9001
       Internal operations:
@@ -47,37 +47,37 @@ This sequence of operations was run:
           To: [CONTRACT_HASH]
           Entrypoint: transfer
           Parameter: (Pair 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78
-                           (Pair 0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600 721))
+                           (Pair 0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600 21598))
           This transaction was successfully applied
           Updated storage:
             { 0 ; 1 ; 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78 ; 100010000 }
           Updated big_maps:
             Set map(1)[(Pair 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78
-                  0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600)] to 999999279
-            Set map(0)[0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78] to 99999279
-            Set map(0)[0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600] to 721
-          Storage size: 2263 bytes
-          Paid storage size diff: 68 bytes
-          Consumed gas: 3065.552
+                  0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600)] to 999978402
+            Set map(0)[0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78] to 99978402
+            Set map(0)[0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600] to 21598
+          Storage size: 2264 bytes
+          Paid storage size diff: 69 bytes
+          Consumed gas: 3065.556
           Balance updates:
-            [CONTRACT_HASH] ... -ꜩ0.017
-            storage fees ........................... +ꜩ0.017
+            [CONTRACT_HASH] ... -ꜩ0.01725
+            storage fees ........................... +ꜩ0.01725
         Internal Transaction:
           Amount: ꜩ0
           From: [CONTRACT_HASH]
           To: [CONTRACT_HASH]
           Entrypoint: mintOrBurn
-          Parameter: (Pair 72007 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78)
+          Parameter: (Pair 2159730 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78)
           This transaction was successfully applied
           Updated storage:
-            { 2 ; 3 ; 0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600 ; 72107 }
+            { 2 ; 3 ; 0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600 ; 2159830 }
           Updated big_maps:
-            Set map(2)[0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78] to 72007
-          Storage size: 2048 bytes
-          Paid storage size diff: 70 bytes
-          Consumed gas: 3213.097
+            Set map(2)[0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78] to 2159730
+          Storage size: 2050 bytes
+          Paid storage size diff: 72 bytes
+          Consumed gas: 3213.105
           Balance updates:
-            [CONTRACT_HASH] ... -ꜩ0.0175
-            storage fees ........................... +ꜩ0.0175
+            [CONTRACT_HASH] ... -ꜩ0.018
+            storage fees ........................... +ꜩ0.018
 
 Injected block at minimal timestamp

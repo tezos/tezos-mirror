@@ -865,6 +865,7 @@ module Constants : sig
       baking_reward_fixed_portion : Tez.t;
       baking_reward_bonus_per_slot : Tez.t;
       endorsing_reward_per_slot : Tez.t;
+      liquidity_baking_subsidy : Tez.t;
     }
 
     val generate :
