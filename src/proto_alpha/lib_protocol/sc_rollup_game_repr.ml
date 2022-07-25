@@ -771,7 +771,7 @@ let check_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
            [Dissection_invalid_number_of_sections] returned above *)
         invalid_move (Dissection_invalid_number_of_sections len)
   in
-  let half_dist = Z.(div dist (of_int 2)) in
+  let half_dist = Z.(div dist (of_int 2) |> succ) in
   let rec traverse states =
     match states with
     | {state_hash = None; _} :: {state_hash = Some _; _} :: _ ->
