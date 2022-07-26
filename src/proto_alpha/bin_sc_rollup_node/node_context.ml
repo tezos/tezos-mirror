@@ -39,13 +39,8 @@ type t = {
   loser_mode : Loser_mode.t;
 }
 
-let get_operator_keys node_ctxt purpose =
-  let open Lwt_result_syntax in
-  match Configuration.Operator_purpose_map.find purpose node_ctxt.operators with
-  | None -> return_none
-  | Some operator ->
-      let+ _, pk, sk = Client_keys.get_key node_ctxt.cctxt operator in
-      Some (operator, pk, sk)
+let get_operator node_ctxt purpose =
+  Configuration.Operator_purpose_map.find purpose node_ctxt.operators
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2901
    The constants are retrieved from the latest tezos block. These constants can

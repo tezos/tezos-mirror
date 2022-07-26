@@ -51,16 +51,11 @@ type t = {
           issues wrong commitments (for tests). *)
 }
 
-(** [get_operator_keys cctxt] returns a triple [(pkh, pk, sk)] corresponding
-    to the address, public key, and secret key URI of the rollup node operator.
+(** [get_operator cctxt purpose] returns the public key hash for the operator
+    who has purpose [purpose], if any.
 *)
-val get_operator_keys :
-  t ->
-  Configuration.purpose ->
-  (Signature.Public_key_hash.t * Signature.Public_key.t * Client_keys.sk_uri)
-  option
-  tzresult
-  Lwt.t
+val get_operator :
+  t -> Configuration.purpose -> Signature.Public_key_hash.t option
 
 (** [init cctxt l1_ctxt sc_rollup operators_pkh] initialises the rollup
     representation.  The rollup origination level and kind are fetched via an

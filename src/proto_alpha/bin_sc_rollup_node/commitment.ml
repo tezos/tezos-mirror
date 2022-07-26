@@ -319,12 +319,12 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
                  commitment)
         else return_unit
       in
-      let* operator = Node_context.get_operator_keys node_ctxt Publish in
+      let operator = Node_context.get_operator node_ctxt Publish in
       match operator with
       | None ->
           (* Configured to not publish commitments *)
           return_unit
-      | Some (source, _src_pk, _src_sk) ->
+      | Some source ->
           let publish_operation =
             Sc_rollup_publish {rollup = node_ctxt.rollup_address; commitment}
           in
@@ -406,12 +406,12 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
 
   let cement_commitment (node_ctxt : Node_context.t) commitment_hash =
     let open Lwt_result_syntax in
-    let* operator = Node_context.get_operator_keys node_ctxt Cement in
+    let operator = Node_context.get_operator node_ctxt Cement in
     match operator with
     | None ->
         (* Configured to not cement commitments *)
         return_unit
-    | Some (source, _src_pk, _src_sk) ->
+    | Some source ->
         let cement_operation =
           Sc_rollup_cement
             {rollup = node_ctxt.rollup_address; commitment = commitment_hash}
