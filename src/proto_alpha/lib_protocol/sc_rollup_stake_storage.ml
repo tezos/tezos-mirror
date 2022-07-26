@@ -372,7 +372,8 @@ let cement_commitment ctxt rollup new_lcc =
      on the new LCC, and no one is directly staked on the old LCC. We
      can safely deallocate the old LCC.
   *)
-  deallocate ctxt rollup old_lcc
+  let+ ctxt = deallocate ctxt rollup old_lcc in
+  (ctxt, new_lcc_commitment)
 
 let remove_staker ctxt rollup staker =
   let open Lwt_tzresult_syntax in

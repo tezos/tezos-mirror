@@ -68,66 +68,11 @@ module Simple = struct
       ("other", Sc_rollup.Staker.encoding)
       ("their_commitment_hash", Sc_rollup.Commitment.Hash.encoding)
       ("parent_commitment_hash", Sc_rollup.Commitment.Hash.encoding)
-
-  let refutation_event state =
-    declare_2
-      ~section
-      ~name:("sc_rollup_node_refutation_" ^ state)
-      ~msg:
-        ("Refutation was " ^ state
-       ^ " - opponent: {opponent}, refutation: {refutation}")
-      ~level:Notice
-      ("opponent", Sc_rollup.Staker.encoding)
-      ("refutation", Data_encoding.option Sc_rollup.Game.refutation_encoding)
-
-  let refutation_published = refutation_event "published"
-
-  let refutation_failed = refutation_event "failed"
-
-  let refutation_backtracked = refutation_event "backtracked"
-
-  let refutation_skipped = refutation_event "skipped"
-
-  let timeout_event state =
-    declare_1
-      ~section
-      ~name:("sc_rollup_node_timeout_" ^ state)
-      ~msg:("Timeout was " ^ state ^ " - players: {players}")
-      ~level:Notice
-      ("players", Sc_rollup.Game.Index.encoding)
-
-  let timeout_published = timeout_event "published"
-
-  let timeout_failed = timeout_event "failed"
-
-  let timeout_backtracked = timeout_event "backtracked"
-
-  let timeout_skipped = timeout_event "skipped"
 end
 
 let timeout address = Simple.(emit timeout address)
 
 let invalid_move () = Simple.(emit invalid_move ())
-
-let refutation_published opponent refutation =
-  Simple.(emit refutation_published (opponent, refutation))
-
-let refutation_failed opponent refutation =
-  Simple.(emit refutation_failed (opponent, refutation))
-
-let refutation_backtracked opponent refutation =
-  Simple.(emit refutation_backtracked (opponent, refutation))
-
-let refutation_skipped opponent refutation =
-  Simple.(emit refutation_skipped (opponent, refutation))
-
-let timeout_published players = Simple.(emit timeout_published players)
-
-let timeout_failed players = Simple.(emit timeout_failed players)
-
-let timeout_backtracked players = Simple.(emit timeout_backtracked players)
-
-let timeout_skipped players = Simple.(emit timeout_skipped players)
 
 let conflict_detected (conflict : Sc_rollup.Refutation_storage.conflict) =
   let our_commitment_hash =

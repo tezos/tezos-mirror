@@ -62,6 +62,104 @@ let categorise_heads (node_ctxt : Node_context.t) old_heads new_heads =
 
 module Make (PVM : Pvm.S) = struct
   module Components = Components.Make (PVM)
+  open Protocol
+  open Alpha_context
+  open Apply_results
+
+  (** Process an L1 SCORU operation (for the node's rollup) which is included
+      for the first time. {b Note}: this function does not process inboxes for
+      the rollup, which is done instead by {!Inbox.process_head}. *)
+  let process_included_l1_operation (type kind) _node_ctxt store ~source:_
+      (operation : kind manager_operation)
+      (result : kind successful_manager_operation_result) =
+    let open Lwt_syntax in
+    match (operation, result) with
+    | ( Sc_rollup_publish {commitment; _},
+        Sc_rollup_publish_result {published_at_level; _} ) ->
+        (* Published commitment --------------------------------------------- *)
+        let commitment_hash =
+          Sc_rollup.Commitment.hash_uncarbonated commitment
+        in
+        Store.Commitments_published_at_level.add
+          store
+          commitment_hash
+          published_at_level
+    | Sc_rollup_cement {commitment; _}, Sc_rollup_cement_result {inbox_level; _}
+      ->
+        (* Cemented commitment ---------------------------------------------- *)
+        let* () = Store.Last_cemented_commitment_level.set store inbox_level in
+        Store.Last_cemented_commitment_hash.set store commitment
+    | _, _ ->
+        (* Other manager operations *)
+        return_unit
+
+  (** Process an L1 SCORU operation (for the node's rollup) which is finalized
+      for the first time. *)
+  let process_finalized_l1_operation (type kind) _node_ctxt _store ~source:_
+      (_operation : kind manager_operation)
+      (_result : kind successful_manager_operation_result) =
+    Lwt.return_unit
+
+  let process_l1_operation (type kind) ~finalized node_ctxt store ~source
+      (operation : kind manager_operation)
+      (result : kind Apply_results.manager_operation_result) =
+    let open Lwt_syntax in
+    let is_for_my_rollup : type kind. kind manager_operation -> bool = function
+      | Sc_rollup_add_messages {rollup; _}
+      | Sc_rollup_cement {rollup; _}
+      | Sc_rollup_publish {rollup; _}
+      | Sc_rollup_refute {rollup; _}
+      | Sc_rollup_timeout {rollup; _}
+      | Sc_rollup_execute_outbox_message {rollup; _}
+      | Sc_rollup_recover_bond {sc_rollup = rollup}
+      | Sc_rollup_dal_slot_subscribe {rollup; _} ->
+          Sc_rollup.Address.(rollup = node_ctxt.Node_context.rollup_address)
+      | Reveal _ | Transaction _ | Origination _ | Delegation _
+      | Register_global_constant _ | Set_deposits_limit _
+      | Increase_paid_storage _ | Tx_rollup_origination
+      | Tx_rollup_submit_batch _ | Tx_rollup_commit _ | Tx_rollup_return_bond _
+      | Tx_rollup_finalize_commitment _ | Tx_rollup_remove_commitment _
+      | Tx_rollup_rejection _ | Tx_rollup_dispatch_tickets _ | Transfer_ticket _
+      | Dal_publish_slot_header _ | Sc_rollup_originate _ ->
+          false
+    in
+    if not (is_for_my_rollup operation) then return_unit
+    else
+      (* Only look at operations that are for the node's rollup *)
+      let* () = Daemon_event.included_operation ~finalized operation result in
+      match result with
+      | Applied success_result ->
+          let process =
+            if finalized then process_finalized_l1_operation
+            else process_included_l1_operation
+          in
+          process node_ctxt store ~source operation success_result
+      | _ ->
+          (* No action for non successful operations  *)
+          return_unit
+
+  let process_l1_block_operations ~finalized node_ctxt store
+      (Layer1.Head {hash; _}) =
+    let open Lwt_result_syntax in
+    let* block = Layer1.fetch_tezos_block node_ctxt.Node_context.l1_ctxt hash in
+    let apply (type kind) accu ~source (operation : kind manager_operation)
+        result =
+      let open Lwt_syntax in
+      let* () = accu in
+      process_l1_operation ~finalized node_ctxt store ~source operation result
+    in
+    let apply_internal (type kind) accu ~source:_
+        (_operation : kind Apply_internal_results.internal_operation)
+        (_result : kind Apply_internal_results.internal_operation_result) =
+      accu
+    in
+    let*! () =
+      Layer1_services.process_manager_operations
+        Lwt.return_unit
+        block.operations
+        {apply; apply_internal}
+    in
+    return_unit
 
   let process_head node_ctxt store head_state =
     let open Lwt_result_syntax in
@@ -69,9 +167,13 @@ module Make (PVM : Pvm.S) = struct
     let* () =
       let*! () = emit_head_processing_event head_state in
       (* Avoid processing inbox again if it has been processed before for this head *)
-      if seen_before then return_unit
+      if seen_before then
+        if finalized then
+          process_l1_block_operations ~finalized node_ctxt store head
+        else return_unit
       else
         let* () = Inbox.process_head node_ctxt store head in
+        let* () = process_l1_block_operations ~finalized node_ctxt store head in
         (* Avoid storing and publishing commitments if the head is not final *)
         (* Avoid triggering the pvm execution if this has been done before for this head *)
         let* () = Components.Interpreter.process_head node_ctxt store head in

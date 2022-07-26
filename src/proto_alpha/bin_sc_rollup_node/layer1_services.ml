@@ -28,7 +28,7 @@ open Alpha_context
 open Apply_results
 open Protocol_client_context.Alpha_block_services
 
-type 'accu operation_processor = {
+type 'accu successful_operation_processor = {
   apply :
     'kind.
     'accu ->
@@ -45,43 +45,49 @@ type 'accu operation_processor = {
     'accu;
 }
 
-let process_applied_manager_operations operations accu f =
-  let rec on_applied_operation_and_result :
+type 'accu operation_processor = {
+  apply :
+    'kind.
+    'accu ->
+    source:public_key_hash ->
+    'kind manager_operation ->
+    'kind Apply_results.manager_operation_result ->
+    'accu;
+  apply_internal :
+    'kind.
+    'accu ->
+    source:public_key_hash ->
+    'kind Apply_internal_results.internal_operation ->
+    'kind Apply_internal_results.internal_operation_result ->
+    'accu;
+}
+
+let process_manager_operations operations accu f =
+  let rec on_operation_and_result :
       type kind. _ -> kind Apply_results.contents_and_result_list -> _ =
    fun accu -> function
     | Single_and_result
         ( Manager_operation {operation; source; _},
           Manager_operation_result
-            {
-              operation_result = Applied operation_result;
-              internal_operation_results;
-              _;
-            } ) ->
+            {operation_result; internal_operation_results; _} ) ->
         let accu = f.apply accu ~source operation operation_result in
-        on_applied_internal_operations accu source internal_operation_results
+        on_internal_operations accu source internal_operation_results
     | Single_and_result (_, _) -> accu
     | Cons_and_result
         ( Manager_operation {operation; source; _},
           Manager_operation_result
-            {
-              operation_result = Applied operation_result;
-              internal_operation_results;
-              _;
-            },
+            {operation_result; internal_operation_results; _},
           rest ) ->
         let accu = f.apply accu ~source operation operation_result in
         let accu =
-          on_applied_internal_operations accu source internal_operation_results
+          on_internal_operations accu source internal_operation_results
         in
-        on_applied_operation_and_result accu rest
-    | Cons_and_result (_, _, rest) -> on_applied_operation_and_result accu rest
-  and on_applied_internal_operations accu source internal_operation_results =
+        on_operation_and_result accu rest
+  and on_internal_operations accu source internal_operation_results =
     let open Apply_internal_results in
     List.fold_left
       (fun accu (Internal_operation_result (operation, result)) ->
-        match result with
-        | Applied result -> f.apply_internal accu ~source operation result
-        | _ -> accu)
+        f.apply_internal accu ~source operation result)
       accu
       internal_operation_results
   in
@@ -96,7 +102,7 @@ let process_applied_manager_operations operations accu f =
     | Receipt (Operation_metadata {contents = results; _}) -> (
         match Apply_results.kind_equal_list contents results with
         | Some Eq ->
-            on_applied_operation_and_result accu
+            on_operation_and_result accu
             @@ Apply_results.pack_contents_list contents results
         | None ->
             (* Should not happen *)
@@ -104,3 +110,20 @@ let process_applied_manager_operations operations accu f =
   in
   let process_operations = List.fold_left process_contents in
   List.fold_left process_operations operations accu
+
+let process_applied_manager_operations operations accu
+    (f : _ successful_operation_processor) =
+  let apply (type kind) accu ~source (operation : kind manager_operation)
+      (result : kind Apply_results.manager_operation_result) =
+    match result with
+    | Applied result -> f.apply accu ~source operation result
+    | _ -> accu
+  in
+  let apply_internal (type kind) accu ~source
+      (operation : kind Apply_internal_results.internal_operation)
+      (result : kind Apply_internal_results.internal_operation_result) =
+    match result with
+    | Applied result -> f.apply_internal accu ~source operation result
+    | _ -> accu
+  in
+  process_manager_operations operations accu {apply; apply_internal}

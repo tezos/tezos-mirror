@@ -32,26 +32,10 @@ val starting : unit -> unit Lwt.t
 
 val stopping : unit -> unit Lwt.t
 
-(** The commitment functions below emit events depending on whether they are
-    being published or cemented, along with their status:
-    * backtracked;
-    * skipped;
-    * injected;
-    or if it has failed. *)
-
-val publish_commitment_failed : Sc_rollup.Commitment.t -> unit Lwt.t
-
-val publish_commitment_backtracked : Sc_rollup.Commitment.t -> unit Lwt.t
-
-val publish_commitment_skipped : Sc_rollup.Commitment.t -> unit Lwt.t
+(** The functions below emit commitment events depending on whether they are
+    being published or cemented. *)
 
 val publish_commitment_injected : Sc_rollup.Commitment.t -> unit Lwt.t
-
-val cement_commitment_failed : Sc_rollup.Commitment.t -> unit Lwt.t
-
-val cement_commitment_backtracked : Sc_rollup.Commitment.t -> unit Lwt.t
-
-val cement_commitment_skipped : Sc_rollup.Commitment.t -> unit Lwt.t
 
 val cement_commitment_injected : Sc_rollup.Commitment.t -> unit Lwt.t
 

@@ -240,6 +240,32 @@ let assert_commitment_hash_equal ~loc _ctxt x y =
     x
     y
 
+let assert_commitment_equal ~loc x y =
+  Assert.equal
+    ~loc
+    (fun Commitment_repr.
+           {
+             compressed_state = c1;
+             inbox_level = l1;
+             predecessor = p1;
+             number_of_ticks = n1;
+           }
+         Commitment_repr.
+           {
+             compressed_state = c2;
+             inbox_level = l2;
+             predecessor = p2;
+             number_of_ticks = n2;
+           } ->
+      Sc_rollup_repr.State_hash.equal c1 c2
+      && Raw_level_repr.equal l1 l2
+      && Commitment_repr.Hash.equal p1 p2
+      && Sc_rollup_repr.Number_of_ticks.equal n1 n2)
+    "Compare commitment"
+    Commitment_repr.pp
+    x
+    y
+
 let assert_kinds_are_equal ~loc x y =
   Assert.equal
     ~loc
@@ -765,9 +791,7 @@ let test_cement_three_commitments () =
   let challenge_window =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
-  lift
-  @@
-  let commitment =
+  let commitment1 =
     Commitment_repr.
       {
         predecessor = genesis_hash;
@@ -777,13 +801,14 @@ let test_cement_three_commitments () =
       }
   in
   let* c1, _level, ctxt =
-    Sc_rollup_stake_storage.Internal_for_tests.refine_stake
-      ctxt
-      rollup
-      staker
-      commitment
+    lift
+    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+         ctxt
+         rollup
+         staker
+         commitment1
   in
-  let commitment =
+  let commitment2 =
     Commitment_repr.
       {
         predecessor = c1;
@@ -793,13 +818,14 @@ let test_cement_three_commitments () =
       }
   in
   let* c2, _level, ctxt =
-    Sc_rollup_stake_storage.Internal_for_tests.refine_stake
-      ctxt
-      rollup
-      staker
-      commitment
+    lift
+    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+         ctxt
+         rollup
+         staker
+         commitment2
   in
-  let commitment =
+  let commitment3 =
     Commitment_repr.
       {
         predecessor = c2;
@@ -809,16 +835,26 @@ let test_cement_three_commitments () =
       }
   in
   let* c3, _level, ctxt =
-    Sc_rollup_stake_storage.Internal_for_tests.refine_stake
-      ctxt
-      rollup
-      staker
-      commitment
+    lift
+    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+         ctxt
+         rollup
+         staker
+         commitment3
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
-  let* ctxt = Sc_rollup_stake_storage.cement_commitment ctxt rollup c1 in
-  let* ctxt = Sc_rollup_stake_storage.cement_commitment ctxt rollup c2 in
-  let* ctxt = Sc_rollup_stake_storage.cement_commitment ctxt rollup c3 in
+  let* ctxt, commitment1' =
+    lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
+  in
+  let* ctxt, commitment2' =
+    lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c2
+  in
+  let* ctxt, commitment3' =
+    lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c3
+  in
+  let* () = assert_commitment_equal ~loc:__LOC__ commitment1' commitment1 in
+  let* () = assert_commitment_equal ~loc:__LOC__ commitment2' commitment2 in
+  let* () = assert_commitment_equal ~loc:__LOC__ commitment3' commitment3 in
   assert_true ctxt
 
 let test_cement_then_remove () =
@@ -849,7 +885,7 @@ let test_cement_then_remove () =
          commitment
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
-  let* ctxt =
+  let* ctxt, _ =
     lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
   in
   assert_fails_with
@@ -1027,7 +1063,7 @@ let test_last_cemented_commitment_hash_with_level () =
          commitment
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
-  let* ctxt =
+  let* ctxt, _ =
     lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
   in
   let* c1', inbox_level', ctxt =
@@ -1817,7 +1853,7 @@ let test_no_conflict_point_one_staker_at_lcc () =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
-  let* ctxt =
+  let* ctxt, _ =
     lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
   in
   assert_fails_with
@@ -1862,7 +1898,7 @@ let test_no_conflict_point_both_stakers_at_lcc () =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
-  let* ctxt =
+  let* ctxt, _ =
     lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
   in
   assert_fails_with
@@ -2194,7 +2230,9 @@ let test_concurrent_refinement_cement () =
        let ctxt =
          Raw_context.Internal_for_tests.add_level ctxt challenge_window
        in
-       let* ctxt = Sc_rollup_stake_storage.cement_commitment ctxt rollup c1 in
+       let* ctxt, _ =
+         Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
+       in
        Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
   in
   let* c2, ctxt =
@@ -2219,7 +2257,9 @@ let test_concurrent_refinement_cement () =
        let ctxt =
          Raw_context.Internal_for_tests.add_level ctxt challenge_window
        in
-       let* ctxt = Sc_rollup_stake_storage.cement_commitment ctxt rollup c2 in
+       let* ctxt, _ =
+         Sc_rollup_stake_storage.cement_commitment ctxt rollup c2
+       in
        Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
   in
   assert_commitment_hash_equal ~loc:__LOC__ ctxt c1 c2

@@ -27,7 +27,7 @@ open Protocol
 open Alpha_context
 open Protocol_client_context.Alpha_block_services
 
-type 'accu operation_processor = {
+type 'accu successful_operation_processor = {
   apply :
     'kind.
     'accu ->
@@ -44,8 +44,31 @@ type 'accu operation_processor = {
     'accu;
 }
 
-(** [process_applied_manager_operations accu operations operator]
-    folds over the list of [operations] applying [operator] to
+type 'accu operation_processor = {
+  apply :
+    'kind.
+    'accu ->
+    source:public_key_hash ->
+    'kind manager_operation ->
+    'kind Apply_results.manager_operation_result ->
+    'accu;
+  apply_internal :
+    'kind.
+    'accu ->
+    source:public_key_hash ->
+    'kind Apply_internal_results.internal_operation ->
+    'kind Apply_internal_results.internal_operation_result ->
+    'accu;
+}
+
+(** [process_manager_operations accu operations operator] folds over the list of
+    manager operations in [operations] applying [operator] to transform [accu]
+    along the way. *)
+val process_manager_operations :
+  'a -> operation list list -> 'a operation_processor -> 'a
+
+(** [process_applied_manager_operations accu operations operator] folds over the
+    list of applied manager operations in [operations] applying [operator] to
     transform [accu] along the way. *)
 val process_applied_manager_operations :
-  'a -> operation list list -> 'a operation_processor -> 'a
+  'a -> operation list list -> 'a successful_operation_processor -> 'a

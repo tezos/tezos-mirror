@@ -1317,5 +1317,4 @@ This sequence of operations was run:
       "inbox_level": 62,
       "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
       "number_of_ticks": 0 },
-  "hash": "[SC_ROLLUP_COMMITMENT_HASH]",
-  "published_at_level": 65 }
+  "hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
