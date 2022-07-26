@@ -54,8 +54,8 @@ let get_operations client =
 
 let read_consumed_gas operation =
   JSON.(
-    operation |> get "metadata" |> get "operation_result" |> get "consumed_gas"
-    |> as_int)
+    operation |> get "metadata" |> get "operation_result"
+    |> get "consumed_milligas" |> as_int)
 
 let get_consumed_gas client =
   JSON.(
@@ -339,7 +339,7 @@ let check_full_cache ~protocol =
       in
       aux contracts size nremoved (k - 1) (counter + 1)
   in
-  aux [] 0 0 80 counter
+  aux [] 0 0 120 counter
 
 (*
 
@@ -355,7 +355,10 @@ let check_full_cache ~protocol =
 
 *)
 let check_block_impact_on_cache ~protocol =
-  check "one cannot violate the cache size limit" ~protocol ~tags:["memory"]
+  check
+    "one cannot violate the cache size limit"
+    ~protocol
+    ~tags:["memory"; "limit"]
   @@ fun () ->
   let* node, client = init1 ~protocol in
 
@@ -904,7 +907,7 @@ let register ~executors ~protocols =
      check_cache_backtracking_during_chain_reorganization ~protocol ~executors ;
      check_cache_reloading_is_not_too_slow ~protocol ~executors ;
      check_simulation_takes_cache_into_account ~protocol ~executors) ;
-  protocols
+  Protocol.[Kathmandu; Alpha]
   |> List.iter @@ fun migrate_from ->
      check_simulation_close_to_protocol_user_activation
        ~executors

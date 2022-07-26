@@ -398,9 +398,7 @@ module Make (X : PARAMETERS) = struct
       let p = Process.spawn ~log_output:true cmd args in
       fun () ->
         let* output = Process.check_and_read_stdout ~expect_failure p in
-        match output =~* rex r with
-        | None -> Test.fail "Unable to find `%s' in process stdout" r
-        | Some v -> return v
+        return (output =~* rex r)
     in
     let cannot_observe = return @@ Observe (fun () -> return None) in
     match daemon.status with
@@ -423,34 +421,52 @@ module Make (X : PARAMETERS) = struct
               return
               @@ Observe
                    (fun () ->
+                     Process.kill process ;
                      let* dump = get_trace () in
-                     let* peak =
-                       from_command
-                         ~cmd:heaptrack_print
-                         ~args:[dump]
-                         ~expect_failure:false
-                         "peak heap memory consumption: (\\d+\\.?\\d*\\w)"
-                         ()
-                     in
-                     match peak =~** rex "(\\d+\\.?\\d*)(\\w)" with
+                     match dump with
                      | None ->
-                         Test.fail
-                           "Invalid memory consumption format: %s\n"
-                           peak
-                     | Some (size, unit) ->
-                         let factor_of_unit =
-                           match unit with
-                           | "K" -> 1024
-                           | "M" -> 1024 * 1024
-                           | "G" -> 1024 * 1024 * 1024
-                           | _ -> 1
+                         (*
+                            [perf] may fail if [kernel.perf_event_paranoid] is set to
+                            a permissive enough value. In this case, we cannot observe
+                            memory consumption. We do not consider this situation as an
+                            error because that's a too strong requirement on CI workers.
+                         *)
+                         Log.warn
+                           "kernel.perf_event_paranoid is not permissive \
+                            enough. Aborting memory observation." ;
+                         return None
+                     | Some dump -> (
+                         let* peak =
+                           from_command
+                             ~cmd:heaptrack_print
+                             ~args:[dump]
+                             ~expect_failure:false
+                             "peak heap memory consumption: (\\d+\\.?\\d*\\w)"
+                             ()
                          in
-                         let size =
-                           int_of_float
-                           @@ float_of_string size
-                              *. float_of_int factor_of_unit
-                         in
-                         return @@ Some size)
+                         match
+                           Option.get peak =~** rex "(\\d+\\.?\\d*)(\\w)"
+                         with
+                         | None ->
+                             Test.fail
+                               "Invalid memory consumption format: %s\n"
+                               (match peak with
+                               | None -> "(empty)"
+                               | Some s -> s)
+                         | Some (size, unit) ->
+                             let factor_of_unit =
+                               match unit with
+                               | "K" -> 1024
+                               | "M" -> 1024 * 1024
+                               | "G" -> 1024 * 1024 * 1024
+                               | _ -> 1
+                             in
+                             let size =
+                               int_of_float
+                               @@ float_of_string size
+                                  *. float_of_int factor_of_unit
+                             in
+                             return @@ Some size))
             with exn ->
               Test.fail
                 "failed to set up memory consumption measurement: %s"

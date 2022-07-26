@@ -232,7 +232,8 @@ module Make : functor (X : PARAMETERS) -> sig
 
   (** Observe memory consumption of the daemon.
 
-      This function requires [perf] and [heaptrack] in the PATH.
+      This function requires [perf] and [heaptrack] in the PATH
+      and [kernel.perf_event_paranoid] to be permissive enough.
       Otherwise, the observation will always return [None].
 
       The returned function gives the peak of memory consumption
