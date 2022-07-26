@@ -172,9 +172,9 @@ module Simulation = struct
     successful_multiple protocol ;
     failing protocol ;
     failing_force protocol ;
-    failing_multiple_force [Alpha] ;
+    failing_multiple_force protocol ;
     injection_force protocol ;
-    injection_multiple_force [Alpha]
+    injection_multiple_force protocol
 end
 
 module Transfer = struct
