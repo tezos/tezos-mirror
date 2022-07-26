@@ -749,14 +749,8 @@ module Inner = struct
         if i = 0 then Bls12_381.Fr.(copy one) else Array.get domain (n - i))
 
   let build_h_list_with_precomputed_srs a_list (domain2m, precomputed_srs) =
-    let y = precomputed_srs in
-    let v = Scalar.fft ~domain:domain2m ~points:a_list in
-    Array.map2 (fun yi vi -> Bls12_381.G1.mul yi vi) y v
-
-  (* Final ifft of Toeplitz computation. *)
-  let build_h_list_final u domain2m =
-    let res = Bls12_381.G1.ifft ~domain:(inverse domain2m) ~points:u in
-    Array.sub res 0 (Array.length domain2m / 2)
+    Scalar.fft_inplace ~domain:domain2m ~points:a_list ;
+    Array.map2 Bls12_381.G1.mul precomputed_srs a_list
 
   (* part 3.2 *)
 
@@ -774,6 +768,7 @@ module Inner = struct
   (* Precompute first part of Toeplitz trick, which doesn't depends on the
      polynomial’s coefficients. *)
   let preprocess_multi_reveals ~chunk_len ~degree srs1 =
+    let open Bls12_381 in
     let l = 1 lsl chunk_len in
     let k =
       let ratio = degree / l in
@@ -784,14 +779,15 @@ module Inner = struct
     let precompute_srsj j =
       let quotient = (degree - j) / l in
       let padding = diff_next_power_of_two (2 * quotient) in
-      let srsj =
+      let points =
         Array.init
           ((2 * quotient) + padding)
           (fun i ->
-            if i < quotient then srs1.(degree - j - ((i + 1) * l))
-            else Bls12_381.G1.(copy zero))
+            if i < quotient then G1.copy srs1.(degree - j - ((i + 1) * l))
+            else G1.(copy zero))
       in
-      Bls12_381.G1.fft ~domain ~points:srsj
+      G1.fft_inplace ~domain ~points ;
+      points
     in
     (domain, Array.init l precompute_srsj)
 
@@ -803,6 +799,7 @@ module Inner = struct
    *)
   let multiple_multi_reveals ~chunk_len ~chunk_count ~degree
       ~preprocess:(domain2m, precomputed_srs_part) coefs =
+    let open Bls12_381 in
     let n = chunk_len + chunk_count in
     assert (2 <= chunk_len) ;
     assert (chunk_len < n) ;
@@ -810,48 +807,44 @@ module Inner = struct
     assert (1 lsl chunk_len < degree) ;
     assert (degree <= 1 lsl n) ;
     let l = 1 lsl chunk_len in
-    (* Since we don’t need the first coefficient f₀, we remove it and add a zero
-       as last coefficient to keep the size unchanged *)
-    let coefs = List.tl (coefs @ [Scalar.(copy zero)]) in
-    let coefs = Array.of_list coefs in
+    (* We don’t need the first coefficient f₀. *)
     let compute_h_j j =
       let rest = (degree - j) mod l in
       let quotient = (degree - j) / l in
       (* Padding in case quotient is not a power of 2 to get proper fft in
          Toeplitz matrix part. *)
       let padding = diff_next_power_of_two (2 * quotient) in
-      let a_list =
-        (* fm, 0, …, 0, f₁, f₂, …, fm-1 *)
-        let a_array =
-          Array.init
-            ((2 * quotient) + padding)
-            (fun i ->
-              if i <= quotient + (padding / 2) then Scalar.(copy zero)
-              else coefs.(rest + ((i - (quotient + padding)) * l) - 1))
-        in
-        a_array.(0) <- coefs.(degree - j - 1) ;
-        a_array
+      (* fm, 0, …, 0, f₁, f₂, …, fm-1 *)
+      let a_array =
+        Array.init
+          ((2 * quotient) + padding)
+          (fun i ->
+            if i <= quotient + (padding / 2) then Scalar.(copy zero)
+            else Scalar.copy coefs.(rest + ((i - (quotient + padding)) * l)))
       in
+      if j <> 0 then a_array.(0) <- Scalar.copy coefs.(degree - j) ;
       build_h_list_with_precomputed_srs
-        a_list
+        a_array
         (domain2m, precomputed_srs_part.(j))
     in
     let sum = compute_h_j 0 in
-    let hl =
-      let rec sum_hj j =
-        if j = l then ()
-        else
-          let hj = compute_h_j j in
-          (* sum.(i) <- sum.(i) + hj.(i) *)
-          Array.iteri (fun i hij -> sum.(i) <- Bls12_381.G1.add sum.(i) hij) hj ;
-          sum_hj (j + 1)
-      in
-      sum_hj 1 ;
-      build_h_list_final sum domain2m
+
+    let rec sum_hj j =
+      if j = l then ()
+      else
+        let hj = compute_h_j j in
+        (* sum.(i) <- sum.(i) + hj.(i) *)
+        Array.iteri (fun i hij -> sum.(i) <- G1.add sum.(i) hij) hj ;
+        sum_hj (j + 1)
     in
+    sum_hj 1 ;
+    (* Toeplitz matrix-vector multiplication *)
+    Bls12_381.G1.ifft_inplace ~domain:(inverse domain2m) ~points:sum ;
+    let hl = Array.sub sum 0 (Array.length domain2m / 2) in
+    (* Kate amortized FFT *)
     let phidomain = Domains.build ~log:chunk_count in
     let phidomain = inverse (Domains.inverse phidomain) in
-    Bls12_381.G1.fft ~domain:phidomain ~points:hl
+    G1.fft ~domain:phidomain ~points:hl
 
   (* h = polynomial such that h(y×domain[i]) = zi. *)
   let interpolation_h_poly y domain z_list =
@@ -914,7 +907,7 @@ module Inner = struct
       ~chunk_count:t.proofs_log
       ~degree:t.k
       ~preprocess
-      (Polynomials.to_dense_coefficients p |> Array.to_list)
+      (Polynomials.to_dense_coefficients p)
 
   let verify_shard t trusted_setup cm
       {index = shard_index; share = shard_evaluations} proof =
