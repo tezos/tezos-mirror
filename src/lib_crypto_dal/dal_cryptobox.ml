@@ -735,13 +735,15 @@ module Inner = struct
 
      Generalize this function to pass the degree in parameter. *)
   let verify_commitment trusted_setup cm proof =
-    let open Result_syntax in
     let open Bls12_381 in
-    let* commit_xk =
-      commit' (module G2) [|Scalar.(copy one)|] trusted_setup.srs_g2
+    let check =
+      match Array.get trusted_setup.srs_g2 0 with
+      | exception Invalid_argument _ -> false
+      | commit_xk ->
+          Pairing.pairing_check
+            [(cm, commit_xk); (proof, G2.(negate (copy one)))]
     in
-    Ok
-      (Pairing.pairing_check [(cm, commit_xk); (proof, G2.(negate (copy one)))])
+    Ok check
 
   let inverse domain =
     let n = Array.length domain in
