@@ -100,29 +100,31 @@ module Simple = struct
       ("lcc_hash", Sc_rollup.Commitment.Hash.encoding)
 
   let commitment_stored =
-    declare_4
+    declare_5
       ~section
       ~name:"sc_rollup_node_commitment_stored"
       ~msg:
-        "Commitment was stored - predecessor: {predecessor}, inbox_level: \
-         {inbox_level}, compressed_state: {compressed_state}, number_of_ticks: \
-         {number_of_ticks}"
+        "Commitment {commitment_hash} was stored - predecessor: {predecessor}, \
+         inbox_level: {inbox_level}, compressed_state: {compressed_state}, \
+         number_of_ticks: {number_of_ticks}"
       ~level:Notice
+      ("commitment_hash", Sc_rollup.Commitment.Hash.encoding)
       ("predecessor", Sc_rollup.Commitment.Hash.encoding)
       ("inbox_level", Raw_level.encoding)
       ("compressed_state", Sc_rollup.State_hash.encoding)
       ("number_of_ticks", Sc_rollup.Number_of_ticks.encoding)
 
   let commitment_injected kind =
-    declare_4
+    declare_5
       ~section
       ~name:(Printf.sprintf "sc_rollup_%s_commitment_injected" kind)
       ~msg:
         (kind
-       ^ " commitment was injected - predecessor: {predecessor}, inbox_level: \
-          {inbox_level}, compressed_state: {compressed_state}, \
-          number_of_ticks: {number_of_ticks}")
+       ^ " commitment {commitment_hash} was injected - predecessor: \
+          {predecessor}, inbox_level: {inbox_level}, compressed_state: \
+          {compressed_state}, number_of_ticks: {number_of_ticks}")
       ~level:Notice
+      ("commitment_hash", Sc_rollup.Commitment.Hash.encoding)
       ("predecessor", Sc_rollup.Commitment.Hash.encoding)
       ("inbox_level", Raw_level.encoding)
       ("compressed_state", Sc_rollup.State_hash.encoding)
@@ -135,9 +137,16 @@ let stopping = Simple.(emit stopping)
 
 open Sc_rollup.Commitment
 
-let emit_commitment_event f
+let emit_commitment_event f commitment_hash
     {predecessor; inbox_level; compressed_state; number_of_ticks} =
-  Simple.(emit f (predecessor, inbox_level, compressed_state, number_of_ticks))
+  Simple.(
+    emit
+      f
+      ( commitment_hash,
+        predecessor,
+        inbox_level,
+        compressed_state,
+        number_of_ticks ))
 
 let commitment_will_not_be_published lcc_level
     {predecessor; inbox_level; compressed_state; number_of_ticks} =
