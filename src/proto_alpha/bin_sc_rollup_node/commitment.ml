@@ -268,6 +268,19 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     in
     return_unit
 
+  let predecessor_is_published cctxt rollup_address commitment_hash =
+    let open Lwt_result_syntax in
+    let*! _commitment_res =
+      Plugin.RPC.Sc_rollup.commitment
+        cctxt
+        (cctxt#chain, cctxt#block)
+        rollup_address
+        commitment_hash
+    in
+    match _commitment_res with
+    | Ok _commitment -> return_true
+    | Error _errors -> return_false
+
   let get_commitment_and_publish ~check_lcc_hash
       ({cctxt; rollup_address; _} as node_ctxt : Node_context.t)
       next_level_to_publish store =
@@ -276,9 +289,13 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       Store.Commitments.mem store next_level_to_publish
     in
     if is_commitment_available then
-      let*! commitment, _commitment_hash =
+      let*! commitment, commitment_hash =
         Store.Commitments.get store next_level_to_publish
       in
+      let* predecessor_published =
+        predecessor_is_published cctxt rollup_address commitment.predecessor
+      in
+      when_ predecessor_published @@ fun () ->
       let* () =
         if check_lcc_hash then
           let open Lwt_result_syntax in
@@ -321,7 +338,11 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
               store
               commitment.inbox_level
           in
-          let*! () = Commitment_event.publish_commitment_injected commitment in
+          let*! () =
+            Commitment_event.publish_commitment_injected
+              commitment_hash
+              commitment
+          in
           return_unit
     else return_unit
 

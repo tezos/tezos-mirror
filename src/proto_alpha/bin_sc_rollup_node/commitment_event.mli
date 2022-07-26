@@ -38,7 +38,8 @@ val stopping : unit -> unit Lwt.t
 val publish_commitment_injected :
   Sc_rollup.Commitment.Hash.t -> Sc_rollup.Commitment.t -> unit Lwt.t
 
-val cement_commitment_injected : Sc_rollup.Commitment.t -> unit Lwt.t
+val cement_commitment_injected :
+  Sc_rollup.Commitment.Hash.t -> Sc_rollup.Commitment.t -> unit Lwt.t
 
 (** [commitment_stored commitment_hash commitment] emits the event
    that the [commitment] was stored. *)
