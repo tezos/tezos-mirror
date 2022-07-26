@@ -181,7 +181,7 @@ module Dune = struct
 
   let executable_or_library kind ?(public_names = Stdlib.List.[]) ?package
       ?(instrumentation = Stdlib.List.[]) ?(libraries = []) ?flags
-      ?library_flags ?link_flags ?(inline_tests = false)
+      ?library_flags ?link_flags ?(inline_tests = false) ?(optional = false)
       ?(preprocess = Stdlib.List.[]) ?(preprocessor_deps = Stdlib.List.[])
       ?(virtual_modules = Stdlib.List.[]) ?default_implementation ?implements
       ?modules ?modules_without_implementation ?modes ?foreign_stubs
@@ -216,6 +216,7 @@ module Dune = struct
             S "modes"
             :: of_list (List.map (function mode -> S (string_of_mode mode)) x)
           );
+          (if optional then [S "optional"] else E);
           (match libraries with
           | [] -> E
           | _ -> [V (S "libraries" :: libraries)]);
@@ -922,6 +923,7 @@ module Target = struct
     opam_doc : string option;
     opam_homepage : string option;
     opam_with_test : with_test;
+    optional : bool;
     opens : string list;
     path : string;
     preprocess : preprocessor list;
@@ -1077,6 +1079,7 @@ module Target = struct
     ?opam_doc:string ->
     ?opam_homepage:string ->
     ?opam_with_test:with_test ->
+    ?optional:bool ->
     ?preprocess:preprocessor list ->
     ?preprocessor_deps:preprocessor_dep list ->
     ?private_modules:string list ->
@@ -1150,11 +1153,12 @@ module Target = struct
       ?js_compatible ?js_of_ocaml ?documentation ?(linkall = false) ?modes
       ?modules ?(modules_without_implementation = []) ?(npm_deps = []) ?ocaml
       ?opam ?opam_bug_reports ?opam_doc ?opam_homepage
-      ?(opam_with_test = Always) ?(preprocess = []) ?(preprocessor_deps = [])
-      ?(private_modules = []) ?(opam_only_deps = []) ?(release = false) ?static
-      ?synopsis ?description ?(time_measurement_ppx = false)
-      ?(virtual_modules = []) ?default_implementation ?(cram = false) ?license
-      ?(extra_authors = []) ~path names =
+      ?(opam_with_test = Always) ?(optional = false) ?(preprocess = [])
+      ?(preprocessor_deps = []) ?(private_modules = []) ?(opam_only_deps = [])
+      ?(release = false) ?static ?synopsis ?description
+      ?(time_measurement_ppx = false) ?(virtual_modules = [])
+      ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
+      ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1445,6 +1449,7 @@ module Target = struct
         opam_doc;
         opam_homepage;
         opam_with_test;
+        optional;
         opens;
         path;
         preprocess;
@@ -1946,6 +1951,7 @@ let generate_dune (internal : Target.internal) =
       ?link_flags
       ?flags
       ~inline_tests:internal.inline_tests
+      ~optional:internal.optional
       ~preprocess
       ~preprocessor_deps
       ~virtual_modules:internal.virtual_modules
@@ -2029,7 +2035,7 @@ let generate_dune_files () =
    If [fix_version] is [true], require [target]'s version to be
    exactly the same as [for_package]'s version, but only if [target] is internal. *)
 let rec as_opam_dependency ~fix_version ~(for_package : string) ~with_test
-    (target : Target.t) : Opam.dependency list =
+    ~optional (target : Target.t) : Opam.dependency list =
   match target with
   | External {opam = None; _} -> []
   | Internal {opam = Some package; _} ->
@@ -2038,24 +2044,30 @@ let rec as_opam_dependency ~fix_version ~(for_package : string) ~with_test
         let version =
           if fix_version then Version.(Exactly Version) else Version.True
         in
-        [{Opam.package; version; with_test; optional = false}]
+        [{Opam.package; version; with_test; optional}]
   | Internal ({opam = None; _} as internal) ->
-      (* If a target depends on a global "private" target, we must include its dependencies as well *)
+      (* If a target depends on a global "private" target, we must
+         include its dependencies as well. *)
       let deps = Target.all_internal_deps internal in
       List.concat_map
-        (as_opam_dependency ~fix_version ~for_package ~with_test)
+        (as_opam_dependency ~fix_version ~for_package ~with_test ~optional)
         deps
   | Vendored {name = package; _} ->
-      [{Opam.package; version = True; with_test; optional = false}]
+      [{Opam.package; version = True; with_test; optional}]
   | External {opam = Some opam; version; _}
   | Opam_only {name = opam; version; _} ->
-      [{Opam.package = opam; version; with_test; optional = false}]
+      [{Opam.package = opam; version; with_test; optional}]
   | Optional target | Select {package = target; _} ->
       List.map
         (fun (dep : Opam.dependency) -> {dep with optional = true})
-        (as_opam_dependency ~fix_version ~for_package ~with_test target)
+        (as_opam_dependency
+           ~fix_version
+           ~for_package
+           ~with_test
+           ~optional
+           target)
   | Open (target, _) ->
-      as_opam_dependency ~fix_version ~for_package ~with_test target
+      as_opam_dependency ~fix_version ~for_package ~with_test ~optional target
 
 let as_opam_monorepo_opam_provided = function
   | Target.Opam_only {can_vendor = false; name; _} -> Some name
@@ -2077,7 +2089,11 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     in
     let deps =
       List.concat_map
-        (as_opam_dependency ~fix_version:for_release ~for_package ~with_test)
+        (as_opam_dependency
+           ~fix_version:for_release
+           ~for_package
+           ~with_test
+           ~optional:internal.optional)
         deps
     in
     (deps, x_opam_monorepo_opam_provided)
@@ -2135,7 +2151,11 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     List.flatten @@ map internals
     @@ fun internal ->
     List.concat_map
-      (as_opam_dependency ~fix_version:false ~for_package ~with_test:Never)
+      (as_opam_dependency
+         ~fix_version:false
+         ~for_package
+         ~with_test:Never
+         ~optional:false)
       internal.conflicts
   in
   let get_consistent_value ~name ?default
@@ -2740,7 +2760,8 @@ let generate_opam_ci () =
                     (as_opam_dependency
                        ~fix_version:false
                        ~for_package:package_name
-                       ~with_test:Never))
+                       ~with_test:Never
+                       ~optional:false))
         |> deduplicate_list
              ~merge:(fun a _b -> a)
              (fun {Opam.package; _} -> package)
