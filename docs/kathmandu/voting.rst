@@ -127,15 +127,18 @@ The *vote participation* is the ratio of all the cumulated stake of cast ballots
 For the first vote, the *quorum* started at 80% of stake. The quorum is
 adjusted after each vote as detailed below. This adjustment is necessary to
 ensure that the amendment process can continue even if some delegates stop
-participating. After each vote the new quorum is updated based on the old quorum
-and the **vote participation** with the following coefficients::
+participating. After each vote the new quorum is updated based on the
+exponential moving average of the **vote participation**::
 
-  new-quorum = 0.8 × old-quorum + 0.2 × participation
+  new_participation_ema = 0.8 * old_participation_ema + 0.2 * participation
 
-However, in order to avoid establishing quorums close to 100% that would be
+with the following formula::
+
+  new_quorum = 0.2 + (0.7 - 0.2) * old_participation_ema
+
+This formula avoids establishing quorums close to 100% that would be
 very difficult to attain, or, conversely, low quorums close to 0% making
-little participation chronicle, the quorums are lower- and upper-bounded by
-:ref:`quorum_caps`.
+little participation chronicle, ensuring that the quorums are lower- and upper-bounded by :ref:`quorum_caps` (0.2 and 0.7, respectively).
 
 The *super-majority* is reached if the cumulated stake of Yay ballots is
 greater than 8/10 of the cumulated stake of Yay and Nay ballots.
