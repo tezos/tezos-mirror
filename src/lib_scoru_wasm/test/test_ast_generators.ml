@@ -25,17 +25,30 @@
 
 (** Testing
     -------
-    Component:    Lib_scoru_wasm
-    Invocation:   dune runtest src/lib_scoru_wasm/
-    Subject:      Tests for the tezos-scoru-wasm library
+    Component:    Tree_encoding_decoding
+    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
+                    -- test "AST Generators"
+    Subject:      Encoding tests for the tezos-scoru-wasm library
 *)
 
-let () =
-  Alcotest_lwt.run
-    "test lib scoru wasm"
-    [
-      ("Input", Test_input.tests);
-      ("Encodings", Test_encoding.tests);
-      ("AST Generators", Test_ast_generators.tests);
-    ]
-  |> Lwt_main.run
+open Tztest
+
+let qcheck ?print gen f =
+  let open Lwt_result_syntax in
+  let test =
+    QCheck2.Test.make ?print gen (fun x -> Result.is_ok @@ Lwt_main.run (f x))
+  in
+  let res = QCheck_base_runner.run_tests [test] in
+  if res = 0 then return_unit else failwith "QCheck tests failed"
+
+let print = Format.asprintf "%a" Ast_printer.pp_module
+
+(** A simple test that checks that generating and printing a module doesn't
+    throw an exception. *)
+let test_gen_print_module () =
+  let open Lwt_result_syntax in
+  qcheck ~print (Ast_generators.module_gen ()) (fun module_ ->
+      let _ = print module_ in
+      return_unit)
+
+let tests = [tztest "Module" `Quick test_gen_print_module]

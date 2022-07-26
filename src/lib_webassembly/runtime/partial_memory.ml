@@ -43,6 +43,8 @@ type memory = {mutable ty : memory_type; content : Chunked.t}
 (* Copied from [Memory] module *)
 type t = memory
 
+let content {content; _} = content
+
 let max_pages = 0x10000l
 
 (* Copied from [Memory] module *)

@@ -1,1 +1,1 @@
-include Memory_sig.S
+include module type of Partial_memory
