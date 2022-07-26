@@ -927,12 +927,14 @@ let prepare_first_block ~level ~timestamp ctxt =
             segment_size = 4096;
           }
       in
+      (* Inherit values that existed in previous protocol and haven't changed.
+         Assign values to new constants or those with new default value. *)
       let sc_rollup =
         Constants_parametric_repr.
           {
-            enable = false;
+            enable = c.sc_rollup.enable;
             origination_size = c.sc_rollup.origination_size;
-            challenge_window_in_blocks = 20_160;
+            challenge_window_in_blocks = c.sc_rollup.challenge_window_in_blocks;
             (* The following value is chosen to limit the maximal
                length of an inbox refutation proof. *)
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/2373
@@ -941,17 +943,19 @@ let prepare_first_block ~level ~timestamp ctxt =
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
                The following constants need to be refined. *)
             stake_amount = Tez_repr.of_mutez_exn 10_000_000_000L;
-            commitment_period_in_blocks = 30;
-            max_lookahead_in_blocks = 30_000l;
+            commitment_period_in_blocks =
+              c.sc_rollup.commitment_period_in_blocks;
+            max_lookahead_in_blocks = c.sc_rollup.max_lookahead_in_blocks;
             (* Number of active levels kept for executing outbox messages.
                WARNING: Changing this value impacts the storage charge for
                applying messages from the outbox. It also requires migration for
                remapping existing active outbox levels to new indices. *)
-            max_active_outbox_levels = 20_160l;
+            max_active_outbox_levels = c.sc_rollup.max_active_outbox_levels;
             (* Maximum number of outbox messages per level.
                WARNING: changing this value impacts the storage cost charged
                for applying messages from the outbox. *)
-            max_outbox_messages_per_level = 100;
+            max_outbox_messages_per_level =
+              c.sc_rollup.max_outbox_messages_per_level;
             (* The default number of required sections in a dissection *)
             number_of_sections_in_dissection = 32;
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/2902
