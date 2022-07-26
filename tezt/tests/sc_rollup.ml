@@ -2670,6 +2670,26 @@ let test_valid_dispute_dissection protocols =
       cement [c31; c32] ~fail:"Attempted to cement a disputed commitment")
     protocols
 
+(* Testing rollup node catch up mechanism
+   --------------------------------------
+
+   The rollup node must be able to catch up from the genesis
+   of the rollup when paired with a node in archive mode.
+*)
+let test_late_rollup_node =
+  test_scenario
+    {
+      tags = ["node"];
+      variant = "late";
+      description = "a late rollup should catch up";
+    }
+  @@ fun _protocol sc_rollup_node _sc_rollup_address _node client ->
+  let* () = bake_levels 65 client in
+  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = bake_levels 30 client in
+  let* _status = Sc_rollup_node.wait_for_level ~timeout:2. sc_rollup_node 95 in
+  return ()
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -2767,7 +2787,8 @@ let register ~kind ~protocols =
     protocols
     ~kind ;
   test_consecutive_commitments protocols ~kind ;
-  test_refutation protocols ~kind
+  test_refutation protocols ~kind ;
+  test_late_rollup_node protocols ~kind
 
 let register ~protocols =
   (* PVM-independent tests. We still need to specify a PVM kind
