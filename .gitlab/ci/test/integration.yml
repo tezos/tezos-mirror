@@ -120,7 +120,7 @@ integration:pytest:
 integration:pytest_old_protocols:
   extends:
     - .pytest_integration
-    - .rules_template__extended_test_pipeline
+    - .rules_template__extended_test_pipeline__pytest
   parallel: 16
   variables:
     TESTS: "--ignore tests_alpha"
