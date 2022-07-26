@@ -162,6 +162,23 @@ module V1 : sig
   *)
   type history_proof
 
+  (** A [history] is basically a lookup table of {!history_proof}s. We
+      need this if we want to produce inbox proofs because it allows us
+      to dereference the 'pointer' hashes in any of the
+      [history_proof]s. This [deref] function is passed to
+      [Skip_list.back_path] or [Skip_list.search] to allow these
+      functions to construct valid paths back through the skip list.
+
+      A subtlety of this [history] type is that it is customizable
+      depending on how much of the inbox history you actually want to
+      remember, using the [capacity] parameter. In the L1 we use this with
+      [capacity] set to zero, which makes it immediately forget an old
+      level as soon as we move to the next. By contrast, the rollup node
+      uses a history that is sufficiently large to be able to take part
+      in all potential refutation games occurring during the challenge
+      period. *)
+  type history
+
   val pp_history_proof : Format.formatter -> history_proof -> unit
 
   val history_proof_encoding : history_proof Data_encoding.t
@@ -227,23 +244,6 @@ module type MerkelizedOperations = sig
       tree with no messages yet, but has the [level] stored so we can
       check that in proofs. *)
   val new_level_tree : inbox_context -> Raw_level_repr.t -> tree Lwt.t
-
-  (** A [history] is basically a lookup table of {!history_proof}s. We
-      need this if we want to produce inbox proofs because it allows us
-      to dereference the 'pointer' hashes in any of the
-      [history_proof]s. This [deref] function is passed to
-      [Skip_list.back_path] or [Skip_list.search] to allow these
-      functions to construct valid paths back through the skip list.
-
-      A subtlety of this [history] type is that it is customizable
-      depending on how much of the inbox history you actually want to
-      remember, using the [capacity] parameter. In the L1 we use this with
-      [capacity] set to zero, which makes it immediately forget an old
-      level as soon as we move to the next. By contrast, the rollup node
-      uses a history that is sufficiently large to be able to take part
-      in all potential refutation games occurring during the challenge
-      period.  *)
-  type history
 
   val history_encoding : history Data_encoding.t
 

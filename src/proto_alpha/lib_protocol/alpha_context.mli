@@ -2807,6 +2807,8 @@ module Sc_rollup : sig
 
     type history_proof
 
+    type history
+
     module Hash : sig
       include S.HASH
 
@@ -2827,8 +2829,6 @@ module Sc_rollup : sig
       val hash_level_tree : tree -> Hash.t
 
       val new_level_tree : inbox_context -> Raw_level.t -> tree Lwt.t
-
-      type history
 
       val history_encoding : history Data_encoding.t
 
@@ -3305,7 +3305,7 @@ module Sc_rollup : sig
 
         val inbox : Inbox.history_proof
 
-        val history : history
+        val history : Inbox.history
       end
     end
 
