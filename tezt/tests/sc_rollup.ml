@@ -141,10 +141,7 @@ let setup ?commitment_period ?challenge_window ?timeout f ~protocol =
   let base = Either.right (protocol, None) in
   let* parameter_file = Protocol.write_parameter_file ~base parameters in
   let nodes_args =
-    Node.
-      [
-        Synchronisation_threshold 0; History_mode (Full None); No_bootstrap_peers;
-      ]
+    Node.[Synchronisation_threshold 0; History_mode Archive; No_bootstrap_peers]
   in
   let* node, client =
     Client.init_with_protocol ~parameter_file `Client ~protocol ~nodes_args ()
