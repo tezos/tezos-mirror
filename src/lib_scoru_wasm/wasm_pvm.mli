@@ -25,4 +25,4 @@
 
 (** Builds a WASM VM given a concrete implementation of {!Tree.S}. *)
 
-module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree
+module Make (T : Tree.S) : Gather_floppies.S with type tree = T.tree

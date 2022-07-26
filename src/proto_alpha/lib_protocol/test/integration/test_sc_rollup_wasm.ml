@@ -143,7 +143,7 @@ let checked_set_input ~loc context input s =
 
 let complete_boot_sector sector :
     Tezos_scoru_wasm.Gather_floppies.origination_message =
-  Complete_kernel (Bytes.of_string sector)
+  Complete_kernel sector
 
 let incomplete_boot_sector sector Account.{pk; _} :
     Tezos_scoru_wasm.Gather_floppies.origination_message =
@@ -151,23 +151,26 @@ let incomplete_boot_sector sector Account.{pk; _} :
 
 let find tree key encoding =
   let open Lwt.Syntax in
+  Format.printf "f %s\n" (String.concat "/" key) ;
   let+ value = Context_binary.Tree.find tree key in
   match value with
-  | Some bytes -> Some (Data_encoding.Binary.of_bytes_exn encoding bytes)
+  | Some bytes ->
+      Format.printf "v %S\n" (Bytes.to_string bytes) ;
+      Some (Data_encoding.Binary.of_bytes_exn encoding bytes)
   | None -> None
 
 let find_status tree =
   find
     tree
-    ["pvm"; "status"]
+    ["gather-floppies"; "status"]
     Tezos_scoru_wasm.Gather_floppies.internal_status_encoding
 
 let get_chunks_count tree =
   let open Lwt.Syntax in
   let+ len =
-    find tree ["durable"; "kernel"; "boot.wasm"; "len"] Data_encoding.int32
+    find tree ["durable"; "kernel"; "boot.wasm"; "length"] Data_encoding.int64
   in
-  Option.value ~default:0l len
+  Option.fold ~none:0 ~some:Int64.to_int len
 
 let check_status tree expected =
   let open Lwt.Syntax in
@@ -183,11 +186,7 @@ let check_chunks_count tree expected =
   let open Lwt.Syntax in
   let* count = get_chunks_count tree in
   if count = expected then Lwt_result.return ()
-  else
-    failwith
-      "wrong chunks counter, expected %d, got %d"
-      (Int32.to_int expected)
-      (Int32.to_int count)
+  else failwith "wrong chunks counter, expected %d, got %d" expected count
 
 let operator () =
   match Account.generate_accounts 1 with
@@ -200,12 +199,9 @@ let should_boot_complete_boot_sector boot_sector () =
   let*! index = Context_binary.init "/tmp" in
   let context = Context_binary.empty index in
   (* The number of chunks necessary to store the kernel. *)
-  let nb_chunk_i32 =
+  let boot_sector_len =
     match boot_sector with
-    | Complete_kernel bytes | Incomplete_kernel (bytes, _) ->
-        let len = Bytes.length bytes |> Int32.of_int in
-        let empty = if 0l < Int32.rem len 4_000l then 1l else 0l in
-        Int32.(add (div len 4_000l) empty)
+    | Complete_kernel bytes | Incomplete_kernel (bytes, _) -> Bytes.length bytes
   in
   let boot_sector =
     Data_encoding.Binary.to_string_exn origination_message_encoding boot_sector
@@ -217,14 +213,14 @@ let should_boot_complete_boot_sector boot_sector () =
      "/boot-sector", and nothing more.  As a consequence, most of the
      step of the [Gather_floppies] instrumentation is not set. *)
   let*! () = check_status s None in
-  let* () = check_chunks_count s 0l in
+  let* () = check_chunks_count s 0 in
   (* At this step, the [eval] function of the PVM will interpret the
      origination message encoded in [boot_sector]. *)
   let* s = checked_eval ~loc:__LOC__ context s in
   (* We expect that the WASM does not expect more floppies, and that
      the kernel as been correctly splitted into several chunks. *)
   let*! () = check_status s (Some Not_gathering_floppies) in
-  let* () = check_chunks_count s nb_chunk_i32 in
+  let* () = check_chunks_count s boot_sector_len in
   return_unit
 
 let floppy_input i operator chunk =
@@ -269,13 +265,13 @@ let should_interpret_empty_chunk () =
   let*! s = Prover.install_boot_sector s origination_message in
   (* Intererptation of the origination message *)
   let* s = checked_eval ~loc:__LOC__ context s in
-  let*! () = check_status s (Some Gathering_floppies) in
-  let* () = check_chunks_count s 1l in
+  let*! () = check_status s (Some (Gathering_floppies op.pk)) in
+  let* () = check_chunks_count s chunk_size in
   (* Try to interpret the empty input (correctly signed) *)
   let* s = checked_set_input ~loc:__LOC__ context correct_input s in
   let*! () = check_status s (Some Not_gathering_floppies) in
   (* We still have 1 chunk. *)
-  let* () = check_chunks_count s 1l in
+  let* () = check_chunks_count s chunk_size in
   return_unit
 
 let should_refuse_chunks_with_incorrect_signature () =
@@ -299,18 +295,18 @@ let should_refuse_chunks_with_incorrect_signature () =
   let*! s = Prover.install_boot_sector s origination_message in
   (* Intererptation of the origination message *)
   let* s = checked_eval ~loc:__LOC__ context s in
-  let*! () = check_status s (Some Gathering_floppies) in
-  let* () = check_chunks_count s 1l in
+  let*! () = check_status s (Some (Gathering_floppies good_op.pk)) in
+  let* () = check_chunks_count s chunk_size in
   (* Try to interpret the incorrect input (badly signed) *)
   let* s = checked_set_input ~loc:__LOC__ context incorrect_input s in
-  let*! () = check_status s (Some Gathering_floppies) in
+  let*! () = check_status s (Some (Gathering_floppies good_op.pk)) in
   (* We still have 1 chunk. *)
-  let* () = check_chunks_count s 1l in
+  let* () = check_chunks_count s chunk_size in
   (* Try to interpret the correct input (correctly signed) *)
   let* s = checked_set_input ~loc:__LOC__ context correct_input s in
-  let*! () = check_status s (Some Gathering_floppies) in
+  let*! () = check_status s (Some (Gathering_floppies good_op.pk)) in
   (* We now have 2 chunks. *)
-  let* () = check_chunks_count s 2l in
+  let* () = check_chunks_count s (2 * chunk_size) in
   return_unit
 
 let should_boot_incomplete_boot_sector kernel () =
@@ -349,6 +345,7 @@ let should_boot_incomplete_boot_sector kernel () =
     |> List.map Bytes.of_string
   in
   let final_chunk = Bytes.of_string @@ List.last "" rem_chunks in
+  let final_chunk_size = Bytes.length final_chunk in
 
   let*! index = Context_binary.init "/tmp" in
   let context = Context_binary.empty index in
@@ -356,14 +353,13 @@ let should_boot_incomplete_boot_sector kernel () =
   let*! s = Prover.install_boot_sector s initial_chunk in
   let* () = check_proof_size ~loc:__LOC__ context None s in
   let*! () = check_status s None in
-  let* () = check_chunks_count s 0l in
+  let* () = check_chunks_count s 0 in
   (* First tick, to interpret the boot sector. One chunk have been
      provided, and the PVM expects more chunk to come. *)
-  (* First tick, to interpret the boot sector*)
   let* s = checked_eval ~loc:__LOC__ context s in
-  let*! () = check_status s (Some Gathering_floppies) in
-  let* () = check_chunks_count s 1l in
-  (* Then, installing the additional chunks *)
+  let*! () = check_status s (Some (Gathering_floppies operator.pk)) in
+  let* () = check_chunks_count s chunk_size in
+  (* Then, installing the additional chunks. *)
   let* s =
     List.fold_left_i_es
       (fun i s chunk ->
@@ -372,8 +368,7 @@ let should_boot_incomplete_boot_sector kernel () =
         let* input = floppy_input i operator chunk in
         let* s = checked_set_input ~loc:__LOC__ context input s in
         (* We have [i+2] chunks. *)
-        let*! () = check_status s (Some Gathering_floppies) in
-        let* () = check_chunks_count s Int32.(of_int @@ (i + 2)) in
+        let* () = check_chunks_count s ((i + 2) * chunk_size) in
         return s)
       s
       chunks
@@ -383,7 +378,9 @@ let should_boot_incomplete_boot_sector kernel () =
   let* input = floppy_input len operator final_chunk in
   let* s = checked_set_input ~loc:__LOC__ context input s in
   let*! () = check_status s (Some Not_gathering_floppies) in
-  let* () = check_chunks_count s Int32.(of_int @@ (len + 2)) in
+  let* () =
+    check_chunks_count s (((len + 1) * chunk_size) + final_chunk_size)
+  in
   return_unit
 
 (* Read the chosen `wasm_kernel` into memory. *)
@@ -403,7 +400,7 @@ let tests =
   [
     Tztest.tztest "should boot a complete boot sector" `Quick
     @@ should_boot_complete_boot_sector
-         (complete_boot_sector @@ computation_kernel ());
+         (complete_boot_sector (Bytes.of_string @@ computation_kernel ()));
     ( Tztest.tztest "should boot an incomplete but too small boot sector" `Quick
     @@ fun () ->
       let operator = operator () in
