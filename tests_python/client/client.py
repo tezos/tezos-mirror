@@ -13,6 +13,8 @@ from typing import Any, List, Optional, Tuple
 from process.process_utils import format_command
 from . import client_output
 
+HTTP_VERBS = {'put', 'get', 'post', 'delete', 'patch'}
+
 
 class Client:
     """Client to a Tezos node.
@@ -209,11 +211,28 @@ class Client:
 
         See `run` for more details.
         """
-        assert verb in {'put', 'get', 'post', 'delete', 'patch'}
+        assert verb in HTTP_VERBS
         params = [] if params is None else params
         params = params + ['--better-errors'] + ['rpc', verb, path]
         if data is not None:
             params = params + ['with', json.dumps(data)]
+        compl_pr = self.run(params)
+        return client_output.extract_rpc_answer(compl_pr)
+
+    def rpc_schema(self, verb: str, path: str) -> Any:
+        """Get the input and output JSON schemas of an RPC.
+
+        Args:
+            verb (str): either `get`, `post`, `put`, `patch` or `delete`
+            path (str): rpc path
+        Returns:
+            dict representing the json schema, raise exception
+            if schema isn't json.
+
+        See `run` for more details.
+        """
+        assert verb.lower() in HTTP_VERBS
+        params = ['rpc', 'schema', verb, path]
         compl_pr = self.run(params)
         return client_output.extract_rpc_answer(compl_pr)
 

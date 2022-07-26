@@ -13,11 +13,13 @@ import re
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, Iterator, Dict
+from pprint import pformat
 import pytest
 from launchers.sandbox import Sandbox
 from client.client import Client
 from client.client_output import CreateMockupResult
+import tools
 
 from . import protocol
 
@@ -606,102 +608,160 @@ def _test_create_mockup_init_show_roundtrip(
     )
 
 
+@pytest.fixture(scope="class")
+def protocol_constants_fixture_none() -> Iterator[Optional[str]]:
+    """A fixture that simply returns None"""
+    yield None
+
+
+def succ(obj: Optional[object], schema: dict) -> object:
+    """Given the [obj] of JSON schema [schema], attempt to return a value
+    of the same schema that is not equal to [obj].
+    """
+
+    # pylint: disable=R0911
+
+    def succ_numeric(
+        val: Optional[int],
+        minimum: Optional[int] = None,
+        maximum: Optional[int] = None,
+    ) -> int:
+        """Returns an integer different from val. If minimum and/or maximum is
+        given, then a value greater or equal than minimum and/or
+        greater or equal than maximum is returned.
+        """
+        val = (
+            val
+            if val is not None
+            else minimum
+            if minimum is not None
+            else (maximum - 1)
+            if maximum is not None
+            else 0
+        )
+
+        if maximum is not None:
+            assert val <= maximum
+        if minimum is not None:
+            assert minimum <= val
+        if maximum is not None and minimum is not None:
+            assert abs(maximum - minimum) >= 0
+            assert minimum < maximum
+
+        if maximum is None:
+            return val + 1
+        if minimum is None:
+            return val - 1
+        return minimum + ((val - minimum + 1) % (maximum - minimum + 1))
+
+    def succ_list(val: Optional[Any], candidates: List[Any]) -> Any:
+        if val is not None:
+            candidates = [c for c in candidates if c != val]
+        return candidates[0]
+
+    typ = schema.get("type", schema.get("$ref"))
+    if typ == "object":
+        obj = obj if obj is not None else {}
+        assert isinstance(obj, dict)
+
+        obj_succ: Dict[str, Any] = {}
+        for key, key_schema in schema["properties"].items():
+            obj_succ[key] = succ(obj.get(key), key_schema)
+        return obj_succ
+    if typ == "integer":
+        minimum = schema.get('minimum')
+        maximum = schema.get('maximum')
+        assert obj is None or isinstance(obj, int)
+        int_succ = succ_numeric(obj, minimum, maximum)
+        return int_succ
+    if typ == "boolean":
+        obj = obj if obj is not None else False
+        assert isinstance(obj, bool)
+        return not obj
+    if typ == "#/definitions/bignum":
+        if obj is not None:
+            assert isinstance(obj, str)
+            obj = int(obj)
+        return str(succ_numeric(obj))
+    if typ == "#/definitions/int64":
+        if obj is not None:
+            assert isinstance(obj, str)
+            obj = int(obj)
+        return str(succ_numeric(obj, minimum=-(2**63) + 1, maximum=2**63))
+    if typ == "#/definitions/alpha.mutez":
+        if obj is not None:
+            assert isinstance(obj, str)
+            obj = int(obj)
+        return str(succ_numeric(obj, minimum=0))
+    if typ == "#/definitions/Signature.Public_key_hash":
+        bootstrap1 = tools.constants.IDENTITIES['bootstrap1']['identity']
+        bootstrap2 = tools.constants.IDENTITIES['bootstrap2']['identity']
+        return succ_list(obj, [bootstrap1, bootstrap2])
+    if typ == "#/definitions/random":
+        return succ_list(
+            obj,
+            [
+                "rngFtAUcm1EneHCCrxxSWAaxSukwEhSPvpTnFjVdKLEjgkapUy1pP",
+                "rngGPSm87ZqWxJmZu7rewiLiyKY72ffCQQvxDuWmFBw59dWAL5VTB",
+            ],
+        )
+
+    raise NotImplementedError(
+        f"'succ' is not implemented for types [{typ}] (value: {pformat(obj)})"
+    )
+
+
+@pytest.fixture(scope="function")
+def protocol_constants_fixture_from_rpc(
+    mockup_client: Client,
+) -> Iterator[Optional[str]]:
+    """A fixture that creates a protocol constant value adapted for
+    the mockup client initialization, while attempting to change each
+    parameter from the default in order to check loading of the
+    parameters."""
+
+    # Fetch default values
+    endpoint = '/chains/main/blocks/head/context/constants/parametric'
+    parametric_constants = mockup_client.rpc('get', endpoint)
+    # Fetch schema, used to move from default values
+    parametric_constants_schema = mockup_client.rpc_schema('get', endpoint)[
+        "output"
+    ]
+    # Move from default values
+    parametric_constants_succ = succ(
+        parametric_constants, parametric_constants_schema
+    )
+    assert isinstance(parametric_constants_succ, dict)
+    # Some constants are very constant.
+    constant_parametric_constants = {
+        # DO NOT EDIT the value consensus_threshold this is actually a
+        # constant, not a parameter
+        'consensus_threshold': 0,
+    }
+    # These are the mockup specific protocol parameters as per
+    # src/proto_alpha/lib_client/mockup.ml
+    mockup_constants = {
+        'initial_timestamp': '2021-02-03T12:34:56Z',
+        'chain_id': 'NetXaFDF7xZQCpR',
+    }
+    constants: Dict[str, Any] = {
+        **parametric_constants_succ,
+        **constant_parametric_constants,
+        **mockup_constants,
+    }
+    yield json.dumps(constants)
+
+
 @pytest.mark.client
 @pytest.mark.parametrize(
     'initial_bootstrap_accounts', [None, json.dumps(_create_accounts_list())]
 )
-# The following values should be different from the default ones in
-# order to check loading of the parameters.
 @pytest.mark.parametrize(
     'protocol_constants',
     [
-        None,
-        json.dumps(
-            {
-                "initial_timestamp": "2021-02-03T12:34:56Z",
-                "chain_id": "NetXaFDF7xZQCpR",
-                "min_proposal_quorum": 501,
-                "quorum_max": 7001,
-                "quorum_min": 2001,
-                "hard_storage_limit_per_operation": "60001",
-                "cost_per_byte": "251",
-                "baking_reward_fixed_portion": "20000000",
-                "baking_reward_bonus_per_slot": "2500",
-                "endorsing_reward_per_slot": "2857",
-                "origination_size": 258,
-                "vdf_difficulty": "1000000000",
-                "seed_nonce_revelation_tip": "125001",
-                "testnet_dictator": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
-                "tokens_per_roll": "8000000001",
-                "proof_of_work_threshold": "-2",
-                "hard_gas_limit_per_block": "10400001",
-                "hard_gas_limit_per_operation": "1040001",
-                'consensus_committee_size': 12,
-                # DO NOT EDIT the value consensus_threshold this is actually a
-                # constant, not a parameter
-                'consensus_threshold': 0,
-                'initial_seed': None,
-                'minimal_participation_ratio': {
-                    'denominator': 5,
-                    'numerator': 1,
-                },
-                'minimal_block_delay': '1',
-                'delay_increment_per_round': '1',
-                'max_slashing_period': 12,
-                "cycles_per_voting_period": 7,
-                "blocks_per_stake_snapshot": 5,
-                "blocks_per_commitment": 5,
-                "nonce_revelation_threshold": 5,
-                "blocks_per_cycle": 9,
-                "preserved_cycles": 3,
-                "liquidity_baking_toggle_ema_threshold": 1000000000,
-                "liquidity_baking_subsidy": "2500000",
-                "liquidity_baking_sunset_level": 1024,
-                "max_operations_time_to_live": 120,
-                "frozen_deposits_percentage": 10,
-                'ratio_of_frozen_deposits_slashed_per_double_endorsement': {
-                    'numerator': 1,
-                    'denominator': 2,
-                },
-                "double_baking_punishment": "640000001",
-                "cache_script_size": 100000001,
-                "cache_stake_distribution_cycles": 10,
-                "cache_sampler_state_cycles": 10,
-                "tx_rollup_enable": False,
-                "tx_rollup_origination_size": 30_000,
-                "tx_rollup_hard_size_limit_per_inbox": 100_000,
-                "tx_rollup_hard_size_limit_per_message": 5_000,
-                "tx_rollup_commitment_bond": "10000000000",
-                "tx_rollup_finality_period": 2000,
-                "tx_rollup_withdraw_period": 123456,
-                "tx_rollup_max_inboxes_count": 2218,
-                "tx_rollup_max_messages_per_inbox": 1010,
-                'tx_rollup_max_withdrawals_per_batch': 255,
-                "tx_rollup_max_commitments_count": 666,
-                "tx_rollup_cost_per_byte_ema_factor": 321,
-                "tx_rollup_max_ticket_payload_size": 10_240,
-                "tx_rollup_rejection_max_proof_size": 30_000,
-                "tx_rollup_sunset_level": 3_473_409,
-                "dal_parametric": {
-                    "feature_enable": True,
-                    "number_of_slots": 64,
-                    "number_of_shards": 1024,
-                    "endorsement_lag": 1,
-                    "availability_threshold": 25,
-                },
-                "sc_rollup_enable": False,
-                "sc_rollup_origination_size": 6_314,
-                "sc_rollup_challenge_window_in_blocks": 20_160,
-                "sc_rollup_max_number_of_messages_per_commitment_period": 32765,
-                "sc_rollup_stake_amount": "42000000",
-                "sc_rollup_commitment_period_in_blocks": 40,
-                "sc_rollup_max_lookahead_in_blocks": 30_000,
-                "sc_rollup_max_active_outbox_levels": 20_160,
-                "sc_rollup_max_outbox_messages_per_level": 100,
-                "sc_rollup_number_of_sections_in_dissection": 32,
-                "sc_rollup_timeout_period_in_blocks": 20_160,
-            }
-        ),
+        # These are fixtures defined above loaded dynamically
+        'protocol_constants_fixture_none',
+        'protocol_constants_fixture_from_rpc',
     ],
 )
 @pytest.mark.parametrize(
@@ -718,6 +778,7 @@ def test_create_mockup_config_show_init_roundtrip(
     protocol_constants,
     read_initial_state,
     read_final_state,
+    request,
 ):
     """1/ Create a mockup, using possibly custom bootstrap_accounts
        (as specified by `initial_bootstrap_json`).
@@ -734,7 +795,7 @@ def test_create_mockup_config_show_init_roundtrip(
         read_initial_state,
         read_final_state,
         initial_bootstrap_accounts,
-        protocol_constants,
+        request.getfixturevalue(protocol_constants),
     )
 
 

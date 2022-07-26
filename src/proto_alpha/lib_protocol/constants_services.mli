@@ -31,4 +31,8 @@ val errors :
 (** Returns all the constants of the protocol *)
 val all : 'a #RPC_context.simple -> 'a -> Constants.t shell_tzresult Lwt.t
 
+(** Returns the parametric constants of the protocol *)
+val parametric :
+  'a #RPC_context.simple -> 'a -> Constants.Parametric.t shell_tzresult Lwt.t
+
 val register : unit -> unit
