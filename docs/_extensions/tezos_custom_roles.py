@@ -67,9 +67,7 @@ def parse_role(text: str) -> Tuple[str, str]:
     return (description, obj)
 
 
-def package_role(
-    name, rawtext, text, _lineno, inliner, options={}, _content=[]
-):
+def package_role(name, rawtext, text, lineno, inliner, options={}, _content=[]):
     """Implement the package(-name)? roles."""
     rel_lvl = inliner.document.current_source.replace(os.getcwd(), '').count(
         '/'
@@ -79,8 +77,17 @@ def package_role(
     # no '/' allowed in the package name:
     (pkg, _sep, _rest) = path.partition("/")
     if pkg != path:
-        raise ValueError('package_role: garbage found in package name  ', path)
-    find_dot_opam(pkg)  # check that the package exists
+        msg = inliner.reporter.error(
+            'package_role: garbage found in package name  ' + path, line=lineno
+        )
+        prb = inliner.problematic(rawtext, rawtext, msg)
+        return [prb], [msg]
+    try:
+        find_dot_opam(pkg)  # check that the package exists
+    except ValueError as err:
+        msg = inliner.reporter.error(format(err), line=lineno)
+        prb = inliner.problematic(rawtext, rawtext, msg)
+        return [prb], [msg]
     if name == 'package-name':
         node = nodes.literal(text, text)
         return [node], []
@@ -107,7 +114,7 @@ def package_role(
 
 
 def package_api_role(
-    _name, rawtext, text, _lineno, inliner, options={}, _content=[]
+    _name, rawtext, text, lineno, inliner, options={}, _content=[]
 ):
     """Implement the package-api role."""
     rel_lvl = inliner.document.current_source.replace(os.getcwd(), '').count(
@@ -116,14 +123,22 @@ def package_api_role(
     url_prefix = '../' * (rel_lvl - 1)
     (text, path) = parse_role(text)
     (pkg, _sep, _rest) = path.partition("/")
-    find_dot_opam(pkg)  # check that the package exists
+    try:  # check that the package exists
+        find_dot_opam(pkg)
+    except ValueError as err:
+        msg = inliner.reporter.error(format(err), line=lineno)
+        prb = inliner.problematic(rawtext, rawtext, msg)
+        return [prb], [msg]
     (file, _sep, _section) = path.partition('#')  # remove eventual section
     if os.path.isdir('_build/api/odoc/_html/') and not os.path.isfile(
         '_build/api/odoc/_html/' + file
     ):
         # odoc was run but did not generate the page => path is wrong
         # (this is probably a user error)
-        raise ValueError('package_role: no API ', path)
+        err = 'package_role: no API  ' + path
+        msg = inliner.reporter.error(format(err), line=lineno)
+        prb = inliner.problematic(rawtext, rawtext, msg)
+        return [prb], [msg]
     url = url_prefix + "api/odoc/_html/" + path
     node = nodes.reference(rawtext, text, refuri=url, **options)
     return [node], []
