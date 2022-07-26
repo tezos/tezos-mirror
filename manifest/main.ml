@@ -2930,6 +2930,14 @@ let octez_shell_benchmarks =
       ]
     ~linkall:true
 
+let tezt_core_lib =
+  public_lib
+    "tezt.core"
+    ~path:"tezt/lib_core"
+    ~ocaml:V.(at_least "4.12")
+    ~bisect_ppx:false
+    ~deps:[re; lwt; unix; ezjsonm]
+
 let tezt_lib =
   public_lib
     "tezt"
@@ -2940,7 +2948,7 @@ let tezt_lib =
     ~opam_doc:"https://tezos.gitlab.io/api/odoc/_html/tezt/Tezt/index.html"
     ~ocaml:V.(at_least "4.12")
     ~bisect_ppx:false
-    ~deps:[re; lwt_unix; ezjsonm]
+    ~deps:[re; lwt_unix; ezjsonm; tezt_core_lib |> open_]
 
 let tezt ~opam ~path ?(deps = []) ?dep_globs l =
   tezt_without_tezt_lib_dependency
