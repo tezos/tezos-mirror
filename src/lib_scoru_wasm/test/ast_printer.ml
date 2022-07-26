@@ -89,7 +89,7 @@ let pp_list pp out x =
 let pp_value_type_list = pp_list pp_value_type
 
 let pp_block_label out (Ast.Block_label l) =
-  Format.fprintf out "Block_label @<hv 2>(%ld)@]" l
+  Format.fprintf out "Block_label @[<hv 2>(%ld)@]" l
 
 let pp_opt pp out = function
   | Some x -> Format.fprintf out "Some @[<hv 2>(%a)@]" pp x
@@ -340,8 +340,9 @@ let pp_instr' out instr =
 let pp_instr = pp_phrase pp_instr'
 
 let pp_vector pp out v =
-  let xs = Lwt_main.run @@ Lazy_vector.LwtInt32Vector.to_list v in
-  pp_list pp out xs
+  (* Force evaluation of the vector. *)
+  let _ = Lwt_main.run @@ Lazy_vector.LwtInt32Vector.to_list v in
+  Lazy_vector.LwtInt32Vector.pp pp out v
 
 let pp_resul_type = pp_vector pp_value_type
 
@@ -407,14 +408,13 @@ let pp_chunk_byte_vector out chunks =
 let pp_table out t =
   let ty = Partial_table.type_of t in
   let c = Partial_table.content t in
-  let xs = Lwt_main.run @@ Partial_table.Vector.Vector.to_list c in
   Format.fprintf
     out
-    "@[<hv 2>{ty = %a;@; content = %a}@]"
+    "@[<hv 2>{ty = %a;@; content = (%a)}@]"
     pp_table_type
     ty
-    (pp_list pp_ref)
-    xs
+    (pp_vector pp_ref)
+    c
 
 let pp_mutable out = function
   | Types.Immutable -> Format.pp_print_string out "Immutable"
