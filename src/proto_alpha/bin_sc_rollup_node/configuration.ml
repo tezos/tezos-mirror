@@ -120,8 +120,24 @@ let purpose_of_string_exn s =
   | Some p -> p
   | None -> invalid_arg ("purpose_of_string " ^ s)
 
+let add_fallbacks map fallbacks =
+  List.fold_left
+    (fun map (missing_purpose, fallback_purpose) ->
+      if Operator_purpose_map.mem missing_purpose map then
+        (* No missing purpose, don't fallback *)
+        map
+      else
+        match Operator_purpose_map.find fallback_purpose map with
+        | None ->
+            (* Nothing to fallback on *)
+            map
+        | Some operator -> Operator_purpose_map.add missing_purpose operator map)
+    map
+    fallbacks
+
 let make_purpose_map ~default bindings =
   let map = Operator_purpose_map.of_seq @@ List.to_seq bindings in
+  let map = add_fallbacks map [(Timeout, Refute)] in
   match default with
   | None -> map
   | Some default ->
