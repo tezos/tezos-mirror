@@ -28,9 +28,9 @@ open Protocol.Alpha_context
 
 type mode = Observer | Batcher | Maintenance | Operator | Custom
 
-type purpose = Publish | Add_messages | Cement | Refute
+type purpose = Publish | Add_messages | Cement | Timeout | Refute
 
-let purposes = [Publish; Add_messages; Cement; Refute]
+let purposes = [Publish; Add_messages; Cement; Timeout; Refute]
 
 module Operator_purpose_map = Map.Make (struct
   type t = purpose
@@ -104,12 +104,14 @@ let string_of_purpose = function
   | Publish -> "publish"
   | Add_messages -> "add_messages"
   | Cement -> "cement"
+  | Timeout -> "timeout"
   | Refute -> "refute"
 
 let purpose_of_string = function
   | "publish" -> Some Publish
   | "add_messages" -> Some Add_messages
   | "cement" -> Some Cement
+  | "timeout" -> Some Timeout
   | "refute" -> Some Refute
   | _ -> None
 
