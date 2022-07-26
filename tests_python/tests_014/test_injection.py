@@ -53,7 +53,7 @@ class TestInjectionAndActivation:
 
     def test_environment_version(self, clients: List[Client], session: dict):
         proto = session['proto_hash']
-        assert clients[0].environment_protocol(proto) == "V6"
+        assert clients[0].environment_protocol(proto) == "V7"
 
     def test_activation(self, clients: List[Client], session: dict):
         proto = session['proto_hash']
