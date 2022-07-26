@@ -222,9 +222,6 @@ module Inner = struct
   (* Builds group of nth roots of unity, a valid domain for the FFT. *)
   let make_domain n = Domains.build ~log:Z.(log2up (of_int n))
 
-  (* Memoize intermediate domains for the FFTs. *)
-  let intermediate_domains : Evaluations.domain IntMap.t ref = ref IntMap.empty
-
   type t = {
     redundancy_factor : int;
     slot_size : int;
@@ -486,36 +483,6 @@ module Inner = struct
     let evaluations = List.map (evaluation_fft d) ps in
     interpolation_fft d (mul_c ~evaluations ())
 
-  (* Divide & conquer polynomial multiplication with FFTs, assuming leaves are
-     polynomials of equal length. For n the degree of the returned polynomial,
-     k = |ps|, runs in time O(n log n log k). *)
-  let poly_mul t ps =
-    let split = List.fold_left (fun (l, r) x -> (x :: r, l)) ([], []) in
-    let rec poly_mul_aux ps =
-      match ps with
-      | [x] -> x
-      | _ ->
-          let a, b = split ps in
-          let a = poly_mul_aux a in
-          let b = poly_mul_aux b in
-          let deg = Polynomials.degree a + 1 (* deg a = deg b in our case. *) in
-          (* Computes adequate domain for the FFTs. *)
-          let d =
-            match IntMap.find deg !intermediate_domains with
-            | Some d -> d
-            | None ->
-                let d =
-                  Domains.subgroup
-                    ~log:(Z.log2up (Z.of_int (2 * deg)))
-                    t.domain_n
-                in
-                intermediate_domains := IntMap.add deg d !intermediate_domains ;
-                d
-          in
-          fft_mul d [a; b]
-    in
-    poly_mul_aux ps
-
   (* We encode by segments of [segment_size] bytes each.  The segments
      are arranged in cosets to evaluate in batch with Kate
      amortized. *)
@@ -655,18 +622,31 @@ module Inner = struct
          This also reduces the depth of the recursion tree of the poly_mul
          function from log(k) to log(number_of_shards), so that the decoding time
          reduces from O(k*log^2(k) + n*log(n)) to O(n*log(n)). *)
-      let factors =
+      let split = List.fold_left (fun (l, r) x -> (x :: r, l)) ([], []) in
+      let f1, f2 =
         IntMap.bindings shards
         (* We always consider the first k codeword vector components. *)
         |> Tezos_stdlib.TzList.take_n (t.k / t.shard_size)
-        |> List.rev_map (fun (i, _) ->
-               Polynomials.of_coefficients
-                 [
-                   (Scalar.negate (Domains.get t.domain_n (i * t.shard_size)), 0);
-                   (Scalar.(copy one), t.shard_size);
-                 ])
+        |> split
       in
-      let a_poly = poly_mul t factors in
+      let f11, f12 = split f1 in
+      let f21, f22 = split f2 in
+
+      let prod =
+        List.fold_left
+          (fun acc (i, _) ->
+            Polynomials.mul_xn
+              acc
+              t.shard_size
+              (Scalar.negate (Domains.get t.domain_n (i * t.shard_size))))
+          Polynomials.one
+      in
+      let p11 = prod f11 in
+      let p12 = prod f12 in
+      let p21 = prod f21 in
+      let p22 = prod f22 in
+
+      let a_poly = fft_mul t.domain_2k [p11; p12; p21; p22] in
 
       (* 2. Computing formal derivative of A(x). *)
       let a' = Polynomials.derivative a_poly in
