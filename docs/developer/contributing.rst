@@ -302,6 +302,7 @@ Therefore, when creating your MR, observe the following rules:
     be added before any push action is made on the MR.
 
     + ``ci--opam`` is for triggering the opam packaging tests pipeline.
+    + ``ci--extended-tests`` is for triggering the extended tests pipeline, including Python tests for the non-alpha protocols.
     + ``ci--docs`` is for testing some scripts in the documentation (e.g. Octez installation scenarios).
     + ``ci--docker`` is for publishing the Docker image of the MR.
     + ``ci--arm64`` is for building on the ARM64 architecture.
