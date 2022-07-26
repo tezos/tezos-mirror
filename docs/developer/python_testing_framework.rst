@@ -28,6 +28,8 @@ They are organized in four layers.
 3. ``launchers``,
 4. ``tests``, ``examples``, ``tools``.
 
+.. _install_python:
+
 Installation
 ------------
 
@@ -58,7 +60,7 @@ Prerequisites:
 
   All subsequent poetry commands are to be run in ``tests_python/``.
 
-Summing up, a typical installation proceeds as follows::
+A typical installation of the above prerequisites (including their own prerequisites) proceeds as follows, see below for full details::
 
   # 1. install pyenv
   # 2. restart shell, to ensure "pyenv init -" has been evaluated
