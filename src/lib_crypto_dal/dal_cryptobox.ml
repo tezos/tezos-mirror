@@ -748,12 +748,6 @@ module Inner = struct
     Array.init n (fun i ->
         if i = 0 then Bls12_381.Fr.(copy one) else Array.get domain (n - i))
 
-  let build_h_list_with_precomputed_srs a_list (domain2m, precomputed_srs) =
-    Scalar.fft_inplace ~domain:domain2m ~points:a_list ;
-    Array.map2 Bls12_381.G1.mul precomputed_srs a_list
-
-  (* part 3.2 *)
-
   let diff_next_power_of_two x =
     let logx = Z.log2 (Z.of_int x) in
     if 1 lsl logx = x then 0 else (1 lsl (logx + 1)) - x
@@ -815,20 +809,18 @@ module Inner = struct
          Toeplitz matrix part. *)
       let padding = diff_next_power_of_two (2 * quotient) in
       (* fm, 0, …, 0, f₁, f₂, …, fm-1 *)
-      let a_array =
+      let points =
         Array.init
           ((2 * quotient) + padding)
           (fun i ->
             if i <= quotient + (padding / 2) then Scalar.(copy zero)
             else Scalar.copy coefs.(rest + ((i - (quotient + padding)) * l)))
       in
-      if j <> 0 then a_array.(0) <- Scalar.copy coefs.(degree - j) ;
-      build_h_list_with_precomputed_srs
-        a_array
-        (domain2m, precomputed_srs_part.(j))
+      if j <> 0 then points.(0) <- Scalar.copy coefs.(degree - j) ;
+      Scalar.fft_inplace ~domain:domain2m ~points ;
+      Array.map2 G1.mul precomputed_srs_part.(j) points
     in
     let sum = compute_h_j 0 in
-
     let rec sum_hj j =
       if j = l then ()
       else
@@ -838,12 +830,14 @@ module Inner = struct
         sum_hj (j + 1)
     in
     sum_hj 1 ;
+
     (* Toeplitz matrix-vector multiplication *)
-    Bls12_381.G1.ifft_inplace ~domain:(inverse domain2m) ~points:sum ;
+    G1.ifft_inplace ~domain:(inverse domain2m) ~points:sum ;
     let hl = Array.sub sum 0 (Array.length domain2m / 2) in
-    (* Kate amortized FFT *)
+
     let phidomain = Domains.build ~log:chunk_count in
     let phidomain = inverse (Domains.inverse phidomain) in
+    (* Kate amortized FFT *)
     G1.fft ~domain:phidomain ~points:hl
 
   (* h = polynomial such that h(y×domain[i]) = zi. *)
