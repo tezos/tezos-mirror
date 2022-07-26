@@ -169,34 +169,40 @@ type section_tag =
   | `TableSection
   | `TypeSection ]
 
+(** Type witness for a LazyVector. *)
+type vec_repr = VecRepr
+
+(** Type witness for an option. *)
+type opt_repr = OptRepr
+
 (** Sections representation. *)
-type _ field_type =
-  | TypeField : Ast.type_ field_type
-  | ImportField : Ast.import field_type
-  | FuncField : Ast.var field_type
-  | TableField : Ast.table field_type
-  | MemoryField : Ast.memory field_type
-  | GlobalField : Ast.global field_type
-  | ExportField : Ast.export field_type
-  | StartField : Ast.start field_type
-  | ElemField : Ast.elem_segment field_type
-  | DataCountField : int32 field_type
-  | CodeField : Ast.func field_type
-  | DataField : Ast.data_segment field_type
+type (_, _) field_type =
+  | TypeField : (Ast.type_, vec_repr) field_type
+  | ImportField : (Ast.import, vec_repr) field_type
+  | FuncField : (Ast.var, vec_repr) field_type
+  | TableField : (Ast.table, vec_repr) field_type
+  | MemoryField : (Ast.memory, vec_repr) field_type
+  | GlobalField : (Ast.global, vec_repr) field_type
+  | ExportField : (Ast.export, vec_repr) field_type
+  | StartField : (Ast.start, opt_repr) field_type
+  | ElemField : (Ast.elem_segment, vec_repr) field_type
+  | DataCountField : (int32, opt_repr) field_type
+  | CodeField : (Ast.func, vec_repr) field_type
+  | DataField : (Ast.data_segment, vec_repr) field_type
 
 (** Result of a section parsing, being either a single value or a vector. *)
 type field =
-  | VecField : 'a field_type * 'a Vector.t -> field
-  | SingleField : 'a field_type * 'a option -> field
+  | VecField : ('a, vec_repr) field_type * 'a Vector.t -> field
+  | SingleField : ('a, opt_repr) field_type * 'a option -> field
 
 (** Module parsing steps *)
 type module_kont =
   | MKStart  (** Initial state of a module parsing *)
-  | MKSkipCustom : ('a field_type * section_tag) option -> module_kont
+  | MKSkipCustom : (('a, 'repr) field_type * section_tag) option -> module_kont
       (** Custom section which are skipped, with the next section to parse. *)
-  | MKFieldStart : 'a field_type * section_tag -> module_kont
+  | MKFieldStart : ('a, 'repr) field_type * section_tag -> module_kont
       (** Starting point of a section, handles parsing generic section header. *)
-  | MKField : 'a field_type * size * 'a lazy_vec_kont -> module_kont
+  | MKField : ('a, 'repr) field_type * size * 'a lazy_vec_kont -> module_kont
       (** Section currently parsed, accumulating each element from the underlying vector. *)
   | MKElaborateFunc :
       Ast.var Vector.t * Ast.func Vector.t * Ast.func lazy_vec_kont * bool
@@ -241,9 +247,25 @@ type stream = {name : string; bytes : string; pos : pos ref}
 *)
 type block_state = private {mutable new_blocks : Ast.instr Vector.t Vector.t}
 
+(** Accumulator of parsed fields *)
+type building_state = {
+  types : Ast.type_ Vector.t;
+  imports : Ast.import Vector.t;
+  vars : Ast.var Vector.t;
+  tables : Ast.table Vector.t;
+  memories : Ast.memory Vector.t;
+  globals : Ast.global Vector.t;
+  exports : Ast.export Vector.t;
+  start : Ast.start option;
+  elems : Ast.elem_segment Vector.t;
+  data_count : int32 option;
+  code : Ast.func Vector.t;
+  datas : Ast.data_segment Vector.t;
+}
+
 (** Decoding continuation step. *)
 type decode_kont = {
-  building_state : field Vector.t;
+  building_state : building_state;
       (** Accumulated parsed sections, used to build the final module. *)
   module_kont : module_kont;  (** Module continuation. *)
   stream : stream;  (** Parsed stream. *)
