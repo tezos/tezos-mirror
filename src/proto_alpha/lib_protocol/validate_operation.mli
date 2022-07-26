@@ -129,6 +129,21 @@ end
     includes it being correctly signed: indeed, we can't take anything
     from a manager without having checked their signature.
 
+    @param should_check_signature indicates whether the signature
+    check should happen. It defaults to [true] because the signature
+    needs to be correct for the operation to be valid. This argument
+    exists for special cases where it is acceptable to bypass this
+    check, e.g.:
+
+    - The mempool may keep track of operations whose signatures have
+      already been checked: if such an operation needs to be validated
+      again (typically when the head block changes), then the mempool may
+      call [validate_operation] with [should_check_signature:false].
+
+    - The [run_operation] RPC provided by the plugin explicitly
+      excludes signature checks: see its documentation in
+      [lib_plugin/RPC.Scripts.S.run_operation].
+
     TODO: https://gitlab.com/tezos/tezos/-/issues/2603
 
     This function currently does nothing for non-manager operations
@@ -139,6 +154,7 @@ end
 val validate_operation :
   validate_operation_info ->
   validate_operation_state ->
+  ?should_check_signature:bool ->
   Operation_hash.t ->
   'kind Alpha_context.operation ->
   (validate_operation_state * stamp) tzresult Lwt.t
@@ -185,27 +201,5 @@ module TMP_for_plugin : sig
     validate_operation_state ->
     'a Alpha_context.Kind.manager Alpha_context.contents_list ->
     'a Alpha_context.Kind.manager should_check_signature ->
-    stamp tzresult Lwt.t
-
-  (** Same as {!precheck_manager}, except that:
-
-      - This function does not require [validate_operation_info] and
-        [validate_operation_state] arguments. Instead, they are
-        constructed internally from the given context and chain_id.
-
-      - This function accepts any kind of operation as its
-        [contents_list] argument rather than just manager
-        operations. However, on non-manager operations, this function
-        does not check anything.
-
-      This function is called in [lib_plugin/RPC.ml], where we do not
-      have access to a {!Main.validation_state} containing
-      [validate_operation_info] and [_state], and where we need a
-      {!stamp} even for non-manager operations. *)
-  val precheck_manager__do_nothing_on_non_manager_op :
-    Alpha_context.t ->
-    Chain_id.t ->
-    'kind Alpha_context.contents_list ->
-    'kind should_check_signature ->
     stamp tzresult Lwt.t
 end

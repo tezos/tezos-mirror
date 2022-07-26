@@ -66,3 +66,8 @@ Internal
 
 - Internal refactorings in Michelson typechecker and interpreter. (MRs
   :gl:`!5586`, :gl:`!5587`)
+
+- Refactor the ``run_operation`` RPC. This allowed us to remove a
+  function from ``Validate_operation.TMP_for_plugin`` and to no longer
+  expose ``apply_contents_list`` and ``apply_manager_operations`` in
+  ``apply.mli``. (MR :gl:`!5770`)

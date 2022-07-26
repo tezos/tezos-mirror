@@ -138,8 +138,32 @@ type apply_mode =
     been extended to every kind of operation, [apply_operation] should
     never return an error.
 
-    See {!apply_manager_operations} for additional information on the
-    application of manager operations. *)
+    For manager operations, the application has two stages. The first
+    stage consists in updating the context to:
+
+    - take the fees;
+
+    - increment the account's counter;
+
+    - decrease of the available block gas by operation's [gas_limit].
+
+    These updates are mandatory. In particular, taking the fees is
+    critically important. The {!Validate_operation} module (from which
+    we get the {!Validate_opoeration.stamp} as explained above) is
+    responsible for ensuring that the operation is solvable, i.e. that
+    fees can be taken, i.e. that the first stage of manager operation
+    application cannot fail. If this stage fails nevertheless, the
+    function returns an error.
+
+    The second stage of this function (still in the case of a manager
+    operation) consists in applying all the other effects, in
+    accordance with the semantic of the operation's kind.
+
+    An error may happen during this second phase: in that case, the
+    function returns the context obtained at the end of the first
+    stage, and metadata that contain the error. This means that the
+    operation has no other effects than those described above during
+    the first phase. *)
 val apply_operation :
   context ->
   Chain_id.t ->
@@ -169,57 +193,6 @@ val finalize_application :
   predecessor:Block_hash.t ->
   migration_balance_updates:Receipt.balance_updates ->
   (context * Fitness.t * block_metadata, error trace) result Lwt.t
-
-(** Similar to {!apply_operation}, but a few initial and final steps
-    are skipped. This function is called in [lib_plugin/RPC.ml]. *)
-val apply_contents_list :
-  context ->
-  Chain_id.t ->
-  apply_mode ->
-  payload_producer:public_key_hash ->
-  Validate_operation.stamp ->
-  'kind operation ->
-  'kind contents_list ->
-  (context * 'kind contents_result_list) tzresult Lwt.t
-
-(** Update the context to reflect the application of a manager
-    operation.
-
-    This function first updates the context to:
-
-    - take the fees;
-
-    - increment the account's counter;
-
-    - decrease of the available block gas by operation's [gas_limit].
-
-    These updates are mandatory. In particular, taking the fees is
-    critically important. That's why [apply_manager_operations] takes a
-    [Validate_operation.stamp] argument, so that it may only be called
-    after having validated the operation by calling
-    {!Validate_operation}. Indeed, this module is responsible for
-    ensuring that the operation is solvable, i.e. that fees can be
-    taken, i.e. that the first stage of [apply_manager_operations]
-    cannot fail. If this stage fails nevertheless, the function returns
-    an error.
-
-    The second stage of this function consists in applying all the
-    other effects, in accordance with the semantic of the operation's
-    kind.
-
-    An error may happen during this second phase: in that case, the
-    function returns the context obtained at the end of the first
-    stage, and a [contents_result_list] that contains the error. This
-    means that the operation has no other effects than those described
-    above during the first phase. *)
-val apply_manager_operations :
-  context ->
-  payload_producer:public_key_hash ->
-  Chain_id.t ->
-  mempool_mode:bool ->
-  Validate_operation.stamp ->
-  'a Kind.manager contents_list ->
-  (context * 'a Kind.manager contents_result_list) tzresult Lwt.t
 
 (** [value_of_key ctxt k] builds a value identified by key [k]
     so that it can be put into the cache. *)
