@@ -19,7 +19,6 @@ def setup(app):
     """Perform initializations."""
     app.add_role('package', package_role)
     app.add_role('package-name', package_role)
-    app.add_role('package-src', package_role)
     app.add_role('package-api', package_api_role)
     app.add_role('opam', opam_role)
     app.add_role('src', src_role)
@@ -71,28 +70,19 @@ def parse_role(text: str) -> Tuple[str, str]:
 def package_role(
     name, rawtext, text, _lineno, inliner, options={}, _content=[]
 ):
-    """Implement the package(-name|-src)? roles."""
+    """Implement the package(-name)? roles."""
     rel_lvl = inliner.document.current_source.replace(os.getcwd(), '').count(
         '/'
     )
     url_prefix = '../' * (rel_lvl - 1)
-    (text, pkg) = parse_role(text)
-    # no '/' allowed in all the package name:
-    parts = pkg.split('/', maxsplit=1)
-    if len(parts) > 1:
-        raise ValueError('package_role: garbage found in package name  ', pkg)
-    src = find_dot_opam(pkg)
-    branch = os.environ.get('CI_COMMIT_REF_NAME', 'master')
+    (text, path) = parse_role(text)
+    # no '/' allowed in the package name:
+    (pkg, _sep, _rest) = path.partition("/")
+    if pkg != path:
+        raise ValueError('package_role: garbage found in package name  ', path)
+    find_dot_opam(pkg)  # check that the package exists
     if name == 'package-name':
         node = nodes.literal(text, text)
-        return [node], []
-    project_url = os.environ.get(
-        'CI_MERGE_REQUEST_SOURCE_PROJECT_URL',
-        os.environ.get('CI_PROJECT_URL', 'https://gitlab.com/tezos/tezos'),
-    )
-    src_url = project_url + "/tree/" + branch + "/" + src
-    if name == 'package-src':
-        node = nodes.reference(rawtext, src, refuri=src_url, **options)
         return [node], []
     # name == 'package'
     if os.path.isdir('_build/api/odoc/_html/' + pkg):
@@ -106,12 +96,12 @@ def package_role(
                 pkg.replace('-', '_').capitalize(),
             )
         ):
-            pkg = pkg + '/' + pkg.replace('-', '_').capitalize()
+            path = pkg + '/' + pkg.replace('-', '_').capitalize()
     elif os.path.isdir('_build/api/odoc/_html/'):
         # odoc was run but did not generate the page for an axisting package
         # (this is really weird, kind of internal error)
         raise ValueError('package_role: no API for package ', pkg)
-    url = url_prefix + "api/odoc/_html/" + pkg + '/index.html'
+    url = url_prefix + "api/odoc/_html/" + path + '/index.html'
     node = nodes.reference(rawtext, text, refuri=url, **options)
     return [node], []
 
@@ -125,7 +115,9 @@ def package_api_role(
     )
     url_prefix = '../' * (rel_lvl - 1)
     (text, path) = parse_role(text)
-    file = path.rsplit('#', maxsplit=1)[0]  # remove eventual section marker
+    (pkg, _sep, _rest) = path.partition("/")
+    find_dot_opam(pkg)  # check that the package exists
+    (file, _sep, _section) = path.partition('#')  # remove eventual section
     if os.path.isdir('_build/api/odoc/_html/') and not os.path.isfile(
         '_build/api/odoc/_html/' + file
     ):
