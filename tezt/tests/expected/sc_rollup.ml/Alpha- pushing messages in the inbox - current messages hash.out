@@ -1,5 +1,5 @@
 
-./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string booting with  --burn-cap 9999999
+./tezos-client --wait none originate sc rollup from bootstrap1 of kind arith of type string booting with  --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 3110.433 units (will add 100 for safety)
 Estimated storage: 6652 bytes added (will add 20 for safety)
@@ -33,7 +33,7 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.663
 
 
-./tezos-client --wait none send sc rollup message 'text:["hello, message number 0", "hello, message number 1", "hello, message number 2", "hello, message number 3", "hello, message number 4"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message 'text:["hello, message number 0", "hello, message number 1", "hello, message number 2", "hello, message number 3", "hello, message number 4"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1880.381 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -47,7 +47,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000603
-    Expected counter: 2
+    Expected counter: 1
     Gas limit: 1981
     Storage limit: 0 bytes
     Balance updates:
@@ -72,7 +72,7 @@ This sequence of operations was run:
                                }
 
 
-./tezos-client --wait none send sc rollup message 'text:["hello, message number 5", "hello, message number 6", "hello, message number 7", "hello, message number 8", "hello, message number 9", "hello, message number 10"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message 'text:["hello, message number 5", "hello, message number 6", "hello, message number 7", "hello, message number 8", "hello, message number 9", "hello, message number 10"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1881.471 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -86,7 +86,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000631
-    Expected counter: 3
+    Expected counter: 2
     Gas limit: 1982
     Storage limit: 0 bytes
     Balance updates:

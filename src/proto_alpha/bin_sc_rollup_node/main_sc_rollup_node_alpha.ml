@@ -36,13 +36,67 @@ let sc_rollup_address_param =
 let sc_rollup_node_operator_param =
   let open Lwt_result_syntax in
   Clic.param
-    ~name:"node-operator"
-    ~desc:"Public key hash of the the smart-contract rollup node operator"
-    (Clic.parameter (fun _ s ->
-         match Signature.Public_key_hash.of_b58check_opt s with
-         | None ->
-             failwith "Could not read public key hash for rollup node operator"
-         | Some pkh -> return pkh))
+    ~name:"operator"
+    ~desc:
+      (Printf.sprintf
+         "Public key hash, or alias, of a smart-contract rollup node operator. \
+          An operator can be specialized to a particular purpose by prefixing \
+          its key or alias by said purpose, e.g. publish:alias_of_my_operator. \
+          The possible purposes are: %s."
+         (String.concat ", "
+         @@ Configuration.(List.map string_of_purpose purposes)))
+  @@ Clic.parameter
+  @@ fun cctxt s ->
+  let parse_pkh s =
+    let from_alias s = Client_keys.Public_key_hash.find cctxt s in
+    let from_key s =
+      match Signature.Public_key_hash.of_b58check_opt s with
+      | None ->
+          failwith "Could not read public key hash for rollup node operator"
+      | Some pkh -> return pkh
+    in
+    Client_aliases.parse_alternatives
+      [("alias", from_alias); ("key", from_key)]
+      s
+  in
+  match String.split ~limit:1 ':' s with
+  | [_] ->
+      let+ pkh = parse_pkh s in
+      `Default pkh
+  | [purpose; operator_s] -> (
+      match Configuration.purpose_of_string purpose with
+      | Some purpose ->
+          let+ pkh = parse_pkh operator_s in
+          `Purpose (purpose, pkh)
+      | None ->
+          let+ pkh = parse_pkh s in
+          `Default pkh)
+  | _ ->
+      (* cannot happen due to String.split's implementation. *)
+      assert false
+
+let possible_modes = List.map Configuration.string_of_mode Configuration.modes
+
+let mode_parameter =
+  Clic.parameter
+    ~autocomplete:(fun _ -> return possible_modes)
+    (fun _ m -> Lwt.return (Configuration.mode_of_string m))
+
+let mode_param =
+  Clic.param
+    ~name:"mode"
+    ~desc:
+      (Format.asprintf
+         "@[<v 2>The mode for the rollup node (%s)@,%a@]"
+         (String.concat ", " possible_modes)
+         (Format.pp_print_list (fun fmt mode ->
+              Format.fprintf
+                fmt
+                "- %s: %s"
+                (Configuration.string_of_mode mode)
+                (Configuration.description_of_mode mode)))
+         Configuration.modes)
+    mode_parameter
 
 let rpc_addr_arg =
   let default = Configuration.default_rpc_addr in
@@ -183,6 +237,7 @@ let group =
   }
 
 let config_init_command =
+  let open Lwt_result_syntax in
   let open Clic in
   command
     ~group
@@ -198,10 +253,11 @@ let config_init_command =
        fee_cap_arg
        burn_cap_arg
        loser_mode)
-    (prefixes ["config"; "init"; "on"]
+    (prefix "init" @@ mode_param
+    @@ prefixes ["config"; "for"]
     @@ sc_rollup_address_param
-    @@ prefixes ["with"; "operator"]
-    @@ sc_rollup_node_operator_param stop)
+    @@ prefixes ["with"; "operators"]
+    @@ seq_of_param @@ sc_rollup_node_operator_param)
     (fun ( data_dir,
            rpc_addr,
            rpc_port,
@@ -212,15 +268,34 @@ let config_init_command =
            fee_cap,
            burn_cap,
            loser_mode )
+         mode
          sc_rollup_address
-         sc_rollup_node_operator
+         sc_rollup_node_operators
          cctxt ->
       let open Configuration in
+      let purposed_operators, default_operators =
+        List.partition_map
+          (function
+            | `Purpose p_operator -> Left p_operator
+            | `Default operator -> Right operator)
+          sc_rollup_node_operators
+      in
+      let default_operator =
+        match default_operators with
+        | [] -> None
+        | [default_operator] -> Some default_operator
+        | _ -> Stdlib.failwith "Multiple default operators"
+      in
+      let sc_rollup_node_operators =
+        Configuration.make_purpose_map
+          purposed_operators
+          ~default:default_operator
+      in
       let config =
         {
           data_dir;
           sc_rollup_address;
-          sc_rollup_node_operator;
+          sc_rollup_node_operators;
           rpc_addr;
           rpc_port;
           fee_parameter =
@@ -232,9 +307,11 @@ let config_init_command =
               fee_cap;
               burn_cap;
             };
+          mode;
           loser_mode;
         }
       in
+      let*? config = check_mode config in
       save config >>=? fun () ->
       cctxt#message
         "Smart-contract rollup node configuration written in %s"

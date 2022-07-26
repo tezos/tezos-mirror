@@ -30,7 +30,7 @@ type t = {
   cctxt : Protocol_client_context.full;
   l1_ctxt : Layer1.t;
   rollup_address : Sc_rollup.t;
-  operator : Signature.Public_key_hash.t;
+  operators : Configuration.operators;
   genesis_info : Sc_rollup.Commitment.genesis_info;
   block_finality_time : int;
   kind : Sc_rollup.Kind.t;
@@ -39,10 +39,13 @@ type t = {
   loser_mode : Loser_mode.t;
 }
 
-let get_operator_keys node_ctxt =
+let get_operator_keys node_ctxt purpose =
   let open Lwt_result_syntax in
-  let+ _, pk, sk = Client_keys.get_key node_ctxt.cctxt node_ctxt.operator in
-  (node_ctxt.operator, pk, sk)
+  match Configuration.Operator_purpose_map.find purpose node_ctxt.operators with
+  | None -> return_none
+  | Some operator ->
+      let+ _, pk, sk = Client_keys.get_key node_ctxt.cctxt operator in
+      Some (operator, pk, sk)
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2901
    The constants are retrieved from the latest tezos block. These constants can
@@ -54,14 +57,14 @@ let retrieve_constants cctxt =
   Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
 
 let init (cctxt : Protocol_client_context.full) l1_ctxt rollup_address
-    genesis_info kind operator fee_parameter ~loser_mode =
+    genesis_info kind operators fee_parameter ~loser_mode =
   let open Lwt_result_syntax in
   let+ protocol_constants = retrieve_constants cctxt in
   {
     cctxt;
     l1_ctxt;
     rollup_address;
-    operator;
+    operators;
     genesis_info;
     kind;
     block_finality_time = 2;

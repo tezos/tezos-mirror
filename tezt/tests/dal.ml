@@ -92,7 +92,11 @@ let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
       tezos_client
   in
   let sc_rollup_node =
-    Sc_rollup_node.create tezos_node tezos_client ~operator_pkh:bootstrap1_key
+    Sc_rollup_node.create
+      Operator
+      tezos_node
+      tezos_client
+      ~default_operator:bootstrap1_key
   in
   let* configuration_filename =
     Sc_rollup_node.config_init sc_rollup_node rollup_address

@@ -1,5 +1,5 @@
 
-./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string booting with  --burn-cap 9999999
+./tezos-client --wait none originate sc rollup from bootstrap1 of kind arith of type string booting with  --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 3110.433 units (will add 100 for safety)
 Estimated storage: 6652 bytes added (will add 20 for safety)
@@ -33,7 +33,7 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.663
 
 
-./tezos-client --wait none send sc rollup message 'text:["CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1876.722 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -47,7 +47,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000479
-    Expected counter: 2
+    Expected counter: 1
     Gas limit: 1977
     Storage limit: 0 bytes
     Balance updates:
@@ -72,7 +72,7 @@ This sequence of operations was run:
                                }
 
 
-./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1877.540 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -86,7 +86,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000491
-    Expected counter: 3
+    Expected counter: 2
     Gas limit: 1978
     Storage limit: 0 bytes
     Balance updates:
@@ -112,7 +112,7 @@ This sequence of operations was run:
                                }
 
 
-./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1878.343 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -126,7 +126,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000503
-    Expected counter: 4
+    Expected counter: 3
     Gas limit: 1979
     Storage limit: 0 bytes
     Balance updates:
@@ -152,7 +152,7 @@ This sequence of operations was run:
                                }
 
 
-./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1878.939 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -166,7 +166,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000515
-    Expected counter: 5
+    Expected counter: 4
     Gas limit: 1979
     Storage limit: 0 bytes
     Balance updates:
@@ -193,7 +193,7 @@ This sequence of operations was run:
                                }
 
 
-./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1879.742 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -207,7 +207,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000527
-    Expected counter: 6
+    Expected counter: 5
     Gas limit: 1980
     Storage limit: 0 bytes
     Balance updates:
@@ -234,7 +234,7 @@ This sequence of operations was run:
                                }
 
 
-./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1880.338 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -248,7 +248,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.00054
-    Expected counter: 7
+    Expected counter: 6
     Gas limit: 1981
     Storage limit: 0 bytes
     Balance updates:
@@ -275,7 +275,7 @@ This sequence of operations was run:
                                }
 
 
-./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1880.934 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -289,7 +289,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000552
-    Expected counter: 8
+    Expected counter: 7
     Gas limit: 1981
     Storage limit: 0 bytes
     Balance updates:
@@ -316,7 +316,7 @@ This sequence of operations was run:
                                }
 
 
-./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1881.530 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -330,7 +330,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000564
-    Expected counter: 9
+    Expected counter: 8
     Gas limit: 1982
     Storage limit: 0 bytes
     Balance updates:
@@ -358,7 +358,7 @@ This sequence of operations was run:
                                }
 
 
-./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1882.333 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -372,7 +372,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000576
-    Expected counter: 10
+    Expected counter: 9
     Gas limit: 1983
     Storage limit: 0 bytes
     Balance updates:
@@ -400,7 +400,7 @@ This sequence of operations was run:
                                }
 
 
-./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE","CAFEBABE"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1882.929 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -414,7 +414,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000588
-    Expected counter: 11
+    Expected counter: 10
     Gas limit: 1983
     Storage limit: 0 bytes
     Balance updates:

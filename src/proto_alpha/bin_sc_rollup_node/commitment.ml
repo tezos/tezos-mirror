@@ -297,45 +297,50 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
                  commitment)
         else return_unit
       in
-      let* source, src_pk, src_sk = Node_context.get_operator_keys node_ctxt in
-      let* _, _, Manager_operation_result {operation_result; _} =
-        Client_proto_context.sc_rollup_publish
-          cctxt
-          ~chain:cctxt#chain
-          ~block:cctxt#block
-          ~commitment
-          ~source
-          ~rollup:rollup_address
-          ~src_pk
-          ~src_sk
-          ~fee_parameter:Configuration.default_fee_parameter
-          ()
-      in
-      let open Apply_results in
-      let*! () =
-        match operation_result with
-        | Applied (Sc_rollup_publish_result {published_at_level; _}) ->
-            let open Lwt_syntax in
-            let* () =
-              Store.Last_published_commitment_level.set
-                store
-                commitment.inbox_level
-            in
-            let* () =
-              Store.Commitments_published_at_level.add
-                store
-                commitment_hash
-                published_at_level
-            in
-            Commitment_event.publish_commitment_injected commitment
-        | Failed (Sc_rollup_publish_manager_kind, _errors) ->
-            Commitment_event.publish_commitment_failed commitment
-        | Backtracked (Sc_rollup_publish_result _, _errors) ->
-            Commitment_event.publish_commitment_backtracked commitment
-        | Skipped Sc_rollup_publish_manager_kind ->
-            Commitment_event.publish_commitment_skipped commitment
-      in
-      return_unit
+      let* operator = Node_context.get_operator_keys node_ctxt Publish in
+      match operator with
+      | None ->
+          (* Configured to not publish commitments *)
+          return_unit
+      | Some (source, src_pk, src_sk) ->
+          let* _, _, Manager_operation_result {operation_result; _} =
+            Client_proto_context.sc_rollup_publish
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ~commitment
+              ~source
+              ~rollup:rollup_address
+              ~src_pk
+              ~src_sk
+              ~fee_parameter:Configuration.default_fee_parameter
+              ()
+          in
+          let open Apply_results in
+          let*! () =
+            match operation_result with
+            | Applied (Sc_rollup_publish_result {published_at_level; _}) ->
+                let open Lwt_syntax in
+                let* () =
+                  Store.Last_published_commitment_level.set
+                    store
+                    commitment.inbox_level
+                in
+                let* () =
+                  Store.Commitments_published_at_level.add
+                    store
+                    commitment_hash
+                    published_at_level
+                in
+                Commitment_event.publish_commitment_injected commitment
+            | Failed (Sc_rollup_publish_manager_kind, _errors) ->
+                Commitment_event.publish_commitment_failed commitment
+            | Backtracked (Sc_rollup_publish_result _, _errors) ->
+                Commitment_event.publish_commitment_backtracked commitment
+            | Skipped Sc_rollup_publish_manager_kind ->
+                Commitment_event.publish_commitment_skipped commitment
+          in
+          return_unit
     else return_unit
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2869
@@ -406,40 +411,45 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       ({Sc_rollup.Commitment.inbox_level; _} as commitment) commitment_hash
       store =
     let open Lwt_result_syntax in
-    let* source, src_pk, src_sk = Node_context.get_operator_keys node_ctxt in
-    let* _, _, Manager_operation_result {operation_result; _} =
-      Client_proto_context.sc_rollup_cement
-        cctxt
-        ~chain:cctxt#chain
-        ~block:cctxt#block
-        ~commitment:commitment_hash
-        ~source
-        ~rollup:rollup_address
-        ~src_pk
-        ~src_sk
-        ~fee_parameter:Configuration.default_fee_parameter
-        ()
-    in
-    let open Apply_results in
-    let*! () =
-      match operation_result with
-      | Applied (Sc_rollup_cement_result _) ->
-          let open Lwt_syntax in
-          let* () =
-            Store.Last_cemented_commitment_level.set store inbox_level
-          in
-          let* () =
-            Store.Last_cemented_commitment_hash.set store commitment_hash
-          in
-          Commitment_event.cement_commitment_injected commitment
-      | Failed (Sc_rollup_cement_manager_kind, _errors) ->
-          Commitment_event.cement_commitment_failed commitment
-      | Backtracked (Sc_rollup_cement_result _, _errors) ->
-          Commitment_event.cement_commitment_backtracked commitment
-      | Skipped Sc_rollup_cement_manager_kind ->
-          Commitment_event.cement_commitment_skipped commitment
-    in
-    return_unit
+    let* operator = Node_context.get_operator_keys node_ctxt Cement in
+    match operator with
+    | None ->
+        (* Configured to not cement commitments *)
+        return_unit
+    | Some (source, src_pk, src_sk) ->
+        let* _, _, Manager_operation_result {operation_result; _} =
+          Client_proto_context.sc_rollup_cement
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~commitment:commitment_hash
+            ~source
+            ~rollup:rollup_address
+            ~src_pk
+            ~src_sk
+            ~fee_parameter:Configuration.default_fee_parameter
+            ()
+        in
+        let open Apply_results in
+        let*! () =
+          match operation_result with
+          | Applied (Sc_rollup_cement_result _) ->
+              let open Lwt_syntax in
+              let* () =
+                Store.Last_cemented_commitment_level.set store inbox_level
+              in
+              let* () =
+                Store.Last_cemented_commitment_hash.set store commitment_hash
+              in
+              Commitment_event.cement_commitment_injected commitment
+          | Failed (Sc_rollup_cement_manager_kind, _errors) ->
+              Commitment_event.cement_commitment_failed commitment
+          | Backtracked (Sc_rollup_cement_result _, _errors) ->
+              Commitment_event.cement_commitment_backtracked commitment
+          | Skipped Sc_rollup_cement_manager_kind ->
+              Commitment_event.cement_commitment_skipped commitment
+        in
+        return_unit
 
   (* TODO:  https://gitlab.com/tezos/tezos/-/issues/3008
      Use the injector to cement commitments. *)

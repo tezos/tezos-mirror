@@ -32,7 +32,11 @@ type error += Commitment_predecessor_should_be_LCC of Sc_rollup.Commitment.t
 type error += Unreliable_tezos_node_returning_inconsistent_game
 
 type error +=
-  | Cannot_produce_proof of Store.Inbox.t * Store.Inbox.history * Raw_level.t
+  | Cannot_produce_proof of
+      Sc_rollup.Inbox.t * Sc_rollup.Inbox.history * Raw_level.t
+
+type error +=
+  | Missing_mode_operators of {mode : string; missing_operators : string list}
 
 let () =
   register_error_kind
@@ -91,20 +95,43 @@ let () =
       Format.fprintf
         ppf
         "cannot produce proof for inbox %a of level %a with history %a"
-        Store.Inbox.pp
+        Sc_rollup.Inbox.pp
         inbox
         Raw_level.pp
         level
-        Store.Inbox.pp_history
+        Sc_rollup.Inbox.pp_history
         history)
     Data_encoding.(
       obj3
-        (req "inbox" Store.Inbox.encoding)
-        (req "history" Store.Inbox.history_encoding)
+        (req "inbox" Sc_rollup.Inbox.encoding)
+        (req "history" Sc_rollup.Inbox.history_encoding)
         (req "level" Raw_level.encoding))
     (function
       | Cannot_produce_proof (inbox, history, level) ->
           Some (inbox, history, level)
       | _ -> None)
     (fun (inbox, history, level) ->
-      Cannot_produce_proof (inbox, history, level))
+      Cannot_produce_proof (inbox, history, level)) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.missing_mode_operators"
+    ~title:"Missing operators for the chosen mode"
+    ~description:"Missing operators for the chosen mode."
+    ~pp:(fun ppf (mode, missing_operators) ->
+      Format.fprintf
+        ppf
+        "@[<hov>Missing operators %a for mode %s.@]"
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+           Format.pp_print_string)
+        missing_operators
+        mode)
+    `Permanent
+    Data_encoding.(
+      obj2 (req "mode" string) (req "missing_operators" (list string)))
+    (function
+      | Missing_mode_operators {mode; missing_operators} ->
+          Some (mode, missing_operators)
+      | _ -> None)
+    (fun (mode, missing_operators) ->
+      Missing_mode_operators {mode; missing_operators})

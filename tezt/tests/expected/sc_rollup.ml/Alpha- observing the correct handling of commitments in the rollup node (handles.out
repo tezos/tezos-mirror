@@ -1,5 +1,5 @@
 
-./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith of type string booting with  --burn-cap 9999999
+./tezos-client --wait none originate sc rollup from bootstrap1 of kind arith of type string booting with  --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 3110.433 units (will add 100 for safety)
 Estimated storage: 6652 bytes added (will add 20 for safety)
@@ -37,7 +37,7 @@ This sequence of operations was run:
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./tezos-client --wait none send sc rollup message 'text:["CAFEBABE"]' from bootstrap1 to '[SC_ROLLUP_HASH]'
+./tezos-client --wait none send sc rollup message 'text:["CAFEBABE"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1876.850 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -51,7 +51,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000479
-    Expected counter: 2
+    Expected counter: 1
     Gas limit: 1977
     Storage limit: 0 bytes
     Balance updates:

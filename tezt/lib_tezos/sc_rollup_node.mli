@@ -31,6 +31,8 @@
 (** Smart contract rollup node states. *)
 type t
 
+type mode = Batcher | Custom | Maintenance | Observer | Operator
+
 (** Create a smart contract rollup node.
 
     A smart contract rollup node is associated to a tezos node
@@ -62,7 +64,9 @@ val create :
   ?event_pipe:string ->
   ?rpc_host:string ->
   ?rpc_port:int ->
-  operator_pkh:string ->
+  ?operators:(string * string) list ->
+  ?default_operator:string ->
+  mode ->
   Node.t ->
   Client.t ->
   t
@@ -84,9 +88,6 @@ val data_dir : t -> string
 
 (** Get the base-dir of an sc node *)
 val base_dir : t -> string
-
-(** Get the public key hash of the sc node oeprator *)
-val operator_pkh : t -> string
 
 (** Wait until an sc node terminates and check its status.
 
