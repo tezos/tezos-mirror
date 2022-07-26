@@ -33,6 +33,7 @@
 
 open Tztest
 open Tezos_scoru_wasm
+open Tezos_webassembly_interpreter
 
 let qcheck ?count ?print gen f =
   let open Lwt_result_syntax in
@@ -89,15 +90,31 @@ let assert_string_equal s1 s2 =
 let test_module_roundtrip () =
   let print = Format.asprintf "%a" Ast_printer.pp_module in
   let open Lwt_result_syntax in
-  qcheck ~print (Ast_generators.module_gen ()) (fun module1 ->
+  let dummy_module_reg =
+    (* It is ok to use a dummy here, because the module lookup (dereferenceing)
+       is not important when encoding or decoding. *)
+    Instance.ModuleMap.create ()
+  in
+  let lazy_dummy_module_reg = Lazy.from_val dummy_module_reg in
+
+  qcheck
+    ~print
+    (Ast_generators.module_gen ~module_reg:dummy_module_reg ())
+    (fun module1 ->
       (* We need to print here in order to force lazy bindings to be evaluated. *)
       let module1_str = print module1 in
       let*! module2 =
-        encode_decode Wasm_encoding.module_instance_encoding module1
+        encode_decode
+          (Wasm_encoding.module_instance_encoding
+             ~module_reg:lazy_dummy_module_reg)
+          module1
       in
       let module2_str = print module2 in
       let*! module3 =
-        encode_decode Wasm_encoding.module_instance_encoding module2
+        encode_decode
+          (Wasm_encoding.module_instance_encoding
+             ~module_reg:lazy_dummy_module_reg)
+          module2
       in
       let module3_str = print module3 in
       (* Check that modules match. *)
@@ -108,24 +125,38 @@ let test_module_roundtrip () =
 let test_module_tree () =
   let print = Format.asprintf "%a" Ast_printer.pp_module in
   let open Lwt_result_syntax in
-  qcheck ~print (Ast_generators.module_gen ()) (fun module1 ->
+  let dummy_module_reg =
+    (* It is ok to use a dummy here, because the module lookup (dereferenceing)
+       is not important when encoding or decoding. *)
+    Instance.ModuleMap.create ()
+  in
+  let lazy_dummy_module_reg = Lazy.from_val dummy_module_reg in
+  qcheck
+    ~print
+    (Ast_generators.module_gen ~module_reg:dummy_module_reg ())
+    (fun module1 ->
       let*! empty_tree = empty_tree () in
       (* We need to print here in order to force lazy bindings to be evaluated. *)
       let _ = print module1 in
       let*! tree1 =
         Merklizer.encode
-          Wasm_encoding.module_instance_encoding
+          (Wasm_encoding.module_instance_encoding
+             ~module_reg:lazy_dummy_module_reg)
           module1
           empty_tree
       in
       let*! module2 =
-        Merklizer.decode Wasm_encoding.module_instance_encoding tree1
+        Merklizer.decode
+          (Wasm_encoding.module_instance_encoding
+             ~module_reg:lazy_dummy_module_reg)
+          tree1
       in
       (* We need to print here in order to force lazy bindings to be evaluated. *)
       let _ = print module2 in
       let*! tree2 =
         Merklizer.encode
-          Wasm_encoding.module_instance_encoding
+          (Wasm_encoding.module_instance_encoding
+             ~module_reg:lazy_dummy_module_reg)
           module2
           empty_tree
       in

@@ -330,9 +330,45 @@ let scripts : script Map.t ref = ref Map.empty
 
 let modules : Ast.module_ Map.t ref = ref Map.empty
 
-let instances : Instance.module_inst Map.t ref = ref Map.empty
+(* NOTE: See [instantiate_module] below on why this exists. *)
+let unnamed_instance_counter = ref 0
+
+(* NOTE: See [instantiate_module] below on why this exists. *)
+let unnamed_instances : Instance.module_reg = Instance.ModuleMap.create ()
+
+let instances : Instance.module_reg = Instance.ModuleMap.create ()
 
 let registry : Instance.module_inst Map.t ref = ref Map.empty
+
+let instantiate_module x_opt m imports =
+  let self =
+    match x_opt with
+    | None ->
+        (* The WASM REPL allows you to create modules without a name. The
+           intended use case is to define a module without a name and then
+           register it under one or more names later.
+           This mechanism used a slot "" for the temporary module.
+           Unfortunately, this doesn't work super well with our module
+           references because they require module keys (their names) to be
+           stable. E.g. multiple modules temporarily assigned as "" will
+           conflict given their module key will statically be "" regardless of
+           how many times it was rebound.
+           The solution is to bind to a unique temporary module each time the
+           module in question has no name.
+        *)
+        let index = !unnamed_instance_counter in
+        unnamed_instance_counter := !unnamed_instance_counter + 1 ;
+        Instance.
+          {registry = unnamed_instances; key = Module_key (Int.to_string index)}
+    | Some name -> Instance.{registry = instances; key = Module_key name.it}
+  in
+  Eval.init ~self host_funcs_registry m imports
+
+let bind_lazy module_reg name instance =
+  Option.iter
+    (fun name -> Instance.ModuleMap.set name.it instance module_reg)
+    name ;
+  Instance.ModuleMap.set "" instance module_reg
 
 let bind map x_opt y =
   let map' = match x_opt with None -> !map | Some x -> Map.add x.it y !map in
@@ -351,7 +387,18 @@ let lookup_script = lookup "script" scripts
 
 let lookup_module = lookup "module" modules
 
-let lookup_instance = lookup "module" instances
+let lookup_instance name at =
+  let category = "instance" in
+  let key = match name with Some name -> name.it | None -> "" in
+  Lwt.catch
+    (fun () -> Instance.ModuleMap.get key instances)
+    (function
+      | Lazy_map.UnexpectedAccess ->
+          IO.error
+            at
+            (if key = "" then "no " ^ category ^ " defined"
+            else "unknown " ^ category ^ " " ^ key)
+      | exn -> raise exn)
 
 let lookup_registry module_name item_name =
   let* item_name = Lazy_vector.LwtInt32Vector.to_list item_name in
@@ -377,7 +424,7 @@ let run_action act : Values.value list Lwt.t =
       let* () =
         trace_lwt ("Invoking function \"" ^ Ast.string_of_name name ^ "\"...")
       in
-      let inst = lookup_instance x_opt act.at in
+      let* inst = lookup_instance x_opt act.at in
       let* name = Lazy_vector.LwtInt32Vector.to_list name in
       let* export = Instance.export inst name in
       match export with
@@ -392,7 +439,7 @@ let run_action act : Values.value list Lwt.t =
                 Script.error v.at "wrong type of argument")
             vs
             ins_l ;
-          let+ _, result =
+          let+ result =
             Eval.invoke host_funcs_registry f (List.map (fun v -> v.it) vs)
           in
           result
@@ -402,7 +449,7 @@ let run_action act : Values.value list Lwt.t =
       let* () =
         trace_lwt ("Getting global \"" ^ Ast.string_of_name name ^ "\"...")
       in
-      let inst = lookup_instance x_opt act.at in
+      let* inst = lookup_instance x_opt act.at in
       let* name = Lazy_vector.LwtInt32Vector.to_list name in
       let+ export = Instance.export inst name in
       match export with
@@ -513,7 +560,7 @@ let run_assertion ass : unit Lwt.t =
       Lwt.try_bind
         (fun () ->
           let* imports = Import.link m in
-          Eval.init host_funcs_registry m imports)
+          instantiate_module None m imports)
         (fun _ -> Assert.error ass.at "expected linking error")
         (function
           | Import.Unknown (_, msg) | Eval.Link (_, msg) ->
@@ -528,7 +575,7 @@ let run_assertion ass : unit Lwt.t =
       Lwt.try_bind
         (fun () ->
           let* imports = Import.link m in
-          Eval.init host_funcs_registry m imports)
+          instantiate_module None m imports)
         (fun _ -> Assert.error ass.at "expected instantiation error")
         (function
           | Eval.Trap (_, msg) -> assert_message ass.at "instantiation" msg re
@@ -576,14 +623,14 @@ let rec run_command cmd : unit Lwt.t =
       if not !Flags.dry then
         let* () = trace_lwt "Initializing..." in
         let* imports = Import.link m in
-        let+ inst = Eval.init host_funcs_registry m imports in
-        bind instances x_opt inst
+        let+ inst = instantiate_module x_opt m imports in
+        bind_lazy instances x_opt inst
       else Lwt.return_unit
   | Register (name, x_opt) ->
       quote := cmd :: !quote ;
       if not !Flags.dry then (
         trace ("Registering module \"" ^ Ast.string_of_name name ^ "\"...") ;
-        let inst = lookup_instance x_opt cmd.at in
+        let* inst = lookup_instance x_opt cmd.at in
         let* utf8_name = Utf8.encode name in
         registry := Map.add utf8_name inst !registry ;
         Import.register ~module_name:name (lookup_registry utf8_name))
@@ -605,7 +652,7 @@ and run_meta cmd =
       let+ () = run_quote_script script in
       bind scripts x_opt (lookup_script None cmd.at)
   | Input (x_opt, file) ->
-      let+ () =
+      let* () =
         Lwt.catch
           (fun () ->
             let+ res = input_file file run_quote_script in
@@ -616,7 +663,10 @@ and run_meta cmd =
       if x_opt <> None then (
         bind modules x_opt (lookup_module None cmd.at) ;
         if not !Flags.dry then
-          bind instances x_opt (lookup_instance None cmd.at))
+          let+ inst = lookup_instance None cmd.at in
+          bind_lazy instances x_opt inst
+        else Lwt.return_unit)
+      else Lwt.return_unit
   | Output (x_opt, Some file) ->
       Lwt.catch
         (fun () ->

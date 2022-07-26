@@ -93,15 +93,13 @@ let read_input () =
       }
   in
   assert (Input_buffer.num_elements input_buffer = Z.one) ;
-  let module_inst =
-    ref Tezos_webassembly_interpreter.Instance.empty_module_inst
-  in
+  let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
   let memories =
     Tezos_webassembly_interpreter.Instance.Vector.cons
       memory
-      !module_inst.memories
+      module_inst.memories
   in
-  module_inst := {!module_inst with memories} ;
+  let module_inst = {module_inst with memories} in
   let* result =
     Host_funcs.Internal_for_tests.aux_write_input_in_memory
       ~input_buffer
@@ -113,7 +111,7 @@ let read_input () =
       ~max_bytes:36000l
   in
   let* memory =
-    Tezos_webassembly_interpreter.Instance.Vector.get 0l !module_inst.memories
+    Tezos_webassembly_interpreter.Instance.Vector.get 0l module_inst.memories
   in
   assert (Input_buffer.num_elements input_buffer = Z.zero) ;
   assert (result = 5) ;
@@ -156,14 +154,20 @@ let test_host_fun () =
   let host_funcs_registry = Tezos_webassembly_interpreter.Host_funcs.empty () in
   Host_funcs.register_host_funcs host_funcs_registry ;
 
-  let* module_inst, result =
+  let module_reg = Instance.ModuleMap.create () in
+  let module_ref =
+    Instance.(alloc_module_ref (Module_key "test") ~module_inst module_reg)
+  in
+
+  let* result =
     Eval.invoke
+      ~caller:module_ref
       host_funcs_registry
-      ~module_inst
       ~input
       Host_funcs.Internal_for_tests.read_input
       values
   in
+  let* module_inst = Instance.resolve_module_ref module_ref in
   let* memory =
     Tezos_webassembly_interpreter.Lazy_vector.LwtInt32Vector.get
       0l

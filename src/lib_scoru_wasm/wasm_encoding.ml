@@ -451,7 +451,14 @@ module Make (Tree_encoding_decoding : Tree_encoding_decoding.S) = struct
             "type_result"
             (value [] Interpreter_encodings.Types.value_type_encoding)))
 
-  let function_encoding ~current_module =
+  let module_ref_encoding ~module_reg =
+    conv
+      (fun key ->
+        Instance.{key = Module_key key; registry = Lazy.force module_reg})
+      (fun Instance.{key = Module_key key; _} -> key)
+      (value [] Data_encoding.string)
+
+  let function_encoding ~module_reg =
     tagged_union
       string_tag
       [
@@ -467,37 +474,34 @@ module Make (Tree_encoding_decoding : Tree_encoding_decoding.S) = struct
           (fun (func_type, name) -> Func.HostFunc (func_type, name));
         case
           "Native"
-          (tup4
+          (tup5
              ~flatten:false
              function_type_encoding
+             (scope ["module"] (module_ref_encoding ~module_reg))
              (value ["ftype"] Interpreter_encodings.Ast.var_encoding)
              (lazy_vector_encoding
                 "locals"
                 (value [] Interpreter_encodings.Types.value_type_encoding))
              block_label_encoding)
           (function
-            | Func.AstFunc
-                (type_, _current_module, {at = _; it = {ftype; locals; body}})
+            | Func.AstFunc (type_, module_, {at = _; it = {ftype; locals; body}})
               ->
-                (* Note that we do not encode [_current_module] to avoid
-                   infinite recursion. Instead we use the given self-reference
-                   [current_module] on decoding. *)
-                Some (type_, ftype, locals, body)
+                Some (type_, module_, ftype, locals, body)
             | _ -> None)
-          (fun (type_, ftype, locals, body) ->
+          (fun (type_, module_, ftype, locals, body) ->
             let func =
               Source.{at = no_region; it = {Ast.ftype; locals; body}}
             in
-            Func.AstFunc (type_, Lazy.force current_module, func));
+            Func.AstFunc (type_, module_, func));
       ]
 
-  let value_ref_encoding ~current_module =
+  let value_ref_encoding ~module_reg =
     tagged_union
       string_tag
       [
         case
           "FuncRef"
-          (function_encoding ~current_module)
+          (function_encoding ~module_reg)
           (fun val_ref ->
             match val_ref with
             | Instance.FuncRef func_inst -> Some func_inst
@@ -515,7 +519,7 @@ module Make (Tree_encoding_decoding : Tree_encoding_decoding.S) = struct
           (fun v -> Values.NullRef v);
       ]
 
-  let value_encoding ~current_module =
+  let value_encoding ~module_reg =
     tagged_union
       string_tag
       [
@@ -531,7 +535,7 @@ module Make (Tree_encoding_decoding : Tree_encoding_decoding.S) = struct
           (fun v -> Values.Vec v);
         case
           "RefType"
-          (value_ref_encoding ~current_module)
+          (value_ref_encoding ~module_reg)
           (function Values.Ref r -> Some r | _ -> None)
           (fun r -> Values.Ref r);
       ]
@@ -550,7 +554,7 @@ module Make (Tree_encoding_decoding : Tree_encoding_decoding.S) = struct
          (value_option ["max"] Data_encoding.int32)
          (scope ["chunks"] chunked_byte_vector))
 
-  let table_encoding ~current_module =
+  let table_encoding ~module_reg =
     conv
       (fun (min, max, vector, ref_type) ->
         let table_type = Types.TableType ({min; max}, ref_type) in
@@ -562,10 +566,10 @@ module Make (Tree_encoding_decoding : Tree_encoding_decoding.S) = struct
          ~flatten:false
          (value ["min"] Data_encoding.int32)
          (value_option ["max"] Data_encoding.int32)
-         (lazy_vector_encoding "refs" (value_ref_encoding ~current_module))
+         (lazy_vector_encoding "refs" (value_ref_encoding ~module_reg))
          (value ["ref-type"] Interpreter_encodings.Types.ref_type_encoding))
 
-  let global_encoding ~current_module =
+  let global_encoding ~module_reg =
     conv
       (fun (type_, value) ->
         let ty = Types.GlobalType (Values.type_of_value value, type_) in
@@ -577,41 +581,41 @@ module Make (Tree_encoding_decoding : Tree_encoding_decoding.S) = struct
       (tup2
          ~flatten:false
          (value ["type"] Interpreter_encodings.Types.mutability_encoding)
-         (scope ["value"] (value_encoding ~current_module)))
+         (scope ["value"] (value_encoding ~module_reg)))
 
   let memory_instance_encoding = lazy_vector_encoding "memories" memory_encoding
 
-  let table_vector_encoding ~current_module =
-    lazy_vector_encoding "tables" (table_encoding ~current_module)
+  let table_vector_encoding ~module_reg =
+    lazy_vector_encoding "tables" (table_encoding ~module_reg)
 
-  let global_vector_encoding ~current_module =
-    lazy_vector_encoding "globals" (global_encoding ~current_module)
+  let global_vector_encoding ~module_reg =
+    lazy_vector_encoding "globals" (global_encoding ~module_reg)
 
   let data_label_ref_encoding =
     conv (fun x -> ref x) (fun r -> !r) data_label_encoding
 
-  let function_vector_encoding ~current_module =
-    lazy_vector_encoding "functions" (function_encoding ~current_module)
+  let function_vector_encoding ~module_reg =
+    lazy_vector_encoding "functions" (function_encoding ~module_reg)
 
   let function_type_vector_encoding =
     lazy_vector_encoding "types" function_type_encoding
 
-  let value_ref_vector_encoding ~current_module =
-    lazy_vector_encoding "refs" (value_ref_encoding ~current_module)
+  let value_ref_vector_encoding ~module_reg =
+    lazy_vector_encoding "refs" (value_ref_encoding ~module_reg)
 
-  let extern_map_encoding ~current_module =
+  let extern_map_encoding ~module_reg =
     lazy_map
       (tagged_union
          string_tag
          [
            case
              "ExternFunc"
-             (function_encoding ~current_module)
+             (function_encoding ~module_reg)
              (function Instance.ExternFunc x -> Some x | _ -> None)
              (fun x -> Instance.ExternFunc x);
            case
              "ExternTable"
-             (table_encoding ~current_module)
+             (table_encoding ~module_reg)
              (function Instance.ExternTable x -> Some x | _ -> None)
              (fun x -> Instance.ExternTable x);
            case
@@ -621,18 +625,18 @@ module Make (Tree_encoding_decoding : Tree_encoding_decoding.S) = struct
              (fun x -> Instance.ExternMemory x);
            case
              "ExternGlobal"
-             (global_encoding ~current_module)
+             (global_encoding ~module_reg)
              (function Instance.ExternGlobal x -> Some x | _ -> None)
              (fun x -> Instance.ExternGlobal x);
          ])
 
-  let value_ref_vector_vector_encoding ~current_module =
+  let value_ref_vector_vector_encoding ~module_reg =
     lazy_vector_encoding
       "elements"
       (conv
          (fun x -> ref x)
          (fun r -> !r)
-         (value_ref_vector_encoding ~current_module))
+         (value_ref_vector_encoding ~module_reg))
 
   let data_instance_encoding =
     lazy_vector_encoding "datas" data_label_ref_encoding
@@ -651,65 +655,67 @@ module Make (Tree_encoding_decoding : Tree_encoding_decoding.S) = struct
       (fun {blocks; datas} -> (blocks, datas))
       (tup2 ~flatten:false block_table_encoding datas_table_encoding)
 
-  let module_instance_encoding =
-    let open Lwt_syntax in
-    let gen_encoding current_module =
-      let current_module = Lazy.map (fun x -> ref x) current_module in
-      conv_lwt
-        (fun ( types,
-               funcs,
-               tables,
-               memories,
-               globals,
-               exports,
-               elems,
-               datas,
-               allocations ) ->
-          let open Lwt_syntax in
-          return
-            {
-              Instance.types;
-              funcs;
-              tables;
-              memories;
-              globals;
-              exports;
-              elems;
-              datas;
-              allocations;
-            })
-        (fun {
-               Instance.types;
-               funcs;
-               tables;
-               memories;
-               globals;
-               exports;
-               elems;
-               datas;
-               allocations;
-             } ->
-          return
-            ( types,
-              funcs,
-              tables,
-              memories,
-              globals,
-              exports,
-              elems,
-              datas,
-              allocations ))
-        (tup9
-           ~flatten:false
-           function_type_vector_encoding
-           (function_vector_encoding ~current_module)
-           (table_vector_encoding ~current_module)
-           memory_instance_encoding
-           (global_vector_encoding ~current_module)
-           (extern_map_encoding ~current_module)
-           (value_ref_vector_vector_encoding ~current_module)
-           data_instance_encoding
-           allocations_encoding)
-    in
-    scope ["module"] @@ with_self_reference gen_encoding
+  let module_instance_encoding ~module_reg =
+    conv
+      (fun ( types,
+             funcs,
+             tables,
+             memories,
+             globals,
+             exports,
+             elems,
+             datas,
+             allocations ) ->
+        {
+          Instance.types;
+          funcs;
+          tables;
+          memories;
+          globals;
+          exports;
+          elems;
+          datas;
+          allocations;
+        })
+      (fun {
+             Instance.types;
+             funcs;
+             tables;
+             memories;
+             globals;
+             exports;
+             elems;
+             datas;
+             allocations;
+           } ->
+        ( types,
+          funcs,
+          tables,
+          memories,
+          globals,
+          exports,
+          elems,
+          datas,
+          allocations ))
+      (tup9
+         ~flatten:false
+         function_type_vector_encoding
+         (function_vector_encoding ~module_reg)
+         (table_vector_encoding ~module_reg)
+         memory_instance_encoding
+         (global_vector_encoding ~module_reg)
+         (extern_map_encoding ~module_reg)
+         (value_ref_vector_vector_encoding ~module_reg)
+         data_instance_encoding
+         allocations_encoding)
+
+  let module_instances_encoding =
+    with_self_reference (fun module_reg ->
+        conv
+          Instance.ModuleMap.of_immutable
+          Instance.ModuleMap.snapshot
+          (scope
+             ["modules"]
+             (Lazy_map_encoding_decoding.ModuleMap.lazy_map
+                (module_instance_encoding ~module_reg))))
 end

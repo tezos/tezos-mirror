@@ -31,7 +31,7 @@ exception Bad_input
 let aux_write_input_in_memory ~input_buffer ~module_inst ~rtype_offset
     ~level_offset ~id_offset ~dst ~max_bytes =
   let open Lwt.Syntax in
-  let memories = !module_inst.memories in
+  let memories = module_inst.memories in
   let* {rtype; raw_level; message_counter; payload} =
     Input_buffer.dequeue input_buffer
   in

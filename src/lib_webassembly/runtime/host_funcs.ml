@@ -1,7 +1,7 @@
 type host_func =
   | Host_func of
       (Input_buffer.t ->
-      Instance.module_inst ref ->
+      Instance.module_inst ->
       Values.value list ->
       Values.value list Lwt.t)
 [@@ocaml.unboxed]
