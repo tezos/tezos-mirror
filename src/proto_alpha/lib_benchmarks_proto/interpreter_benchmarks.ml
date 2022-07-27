@@ -2170,10 +2170,23 @@ module Registration_section = struct
         ()
 
     let () =
-      simple_benchmark
+      simple_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_ITransfer_tokens
         ~stack_type:(unit @$ mutez @$ contract unit @$ bot)
         ~kinstr:(ITransfer_tokens (dummy_loc, halt))
+        ~stack_sampler:(fun cfg rng_state ->
+          let _, (module Samplers) = make_default_samplers cfg.sampler in
+          fun () ->
+            let contract =
+              Samplers.Random_value.value (contract unit) rng_state
+            in
+            let amount =
+              match contract with
+              | Typed_implicit _ | Typed_originated _ ->
+                  Samplers.Random_value.value mutez rng_state
+              | Typed_sc_rollup _ -> Alpha_context.Tez.zero
+            in
+            ((), (amount, (contract, eos))))
         ()
 
     let () =
