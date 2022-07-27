@@ -30,6 +30,7 @@ workflow:
 # The "manual" stage exists to fix a UI problem that occurs when mixing
 # manual and non-manual jobs.
 stages:
+  - trigger
   - sanity
   - build
   - test
@@ -57,6 +58,7 @@ include:
 
   # Actual jobs are defined in these included files
 
+  - .gitlab/ci/trigger.yml
   - .gitlab/ci/packaging.yml
   - .gitlab/ci/opam-ci.yml
   - .gitlab/ci/sanity.yml

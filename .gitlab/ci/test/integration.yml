@@ -41,8 +41,8 @@ script:test-gen-genesis:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
     - .rules_template__development
+    - .needs_template__wait_for_trigger_job
   stage: test
-  needs: []
   before_script:
     - cd scripts/gen-genesis
   script:
