@@ -75,12 +75,16 @@ let init (cctxt : Protocol_client_context.full) l1_ctxt rollup_address kind
 let checkout_context node_ctxt block_hash =
   let open Lwt_result_syntax in
   let*! context_hash = Store.Contexts.find node_ctxt.store block_hash in
-  let* context_hash =
+  let*? context_hash =
     match context_hash with
-    | None -> failwith "No context for block %a" Block_hash.pp block_hash
-    | Some context_hash -> return context_hash
+    | None ->
+        error (Sc_rollup_node_errors.Cannot_checkout_context (block_hash, None))
+    | Some context_hash -> ok context_hash
   in
   let*! ctxt = Context.checkout node_ctxt.context context_hash in
   match ctxt with
-  | None -> failwith "Cannot checkout context %a" Context.pp_hash context_hash
+  | None ->
+      tzfail
+        (Sc_rollup_node_errors.Cannot_checkout_context
+           (block_hash, Some (Context.hash_to_raw_string context_hash)))
   | Some ctxt -> return ctxt

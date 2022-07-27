@@ -39,6 +39,8 @@ type error +=
 
 type error += Missing_PVM_state of Block_hash.t * Raw_level.t
 
+type error += Cannot_checkout_context of Block_hash.t * string option
+
 let () =
   register_error_kind
     `Permanent
@@ -177,4 +179,29 @@ let () =
       obj2 (req "block" Block_hash.encoding) (req "level" Raw_level.encoding))
     (function
       | Missing_PVM_state (block, level) -> Some (block, level) | _ -> None)
-    (fun (block, level) -> Missing_PVM_state (block, level))
+    (fun (block, level) -> Missing_PVM_state (block, level)) ;
+
+  register_error_kind
+    `Permanent
+    ~id:"internal.cannot_checkout_context"
+    ~title:"Internal error: Cannot checkout context"
+    ~description:
+      "The rollup node cannot checkout the context registered for the block."
+    ~pp:(fun ppf (block, context_hash) ->
+      Format.fprintf
+        ppf
+        "The context %sfor block %a cannot be checkouted"
+        (Option.fold
+           ~none:""
+           ~some:(fun c -> Hex.(show (of_string c)))
+           context_hash)
+        Block_hash.pp
+        block)
+    Data_encoding.(
+      obj2
+        (req "block" Block_hash.encoding)
+        (opt "context" (conv Bytes.of_string Bytes.to_string bytes)))
+    (function
+      | Cannot_checkout_context (block, context) -> Some (block, context)
+      | _ -> None)
+    (fun (block, context) -> Cannot_checkout_context (block, context))

@@ -49,6 +49,8 @@ let hash_encoding =
     (fun b -> Bytes.unsafe_to_string b |> IStore.Hash.unsafe_of_raw_string)
     (Fixed.bytes IStore.Hash.hash_size)
 
+let hash_to_raw_string = IStore.Hash.to_raw_string
+
 let pp_hash fmt h =
   IStore.Hash.to_raw_string h
   |> Hex.of_string |> Hex.show |> Format.pp_print_string fmt
