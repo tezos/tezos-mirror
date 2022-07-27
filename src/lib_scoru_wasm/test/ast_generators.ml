@@ -328,12 +328,15 @@ let table_gen =
   in
   return @@ Table.of_lazy_vector ty table_entries
 
+let chunked_byte_vector_gen =
+  let* bs = small_string ~gen:char in
+  return @@ Chunked_byte_vector.Lwt.of_string bs
+
 let memory_gen =
   let* len = frequency [(10, int_range 1 10); (1, int_range 100 200)] in
   let* max = opt @@ map Int32.of_int @@ int_range 1 len in
   let ty = Types.MemoryType {Types.min = 0l; max} in
-  let* bs = string in
-  let chunks = Chunked_byte_vector.Lwt.of_string bs in
+  let* chunks = chunked_byte_vector_gen in
   return @@ Memory.of_chunks ty chunks
 
 let value_num_gen nt =
@@ -378,8 +381,8 @@ let elems_gen =
   ref v
 
 let datas_gen =
-  let+ bs = string in
-  ref @@ Chunked_byte_vector.Lwt.of_string bs
+  let+ chunk = chunked_byte_vector_gen in
+  ref @@ chunk
 
 let blocks_table_gen = vector_gen (vector_gen instr_gen)
 
