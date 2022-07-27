@@ -15,7 +15,7 @@
 # Insert code owner declarations here!
 # ************************************
 
-/docs                        @NicVolanschi @raphael-proust @Saroupille @astefano @eugenz @arvidnl @yrg @dannywillems @lthms @rafoo_
+/docs                        @NicVolanschi @raphael-proust @Saroupille @arvidnl @yrg @dannywillems @lthms @rafoo_
 
 /src/bin_codec               @raphael-proust
 /src/bin_node                @romain.nl
