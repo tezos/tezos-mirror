@@ -335,7 +335,6 @@ module Make (PVM : Pvm.S) = struct
     let open Lwt_syntax in
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
     l1_ctxt.stopper () ;
-    let* () = Lwt_stream.closed l1_ctxt.events in
     let* () = Layer1.shutdown store in
     let* () = Components.RPC_server.shutdown rpc_server in
     let* () = Store.close store in
