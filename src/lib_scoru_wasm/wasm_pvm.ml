@@ -30,8 +30,6 @@
 
 *)
 
-open Tezos_webassembly_interpreter
-
 module Make (T : Tree.S) : Gather_floppies.S with type tree = T.tree = struct
   include
     Gather_floppies.Make
@@ -39,13 +37,14 @@ module Make (T : Tree.S) : Gather_floppies.S with type tree = T.tree = struct
       (struct
         type tree = T.tree
 
-        module Decodings = Wasm_decodings.Make (T)
+        module Wasm = Tezos_webassembly_interpreter
         module EncDec =
           Tree_encoding_decoding.Make
-            (Lazy_map.LwtInt32Map)
-            (Lazy_vector.LwtInt32Vector)
-            (Chunked_byte_vector.Lwt)
+            (Wasm.Instance.NameMap)
+            (Wasm.Instance.Vector)
+            (Wasm.Chunked_byte_vector.Lwt)
             (T)
+        module Wasm_encoding = Wasm_encoding.Make (EncDec)
 
         let compute_step = Lwt.return
 
@@ -121,11 +120,5 @@ module Make (T : Tree.S) : Gather_floppies.S with type tree = T.tree = struct
           in
           let* tree = EncDec.encode status_encoding false tree in
           EncDec.encode (inp_encoding level id) message tree
-
-        let _module_instance_of_tree modules =
-          Decodings.run (Decodings.module_instance_decoding modules)
-
-        let _module_instances_of_tree =
-          Decodings.run Decodings.module_instances_decoding
       end)
 end

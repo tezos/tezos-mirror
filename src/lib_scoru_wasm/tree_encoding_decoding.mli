@@ -25,6 +25,8 @@
 
 open Tezos_webassembly_interpreter
 
+exception Uninitialized_self_ref
+
 (** A key in the tree is a list of string. *)
 type key = string trace
 
@@ -172,6 +174,21 @@ module type S = sig
     'h t ->
     ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h) t
 
+  (** [tup9 ~flatten e1 e2 e3 e4 e5 e6 e7 e8 e9] combines the given encoders
+      [e1 .. e9] into an encoder for a tuple of nine elements. *)
+  val tup9 :
+    flatten:bool ->
+    'a t ->
+    'b t ->
+    'c t ->
+    'd t ->
+    'e t ->
+    'f t ->
+    'g t ->
+    'h t ->
+    'i t ->
+    ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i) t
+
   (** [raw key] is an encoder for bytes under the given [key]. *)
   val raw : key -> bytes t
 
@@ -228,6 +245,12 @@ module type S = sig
   (** [option enc] lifts the given encoding [enc] to one that can encode
       optional values. *)
   val option : 'a t -> 'a option t
+
+  (** [with_self_reference f] creates an encoder that allows accessing the
+      encoded/decoded value itself. It's useful for encoding cyclic
+      data-structures. Here, [f] is a function that takes the (lazy)
+      self-reference as an argument and constructs an encoder. *)
+  val with_self_reference : ('a Lazy.t -> 'a t) -> 'a t
 end
 
 (** Produces an encoder/decoder module with the provided map, vector and tree
