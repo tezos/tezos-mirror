@@ -434,6 +434,7 @@ Consensus related protocol parameters
    * - ``ENDORSING_REWARD_PER_SLOT``
      - ``endorsing_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.002857 tez
 
+These are a subset of the :ref:`protocol constants <protocol_constants_alpha>`.
 
 .. _shell_proto_revisit_alpha:
 
