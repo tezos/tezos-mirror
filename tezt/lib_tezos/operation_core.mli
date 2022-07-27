@@ -144,29 +144,13 @@ val inject_operations :
    The operation is signed with {!Tezos_crypto.Signature.zero},
    because the [run_operation] RPC skips signature checks anyway.
 
-   @param sign_correctly If [true], use the correct signature of the
-   operation instead of [Signature.zero]. Defaults to [false]. This
-   parameter is temporary until the [run_operation] RPC is fixed to
-   actually skip signature checks for non-manager operations (see
-   https://gitlab.com/tezos/tezos/-/issues/3401)
-
    @param chain_id Allows to manually provide the [chain_id]. If
    omitted, the [chain_id] is retrieved via RPC using the provided
    [client].
 
    @param client The {!Client.t} argument is used to retrieve the
    [chain_id] when it is not provided. *)
-val make_run_operation_input :
-  ?chain_id:string ->
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3401
-
-     Remove the [sign_correctly] argument once the [run_operation] RPC
-     is fixed to actually skip signature checks for non-manager
-     operations. *)
-  ?sign_correctly:bool ->
-  t ->
-  Client.t ->
-  JSON.u Lwt.t
+val make_run_operation_input : ?chain_id:string -> t -> Client.t -> JSON.u Lwt.t
 
 module Consensus : sig
   (** A representation of a consensus operation. *)

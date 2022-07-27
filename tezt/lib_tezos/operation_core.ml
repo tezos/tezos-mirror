@@ -149,7 +149,7 @@ let inject_operations ?(request = `Inject) ?(force = false) ?error t client :
       let* () = Process.check_error ~msg process in
       Lwt_list.map_s (fun op -> hash op client) t
 
-let make_run_operation_input ?chain_id ?(sign_correctly = false) t client =
+let make_run_operation_input ?chain_id t client =
   let* chain_id =
     match chain_id with
     | Some chain_id -> return chain_id
@@ -157,11 +157,6 @@ let make_run_operation_input ?chain_id ?(sign_correctly = false) t client =
   in
   (* The [run_operation] RPC does not check the signature. *)
   let signature = Tezos_crypto.Signature.zero in
-  (* ...except that it is currently bugged, and it checks the
-     signature of non-manager operations
-     (https://gitlab.com/tezos/tezos/-/issues/3401). So we temporarily
-     provide the option to compute a correct signature. *)
-  let* signature = if sign_correctly then sign t client else return signature in
   return
     (`O
       [
