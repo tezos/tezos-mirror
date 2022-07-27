@@ -646,48 +646,60 @@ struct
   (** [remember ptr cell history] extends [history] with a new
       mapping from [ptr] to [cell]. If [history] is full, the
       oldest mapping is removed. If the history capacity is less
-      or equal to zero, then this function returns [history]
-      untouched. *)
+      or equal to zero or if [ptr] is already present, then [history]
+      is returned unchanged, unless it's associated to a content different
+      from [cell], in which case a failwith is triggered. *)
   let remember ptr cell history =
     if Compare.Int64.(history.capacity <= 0L) then history
     else
-      let events = Hash.Map.add ptr cell history.events in
-      let current_index = history.next_index in
-      let next_index = Int64.succ current_index in
-      let history =
-        {
-          events;
-          sequence = Int64_map.add current_index ptr history.sequence;
-          capacity = history.capacity;
-          next_index;
-          oldest_index = history.oldest_index;
-          size = Int64.succ history.size;
-        }
-      in
-      (* A negative size means that [history.capacity] is set to [Int64.max_int]
-         and that the structure is full, so adding a new entry makes the size
-         overflows. In this case, we remove an element in the else branch to
-         keep the size of the history equal to [Int64.max_int] at most. *)
-      if Compare.Int64.(history.size > 0L && history.size <= history.capacity)
-      then history
-      else
-        let l = history.oldest_index in
-        match Int64_map.find l history.sequence with
-        | None ->
-            (* If history.size > history.capacity > 0, there is necessarily
-               an entry whose index is history.oldest_index in [sequence]. *)
-            assert false
-        | Some h ->
-            let sequence = Int64_map.remove l history.sequence in
-            let events = Hash.Map.remove h events in
+      match Hash.Map.find ptr history.events with
+      | Some cell' when not (equal_history_proof cell cell') ->
+          Format.kasprintf
+            failwith
+            "Internal error: %a already exists in history with a different \
+             proof"
+            Hash.pp
+            ptr
+      | _ -> (
+          let events = Hash.Map.add ptr cell history.events in
+          let current_index = history.next_index in
+          let next_index = Int64.succ current_index in
+          let history =
             {
-              next_index = history.next_index;
-              capacity = history.capacity;
-              size = history.capacity;
-              oldest_index = Int64.succ history.oldest_index;
-              sequence;
               events;
+              sequence = Int64_map.add current_index ptr history.sequence;
+              capacity = history.capacity;
+              next_index;
+              oldest_index = history.oldest_index;
+              size = Int64.succ history.size;
             }
+          in
+          (* A negative size means that [history.capacity] is set to [Int64.max_int]
+             and that the structure is full, so adding a new entry makes the size
+             overflows. In this case, we remove an element in the else branch to
+             keep the size of the history equal to [Int64.max_int] at most. *)
+          if
+            Compare.Int64.(
+              history.size > 0L && history.size <= history.capacity)
+          then history
+          else
+            let l = history.oldest_index in
+            match Int64_map.find l history.sequence with
+            | None ->
+                (* If history.size > history.capacity > 0, there is necessarily
+                   an entry whose index is history.oldest_index in [sequence]. *)
+                assert false
+            | Some h ->
+                let sequence = Int64_map.remove l history.sequence in
+                let events = Hash.Map.remove h events in
+                {
+                  next_index = history.next_index;
+                  capacity = history.capacity;
+                  size = history.capacity;
+                  oldest_index = Int64.succ history.oldest_index;
+                  sequence;
+                  events;
+                })
 
   let take_snapshot inbox =
     let prev_cell = inbox.old_levels_messages in
