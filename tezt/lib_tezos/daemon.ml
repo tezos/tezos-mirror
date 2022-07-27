@@ -235,8 +235,9 @@ module Make (X : PARAMETERS) = struct
             in
             loop [] events)
 
-  let run ?runner ?(on_terminate = fun _ -> unit) ?(event_level = `Info)
-      ?(event_sections_levels = []) daemon session_state arguments =
+  let run ?(env = String_map.empty) ?runner ?(on_terminate = fun _ -> unit)
+      ?(event_level = `Info) ?(event_sections_levels = []) daemon session_state
+      arguments =
     ignore (event_level : Level.default_level) ;
     (match daemon.status with
     | Not_running -> ()
@@ -277,9 +278,10 @@ module Make (X : PARAMETERS) = struct
           []
       in
       let args_str = "?" ^ String.concat "&" (List.rev args) in
-      String_map.singleton
+      String_map.add
         "TEZOS_EVENTS_CONFIG"
         ("file-descriptor-path://" ^ daemon.event_pipe ^ args_str)
+        env
     in
     let process =
       Process.spawn

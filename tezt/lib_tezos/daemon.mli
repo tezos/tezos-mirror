@@ -160,6 +160,7 @@ module Make : functor (X : PARAMETERS) -> sig
 
   (** Spawn a daemon. *)
   val run :
+    ?env:string String_map.t ->
     ?runner:Runner.t ->
     ?on_terminate:(Unix.process_status -> unit Lwt.t) ->
     ?event_level:Level.default_level ->
