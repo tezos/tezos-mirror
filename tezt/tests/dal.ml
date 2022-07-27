@@ -159,6 +159,11 @@ let test_feature_flag _protocol _sc_rollup_node sc_rollup_address node client =
     JSON.(
       protocol_parameters |-> "dal_parametric" |-> "number_of_slots" |> as_int)
   in
+  let* parameters = Rollup.Dal.Parameters.from_client client in
+  let cryptobox = Rollup.Dal.make parameters in
+  let header =
+    Rollup.Dal.Commitment.dummy_commitment parameters cryptobox "coucou"
+  in
   Check.(
     (feature_flag = false)
       bool
@@ -175,7 +180,7 @@ let test_feature_flag _protocol _sc_rollup_node sc_rollup_address node client =
     Operation.Manager.(
       inject
         ~force:true
-        [make @@ dal_publish_slot_header ~index:0 ~level:1 ~header:0]
+        [make @@ dal_publish_slot_header ~index:0 ~level:1 ~header]
         client)
   in
   let* (`OpHash oph3) =
@@ -195,9 +200,11 @@ let test_feature_flag _protocol _sc_rollup_node sc_rollup_address node client =
 
 open Tezt_tezos.Rollup.Dal
 
-let publish_slot ~source ?fee ~index node client =
+let publish_slot ~source ?fee ~index ~message parameters cryptobox node client =
   let level = Node.get_level node in
-  let header = 0 in
+  let header =
+    Rollup.Dal.Commitment.dummy_commitment parameters cryptobox message
+  in
   Operation.Manager.(
     inject
       [make ~source ?fee @@ dal_publish_slot_header ~index ~level ~header]
@@ -259,17 +266,51 @@ let test_slot_management_logic =
   let* node, client =
     Client.init_with_protocol ~parameter_file `Client ~protocol ()
   in
+  let* parameters = Rollup.Dal.Parameters.from_client client in
+  let cryptobox = Rollup.Dal.make parameters in
   let* (`OpHash oph1) =
-    publish_slot ~source:Constant.bootstrap1 ~fee:1_000 ~index:0 node client
+    publish_slot
+      ~source:Constant.bootstrap1
+      ~fee:1_000
+      ~index:0
+      ~message:"a"
+      parameters
+      cryptobox
+      node
+      client
   in
   let* (`OpHash oph2) =
-    publish_slot ~source:Constant.bootstrap2 ~fee:1_500 ~index:1 node client
+    publish_slot
+      ~source:Constant.bootstrap2
+      ~fee:1_500
+      ~index:1
+      ~message:"b"
+      parameters
+      cryptobox
+      node
+      client
   in
   let* (`OpHash oph3) =
-    publish_slot ~source:Constant.bootstrap3 ~fee:2_000 ~index:0 node client
+    publish_slot
+      ~source:Constant.bootstrap3
+      ~fee:2_000
+      ~index:0
+      ~message:"c"
+      parameters
+      cryptobox
+      node
+      client
   in
   let* (`OpHash oph4) =
-    publish_slot ~source:Constant.bootstrap4 ~fee:1_200 ~index:1 node client
+    publish_slot
+      ~source:Constant.bootstrap4
+      ~fee:1_200
+      ~index:1
+      ~message:"d"
+      parameters
+      cryptobox
+      node
+      client
   in
   let* mempool = Mempool.get_mempool client in
   let expected_mempool =

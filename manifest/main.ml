@@ -5397,6 +5397,7 @@ let () =
         bls12_381;
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         data_encoding;
+        octez_crypto_dal;
         octez_base;
         octez_base_unix;
         octez_stdlib_unix;

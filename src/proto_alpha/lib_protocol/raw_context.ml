@@ -922,6 +922,9 @@ let prepare_first_block ~level ~timestamp ctxt =
             number_of_shards = 2048;
             endorsement_lag = 1;
             availability_threshold = 50;
+            slot_size = 1 lsl 20;
+            redundancy_factor = 16;
+            segment_size = 4096;
           }
       in
       let sc_rollup =

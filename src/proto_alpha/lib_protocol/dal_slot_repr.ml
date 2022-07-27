@@ -24,15 +24,16 @@
 (*****************************************************************************)
 
 module Header = struct
-  (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3101
+  (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3389
 
-     Datatype is mocked for the moment while the cryptography is not
-     provided by the environment. *)
-  type t = int
+     It is not clear whether the size of the slot associated to the
+     commitment should be given here. *)
+  type t = Dal.commitment
 
-  let encoding = Data_encoding.int31
+  let encoding = Dal.Commitment.encoding
 
-  let pp = Format.pp_print_int
+  let pp ppf commitment =
+    Format.fprintf ppf "%s" (Dal.Commitment.to_b58check commitment)
 end
 
 module Index = struct
@@ -58,11 +59,11 @@ end
 
 type header = Header.t
 
+let zero = Dal.Commitment.zero
+
 type t = {level : Raw_level_repr.t; index : Index.t; header : header}
 
 type slot = t
-
-let make ~level ~index ~header = {level; index; header}
 
 let encoding =
   let open Data_encoding in

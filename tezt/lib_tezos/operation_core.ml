@@ -270,6 +270,11 @@ module Manager = struct
 
   let json_of_int n = float_of_int n |> Ezjsonm.float
 
+  let json_of_commitment commitment =
+    Data_encoding.Json.construct
+      Tezos_crypto_dal.Dal_cryptobox.Commitment.encoding
+      commitment
+
   let get_next_counter ?(source = Constant.bootstrap1) client =
     let*! json =
       RPC.Contracts.get_counter
@@ -331,7 +336,11 @@ module Manager = struct
   type payload =
     | Reveal of Account.key
     | Transfer of {amount : int; dest : Account.key}
-    | Dal_publish_slot_header of {level : int; index : int; header : int}
+    | Dal_publish_slot_header of {
+        level : int;
+        index : int;
+        header : Tezos_crypto_dal.Dal_cryptobox.commitment;
+      }
     | Sc_rollup_dal_slot_subscribe of {rollup : string; slot_index : int}
     | Delegation of {delegate : Account.key}
     | Sc_rollup_refute of {
@@ -381,7 +390,7 @@ module Manager = struct
             [
               ("index", json_of_int index);
               ("level", json_of_int level);
-              ("header", json_of_int header);
+              ("header", json_of_commitment header);
             ]
         in
         [("kind", `String "dal_publish_slot_header"); ("slot", slot)]

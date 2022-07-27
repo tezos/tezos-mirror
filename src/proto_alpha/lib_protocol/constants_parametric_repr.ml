@@ -31,6 +31,9 @@ type dal = {
   number_of_shards : int;
   endorsement_lag : int;
   availability_threshold : int;
+  slot_size : int;
+  redundancy_factor : int;
+  segment_size : int;
 }
 
 let dal_encoding =
@@ -42,30 +45,45 @@ let dal_encoding =
            number_of_shards;
            endorsement_lag;
            availability_threshold;
+           slot_size;
+           redundancy_factor;
+           segment_size;
          } ->
       ( feature_enable,
         number_of_slots,
         number_of_shards,
         endorsement_lag,
-        availability_threshold ))
+        availability_threshold,
+        slot_size,
+        redundancy_factor,
+        segment_size ))
     (fun ( feature_enable,
            number_of_slots,
            number_of_shards,
            endorsement_lag,
-           availability_threshold ) ->
+           availability_threshold,
+           slot_size,
+           redundancy_factor,
+           segment_size ) ->
       {
         feature_enable;
         number_of_slots;
         number_of_shards;
         endorsement_lag;
         availability_threshold;
+        slot_size;
+        redundancy_factor;
+        segment_size;
       })
-    (obj5
+    (obj8
        (req "feature_enable" Data_encoding.bool)
        (req "number_of_slots" Data_encoding.int16)
        (req "number_of_shards" Data_encoding.int16)
        (req "endorsement_lag" Data_encoding.int16)
-       (req "availability_threshold" Data_encoding.int16))
+       (req "availability_threshold" Data_encoding.int16)
+       (req "slot_size" Data_encoding.int31)
+       (req "redundancy_factor" Data_encoding.uint8)
+       (req "segment_size" Data_encoding.uint16))
 
 (* The encoded representation of this type is stored in the context as
    bytes. Changing the encoding, or the value of these constants from

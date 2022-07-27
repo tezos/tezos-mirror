@@ -84,16 +84,14 @@ end
 
 type header = Header.t
 
-type t = private {level : Raw_level_repr.t; index : Index.t; header : header}
+type t = {level : Raw_level_repr.t; index : Index.t; header : header}
 
 type slot = t
 
-(** [make ~level ~index ~header] builds a slot. *)
-
-val make : level:Raw_level_repr.t -> index:Index.t -> header:header -> t
-
 (** The encoding ensures the slot is always a non-negative number. *)
 val encoding : t Data_encoding.t
+
+val zero : header
 
 val pp : Format.formatter -> t -> unit
 

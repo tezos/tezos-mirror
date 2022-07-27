@@ -961,22 +961,10 @@ let mk_sc_rollup_return_bond (oinfos : operation_req) (infos : infos) =
     sc_rollup
 
 let mk_dal_publish_slot_header (oinfos : operation_req) (infos : infos) =
-  let open Lwt_result_syntax in
-  let level = 0 in
-  let index = 0 in
-  let header = 0 in
-  let json_slot =
-    Data_encoding.Json.from_string
-      (Format.asprintf
-         {|{"level":%d,"index":%d,"header":%d}|}
-         level
-         index
-         header)
-  in
-  let* json_slot =
-    match json_slot with Error s -> failwith "%s" s | Ok slot -> return slot
-  in
-  let slot = Data_encoding.Json.destruct Dal.Slot.encoding json_slot in
+  let level = Alpha_context.Raw_level.of_int32_exn Int32.zero in
+  let index = Alpha_context.Dal.Slot_index.zero in
+  let header = Alpha_context.Dal.Slot.zero in
+  let slot = Alpha_context.Dal.Slot.{level; index; header} in
   Op.dal_publish_slot_header
     ?fee:oinfos.fee
     ?gas_limit:oinfos.gas_limit

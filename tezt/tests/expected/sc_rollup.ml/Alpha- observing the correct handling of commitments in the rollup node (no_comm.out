@@ -102,8 +102,9 @@ This sequence of operations was run:
   "dal_parametric":
     { "feature_enable": false, "number_of_slots": 16,
       "number_of_shards": 256, "endorsement_lag": 1,
-      "availability_threshold": 50 }, "sc_rollup_enable": true,
-  "sc_rollup_origination_size": 6314,
+      "availability_threshold": 50, "slot_size": 65536,
+      "redundancy_factor": 4, "segment_size": 4096 },
+  "sc_rollup_enable": true, "sc_rollup_origination_size": 6314,
   "sc_rollup_challenge_window_in_blocks": 1,
   "sc_rollup_max_number_of_messages_per_commitment_period": 32765,
   "sc_rollup_stake_amount": "10000000000",
@@ -209,8 +210,9 @@ This sequence of operations was run:
   "dal_parametric":
     { "feature_enable": false, "number_of_slots": 16,
       "number_of_shards": 256, "endorsement_lag": 1,
-      "availability_threshold": 50 }, "sc_rollup_enable": true,
-  "sc_rollup_origination_size": 6314,
+      "availability_threshold": 50, "slot_size": 65536,
+      "redundancy_factor": 4, "segment_size": 4096 },
+  "sc_rollup_enable": true, "sc_rollup_origination_size": 6314,
   "sc_rollup_challenge_window_in_blocks": 1,
   "sc_rollup_max_number_of_messages_per_commitment_period": 32765,
   "sc_rollup_stake_amount": "10000000000",
