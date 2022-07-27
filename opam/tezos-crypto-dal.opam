@@ -12,6 +12,7 @@ depends: [
   "tezos-stdlib"
   "tezos-error-monad"
   "data-encoding" { >= "0.6" & < "0.7" }
+  "tezos-crypto"
   "tezos-bls12-381-polynomial" { >= "0.1.0" }
   "alcotest" { with-test & >= "1.5.0" }
   "qcheck-alcotest" { with-test & >= "0.18" }

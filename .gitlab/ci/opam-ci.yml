@@ -689,14 +689,14 @@ opam:tezos-context-ops:
 opam:tezos-crypto:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-crypto
 
 opam:tezos-crypto-dal:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_7
+    - .rules_template__trigger_opam_batch_6
   variables:
     package: tezos-crypto-dal
 

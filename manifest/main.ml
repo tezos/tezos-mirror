@@ -834,6 +834,7 @@ let octez_crypto_dal =
         octez_stdlib |> open_;
         octez_error_monad |> open_;
         data_encoding |> open_;
+        octez_crypto;
         bls12_381_polynomial;
       ]
 

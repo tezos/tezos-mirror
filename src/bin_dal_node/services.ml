@@ -49,8 +49,7 @@ let slot () =
     ~description:"Show content of a slot"
     ~query:slot_query
     ~output:Data_encoding.string
-    RPC_path.(
-      open_root / "slot" / "content" /: Slot_manager.Slot_header.rpc_arg)
+    RPC_path.(open_root / "slot" / "content" /: Cryptobox.Commitment.rpc_arg)
 
 let shard () =
   let shard_arg = RPC_arg.int in
@@ -58,15 +57,14 @@ let shard () =
     ~description:"Fetch shard as bytes"
     ~query:RPC_query.empty
     ~output:Cryptobox.shard_encoding
-    RPC_path.(
-      open_root / "shard" /: Slot_manager.Slot_header.rpc_arg /: shard_arg)
+    RPC_path.(open_root / "shard" /: Cryptobox.Commitment.rpc_arg /: shard_arg)
 
 let handle_split_slot dal_constants srs store fill slot =
   let open Lwt_result_syntax in
   let slot = String.to_bytes slot in
   let slot = if fill then Slot_manager.Utils.fill_x00 slot else slot in
   let+ commitment = Slot_manager.split_and_store dal_constants srs store slot in
-  Slot_manager.Slot_header.to_b58check commitment
+  Cryptobox.Commitment.to_b58check commitment
 
 let handle_slot dal_constants store (_, commitment) trim () =
   let open Lwt_result_syntax in

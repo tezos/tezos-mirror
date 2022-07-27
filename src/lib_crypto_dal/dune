@@ -9,6 +9,7 @@
   tezos-stdlib
   tezos-error-monad
   data-encoding
+  tezos-crypto
   tezos-bls12-381-polynomial)
  (flags
   (:standard)
