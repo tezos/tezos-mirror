@@ -92,13 +92,37 @@ module Event = struct
       ~msg:
         "inconsistent operation receipt at {operation_index} - expected: \
          {expected}, replay result: {replay_result}"
-      ~level:Notice
+      ~level:Error
       ~pp1:(fun ppf (l, o) -> Format.fprintf ppf "(list %d, index %d)" l o)
       ("operation_index", Data_encoding.(tup2 int31 int31))
       ~pp2:pp_json
       ("expected", Data_encoding.json)
       ~pp3:pp_json
       ("replay_result", Data_encoding.json)
+
+  let unexpected_receipts_layout =
+    let pp_list_lengths fmt =
+      Format.fprintf
+        fmt
+        "%a"
+        Format.(
+          pp_print_list
+            ~pp_sep:(fun fmt () -> fprintf fmt ",")
+            Format.pp_print_int)
+    in
+    declare_3
+      ~section
+      ~name:"unexpected_receipts_layout"
+      ~msg:
+        "unexpected receipts layout for block {hash} - expected: {expected}, \
+         replay result: {replay_result}"
+      ~level:Error
+      ~pp1:Block_hash.pp
+      ("hash", Block_hash.encoding)
+      ~pp2:pp_list_lengths
+      ("expected", Data_encoding.(list int31))
+      ~pp3:pp_list_lengths
+      ("replay_result", Data_encoding.(list int31))
 
   let strict_emit ~strict e v =
     let open Lwt_syntax in
@@ -245,9 +269,23 @@ let replay_one_block strict main_chain_store validator_process block =
         (got : Block_validation.operation_metadata list list) =
       match (exp, got) with
       | [], [] -> return_unit
-      | [], _ :: _ | _ :: _, [] -> assert false
+      | [], _ :: _ | _ :: _, [] ->
+          let*! () =
+            Event.(strict_emit ~strict unexpected_receipts_layout)
+              ( Store.Block.hash block,
+                List.(map length exp),
+                List.(map length got) )
+          in
+          return_unit
       | [] :: exps, [] :: gots -> check_receipts (succ i) 0 exps gots
-      | (_ :: _) :: _, [] :: _ | [] :: _, (_ :: _) :: _ -> assert false
+      | (_ :: _) :: _, [] :: _ | [] :: _, (_ :: _) :: _ ->
+          let*! () =
+            Event.(strict_emit ~strict unexpected_receipts_layout)
+              ( Store.Block.hash block,
+                List.(map length exp),
+                List.(map length got) )
+          in
+          return_unit
       | (exp :: exps) :: expss, (got :: gots) :: gotss ->
           let* () =
             let equal a b =
