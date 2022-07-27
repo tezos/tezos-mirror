@@ -790,40 +790,28 @@ let transfer ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
     client
   |> Process.check ?expect_failure
 
-let spawn_multiple_transfers ?log_output ?endpoint ?(wait = "none") ?burn_cap
-    ?fee_cap ?gas_limit ?storage_limit ?counter ?arg ~giver ~json_batch client =
-  spawn_command
-    ?log_output
-    ?endpoint
-    client
-    (["--wait"; wait]
-    @ ["multiple"; "transfers"; "from"; giver; "using"; json_batch]
-    @ Option.fold
-        ~none:[]
-        ~some:(fun f -> ["--fee-cap"; Tez.to_string f; "--force-low-fee"])
-        fee_cap
-    @ optional_arg "burn-cap" Tez.to_string burn_cap
-    @ optional_arg "gas-limit" string_of_int gas_limit
-    @ optional_arg "storage-limit" string_of_int storage_limit
-    @ optional_arg "counter" string_of_int counter
-    @ optional_arg "arg" Fun.id arg)
-
-let multiple_transfers ?log_output ?endpoint ?wait ?burn_cap ?fee_cap ?gas_limit
-    ?storage_limit ?counter ?arg ~giver ~json_batch client =
-  spawn_multiple_transfers
-    ?log_output
-    ?endpoint
-    ?wait
-    ?burn_cap
-    ?fee_cap
-    ?gas_limit
-    ?storage_limit
-    ?counter
-    ?arg
-    ~giver
-    ~json_batch
-    client
-  |> Process.check
+let multiple_transfers ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee_cap
+    ?gas_limit ?storage_limit ?counter ?(simulation = false) ?(force = false)
+    ~giver ~json_batch client =
+  let value =
+    spawn_command
+      ?log_output
+      ?endpoint
+      client
+      (["--wait"; wait]
+      @ ["multiple"; "transfers"; "from"; giver; "using"; json_batch]
+      @ Option.fold
+          ~none:[]
+          ~some:(fun f -> ["--fee-cap"; Tez.to_string f; "--force-low-fee"])
+          fee_cap
+      @ optional_arg "burn-cap" Tez.to_string burn_cap
+      @ optional_arg "gas-limit" string_of_int gas_limit
+      @ optional_arg "storage-limit" string_of_int storage_limit
+      @ optional_arg "counter" string_of_int counter
+      @ (if simulation then ["--simulation"] else [])
+      @ if force then ["--force"] else [])
+  in
+  {value; run = Process.check}
 
 let spawn_get_delegate ?endpoint ~src client =
   spawn_command ?endpoint client ["get"; "delegate"; "for"; src]

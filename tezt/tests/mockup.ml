@@ -569,7 +569,13 @@ let test_multiple_transfers =
   let oc = open_out file in
   Ezjsonm.to_channel oc (batch 200) ;
   close_out oc ;
-  Client.multiple_transfers ~giver:"bootstrap2" ~json_batch:file client
+  let*! () =
+    Client.multiple_transfers
+      ~giver:Constant.bootstrap2.alias
+      ~json_batch:file
+      client
+  in
+  unit
 
 let test_empty_block_baking =
   Protocol.register_test

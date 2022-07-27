@@ -28,6 +28,9 @@ Node
 Client
 ------
 
+- Simulation returns correct errors on batches of operations where some are
+  backtracked, failed and/or skipped.
+
 Accuser
 -------
 
