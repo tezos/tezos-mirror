@@ -306,6 +306,16 @@ variables:
       when: on_success
     - when: never
 
+# Rules for jobs that should appear in the extended test pipeline or
+# whenever the pytests change
+.rules_template__extended_test_pipeline__pytest:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - tests_python/**/*
+      when: on_success
+    - !reference [.rules_template__extended_test_pipeline, rules]
+
 .rules_template__merge_request_only:
   rules:
     # Only run on merge requests
