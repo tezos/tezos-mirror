@@ -44,9 +44,7 @@
 /scripts                     @romain.nl
 /scripts/pre_commit          @smelc
 
-/tests_python                @smelc
-
-/tezt                        @romain.nl @smelc
+/tezt                        @romain.nl
 
 /.gitlab                     @romain.nl @raphael-proust
 
