@@ -130,4 +130,6 @@ module type T = sig
   module Wasm_2_0_0 : [%sig "v7/wasm_2_0_0.mli"]
 
   module Plonk : [%sig "v7/plonk.mli"]
+
+  module Dal : [%sig "v7/dal.mli"]
 end

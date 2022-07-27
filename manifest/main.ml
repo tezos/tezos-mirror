@@ -1816,6 +1816,7 @@ protocols.|}
         zarith_stubs_js;
         bls12_381;
         plonk;
+        octez_crypto_dal;
         vdf;
         ringo;
         ringo_lwt;
