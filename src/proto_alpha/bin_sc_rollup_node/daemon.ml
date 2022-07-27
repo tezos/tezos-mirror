@@ -334,9 +334,14 @@ module Make (PVM : Pvm.S) = struct
   let install_finalizer store rpc_server (l1_ctxt : Layer1.t) =
     let open Lwt_syntax in
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
+    let message = l1_ctxt.cctxt#message in
+    let* () = message "Stopping L1 monitor@." in
     l1_ctxt.stopper () ;
+    let* () = message "Shutting down L1@." in
     let* () = Layer1.shutdown store in
+    let* () = message "Shutting down RPC server@." in
     let* () = Components.RPC_server.shutdown rpc_server in
+    let* () = message "Closing store@." in
     let* () = Store.close store in
     let* () = Event.shutdown_node exit_status in
     Tezos_base_unix.Internal_event_unix.close ()
@@ -371,10 +376,12 @@ module Make (PVM : Pvm.S) = struct
       let* rpc_server =
         Components.RPC_server.start node_ctxt store configuration
       in
+      let (_ : Lwt_exit.clean_up_callback_id) =
+        install_finalizer store rpc_server node_ctxt.l1_ctxt
+      in
       let*! () = Inbox.start () in
       let*! () = Components.Commitment.start () in
 
-      let _ = install_finalizer store rpc_server node_ctxt.l1_ctxt in
       let*! () =
         Event.node_is_ready
           ~rpc_addr:configuration.rpc_addr
