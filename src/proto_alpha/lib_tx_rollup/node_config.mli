@@ -75,8 +75,8 @@ type t = {
   batch_burn_limit : Protocol.Alpha_context.Tez.t option;
 }
 
-(** [default_data_dir] is the default value for [data_dir]. *)
-val default_data_dir : Protocol.Alpha_context.Tx_rollup.t -> string
+(** [default_data_dir] creates and returns the default value for [data_dir]. *)
+val default_data_dir : Protocol.Alpha_context.Tx_rollup.t -> string Lwt.t
 
 (** [default_rpc_addr] is the default value for [rpc_addr]. *)
 val default_rpc_addr : P2p_point.Id.t
@@ -111,6 +111,3 @@ val save : force:bool -> t -> string tzresult Lwt.t
 
 (** [load ~data_dir] loads a configuration stored in [data_dir]. *)
 val load : data_dir:string -> t tzresult Lwt.t
-
-(** [encoding] encodes a configuration. *)
-val encoding : t Data_encoding.t
