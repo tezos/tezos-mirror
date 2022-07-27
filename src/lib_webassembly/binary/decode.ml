@@ -1670,34 +1670,38 @@ let rec iterate f s = if f s <> None then iterate f s
 
 let magic = 0x6d736100l
 
+type vec_repr = VecRepr
+
+type opt_repr = OptRepr
+
 (** Sections representation. *)
-type _ field_type =
-  | TypeField : type_ field_type
-  | ImportField : import field_type
-  | FuncField : var field_type
-  | TableField : table field_type
-  | MemoryField : memory field_type
-  | GlobalField : global field_type
-  | ExportField : export field_type
-  | StartField : start field_type
-  | ElemField : elem_segment field_type
-  | DataCountField : int32 field_type
-  | CodeField : func field_type
-  | DataField : data_segment field_type
+type (_, _) field_type =
+  | TypeField : (type_, vec_repr) field_type
+  | ImportField : (import, vec_repr) field_type
+  | FuncField : (var, vec_repr) field_type
+  | TableField : (table, vec_repr) field_type
+  | MemoryField : (memory, vec_repr) field_type
+  | GlobalField : (global, vec_repr) field_type
+  | ExportField : (export, vec_repr) field_type
+  | StartField : (start, opt_repr) field_type
+  | ElemField : (elem_segment, vec_repr) field_type
+  | DataCountField : (int32, opt_repr) field_type
+  | CodeField : (func, vec_repr) field_type
+  | DataField : (data_segment, vec_repr) field_type
 
 (** Result of a section parsing, being either a single value or a vector. *)
 type field =
-  | VecField : 'a field_type * 'a Vector.t -> field
-  | SingleField : 'a field_type * 'a option -> field
+  | VecField : ('a, vec_repr) field_type * 'a Vector.t -> field
+  | SingleField : ('a, opt_repr) field_type * 'a option -> field
 
 (** Module parsing steps *)
 type module_kont =
   | MKStart  (** Initial state of a module parsing *)
-  | MKSkipCustom : ('a field_type * section_tag) option -> module_kont
+  | MKSkipCustom : (('a, 'repr) field_type * section_tag) option -> module_kont
       (** Custom section which are skipped, with the next section to parse. *)
-  | MKFieldStart : 'a field_type * section_tag -> module_kont
+  | MKFieldStart : ('a, 'repr) field_type * section_tag -> module_kont
       (** Starting point of a section, handles parsing generic section header. *)
-  | MKField : 'a field_type * size * 'a lazy_vec_kont -> module_kont
+  | MKField : ('a, 'repr) field_type * size * 'a lazy_vec_kont -> module_kont
       (** Section currently parsed, accumulating each element from the underlying vector. *)
   | MKElaborateFunc :
       var Vector.t * func Vector.t * func lazy_vec_kont * bool
@@ -1733,78 +1737,58 @@ type module_kont =
       continuation, the starting position of the current function, the size of
       the section. *)
 
+type building_state = {
+  types : type_ Vector.t;
+  imports : import Vector.t;
+  vars : var Vector.t;
+  tables : table Vector.t;
+  memories : memory Vector.t;
+  globals : global Vector.t;
+  exports : export Vector.t;
+  start : start option;
+  elems : elem_segment Vector.t;
+  data_count : int32 option;
+  code : func Vector.t;
+  datas : data_segment Vector.t;
+}
+
+let empty_building_state =
+  {
+    types = Vector.empty ();
+    imports = Vector.empty ();
+    vars = Vector.empty ();
+    tables = Vector.empty ();
+    memories = Vector.empty ();
+    globals = Vector.empty ();
+    exports = Vector.empty ();
+    start = None;
+    elems = Vector.empty ();
+    data_count = None;
+    code = Vector.empty ();
+    datas = Vector.empty ();
+  }
+
+let add_field field state =
+  match field with
+  | VecField (TypeField, types) -> {state with types}
+  | VecField (ImportField, imports) -> {state with imports}
+  | VecField (FuncField, vars) -> {state with vars}
+  | VecField (TableField, tables) -> {state with tables}
+  | VecField (MemoryField, memories) -> {state with memories}
+  | VecField (GlobalField, globals) -> {state with globals}
+  | VecField (ExportField, exports) -> {state with exports}
+  | SingleField (StartField, start) -> {state with start}
+  | VecField (ElemField, elems) -> {state with elems}
+  | SingleField (DataCountField, data_count) -> {state with data_count}
+  | VecField (CodeField, code) -> {state with code}
+  | VecField (DataField, datas) -> {state with datas}
+
 type decode_kont = {
-  building_state : field Vector.t;  (** Accumulated parsed sections. *)
+  building_state : building_state;  (** Accumulated parsed sections. *)
   module_kont : module_kont;
   stream : stream;
   block_state : block_state;
 }
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3366
-   Check the size of the proof generated after calling `find_vec'`. *)
-let rec find_vec' :
-    type t. t field_type -> int32 -> _ Vector.t -> t Vector.t Lwt.t =
- fun ty index fields ->
-  (* This function is called once the whole module has been parsed. As such
-     each module section is available and it cannot fail. *)
-  let open Lwt.Syntax in
-  if Vector.num_elements fields <= index then invalid_arg "find_vec"
-  else
-    let* field = Vector.get index fields in
-    match field with
-    | SingleField _ -> find_vec' ty (Int32.add index 1l) fields
-    | VecField (ty', v) -> (
-        let v = Lwt.return v in
-        match (ty, ty') with
-        (* TODO (https://gitlab.com/tezos/tezos/-/issues/3120):
-           factor this out with a Leibnitz equality witness *)
-        | TypeField, TypeField -> v
-        | ImportField, ImportField -> v
-        | FuncField, FuncField -> v
-        | TableField, TableField -> v
-        | MemoryField, MemoryField -> v
-        | GlobalField, GlobalField -> v
-        | ExportField, ExportField -> v
-        | StartField, StartField -> v
-        | ElemField, ElemField -> v
-        | DataCountField, DataCountField -> v
-        | CodeField, CodeField -> v
-        | DataField, DataField -> v
-        | _ -> find_vec' ty (Int32.succ index) fields)
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3366
-   Check the size of the proof generated after calling `find_single'`. *)
-let rec find_single' :
-    type t. t field_type -> int32 -> _ Vector.t -> t option Lwt.t =
- fun ty index fields ->
-  (* This function is called once the whole module has been parsed. As such
-     each module section is available and it cannot fail. *)
-  let open Lwt.Syntax in
-  if Vector.num_elements fields <= index then invalid_arg "find_single"
-  else
-    let* field = Vector.get index fields in
-    match field with
-    | VecField _ -> find_single' ty (Int32.add index 1l) fields
-    | SingleField (ty', v) -> (
-        let v = Lwt.return v in
-        match (ty, ty') with
-        | TypeField, TypeField -> v
-        | ImportField, ImportField -> v
-        | FuncField, FuncField -> v
-        | TableField, TableField -> v
-        | MemoryField, MemoryField -> v
-        | GlobalField, GlobalField -> v
-        | ExportField, ExportField -> v
-        | StartField, StartField -> v
-        | ElemField, ElemField -> v
-        | DataCountField, DataCountField -> v
-        | CodeField, CodeField -> v
-        | DataField, DataField -> v
-        | _ -> find_single' ty (Int32.succ index) fields)
-
-let find_vec ty fields = find_vec' ty 0l fields
-
-let find_single ty fields = find_single' ty 0l fields
 
 let vec_field ty (LazyVec {vector; _}) = VecField (ty, vector)
 
@@ -1815,7 +1799,7 @@ let module_step state =
     Lwt.return
       {
         state with
-        building_state = Vector.cons field state.building_state;
+        building_state = add_field field state.building_state;
         module_kont;
       }
   in
@@ -1845,8 +1829,8 @@ let module_step state =
       | _ -> (
           match k with
           | None ->
-              let* func_types = find_vec FuncField state.building_state in
-              let* func_bodies = find_vec CodeField state.building_state in
+              let func_types = state.building_state.vars in
+              let func_bodies = state.building_state.code in
               if Vector.(num_elements func_types <> num_elements func_bodies)
               then next @@ MKBuild (None, true)
               else
@@ -2026,17 +2010,24 @@ let module_step state =
              lazy_vec_step fb' vec,
              no_datas_in_func && free.datas = Free.Set.empty )
   | MKBuild (funcs, no_datas_in_func) ->
-      let fields = state.building_state in
-      let* types = find_vec TypeField fields in
-      let* data_count = find_single DataCountField fields in
-      let* datas = find_vec DataField fields in
-      let* elems = find_vec ElemField fields in
-      let* start = find_single StartField fields in
-      let* tables = find_vec TableField fields in
-      let* memories = find_vec MemoryField fields in
-      let* globals = find_vec GlobalField fields in
-      let* imports = find_vec ImportField fields in
-      let* exports = find_vec ExportField fields in
+      let {
+        types;
+        data_count;
+        datas;
+        elems;
+        start;
+        tables;
+        memories;
+        globals;
+        imports;
+        exports;
+        (* `vars` and `code` are already handled `MKElaborateFunc` and merged
+           into `funcs` in the current state. *)
+        vars = _;
+        code = _;
+      } =
+        state.building_state
+      in
       ignore types ;
       require (pos s = len s) s (len s) "unexpected content after last section" ;
       require
@@ -2060,9 +2051,6 @@ let module_step state =
         "data count section required" ;
       {
         state with
-        building_state = Vector.create 0l;
-        (* At this point, there shouldn't be any new fields added, we can safely
-           reset the building state. *)
         module_kont =
           MKStop
             {
@@ -2092,7 +2080,7 @@ let module_ stream =
   in
   loop
     {
-      building_state = Vector.create 0l;
+      building_state = empty_building_state;
       module_kont = MKStart;
       stream;
       block_state = make_empty_block_state ();
