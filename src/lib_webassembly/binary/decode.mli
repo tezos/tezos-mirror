@@ -198,11 +198,11 @@ type field =
 (** Module parsing steps *)
 type module_kont =
   | MKStart  (** Initial state of a module parsing *)
-  | MKSkipCustom : (('a, 'repr) field_type * section_tag) option -> module_kont
+  | MKSkipCustom : ('a, 'repr) field_type option -> module_kont
       (** Custom section which are skipped, with the next section to parse. *)
-  | MKFieldStart : ('a, 'repr) field_type * section_tag -> module_kont
+  | MKFieldStart : ('a, 'repr) field_type -> module_kont
       (** Starting point of a section, handles parsing generic section header. *)
-  | MKField : ('a, 'repr) field_type * size * 'a lazy_vec_kont -> module_kont
+  | MKField : ('a, vec_repr) field_type * size * 'a lazy_vec_kont -> module_kont
       (** Section currently parsed, accumulating each element from the underlying vector. *)
   | MKElaborateFunc :
       Ast.var Vector.t * Ast.func Vector.t * Ast.func lazy_vec_kont * bool

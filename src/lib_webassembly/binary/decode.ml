@@ -1916,11 +1916,11 @@ type field =
 (** Module parsing steps *)
 type module_kont =
   | MKStart  (** Initial state of a module parsing *)
-  | MKSkipCustom : (('a, 'repr) field_type * section_tag) option -> module_kont
+  | MKSkipCustom : ('a, 'repr) field_type option -> module_kont
       (** Custom section which are skipped, with the next section to parse. *)
-  | MKFieldStart : ('a, 'repr) field_type * section_tag -> module_kont
+  | MKFieldStart : ('a, 'repr) field_type -> module_kont
       (** Starting point of a section, handles parsing generic section header. *)
-  | MKField : ('a, 'repr) field_type * size * 'a lazy_vec_kont -> module_kont
+  | MKField : ('a, vec_repr) field_type * size * 'a lazy_vec_kont -> module_kont
       (** Section currently parsed, accumulating each element from the underlying vector. *)
   | MKElaborateFunc :
       var Vector.t * func Vector.t * func lazy_vec_kont * bool
@@ -2010,6 +2010,20 @@ type decode_kont = {
   stream_name : string;
 }
 
+let tag_of_field : type t repr. (t, repr) field_type -> section_tag = function
+  | DataCountField -> `DataCountSection
+  | StartField -> `StartSection
+  | TypeField -> `TypeSection
+  | ImportField -> `ImportSection
+  | FuncField -> `FuncSection
+  | TableField -> `TableSection
+  | MemoryField -> `MemorySection
+  | GlobalField -> `GlobalSection
+  | ExportField -> `ExportSection
+  | ElemField -> `ElemSection
+  | CodeField -> `CodeSection
+  | DataField -> `DataSection
+
 let vec_field ty (LazyVec {vector; _}) = VecField (ty, vector)
 
 let module_step bytes state =
@@ -2036,7 +2050,7 @@ let module_step bytes state =
       let* version = u32 s in
       require (version = Encode.version) s 4 "unknown binary version" ;
       (* Module header *)
-      next @@ MKSkipCustom (Some (TypeField, `TypeSection))
+      next @@ MKSkipCustom (Some TypeField)
   | MKSkipCustom k -> (
       let* x = id s in
       match x with
@@ -2064,80 +2078,89 @@ let module_step bytes state =
                        func_bodies,
                        init_lazy_vec (Vector.num_elements func_types),
                        true )
-          | Some (ty, tag) -> next @@ MKFieldStart (ty, tag)))
-  | MKFieldStart (DataCountField, `DataCountSection) ->
-      let* v = data_count_section s in
-      next_with_field
-        (SingleField (DataCountField, v))
-        (MKSkipCustom (Some (CodeField, `CodeSection)))
-  | MKFieldStart (StartField, `StartSection) ->
-      let* v = start_section s in
-      next_with_field
-        (SingleField (StartField, v))
-        (MKSkipCustom (Some (ElemField, `ElemSection)))
+          | Some ty -> next @@ MKFieldStart ty))
   (* Parsing of fields vector. *)
-  | MKFieldStart (ty, tag) -> (
-      let* x = id s in
-      match x with
-      | Some t when t = tag ->
-          let* () = lwt_ignore @@ u8 s in
-          let* size = size s in
-          (* length of `vec` *)
-          let* l = len32 s in
-          next @@ MKField (ty, size, init_lazy_vec (Int32.of_int l))
-      | _ ->
-          let size = {size = 0; start = pos s} in
-          next @@ MKField (ty, size, init_lazy_vec 0l)
-      (* Transitions steps from the end of a section to the next one.
+  | MKFieldStart ty -> (
+      let next_vec (ty : (_, vec_repr) field_type) =
+        let* x = id s in
+        match x with
+        | Some t when t = tag_of_field ty ->
+            ignore (u8 s) ;
+            let* size = size s in
+            (* length of `vec` *)
+            let* l = len32 s in
+            next @@ MKField (ty, size, init_lazy_vec (Int32.of_int l))
+        | _ ->
+            let size = {size = 0; start = pos s} in
+            next @@ MKField (ty, size, init_lazy_vec 0l)
+      in
+      match ty with
+      | DataCountField ->
+          let* v = data_count_section s in
+          next_with_field
+            (SingleField (DataCountField, v))
+            (MKSkipCustom (Some CodeField))
+      | StartField ->
+          let* v = start_section s in
+          next_with_field
+            (SingleField (StartField, v))
+            (MKSkipCustom (Some ElemField))
+      | TypeField -> next_vec TypeField
+      | ImportField -> next_vec ImportField
+      | FuncField -> next_vec FuncField
+      | TableField -> next_vec TableField
+      | MemoryField -> next_vec MemoryField
+      | GlobalField -> next_vec GlobalField
+      | ExportField -> next_vec ExportField
+      | ElemField -> next_vec ElemField
+      | CodeField -> next_vec CodeField
+      | DataField -> next_vec DataField)
+  (* Transitions steps from the end of a section to the next one.
 
-         The values accumulated from the section are accumulated into the building
-         state..*))
+     The values accumulated from the section are accumulated into the building
+     state..*)
   (* TODO (https://gitlab.com/tezos/tezos/-/issues/3120): maybe we can factor-out these similarly shaped module section transitions *)
   | MKField (TypeField, size, vec) when is_end_of_vec vec ->
       check_size size s ;
       next_with_field
         (vec_field TypeField vec)
-        (MKSkipCustom (Some (ImportField, `ImportSection)))
+        (MKSkipCustom (Some ImportField))
   | MKField (ImportField, size, vec) when is_end_of_vec vec ->
       check_size size s ;
       next_with_field
         (vec_field ImportField vec)
-        (MKSkipCustom (Some (FuncField, `FuncSection)))
+        (MKSkipCustom (Some FuncField))
   | MKField (FuncField, size, vec) when is_end_of_vec vec ->
       check_size size s ;
-      next_with_field
-        (vec_field FuncField vec)
-        (MKSkipCustom (Some (TableField, `TableSection)))
+      next_with_field (vec_field FuncField vec) (MKSkipCustom (Some TableField))
   | MKField (TableField, size, vec) when is_end_of_vec vec ->
       check_size size s ;
       next_with_field
         (vec_field TableField vec)
-        (MKSkipCustom (Some (MemoryField, `MemorySection)))
+        (MKSkipCustom (Some MemoryField))
   | MKField (MemoryField, size, vec) when is_end_of_vec vec ->
       check_size size s ;
       next_with_field
         (vec_field MemoryField vec)
-        (MKSkipCustom (Some (GlobalField, `GlobalSection)))
+        (MKSkipCustom (Some GlobalField))
   | MKField (GlobalField, size, vec) when is_end_of_vec vec ->
       check_size size s ;
       next_with_field
         (vec_field GlobalField vec)
-        (MKSkipCustom (Some (ExportField, `ExportSection)))
+        (MKSkipCustom (Some ExportField))
   | MKField (ExportField, size, vec) when is_end_of_vec vec ->
       check_size size s ;
       next_with_field
         (vec_field ExportField vec)
-        (MKSkipCustom (Some (StartField, `StartSection)))
+        (MKSkipCustom (Some StartField))
   | MKField (ElemField, size, vec) when is_end_of_vec vec ->
       check_size size s ;
       next_with_field
         (vec_field ElemField vec)
-        (MKSkipCustom (Some (DataCountField, `DataCountSection)))
+        (MKSkipCustom (Some DataCountField))
   | MKField (CodeField, size, vec) when is_end_of_vec vec ->
       check_size size s ;
-      next_with_field
-        (vec_field CodeField vec)
-        (MKSkipCustom (Some (DataField, `DataSection)))
+      next_with_field (vec_field CodeField vec) (MKSkipCustom (Some DataField))
   | MKField (DataField, size, vec) when is_end_of_vec vec ->
       check_size size s ;
       next_with_field
@@ -2164,13 +2187,7 @@ let module_step bytes state =
           let* gtype = global_type s in
           next @@ MKGlobal (gtype, pos s, BlockStart, size, vec)
       | ExportField -> next @@ MKExport (ExpKStart, pos s, size, vec)
-      | StartField ->
-          (* not a vector *)
-          assert false
       | ElemField -> next @@ MKElem (EKStart, pos s, size, vec)
-      | DataCountField ->
-          (* not a vector *)
-          assert false
       | CodeField -> next @@ MKCode (CKStart, pos s, size, vec)
       | DataField ->
           next @@ MKData (DKStart, pos s, size, vec)
