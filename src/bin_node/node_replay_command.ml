@@ -156,8 +156,8 @@ let () =
       Format.fprintf
         ppf
         "Replay of a block that has no ancestor was requested. This is an \
-         impossible operation. This can happpen if the block is a genesis \
-         (main chain or test chain) or if it's the oldest non purged block in \
+         impossible operation. This can happen if the block is a genesis (main \
+         chain or test chain) or if it's the oldest non purged block in \
          rolling mode.")
     `Permanent
     Data_encoding.empty
@@ -246,6 +246,8 @@ let replay_one_block strict main_chain_store validator_process block =
     in
     let block_metadata_bytes = fst result.block_metadata in
     let* () =
+      (* Check that the block metadata bytes are equal.
+         If not, decode and print them as Json to ease debugging. *)
       if not (Bytes.equal expected_block_receipt_bytes block_metadata_bytes)
       then
         let* protocol = Store.Block.protocol_hash main_chain_store block in
@@ -264,9 +266,13 @@ let replay_one_block strict main_chain_store validator_process block =
         return_unit
       else return_unit
     in
+    (* Check that the operations metadata are equal.
+       If not, decode and print them as Json to ease debugging. *)
     let rec check_receipts i j
         (exp : Block_validation.operation_metadata list list)
         (got : Block_validation.operation_metadata list list) =
+      (* As a coarse grain check, we first ensure that the lists have
+         the same layout. *)
       match (exp, got) with
       | [], [] -> return_unit
       | [], _ :: _ | _ :: _, [] ->
@@ -294,6 +300,9 @@ let replay_one_block strict main_chain_store validator_process block =
               | Too_large_metadata, Too_large_metadata -> true
               | _ -> false
             in
+            (* Check that the operations metadata bytes are equal.
+               If not, decode and print them as Json to ease
+               debugging. *)
             if not (equal exp got) then
               let* protocol =
                 Store.Block.protocol_hash main_chain_store block
