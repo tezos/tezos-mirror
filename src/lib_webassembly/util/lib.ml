@@ -164,6 +164,18 @@ module List32 = struct
   and mapi' f i = function
     | [] -> []
     | x :: xs -> f i x :: mapi' f (Int32.add i 1l) xs
+
+  let mapi_s f xs =
+    let rec mapi_s' f i =
+      let open Lwt.Syntax in
+      function
+      | [] -> Lwt.return []
+      | x :: xs ->
+          let* v = f i x in
+          let+ xs' = mapi_s' f (Int32.succ i) xs in
+          v :: xs'
+    in
+    mapi_s' f 0l xs
 end
 
 module Array32 = struct

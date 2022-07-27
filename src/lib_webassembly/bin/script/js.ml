@@ -518,7 +518,10 @@ let wrap item_name wrap_action wrap_assertion at =
         Vector.of_list body; Vector.of_list (action @ assertion @ [Return @@ at]);
       ]
   in
-  let m = {empty_module with types; funcs; imports; exports; blocks} in
+  let allocations = {(Ast.empty_allocations ()) with blocks} in
+  let m =
+    {(empty_module ()) with types; funcs; imports; exports; allocations}
+  in
   Encode.encode (m @@ at)
 
 let is_js_num_type = function

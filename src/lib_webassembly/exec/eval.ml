@@ -173,10 +173,11 @@ let mem_oob frame x i n =
     (Memory.bound mem)
 
 let data_oob frame x i n =
-  let+ data = data frame.inst x in
+  let* data_label = data frame.inst x in
+  let+ data = Ast.get_data !data_label frame.inst.allocations.datas in
   I64.gt_u
     (I64.add (I64_convert.extend_i32_u i) (I64_convert.extend_i32_u n))
-    (Chunked_byte_vector.Lwt.length !data)
+    (Chunked_byte_vector.Lwt.length data)
 
 let table_oob frame x i n =
   let+ tbl = table frame.inst x in
@@ -194,7 +195,7 @@ let rec step (c : config) : config Lwt.t =
   let {frame; code = vs, es; _} = c in
   match es with
   | {it = From_block (Block_label b, i); at} :: es ->
-      let* block = Vector.get b frame.inst.Instance.blocks in
+      let* block = Vector.get b frame.inst.Instance.allocations.blocks in
       let length = Vector.num_elements block in
       if i = length then Lwt.return {c with code = (vs, es)}
       else
@@ -621,8 +622,9 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
             else if n = 0l then Lwt.return (vs', [])
             else
               let* seg = data frame.inst x in
+              let* seg = Ast.get_data !seg frame.inst.allocations.datas in
               let+ b =
-                Chunked_byte_vector.Lwt.load_byte !seg (Int64.of_int32 s)
+                Chunked_byte_vector.Lwt.load_byte seg (Int64.of_int32 s)
               in
               let b = Int32.of_int b in
               ( vs',
@@ -646,7 +648,7 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
                   ] )
         | DataDrop x, vs ->
             let+ seg = data frame.inst x in
-            seg := Chunked_byte_vector.Lwt.create 0L ;
+            seg := Data_label 0l ;
             (vs, [])
         | RefNull t, vs' -> Lwt.return (Ref (NullRef t) :: vs', [])
         | RefIsNull, Ref r :: vs' ->
@@ -839,16 +841,16 @@ let invoke ?(module_inst = empty_module_inst) ?(input = Input_buffer.alloc ())
   (* TODO: tickify? *)
   if not (List.for_all2 (fun v -> ( = ) (type_of_value v)) vs ins_l) then
     Crash.error at "wrong types of arguments" ;
-  let blocks =
+  let allocations =
     match func with
-    | Func.AstFunc (_, {contents = {blocks; _}}, _) -> blocks
-    | Func.HostFunc _ -> Instance.Vector.create 0l
+    | Func.AstFunc (_, {contents = {allocations; _}}, _) -> allocations
+    | Func.HostFunc _ -> Ast.empty_allocations ()
   in
   let c =
     config
       ~input
       host_funcs
-      {module_inst with blocks}
+      {module_inst with allocations}
       (List.rev vs)
       [Invoke func @@ at]
   in
@@ -923,9 +925,9 @@ let create_elem (inst : module_inst) (seg : elem_segment) : elem_inst Lwt.t =
   in
   ref (Instance.Vector.of_list init)
 
-let create_data (inst : module_inst) (seg : data_segment) : data_inst Lwt.t =
+let create_data (inst : module_inst) (seg : data_segment) : data_inst =
   let {dinit; _} = seg.it in
-  Lwt.return (ref dinit)
+  ref dinit
 
 let add_import (m : module_) (ext : extern) (im : import) (inst : module_inst) :
     module_inst Lwt.t =
@@ -975,13 +977,14 @@ let run_elem inst i elem =
            ]
   | Declarative -> List.map plain [ElemDrop x @@ at]
 
-let run_data inst i data =
+let run_data (inst : module_inst) i data =
   let at = data.it.dmode.at in
   let x = i @@ at in
   match data.it.dmode.it with
-  | Passive -> []
+  | Passive -> Lwt.return []
   | Active {index; offset} ->
       assert (index.it = 0l) ;
+      let+ data = Ast.get_data data.it.dinit inst.allocations.datas in
       (From_block (offset.it, 0l) @@ offset.at)
       :: List.map
            plain
@@ -990,8 +993,7 @@ let run_data inst i data =
              Const
                (I32
                   (Int32.of_int
-                     (Int64.to_int
-                        (Chunked_byte_vector.Lwt.length data.it.dinit)))
+                     (Int64.to_int (Chunked_byte_vector.Lwt.length data)))
                @@ at)
              @@ at;
              MemoryInit x @@ at;
@@ -1014,7 +1016,7 @@ let init host_funcs (m : module_) (exts : extern list) : module_inst Lwt.t =
     elems;
     datas;
     start;
-    blocks;
+    allocations;
   } =
     m.it
   in
@@ -1057,7 +1059,7 @@ let init host_funcs (m : module_) (exts : extern list) : module_inst Lwt.t =
            [types] should be a lazy structure so we can avoid traversing it
            whole. *)
         List.map (fun type_ -> type_.it) types |> Vector.of_list;
-      blocks;
+      allocations;
     }
   in
   let* fs = TzStdLib.List.map_s (create_func inst0) funcs in
@@ -1093,7 +1095,7 @@ let init host_funcs (m : module_) (exts : extern list) : module_inst Lwt.t =
   in
   let* new_exports = TzStdLib.List.map_s (create_export inst2) exports in
   let* new_elems = TzStdLib.List.map_s (create_elem inst2) elems in
-  let* new_datas = TzStdLib.List.map_s (create_data inst2) datas in
+  let new_datas = List.map (create_data inst2) datas in
   let* exports =
     (* TODO: #3076
        [new_exports]/[exports] should be lazy structures. *)
@@ -1120,7 +1122,8 @@ let init host_funcs (m : module_) (exts : extern list) : module_inst Lwt.t =
   in
   List.iter (init_func inst) fs ;
   let es_elem = List.concat (Lib.List32.mapi (run_elem inst) elems) in
-  let es_data = List.concat (Lib.List32.mapi (run_data inst) datas) in
+  let* datas = Lib.List32.mapi_s (run_data inst) datas in
+  let es_data = TzStdLib.List.concat datas in
   let es_start = Lib.Option.get (Lib.Option.map run_start start) [] in
   let+ (_ : Values.value stack) =
     eval (config host_funcs inst [] (es_elem @ es_data @ es_start))

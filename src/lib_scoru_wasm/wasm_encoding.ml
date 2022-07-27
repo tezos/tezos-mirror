@@ -73,6 +73,9 @@ struct
   let block_label_encoding =
     value [] Interpreter_encodings.Ast.block_label_encoding
 
+  let data_label_encoding =
+    value [] Interpreter_encodings.Ast.data_label_encoding
+
   let instruction_encoding =
     let unit_encoding = value [] Data_encoding.unit in
     let open Ast in
@@ -587,8 +590,8 @@ struct
   let global_vector_encoding ~current_module =
     lazy_vector_encoding "globals" (global_encoding ~current_module)
 
-  let chunked_byte_vector_ref_encoding =
-    conv (fun x -> ref x) (fun r -> !r) chunked_byte_vector
+  let data_label_ref_encoding =
+    conv (fun x -> ref x) (fun r -> !r) data_label_encoding
 
   let function_vector_encoding ~current_module =
     lazy_vector_encoding "functions" (function_encoding ~current_module)
@@ -635,12 +638,21 @@ struct
          (value_ref_vector_encoding ~current_module))
 
   let data_instance_encoding =
-    lazy_vector_encoding "datas" chunked_byte_vector_ref_encoding
+    lazy_vector_encoding "datas" data_label_ref_encoding
 
   let block_table_encoding =
     lazy_vector_encoding
       "block-table"
       (lazy_vector_encoding "instructions" instruction_encoding)
+
+  let datas_table_encoding =
+    lazy_vector_encoding "datas-table" chunked_byte_vector
+
+  let allocations_encoding =
+    conv
+      (fun (blocks, datas) -> Ast.{blocks; datas})
+      (fun {blocks; datas} -> (blocks, datas))
+      (tup2 ~flatten:false block_table_encoding datas_table_encoding)
 
   let module_instance_encoding =
     let open Lwt_syntax in
@@ -655,7 +667,7 @@ struct
                exports,
                elems,
                datas,
-               blocks ) ->
+               allocations ) ->
           let open Lwt_syntax in
           return
             {
@@ -667,7 +679,7 @@ struct
               exports;
               elems;
               datas;
-              blocks;
+              allocations;
             })
         (fun {
                Instance.types;
@@ -678,7 +690,7 @@ struct
                exports;
                elems;
                datas;
-               blocks;
+               allocations;
              } ->
           return
             ( types,
@@ -689,7 +701,7 @@ struct
               exports,
               elems,
               datas,
-              blocks ))
+              allocations ))
         (tup9
            ~flatten:false
            function_type_vector_encoding
@@ -700,7 +712,7 @@ struct
            (extern_map_encoding ~current_module)
            (value_ref_vector_vector_encoding ~current_module)
            data_instance_encoding
-           block_table_encoding)
+           allocations_encoding)
     in
     scope ["module"] @@ with_self_reference gen_encoding
 end

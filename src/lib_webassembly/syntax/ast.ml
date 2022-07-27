@@ -367,9 +367,11 @@ and elem_segment' = {
   emode : segment_mode;
 }
 
+type data_label = Data_label of int32
+
 type data_segment = data_segment' Source.phrase
 
-and data_segment' = {dinit : Chunked_byte_vector.Lwt.t; dmode : segment_mode}
+and data_segment' = {dinit : data_label; dmode : segment_mode}
 
 (* Modules *)
 
@@ -405,6 +407,10 @@ and start' = {sfunc : var}
 
 type block_table = instr Vector.t Vector.t
 
+type datas_table = Chunked_byte_vector.Lwt.t Vector.t
+
+type allocations = {mutable blocks : block_table; mutable datas : datas_table}
+
 type module_ = module_' Source.phrase
 
 and module_' = {
@@ -418,12 +424,43 @@ and module_' = {
   datas : data_segment Vector.t;
   imports : import Vector.t;
   exports : export Vector.t;
-  blocks : block_table;
+  allocations : allocations;
 }
 
 (* Auxiliary functions *)
 
-let empty_module =
+let empty_allocations () =
+  {
+    blocks = Vector.(singleton (empty ()));
+    datas = Vector.(singleton (Chunked_byte_vector.Lwt.create 0L));
+  }
+
+let make_allocation_state blocks datas = {blocks; datas}
+
+let alloc_block allocs =
+  let blocks, b = Vector.(append (empty ()) allocs.blocks) in
+  allocs.blocks <- blocks ;
+  Block_label b
+
+let add_to_block allocs (Block_label b) instr =
+  let open Lwt.Syntax in
+  let+ block = Vector.get b allocs.blocks in
+  let block, _ = Vector.(append instr block) in
+  allocs.blocks <- Vector.set b block allocs.blocks
+
+let alloc_data (allocs : allocations) len =
+  let datas, d =
+    Vector.append (Chunked_byte_vector.Lwt.create len) allocs.datas
+  in
+  allocs.datas <- datas ;
+  Data_label d
+
+let add_to_data (allocs : allocations) (Data_label d) index byte =
+  let open Lwt.Syntax in
+  let* data = Vector.get d allocs.datas in
+  Chunked_byte_vector.Lwt.store_byte data index byte
+
+let empty_module () =
   {
     types = Vector.create 0l;
     globals = Vector.create 0l;
@@ -435,10 +472,12 @@ let empty_module =
     datas = Vector.create 0l;
     imports = Vector.create 0l;
     exports = Vector.create 0l;
-    blocks = Vector.create 0l;
+    allocations = empty_allocations ();
   }
 
 open Source
+
+let get_data (Data_label d) datas = Vector.get d datas
 
 let func_type_for (m : module_) (x : var) : func_type Lwt.t =
   let open Lwt.Syntax in

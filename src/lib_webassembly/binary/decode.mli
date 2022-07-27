@@ -62,10 +62,10 @@ type size = {size : int; start : pos}
 (** Incremental chunked byte vector creation (from implicit input). *)
 type byte_vector_kont =
   | VKStart  (** Initial step. *)
-  | VKRead of Chunked_byte_vector.Lwt.t * int64 * int64
+  | VKRead of Ast.data_label * int64 * int64
       (** Reading step, containing the current position in the string and the
       length, reading byte per byte. *)
-  | VKStop of Chunked_byte_vector.Lwt.t  (** Final step, cannot reduce. *)
+  | VKStop of Ast.data_label  (** Final step, cannot reduce. *)
 
 type name_step =
   | NKStart  (** UTF8 name starting point. *)
@@ -242,11 +242,6 @@ type module_kont =
 (** Parsed bytes with the current reading position. *)
 type stream = {name : string; bytes : string; pos : pos ref}
 
-(** Allocation state of basic blocks. The type relies on the mutable state
-    internaly, but making it private avoids being able to modify it externally.
-*)
-type block_state = private {mutable new_blocks : Ast.instr Vector.t Vector.t}
-
 (** Accumulator of parsed fields *)
 type building_state = {
   types : Ast.type_ Vector.t;
@@ -269,19 +264,11 @@ type decode_kont = {
       (** Accumulated parsed sections, used to build the final module. *)
   module_kont : module_kont;  (** Module continuation. *)
   stream : stream;  (** Parsed stream. *)
-  block_state : block_state;  (** Basic blocks allocated. *)
+  allocation_state : Ast.allocations;  (** Basic blocks allocated. *)
 }
 
 (** [make_stream filename bytes] returns a new stream to decode. *)
 val make_stream : name:string -> bytes:string -> stream
-
-(** [make_empty_block_state ()] returns a new block allocation state. *)
-val make_empty_block_state : unit -> block_state
-
-(** [make_block_state blocks] returns a new block allocation state from already
-    existing blocks allocation. This function is used to build block state during
-    tree decoding. *)
-val make_block_state : Ast.instr Vector.t Vector.t -> block_state
 
 (** [module_step kont] takes one step of parsing from a continuation and returns
    a new continuation. Fails when the contination of the module is [MKStop]

@@ -56,6 +56,10 @@ let block_label_gen =
   let+ l = int32 in
   Ast.Block_label l
 
+let data_label_gen =
+  let+ l = int32 in
+  Ast.Data_label l
+
 let block_type_gen =
   let open Ast in
   oneof
@@ -381,10 +385,17 @@ let elems_gen =
   ref v
 
 let datas_gen =
-  let+ chunk = chunked_byte_vector_gen in
-  ref @@ chunk
+  let+ lbl = data_label_gen in
+  ref @@ lbl
 
 let blocks_table_gen = vector_gen (vector_gen instr_gen)
+
+let datas_table_gen = vector_gen chunked_byte_vector_gen
+
+let allocations_gen =
+  let* blocks = blocks_table_gen in
+  let+ datas = datas_table_gen in
+  Ast.{blocks; datas}
 
 let module_gen () =
   let current_module = ref None in
@@ -401,7 +412,7 @@ let module_gen () =
   let* exports = map_gen (extern_gen get_current_module) in
   let* elems = vector_gen elems_gen in
   let* datas = vector_gen datas_gen in
-  let* blocks = blocks_table_gen in
+  let* allocations = allocations_gen in
   let module_ =
     {
       Instance.types;
@@ -412,7 +423,7 @@ let module_gen () =
       exports;
       elems;
       datas;
-      blocks;
+      allocations;
     }
   in
   current_module := Some (ref module_) ;

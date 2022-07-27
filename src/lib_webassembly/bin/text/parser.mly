@@ -108,20 +108,24 @@ type context =
     datas : space; elems : space;
     labels : int32 VarMap.t; deferred_locals : (unit -> unit) list ref;
     new_blocks : instr Vector.t Vector.t ref;
+    new_datas : Chunked_byte_vector.Lwt.t Vector.t ref;
   }
 
 
 let with_blocks f =
+  let allocations = Ast.empty_allocations () in
   let c =  {
     types = empty_types (); tables = empty (); memories = empty ();
     funcs = empty (); locals = empty (); globals = empty ();
     datas = empty (); elems = empty ();
     labels = VarMap.empty; deferred_locals = ref [];
-    new_blocks = ref (Vector.create 0l);
+    new_blocks = ref allocations.blocks;
+    new_datas = ref allocations.datas;
   }
   in
   let res = f c in
-  {res.it with Ast.blocks = !(c.new_blocks)}
+  let allocations = Ast.{ blocks = !(c.new_blocks); datas = !(c.new_datas) } in
+  {res.it with allocations}
   @@ res.at
 
 
@@ -132,6 +136,11 @@ let alloc_block c es =
 
 let empty_block =
   Block_label 0l
+
+let alloc_data c data =
+  let d = Vector.num_elements !(c.new_datas) in
+  c.new_datas := Vector.grow 1l !(c.new_datas) |> Vector.set d data;
+  Data_label d
 
 let force_locals (c : context) =
   List.fold_right Stdlib.(@@) !(c.deferred_locals) ();
@@ -299,7 +308,7 @@ let to_module_ pm =
     elems;
     datas;
     start = p_start;
-    blocks = Vector.create 0l;
+    allocations = Ast.empty_allocations ();
   } @@ pm.at
 %}
 
@@ -998,17 +1007,17 @@ data :
   | LPAR DATA bind_var_opt string_list RPAR
     { let at = at () in
       fun c -> ignore ($3 c anon_data bind_data);
-      fun () -> {dinit = Chunked_byte_vector.Lwt.of_string $4; dmode = Passive @@ at} @@ at }
+      fun () -> {dinit = alloc_data c (Chunked_byte_vector.Lwt.of_string $4); dmode = Passive @@ at} @@ at }
   | LPAR DATA bind_var_opt memory_use offset string_list RPAR
     { let at = at () in
       fun c -> ignore ($3 c anon_data bind_data);
       fun () ->
-      {dinit = Chunked_byte_vector.Lwt.of_string $6; dmode = Active {index = $4 c memory; offset = $5 c} @@ at} @@ at }
+      {dinit = alloc_data c (Chunked_byte_vector.Lwt.of_string $6); dmode = Active {index = $4 c memory; offset = $5 c} @@ at} @@ at }
   | LPAR DATA bind_var_opt offset string_list RPAR  /* Sugar */
     { let at = at () in
       fun c -> ignore ($3 c anon_data bind_data);
       fun () ->
-      {dinit = Chunked_byte_vector.Lwt.of_string $5; dmode = Active {index = 0l @@ at; offset = $4 c} @@ at} @@ at }
+      {dinit = alloc_data c (Chunked_byte_vector.Lwt.of_string $5); dmode = Active {index = 0l @@ at; offset = $4 c} @@ at} @@ at }
 
 memory :
   | LPAR MEMORY bind_var_opt memory_fields RPAR
@@ -1032,7 +1041,7 @@ memory_fields :
       let offset = alloc_block c [i32_const (0l @@ at) @@ at] @@ at in
       let size = Int32.(div (add (of_int (String.length $3)) 65535l) 65536l) in
       [{mtype = MemoryType {min = size; max = Some size}} @@ at],
-      [{dinit = Chunked_byte_vector.Lwt.of_string $3; dmode = Active {index = x; offset} @@ at} @@ at],
+      [{dinit = alloc_data c (Chunked_byte_vector.Lwt.of_string $3); dmode = Active {index = x; offset} @@ at} @@ at],
       [], [] }
 
 global :

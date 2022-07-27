@@ -21,7 +21,7 @@ type module_inst = {
   exports : extern NameMap.t;
   elems : elem_inst Vector.t;
   datas : data_inst Vector.t;
-  blocks : Ast.block_table;
+  allocations : Ast.allocations;
 }
 
 and func_inst = module_inst ref Func.t
@@ -38,7 +38,7 @@ and export_inst = Ast.name * extern
 
 and elem_inst = Values.ref_ Vector.t ref
 
-and data_inst = Chunked_byte_vector.Lwt.t ref
+and data_inst = Ast.data_label ref
 
 and extern =
   | ExternFunc of func_inst
@@ -80,7 +80,7 @@ let empty_module_inst =
     exports = NameMap.create ~produce_value:(fun _ -> Lwt.fail Not_found) ();
     elems = Vector.create 0l;
     datas = Vector.create 0l;
-    blocks = Vector.create 0l;
+    allocations = Ast.empty_allocations ();
   }
 
 let extern_type_of = function

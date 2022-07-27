@@ -41,6 +41,8 @@ module E (S : sig
   val stream : stream
 
   val blocks : Ast.instr Vector.t Vector.t
+
+  val datas : Ast.datas_table
 end) =
 struct
   let s = S.stream
@@ -1141,6 +1143,7 @@ struct
   let data seg =
     let open Lwt.Syntax in
     let {dinit; dmode} = seg.it in
+    let* dinit = Ast.get_data dinit S.datas in
     let+ dinit = Chunked_byte_vector.Lwt.to_string dinit in
     match dmode.it with
     | Passive ->
@@ -1190,7 +1193,7 @@ end
 let encode m =
   let open Lwt.Syntax in
   let* blocks =
-    let* bls = Ast.Vector.to_list m.Source.it.Ast.blocks in
+    let* bls = Ast.Vector.to_list m.Source.it.Ast.allocations.Ast.blocks in
     let+ bls_l = TzStdLib.List.map_s Ast.Vector.to_list bls in
     let bls_v = List.map Vector.of_list bls_l in
     Vector.of_list bls_v
@@ -1199,6 +1202,8 @@ let encode m =
     let stream = stream ()
 
     let blocks = blocks
+
+    let datas = m.Source.it.Ast.allocations.Ast.datas
   end) in
   let+ () = E.module_ m in
   to_string E.s

@@ -566,4 +566,9 @@ module Ast = struct
     let open Data_encoding in
     let open Ast in
     conv (fun (Block_label l) -> l) (fun l -> Block_label l) int32
+
+  let data_label_encoding =
+    let open Data_encoding in
+    let open Ast in
+    conv (fun (Data_label l) -> l) (fun l -> Data_label l) int32
 end
