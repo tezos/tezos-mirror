@@ -29,4 +29,5 @@ let () =
   Test_check.register () ;
   Test_daemon.register () ;
   Test_retry.register () ;
+  Test_diff.register () ;
   Test.run ()
