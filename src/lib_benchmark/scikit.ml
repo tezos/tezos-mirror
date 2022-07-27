@@ -36,8 +36,7 @@ module LinearModel = struct
     assert (l <> 0 && c <> 0)
 
   let ridge ~(alpha : float) ?(fit_intercept : bool = false)
-      ?(normalize : bool = false) ~(input : Scikit_matrix.t)
-      ~(output : Scikit_matrix.t) () =
+      ~(input : Scikit_matrix.t) ~(output : Scikit_matrix.t) () =
     assert_matrix_nontrivial input ;
     assert_matrix_nontrivial output ;
     let input = Scikit_matrix.to_numpy input in
@@ -50,7 +49,6 @@ module LinearModel = struct
         [
           ("alpha", Py.Float.of_float alpha);
           ("fit_intercept", Py.Bool.of_bool fit_intercept);
-          ("normalize", Py.Bool.of_bool normalize);
         ]
     in
     let _ =
@@ -64,8 +62,8 @@ module LinearModel = struct
     | Some coef -> Scikit_matrix.of_numpy (Numpy.transpose coef)
 
   let lasso ~(alpha : float) ?(fit_intercept : bool = false)
-      ?(normalize : bool = false) ?(positive : bool = false)
-      ~(input : Scikit_matrix.t) ~(output : Scikit_matrix.t) () =
+      ?(positive : bool = false) ~(input : Scikit_matrix.t)
+      ~(output : Scikit_matrix.t) () =
     assert_matrix_nontrivial input ;
     assert_matrix_nontrivial output ;
     let input = Scikit_matrix.to_numpy input in
@@ -78,7 +76,6 @@ module LinearModel = struct
         [
           ("alpha", Py.Float.of_float alpha);
           ("fit_intercept", Py.Bool.of_bool fit_intercept);
-          ("normalize", Py.Bool.of_bool normalize);
           ("positive", Py.Bool.of_bool positive);
         ]
     in
