@@ -61,6 +61,7 @@ type prim =
   | D_Some
   | D_True
   | D_Unit
+  | D_Lambda_rec
   | I_PACK
   | I_UNPACK
   | I_BLAKE2B

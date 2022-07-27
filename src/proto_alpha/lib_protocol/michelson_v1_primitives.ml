@@ -48,6 +48,7 @@ type prim =
   | D_Some
   | D_True
   | D_Unit
+  | D_Lambda_rec
   | I_PACK
   | I_UNPACK
   | I_BLAKE2B
@@ -201,7 +202,7 @@ type namespace =
 let namespace = function
   | K_code | K_view | K_parameter | K_storage -> Keyword_namespace
   | D_Elt | D_False | D_Left | D_None | D_Pair | D_Right | D_Some | D_True
-  | D_Unit ->
+  | D_Unit | D_Lambda_rec ->
       Constant_namespace
   | I_ABS | I_ADD | I_ADDRESS | I_AMOUNT | I_AND | I_APPLY | I_BALANCE
   | I_BLAKE2B | I_CAR | I_CAST | I_CDR | I_CHAIN_ID | I_CHECK_SIGNATURE
@@ -256,6 +257,7 @@ let string_of_prim = function
   | D_Some -> "Some"
   | D_True -> "True"
   | D_Unit -> "Unit"
+  | D_Lambda_rec -> "Lambda_rec"
   | I_PACK -> "PACK"
   | I_UNPACK -> "UNPACK"
   | I_BLAKE2B -> "BLAKE2B"
@@ -411,6 +413,7 @@ let prim_of_string = function
   | "Some" -> ok D_Some
   | "True" -> ok D_True
   | "Unit" -> ok D_Unit
+  | "Lambda_rec" -> ok D_Lambda_rec
   | "PACK" -> ok I_PACK
   | "UNPACK" -> ok I_UNPACK
   | "BLAKE2B" -> ok I_BLAKE2B
@@ -766,6 +769,7 @@ let prim_encoding =
          (* Alpha_014 addition *)
          ("EMIT", I_EMIT);
          (* Alpha_015 addition *)
+         ("Lambda_rec", D_Lambda_rec);
          ("LAMBDA_REC", I_LAMBDA_REC)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *);

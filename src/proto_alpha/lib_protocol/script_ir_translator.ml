@@ -2074,7 +2074,7 @@ let rec parse_data :
            script_instr
       >|=? fun (kdescr, ctxt) -> (Lam (kdescr, script_instr), ctxt)
   | ( Lambda_t (ta, tr, _ty_name),
-      Prim (loc, I_LAMBDA_REC, [(Seq (_loc, _) as script_instr)], []) ) ->
+      Prim (loc, D_Lambda_rec, [(Seq (_loc, _) as script_instr)], []) ) ->
       traced
       @@ ( lambda_t loc ta tr >>?= fun lambda_rec_ty ->
            parse_lam_rec
