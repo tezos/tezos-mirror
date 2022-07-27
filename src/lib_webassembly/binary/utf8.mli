@@ -4,7 +4,7 @@
 
     @raise Binary_exn.Utf8 in case the encoding is illformed with regards to the Utf8
       conventions. *)
-val decode_step : ('a -> int) -> 'a -> int * int
+val decode_step : ('a -> int Lwt.t) -> 'a -> (int * int) Lwt.t
 
 (** [encode_int i] encodes an Utf8 represented into an integer into its char
     codes.

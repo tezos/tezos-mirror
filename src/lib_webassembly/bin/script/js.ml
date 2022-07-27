@@ -716,7 +716,10 @@ let of_command mods cmd =
         let rec unquote def =
           match def.it with
           | Textual m -> Lwt.return m
-          | Encoded (_, bytes) -> Decode.decode ~name:"binary" ~bytes
+          | Encoded (_, bytes) ->
+              Decode.decode
+                ~name:"binary"
+                ~bytes:(Chunked_byte_vector.Lwt.of_string bytes)
           | Quoted (_, s) -> unquote (Parse.string_to_module s)
         in
         let* unquoted = unquote def in
