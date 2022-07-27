@@ -188,63 +188,6 @@ module Free_variables :
   let if_ cond ift iff = Set.union cond (Set.union ift iff)
 end
 
-module Parameters :
-  S with type 'a repr = bool -> String.Set.t and type size = unit = struct
-  type 'a repr = bool -> String.Set.t
-
-  type size = unit
-
-  let true_ _ = String.Set.empty
-
-  let false_ _ = String.Set.empty
-
-  let lift_binop _x _y _b = String.Set.empty
-
-  let float _ _ = String.Set.empty
-
-  let int _ _ = String.Set.empty
-
-  let ( + ) = lift_binop
-
-  let ( - ) = lift_binop
-
-  let ( * ) = lift_binop
-
-  let ( / ) = lift_binop
-
-  let max = lift_binop
-
-  let min = lift_binop
-
-  let shift_left _x _i _ = String.Set.empty
-
-  let shift_right _x _i _ = String.Set.empty
-
-  let log2 _x _ = String.Set.empty
-
-  let sqrt _x _ = String.Set.empty
-
-  let free ~name _ =
-    ignore name ;
-    String.Set.empty
-
-  let lt = lift_binop
-
-  let eq = lift_binop
-
-  let lam ~name f is_head =
-    if is_head then String.Set.add name (f (fun _ -> String.Set.empty) is_head)
-    else String.Set.empty
-
-  let app _f _arg _ = String.Set.empty
-
-  let let_ ~name _m _f _ =
-    ignore name ;
-    String.Set.empty
-
-  let if_ _cond _ift _iff _ = String.Set.empty
-end
-
 module Eval : S with type 'a repr = 'a and type size = float = struct
   exception Term_contains_free_variable of Free_variable.t
 
@@ -505,26 +448,6 @@ functor
     include X
 
     let prj x = x
-  end
-
-module type Map_const_params = sig
-  val map_int : int -> int
-
-  val map_float : float -> float
-end
-
-module Map_const (P : Map_const_params) : Transform =
-functor
-  (X : S)
-  ->
-  struct
-    include X
-
-    let prj x = x
-
-    let float f = X.float (P.map_float f)
-
-    let int i = X.int (P.map_int i)
   end
 
 module Subst (P : sig

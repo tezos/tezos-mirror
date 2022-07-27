@@ -247,7 +247,7 @@ let plot_scatter opts title input_columns outputs =
   | _ ->
       if opts.reduced_plot_verbosity then return []
       else
-        let subsets = Benchmark_helpers.enumerate_subsets 2 input_columns in
+        let subsets = Stats.Combi.enumerate_subsets 2 input_columns in
         let plots =
           List.map
             (function
