@@ -127,7 +127,7 @@ let register_protocol_agnostic_tests () =
   Synchronisation_heuristic.register ~protocols:[Alpha] ;
   Tenderbake.register ~protocols:[Alpha] ;
   Tx_rollup.register ~protocols ;
-  Tx_rollup_node.register ~protocols ;
+  Tx_rollup_l2_node.register ~protocols ;
   Views.register [Alpha]
 
 let register_K_plus_tests () =

@@ -31,7 +31,6 @@
 *)
 
 module Rollup = Rollup.Tx_rollup
-module Rollup_node = Rollup_node.Tx_node
 module Parameters = Rollup.Parameters
 
 let check_json =
@@ -43,19 +42,19 @@ let get_block_hash block_json = JSON.(block_json |-> "hash" |> as_string)
 
 let wait_tezos_node_level tx_node node =
   let level = Node.get_level node in
-  Rollup_node.wait_for_tezos_level tx_node level
+  Tx_rollup_node.wait_for_tezos_level tx_node level
 
 (* Wait for the rollup node to be notified of a new tezos block *)
 let wait_for_notified_block node =
-  Rollup_node.wait_for node "tx_rollup_node_new_block.v0" (fun _ -> Some ())
+  Tx_rollup_node.wait_for node "tx_rollup_node_new_block.v0" (fun _ -> Some ())
 
 (* Wait for the [batch_success] event from the rollup node batcher. *)
 let wait_for_batch_success_event node =
-  Rollup_node.wait_for node "batch_success.v0" (fun _ -> Some ())
+  Tx_rollup_node.wait_for node "batch_success.v0" (fun _ -> Some ())
 
 (* Wait for the [injecting_pending] event from the injector. *)
 let wait_for_injecting_event ?(tags = []) ?count node =
-  Rollup_node.wait_for node "injecting_pending.v0" @@ fun json ->
+  Tx_rollup_node.wait_for node "injecting_pending.v0" @@ fun json ->
   let event_tags = JSON.(json |-> "tags" |> as_list |> List.map as_string) in
   let event_count = JSON.(json |-> "count" |> as_int) in
   match count with
@@ -67,7 +66,7 @@ let wait_for_injecting_event ?(tags = []) ?count node =
 
 (* Wait for the [request_completed] event from the injector. *)
 let wait_for_request_completed ?(tags = []) node request =
-  Rollup_node.wait_for node "request_completed_notice.v0" @@ fun json ->
+  Tx_rollup_node.wait_for node "request_completed_notice.v0" @@ fun json ->
   let event_request = JSON.(json |-> "view" |-> "request" |> as_string) in
   if request <> event_request then None
   else
@@ -75,7 +74,7 @@ let wait_for_request_completed ?(tags = []) node request =
     if List.for_all (fun t -> List.mem t event_tags) tags then Some () else None
 
 (* Check that all messages in the inbox have been successfully applied. *)
-let check_inbox_success (inbox : Rollup_node.Inbox.t) =
+let check_inbox_success (inbox : Tx_rollup_node.Inbox.t) =
   let ( |->? ) json field =
     let res = JSON.(json |-> field) in
     match JSON.unannotate res with `Null -> None | _ -> Some res
@@ -84,7 +83,7 @@ let check_inbox_success (inbox : Rollup_node.Inbox.t) =
     (fun i msg ->
       let result =
         (* Pair of result and withdraws *)
-        JSON.(msg.Rollup_node.Inbox.result |=> 0)
+        JSON.(msg.Tx_rollup_node.Inbox.result |=> 0)
       in
       match result |->? "deposit_result" with
       | None ->
@@ -208,7 +207,7 @@ let check_commitments_inclusion ~tx_node list =
   in
   Lwt_list.iter_p
     (fun (block, included) ->
-      let* block = Rollup_node.Client.get_block ~tx_node ~block in
+      let* block = Tx_rollup_node.Client.get_block ~tx_node ~block in
       check_commitment_included block included ;
       unit)
     list
@@ -229,17 +228,17 @@ let test_node_configuration =
       (* Originate a rollup with a given operator *)
       let*! tx_rollup_hash = Client.Tx_rollup.originate ~src:operator client in
       let* () =
-        Rollup_node.create
+        Tx_rollup_node.create
           ~protocol
           Operator
           ~rollup_id:tx_rollup_hash
           client
           node
-        |> Rollup_node.spawn_init_config
+        |> Tx_rollup_node.spawn_init_config
         |> Process.check_error ~exit_code:1 ~msg:(rex "Missing signers")
       in
       let tx_rollup_node =
-        Rollup_node.create
+        Tx_rollup_node.create
           ~protocol
           Observer
           ~rollup_id:tx_rollup_hash
@@ -247,7 +246,7 @@ let test_node_configuration =
           client
           node
       in
-      let* filename = Rollup_node.init_config tx_rollup_node in
+      let* filename = Tx_rollup_node.init_config tx_rollup_node in
       Log.info "Tx_rollup configuration file was successfully created" ;
       let () =
         let open Ezjsonm in
@@ -275,7 +274,7 @@ let init_and_run_rollup_node ~protocol ~originator ?operator ?batch_signer
   in
   Log.info "Tx_rollup %s was successfully originated" tx_rollup_hash ;
   let tx_node =
-    Rollup_node.create
+    Tx_rollup_node.create
       ~protocol
       Custom
       ~rollup_id:tx_rollup_hash
@@ -289,10 +288,10 @@ let init_and_run_rollup_node ~protocol ~originator ?operator ?batch_signer
       client
       node
   in
-  let* _ = Rollup_node.init_config tx_node in
-  let* () = Rollup_node.run tx_node in
+  let* _ = Tx_rollup_node.init_config tx_node in
+  let* () = Tx_rollup_node.run tx_node in
   Log.info "Tx_rollup node is now running" ;
-  let* () = Rollup_node.wait_for_ready tx_node in
+  let* () = Tx_rollup_node.wait_for_ready tx_node in
   Lwt.return (tx_rollup_hash, tx_node)
 
 (* Checks that the tx_node is ready after originating an associated
@@ -332,7 +331,7 @@ let test_not_allow_deposit =
       let* () = Client.bake_for_and_wait client in
       Log.info "Tx_rollup %s was successfully originated" tx_rollup_hash ;
       let tx_node =
-        Rollup_node.create
+        Tx_rollup_node.create
           ~protocol
           Custom
           ~rollup_id:tx_rollup_hash
@@ -341,16 +340,16 @@ let test_not_allow_deposit =
           client
           node
       in
-      let* _ = Rollup_node.init_config tx_node in
-      let* () = Rollup_node.run tx_node in
+      let* _ = Tx_rollup_node.init_config tx_node in
+      let* () = Tx_rollup_node.run tx_node in
       Log.info "Tx_rollup node is now running" ;
       let ready =
-        let* () = Rollup_node.wait_for_ready tx_node in
+        let* () = Tx_rollup_node.wait_for_ready tx_node in
         Test.fail
           "Rollup node shouldn't start when not allowed to make deposits"
       in
       let dies =
-        let node_process = Option.get @@ Rollup_node.process tx_node in
+        let node_process = Option.get @@ Tx_rollup_node.process tx_node in
         Process.check_error
           ~exit_code:1
           ~msg:(rex "This rollup node is not authorized to make a deposit")
@@ -428,7 +427,7 @@ let test_tx_node_store_inbox =
       let*! rollup = Client.Tx_rollup.originate ~src:operator client in
       let* () = Client.bake_for_and_wait client in
       let tx_node =
-        Rollup_node.create
+        Tx_rollup_node.create
           ~protocol
           Observer
           ~rollup_id:rollup
@@ -436,8 +435,8 @@ let test_tx_node_store_inbox =
           client
           node
       in
-      let* _ = Rollup_node.init_config tx_node in
-      let* () = Rollup_node.run tx_node in
+      let* _ = Tx_rollup_node.init_config tx_node in
+      let* () = Tx_rollup_node.run tx_node in
       let tx_client =
         Tx_rollup_client.create
           ~protocol
@@ -454,7 +453,7 @@ let test_tx_node_store_inbox =
           client
       in
       let* () = Client.bake_for_and_wait client in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 3 in
+      let* _ = Tx_rollup_node.wait_for_tezos_level tx_node 3 in
       let* tx_node_inbox_1 =
         tx_client_get_inbox ~tx_client ~tezos_client:client ~block:"0"
       in
@@ -483,7 +482,7 @@ let test_tx_node_store_inbox =
           client
       in
       let* () = Client.bake_for_and_wait client in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
+      let* _ = Tx_rollup_node.wait_for_tezos_level tx_node 4 in
       let* tx_node_inbox_2 =
         tx_client_get_inbox ~tx_client ~tezos_client:client ~block:"1"
       in
@@ -496,9 +495,9 @@ let test_tx_node_store_inbox =
           "Unexpected inbox computed from the rollup node. Expected %R. \
            Computed %L" ;
       (* Stop the node and try to get the inbox once again*)
-      let* () = Rollup_node.terminate tx_node in
-      let* () = Rollup_node.run tx_node in
-      let* () = Rollup_node.wait_for_ready tx_node in
+      let* () = Tx_rollup_node.terminate tx_node in
+      let* () = Tx_rollup_node.run tx_node in
+      let* () = Tx_rollup_node.wait_for_ready tx_node in
       let*! inbox_after_restart = Rollup.get_inbox ~rollup ~level:1 client in
       Check.(Some tx_node_inbox_2 = inbox_after_restart)
         (Check.option Rollup.Check.inbox)
@@ -526,7 +525,7 @@ let test_node_cannot_connect =
   Log.info "Stopping Tezos node" ;
   let* () = Node.terminate node in
   let tx_node =
-    Rollup_node.create
+    Tx_rollup_node.create
       ~protocol
       Custom
       ~rollup_id
@@ -534,15 +533,15 @@ let test_node_cannot_connect =
       client
       node
   in
-  let* _ = Rollup_node.init_config tx_node in
-  let* () = Rollup_node.run tx_node in
+  let* _ = Tx_rollup_node.init_config tx_node in
+  let* () = Tx_rollup_node.run tx_node in
   let ready =
-    let* () = Rollup_node.wait_for_ready tx_node in
+    let* () = Tx_rollup_node.wait_for_ready tx_node in
     Test.fail
       "Rollup node shouldn't start when it cannot connect to a Tezos node"
   in
   let dies =
-    let node_process = Option.get @@ Rollup_node.process tx_node in
+    let node_process = Option.get @@ Tx_rollup_node.process tx_node in
     Process.check_error
       ~exit_code:1
       ~msg:(rex "Unable to connect to the node")
@@ -586,7 +585,7 @@ let test_node_disconnect =
   let* () = Client.bake_for_and_wait client in
   Log.info "Rollup node should reconnect and see the new L1 block" ;
   let () =
-    match Rollup_node.process tx_node with
+    match Tx_rollup_node.process tx_node with
     | None -> Test.fail "Rollup node stopped"
     | Some _ -> ()
   in
@@ -627,11 +626,11 @@ let build_commitment_info ~tx_level ~tx_rollup_hash ~tx_node ~client =
   in
   let inbox_merkle_root = inbox.merkle_root in
   let* rollup_inbox =
-    Rollup_node.Client.get_inbox ~tx_node ~block:(string_of_int tx_level)
+    Tx_rollup_node.Client.get_inbox ~tx_node ~block:(string_of_int tx_level)
   in
   let context_hashes =
     List.map
-      (fun x -> x.Rollup_node.Inbox.l2_context_hash.tree_hash)
+      (fun x -> x.Tx_rollup_node.Inbox.l2_context_hash.tree_hash)
       rollup_inbox
   in
   let* roots =
@@ -700,7 +699,7 @@ let check_commitments_content ~tx_node ~tx_rollup_hash ~client list =
   Lwt_list.iter_p
     (fun block ->
       let tx_level = int_of_string block in
-      let* block = Rollup_node.Client.get_block ~tx_node ~block in
+      let* block = Tx_rollup_node.Client.get_block ~tx_node ~block in
       check_commitment_content block ~tx_level ~tx_rollup_hash ~tx_node ~client)
     list
 
@@ -728,12 +727,12 @@ type rejection_info = {
 let build_rejection ~tx_level ~tx_node ~message_pos ~client ?agreed_context_hash
     ?agreed_message_result_path commitment_info : rejection_info Lwt.t =
   let* rollup_inbox =
-    Rollup_node.Client.get_inbox ~tx_node ~block:(string_of_int tx_level)
+    Tx_rollup_node.Client.get_inbox ~tx_node ~block:(string_of_int tx_level)
   in
   let* hashes =
     Lwt_list.map_p
       (fun content ->
-        let message = content.Rollup_node.Inbox.message in
+        let message = content.Tx_rollup_node.Inbox.message in
         let message =
           (match JSON.(message |-> "batch" |> as_string_opt) with
            | Some x -> `Batch (`Hex x)
@@ -804,7 +803,7 @@ let build_rejection ~tx_level ~tx_node ~message_pos ~client ?agreed_context_hash
   in
   let* proof =
     let* proof =
-      Rollup_node.Client.get_merkle_proof
+      Tx_rollup_node.Client.get_merkle_proof
         ~tx_node
         ~block:(string_of_int tx_level)
         ~message_pos:(string_of_int message_pos)
@@ -841,7 +840,7 @@ let check_tz4_balance ~tx_client ~block ~ticket_id ~tz4_address
            tz4_balance)) ;
   unit
 
-let get_ticket_hash_from_deposit (d : Rollup_node.Inbox.message) : string =
+let get_ticket_hash_from_deposit (d : Tx_rollup_node.Inbox.message) : string =
   JSON.(d.message |-> "deposit" |-> "ticket_hash" |> as_string)
 
 let get_ticket_hash_from_deposit_json inbox =
@@ -907,7 +906,7 @@ let test_ticket_deposit_from_l1_to_l2 =
           client
       in
       let* () = Client.bake_for_and_wait client in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
+      let* _ = Tx_rollup_node.wait_for_tezos_level tx_node 4 in
       (* Get the operation containing the ticket transfer. We assume
          that only one operation is issued in this block. *)
       let* inbox = tx_client_get_inbox_as_json ~tx_client ~block:"head" in
@@ -1074,7 +1073,7 @@ let test_l2_to_l2_transaction =
           client
       in
       let* () = Client.bake_for_and_wait client in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
+      let* _ = Tx_rollup_node.wait_for_tezos_level tx_node 4 in
       let* inbox = tx_client_get_inbox_as_json ~tx_client ~block:"head" in
       let ticket_id = get_ticket_hash_from_deposit_json inbox in
       Log.info "Ticket %s was successfully emitted" ticket_id ;
@@ -1108,7 +1107,7 @@ let test_l2_to_l2_transaction =
           client
       in
       let* () = Client.bake_for_and_wait client in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 5 in
+      let* _ = Tx_rollup_node.wait_for_tezos_level tx_node 5 in
       let* () =
         check_tz4_balance
           ~tx_client
@@ -1136,7 +1135,7 @@ let test_l2_to_l2_transaction =
       in
       Log.info "Baking the batch" ;
       let* () = Client.bake_for_and_wait client in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 6 in
+      let* _ = Tx_rollup_node.wait_for_tezos_level tx_node 6 in
       (* The decoding fails because of the buggy JSON encoding. This
          line can be uncommented once it is fixed.*)
       let* _node_inbox =
@@ -1257,7 +1256,7 @@ let make_deposit ~source ~tx_rollup_hash ~tx_node ~client ?(dests = [])
   let* level = Client.level client in
   let* () = Client.bake_for_and_wait client in
   let level = succ level in
-  let* _ = Rollup_node.wait_for_tezos_level tx_node level in
+  let* _ = Tx_rollup_node.wait_for_tezos_level tx_node level in
   Log.info
     "The tx_rollup_deposit %s contract was successfully originated"
     contract_id ;
@@ -1287,7 +1286,7 @@ let make_deposit ~source ~tx_rollup_hash ~tx_node ~client ?(dests = [])
         in
         let* () = Client.bake_for_and_wait client in
         let level = succ level in
-        let* _ = Rollup_node.wait_for_tezos_level tx_node level in
+        let* _ = Tx_rollup_node.wait_for_tezos_level tx_node level in
         return level)
       level
       dests
@@ -1446,8 +1445,8 @@ let test_batcher ~test_persistence =
       let* _t1 = tx_client_get_transaction_in_queue ~tx_client txh1
       and* _t2 = tx_client_get_transaction_in_queue ~tx_client txh2 in
       let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 7 in
-      let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
+      let* _ = Tx_rollup_node.wait_for_tezos_level tx_node 7 in
+      let* inbox = Tx_rollup_node.Client.get_inbox ~tx_node ~block:"head" in
       check_inbox_success inbox ;
       let* () =
         check_tz4_balance
@@ -1512,19 +1511,19 @@ let test_batcher ~test_persistence =
              Note: This can be a source of flakiness. *)
           let* () = Lwt_unix.sleep 2.0 in
           Log.info "Stopping rollup node" ;
-          let* () = Rollup_node.terminate tx_node in
+          let* () = Tx_rollup_node.terminate tx_node in
           let* () =
             Node.run node Node.[Connections 0; Synchronisation_threshold 0]
           in
           let* () = Node.wait_for_ready node in
-          let* () = Rollup_node.run tx_node in
-          let* () = Rollup_node.wait_for_ready tx_node in
+          let* () = Tx_rollup_node.run tx_node in
+          let* () = Tx_rollup_node.wait_for_ready tx_node in
           Client.bake_for_and_wait client)
         else unit
       in
       let* () = Client.bake_for_and_wait client in
       let* _ = wait_tezos_node_level tx_node node in
-      let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
+      let* inbox = Tx_rollup_node.Client.get_inbox ~tx_node ~block:"head" in
       check_inbox_success inbox ;
       let* () =
         check_tz4_balance
@@ -1590,7 +1589,7 @@ let test_reorganization =
           ~tickets_amount:10
           bls_pkh_1
       in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
+      let* _ = Tx_rollup_node.wait_for_tezos_level tx_node 4 in
       let* inbox = tx_client_get_inbox_as_json ~tx_client ~block:"head" in
       let ticket_id = get_ticket_hash_from_deposit_json inbox in
       (* Run the node that will be used to forge an alternative branch *)
@@ -1627,7 +1626,7 @@ let test_reorganization =
       in
       let* () = Client.bake_for_and_wait client1 in
       let* _ = Node.wait_for_level node1 5 in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 5 in
+      let* _ = Tx_rollup_node.wait_for_tezos_level tx_node 5 in
       Log.info "Check that L2 balance is now 99_990" ;
       let* () =
         check_tz4_balance
@@ -1659,7 +1658,7 @@ let test_reorganization =
       let* () = Client.Admin.trust_address client2 ~peer:node1 in
       let* () = Client.Admin.connect_address client2 ~peer:node1 in
       let* _ = Node.wait_for_level node1 6 in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 6 in
+      let* _ = Tx_rollup_node.wait_for_tezos_level tx_node 6 in
       (* Check that the balance is untouched, that is to say that the
          rollup node had backtracked the operation from the
          alternative branch. *)
@@ -1709,7 +1708,7 @@ let test_l2_proof_rpc_position =
           ~tickets_amount:100_000
           bls_pkh_1
       in
-      let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
+      let* inbox = Tx_rollup_node.Client.get_inbox ~tx_node ~block:"head" in
       let ticket_id = get_ticket_hash_from_deposit (List.hd inbox) in
       Log.info "Ticket %s was successfully emitted" ticket_id ;
 
@@ -1768,7 +1767,7 @@ let test_l2_proof_rpc_position =
       in
       Log.info "Baking the batches" ;
       let* () = Client.bake_for_and_wait client in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 5 in
+      let* _ = Tx_rollup_node.wait_for_tezos_level tx_node 5 in
       Log.info "Commitment for rollup level: 1" ;
       let* ({
               roots;
@@ -1789,7 +1788,7 @@ let test_l2_proof_rpc_position =
           client
       in
       let* () = Client.bake_for_and_wait client in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 6 in
+      let* _ = Tx_rollup_node.wait_for_tezos_level tx_node 6 in
       Log.info "Try to reject a good commitment at level 1, message 0" ;
       let last_prev_pos = List.length context_hashes_level0 - 1 in
       let agreed_context_hash = List.nth context_hashes_level0 last_prev_pos in
@@ -1930,7 +1929,7 @@ let test_reject_bad_commitment =
           client
       in
       let* () = Client.bake_for_and_wait client in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
+      let* _ = Tx_rollup_node.wait_for_tezos_level tx_node 4 in
       let* {
              proof;
              message;
@@ -1949,11 +1948,13 @@ let test_reject_bad_commitment =
           commitment_info
       in
       Log.info "Stopping rollup node" ;
-      let* () = Rollup_node.terminate tx_node in
+      let* () = Tx_rollup_node.terminate tx_node in
       Log.info "Restarting rollup node with committer/operator" ;
-      let* () = Rollup_node.change_signers ~operator:(Some operator) tx_node in
-      let* () = Rollup_node.run tx_node in
-      let* () = Rollup_node.wait_for_ready tx_node in
+      let* () =
+        Tx_rollup_node.change_signers ~operator:(Some operator) tx_node
+      in
+      let* () = Tx_rollup_node.run tx_node in
+      let* () = Tx_rollup_node.wait_for_ready tx_node in
       Log.info "Injecting rejection" ;
       let*! () =
         Client.Tx_rollup.submit_rejection
@@ -1971,7 +1972,7 @@ let test_reject_bad_commitment =
           ~agreed_message_result_path
           client
       in
-      let node_process = Option.get @@ Rollup_node.process tx_node in
+      let node_process = Option.get @@ Tx_rollup_node.process tx_node in
       (* Baking one block for rejection *)
       let* () = Client.bake_for_and_wait client in
       Log.info "Rollup node must exist with error message because of slashing" ;
@@ -2021,7 +2022,7 @@ let test_committer =
           ~tickets_amount:100_000
           bls_pkh_1
       in
-      let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
+      let* inbox = Tx_rollup_node.Client.get_inbox ~tx_node ~block:"head" in
       let ticket_id = get_ticket_hash_from_deposit (List.hd inbox) in
       let inject_tx ?counter ~from ~dest ?(amount = 1L) () =
         craft_tx_and_inject
@@ -2037,13 +2038,17 @@ let test_committer =
       let* _ = inject_tx ~from:bls_key_1 ~dest:bls_pkh_2 ~amount:1000L () in
       let* _ = inject_tx ~from:bls_key_2 ~dest:bls_pkh_1 ~amount:2L () in
       let* () = Client.bake_for_and_wait client in
-      let* tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 1) in
+      let* tzlevel =
+        Tx_rollup_node.wait_for_tezos_level tx_node (tzlevel + 1)
+      in
       let* () = check_commitments_inclusion ~tx_node [("0", true)] in
       let* () =
         check_injection tx_node "commitment" @@ Client.bake_for_and_wait client
       in
-      let* tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 1) in
-      let* block = Rollup_node.Client.get_block ~tx_node ~block:"head" in
+      let* tzlevel =
+        Tx_rollup_node.wait_for_tezos_level tx_node (tzlevel + 1)
+      in
+      let* block = Tx_rollup_node.Client.get_block ~tx_node ~block:"head" in
       check_l2_level block 1 ;
       let* () =
         check_commitments_inclusion ~tx_node [("0", true); ("1", false)]
@@ -2052,8 +2057,10 @@ let test_committer =
       let* _ = inject_tx ~from:bls_key_1 ~dest:bls_pkh_2 ~amount:3L () in
       let* _ = inject_tx ~from:bls_key_2 ~dest:bls_pkh_1 ~amount:4L () in
       let* () = Client.bake_for_and_wait client in
-      let* tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 1) in
-      let* block = Rollup_node.Client.get_block ~tx_node ~block:"head" in
+      let* tzlevel =
+        Tx_rollup_node.wait_for_tezos_level tx_node (tzlevel + 1)
+      in
+      let* block = Tx_rollup_node.Client.get_block ~tx_node ~block:"head" in
       check_l2_level block 1 ;
       let* () =
         check_commitments_inclusion ~tx_node [("0", true); ("1", true)]
@@ -2064,8 +2071,10 @@ let test_committer =
       let* () =
         check_injection tx_node "commitment" @@ Client.bake_for_and_wait client
       in
-      let* tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 1) in
-      let* block = Rollup_node.Client.get_block ~tx_node ~block:"head" in
+      let* tzlevel =
+        Tx_rollup_node.wait_for_tezos_level tx_node (tzlevel + 1)
+      in
+      let* block = Tx_rollup_node.Client.get_block ~tx_node ~block:"head" in
       check_l2_level block 2 ;
       let* () =
         check_commitments_inclusion
@@ -2075,8 +2084,10 @@ let test_committer =
       let* () =
         check_injection tx_node "commitment" @@ Client.bake_for_and_wait client
       in
-      let* _tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 1) in
-      let* block = Rollup_node.Client.get_block ~tx_node ~block:"head" in
+      let* _tzlevel =
+        Tx_rollup_node.wait_for_tezos_level tx_node (tzlevel + 1)
+      in
+      let* block = Tx_rollup_node.Client.get_block ~tx_node ~block:"head" in
       check_l2_level block 3 ;
       let* () =
         check_commitments_inclusion
@@ -2136,7 +2147,7 @@ let test_tickets_context =
       Log.info "Ticket %s was successfully emitted" ticket_id ;
       Log.info "Checking ticket availability in head context" ;
       let* ticket =
-        Rollup_node.Client.get_ticket ~tx_node ~block:"head" ~ticket_id
+        Tx_rollup_node.Client.get_ticket ~tx_node ~block:"head" ~ticket_id
       in
       let expected_ticket =
         JSON.annotate ~origin:"expected"
@@ -2153,10 +2164,10 @@ let test_tickets_context =
         ~error_msg:"Ticket is %L but expected %R" ;
       Log.info "Checking ticket can be retrieved by index" ;
       let* ticket_index =
-        Rollup_node.Client.get_ticket_index ~tx_node ~block:"head" ~ticket_id
+        Tx_rollup_node.Client.get_ticket_index ~tx_node ~block:"head" ~ticket_id
       in
       let* ticket =
-        Rollup_node.Client.get_ticket
+        Tx_rollup_node.Client.get_ticket
           ~tx_node
           ~block:"head"
           ~ticket_id:(string_of_int ticket_index)
@@ -2184,8 +2195,8 @@ let test_tickets_context =
       Log.info "Waiting for new L2 block" ;
       let* () = Client.bake_for_and_wait client in
       let* () = Client.bake_for_and_wait client in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 6 in
-      let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
+      let* _ = Tx_rollup_node.wait_for_tezos_level tx_node 6 in
+      let* inbox = Tx_rollup_node.Client.get_inbox ~tx_node ~block:"head" in
       check_inbox_success inbox ;
       let* () =
         check_tz4_balance
@@ -2204,7 +2215,7 @@ let test_tickets_context =
       in
       Log.info "Ticket still available in later contexts" ;
       let* ticket =
-        Rollup_node.Client.get_ticket ~tx_node ~block:"head" ~ticket_id
+        Tx_rollup_node.Client.get_ticket ~tx_node ~block:"head" ~ticket_id
       in
       Check.(ticket = expected_ticket)
         check_json
@@ -2287,8 +2298,8 @@ let test_round_trip ~title ?before_init ~originator ~operator ~batch_signer
       Log.info "Waiting for new L2 block" ;
       let* () = Client.bake_for_and_wait client in
       let* () = Client.bake_for_and_wait client in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 6 in
-      let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
+      let* _ = Tx_rollup_node.wait_for_tezos_level tx_node 6 in
+      let* inbox = Tx_rollup_node.Client.get_inbox ~tx_node ~block:"head" in
       check_inbox_success inbox ;
       let* () =
         check_tz4_balance
@@ -2327,8 +2338,8 @@ let test_round_trip ~title ?before_init ~originator ~operator ~batch_signer
       Log.info "Waiting for new L2 block" ;
       let* () = Client.bake_for_and_wait client in
       let* () = Client.bake_for_and_wait client in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 8 in
-      let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
+      let* _ = Tx_rollup_node.wait_for_tezos_level tx_node 8 in
+      let* inbox = Tx_rollup_node.Client.get_inbox ~tx_node ~block:"head" in
       check_inbox_success inbox ;
       let* () =
         check_tz4_balance
@@ -2360,7 +2371,7 @@ let test_round_trip ~title ?before_init ~originator ~operator ~batch_signer
       in
       let* block = RPC.Client.call client @@ RPC.get_chain_block () in
       check_l1_block_contains_finalize ~level:2 block ;
-      let* l2_head = Rollup_node.Client.get_block ~tx_node ~block:"head" in
+      let* l2_head = Tx_rollup_node.Client.get_block ~tx_node ~block:"head" in
       check_l2_block_finalized l2_head ;
       Log.info "Baking 1 L1 block for dispatch to be included" ;
       let* () = Client.bake_for_and_wait client in
@@ -2617,7 +2628,7 @@ let test_transfer_command =
       let* () = Client.bake_for_and_wait client in
       let* () = Client.bake_for_and_wait client in
       let* level = Client.level client in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node level in
+      let* _ = Tx_rollup_node.wait_for_tezos_level tx_node level in
       let* () =
         check_tz4_balance
           ~tx_client
@@ -2694,7 +2705,7 @@ let test_withdraw_command =
       let* () = Client.bake_for_and_wait client in
       let* () = Client.bake_for_and_wait client in
       let* level = Client.level client in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node level in
+      let* _ = Tx_rollup_node.wait_for_tezos_level tx_node level in
       check_tz4_balance
         ~tx_client
         ~block:"head"
@@ -2750,7 +2761,7 @@ let test_catch_up =
   let* inbox = tx_client_get_inbox_as_json ~tx_client ~block:"head" in
   let ticket_id = get_ticket_hash_from_deposit_json inbox in
   Log.info "Ticket %s was successfully emitted" ticket_id ;
-  let* block = Rollup_node.Client.get_block ~tx_node ~block:"head" in
+  let* block = Tx_rollup_node.Client.get_block ~tx_node ~block:"head" in
   check_l2_level block 0 ;
   let inject_tx ?counter ~from ~dest ?(amount = 1L) () =
     craft_tx_and_inject
@@ -2766,16 +2777,16 @@ let test_catch_up =
   let* _ = inject_tx ~from:bls_key_2 ~dest:bls_pkh_1 ~amount:2L () in
   let* () = Client.bake_for_and_wait client in
   let* () = Client.bake_for_and_wait client in
-  let* tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 2) in
-  let* block = Rollup_node.Client.get_block ~tx_node ~block:"head" in
+  let* tzlevel = Tx_rollup_node.wait_for_tezos_level tx_node (tzlevel + 2) in
+  let* block = Tx_rollup_node.Client.get_block ~tx_node ~block:"head" in
   check_l2_level block 1 ;
   Log.info "Making L1 block 2" ;
   let* _ = inject_tx ~from:bls_key_1 ~dest:bls_pkh_2 ~amount:3L () in
   let* _ = inject_tx ~from:bls_key_2 ~dest:bls_pkh_1 ~amount:4L () in
   let* () = Client.bake_for_and_wait client in
   let* () = Client.bake_for_and_wait client in
-  let* _tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 2) in
-  let* block = Rollup_node.Client.get_block ~tx_node ~block:"head" in
+  let* _tzlevel = Tx_rollup_node.wait_for_tezos_level tx_node (tzlevel + 2) in
+  let* block = Tx_rollup_node.Client.get_block ~tx_node ~block:"head" in
   check_l2_level block 2 ;
   Log.info "Check no block is committed" ;
   let* () =
@@ -2784,20 +2795,20 @@ let test_catch_up =
       [("0", false); ("1", false); ("2", false)]
   in
   Log.info "Stopping rollup node" ;
-  let* () = Rollup_node.terminate tx_node in
+  let* () = Tx_rollup_node.terminate tx_node in
   Log.info "Restarting rollup node with committer/operator" ;
   let* () =
-    Rollup_node.change_signers
+    Tx_rollup_node.change_signers
       ~operator:(Some operator)
       ~allow_deposit:true
       tx_node
   in
-  let* () = Rollup_node.run tx_node in
-  let* () = Rollup_node.wait_for_ready tx_node in
+  let* () = Tx_rollup_node.run tx_node in
+  let* () = Tx_rollup_node.wait_for_ready tx_node in
   (* Baking one block to make sure catch up phase is over *)
   let* () = Client.bake_for_and_wait client in
   let* () = Client.bake_for_and_wait client in
-  let* _tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 2) in
+  let* _tzlevel = Tx_rollup_node.wait_for_tezos_level tx_node (tzlevel + 2) in
   let* () =
     check_commitments_inclusion ~tx_node [("0", true); ("1", true); ("2", true)]
   in
@@ -2840,7 +2851,7 @@ let test_origination_deposit_same_block =
       in
       (* Do not bake after origination, we will also inject deposit *)
       let tx_node =
-        Rollup_node.create
+        Tx_rollup_node.create
           ~protocol
           Observer
           ~rollup_id:tx_rollup_hash
@@ -2848,7 +2859,7 @@ let test_origination_deposit_same_block =
           client
           node
       in
-      let* _ = Rollup_node.init_config tx_node in
+      let* _ = Tx_rollup_node.init_config tx_node in
       let* bls_key = Client.bls_gen_and_show_keys client in
       let tickets_content = "toru" in
       let tickets_amount = 10 in
@@ -2890,8 +2901,8 @@ let test_origination_deposit_same_block =
         ~kind:"transaction"
         ~what:"Ticket deposit to L2" ;
       Log.info "Starting Rollup node" ;
-      let* () = Rollup_node.run tx_node in
-      let* () = Rollup_node.wait_for_ready tx_node in
+      let* () = Tx_rollup_node.run tx_node in
+      let* () = Tx_rollup_node.wait_for_ready tx_node in
       Log.info "Tx_rollup node is now ready" ;
       let* _ = wait_tezos_node_level tx_node node in
       (* Get the operation containing the ticket transfer. We assume
