@@ -693,6 +693,13 @@ opam:tezos-crypto:
   variables:
     package: tezos-crypto
 
+opam:tezos-crypto-dal:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_7
+  variables:
+    package: tezos-crypto-dal
+
 opam:tezos-dal-alpha:
   extends:
     - .opam_template
