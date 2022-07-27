@@ -9,6 +9,7 @@
   tezt-performance-regression
   uri
   hex
+  tezos-crypto-dal
   tezos-base
   tezos-base.unix
   cohttp-lwt-unix)
