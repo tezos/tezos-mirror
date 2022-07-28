@@ -76,13 +76,16 @@ type baking_mode = Application | Baking
 let get_next_baker_by_round round block =
   Plugin.RPC.Baking_rights.get rpc_ctxt ~all:true ~max_round:(round + 1) block
   >|=? fun bakers ->
-  let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; _} =
+  let {Plugin.RPC.Baking_rights.delegate = pkh; consensus_key; timestamp; _} =
     WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
          (fun {Plugin.RPC.Baking_rights.round = r; _} -> r = round)
          bakers
   in
-  (pkh, round, WithExceptions.Option.to_exn ~none:(Failure "") timestamp)
+  ( pkh,
+    consensus_key,
+    round,
+    WithExceptions.Option.to_exn ~none:(Failure "") timestamp )
 
 let get_next_baker_by_account pkh block =
   Plugin.RPC.Baking_rights.get rpc_ctxt ~delegates:[pkh] block
@@ -90,21 +93,42 @@ let get_next_baker_by_account pkh block =
   (match List.hd bakers with
   | Some b -> return b
   | None -> failwith "No slots found for %a" Signature.Public_key_hash.pp pkh)
-  >>=? fun {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; round; _} ->
+  >>=? fun {
+             Plugin.RPC.Baking_rights.delegate = pkh;
+             consensus_key;
+             timestamp;
+             round;
+             _;
+           } ->
   return
-    (pkh, round, WithExceptions.Option.to_exn ~none:(Failure __LOC__) timestamp)
+    ( pkh,
+      consensus_key,
+      round,
+      WithExceptions.Option.to_exn ~none:(Failure __LOC__) timestamp )
 
 let get_next_baker_excluding excludes block =
   Plugin.RPC.Baking_rights.get rpc_ctxt block >|=? fun bakers ->
-  let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; round; _} =
+  let {
+    Plugin.RPC.Baking_rights.delegate = pkh;
+    consensus_key;
+    timestamp;
+    round;
+    _;
+  } =
     WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
-         (fun {Plugin.RPC.Baking_rights.delegate; _} ->
+         (fun {Plugin.RPC.Baking_rights.consensus_key; _} ->
            not
-             (List.mem ~equal:Signature.Public_key_hash.equal delegate excludes))
+             (List.mem
+                ~equal:Signature.Public_key_hash.equal
+                consensus_key
+                excludes))
          bakers
   in
-  (pkh, round, WithExceptions.Option.to_exn ~none:(Failure "") timestamp)
+  ( pkh,
+    consensus_key,
+    round,
+    WithExceptions.Option.to_exn ~none:(Failure "") timestamp )
 
 let dispatch_policy = function
   | By_round r -> get_next_baker_by_round r
@@ -120,6 +144,7 @@ let get_round (b : t) =
 module Forge = struct
   type header = {
     baker : public_key_hash;
+    consensus_key : public_key_hash;
     (* the signer of the block *)
     shell : Block_header.shell_header;
     contents : Block_header.contents;
@@ -155,13 +180,15 @@ module Forge = struct
         context = Context_hash.zero;
       }
 
-  let set_seed_nonce_hash seed_nonce_hash {baker; shell; contents} =
-    {baker; shell; contents = {contents with seed_nonce_hash}}
+  let set_seed_nonce_hash seed_nonce_hash
+      {baker; consensus_key; shell; contents} =
+    {baker; consensus_key; shell; contents = {contents with seed_nonce_hash}}
 
-  let set_baker baker header = {header with baker}
+  let set_baker baker ?(consensus_key = baker) header =
+    {header with baker; consensus_key}
 
-  let sign_header {baker; shell; contents} =
-    Account.find baker >|=? fun delegate ->
+  let sign_header {consensus_key; shell; contents; _} =
+    Account.find consensus_key >|=? fun signer_account ->
     let unsigned_bytes =
       Data_encoding.Binary.to_bytes_exn
         Block_header.unsigned_encoding
@@ -170,7 +197,7 @@ module Forge = struct
     let signature =
       Signature.sign
         ~watermark:Block_header.(to_watermark (Block_header Chain_id.zero))
-        delegate.sk
+        signer_account.sk
         unsigned_bytes
     in
     Block_header.{shell; protocol_data = {contents; signature}}
@@ -196,7 +223,8 @@ module Forge = struct
       | _ -> assert false
     in
     let predecessor_round = Fitness.round pred_fitness in
-    dispatch_policy policy pred >>=? fun (pkh, round, expected_timestamp) ->
+    dispatch_policy policy pred
+    >>=? fun (delegate, consensus_key, round, expected_timestamp) ->
     let timestamp = Option.value ~default:expected_timestamp timestamp in
     let level = Int32.succ pred.header.shell.level in
     Raw_level.of_int32 level |> Environment.wrap_tzresult >>?= fun raw_level ->
@@ -243,7 +271,7 @@ module Forge = struct
         ~payload_round
         ()
     in
-    {baker = pkh; shell; contents}
+    {baker = delegate; consensus_key; shell; contents}
 
   (* compatibility only, needed by incremental *)
   let contents ?(proof_of_work_nonce = default_proof_of_work_nonce)
@@ -685,7 +713,8 @@ let get_application_vstate (pred : t) (operations : Protocol.operation trace) =
 let get_construction_vstate ?(policy = By_round 0) ?timestamp
     ?(protocol_data = None) (pred : t) =
   let open Protocol in
-  dispatch_policy policy pred >>=? fun (_pkh, _round, expected_timestamp) ->
+  dispatch_policy policy pred
+  >>=? fun (_pkh, _ck, _round, expected_timestamp) ->
   let timestamp = Option.value ~default:expected_timestamp timestamp in
   Main.begin_construction
     ~chain_id:Chain_id.zero

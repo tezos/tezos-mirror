@@ -102,8 +102,9 @@ let check ctxt ~selection =
         (fun (level, round) delegate ctxt ->
           Delegate_sampler.baking_rights_owner ctxt level ~round
           >|= Environment.wrap_tzresult
-          >>=? fun (ctxt, _, (_, pkh)) ->
-          if not (Signature.Public_key_hash.equal delegate pkh) then raise Exit
+          >>=? fun (ctxt, _, pk) ->
+          if not (Signature.Public_key_hash.equal delegate pk.delegate) then
+            raise Exit
           else return ctxt)
         selection
         ctxt

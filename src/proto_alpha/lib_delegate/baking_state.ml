@@ -606,7 +606,7 @@ let compute_delegate_slots (cctxt : Protocol_client_context.full)
   let own_delegate_slots, all_delegate_slots =
     List.fold_left
       (fun (own_map, all_map) slot ->
-        let {Plugin.RPC.Validators.delegate; slots; _} = slot in
+        let {Plugin.RPC.Validators.consensus_key = delegate; slots; _} = slot in
         let endorsing_slot =
           {endorsing_power = List.length slots; delegate; slots}
         in

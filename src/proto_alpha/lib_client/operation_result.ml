@@ -984,8 +984,8 @@ let pp_contents_and_result :
         pp_balance_updates
         bus
   | ( Preendorsement {level; _},
-      Preendorsement_result {balance_updates; delegate; preendorsement_power} )
-    ->
+      Preendorsement_result
+        {balance_updates; delegate; consensus_key; preendorsement_power} ) ->
       Format.fprintf
         ppf
         "@[<v 2>Preendorsement:@,\
@@ -997,11 +997,12 @@ let pp_contents_and_result :
         level
         pp_balance_updates
         balance_updates
-        Signature.Public_key_hash.pp
-        delegate
+        Consensus_key.pp
+        {delegate; consensus_pkh = consensus_key}
         preendorsement_power
   | ( Endorsement {level; _},
-      Endorsement_result {balance_updates; delegate; endorsement_power} ) ->
+      Endorsement_result
+        {balance_updates; delegate; consensus_key; endorsement_power} ) ->
       Format.fprintf
         ppf
         "@[<v 2>Endorsement:@,\
@@ -1013,8 +1014,8 @@ let pp_contents_and_result :
         level
         pp_balance_updates
         balance_updates
-        Signature.Public_key_hash.pp
-        delegate
+        Consensus_key.pp
+        {delegate; consensus_pkh = consensus_key}
         endorsement_power
   | Dal_slot_availability _, Dal_slot_availability_result {delegate} ->
       Format.fprintf

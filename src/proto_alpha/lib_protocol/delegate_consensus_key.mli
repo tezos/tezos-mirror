@@ -25,6 +25,25 @@
 
 type error += Invalid_consensus_key_update_noop of Cycle_repr.t
 
+(** The public key of a consensus key and the associated delegate. *)
+type pk = Raw_context.consensus_pk = {
+  delegate : Signature.Public_key_hash.t;
+  consensus_pk : Signature.Public_key.t;
+  consensus_pkh : Signature.Public_key_hash.t;
+}
+
+(** The public key hash of a consensus key and the associated delegate. *)
+type t = {
+  delegate : Signature.Public_key_hash.t;
+  consensus_pkh : Signature.Public_key_hash.t;
+}
+
+val zero : t
+
+val pp : Format.formatter -> t -> unit
+
+val pkh : pk -> t
+
 (** Initialize the consensus key when registering a delegate. *)
 val init :
   Raw_context.t ->
@@ -34,22 +53,18 @@ val init :
 
 (** Returns the active consensus key for the current cycle. *)
 val active_pubkey :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Signature.Public_key.t tzresult Lwt.t
+  Raw_context.t -> Signature.Public_key_hash.t -> pk tzresult Lwt.t
 
 (** Returns the active consensus key for the current cycle. *)
 val active_key :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Signature.Public_key_hash.t tzresult Lwt.t
+  Raw_context.t -> Signature.Public_key_hash.t -> t tzresult Lwt.t
 
 (** Returns the active consensus key for the given cycle. *)
 val active_pubkey_for_cycle :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Cycle_repr.t ->
-  Signature.Public_key.t tzresult Lwt.t
+  pk tzresult Lwt.t
 
 (** Returns the list of pending consensus-key updates in upcoming cycles. *)
 val pending_updates :

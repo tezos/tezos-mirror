@@ -45,18 +45,13 @@ val slot_owner :
   Raw_context.t ->
   Level_repr.t ->
   Slot_repr.t ->
-  (Raw_context.t * (Signature.public_key * Signature.public_key_hash)) tzresult
-  Lwt.t
+  (Raw_context.t * Delegate_consensus_key.pk) tzresult Lwt.t
 
 val baking_rights_owner :
   Raw_context.t ->
   Level_repr.t ->
   round:Round_repr.round ->
-  (Raw_context.t
-  * Slot_repr.t
-  * (Signature.public_key * Signature.public_key_hash))
-  tzresult
-  Lwt.t
+  (Raw_context.t * Slot_repr.t * Delegate_consensus_key.pk) tzresult Lwt.t
 
 (** [compute_snapshot_index ctxt cycle max_snapshot_index] Returns the index of
     the selected snapshot for the [cycle] passed as argument, and for the max
@@ -73,3 +68,8 @@ val clear_outdated_sampling_data :
 
 val select_distribution_for_cycle :
   Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
+
+module Migration_from_Kathmandu : sig
+  val update_sampler :
+    Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
+end

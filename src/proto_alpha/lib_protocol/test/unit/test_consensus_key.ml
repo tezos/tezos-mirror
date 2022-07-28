@@ -65,9 +65,7 @@ module Consensus_key = struct
     >|= Environment.wrap_tzresult
 
   let activate ctxt ~new_cycle =
-    Delegate_consensus_key.activate
-      ctxt
-      ~new_cycle:(Cycle_repr.of_int32_exn (Int32.of_int new_cycle))
+    Delegate_consensus_key.activate ctxt ~new_cycle
     >|= Environment.wrap_tzresult
 end
 
@@ -99,31 +97,49 @@ module Assert = struct
         let* active_pk =
           Consensus_key.active_pubkey_for_cycle ctxt delegate c
         in
-        equal_pk ~__LOC__ active_pk pk)
+        equal_pk ~__LOC__ active_pk.consensus_pk pk)
       l
 end
+
+let rec add_cycles ctxt n =
+  if n <= 0 then return ctxt
+  else
+    let open Lwt_result_syntax in
+    let current_level = Raw_context.current_level ctxt in
+    let new_cycle = Cycle_repr.succ current_level.cycle in
+    let* ctxt = Consensus_key.activate ctxt ~new_cycle in
+    let ctxt = Raw_context.Internal_for_tests.add_cycles ctxt 1 in
+    add_cycles ctxt (n - 1)
 
 let test_consensus_key_storage () =
   let open Lwt_result_syntax in
   let* ctxt, delegate = create () in
   let a1 = Account.new_account () in
   let a2 = Account.new_account () in
+  let preserved_cycles = Constants_storage.preserved_cycles ctxt in
+  let* () = Assert.equal_int ~loc:__LOC__ preserved_cycles 3 in
   let* () =
     let* active_pkh = Consensus_key.active_key ctxt delegate.pkh in
-    Assert.equal_pkh ~__LOC__ active_pkh delegate.pkh
+    Assert.equal_pkh ~__LOC__ active_pkh.consensus_pkh delegate.pkh
   in
   let* () =
     let* active_pk = Consensus_key.active_pubkey ctxt delegate.pkh in
-    Assert.equal_pk ~__LOC__ active_pk delegate.pk
+    Assert.equal_pk ~__LOC__ active_pk.consensus_pk delegate.pk
   in
   let* () =
     let* active_pk =
-      Consensus_key.active_pubkey_for_cycle ctxt delegate.pkh 5
+      Consensus_key.active_pubkey_for_cycle ctxt delegate.pkh 3
     in
-    Assert.equal_pk ~__LOC__ active_pk delegate.pk
+    Assert.equal_pk ~__LOC__ active_pk.consensus_pk delegate.pk
   in
   let* ctxt = Consensus_key.register_update ctxt delegate.pkh a1.pk in
-  let* ctxt = Consensus_key.register_update ctxt delegate.pkh a2.pk in
+  let* () =
+    let*! err = Consensus_key.register_update ctxt delegate.pkh a1.pk in
+    Assert.proto_error ~loc:__LOC__ err (function
+        | Delegate_consensus_key.Invalid_consensus_key_update_noop c ->
+            c = Cycle_repr.of_int32_exn 4l
+        | _ -> false)
+  in
   let* () =
     Assert.active_keys
       ~__LOC__
@@ -132,33 +148,45 @@ let test_consensus_key_storage () =
       [
         (0, delegate.pk);
         (1, delegate.pk);
-        (2, a1.pk);
-        (3, a1.pk);
+        (2, delegate.pk);
+        (2, delegate.pk);
+        (3, delegate.pk);
+        (4, a1.pk);
+        (5, a1.pk);
+      ]
+  in
+  let* ctxt = add_cycles ctxt 1 in
+  let* () =
+    let* active_pkh = Consensus_key.active_key ctxt delegate.pkh in
+    Assert.equal_pkh ~__LOC__ active_pkh.consensus_pkh delegate.pkh
+  in
+  let* () =
+    let*! err = Consensus_key.register_update ctxt delegate.pkh a1.pk in
+    Assert.proto_error ~loc:__LOC__ err (function
+        | Delegate_consensus_key.Invalid_consensus_key_update_noop c ->
+            c = Cycle_repr.of_int32_exn 4l
+        | _ -> false)
+  in
+  let* ctxt = Consensus_key.register_update ctxt delegate.pkh a2.pk in
+  let* () =
+    Assert.active_keys
+      ~__LOC__
+      ctxt
+      delegate.pkh
+      [
+        (1, delegate.pk);
+        (2, delegate.pk);
+        (2, delegate.pk);
+        (3, delegate.pk);
         (4, a1.pk);
         (5, a2.pk);
         (6, a2.pk);
       ]
   in
+  let* ctxt = add_cycles ctxt 2 in
   let* () =
-    let*! err = Consensus_key.register_update ctxt delegate.pkh a1.pk in
-    Assert.proto_error ~loc:__LOC__ err (function
-        | Delegate_consensus_key.Invalid_consensus_key_update_noop c ->
-            c = Cycle_repr.of_int32_exn 2l
-        | _ -> false)
-  in
-  let* () =
-    let*! err = Consensus_key.register_update ctxt delegate.pkh a1.pk in
-    Assert.proto_error ~loc:__LOC__ err (function
-        | Delegate_consensus_key.Invalid_consensus_key_update_noop c ->
-            c = Cycle_repr.of_int32_exn 2l
-        | _ -> false)
-  in
-  let* () =
-    let*! err = Consensus_key.register_update ctxt delegate.pkh a1.pk in
-    Assert.proto_error ~loc:__LOC__ err (function
-        | Delegate_consensus_key.Invalid_consensus_key_update_noop c ->
-            c = Cycle_repr.of_int32_exn 2l
-        | _ -> false)
+    let* active_pkh = Consensus_key.active_key ctxt delegate.pkh in
+    Assert.equal_pkh ~__LOC__ active_pkh.consensus_pkh delegate.pkh
   in
   let* () =
     let*! err = Consensus_key.register_update ctxt delegate.pkh a2.pk in
@@ -167,38 +195,40 @@ let test_consensus_key_storage () =
             c = Cycle_repr.of_int32_exn 5l
         | _ -> false)
   in
+  let* ctxt = Consensus_key.register_update ctxt delegate.pkh a1.pk in
   let* () =
-    let*! err = Consensus_key.register_update ctxt delegate.pkh a2.pk in
-    Assert.proto_error ~loc:__LOC__ err (function
-        | Delegate_consensus_key.Invalid_consensus_key_update_noop c ->
-            c = Cycle_repr.of_int32_exn 5l
-        | _ -> false)
+    Assert.active_keys
+      ~__LOC__
+      ctxt
+      delegate.pkh
+      [
+        (3, delegate.pk);
+        (4, a1.pk);
+        (5, a2.pk);
+        (6, a2.pk);
+        (7, a1.pk);
+        (8, a1.pk);
+      ]
   in
-  let* ctxt = Consensus_key.activate ctxt ~new_cycle:1 in
-  let* ctxt = Consensus_key.activate ctxt ~new_cycle:2 in
+  let* ctxt = add_cycles ctxt 1 in
   let* () =
     let* active_pkh = Consensus_key.active_key ctxt delegate.pkh in
-    Assert.equal_pkh ~__LOC__ active_pkh a1.pkh
+    Assert.equal_pkh ~__LOC__ active_pkh.consensus_pkh a1.pkh
   in
-  let* ctxt = Consensus_key.activate ctxt ~new_cycle:3 in
+  let* ctxt = add_cycles ctxt 1 in
   let* () =
     let* active_pkh = Consensus_key.active_key ctxt delegate.pkh in
-    Assert.equal_pkh ~__LOC__ active_pkh a1.pkh
+    Assert.equal_pkh ~__LOC__ active_pkh.consensus_pkh a2.pkh
   in
-  let* ctxt = Consensus_key.activate ctxt ~new_cycle:4 in
+  let* ctxt = add_cycles ctxt 1 in
   let* () =
     let* active_pkh = Consensus_key.active_key ctxt delegate.pkh in
-    Assert.equal_pkh ~__LOC__ active_pkh a1.pkh
+    Assert.equal_pkh ~__LOC__ active_pkh.consensus_pkh a2.pkh
   in
-  let* ctxt = Consensus_key.activate ctxt ~new_cycle:5 in
+  let* ctxt = add_cycles ctxt 1 in
   let* () =
     let* active_pkh = Consensus_key.active_key ctxt delegate.pkh in
-    Assert.equal_pkh ~__LOC__ active_pkh a2.pkh
-  in
-  let* ctxt = Consensus_key.activate ctxt ~new_cycle:6 in
-  let* () =
-    let* active_pkh = Consensus_key.active_key ctxt delegate.pkh in
-    Assert.equal_pkh ~__LOC__ active_pkh a2.pkh
+    Assert.equal_pkh ~__LOC__ active_pkh.consensus_pkh a1.pkh
   in
   return ()
 

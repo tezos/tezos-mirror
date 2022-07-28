@@ -452,7 +452,7 @@ let register () =
         deactivated;
         grace_period;
         voting_info;
-        active_consensus_key = Signature.Public_key.hash consensus_key;
+        active_consensus_key = consensus_key.consensus_pkh;
         pending_consensus_keys = pendings;
       }) ;
   register1 ~chunked:false S.full_balance (fun ctxt pkh () () ->
@@ -493,7 +493,7 @@ let register () =
   register1 ~chunked:false S.consensus_key (fun ctxt pkh () () ->
       Delegate.Consensus_key.active_pubkey ctxt pkh >>=? fun pk ->
       Delegate.Consensus_key.pending_updates ctxt pkh >>=? fun pendings ->
-      return (Signature.Public_key.hash pk, pendings)) ;
+      return (pk.consensus_pkh, pendings)) ;
   register1 ~chunked:false S.participation (fun ctxt pkh () () ->
       check_delegate_registered ctxt pkh >>=? fun () ->
       Delegate.participation_info ctxt pkh)

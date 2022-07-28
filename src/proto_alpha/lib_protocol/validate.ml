@@ -95,10 +95,8 @@ type all_expected_consensus_features = {
 
 type consensus_info = {
   all_expected_features : all_expected_consensus_features;
-  preendorsement_slot_map :
-    (Signature.public_key * Signature.public_key_hash * int) Slot.Map.t;
-  endorsement_slot_map :
-    (Signature.public_key * Signature.public_key_hash * int) Slot.Map.t;
+  preendorsement_slot_map : (Consensus_key.pk * int) Slot.Map.t;
+  endorsement_slot_map : (Consensus_key.pk * int) Slot.Map.t;
 }
 
 let init_consensus_info ctxt all_expected_features =
@@ -246,8 +244,8 @@ let init_manager_state ctxt =
 (** Mode-dependent information needed in final checks. *)
 type application_info = {
   fitness : Fitness.t;
-  block_producer : public_key_hash;
-  payload_producer : public_key_hash;
+  block_producer : Consensus_key.pk;
+  payload_producer : Consensus_key.pk;
   predecessor_hash : Block_hash.t;
   block_data_contents : Block_header.contents;
 }
@@ -278,8 +276,8 @@ type mode =
       predecessor_hash : Block_hash.t;
       round : Round.t;
       block_data_contents : Block_header.contents;
-      block_producer : public_key_hash;
-      payload_producer : public_key_hash;
+      block_producer : Consensus_key.pk;
+      payload_producer : Consensus_key.pk;
     }
   | Mempool
 
@@ -599,16 +597,21 @@ module Consensus = struct
         consensus_content
         operation
     in
-    let*? delegate_pk, delegate_pkh, voting_power =
+    let*? consensus_key, voting_power =
       get_delegate_details
         vi.consensus_info.preendorsement_slot_map
         kind
         consensus_content
     in
-    let* () = check_frozen_deposits_are_positive vi.ctxt delegate_pkh in
+    let* () =
+      check_frozen_deposits_are_positive vi.ctxt consensus_key.delegate
+    in
     let*? () =
       if should_check_signature then
-        Operation.check_signature delegate_pk vi.chain_id operation
+        Operation.check_signature
+          consensus_key.consensus_pk
+          vi.chain_id
+          operation
       else ok ()
     in
     return
@@ -646,19 +649,25 @@ module Consensus = struct
     let open Lwt_result_syntax in
     let kind = Grandparent_endorsement in
     let level = Level.from_raw vi.ctxt consensus_content.level in
-    let* _ctxt, (delegate_pk, delegate_pkh) =
+    let* _ctxt, consensus_key =
       Stake_distribution.slot_owner vi.ctxt level consensus_content.slot
     in
-    let*? () = ensure_conflict_free_grandparent_endorsement vs delegate_pkh in
+    let*? () =
+      ensure_conflict_free_grandparent_endorsement vs consensus_key.delegate
+    in
     let*? () =
       check_consensus_features vs kind expected consensus_content operation
     in
     let*? () =
       if should_check_signature then
-        Operation.check_signature delegate_pk vi.chain_id operation
+        Operation.check_signature
+          consensus_key.consensus_pk
+          vi.chain_id
+          operation
       else ok ()
     in
-    return (update_validity_state_grandparent_endorsement vs delegate_pkh)
+    return
+      (update_validity_state_grandparent_endorsement vs consensus_key.delegate)
 
   let ensure_conflict_free_endorsement vs slot =
     error_unless
@@ -713,16 +722,21 @@ module Consensus = struct
         consensus_content
         operation
     in
-    let*? delegate_pk, delegate_pkh, voting_power =
+    let*? consensus_key, voting_power =
       get_delegate_details
         vi.consensus_info.endorsement_slot_map
         kind
         consensus_content
     in
-    let* () = check_frozen_deposits_are_positive vi.ctxt delegate_pkh in
+    let* () =
+      check_frozen_deposits_are_positive vi.ctxt consensus_key.delegate
+    in
     let*? () =
       if should_check_signature then
-        Operation.check_signature delegate_pk vi.chain_id operation
+        Operation.check_signature
+          consensus_key.consensus_pk
+          vi.chain_id
+          operation
       else ok ()
     in
     return
@@ -1307,11 +1321,14 @@ module Anonymous = struct
         (* Disambiguate: levels are equal *)
         let level = Level.from_raw vi.ctxt e1.level in
         let*? () = check_denunciation_age vi denunciation_kind level.level in
-        let* ctxt, (delegate1_pk, delegate1) =
+        let* ctxt, consensus_key1 =
           Stake_distribution.slot_owner vi.ctxt level e1.slot
         in
-        let* ctxt, (_delegate2_pk, delegate2) =
+        let* ctxt, consensus_key2 =
           Stake_distribution.slot_owner ctxt level e2.slot
+        in
+        let delegate1, delegate2 =
+          (consensus_key1.delegate, consensus_key2.delegate)
         in
         let*? () =
           error_unless
@@ -1319,7 +1336,7 @@ module Anonymous = struct
             (Inconsistent_denunciation
                {kind = denunciation_kind; delegate1; delegate2})
         in
-        let delegate_pk, delegate = (delegate1_pk, delegate1) in
+        let delegate_pk, delegate = (consensus_key1.consensus_pk, delegate1) in
         let*? () =
           match
             Double_evidence.find
@@ -1394,19 +1411,22 @@ module Anonymous = struct
     let level = Level.from_raw vi.ctxt level1 in
     let committee_size = Constants.consensus_committee_size vi.ctxt in
     let*? slot1 = Round.to_slot round1 ~committee_size in
-    let* ctxt, (delegate1_pk, delegate1) =
+    let* ctxt, consensus_key1 =
       Stake_distribution.slot_owner vi.ctxt level slot1
     in
     let*? slot2 = Round.to_slot round2 ~committee_size in
-    let* ctxt, (_delegate2_pk, delegate2) =
+    let* ctxt, consensus_key2 =
       Stake_distribution.slot_owner ctxt level slot2
+    in
+    let delegate1, delegate2 =
+      (consensus_key1.delegate, consensus_key2.delegate)
     in
     let*? () =
       error_unless
         Signature.Public_key_hash.(delegate1 = delegate2)
         (Inconsistent_denunciation {kind = Block; delegate1; delegate2})
     in
-    let delegate_pk, delegate = (delegate1_pk, delegate1) in
+    let delegate_pk, delegate = (consensus_key1.consensus_pk, delegate1) in
     let*? () =
       match
         Double_evidence.find
@@ -2010,7 +2030,7 @@ let begin_application ctxt chain_id ~predecessor_level ~predecessor_timestamp
   let predecessor_round = Fitness.predecessor_round fitness in
   let round = Fitness.round fitness in
   let current_level = Level.current ctxt in
-  let* ctxt, _slot, (block_producer_pk, block_producer) =
+  let* ctxt, _slot, block_producer =
     Stake_distribution.baking_rights_owner ctxt current_level ~round
   in
   let*? () =
@@ -2021,13 +2041,15 @@ let begin_application ctxt chain_id ~predecessor_level ~predecessor_timestamp
       ~predecessor_round
       ~fitness
       ~timestamp:block_header.shell.timestamp
-      ~delegate_pk:block_producer_pk
+      ~delegate_pk:block_producer.consensus_pk
       ~round_durations:(Constants.round_durations ctxt)
       ~proof_of_work_threshold:(Constants.proof_of_work_threshold ctxt)
       ~expected_commitment:current_level.expected_commitment
   in
-  let* () = Consensus.check_frozen_deposits_are_positive ctxt block_producer in
-  let* ctxt, _slot, (_payload_producer_pk, payload_producer) =
+  let* () =
+    Consensus.check_frozen_deposits_are_positive ctxt block_producer.delegate
+  in
+  let* ctxt, _slot, payload_producer =
     Stake_distribution.baking_rights_owner
       ctxt
       current_level
@@ -2097,11 +2119,13 @@ let begin_full_construction ctxt chain_id ~predecessor_level ~predecessor_round
       ~predecessor_round
   in
   let current_level = Level.current ctxt in
-  let* ctxt, _slot, (_block_producer_pk, block_producer) =
+  let* ctxt, _slot, block_producer =
     Stake_distribution.baking_rights_owner ctxt current_level ~round
   in
-  let* () = Consensus.check_frozen_deposits_are_positive ctxt block_producer in
-  let* ctxt, _slot, (_payload_producer_pk, payload_producer) =
+  let* () =
+    Consensus.check_frozen_deposits_are_positive ctxt block_producer.delegate
+  in
+  let* ctxt, _slot, payload_producer =
     Stake_distribution.baking_rights_owner
       ctxt
       current_level

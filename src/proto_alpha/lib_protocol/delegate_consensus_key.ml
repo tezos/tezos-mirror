@@ -41,6 +41,35 @@ let () =
     (function Invalid_consensus_key_update_noop c -> Some c | _ -> None)
     (fun c -> Invalid_consensus_key_update_noop c)
 
+type pk = Raw_context.consensus_pk = {
+  delegate : Signature.Public_key_hash.t;
+  consensus_pk : Signature.Public_key.t;
+  consensus_pkh : Signature.Public_key_hash.t;
+}
+
+type t = {
+  delegate : Signature.Public_key_hash.t;
+  consensus_pkh : Signature.Public_key_hash.t;
+}
+
+let pkh {delegate; consensus_pkh; consensus_pk = _} = {delegate; consensus_pkh}
+
+let zero =
+  {
+    consensus_pkh = Signature.Public_key_hash.zero;
+    delegate = Signature.Public_key_hash.zero;
+  }
+
+let pp ppf {delegate; consensus_pkh} =
+  Format.fprintf ppf "@[<v 2>%a" Signature.Public_key_hash.pp delegate ;
+  if not (Signature.Public_key_hash.equal delegate consensus_pkh) then
+    Format.fprintf
+      ppf
+      "@,Active key: %a"
+      Signature.Public_key_hash.pp
+      consensus_pkh ;
+  Format.fprintf ppf "@]"
+
 let init ctxt delegate pk =
   Storage.Contract.Consensus_key.init ctxt (Contract_repr.Implicit delegate) pk
 
@@ -49,12 +78,13 @@ let active_pubkey ctxt delegate =
   let* pk =
     Storage.Contract.Consensus_key.get ctxt (Contract_repr.Implicit delegate)
   in
-  return pk
+  let pkh = Signature.Public_key.hash pk in
+  return {consensus_pk = pk; consensus_pkh = pkh; delegate}
 
 let active_key ctxt delegate =
   let open Lwt_tzresult_syntax in
   let* pk = active_pubkey ctxt delegate in
-  return (Signature.Public_key.hash pk)
+  return (pkh pk)
 
 let raw_pending_updates ctxt delegate =
   let open Lwt_tzresult_syntax in
@@ -81,15 +111,20 @@ let raw_active_pubkey_for_cycle ctxt delegate cycle =
     List.fold_left
       (fun (c1, active) (c2, pk) ->
         if Cycle_repr.(c1 < c2 && c2 <= cycle) then (c2, pk) else (c1, active))
-      (current_level.cycle, active)
+      (current_level.cycle, active.consensus_pk)
       pendings
   in
   return active_for_cycle
 
 let active_pubkey_for_cycle ctxt delegate cycle =
   let open Lwt_tzresult_syntax in
-  let* _, active = raw_active_pubkey_for_cycle ctxt delegate cycle in
-  return active
+  let* _, consensus_pk = raw_active_pubkey_for_cycle ctxt delegate cycle in
+  return
+    {
+      consensus_pk;
+      consensus_pkh = Signature.Public_key.hash consensus_pk;
+      delegate;
+    }
 
 let register_update ctxt delegate pk =
   let open Lwt_tzresult_syntax in

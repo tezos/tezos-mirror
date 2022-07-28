@@ -143,7 +143,3 @@ val full_balance :
 (** Only use this function for RPCs: this is expensive. *)
 val delegated_balance :
   Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
-
-module Migration_from_Kathmandu : sig
-  val update : Raw_context.t -> Raw_context.t tzresult Lwt.t
-end

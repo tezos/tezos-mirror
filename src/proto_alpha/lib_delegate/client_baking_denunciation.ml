@@ -264,13 +264,13 @@ let process_block (cctxt : #Protocol_client_context.full) state
         Option.value ~default:Delegate_Map.empty
         @@ HLevel.find state.blocks_table (chain_id, level, round)
       in
-      match Delegate_Map.find baker map with
+      match Delegate_Map.find baker.delegate map with
       | None ->
           return
           @@ HLevel.add
                state.blocks_table
                (chain_id, level, round)
-               (Delegate_Map.add baker new_hash map)
+               (Delegate_Map.add baker.delegate new_hash map)
       | Some existing_hash when Block_hash.(existing_hash = new_hash) ->
           (* This case should never happen *)
           Events.(emit double_baking_but_not) () >>= fun () ->
@@ -278,7 +278,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
           @@ HLevel.replace
                state.blocks_table
                (chain_id, level, round)
-               (Delegate_Map.add baker new_hash map)
+               (Delegate_Map.add baker.delegate new_hash map)
       | Some existing_hash ->
           (* If a previous block made by this pkh is found for
              the same (level, round) we inject a double_baking_evidence *)
@@ -310,7 +310,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
           @@ HLevel.replace
                state.blocks_table
                (chain_id, level, round)
-               (Delegate_Map.add baker new_hash map))
+               (Delegate_Map.add baker.delegate new_hash map))
 
 (* Remove levels that are lower than the
    [highest_level_encountered] minus [preserved_levels] *)

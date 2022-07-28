@@ -469,6 +469,7 @@ module Bond_id = struct
 end
 
 module Receipt = Receipt_repr
+module Consensus_key = Delegate_consensus_key
 
 module Delegate = struct
   include Delegate_storage

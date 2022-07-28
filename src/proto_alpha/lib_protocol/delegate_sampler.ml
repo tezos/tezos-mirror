@@ -27,8 +27,7 @@
 
 module Delegate_sampler_state = struct
   module Cache_client = struct
-    type cached_value =
-      (Signature.Public_key.t * Signature.Public_key_hash.t) Sampler.t
+    type cached_value = Delegate_consensus_key.pk Sampler.t
 
     let namespace = Cache_repr.create_namespace "sampler_state"
 
@@ -133,8 +132,8 @@ module Random = struct
       let elt, _ = take_int64 mass_bound state in
       (Int64.to_int i, elt)
     in
-    let pk, pkh = Sampler.sample state sample in
-    return (c, (pk, pkh))
+    let pk = Sampler.sample state sample in
+    return (c, pk)
 end
 
 let slot_owner c level slot = Random.owner c level (Slot_repr.to_int slot)
@@ -217,7 +216,7 @@ let select_distribution_for_cycle ctxt cycle =
   List.fold_left_es
     (fun acc (pkh, stake) ->
       Delegate_consensus_key.active_pubkey_for_cycle ctxt pkh cycle
-      >|=? fun pk -> ((pk, pkh), Tez_repr.to_mutez stake) :: acc)
+      >|=? fun pk -> (pk, Tez_repr.to_mutez stake) :: acc)
     []
     stakes
   >>=? fun stakes_pk ->
@@ -238,3 +237,21 @@ let clear_outdated_sampling_data ctxt ~new_cycle =
   | Some outdated_cycle ->
       Delegate_sampler_state.remove_existing ctxt outdated_cycle
       >>=? fun ctxt -> Seed_storage.remove_for_cycle ctxt outdated_cycle
+
+module Migration_from_Kathmandu = struct
+  let update_sampler ctxt cycle =
+    let open Lwt_tzresult_syntax in
+    let* stakes = Stake_storage.get_selected_distribution ctxt cycle in
+    let* stakes_pk =
+      List.fold_left_es
+        (fun acc (delegate, stake) ->
+          Delegate_consensus_key.active_pubkey ctxt delegate >>=? fun pk ->
+          return ((pk, Tez_repr.to_mutez stake) :: acc))
+        []
+        stakes
+    in
+    let state = Sampler.create stakes_pk in
+    Delegate_sampler_state.init ctxt cycle state >>=? fun ctxt ->
+    Storage.Seed.For_cycle.get ctxt cycle >>=? fun seed ->
+    Lwt.return (Raw_context.init_sampler_for_cycle ctxt cycle seed state)
+end

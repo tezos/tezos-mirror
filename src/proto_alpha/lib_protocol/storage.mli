@@ -413,8 +413,7 @@ end
 module Delegate_sampler_state :
   Indexed_data_storage
     with type key = Cycle_repr.t
-     and type value =
-      (Signature.Public_key.t * Signature.Public_key_hash.t) Sampler.t
+     and type value = Raw_context.consensus_pk Sampler.t
      and type t := Raw_context.t
 
 (** Votes *)
@@ -918,4 +917,13 @@ module Zk_rollup : sig
       with type t := Raw_context.t * Zk_rollup_repr.t
        and type key = int64
        and type value = Zk_rollup_operation_repr.t * Ticket_hash_repr.t option
+end
+
+module Migration_from_Kathmandu : sig
+  module Delegate_sampler_state :
+    Indexed_data_storage
+      with type key = Cycle_repr.t
+       and type value =
+        (Signature.Public_key.t * Signature.Public_key_hash.t) Sampler.t
+       and type t := Raw_context.t
 end

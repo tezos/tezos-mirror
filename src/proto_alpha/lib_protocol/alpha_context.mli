@@ -2440,6 +2440,25 @@ module Receipt : sig
   val group_balance_updates : balance_updates -> balance_updates tzresult
 end
 
+module Consensus_key : sig
+  type pk = {
+    delegate : Signature.Public_key_hash.t;
+    consensus_pk : Signature.Public_key.t;
+    consensus_pkh : Signature.Public_key_hash.t;
+  }
+
+  type t = {
+    delegate : Signature.Public_key_hash.t;
+    consensus_pkh : Signature.Public_key_hash.t;
+  }
+
+  val zero : t
+
+  val pp : Format.formatter -> t -> unit
+
+  val pkh : pk -> t
+end
+
 (** This module re-exports definitions from {!Delegate_storage},
    {!Delegate_missed_endorsements_storage},
    {!Delegate_slashed_deposits_storage}, {!Delegate_cycles}. *)
@@ -2533,7 +2552,8 @@ module Delegate : sig
     context -> public_key_hash -> Cycle.t tzresult Lwt.t
 
   module Consensus_key : sig
-    val active_pubkey : context -> public_key_hash -> public_key tzresult Lwt.t
+    val active_pubkey :
+      context -> public_key_hash -> Consensus_key.pk tzresult Lwt.t
 
     val pending_updates :
       context ->
@@ -4478,13 +4498,10 @@ module Stake_distribution : sig
     context ->
     Level.t ->
     round:Round.t ->
-    (context * Slot.t * (public_key * public_key_hash)) tzresult Lwt.t
+    (context * Slot.t * Consensus_key.pk) tzresult Lwt.t
 
   val slot_owner :
-    context ->
-    Level.t ->
-    Slot.t ->
-    (context * (public_key * public_key_hash)) tzresult Lwt.t
+    context -> Level.t -> Slot.t -> (context * Consensus_key.pk) tzresult Lwt.t
 end
 
 (** This module re-exports definitions from {!Commitment_repr} and,
@@ -4663,6 +4680,7 @@ module Consensus : sig
        and type 'a slot_map := 'a Slot.Map.t
        and type slot_set := Slot.Set.t
        and type round := Round.t
+       and type consensus_pk := Consensus_key.pk
 
   (** [store_endorsement_branch context branch] sets the "endorsement branch"
       (see {!Storage.Tenderbake.Endorsement_branch} to [branch] in both the disk

@@ -1014,13 +1014,15 @@ let successful_manager_operation_result_encoding :
 type 'kind contents_result =
   | Preendorsement_result : {
       balance_updates : Receipt.balance_updates;
-      delegate : Signature.Public_key_hash.t;
+      delegate : Signature.public_key_hash;
+      consensus_key : Signature.public_key_hash;
       preendorsement_power : int;
     }
       -> Kind.preendorsement contents_result
   | Endorsement_result : {
       balance_updates : Receipt.balance_updates;
-      delegate : Signature.Public_key_hash.t;
+      delegate : Signature.public_key_hash;
+      consensus_key : Signature.public_key_hash;
       endorsement_power : int;
     }
       -> Kind.endorsement contents_result
@@ -1194,10 +1196,11 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.preendorsement_case;
         encoding =
-          obj3
+          obj4
             (dft "balance_updates" Receipt.balance_updates_encoding [])
             (req "delegate" Signature.Public_key_hash.encoding)
-            (req "preendorsement_power" int31);
+            (req "preendorsement_power" int31)
+            (req "consensus_key" Signature.Public_key_hash.encoding);
         select =
           (function
           | Contents_result (Preendorsement_result _ as op) -> Some op
@@ -1209,12 +1212,13 @@ module Encoding = struct
         proj =
           (function
           | Preendorsement_result
-              {balance_updates; delegate; preendorsement_power} ->
-              (balance_updates, delegate, preendorsement_power));
+              {balance_updates; delegate; consensus_key; preendorsement_power}
+            ->
+              (balance_updates, delegate, preendorsement_power, consensus_key));
         inj =
-          (fun (balance_updates, delegate, preendorsement_power) ->
+          (fun (balance_updates, delegate, preendorsement_power, consensus_key) ->
             Preendorsement_result
-              {balance_updates; delegate; preendorsement_power});
+              {balance_updates; delegate; consensus_key; preendorsement_power});
       }
 
   let endorsement_case =
@@ -1222,10 +1226,11 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.endorsement_case;
         encoding =
-          obj3
+          obj4
             (dft "balance_updates" Receipt.balance_updates_encoding [])
             (req "delegate" Signature.Public_key_hash.encoding)
-            (req "endorsement_power" int31);
+            (req "endorsement_power" int31)
+            (req "consensus_key" Signature.Public_key_hash.encoding);
         select =
           (function
           | Contents_result (Endorsement_result _ as op) -> Some op | _ -> None);
@@ -1235,11 +1240,13 @@ module Encoding = struct
           | _ -> None);
         proj =
           (function
-          | Endorsement_result {balance_updates; delegate; endorsement_power} ->
-              (balance_updates, delegate, endorsement_power));
+          | Endorsement_result
+              {balance_updates; delegate; consensus_key; endorsement_power} ->
+              (balance_updates, delegate, endorsement_power, consensus_key));
         inj =
-          (fun (balance_updates, delegate, endorsement_power) ->
-            Endorsement_result {balance_updates; delegate; endorsement_power});
+          (fun (balance_updates, delegate, endorsement_power, consensus_key) ->
+            Endorsement_result
+              {balance_updates; delegate; consensus_key; endorsement_power});
       }
 
   let dal_slot_availability_case =
@@ -2870,8 +2877,8 @@ let operation_data_and_metadata_encoding =
        ]
 
 type block_metadata = {
-  proposer : Signature.Public_key_hash.t;
-  baker : Signature.Public_key_hash.t;
+  proposer : Consensus_key.t;
+  baker : Consensus_key.t;
   level_info : Level.t;
   voting_period_info : Voting_period.info;
   nonce_hash : Nonce_hash.t option;
@@ -2888,8 +2895,9 @@ let block_metadata_encoding =
   def "block_header.alpha.metadata"
   @@ conv
        (fun {
-              proposer;
-              baker;
+              proposer =
+                {delegate = proposer; consensus_pkh = proposer_active_key};
+              baker = {delegate = baker; consensus_pkh = baker_active_key};
               level_info;
               voting_period_info;
               nonce_hash;
@@ -2909,7 +2917,10 @@ let block_metadata_encoding =
              balance_updates,
              liquidity_baking_toggle_ema,
              implicit_operations_results ),
-           (consumed_gas, dal_slot_availability) ))
+           ( proposer_active_key,
+             baker_active_key,
+             consumed_gas,
+             dal_slot_availability ) ))
        (fun ( ( proposer,
                 baker,
                 level_info,
@@ -2919,10 +2930,13 @@ let block_metadata_encoding =
                 balance_updates,
                 liquidity_baking_toggle_ema,
                 implicit_operations_results ),
-              (consumed_gas, dal_slot_availability) ) ->
+              ( proposer_active_key,
+                baker_active_key,
+                consumed_gas,
+                dal_slot_availability ) ) ->
          {
-           proposer;
-           baker;
+           proposer = {delegate = proposer; consensus_pkh = proposer_active_key};
+           baker = {delegate = baker; consensus_pkh = baker_active_key};
            level_info;
            voting_period_info;
            nonce_hash;
@@ -2948,10 +2962,11 @@ let block_metadata_encoding =
              (req
                 "implicit_operations_results"
                 (list successful_manager_operation_result_encoding)))
-          (obj2
+          (obj4
+             (req "proposer_consensus_key" Signature.Public_key_hash.encoding)
+             (req "baker_consensus_key" Signature.Public_key_hash.encoding)
              (req "consumed_milligas" Gas.Arith.n_fp_encoding)
              (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3119
-
                 This varopt is here while the DAL is behind a feature
                 flag. This should be replaced by a required field once
                 the feature flag will be activated. *)

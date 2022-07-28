@@ -60,13 +60,15 @@ and packed_contents_result_list =
 and 'kind contents_result =
   | Preendorsement_result : {
       balance_updates : Receipt.balance_updates;
-      delegate : Signature.Public_key_hash.t;
+      delegate : Signature.public_key_hash;
+      consensus_key : Signature.public_key_hash;
       preendorsement_power : int;
     }
       -> Kind.preendorsement contents_result
   | Endorsement_result : {
       balance_updates : Receipt.balance_updates;
-      delegate : Signature.Public_key_hash.t;
+      delegate : Signature.public_key_hash;
+      consensus_key : Signature.public_key_hash;
       endorsement_power : int;
     }
       -> Kind.endorsement contents_result
@@ -334,8 +336,8 @@ val kind_equal_list :
   ('kind, 'kind2) eq option
 
 type block_metadata = {
-  proposer : Signature.Public_key_hash.t;
-  baker : Signature.Public_key_hash.t;
+  proposer : Consensus_key.t;
+  baker : Consensus_key.t;
   level_info : Level.t;
   voting_period_info : Voting_period.info;
   nonce_hash : Nonce_hash.t option;

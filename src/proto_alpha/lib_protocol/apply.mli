@@ -47,23 +47,23 @@ type mode =
   | Application of {
       block_header : Block_header.t;
       fitness : Fitness.t;
-      payload_producer : public_key_hash;
-      block_producer : public_key_hash;
+      payload_producer : Consensus_key.t;
+      block_producer : Consensus_key.t;
       predecessor_level : Level.t;
       predecessor_round : Round.t;
     }
   | Partial_application of {
       block_header : Block_header.t;
       fitness : Fitness.t;
-      payload_producer : public_key_hash;
-      block_producer : public_key_hash;
+      payload_producer : Consensus_key.t;
+      block_producer : Consensus_key.t;
       predecessor_level : Level.t;
       predecessor_round : Round.t;
     }
   | Full_construction of {
       predecessor : Block_hash.t;
-      payload_producer : public_key_hash;
-      block_producer : public_key_hash;
+      payload_producer : Consensus_key.t;
+      block_producer : Consensus_key.t;
       block_data_contents : Block_header.contents;
       round : Round.t;
       predecessor_level : Level.t;

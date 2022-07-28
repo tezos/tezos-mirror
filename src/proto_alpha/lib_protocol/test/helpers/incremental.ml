@@ -74,7 +74,7 @@ let set_alpha_ctxt st ctxt =
 let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
     ?(policy = Block.By_round 0) (predecessor : Block.t) =
   Block.get_next_baker ~policy predecessor
-  >>=? fun (delegate, round, real_timestamp) ->
+  >>=? fun (delegate, _consensus_key, round, real_timestamp) ->
   Account.find delegate >>=? fun delegate ->
   Round.of_int round |> Environment.wrap_tzresult >>?= fun payload_round ->
   let timestamp = Option.value ~default:real_timestamp timestamp in

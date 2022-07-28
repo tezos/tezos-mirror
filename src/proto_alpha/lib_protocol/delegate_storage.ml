@@ -247,17 +247,3 @@ let delegated_balance ctxt delegate =
   staking_balance ctxt delegate >>=? fun staking_balance ->
   full_balance ctxt delegate >>=? fun self_staking_balance ->
   Lwt.return Tez_repr.(staking_balance -? self_staking_balance)
-
-module Migration_from_Kathmandu = struct
-  let update_delegate ctxt pkh =
-    let open Lwt_tzresult_syntax in
-    let* pk = Contract_manager_storage.get_manager_key ctxt pkh in
-    let* ctxt = Delegate_consensus_key.init ctxt pkh pk in
-    return ctxt
-
-  let update ctxt =
-    let open Lwt_tzresult_syntax in
-    let*! delegates = Storage.Delegates.elements ctxt in
-    let* ctxt = List.fold_left_es update_delegate ctxt delegates in
-    return ctxt
-end
