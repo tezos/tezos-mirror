@@ -145,19 +145,20 @@ let get_shard store slot_header shard_id =
   let*? share = decode_share share in
   return Cryptobox.{index = shard_id; share}
 
-let check_shards shards =
+let check_shards initial_constants shards =
   let open Result_syntax in
   if shards = [] then fail [Slot_not_found]
   else if
-    Compare.List_length_with.(shards = Cryptobox.Constants.number_of_shards)
+    Compare.List_length_with.(
+      shards = initial_constants.Cryptobox.number_of_shards)
   then Ok ()
   else fail [Missing_shards]
 
-let get_slot cb_constants store slot_header =
+let get_slot initial_constants dal_constants store slot_header =
   let open Lwt_result_syntax in
   let slot_header = Cryptobox.Commitment.to_b58check slot_header in
   let*! shards = Store.list store [slot_header] in
-  let*? () = check_shards shards in
+  let*? () = check_shards initial_constants shards in
   let* shards =
     List.fold_left_es
       (fun shards (i, tree) ->
@@ -176,12 +177,12 @@ let get_slot cb_constants store slot_header =
       shards
   in
   let*? polynomial =
-    match Cryptobox.polynomial_from_shards cb_constants shards with
+    match Cryptobox.polynomial_from_shards dal_constants shards with
     | Ok p -> Ok p
     | Error (`Invert_zero msg | `Not_enough_shards msg) ->
         Error [Merging_failed msg]
   in
-  let slot = Cryptobox.polynomial_to_bytes cb_constants polynomial in
+  let slot = Cryptobox.polynomial_to_bytes dal_constants polynomial in
   let*! () =
     Event.(
       emit fetched_slot (Bytes.length slot, Cryptobox.IntMap.cardinal shards))
@@ -205,7 +206,7 @@ module Utils = struct
     in
     Bytes.sub b 0 (Bytes.length b - !len)
 
-  let fill_x00 b =
+  let fill_x00 slot_size b =
     let len = Bytes.length b in
-    Bytes.extend b 0 (Cryptobox.Constants.slot_size - len)
+    Bytes.extend b 0 (slot_size - len)
 end

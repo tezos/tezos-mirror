@@ -95,3 +95,28 @@ let fetched_slot =
     ~level:Notice
     ("size", Data_encoding.int31)
     ("shards", Data_encoding.int31)
+
+let layer1_node_new_head =
+  declare_2
+    ~section
+    ~name:"dal_node_layer_1_new_head"
+    ~msg:"Head of layer 1's node updated to {hash} at level {level}"
+    ~level:Notice
+    ("hash", Block_hash.encoding)
+    ("level", Data_encoding.int32)
+
+let layer1_node_tracking_started =
+  declare_0
+    ~section
+    ~name:"dal_node_layer_1_start_tracking"
+    ~msg:"Started tracking layer 1's node"
+    ~level:Notice
+    ()
+
+let protocol_plugin_resolved =
+  declare_1
+    ~section
+    ~name:"dal_node_pluging_resolved"
+    ~msg:"Resolved plugin on protocol {proto_hash}"
+    ~level:Notice
+    ("proto_hash", Data_encoding.string)

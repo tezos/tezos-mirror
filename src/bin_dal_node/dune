@@ -14,13 +14,18 @@
   tezos-client-commands
   tezos-rpc-http
   tezos-rpc-http-server
+  tezos-protocol-updater
   tezos-rpc-http-client-unix
   tezos-stdlib-unix
   tezos-stdlib
+  tezos_dal_node_lib
   tezos-crypto-dal
   irmin-pack
   irmin-pack.unix
-  irmin)
+  irmin
+  (select void_for_linking-tezos-dal-alpha from
+   (tezos-dal-alpha -> void_for_linking-tezos-dal-alpha.empty)
+   (-> void_for_linking-tezos-dal-alpha.empty)))
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp))
@@ -32,6 +37,10 @@
   -open Tezos_client_commands
   -open Tezos_rpc_http
   -open Tezos_rpc_http_server
+  -open Tezos_protocol_updater
   -open Tezos_rpc_http_client_unix
   -open Tezos_stdlib_unix
-  -open Tezos_stdlib))
+  -open Tezos_stdlib
+  -open Tezos_dal_node_lib))
+
+(rule (action (progn (write-file void_for_linking-tezos-dal-alpha.empty ""))))
