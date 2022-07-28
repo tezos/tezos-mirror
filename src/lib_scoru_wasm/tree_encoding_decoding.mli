@@ -192,9 +192,16 @@ module type S = sig
   (** [raw key] is an encoder for bytes under the given [key]. *)
   val raw : key -> bytes t
 
-  (** [value key enc] creates an encoder under the given [key] using the
-      provided data-encoding [enc] for encoding/decoding values. *)
-  val value : key -> 'a Data_encoding.t -> 'a t
+  (** [optional key encoding] returns an encoder that uses [encoding]
+      for encoding values, but does not fail if the [key] is
+      absent. *)
+  val optional : key -> 'a Data_encoding.t -> 'a option t
+
+  (** [value ?default key enc] creates an encoder under the given
+      [key] using the provided data-encoding [enc] for
+      encoding/decoding values, and using [default] as a fallback when
+      decoding in case the [key] is absent from the tree. *)
+  val value : ?default:'a -> key -> 'a Data_encoding.t -> 'a t
 
   (** [value_option key enc] creates an encoder for optional values under the
       given [key] using the provided data-encoding [enc]. Note that the value is
@@ -239,8 +246,11 @@ module type S = sig
       encoding the value of a field [tag]. The encoder searches through the list
       of cases for a matching branch. When a matching branch is found, it uses
       its embedded encoder for the value. This function is used for constructing
-      encoders for sum-types. *)
-  val tagged_union : 'tag t -> ('tag, 'a) case list -> 'a t
+      encoders for sum-types.
+
+      The [default] labeled argument can be provided to have a
+      fallback in case the value is missing from the tree. *)
+  val tagged_union : ?default:'a -> 'tag t -> ('tag, 'a) case list -> 'a t
 
   (** [option enc] lifts the given encoding [enc] to one that can encode
       optional values. *)

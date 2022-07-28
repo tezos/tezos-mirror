@@ -27,7 +27,7 @@
     -------
     Component:    Tree_encoding_decoding
     Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "$Encodings^"
+                    -- test "^Encodings$"
     Subject:      Encoding tests for the tezos-scoru-wasm library
 *)
 
@@ -84,12 +84,41 @@ let test_encode_decode enc value f =
   let*! value' = Merklizer.decode enc tree in
   f value'
 
+let test_decode_encode_decode tree enc f =
+  let open Lwt_syntax in
+  let* value = Merklizer.decode enc tree in
+  let* tree = Merklizer.encode enc value tree in
+  let* value' = Merklizer.decode enc tree in
+  f value value'
+
 let encode_decode enc value = test_encode_decode enc value Lwt.return
+
+let decode_encode_decode tree enc =
+  test_decode_encode_decode tree enc (fun x y -> Lwt.return (x, y))
+
+let assert_value tree enc v =
+  let open Lwt_result_syntax in
+  let*! v' = Merklizer.decode enc tree in
+  assert (v = v') ;
+  return_unit
+
+let assert_missing_value tree key =
+  let open Lwt_result_syntax in
+  let*! candidate = Tree.find tree key in
+  match candidate with
+  | None -> return_unit
+  | Some _ -> failwith "value should be missing"
 
 let assert_round_trip enc value equal =
   let open Lwt_syntax in
   let* value' = encode_decode enc value in
   let open Lwt_result_syntax in
+  assert (equal value' value) ;
+  return_unit
+
+let assert_decode_round_trip tree enc equal =
+  let open Lwt_result_syntax in
+  let*! value, value' = decode_encode_decode tree enc in
   assert (equal value' value) ;
   return_unit
 
@@ -123,36 +152,52 @@ type contact =
   | Address of {street : string; number : int}
   | No_address
 
-let test_tagged_union () =
+let contact_enc ?default () =
   let open Merklizer in
+  tagged_union
+    ?default
+    (value [] Data_encoding.string)
+    [
+      case
+        "Email"
+        (value [] Data_encoding.string)
+        (function Email s -> Some s | _ -> None)
+        (fun s -> Email s);
+      case
+        "Address"
+        (tup2
+           ~flatten:false
+           (value ["street"] Data_encoding.string)
+           (value ["number"] Data_encoding.int31))
+        (function
+          | Address {street; number} -> Some (street, number) | _ -> None)
+        (fun (street, number) -> Address {street; number});
+      case
+        "No Address"
+        (value [] Data_encoding.unit)
+        (function No_address -> Some () | _ -> None)
+        (fun () -> No_address);
+    ]
+
+let test_tagged_union () =
   let open Lwt_result_syntax in
-  let enc =
-    tagged_union
-      (value [] Data_encoding.string)
-      [
-        case
-          "Email"
-          (value [] Data_encoding.string)
-          (function Email s -> Some s | _ -> None)
-          (fun s -> Email s);
-        case
-          "Address"
-          (tup2
-             ~flatten:false
-             (value ["street"] Data_encoding.string)
-             (value ["number"] Data_encoding.int31))
-          (function
-            | Address {street; number} -> Some (street, number) | _ -> None)
-          (fun (street, number) -> Address {street; number});
-        case
-          "No Address"
-          (value [] Data_encoding.unit)
-          (function No_address -> Some () | _ -> None)
-          (fun () -> No_address);
-      ]
-  in
+  let enc = contact_enc () in
   let* () = assert_round_trip enc No_address Stdlib.( = ) in
   let* () = assert_round_trip enc (Email "foo@bar.com") Stdlib.( = ) in
+  let* () =
+    assert_round_trip
+      enc
+      (Address {street = "Main Street"; number = 10})
+      Stdlib.( = )
+  in
+  return_unit
+
+let test_tagged_union_default () =
+  let open Lwt_result_syntax in
+  let enc = contact_enc ~default:No_address () in
+  let*! empty_tree = empty_tree () in
+  let* () = assert_value empty_tree enc No_address in
+  let* () = assert_round_trip enc No_address Stdlib.( = ) in
   let* () =
     assert_round_trip
       enc
@@ -315,6 +360,25 @@ let test_value_option () =
   let* () = assert_round_trip enc None Stdlib.( = ) in
   return_unit
 
+let test_value_default () =
+  let open Merklizer in
+  let open Lwt_result_syntax in
+  let*! tree = empty_tree () in
+  let enc = value ~default:42 [] Data_encoding.int31 in
+  assert_value tree enc 42
+
+let test_optional () =
+  let open Merklizer in
+  let open Lwt_result_syntax in
+  let key = [] in
+  let enc = optional key Data_encoding.int31 in
+  let*! tree = empty_tree () in
+  let*! tree = Merklizer.encode enc (Some 0) tree in
+  let* () = assert_value tree enc (Some 0) in
+  let*! tree = Merklizer.encode enc None tree in
+  let* () = assert_missing_value tree key in
+  return_unit
+
 type cyclic = {name : string; self : unit -> cyclic}
 
 let test_with_self_ref () =
@@ -346,6 +410,7 @@ let tests =
     tztest "Raw" `Quick test_raw;
     tztest "Convert" `Quick test_conv;
     tztest "Tagged-union" `Quick test_tagged_union;
+    tztest "Tagged-union ~default" `Quick test_tagged_union_default;
     tztest "Lazy mapping" `Quick test_lazy_mapping;
     tztest
       "Add element to decoded empty map"
@@ -356,5 +421,7 @@ let tests =
     tztest "Tuples" `Quick test_tuples;
     tztest "Option" `Quick test_option;
     tztest "Value Option" `Quick test_value_option;
+    tztest "Value ~default" `Quick test_value_default;
+    tztest "Optional" `Quick test_optional;
     tztest "Self ref" `Quick test_with_self_ref;
   ]

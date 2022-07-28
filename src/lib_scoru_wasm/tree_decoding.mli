@@ -54,13 +54,26 @@ module type S = sig
   *)
   val raw : key -> bytes t
 
-  (** [value key data_encoding] retrieves the value at a given [key] by decoding
-      its raw value using the provided [data_encoding].
+  (** [optional key data_encoding] tries to retrieve the value at a
+      given [key] by decoding its raw value using the provided
+      [data_encoding], or return [None] if [key] is missing.
 
-      @raises Key_not_found when the requested key is not presented
       @raises Decode_error when decoding of the value fails
   *)
-  val value : key -> 'a Data_encoding.t -> 'a t
+  val optional : key -> 'a Data_encoding.t -> 'a option t
+
+  (** [value ?default key data_encoding] retrieves the value at a
+      given [key] by decoding its raw value using the provided
+      [data_encoding].
+
+      The [default] labeled argument can be provided to specify a
+      fallback value for when the key is absent from the tree.
+
+      @raises Key_not_found when the requested key is not presented
+      and the [default] argument is omitted.
+      @raises Decode_error when decoding of the value fails
+  *)
+  val value : ?default:'a -> key -> 'a Data_encoding.t -> 'a t
 
   (** [scope key decoder] applies a tree decoder for a provided [key].
 
@@ -98,15 +111,21 @@ module type S = sig
       an [Lwt] value. *)
   val case_lwt : 'tag -> 'b t -> ('b -> 'a Lwt.t) -> ('tag, 'a) case
 
-  (** [tagged_union tag_dec cases] returns a decoder that use [tag_dec] for
-      decoding the value of a field [tag]. The decoder searches through the list
-      of cases for a matching branch. When a matching branch is found, it uses
-      its embedded decoder for the value. This function is used for constructing
-      decoders for sum-types.
+  (** [tagged_union ?default tag_dec cases] returns a decoder that use
+      [tag_dec] for decoding the value of a field [tag]. The decoder
+      searches through the list of cases for a matching branch. When a
+      matching branch is found, it uses its embedded decoder for the
+      value. This function is used for constructing decoders for
+      sum-types.
+
+      [default] is an optional labeled argument that can be provided
+      in order to have a fallback to use in case the tag is absent
+      from the tree (which means, the value has not yet been
+      initialized in the tree).
 
       If an insufficient list of cases are provided, the resulting encoder may
       fail with a [No_tag_matched] error when [run].  *)
-  val tagged_union : 'tag t -> ('tag, 'a) case list -> 'a t
+  val tagged_union : ?default:'a -> 'tag t -> ('tag, 'a) case list -> 'a t
 
   (** Syntax module for the {!Tree_decoding}. This is intended to be opened
       locally in functions. Within the scope of this module, the code can
