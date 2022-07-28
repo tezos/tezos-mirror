@@ -67,7 +67,7 @@ module type S = sig
   (** Samplers for random Michelson types. *)
   module Random_type : sig
     (** [m_type ~size] samples a type containing exactly [size] constructors. *)
-    val m_type : size:int -> Script_ir_translator.ex_ty sampler
+    val m_type : size:int -> Script_typed_ir.ex_ty sampler
 
     (** [m_comparable_type ~size] samples a comparable type containing
         exactly [size] constructors. *)

@@ -44,7 +44,7 @@ val michelson_type_list_to_ex_stack_ty :
 
     @raise Type_helpers_error if an error arises during parsing. *)
 val michelson_type_to_ex_ty :
-  Alpha_context.Script.expr -> Alpha_context.t -> Script_ir_translator.ex_ty
+  Alpha_context.Script.expr -> Alpha_context.t -> Script_typed_ir.ex_ty
 
 (** [stack_type_to_michelson_type_list] converts a Mikhailsky stack type
     to a stack represented as a list of Micheline expressions, each
@@ -54,5 +54,4 @@ val michelson_type_to_ex_ty :
 val stack_type_to_michelson_type_list : Type.Stack.t -> Script_repr.expr list
 
 (** [base_type_to_ex_ty] converts a Mikhailsky type to a Michelson one. *)
-val base_type_to_ex_ty :
-  Type.Base.t -> Alpha_context.t -> Script_ir_translator.ex_ty
+val base_type_to_ex_ty : Type.Base.t -> Alpha_context.t -> Script_typed_ir.ex_ty

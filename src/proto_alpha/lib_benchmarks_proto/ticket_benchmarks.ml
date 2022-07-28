@@ -183,7 +183,6 @@ let ticket_ty =
    This is a worst case type for [type_has_tickets], though nested
    unions, nested maps or nested lists would be just as bad. *)
 let rec dummy_type_generator ~rng_state size =
-  let open Script_ir_translator in
   let open Script_typed_ir in
   let ticket_or_int =
     if Base_samplers.uniform_bool rng_state then Ex_ty ticket_ty

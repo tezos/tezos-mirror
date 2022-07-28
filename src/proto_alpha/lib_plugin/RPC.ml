@@ -123,7 +123,7 @@ module Registration = struct
 end
 
 let unparsing_mode_encoding =
-  let open Script_ir_translator in
+  let open Script_ir_unparser in
   let open Data_encoding in
   union
     ~tag_size:`Uint8
@@ -468,7 +468,7 @@ module Scripts = struct
   end
 
   module type UNPARSING_MODE = sig
-    val unparsing_mode : Script_ir_translator.unparsing_mode
+    val unparsing_mode : Script_ir_unparser.unparsing_mode
   end
 
   module Traced_interpreter (Unparsing_mode : UNPARSING_MODE) = struct
@@ -556,7 +556,7 @@ module Scripts = struct
     >>?= fun (Ex_ty exp_ty, ctxt) ->
     trace_eval
       (fun () ->
-        let exp_ty = Script_ir_translator.serialize_ty_for_error exp_ty in
+        let exp_ty = Script_ir_unparser.serialize_ty_for_error exp_ty in
         Script_tc_errors.Ill_typed_data (None, data, exp_ty))
       (let allow_forged =
          true
@@ -1451,7 +1451,7 @@ module Scripts = struct
           (Micheline.root script)
         >|=? fun (normalized, _ctxt) -> Micheline.strip_locations normalized) ;
     Registration.register0 ~chunked:true S.normalize_type (fun ctxt () typ ->
-        let open Script_ir_translator in
+        let open Script_typed_ir in
         let ctxt = Gas.set_unlimited ctxt in
         (* Unfortunately, Script_ir_translator.parse_any_ty is not exported *)
         Script_ir_translator.parse_ty

@@ -79,7 +79,7 @@ end = struct
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
         let ex_ty = Type_helpers.michelson_type_to_ex_ty michelson_type ctxt in
         match ex_ty with
-        | Script_ir_translator.Ex_ty ty -> (
+        | Script_typed_ir.Ex_ty ty -> (
             match
               Lwt_main.run
                 (Script_ir_translator.parse_data
@@ -144,7 +144,7 @@ module Type_size_benchmark : Tezos_benchmark.Benchmark.S = struct
 
   let models = [(model_name, size_based_model name)]
 
-  let type_size_benchmark (Script_ir_translator.Ex_ty ty) =
+  let type_size_benchmark (Script_typed_ir.Ex_ty ty) =
     let open Script_typed_ir_size.Internal_for_tests in
     let open Cache_memory_helpers in
     let size = Nodes.(to_int (fst (ty_size ty))) in

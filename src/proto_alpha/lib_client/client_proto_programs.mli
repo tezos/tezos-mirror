@@ -35,7 +35,7 @@ module Program :
 (* Parameters shared by both simulations (views, and contracts). *)
 type simulation_params = {
   input : Michelson_v1_parser.parsed;
-  unparsing_mode : Script_ir_translator.unparsing_mode;
+  unparsing_mode : Script_ir_unparser.unparsing_mode;
   now : Script_timestamp.t option;
   level : Script_int.n Script_int.num option;
   source : Contract.t option;

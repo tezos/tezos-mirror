@@ -559,9 +559,9 @@ let unparsing_mode_parameter =
       return ["Readable"; "Optimized"; "Optimized_legacy"])
     (fun _cctxt s ->
       match s with
-      | "Readable" -> return Script_ir_translator.Readable
-      | "Optimized" -> return Script_ir_translator.Optimized
-      | "Optimized_legacy" -> return Script_ir_translator.Optimized_legacy
+      | "Readable" -> return Script_ir_unparser.Readable
+      | "Optimized" -> return Script_ir_unparser.Optimized
+      | "Optimized_legacy" -> return Script_ir_unparser.Optimized_legacy
       | _ -> failwith "Unknown unparsing mode %s" s)
 
 let unparsing_mode_arg ~default =

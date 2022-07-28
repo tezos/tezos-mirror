@@ -42,7 +42,7 @@
    careful not to accidentally quantify 'a universally, that is "for all 'a,
    'a ty exists", otherwise you'll get an annoying error about 'a trying to escape
    it's scope. We do this by hiding 'a in an existential type. This is what
-   ex_comparable_ty, ex_ty, ex_stack_ty, etc. do.
+    ex_comparable_ty, ex_ty, ex_stack_ty, etc. do.
 
    2. A set of functions dealing with high-level Michelson types:
    This module also provides functions for interacting with the list, map,
@@ -63,14 +63,13 @@
 (** {1 Michelson Existential Witness types} *)
 open Alpha_context
 
+open Script_typed_ir
 open Script_tc_errors
 
 type ('ta, 'tb) eq = Eq : ('same, 'same) eq
 
 type ex_comparable_ty =
   | Ex_comparable_ty : 'a Script_typed_ir.comparable_ty -> ex_comparable_ty
-
-type ex_ty = Ex_ty : ('a, _) Script_typed_ir.ty -> ex_ty
 
 type ex_parameter_ty_and_entrypoints =
   | Ex_parameter_ty_and_entrypoints : {
@@ -158,14 +157,6 @@ type ('a, 's) judgement =
 val close_descr :
   ('a, 'b, 'c, 'd) descr -> ('a, 'b, 'c, 'd) Script_typed_ir.kdescr
 
-(** Flag that drives unparsing of typed values to nodes.
-    - [Optimized_legacy] must be kept backward-compatible in order to compute
-      valid hashes (of big map keys).
-    - [Optimized] may be used as long as the result can be read by parse_data.
-    - [Readable] produces with [string] values instead of [bytes] when feasible.
-*)
-type unparsing_mode = Optimized | Readable | Optimized_legacy
-
 (* ---- Lists, Sets and Maps ----------------------------------------------- *)
 
 (** {2 High-level Michelson Data Types} *)
@@ -204,22 +195,14 @@ val parse_data :
 (* Unparsing an IR-typed data back into a Micheline node data *)
 val unparse_data :
   context ->
-  unparsing_mode ->
+  Script_ir_unparser.unparsing_mode ->
   ('a, _) Script_typed_ir.ty ->
   'a ->
   (Script.node * context) tzresult Lwt.t
 
-val unparse_comparable_data :
-  loc:'loc ->
-  context ->
-  unparsing_mode ->
-  'a Script_typed_ir.comparable_ty ->
-  'a ->
-  ('loc Script.michelson_node * context) tzresult Lwt.t
-
 val unparse_code :
   context ->
-  unparsing_mode ->
+  Script_ir_unparser.unparsing_mode ->
   Script.node ->
   (Script.node * context) tzresult Lwt.t
 
@@ -303,21 +286,8 @@ val parse_ty :
   Script.node ->
   (ex_ty * context) tzresult
 
-val unparse_ty :
-  loc:'loc ->
-  context ->
-  ('a, _) Script_typed_ir.ty ->
-  ('loc Script.michelson_node * context) tzresult
-
 val parse_toplevel :
   context -> legacy:bool -> Script.expr -> (toplevel * context) tzresult Lwt.t
-
-val unparse_parameter_ty :
-  loc:'loc ->
-  context ->
-  ('a, _) Script_typed_ir.ty ->
-  entrypoints:'a Script_typed_ir.entrypoints ->
-  ('loc Script.michelson_node * context) tzresult
 
 (** High-level function to typecheck a Michelson script. This function is not
     used for validating operations but only for the [typecheck_code] RPC.
@@ -330,8 +300,6 @@ val typecheck_code :
   context ->
   Script.expr ->
   (type_map * context) tzresult Lwt.t
-
-val serialize_ty_for_error : ('a, _) Script_typed_ir.ty -> Script.expr
 
 val parse_code :
   ?type_logger:type_logger ->
@@ -363,7 +331,7 @@ val parse_and_unparse_script_unaccounted :
   context ->
   legacy:bool ->
   allow_forged_in_storage:bool ->
-  unparsing_mode ->
+  Script_ir_unparser.unparsing_mode ->
   normalize_types:bool ->
   Script.t ->
   (Script.t * context) tzresult Lwt.t
@@ -459,7 +427,7 @@ val list_of_big_map_ids : lazy_storage_ids -> Big_map.Id.t list
  *)
 val extract_lazy_storage_diff :
   context ->
-  unparsing_mode ->
+  Script_ir_unparser.unparsing_mode ->
   temporary:bool ->
   to_duplicate:lazy_storage_ids ->
   to_update:lazy_storage_ids ->

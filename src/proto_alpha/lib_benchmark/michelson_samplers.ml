@@ -244,7 +244,7 @@ module type S = sig
   module Michelson_base : Michelson_samplers_base.S
 
   module Random_type : sig
-    val m_type : size:int -> Script_ir_translator.ex_ty sampler
+    val m_type : size:int -> Script_typed_ir.ex_ty sampler
 
     val m_comparable_type :
       size:int -> Script_ir_translator.ex_comparable_ty sampler
@@ -290,7 +290,7 @@ end)
   (* Random generation of Michelson types. *)
   module Random_type = struct
     let type_of_atomic_type_name (at_tn : atomic_type_name) :
-        Script_ir_translator.ex_ty =
+        Script_typed_ir.ex_ty =
       match at_tn with
       | `TString -> Ex_ty string_t
       | `TNat -> Ex_ty nat_t
@@ -333,7 +333,7 @@ end)
       | `TKey -> Ex_comparable_ty key_t
       | `TChain_id -> Ex_comparable_ty chain_id_t
 
-    let rec m_type ~size : Script_ir_translator.ex_ty sampler =
+    let rec m_type ~size : Script_typed_ir.ex_ty sampler =
       let open Script_ir_translator in
       let open M in
       if size <= 0 then Stdlib.failwith "m_type: size <= 0"

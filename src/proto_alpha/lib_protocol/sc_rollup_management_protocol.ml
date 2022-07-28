@@ -59,7 +59,7 @@ let make_internal_inbox_message ctxt ty ~payload ~sender ~source =
   let+ payload, ctxt =
     Script_ir_translator.unparse_data
       ctxt
-      Script_ir_translator.Optimized
+      Script_ir_unparser.Optimized
       ty
       payload
   in

@@ -110,7 +110,7 @@ let workload_to_sparse_vec (trace : t) =
 let data_typechecker_workload ctxt t_kind micheline_node ex_ty =
   let open Protocol in
   match ex_ty with
-  | Script_ir_translator.Ex_ty ty ->
+  | Script_typed_ir.Ex_ty ty ->
       let ctxt = Gas_helpers.set_limit ctxt in
       Lwt_main.run
         ( Script_ir_translator.parse_data

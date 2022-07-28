@@ -433,7 +433,7 @@ let apply ctxt gas capture_ty capture lam =
   let ctxt = update_context gas ctxt in
   unparse_data ctxt Optimized capture_ty capture >>=? fun (const_expr, ctxt) ->
   let loc = Micheline.dummy_location in
-  unparse_ty ~loc ctxt capture_ty >>?= fun (ty_expr, ctxt) ->
+  Script_ir_unparser.unparse_ty ~loc ctxt capture_ty >>?= fun (ty_expr, ctxt) ->
   match full_arg_ty with
   | Pair_t (capture_ty, arg_ty, _, _) ->
       let arg_stack_ty = Item_t (arg_ty, Bot_t) in
@@ -483,7 +483,7 @@ let make_transaction_to_tx_rollup (type t) ctxt ~destination ~amount
   unparse_data ctxt Optimized parameters_ty parameters
   >>=? fun (unparsed_parameters, ctxt) ->
   Lwt.return
-    ( Script_ir_translator.unparse_ty ~loc:Micheline.dummy_location ctxt tp
+    ( Script_ir_unparser.unparse_ty ~loc:Micheline.dummy_location ctxt tp
     >>? fun (ty, ctxt) ->
       let unparsed_parameters =
         Micheline.Seq (Micheline.dummy_location, [unparsed_parameters; ty])

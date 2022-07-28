@@ -206,7 +206,7 @@ module Typechecking_data : Benchmark.S = struct
           | Some workload -> workload
         in
         match ex_ty with
-        | Script_ir_translator.Ex_ty ty ->
+        | Script_typed_ir.Ex_ty ty ->
             let closure () =
               match
                 Lwt_main.run
@@ -278,7 +278,7 @@ module Unparsing_data : Benchmark.S = struct
           | Some workload -> workload
         in
         match ex_ty with
-        | Script_ir_translator.Ex_ty ty ->
+        | Script_typed_ir.Ex_ty ty ->
             Script_ir_translator.parse_data
               ctxt
               ~legacy:false
@@ -292,7 +292,7 @@ module Unparsing_data : Benchmark.S = struct
                 Lwt_main.run
                   (Script_ir_translator.unparse_data
                      ctxt
-                     Script_ir_translator.Optimized
+                     Script_ir_unparser.Optimized
                      ty
                      typed)
               with
@@ -570,7 +570,7 @@ module Ty_eq : Benchmark.S = struct
   let models =
     [("size_translator_model", size_model); ("codegen", codegen_model)]
 
-  let ty_eq_benchmark rng_state nodes (ty : Script_ir_translator.ex_ty) =
+  let ty_eq_benchmark rng_state nodes (ty : Script_typed_ir.ex_ty) =
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
         let ctxt = Gas_helpers.set_limit ctxt in
@@ -630,7 +630,6 @@ let () = Registration_helpers.register (module Ty_eq)
    an extra test is performed to determine if the comb type needs to be folded.
 *)
 let rec dummy_type_generator size =
-  let open Script_ir_translator in
   let open Script_typed_ir in
   if size <= 1 then Ex_ty unit_t
   else
@@ -694,7 +693,7 @@ let parse_ty ctxt node =
     ~allow_ticket:true
     node
 
-let unparse_ty ctxt ty = Script_ir_translator.unparse_ty ~loc:(-1) ctxt ty
+let unparse_ty ctxt ty = Script_ir_unparser.unparse_ty ~loc:(-1) ctxt ty
 
 module Parse_type_benchmark : Benchmark.S = struct
   include Parse_type_shared

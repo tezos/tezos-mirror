@@ -35,7 +35,7 @@ open Alpha_context
 let of_ex_token ctxt ~owner
     (Ticket_token.Ex_token {ticketer; contents_type; contents}) =
   let loc = Micheline.dummy_location in
-  Script_ir_translator.unparse_ty ~loc ctxt contents_type
+  Script_ir_unparser.unparse_ty ~loc ctxt contents_type
   >>?= fun (cont_ty_unstripped, ctxt) ->
   (* We strip the annotations from the content type in order to map
      tickets with the same content type, but with different annotations, to the
@@ -43,10 +43,10 @@ let of_ex_token ctxt ~owner
   Gas.consume ctxt (Script.strip_annotations_cost cont_ty_unstripped)
   >>?= fun ctxt ->
   let ty = Script.strip_annotations cont_ty_unstripped in
-  Script_ir_translator.unparse_comparable_data
+  Script_ir_unparser.unparse_comparable_data
     ~loc
     ctxt
-    Script_ir_translator.Optimized_legacy
+    Script_ir_unparser.Optimized_legacy
     contents_type
     contents
   >>=? fun (contents, ctxt) ->
@@ -59,13 +59,13 @@ let of_ex_token ctxt ~owner
   in
   Script_ir_translator.unparse_data
     ctxt
-    Script_ir_translator.Optimized_legacy
+    Script_ir_unparser.Optimized_legacy
     Script_typed_ir.address_t
     ticketer_address
   >>=? fun (ticketer, ctxt) ->
   Script_ir_translator.unparse_data
     ctxt
-    Script_ir_translator.Optimized_legacy
+    Script_ir_unparser.Optimized_legacy
     Script_typed_ir.address_t
     owner_address
   >>=? fun (owner, ctxt) ->

@@ -157,6 +157,6 @@ val run_view_action :
   action:action ->
   ?payer:Signature.public_key_hash ->
   ?gas:Gas.Arith.integral ->
-  unparsing_mode:Script_ir_translator.unparsing_mode ->
+  unparsing_mode:Script_ir_unparser.unparsing_mode ->
   unit ->
   Script.expr tzresult Lwt.t
