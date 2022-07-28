@@ -189,43 +189,41 @@ let process_head node_ctxt store Layer1.(Head {level; hash = head_hash} as head)
       let*! predecessor = Layer1.predecessor store head in
       let* inbox = State.inbox_of_hash node_ctxt store predecessor in
       let* history = State.history_of_hash node_ctxt store predecessor in
-      let* inbox =
+      let* history, inbox, messages_tree =
         lift
         @@ let*? level = Raw_level.of_int32 level in
            let*! messages_tree = State.find_message_tree store predecessor in
            let*? messages = List.map_e Store.Inbox.Message.serialize messages in
-           let* history, inbox =
-             if messages = [] then return (history, inbox)
-             else
-               let commitment_period =
-                 node_ctxt.protocol_constants.parametric.sc_rollup
-                   .commitment_period_in_blocks |> Int32.of_int
-               in
-               let inbox =
-                 Store.Inbox.refresh_commitment_period
-                   ~commitment_period
-                   ~level
-                   inbox
-               in
-               let* messages_tree, history, inbox =
-                 Store.Inbox.add_messages
-                   store
-                   history
-                   inbox
-                   level
-                   messages
-                   messages_tree
-               in
-               let*! () =
-                 State.set_message_tree store head_hash messages_tree
-               in
-               return (history, inbox)
-           in
-           let*! () = State.add_inbox store head_hash inbox in
-           let*! () = State.add_history store head_hash history in
-           return inbox
+           if messages = [] then return (history, inbox, messages_tree)
+           else
+             let commitment_period =
+               node_ctxt.protocol_constants.parametric.sc_rollup
+                 .commitment_period_in_blocks |> Int32.of_int
+             in
+             let inbox =
+               Store.Inbox.refresh_commitment_period
+                 ~commitment_period
+                 ~level
+                 inbox
+             in
+             let* messages_tree, history, inbox =
+               Store.Inbox.add_messages
+                 store
+                 history
+                 inbox
+                 level
+                 messages
+                 messages_tree
+             in
+             return (history, inbox, Some messages_tree)
       in
-      same_inbox_as_layer_1 node_ctxt head_hash inbox
+      let* () = same_inbox_as_layer_1 node_ctxt head_hash inbox in
+      let*! () =
+        Option.iter_s (State.set_message_tree store head_hash) messages_tree
+      in
+      let*! () = State.add_inbox store head_hash inbox in
+      let*! () = State.add_history store head_hash history in
+      return ()
 
 let inbox_of_hash = State.inbox_of_hash
 
