@@ -122,7 +122,9 @@ module type S = sig
 
   val raw : key -> bytes t
 
-  val value : key -> 'a Data_encoding.t -> 'a t
+  val optional : key -> 'a Data_encoding.t -> 'a option t
+
+  val value : ?default:'a -> key -> 'a Data_encoding.t -> 'a t
 
   val value_option : key -> 'a Data_encoding.t -> 'a option t
 
@@ -145,7 +147,7 @@ module type S = sig
     ('b -> 'a Lwt.t) ->
     ('tag, 'a) case
 
-  val tagged_union : 'tag t -> ('tag, 'a) case list -> 'a t
+  val tagged_union : ?default:'a -> 'tag t -> ('tag, 'a) case list -> 'a t
 
   val option : 'a t -> 'a option t
 
@@ -320,7 +322,8 @@ module Make
 
   let raw key = {encode = E.raw key; decode = D.raw key}
 
-  let value key de = {encode = E.value key de; decode = D.value key de}
+  let value ?default key de =
+    {encode = E.value key de; decode = D.value ?default key de}
 
   let value_option key de = value key (Data_encoding.option de)
 
@@ -400,7 +403,7 @@ module Make
       (fun x -> Option.map Lwt.return @@ probe x)
       (fun x -> Lwt.return @@ extract x)
 
-  let tagged_union {encode; decode} cases =
+  let tagged_union ?default {encode; decode} cases =
     let to_encode_case (Case {tag; delegate; probe; extract = _}) =
       E.case_lwt tag delegate.encode probe
     in
@@ -408,7 +411,14 @@ module Make
       D.case_lwt tag delegate.decode extract
     in
     let encode = E.tagged_union encode (List.map to_encode_case cases) in
-    let decode = D.tagged_union decode (List.map to_decode_case cases) in
+    let decode =
+      D.tagged_union ?default decode (List.map to_decode_case cases)
+    in
+    {encode; decode}
+
+  let optional key encoding =
+    let encode = E.optional key encoding in
+    let decode = D.optional key encoding in
     {encode; decode}
 
   let option enc =

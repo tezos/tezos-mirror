@@ -42,7 +42,9 @@ module type S = sig
 
   val raw : key -> bytes t
 
-  val value : key -> 'a Data_encoding.t -> 'a t
+  val optional : key -> 'a Data_encoding.t -> 'a option t
+
+  val value : ?default:'a -> key -> 'a Data_encoding.t -> 'a t
 
   val scope : key -> 'a t -> 'a t
 
@@ -58,7 +60,7 @@ module type S = sig
 
   val case_lwt : 'tag -> 'b t -> ('b -> 'a Lwt.t) -> ('tag, 'a) case
 
-  val tagged_union : 'tag t -> ('tag, 'a) case list -> 'a t
+  val tagged_union : ?default:'a -> 'tag t -> ('tag, 'a) case list -> 'a t
 
   module Syntax : sig
     val return : 'a -> 'a t
@@ -135,16 +137,24 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
     let+ value = Tree.find tree key in
     match value with Some value -> value | None -> raise (Key_not_found key)
 
-  let value key decoder tree prefix =
+  let optional key decoder tree prefix =
     let open Lwt_syntax in
     let key = prefix key in
     let* value = Tree.find tree key in
     match value with
     | Some value -> (
         match Data_encoding.Binary.of_bytes decoder value with
-        | Ok value -> return value
+        | Ok value -> return_some value
         | Error error -> raise (Decode_error {key; error}))
-    | None -> raise (Key_not_found key)
+    | None -> return_none
+
+  let value ?default key decoder tree prefix =
+    let open Lwt_syntax in
+    let* value = optional key decoder tree prefix in
+    match (value, default) with
+    | Some value, _ -> return value
+    | None, Some default -> return default
+    | None, None -> raise (Key_not_found (prefix key))
 
   let scope key dec tree prefix = dec tree (append_key prefix key)
 
@@ -159,14 +169,28 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
   let case tag decode extract =
     case_lwt tag decode (fun x -> Lwt.return @@ extract x)
 
-  let tagged_union decode_tag cases input_tree prefix =
+  let tagged_union ?default decode_tag cases input_tree prefix =
     let open Lwt_syntax in
-    let* target_tag = scope ["tag"] decode_tag input_tree prefix in
-    (* Search through the cases to find a matching branch. *)
-    cases
-    |> List.find_map (fun (Case {tag; decode; extract}) ->
-           if tag = target_tag then
-             Some (map_lwt extract (scope ["value"] decode) input_tree prefix)
-           else None)
-    |> Option.value_f ~default:(fun _ -> raise No_tag_matched_on_decoding)
+    Lwt.try_bind
+      (fun () -> scope ["tag"] decode_tag input_tree prefix)
+      (fun target_tag ->
+        (* Search through the cases to find a matching branch. *)
+        let candidate =
+          List.find_map
+            (fun (Case {tag; decode; extract}) ->
+              if tag = target_tag then
+                Some
+                  (map_lwt extract (scope ["value"] decode) input_tree prefix)
+              else None)
+            cases
+        in
+        match candidate with
+        | Some case -> case
+        | None -> raise No_tag_matched_on_decoding)
+      (function
+        | Key_not_found _ as exn -> (
+            match default with
+            | Some default -> return default
+            | None -> raise exn)
+        | exn -> raise exn)
 end
