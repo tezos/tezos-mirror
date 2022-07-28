@@ -25,7 +25,7 @@ module Test = struct
   (* Encoding and decoding of Reed-Solomon codes on the erasure channel. *)
   let bench_DAL_crypto_params () =
     (* We take mainnet parameters we divide by [16] to speed up the test. *)
-    let shards_amount = 2048 / 16 in
+    let number_of_shards = 2048 / 16 in
     let slot_size = 1048576 / 16 in
     let segment_size = 4096 / 16 in
     let msg_size = slot_size in
@@ -41,7 +41,7 @@ module Test = struct
             ~redundancy_factor
             ~slot_size
             ~segment_size
-            ~shards_amount
+            ~number_of_shards
         in
         let trusted_setup =
           Dal_cryptobox.srs t
@@ -67,8 +67,8 @@ module Test = struct
           (* Only take half of the buckets *)
           let c_indices =
             random_indices
-              (shards_amount - 1)
-              (shards_amount / redundancy_factor)
+              (number_of_shards - 1)
+              (number_of_shards / redundancy_factor)
             |> Array.of_list
           in
 

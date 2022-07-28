@@ -31,7 +31,7 @@ module Constants = struct
 
   let slot_size = 1048576 (* 1Mb *)
 
-  let shards_amount = 2048
+  let number_of_shards = 2048
 
   let trusted_setup_logarithm_size = 21
 end
@@ -46,4 +46,4 @@ let slot_header_encoding = Commitment.encoding
 
 let init () =
   let open Constants in
-  make ~redundancy_factor ~segment_size ~slot_size ~shards_amount
+  make ~redundancy_factor ~segment_size ~slot_size ~number_of_shards

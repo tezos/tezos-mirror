@@ -11308,7 +11308,7 @@ val make :
   redundancy_factor:int ->
   slot_size:int ->
   segment_size:int ->
-  shards_amount:int ->
+  number_of_shards:int ->
   t
 
 (** A trusted setup. Namely Structured Reference String.

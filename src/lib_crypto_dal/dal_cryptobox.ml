@@ -231,7 +231,7 @@ module Inner = struct
     redundancy_factor : int;
     slot_size : int;
     segment_size : int;
-    shards_amount : int;
+    number_of_shards : int;
     k : int;
     n : int;
     (* k and n are the parameters of the erasure code. *)
@@ -273,15 +273,15 @@ module Inner = struct
       (* n must be at most 2^32, the biggest subgroup of 2^i roots of unity in the
          multiplicative group of Fr, because the FFTs operate on such groups. *)
       invalid_arg "Wrong computed size for n"
-    else if not (is_pow_of_two t.shards_amount && t.n > t.shards_amount) then
-      invalid_arg "Shards not containing at least two elements"
+    else if not (is_pow_of_two t.number_of_shards && t.n > t.number_of_shards)
+    then invalid_arg "Shards not containing at least two elements"
     else ()
   (* Shards must contain at least two elements. *)
 
-  let make ~redundancy_factor ~slot_size ~segment_size ~shards_amount =
+  let make ~redundancy_factor ~slot_size ~segment_size ~number_of_shards =
     let k = 1 lsl Z.(log2up (of_int slot_size / of_int scalar_bytes_amount)) in
     let n = redundancy_factor * k in
-    let shard_size = n / shards_amount in
+    let shard_size = n / number_of_shards in
     let evaluations_log = Z.(log2 (of_int n)) in
     let evaluations_per_proof_log = Z.(log2 (of_int shard_size)) in
     let t =
@@ -289,7 +289,7 @@ module Inner = struct
         redundancy_factor;
         slot_size;
         segment_size;
-        shards_amount;
+        number_of_shards;
         k;
         n;
         domain_k = make_domain k;
@@ -592,14 +592,14 @@ module Inner = struct
      amortized. *)
   let shards_from_polynomial t p =
     let codeword = encode t p in
-    let len_shard = t.n / t.shards_amount in
+    let len_shard = t.n / t.number_of_shards in
     let rec loop i map =
       match i with
-      | i when i = t.shards_amount -> map
+      | i when i = t.number_of_shards -> map
       | _ ->
           let shard = Array.init len_shard (fun _ -> Scalar.(copy zero)) in
           for j = 0 to len_shard - 1 do
-            shard.(j) <- codeword.((t.shards_amount * j) + i)
+            shard.(j) <- codeword.((t.number_of_shards * j) + i)
           done ;
           loop (i + 1) (IntMap.add i shard map)
     in
@@ -621,7 +621,7 @@ module Inner = struct
               | j when j = Array.length arr -> Ok ()
               | _ -> (
                   let c_i = arr.(j) in
-                  let z_i = (t.shards_amount * j) + z_i in
+                  let z_i = (t.number_of_shards * j) + z_i in
                   let x_i = Scalar.pow w (Z.of_int z_i) in
                   let tmp = Evaluations.get eval_a' z_i in
                   Scalar.mul_inplace tmp tmp x_i ;
@@ -648,14 +648,14 @@ module Inner = struct
     else
       (* 1. Computing A(x) = prod_{i=0}^{k-1} (x - w^{z_i}).
          Let w be a primitive nth root of unity and
-         Ω_0 = {w^{shards_amount j}}_{j=0 to (n/shards_amount)-1}
-         be the (n/shards_amount)-th roots of unity and Ω_i = w^i Ω_0.
+         Ω_0 = {w^{number_of_shards j}}_{j=0 to (n/number_of_shards)-1}
+         be the (n/number_of_shards)-th roots of unity and Ω_i = w^i Ω_0.
 
          Together, the Ω_i's form a partition of the subgroup of the n-th roots
-         of unity: 𝕌_n = disjoint union_{i ∈ {0, ..., shards_amount-1}} Ω_i.
+         of unity: 𝕌_n = disjoint union_{i ∈ {0, ..., number_of_shards-1}} Ω_i.
 
          Let Z_j := Prod_{w ∈ Ω_j} (x − w). For a random set of shards
-         S⊆{0, ..., shards_amount-1} of length k/shard_size, we reorganize the
+         S⊆{0, ..., number_of_shards-1} of length k/shard_size, we reorganize the
          product A(x) = Prod_{i=0}^{k-1} (x − w^{z_i}) into
          A(x) = Prod_{j ∈ S} Z_j.
 
@@ -667,7 +667,7 @@ module Inner = struct
          when using other ways of grouping the z_i's into shards.
 
          This also reduces the depth of the recursion tree of the poly_mul
-         function from log(k) to log(shards_amounts), so that the decoding time
+         function from log(k) to log(number_of_shards), so that the decoding time
          reduces from O(k*log^2(k) + n*log(n)) to O(n*log(n)). *)
       let factors =
         IntMap.bindings shards
