@@ -267,17 +267,18 @@ type decode_kont = {
   building_state : building_state;
       (** Accumulated parsed sections, used to build the final module. *)
   module_kont : module_kont;  (** Module continuation. *)
-  stream : stream;  (** Parsed stream. *)
   allocation_state : Ast.allocations;  (** Basic blocks allocated. *)
+  stream_pos : int;
+  stream_name : string;
 }
 
 (** [make_stream filename bytes] returns a new stream to decode. *)
 val make_stream : name:string -> bytes:Chunked_byte_vector.Lwt.t -> stream
 
-(** [module_step kont] takes one step of parsing from a continuation and returns
-   a new continuation. Fails when the contination of the module is [MKStop]
-   since it cannot reduce. *)
-val module_step : decode_kont -> decode_kont Lwt.t
+(** [module_step stream kont] takes one step of parsing from a
+   continuation and returns a new continuation. Fails when the
+   continuation of the module is [MKStop] since it cannot reduce. *)
+val module_step : Chunked_byte_vector.Lwt.t -> decode_kont -> decode_kont Lwt.t
 
 (** [decode ~name ~bytes] decodes a module [name] from its [bytes] encoding.
 
