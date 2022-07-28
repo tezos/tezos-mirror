@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** External processes launched by tests. *)
+(** This module is only available in [tezt], not in [tezt.core] and [tezt.js]. *)
 
 (** A process which was {!spawn}ed. *)
 type t

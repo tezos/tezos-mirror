@@ -25,9 +25,8 @@
 
 (** Tezt (for JavaScript). *)
 
-(** This library is the same as {!Tezt} except that:
-    - there is no [Process] module;
-    - it can be compiled using js_of_ocaml to be run with nodejs. *)
+(** This library is the same as {!Tezt} but for JavaScript.
+    Contrary to {!Tezt}, it does not provide the [Process] module. *)
 
 module Background = Background
 module Base = Base

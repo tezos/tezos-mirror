@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Tezt core library. *)
+(** Tezt. *)
 
 (** Tezt (pronounced "tezty", as in "tasty" with a "z") is a test framework for OCaml.
     It is well suited for writing and executing unit, integration and
@@ -73,6 +73,43 @@
     get the list. See also the
     {{: https://research-development.nomadic-labs.com/announcing-tezt.html } Tezt mini-tutorial}. *)
 
+(** {2 Backends} *)
+
+(** Tezt executables can be compiled to bytecode, native code, or JavaScript.
+    This is reflected by three Dune libraries:
+    - code which is common to all backends is provided by [tezt.core];
+    - the bytecode and native code backends are provided by [tezt];
+    - the JavaScript backend is provided by [tezt.js].
+
+    Function [Test.run] is only available in [tezt] and [tezt.js].
+    In other words, to actually run the tests you have to decide whether
+    to use the JavaScript backend or not.
+
+    The only difference between [tezt] and [tezt.js] is that [tezt.js] does
+    not provide the [Process] module. So the JavaScript backend is not well
+    suited for integration tests. But it does support unit tests and regression tests.
+
+    If you want to run your tests on multiple backends you have to write
+    two executables: one linked with [tezt] and one linked with [tezt.js].
+    To share the code of your tests, you can write your calls to [Test.register]
+    in a library that depends on [tezt.core]. Here is an example of [dune] files:
+    {[
+; Dune file for the library that calls [Test.register].
+(library
+ (name tezts)
+ (libraries tezt.core)
+ (library_flags (:standard -linkall))
+ (flags (:standard) -open Tezt_core -open Tezt_core.Base))
+
+; Dune file for the executable used to run tests in native or bytecode mode.
+(executable (name main) (libraries tezts tezt))
+
+; Dune file for the executable used to run tests using nodejs.
+(executable (name main_js) (modes js) (libraries tezts tezt.js))
+    ]} *)
+
+(** {2 Modules} *)
+
 (** Support for running promises in the background.
 
     Background promises are promises that are not bound.
@@ -100,7 +137,7 @@ module JSON = JSON
 (** Functions for logging messages. *)
 module Log = Log
 
-(** Managing external processes (spawning them, capturing outputs, exit codes, etc). *)
+(** Managing external processes. *)
 module Process = Process
 
 (** Process hooks, in particular for use with regression tests. *)
@@ -119,6 +156,9 @@ module Temp = Temp
 module Test = struct
   include Test
 
-  (** Run registered tests that should be run. *)
+  (** Run registered tests that should be run.
+
+      This function is not available in [tezt.core].
+      It is available in [tezt] and [tezt.js]. *)
   let run = Main.run
 end
