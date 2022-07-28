@@ -144,13 +144,6 @@ val full_balance :
 val delegated_balance :
   Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 
-(** Returns the public key of a registered delegate. Returns the error
-   {!Contract.Unregistered_delegate} if the delegate is not registered.  *)
-val pubkey :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Signature.Public_key.t tzresult Lwt.t
-
 module Migration_from_Kathmandu : sig
   val update : Raw_context.t -> Raw_context.t tzresult Lwt.t
 end

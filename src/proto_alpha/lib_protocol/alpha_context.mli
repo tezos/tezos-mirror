@@ -2532,8 +2532,6 @@ module Delegate : sig
   val last_cycle_before_deactivation :
     context -> public_key_hash -> Cycle.t tzresult Lwt.t
 
-  val pubkey : context -> public_key_hash -> public_key tzresult Lwt.t
-
   module Consensus_key : sig
     val active_pubkey : context -> public_key_hash -> public_key tzresult Lwt.t
 
