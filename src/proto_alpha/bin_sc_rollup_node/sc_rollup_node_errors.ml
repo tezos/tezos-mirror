@@ -25,18 +25,17 @@
 
 open Protocol.Alpha_context
 
-type error += Bad_minimal_fees of string
-
-type error += Commitment_predecessor_should_be_LCC of Sc_rollup.Commitment.t
-
-type error += Unreliable_tezos_node_returning_inconsistent_game
-
 type error +=
   | Cannot_produce_proof of
       Sc_rollup.Inbox.t * Sc_rollup.Inbox.history * Raw_level.t
-
-type error +=
   | Missing_mode_operators of {mode : string; missing_operators : string list}
+  | Bad_minimal_fees of string
+  | Commitment_predecessor_should_be_LCC of Sc_rollup.Commitment.t
+  | Unreliable_tezos_node_returning_inconsistent_game
+  | Inconsistent_inbox of {
+      layer1_inbox : Sc_rollup.Inbox.t;
+      inbox : Sc_rollup.Inbox.t;
+    }
 
 let () =
   register_error_kind
@@ -134,4 +133,27 @@ let () =
           Some (mode, missing_operators)
       | _ -> None)
     (fun (mode, missing_operators) ->
-      Missing_mode_operators {mode; missing_operators})
+      Missing_mode_operators {mode; missing_operators}) ;
+
+  register_error_kind
+    ~id:"internal.inconsistent_inbox"
+    ~title:"Internal error: Rollup node has an inconsistent inbox"
+    ~description:
+      "The rollup node inbox should be the same as the layer 1 inbox."
+    ~pp:(fun ppf (layer1_inbox, inbox) ->
+      Format.fprintf
+        ppf
+        "@[Rollup inbox:@;%a@]@;should be equal to @[Layer1 inbox:@;%a@]"
+        Sc_rollup.Inbox.pp
+        inbox
+        Sc_rollup.Inbox.pp
+        layer1_inbox)
+    `Permanent
+    Data_encoding.(
+      obj2
+        (req "layer1_inbox" Sc_rollup.Inbox.encoding)
+        (req "inbox" Sc_rollup.Inbox.encoding))
+    (function
+      | Inconsistent_inbox {layer1_inbox; inbox} -> Some (layer1_inbox, inbox)
+      | _ -> None)
+    (fun (layer1_inbox, inbox) -> Inconsistent_inbox {layer1_inbox; inbox})
