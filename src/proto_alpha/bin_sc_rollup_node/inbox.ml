@@ -154,6 +154,17 @@ let get_messages Node_context.{l1_ctxt; rollup_address; _} head =
   in
   return (List.rev messages)
 
+let same_inbox_as_layer_1 node_ctxt head_hash inbox =
+  let open Lwt_result_syntax in
+  let head_block = `Hash (head_hash, 0) in
+  let Node_context.{cctxt; rollup_address; _} = node_ctxt in
+  let* layer1_inbox =
+    Plugin.RPC.Sc_rollup.inbox cctxt (cctxt#chain, head_block) rollup_address
+  in
+  fail_unless
+    (Sc_rollup.Inbox.equal layer1_inbox inbox)
+    (Sc_rollup_node_errors.Inconsistent_inbox {layer1_inbox; inbox})
+
 let process_head node_ctxt store Layer1.(Head {level; hash = head_hash} as head)
     =
   let open Lwt_result_syntax in
@@ -175,28 +186,33 @@ let process_head node_ctxt store Layer1.(Head {level; hash = head_hash} as head)
       let*! predecessor = Layer1.predecessor store head in
       let* inbox = State.inbox_of_hash node_ctxt store predecessor in
       let* history = State.history_of_hash node_ctxt store predecessor in
-      lift
-      @@ let*! messages_tree = State.find_message_tree store predecessor in
-         let*? level = Raw_level.of_int32 level in
-         let*? messages = List.map_e Store.Inbox.Message.serialize messages in
-         let* history, inbox =
-           if messages = [] then return (history, inbox)
-           else
-             let* messages_tree, history, inbox =
-               Store.Inbox.add_messages
-                 store
-                 history
-                 inbox
-                 level
-                 messages
-                 messages_tree
-             in
-             let*! () = State.set_message_tree store head_hash messages_tree in
-             return (history, inbox)
-         in
-         let*! () = State.add_inbox store head_hash inbox in
-         let*! () = State.add_history store head_hash history in
-         return_unit
+      let* inbox =
+        lift
+        @@ let*! messages_tree = State.find_message_tree store predecessor in
+           let*? level = Raw_level.of_int32 level in
+           let*? messages = List.map_e Store.Inbox.Message.serialize messages in
+           let* history, inbox =
+             if messages = [] then return (history, inbox)
+             else
+               let* messages_tree, history, inbox =
+                 Store.Inbox.add_messages
+                   store
+                   history
+                   inbox
+                   level
+                   messages
+                   messages_tree
+               in
+               let*! () =
+                 State.set_message_tree store head_hash messages_tree
+               in
+               return (history, inbox)
+           in
+           let*! () = State.add_inbox store head_hash inbox in
+           let*! () = State.add_history store head_hash history in
+           return inbox
+      in
+      same_inbox_as_layer_1 node_ctxt head_hash inbox
 
 let inbox_of_hash = State.inbox_of_hash
 
