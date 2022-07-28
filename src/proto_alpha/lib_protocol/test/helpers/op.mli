@@ -698,3 +698,21 @@ val dal_publish_slot_header :
   Contract.t ->
   Dal.Slot.t ->
   (packed_operation, tztrace) result Lwt.t
+
+(** [zk_rollup_origination ctxt source ~public_parameters ~circuits_info
+    ~init_state ~nb_ops] tries to originate a ZK Rollup. *)
+val zk_rollup_origination :
+  ?force_reveal:bool ->
+  ?counter:Z.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:counter ->
+  Context.t ->
+  Contract.t ->
+  public_parameters:
+    Plonk.Main_protocol.verifier_public_parameters
+    * Plonk.Main_protocol.transcript ->
+  circuits_info:bool Zk_rollup.Account.SMap.t ->
+  init_state:Zk_rollup.State.t ->
+  nb_ops:int ->
+  (Operation.packed * Zk_rollup.t) tzresult Lwt.t
