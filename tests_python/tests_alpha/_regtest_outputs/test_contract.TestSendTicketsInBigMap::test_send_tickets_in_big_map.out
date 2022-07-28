@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestSendTicketsInBigMap::test_send_tickets_in_big_map
 
 Node is bootstrapped.
-Estimated gas: 100129.912 units (will add 100 for safety)
+Estimated gas: 100143.097 units (will add 100 for safety)
 Estimated storage: 10767 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.010319
+    Fee to the baker: ꜩ0.010321
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 100230
+    Gas limit: 100244
     Storage limit: 10787 bytes
     Balance updates:
-      [CONTRACT_HASH] ... -ꜩ0.010319
-      payload fees(the block proposer) ....... +ꜩ0.010319
+      [CONTRACT_HASH] ... -ꜩ0.010321
+      payload fees(the block proposer) ....... +ꜩ0.010321
     Transaction:
       Amount: ꜩ0
       From: [CONTRACT_HASH]
@@ -130,7 +130,7 @@ This sequence of operations was run:
         Set temp(1)[40] to (Pair 0x013fdf9fa7cb678c9c1da3bbfdd83a77ca36efa00300 (Pair "BLUE" 1))
       Storage size: 294 bytes
       Paid storage size diff: 67 bytes
-      Consumed gas: 50519.068
+      Consumed gas: 50522.278
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ0.01675
         storage fees ........................... +ꜩ0.01675
@@ -147,7 +147,7 @@ This sequence of operations was run:
             Copy temp(1) to map(5)
           Storage size: 10783 bytes
           Paid storage size diff: 10700 bytes
-          Consumed gas: 49610.844
+          Consumed gas: 49620.819
           Balance updates:
             [CONTRACT_HASH] ... -ꜩ2.675
             storage fees ........................... +ꜩ2.675
