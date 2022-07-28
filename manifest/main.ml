@@ -234,7 +234,9 @@ let ometrics = opam_only "ometrics" V.(at_least "0.2.1")
 
 let ppx_expect = inline_tests_backend (external_lib "ppx_expect" V.True)
 
-let plonk = external_lib "tezos-plonk" V.(at_least "0.1.0")
+let plompiler = external_lib "tezos-plompiler" V.(at_least "0.1.2")
+
+let plonk = external_lib "tezos-plonk" V.(at_least "0.1.2")
 
 let ptime = external_lib ~js_compatible:true "ptime" V.(at_least "1.0.0")
 
@@ -4040,6 +4042,7 @@ module Protocol = Protocol
             octez_protocol_environment;
             plugin |> if_some |> open_;
             octez_shell_services |> open_;
+            plompiler |> if_ N.(number >= 015);
           ]
     in
     let _plugin_tests =

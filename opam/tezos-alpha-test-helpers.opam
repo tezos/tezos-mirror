@@ -20,6 +20,7 @@ depends: [
   "tezos-protocol-environment"
   "tezos-protocol-plugin-alpha"
   "tezos-shell-services"
+  "tezos-plompiler" { >= "0.1.2" }
 ]
 build: [
   ["rm" "-r" "vendors"]
