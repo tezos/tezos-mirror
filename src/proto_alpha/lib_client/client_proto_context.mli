@@ -177,6 +177,21 @@ val update_consensus_key :
   Signature.public_key ->
   Kind.update_consensus_key Kind.manager Injection.result tzresult Lwt.t
 
+val drain_delegate :
+  #Protocol_client_context.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?simulation:bool ->
+  consensus_sk:Client_keys.sk_uri ->
+  consensus_pkh:Signature.public_key_hash ->
+  ?destination:Signature.public_key_hash ->
+  delegate:Signature.public_key_hash ->
+  unit ->
+  Kind.drain_delegate Injection.result tzresult Lwt.t
+
 (** Calls {!Injection.inject_manager_operation}
     with {!Annotated_manager_operation.Single_manager} {!Alpha_context.Set_deposits_limit} [limit_opt]
     as operation. *)

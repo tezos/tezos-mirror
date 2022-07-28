@@ -400,6 +400,28 @@ let update_consensus_key cctxt ~chain ~block ?confirmations ?dry_run
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
 
+let drain_delegate cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing
+    ?simulation ~consensus_sk ~consensus_pkh ?(destination = consensus_pkh)
+    ~delegate () =
+  let operation =
+    Single
+      (Drain_delegate {consensus_key = consensus_pkh; delegate; destination})
+  in
+  Injection.inject_operation
+    cctxt
+    ~chain
+    ~block
+    ?confirmations
+    ?dry_run
+    ?verbose_signing
+    ?simulation
+    ~src_sk:consensus_sk
+    operation
+  >>=? fun (oph, op, result) ->
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Drain_delegate _ as op), result) ->
+      return (oph, op, result)
+
 let set_deposits_limit cctxt ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?fee contract ~src_pk ~manager_sk
     ~fee_parameter limit_opt =

@@ -1712,6 +1712,69 @@ let commands_rw () =
         in
         match r with Ok _ -> return_unit | Error el -> Lwt.return_error el);
     command
+      ~group
+      ~desc:"Drain all funds from a delegate."
+      (args2 dry_run_switch verbose_signing_switch)
+      (prefixes ["drain"; "delegate"]
+      @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
+      @@ prefixes ["to"]
+      @@ Public_key_hash.source_param ~name:"key" ~desc:"the consensus key"
+      @@ stop)
+      (fun (dry_run, verbose_signing) delegate_pkh consensus_pkh cctxt ->
+        let open Lwt_result_syntax in
+        let* _, _consensus_pk, consensus_sk =
+          Client_keys.get_key cctxt consensus_pkh
+        in
+        let*! r =
+          drain_delegate
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ?confirmations:cctxt#confirmations
+            ~dry_run
+            ~verbose_signing
+            ~consensus_pkh
+            ~consensus_sk
+            ~delegate:delegate_pkh
+            ()
+        in
+        match r with Ok _ -> return_unit | Error el -> Lwt.return_error el);
+    command
+      ~group
+      ~desc:"Drain all funds from a delegate."
+      (args2 dry_run_switch verbose_signing_switch)
+      (prefixes ["drain"; "delegate"]
+      @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
+      @@ prefixes ["to"]
+      @@ Public_key_hash.source_param ~name:"key" ~desc:"the destination key"
+      @@ prefixes ["with"]
+      @@ Public_key_hash.source_param ~name:"key" ~desc:"the consensus key"
+      @@ stop)
+      (fun (dry_run, verbose_signing)
+           delegate_pkh
+           destination_pkh
+           consensus_pkh
+           cctxt ->
+        let open Lwt_result_syntax in
+        let* _, _consensus_pk, consensus_sk =
+          Client_keys.get_key cctxt consensus_pkh
+        in
+        let*! r =
+          drain_delegate
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ?confirmations:cctxt#confirmations
+            ~dry_run
+            ~verbose_signing
+            ~consensus_pkh
+            ~consensus_sk
+            ~destination:destination_pkh
+            ~delegate:delegate_pkh
+            ()
+        in
+        match r with Ok _ -> return_unit | Error el -> Lwt.return_error el);
+    command
       ~desc:"Wait until an operation is included in a block"
       (args3
          (default_arg
