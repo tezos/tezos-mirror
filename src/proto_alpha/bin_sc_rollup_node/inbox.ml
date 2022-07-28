@@ -191,12 +191,22 @@ let process_head node_ctxt store Layer1.(Head {level; hash = head_hash} as head)
       let* history = State.history_of_hash node_ctxt store predecessor in
       let* inbox =
         lift
-        @@ let*! messages_tree = State.find_message_tree store predecessor in
-           let*? level = Raw_level.of_int32 level in
+        @@ let*? level = Raw_level.of_int32 level in
+           let*! messages_tree = State.find_message_tree store predecessor in
            let*? messages = List.map_e Store.Inbox.Message.serialize messages in
            let* history, inbox =
              if messages = [] then return (history, inbox)
              else
+               let commitment_period =
+                 node_ctxt.protocol_constants.parametric.sc_rollup
+                   .commitment_period_in_blocks |> Int32.of_int
+               in
+               let inbox =
+                 Store.Inbox.refresh_commitment_period
+                   ~commitment_period
+                   ~level
+                   inbox
+               in
                let* messages_tree, history, inbox =
                  Store.Inbox.add_messages
                    store
