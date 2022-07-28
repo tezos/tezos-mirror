@@ -26,7 +26,9 @@ tezt:
     - .integration_template
     - .template__coverage_files
     - .tezt_template
-  parallel: 9
+  # WARNING: if you increase the number of parallel jobs, you need to
+  # update test_coverage.yml with the new list of jobs.
+  parallel: 15
 
 # these are tezt tests as above, but run using the static binaries
 tezt:static-binaries:
@@ -37,6 +39,8 @@ tezt:static-binaries:
     - build:static-x86_64-linux-binaries
   needs:
     - build:static-x86_64-linux-binaries
+  # WARNING: if you increase the number of parallel jobs, you need to
+  # update test_coverage.yml with the new list of jobs.
   parallel: 2
   variables:
     TESTS: "cli"
