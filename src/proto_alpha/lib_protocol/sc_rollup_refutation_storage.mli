@@ -84,8 +84,7 @@ val start_game :
     that [player] is the player whose turn it is; if so, it applies
     [refutation] using the [play] function.
 
-    If the result is a new game, this is stored and the timeout level is
-    updated.
+    If the result is a new game, this is stored and the timeout is updated.
 
     If the result is an [outcome], this will be returned.
 
@@ -146,6 +145,14 @@ val timeout :
   Sc_rollup_repr.t ->
   Sc_rollup_game_repr.Index.t ->
   (Sc_rollup_game_repr.outcome * Raw_context.t) tzresult Lwt.t
+
+(** [get_timeout ctxt rollup stakers] returns the current timeout values of both
+    players. *)
+val get_timeout :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  Sc_rollup_game_repr.Index.t ->
+  (Sc_rollup_game_repr.timeout * Raw_context.t) tzresult Lwt.t
 
 (** [apply_outcome ctxt rollup outcome] takes an [outcome] produced
     by [timeout] or [game_move] and performs the necessary end-of-game

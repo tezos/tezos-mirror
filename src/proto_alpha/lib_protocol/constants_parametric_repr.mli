@@ -102,7 +102,22 @@ type sc_rollup = {
   max_outbox_messages_per_level : int;
   (* The default number of required sections in a dissection *)
   number_of_sections_in_dissection : int;
-  (* The timeout period for a player in a refutation game. *)
+  (* The timeout period for a player in a refutation game.
+
+     Timeout logic is similar to a chess clock. Each player starts with the same
+     timeout = [timeout_period_in_blocks]. Each game move updates the timeout of
+     the current player by decreasing it by the amount of time she took to play,
+     i.e. number of blocks since the opponent last move. See
+     {!Sc_rollup_game_repr.timeout} and
+     {!Sc_rollup_refutation_storage.game_move} to see the implementation.
+
+     Because of that [timeout_period_in_blocks] must be at least half the upper
+     bound number of blocks needed for a game to finish. This bound is
+     correlated to the maximum distance allowed between the first and last tick
+     of a dissection. For example, when the maximum distance allowed is half the
+     total distance [(last_tick - last_tick) / 2] then bound is [Log^2
+     (Int32.max_int) + 2 = 33]. See {!Sc_rollup_game_repr.check_dissection} for
+     more information on the dissection logic. *)
   timeout_period_in_blocks : int;
 }
 

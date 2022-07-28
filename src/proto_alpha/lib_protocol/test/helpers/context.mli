@@ -224,6 +224,12 @@ module Sc_rollup : sig
 
   val genesis_info :
     t -> Sc_rollup.t -> Sc_rollup.Commitment.genesis_info tzresult Lwt.t
+
+  val timeout :
+    t ->
+    Sc_rollup.t ->
+    Signature.Public_key_hash.t * Signature.Public_key_hash.t ->
+    Sc_rollup.Game.timeout option tzresult Lwt.t
 end
 
 type (_, _) tup =

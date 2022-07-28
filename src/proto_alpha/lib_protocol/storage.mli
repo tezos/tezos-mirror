@@ -817,7 +817,7 @@ module Sc_rollup : sig
   module Game_timeout :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Sc_rollup_game_repr.Index.t
-       and type value = Raw_level_repr.t
+       and type value = Sc_rollup_game_repr.timeout
        and type t = Raw_context.t * Sc_rollup_repr.t
 
   (** [Opponent] stores the current opponent of the staker. This is

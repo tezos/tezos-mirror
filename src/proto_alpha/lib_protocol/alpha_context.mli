@@ -3421,6 +3421,10 @@ module Sc_rollup : sig
 
     val play : t -> refutation -> (outcome, t) Either.t Lwt.t
 
+    type timeout = {alice : int; bob : int; last_turn_level : Raw_level_repr.t}
+
+    val timeout_encoding : timeout Data_encoding.t
+
     module Internal_for_tests : sig
       val check_dissection :
         default_number_of_sections:int ->
@@ -3494,6 +3498,9 @@ module Sc_rollup : sig
       opponent:Staker.t ->
       Game.refutation ->
       (Game.outcome option * context) tzresult Lwt.t
+
+    val get_timeout :
+      context -> t -> Game.Index.t -> (Game.timeout * context) tzresult Lwt.t
 
     val timeout :
       context -> t -> Game.Index.t -> (Game.outcome * context) tzresult Lwt.t

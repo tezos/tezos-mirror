@@ -38,12 +38,43 @@ type point = {
 
 type conflict_point = point * point
 
-let timeout_level ctxt =
-  let level = Raw_context.current_level ctxt in
+(** [initial_timeout ctxt] set the initial timeout of players. The initial
+    timeout of each player is equal to [sc_rollup_timeout_period_in_blocks]. *)
+let initial_timeout ctxt =
+  let last_turn_level = (Raw_context.current_level ctxt).level in
   let timeout_period_in_blocks =
     Constants_storage.sc_rollup_timeout_period_in_blocks ctxt
   in
-  Raw_level_repr.add level.level timeout_period_in_blocks
+  Sc_rollup_game_repr.
+    {
+      alice = timeout_period_in_blocks;
+      bob = timeout_period_in_blocks;
+      last_turn_level;
+    }
+
+(** [update_timeout ctxt rollup game idx] update the timeout left for the
+    current player [game.turn]. Her new timeout is equal to [nb_of_block_left -
+    (current_level - last_turn_level)] where [nb_of_block_left] is her current
+    timeout. *)
+let update_timeout ctxt rollup (game : Sc_rollup_game_repr.t) idx =
+  let open Lwt_tzresult_syntax in
+  let* ctxt, timeout = Store.Game_timeout.get (ctxt, rollup) idx in
+  let current_level = (Raw_context.current_level ctxt).level in
+  let sub_block_left nb_of_block_left =
+    nb_of_block_left
+    - Int32.to_int (Raw_level_repr.diff current_level timeout.last_turn_level)
+  in
+  let new_timeout =
+    match game.turn with
+    | Alice ->
+        let nb_of_block_left = sub_block_left timeout.alice in
+        {timeout with last_turn_level = current_level; alice = nb_of_block_left}
+    | Bob ->
+        let nb_of_block_left = sub_block_left timeout.bob in
+        {timeout with last_turn_level = current_level; bob = nb_of_block_left}
+  in
+  let* ctxt, _ = Store.Game_timeout.update (ctxt, rollup) idx new_timeout in
+  return ctxt
 
 let get_ongoing_game ctxt rollup staker1 staker2 =
   let open Lwt_tzresult_syntax in
@@ -238,7 +269,7 @@ let start_game ctxt rollup ~player:refuter ~opponent:defender =
   in
   let* ctxt, _ = Store.Game.init (ctxt, rollup) stakers game in
   let* ctxt, _ =
-    Store.Game_timeout.init (ctxt, rollup) stakers (timeout_level ctxt)
+    Store.Game_timeout.init (ctxt, rollup) stakers (initial_timeout ctxt)
   in
   let* ctxt, _ = Store.Opponent.init (ctxt, rollup) refuter defender in
   let* ctxt, _ = Store.Opponent.init (ctxt, rollup) defender refuter in
@@ -260,20 +291,35 @@ let game_move ctxt rollup ~player ~opponent refutation =
   | Either.Left outcome -> return (Some outcome, ctxt)
   | Either.Right new_game ->
       let* ctxt, _ = Store.Game.update (ctxt, rollup) idx new_game in
-      let* ctxt, _ =
-        Store.Game_timeout.update (ctxt, rollup) idx (timeout_level ctxt)
-      in
+      let* ctxt = update_timeout ctxt rollup game idx in
       return (None, ctxt)
+
+let get_timeout ctxt rollup stakers =
+  let open Lwt_tzresult_syntax in
+  let* ctxt, timeout_opt =
+    Storage.Sc_rollup.Game_timeout.find (ctxt, rollup) stakers
+  in
+  match timeout_opt with
+  | Some timeout -> return (timeout, ctxt)
+  | None -> fail Sc_rollup_no_game
 
 let timeout ctxt rollup stakers =
   let open Lwt_tzresult_syntax in
   let level = (Raw_context.current_level ctxt).level in
   let* game, ctxt = get_game ctxt rollup stakers in
-  let* ctxt, timeout_level = Store.Game_timeout.get (ctxt, rollup) stakers in
+  let* ctxt, timeout = Store.Game_timeout.get (ctxt, rollup) stakers in
   let* () =
+    let block_left_before_timeout =
+      match game.turn with Alice -> timeout.alice | Bob -> timeout.bob
+    in
+    let level_of_timeout =
+      Raw_level_repr.add timeout.last_turn_level block_left_before_timeout
+    in
     fail_unless
-      Raw_level_repr.(level > timeout_level)
-      Sc_rollup_timeout_level_not_reached
+      Raw_level_repr.(level > level_of_timeout)
+      (Sc_rollup_timeout_level_not_reached
+         ( level_of_timeout,
+           match game.turn with Alice -> stakers.alice | Bob -> stakers.bob ))
   in
   return (Sc_rollup_game_repr.{loser = game.turn; reason = Timeout}, ctxt)
 

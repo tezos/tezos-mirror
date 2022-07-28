@@ -1762,9 +1762,9 @@ module Sc_rollup = struct
          end))
          (Make_index (Sc_rollup_game_repr.Index))
       (struct
-        type t = Raw_level_repr.t
+        type t = Sc_rollup_game_repr.timeout
 
-        let encoding = Raw_level_repr.encoding
+        let encoding = Sc_rollup_game_repr.timeout_encoding
       end)
 
   module Opponent =

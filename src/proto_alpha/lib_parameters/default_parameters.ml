@@ -52,9 +52,6 @@ let sc_rollup_max_outbox_messages_per_level = 100
 
     It suffers from the same risk of censorship as
     {!sc_rollup_challenge_windows_in_blocks} so we use the same value.
-
-    TODO: https://gitlab.com/tezos/tezos/-/issues/2902
-    This constant needs to be refined.
 *)
 let sc_rollup_timeout_period_in_blocks = 20_160
 

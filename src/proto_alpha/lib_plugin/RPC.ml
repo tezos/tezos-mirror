@@ -1927,6 +1927,24 @@ module Sc_rollup = struct
         ~output
         RPC_path.(path /: Sc_rollup.Address.rpc_arg / "conflicts")
 
+    let timeout =
+      let query =
+        let open RPC_query in
+        query (fun x y ->
+            Sc_rollup.Staker.(of_b58check_exn x, of_b58check_exn y))
+        |+ field "staker1" RPC_arg.string "" (fun (x, _) ->
+               Format.asprintf "%a" Sc_rollup.Staker.pp x)
+        |+ field "staker2" RPC_arg.string "" (fun (_, x) ->
+               Format.asprintf "%a" Sc_rollup.Staker.pp x)
+        |> seal
+      in
+      let output = Data_encoding.option Sc_rollup.Game.timeout_encoding in
+      RPC_service.get_service
+        ~description:"Returns the timeout of players."
+        ~query
+        ~output
+        RPC_path.(path /: Sc_rollup.Address.rpc_arg / "timeout")
+
     let timeout_reached =
       let query =
         let open RPC_query in
@@ -2067,6 +2085,20 @@ module Sc_rollup = struct
           rollup
           staker)
 
+  let register_timeout () =
+    Registration.register1
+      ~chunked:false
+      S.timeout
+      (fun context rollup (staker1, staker2) () ->
+        let open Lwt_tzresult_syntax in
+        let index = Sc_rollup.Game.Index.make staker1 staker2 in
+        let*! res =
+          Sc_rollup.Refutation_storage.get_timeout context rollup index
+        in
+        match res with
+        | Ok (timeout, _context) -> return_some timeout
+        | Error _ -> return_none)
+
   let register_timeout_reached () =
     Registration.register1
       ~chunked:false
@@ -2105,6 +2137,7 @@ module Sc_rollup = struct
     register_root () ;
     register_ongoing_refutation_game () ;
     register_conflicts () ;
+    register_timeout () ;
     register_timeout_reached () ;
     register_can_be_cemented ()
 

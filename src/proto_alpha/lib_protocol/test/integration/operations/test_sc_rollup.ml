@@ -80,7 +80,8 @@ let assert_equal_z ~loc x y =
 (** [context_init tup] initializes a context for testing in which the
   [sc_rollup_enable] constant is set to true. It returns the created
   context and contracts. *)
-let context_init ?(sc_rollup_challenge_window_in_blocks = 10) tup =
+let context_init ?(sc_rollup_challenge_window_in_blocks = 10)
+    ?(timeout_period_in_blocks = 10) tup =
   Context.init_with_constants_gen
     tup
     {
@@ -91,6 +92,7 @@ let context_init ?(sc_rollup_challenge_window_in_blocks = 10) tup =
           Context.default_test_constants.sc_rollup with
           enable = true;
           challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
+          timeout_period_in_blocks;
         };
     }
 
@@ -1421,6 +1423,155 @@ let test_inbox_max_number_of_messages_per_commitment_period () =
   let* _incr = Incremental.add_operation ~expect_apply_failure incr op in
   return_unit
 
+(** [test_timeout] test multiple cases of the timeout logic.
+    - Test to timeout a player before it's allowed and fails.
+    - Test that the timeout left by player decreases as expected.
+    - Test another account can timeout a late player.
+*)
+let test_timeout () =
+  let* block, (account1, account2, account3) = context_init Context.T3 in
+  let pkh1 = Account.pkh_of_contract_exn account1 in
+  let pkh2 = Account.pkh_of_contract_exn account2 in
+  let* block, rollup = sc_originate block account1 "unit" in
+  let* constants = Context.get_constants (B block) in
+  let Constants.Parametric.{timeout_period_in_blocks; _} =
+    constants.parametric.sc_rollup
+  in
+  let* genesis_info = Context.Sc_rollup.genesis_info (B block) rollup in
+  let* dummy_commitment = dummy_commitment (B block) rollup in
+  let commitment1 =
+    {
+      dummy_commitment with
+      number_of_ticks = number_of_ticks_exn 4l;
+      compressed_state =
+        Sc_rollup.State_hash.context_hash_to_state_hash
+          (Context_hash.hash_string ["first"]);
+    }
+  in
+  let commitment2 =
+    {
+      dummy_commitment with
+      number_of_ticks = number_of_ticks_exn 4l;
+      compressed_state =
+        Sc_rollup.State_hash.context_hash_to_state_hash
+          (Context_hash.hash_string ["second"]);
+    }
+  in
+  let add_op block op =
+    let* incr = Incremental.begin_construction block in
+    let* incr = Incremental.add_operation incr op in
+    Incremental.finalize_block incr
+  in
+  let add_publish block account commitment =
+    let* publish = Op.sc_rollup_publish (B block) account rollup commitment in
+    add_op block publish
+  in
+  let* block = add_publish block account1 commitment1 in
+  let* block = add_publish block account2 commitment2 in
+  let* start_game_op =
+    Op.sc_rollup_refute (B block) account1 rollup pkh2 None
+  in
+  let* block = add_op block start_game_op in
+  let* block = Block.bake_n (timeout_period_in_blocks - 1) block in
+  let game_index = Sc_rollup.Game.Index.make pkh1 pkh2 in
+  (* Testing to send a timeout before it's allowed. There is one block left
+     before timeout is allowed. *)
+  let* _incr =
+    let*? current_level =
+      Context.get_level (B block) >|? fun lvl ->
+      Raw_level.to_int32 lvl |> Raw_level_repr.of_int32_exn
+    in
+    let expected_block_left = 1l in
+    let expect_apply_failure = function
+      | Environment.Ecoproto_error
+          (Sc_rollup_errors.Sc_rollup_timeout_level_not_reached
+             (level_timeout, staker) as e)
+        :: _ ->
+          Assert.test_error_encodings e ;
+          let block_left = Raw_level_repr.diff level_timeout current_level in
+          if block_left = expected_block_left && pkh1 = staker then return_unit
+          else
+            failwith
+              "It should have failed with [Sc_rollup_timeout_level_not_reached \
+               (%ld, %a)] but got [Sc_rollup_timeout_level_not_reached (%ld, \
+               %a)]"
+              expected_block_left
+              Signature.Public_key_hash.pp
+              pkh1
+              block_left
+              Signature.Public_key_hash.pp
+              staker
+      | _ ->
+          failwith
+            "It should have failed with [Sc_rollup_timeout_level_not_reached \
+             (%ld, %a)]"
+            expected_block_left
+            Signature.Public_key_hash.pp
+            pkh1
+    in
+    let* timeout = Op.sc_rollup_timeout (B block) account3 rollup game_index in
+    let* incr = Incremental.begin_construction block in
+    Incremental.add_operation ~expect_apply_failure incr timeout
+  in
+  let* refute =
+    let tick =
+      WithExceptions.Option.get ~loc:__LOC__ (Sc_rollup.Tick.of_int 0)
+    in
+    let* {compressed_state; _} =
+      Context.Sc_rollup.commitment (B block) rollup genesis_info.commitment_hash
+    in
+    let first_chunk =
+      Sc_rollup.Game.{state_hash = Some compressed_state; tick}
+    in
+    let* rest =
+      List.init_es ~when_negative_length:[] 4 (fun i ->
+          let state_hash = None in
+          let tick =
+            WithExceptions.Option.get
+              ~loc:__LOC__
+              (Sc_rollup.Tick.of_int (i + 1))
+          in
+          return Sc_rollup.Game.{state_hash; tick})
+    in
+    let step = Sc_rollup.Game.Dissection (first_chunk :: rest) in
+    let move = Sc_rollup.Game.{choice = tick; step} in
+    Op.sc_rollup_refute (B block) account1 rollup pkh2 (Some move)
+  in
+  let* block = add_op block refute in
+  let* pkh1_timeout, pkh2_timeout =
+    let+ timeout = Context.Sc_rollup.timeout (B block) rollup (pkh1, pkh2) in
+    let timeout = WithExceptions.Option.get ~loc:__LOC__ timeout in
+    if game_index.alice = pkh1 then (timeout.alice, timeout.bob)
+    else (timeout.bob, timeout.alice)
+  in
+  let* () = Assert.equal_int ~loc:__LOC__ pkh1_timeout 0 in
+  let* () =
+    Assert.equal_int ~loc:__LOC__ pkh2_timeout timeout_period_in_blocks
+  in
+  let* block = Block.bake_n timeout_period_in_blocks block in
+  let* timeout = Op.sc_rollup_timeout (B block) account3 rollup game_index in
+  let* incr = Incremental.begin_construction block in
+  let* incr = Incremental.add_operation incr timeout in
+  match Incremental.rev_tickets incr with
+  | [
+   Operation_metadata
+     {
+       contents =
+         Single_result
+           (Manager_operation_result
+             {
+               operation_result =
+                 Applied
+                   (Sc_rollup_timeout_result
+                     {game_status = Ended (Timeout, looser); _});
+               _;
+             });
+     };
+  ]
+    when looser = pkh2 ->
+      return_unit
+  | _ -> assert false
+
 let tests =
   [
     Tztest.tztest
@@ -1501,4 +1652,9 @@ let tests =
       "inbox max number of messages during commitment period"
       `Quick
       test_inbox_max_number_of_messages_per_commitment_period;
+    Tztest.tztest
+      "Test that a player can't timeout another player before timeout period \
+       and related timeout value."
+      `Quick
+      test_timeout;
   ]
