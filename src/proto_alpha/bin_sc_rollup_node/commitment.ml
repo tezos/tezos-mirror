@@ -408,35 +408,22 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
         ()
     else return_false
 
-  let cement_commitment ({Node_context.cctxt; rollup_address; _} as node_ctxt)
-      commitment commitment_hash =
+  let cement_commitment (node_ctxt : Node_context.t) commitment_hash =
     let open Lwt_result_syntax in
     let* operator = Node_context.get_operator_keys node_ctxt Cement in
     match operator with
     | None ->
         (* Configured to not cement commitments *)
         return_unit
-    | Some (source, src_pk, src_sk) ->
-        let* _oph, _op, _results =
-          Client_proto_context.sc_rollup_cement
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~commitment:commitment_hash
-            ~source
-            ~rollup:rollup_address
-            ~src_pk
-            ~src_sk
-            ~fee_parameter:Configuration.default_fee_parameter
-            ()
+    | Some (source, _src_pk, _src_sk) ->
+        let cement_operation =
+          Sc_rollup_cement
+            {rollup = node_ctxt.rollup_address; commitment = commitment_hash}
         in
-        let*! () =
-          Commitment_event.cement_commitment_injected commitment_hash commitment
-        in
+        let* () = Injector.add_pending_operation ~source cement_operation in
+        let*! () = Commitment_event.cement_commitment_injected commitment in
         return_unit
 
-  (* TODO:  https://gitlab.com/tezos/tezos/-/issues/3008
-     Use the injector to cement commitments. *)
   let cement_commitment_if_possible node_ctxt store
       (Layer1.Head {level = head_level; _}) =
     let open Lwt_result_syntax in
