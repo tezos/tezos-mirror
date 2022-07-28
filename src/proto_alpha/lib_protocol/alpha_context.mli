@@ -2826,6 +2826,8 @@ module Sc_rollup : sig
 
     val encoding : t Data_encoding.t
 
+    val equal : t -> t -> bool
+
     val inbox_level : t -> Raw_level.t
 
     type history_proof
