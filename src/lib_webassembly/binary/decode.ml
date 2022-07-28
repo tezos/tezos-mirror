@@ -72,10 +72,12 @@ let string_of_byte b = Printf.sprintf "%02x" b
 
 let string_of_multi n = Printf.sprintf "%02lx" n
 
-let position s pos = Source.{file = s.name; line = -1; column = pos}
+let position_ file pos = Source.{file; line = -1; column = pos}
 
-let region s left right =
-  Source.{left = position s left; right = position s right}
+let region_ file left right =
+  Source.{left = position_ file left; right = position_ file right}
+
+let region s = region_ s.name
 
 let error s pos msg = raise (Code (region s pos pos, msg))
 
@@ -2003,24 +2005,28 @@ let add_field field state =
 type decode_kont = {
   building_state : building_state;  (** Accumulated parsed sections. *)
   module_kont : module_kont;
-  stream : stream;
   allocation_state : Ast.allocations;
+  stream_pos : int;
+  stream_name : string;
 }
 
 let vec_field ty (LazyVec {vector; _}) = VecField (ty, vector)
 
-let module_step state =
+let module_step bytes state =
   let open Lwt.Syntax in
-  let next module_kont = Lwt.return {state with module_kont} in
+  let s = {name = state.stream_name; bytes; pos = state.stream_pos} in
+  let next module_kont =
+    Lwt.return {state with module_kont; stream_pos = s.pos}
+  in
   let next_with_field field module_kont =
     Lwt.return
       {
         state with
         building_state = add_field field state.building_state;
         module_kont;
+        stream_pos = s.pos;
       }
   in
-  let s = state.stream in
   let allocs = state.allocation_state in
   match state.module_kont with
   | MKStart ->
@@ -2292,12 +2298,12 @@ let module_step state =
       |> Lwt.return
   | MKStop _ (* Stop cannot reduce. *) -> assert false
 
-let module_ stream =
+let module_ name bytes =
   let open Lwt.Syntax in
   let rec loop = function
-    | {module_kont = MKStop m; _} -> Lwt.return m
+    | {module_kont = MKStop m; stream_pos; _} -> Lwt.return (m, stream_pos)
     | k ->
-        let* next_state = module_step k in
+        let* next_state = module_step bytes k in
         loop next_state
   in
   let allocation_state = Ast.empty_allocations () in
@@ -2305,17 +2311,16 @@ let module_ stream =
     {
       building_state = empty_building_state;
       module_kont = MKStart;
-      stream;
       allocation_state;
+      stream_pos = 0;
+      stream_name = name;
     }
 
 let decode ~name ~bytes =
   let open Lwt.Syntax in
-  let s = make_stream ~name ~bytes in
-  let left = pos s in
-  let+ m = module_ s in
-  let right = pos s in
-  Source.(m @@ region s left right)
+  let left = 0 in
+  let+ m, right = module_ name bytes in
+  Source.(m @@ region_ name left right)
 
 let all_custom tag s =
   let open Lwt.Syntax in
