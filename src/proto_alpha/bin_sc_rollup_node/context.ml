@@ -93,8 +93,6 @@ let empty index = {index; tree = IStore.Tree.empty ()}
 
 let is_empty ctxt = IStore.Tree.is_empty ctxt.tree
 
-let raw_find = IStoreTree.find
-
 module Proof (Hash : sig
   type t
 
@@ -209,6 +207,8 @@ module PVMState = struct
   let key = ["pvm_state"]
 
   let find ctxt = IStore.Tree.find_tree ctxt.tree key
+
+  let lookup tree path = IStore.Tree.find tree path
 
   let set ctxt state =
     let open Lwt_syntax in

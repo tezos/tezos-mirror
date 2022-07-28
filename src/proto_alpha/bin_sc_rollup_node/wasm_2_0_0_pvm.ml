@@ -39,6 +39,7 @@ end)
 
 module Impl : Pvm.S = struct
   include Sc_rollup.Wasm_2_0_0PVM.Make (Wasm_2_0_0_proof_format)
+  module State = Context.PVMState
 
   let string_of_status : status -> string = function
     | Waiting_for_input_message -> "Waiting for input message"

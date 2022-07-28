@@ -27,7 +27,7 @@
 module type S = sig
   module PVM : Pvm.S
 
-  module Interpreter : Interpreter.S
+  module Interpreter : Interpreter.S with module PVM = PVM
 
   module Commitment : Commitment_sig.S with module PVM = PVM
 

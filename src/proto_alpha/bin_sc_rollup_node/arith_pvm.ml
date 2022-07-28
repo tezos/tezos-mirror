@@ -39,6 +39,7 @@ end)
 
 module Impl : Pvm.S = struct
   include Sc_rollup.ArithPVM.Make (Arith_proof_format)
+  module State = Context.PVMState
 
   let string_of_status status =
     match status with

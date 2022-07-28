@@ -32,13 +32,6 @@ let get_head_exn store =
   let*! head = Layer1.current_head_hash store in
   match head with None -> failwith "No head" | Some head -> return head
 
-let get_state_exn (node_ctxt : Node_context.t) =
-  let open Lwt_result_syntax in
-  let* head = get_head_exn node_ctxt.store in
-  let* ctxt = Node_context.checkout_context node_ctxt head in
-  let*! state = Context.PVMState.find ctxt in
-  match state with None -> failwith "No state" | Some state -> return state
-
 let get_state_info_exn store =
   let open Lwt_result_syntax in
   let* head = get_head_exn store in
@@ -141,6 +134,13 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   include Common
   module PVM = PVM
 
+  let get_state_exn (node_ctxt : Node_context.t) =
+    let open Lwt_result_syntax in
+    let* head = get_head_exn node_ctxt.store in
+    let* ctxt = Node_context.checkout_context node_ctxt head in
+    let*! state = PVM.State.find ctxt in
+    match state with None -> failwith "No state" | Some state -> return state
+
   let register_current_total_ticks node_ctxt dir =
     RPC_directory.register0
       dir
@@ -169,7 +169,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         let open Lwt_result_syntax in
         let* state = get_state_exn node_ctxt in
         let path = String.split_on_char '/' key in
-        let*! value = Context.raw_find state path in
+        let*! value = PVM.State.lookup state path in
         match value with
         | None -> failwith "No such key in PVM state"
         | Some value ->

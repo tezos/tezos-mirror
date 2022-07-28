@@ -80,8 +80,7 @@ val empty : index -> t
     empty. *)
 val is_empty : t -> bool
 
-val raw_find : tree -> string list -> bytes option Lwt.t
-
+(** Module for generating and verifying proofs for a context *)
 module Proof (Hash : sig
   type t
 
@@ -169,6 +168,10 @@ module PVMState : sig
 
   (** [find context] returns the PVM state stored in the [context], if any. *)
   val find : t -> value option Lwt.t
+
+  (** [lookup state path] returns the data stored for the path [path] in the PVM
+      state [state].  *)
+  val lookup : value -> string list -> bytes option Lwt.t
 
   (** [set context state] saves the PVM state [state] in the context and returns
       the updated context. Note: [set] does not perform any write on disk, this

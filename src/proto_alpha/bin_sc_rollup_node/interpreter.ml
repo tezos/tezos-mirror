@@ -48,6 +48,7 @@ end
 
 module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   module PVM = PVM
+  module Interpreter_event = Interpreter_event.Make (PVM)
 
   let consume_fuel = Option.map pred
 
@@ -206,7 +207,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     in
     let*! initial_state = PVM.initial_state node_ctxt.context in
     let*! genesis_state = PVM.install_boot_sector initial_state boot_sector in
-    let*! ctxt = Context.PVMState.set ctxt genesis_state in
+    let*! ctxt = PVM.State.set ctxt genesis_state in
     return (ctxt, genesis_state)
 
   let state_of_hash node_ctxt ctxt hash level =
@@ -214,7 +215,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     if Raw_level.(level = node_ctxt.Node_context.genesis_info.level) then
       genesis_state hash node_ctxt ctxt
     else
-      let*! state = Context.PVMState.find ctxt in
+      let*! state = PVM.State.find ctxt in
       match state with
       | None -> tzfail (Sc_rollup_node_errors.Missing_PVM_state (hash, level))
       | Some state -> return (ctxt, state)
@@ -241,7 +242,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     in
 
     (* Write final state to store. *)
-    let*! ctxt = Context.PVMState.set ctxt state in
+    let*! ctxt = PVM.State.set ctxt state in
     let*! context_hash = Context.commit ctxt in
     let*! () = Store.Contexts.add node_ctxt.store hash context_hash in
 
