@@ -340,6 +340,7 @@ val replay :
   ?on_terminate:(Unix.process_status -> unit) ->
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
+  ?strict:bool ->
   ?blocks:string list ->
   t ->
   argument list ->

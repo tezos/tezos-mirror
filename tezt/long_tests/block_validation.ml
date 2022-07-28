@@ -196,7 +196,7 @@ module Node = struct
   (** [replay_and_wait_for_termination blocks node] launches the [replay]
       command to start the validation of the given [blocks] on the given
       [node]. It then waits for the [node] to stop properly. *)
-  let replay_and_wait_for_termination blocks node =
+  let replay_and_wait_for_termination ?strict blocks node =
     let callback, resolver = Lwt.wait () in
     let on_terminate status =
       match Process.validate_status status with
@@ -204,7 +204,7 @@ module Node = struct
       | Error (`Invalid_status reason) ->
           failwith @@ Format.sprintf "Node %s" reason
     in
-    let* () = Node.replay ~on_terminate ~blocks node [] in
+    let* () = Node.replay ~on_terminate ~blocks ?strict node [] in
     callback
 end
 
@@ -248,7 +248,8 @@ module Validation = struct
   let replay blocks datadir =
     let node = Node.create datadir in
     Lwt_seq.iter_s
-      (fun range -> Node.replay_and_wait_for_termination [range] node)
+      (fun range ->
+        Node.replay_and_wait_for_termination ~strict:true [range] node)
       (Lwt_seq.of_seq blocks)
 end
 

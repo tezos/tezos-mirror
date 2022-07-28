@@ -54,6 +54,9 @@ Node
   with ``validator`` and ``peer``.
 
 
+*  Added support for ``--strict`` mode in the replay command: it causes the
+   command to be less permissive.
+
 Client
 ------
 

@@ -648,9 +648,12 @@ let run ?on_terminate ?event_level ?event_sections_levels node arguments =
     node
     arguments
 
-let replay ?on_terminate ?event_level ?event_sections_levels
+let replay ?on_terminate ?event_level ?event_sections_levels ?(strict = false)
     ?(blocks = ["head"]) node arguments =
-  let arguments = runlike_command_arguments node "replay" arguments @ blocks in
+  let strict = if strict then ["--strict"] else [] in
+  let arguments =
+    runlike_command_arguments node "replay" arguments @ strict @ blocks
+  in
   do_runlike_command
     ?on_terminate
     ?event_level
