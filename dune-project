@@ -70,6 +70,7 @@
 (package (name tezos-crypto-dal))
 (package (name tezos-dal-alpha))
 (package (name tezos-dal-node))
+(package (name tezos-dal-node-lib)(allow_empty))
 (package (name tezos-embedded-protocol-000-Ps9mPmXa))
 (package (name tezos-embedded-protocol-001-PtCJ7pwo))
 (package (name tezos-embedded-protocol-002-PsYLVpVv))

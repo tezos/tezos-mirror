@@ -3001,6 +3001,20 @@ let _octez_embedded_protocol_packer =
     ~linkall:true
     ~modules:["Main_embedded_packer"]
 
+let octez_dal_node_lib =
+  private_lib
+    "tezos_dal_node_lib"
+    ~path:"src/lib_dal_node"
+    ~opam:"tezos-dal-node-lib"
+    ~synopsis:"Tezos: `tezos-dal-node` library"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_client_base |> open_;
+        octez_protocol_updater |> open_;
+      ]
+
 (* PROTOCOL PACKAGES *)
 
 module Protocol : sig
