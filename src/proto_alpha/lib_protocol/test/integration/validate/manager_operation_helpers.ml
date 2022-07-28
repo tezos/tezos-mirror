@@ -43,6 +43,7 @@ type ctxt = {
   originated_contract : Contract_hash.t;
   tx_rollup : Tx_rollup.t option;
   sc_rollup : Sc_rollup.t option;
+  zk_rollup : Zk_rollup.t option;
 }
 
 (** Accounts manipulated in the tests. By convention, each field name
@@ -56,6 +57,7 @@ type accounts = {
   del : Account.t option;
   tx : Account.t option;
   sc : Account.t option;
+  zk : Account.t option;
 }
 
 (** Infos describes the information of the setting for a test: the
@@ -95,6 +97,7 @@ type manager_operation_kind =
   | K_Sc_rollup_execute_outbox_message
   | K_Sc_rollup_recover_bond
   | K_Dal_publish_slot_header
+  | K_Zk_rollup_origination
 
 (** The requirements for a tested manager operation. *)
 type operation_req = {
@@ -108,7 +111,7 @@ type operation_req = {
 }
 
 (** Feature flags requirements for a context setting for a test. *)
-type feature_flags = {dal : bool; scoru : bool; toru : bool}
+type feature_flags = {dal : bool; scoru : bool; toru : bool; zkru : bool}
 
 (** The requirements for a context setting for a test. *)
 type ctxt_req = {
@@ -118,6 +121,7 @@ type ctxt_req = {
   fund_del : Tez.t option;
   fund_tx : Tez.t option;
   fund_sc : Tez.t option;
+  fund_zk : Tez.t option;
   flags : feature_flags;
 }
 
@@ -130,13 +134,15 @@ type ctxt_req = {
 type mode = Construction | Mempool | Application
 
 (** {2 Default values} *)
-let all_enabled = {dal = true; scoru = true; toru = true}
+let all_enabled = {dal = true; scoru = true; toru = true; zkru = true}
 
 let disabled_dal = {all_enabled with dal = false}
 
 let disabled_scoru = {all_enabled with scoru = false}
 
 let disabled_toru = {all_enabled with toru = false}
+
+let disabled_zkru = {all_enabled with zkru = false}
 
 let ctxt_req_default_to_flag flags =
   {
@@ -146,6 +152,7 @@ let ctxt_req_default_to_flag flags =
     fund_del = Some Tez.one;
     fund_tx = Some Tez.one;
     fund_sc = Some Tez.one;
+    fund_zk = Some Tez.one;
     flags;
   }
 
@@ -191,6 +198,7 @@ let kind_to_string = function
   | K_Sc_rollup_execute_outbox_message -> "Sc_rollup_execute_outbox_message"
   | K_Sc_rollup_recover_bond -> "Sc_rollup_recover_bond"
   | K_Dal_publish_slot_header -> "Dal_publish_slot_header"
+  | K_Zk_rollup_origination -> "Zk_rollup_origination"
 
 (** {2 Pretty-printers} *)
 let pp_opt pp v =
@@ -241,6 +249,7 @@ let pp_ctxt_req pp
       fund_del;
       fund_tx;
       fund_sc;
+      fund_zk;
       flags;
     } =
   Format.fprintf
@@ -252,9 +261,11 @@ let pp_ctxt_req pp
      fund_del: %a tz@,\
      fund_tx: %a tz@,\
      fund_sc: %a tz@,\
+     fund_zk: %a tz@,\
      dal_flag: %a@,\
      scoru_flag: %a@,\
      toru_flag: %a@,\
+     zkru_flag: %a@,\
      @]"
     (pp_opt Gas.Arith.pp_integral)
     hard_gas_limit_per_block
@@ -268,12 +279,16 @@ let pp_ctxt_req pp
     fund_tx
     (pp_opt Tez.pp)
     fund_sc
+    (pp_opt Tez.pp)
+    fund_zk
     Format.pp_print_bool
     flags.dal
     Format.pp_print_bool
     flags.scoru
     Format.pp_print_bool
     flags.toru
+    Format.pp_print_bool
+    flags.zkru
 
 let pp_mode pp = function
   | Construction -> Format.fprintf pp "Construction"
@@ -357,6 +372,28 @@ let originate_sc_rollup block rollup_account =
   let+ block = Block.bake ~operation:rollup_origination block in
   (block, sc_rollup)
 
+module ZKOperator = Dummy_zk_rollup.Operator (struct
+  let batch_size = 10
+end)
+
+let originate_zk_rollup block rollup_account =
+  let open Lwt_result_syntax in
+  let rollup_contract = contract_of rollup_account in
+  let* rollup_origination, zk_rollup =
+    Op.zk_rollup_origination
+      ~force_reveal:true
+      (B block)
+      rollup_contract
+      ~public_parameters:ZKOperator.public_parameters
+      ~circuits_info:
+        (Zk_rollup.Account.SMap.of_seq
+        @@ Plonk.Main_protocol.SMap.to_seq ZKOperator.circuits)
+      ~init_state:ZKOperator.init_state
+      ~nb_ops:1
+  in
+  let+ block = Block.bake ~operation:rollup_origination block in
+  (block, zk_rollup)
+
 (** {2 Setting's context construction} *)
 
 let fund_account block bootstrap account fund =
@@ -395,6 +432,7 @@ let init_ctxt : ctxt_req -> infos tzresult Lwt.t =
        fund_del;
        fund_tx;
        fund_sc;
+       fund_zk;
        flags;
      } ->
   let open Lwt_result_syntax in
@@ -415,13 +453,14 @@ let init_ctxt : ctxt_req -> infos tzresult Lwt.t =
   in
   let* block, bootstraps =
     Context.init_n
-      6
+      7
       ~consensus_threshold:0
       ?hard_gas_limit_per_block
       ~tx_rollup_enable:flags.toru
       ~tx_rollup_sunset_level:Int32.max_int
       ~sc_rollup_enable:flags.scoru
       ~dal_enable:flags.dal
+      ~zk_rollup_enable:flags.zkru
       ()
   in
   let get_bootstrap bootstraps n = Stdlib.List.nth bootstraps n in
@@ -438,8 +477,7 @@ let init_ctxt : ctxt_req -> infos tzresult Lwt.t =
   let* block, tx, tx_rollup =
     if flags.toru then
       create_and_fund
-        ~originate_rollup:(fun infos account ->
-          originate_tx_rollup infos account)
+        ~originate_rollup:originate_tx_rollup
         block
         (get_bootstrap bootstraps 3)
         fund_tx
@@ -448,23 +486,31 @@ let init_ctxt : ctxt_req -> infos tzresult Lwt.t =
   let* block, sc, sc_rollup =
     if flags.scoru then
       create_and_fund
-        ~originate_rollup:(fun infos account ->
-          originate_sc_rollup infos account)
+        ~originate_rollup:originate_sc_rollup
         block
         (get_bootstrap bootstraps 4)
         fund_sc
     else return (block, None, None)
   in
+  let* block, zk, zk_rollup =
+    if flags.zkru then
+      create_and_fund
+        ~originate_rollup:originate_zk_rollup
+        block
+        (get_bootstrap bootstraps 5)
+        fund_zk
+    else return (block, None, None)
+  in
   let* create_contract_hash, originated_contract =
     Op.contract_origination_hash
       (B block)
-      (get_bootstrap bootstraps 5)
+      (get_bootstrap bootstraps 6)
       ~fee:Tez.zero
       ~script:Op.dummy_script
   in
   let+ block = Block.bake ~operation:create_contract_hash block in
-  let ctxt = {block; originated_contract; tx_rollup; sc_rollup} in
-  {ctxt; accounts = {source; dest; del; tx; sc}}
+  let ctxt = {block; originated_contract; tx_rollup; sc_rollup; zk_rollup} in
+  {ctxt; accounts = {source; dest; del; tx; sc; zk}}
 
 (** In addition of building up a context according to a context
     requirement, source is self-delegated.
@@ -641,6 +687,10 @@ let tx_rollup_of = function
 let sc_rollup_of = function
   | Some sc_rollup -> return sc_rollup
   | None -> failwith "Sc_rollup not created in this context"
+
+let zk_rollup_of = function
+  | Some zk_rollup -> return zk_rollup
+  | None -> failwith "Zk_rollup not created in this context"
 
 let mk_tx_rollup_submit_batch (oinfos : operation_req) (infos : infos) =
   let open Lwt_result_syntax in
@@ -975,6 +1025,26 @@ let mk_dal_publish_slot_header (oinfos : operation_req) (infos : infos) =
     (contract_of infos.accounts.source)
     slot
 
+let mk_zk_rollup_origination (oinfos : operation_req) (infos : infos) =
+  let open Lwt_result_syntax in
+  let* op, _ =
+    Op.zk_rollup_origination
+      ?fee:oinfos.fee
+      ?gas_limit:oinfos.gas_limit
+      ?counter:oinfos.counter
+      ?storage_limit:oinfos.storage_limit
+      ?force_reveal:oinfos.force_reveal
+      (B infos.ctxt.block)
+      (contract_of infos.accounts.source)
+      ~public_parameters:ZKOperator.public_parameters
+      ~circuits_info:
+        (Zk_rollup.Account.SMap.of_seq
+        @@ Plonk.Main_protocol.SMap.to_seq ZKOperator.circuits)
+      ~init_state:ZKOperator.init_state
+      ~nb_ops:1
+  in
+  return op
+
 (** {2 Helpers for generation of generic check tests by manager operation} *)
 
 (** Generic forge for any kind of manager operation according to
@@ -1009,6 +1079,7 @@ let select_op (op_req : operation_req) (infos : infos) =
     | K_Sc_rollup_execute_outbox_message -> mk_sc_rollup_execute_outbox_message
     | K_Sc_rollup_recover_bond -> mk_sc_rollup_return_bond
     | K_Dal_publish_slot_header -> mk_dal_publish_slot_header
+    | K_Zk_rollup_origination -> mk_zk_rollup_origination
   in
   mk_op op_req infos
 
@@ -1342,6 +1413,7 @@ let subjects =
     K_Sc_rollup_execute_outbox_message;
     K_Sc_rollup_recover_bond;
     K_Dal_publish_slot_header;
+    K_Zk_rollup_origination;
   ]
 
 let is_consumer = function
@@ -1352,7 +1424,7 @@ let is_consumer = function
   | K_Sc_rollup_add_messages | K_Sc_rollup_origination | K_Sc_rollup_refute
   | K_Sc_rollup_timeout | K_Sc_rollup_cement | K_Sc_rollup_publish
   | K_Sc_rollup_execute_outbox_message | K_Sc_rollup_recover_bond
-  | K_Dal_publish_slot_header ->
+  | K_Dal_publish_slot_header | K_Zk_rollup_origination ->
       false
   | K_Transaction | K_Origination | K_Register_global_constant
   | K_Tx_rollup_dispatch_tickets | K_Transfer_ticket ->
@@ -1379,3 +1451,4 @@ let is_disabled flags = function
   | K_Sc_rollup_execute_outbox_message | K_Sc_rollup_recover_bond ->
       flags.scoru = false
   | K_Dal_publish_slot_header -> flags.dal = false
+  | K_Zk_rollup_origination -> flags.zkru = false

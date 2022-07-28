@@ -83,7 +83,8 @@ let ensure_kind infos kind =
       | Sc_rollup_timeout _, K_Sc_rollup_timeout
       | Sc_rollup_execute_outbox_message _, K_Sc_rollup_execute_outbox_message
       | Sc_rollup_recover_bond _, K_Sc_rollup_recover_bond
-      | Dal_publish_slot_header _, K_Dal_publish_slot_header ->
+      | Dal_publish_slot_header _, K_Dal_publish_slot_header
+      | Zk_rollup_origination _, K_Zk_rollup_origination ->
           return_unit
       | ( ( Transaction _ | Origination _ | Register_global_constant _
           | Delegation _ | Set_deposits_limit _ | Increase_paid_storage _
@@ -95,7 +96,7 @@ let ensure_kind infos kind =
           | Sc_rollup_cement _ | Sc_rollup_add_messages _ | Sc_rollup_refute _
           | Sc_rollup_timeout _ | Sc_rollup_execute_outbox_message _
           | Sc_rollup_recover_bond _ | Dal_publish_slot_header _
-          | Sc_rollup_dal_slot_subscribe _ ),
+          | Sc_rollup_dal_slot_subscribe _ | Zk_rollup_origination _ ),
           _ ) ->
           assert false)
   | Single _ -> assert false
@@ -683,6 +684,11 @@ let flag_expect_failure flags errs =
   | [Environment.Ecoproto_error Dal_errors.Dal_feature_disabled]
     when flags.dal = false ->
       return_unit
+  | [
+   Environment.Ecoproto_error Validate_errors.Manager.Zk_rollup_feature_disabled;
+  ]
+    when flags.zkru = false ->
+      return_unit
   | err ->
       failwith
         "Error trace:@, %a does not match the expected one"
@@ -710,6 +716,7 @@ let test_feature_flags flags kind () =
           infos.ctxt with
           tx_rollup = infos_op.ctxt.tx_rollup;
           sc_rollup = infos_op.ctxt.sc_rollup;
+          zk_rollup = infos_op.ctxt.zk_rollup;
         };
     }
   in
@@ -753,6 +760,12 @@ let generate_toru_flag () =
     "Validate with toru disabled."
     subjects
 
+let generate_zkru_flag () =
+  create_Tztest
+    (test_feature_flags disabled_zkru)
+    "Validate with zkru disabled."
+    subjects
+
 let sanity_tests =
   test_ensure_manager_operation_coverage () :: generate_tests_validate ()
 
@@ -776,3 +789,4 @@ let contract_tests =
 
 let flags_tests =
   generate_dal_flag () @ generate_toru_flag () @ generate_scoru_flag ()
+  @ generate_zkru_flag ()
