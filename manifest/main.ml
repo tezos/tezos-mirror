@@ -3065,6 +3065,8 @@ module Protocol : sig
 
   val plugin_registerer : t -> target option
 
+  val dal : t -> target option
+
   val parameters_exn : t -> target
 
   val benchmarks_proto_exn : t -> target
@@ -3169,6 +3171,7 @@ end = struct
     baking_commands_registration : target option;
     plugin : target option;
     plugin_registerer : target option;
+    dal : target option;
     test_helpers : target option;
     parameters : target option;
     benchmarks_proto : target option;
@@ -3176,8 +3179,9 @@ end = struct
   }
 
   let make ?client ?client_commands ?client_commands_registration
-      ?baking_commands_registration ?plugin ?plugin_registerer ?test_helpers
-      ?parameters ?benchmarks_proto ?baking ~status ~name ~main ~embedded () =
+      ?baking_commands_registration ?plugin ?plugin_registerer ?dal
+      ?test_helpers ?parameters ?benchmarks_proto ?baking ~status ~name ~main
+      ~embedded () =
     {
       status;
       name;
@@ -3189,6 +3193,7 @@ end = struct
       baking_commands_registration;
       plugin;
       plugin_registerer;
+      dal;
       test_helpers;
       parameters;
       benchmarks_proto;
@@ -3238,6 +3243,8 @@ end = struct
   let plugin_exn p = mandatory "plugin" p p.plugin
 
   let plugin_registerer p = p.plugin_registerer
+
+  let dal p = p.dal
 
   let parameters_exn p = mandatory "parameters" p p.parameters
 
@@ -4713,6 +4720,7 @@ module Protocol = Protocol
          ?baking_commands_registration
          ?plugin
          ?plugin_registerer
+         ?dal
          ?test_helpers
          ?parameters
          ?benchmarks_proto

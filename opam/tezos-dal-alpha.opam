@@ -11,6 +11,10 @@ depends: [
   "dune" { >= "3.0" }
   "ppx_expect"
   "tezos-base"
+  "tezos-protocol-compiler"
+  "tezos-dal-node-lib"
+  "tezos-client-alpha"
+  "tezos-embedded-protocol-alpha"
   "tezos-protocol-alpha"
   "tezos-base-test-helpers" {with-test}
   "tezos-alpha-test-helpers" {with-test}
