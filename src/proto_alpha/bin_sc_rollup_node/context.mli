@@ -127,7 +127,7 @@ end
 (** Aggregated collection of messages from the L1 inbox. *)
 module MessageTrees : sig
   (** The value of a messages tree  *)
-  type value = tree
+  type value
 
   (** [find context] returns the messages tree stored in the [context], if any. *)
   val find : t -> value option Lwt.t
@@ -158,7 +158,7 @@ module Inbox : sig
 
   include
     Sc_rollup.Inbox.Merkelized_operations
-      with type tree = tree
+      with type tree = MessageTrees.value
        and type inbox_context = index
 end
 

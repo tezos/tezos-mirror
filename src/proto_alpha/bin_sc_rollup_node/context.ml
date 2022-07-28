@@ -159,6 +159,21 @@ struct
         return None
 end
 
+(** Aggregated collection of messages from the L1 inbox *)
+module MessageTrees = struct
+  type value = tree
+
+  let key = ["message_tree"]
+
+  let find ctxt = IStore.Tree.find_tree ctxt.tree key
+
+  let set ctxt tree =
+    let open Lwt_syntax in
+    let* tree = IStore.Tree.add_tree ctxt.tree key tree in
+    let ctxt = {ctxt with tree} in
+    return ctxt
+end
+
 module Inbox = struct
   include Sc_rollup.Inbox
 
@@ -185,21 +200,6 @@ module Inbox = struct
     let lookup_tree index hash =
       IStore.Tree.of_hash index.repo (from_inbox_hash hash)
   end)
-end
-
-(** Aggregated collection of messages from the L1 inbox *)
-module MessageTrees = struct
-  type value = tree
-
-  let key = ["message_tree"]
-
-  let find ctxt = IStore.Tree.find_tree ctxt.tree key
-
-  let set ctxt tree =
-    let open Lwt_syntax in
-    let* tree = IStore.Tree.add_tree ctxt.tree key tree in
-    let ctxt = {ctxt with tree} in
-    return ctxt
 end
 
 (** State of the PVM that this rollup node deals with *)
