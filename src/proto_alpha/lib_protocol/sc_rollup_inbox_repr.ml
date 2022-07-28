@@ -348,6 +348,23 @@ module V1 = struct
 
   let starting_level_of_current_commitment_period inbox =
     inbox.starting_level_of_current_commitment_period
+
+  let refresh_commitment_period ~commitment_period ~level inbox =
+    let start = starting_level_of_current_commitment_period inbox in
+    let freshness = Raw_level_repr.diff level start in
+    let open Int32 in
+    let open Compare.Int32 in
+    if freshness >= commitment_period then (
+      let nb_periods =
+        to_int ((mul (div freshness commitment_period)) commitment_period)
+      in
+      let new_starting_level = Raw_level_repr.(add start nb_periods) in
+      assert (Raw_level_repr.(new_starting_level <= level)) ;
+      assert (
+        rem (Raw_level_repr.diff new_starting_level start) commitment_period
+        = 0l) ;
+      start_new_commitment_period inbox new_starting_level)
+    else inbox
 end
 
 type versioned = V1 of V1.t
