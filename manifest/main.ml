@@ -175,7 +175,7 @@ let ipaddr =
 
 let ipaddr_unix = external_sublib ipaddr "ipaddr.unix"
 
-let irmin = external_lib "irmin" V.(at_least "3.3.1" && less_than "3.4.0")
+let irmin = external_lib "irmin" V.(at_least "3.3.2" && less_than "3.4.0")
 
 let irmin_pack =
   external_lib "irmin-pack" V.(at_least "3.3.1" && less_than "3.4.0")
@@ -336,7 +336,7 @@ let zarith_stubs_js = external_lib ~js_compatible:true "zarith_stubs_js" V.True
 let ledgerwallet_tezos = vendored_lib "ledgerwallet-tezos"
 
 let vdf =
-  external_lib ~js_compatible:true "class_group_vdf" V.(at_least "0.0.2")
+  external_lib ~js_compatible:true "class_group_vdf" V.(at_least "0.0.4")
 
 (* INTERNAL LIBS *)
 
