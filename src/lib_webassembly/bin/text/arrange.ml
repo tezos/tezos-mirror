@@ -752,7 +752,10 @@ let definition mode x_opt def =
           let rec unquote def =
             match def.it with
             | Textual m -> Lwt.return m
-            | Encoded (_, bytes) -> Decode.decode ~name:"" ~bytes
+            | Encoded (_, bytes) ->
+                Decode.decode
+                  ~name:""
+                  ~bytes:(Chunked_byte_vector.Lwt.of_string bytes)
             | Quoted (_, s) -> unquote (Parse.string_to_module s)
           in
           let* unquoted = unquote def in
@@ -762,7 +765,11 @@ let definition mode x_opt def =
             match def.it with
             | Textual m -> Encode.encode m
             | Encoded (_, bytes) ->
-                let* m = Decode.decode ~name:"" ~bytes in
+                let* m =
+                  Decode.decode
+                    ~name:""
+                    ~bytes:(Chunked_byte_vector.Lwt.of_string bytes)
+                in
                 Encode.encode m
             | Quoted (_, s) -> unquote (Parse.string_to_module s)
           in

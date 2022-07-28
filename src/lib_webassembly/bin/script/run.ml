@@ -365,7 +365,7 @@ let rec run_definition def : Ast.module_ Lwt.t =
   | Textual m -> Lwt.return m
   | Encoded (name, bytes) ->
       let* () = trace_lwt "Decoding..." in
-      Decode.decode ~name ~bytes
+      Decode.decode ~name ~bytes:(Chunked_byte_vector.Lwt.of_string bytes)
   | Quoted (_, s) ->
       let* () = trace_lwt "Parsing quote..." in
       let def' = Parse.string_to_module s in

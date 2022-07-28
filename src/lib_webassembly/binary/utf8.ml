@@ -41,6 +41,7 @@ let code min n =
   else n
 
 let decode_step get s =
+  let open Lwt.Syntax in
   let i = ref 0 in
   let get s =
     (* In the testsuite, some tests are supposed to break during reading the
@@ -54,29 +55,31 @@ let decode_step get s =
       get s
     with Decode_error.Error _ -> raise Utf8
   in
-  let b1 = get s in
-  let code =
-    if b1 < 0x80 then code 0x0 b1
+  let* b1 = get s in
+  let* code =
+    if b1 < 0x80 then Lwt.return @@ code 0x0 b1
     else if b1 < 0xc0 then raise Utf8
     else
-      let b2 = get s in
-      if b1 < 0xe0 then code 0x80 (((b1 land 0x1f) lsl 6) + con b2)
+      let* b2 = get s in
+      if b1 < 0xe0 then Lwt.return @@ code 0x80 (((b1 land 0x1f) lsl 6) + con b2)
       else
-        let b3 = get s in
+        let* b3 = get s in
         if b1 < 0xf0 then
-          code 0x800 (((b1 land 0x0f) lsl 12) + (con b2 lsl 6) + con b3)
+          Lwt.return
+          @@ code 0x800 (((b1 land 0x0f) lsl 12) + (con b2 lsl 6) + con b3)
         else
-          let b4 = get s in
+          let* b4 = get s in
           if b1 < 0xf8 then
-            code
-              0x10000
-              (((b1 land 0x07) lsl 18)
-              + (con b2 lsl 12)
-              + (con b3 lsl 6)
-              + con b4)
+            Lwt.return
+            @@ code
+                 0x10000
+                 (((b1 land 0x07) lsl 18)
+                 + (con b2 lsl 12)
+                 + (con b3 lsl 6)
+                 + con b4)
           else raise Utf8
   in
-  (code, !i)
+  Lwt.return (code, !i)
 
 let rec decode s =
   Lazy_vector.LwtInt32Vector.of_list
