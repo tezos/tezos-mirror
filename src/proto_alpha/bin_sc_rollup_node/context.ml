@@ -32,11 +32,18 @@ module IStore = struct
   module Schema = Tezos_context_encoding.Context.Schema
 end
 
+module IStoreTree =
+  Tezos_context_helpers.Context.Make_tree
+    (Tezos_context_encoding.Context.Conf)
+    (IStore)
+
 type tree = IStore.tree
 
 type index = {path : string; repo : IStore.Repo.t}
 
 type t = {index : index; tree : tree}
+
+type commit = IStore.commit
 
 type hash = IStore.hash
 
@@ -62,13 +69,7 @@ let load configuration =
   let+ repo = IStore.Repo.v (Irmin_pack.config path) in
   {path; repo}
 
-let flush ctxt = IStore.flush ctxt.repo
-
 let close ctxt = IStore.Repo.close ctxt.repo
-
-let info message =
-  let date = Unix.gettimeofday () |> int_of_float |> Int64.of_int in
-  Irmin.Info.Default.v ~author:"Tezos smart-contract rollup node" ~message date
 
 let raw_commit ?(message = "") index tree =
   let info = IStore.Info.v ~author:"Tezos" 0L ~message in
@@ -92,49 +93,87 @@ let empty index = {index; tree = IStore.Tree.empty ()}
 
 let is_empty ctxt = IStore.Tree.is_empty ctxt.tree
 
-let make index tree = {index; tree}
+let raw_find = IStoreTree.find
 
-module IStoreTree = struct
-  include
-    Tezos_context_helpers.Context.Make_tree
-      (Tezos_context_encoding.Context.Conf)
+module Proof (Hash : sig
+  type t
+
+  val of_context_hash : Context_hash.t -> t
+end) =
+struct
+  module IStoreProof =
+    Tezos_context_helpers.Context.Make_proof
       (IStore)
+      (Tezos_context_encoding.Context.Conf)
 
-  type nonrec t = index
+  module Tree = struct
+    include IStoreTree
 
-  type tree = IStore.tree
+    type nonrec t = index
 
-  type key = path
+    type tree = IStore.tree
 
-  type value = bytes
+    type key = path
+
+    type value = bytes
+  end
+
+  type tree = Tree.tree
+
+  type proof = IStoreProof.Proof.tree IStoreProof.Proof.t
+
+  let hash_tree tree = Hash.of_context_hash (Tree.hash tree)
+
+  let proof_encoding =
+    Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V1.Tree32
+    .tree_proof_encoding
+
+  let proof_before proof =
+    let (`Value hash | `Node hash) = proof.IStoreProof.Proof.before in
+    Hash.of_context_hash hash
+
+  let proof_after proof =
+    let (`Value hash | `Node hash) = proof.IStoreProof.Proof.after in
+    Hash.of_context_hash hash
+
+  let produce_proof index tree step =
+    let open Lwt_syntax in
+    (* Committing the context is required by Irmin to produce valid proofs. *)
+    let* _commit_key = raw_commit index tree in
+    match Tree.kinded_key tree with
+    | Some k ->
+        let* p = IStoreProof.produce_tree_proof index.repo k step in
+        return (Some p)
+    | None -> return None
+
+  let verify_proof proof step =
+    (* The rollup node is not supposed to verify proof. We keep
+       this part in case this changes in the future. *)
+    let open Lwt_syntax in
+    let* result = IStoreProof.verify_tree_proof proof step in
+    match result with
+    | Ok v -> return (Some v)
+    | Error _ ->
+        (* We skip the error analysis here since proof verification is not a
+           job for the rollup node. *)
+        return None
 end
-
-module IStoreProof =
-  Tezos_context_helpers.Context.Make_proof
-    (IStore)
-    (Tezos_context_encoding.Context.Conf)
 
 module Inbox = struct
   include Sc_rollup.Inbox
 
   include Sc_rollup.Inbox.Make_hashing_scheme (struct
-    module Tree = IStoreTree
+    include Proof (Hash)
 
     type t = index
 
-    type tree = Tree.tree
-
     let commit_tree index _key tree =
-      (* TODO: _key ? *)
       let open Lwt_syntax in
       let info () = IStore.Info.v ~author:"Tezos" 0L ~message:"" in
       let* (_ : IStore.commit) =
         IStore.Commit.v index.repo ~info:(info ()) ~parents:[] tree
       in
       return ()
-
-    let to_inbox_hash kinded_hash =
-      match kinded_hash with `Value h | `Node h -> Hash.of_context_hash h
 
     let from_inbox_hash inbox_hash =
       let ctxt_hash = Hash.to_context_hash inbox_hash in
@@ -145,30 +184,6 @@ module Inbox = struct
 
     let lookup_tree index hash =
       IStore.Tree.of_hash index.repo (from_inbox_hash hash)
-
-    type proof = IStoreProof.Proof.tree IStoreProof.Proof.t
-
-    let verify_proof proof f =
-      Lwt.map Result.to_option (IStoreProof.verify_tree_proof proof f)
-
-    let produce_proof index tree f =
-      let open Lwt_syntax in
-      (* TODO: #3381
-         Since committing is required for proof production to work
-         properly, why isn't committing part of the process of proof
-         production? *)
-      let* _commit_key = raw_commit index tree in
-      match IStoreTree.kinded_key tree with
-      | Some k ->
-          let* p = IStoreProof.produce_tree_proof index.repo k f in
-          return (Some p)
-      | None -> return None
-
-    let proof_before proof = to_inbox_hash proof.IStoreProof.Proof.before
-
-    let proof_encoding =
-      Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V1.Tree32
-      .tree_proof_encoding
   end)
 end
 
@@ -194,8 +209,6 @@ module PVMState = struct
   let key = ["pvm_state"]
 
   let find ctxt = IStore.Tree.find_tree ctxt.tree key
-
-  let exists ctxt = IStore.Tree.mem_tree ctxt.tree key
 
   let set ctxt state =
     let open Lwt_syntax in

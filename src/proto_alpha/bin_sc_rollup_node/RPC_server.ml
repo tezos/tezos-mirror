@@ -169,7 +169,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         let open Lwt_result_syntax in
         let* state = get_state_exn node_ctxt in
         let path = String.split_on_char '/' key in
-        let*! value = Context.IStoreTree.find state path in
+        let*! value = Context.raw_find state path in
         match value with
         | None -> failwith "No such key in PVM state"
         | Some value ->
