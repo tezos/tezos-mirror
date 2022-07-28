@@ -31,6 +31,8 @@ Client
 - Simulation returns correct errors on batches of operations where some are
   backtracked, failed and/or skipped.
 
+- Disabled origination of contracts with timelock instructions.
+
 Accuser
 -------
 
