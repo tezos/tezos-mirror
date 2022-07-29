@@ -40,6 +40,8 @@ end)
 
 type operators = Signature.Public_key_hash.t Operator_purpose_map.t
 
+type fee_parameters = Injection.fee_parameter Operator_purpose_map.t
+
 type t = {
   data_dir : string;
   sc_rollup_address : Sc_rollup.t;
@@ -47,7 +49,7 @@ type t = {
   rpc_addr : string;
   rpc_port : int;
   reconnection_delay : float;
-  fee_parameter : Injection.fee_parameter;
+  fee_parameters : fee_parameters;
   mode : mode;
   loser_mode : Loser_mode.t;
   dal_node_addr : string;
@@ -79,14 +81,15 @@ let default_dal_node_addr = "127.0.0.1"
 
 let default_dal_node_port = 10732
 
+let tez t = Tez.of_mutez_exn Int64.(mul (of_int t) 1_000_000L)
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2794
    the below default values have been copied from
    `src/proto_alpha/lib_client/client_proto_args.ml`, but
    we need to check whether these values are sensible for the rollup
    node.
 *)
-let default_minimal_fees =
-  match Tez.of_mutez 100L with None -> assert false | Some t -> t
+let default_minimal_fees = Tez.of_mutez_exn 100L
 
 let default_minimal_nanotez_per_gas_unit = Q.of_int 100
 
@@ -94,21 +97,74 @@ let default_minimal_nanotez_per_byte = Q.of_int 1000
 
 let default_force_low_fee = false
 
-let default_fee_cap =
-  match Tez.of_string "1.0" with None -> assert false | Some t -> t
+let default_fee_cap = tez 1
 
-let default_burn_cap =
-  match Tez.of_string "0" with None -> assert false | Some t -> t
+let default_burn_cap = Tez.zero
 
-let default_fee_parameter =
+(* The below default fee and burn limits are computed by taking into account
+   the worst fee found in the tests for the rollup node.
+
+   We take as base the cost of commitment cementation, which is 719 mutez in fees:
+   - Commitment publishing is 1.37 times more expensive.
+   - Message submission is 0.7 times more expensive, so cheaper but it depends on
+     the size of the message.
+   - For refutation games:
+     - Open is 1.55 times more expensive.
+     - Dissection move is 2.31 times more expensive.
+     - Proof move is 1.47 times more expensive but depends on the size of the proof.
+     - Timeout move is 1.34 times more expensive.
+
+   We set a fee limit of 1 tz for cementation (instead of 719 mutez) which
+   should be plenty enough even if the gas price or gas consumption
+   increases. We adjust the other limits in proportion.
+*)
+let default_fee = function
+  | Cement -> tez 1
+  | Publish -> tez 2
+  | Add_messages ->
+      (* We keep this limit even though it depends on the size of the message
+         because the rollup node pays the fees for messages submitted by the
+         **users**. *)
+      tez 1
+  | Timeout -> tez 2
+  | Refute ->
+      (* Should be 3 based on comment above but we want to make sure we inject
+         refutation moves even if the proof is large. The stake is high (we can
+         lose the 10k deposit or we can get the reward). *)
+      tez 5
+
+let default_burn = function
+  | Publish ->
+      (* The first commitment can store data. *)
+      tez 1
+  | Add_messages -> tez 0
+  | Cement -> tez 0
+  | Timeout -> tez 0
+  | Refute ->
+      (* A refutation move can store data, e.g. opening a game. *)
+      tez 1
+
+let default_fee_parameter ?purpose () =
+  let fee_cap, burn_cap =
+    match purpose with
+    | None -> (default_fee_cap, default_burn_cap)
+    | Some purpose -> (default_fee purpose, default_burn purpose)
+  in
   {
     Injection.minimal_fees = default_minimal_fees;
     minimal_nanotez_per_byte = default_minimal_nanotez_per_byte;
     minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit;
     force_low_fee = default_force_low_fee;
-    fee_cap = default_fee_cap;
-    burn_cap = default_burn_cap;
+    fee_cap;
+    burn_cap;
   }
+
+let default_fee_parameters =
+  List.fold_left
+    (fun acc purpose ->
+      Operator_purpose_map.add purpose (default_fee_parameter ~purpose ()) acc)
+    Operator_purpose_map.empty
+    purposes
 
 let string_of_purpose = function
   | Publish -> "publish"
@@ -162,15 +218,15 @@ let operator_purpose_map_encoding encoding =
   let open Data_encoding in
   let schema =
     let open Json_schema in
-    let v_schema = Data_encoding.Json.schema encoding in
-    let v_schema_r = root v_schema in
+    let v_schema p = Data_encoding.Json.schema (encoding p) in
+    let v_schema_r p = root (v_schema p) in
     let kind =
       Object
         {
           properties =
             List.map
               (fun purpose ->
-                (string_of_purpose purpose, v_schema_r, false, None))
+                (string_of_purpose purpose, v_schema_r purpose, false, None))
               purposes;
           pattern_properties = [];
           additional_properties = None;
@@ -180,7 +236,7 @@ let operator_purpose_map_encoding encoding =
           property_dependencies = [];
         }
     in
-    update (element kind) v_schema
+    update (element kind) (v_schema Publish (* Dummy for definitions *))
   in
   conv
     ~schema
@@ -188,23 +244,24 @@ let operator_purpose_map_encoding encoding =
       let fields =
         Operator_purpose_map.bindings map
         |> List.map (fun (p, v) ->
-               (string_of_purpose p, Data_encoding.Json.construct encoding v))
+               (string_of_purpose p, Data_encoding.Json.construct (encoding p) v))
       in
       `O fields)
     (function
       | `O fields ->
           List.map
             (fun (p, v) ->
-              (purpose_of_string_exn p, Data_encoding.Json.destruct encoding v))
+              let purpose = purpose_of_string_exn p in
+              (purpose, Data_encoding.Json.destruct (encoding purpose) v))
             fields
           |> List.to_seq |> Operator_purpose_map.of_seq
       | _ -> assert false)
     Data_encoding.Json.encoding
 
 let operators_encoding =
-  operator_purpose_map_encoding Signature.Public_key_hash.encoding
+  operator_purpose_map_encoding (fun _ -> Signature.Public_key_hash.encoding)
 
-let fee_parameter_encoding =
+let fee_parameter_encoding purpose =
   let open Data_encoding in
   conv
     (fun {
@@ -257,12 +314,19 @@ let fee_parameter_encoding =
             "Don't check that the fee is lower than the estimated default"
           bool
           default_force_low_fee)
-       (dft "fee-cap" ~description:"The fee cap" Tez.encoding default_fee_cap)
+       (dft
+          "fee-cap"
+          ~description:"The fee cap"
+          Tez.encoding
+          (default_fee purpose))
        (dft
           "burn-cap"
           ~description:"The burn cap"
           Tez.encoding
-          default_burn_cap))
+          (default_burn purpose)))
+
+let fee_parameters_encoding =
+  operator_purpose_map_encoding fee_parameter_encoding
 
 let modes = [Observer; Batcher; Maintenance; Operator; Custom]
 
@@ -312,7 +376,7 @@ let encoding : t Data_encoding.t =
            rpc_addr;
            rpc_port;
            reconnection_delay;
-           fee_parameter;
+           fee_parameters;
            mode;
            loser_mode;
            dal_node_addr;
@@ -324,7 +388,7 @@ let encoding : t Data_encoding.t =
           rpc_addr,
           rpc_port,
           reconnection_delay,
-          fee_parameter,
+          fee_parameters,
           mode,
           loser_mode ),
         (dal_node_addr, dal_node_port) ))
@@ -334,7 +398,7 @@ let encoding : t Data_encoding.t =
              rpc_addr,
              rpc_port,
              reconnection_delay,
-             fee_parameter,
+             fee_parameters,
              mode,
              loser_mode ),
            (dal_node_addr, dal_node_port) ) ->
@@ -345,7 +409,7 @@ let encoding : t Data_encoding.t =
         rpc_addr;
         rpc_port;
         reconnection_delay;
-        fee_parameter;
+        fee_parameters;
         mode;
         loser_mode;
         dal_node_addr;
@@ -371,17 +435,18 @@ let encoding : t Data_encoding.t =
           (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
           (dft "rpc-port" ~description:"RPC port" int16 default_rpc_port)
           (dft
+             "reconnection_delay"
              ~description:
                "The reconnection (to the tezos node) delay in seconds"
-             "reconnection_delay"
              float
              default_reconnection_delay)
           (dft
-             "fee-parameter"
+             "fee-parameters"
              ~description:
-               "The fee parameter used when injecting operations in L1"
-             fee_parameter_encoding
-             default_fee_parameter)
+               "The fee parameters for each purpose used when injecting \
+                operations in L1"
+             fee_parameters_encoding
+             default_fee_parameters)
           (req
              ~description:"The mode for this rollup node"
              "mode"

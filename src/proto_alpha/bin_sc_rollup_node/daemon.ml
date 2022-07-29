@@ -455,7 +455,7 @@ let run ~data_dir (cctxt : Protocol_client_context.full) =
       configuration.sc_rollup_address
       kind
       configuration.sc_rollup_node_operators
-      configuration.fee_parameter
+      configuration.fee_parameters
       ~loser_mode:configuration.loser_mode
       store
       context

@@ -63,7 +63,20 @@ module Parameters :
     | Timeout -> 1
     | Refute -> 1
 
-  let fee_parameter {Node_context.fee_parameter; _} _ = fee_parameter
+  let operation_tag (type kind) (operation : kind manager_operation) :
+      Tag.t option =
+    match operation with
+    | Sc_rollup_add_messages _ -> Some Add_messages
+    | Sc_rollup_cement _ -> Some Cement
+    | Sc_rollup_publish _ -> Some Publish
+    | Sc_rollup_timeout _ -> Some Timeout
+    | Sc_rollup_refute _ -> Some Refute
+    | _ -> None
+
+  let fee_parameter node_ctxt operation =
+    match operation_tag operation with
+    | None -> Configuration.default_fee_parameter ()
+    | Some tag -> Node_context.get_fee_parameter node_ctxt tag
 
   (* Below are dummy values that are only used to approximate the
      size. It is thus important that they remain above the real

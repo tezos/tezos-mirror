@@ -41,6 +41,8 @@ module Operator_purpose_map : Map.S with type key = purpose
 
 type operators = Signature.Public_key_hash.t Operator_purpose_map.t
 
+type fee_parameters = Injection.fee_parameter Operator_purpose_map.t
+
 type t = {
   data_dir : string;
   sc_rollup_address : Protocol.Alpha_context.Sc_rollup.t;
@@ -48,7 +50,7 @@ type t = {
   rpc_addr : string;
   rpc_port : int;
   reconnection_delay : float;
-  fee_parameter : Injection.fee_parameter;
+  fee_parameters : fee_parameters;
   mode : mode;
   loser_mode : Loser_mode.t;
   (*DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3718
@@ -93,8 +95,14 @@ val default_rpc_port : int
 (** [default_reconnection_delay] is the default value for [reconnection_delay]. *)
 val default_reconnection_delay : float
 
-(** [default_fee_parameter] is the default value for [fee_parameter] *)
-val default_fee_parameter : Injection.fee_parameter
+(** [default_fee_parameter ?purpose ()] is the default fee parameter to inject
+    operation on L1. If [purpose] is provided, it returns the default fee
+    parameter for the specific purpose. *)
+val default_fee_parameter : ?purpose:purpose -> unit -> Injection.fee_parameter
+
+(** [default_fee_parameters] is the default fee parameters configuration build
+    with {!default_fee_parameter} for all purposes. *)
+val default_fee_parameters : fee_parameters
 
 (** [default_dal_node_addr] is the default value for [dal_node_addr]. *)
 val default_dal_node_addr : string

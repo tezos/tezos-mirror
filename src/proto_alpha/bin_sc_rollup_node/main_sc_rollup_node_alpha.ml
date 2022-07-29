@@ -163,88 +163,6 @@ let data_dir_arg =
     ~default
     Client_proto_args.string_parameter
 
-let minimal_fees_arg =
-  let open Protocol.Alpha_context in
-  let default =
-    Configuration.default_fee_parameter.minimal_fees |> Tez.to_string
-  in
-  Clic.default_arg
-    ~long:"minimal-fees"
-    ~placeholder:"amount"
-    ~doc:
-      "Exclude operations with fees lower than this threshold (in tez) when \
-       injecting."
-    ~default
-    (Clic.parameter (fun _ s ->
-         match Tez.of_string s with
-         | Some t -> return t
-         | None -> fail (Sc_rollup_node_errors.Bad_minimal_fees s)))
-
-let minimal_nanotez_per_gas_unit_arg =
-  let default =
-    Configuration.default_fee_parameter.minimal_nanotez_per_gas_unit
-    |> Q.to_string
-  in
-  Clic.default_arg
-    ~long:"minimal-nanotez-per-gas-unit"
-    ~placeholder:"amount"
-    ~doc:
-      "Exclude operations with fees per gas lower than this threshold (in \
-       nanotez) when injecting."
-    ~default
-    (Clic.parameter (fun _ s ->
-         try return (Q.of_string s)
-         with _ -> fail (Sc_rollup_node_errors.Bad_minimal_fees s)))
-
-let minimal_nanotez_per_byte_arg =
-  let default =
-    Configuration.default_fee_parameter.minimal_nanotez_per_byte |> Q.to_string
-  in
-  Clic.default_arg
-    ~long:"minimal-nanotez-per-byte"
-    ~placeholder:"amount"
-    ~default
-    ~doc:
-      "Exclude operations with fees per byte lower than this threshold (in \
-       nanotez) when injecting."
-    (Clic.parameter (fun _ s ->
-         try return (Q.of_string s)
-         with _ -> fail (Sc_rollup_node_errors.Bad_minimal_fees s)))
-
-let force_low_fee_arg =
-  Clic.switch
-    ~long:"force-low-fee"
-    ~doc:
-      "Don't check that the fee is lower than the estimated default value when \
-       injecting."
-    ()
-
-let fee_cap_arg =
-  let open Protocol.Alpha_context in
-  let default = Configuration.default_fee_parameter.fee_cap |> Tez.to_string in
-  Clic.default_arg
-    ~long:"fee-cap"
-    ~placeholder:"amount"
-    ~default
-    ~doc:"Set the fee cap when injecting."
-    (Clic.parameter (fun _ s ->
-         match Tez.of_string s with
-         | Some t -> return t
-         | None -> failwith "Bad fee cap"))
-
-let burn_cap_arg =
-  let open Protocol.Alpha_context in
-  let default = Configuration.default_fee_parameter.burn_cap |> Tez.to_string in
-  Clic.default_arg
-    ~long:"burn-cap"
-    ~placeholder:"amount"
-    ~default
-    ~doc:"Set the burn cap when injecting."
-    (Clic.parameter (fun _ s ->
-         match Tez.of_string s with
-         | Some t -> return t
-         | None -> failwith "Bad burn cap"))
-
 let loser_mode =
   Clic.default_arg
     ~long:"loser-mode"
@@ -288,16 +206,10 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure the smart-contract rollup node."
-    (args13
+    (args7
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
-       minimal_fees_arg
-       minimal_nanotez_per_byte_arg
-       minimal_nanotez_per_gas_unit_arg
-       force_low_fee_arg
-       fee_cap_arg
-       burn_cap_arg
        loser_mode
        reconnection_delay_arg
        dal_node_addr_arg
@@ -310,12 +222,6 @@ let config_init_command =
     (fun ( data_dir,
            rpc_addr,
            rpc_port,
-           minimal_fees,
-           minimal_nanotez_per_byte,
-           minimal_nanotez_per_gas_unit,
-           force_low_fee,
-           fee_cap,
-           burn_cap,
            loser_mode,
            reconnection_delay,
            dal_node_addr,
@@ -353,15 +259,7 @@ let config_init_command =
           reconnection_delay;
           dal_node_addr;
           dal_node_port;
-          fee_parameter =
-            {
-              minimal_fees;
-              minimal_nanotez_per_byte;
-              minimal_nanotez_per_gas_unit;
-              force_low_fee;
-              fee_cap;
-              burn_cap;
-            };
+          fee_parameters = Operator_purpose_map.empty;
           mode;
           loser_mode;
         }
