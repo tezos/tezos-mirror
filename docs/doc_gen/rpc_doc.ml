@@ -33,14 +33,14 @@ let protocols =
       Some "/include/rpc_introduction.rst.inc",
       "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" );
     (* TODO tezos/tezos#2170: adapt rest of this list *)
-    ( "",
-      "Ithaca",
-      Some "/include/rpc_introduction.rst.inc",
-      "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A" );
     ( "jakarta",
       "Jakarta",
       Some "/include/rpc_introduction.rst.inc",
       "PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY" );
+    ( "kathmandu",
+      "Kathmandu",
+      Some "/include/rpc_introduction.rst.inc",
+      "PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg" );
   ]
 
 let pp_name ppf = function
@@ -272,7 +272,7 @@ module Description = struct
             service ;
           Option.iter
             (fun input ->
-              let (schema, bin_schema) = Lazy.force input in
+              let schema, bin_schema = Lazy.force input in
               pp_content
                 ppf
                 ~tag:"pre"
@@ -408,7 +408,7 @@ let make_index node required_version =
     ("shell", "Shell", Some "/shell/rpc_introduction.rst.inc", [""], shell_dir)
     :: protocol_dirs
   in
-  let (_version, name, intro, path, dir) =
+  let _version, name, intro, path, dir =
     WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
          (fun (version, _name, _intro, _path, _dir) ->

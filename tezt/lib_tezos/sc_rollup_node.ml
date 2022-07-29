@@ -86,27 +86,28 @@ let layer1_port sc_node = Node.rpc_port sc_node.persistent_state.node
 let spawn_command sc_node =
   Process.spawn ~name:sc_node.name ~color:sc_node.color sc_node.path
 
-let spawn_config_init sc_node rollup_address =
+let spawn_config_init sc_node ?loser_mode rollup_address =
   spawn_command
     sc_node
-    [
-      "config";
-      "init";
-      "on";
-      rollup_address;
-      "with";
-      "operator";
-      operator_pkh sc_node;
-      "--data-dir";
-      data_dir sc_node;
-      "--rpc-addr";
-      rpc_host sc_node;
-      "--rpc-port";
-      string_of_int @@ rpc_port sc_node;
-    ]
+    ([
+       "config";
+       "init";
+       "on";
+       rollup_address;
+       "with";
+       "operator";
+       operator_pkh sc_node;
+       "--data-dir";
+       data_dir sc_node;
+       "--rpc-addr";
+       rpc_host sc_node;
+       "--rpc-port";
+       string_of_int @@ rpc_port sc_node;
+     ]
+    @ match loser_mode with None -> [] | Some mode -> ["--loser-mode"; mode])
 
-let config_init sc_node rollup_address =
-  let process = spawn_config_init sc_node rollup_address in
+let config_init sc_node ?loser_mode rollup_address =
+  let process = spawn_config_init sc_node ?loser_mode rollup_address in
   let* output = Process.check_and_read_stdout process in
   match
     output
@@ -137,8 +138,18 @@ let set_ready sc_node =
   | Running status -> status.session_state.ready <- true) ;
   trigger_ready sc_node (Some ())
 
-let check_event ?where sc_node name promise =
-  let* result = promise in
+let check_event ?timeout ?where sc_node name promise =
+  let* result =
+    match timeout with
+    | None -> promise
+    | Some timeout ->
+        Lwt.pick
+          [
+            promise;
+            (let* () = Lwt_unix.sleep timeout in
+             Lwt.return None);
+          ]
+  in
   match result with
   | None ->
       raise
@@ -149,7 +160,7 @@ let wait_for_ready sc_node =
   match sc_node.status with
   | Running {session_state = {ready = true; _}; _} -> unit
   | Not_running | Running {session_state = {ready = false; _}; _} ->
-      let (promise, resolver) = Lwt.task () in
+      let promise, resolver = Lwt.task () in
       sc_node.persistent_state.pending_ready <-
         resolver :: sc_node.persistent_state.pending_ready ;
       check_event sc_node "sc_rollup_node_is_ready.v0" promise
@@ -173,16 +184,17 @@ let update_level sc_node current_level =
           pending :: sc_node.persistent_state.pending_level)
     pending
 
-let wait_for_level sc_node level =
+let wait_for_level ?timeout sc_node level =
   match sc_node.status with
   | Running {session_state = {level = Known current_level; _}; _}
     when current_level >= level ->
       return current_level
   | Not_running | Running _ ->
-      let (promise, resolver) = Lwt.task () in
+      let promise, resolver = Lwt.task () in
       sc_node.persistent_state.pending_level <-
         (level, resolver) :: sc_node.persistent_state.pending_level ;
       check_event
+        ?timeout
         sc_node
         "sc_rollup_node_layer_1_new_head.v0"
         ~where:("level >= " ^ string_of_int level)

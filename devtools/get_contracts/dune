@@ -1,0 +1,77 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name get_contracts)
+ (libraries
+  tezos-micheline
+  tezos-base
+  tezos-stdlib-unix
+  tezos-client-base-unix
+  tezos-store)
+ (flags
+  (:standard)
+  -open Tezos_micheline
+  -open Tezos_base.TzPervasives
+  -open Tezos_stdlib_unix)
+ (modules get_contracts sigs storage_helpers contract_size))
+
+(executable
+ (name get_contracts_012_Psithaca)
+ (libraries
+  tezos-base
+  tezos-protocol-012-Psithaca
+  tezos-client-012-Psithaca
+  get_contracts)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_012_Psithaca
+  -open Tezos_protocol_012_Psithaca.Protocol
+  -open Tezos_client_012_Psithaca)
+ (modules get_contracts_012_Psithaca))
+
+(executable
+ (name get_contracts_013_PtJakart)
+ (libraries
+  tezos-base
+  tezos-protocol-013-PtJakart
+  tezos-client-013-PtJakart
+  get_contracts)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_013_PtJakart
+  -open Tezos_protocol_013_PtJakart.Protocol
+  -open Tezos_client_013_PtJakart)
+ (modules get_contracts_013_PtJakart))
+
+(executable
+ (name get_contracts_014_PtKathma)
+ (libraries
+  tezos-base
+  tezos-protocol-014-PtKathma
+  tezos-client-014-PtKathma
+  get_contracts)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_014_PtKathma
+  -open Tezos_protocol_014_PtKathma.Protocol
+  -open Tezos_client_014_PtKathma)
+ (modules get_contracts_014_PtKathma))
+
+(executable
+ (name get_contracts_alpha)
+ (libraries
+  tezos-base
+  tezos-protocol-alpha
+  tezos-client-alpha
+  get_contracts)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_alpha
+  -open Tezos_protocol_alpha.Protocol
+  -open Tezos_client_alpha)
+ (modules get_contracts_alpha))

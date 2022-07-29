@@ -28,11 +28,7 @@
 
 (** {2 Worker group maker} *)
 
-(** An error returned when trying to communicate with a worker that
-    has been closed. *)
 type worker_name = {base : string; name : string}
-
-type Error_monad.error += Closed of worker_name
 
 (** Functor to build a group of workers.
     At that point, all the types are fixed and introspectable,
@@ -63,6 +59,16 @@ module type T = sig
 
   type dropbox
 
+  (** An error returned when waiting for a message pushed to the worker.
+      [Closed errs] is returned if the worker is terminated or has crashed. If the
+      worker is terminated, [errs] is an empty list.
+      [Request_error err] is returned if the request failed with an error. [Any
+      exn] is returned if the request failed with an exception. *)
+  type 'a message_error =
+    | Closed of error list option
+    | Request_error of 'a
+    | Any of exn
+
   (** Supported kinds of internal buffers. *)
   type _ buffer_kind =
     | Queue : infinite queue buffer_kind
@@ -84,39 +90,50 @@ module type T = sig
         provided by the type of buffer chosen at {!launch}.*)
     type self
 
+    (** The type of errors happening when launching an instance of a worker.  *)
+    type launch_error
+
     (** Builds the initial internal state of a worker at launch.
         It is possible to initialize the message queue.
         Of course calling {!state} will fail at that point. *)
     val on_launch :
-      self -> Name.t -> Types.parameters -> Types.state tzresult Lwt.t
+      self ->
+      Name.t ->
+      Types.parameters ->
+      (Types.state, launch_error) result Lwt.t
 
     (** The main request processor, i.e. the body of the event loop. *)
-    val on_request : self -> 'a Request.t -> 'a tzresult Lwt.t
+    val on_request :
+      self ->
+      ('a, 'request_error) Request.t ->
+      ('a, 'request_error) result Lwt.t
 
     (** Called when no request has been made before the timeout, if
         the parameter has been passed to {!launch}. *)
-    val on_no_request : self -> unit tzresult Lwt.t
+    val on_no_request : self -> unit Lwt.t
 
     (** A function called when terminating a worker. *)
     val on_close : self -> unit Lwt.t
 
-    (** A function called at the end of the worker loop in case of an
-        abnormal error. This function can handle the error by
-        returning [Ok ()], or leave the default unexpected error
-        behavior by returning its parameter. A possibility is to
-        handle the error for ad-hoc logging, and still use
-        {!trigger_shutdown} to kill the worker. *)
+    (** A function called at the end of the worker loop in case of an error. One
+        can first log the incoming error. Then, the error can be filtered out by
+        returning [return_unit] and the worker execution continues, or the error
+        can be propagated through a [tzresult], making the worker crash. *)
     val on_error :
       self ->
-      Request.view ->
       Worker_types.request_status ->
-      error list ->
+      ('a, 'request_error) Request.t ->
+      'request_error ->
       unit tzresult Lwt.t
 
     (** A function called at the end of the worker loop in case of a
         successful treatment of the current request. *)
     val on_completion :
-      self -> 'a Request.t -> 'a -> Worker_types.request_status -> unit Lwt.t
+      self ->
+      ('a, 'request_error) Request.t ->
+      'a ->
+      Worker_types.request_status ->
+      unit Lwt.t
   end
 
   (** Creates a new worker instance.
@@ -126,8 +143,10 @@ module type T = sig
     ?timeout:Time.System.Span.t ->
     Name.t ->
     Types.parameters ->
-    (module HANDLERS with type self = 'kind t) ->
-    'kind t tzresult Lwt.t
+    (module HANDLERS
+       with type self = 'kind t
+        and type launch_error = 'launch_error) ->
+    ('kind t, 'launch_error) result Lwt.t
 
   (** Triggers a worker termination and waits for its completion.
       Cannot be called from within the handlers.  *)
@@ -139,18 +158,37 @@ module type T = sig
     (** With [BOX]es, you can put a request right at the front *)
     type t
 
-    val put_request : t -> 'a Request.t -> unit
+    (** [put_request worker request] sends the [request] to the [worker]. If the
+        [worker] dropbox is closed, then it is a no-op. *)
+    val put_request : t -> ('a, 'request_error) Request.t -> unit
 
-    val put_request_and_wait : t -> 'a Request.t -> 'a tzresult Lwt.t
+    (** [put_request_and_wait worker request] sends the [request] to the
+        [worker] and waits for its completion. If the worker dropbox is closed,
+        then it returns [Error Closed]. *)
+    val put_request_and_wait :
+      t ->
+      ('a, 'request_error) Request.t ->
+      ('a, 'request_error message_error) result Lwt.t
   end
 
   module type QUEUE = sig
     (** With [QUEUE]s, you can push requests in the queue *)
     type 'a t
 
-    val push_request_and_wait : 'q t -> 'a Request.t -> 'a tzresult Lwt.t
+    (** [push_request_and_wait worker request] sends the [request] to the
+        [worker] and waits for its completion. If the [worker] queue is closed,
+        then it returns [Error Closed]. If the buffer is a bounded queue and the
+        underlying queue is full, the call is blocking. *)
+    val push_request_and_wait :
+      'q t ->
+      ('a, 'request_error) Request.t ->
+      ('a, 'request_error message_error) result Lwt.t
 
-    val push_request : 'q t -> 'a Request.t -> unit Lwt.t
+    (** [push_request worker request] sends the [request] to the [worker]. The
+        promise returned is [true] if the request was pushed successfuly or
+        [false] if the worker queue is closed. If the buffer is a bounded queue
+        and the underlying queue is full, the call is blocking. *)
+    val push_request : 'q t -> ('a, 'request_error) Request.t -> bool Lwt.t
 
     val pending_requests : 'a t -> (Time.System.t * Request.view) list
 
@@ -165,16 +203,9 @@ module type T = sig
     include QUEUE with type 'a t := 'a queue t
 
     (** Adds a message to the queue immediately. *)
-    val push_request_now : infinite queue t -> 'a Request.t -> unit
+    val push_request_now :
+      infinite queue t -> ('a, 'request_error) Request.t -> unit
   end
-
-  (** Detects cancellation from within the request handler to stop
-      asynchronous operations. *)
-  val protect :
-    _ t ->
-    ?on_error:(error list -> 'b tzresult Lwt.t) ->
-    (unit -> 'b tzresult Lwt.t) ->
-    'b tzresult Lwt.t
 
   (** Exports the canceler to allow cancellation of other tasks when this
       worker is shutdown or when it dies. *)
@@ -191,6 +222,14 @@ module type T = sig
 
   (** Access the internal state, once initialized. *)
   val state : _ t -> Types.state
+
+  (** [with_state w f] calls [f] on the current state of worker [w] if
+      it was intialized and not closed or crashed, otherwise
+      returns immediately. *)
+  val with_state :
+    _ t ->
+    (Types.state -> (unit, 'request_error) result Lwt.t) ->
+    (unit, 'request_error) result Lwt.t
 
   (** Introspect the message queue, gives the times requests were pushed. *)
   val pending_requests : _ queue t -> (Time.System.t * Request.view) list
@@ -214,7 +253,35 @@ module type T = sig
   val find_opt : 'a table -> Name.t -> 'a t option
 end
 
-module Make
+(** [module WG = MakeGroup (Name) (Event) (Request) (Logger)] defines a {e worker
+    group} all using the same [Name], [Event], etc. To instantiate a worker from a group, you
+    must give the [Types] parameter: [WG.MakeWorker(Types)]. This defines a
+    [Worker] module of type [T]. This last instantiation can be safely used as
+    first class module.
+
+    The delayed application is there to prevent multiple side-effect executions
+    in case of multiple instantiation. (Inner events trigger side effects.)
+*)
+module MakeGroup
+    (Name : Worker_intf.NAME)
+    (Event : Worker_intf.EVENT)
+    (Request : Worker_intf.REQUEST)
+    (Logger : Worker_intf.LOGGER
+                with module Event = Event
+                 and type Request.view = Request.view) : sig
+  module MakeWorker (Types : Worker_intf.TYPES) :
+    T
+      with module Name = Name
+       and module Event = Event
+       and module Request = Request
+       and module Types = Types
+end
+
+(** [MakeSingle (Name) (Event) (Request) (Types) (Logger)] is the same as using
+    [MakeGroup] and then [MakeWorker]. It's a special case which you can
+    use if you only ever need a single instantiation.
+*)
+module MakeSingle
     (Name : Worker_intf.NAME)
     (Event : Worker_intf.EVENT)
     (Request : Worker_intf.REQUEST)

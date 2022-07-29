@@ -13,21 +13,24 @@
 ## This script is also sourced in the Makefile, as such it should be compatible
 ## with both the make and sh syntax
 
-export ocaml_version=4.12.1
+export ocaml_version=4.14.0
 export opam_version=2
 export recommended_rust_version=1.52.1
 export recommended_node_version=14.12.0
 
 ## full_opam_repository is a commit hash of the public OPAM repository, i.e.
 ## https://github.com/ocaml/opam-repository
-export full_opam_repository_tag=de5b1f98a1c16bd8c90f22d03e82a0633b7554dc
+export full_opam_repository_tag=187686a4f13743104fb272962979e96cdbf6e5a7
 
 ## opam_repository is an additional, tezos-specific opam repository.
-## This value MUST be the same as `build_deps_image_version` in `.gitlab/ci/templates.yml
+## This value MUST be the same as `build_deps_image_version` in `.gitlab/ci/templates.ym
 export opam_repository_url=https://gitlab.com/tezos/opam-repository
-export opam_repository_tag=845375388d477153b36344f69a23a1b34b2bf82e
+export opam_repository_tag=d19f422fc819da8d82d2214e1105ca3867f0e1eb
 export opam_repository_git=$opam_repository_url.git
 export opam_repository=$opam_repository_git\#$opam_repository_tag
 
 ## Other variables, used both in Makefile and scripts
 export COVERAGE_OUTPUT=_coverage_output
+
+export sapling_output_parameters_sha256=2f0ebbcbb9bb0bcffe95a397e7eba89c29eb4dde6191c339db88570e3f3fb0e4
+export sapling_spend_parameters_sha256=8e48ffd23abb3a5fd9c5589204f32d9c31285a04b78096ba40a79b75677efc13

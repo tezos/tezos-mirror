@@ -64,6 +64,10 @@ val mem : Operation_hash.t -> 'protocol_data t -> bool
 
     Complexity is O(log(n)), where n is the number of operations (hashes) in the
     structure.
+
+    It is unspecified behaviour to call this function with a hash ([oph]) which
+    is already recorded in the data-structure ([p]). It is your responsibility
+    as the caller of the function to ensure this.
 *)
 val add :
   'protocol_data Prevalidation.operation ->

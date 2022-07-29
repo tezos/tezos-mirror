@@ -23,28 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Support.Lib.Monad
-
-let assert_eq_s pa pb =
-  let open Lwt_syntax in
-  let* a = pa and* b = pb in
-  assert (a = b) ;
-  return_unit
-
-let assert_err e = e = Error ()
-
-let assert_err_s e =
-  let open Lwt_syntax in
-  let* e = e in
-  assert (e = Error ()) ;
-  return_unit
-
-let assert_err_p e =
-  let open Lwt_syntax in
-  let* e = e in
-  assert (e = Error (Support.Test_trace.make ())) ;
-  return_unit
-
 module ListGen = struct
   include Support.Lib.List
 
@@ -269,20 +247,20 @@ module Shuffle = struct
       ~pp_sep:(fun ppf () -> Format.fprintf ppf "; ")
       Format.pp_print_int
 
-  let list_size = QCheck.Gen.int_range 2 50
+  let size = QCheck2.Gen.int_range 2 50
 
   let count = 50
 
   let test_shuffle_preserves_values =
-    QCheck.Test.make
+    QCheck2.Test.make
       ~name:"shuffle preserves value sets"
       ~count
-      QCheck.(pair (list_of_size list_size int) int)
+      QCheck2.Gen.(pair (list_size size int) int)
       (fun (l, seed) ->
         let rng = Random.State.make [|seed|] in
         let l1 = sort Int.compare l in
         let l2 = sort Int.compare (shuffle ~rng l) in
-        Lib_test.Qcheck_helpers.qcheck_eq'
+        Lib_test.Qcheck2_helpers.qcheck_eq'
           ~pp:pp_int_list
           ~eq:( = )
           ~actual:l2

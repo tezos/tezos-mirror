@@ -70,7 +70,7 @@ let create_echo () =
         if echo.closed then return 0
         else
           (* Nothing to read, for now. *)
-          let (promise, resolver) = Lwt.task () in
+          let promise, resolver = Lwt.task () in
           echo.pending <- resolver :: echo.pending ;
           let* () = promise in
           read bytes ofs len
@@ -324,7 +324,7 @@ let spawn_with_stdin ?runner ?(log_command = true) ?(log_status_on_exit = true)
     | None -> (command, Array.of_list (command :: arguments))
     | Some runner ->
         let local_env = String_map.bindings env in
-        let (ssh, ssh_args) =
+        let ssh, ssh_args =
           Runner.wrap_with_ssh_pid runner {local_env; name = command; arguments}
         in
         (ssh, Array.of_list (ssh :: ssh_args))
@@ -388,7 +388,7 @@ let spawn_with_stdin ?runner ?(log_command = true) ?(log_status_on_exit = true)
 
 let spawn ?runner ?log_command ?log_status_on_exit ?log_output ?name ?color ?env
     ?hooks command arguments =
-  let (process, stdin) =
+  let process, stdin =
     spawn_with_stdin
       ?runner
       ?log_command

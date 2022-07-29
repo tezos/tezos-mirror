@@ -130,7 +130,7 @@ let may_create_discovery_worker _limits config pool =
   match
     (config.listening_port, config.discovery_port, config.discovery_addr)
   with
-  | (Some listening_port, Some discovery_port, Some discovery_addr) ->
+  | Some listening_port, Some discovery_port, Some discovery_addr ->
       Some
         (P2p_discovery.create
            pool
@@ -139,7 +139,7 @@ let may_create_discovery_worker _limits config pool =
            ~discovery_port
            ~discovery_addr
            ~trust_discovered_peers:config.trust_discovered_peers)
-  | (_, _, _) -> None
+  | _, _, _ -> None
 
 let create_maintenance_worker limits pool connect_handler config triggers log =
   let maintenance_config =

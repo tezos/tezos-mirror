@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -30,6 +30,7 @@ let hooks =
       [
         ("tz[123]\\w{33}\\b", "[PUBLIC_KEY_HASH]");
         ("\\bB\\w{50}\\b", "[BLOCK_HASH]");
+        ("Co\\w{50}\\b", "[CONTEXT_HASH]");
         ("txr1\\w{33}\\b", "[TX_ROLLUP_HASH]");
         ("tz4\\w{33}\\b", "[TX_ROLLUP_PUBLIC_KEY_HASH]");
         ("txi\\w{50}\\b", "[TX_ROLLUP_INBOX_HASH]");
@@ -40,7 +41,6 @@ let hooks =
         ("txc\\w{50}\\b", "[TX_ROLLUP_COMMITMENT_HASH]");
         ("scr1\\w{33}\\b", "[SC_ROLLUP_HASH]");
         ("scc1\\w{50}\\b", "[SC_ROLLUP_COMMITMENT_HASH]");
-        ("scs1\\w{50}\\b", "[SC_ROLLUP_STATE_HASH]");
         ("scib1\\w{50}\\b", "[SC_ROLLUP_INBOX_HASH]");
         ("edpk\\w{50}\\b", "[PUBLIC_KEY]");
         ("KT1\\w{33}\\b", "[CONTRACT_HASH]");
@@ -58,7 +58,7 @@ let hooks =
   in
   let on_spawn command arguments =
     (* Remove arguments that shouldn't be captured in regression output. *)
-    let (arguments, _) =
+    let arguments, _ =
       List.fold_left
         (fun (acc, scrub_next) arg ->
           if scrub_next then (acc, false)

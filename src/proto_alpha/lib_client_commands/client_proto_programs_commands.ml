@@ -91,13 +91,13 @@ let commands () =
       ()
   in
   let payer_arg =
-    ContractAlias.destination_arg
-      ~name:"payer"
+    Client_keys.Public_key_hash.source_arg
+      ~long:"payer"
       ~doc:"name of the payer (i.e. SOURCE) contract for the transaction"
       ()
   in
   let self_arg =
-    ContractAlias.destination_arg
+    OriginatedContractAlias.destination_arg
       ~name:"self-address"
       ~doc:"address of the contract (i.e. SELF_ADDRESS) for the transaction"
       ()
@@ -183,7 +183,7 @@ let commands () =
   let handle_parsing_error label (cctxt : Protocol_client_context.full)
       (emacs_mode, no_print_source) program body =
     match program with
-    | (program, []) -> body program
+    | program, [] -> body program
     | res_with_errors when emacs_mode ->
         cctxt#message
           "(@[<v 0>(%s . ())@ (errors . %a)@])"
@@ -191,7 +191,7 @@ let commands () =
           Michelson_v1_emacs.report_errors
           res_with_errors
         >>= fun () -> return_unit
-    | (parsed, errors) ->
+    | parsed, errors ->
         cctxt#message
           "%a"
           (fun ppf () ->
@@ -276,9 +276,6 @@ let commands () =
            storage
            input
            cctxt ->
-        let source = Option.map snd source in
-        let payer = Option.map snd payer in
-        let self = Option.map snd self in
         Lwt.return @@ Micheline_parser.no_parsing_error program
         >>=? fun program ->
         let show_source = not no_print_source in
@@ -665,8 +662,7 @@ let commands () =
       no_options
       (prefixes ["sign"; "bytes"]
       @@ bytes_parameter ~name:"data" ~desc:"the raw data to sign"
-      @@ prefixes ["for"]
-      @@ Client_keys.Secret_key.source_param @@ stop)
+      @@ prefixes ["for"] @@ Client_keys.Secret_key.source_param @@ stop)
       (fun () bytes sk cctxt ->
         Client_keys.sign cctxt sk bytes >>=? fun signature ->
         cctxt#message "Signature: %a" Signature.pp signature >>= fun () ->
@@ -708,8 +704,7 @@ let commands () =
            ~name:"entrypoint"
            ~desc:"the entrypoint to describe"
            entrypoint_parameter
-      @@ prefixes ["for"]
-      @@ Program.source_param @@ stop)
+      @@ prefixes ["for"] @@ Program.source_param @@ stop)
       (fun ((emacs_mode, no_print_source) as setup) entrypoint program cctxt ->
         handle_parsing_error "entrypoint" cctxt setup program @@ fun program ->
         entrypoint_type
@@ -955,7 +950,7 @@ let commands () =
            ~desc:"the name of the view"
            entrypoint_parameter
       @@ prefixes ["on"; "contract"]
-      @@ ContractAlias.destination_param
+      @@ OriginatedContractAlias.destination_param
            ~name:"contract"
            ~desc:"viewed contract"
       @@ prefixes ["with"; "input"]
@@ -963,11 +958,9 @@ let commands () =
       @@ stop)
       (fun (source, payer, gas, unparsing_mode, now, level)
            entrypoint
-           (_, contract)
+           contract
            input
            cctxt ->
-        let source = Option.map snd source in
-        let payer = Option.map snd payer in
         Client_proto_programs.run_view
           cctxt
           ~chain:cctxt#chain
@@ -977,6 +970,83 @@ let commands () =
               {input; unparsing_mode; now; level; source; payer; gas};
             contract;
             entrypoint;
+          }
+        >>= fun res -> print_view_result cctxt res);
+    command
+      ~group
+      ~desc:"Ask the node to run a Michelson view with Unit as input."
+      (args7
+         source_arg
+         payer_arg
+         run_gas_limit_arg
+         unlimited_gas_arg
+         (unparsing_mode_arg ~default:"Readable")
+         now_arg
+         level_arg)
+      (prefixes ["run"; "view"]
+      @@ param ~name:"view" ~desc:"the name of the view" string_parameter
+      @@ prefixes ["on"; "contract"]
+      @@ OriginatedContractAlias.destination_param
+           ~name:"contract"
+           ~desc:"the contract containing the view"
+      @@ stop)
+      (fun (source, payer, gas, unlimited_gas, unparsing_mode, now, level)
+           view
+           contract
+           cctxt ->
+        Micheline_parser.no_parsing_error
+        @@ Michelson_v1_parser.parse_expression "Unit"
+        >>?= fun input ->
+        Client_proto_programs.run_script_view
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          {
+            shared_params =
+              {input; unparsing_mode; now; level; source; payer; gas};
+            contract;
+            view;
+            unlimited_gas;
+          }
+        >>= fun res -> print_view_result cctxt res);
+    command
+      ~group
+      ~desc:"Ask the node to run a Michelson view."
+      (args7
+         source_arg
+         payer_arg
+         run_gas_limit_arg
+         unlimited_gas_arg
+         (unparsing_mode_arg ~default:"Readable")
+         now_arg
+         level_arg)
+      (prefixes ["run"; "view"]
+      @@ param ~name:"view" ~desc:"the name of the view" string_parameter
+      @@ prefixes ["on"; "contract"]
+      @@ OriginatedContractAlias.destination_param
+           ~name:"contract"
+           ~desc:"the contract containing the view"
+      @@ prefixes ["with"; "input"]
+      @@ param
+           ~name:"input"
+           ~desc:"the argument provided to the view"
+           data_parameter
+      @@ stop)
+      (fun (source, payer, gas, unlimited_gas, unparsing_mode, now, level)
+           view
+           contract
+           input
+           cctxt ->
+        Client_proto_programs.run_script_view
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          {
+            shared_params =
+              {input; unparsing_mode; now; level; source; payer; gas};
+            contract;
+            view;
+            unlimited_gas;
           }
         >>= fun res -> print_view_result cctxt res);
   ]

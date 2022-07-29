@@ -85,7 +85,8 @@ type 'protocol_data t = private {
   mutable prechecked : 'protocol_data Prevalidation.operation Sized_map.t;
   mutable unparsable : Operation_hash.Set.t;
   mutable in_mempool :
-    ('protocol_data Prevalidation.operation * classification) Sized_map.t;
+    ('protocol_data Prevalidation.operation * classification)
+    Operation_hash.Map.t;
 }
 
 (** [create parameters] returns an empty {!t} whose bounded maps hold

@@ -349,7 +349,7 @@ let endpoint_parameter () =
                  ("only http and https endpoints are supported: " ^ x))
       in
       match (Uri.query parsed, Uri.fragment parsed) with
-      | ([], None) -> return parsed
+      | [], None -> return parsed
       | _ ->
           tzfail
             (Invalid_endpoint_arg
@@ -678,7 +678,7 @@ let config_show_mockup (cctxt : #Client_context.full)
     (protocol_hash_opt : Protocol_hash.t option) (base_dir : string) =
   let open Lwt_result_syntax in
   let* () = fail_on_non_mockup_dir cctxt in
-  let* (mockup, _) =
+  let* mockup, _ =
     Tezos_mockup.Persistence.get_mockup_context_from_disk
       ~base_dir
       ~protocol_hash:protocol_hash_opt
@@ -732,7 +732,7 @@ let config_init_mockup cctxt protocol_hash_opt bootstrap_accounts_file
          mockup_protocol_constants
          protocol_constants_file)
   in
-  let* (mockup, _) =
+  let* mockup, _ =
     Tezos_mockup.Persistence.get_mockup_context_from_disk
       ~base_dir
       ~protocol_hash:protocol_hash_opt
@@ -989,21 +989,21 @@ let build_endpoint addr port tls =
 let light_mode_checks mode endpoint sources =
   let open Lwt_result_syntax in
   match (mode, sources) with
-  | (`Mode_client, None) | (`Mode_mockup, None) | (`Mode_proxy, None) ->
+  | `Mode_client, None | `Mode_mockup, None | `Mode_proxy, None ->
       (* No --mode light, no --sources; good *)
       return_unit
-  | (`Mode_client, Some _) | (`Mode_mockup, Some _) | (`Mode_proxy, Some _) ->
+  | `Mode_client, Some _ | `Mode_mockup, Some _ | `Mode_proxy, Some _ ->
       (* --sources without the light mode: wrong *)
       failwith
         "--sources is specified whereas mode is %s. --sources should only be \
          used with --mode light."
       @@ client_mode_to_string mode
-  | (`Mode_light, None) ->
+  | `Mode_light, None ->
       (* --mode light without --sources: wrong *)
       failwith
         "--mode light requires passing --sources. Example --sources file: %s"
         Tezos_proxy.Light.example_sources
-  | (`Mode_light, Some sources) ->
+  | `Mode_light, Some sources ->
       let sources_uris = Tezos_proxy.Light.sources_config_to_uris sources in
       if List.mem ~equal:Uri.equal endpoint sources_uris then return_unit
       else
@@ -1185,9 +1185,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
     Format.eprintf "%s is not a directory.@." config_dir ;
     exit 1) ;
   let* () =
-    unless
-      (client_mode = `Mode_mockup)
-      (fun () ->
+    unless (client_mode = `Mode_mockup) (fun () ->
         let*! () = Lwt_utils_unix.create_dir config_dir in
         return_unit)
   in

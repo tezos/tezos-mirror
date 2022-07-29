@@ -87,7 +87,6 @@ type error +=
         | `Hash of Tx_rollup_message_result_hash_repr.t ];
     }
   | Ticket_payload_size_limit_exceeded of {payload_size : int; limit : int}
-  | Wrong_deposit_parameters
   | Proof_failed_to_reject
   | Proof_produced_rejected_state
   | Proof_invalid_before of {agreed : Context_hash.t; provided : Context_hash.t}

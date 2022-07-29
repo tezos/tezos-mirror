@@ -33,9 +33,73 @@ type sequence = S of State_hash.t
 
 type nonce = bytes
 
-let nonce_encoding = Data_encoding.Fixed.bytes Constants_repr.nonce_length
+type vdf_setup = Vdf.discriminant * Vdf.challenge
 
-let initial_seed = "Laissez-faire les proprietaires."
+type vdf_solution = Vdf.result * Vdf.proof
+
+let seed_to_bytes x =
+  let seed_to_state_hash (B b) = b in
+  State_hash.to_bytes (seed_to_state_hash x)
+
+let vdf_setup_encoding =
+  let open Data_encoding in
+  let vdf_discriminant_encoding =
+    conv_with_guard
+      Vdf.discriminant_to_bytes
+      (fun b ->
+        Option.to_result
+          ~none:"VDF discriminant could not be deserialised"
+          (Vdf.discriminant_of_bytes_opt b))
+      (Fixed.bytes Vdf.discriminant_size_bytes)
+  in
+  let vdf_challenge_encoding =
+    conv_with_guard
+      Vdf.challenge_to_bytes
+      (fun b ->
+        Option.to_result
+          ~none:"VDF challenge could not be deserialised"
+          (Vdf.challenge_of_bytes_opt b))
+      (Fixed.bytes Vdf.form_size_bytes)
+  in
+  tup2 vdf_discriminant_encoding vdf_challenge_encoding
+
+let vdf_solution_encoding =
+  let open Data_encoding in
+  let vdf_result_encoding =
+    conv_with_guard
+      Vdf.result_to_bytes
+      (fun b ->
+        Option.to_result
+          ~none:"VDF result could not be deserialised"
+          (Vdf.result_of_bytes_opt b))
+      (Fixed.bytes Vdf.form_size_bytes)
+  in
+  let vdf_proof_encoding =
+    conv_with_guard
+      Vdf.proof_to_bytes
+      (fun b ->
+        Option.to_result
+          ~none:"VDF proof could not be deserialised"
+          (Vdf.proof_of_bytes_opt b))
+      (Fixed.bytes Vdf.form_size_bytes)
+  in
+  tup2 vdf_result_encoding vdf_proof_encoding
+
+let pp_solution ppf solution =
+  let result, proof = solution in
+  Format.fprintf
+    ppf
+    "@[<v 2>VDF result: %a"
+    Hex.pp
+    (Hex.of_bytes (Vdf.result_to_bytes result)) ;
+  Format.fprintf
+    ppf
+    "@,VDF proof: %a"
+    Hex.pp
+    (Hex.of_bytes (Vdf.proof_to_bytes proof)) ;
+  Format.fprintf ppf "@]"
+
+let nonce_encoding = Data_encoding.Fixed.bytes Constants_repr.nonce_length
 
 let zero_bytes = Bytes.make Nonce_hash.size '\000'
 
@@ -47,9 +111,7 @@ let seed_encoding =
   let open Data_encoding in
   conv (fun (B b) -> b) (fun b -> B b) state_hash_encoding
 
-let empty = B (State_hash.hash_string [initial_seed])
-
-let nonce (B state) nonce =
+let update_seed (B state) nonce =
   B (State_hash.hash_bytes [State_hash.to_bytes state; nonce])
 
 let initialize_new (B state) append =
@@ -79,7 +141,7 @@ let take_int32 s bound =
       Int32.sub Int32.max_int (Int32.rem Int32.max_int bound)
     in
     let rec loop s =
-      let (bytes, s) = take s in
+      let bytes, s = take s in
       let r = TzEndian.get_int32 bytes 0 in
       (* The absolute value of min_int is min_int.  Also, every
            positive integer is represented twice (positive and negative),
@@ -102,7 +164,7 @@ let take_int64 s bound =
     in
 
     let rec loop s =
-      let (bytes, s) = take s in
+      let bytes, s = take s in
       let r = TzEndian.get_int64 bytes 0 in
       (* The absolute value of min_int is min_int.  Also, every
            positive integer is represented twice (positive and negative),
@@ -150,16 +212,48 @@ let initial_nonce_0 = zero_bytes
 
 let initial_nonce_hash_0 = hash initial_nonce_0
 
-let deterministic_seed seed = nonce seed zero_bytes
+let deterministic_seed seed = update_seed seed zero_bytes
 
 let initial_seeds ?initial_seed n =
-  let[@coq_struct "i"] rec loop acc elt i =
+  let rec loop acc elt i =
     if Compare.Int.(i = 1) then List.rev (elt :: acc)
     else loop (elt :: acc) (deterministic_seed elt) (i - 1)
   in
   let first_seed =
     match initial_seed with
-    | Some initial_seed -> nonce (B initial_seed) initial_nonce_0
+    | Some initial_seed -> update_seed (B initial_seed) initial_nonce_0
     | None -> B (State_hash.hash_bytes [])
   in
   loop [] first_seed n
+
+let nonce_discriminant = Bytes.of_string "Tezos_generating_vdf_discriminant"
+
+let nonce_challenge = Bytes.of_string "Tezos_generating_vdf_challenge"
+
+let generate_vdf_setup ~seed_discriminant ~seed_challenge =
+  let size = Vdf.discriminant_size_bytes in
+  let seed =
+    update_seed seed_discriminant nonce_discriminant |> seed_to_bytes
+  in
+  let discriminant = Vdf.generate_discriminant ~seed size in
+  let input = update_seed seed_challenge nonce_challenge |> seed_to_bytes in
+  let challenge = Vdf.generate_challenge discriminant input in
+  (discriminant, challenge)
+
+let verify (discriminant, challenge) vdf_difficulty solution =
+  (* We return false when getting non group elements as input *)
+  let result, proof = solution in
+  Option.catch
+    ~catch_only:(function Invalid_argument _ -> true | _ -> false)
+    (fun () -> Vdf.verify discriminant challenge vdf_difficulty result proof)
+
+let vdf_to_seed seed_challenge solution =
+  let result, _ = solution in
+  update_seed seed_challenge (Vdf.result_to_bytes result)
+
+type seed_status = RANDAO_seed | VDF_seed
+
+let seed_status_encoding =
+  let to_bool = function RANDAO_seed -> false | VDF_seed -> true in
+  let of_bool t = if t then VDF_seed else RANDAO_seed in
+  Data_encoding.conv to_bool of_bool Data_encoding.bool

@@ -1,29 +1,51 @@
-# This job fetchs coverage files by precedent test stage. It creates the html,
+---
+# This job fetches coverage files by precedent test stage. It creates the html,
 # summary and cobertura reports. It also provide a coverage % for the merge request.
 
 unified_coverage:
   extends:
     - .default_settings_template
-    - .rules_template__development_unified_coverage
     - .image_template__runtime_build_test_dependencies_template
-    - .template__coverage
-  stage: test_coverage
-  # This job requires all artifacts from the stage test, so we override
-  # the `dependencies: []` in `.default_settings` by setting `dependencies` 
-  # to `null`.
+    - .template__coverage_report
+  # This job requires all bisect_ppx artifacts from the stage test, so we override
+  # the `dependencies: []` in `.default_settings` with a list of jobs.
+  # Each new job in the stage test needs to be manually added to this list.
   dependencies:
-  before_script:
-    # Load the environment poetry previously created in the docker image.
-    # Give access to the Python dependencies/executables
-    - . "$HOME"/.venv/bin/activate
+    - "integration:pytest 1/9"
+    - "integration:pytest 2/9"
+    - "integration:pytest 3/9"
+    - "integration:pytest 4/9"
+    - "integration:pytest 5/9"
+    - "integration:pytest 6/9"
+    - "integration:pytest 7/9"
+    - "integration:pytest 8/9"
+    - "integration:pytest 9/9"
+    - "test-liquidity-baking-scripts"
+    - "tezt 1/9"
+    - "tezt 2/9"
+    - "tezt 3/9"
+    - "tezt 4/9"
+    - "tezt 5/9"
+    - "tezt 6/9"
+    - "tezt 7/9"
+    - "tezt 8/9"
+    - "tezt 9/9"
+    - "tezt:static-binaries 1/2"
+    - "tezt:static-binaries 2/2"
+    - "unit:012_Psithaca: [proto_012_Psithaca]"
+    - "unit:012_Psithaca: [proto_012_Psithaca__lib_protocol__1]"
+    - "unit:012_Psithaca: [proto_012_Psithaca__lib_protocol__2]"
+    - "unit:012_Psithaca: [proto_012_Psithaca__lib_protocol__3]"
+    - "unit:013_PtJakart: [proto_013_PtJakart]"
+    - "unit:013_PtJakart: [proto_013_PtJakart__lib_protocol__1]"
+    - "unit:013_PtJakart: [proto_013_PtJakart__lib_protocol__2]"
+    - "unit:013_PtJakart: [proto_013_PtJakart__lib_protocol__3]"
+    - "unit:alpha: [proto_alpha]"
+    - "unit:alpha: [proto_alpha__lib_protocol__1]"
+    - "unit:alpha: [proto_alpha__lib_protocol__2]"
+    - "unit:alpha: [proto_alpha__lib_protocol__3]"
+    - "unit:non-proto-x86_64"
+
   script:
+    # On the development branches, we compute coverage
     - ./scripts/ci/report_coverage.sh
-  coverage: '/Coverage: ([^%]+%)/'
-  artifacts:
-    expose_as: 'Coverage report'
-    when: always
-    reports:
-      cobertura: _coverage_report/cobertura.xml
-    paths:
-      - _coverage_report/
-    expire_in: 15 days

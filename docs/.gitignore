@@ -7,13 +7,16 @@ tezos-client.html
 /api/tezos-admin-client.html
 /api/tezos-signer.html
 
-/ithaca/rpc.rst
 /jakarta/rpc.rst
+/kathmandu/rpc.rst
 /alpha/rpc.rst
 /shell/rpc.rst
 
 /api/errors.rst
 /shell/p2p_api.rst
 /user/default-acl.json
+/user/node-config.json
 /CHANGES-dev.rst
 /developer/metrics.csv
+
+/linkcheck

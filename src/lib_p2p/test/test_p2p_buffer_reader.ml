@@ -31,7 +31,7 @@
     Subject:      Tests [P2p_buffer_reader]
 *)
 
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
 open Lwt.Syntax
 
 let test_mk_buffer_negative_len =
@@ -74,7 +74,7 @@ let test_mk_buffer_regular =
 
 let test_mk_buffer_safe =
   Alcotest.test_case "mk_buffer_safe makes valid buffers" `Quick @@ fun () ->
-  (* We don't need to use QCheck, because the input data we need
+  (* We don't need to use QCheck2, because the input data we need
      is [0..some_not_too_big_int[, so we can just test all the ints
      until the chosen bound, which we set here to 128. The bound should
      be small, because a buffer of the given size is allocated. *)
@@ -84,7 +84,7 @@ let test_mk_buffer_safe =
       let safe_buffer =
         Bytes.create buf_len |> P2p_buffer_reader.mk_buffer_safe
       in
-      let (pos, length_to_copy, buf) =
+      let pos, length_to_copy, buf =
         P2p_buffer_reader.Internal_for_tests.destruct_buffer safe_buffer
       in
       Alcotest.(check int "pos is always 0") 0 pos ;
@@ -129,13 +129,13 @@ let test_read_waits_for_data =
      return_unit) ;
   assert (!cancelled = true)
 
-let test_read_less_than_length : QCheck.Test.t =
-  QCheck.(
+let test_read_less_than_length : QCheck2.Test.t =
+  QCheck2.(
     Test.make
       ~name:
         "read result (number of read bytes) is lower than or equal to \
          buffer.len"
-      (pair (0 -- 2048) string))
+      Gen.(pair (0 -- 2048) string))
   @@ fun (buf_size, data_to_write) ->
   Lwt_main.run
   @@
@@ -147,15 +147,19 @@ let test_read_less_than_length : QCheck.Test.t =
   (* Wrap in a timeout in case reading hangs - which can happen if the
      test is not well written or if a bug is introduced. Better safe than sorry. *)
   Lwt_unix.with_timeout 1. @@ fun () ->
-  let* data =
+  let* data_result =
     Circular_buffer.write
       ~maxlen:(String.length data_to_write)
       ~fill_using:(fun bytes offset maxlen ->
         Bytes.blit_string data_to_write 0 bytes offset maxlen ;
-        Lwt.return maxlen)
+        Lwt.return_ok maxlen)
       read_buffer
   in
-  let* () = Lwt_pipe.Maybe_bounded.push read_queue (Ok data) in
+  let* () =
+    match data_result with
+    | Ok data -> Lwt_pipe.Maybe_bounded.push read_queue (Ok data)
+    | Error _ -> Alcotest.failf "Faild to read from circular buffer"
+  in
   let+ res = P2p_buffer_reader.read readable reader_buffer in
   qcheck_eq'
     ~expected:true
@@ -171,21 +175,20 @@ let test_read_less_than_length : QCheck.Test.t =
     - Read a second part in another buffer of length [l2]
     - Check that both buffers are correct (i.e. partial reading worked, no data was lost)
 *)
-let test_read_partial : QCheck.Test.t =
-  let buffer_size_gen = QCheck.Gen.(0 -- 2048) in
+let test_read_partial : QCheck2.Test.t =
+  let open QCheck2 in
+  let buffer_size_gen = Gen.(0 -- 2048)
+  and print = QCheck2.Print.(quad int int int (Format.sprintf "%S")) in
   (* The data to write (bytes) must be at least the sum of the 3 sizes, as this will be the [maxlen]*)
-  let buffer_sizes_and_data_arb =
-    let open QCheck.Gen in
-    let gen =
-      let* buf1_size = buffer_size_gen
-      and* buf2_size = buffer_size_gen
-      and* additional_size = buffer_size_gen in
-      let+ data_to_write =
-        string_size (pure (buf1_size + buf2_size + additional_size))
-      in
-      (buf1_size, buf2_size, additional_size, data_to_write)
+  let buffer_sizes_and_data_gen =
+    let open QCheck2.Gen in
+    let* buf1_size = buffer_size_gen
+    and* buf2_size = buffer_size_gen
+    and* additional_size = buffer_size_gen in
+    let+ data_to_write =
+      string_size (pure (buf1_size + buf2_size + additional_size))
     in
-    QCheck.make ~print:QCheck.Print.(quad int int int (Format.sprintf "%S")) gen
+    (buf1_size, buf2_size, additional_size, data_to_write)
   in
   let qcheck_eq_result_tztrace ~expected ~actual =
     qcheck_eq'
@@ -204,17 +207,17 @@ let test_read_partial : QCheck.Test.t =
       ~actual
       ()
   in
-  QCheck.(
-    Test.make
-      ~name:
-        "When reading less data than available, [read] reads partially and \
-         reads the remaining data on second [read]"
-      buffer_sizes_and_data_arb)
+  Test.make
+    ~name:
+      "When reading less data than available, [read] reads partially and reads \
+       the remaining data on second [read]"
+    ~print
+    buffer_sizes_and_data_gen
   @@ fun (buf1_size, buf2_size, additional_size, data_to_write) ->
   (* If both [buf2_size] and [additional_size] are [0], then the second [read] call
      hangs forever as it waits for data to arrive in the circular buffer, even if it's
      useless. *)
-  QCheck.assume (buf2_size + additional_size > 0) ;
+  assume (buf2_size + additional_size > 0) ;
   Lwt_main.run
   @@
   let read_buffer = Circular_buffer.create () in
@@ -228,15 +231,19 @@ let test_read_partial : QCheck.Test.t =
      test is not well written or if a bug is introduced. Better safe than sorry. *)
   Lwt_unix.with_timeout 1. @@ fun () ->
   (* Write data into the [readable] *)
-  let* data =
+  let* data_result =
     Circular_buffer.write
       ~maxlen:(buf1_size + buf2_size + additional_size)
       ~fill_using:(fun bytes offset maxlen ->
         Bytes.blit_string data_to_write 0 bytes offset maxlen ;
-        Lwt.return maxlen)
+        Lwt.return_ok maxlen)
       read_buffer
   in
-  let* () = Lwt_pipe.Maybe_bounded.push read_queue (Ok data) in
+  let* () =
+    match data_result with
+    | Ok data -> Lwt_pipe.Maybe_bounded.push read_queue (Ok data)
+    | Error _ -> Alcotest.failf "Faild to read from circular buffer"
+  in
   (* [read] a first segment, which leaves partial data in the [readable] *)
   let* res1 = P2p_buffer_reader.read readable reader_buffer1 in
   (* [read] a second segment, which should start on the remaining partial data of the [readable] *)
@@ -254,7 +261,7 @@ let test_read_partial : QCheck.Test.t =
     ~actual:buffer2
 
 let test_read_full_basic =
-  QCheck.(Test.make ~name:"read_full fills the buffer" string)
+  QCheck2.(Test.make ~name:"read_full fills the buffer" Gen.string)
   @@ fun data_to_write ->
   Lwt_main.run
   @@
@@ -266,26 +273,30 @@ let test_read_full_basic =
   (* Wrap in a timeout in case reading hangs - which can happen if the
      test is not well written or if a bug is introduced. Better safe than sorry. *)
   Lwt_unix.with_timeout 1. @@ fun () ->
-  let* data =
+  let* data_result =
     Circular_buffer.write
       ~maxlen:(String.length data_to_write)
       ~fill_using:(fun bytes offset maxlen ->
         Bytes.blit_string data_to_write 0 bytes offset maxlen ;
-        Lwt.return maxlen)
+        Lwt.return_ok maxlen)
       read_buffer
   in
-  let* () = Lwt_pipe.Maybe_bounded.push read_queue (Ok data) in
+  let* () =
+    match data_result with
+    | Ok data -> Lwt_pipe.Maybe_bounded.push read_queue (Ok data)
+    | Error _ -> Alcotest.failf "Faild to read from circular buffer"
+  in
   let+ res = P2p_buffer_reader.read_full readable reader_buffer in
   let _ = qcheck_eq' ~expected:true ~actual:(Result.is_ok res) () in
   qcheck_eq' ~expected:data_to_write ~actual:(Bytes.to_string buffer) ()
 
 let test_read_full_waits =
-  QCheck.(
+  QCheck2.(
     Test.make
       ~name:
         "read_full fills the buffer and waits for enough data to be available \
          if needed"
-      (list string))
+      Gen.(small_list string))
   @@ fun data_to_write_list ->
   let total_size =
     List.fold_left (fun size s -> size + String.length s) 0 data_to_write_list
@@ -306,15 +317,19 @@ let test_read_full_waits =
     let* () = Lwt_unix.sleep 0.01 in
     List.iter_s
       (fun data_to_write ->
-        let* data =
+        let* data_result =
           Circular_buffer.write
             ~maxlen:(String.length data_to_write)
             ~fill_using:(fun bytes offset maxlen ->
               Bytes.blit_string data_to_write 0 bytes offset maxlen ;
-              Lwt.return maxlen)
+              Lwt.return_ok maxlen)
             read_buffer
         in
-        let* () = Lwt_pipe.Maybe_bounded.push read_queue (Ok data) in
+        let* () =
+          match data_result with
+          | Ok data -> Lwt_pipe.Maybe_bounded.push read_queue (Ok data)
+          | Error _ -> Alcotest.failf "Faild to read from circular buffer"
+        in
         (* Note: this cooperation point is necessary to allow [read_full] to read some data from the circular buffer before writing again; otherwise it can deadlock if [total_size > Circular_buffer.default_size] (one can also set the Circular_buffer size to [total_size] but putting a cooperation point is more representative of real-world scenarios). *)
         Lwt.pause ())
       data_to_write_list

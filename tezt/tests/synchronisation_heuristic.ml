@@ -60,9 +60,10 @@ let wait_for_sync node =
      whether the node is (already) synchronized via an RPC. *)
   let is_synchronised =
     let* client = Client.init ~endpoint:(Node node) () in
-    let* json = RPC.is_bootstrapped client in
-    if String.equal JSON.(json |-> "sync_state" |> as_string) "synced" then
-      Lwt.return_unit
+    let* sync_state =
+      RPC.Client.call client @@ RPC.get_chain_is_bootstrapped ()
+    in
+    if String.equal sync_state "synced" then Lwt.return_unit
     else fst @@ Lwt.task ()
   in
   Lwt.pick [event; is_synchronised]
@@ -92,7 +93,7 @@ let check_node_synchronization_state =
   Log.info "Activated protocol." ;
   let* () =
     repeat blocks_to_bake (fun () ->
-        Client.bake_for ~minimal_timestamp:true client)
+        Client.bake_for_and_wait ~minimal_timestamp:true client)
   in
   Log.info "Baked %d blocks." blocks_to_bake ;
   let* () =
@@ -177,7 +178,7 @@ let check_prevalidator_start =
   let* client = Client.init ~endpoint:(Node node1) () in
   let* () = Client.activate_protocol ~protocol client ~timestamp:Now in
   Log.info "Activated protocol." ;
-  let* () = Client.bake_for ~minimal_timestamp:false client in
+  let* () = Client.bake_for_and_wait ~minimal_timestamp:false client in
   let connect node node' =
     Log.info "%s connects to %s." (Node.name node) (Node.name node') ;
     Client.Admin.connect_address client ~peer:node'

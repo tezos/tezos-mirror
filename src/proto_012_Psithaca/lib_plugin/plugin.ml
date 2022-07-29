@@ -607,7 +607,7 @@ module Mempool = struct
   (** Returns the weight of an operation, i.e. the fees w.r.t the gas and size
       consumption in the block. *)
   let weight_manager_operation ~validation_state ?size ~fee ~gas op =
-    let (weight, _resources) =
+    let weight, _resources =
       weight_and_resources_manager_operation
         ~validation_state
         ?size
@@ -632,7 +632,7 @@ module Mempool = struct
     match validation_state with
     | None -> `Weight_ok (`No_replace, [])
     | Some validation_state -> (
-        let (weight, op_resources) =
+        let weight, op_resources =
           weight_and_resources_manager_operation
             ~validation_state
             ~fee
@@ -923,7 +923,7 @@ module Mempool = struct
     match
       (grandparent_level_start, validation_state_before, round_zero_duration)
     with
-    | (None, _, _) | (_, None, _) | (_, _, None) -> Lwt.return_true
+    | None, _, _ | _, None, _ | _, _, None -> Lwt.return_true
     | ( Some grandparent_level_start,
         Some validation_state_before,
         Some round_zero_duration ) -> (
@@ -1788,7 +1788,10 @@ module RPC = struct
 
       let run_operation =
         RPC_service.post_service
-          ~description:"Run an operation without signature checks"
+          ~description:
+            "Run an operation with the context of the given block and without \
+             signature checks. Return the operation application result, \
+             including the consumed gas."
           ~query:RPC_query.empty
           ~input:
             (obj2
@@ -1799,7 +1802,14 @@ module RPC = struct
 
       let simulate_operation =
         RPC_service.post_service
-          ~description:"Simulate an operation"
+          ~description:
+            "Simulate running an operation at some future moment (based on the \
+             number of blocks given in the `latency` argument), and return the \
+             operation application result. The result is the same as \
+             run_operation except for the consumed gas, which depends on the \
+             contents of the cache at that future moment. This RPC estimates \
+             future gas consumption by trying to predict the state of the \
+             cache using some heuristics."
           ~query:RPC_query.empty
           ~input:
             (obj4
@@ -1861,8 +1871,8 @@ module RPC = struct
             type a s.
             (a, s) Script_typed_ir.stack_ty * (a * s) ->
             (Script.expr * string option) list tzresult Lwt.t = function
-          | (Bot_t, (EmptyCell, EmptyCell)) -> return_nil
-          | (Item_t (ty, rest_ty, annot), (v, rest)) ->
+          | Bot_t, (EmptyCell, EmptyCell) -> return_nil
+          | Item_t (ty, rest_ty, annot), (v, rest) ->
               Script_ir_translator.unparse_data
                 ctxt
                 Unparsing_mode.unparsing_mode
@@ -2290,12 +2300,12 @@ module RPC = struct
           let code = Script.lazy_expr code in
           originate_dummy_contract ctxt {storage; code} balance
           >>=? fun (ctxt, dummy_contract) ->
-          let (source, payer) =
+          let source, payer =
             match (source, payer) with
-            | (Some source, Some payer) -> (source, payer)
-            | (Some source, None) -> (source, source)
-            | (None, Some payer) -> (payer, payer)
-            | (None, None) -> (dummy_contract, dummy_contract)
+            | Some source, Some payer -> (source, payer)
+            | Some source, None -> (source, source)
+            | None, Some payer -> (payer, payer)
+            | None, None -> (dummy_contract, dummy_contract)
           in
           let gas =
             match gas with
@@ -2356,12 +2366,12 @@ module RPC = struct
           let code = Script.lazy_expr code in
           originate_dummy_contract ctxt {storage; code} balance
           >>=? fun (ctxt, dummy_contract) ->
-          let (source, payer) =
+          let source, payer =
             match (source, payer) with
-            | (Some source, Some payer) -> (source, payer)
-            | (Some source, None) -> (source, source)
-            | (None, Some payer) -> (payer, payer)
-            | (None, None) -> (dummy_contract, dummy_contract)
+            | Some source, Some payer -> (source, payer)
+            | Some source, None -> (source, source)
+            | None, Some payer -> (payer, payer)
+            | None, None -> (dummy_contract, dummy_contract)
           in
           let gas =
             match gas with
@@ -2434,12 +2444,12 @@ module RPC = struct
                (View_helpers.make_viewer_script ty)
                Tez.zero
           >>=? fun (ctxt, viewer_contract) ->
-          let (source, payer) =
+          let source, payer =
             match (source, payer) with
-            | (Some source, Some payer) -> (source, payer)
-            | (Some source, None) -> (source, source)
-            | (None, Some payer) -> (payer, payer)
-            | (None, None) -> (contract, contract)
+            | Some source, Some payer -> (source, payer)
+            | Some source, None -> (source, source)
+            | None, Some payer -> (payer, payer)
+            | None, None -> (contract, contract)
           in
           let gas =
             Option.value
@@ -2543,7 +2553,7 @@ module RPC = struct
                 storage;
               }
           in
-          let (size, cost) = Script_ir_translator.script_size script in
+          let size, cost = Script_ir_translator.script_size script in
           Gas.consume ctxt cost >>?= fun _ctxt -> return @@ size) ;
 
       Registration.register0
@@ -2991,9 +3001,8 @@ module RPC = struct
                }))
 
     module Manager = struct
-      let[@coq_axiom_with_reason "cast on e"] operations ctxt block ~branch
-          ~source ?sourcePubKey ~counter ~fee ~gas_limit ~storage_limit
-          operations =
+      let operations ctxt block ~branch ~source ?sourcePubKey ~counter ~fee
+          ~gas_limit ~storage_limit operations =
         Contract_services.manager_key ctxt block source >>= function
         | Error _ as e -> Lwt.return e
         | Ok revealed ->
@@ -3014,8 +3023,8 @@ module RPC = struct
             in
             let ops =
               match (sourcePubKey, revealed) with
-              | (None, _) | (_, Some _) -> ops
-              | (Some pk, None) ->
+              | None, _ | _, Some _ -> ops
+              | Some pk, None ->
                   let operation = Reveal pk in
                   Contents
                     (Manager_operation
@@ -3243,8 +3252,8 @@ module RPC = struct
 
   let requested_levels ~default_level ctxt cycles levels =
     match (levels, cycles) with
-    | ([], []) -> [default_level]
-    | (levels, cycles) ->
+    | [], [] -> [default_level]
+    | levels, cycles ->
         (* explicitly fail when requested levels or cycle are in the past...
            or too far in the future...
            TODO-TB: this old comment (from version Alpha) conflicts with

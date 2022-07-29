@@ -1,0 +1,13 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name tztop_main)
+ (public_name tztop)
+ (package internal-devtools)
+ (modes byte)
+ (libraries
+  tezos-protocol-compiler
+  tezos-base
+  compiler-libs.toplevel
+  (select tztop.ml from (utop -> tztop.utop.ml) (-> tztop.vanilla.ml))))

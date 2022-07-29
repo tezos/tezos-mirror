@@ -25,8 +25,8 @@
 
 (** Generate dune and opam files from common definitions. *)
 
-(** Return whether [prefix] is a prefix of a string. *)
-val has_prefix : prefix:string -> string -> bool
+(** Same as [Filename.concat]. *)
+val ( // ) : string -> string -> string
 
 module Dune : sig
   (** Dune AST. *)
@@ -186,9 +186,15 @@ module Dune : sig
 
   (** Make an [ocamllex] stanza.
 
-      Example: [ocamllex "lexer"] results in [(ocamllex parser)], which tells dune
+      Example: [ocamllex "lexer"] results in [(ocamllex lexer)], which tells dune
       that [lexer.ml] can be obtained from [lexer.mll] using ocamllex. *)
   val ocamllex : string -> s_expr
+
+  (** Make an [ocamlyacc] stanza.
+
+      Example: [ocamlyacc "parser"] results in [(ocamlyacc parser)], which tells dune
+      that [parser.ml] and [parser.mli] can be obtained from [parser.mly] using ocamlyacc. *)
+  val ocamlyacc : string -> s_expr
 
   (** Make an [include] stanza.
 
@@ -197,29 +203,34 @@ module Dune : sig
       Such stanzas are used at toplevel to include other dune files. *)
   val include_ : string -> s_expr
 
-  (* Makes a rule stanza to generate targets.
+  (** Makes a rule stanza to generate targets.
 
-     Example: [targets_rule ?deps targets ~action] results in:
+      Example: [targets_rule ?deps targets ~action] results in:
 
-     (rule
-       (targets <targets>)
-       (deps <deps>)
-       (action <action>)) *)
-  val targets_rule : ?deps:s_expr list -> string list -> action:s_expr -> s_expr
+      (rule
+        (targets <targets>)
+        (deps <deps>)
+        (action <action>))
 
-  (* Makes an [install] stanza.
+      Set the optional argument [~promote] to true to generate
+      a [(mode promote)] stanza.
+  *)
+  val targets_rule :
+    ?promote:bool -> ?deps:s_expr list -> string list -> action:s_expr -> s_expr
 
-     Example: [install files ~package ~section] creates a stanza of the form:
+  (** Makes an [install] stanza.
 
-     [(install
-       (package <package>)
-       (section <section>)
-       (files <files>))] *)
+      Example: [install files ~package ~section] creates a stanza of the form:
+
+      [(install
+        (package <package>)
+        (section <section>)
+        (files <files>))] *)
   val install : ?package:string -> s_expr list -> section:string -> s_expr
 
-  (* Makes an [as] expression.
+  (** Makes an [as] expression.
 
-     Example: [as_ "foo" "bar"] results in [(foo as bar)] *)
+      Example: [as_ "foo" "bar"] results in [(foo as bar)] *)
   val as_ : string -> string -> s_expr
 end
 
@@ -437,6 +448,43 @@ module Npm : sig
   val make : string -> Version.constraints -> t
 end
 
+module Flags : sig
+  (** OCaml flags
+
+      This module is used to construct flags to be passed to the OCaml compiler (in the [(flags ...)] stanza)
+  *)
+
+  (** OCaml flags *)
+  type t
+
+  (** Extend standard flags with custom ones.
+
+      - [disable_warnings]: disable additional warnings
+
+      - [nopervasives]: if [true], add [-nopervasives] to the list of flags.
+
+      - [nostdlib]: if [true], add [-nostdlib] to the list of flags.
+
+      - [opaque]: if [true], add [-opaque] to the list of flags.
+   *)
+  val standard :
+    ?disable_warnings:int list ->
+    ?nopervasives:bool ->
+    ?nostdlib:bool ->
+    ?opaque:bool ->
+    unit ->
+    t
+
+  (** [include_ file] will use the flags defined in the file [file]. *)
+  val include_ : string -> t
+
+  (** Helper function to compute the string that correspond to
+      disabling warnings given as a list of integers. It deduplicates
+      warnings, sorts them, and collapses ranges using the [n..m]
+      syntax. *)
+  val disabled_warnings_to_string : int list -> string
+end
+
 (** Preprocessors. *)
 type preprocessor
 
@@ -454,6 +502,14 @@ type inline_tests
 
 (** Declare an inline_tests backend. *)
 val inline_tests_backend : target -> inline_tests
+
+(** Whether to add the [dune runtest] command in the [.opam] file.
+
+    - [Never]: do not add it.
+    - [Always]: add it with [{with-test}].
+    - [Only_on_64_arch]: add it with [{with-test & ARCH}]
+      where [ARCH] is a condition that only holds on 64-bit architectures. *)
+type with_test = Always | Never | Only_on_64_arch
 
 (** Functions that build internal targets.
 
@@ -485,7 +541,12 @@ val inline_tests_backend : target -> inline_tests
     - [dune]: added to the [dune] file after this target.
       A typical use is to add [rule] or [install] stanzas.
 
+    - [flags]: specifies a [(flags ...)] stanza.
+      Those flags are passed to the OCaml compiler when compiling and linking OCaml units.
+
     - [foreign_stubs]: specifies a [(foreign_stubs)] stanza for the [dune] target.
+
+    - [implements]: specifies an [(implements)] stanza for the [dune] target.
 
     - [inline_tests]: specifies an inline_tests backend. Can only be used when constructing a library.
       If used, will add [(inline_tests)] and the corresponding preprocessor in the dune stanza.
@@ -520,12 +581,6 @@ val inline_tests_backend : target -> inline_tests
 
     - [npm]: npm dependencies used when targeting JavaScript.
 
-    - [nopervasives]: if [true], add [-nopervasives] to the list of flags to
-      be passed to the OCaml compiler (in the [(flags ...)] stanza).
-
-    - [nostdlib]: if [true], add [-nostdlib] to the list of flags to
-      be passed to the OCaml compiler (in the [(flags ...)] stanza).
-
     - [ocaml]: constraints for the version of the [ocaml] opam package,
       i.e. on the version of the OCaml compiler.
 
@@ -537,18 +592,15 @@ val inline_tests_backend : target -> inline_tests
       For private libraries, private executables and tests, you must specify
       this argument (you can explicitely set it to [""] to generate no [.opam] file).
 
-    - [opaque]: if [true], add [-opaque] to the list of flags to be passed
-      to the OCaml compiler (in the [(flags ...)] stanza).
-
-    - [opens]: list of module names to open when compiling.
-      They are passed as [-open] flags to the OCaml compiler (in the [(flags ...)] stanza).
+    - [opam_with_test]: whether to add the [dune runtest] command.
+      Note that for a given package all targets must have the same value of [opam_with_test].
 
     - [path]: path of the directory in which to generate the [dune] file for this target.
 
     - [preprocess]: preprocessor directives to add using the [(preprocess ...)] stanza.
       Those preprocessors are also added as dependencies in the [.opam] file.
 
-    - [preprocessor_deps]: preprocessor dependencies, such as files for [ppx_blob].
+    - [preprocessor_deps]: preprocessor dependencies.
 
     - [private_modules]: similar to [modules], but those modules are not part of the
       library interface. They are not part of the toplevel module of the library.
@@ -557,27 +609,33 @@ val inline_tests_backend : target -> inline_tests
       Typical use cases are runtime dependencies and build dependencies for users
       of the target (but not the target itself).
 
-    - [release]: unused for now. The intent is to define whether this should be released.
+    - [release]: defines whether this should be released. Note: it is not always the case that
+      public_exes should be released. They are often public because they are needed by other
+      opam packages, such as in tests. Releasable [public_exe] values should be marked explicitly.
+      Default is [false].
+
+    - [static]: whether to incluce [ %{workspace_root}/static-link-flags.sexp ] to the link
+      flags to provide a static compilation profile.
       Default is [true] for public executables and [false] for other targets.
-
-    - [static]: whether to generate a [(env (static (flags (:standard -ccopt -static ...))))]
-      stanza to provide a static compilation profile.
-      Default is [true] for public executables and [false] for other targets,
-      unless you specify [static_cclibs], in which case default is [true].
-
-    - [static_cclibs]: list of static libraries to link with for targets
-      in this [dune] file when building static executables.
-      Added using [-cclib] to the stanza that is generated when [static] is [true].
 
     - [synopsis]: short description for the [.opam] file.
 
     - [description]: long description for the [.opam] file.
 
-    - [warnings]: the argument passed to the -w flag when building.
+    - [virtual_modules]: similar to [modules], but for modules that should have an
+      implementation (an [.ml] file) but that have not. Those modules only come
+      with an [.mli]. This turns the target into a virtual target.
+      Other targets can declare that they implement those modules with [implements].
 
-    - [wrapped]: if [false], add the [(wrapped false)] stanza in the [dune] file.
-      This causes the library to not come with a toplevel module with aliases to
-      all other modules. Not recommended (according to the dune documentation).
+    - [default_implementation] specifies a [(default_implementation)] stanza for the
+      [dune] target. Note that this argument has type [string] instead of type [target].
+      The user should give the name of e.g. the public library that serves as default
+      implementation.
+
+    - [license]: specific license to use for that target. If omitted it will
+      default to MIT.
+
+    - [extra_authors]: list of authors in addition to the Tezos Dev Team.
 
     - [path]: the path to the directory of the [dune] file that will define this target. *)
 type 'a maker =
@@ -587,7 +645,9 @@ type 'a maker =
   ?conflicts:target list ->
   ?deps:target list ->
   ?dune:Dune.s_expr ->
+  ?flags:Flags.t ->
   ?foreign_stubs:Dune.foreign_stubs ->
+  ?implements:target ->
   ?inline_tests:inline_tests ->
   ?js_compatible:bool ->
   ?js_of_ocaml:Dune.s_expr ->
@@ -597,28 +657,66 @@ type 'a maker =
   ?modules:string list ->
   ?modules_without_implementation:string list ->
   ?npm_deps:Npm.t list ->
-  ?nopervasives:bool ->
-  ?nostdlib:bool ->
   ?ocaml:Version.constraints ->
   ?opam:string ->
-  ?opaque:bool ->
-  ?opens:string list ->
+  ?opam_with_test:with_test ->
   ?preprocess:preprocessor list ->
   ?preprocessor_deps:preprocessor_dep list ->
   ?private_modules:string list ->
   ?opam_only_deps:target list ->
   ?release:bool ->
   ?static:bool ->
-  ?static_cclibs:string list ->
   ?synopsis:string ->
   ?description:string ->
   ?time_measurement_ppx:bool ->
-  ?warnings:string ->
-  ?wrapped:bool ->
+  ?virtual_modules:string list ->
+  ?default_implementation:string ->
   ?cram:bool ->
+  ?license:string ->
+  ?extra_authors:string list ->
   path:string ->
   'a ->
   target
+
+module Env : sig
+  (** [env] stanza *)
+  type t
+
+  (** profile selector for the env stanza. A profile name or Any (_) *)
+  type profile = Profile of string | Any
+
+  (** The empty env *)
+  val empty : t
+
+  (** [add profile ~key payload] adds a [key] entry with its [payload]
+      to the given [profile].  Adding an entry to [Any] profile means
+      that it will apply regardless of the profile. In practice, it
+      means that the entry can end up being duplicated in the resulting
+      [s_expr].
+    {[
+      Env.empty
+      |> Env.add Any ~key:"flags" Dune.[S "-flag"]
+      |> Env.add (Profile "static") ~key:"link_flags" Dune.[S "-link-flag"]
+    ]}
+
+    will generate
+
+    {v
+      (env
+        (_
+          (flags (-flag))
+        )
+        (static
+          (flags (-flag))
+          (link_flags (-link_flag))
+        )
+      )
+    v}
+
+    Also note that [Profile "_"] is not allowed. One should use [Any] instead.
+ *)
+  val add : profile -> key:string -> Dune.s_expr -> t -> t
+end
 
 (** Register and return an internal public library.
 
@@ -661,18 +759,58 @@ val private_exes : string list maker
 
 (** Register and return an internal test.
 
-    - [runtest]: if true, setup runtest aliases for the given
-      test. If unspecified, [runtest] is set true.
+    - [alias]: if non-empty, an alias is set up for the given test, named [alias].
+      Default is ["runtest"]. Note that for JS tests, ["_js"] is appended to this alias.
+      Also note that if [alias] is non-empty, the target must belong to an opam package
+      (i.e. [~opam] must also be non-empty).
 
     - [dep_files]: a list of files to add as dependencies using [(deps (file ...))]
       in the [runtest] alias.
 
+    - [dep_globs]: a list of files to add as dependencies using [(deps (glob_files ...))]
+      in the [dune] file.
+
     Since tests are private, they have no public name: the ['a]
     argument of [maker] is the internal name. *)
-val test : ?dep_files:string list -> ?runtest:bool -> string maker
+val test :
+  ?alias:string ->
+  ?dep_files:string list ->
+  ?dep_globs:string list ->
+  string maker
 
 (** Same as {!test} but with several names, to define multiple tests at once. *)
-val tests : ?dep_files:string list -> ?runtest:bool -> string list maker
+val tests :
+  ?alias:string ->
+  ?dep_files:string list ->
+  ?dep_globs:string list ->
+  string list maker
+
+(** Register a Tezt test.
+
+    Usage: [tezt module_names]
+
+    This declares:
+    - a library [PACKAGE_tezt_lib] in [path] where [PACKAGE] is the name of the
+      opam package denoted by [opam];
+    - an executable [main] in [path] that links with [PACKAGE_tezt_lib]
+      and runs [Tezt.Test.run].
+
+    [module_names] is the list of modules to link in [PACKAGE_tezt_lib].
+    Those should be files in [path] that call [Tezt.Test.register].
+
+    Note that a wrapper in [main.ml] adds a dependency to the [tezt] library
+    and [-open]s modules [Tezt] and [Tezt.Base] when compiling [module_names].
+
+    Additionally, the library [PACKAGE_tezt_lib] is also linked in [tezt/tests/main.exe]
+    so that this executable can be used to run all tests with auto-balancing
+    and other Tezt features. *)
+val tezt :
+  opam:string ->
+  path:string ->
+  ?deps:target list ->
+  ?dep_globs:string list ->
+  string list ->
+  unit
 
 (** Make an external vendored library, for use in internal target dependencies.
 
@@ -682,8 +820,12 @@ val tests : ?dep_files:string list -> ?runtest:bool -> string list maker
     Default value for [js_compatible] is false.
 
     [npm_deps]: npm dependencies used when targeting JavaScript.
- *)
+
+    [released_on_opam]: whether the library is available on the upstream opam-repository
+    (default true). In case the lib is not available on opam, tezos packages depending
+    on it won't be installable on opam. *)
 val vendored_lib :
+  ?released_on_opam:bool ->
   ?main_module:string ->
   ?js_compatible:bool ->
   ?npm_deps:Npm.t list ->
@@ -811,11 +953,11 @@ val optional : target -> target
     If [m] is specified, open this submodule instead of the main module.
 
     When such targets appear in [?deps] of a target [maker], they are
-    automatically prepended to [?opens] in the order of declaration in [?deps].
+    converted into [-open] in the order of declaration in [?deps].
     If you use [open_] on an [open_], the innermost [open_]s is opened first;
     For instance, [tezos_base |> open_ |> open_ ~m: "TzPervasives"]
-    is target [tezos_base], but when used in [?deps], this automatically prepend
-    ["Tezos_base"], followed by ["Tezos_base__TzPervasives"], to [?opens].
+    is target [tezos_base], but when used in [?deps], this automatically opens
+    ["Tezos_base"], followed by ["Tezos_base.TzPervasives"].
 
     Can only be used on internal libraries and on external or vendored
     libraries for which a [main_module] was specified. *)
@@ -837,10 +979,34 @@ val name_for_errors : target -> string
     Call this after you declared all your targets with functions such as
     [public_lib], [test], etc.
 
-    If a [dune] or [.opam] file exists but is not generated by this function,
-    an error is printed and the process exits with exit code 1.
-    You can use [exclude] to specify that some files should not cause
-    this error. [exclude] is given a path relative to the [manifest]
-    directory (i.e. that usually starts with [../]) and shall return [true]
-    if this path should not result in an error. *)
-val generate : ?exclude:(string -> bool) -> unit -> unit
+    [make_tezt_exe] is given the list of libraries that register Tezt tests
+    and shall create a test executable that links all of them. *)
+val generate : make_tezt_exe:(target list -> target) -> unit
+
+(** Run various checks.
+
+   1. Check that all [dune], [dune-project], [dune-workspace] and [.opam]
+   files are either generated or excluded. It is an error if a generated file is excluded.
+   You can use [exclude] to specify which files should be excluded. [exclude] is given a path relative to the [root]
+   directory and shall return [true] for excluded path.
+
+   2. Check that the transitive closure of dependencies of a [js_compatible] target is [js_compatible].
+
+   3. Check that there are no circular dependencies of opam packages.
+
+   In case of errors, errors are printed and the process exits with exit code 1.
+ *)
+val check : ?exclude:(string -> bool) -> unit -> unit
+
+(** Generate dune-workspace file.
+
+    [generate_workspace env dune] will generate a dune-workspace file at the root of the repo.
+    [env] will translate into the corresponding env stanza.
+    [dune] is a free form s-expression that will be included as is at the end of the file.
+ *)
+val generate_workspace : Env.t -> Dune.s_expr -> unit
+
+(** [write filename f] writes a file relatively to the root directory of the repository.
+
+    The callback [f] is reponsible for feeding the content of the file by using the formmater. *)
+val write : string -> (Format.formatter -> unit) -> unit

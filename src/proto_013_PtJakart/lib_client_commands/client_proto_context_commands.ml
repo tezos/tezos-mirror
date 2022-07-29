@@ -29,8 +29,14 @@ open Protocol
 open Alpha_context
 open Client_proto_context
 open Client_proto_contracts
+open Client_proto_rollups
 open Client_keys
 open Client_proto_args
+
+let save_tx_rollup ~force (cctxt : #Client_context.full) alias_name tx_rollup =
+  TxRollupAlias.add ~force cctxt alias_name tx_rollup >>=? fun () ->
+  cctxt#message "Transaction rollup memorized as %s" alias_name >>= fun () ->
+  return_unit
 
 let encrypted_switch =
   Clic.switch ~long:"encrypted" ~doc:"encrypt the key on-disk" ()
@@ -635,27 +641,27 @@ let commands_ro () =
 
 (* ----------------------------------------------------------------------------*)
 (* After the activation of a new version of the protocol, the older protocols
- are only kept in the code base to replay the history of the chain and to query
- old states.
+   are only kept in the code base to replay the history of the chain and to query
+   old states.
 
- The commands that are not useful anymore in the old protocols are removed,
- this is called protocol freezing. The commands below are those that can be
- removed during protocol freezing.
+   The commands that are not useful anymore in the old protocols are removed,
+   this is called protocol freezing. The commands below are those that can be
+   removed during protocol freezing.
 
- The rule of thumb to know if a command should be kept at freezing is that all
- commands that modify the state of the chain should be removed and conversely
- all commands that are used to query the context should be kept. For this
- reason, we call read-only (or RO for short) the commands that are kept and
- read-write (or RW for short) the commands that are removed.
+   The rule of thumb to know if a command should be kept at freezing is that all
+   commands that modify the state of the chain should be removed and conversely
+   all commands that are used to query the context should be kept. For this
+   reason, we call read-only (or RO for short) the commands that are kept and
+   read-write (or RW for short) the commands that are removed.
 
- There are some exceptions to this rule however, for example the command
- "tezos-client wait for <op> to be included" is classified as RW despite having
- no effect on the context because it has no use case once all RW commands are
- removed.
+   There are some exceptions to this rule however, for example the command
+   "tezos-client wait for <op> to be included" is classified as RW despite having
+   no effect on the context because it has no use case once all RW commands are
+   removed.
 
- Keeping this in mind, the developer should decide where to add a new command.
- At the end of the file, RO and RW commands are concatenated into one list that
- is then exported in the mli file.  *)
+   Keeping this in mind, the developer should decide where to add a new command.
+   At the end of the file, RO and RW commands are concatenated into one list that
+   is then exported in the mli file. *)
 (* ----------------------------------------------------------------------------*)
 
 let dry_run_switch =
@@ -726,7 +732,7 @@ let transfer_command amount source destination (cctxt : #Client_context.printer)
           name
     | _ -> Lwt.return_unit
   in
-  (if force then
+  (if force && not simulation then
    check_force_dependency "--gas-limit" gas_limit >>= fun () ->
    check_force_dependency "--storage-limit" storage_limit >>= fun () ->
    check_force_dependency "--fee" fee
@@ -845,8 +851,7 @@ let commands_network network () =
           ~desc:"Register and activate an Alphanet/Zeronet faucet account."
           (args2 (Secret_key.force_switch ()) encrypted_switch)
           (prefixes ["activate"; "account"]
-          @@ Secret_key.fresh_alias_param
-          @@ prefixes ["with"]
+          @@ Secret_key.fresh_alias_param @@ prefixes ["with"]
           @@ param
                ~name:"activation_key"
                ~desc:
@@ -888,8 +893,7 @@ let commands_network network () =
           ~desc:"Activate a fundraiser account."
           (args1 dry_run_switch)
           (prefixes ["activate"; "fundraiser"; "account"]
-          @@ Public_key_hash.alias_param
-          @@ prefixes ["with"]
+          @@ Public_key_hash.alias_param @@ prefixes ["with"]
           @@ param
                ~name:"code"
                (Clic.parameter (fun _ctx code ->
@@ -1319,7 +1323,7 @@ let commands_rw () =
         | exception (Data_encoding.Json.Cannot_destruct (path, exn2) as exn)
           -> (
             match (path, operations_json) with
-            | ([`Index n], `A lj) -> (
+            | [`Index n], `A lj -> (
                 match List.nth_opt lj n with
                 | Some j ->
                     failwith
@@ -1966,7 +1970,7 @@ let commands_rw () =
               (cctxt#chain, cctxt#block)
             >>=? fun current_proposal ->
             (match (info.current_period_kind, current_proposal) with
-            | ((Exploration | Promotion), Some current_proposal) ->
+            | (Exploration | Promotion), Some current_proposal ->
                 if Protocol_hash.equal proposal current_proposal then
                   return_unit
                 else
@@ -2127,7 +2131,8 @@ let commands_rw () =
     command
       ~group
       ~desc:"Launch a new transaction rollup."
-      (args12
+      (args13
+         force_switch
          fee_arg
          dry_run_switch
          verbose_signing_switch
@@ -2141,12 +2146,16 @@ let commands_rw () =
          fee_cap_arg
          burn_cap_arg)
       (prefixes ["originate"; "tx"; "rollup"]
+      @@ TxRollupAlias.fresh_alias_param
+           ~name:"tx_rollup"
+           ~desc:"Fresh name for a transaction rollup"
       @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
            ~desc:"Account originating the transaction rollup."
       @@ stop)
-      (fun ( fee,
+      (fun ( force,
+             fee,
              dry_run,
              verbose_signing,
              simulation,
@@ -2158,6 +2167,7 @@ let commands_rw () =
              force_low_fee,
              fee_cap,
              burn_cap )
+           alias
            (_, source)
            cctxt ->
         match Contract.is_implicit source with
@@ -2191,7 +2201,22 @@ let commands_rw () =
               ~src_sk
               ~fee_parameter
               ()
-            >>=? fun _res -> return_unit);
+            >>=? fun res ->
+            TxRollupAlias.of_fresh cctxt force alias >>=? fun alias_name ->
+            (match res with
+            | ( _,
+                _,
+                Apply_results.Manager_operation_result
+                  {
+                    operation_result =
+                      Apply_results.Applied
+                        (Apply_results.Tx_rollup_origination_result
+                          {originated_tx_rollup; _});
+                    _;
+                  } ) ->
+                ok originated_tx_rollup
+            | _ -> error_with "transaction rollup was not correctly originated")
+            >>?= fun res -> save_tx_rollup ~force cctxt alias_name res);
     command
       ~group
       ~desc:"Submit a batch of transaction rollup operations."

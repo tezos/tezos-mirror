@@ -52,7 +52,7 @@ let build_rpc_directory state =
   register1 Worker_services.Prevalidators.S.state (fun chain () () ->
       let* chain_id = Chain_directory.get_chain_id state chain in
       let workers = Prevalidator.running_workers () in
-      let (_, _, t) =
+      let _, _, t =
         (* NOTE: it is technically possible to use the Prevalidator interface to
          * register multiple Prevalidator for a single chain (using distinct
          * protocols). However, this is never done. *)

@@ -24,11 +24,11 @@ let find_component dirname module_name =
   let implementation = (dirname // name_lowercase) ^ ".ml" in
   let interface = implementation ^ "i" in
   match (Sys.file_exists implementation, Sys.file_exists interface) with
-  | (false, _) -> Stdlib.failwith @@ "No such file: " ^ implementation
-  | (true, false) ->
+  | false, _ -> Stdlib.failwith @@ "No such file: " ^ implementation
+  | true, false ->
       let+ implementation = Lwt_utils_unix.read_file implementation in
       {name = module_name; interface = None; implementation}
-  | (true, true) ->
+  | true, true ->
       let+ interface = Lwt_utils_unix.read_file interface
       and+ implementation = Lwt_utils_unix.read_file implementation in
       {name = module_name; interface = Some interface; implementation}

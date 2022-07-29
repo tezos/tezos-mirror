@@ -51,7 +51,10 @@ let () =
 module type CHAIN_STORE = sig
   type chain_store
 
-  val context : chain_store -> Store.Block.t -> Context.t tzresult Lwt.t
+  val context :
+    chain_store ->
+    Store.Block.t ->
+    Tezos_protocol_environment.Context.t tzresult Lwt.t
 
   val chain_id : chain_store -> Chain_id.t
 end
@@ -204,9 +207,6 @@ module MakeAbstract
           | None -> failwith "Invalid block header"
           | Some protocol_data -> return_some protocol_data)
     in
-    let predecessor_context =
-      Shell_context.wrap_disk_context predecessor_context
-    in
     let* state =
       Proto.begin_construction
         ~chain_id:(Chain_store.chain_id chain_store)
@@ -294,6 +294,8 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
 
 module Internal_for_tests = struct
   let to_raw {raw; _} = raw
+
+  let hash_of {hash; _} = hash
 
   let make_operation op oph data =
     (* When we build an operation, we assume that it has never been

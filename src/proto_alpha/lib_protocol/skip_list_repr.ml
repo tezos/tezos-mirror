@@ -26,6 +26,13 @@
 module type S = sig
   type ('content, 'ptr) cell
 
+  val pp :
+    pp_content:(Format.formatter -> 'content -> unit) ->
+    pp_ptr:(Format.formatter -> 'ptr -> unit) ->
+    Format.formatter ->
+    ('content, 'ptr) cell ->
+    unit
+
   val equal :
     ('content -> 'content -> bool) ->
     ('ptr -> 'ptr -> bool) ->
@@ -67,6 +74,12 @@ module type S = sig
     target_ptr:'ptr ->
     'ptr list ->
     bool
+
+  val search :
+    deref:('ptr -> ('content, 'ptr) cell option) ->
+    compare:('content -> int Lwt.t) ->
+    cell_ptr:'ptr ->
+    'ptr list option Lwt.t
 end
 
 module Make (Parameters : sig
@@ -97,9 +110,9 @@ end) : S = struct
        also ask the client to provide the index of the cell to be
        built, which can be error-prone.
 
-     - The back pointers of a node are chosen from the back pointers of
-       its predecessor (except for the genesis node) and a pointer to this
-       predecessor. This locality makes the insertion of new nodes very
+     - The back pointers of a cell are chosen from the back pointers of
+       its predecessor (except for the genesis cell) and a pointer to this
+       predecessor. This locality makes the insertion of new cell very
        efficient in practice.
 
   *)
@@ -122,8 +135,8 @@ end) : S = struct
     in
     let {content; back_pointers; index} = cell1 in
     equal_content content cell2.content
-    && equal_back_pointers back_pointers cell2.back_pointers
     && Compare.Int.equal index cell2.index
+    && equal_back_pointers back_pointers cell2.back_pointers
 
   let index cell = cell.index
 
@@ -135,6 +148,20 @@ end) : S = struct
       a
       []
     |> List.rev
+
+  let pp ~pp_content ~pp_ptr fmt {content; back_pointers; index} =
+    Format.fprintf
+      fmt
+      {|
+       content = %a
+       index = %d
+       back_pointers = %a
+    |}
+      pp_content
+      content
+      index
+      (Format.pp_print_list pp_ptr)
+      (back_pointers_to_list back_pointers)
 
   let encoding ptr_encoding content_encoding =
     let of_list =
@@ -188,25 +215,21 @@ end) : S = struct
       aux 1 [] 0
     in
     let back_pointers =
-      FallbackArray.of_list ~fallback:None ~proj:(fun x -> Some x) back_pointers
+      FallbackArray.of_list ~fallback:None ~proj:Option.some back_pointers
     in
     {index; content; back_pointers}
 
   let best_skip cell target_index =
     let index = cell.index in
-    let rec aux idx pow best_idx best_skip =
+    let rec aux idx pow best_idx =
       if Compare.Int.(idx >= FallbackArray.length cell.back_pointers) then
         best_idx
       else
         let idx_index = index - (index mod pow) - 1 in
-        let skip = index - idx_index in
-        if
-          Compare.Int.(idx_index < target_index)
-          || Option.equal Compare.Int.equal (Some skip) best_skip
-        then best_idx
-        else aux (idx + 1) (basis * pow) (Some idx) (Some skip)
+        if Compare.Int.(idx_index < target_index) then best_idx
+        else aux (idx + 1) (basis * pow) (Some idx)
     in
-    aux 0 1 None None
+    aux 0 1 None
 
   let back_path ~deref ~cell_ptr ~target_index =
     let rec aux path ptr =
@@ -241,9 +264,9 @@ end) : S = struct
     let target_index = index target and cell_index = index cell in
     let rec valid_path index cell_ptr path =
       match (cell_ptr, path) with
-      | (final_cell, []) ->
+      | final_cell, [] ->
           equal_ptr target_ptr final_cell && Compare.Int.(index = target_index)
-      | (cell_ptr, cell_ptr' :: path) ->
+      | cell_ptr, cell_ptr' :: path ->
           assume_some (deref cell_ptr) @@ fun cell ->
           assume_some (deref cell_ptr') @@ fun cell' ->
           mem equal_ptr cell_ptr' cell.back_pointers
@@ -257,4 +280,45 @@ end) : S = struct
     | [] -> false
     | first_cell_ptr :: path ->
         equal_ptr first_cell_ptr cell_ptr && valid_path cell_index cell_ptr path
+
+  let search ~deref ~compare ~cell_ptr =
+    (* TODO: #3321 replace with Lwt_option_syntax when that's in the
+       environment V6 *)
+    let ( let*? ) x f =
+      match x with None -> Lwt.return None | Some y -> f y
+    in
+    let ( let*! ) = Lwt.bind in
+    let rec aux path ptr ix =
+      let*? cell = deref ptr in
+      let*? candidate_ptr = back_pointer cell ix in
+      let*? candidate_cell = deref candidate_ptr in
+      let*! comparison = compare candidate_cell.content in
+      if Compare.Int.(comparison = 0) then
+        (* In this case, we have reached our target cell. *)
+        Option.some_s (List.rev (candidate_ptr :: ptr :: path))
+      else if Compare.Int.(comparison < 0) then
+        if Compare.Int.(ix = 0) then
+          (* If the first back pointer is 'too far' ([comparison < 0]),
+             that means we won't find a valid target cell. *)
+          Option.none_s
+        else
+          (* If a back pointer other than the first is 'too far'
+             we can then backtrack to the previous back pointer. *)
+          let*? new_ptr = back_pointer cell (ix - 1) in
+          aux (ptr :: path) new_ptr 0
+      else if Compare.Int.(ix + 1 >= FallbackArray.length cell.back_pointers)
+      then
+        (* If we reach the final back pointer and still have
+           [comparison > 0], we should continue from that cell. *)
+        aux (ptr :: path) candidate_ptr 0
+      else
+        (* Final case, we just try the next back pointer. *)
+        aux path ptr (ix + 1)
+    in
+    let*? cell = deref cell_ptr in
+    let*! comparison = compare cell.content in
+    (* We must check that we aren't already at the target cell before
+       starting the recursion. *)
+    if Compare.Int.(comparison = 0) then Option.some_s [cell_ptr]
+    else aux [] cell_ptr 0
 end

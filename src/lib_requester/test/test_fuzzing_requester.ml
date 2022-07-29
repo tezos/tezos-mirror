@@ -66,13 +66,13 @@ let domain_and_requester_gen : (string list * Test_Requester.t) Gen.t =
  *)
 let requester_and_keys_gen : (Test_Requester.t * string * string) Gen.t =
   let open Gen in
-  let* (domain, requester) = domain_and_requester_gen in
+  let* domain, requester = domain_and_requester_gen in
   let key_gen =
     let in_domain_gen = if domain = [] then [] else [oneofl domain] in
     (* Either a random key or a key in the domain *)
     oneof (key_gen :: in_domain_gen)
   in
-  let* (key1, key2) = pair key_gen key_gen in
+  let* key1, key2 = pair key_gen key_gen in
   pure (requester, key1, key2)
 
 let print = Print.(triple (Fun.const "requester") string string)
@@ -142,7 +142,7 @@ let test_inject_read_opt_other =
   qcheck_eq_true ~actual:(read_opt_before = read_opt_after)
 
 let leq_opt opt1 opt2 =
-  match (opt1, opt2) with (None, _) | (Some _, Some _) -> true | _ -> false
+  match (opt1, opt2) with None, _ | Some _, Some _ -> true | _ -> false
 
 let test_inject_growth =
   Test.make

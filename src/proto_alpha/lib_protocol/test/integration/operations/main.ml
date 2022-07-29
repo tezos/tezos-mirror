@@ -39,9 +39,11 @@ let () =
       ("revelation", Test_reveal.tests);
       ("transfer", Test_transfer.tests);
       ("activation", Test_activation.tests);
+      ("paid storage increase", Test_paid_storage_increase.tests);
       ("combined", Test_combined_operations.tests);
       ("failing_noop operation", Test_failing_noop.tests);
       ("tx rollup", Test_tx_rollup.tests);
       ("sc rollup", Test_sc_rollup.tests);
+      ("sc rollup transfer", Test_sc_rollup_transfer.tests);
     ]
   |> Lwt_main.run

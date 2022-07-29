@@ -183,7 +183,7 @@ Working within the protocol
 If you are working on the protocol, things are slightly different for
 you. This is because the protocol has a restricted access to external
 resources and libraries. You can find more details in :doc:`the dedicated
-documentation <protocol_environment>`.
+documentation <../shell/protocol_environment>`.
 This section focuses on the error-monad within the protocol.
 
 The protocol environment libraries evolve at a slightly different pace

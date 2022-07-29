@@ -11,6 +11,7 @@ __pycache__
 /_docker_build
 /_snoop
 /node_modules
+/_opam-repo-for-releases/
 
 /test_results
 
@@ -33,6 +34,7 @@ __pycache__
 /tezos-tps-evaluation-*
 /tezos-sc-rollup-node-*
 /tezos-sc-rollup-client-*
+/tezos-dal-node
 /tezos-binaries
 
 /src/proto_*/parameters/*-parameters.json
@@ -60,6 +62,7 @@ __pycache__
 *.orig
 
 .idea
+.vscode
 # .venv directories are created by poetry if the option in-project is set to true.
 **/.venv
 **/.mypy_cache/

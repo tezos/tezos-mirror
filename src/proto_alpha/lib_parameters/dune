@@ -3,30 +3,32 @@
 
 (library
  (name tezos_protocol_alpha_parameters)
- (public_name tezos-protocol-alpha-parameters)
+ (public_name tezos-protocol-alpha.parameters)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
   tezos-protocol-environment
   tezos-protocol-alpha)
  (library_flags (:standard -linkall))
- (flags (:standard
-         -open Tezos_base.TzPervasives
-         -open Tezos_protocol_alpha))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_alpha)
  (modules (:standard \ gen)))
 
 (executable
  (name gen)
  (libraries
   tezos-base
-  tezos-protocol-alpha-parameters
+  tezos-protocol-alpha.parameters
   tezos-protocol-alpha)
- (link_flags (:standard -linkall))
+ (link_flags
+  (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_protocol_alpha_parameters
-   -open Tezos_protocol_alpha))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_alpha_parameters
+  -open Tezos_protocol_alpha)
  (modules gen))
 
 (rule
@@ -45,5 +47,6 @@
  (action (run %{deps} --mainnet)))
 
 (install
+ (package tezos-protocol-alpha)
  (section lib)
  (files sandbox-parameters.json test-parameters.json mainnet-parameters.json))

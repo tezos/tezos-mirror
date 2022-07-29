@@ -19,11 +19,12 @@
   ptime
   mtime
   mtime.clock.os
-  lwt_log)
+  lwt_log
+  uri)
  (flags
-  (:standard
-   -open Tezos_error_monad
-   -open Tezos_error_monad.TzLwtreslib
-   -open Tezos_event_logging
-   -open Tezos_stdlib
-   -open Data_encoding)))
+  (:standard)
+  -open Tezos_error_monad
+  -open Tezos_error_monad.TzLwtreslib
+  -open Tezos_event_logging
+  -open Tezos_stdlib
+  -open Data_encoding))

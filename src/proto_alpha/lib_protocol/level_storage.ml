@@ -73,7 +73,7 @@ let last_level_in_cycle ctxt c =
 
 let levels_in_cycle ctxt cycle =
   let first = first_level_in_cycle ctxt cycle in
-  let[@coq_struct "n"] rec loop (n : Level_repr.t) acc =
+  let rec loop (n : Level_repr.t) acc =
     if Cycle_repr.(n.cycle = first.cycle) then loop (succ ctxt n) (n :: acc)
     else acc
   in
@@ -89,7 +89,7 @@ let levels_in_current_cycle ctxt ?(offset = 0l) () =
 
 let levels_with_commitments_in_cycle ctxt c =
   let first = first_level_in_cycle ctxt c in
-  let[@coq_struct "n"] rec loop (n : Level_repr.t) acc =
+  let rec loop (n : Level_repr.t) acc =
     if Cycle_repr.(n.cycle = first.cycle) then
       if n.expected_commitment then loop (succ ctxt n) (n :: acc)
       else loop (succ ctxt n) acc
@@ -120,3 +120,8 @@ let may_snapshot_rolls ctxt =
   Compare.Int32.equal
     (Int32.rem level.cycle_position blocks_per_stake_snapshot)
     (Int32.pred blocks_per_stake_snapshot)
+
+let may_compute_randao ctxt =
+  let level = current ctxt in
+  let nonce_reveal_cutoff = Constants_storage.nonce_revelation_threshold ctxt in
+  Compare.Int32.equal level.cycle_position nonce_reveal_cutoff

@@ -83,7 +83,7 @@ let public_key_hash =
 let public_key_hash_gen =
   let open QCheck2.Gen in
   let+ seed = seed_gen in
-  let (pkh, _, _) = Tx_rollup_l2_helpers.gen_l1_address ~seed () in
+  let pkh, _, _ = Tx_rollup_l2_helpers.gen_l1_address ~seed () in
   pkh
 
 let ticket_hash : Protocol.Alpha_context.Ticket_hash.t =
@@ -149,7 +149,7 @@ let v1_batch =
      tests here as the bytes length stays the same. *)
   let bytes = Bls12_381.G2.(to_compressed_bytes (random ())) in
   let aggregated_signature =
-    Protocol.Environment.Bls_signature.unsafe_signature_of_bytes bytes
+    Environment.Bls_signature.unsafe_signature_of_bytes bytes
   in
   V1.{aggregated_signature; contents}
 
@@ -240,8 +240,6 @@ let message_result_withdrawal : Message_result.t QCheck2.Gen.t =
   let open QCheck2.Gen in
   let+ mres = message_result and+ withdrawals = list withdrawal in
   (mres, withdrawals)
-
-let pp fmt _ = Format.fprintf fmt "{}"
 
 (* ------ test template ----------------------------------------------------- *)
 

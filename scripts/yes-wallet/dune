@@ -14,6 +14,8 @@
   tezos-protocol-010-PtGRANAD
   tezos-protocol-011-PtHangz2
   tezos-protocol-012-Psithaca
+  tezos-protocol-013-PtJakart
+  tezos-protocol-014-PtKathma
   tezos-protocol-alpha)
  (modules yes_wallet_lib))
 

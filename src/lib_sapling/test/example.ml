@@ -55,7 +55,7 @@ module Client = struct
     }
 
   let new_address wallet =
-    let (idx, address) = Core.Viewing_key.new_address wallet.vk wallet.idx in
+    let idx, address = Core.Viewing_key.new_address wallet.vk wallet.idx in
     wallet.idx <- idx ;
     address
 
@@ -80,7 +80,7 @@ module Client = struct
               Int64.(equal pos 0L) then (pos, set, balance)
       else (Int64.pred pos, set, balance)
     in
-    let (scanned, unspent_inputs, balance) =
+    let scanned, unspent_inputs, balance =
       aux w.scanned w.unspent_inputs w.balance
     in
     {w with unspent_inputs; balance; scanned}
@@ -119,13 +119,13 @@ module Client = struct
           (InputSet.remove input_to_add unspent_inputs)
       else (inputs, balance, unspent_inputs, Int64.abs to_pay)
     in
-    let (inputs, balance, unspent_inputs, change) =
+    let inputs, balance, unspent_inputs, change =
       gather_input (Int64.sub 0L tez) wallet.balance [] wallet.unspent_inputs
     in
     let payment_output =
       Forge.make_output (Core.Viewing_key.dummy_address ()) 0L memo
     in
-    let (new_index, address) =
+    let new_index, address =
       Core.Viewing_key.new_address wallet.vk wallet.idx
     in
     wallet.idx <- new_index ;
@@ -172,7 +172,7 @@ module Client = struct
           (InputSet.remove input_to_add unspent_input)
       else (inputs, balance, unspent_input, Int64.abs to_pay)
     in
-    let (inputs, balance, unspent_inputs, change) =
+    let inputs, balance, unspent_inputs, change =
       gather_input
         (Int64.sub amount tez)
         wallet.balance

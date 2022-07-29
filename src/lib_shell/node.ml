@@ -127,7 +127,10 @@ type config = {
   store_root : string;
   context_root : string;
   protocol_root : string;
-  patch_context : (Context.t -> Context.t tzresult Lwt.t) option;
+  patch_context :
+    (Tezos_protocol_environment.Context.t ->
+    Tezos_protocol_environment.Context.t tzresult Lwt.t)
+    option;
   p2p : (P2p.config * P2p.limits) option;
   target : (Block_hash.t * int32) option;
   disable_mempool : bool;
@@ -235,7 +238,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
     } peer_validator_limits block_validator_limits prevalidator_limits
     chain_validator_limits history_mode =
   let open Lwt_result_syntax in
-  let (start_prevalidator, start_testchain) =
+  let start_prevalidator, start_testchain =
     match p2p_params with
     | Some _ -> (not disable_mempool, enable_testchain)
     | None -> (true, true)
@@ -247,7 +250,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       disable_mempool
   in
   Shell_metrics.Version.init p2p ;
-  let* (validator_process, store) =
+  let* validator_process, store =
     let open Block_validator_process in
     let validator_environment =
       {
@@ -264,6 +267,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
           ~store_dir:store_root
           ~context_dir:context_root
           ~allow_testchains:start_testchain
+          ~readonly:false
           genesis
       in
       let main_chain_store = Store.main_chain_store store in
@@ -278,6 +282,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
           (External
              {
                data_dir;
+               readonly = false;
                genesis;
                context_root;
                protocol_root;
@@ -296,6 +301,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
           ~store_dir:store_root
           ~context_dir:context_root
           ~allow_testchains:start_testchain
+          ~readonly:false
           genesis
       in
       return (validator_process, store)

@@ -97,7 +97,7 @@ let fold_map f array init fallback =
   let rec aux accu idx =
     if idx > length array - 1 then accu
     else
-      let (accu, y) = f accu (Array.unsafe_get array idx) in
+      let accu, y = f accu (Array.unsafe_get array idx) in
       Array.unsafe_set output idx y ;
       aux accu (idx + 1)
   in

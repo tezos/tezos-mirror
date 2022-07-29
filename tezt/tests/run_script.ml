@@ -28,7 +28,7 @@
    Component:    Client
    Invocation:   dune exec tezt/tests/main.exe -- --file run_script.ml
    Subject:      Check that run script command to tezos-client behaves correctly
- *)
+*)
 
 (* This script checks result of some arbitrary instruction against the
    expected value. Return type and name of the instruction should be
@@ -148,13 +148,21 @@ let test_source_and_sender ~protocol () =
   let* bootstrap1 = Client.show_address ~alias:"bootstrap1" client in
   let* bootstrap2 = Client.show_address ~alias:"bootstrap2" client in
 
-  (* When --payer is absent, --source sets *both* SENDER and SOURCE. *)
+  (* When --payer is absent, --source sets:
+     - *both* SENDER and SOURCE (until Kathmandu);
+     - SENDER, but SOURCE is the zero address (since L). *)
+  let expected_source =
+    match protocol with
+    | Ithaca | Jakarta | Kathmandu ->
+        Format.sprintf "%S" bootstrap1.public_key_hash
+    | Alpha -> "0x00000000000000000000000000000000000000000000"
+  in
   let* _storage =
     Client.run_script
       ~source:"bootstrap1"
       ~prg:check_source
       ~storage:"Unit"
-      ~input:(Format.sprintf "%S" bootstrap1.public_key_hash)
+      ~input:expected_source
       client
   in
   let* _storage =
@@ -218,7 +226,8 @@ let make_for ~protocol () =
 let register ~protocols =
   List.iter
     (function
-      | (Protocol.Alpha | Protocol.Jakarta) as protocol -> make_for ~protocol ()
+      | (Protocol.Alpha | Protocol.Jakarta | Protocol.Kathmandu) as protocol ->
+          make_for ~protocol ()
       | Protocol.Ithaca -> ())
     (* Won't work prior to protocol J. *)
     protocols

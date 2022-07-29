@@ -32,22 +32,12 @@ include Compare.Make (struct
 
   let compare l1 l2 =
     match (l1, l2) with
-    | (Implicit pkh1, Implicit pkh2) ->
+    | Implicit pkh1, Implicit pkh2 ->
         Signature.Public_key_hash.compare pkh1 pkh2
-    | (Originated h1, Originated h2) -> Contract_hash.compare h1 h2
-    | (Implicit _, Originated _) -> -1
-    | (Originated _, Implicit _) -> 1
+    | Originated h1, Originated h2 -> Contract_hash.compare h1 h2
+    | Implicit _, Originated _ -> -1
+    | Originated _, Implicit _ -> 1
 end)
-
-type contract = t
-
-let blake2b_hash_size =
-  let open Cache_memory_helpers in
-  h1w +! string_size_gen 20
-
-let public_key_hash_in_memory_size =
-  let open Cache_memory_helpers in
-  header_size +! word_size +! blake2b_hash_size
 
 let in_memory_size =
   let open Cache_memory_helpers in
@@ -61,17 +51,34 @@ let to_b58check = function
   | Implicit pbk -> Signature.Public_key_hash.to_b58check pbk
   | Originated h -> Contract_hash.to_b58check h
 
-let of_b58check s =
+let implicit_of_b58data : Base58.data -> Signature.public_key_hash option =
+  function
+  | Ed25519.Public_key_hash.Data h -> Some (Signature.Ed25519 h)
+  | Secp256k1.Public_key_hash.Data h -> Some (Signature.Secp256k1 h)
+  | P256.Public_key_hash.Data h -> Some (Signature.P256 h)
+  | _ -> None
+
+let originated_of_b58data = function
+  | Contract_hash.Data h -> Some h
+  | _ -> None
+
+let contract_of_b58data data =
+  match implicit_of_b58data data with
+  | Some pkh -> Some (Implicit pkh)
+  | None -> (
+      match originated_of_b58data data with
+      | Some contract_hash -> Some (Originated contract_hash)
+      | None -> None)
+
+let of_b58check_gen ~of_b58data s =
   match Base58.decode s with
   | Some data -> (
-      match data with
-      | Ed25519.Public_key_hash.Data h -> ok (Implicit (Signature.Ed25519 h))
-      | Secp256k1.Public_key_hash.Data h ->
-          ok (Implicit (Signature.Secp256k1 h))
-      | P256.Public_key_hash.Data h -> ok (Implicit (Signature.P256 h))
-      | Contract_hash.Data h -> ok (Originated h)
-      | _ -> error (Invalid_contract_notation s))
+      match of_b58data data with
+      | Some c -> ok c
+      | None -> error (Invalid_contract_notation s))
   | None -> error (Invalid_contract_notation s)
+
+let of_b58check = of_b58check_gen ~of_b58data:contract_of_b58data
 
 let pp ppf = function
   | Implicit pbk -> Signature.Public_key_hash.pp ppf pbk
@@ -81,43 +88,77 @@ let pp_short ppf = function
   | Implicit pbk -> Signature.Public_key_hash.pp_short ppf pbk
   | Originated h -> Contract_hash.pp_short ppf h
 
-let cases is_contract to_contract =
-  Data_encoding.
-    [
-      case
-        (Tag 0)
-        ~title:"Implicit"
-        Signature.Public_key_hash.encoding
-        (fun k ->
-          match is_contract k with Some (Implicit k) -> Some k | _ -> None)
-        (fun k -> to_contract (Implicit k));
-      case
-        (Tag 1)
-        (Fixed.add_padding Contract_hash.encoding 1)
-        ~title:"Originated"
-        (fun k ->
-          match is_contract k with Some (Originated k) -> Some k | _ -> None)
-        (fun k -> to_contract (Originated k));
-    ]
+let implicit_case ~proj ~inj =
+  let open Data_encoding in
+  case (Tag 0) ~title:"Implicit" Signature.Public_key_hash.encoding proj inj
 
-let encoding =
+let originated_case ~proj ~inj =
+  let open Data_encoding in
+  case
+    (Tag 1)
+    (Fixed.add_padding Contract_hash.encoding 1)
+    ~title:"Originated"
+    proj
+    inj
+
+let cases is_contract to_contract =
+  [
+    implicit_case
+      ~proj:(fun k ->
+        match is_contract k with Some (Implicit k) -> Some k | _ -> None)
+      ~inj:(fun k -> to_contract (Implicit k));
+    originated_case
+      ~proj:(fun k ->
+        match is_contract k with Some (Originated k) -> Some k | _ -> None)
+      ~inj:(fun k -> to_contract (Originated k));
+  ]
+
+let encoding_gen ~id_extra ~title_extra ~can_be ~cases ~to_b58check ~of_b58data
+    =
   let open Data_encoding in
   def
-    "contract_id"
-    ~title:"A contract handle"
+    ("contract_id" ^ id_extra)
+    ~title:("A contract handle" ^ title_extra)
     ~description:
-      "A contract notation as given to an RPC or inside scripts. Can be a \
-       base58 implicit contract hash or a base58 originated contract hash."
+      ("A contract notation as given to an RPC or inside scripts. Can be a \
+        base58 " ^ can_be)
   @@ splitted
        ~binary:(union ~tag_size:`Uint8 @@ cases (fun x -> Some x) (fun x -> x))
        ~json:
          (conv
             to_b58check
             (fun s ->
-              match of_b58check s with
+              match of_b58check_gen ~of_b58data s with
               | Ok s -> s
               | Error _ -> Json.cannot_destruct "Invalid contract notation.")
             string)
+
+let encoding =
+  encoding_gen
+    ~id_extra:""
+    ~title_extra:""
+    ~can_be:"implicit contract hash or a base58 originated contract hash."
+    ~cases
+    ~to_b58check
+    ~of_b58data:contract_of_b58data
+
+let implicit_encoding =
+  encoding_gen
+    ~id_extra:".implicit"
+    ~title_extra:" -- implicit account"
+    ~can_be:"implicit contract hash."
+    ~cases:(fun proj inj -> [implicit_case ~proj ~inj])
+    ~to_b58check:Signature.Public_key_hash.to_b58check
+    ~of_b58data:implicit_of_b58data
+
+let originated_encoding =
+  encoding_gen
+    ~id_extra:".originated"
+    ~title_extra:" -- originated account"
+    ~can_be:"originated contract hash."
+    ~cases:(fun proj inj -> [originated_case ~proj ~inj])
+    ~to_b58check:Contract_hash.to_b58check
+    ~of_b58data:originated_of_b58data
 
 let () =
   let open Data_encoding in
@@ -132,17 +173,7 @@ let () =
     (function Invalid_contract_notation loc -> Some loc | _ -> None)
     (fun loc -> Invalid_contract_notation loc)
 
-let implicit_contract id = Implicit id
-
-let is_implicit = function Implicit m -> Some m | Originated _ -> None
-
-let is_originated = function Implicit _ -> None | Originated h -> Some h
-
-let originated_contract nonce =
-  let data =
-    Data_encoding.Binary.to_bytes_exn Origination_nonce.encoding nonce
-  in
-  Originated (Contract_hash.hash_bytes [data])
+let originated_contract nonce = Originated (Contract_hash.of_nonce nonce)
 
 let originated_contracts
     ~since:
@@ -151,11 +182,11 @@ let originated_contracts
       (Origination_nonce.{origination_index = last; operation_hash = last_hash}
       as origination_nonce) =
   assert (Operation_hash.equal first_hash last_hash) ;
-  let[@coq_struct "origination_index"] rec contracts acc origination_index =
+  let rec contracts acc origination_index =
     if Compare.Int32.(origination_index < first) then acc
     else
       let origination_nonce = {origination_nonce with origination_index} in
-      let acc = originated_contract origination_nonce :: acc in
+      let acc = Contract_hash.of_nonce origination_nonce :: acc in
       contracts acc (Int32.pred origination_index)
   in
   contracts [] (Int32.pred last)
@@ -173,7 +204,7 @@ let rpc_arg =
     ()
 
 module Index = struct
-  type t = contract
+  type nonrec t = t
 
   let path_length = 1
 
@@ -195,3 +226,7 @@ module Index = struct
 
   let compare = compare
 end
+
+(* Renamed exports. *)
+
+let of_b58data = contract_of_b58data

@@ -175,14 +175,14 @@ module Base = struct
     let pp_list = pp_list pp in
     let rec iter i x y =
       match (x, y) with
-      | (hd_x :: tl_x, hd_y :: tl_y) ->
+      | hd_x :: tl_x, hd_y :: tl_y ->
           if eq hd_x hd_y then iter (succ i) tl_x tl_y
           else
             let msg =
               Format.asprintf "@[<h>%a(at index %d)@]" pp_msg_opt msg i
             in
             fail pp hd_x hd_y ~msg ?loc
-      | (_ :: _, []) | ([], _ :: _) ->
+      | _ :: _, [] | [], _ :: _ ->
           fail_msg
             "@[<v 2>@[<h>%a%a@](lists of different sizes: %d <> %d. The lists \
              are %a and %a@]"
@@ -196,7 +196,7 @@ module Base = struct
             x
             pp_list
             y
-      | ([], []) -> ()
+      | [], [] -> ()
     in
     iter 0 x y
 

@@ -86,6 +86,56 @@ module Tx_rollup = struct
     finalized_at : int option;
   }
 
+  type operation_content_payload = {
+    qty : Int64.t;
+    destination : string;
+    ticket : string;
+  }
+
+  type l2_transfer = [`Transfer of operation_content_payload]
+
+  type l2_withdraw = [`Withdraw of operation_content_payload]
+
+  type operation_content = [l2_transfer | l2_withdraw]
+
+  let operation_content_encoding : operation_content Data_encoding.t =
+    let open Data_encoding in
+    let payload_encoding =
+      obj3
+        (req "qty" int64)
+        (req "destination" string)
+        (req "ticket_hash" string)
+    in
+    union
+      [
+        case
+          ~title:"transfer"
+          (Tag 0)
+          payload_encoding
+          (function
+            | `Transfer {qty; destination; ticket} ->
+                Some (qty, destination, ticket)
+            | _ -> None)
+          (fun (qty, destination, ticket) ->
+            `Transfer {qty; destination; ticket});
+        case
+          ~title:"withdraw"
+          (Tag 1)
+          payload_encoding
+          (function
+            | `Withdraw {qty; destination; ticket} ->
+                Some (qty, destination, ticket)
+            | _ -> None)
+          (fun (qty, destination, ticket) ->
+            `Withdraw {qty; destination; ticket});
+      ]
+
+  type operation = {
+    signer : string;
+    counter : int64 option;
+    contents : operation_content list;
+  }
+
   type deposit_content = {
     sender : string;
     destination : string;
@@ -450,6 +500,14 @@ module Tx_rollup = struct
               Some (string_of_int parameters.withdraw_period) );
           ]
       in
+      Protocol.write_parameter_file ~base:(Either.right (protocol, None)) args
+  end
+end
+
+module Dal = struct
+  module Parameters = struct
+    let parameter_file protocol =
+      let args = [(["dal_parametric"; "feature_enable"], Some "true")] in
       Protocol.write_parameter_file ~base:(Either.right (protocol, None)) args
   end
 end

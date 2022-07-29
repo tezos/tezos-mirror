@@ -69,7 +69,7 @@ type t = {
 
 let wrap_context_init f _ () =
   let open Lwt_syntax in
-  let genesis = Memory_context.empty in
+  let genesis = Tezos_protocol_environment.Memory_context.empty in
   let* block2 = create_block2 genesis in
   let* block3a = create_block3a block2 in
   let* block3b = create_block3b block2 in
@@ -218,7 +218,7 @@ let test_fold {genesis = ctxt; _} =
   let* ctxt = Context.add ctxt ["foo"; "toto"] foo1 in
   let* ctxt = Context.add ctxt ["foo"; "bar"; "toto"] foo2 in
   let fold depth ecs ens =
-    let* (cs, ns) =
+    let* cs, ns =
       Context.fold
         ?depth
         ctxt
@@ -314,7 +314,7 @@ let test_trees {genesis = ctxt; _} =
   let* v1 = Context.Tree.add v1 ["foo"; "toto"] foo1 in
   let* v1 = Context.Tree.add v1 ["foo"; "bar"; "toto"] foo2 in
   let fold depth ecs ens =
-    let* (cs, ns) =
+    let* cs, ns =
       Context.Tree.fold
         v1
         ?depth
@@ -370,7 +370,7 @@ let test_trees {genesis = ctxt; _} =
  *
  * These tests are important for [Test_mem_context_array_theory] that
  * relies on this function. We don't want the tests of [keys] to be
- * in [Test_mem_context_array_theory] because it uses [QCheck].
+ * in [Test_mem_context_array_theory] because it uses [QCheck2].
  *
  * We need [keys] to be correct, because it's at the core of checking
  * the second axiom of array theory in [Test_mem_context_array_theory].
@@ -415,7 +415,7 @@ let test_domain0 () =
   let k1 = ["a"] in
   let k2 = ["b"] in
   let k3 = ["c"] in
-  let ctxt = Memory_context.empty in
+  let ctxt = Tezos_protocol_environment.Memory_context.empty in
   let* ctxt = Context.add ctxt k1 b0 in
   let* ctxt = Context.add ctxt k2 b0 in
   let* ctxt = Context.add ctxt k3 b0 in
@@ -430,7 +430,7 @@ let test_domain1 () =
   let b0 = Bytes.of_string "0" in
   let k1 = ["a"; "b"] in
   let k2 = ["a"; "c"; "d"] in
-  let ctxt = Memory_context.empty in
+  let ctxt = Tezos_protocol_environment.Memory_context.empty in
   let* ctxt = Context.add ctxt k1 b0 in
   let* ctxt = Context.add ctxt k2 b0 in
   let expected_domain = [k1; k2] |> StringListSet.of_list in
@@ -446,7 +446,7 @@ let test_domain2 () =
   let k2 = ["a"; "c"; "d"] in
   let k3 = ["a"; "c"; "e"] in
   let k4 = ["x"] in
-  let ctxt = Memory_context.empty in
+  let ctxt = Tezos_protocol_environment.Memory_context.empty in
   let* ctxt = Context.add ctxt k1 b0 in
   let* ctxt = Context.add ctxt k2 b0 in
   let* ctxt = Context.add ctxt k3 b0 in

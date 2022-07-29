@@ -28,8 +28,7 @@ class type full =
     inherit Client_context.full
 
     inherit
-      [Shell_services.chain * Shell_services.block] Protocol.Environment
-                                                    .RPC_context
+      [Shell_services.chain * Shell_services.block] Environment.RPC_context
                                                     .simple
   end
 
@@ -38,8 +37,7 @@ class wrap_full (t : Client_context.full) : full =
     inherit Client_context.proxy_context t
 
     inherit
-      [Shell_services.chain, Shell_services.block] Protocol.Environment
-                                                   .proto_rpc_context
+      [Shell_services.chain, Shell_services.block] Environment.proto_rpc_context
         (t :> RPC_context.t)
         Shell_services.Blocks.path
   end

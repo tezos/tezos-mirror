@@ -84,7 +84,10 @@ let gc_points {config = {max_known_points; _}; known_points; log; _} =
         let table = Gc_point_set.create to_remove_target in
         P2p_point.Table.iter
           (fun p point_info ->
-            if P2p_point_state.is_disconnected point_info then
+            if
+              P2p_point_state.is_disconnected point_info
+              && not (P2p_point_state.Info.trusted point_info)
+            then
               let time =
                 match P2p_point_state.Info.last_miss point_info with
                 | None -> now
@@ -128,6 +131,10 @@ let register_point ?trusted ?expected_peer_id pool ((addr, port) as point) =
       let point_info =
         P2p_point_state.Info.create ?trusted ?expected_peer_id addr port
       in
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3175
+         GC is off by one, it keeps one extra connection as it does not take
+         into account the subsequent add.
+      *)
       Option.iter
         (fun (max, _) ->
           if P2p_point.Table.length pool.known_points >= max then gc_points pool)
@@ -196,8 +203,10 @@ let gc_peer_ids
           (fun peer_id peer_info ->
             let created = P2p_peer_state.Info.created peer_info in
             let score = score @@ P2p_peer_state.Info.peer_metadata peer_info in
-            if P2p_peer_state.is_disconnected peer_info then
-              Gc_peer_set.insert (score, created, peer_id) table)
+            if
+              P2p_peer_state.is_disconnected peer_info
+              && not (P2p_peer_state.Info.trusted peer_info)
+            then Gc_peer_set.insert (score, created, peer_id) table)
           known_peer_ids ;
         let to_remove = Gc_peer_set.get table in
         ListLabels.iter to_remove ~f:(fun (_, _, peer_id) ->
@@ -215,6 +224,10 @@ let register_peer pool peer_id =
           peer_id
           ~peer_metadata:(pool.peer_meta_config.peer_meta_initial ())
       in
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3175
+         GC is off by one, it keeps one extra connection as it does not take
+         into account the subsequent add.
+      *)
       Option.iter
         (fun (max, _) ->
           if P2p_peer.Table.length pool.known_peer_ids >= max then
@@ -421,8 +434,8 @@ module Connection = struct
             | Some _ | None -> (
                 let ci = P2p_conn.info conn in
                 match ci.id_point with
-                | (_, None) -> acc
-                | (addr, Some port) -> ((addr, port), ci.peer_id) :: acc))
+                | _, None -> acc
+                | addr, Some port -> ((addr, port), ci.peer_id) :: acc))
     in
     random_elt candidates
 
@@ -447,7 +460,7 @@ module Connection = struct
   let propose_swap_request pool =
     let open Option_syntax in
     let* recipient = random_connection ~no_private:true pool in
-    let* (proposed_point, proposed_peer_id) =
+    let* proposed_point, proposed_peer_id =
       random_addr ~different_than:recipient ~no_private:true pool
     in
     Some (proposed_point, proposed_peer_id, recipient)
@@ -579,7 +592,7 @@ let add_to_id_points t point =
    close to the end of the list is picked multiple times.
 
    @raise Invalid_argument if either [best] or [other] is strictly negative.
-   *)
+*)
 let sample best other points =
   if best < 0 || other < 0 then raise (Invalid_argument "P2p_pool.sample") ;
   let l = List.length points in
@@ -622,19 +635,19 @@ let compare_known_point_info p1 p2 =
     match
       (P2p_point_state.Info.last_seen p1, P2p_point_state.Info.last_seen p2)
     with
-    | (None, None) -> (Random.int 2 * 2) - 1 (* HACK... *)
-    | (Some _, None) -> 1
-    | (None, Some _) -> -1
-    | (Some (_, time1), Some (_, time2)) -> (
+    | None, None -> (Random.int 2 * 2) - 1 (* HACK... *)
+    | Some _, None -> 1
+    | None, Some _ -> -1
+    | Some (_, time1), Some (_, time2) -> (
         match compare time1 time2 with
         | 0 -> (Random.int 2 * 2) - 1 (* HACK... *)
         | x -> x)
   in
   match (disconnected1, disconnected2) with
-  | (false, false) -> compare_last_seen p1 p2
-  | (false, true) -> -1
-  | (true, false) -> 1
-  | (true, true) -> compare_last_seen p2 p1
+  | false, false -> compare_last_seen p1 p2
+  | false, true -> -1
+  | true, false -> 1
+  | true, true -> compare_last_seen p2 p1
 
 let list_known_points ~ignore_private ?(size = 50) pool =
   if size < 0 then Lwt.fail (Invalid_argument "P2p_pool.list_known_points")

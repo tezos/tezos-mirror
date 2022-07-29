@@ -36,6 +36,10 @@ let blocks_per_commitment c =
   let constants = Raw_context.constants c in
   constants.blocks_per_commitment
 
+let nonce_revelation_threshold c =
+  let constants = Raw_context.constants c in
+  constants.nonce_revelation_threshold
+
 let blocks_per_stake_snapshot c =
   let constants = Raw_context.constants c in
   constants.blocks_per_stake_snapshot
@@ -67,6 +71,10 @@ let proof_of_work_threshold c =
 let tokens_per_roll c =
   let constants = Raw_context.constants c in
   constants.tokens_per_roll
+
+let vdf_difficulty c =
+  let constants = Raw_context.constants c in
+  constants.vdf_difficulty
 
 let seed_nonce_revelation_tip c =
   let constants = Raw_context.constants c in
@@ -114,6 +122,10 @@ let liquidity_baking_toggle_ema_threshold c =
 
 let parametric c = Raw_context.constants c
 
+let tx_rollup c = (Raw_context.constants c).tx_rollup
+
+let sc_rollup c = (Raw_context.constants c).sc_rollup
+
 let minimal_block_delay c =
   let constants = Raw_context.constants c in
   constants.minimal_block_delay
@@ -147,97 +159,121 @@ let double_baking_punishment c =
   constants.double_baking_punishment
 
 let tx_rollup_enable c =
-  let constants = Raw_context.constants c in
-  constants.tx_rollup_enable
+  let tx_rollup = Raw_context.tx_rollup c in
+  tx_rollup.enable
 
 let tx_rollup_sunset_level c =
-  let constants = Raw_context.constants c in
-  constants.tx_rollup_sunset_level
+  let tx_rollup = Raw_context.tx_rollup c in
+  tx_rollup.sunset_level
 
 let tx_rollup_origination_size c =
-  let constants = Raw_context.constants c in
-  constants.tx_rollup_origination_size
+  let tx_rollup = Raw_context.tx_rollup c in
+  tx_rollup.origination_size
 
 let tx_rollup_hard_size_limit_per_inbox c =
-  let constants = Raw_context.constants c in
-  constants.tx_rollup_hard_size_limit_per_inbox
+  let tx_rollup = Raw_context.tx_rollup c in
+  tx_rollup.hard_size_limit_per_inbox
 
 let tx_rollup_hard_size_limit_per_message c =
-  let constants = Raw_context.constants c in
-  constants.tx_rollup_hard_size_limit_per_message
+  let tx_rollup = Raw_context.tx_rollup c in
+  tx_rollup.hard_size_limit_per_message
 
 let tx_rollup_max_withdrawals_per_batch c =
-  let constants = Raw_context.constants c in
-  constants.tx_rollup_max_withdrawals_per_batch
+  let tx_rollup = Raw_context.tx_rollup c in
+  tx_rollup.max_withdrawals_per_batch
 
 let tx_rollup_commitment_bond c =
-  let constants = Raw_context.constants c in
-  constants.tx_rollup_commitment_bond
+  let tx_rollup = Raw_context.tx_rollup c in
+  tx_rollup.commitment_bond
 
 let tx_rollup_finality_period c =
-  let constants = Raw_context.constants c in
-  constants.tx_rollup_finality_period
+  let tx_rollup = Raw_context.tx_rollup c in
+  tx_rollup.finality_period
 
 let tx_rollup_withdraw_period c =
-  let constants = Raw_context.constants c in
-  constants.tx_rollup_withdraw_period
+  let tx_rollup = Raw_context.tx_rollup c in
+  tx_rollup.withdraw_period
 
 let tx_rollup_max_inboxes_count c =
-  let constants = Raw_context.constants c in
-  constants.tx_rollup_max_inboxes_count
+  let tx_rollup = Raw_context.tx_rollup c in
+  tx_rollup.max_inboxes_count
 
 let tx_rollup_max_messages_per_inbox c =
-  let constants = Raw_context.constants c in
-  constants.tx_rollup_max_messages_per_inbox
+  let tx_rollup = Raw_context.tx_rollup c in
+  tx_rollup.max_messages_per_inbox
 
 let tx_rollup_max_commitments_count c =
-  let constants = Raw_context.constants c in
-  constants.tx_rollup_max_commitments_count
+  let tx_rollup = Raw_context.tx_rollup c in
+  tx_rollup.max_commitments_count
 
 let tx_rollup_cost_per_byte_ema_factor c =
-  let constants = Raw_context.constants c in
-  constants.tx_rollup_cost_per_byte_ema_factor
+  let tx_rollup = Raw_context.tx_rollup c in
+  tx_rollup.cost_per_byte_ema_factor
 
 let tx_rollup_max_ticket_payload_size c =
-  let constants = Raw_context.constants c in
-  constants.tx_rollup_max_ticket_payload_size
+  let tx_rollup = Raw_context.tx_rollup c in
+  tx_rollup.max_ticket_payload_size
 
 let tx_rollup_rejection_max_proof_size c =
-  let constants = Raw_context.constants c in
-  constants.tx_rollup_rejection_max_proof_size
+  let tx_rollup = Raw_context.tx_rollup c in
+  tx_rollup.rejection_max_proof_size
 
 let ratio_of_frozen_deposits_slashed_per_double_endorsement c =
   let constants = Raw_context.constants c in
   constants.ratio_of_frozen_deposits_slashed_per_double_endorsement
 
-let sc_rollup_enable c =
+let testnet_dictator c =
   let constants = Raw_context.constants c in
-  constants.sc_rollup_enable
+  constants.testnet_dictator
+
+let sc_rollup_enable c =
+  let sc_rollup = Raw_context.sc_rollup c in
+  sc_rollup.enable
 
 let sc_rollup_origination_size c =
-  let constants = Raw_context.constants c in
-  constants.sc_rollup_origination_size
+  let sc_rollup = Raw_context.sc_rollup c in
+  sc_rollup.origination_size
 
 let sc_rollup_challenge_window_in_blocks c =
-  let constants = Raw_context.constants c in
-  constants.sc_rollup_challenge_window_in_blocks
+  let sc_rollup = Raw_context.sc_rollup c in
+  sc_rollup.challenge_window_in_blocks
 
-let sc_rollup_max_available_messages c =
-  let constants = Raw_context.constants c in
-  constants.sc_rollup_max_available_messages
+let sc_rollup_max_number_of_messages_per_commitment_period c =
+  let sc_rollup = Raw_context.sc_rollup c in
+  sc_rollup.max_number_of_messages_per_commitment_period
 
-let sc_rollup_stake_amount_in_mutez c =
-  let constants = Raw_context.constants c in
-  constants.sc_rollup_stake_amount_in_mutez
+let sc_rollup_stake_amount c =
+  let sc_rollup = Raw_context.sc_rollup c in
+  sc_rollup.stake_amount
 
-let sc_rollup_commitment_frequency_in_blocks c =
-  let constants = Raw_context.constants c in
-  constants.sc_rollup_commitment_frequency_in_blocks
-
-let sc_rollup_commitment_storage_size_in_bytes c =
-  let constants = Raw_context.constants c in
-  constants.sc_rollup_commitment_storage_size_in_bytes
+let sc_rollup_commitment_period_in_blocks c =
+  let sc_rollup = Raw_context.sc_rollup c in
+  sc_rollup.commitment_period_in_blocks
 
 let sc_rollup_max_lookahead_in_blocks c =
+  let sc_rollup = Raw_context.sc_rollup c in
+  sc_rollup.max_lookahead_in_blocks
+
+let sc_rollup_max_active_outbox_levels c =
+  let sc_rollup = Raw_context.sc_rollup c in
+  sc_rollup.max_active_outbox_levels
+
+let sc_rollup_max_outbox_messages_per_level c =
+  let sc_rollup = Raw_context.sc_rollup c in
+  sc_rollup.max_outbox_messages_per_level
+
+let sc_rollup_number_of_sections_in_dissection c =
+  let sc_rollup = Raw_context.sc_rollup c in
+  sc_rollup.number_of_sections_in_dissection
+
+let sc_rollup_timeout_period_in_blocks c =
+  let sc_rollup = Raw_context.sc_rollup c in
+  sc_rollup.timeout_period_in_blocks
+
+let dal_number_of_slots c =
   let constants = Raw_context.constants c in
-  constants.sc_rollup_max_lookahead_in_blocks
+  constants.dal.number_of_slots
+
+let dal_enable c =
+  let constants = Raw_context.constants c in
+  constants.dal.feature_enable

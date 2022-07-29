@@ -240,8 +240,7 @@ let test_threshold_is_one_always_takes_best_timestamp () =
 
    4. After adding more values (including in the past, from other peers), the
    status still is `Sync`
-
-   *)
+*)
 let test_threshold_is_two () =
   let latency = 120 in
   let heuristic = create ~threshold:2 ~latency in
@@ -320,7 +319,7 @@ let test_threshold_is_two_one_in_the_past_and_one_more () =
    the status is `Stuck`.
 
    4. After a more recent value, the status is `Unsync`.
-   *)
+*)
 let test_threshold_is_two_two_in_the_past () =
   let latency = 120 in
   let heuristic = create ~threshold:2 ~latency in

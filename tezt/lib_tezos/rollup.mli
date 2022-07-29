@@ -62,6 +62,26 @@ module Tx_rollup : sig
     finalized_at : int option;
   }
 
+  type operation_content_payload = {
+    qty : Int64.t;
+    destination : string;
+    ticket : string;
+  }
+
+  type l2_transfer = [`Transfer of operation_content_payload]
+
+  type l2_withdraw = [`Withdraw of operation_content_payload]
+
+  type operation_content = [l2_transfer | l2_withdraw]
+
+  val operation_content_encoding : operation_content Data_encoding.t
+
+  type operation = {
+    signer : string;
+    counter : int64 option;
+    contents : operation_content list;
+  }
+
   type deposit_content = {
     sender : string;
     destination : string;
@@ -191,5 +211,11 @@ module Tx_rollup : sig
     val default : t
 
     val parameter_file : ?parameters:t -> Protocol.t -> string Lwt.t
+  end
+end
+
+module Dal : sig
+  module Parameters : sig
+    val parameter_file : Protocol.t -> string Lwt.t
   end
 end

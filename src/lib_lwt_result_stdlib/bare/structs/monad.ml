@@ -39,9 +39,9 @@ module Lwt_syntax = struct
 end
 
 module Option_syntax = struct
-  let (return[@ocaml.inline "always"]) = fun x -> Some x
+  let (return [@ocaml.inline "always"]) = fun x -> Some x
 
-  let (fail[@ocaml.inline "always"]) = None
+  let (fail [@ocaml.inline "always"]) = None
 
   let return_unit = return ()
 
@@ -55,7 +55,7 @@ module Option_syntax = struct
 
   let ( let+ ) o f = Stdlib.Option.map f o
 
-  let both a b = match (a, b) with (Some x, Some y) -> Some (x, y) | _ -> None
+  let both a b = match (a, b) with Some x, Some y -> Some (x, y) | _ -> None
 
   let ( and* ) = both
 
@@ -63,9 +63,9 @@ module Option_syntax = struct
 end
 
 module Result_syntax = struct
-  let (return[@ocaml.inline "always"]) = fun x -> Ok x
+  let (return [@ocaml.inline "always"]) = fun x -> Ok x
 
-  let (fail[@ocaml.inline "always"]) = fun x -> Error x
+  let (fail [@ocaml.inline "always"]) = fun x -> Error x
 
   let return_unit = Ok ()
 
@@ -103,15 +103,15 @@ module Result_syntax = struct
 
   let both a b =
     match (a, b) with
-    | (Ok a, Ok b) -> Ok (a, b)
-    | (Error err, Ok _) | (Ok _, Error err) -> Error [err]
-    | (Error erra, Error errb) -> Error [erra; errb]
+    | Ok a, Ok b -> Ok (a, b)
+    | Error err, Ok _ | Ok _, Error err -> Error [err]
+    | Error erra, Error errb -> Error [erra; errb]
 end
 
 module Lwt_option_syntax = struct
-  let (return[@ocaml.iniline "always"]) = fun x -> Lwt.return (Some x)
+  let (return [@ocaml.iniline "always"]) = fun x -> Lwt.return (Some x)
 
-  let (fail[@ocaml.iniline "always"]) = Lwt.return None
+  let (fail [@ocaml.iniline "always"]) = Lwt.return None
 
   let return_unit = Lwt_syntax.return_some ()
 
@@ -123,7 +123,7 @@ module Lwt_option_syntax = struct
 
   let both a b =
     let open Lwt_syntax in
-    let+ (a, b) = both a b in
+    let+ a, b = both a b in
     Option_syntax.both a b
 
   let ( let* ) lo f = Lwt.bind lo (function None -> fail | Some x -> f x)
@@ -140,9 +140,9 @@ module Lwt_option_syntax = struct
 end
 
 module Lwt_result_syntax = struct
-  let (return[@ocaml.iniline "always"]) = fun x -> Lwt.return (Ok x)
+  let (return [@ocaml.iniline "always"]) = fun x -> Lwt.return (Ok x)
 
-  let (fail[@ocaml.iniline "always"]) = fun x -> Lwt.return (Error x)
+  let (fail [@ocaml.iniline "always"]) = fun x -> Lwt.return (Error x)
 
   let return_unit = Lwt_syntax.return_ok_unit
 
@@ -179,7 +179,7 @@ module Lwt_result_syntax = struct
 
   let both a b =
     let open Lwt_syntax in
-    let+ (a, b) = both a b in
+    let+ a, b = both a b in
     Result_syntax.both a b
 end
 
@@ -188,8 +188,8 @@ end
 (* For internal use only, not advertised *)
 
 (* Like Lwt.apply but specialised for two-parameters functions *)
-let (lwt_apply2[@ocaml.inline "always"]) =
+let (lwt_apply2 [@ocaml.inline "always"]) =
  fun f x y -> try f x y with exn -> Lwt.fail exn
 
-let (lwt_apply3[@ocaml.inline "always"]) =
+let (lwt_apply3 [@ocaml.inline "always"]) =
  fun f a x y -> try f a x y with exn -> Lwt.fail exn

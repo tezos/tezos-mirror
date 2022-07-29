@@ -31,7 +31,6 @@
     Subject:      Tx rollup l2 encoding
 *)
 
-open Lib_test
 open Lib_test.Qcheck2_helpers
 open Protocol.Indexable
 open Protocol.Tx_rollup_l2_batch
@@ -48,8 +47,8 @@ let bls_pk =
     `Hex "8fee216367c463821f82c942a1cee3a01469b1da782736ca269a2accea6e0cc4"
     |> Hex.to_bytes_exn
   in
-  let secret_key = Bls12_381.Signature.generate_sk ikm in
-  Bls12_381.Signature.MinPk.derive_pk secret_key
+  let _pkh, public_key, _secret_key = Bls.generate_key ~seed:ikm () in
+  public_key
 
 let l2_address = Protocol.Tx_rollup_l2_address.of_bls_pk bls_pk
 
@@ -83,7 +82,7 @@ let public_key_hash =
 let public_key_hash_gen =
   let open QCheck2.Gen in
   let+ seed = seed_gen in
-  let (pkh, _, _) = Tx_rollup_l2_helpers.gen_l1_address ~seed () in
+  let pkh, _, _ = Tx_rollup_l2_helpers.gen_l1_address ~seed () in
   pkh
 
 let ticket_hash : Protocol.Alpha_context.Ticket_hash.t =
@@ -91,9 +90,7 @@ let ticket_hash : Protocol.Alpha_context.Ticket_hash.t =
      we could introduce a bit more randomness here *)
   let ticketer_b58 = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU" in
   let ticketer_pkh = Signature.Public_key_hash.of_b58check_exn ticketer_b58 in
-  let ticketer =
-    Protocol.Alpha_context.Contract.implicit_contract ticketer_pkh
-  in
+  let ticketer = Protocol.Alpha_context.Contract.Implicit ticketer_pkh in
   Tx_rollup_l2_helpers.make_unit_ticket_key ticketer l2_address
 
 let idx_ticket_hash_idx_gen :
@@ -149,7 +146,7 @@ let v1_batch =
      tests here as the bytes length stays the same. *)
   let bytes = Bls12_381.G2.(to_compressed_bytes (random ())) in
   let aggregated_signature =
-    Protocol.Environment.Bls_signature.unsafe_signature_of_bytes bytes
+    Environment.Bls_signature.unsafe_signature_of_bytes bytes
   in
   V1.{aggregated_signature; contents}
 
@@ -241,8 +238,6 @@ let message_result_withdrawal : Message_result.t QCheck2.Gen.t =
   let+ mres = message_result and+ withdrawals = list withdrawal in
   (mres, withdrawals)
 
-let pp fmt _ = Format.fprintf fmt "{}"
-
 (* ------ test template ----------------------------------------------------- *)
 
 let test_quantity ~count =
@@ -278,33 +273,6 @@ let test_quantity ~count =
   in
   QCheck2.Test.make ~count ~print ~name:"quantity operation" test_gen test
 
-let test_roundtrip ~count title arb equ encoding =
-  let pp fmt x =
-    Data_encoding.Json.construct encoding x
-    |> Data_encoding.Json.to_string |> Format.pp_print_string fmt
-  in
-  let test rdt input =
-    let output = Roundtrip.make encoding rdt input in
-    let success = equ input output in
-    if not success then
-      QCheck2.Test.fail_reportf
-        "%s %s roundtrip error: %a became %a"
-        title
-        (Roundtrip.target rdt)
-        pp
-        input
-        pp
-        output
-  in
-  QCheck2.Test.make
-    ~count
-    ~name:(Format.asprintf "roundtrip %s" title)
-    arb
-    (fun input ->
-      test Roundtrip.binary input ;
-      test Roundtrip.json input ;
-      true)
-
 let () =
   let qcheck_wrap = qcheck_wrap ~rand:(Random.State.make_self_init ()) in
   Alcotest.run
@@ -316,15 +284,15 @@ let () =
           [
             test_roundtrip
               ~count:100
-              "batch"
-              batch
-              ( = )
+              ~title:"batch"
+              ~gen:batch
+              ~eq:( = )
               Protocol.Tx_rollup_l2_batch.encoding;
             test_roundtrip
               ~count:100
-              "message_result"
-              message_result_withdrawal
-              ( = )
+              ~title:"message_result"
+              ~gen:message_result_withdrawal
+              ~eq:( = )
               Protocol.Tx_rollup_l2_apply.Message_result.encoding;
           ] );
     ]

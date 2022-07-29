@@ -29,12 +29,9 @@ open Stats
 type determinizer_option = Percentile of int | Mean
 
 type options = {
-  flush_cache : [`Cache_megabytes of int | `Dont];
-  stabilize_gc : bool;
   seed : int option;
   nsamples : int;
   determinizer : determinizer_option;
-  cpu_affinity : int option;
   bench_number : int;
   minor_heap_size : [`words of int];
   config_dir : string option;
@@ -115,52 +112,37 @@ let options_encoding =
   def "benchmark_options_encoding"
   @@ conv
        (fun {
-              flush_cache;
-              stabilize_gc;
               seed;
               nsamples;
               determinizer;
-              cpu_affinity;
               bench_number;
               minor_heap_size;
               config_dir;
             } ->
-         ( flush_cache,
-           stabilize_gc,
-           seed,
+         ( seed,
            nsamples,
            determinizer,
-           cpu_affinity,
            bench_number,
            minor_heap_size,
            config_dir ))
-       (fun ( flush_cache,
-              stabilize_gc,
-              seed,
+       (fun ( seed,
               nsamples,
               determinizer,
-              cpu_affinity,
               bench_number,
               minor_heap_size,
               config_dir ) ->
          {
-           flush_cache;
-           stabilize_gc;
            seed;
            nsamples;
            determinizer;
-           cpu_affinity;
            bench_number;
            minor_heap_size;
            config_dir;
          })
-       (tup9
-          flush_cache_encoding
-          bool
+       (tup6
           (option Benchmark_helpers.int_encoding)
           Benchmark_helpers.int_encoding
           determinizer_option_encoding
-          (option Benchmark_helpers.int_encoding)
           Benchmark_helpers.int_encoding
           heap_size_encoding
           (option string))
@@ -253,12 +235,6 @@ let serialized_workload_encoding =
 
 let pp_options fmtr (options : options) =
   let open Printf in
-  let flush_cache =
-    match options.flush_cache with
-    | `Cache_megabytes i -> sprintf "true, cache size = %d" i
-    | `Dont -> "false"
-  in
-  let stabilize_gc = string_of_bool options.stabilize_gc in
   let seed =
     match options.seed with
     | None -> "self-init"
@@ -270,32 +246,21 @@ let pp_options fmtr (options : options) =
     | Percentile i -> sprintf "percentile %d" i
     | Mean -> "mean"
   in
-  let cpu_affinity =
-    match options.cpu_affinity with
-    | None -> "none"
-    | Some cpu_id -> string_of_int cpu_id
-  in
   let config_dir = Option.value options.config_dir ~default:"None" in
   let bench_number = string_of_int options.bench_number in
   let minor_heap_size = match options.minor_heap_size with `words n -> n in
   Format.fprintf
     fmtr
-    "@[<v 2>{ flush_cache=%s;@,\
-     stabilize_gc=%s;@,\
-     seed=%s;@,\
+    "@[<v 2>{ seed=%s;@,\
      bench #=%s;@,\
      nsamples/bench=%s;@,\
      determinizer=%s;@,\
-     cpu_affinity=%s;@,\
      minor_heap_size=%d words;@,\
      config directory=%s }@]"
-    flush_cache
-    stabilize_gc
     seed
     bench_number
     nsamples
     determinizer
-    cpu_affinity
     minor_heap_size
     config_dir
 
@@ -457,7 +422,7 @@ let collect_stats : 'a workload_data -> workloads_stats =
   let time_dist_data =
     List.rev_map (fun {qty; _} -> qty) workload_data |> Array.of_list
   in
-  let (min, max) = farray_min_max time_dist_data in
+  let min, max = farray_min_max time_dist_data in
   let dist = Emp.of_raw_data time_dist_data in
   let mean = Emp.Float.empirical_mean dist in
   let var = Emp.Float.empirical_variance dist in
@@ -497,28 +462,34 @@ let cull_outliers :
 (* ------------------------------------------------------------------------- *)
 (* Benchmarking *)
 
-module Stubs = Benchmark_utils.Stubs
+module Time = struct
+  external get_time_ns : unit -> (int64[@unboxed])
+    = "caml_clock_gettime_byte" "caml_clock_gettime"
+    [@@noalloc]
 
-let reset_memory ~stabilize_gc ~flush_cache =
-  if stabilize_gc then Stubs.stabilize_gc () ;
-  match flush_cache with
-  | `Dont -> ()
-  | `Cache_megabytes mb ->
-      Stubs.Cache.flush_cache Int64.(mul 1048576L (of_int mb))
+  let measure f =
+    let bef = get_time_ns () in
+    let _ = f () in
+    let aft = get_time_ns () in
+    let dt = Int64.(to_float (sub aft bef)) in
+    dt
+    [@@inline always]
 
-let make_sampler ~stabilize_gc ~flush_cache closure _rng_state =
-  reset_memory ~stabilize_gc ~flush_cache ;
-  let (_, dt) = Stubs.Time.duration closure in
-  float_of_int dt
+  let measure_and_return f =
+    let bef = get_time_ns () in
+    let x = f () in
+    let aft = get_time_ns () in
+    let dt = Int64.(to_float (sub aft bef)) in
+    (dt, x)
+    [@@inline always]
+end
+
+let make_sampler closure _rng_state = Time.measure closure
 
 let compute_empirical_timing_distribution :
-    closure:(unit -> 'a) ->
-    nsamples:int ->
-    flush_cache:[`Cache_megabytes of int | `Dont] ->
-    stabilize_gc:bool ->
-    float Emp.t =
- fun ~closure ~nsamples ~flush_cache ~stabilize_gc ->
-  let sampler = make_sampler ~stabilize_gc ~flush_cache closure in
+    closure:(unit -> 'a) -> nsamples:int -> float Emp.t =
+ fun ~closure ~nsamples ->
+  let sampler = make_sampler closure in
   let dummy_rng_state = Random.State.make [|1; 2; 3|] in
   Emp.of_generative ~nsamples sampler dummy_rng_state
 
@@ -538,11 +509,6 @@ let gc_init_from_options (options : options) =
   match options.minor_heap_size with
   | `words words -> Gc.set {(Gc.get ()) with minor_heap_size = words}
 
-let cpu_affinity_from_options (options : options) =
-  match options.cpu_affinity with
-  | None -> ()
-  | Some cpu_id -> Stubs.Affinity.set cpu_id
-
 let set_gc_increment () =
   let stats = Gc.stat () in
   let words = stats.Gc.heap_words in
@@ -553,29 +519,47 @@ let set_gc_increment () =
 
 let parse_config (type c t) ((module Bench) : (c, t) Benchmark.poly)
     (options : options) =
+  let default_config () =
+    Format.eprintf "Using default configuration for benchmark %s@." Bench.name ;
+    Data_encoding.Json.construct Bench.config_encoding Bench.default_config
+  in
+  let try_load_custom_config directory =
+    let config_file = Format.asprintf "%s.json" Bench.name in
+    let path = Filename.concat directory config_file in
+    let json =
+      match Benchmark_helpers.load_json path with
+      | Ok json ->
+          Format.eprintf
+            "Using custom configuration %s for benchmark %s@."
+            path
+            Bench.name ;
+          json
+      | Error (Sys_error err) ->
+          Format.eprintf "Failed loading json %s (Ignoring)@." err ;
+          default_config ()
+      | Error exn -> raise exn
+    in
+    (json, path)
+  in
+  let decode json =
+    try Data_encoding.Json.destruct Bench.config_encoding json
+    with Data_encoding.Json.Cannot_destruct (_, _) as exn ->
+      Format.eprintf
+        "Json deserialization error: %a@."
+        (Data_encoding.Json.print_error ?print_unknown:None)
+        exn ;
+      exit 1
+  in
   match options.config_dir with
   | None ->
-      Format.eprintf "Using default configuration for benchmark %s@." Bench.name ;
-      let json =
-        Data_encoding.Json.construct Bench.config_encoding Bench.default_config
-      in
+      let json = default_config () in
       Format.eprintf "%a@." Data_encoding.Json.pp json ;
       Bench.default_config
   | Some directory ->
-      let config_file = Format.asprintf "%s.json" Bench.name in
-      let path = Filename.concat directory config_file in
-      let json = Benchmark_helpers.load_json path in
-      let config =
-        try Data_encoding.Json.destruct Bench.config_encoding json
-        with Data_encoding.Json.Cannot_destruct (_, _) as exn ->
-          Format.eprintf
-            "Json deserialization error: %a@."
-            (Data_encoding.Json.print_error ?print_unknown:None)
-            exn ;
-          exit 1
-      in
+      let json, path = try_load_custom_config directory in
+      let config = decode json in
       Format.eprintf
-        "Loading configuration from %s for benchmark %s@."
+        "Loaded configuration from %s for benchmark %s@."
         path
         Bench.name ;
       Format.eprintf "%a@." Data_encoding.Json.pp json ;
@@ -591,7 +575,6 @@ let perform_benchmark (type c t) (options : options)
   in
   let determinizer = determinizer_from_options options in
   gc_init_from_options options ;
-  cpu_affinity_from_options options ;
   let progress =
     Benchmark_helpers.make_progress_printer
       Format.err_formatter
@@ -610,8 +593,6 @@ let perform_benchmark (type c t) (options : options)
               compute_empirical_timing_distribution
                 ~closure
                 ~nsamples:options.nsamples
-                ~flush_cache:options.flush_cache
-                ~stabilize_gc:options.stabilize_gc
             in
             let qty = determinizer qty_dist in
             {workload; qty} :: workload_data
@@ -621,15 +602,10 @@ let perform_benchmark (type c t) (options : options)
                   compute_empirical_timing_distribution
                     ~closure:(fun () -> closure context)
                     ~nsamples:options.nsamples
-                    ~flush_cache:options.flush_cache
-                    ~stabilize_gc:options.stabilize_gc
                 in
                 let qty = determinizer qty_dist in
                 {workload; qty} :: workload_data)
         | Generator.With_probe {workload; probe; closure} ->
-            reset_memory
-              ~stabilize_gc:options.stabilize_gc
-              ~flush_cache:options.flush_cache ;
             Tezos_stdlib.Utils.do_n_times options.nsamples (fun () ->
                 closure probe) ;
             let aspects = probe.Generator.aspects () in
@@ -662,8 +638,8 @@ let make_timing_probe (type t) (module O : Compare.COMPARABLE with type t = t) =
   {
     Generator.apply =
       (fun aspect closure ->
-        let (r, dt) = Stubs.Time.duration closure in
-        Stdlib.Hashtbl.add table aspect (float_of_int dt) ;
+        let dt, r = Time.measure_and_return closure in
+        Stdlib.Hashtbl.add table aspect dt ;
         r);
     aspects =
       (fun () -> Stdlib.Hashtbl.to_seq_keys table |> Set.of_seq |> Set.elements);

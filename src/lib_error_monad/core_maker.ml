@@ -377,7 +377,7 @@ end = struct
     set_error_encoding_cache_dirty :=
       fun () ->
         set_older_caches_dirty () ;
-        error_encoding.Data_encoding__Encoding.json_encoding <- None
+        error_encoding.json_encoding <- None
 
   let json_of_error error = Data_encoding.Json.construct error_encoding error
 

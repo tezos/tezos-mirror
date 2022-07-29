@@ -28,4 +28,7 @@ open Configuration
 let call (cctxt : #sc_client_context) = cctxt#call_service
 
 let get_sc_rollup_addresses_command cctxt =
-  call cctxt (Sc_rollup_services.sc_rollup_address ()) () () ()
+  call cctxt (Sc_rollup_services.Global.sc_rollup_address ()) () () ()
+
+let get_state_value_command cctxt key =
+  call cctxt (Sc_rollup_services.Local.current_state_value ()) () {key} ()

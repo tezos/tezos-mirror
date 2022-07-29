@@ -89,6 +89,10 @@ module Int64 = struct
   let pp pp v = Format.pp_print_int pp (Int64.to_int v)
 end
 
+(* char *)
+let equal_char ~loc a b =
+  equal ~loc Char.equal "Characters aren't equal" Format.pp_print_char a b
+
 (* int *)
 let equal_int ~loc (a : int) (b : int) =
   equal ~loc Int.equal "Integers aren't equal" Format.pp_print_int a b
@@ -195,3 +199,14 @@ let pp_print_list pp out xs =
 
 let assert_equal_list ~loc eq msg pp =
   equal ~loc (List.equal eq) msg (pp_print_list pp)
+
+let to_json_string encoding x =
+  x
+  |> Data_encoding.Json.construct encoding
+  |> Format.asprintf "\n%a\n" Data_encoding.Json.pp
+
+let equal_with_encoding ~loc encoding a b =
+  equal_string ~loc (to_json_string encoding a) (to_json_string encoding b)
+
+let not_equal_with_encoding ~loc encoding a b =
+  not_equal_string ~loc (to_json_string encoding a) (to_json_string encoding b)

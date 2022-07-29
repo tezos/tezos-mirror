@@ -133,10 +133,8 @@ let perform_benchmarks (patches : patch_rule list) snoop benchmarks =
           save_to ;
         return ())
       else
-        let* (bench_num, nsamples, config) =
-          let* (patch, override) =
-            patch_benchmark_config ~patches ~bench_name
-          in
+        let* bench_num, nsamples, config =
+          let* patch, override = patch_benchmark_config ~patches ~bench_name in
           let* config =
             match patch with
             | No_patch -> return None
@@ -251,6 +249,12 @@ let perform_cache_benchmarks snoop =
   let* benches = Snoop.(list_benchmarks ~mode:All ~tags:[Cache] snoop) in
   perform_benchmarks [] snoop benches
 
+let perform_tickets_benchmarks snoop proto =
+  let* benches =
+    Snoop.(list_benchmarks ~mode:All ~tags:[Tickets; Proto proto] snoop)
+  in
+  perform_benchmarks [] snoop benches
+
 let perform_misc_benchmarks snoop =
   let* benches = Snoop.(list_benchmarks ~mode:All ~tags:[Misc] snoop) in
   perform_benchmarks [] snoop benches
@@ -261,7 +265,7 @@ let perform_carbonated_map_benchmarks snoop proto =
   in
   perform_benchmarks [] snoop benches
 
-let perform_tx_rollup_benchmark snoop proto =
+let perform_tx_rollup_benchmarks snoop proto =
   let* benches =
     Snoop.(list_benchmarks ~mode:All ~tags:[Tx_rollup; Proto proto] snoop)
   in
@@ -273,7 +277,9 @@ let main protocol =
   let* () = perform_misc_benchmarks snoop in
   let* () = perform_interpreter_benchmarks snoop protocol in
   let* () = perform_typechecker_benchmarks snoop protocol in
+  let* () = perform_tickets_benchmarks snoop protocol in
   let* () = perform_global_constants_benchmarks snoop in
   let* () = perform_cache_benchmarks snoop in
   let* () = perform_encoding_benchmarks snoop protocol in
+  let* () = perform_tx_rollup_benchmarks snoop protocol in
   perform_carbonated_map_benchmarks snoop protocol

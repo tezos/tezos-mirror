@@ -48,7 +48,7 @@ let gen_storage =
   | Error e ->
       Alcotest.failf
         "An unxpected error %a occurred when generating Bitset.t"
-        Protocol.Environment.Error_monad.pp_trace
+        Environment.Error_monad.pp_trace
         e
 
 let test_get_set (c, ofs) =
@@ -65,7 +65,7 @@ let test_get_set (c, ofs) =
       | Error e ->
           Alcotest.failf
             "Unexpected error: %a"
-            Protocol.Environment.Error_monad.pp_trace
+            Environment.Error_monad.pp_trace
             e
       | Ok res -> res)
     (0 -- 63)

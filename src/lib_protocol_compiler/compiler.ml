@@ -23,9 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let warnings = "+a-4-6-7-9-29-40..42-44-45-48-60-67"
+let default_warnings = Defaults.warnings
 
-let warn_error = "-a+8"
+let default_warn_error = "-a+8"
 
 let () = Clflags.unsafe_string := false
 
@@ -58,7 +58,7 @@ let load_embedded_cmi (unit_name, content) =
   assert (magic = Bytes.of_string Config.cmi_magic_number) ;
   (* Read cmi_name and cmi_sign *)
   let pos = magic_len in
-  let (cmi_name, cmi_sign) = Marshal.from_bytes content pos in
+  let cmi_name, cmi_sign = Marshal.from_bytes content pos in
   let pos = pos + Marshal.total_size content pos in
   (* Read cmi_crcs *)
   let cmi_crcs = Marshal.from_bytes content pos in
@@ -116,6 +116,8 @@ let tezos_protocol_env =
       tezos_protocol_environment_sigs__V4_cmi );
     ( "Tezos_protocol_environment_sigs__V5",
       tezos_protocol_environment_sigs__V5_cmi );
+    ( "Tezos_protocol_environment_sigs__V6",
+      tezos_protocol_environment_sigs__V6_cmi );
   ]
 
 let register_env =
@@ -163,8 +165,13 @@ type driver = {
   link_shared : string -> string list -> unit;
 }
 
+let parse_options errflag s =
+  Option.iter Location.(prerr_alert none) (Warnings.parse_options errflag s)
+
 let main {compile_ml; pack_objects; link_shared} =
   Random.self_init () ;
+  parse_options false default_warnings ;
+  parse_options true default_warn_error ;
   let anonymous = ref []
   and static = ref false
   and register = ref false
@@ -197,6 +204,14 @@ let main {compile_ml; pack_objects; link_shared} =
             Format.printf "%s\n" Tezos_version.Bin_version.version_string ;
             Stdlib.exit 0),
         " Display version information" );
+      ( "-warning",
+        Arg.String (fun s -> parse_options false s),
+        " <list> Enable or disable ocaml warnings according to <list>. This \
+         extends the default: " ^ default_warnings );
+      ( "-warn-error",
+        Arg.String (fun s -> parse_options true s),
+        " <list> Enable or disable ocaml error status according to <list>. \
+         This extends the default: " ^ default_warn_error );
     ]
   in
   let usage_msg =
@@ -210,30 +225,31 @@ let main {compile_ml; pack_objects; link_shared} =
         Arg.usage args_spec usage_msg ;
         Stdlib.exit 1
   in
-  let (announced_hash, protocol) =
+  let stored_hash_opt, protocol =
     match Lwt_main.run (Tezos_base_unix.Protocol_files.read_dir source_dir) with
     | Ok (hash, proto) -> (hash, proto)
     | Error err ->
         Format.eprintf "Failed to read TEZOS_PROTOCOL: %a" pp_print_trace err ;
         exit 2
   in
-  let real_hash = Protocol.hash protocol in
+  let computed_hash = Protocol.hash protocol in
   if !hash_only then (
-    Format.printf "%a@." Protocol_hash.pp real_hash ;
+    Format.printf "%a@." Protocol_hash.pp computed_hash ;
     exit 0) ;
   let hash =
-    match announced_hash with
-    | None -> real_hash
-    | Some hash
-      when !check_protocol_hash && not (Protocol_hash.equal real_hash hash) ->
+    match stored_hash_opt with
+    | None -> computed_hash
+    | Some stored_hash
+      when !check_protocol_hash
+           && not (Protocol_hash.equal computed_hash stored_hash) ->
         Format.eprintf
           "Inconsistent hash for protocol in TEZOS_PROTOCOL.@\n\
-           Found: %a@\n\
-           Expected: %a@."
+           Computed hash: %a@\n\
+           Stored in TEZOS_PROTOCOL: %a@."
           Protocol_hash.pp
-          hash
+          computed_hash
           Protocol_hash.pp
-          real_hash ;
+          stored_hash ;
         exit 2
     | Some hash -> hash
   in
@@ -277,8 +293,6 @@ let main {compile_ml; pack_objects; link_shared} =
   Clflags.nopervasives := true ;
   Clflags.no_std_include := true ;
   Clflags.include_dirs := [Filename.dirname functor_file] ;
-  Warnings.parse_options false warnings ;
-  Warnings.parse_options true warn_error ;
   load_embedded_cmis tezos_protocol_env ;
   let packed_protocol_object = compile_ml ~for_pack functor_file in
   let register_objects =

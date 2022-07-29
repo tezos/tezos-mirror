@@ -35,6 +35,16 @@ type 'collection t = {
 
 (* Should we use a better ordering ? *)
 
+let compare_op op1 op2 =
+  try Stdlib.compare op1 op2
+  with _ ->
+    (* FIXME some operations (e.g. tx_rollup_rejection) pack
+       functional values which could raise an exception. In this
+       specific case, we default to comparing their hashes. *)
+    Operation_hash.compare
+      (Alpha_context.Operation.hash_packed op1)
+      (Alpha_context.Operation.hash_packed op2)
+
 module Prioritized_operation = struct
   (* Higher priority operations will be included first *)
   type t = High of packed_operation | Low of packed_operation
@@ -47,19 +57,19 @@ module Prioritized_operation = struct
 
   let compare_priority t1 t2 =
     match (t1, t2) with
-    | (High _, Low _) -> 1
-    | (Low _, High _) -> -1
-    | (Low _, Low _) | (High _, High _) -> 0
+    | High _, Low _ -> 1
+    | Low _, High _ -> -1
+    | Low _, Low _ | High _, High _ -> 0
 
   let compare a b =
     let c = compare_priority a b in
-    if c <> 0 then c else compare (packed a) (packed b)
+    if c <> 0 then c else compare_op (packed a) (packed b)
 end
 
 module Operation_set = Set.Make (struct
   type t = packed_operation
 
-  let compare = Stdlib.compare
+  let compare = compare_op
 end)
 
 module Prioritized_operation_set = struct
@@ -203,8 +213,7 @@ let filter_with_relevant_consensus_ops ~(endorsement_filter : consensus_filter)
     (fun {protocol_data; _} ->
       match (protocol_data, preendorsement_filter) with
       (* 1a. Remove preendorsements. *)
-      | (Operation_data {contents = Single (Preendorsement _); _}, None) ->
-          false
+      | Operation_data {contents = Single (Preendorsement _); _}, None -> false
       (* 1b. Filter preendorsements. *)
       | ( Operation_data
             {
@@ -305,7 +314,7 @@ let ordered_pool_of_payload ~consensus_operations
 
 let extract_operations_of_list_list = function
   | [consensus; votes_payload; anonymous_payload; managers_payload] ->
-      let (preendorsements, endorsements) =
+      let preendorsements, endorsements =
         List.fold_left
           (fun ( (preendorsements : Kind.preendorsement Operation.t list),
                  (endorsements : Kind.endorsement Operation.t list) )

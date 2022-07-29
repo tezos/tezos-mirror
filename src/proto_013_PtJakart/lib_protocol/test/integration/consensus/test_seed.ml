@@ -104,7 +104,7 @@ let test_revelation_early_wrong_right_twice () =
   Block.bake_until_cycle_end ~policy b >>=? fun b ->
   (* test that revealing at the right time but the wrong value
      produces an error *)
-  let (wrong_hash, _) = Nonce.generate () in
+  let wrong_hash, _ = Nonce.generate () in
   Op.seed_nonce_revelation
     (B b)
     level_commitment
@@ -189,12 +189,12 @@ let test_unrevealed () =
     }
   in
   Context.init_with_constants constants 2 >>=? fun (b, accounts) ->
-  let (account1, account2) =
+  let account1, account2 =
     match accounts with a1 :: a2 :: _ -> (a1, a2) | _ -> assert false
   in
-  let (_delegate1, delegate2) =
+  let _delegate1, delegate2 =
     match (Contract.is_implicit account1, Contract.is_implicit account2) with
-    | (Some d, Some d') -> (d, d')
+    | Some d, Some d' -> (d, d')
     | _ -> assert false
   in
   (* Delegate 2 will add a nonce but never reveals it *)

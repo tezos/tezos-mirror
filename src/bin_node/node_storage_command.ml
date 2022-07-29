@@ -65,7 +65,7 @@ module Term = struct
             (Node_data_version.Invalid_data_dir
                {data_dir = context_dir; msg = None})
         else
-          let pack = context_dir // "store.pack" in
+          let pack = context_dir // "store.0.suffix" in
           let*! b = Lwt_unix.file_exists pack in
           if not b then
             tzfail

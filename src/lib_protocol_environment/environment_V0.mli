@@ -27,7 +27,7 @@
 open Environment_context
 open Environment_protocol_T
 
-module type V0 = sig
+module type T = sig
   include
     Tezos_protocol_environment_sigs.V0.T
       with type Format.formatter = Format.formatter
@@ -44,7 +44,7 @@ module type V0 = sig
        and type Context_hash.t = Context_hash.t
        and type Protocol_hash.t = Protocol_hash.t
        and type Time.t = Time.Protocol.t
-       and type MBytes.t = Tezos_protocol_environment_structs.V0.M.MBytes.t
+       and type MBytes.t = Tezos_protocol_environment_structs.V0.MBytes.t
        and type Operation.shell_header = Operation.shell_header
        and type Operation.t = Operation.t
        and type Block_header.shell_header = Block_header.shell_header
@@ -70,7 +70,7 @@ module type V0 = sig
        and type ('a, 'b) RPC_path.t = ('a, 'b) RPC_path.t
        and type RPC_service.meth = RPC_service.meth
        and type (+'m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t =
-            ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
+        ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
        and type Error_monad.shell_error = Error_monad.error
 
   type error += Ecoproto_error of Error_monad.error
@@ -98,12 +98,11 @@ module type V0 = sig
     -> ['block] RPC_context.simple
 end
 
-module MakeV0 (Param : sig
+module Make (Param : sig
   val name : string
 end)
 () :
-  V0
-    with type Context.t = Context.t
-     and type Updater.validation_result = validation_result
+  T
+    with type Updater.validation_result = validation_result
      and type Updater.quota = quota
      and type Updater.rpc_context = rpc_context

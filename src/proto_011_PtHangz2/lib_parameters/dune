@@ -3,7 +3,7 @@
 
 (library
  (name tezos_protocol_011_PtHangz2_parameters)
- (public_name tezos-protocol-011-PtHangz2-parameters)
+ (public_name tezos-protocol-011-PtHangz2.parameters)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -11,21 +11,22 @@
   tezos-protocol-011-PtHangz2)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_protocol_011_PtHangz2))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_011_PtHangz2)
  (modules (:standard \ gen)))
 
 (executable
  (name gen)
  (libraries
   tezos-base
-  tezos-protocol-011-PtHangz2-parameters)
- (link_flags (:standard -linkall))
+  tezos-protocol-011-PtHangz2.parameters)
+ (link_flags
+  (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_protocol_011_PtHangz2_parameters))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_011_PtHangz2_parameters)
  (modules gen))
 
 (rule
@@ -44,5 +45,6 @@
  (action (run %{deps} --mainnet)))
 
 (install
+ (package tezos-protocol-011-PtHangz2)
  (section lib)
  (files sandbox-parameters.json test-parameters.json mainnet-parameters.json))

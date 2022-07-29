@@ -3,7 +3,7 @@
 
 (library
  (name tezos_protocol_012_Psithaca_parameters)
- (public_name tezos-protocol-012-Psithaca-parameters)
+ (public_name tezos-protocol-012-Psithaca.parameters)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -11,23 +11,24 @@
   tezos-protocol-012-Psithaca)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_protocol_012_Psithaca))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_012_Psithaca)
  (modules (:standard \ gen)))
 
 (executable
  (name gen)
  (libraries
   tezos-base
-  tezos-protocol-012-Psithaca-parameters
+  tezos-protocol-012-Psithaca.parameters
   tezos-protocol-012-Psithaca)
- (link_flags (:standard -linkall))
+ (link_flags
+  (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_protocol_012_Psithaca_parameters
-   -open Tezos_protocol_012_Psithaca))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_012_Psithaca_parameters
+  -open Tezos_protocol_012_Psithaca)
  (modules gen))
 
 (rule
@@ -46,5 +47,6 @@
  (action (run %{deps} --mainnet)))
 
 (install
+ (package tezos-protocol-012-Psithaca)
  (section lib)
  (files sandbox-parameters.json test-parameters.json mainnet-parameters.json))

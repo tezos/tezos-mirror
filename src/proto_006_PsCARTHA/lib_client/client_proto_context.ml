@@ -90,7 +90,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
 
 let reveal cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing ?branch
     ~source ~src_pk ~src_sk ?fee ~fee_parameter () =
-  let (compute_fee, fee) =
+  let compute_fee, fee =
     match fee with None -> (true, Tez.zero) | Some fee -> (false, fee)
   in
   Alpha_services.Contract.counter cctxt (chain, block) source
@@ -496,18 +496,18 @@ let submit_ballot ?dry_run ?verbose_signing (cctxt : #full) ~chain ~block
 
 let pp_operation formatter (a : Alpha_block_services.operation) =
   match (a.receipt, a.protocol_data) with
-  | (Receipt (Apply_results.Operation_metadata omd), Operation_data od) -> (
+  | Receipt (Apply_results.Operation_metadata omd), Operation_data od -> (
       match Apply_results.kind_equal_list od.contents omd.contents with
       | Some Apply_results.Eq ->
           Operation_result.pp_operation_result
             formatter
             (od.contents, omd.contents)
       | None -> Stdlib.failwith "Unexpected result.")
-  | (Empty, _) ->
+  | Empty, _ ->
       Stdlib.failwith
         "Pruned metadata: the operation receipt was removed accordingly to the \
          node's history mode."
-  | (Too_large, _) -> Stdlib.failwith "Too large metadata."
+  | Too_large, _ -> Stdlib.failwith "Too large metadata."
   | _ -> Stdlib.failwith "Unexpected result."
 
 let get_operation_from_block (cctxt : #full) ~chain predecessors operation_hash

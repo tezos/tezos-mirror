@@ -1,32 +1,30 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executables
- (names test_parser test_diff)
- (modes native js)
+(library
+ (name test_parser)
+ (package tezos-micheline)
+ (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-micheline
-  alcotest)
+  tezos-micheline)
+ (inline_tests (flags -verbose) (modes native js))
+ (preprocess (pps ppx_expect))
  (js_of_ocaml)
- (flags (:standard
-         -open Tezos_micheline)))
+ (flags
+  (:standard)
+  -open Tezos_micheline)
+ (modules test_parser))
 
-(rule
- (alias runtest)
+(library
+ (name test_diff)
  (package tezos-micheline)
- (action (run %{dep:./test_parser.exe})))
-
-(rule
- (alias runtest)
- (package tezos-micheline)
- (action (run %{dep:./test_diff.exe})))
-
-(rule
- (alias runtest_js)
- (package tezos-micheline)
- (action (run node %{dep:./test_parser.bc.js})))
-
-(rule
- (alias runtest_js)
- (package tezos-micheline)
- (action (run node %{dep:./test_diff.bc.js})))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-micheline)
+ (inline_tests (flags -verbose) (modes native js))
+ (preprocess (pps ppx_expect))
+ (js_of_ocaml)
+ (flags
+  (:standard)
+  -open Tezos_micheline)
+ (modules test_diff))

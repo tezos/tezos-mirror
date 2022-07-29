@@ -75,7 +75,7 @@ let () =
     `Permanent
     ~id:"Snapshot.cannot_read_info"
     ~title:"Cannot read info"
-    ~description:"Failed to read snasphot info"
+    ~description:"Failed to read snapshot info"
     ~pp:(fun ppf () ->
       Format.fprintf
         ppf
@@ -200,10 +200,10 @@ module Term = struct
         match
           (node_config.blockchain_network.genesis_parameters, sandbox_file)
         with
-        | (None, None) -> return_none
-        | (Some parameters, None) ->
+        | None, None -> return_none
+        | Some parameters, None ->
             return_some (parameters.context_key, parameters.values)
-        | (_, Some filename) -> (
+        | _, Some filename -> (
             let*! r = Lwt_utils_unix.Json.read_file filename in
             match r with
             | Error _err ->
@@ -327,7 +327,7 @@ module Term = struct
     in
     let open Cmdliner.Arg in
     let doc =
-      "Setting this flag selects the format of the exported snasphot. When \
+      "Setting this flag selects the format of the exported snapshot. When \
        $(i, tar) (used by default) is selected, the snapshot is exported as a \
        single file tar archive. $(i, raw) exports the snapshot as a directory \
        populated with all the data -- this mode is suitable for IPFS snapshot \

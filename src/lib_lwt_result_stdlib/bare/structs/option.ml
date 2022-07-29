@@ -82,34 +82,34 @@ let either_f oa ob = match oa with Some _ -> oa | None -> ob ()
 
 let merge f oa ob =
   match (oa, ob) with
-  | (None, None) -> None
-  | (Some r, None) | (None, Some r) -> Some r
-  | (Some a, Some b) -> Some (f a b)
+  | None, None -> None
+  | Some r, None | None, Some r -> Some r
+  | Some a, Some b -> Some (f a b)
 
 let merge_e f oa ob =
   let open Result_syntax in
   match (oa, ob) with
-  | (None, None) -> return_none
-  | (Some r, None) | (None, Some r) -> return_some r
-  | (Some a, Some b) ->
+  | None, None -> return_none
+  | Some r, None | None, Some r -> return_some r
+  | Some a, Some b ->
       let* r = f a b in
       return_some r
 
 let merge_s f oa ob =
   let open Lwt_syntax in
   match (oa, ob) with
-  | (None, None) -> return_none
-  | (Some r, None) | (None, Some r) -> return_some r
-  | (Some a, Some b) ->
+  | None, None -> return_none
+  | Some r, None | None, Some r -> return_some r
+  | Some a, Some b ->
       let* r = f a b in
       return_some r
 
 let merge_es f oa ob =
   let open Lwt_result_syntax in
   match (oa, ob) with
-  | (None, None) -> return_none
-  | (Some r, None) | (None, Some r) -> return_some r
-  | (Some a, Some b) ->
+  | None, None -> return_none
+  | Some r, None | None, Some r -> return_some r
+  | Some a, Some b ->
       let* r = f a b in
       return_some r
 

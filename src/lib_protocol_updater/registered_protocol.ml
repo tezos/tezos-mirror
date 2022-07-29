@@ -48,7 +48,7 @@ let build hash =
       let module Name = struct
         let name = Protocol_hash.to_b58check hash
       end in
-      let module Env = Tezos_protocol_environment.MakeV0 (Name) () in
+      let module Env = Tezos_protocol_environment.V0.Make (Name) () in
       Some
         (module struct
           module Raw = F (Env)
@@ -68,7 +68,7 @@ let build hash =
       let module Name = struct
         let name = Protocol_hash.to_b58check hash
       end in
-      let module Env = Tezos_protocol_environment.MakeV1 (Name) () in
+      let module Env = Tezos_protocol_environment.V1.Make (Name) () in
       Some
         (module struct
           module Raw = F (Env)
@@ -88,7 +88,7 @@ let build hash =
       let module Name = struct
         let name = Protocol_hash.to_b58check hash
       end in
-      let module Env = Tezos_protocol_environment.MakeV2 (Name) () in
+      let module Env = Tezos_protocol_environment.V2.Make (Name) () in
       Some
         (module struct
           module Raw = F (Env)
@@ -108,7 +108,7 @@ let build hash =
       let module Name = struct
         let name = Protocol_hash.to_b58check hash
       end in
-      let module Env = Tezos_protocol_environment.MakeV3 (Name) () in
+      let module Env = Tezos_protocol_environment.V3.Make (Name) () in
       Some
         (module struct
           module Raw = F (Env)
@@ -128,7 +128,7 @@ let build hash =
       let module Name = struct
         let name = Protocol_hash.to_b58check hash
       end in
-      let module Env = Tezos_protocol_environment.MakeV4 (Name) () in
+      let module Env = Tezos_protocol_environment.V4.Make (Name) () in
       Some
         (module struct
           module Raw = F (Env)
@@ -148,7 +148,27 @@ let build hash =
       let module Name = struct
         let name = Protocol_hash.to_b58check hash
       end in
-      let module Env = Tezos_protocol_environment.MakeV5 (Name) () in
+      let module Env = Tezos_protocol_environment.V5.Make (Name) () in
+      Some
+        (module struct
+          module Raw = F (Env)
+
+          module P = struct
+            let hash = hash
+
+            include Env.Lift (Raw)
+          end
+
+          include P
+
+          let complete_b58prefix = Env.Context.complete
+        end : T)
+  | Some (V6 protocol) ->
+      let (module F) = protocol in
+      let module Name = struct
+        let name = Protocol_hash.to_b58check hash
+      end in
+      let module Env = Tezos_protocol_environment.V6.Make (Name) () in
       Some
         (module struct
           module Raw = F (Env)
@@ -221,7 +241,7 @@ module type Source_sig = sig
 end
 
 module Register_embedded_V0
-    (Env : Tezos_protocol_environment.V0)
+    (Env : Tezos_protocol_environment.V0.T)
     (Proto : Env.Updater.PROTOCOL)
     (Source : Source_sig) =
 struct
@@ -250,7 +270,7 @@ struct
 end
 
 module Register_embedded_V1
-    (Env : Tezos_protocol_environment.V1)
+    (Env : Tezos_protocol_environment.V1.T)
     (Proto : Env.Updater.PROTOCOL)
     (Source : Source_sig) =
 struct
@@ -279,7 +299,7 @@ struct
 end
 
 module Register_embedded_V2
-    (Env : Tezos_protocol_environment.V2)
+    (Env : Tezos_protocol_environment.V2.T)
     (Proto : Env.Updater.PROTOCOL)
     (Source : Source_sig) =
 struct
@@ -308,7 +328,7 @@ struct
 end
 
 module Register_embedded_V3
-    (Env : Tezos_protocol_environment.V3)
+    (Env : Tezos_protocol_environment.V3.T)
     (Proto : Env.Updater.PROTOCOL)
     (Source : Source_sig) =
 struct
@@ -337,7 +357,7 @@ struct
 end
 
 module Register_embedded_V4
-    (Env : Tezos_protocol_environment.V4)
+    (Env : Tezos_protocol_environment.V4.T)
     (Proto : Env.Updater.PROTOCOL)
     (Source : Source_sig) =
 struct
@@ -366,7 +386,36 @@ struct
 end
 
 module Register_embedded_V5
-    (Env : Tezos_protocol_environment.V5)
+    (Env : Tezos_protocol_environment.V5.T)
+    (Proto : Env.Updater.PROTOCOL)
+    (Source : Source_sig) =
+struct
+  let hash =
+    match Source.hash with
+    | None -> Protocol.hash Source.sources
+    | Some hash -> hash
+
+  module Self = struct
+    module P = struct
+      let hash = hash
+
+      include Env.Lift (Proto)
+    end
+
+    include P
+
+    let complete_b58prefix = Env.Context.complete
+  end
+
+  let () =
+    VersionTable.add sources hash Source.sources ;
+    VersionTable.add versions hash (module Self : T)
+
+  include Self
+end
+
+module Register_embedded_V6
+    (Env : Tezos_protocol_environment.V6.T)
     (Proto : Env.Updater.PROTOCOL)
     (Source : Source_sig) =
 struct

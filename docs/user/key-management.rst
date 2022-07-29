@@ -88,6 +88,47 @@ These schemes send signing requests over their respective
 communication channel towards the ``tezos-signer``, which can run on a
 different machine that stores the secret key.
 
+Signer requests
+~~~~~~~~~~~~~~~
+
+The ``tezos-signer`` handles signing requests with the following format::
+
+    <magic_byte><data>
+
+In the case of blocks or consensus operations for example, this format is instantiated as follows::
+
+    <magic_byte><chain_id><block|consensus_operation>
+
+Starting with Octez v12 (supporting the Ithaca protocol), consensus operations also include :ref:`preendorsements <quorum>`. The magic byte distinguishes pre-Ithaca messages from (post-)Ithaca messages, as follows:
+
+.. list-table::
+   :widths: 55 25
+   :header-rows: 1
+
+   * - Message type
+     - Magic byte
+   * - Legacy block
+     - 0x01
+   * - Legacy endorsement
+     - 0x02
+   * - Transfer
+     - 0x03
+   * - Authenticated signing request
+     - 0x04
+   * - Michelson data
+     - 0x05
+   * - Block
+     - 0x11
+   * - Pre-endorsement
+     - 0x12
+   * - Endorsement
+     - 0x13
+
+The magic byte values to be used by the signer can be restricted using its option ``--magic-bytes``, as explained in the signer's manual.
+
+Signer configuration
+~~~~~~~~~~~~~~~~~~~~
+
 In our home server we can generate a new key pair (or import one from a
 :ref:`Ledger<ledger>`) and launch a signer that signs operations using these
 keys.
@@ -187,7 +228,6 @@ see the transactions that you sign but on a public blockchain this is
 less of a concern.
 You can still use the ``https`` scheme or the tunnel to encrypt your
 traffic.
-
 
 .. _activate_fundraiser_account:
 

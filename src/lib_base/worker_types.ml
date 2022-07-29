@@ -25,6 +25,8 @@
 
 open Error_monad
 
+type error += Terminated
+
 type worker_status =
   | Launching of Time.System.t
   | Running of Time.System.t

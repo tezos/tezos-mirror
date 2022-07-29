@@ -162,7 +162,7 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection ~blocks_total
   in
   Log.info "Accounts to use: %d" total_bootstraps ;
   Log.info "Spinning up the network..." ;
-  let (regular_transaction_fee, regular_transaction_gas_limit) =
+  let regular_transaction_fee, regular_transaction_gas_limit =
     Gas.deduce_fee_and_gas_limit
       gas_tps_estimation_results.transaction_costs.regular
   in
@@ -184,7 +184,7 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection ~blocks_total
   let default_accounts_balance =
     (max_single_transaction_fee + Constants.gas_safety_margin) * blocks_total
   in
-  let* (node, client) =
+  let* node, client =
     Client.init_with_protocol
       ~nodes_args:Node.[Connections 0; Synchronisation_threshold 0]
       ~parameter_file
@@ -223,16 +223,14 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection ~blocks_total
     Client.spawn_stresstest
       ~fee:regular_transaction_fee
       ~gas_limit:regular_transaction_gas_limit
-      ~tps:
-        target_tps_of_injection
+      ~tps:target_tps_of_injection
         (* The stresstest command allows a small probability of creating
            new accounts along the way. We do not want that, so we set it to
            0. *)
       ~fresh_probability:0.0
       ~single_op_per_pkh_per_block:true
       ~smart_contract_parameters
-      ~source_aliases:
-        (make_delegates Constants.default_bootstraps_count)
+      ~source_aliases:(make_delegates Constants.default_bootstraps_count)
         (* It is essential not to pass all accounts via aliases because every
            alias has to be normalized and that's an extra call of the client
            per account. This does not scale well. On the other hand, if we
@@ -319,7 +317,7 @@ let register () =
       let previous_count =
         Cli.get_int ~default:10 "regression-previous-sample-count"
       in
-      let* (defacto_tps_of_injection, empirical_tps) =
+      let* defacto_tps_of_injection, empirical_tps =
         run_benchmark
           ~lift_protocol_limits
           ~provided_tps_of_injection

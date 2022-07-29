@@ -33,7 +33,7 @@ type limits = {
   operation_metadata_size_limit : int option;
 }
 
-type result =
+type validation_result =
   | Already_commited
   | Outdated_block
   | Validated
@@ -94,19 +94,27 @@ module Request = struct
     operations : Operation.t list list;
   }
 
-  type 'a t =
-    | Request_validation : validation_request -> result t
-    | Request_preapplication : preapplication_request -> result t
+  type ('a, 'b) t =
+    | Request_validation :
+        validation_request
+        -> (validation_result, error trace) t
+    | Request_preapplication :
+        preapplication_request
+        -> (validation_result, error trace) t
 
-  let view : type a. a t -> view = function
-    | Request_validation {chain_db; peer; hash; _} ->
-        let chain_store = Distributed_db.chain_store chain_db in
-        let chain_id = Store.Chain.chain_id chain_store in
-        Validation {chain_id; block = hash; peer}
-    | Request_preapplication {chain_store; predecessor; _} ->
-        let chain_id = Store.Chain.chain_id chain_store in
-        let level = Int32.succ (Store.Block.level predecessor) in
-        Preapplication {chain_id; level}
+  let validation_view {chain_db; peer; hash; _} =
+    let chain_store = Distributed_db.chain_store chain_db in
+    let chain_id = Store.Chain.chain_id chain_store in
+    {chain_id; block = hash; peer}
+
+  let preapplication_view {chain_store; predecessor; _} =
+    let chain_id = Store.Chain.chain_id chain_store in
+    let level = Int32.succ (Store.Block.level predecessor) in
+    {chain_id; level}
+
+  let view : type a b. (a, b) t -> view = function
+    | Request_validation r -> Validation (validation_view r)
+    | Request_preapplication r -> Preapplication (preapplication_view r)
 end
 
 module Logger =
@@ -115,7 +123,7 @@ module Logger =
       let worker_name = "node_block_validator"
     end)
 
-module Worker = Worker.Make (Name) (Event) (Request) (Types) (Logger)
+module Worker = Worker.MakeSingle (Name) (Event) (Request) (Types) (Logger)
 
 type t = Worker.infinite Worker.queue Worker.t
 
@@ -223,7 +231,7 @@ let on_validation_request w
                       return (Precheck_failed errs)
                   | Ok () -> (
                       let* result =
-                        Worker.protect w (fun () ->
+                        protect ~canceler:(Worker.canceler w) (fun () ->
                             protect ?canceler (fun () ->
                                 let*! () =
                                   Worker.log_event w (Validating_block hash)
@@ -240,8 +248,8 @@ let on_validation_request w
                                 | Ok x -> return x
                                 (* [Unavailable_protocol] is expected to be the
                                    first error in the trace *)
-                                | Error
-                                    (Unavailable_protocol {protocol; _} :: _) ->
+                                | Error (Unavailable_protocol {protocol; _} :: _)
+                                  ->
                                     let* _ =
                                       Protocol_validator
                                       .fetch_and_compile_protocol
@@ -259,6 +267,12 @@ let on_validation_request w
                                       operations
                                 | Error _ as x -> Lwt.return x))
                       in
+                      Shell_metrics.Block_validator
+                      .set_operation_per_pass_collector
+                        (fun () ->
+                          List.map
+                            (fun v -> Int.to_float (List.length v))
+                            operations) ;
                       let* o =
                         Distributed_db.commit_block
                           chain_db
@@ -283,7 +297,7 @@ let on_validation_request w
                    (function Invalid_block _ -> true | _ -> false)
                    errs
             then
-              Worker.protect w (fun () ->
+              protect ~canceler:(Worker.canceler w) (fun () ->
                   Distributed_db.commit_invalid_block chain_db hash header errs)
             else return_unit
           in
@@ -304,7 +318,7 @@ let on_preapplication_request w
   let open Lwt_syntax in
   let bv = Worker.state w in
   let* r =
-    Worker.protect w (fun () ->
+    protect ~canceler:(Worker.canceler w) (fun () ->
         protect ?canceler (fun () ->
             Block_validator_process.preapply_block
               bv.validation_process
@@ -318,14 +332,21 @@ let on_preapplication_request w
   | Ok res -> return_ok (Preapplied res)
   | Error errs -> return_ok (Preapplication_error errs)
 
-let on_request : type r. t -> r Request.t -> r tzresult Lwt.t =
- fun w -> function
+let metrics = Shell_metrics.Block_validator.init Name.base
+
+let on_request :
+    type r request_error.
+    t -> (r, request_error) Request.t -> (r, request_error) result Lwt.t =
+ fun w r ->
+  Prometheus.Counter.inc_one metrics.worker_counters.worker_request_count ;
+  match r with
   | Request.Request_validation r -> on_validation_request w r
   | Request.Request_preapplication r -> on_preapplication_request w r
 
-let metrics = Shell_metrics.Block_validator.init Name.base
+type launch_error = |
 
-let on_launch _ _ (limits, start_testchain, db, validation_process) =
+let on_launch _ _ (limits, start_testchain, db, validation_process) :
+    (_, launch_error) result Lwt.t =
   let protocol_validator = Protocol_validator.create db in
   let invalid_blocks_after_precheck = Block_hash_ring.create 50 in
   Lwt.return_ok
@@ -337,64 +358,63 @@ let on_launch _ _ (limits, start_testchain, db, validation_process) =
       invalid_blocks_after_precheck;
     }
 
-let on_error w r st errs =
+let on_error (type a b) (w : t) st (r : (a, b) Request.t) (errs : b) =
   let open Lwt_syntax in
+  Prometheus.Counter.inc_one metrics.worker_counters.worker_error_count ;
   match r with
-  | Request.Validation v ->
-      let* () = Worker.log_event w (Validation_failure (v, st, errs)) in
+  | Request_validation v ->
+      let view = Request.validation_view v in
+      let* () = Worker.log_event w (Validation_failure (view, st, errs)) in
       (* Keep the worker alive. *)
       return_ok_unit
-  | Preapplication v ->
-      let* () = Worker.log_event w (Preapplication_failure (v, st, errs)) in
+  | Request_preapplication v ->
+      let view = Request.preapplication_view v in
+      let* () = Worker.log_event w (Preapplication_failure (view, st, errs)) in
       (* Keep the worker alive. *)
       return_ok_unit
 
 let on_completion :
-    type a. t -> a Request.t -> a -> Worker_types.request_status -> unit Lwt.t =
+    type a b.
+    t -> (a, b) Request.t -> a -> Worker_types.request_status -> unit Lwt.t =
  fun w request v st ->
   let open Lwt_syntax in
+  Prometheus.Counter.inc_one metrics.worker_counters.worker_completion_count ;
   match (request, v) with
-  | (Request.Request_validation {hash; _}, Already_commited) ->
+  | Request.Request_validation {hash; _}, Already_commited ->
       Prometheus.Counter.inc_one metrics.already_commited_blocks_count ;
       let* () = Worker.log_event w (Previously_validated hash) in
       Lwt.return_unit
-  | (Request.Request_validation {hash; _}, Outdated_block) ->
+  | Request.Request_validation {hash; _}, Outdated_block ->
       Prometheus.Counter.inc_one metrics.outdated_blocks_count ;
       let* () = Worker.log_event w (Previously_validated hash) in
       Lwt.return_unit
-  | (Request.Request_validation _, Validated) -> (
-      let () =
-        Shell_metrics.Worker.update metrics.validation_worker_metrics st
-      in
+  | Request.Request_validation _, Validated -> (
+      Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
       Prometheus.Counter.inc_one metrics.validated_blocks_count ;
       match Request.view request with
       | Validation v -> Worker.log_event w (Validation_success (v, st))
       | _ -> (* assert false *) Lwt.return_unit)
-  | (Request.Request_validation _, Validation_error errs) -> (
-      let () =
-        Shell_metrics.Worker.update metrics.validation_worker_metrics st
-      in
+  | Request.Request_validation _, Validation_error errs -> (
+      Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
       Prometheus.Counter.inc_one metrics.validation_errors_count ;
       match Request.view request with
       | Validation v ->
           Worker.log_event w (Event.Validation_failure (v, st, errs))
       | _ -> (* assert false *) Lwt.return_unit)
-  | (Request.Request_preapplication _, Preapplied _) -> (
+  | Request.Request_preapplication _, Preapplied _ -> (
       Prometheus.Counter.inc_one metrics.preapplied_blocks_count ;
       match Request.view request with
       | Preapplication v ->
           Worker.log_event w (Event.Preapplication_success (v, st))
       | _ -> (* assert false *) Lwt.return_unit)
-  | (Request.Request_preapplication _, Preapplication_error errs) -> (
+  | Request.Request_preapplication _, Preapplication_error errs -> (
       Prometheus.Counter.inc_one metrics.preapplication_errors_count ;
       match Request.view request with
       | Preapplication v ->
           Worker.log_event w (Event.Preapplication_failure (v, st, errs))
       | _ -> (* assert false *) Lwt.return_unit)
-  | (Request.Request_validation _, Validation_error_after_precheck errs) -> (
-      let () =
-        Shell_metrics.Worker.update metrics.validation_worker_metrics st
-      in
+  | Request.Request_validation _, Validation_error_after_precheck errs -> (
+      Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
       Prometheus.Counter.inc_one metrics.validation_errors_after_precheck_count ;
       match Request.view request with
       | Validation v ->
@@ -402,10 +422,8 @@ let on_completion :
             w
             (Event.Validation_failure_after_precheck (v, st, errs))
       | _ -> (* assert false *) Lwt.return_unit)
-  | (Request.Request_validation _, Precheck_failed errs) -> (
-      let () =
-        Shell_metrics.Worker.update metrics.validation_worker_metrics st
-      in
+  | Request.Request_validation _, Precheck_failed errs -> (
+      Shell_metrics.Worker.update_timestamps metrics.worker_timestamps st ;
       Prometheus.Counter.inc_one metrics.precheck_failed_count ;
       match Request.view request with
       | Validation v ->
@@ -423,6 +441,8 @@ let create limits db validation_process ~start_testchain =
   let module Handlers = struct
     type self = t
 
+    type nonrec launch_error = launch_error
+
     let on_launch = on_launch
 
     let on_request = on_request
@@ -433,13 +453,17 @@ let create limits db validation_process ~start_testchain =
 
     let on_completion = on_completion
 
-    let on_no_request _ = Lwt_result_syntax.return_unit
+    let on_no_request _ = Lwt.return_unit
   end in
-  Worker.launch
-    table
-    ()
-    (limits, start_testchain, db, validation_process)
-    (module Handlers)
+  let open Lwt_syntax in
+  let* (Ok worker) =
+    Worker.launch
+      table
+      ()
+      (limits, start_testchain, db, validation_process)
+      (module Handlers)
+  in
+  Lwt.return worker
 
 let shutdown = Worker.shutdown
 
@@ -451,15 +475,16 @@ type block_validity =
 let validate w ?canceler ?peer ?(notify_new_block = fun _ -> ())
     ?(precheck_and_notify = false) chain_db hash (header : Block_header.t)
     operations : block_validity Lwt.t =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   let chain_store = Distributed_db.chain_store chain_db in
-  let*! b = Store.Block.is_known_valid chain_store hash in
+  let* b = Store.Block.is_known_valid chain_store hash in
   match b with
   | true ->
-      let*! () = Worker.log_event w (Previously_validated hash) in
+      let* () = Worker.log_event w (Previously_validated hash) in
       Lwt.return Valid
   | false -> (
-      let*! r =
+      let* r =
+        let open Lwt_result_syntax in
         let hashes = List.map (List.map Operation.hash) operations in
         let computed_hash =
           Operation_list_list_hash.compute
@@ -477,8 +502,12 @@ let validate w ?canceler ?peer ?(notify_new_block = fun _ -> ())
                  expected = header.shell.operations_hash;
                  found = computed_hash;
                })
+          |> Lwt_result.map_err (fun e -> Worker.Request_error e)
         in
-        let* () = check_chain_liveness chain_db hash header in
+        let* () =
+          check_chain_liveness chain_db hash header
+          |> Lwt_result.map_err (fun e -> Worker.Request_error e)
+        in
         Worker.Queue.push_request_and_wait
           w
           (Request_validation
@@ -497,9 +526,16 @@ let validate w ?canceler ?peer ?(notify_new_block = fun _ -> ())
       | Ok (Validated | Already_commited | Outdated_block) -> Lwt.return Valid
       | Ok (Validation_error_after_precheck errs) ->
           Lwt.return (Invalid_after_precheck errs)
-      | Ok (Precheck_failed errs) | Ok (Validation_error errs) | Error errs ->
+      | Ok (Precheck_failed errs)
+      | Ok (Validation_error errs)
+      | Error (Request_error errs) ->
           Lwt.return (Invalid errs)
-      | _ -> assert false)
+      | Error (Closed None) -> Lwt.return (Invalid [Worker_types.Terminated])
+      | Error (Closed (Some errs)) -> Lwt.return (Invalid errs)
+      | Error (Any exn) -> Lwt.return (Invalid [Exn exn])
+      | _ ->
+          (* preapplication cases *)
+          assert false)
 
 let preapply w ?canceler chain_store ~predecessor ~timestamp ~protocol_data
     operations =
@@ -519,8 +555,14 @@ let preapply w ?canceler chain_store ~predecessor ~timestamp ~protocol_data
   in
   match r with
   | Ok (Preapplied res) -> return_ok res
-  | Ok (Preapplication_error errs) | Error errs -> Lwt.return_error errs
-  | _ -> failwith "unexpected result"
+  | Ok (Preapplication_error errs) -> Lwt.return_error errs
+  | Error (Request_error errs) -> Lwt.return_error errs
+  | Error (Closed None) -> Lwt.return_error [Worker_types.Terminated]
+  | Error (Closed (Some errs)) -> Lwt.return_error errs
+  | Error (Any exn) -> Lwt.return_error [Exn exn]
+  | _ ->
+      (* validation cases *)
+      assert false
 
 let fetch_and_compile_protocol w =
   let bv = Worker.state w in

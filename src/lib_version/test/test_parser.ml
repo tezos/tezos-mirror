@@ -55,18 +55,18 @@ let eq v1 v2 =
   let open Version in
   let additional_info_eq a1 a2 =
     match (a1, a2) with
-    | (Dev, Dev) -> true
-    | (Dev, _) -> false
-    | (RC n1, RC n2) | (RC_dev n1, RC_dev n2) -> n1 = n2
-    | (RC _, _) | (RC_dev _, _) -> false
-    | (Release, Release) -> true
-    | (Release, _) -> false
+    | Dev, Dev -> true
+    | Dev, _ -> false
+    | RC n1, RC n2 | RC_dev n1, RC_dev n2 -> n1 = n2
+    | RC _, _ | RC_dev _, _ -> false
+    | Release, Release -> true
+    | Release, _ -> false
   in
   match (v1, v2) with
-  | (Some v1, Some v2) ->
+  | Some v1, Some v2 ->
       v1.major = v2.major && v1.minor = v2.minor
       && additional_info_eq v1.additional_info v2.additional_info
-  | (_, _) -> false
+  | _, _ -> false
 
 let prn = function
   | None ->

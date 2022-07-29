@@ -275,7 +275,7 @@ let gen_scenario :
     tzbtc -> liquidity -> int -> (specs * contract_id step list) QCheck.Gen.t =
  fun total_tzbtc total_liquidity size ->
   let* specs = gen_specs total_tzbtc total_liquidity in
-  let (state, env) = SymbolicMachine.build specs in
+  let state, env = SymbolicMachine.build specs in
   let+ scenario = gen_steps env state size in
   (specs, scenario)
 
@@ -312,7 +312,7 @@ let gen_adversary_scenario :
     (specs * contract_id * contract_id step list) QCheck.Gen.t =
  fun total_tzbtc total_liquidity size ->
   let* specs = gen_specs total_tzbtc total_liquidity in
-  let (state, env) = SymbolicMachine.build ~subsidy:0L specs in
+  let state, env = SymbolicMachine.build ~subsidy:0L specs in
   let* c = oneofl env.implicit_accounts in
   let+ scenario = gen_steps ~source:c ~destination:c env state size in
   (specs, c, scenario)
@@ -341,7 +341,7 @@ let arb_adversary_scenario :
    We shrink a valid scenario by removing steps from its tails,
    because a prefix of a valid scenario remains a valid
    scenario. Removing a random element of a scenario could lead to an
-   invalid scenario.  *)
+   invalid scenario. *)
 
 (* Note (2)
 

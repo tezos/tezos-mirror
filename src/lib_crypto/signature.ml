@@ -195,9 +195,9 @@ module Public_key_hash = struct
 
     let compare a b =
       match (a, b) with
-      | (Ed25519 x, Ed25519 y) -> Ed25519.Public_key_hash.compare x y
-      | (Secp256k1 x, Secp256k1 y) -> Secp256k1.Public_key_hash.compare x y
-      | (P256 x, P256 y) -> P256.Public_key_hash.compare x y
+      | Ed25519 x, Ed25519 y -> Ed25519.Public_key_hash.compare x y
+      | Secp256k1 x, Secp256k1 y -> Secp256k1.Public_key_hash.compare x y
+      | P256 x, P256 y -> P256.Public_key_hash.compare x y
       | _ -> Stdlib.compare a b
   end)
 
@@ -267,13 +267,13 @@ module Public_key = struct
 
     let compare a b =
       match (a, b) with
-      | (Ed25519 x, Ed25519 y) -> Ed25519.Public_key.compare x y
-      | (Secp256k1 x, Secp256k1 y) -> Secp256k1.Public_key.compare x y
-      | (P256 x, P256 y) -> P256.Public_key.compare x y
-      | (Ed25519 _, (Secp256k1 _ | P256 _)) -> -1
-      | (Secp256k1 _, P256 _) -> -1
-      | (P256 _, (Secp256k1 _ | Ed25519 _)) -> 1
-      | (Secp256k1 _, Ed25519 _) -> 1
+      | Ed25519 x, Ed25519 y -> Ed25519.Public_key.compare x y
+      | Secp256k1 x, Secp256k1 y -> Secp256k1.Public_key.compare x y
+      | P256 x, P256 y -> P256.Public_key.compare x y
+      | Ed25519 _, (Secp256k1 _ | P256 _) -> -1
+      | Secp256k1 _, P256 _ -> -1
+      | P256 _, (Secp256k1 _ | Ed25519 _) -> 1
+      | Secp256k1 _, Ed25519 _ -> 1
   end)
 
   type Base58.data += Data of t (* unused *)
@@ -401,9 +401,9 @@ module Secret_key = struct
 
     let compare a b =
       match (a, b) with
-      | (Ed25519 x, Ed25519 y) -> Ed25519.Secret_key.compare x y
-      | (Secp256k1 x, Secp256k1 y) -> Secp256k1.Secret_key.compare x y
-      | (P256 x, P256 y) -> P256.Secret_key.compare x y
+      | Ed25519 x, Ed25519 y -> Ed25519.Secret_key.compare x y
+      | Secp256k1 x, Secp256k1 y -> Secp256k1.Secret_key.compare x y
+      | P256 x, P256 y -> P256.Secret_key.compare x y
       | _ -> Stdlib.compare a b
   end)
 
@@ -644,23 +644,23 @@ let sign ?watermark secret_key message =
 let check ?watermark public_key signature message =
   let watermark = Option.map bytes_of_watermark watermark in
   match (public_key, signature) with
-  | (Public_key.Ed25519 pk, Unknown signature) -> (
+  | Public_key.Ed25519 pk, Unknown signature -> (
       match Ed25519.of_bytes_opt signature with
       | Some s -> Ed25519.check ?watermark pk s message
       | None -> false)
-  | (Public_key.Secp256k1 pk, Unknown signature) -> (
+  | Public_key.Secp256k1 pk, Unknown signature -> (
       match Secp256k1.of_bytes_opt signature with
       | Some s -> Secp256k1.check ?watermark pk s message
       | None -> false)
-  | (Public_key.P256 pk, Unknown signature) -> (
+  | Public_key.P256 pk, Unknown signature -> (
       match P256.of_bytes_opt signature with
       | Some s -> P256.check ?watermark pk s message
       | None -> false)
-  | (Public_key.Ed25519 pk, Ed25519 signature) ->
+  | Public_key.Ed25519 pk, Ed25519 signature ->
       Ed25519.check ?watermark pk signature message
-  | (Public_key.Secp256k1 pk, Secp256k1 signature) ->
+  | Public_key.Secp256k1 pk, Secp256k1 signature ->
       Secp256k1.check ?watermark pk signature message
-  | (Public_key.P256 pk, P256 signature) ->
+  | Public_key.P256 pk, P256 signature ->
       P256.check ?watermark pk signature message
   | _ -> false
 
@@ -718,15 +718,15 @@ type algo = Ed25519 | Secp256k1 | P256
 let generate_key ?(algo = Ed25519) ?seed () =
   match algo with
   | Ed25519 ->
-      let (pkh, pk, sk) = Ed25519.generate_key ?seed () in
+      let pkh, pk, sk = Ed25519.generate_key ?seed () in
       (Public_key_hash.Ed25519 pkh, Public_key.Ed25519 pk, Secret_key.Ed25519 sk)
   | Secp256k1 ->
-      let (pkh, pk, sk) = Secp256k1.generate_key ?seed () in
+      let pkh, pk, sk = Secp256k1.generate_key ?seed () in
       ( Public_key_hash.Secp256k1 pkh,
         Public_key.Secp256k1 pk,
         Secret_key.Secp256k1 sk )
   | P256 ->
-      let (pkh, pk, sk) = P256.generate_key ?seed () in
+      let pkh, pk, sk = P256.generate_key ?seed () in
       (Public_key_hash.P256 pkh, Public_key.P256 pk, Secret_key.P256 sk)
 
 let deterministic_nonce sk msg =

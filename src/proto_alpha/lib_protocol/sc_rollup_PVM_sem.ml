@@ -24,94 +24,172 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module introduces the semantics of Proof-generating Virtual Machines.
-
-   A PVM defines an operational semantics for some computational
-   model. The specificity of PVMs, in comparison with standard virtual
-   machines, is their ability to generate and to validate a *compact*
-   proof that a given atomic execution step turned a given state into
-   another one.
-
-   In the smart-contract rollups, PVMs are used for two purposes:
-
-    - They allow for the externalization of rollup execution by
-   completely specifying the operational semantics of a given
-   rollup. This standardization of the semantics gives a unique and
-   executable source of truth about the interpretation of
-   smart-contract rollup inboxes, seen as a transformation of a rollup
-   state.
-
-    - They allow for the validation or refutation of a claim that the
-   processing of some messages led to a given new rollup state (given
-   an actual source of truth about the nature of these messages).
-
-*)
-open Alpha_context
-
-open Sc_rollup
-
-(** An input to a PVM is the [message_counter] element of an inbox at
-    a given [inbox_level] and contains a given [payload]. *)
 type input = {
-  inbox_level : Raw_level.t;
+  inbox_level : Raw_level_repr.t;
   message_counter : Z.t;
-  payload : string;
+  payload : Sc_rollup_inbox_message_repr.serialized;
 }
 
+let input_encoding =
+  let open Data_encoding in
+  conv
+    (fun {inbox_level; message_counter; payload} ->
+      (inbox_level, message_counter, (payload :> string)))
+    (fun (inbox_level, message_counter, payload) ->
+      let payload = Sc_rollup_inbox_message_repr.unsafe_of_string payload in
+      {inbox_level; message_counter; payload})
+    (obj3
+       (req "inbox_level" Raw_level_repr.encoding)
+       (req "message_counter" n)
+       (req "payload" string))
+
+let input_equal (a : input) (b : input) : bool =
+  let {inbox_level; message_counter; payload} = a in
+  (* To be robust to the addition of fields in [input] *)
+  Raw_level_repr.equal inbox_level b.inbox_level
+  && Z.equal message_counter b.message_counter
+  && String.equal (payload :> string) (b.payload :> string)
+
+type input_request =
+  | No_input_required
+  | Initial
+  | First_after of Raw_level_repr.t * Z.t
+
+let input_request_encoding =
+  let open Data_encoding in
+  union
+    ~tag_size:`Uint8
+    [
+      case
+        ~title:"No_input_required"
+        (Tag 0)
+        (obj1 (req "no_input_required" unit))
+        (function No_input_required -> Some () | _ -> None)
+        (fun () -> No_input_required);
+      case
+        ~title:"Initial"
+        (Tag 1)
+        (obj1 (req "initial" unit))
+        (function Initial -> Some () | _ -> None)
+        (fun () -> Initial);
+      case
+        ~title:"First_after"
+        (Tag 2)
+        (obj2 (req "level" Raw_level_repr.encoding) (req "counter" n))
+        (function
+          | First_after (level, counter) -> Some (level, counter) | _ -> None)
+        (fun (level, counter) -> First_after (level, counter));
+    ]
+
+let pp_input_request fmt request =
+  match request with
+  | No_input_required -> Format.fprintf fmt "No_input_required"
+  | Initial -> Format.fprintf fmt "Initial"
+  | First_after (l, n) ->
+      Format.fprintf
+        fmt
+        "First_after (level = %a, counter = %a)"
+        Raw_level_repr.pp
+        l
+        Z.pp_print
+        n
+
+let input_request_equal a b =
+  match (a, b) with
+  | No_input_required, No_input_required -> true
+  | No_input_required, _ -> false
+  | Initial, Initial -> true
+  | Initial, _ -> false
+  | First_after (l, n), First_after (m, o) ->
+      Raw_level_repr.equal l m && Z.equal n o
+  | First_after _, _ -> false
+
+type output = {
+  outbox_level : Raw_level_repr.t;
+  message_index : Z.t;
+  message : Sc_rollup_outbox_message_repr.t;
+}
+
+let output_encoding =
+  let open Data_encoding in
+  conv
+    (fun {outbox_level; message_index; message} ->
+      (outbox_level, message_index, message))
+    (fun (outbox_level, message_index, message) ->
+      {outbox_level; message_index; message})
+    (obj3
+       (req "outbox_level" Raw_level_repr.encoding)
+       (req "message_index" n)
+       (req "message" Sc_rollup_outbox_message_repr.encoding))
+
+let pp_output fmt {outbox_level; message_index; message} =
+  Format.fprintf
+    fmt
+    "@[%a@;%a@;%a@;@]"
+    Raw_level_repr.pp
+    outbox_level
+    Z.pp_print
+    message_index
+    Sc_rollup_outbox_message_repr.pp
+    message
+
 module type S = sig
-  (**
-
-       The state of the PVM denotes a state of the rollup.
-
-  *)
   type state
 
-  (** During interactive rejection games, a player may need to
-      provide a proof that a given execution step is valid. *)
+  val pp : state -> (Format.formatter -> unit -> unit) Lwt.t
+
+  type context
+
+  type hash = Sc_rollup_repr.State_hash.t
+
   type proof
 
   val proof_encoding : proof Data_encoding.t
 
-  (** A state is initialized in a given context. *)
-  type context
-
-  (** A commitment hash characterized the contents of the state. *)
-  type hash = State_hash.t
-
-  (** [proof_start_state proof] returns the initial state hash of the
-     [proof] execution step. *)
   val proof_start_state : proof -> hash
 
-  (** [proof_stop_state proof] returns the final state hash of the
-     [proof] execution step. *)
-  val proof_stop_state : proof -> hash
+  val proof_stop_state : proof -> hash option
 
-  (** [state_hash state] returns a compressed representation of [state]. *)
+  val proof_input_requested : proof -> input_request
+
+  val proof_input_given : proof -> input option
+
   val state_hash : state -> hash Lwt.t
 
-  (** [initial_state context] is the state of the PVM before booting. It must
-      be such that [state_hash state = Commitment_hash.zero]. Any [context]
-      should be enough to create an initial state. *)
-  val initial_state : context -> string -> state Lwt.t
+  val initial_state : context -> state Lwt.t
 
-  (** [is_input_state state] returns [Some (level, counter)] if [state] is
-      waiting for the input message that comes next to the message numbered
-      [counter] in the inbox of a given [level]. *)
-  val is_input_state : state -> (Raw_level.t * Z.t) option Lwt.t
+  val install_boot_sector : state -> string -> state Lwt.t
 
-  (** [set_input level n msg state] sets [msg] in [state] as
-     the next message to be processed. This input message is assumed
-     to be the number [n] in the inbox messages at the given
-     [level]. The input message must be the message next to the
-     previous message processed by the rollup. *)
+  val is_input_state : state -> input_request Lwt.t
+
   val set_input : input -> state -> state Lwt.t
 
-  (** [eval s0] returns a state [s1] resulting from the
-       execution of an atomic step of the rollup at state [s0]. *)
   val eval : state -> state Lwt.t
 
-  (** [verify_proof input proof] returns [true] iff the [proof] is valid.
-      If the state is an input state, [input] is the hash of the input
-      message externally provided to the evaluation function. *)
-  val verify_proof : input:input option -> proof -> bool Lwt.t
+  val verify_proof : proof -> bool Lwt.t
+
+  val produce_proof :
+    context -> input option -> state -> (proof, error) result Lwt.t
+
+  val verify_origination_proof : proof -> string -> bool Lwt.t
+
+  val produce_origination_proof :
+    context -> string -> (proof, error) result Lwt.t
+
+  type output_proof
+
+  val output_proof_encoding : output_proof Data_encoding.t
+
+  val output_of_output_proof : output_proof -> output
+
+  val state_of_output_proof : output_proof -> hash
+
+  val verify_output_proof : output_proof -> bool Lwt.t
+
+  val produce_output_proof :
+    context -> state -> output -> (output_proof, error) result Lwt.t
+
+  module Internal_for_tests : sig
+    val insert_failure : state -> state Lwt.t
+  end
 end

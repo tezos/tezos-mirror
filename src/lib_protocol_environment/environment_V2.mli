@@ -27,7 +27,7 @@
 open Environment_context
 open Environment_protocol_T
 
-module type V2 = sig
+module type T = sig
   include
     Tezos_protocol_environment_sigs.V2.T
       with type Format.formatter = Format.formatter
@@ -64,7 +64,7 @@ module type V2 = sig
        and type Signature.watermark = Signature.watermark
        and type Pvss_secp256k1.Commitment.t = Pvss_secp256k1.Commitment.t
        and type Pvss_secp256k1.Encrypted_share.t =
-            Pvss_secp256k1.Encrypted_share.t
+        Pvss_secp256k1.Encrypted_share.t
        and type Pvss_secp256k1.Clear_share.t = Pvss_secp256k1.Clear_share.t
        and type Pvss_secp256k1.Public_key.t = Pvss_secp256k1.Public_key.t
        and type Pvss_secp256k1.Secret_key.t = Pvss_secp256k1.Secret_key.t
@@ -75,7 +75,7 @@ module type V2 = sig
        and type ('a, 'b) RPC_path.t = ('a, 'b) RPC_path.t
        and type RPC_service.meth = RPC_service.meth
        and type (+'m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t =
-            ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
+        ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
        and type Error_monad.shell_tztrace = Error_monad.tztrace
        and type 'a Error_monad.shell_tzresult = ('a, Error_monad.tztrace) result
        and module Sapling = Tezos_sapling.Core.Validator_legacy
@@ -133,12 +133,11 @@ module type V2 = sig
     -> ['block] RPC_context.simple
 end
 
-module MakeV2 (Param : sig
+module Make (Param : sig
   val name : string
 end)
 () :
-  V2
-    with type Context.t = Context.t
-     and type Updater.validation_result = validation_result
+  T
+    with type Updater.validation_result = validation_result
      and type Updater.quota = quota
      and type Updater.rpc_context = rpc_context

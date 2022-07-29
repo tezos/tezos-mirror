@@ -23,8 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Worker : sig
+  type timestamps
+
+  type counters = {
+    worker_request_count : Prometheus.Counter.t;
+    worker_completion_count : Prometheus.Counter.t;
+    worker_error_count : Prometheus.Counter.t;
+  }
+
+  val update_timestamps : timestamps -> Worker_types.request_status -> unit
+end
+
 (** Metrics associated to the mempool *)
 module Mempool : sig
+  type t = {worker_counters : Worker.counters}
+
+  val init : string list -> t
+
   val set_applied_collector : (unit -> float) -> unit
 
   val set_prechecked_collector : (unit -> float) -> unit
@@ -38,12 +54,6 @@ module Mempool : sig
   val set_outdated_collector : (unit -> float) -> unit
 
   val set_unprocessed_collector : (unit -> float) -> unit
-end
-
-module Worker : sig
-  type t
-
-  val update : t -> Worker_types.request_status -> unit
 end
 
 module Distributed_db : sig
@@ -64,10 +74,44 @@ module Block_validator : sig
     preapplication_errors_count : Prometheus.Counter.t;
     validation_errors_after_precheck_count : Prometheus.Counter.t;
     precheck_failed_count : Prometheus.Counter.t;
-    validation_worker_metrics : Worker.t;
+    worker_timestamps : Worker.timestamps;
+    worker_counters : Worker.counters;
   }
 
-  val init : string trace -> t
+  val init : string list -> t
+
+  val set_operation_per_pass_collector : (unit -> float list) -> unit
+end
+
+module Proto_plugin : sig
+  (* This is a protocol specific module that is used to collect all the
+   * protocol-specific metrics. It works using the protocol plugin system
+   * and it's very similar to the mempool filter plugin. This module
+   * allows to decode protocol data payload and provide back basic
+   * types that can be used as metrics. *)
+  module type PROTOMETRICS = sig
+    val hash : Protocol_hash.t
+
+    val update_metrics :
+      protocol_metadata:bytes ->
+      Fitness.t ->
+      (cycle:float -> consumed_gas:float -> round:float -> unit) ->
+      unit Lwt.t
+  end
+
+  (** Emtpy metrics module. All metrics are -1. *)
+  module UndefinedProtoMetrics (P : sig
+    val hash : Protocol_hash.t
+  end) : PROTOMETRICS
+
+  (** Register a metrics plugin module *)
+  val register_plugin : (module PROTOMETRICS) -> unit
+
+  (** Find a metrics plugin module associated to a protocol *)
+  val find_plugin : Protocol_hash.t -> (module PROTOMETRICS) option
+
+  val safe_get_prevalidator_proto_metrics :
+    Protocol_hash.t -> (module PROTOMETRICS) Lwt.t
 end
 
 module Chain_validator : sig
@@ -76,12 +120,51 @@ module Chain_validator : sig
     ignored_head_count : Prometheus.Counter.t;
     branch_switch_count : Prometheus.Counter.t;
     head_increment_count : Prometheus.Counter.t;
-    validation_worker_metrics : Worker.t;
+    head_round : Prometheus.Gauge.t;
+    head_cycle : Prometheus.Gauge.t;
+    consumed_gas : Prometheus.Gauge.t;
+    is_bootstrapped : Prometheus.Gauge.t;
+    sync_status : Prometheus.Gauge.t;
+    worker_timestamps : Worker.timestamps;
+    worker_counters : Worker.counters;
   }
 
-  val init : string trace -> Chain_id.t -> t
+  val update_bootstrapped : metrics:t -> bool -> unit
+
+  val update_sync_status :
+    metrics:t ->
+    Chain_validator_worker_state.Event.synchronisation_status ->
+    unit
+
+  val init : string list -> Chain_id.t -> t
+
+  val update_proto_metrics_callback :
+    metrics:t -> cycle:float -> consumed_gas:float -> round:float -> unit
+
+  val update_proto : (unit -> unit Lwt.t) -> unit
 end
 
 module Version : sig
   val init : ('a, 'b, 'c) P2p.t -> unit
+end
+
+module Peer_validator : sig
+  type t = {
+    on_no_request : Prometheus.Counter.t;
+    new_head_completed : Prometheus.Counter.t;
+    new_branch_completed : Prometheus.Counter.t;
+    invalid_locator : Prometheus.Counter.t;
+    invalid_block : Prometheus.Counter.t;
+    system_error : Prometheus.Counter.t;
+    unavailable_protocol : Prometheus.Counter.t;
+    unknown_ancestor : Prometheus.Counter.t;
+    too_short_locator : Prometheus.Counter.t;
+    operations_fetching_canceled_new_branch : Prometheus.Counter.t;
+    operations_fetching_canceled_new_known_valid_head : Prometheus.Counter.t;
+    operations_fetching_canceled_new_unknown_head : Prometheus.Counter.t;
+    unknown_error : Prometheus.Counter.t;
+    connections : Prometheus.Counter.t;
+  }
+
+  val init : string list -> t
 end

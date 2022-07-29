@@ -26,12 +26,30 @@
 let qcheck_wrap ?verbose ?long ?rand =
   List.map (QCheck_alcotest.to_alcotest ?verbose ?long ?rand)
 
+let qcheck_make_result ?count ?print ?pp_error ?check ~name
+    ~(gen : 'a QCheck2.Gen.t) (f : 'a -> (bool, 'b) result) =
+  let check =
+    match check with
+    | Some check -> check
+    | None -> (
+        function
+        | Ok b -> b
+        | Error err -> (
+            match pp_error with
+            | Some pp_error ->
+                QCheck2.Test.fail_reportf "Test failed:@,%a" pp_error err
+            | None ->
+                QCheck2.Test.fail_reportf
+                  "Test failed but no pretty printer was provided."))
+  in
+  QCheck2.Test.make ~name ?print ?count gen (fun x -> f x |> check)
+
 let qcheck_eq ?pp ?cmp ?eq expected actual =
   let pass =
     match (eq, cmp) with
-    | (Some eq, _) -> eq expected actual
-    | (None, Some cmp) -> cmp expected actual = 0
-    | (None, None) -> Stdlib.compare expected actual = 0
+    | Some eq, _ -> eq expected actual
+    | None, Some cmp -> cmp expected actual = 0
+    | None, None -> Stdlib.compare expected actual = 0
   in
   if pass then true
   else
@@ -46,6 +64,28 @@ let qcheck_eq ?pp ?cmp ?eq expected actual =
           expected
           pp
           actual
+
+let qcheck_neq ?pp ?cmp ?eq left right =
+  let pass =
+    match (eq, cmp) with
+    | Some eq, _ -> eq left right
+    | None, Some cmp -> cmp left right = 0
+    | None, None -> Stdlib.compare left right = 0
+  in
+  if not pass then true
+  else
+    match pp with
+    | None ->
+        QCheck.Test.fail_reportf
+          "@[<h 0>Values are unexpectedly equal, but no pretty printer was \
+           provided.@]"
+    | Some pp ->
+        QCheck.Test.fail_reportf
+          "@[<v 2>Inequality check failed!@,left:@,%a@,right:@,%a@]"
+          pp
+          left
+          pp
+          right
 
 let qcheck_eq_tests ~eq ~gen ~eq_name =
   let reflexivity_test =
@@ -101,16 +141,34 @@ let qcheck_cond ?pp ~cond e () =
     | Some pp ->
         QCheck.Test.fail_reportf "@[<v 2>The condition check failed!@,%a@]" pp e
 
-let int64_range_gen a b =
+let intX_range_gen ~sub ~add ~gen ~shrink a b =
   let gen a b st =
-    let range = Int64.sub b a in
-    let raw_val = Random.State.int64 st range in
-    let res = Int64.add a raw_val in
+    let range = sub b a in
+    let raw_val = gen st range in
+    let res = add a raw_val in
     assert (a <= res && res <= b) ;
     res
   in
-  let shrink b () = QCheck2.Shrink.int64_towards a b () in
+  let shrink b () = shrink a b () in
   QCheck2.Gen.make_primitive ~gen:(gen a b) ~shrink
+
+let int64_range_gen a b =
+  intX_range_gen
+    ~sub:Int64.sub
+    ~add:Int64.add
+    ~gen:Random.State.int64
+    ~shrink:QCheck2.Shrink.int64_towards
+    a
+    b
+
+let int32_range_gen a b =
+  intX_range_gen
+    ~sub:Int32.sub
+    ~add:Int32.add
+    ~gen:Random.State.int32
+    ~shrink:QCheck2.Shrink.int32_towards
+    a
+    b
 
 let int64_strictly_positive_gen = int64_range_gen 1L
 
@@ -159,6 +217,10 @@ let holey (l : 'a list) : 'a list QCheck2.Gen.t =
   in
   List.rev rev_result
 
+let rec of_option_gen gen =
+  let open QCheck2.Gen in
+  gen >>= function None -> of_option_gen gen | Some a -> return a
+
 let endpoint_gen =
   let open QCheck2 in
   let open Gen in
@@ -175,7 +237,7 @@ let endpoint_gen =
     ":" ^ Int.to_string port
   in
   let url_string_gen =
-    let+ (protocol, path, opt_part) =
+    let+ protocol, path, opt_part =
       triple protocol_gen path_gen (opt port_gen)
     in
     String.concat "" [protocol; "://"; path; Option.value ~default:"" opt_part]
@@ -203,3 +265,30 @@ struct
   let gen (key_gen : Map.key Gen.t) (val_gen : 'v Gen.t) : 'v Map.t Gen.t =
     gen_of_size Gen.small_nat key_gen val_gen
 end
+
+let test_roundtrip ~count ~title ~gen ~eq encoding =
+  let pp fmt x =
+    Data_encoding.Json.construct encoding x
+    |> Data_encoding.Json.to_string |> Format.pp_print_string fmt
+  in
+  let test rdt input =
+    let output = Roundtrip.make encoding rdt input in
+    let success = eq input output in
+    if not success then
+      QCheck2.Test.fail_reportf
+        "%s %s roundtrip error: %a became %a"
+        title
+        (Roundtrip.target rdt)
+        pp
+        input
+        pp
+        output
+  in
+  QCheck2.Test.make
+    ~count
+    ~name:(Format.asprintf "roundtrip %s" title)
+    gen
+    (fun input ->
+      test Roundtrip.binary input ;
+      test Roundtrip.json input ;
+      true)

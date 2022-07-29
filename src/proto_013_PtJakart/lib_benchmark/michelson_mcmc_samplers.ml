@@ -248,7 +248,7 @@ struct
 
   let to_michelson {state = ({typing; term} : State_space.t); jump = _} =
     let typing = Lazy.force typing in
-    let (node, (bef, aft), state) =
+    let node, (bef, aft), state =
       Autocomp.complete_code typing term X.rng_state
     in
     let node =
@@ -316,8 +316,8 @@ struct
 
   let to_michelson {state = ({typing; term} : State_space.t); jump = _} =
     let typing = Lazy.force typing in
-    let (node, _) = Autocomp.complete_data typing term X.rng_state in
-    let (typ, state) =
+    let node, _ = Autocomp.complete_data typing term X.rng_state in
+    let typ, state =
       try Inference.infer_data_with_state node
       with _ ->
         Format.eprintf "Bug found!@." ;

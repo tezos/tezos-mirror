@@ -23,22 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* The functions below could be put in the Tezt library. *)
-let get_checkpoint ?endpoint client =
-  let* json = RPC.get_checkpoint ?endpoint client in
-  return JSON.(json |-> "level" |> as_int)
-
-let get_caboose ?endpoint client =
-  let* json = RPC.get_caboose ?endpoint client in
-  return JSON.(json |-> "level" |> as_int)
-
-let is_connected ?endpoint client ~peer_id =
-  let* connections = RPC.get_connections ?endpoint client in
-  let open JSON in
-  return
-  @@ List.exists
-       (fun peer -> peer |-> "peer_id" |> as_string = peer_id)
-       (connections |> as_list)
+let is_connected node ~peer_id =
+  let* response = RPC.get_network_connection peer_id |> RPC.call_raw node in
+  match response.code with
+  | 200 -> return true
+  | 404 -> return false
+  | code ->
+      Test.fail "unexpected response code in Bootstrap.is_connected: %d" code
 
 let wait_for_unknown_ancestor node =
   let filter json =
@@ -226,7 +217,9 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   in
   let* () = Client.activate_protocol ~protocol client ~parameter_file in
   Log.info "Activated protocol." ;
-  let* () = repeat bakes_before_kill (fun () -> Client.bake_for client) in
+  let* () =
+    repeat bakes_before_kill (fun () -> Client.bake_for_and_wait client)
+  in
   let* _ = Node.wait_for_level node_1 (bakes_before_kill + 1)
   and* _ = Node.wait_for_level node_2 (bakes_before_kill + 1) in
   Log.info "Both nodes are at level %d." (bakes_before_kill + 1) ;
@@ -236,7 +229,9 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   in
   (* Kill node 2 and continue baking without it. *)
   let* () = Node.terminate node_2 in
-  let* () = repeat bakes_during_kill (fun () -> Client.bake_for client) in
+  let* () =
+    repeat bakes_during_kill (fun () -> Client.bake_for_and_wait client)
+  in
   (* Restart node 2 and let it catch up. *)
   Log.info "Baked %d times with node_2 down, restart node_2." bakes_during_kill ;
   let final_level = 1 + bakes_before_kill + bakes_during_kill in
@@ -268,7 +263,10 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   let* () =
     match hmode1 with
     | Full _ ->
-        let* savepoint = get_checkpoint ~endpoint:endpoint_1 client in
+        let* {level = savepoint; _} =
+          RPC.Client.call ~endpoint:endpoint_1 client
+          @@ RPC.get_chain_level_checkpoint ()
+        in
         if savepoint <= bakes_before_kill then
           Test.fail
             "checkpoint level (%d) is lower or equal to the starting level (%d)"
@@ -276,7 +274,10 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
             bakes_before_kill ;
         return ()
     | Rolling _ ->
-        let* caboose = get_caboose ~endpoint:endpoint_1 client in
+        let* {level = caboose; _} =
+          RPC.Client.call ~endpoint:endpoint_1 client
+          @@ RPC.get_chain_level_caboose ()
+        in
         if caboose <= bakes_before_kill then
           Test.fail
             "caboose level (%d) is lower or equal to the starting level (%d)"
@@ -288,10 +289,10 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   (* Check whether the nodes are still connected. *)
   match hmode1 with
   | Full _ | Archive ->
-      let* b = is_connected client ~peer_id:node2_identity in
+      let* b = is_connected node_1 ~peer_id:node2_identity in
       if not b then Test.fail "expected the two nodes to be connected" else unit
   | Rolling _ ->
-      let* b = is_connected client ~peer_id:node2_identity in
+      let* b = is_connected node_1 ~peer_id:node2_identity in
       if b then Test.fail "expected the two nodes NOT to be connected" else unit
 
 let check_rpc_force_bootstrapped () =
@@ -303,10 +304,10 @@ let check_rpc_force_bootstrapped () =
   Log.info "Start a node." ;
   let* node = Node.init [Synchronisation_threshold 255] in
   let* client = Client.init ~endpoint:(Node node) () in
-  let (bootstrapped_promise, bootstrapped_resolver) = Lwt.task () in
+  let bootstrapped_promise, bootstrapped_resolver = Lwt.task () in
   Node.on_event node (bootstrapped_event bootstrapped_resolver) ;
   Log.info "Force the node to be bootstrapped." ;
-  let* _ = RPC.force_bootstrapped client in
+  let* _ = RPC.Client.call client @@ RPC.patch_chain_bootstrapped true in
   Log.info "Waiting for the node to be bootstrapped." ;
   let* () = bootstrapped_promise in
   unit

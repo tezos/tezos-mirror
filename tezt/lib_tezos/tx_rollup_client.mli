@@ -31,9 +31,10 @@ type t
    program at [path], storing local information in [base_dir], and
    communicating with the specified [node]. *)
 val create :
+  protocol:Protocol.t ->
   ?name:string ->
-  ?path:string ->
   ?base_dir:string ->
+  ?wallet_dir:string ->
   ?color:Log.Color.t ->
   Tx_rollup_node.t ->
   t
@@ -43,22 +44,74 @@ val get_balance :
 
 val get_inbox : ?block:string -> t -> string Lwt.t
 
-val get_block : t -> block:string -> string Lwt.t
+val get_block : ?style:[`Fancy | `Raw] -> t -> block:string -> string Lwt.t
 
 val craft_tx_transaction :
+  t ->
+  signer:string ->
+  ?counter:int64 ->
+  Rollup.Tx_rollup.l2_transfer ->
+  JSON.t Lwt.t
+
+val craft_tx_transfers :
+  t ->
+  signer:string ->
+  ?counter:int64 ->
+  Rollup.Tx_rollup.l2_transfer list ->
+  JSON.t Lwt.t
+
+val craft_tx_withdraw :
   ?counter:Int64.t ->
   t ->
   qty:Int64.t ->
   signer:string ->
   dest:string ->
   ticket:string ->
+  JSON.t Lwt.t
+
+val craft_tx_batch :
+  ?show_hex:bool ->
+  t ->
+  transactions_and_sig:JSON.t ->
+  [`Hex of string | `Json of JSON.t] Lwt.t
+
+val sign_transaction :
+  ?aggregate:bool ->
+  ?aggregated_signature:string ->
+  t ->
+  transaction:JSON.t ->
+  signers:string list ->
   string Lwt.t
 
-val craft_tx_batch : t -> batch:string -> signatures:string -> string Lwt.t
+val transfer :
+  ?counter:int64 ->
+  t ->
+  source:string ->
+  Rollup.Tx_rollup.l2_transfer ->
+  string Lwt.t
+
+val withdraw :
+  ?counter:int64 ->
+  t ->
+  source:string ->
+  Rollup.Tx_rollup.l2_withdraw ->
+  string Lwt.t
 
 val get_batcher_queue : t -> string Lwt.t
 
 val get_batcher_transaction : t -> transaction_hash:string -> string Lwt.t
 
 val inject_batcher_transaction :
-  t -> ?expect_failure:bool -> string -> (string * string) Lwt.t
+  ?expect_failure:bool ->
+  t ->
+  transactions_and_sig:JSON.t ->
+  (string * string) Lwt.t
+
+val get_message_proof :
+  ?block:string -> t -> message_position:int -> string Lwt.t
+
+module RPC : sig
+  val get : t -> string -> string Lwt.t
+
+  val post : t -> ?data:Ezjsonm.value -> string -> string Lwt.t
+end

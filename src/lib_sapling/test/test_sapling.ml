@@ -24,7 +24,7 @@ let test_proof_raw () =
   let pos = 0L in
   let rcm = Rcm.random () in
   let xfvk = Viewing_key.of_sk xsk in
-  let (_, address) = Viewing_key.(new_address xfvk default_index) in
+  let _, address = Viewing_key.(new_address xfvk default_index) in
   let nf = Nullifier.compute address xfvk ~amount:vlue rcm ~position:pos in
   let cm = Commitment.compute address ~amount:vlue rcm in
   let esk = DH.esk_random () in
@@ -44,7 +44,7 @@ let test_proof_raw () =
   R.init_params () ;
   let ctx_prove = R.proving_ctx_init () in
   let ctx_verif = R.verification_ctx_init () in
-  let (cv_spend, rk, zkproof_spend) =
+  let cv_spend, rk, zkproof_spend =
     R.spend_proof
       ctx_prove
       xfvk.fvk.ak
@@ -60,7 +60,7 @@ let test_proof_raw () =
     R.check_spend ctx_verif cv_spend root nf rk zkproof_spend signature sighash
   in
   assert check_spend ;
-  let (cv_output, zkproof_output) =
+  let cv_output, zkproof_output =
     R.output_proof
       ctx_prove
       esk
@@ -94,9 +94,9 @@ let test_full_transaction () =
   let xfvk1 = Viewing_key.of_sk xsk1 in
   let xfvk2 = Viewing_key.of_sk xsk2 in
   let xfvk3 = Viewing_key.of_sk xsk3 in
-  let (_, addr1) = Viewing_key.(new_address xfvk1 default_index) in
-  let (_, addr2) = Viewing_key.(new_address xfvk2 default_index) in
-  let (_, addr3) = Viewing_key.(new_address xfvk3 default_index) in
+  let _, addr1 = Viewing_key.(new_address xfvk1 default_index) in
+  let _, addr2 = Viewing_key.(new_address xfvk2 default_index) in
+  let _, addr3 = Viewing_key.(new_address xfvk3 default_index) in
   (* creation of the first note *)
   let rcm_1 = Rcm.random () in
   let cm_1 = Commitment.compute addr1 ~amount:10L rcm_1 in
@@ -129,7 +129,7 @@ let test_full_transaction () =
   let ctx_prove_1 = R.proving_ctx_init () in
   (* Commitment value, randomised signature key, ZK proof that cm_1 is in the
      blockchain and has correct stuff *)
-  let (cv_spend_1, rk_1, zkproof_spend_1) =
+  let cv_spend_1, rk_1, zkproof_spend_1 =
     Proving.spend_proof
       ctx_prove_1
       xfvk1
@@ -142,7 +142,7 @@ let test_full_transaction () =
       ~witness:witness_1
   in
   (* Commitment value of the created note, ZK proof that everything is correct *)
-  let (cv_output_1, zkproof_output_1) =
+  let cv_output_1, zkproof_output_1 =
     Proving.output_proof ctx_prove_1 esk_1 addr2 rcm_2 ~amount:10L
   in
   (* Hash of the spend description *)
@@ -251,7 +251,7 @@ let test_full_transaction () =
   let cm_3 = Commitment.compute addr3 ~amount:5L rcm_3 in
   (* the shared secret is here unnecessary since in our example 3 won't spend money
      It has to be done in real though *)
-  let (cv_spend_2, rk_2, zkproof_spend_2) =
+  let cv_spend_2, rk_2, zkproof_spend_2 =
     R.spend_proof
       ctx_prove_2
       xfvk2.fvk.ak
@@ -263,7 +263,7 @@ let test_full_transaction () =
       ~root:root_2
       ~witness:witness_2
   in
-  let (cv_output_2, zkproof_output_2) =
+  let cv_output_2, zkproof_output_2 =
     R.output_proof
       ctx_prove_2
       esk_2
@@ -310,16 +310,16 @@ let test_forge () =
   let sk2 = List.nth Keys.xsks 1 in
   let vk1 = Core.Viewing_key.of_sk sk1 in
   let vk2 = Core.Viewing_key.of_sk sk2 in
-  let (_, addr1) = Core.Viewing_key.(new_address vk1 default_index) in
-  let (_, addr2) = Core.Viewing_key.(new_address vk2 default_index) in
+  let _, addr1 = Core.Viewing_key.(new_address vk1 default_index) in
+  let _, addr2 = Core.Viewing_key.(new_address vk2 default_index) in
   let output = Forge.make_output addr1 10L Bytes.empty in
   let state = Storage.empty ~memo_size:0 in
   let t1 =
     Forge.forge_transaction [] [output] sk1 key ~bound_data:"pkh" state
   in
-  let* (_, state) = Example.Validator.verify_update t1 state key in
+  let* _, state = Example.Validator.verify_update t1 state key in
   let forge_input_opt = Forge.Input.get state 0L vk1 in
-  let (_msg, forge_input) = Stdlib.Option.get @@ forge_input_opt in
+  let _msg, forge_input = Stdlib.Option.get @@ forge_input_opt in
   let forge_output = Forge.make_output addr2 10L Bytes.empty in
   let transaction =
     Forge.forge_transaction
@@ -369,8 +369,8 @@ let test_simple_client () =
   let state = Storage.empty ~memo_size:2 in
   let addr_b = new_address wb in
   (*a gives 2 to b and 1 (of change) to himself with 3 transparent money*)
-  let (t1, wa) = pay wa addr_b 2L ~memo:"t1" 3L state key in
-  let* (balance, state) = Example.Validator.verify_update t1 state key in
+  let t1, wa = pay wa addr_b 2L ~memo:"t1" 3L state key in
+  let* balance, state = Example.Validator.verify_update t1 state key in
   assert (balance = -3L) ;
   let wb = scan wb state in
   assert (wb.balance = 2L) ;
@@ -378,8 +378,8 @@ let test_simple_client () =
   assert (wa.balance = 1L) ;
   let addr_a = new_address wa in
   (* b gives 1 to a and 1 (of change) to himself with 2 transparent money*)
-  let (t2, wb) = pay wb addr_a 1L ~memo:"t2" 2L state key in
-  let* (balance, state) = Example.Validator.verify_update t2 state key in
+  let t2, wb = pay wb addr_a 1L ~memo:"t2" 2L state key in
+  let* balance, state = Example.Validator.verify_update t2 state key in
   assert (balance = -2L) ;
   (* before scanning b still has 2*)
   assert (wb.balance = 2L) ;
@@ -389,8 +389,8 @@ let test_simple_client () =
   assert (wa.balance = 2L) ;
   (*  b gives 1 to a with shielded money *)
   let addr_a = new_address wa in
-  let (t3, wb) = pay wb addr_a 1L ~memo:"t3" 0L state key in
-  let* (balance, state) = Example.Validator.verify_update t3 state key in
+  let t3, wb = pay wb addr_a 1L ~memo:"t3" 0L state key in
+  let* balance, state = Example.Validator.verify_update t3 state key in
   assert (balance = 0L) ;
   let wb = scan wb state in
   assert (wb.balance = 2L) ;
@@ -398,16 +398,16 @@ let test_simple_client () =
   assert (wa.balance = 3L) ;
   (* a burns 1 shielded money *)
   let addr_a = new_address wa in
-  let (t4, wa) = pay wa addr_a 0L ~memo:"t4" Int64.minus_one state key in
+  let t4, wa = pay wa addr_a 0L ~memo:"t4" Int64.minus_one state key in
   assert (wa.balance = 2L) ;
-  let* (balance, state) = Example.Validator.verify_update t4 state key in
+  let* balance, state = Example.Validator.verify_update t4 state key in
   assert (balance = 1L) ;
   let l_a =
     scan_ovk
       (Obj.magic (Core.Viewing_key.ovk_of_xfvk wa.vk) : Core.Spending_key.ovk)
       state
   in
-  let (l_a_mess, _l_a_forge_input) = List.split l_a in
+  let l_a_mess, _l_a_forge_input = List.split l_a in
   List.iter
     (fun x -> assert (List.mem (Bytes.of_string x) l_a_mess))
     ["t1"; "t4"] ;
@@ -416,7 +416,7 @@ let test_simple_client () =
       (Obj.magic (Core.Viewing_key.ovk_of_xfvk wb.vk) : Core.Spending_key.ovk)
       state
   in
-  let (l_b_mess, _l_b_forge_input) = List.split l_b in
+  let l_b_mess, _l_b_forge_input = List.split l_b in
   List.iter
     (fun x -> assert (List.mem (Bytes.of_string x) l_b_mess))
     ["t2"; "t3"] ;
@@ -431,7 +431,7 @@ let test_replay () =
   let wa = new_wallet (List.nth Keys.xsks 0) in
   let state = Storage.empty ~memo_size:2 in
   let addr = new_address wa in
-  let (t1, _) = pay wa addr 2L ~memo:"t1" 3L state right_string in
+  let t1, _ = pay wa addr 2L ~memo:"t1" 3L state right_string in
   let*! r = Example.Validator.verify_update t1 state wrong_string in
   match r with Error _ -> return_unit | _ -> assert false
 
@@ -446,7 +446,7 @@ let test_wrong_bound_data () =
   let wa = new_wallet (List.nth Keys.xsks 0) in
   let state = Storage.empty ~memo_size:2 in
   let addr = new_address wa in
-  let (t1, _) = pay wa addr 2L ~memo:"t1" ~bound_data:"right" 3L state key in
+  let t1, _ = pay wa addr 2L ~memo:"t1" ~bound_data:"right" 3L state key in
   let t1_wrong = {t1 with bound_data = "wrong"} in
   let*! r = Example.Validator.verify_update t1_wrong state key in
   match r with

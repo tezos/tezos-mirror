@@ -25,19 +25,19 @@
 (*****************************************************************************)
 
 module Request = struct
-  type 'a t =
+  type ('a, 'b) t =
     | Flush :
         Block_hash.t
         * Chain_validator_worker_state.Event.update
         * Block_hash.Set.t
         * Operation_hash.Set.t
-        -> unit t
-    | Notify : P2p_peer.Id.t * Mempool.t -> unit t
-    | Leftover : unit t
-    | Inject : {op : Operation.t; force : bool} -> unit t
-    | Arrived : Operation_hash.t * Operation.t -> unit t
-    | Advertise : unit t
-    | Ban : Operation_hash.t -> unit t
+        -> (unit, error trace) t
+    | Notify : P2p_peer.Id.t * Mempool.t -> (unit, Empty.t) t
+    | Leftover : (unit, Empty.t) t
+    | Inject : {op : Operation.t; force : bool} -> (unit, error trace) t
+    | Arrived : Operation_hash.t * Operation.t -> (unit, Empty.t) t
+    | Advertise : (unit, Empty.t) t
+    | Ban : Operation_hash.t -> (unit, error trace) t
 
   type view = View : _ t -> view
 
@@ -165,7 +165,7 @@ module Operation_encountered = struct
           (obj2
              (req "situation" (constant "injected"))
              (req "operation" Operation_hash.encoding))
-          (function (Injected, oph) -> Some ((), oph) | _ -> None)
+          (function Injected, oph -> Some ((), oph) | _ -> None)
           (fun ((), oph) -> (Injected, oph));
         case
           (Tag 1)
@@ -173,7 +173,7 @@ module Operation_encountered = struct
           (obj2
              (req "situation" (constant "arrived"))
              (req "operation" Operation_hash.encoding))
-          (function (Arrived, oph) -> Some ((), oph) | _ -> None)
+          (function Arrived, oph -> Some ((), oph) | _ -> None)
           (fun ((), oph) -> (Arrived, oph));
         case
           (Tag 2)
@@ -182,7 +182,7 @@ module Operation_encountered = struct
              (req "situation" (constant "notified"))
              (req "operation" Operation_hash.encoding)
              (req "peer" (option P2p_peer_id.encoding)))
-          (function (Notified peer, oph) -> Some ((), oph, peer) | _ -> None)
+          (function Notified peer, oph -> Some ((), oph, peer) | _ -> None)
           (fun ((), oph, peer) -> (Notified peer, oph));
         case
           (Tag 3)
@@ -190,7 +190,7 @@ module Operation_encountered = struct
           (obj2
              (req "situation" (constant "other"))
              (req "operation" Operation_hash.encoding))
-          (function (Other, hash) -> Some ((), hash) | _ -> None)
+          (function Other, hash -> Some ((), hash) | _ -> None)
           (fun ((), oph) -> (Other, oph));
       ]
 

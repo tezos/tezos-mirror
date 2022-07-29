@@ -181,32 +181,32 @@ struct
   let rec pattern_matches_aux : type f. (X.t, f) pattern -> node -> bool =
    fun patt node ->
     match (patt.patt_desc, node) with
-    | (Patt_focus patt, _) -> pattern_matches_aux patt node
-    | (Patt_any, _) -> true
-    | (Patt_int None, Int (_, _z)) -> true
-    | (Patt_int (Some zpred), Int (_, z)) -> zpred z
-    | (Patt_string None, String (_, _s)) -> true
-    | (Patt_string (Some spred), String (_, s)) -> spred s
-    | (Patt_bytes None, Bytes (_, _b)) -> true
-    | (Patt_bytes (Some bpred), Bytes (_, s)) -> bpred s
-    | (Patt_prim (hpred, subpatts), Prim (_, head, subterms, _)) -> (
+    | Patt_focus patt, _ -> pattern_matches_aux patt node
+    | Patt_any, _ -> true
+    | Patt_int None, Int (_, _z) -> true
+    | Patt_int (Some zpred), Int (_, z) -> zpred z
+    | Patt_string None, String (_, _s) -> true
+    | Patt_string (Some spred), String (_, s) -> spred s
+    | Patt_bytes None, Bytes (_, _b) -> true
+    | Patt_bytes (Some bpred), Bytes (_, s) -> bpred s
+    | Patt_prim (hpred, subpatts), Prim (_, head, subterms, _) -> (
         match hpred with
         | Patt_head_equal h ->
             if X.compare h head = 0 then list_matches subpatts subterms
             else false
         | Patt_pred pred ->
             if pred head then list_matches subpatts subterms else false)
-    | (Patt_seq subpatts, Seq (_, subterms)) -> list_matches subpatts subterms
+    | Patt_seq subpatts, Seq (_, subterms) -> list_matches subpatts subterms
     | _ -> false
 
   and list_matches : type f. (X.t, f) pattern_list -> node list -> bool =
    fun patts nodes ->
     match (patts, nodes) with
-    | (Patt_list_any, _) -> true
-    | (Patt_list_empty, []) -> true
-    | (Patt_list_empty, _ :: _) -> false
-    | (Patt_list_cons (_, _, _), []) -> false
-    | (Patt_list_cons (p, lpatt, _), n :: lnodes) ->
+    | Patt_list_any, _ -> true
+    | Patt_list_empty, [] -> true
+    | Patt_list_empty, _ :: _ -> false
+    | Patt_list_cons (_, _, _), [] -> false
+    | Patt_list_cons (p, lpatt, _), n :: lnodes ->
         pattern_matches_aux p n && list_matches lpatt lnodes
 
   let pattern_matches (patt : t) (node : node) =
@@ -218,7 +218,7 @@ struct
     | Int _ | String _ | Bytes _ ->
         if pattern_matches patt node then position :: acc else acc
     | Prim (_, _, subterms, _) | Seq (_, subterms) ->
-        let (_, acc) =
+        let _, acc =
           List.fold_left
             (fun (index, acc) subterm ->
               let position = Path.at_index index position in
@@ -361,7 +361,7 @@ end = struct
         | Int _ | String _ | Bytes _ ->
             if pattern_matches patt node then position :: acc else acc
         | Prim (_, _, subterms, _) | Seq (_, subterms) ->
-            let (_, acc) =
+            let _, acc =
               List.fold_left
                 (fun (index, acc) subterm ->
                   let position = Path.at_index index position in

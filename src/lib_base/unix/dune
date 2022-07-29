@@ -12,12 +12,13 @@
   tezos-hacl
   tezos-stdlib
   tezos-stdlib-unix
-  data-encoding)
+  data-encoding
+  uri)
  (flags
-  (:standard
-   -open Tezos_error_monad
-   -open Tezos_crypto
-   -open Tezos_base
-   -open Tezos_stdlib
-   -open Tezos_stdlib_unix
-   -open Data_encoding)))
+  (:standard)
+  -open Tezos_error_monad
+  -open Tezos_crypto
+  -open Tezos_base
+  -open Tezos_stdlib
+  -open Tezos_stdlib_unix
+  -open Data_encoding))

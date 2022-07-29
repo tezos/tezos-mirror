@@ -108,6 +108,10 @@ val default_arg :
 val switch :
   doc:string -> ?short:char -> long:string -> unit -> (bool, 'ctx) arg
 
+(** Map a function over the result of a parsed argument. *)
+val map_arg :
+  f:('ctx -> 'a -> 'b tzresult Lwt.t) -> ('a, 'ctx) arg -> ('b, 'ctx) arg
+
 (** {2 Groups of Optional Arguments} *)
 
 (** Defines a group of options, either the global options or the
@@ -443,6 +447,9 @@ val args19 :
     'ctx )
   options
 
+(** Aggregate a set of options into a single value. *)
+val aggregate : ('a, 'ctx) options -> ('a, 'ctx) arg
+
 (** {2 Parameter based command lines} *)
 
 (** Type of parameters for a command *)
@@ -569,6 +576,10 @@ val setup_formatter : Format.formatter -> format -> verbosity -> formatter_state
 val restore_formatter : Format.formatter -> formatter_state -> unit
 
 (** {2 Parsing and error reporting} *)
+
+(* FIXME: #2935 Add documentation about failures in [Clic]
+   The documentation should mention what happens if the functions fail.
+*)
 
 (** Help error (not really an error), thrown by {!dispatch} and {!parse_global_options}. *)
 type error += Help : _ command option -> error

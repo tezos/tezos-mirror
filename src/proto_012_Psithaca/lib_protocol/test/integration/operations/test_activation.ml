@@ -95,7 +95,7 @@ let secrets () =
   in
   List.map
     (fun (mnemonic, secret, amount, pkh, password, email) ->
-      let (pkh', pk, sk) = read_key mnemonic email password in
+      let pkh', pk, sk = read_key mnemonic email password in
       let pkh = Signature.Public_key_hash.of_b58check_exn pkh in
       assert (Signature.Public_key_hash.equal pkh pkh') ;
       let account = Account.{pkh; pk; sk} in

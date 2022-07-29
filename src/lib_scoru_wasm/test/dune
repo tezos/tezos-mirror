@@ -1,0 +1,23 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name test_scoru_wasm)
+ (libraries
+  tezos-base
+  tezos-base.unix
+  tezos-context.disk
+  tezos-base-test-helpers
+  tezos-test-helpers
+  tezos-scoru-wasm
+  qcheck-alcotest
+  alcotest-lwt)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base_test_helpers))
+
+(rule
+ (alias runtest)
+ (package tezos-scoru-wasm-test)
+ (action (run %{dep:./test_scoru_wasm.exe})))

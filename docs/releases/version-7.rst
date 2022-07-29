@@ -68,7 +68,7 @@ Multinetwork Node
 
 The node can now be used with any network, including Mainnet (the
 default network) and test networks such as Carthagenet or even custom
-ones. See the :ref:`multinetwork` documentation page for more information.
+ones. See the :doc:`../user/multinetwork` documentation page for more information.
 
 Thanks to this, the same release can be used for all networks
 instead of having one branch per network. This allows to name this release

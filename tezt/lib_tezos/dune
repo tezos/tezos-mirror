@@ -10,9 +10,10 @@
   uri
   hex
   tezos-base
-  tezos-base.unix)
+  tezos-base.unix
+  cohttp-lwt-unix)
  (flags
-  (:standard
-   -open Tezt
-   -open Tezt.Base
-   -open Tezt_performance_regression)))
+  (:standard)
+  -open Tezt
+  -open Tezt.Base
+  -open Tezt_performance_regression))

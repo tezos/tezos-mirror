@@ -398,7 +398,7 @@ module Delegate_sampler_state :
   Indexed_data_storage
     with type key = Cycle_repr.t
      and type value =
-          (Signature.Public_key.t * Signature.Public_key_hash.t) Sampler.t
+      (Signature.Public_key.t * Signature.Public_key_hash.t) Sampler.t
      and type t := Raw_context.t
 
 (** Votes *)
@@ -466,11 +466,21 @@ module type FOR_CYCLE = sig
 
   val get : Raw_context.t -> Cycle_repr.t -> Seed_repr.seed tzresult Lwt.t
 
+  val update :
+    Raw_context.t ->
+    Cycle_repr.t ->
+    Seed_repr.seed ->
+    Seed_repr.seed_status ->
+    Raw_context.t tzresult Lwt.t
+
   val remove_existing :
     Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 end
 
 (** Seed *)
+
+module Seed_status :
+  Simple_single_data_storage with type value = Seed_repr.seed_status
 
 module Seed : sig
   (** Storage from this submodule must only be accessed through the
@@ -491,7 +501,14 @@ module Seed : sig
        and type value := nonce_status
        and type t := Raw_context.t
 
+  module VDF_setup :
+    Single_data_storage
+      with type value = Seed_repr.vdf_setup
+       and type t := Raw_context.t
+
   module For_cycle : FOR_CYCLE
+
+  val get_status : Raw_context.t -> Seed_repr.seed_status tzresult Lwt.t
 end
 
 (** Commitments *)
@@ -548,7 +565,7 @@ module Liquidity_baking : sig
   module Cpmm_address :
     Single_data_storage
       with type t := Raw_context.t
-       and type value = Contract_repr.t
+       and type value = Contract_hash.t
 end
 
 (** A map of [Script_repr.expr] values, indexed by their hash ([Script_expr_hash.t]).
@@ -666,35 +683,42 @@ module Sc_rollup : sig
 
       - a PVM kind (provided at creation time, read-only)
       - a boot sector (provided at creation time, read-only)
+      - a parameters type specifying the types of parameters the rollup accepts
       - the L1 block level at which the rollup was created
       - a merkelized inbox, of which only the root hash is stored
       - a tree of commitments, rooted at the last cemented commitment
       - a map from stakers to commitments
-      - a map from commitments to the time (level) of its first insertion
+      - a map from commitments to the time (level) of their first insertion
 
       For performance reasons we also store (per rollup):
 
       - the total number of active stakers;
       - the number of stakers per commitment.
 
-      See module comments for details.
+      See module {!Sc_rollup_repr.Commitment} for details.
   *)
   module PVM_kind :
-    Indexed_data_storage
+    Non_iterable_indexed_carbonated_data_storage
       with type key = Sc_rollup_repr.t
-       and type value = Sc_rollup_repr.Kind.t
+       and type value = Sc_rollups.Kind.t
        and type t := Raw_context.t
 
   module Boot_sector :
-    Indexed_data_storage
+    Non_iterable_indexed_carbonated_data_storage
       with type key = Sc_rollup_repr.t
        and type value = string
        and type t := Raw_context.t
 
-  module Initial_level :
+  module Parameters_type :
+    Non_iterable_indexed_carbonated_data_storage
+      with type key = Sc_rollup_repr.t
+       and type value = Script_repr.lazy_expr
+       and type t := Raw_context.t
+
+  module Genesis_info :
     Indexed_data_storage
       with type key = Sc_rollup_repr.t
-       and type value = Raw_level_repr.t
+       and type value = Sc_rollup_commitment_repr.genesis_info
        and type t := Raw_context.t
 
   module Inbox :
@@ -706,14 +730,24 @@ module Sc_rollup : sig
   module Last_cemented_commitment :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Sc_rollup_repr.t
-       and type value = Sc_rollup_repr.Commitment_hash.t
+       and type value = Sc_rollup_commitment_repr.Hash.t
        and type t := Raw_context.t
 
   module Stakers :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Signature.Public_key_hash.t
-       and type value = Sc_rollup_repr.Commitment_hash.t
+       and type value = Sc_rollup_commitment_repr.Hash.t
        and type t = Raw_context.t * Sc_rollup_repr.t
+
+  (** [stakers ctxt rollup] returns all the stakers over [rollup] with
+      their related commitment. *)
+  val stakers :
+    Raw_context.t ->
+    Sc_rollup_repr.t ->
+    (Raw_context.t
+    * (Signature.Public_key_hash.t * Sc_rollup_commitment_repr.Hash.t) list)
+    tzresult
+    Lwt.t
 
   (** Cache: This should always be the number of entries in [Stakers].
 
@@ -729,8 +763,8 @@ module Sc_rollup : sig
 
   module Commitments :
     Non_iterable_indexed_carbonated_data_storage
-      with type key = Sc_rollup_repr.Commitment_hash.t
-       and type value = Sc_rollup_repr.Commitment.t
+      with type key = Sc_rollup_commitment_repr.Hash.t
+       and type value = Sc_rollup_commitment_repr.t
        and type t = Raw_context.t * Sc_rollup_repr.t
 
   (** Cache: This should always be the number of stakers that are directly or
@@ -755,13 +789,87 @@ module Sc_rollup : sig
    *)
   module Commitment_stake_count :
     Non_iterable_indexed_carbonated_data_storage
-      with type key = Sc_rollup_repr.Commitment_hash.t
+      with type key = Sc_rollup_commitment_repr.Hash.t
        and type value = int32
        and type t = Raw_context.t * Sc_rollup_repr.t
 
   module Commitment_added :
     Non_iterable_indexed_carbonated_data_storage
-      with type key = Sc_rollup_repr.Commitment_hash.t
+      with type key = Sc_rollup_commitment_repr.Hash.t
        and type value = Raw_level_repr.t
        and type t = Raw_context.t * Sc_rollup_repr.t
+
+  (** Refutation games are indexed by the rollup and the pair of
+      competing stakers. The staker pair should always be in lexical
+      order to ensure that games are not duplicated.
+  *)
+  module Game :
+    Non_iterable_indexed_carbonated_data_storage
+      with type key = Sc_rollup_game_repr.Index.t
+       and type value = Sc_rollup_game_repr.t
+       and type t = Raw_context.t * Sc_rollup_repr.t
+
+  (** [Game_timeout] stores the block level at which the staker whose
+      turn it is to move will (become vulnerable to) timeout. The staker
+      pair should always be in lexical order to ensure that this value is
+      not duplicated.
+  *)
+  module Game_timeout :
+    Non_iterable_indexed_carbonated_data_storage
+      with type key = Sc_rollup_game_repr.Index.t
+       and type value = Raw_level_repr.t
+       and type t = Raw_context.t * Sc_rollup_repr.t
+
+  (** [Opponent] stores the current opponent of the staker. This is
+      mainly used to enforce the requirement that each staker should
+      only play one refutation game at a time. It will also be useful
+      for searching for current game by staker.
+  *)
+  module Opponent :
+    Non_iterable_indexed_carbonated_data_storage
+      with type key = Signature.Public_key_hash.t
+       and type value = Sc_rollup_repr.Staker.t
+       and type t = Raw_context.t * Sc_rollup_repr.t
+
+  (** A carbonated storage for keeping track of applied outbox messages for a
+      a SCORU.
+
+      The [key] is an [int32] value that represents the index of a SCORU's
+      outbox level. An outbox level is mapped to the index through:
+
+      [index = outbox_level % sc_rollup_max_active_outbox_levels]
+
+      The rationale is to keep a limited number of entries. The current value of
+      an entry contains the most recently added level that maps to the index.
+
+      The [value] is a pair of the actual outbox level and a bitset containing
+      the set of applied messages.
+    *)
+  module Applied_outbox_messages :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t = Raw_context.t * Sc_rollup_repr.t
+       and type key = int32
+       and type value = Raw_level_repr.t * Bitset.t
+
+  (** An indexed data storage for keeping track of dal slots to which
+      a rollup is subscribed to a given level.
+
+      The [key] is a pair [(rollup, level)], and the [value] is a [Bitset.t]
+      representation of all the slot indices to which [rollup] has subscribed
+      to, as of level [level]. Only entries at levels for which there is a
+      change in the dal slot subscriptions are kept in this map.
+    *)
+  module Slot_subscriptions :
+    Indexed_data_storage
+      with type t = Raw_context.t * Sc_rollup_repr.t
+       and type key = Raw_level_repr.t
+       and type value = Bitset.t
+end
+
+module Dal : sig
+  module Slot_headers :
+    Non_iterable_indexed_data_storage
+      with type t = Raw_context.t
+       and type key = Raw_level_repr.t
+       and type value = Dal_slot_repr.slot list
 end

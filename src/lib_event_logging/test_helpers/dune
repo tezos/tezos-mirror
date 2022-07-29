@@ -1,8 +1,6 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(env (_ (binaries (%{workspace_root}/src/tooling/node_wrapper.exe as node))))
-
 (library
  (name tezos_event_logging_test_helpers)
  (public_name tezos-event-logging-test-helpers)
@@ -17,7 +15,7 @@
  (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_error_monad
-   -open Tezos_error_monad.TzLwtreslib
-   -open Tezos_event_logging)))
+  (:standard)
+  -open Tezos_error_monad
+  -open Tezos_error_monad.TzLwtreslib
+  -open Tezos_event_logging))

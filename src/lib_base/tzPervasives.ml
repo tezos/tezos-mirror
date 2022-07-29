@@ -90,3 +90,11 @@ module Filename = struct
 end
 
 module Bounded = Bounded
+
+module Empty = struct
+  type t = |
+
+  let get_ok : ('a, t) result -> 'a = function Ok a -> a | Error _ -> .
+
+  let absurd : t -> 'a = function _ -> .
+end

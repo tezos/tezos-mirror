@@ -64,7 +64,7 @@ let check_connections_above_cap () =
     ~title:"CLI above connections cap"
     ~tags:["cli"; "connections"; "bad"]
   @@ fun () ->
-  let (has_failed, on_failure) = Lwt.task () in
+  let has_failed, on_failure = Lwt.task () in
   let node = Node.create [] in
   let* _node =
     Node.run

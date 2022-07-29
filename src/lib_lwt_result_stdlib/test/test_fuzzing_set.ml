@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Test_fuzzing_tests
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
 
 module IntSet : Support.Lib.Set.S with type elt = int = struct
   include Support.Lib.Set.Make (Int)
@@ -57,7 +57,7 @@ module SetWithBase = struct
 end
 
 module type F = functor (S : module type of SetWithBase) -> sig
-  val tests : QCheck.Test.t list
+  val tests : QCheck2.Test.t list
 end
 
 let wrap (name, (module Test : F)) =

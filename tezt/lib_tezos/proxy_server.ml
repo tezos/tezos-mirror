@@ -101,7 +101,7 @@ let create ?runner ?name ?rpc_port ?(args = []) node =
       args
     |> List.concat
   in
-  let (arguments, rpc_port) =
+  let arguments, rpc_port =
     connection_arguments_and_port ?rpc_port node |> fun (args, rpc_port) ->
     (args @ user_arguments, rpc_port)
   in
@@ -141,7 +141,7 @@ let wait_for_ready t =
   match t.status with
   | Running {session_state = {ready = true}; _} -> unit
   | Not_running | Running {session_state = {ready = false}; _} ->
-      let (promise, resolver) = Lwt.task () in
+      let promise, resolver = Lwt.task () in
       t.persistent_state.pending_ready <-
         resolver :: t.persistent_state.pending_ready ;
       check_event t "starting_proxy_rpc_server.v0" promise

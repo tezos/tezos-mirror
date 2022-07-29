@@ -8,14 +8,29 @@ The code can be found in the :src:`src/proto_alpha` directory of the
 ``master`` branch of Tezos.
 
 This page documents the changes brought by protocol Alpha with respect
-to Protocol J.
+to Kathmandu.
 
 .. contents::
 
-Smart Contract Optimistic Rollups
+New Environment Version (V7)
+----------------------------
+
+This protocol requires a different protocol environment than Kathmandu.
+It requires protocol environment V7, compared to V6 for Kathmandu.
+
+Smart Contract Optimistic Rollups (ongoing)
+-------------------------------------------
+
+Rollups supporting execution of smart contracts. (MRs :gl:`!5603`, :gl:`!5606`,
+:gl:`!5447`, :gl:`!5655`, :gl:`!5660`, :gl:`!5680`, :gl:`!5598`, :gl:`!5677`,
+:gl:`!5646`, :gl:`!5686`, :gl:`!5693`, :gl:`!5623`, :gl:`!5687`, :gl:`!5714`,
+:gl:`!5689`, :gl:`!5708`, :gl:`!5565`, :gl:`!5561`, :gl:`!5567`, :gl:`!5332`,
+:gl:`!5628`, :gl:`!5754`, :gl:`!5736`, :gl:`!5784`)
+
+Data Availability Layer (ongoing)
 ---------------------------------
 
-Rollups supporting execution of smart contracts. (MRs :gl:`!4933`, :gl:`!4812`)
+Distribution of rollup operations data off-chain. (MRs :gl:`!5711`)
 
 Breaking Changes
 ----------------
@@ -23,11 +38,8 @@ Breaking Changes
 RPC Changes
 -----------
 
-- Add a new RPC for querying data found on the voting listings for a
-  delegate, i.e. voting power, casted ballots and proposals in the
-  current voting period.  (MR :gl:`!4577`)
-
-  ``/chains/<chain_id>/blocks/<block>/context/delegates/<delegate_pkh>/voting_info``
+Operation receipts
+------------------
 
 Bug Fixes
 ---------
@@ -35,16 +47,16 @@ Bug Fixes
 Minor Changes
 -------------
 
+- Split internal transactions. (MR :gl:`!5585`)
+
 Internal
 --------
 
-- Make carbonated maps available to the Raw context (MRs :gl:`!4815`, `!4891`)
+- Get rid of unparsing_mode. (MR :gl:`!5738`)
 
-- Move Michelson representation modules above the Alpha_context abstraction
-  barrier. (MR :gl:`!4418`)
+- Rename internal operation definitions. (MR :gl:`!5737`)
 
-- Further cleanup on Tenderbake code. (MR :gl:`!4513`)
+- Remove Coq attributes. (MR :gl:`!5735`)
 
-- Add Raw_carbonated_map. (MR :gl:`!4815`)
-
-- Other internal refactorings or documentation. (MRs :gl:`!4890`, :gl:`!4721`)
+- Internal refactorings in Michelson typechecker and interpreter. (MRs
+  :gl:`!5586`, :gl:`!5587`)

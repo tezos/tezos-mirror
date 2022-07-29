@@ -47,7 +47,7 @@ let check_node_initialization (history_mode : Node.history_mode) :
   let* client = Client.init ~endpoint:(Node node) () in
   let* () = Client.activate_protocol ~protocol client in
   Log.info "Activated protocol." ;
-  let* () = repeat 10 (fun () -> Client.bake_for client) in
+  let* () = repeat 10 (fun () -> Client.bake_for_and_wait client) in
   Log.info "Baked 10 blocks." ;
   let* level = Node.wait_for_level node 11 in
   Log.info "Level is now %d." level ;

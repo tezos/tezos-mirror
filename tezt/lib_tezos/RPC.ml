@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,790 +23,323 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let get_connections ?endpoint ?hooks ?peer_id client =
-  match peer_id with
-  | None ->
-      let path = ["network"; "connections"] in
-      Client.rpc ?endpoint ?hooks GET path client
-  | Some peer_id ->
-      let path = ["network"; "connections"; peer_id] in
-      Client.rpc ?endpoint ?hooks GET path client
+include RPC_core
+include RPC_legacy
 
-let get_greylist_ips ?hooks client =
-  let path = ["network"; "greylist"; "ips"] in
-  Client.rpc ?hooks GET path client
+let get_config = make GET ["config"] Fun.id
 
-let get_chain_id ?endpoint ?hooks ?(chain = "main") client =
-  let path = ["chains"; chain; "chain_id"] in
-  Client.rpc ?endpoint ?hooks GET path client
-
-let get_block ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
-  let path = ["chains"; chain; "blocks"; block] in
-  Client.rpc ?endpoint ?hooks GET path client
-
-let get_block_hash ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
-  let path = ["chains"; chain; "blocks"; block; "hash"] in
-  let* json = Client.rpc ?endpoint ?hooks GET path client in
-  return (JSON.as_string json)
-
-let get_block_metadata ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    client =
-  let path = ["chains"; chain; "blocks"; block; "metadata"] in
-  Client.rpc ?endpoint ?hooks GET path client
-
-let force_bootstrapped ?endpoint ?hooks ?(chain = "main") ?(bootstrapped = true)
-    client =
-  let path = ["chains"; chain] in
-  let data = `O [("bootstrapped", `Bool bootstrapped)] in
-  Client.rpc ?endpoint ?hooks ~data PATCH path client
-
-let is_bootstrapped ?endpoint ?hooks ?(chain = "main") client =
-  let path = ["chains"; chain; "is_bootstrapped"] in
-  Client.rpc ?endpoint ?hooks GET path client
-
-let get_checkpoint ?endpoint ?hooks ?(chain = "main") client =
-  let path = ["chains"; chain; "levels"; "checkpoint"] in
-  Client.rpc ?endpoint ?hooks GET path client
-
-let get_savepoint ?endpoint ?hooks ?(chain = "main") client =
-  let path = ["chains"; chain; "levels"; "savepoint"] in
-  Client.rpc ?endpoint ?hooks GET path client
-
-let get_caboose ?endpoint ?hooks ?(chain = "main") client =
-  let path = ["chains"; chain; "levels"; "caboose"] in
-  Client.rpc ?endpoint ?hooks GET path client
-
-let raw_protocol_data ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    client =
-  let path =
-    ["chains"; chain; "blocks"; block; "header"; "protocol_data"; "raw"]
+let get_network_connections =
+  make GET ["network"; "connections"] @@ fun json ->
+  let decode_connection json =
+    let id_point = JSON.(json |-> "id_point") in
+    ( JSON.(id_point |-> "addr" |> as_string),
+      JSON.(id_point |-> "port" |> as_int) )
   in
-  Lwt.(Client.rpc ?endpoint ?hooks GET path client >|= JSON.as_string)
+  List.map decode_connection (JSON.as_list json)
 
-let get_protocol_data ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    ?(offset = 0) client =
-  let path = ["chains"; chain; "blocks"; block; "header"; "protocol_data"] in
-  let query_string = [("offset", string_of_int offset)] in
-  Client.rpc ?endpoint ?hooks GET path ~query_string client
+let get_network_connection peer_id =
+  make GET ["network"; "connections"; peer_id] @@ fun json ->
+  let id_point = JSON.(json |-> "id_point") in
+  (JSON.(id_point |-> "addr" |> as_string), JSON.(id_point |-> "port" |> as_int))
 
-let get_branch ?(offset = 2) ?endpoint ?hooks ?(chain = "main") client =
-  (* By default, we use offset = 2 for Tenderbake, to pick the latest finalized
-     branch *)
-  let block = sf "head~%d" offset in
-  let path = ["chains"; chain; "blocks"; block; "hash"] in
-  Client.rpc ?endpoint ?hooks GET path client
-
-let get_operations ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
-  let path = ["chains"; chain; "blocks"; block; "operations"] in
-  Client.rpc ?endpoint ?hooks GET path client
-
-let get_mempool_pending_operations ?endpoint ?hooks ?(chain = "main") ?version
-    ?applied ?branch_delayed ?branch_refused ?refused ?outdated client =
-  let path = ["chains"; chain; "mempool"; "pending_operations"] in
-  let query_parameter param param_s =
-    match param with
-    | None -> []
-    | Some true -> [(param_s, "true")]
-    | Some false -> [(param_s, "false")]
-  in
+let post_private_injection_operations ?(force = false) ?(async = false) ~ops ()
+    =
   let query_string =
-    (match version with None -> [] | Some v -> [("version", v)])
-    @ query_parameter applied "applied"
-    @ query_parameter refused "refused"
-    @ query_parameter outdated "outdated"
-    @ query_parameter branch_delayed "branch_delayed"
-    @ query_parameter branch_refused "branch_refused"
+    [("async", string_of_bool async); ("force", string_of_bool force)]
   in
-  Client.rpc ?endpoint ?hooks ~query_string GET path client
+  let data = `A (List.map (fun (`Hex op) -> `String op) ops) in
+  make ~data ~query_string POST ["private"; "injection"; "operations"]
+  @@ fun json ->
+  JSON.(json |> as_list |> List.map (fun json -> `OpHash (JSON.as_string json)))
 
-let mempool_request_operations ?endpoint ?(chain = "main") ?peer client =
-  let path = ["chains"; chain; "mempool"; "request_operations"] in
-  Client.rpc
-    ?endpoint
+let get_network_self = make GET ["network"; "self"] JSON.as_string
+
+let get_network_greylist_ips = make GET ["network"; "greylist"; "ips"] Fun.id
+
+let get_network_greylist_clear =
+  make GET ["network"; "greylist"; "clear"] Fun.id
+
+let get_network_peers =
+  make GET ["network"; "peers"] @@ fun json ->
+  JSON.(json |> as_list |> List.map @@ fun p -> (p |=> 0 |> as_string, p |=> 1))
+
+let get_network_peer peer_id = make GET ["network"; "peers"; peer_id] Fun.id
+
+let get_network_peer_ban peer_id =
+  make GET ["network"; "peers"; peer_id; "ban"] Fun.id
+
+let get_network_peer_banned peer_id =
+  make GET ["network"; "peers"; peer_id; "banned"] Fun.id
+
+let get_network_peer_unban peer_id =
+  make GET ["network"; "peers"; peer_id; "unban"] Fun.id
+
+let get_chain_blocks ?(chain = "main") () =
+  make GET ["chains"; chain; "blocks"] Fun.id
+
+let get_chain_invalid_blocks ?(chain = "main") () =
+  make GET ["chains"; chain; "invalid_blocks"] Fun.id
+
+let get_chain_block_header_raw ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "header"; "raw"] Fun.id
+
+let get_chain_block_live_blocks ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "live_blocks"] Fun.id
+
+let decode_operation_hashes json = JSON.(json |> as_list |> List.map as_string)
+
+let get_chain_block_operation_hashes ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "operation_hashes"] (fun json ->
+      JSON.(json |> as_list |> List.map @@ decode_operation_hashes))
+
+let get_chain_block_operation_hashes_of_validation_pass ?(chain = "main")
+    ?(block = "head") validation_pass =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "operation_hashes";
+      string_of_int validation_pass;
+    ]
+    decode_operation_hashes
+
+let get_chain_block_operation_hash ?(chain = "main") ?(block = "head")
+    ~validation_pass ~operation_offset () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "operation_hashes";
+      string_of_int validation_pass;
+      string_of_int operation_offset;
+    ]
+    JSON.as_string
+
+let get_chain_block_helper_complete ?(chain = "main") ?(block = "head") prefix =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "helpers"; "complete"; prefix]
+    Fun.id
+
+let get_chain_block_context_nonce ?(chain = "main") ?(block = "head")
+    block_level =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "nonces";
+      string_of_int block_level;
+    ]
+    Fun.id
+
+let get_network_peer_untrust peer_id =
+  make GET ["network"; "peers"; peer_id; "untrust"] Fun.id
+
+let get_network_peer_trust peer_id =
+  make GET ["network"; "peers"; peer_id; "trust"] Fun.id
+
+let get_network_points =
+  make GET ["network"; "points"] @@ fun json ->
+  JSON.(json |> as_list |> List.map @@ fun p -> (p |=> 0 |> as_string, p |=> 1))
+
+let get_network_point point_id = make GET ["network"; "points"; point_id] Fun.id
+
+let get_network_point_ban point_id =
+  make GET ["network"; "points"; point_id; "ban"] Fun.id
+
+let get_network_point_banned point_id =
+  make GET ["network"; "points"; point_id; "banned"] Fun.id
+
+let get_network_point_unban point_id =
+  make GET ["network"; "points"; point_id; "unban"] Fun.id
+
+let get_network_point_untrust point_id =
+  make GET ["network"; "points"; point_id; "untrust"] Fun.id
+
+let get_network_point_trust point_id =
+  make GET ["network"; "points"; point_id; "trust"] Fun.id
+
+let get_network_stat = make GET ["network"; "stat"] Fun.id
+
+let get_network_version = make GET ["network"; "version"] Fun.id
+
+let get_network_versions = make GET ["network"; "versions"] Fun.id
+
+let post_injection_operation ?(async = false) data =
+  make
     POST
-    path
-    ~query_string:(match peer with None -> [] | Some p -> [("peer_id", p)])
-    client
+    ["injection"; "operation"]
+    ~query_string:(if async then [("async", "")] else [])
+    ~data
+    Fun.id
 
-let mempool_ban_operation ?endpoint ?(chain = "main") ~data client =
-  let path = ["chains"; chain; "mempool"; "ban_operation"] in
-  Client.rpc ?endpoint ~data POST path client
+let post_private_injection_operation ?(async = false) data =
+  make
+    POST
+    ["private"; "injection"; "operation"]
+    ~query_string:(if async then [("async", "")] else [])
+    ~data
+    Fun.id
 
-let mempool_unban_operation ?endpoint ?(chain = "main") ~data client =
-  let path = ["chains"; chain; "mempool"; "unban_operation"] in
-  Client.rpc ?endpoint ~data POST path client
-
-let mempool_unban_all_operations ?endpoint ?(chain = "main") client =
-  let path = ["chains"; chain; "mempool"; "unban_all_operations"] in
-  Client.rpc ?endpoint POST path client
-
-let get_mempool_filter ?endpoint ?hooks ?(chain = "main") ?include_default
-    client =
-  let path = ["chains"; chain; "mempool"; "filter"] in
-  let query_string =
-    Option.map
-      (fun b -> [("include_default", string_of_bool b)])
-      include_default
-  in
-  Client.rpc ?endpoint ?hooks ?query_string GET path client
-
-let post_mempool_filter ?endpoint ?hooks ?(chain = "main") ~data client =
-  let path = ["chains"; chain; "mempool"; "filter"] in
-  Client.rpc ?endpoint ?hooks ~data POST path client
-
-let preapply_block ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~data
-    client =
-  let path =
-    ["chains"; chain; "blocks"; block; "helpers"; "preapply"; "block"]
-  in
-  Client.rpc ?endpoint ?hooks ~data POST path client
-
-let inject_block ?endpoint ?hooks ~data client =
-  let path = ["injection"; "block"] in
-  Client.rpc ?endpoint ?hooks ~data POST path client
-
-let inject_operation ?endpoint ?hooks ?(async = false) ~data client =
-  let path = ["injection"; "operation"] in
-  let query_string = if async then [("async", "")] else [] in
-  Client.Spawn.rpc ?endpoint ?hooks ~query_string ~data POST path client
-
-let private_inject_operation ?endpoint ?hooks ?(async = false) ~data client =
-  let path = ["private"; "injection"; "operation"] in
-  let query_string = if async then [("async", "")] else [] in
-  Client.Spawn.rpc ?endpoint ?hooks ~query_string ~data POST path client
-
-let get_constants ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
-  let path = ["chains"; chain; "blocks"; block; "context"; "constants"] in
-  Client.rpc ?endpoint ?hooks GET path client
-
-let get_constants_errors ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    client =
-  let path =
-    ["chains"; chain; "blocks"; block; "context"; "constants"; "errors"]
-  in
-  Client.rpc ?endpoint ?hooks GET path client
-
-type ctxt_type = Bytes | Json
-
-let ctxt_type_to_string = function Bytes -> "bytes" | Json -> "json"
-
-let get_context_value ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    ?(ctxt_type = Json) ~value_path client =
-  let path =
-    [
-      "chains";
-      chain;
-      "blocks";
-      block;
-      "context";
-      "raw";
-      ctxt_type_to_string ctxt_type;
-    ]
-    @ value_path
-  in
-  Client.rpc ?endpoint ?hooks GET path client
-
-let get_baking_rights ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    ?delegate client =
-  let path = ["chains"; chain; "blocks"; block; "helpers"; "baking_rights"] in
-  let query_string = Option.map (fun d -> [("delegate", d)]) delegate in
-  Client.rpc ?endpoint ?hooks ?query_string GET path client
-
-let get_current_level ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    ?(offset = 0) client =
-  let path = ["chains"; chain; "blocks"; block; "helpers"; "current_level"] in
-  let query_string = [("offset", string_of_int offset)] in
-  Client.rpc ?endpoint ?hooks ~query_string GET path client
-
-let get_endorsing_rights ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    ?delegate client =
-  let path =
-    ["chains"; chain; "blocks"; block; "helpers"; "endorsing_rights"]
-  in
-  let query_string = Option.map (fun d -> [("delegate", d)]) delegate in
-  Client.rpc ?endpoint ?hooks ?query_string GET path client
-
-let get_levels_in_current_cycle ?endpoint ?hooks ?(chain = "main")
-    ?(block = "head") client =
-  let path =
-    ["chains"; chain; "blocks"; block; "helpers"; "levels_in_current_cycle"]
-  in
-  Client.rpc ?endpoint ?hooks GET path client
-
-let post_forge_operations ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    ~data client =
-  let path =
-    ["chains"; chain; "blocks"; block; "helpers"; "forge"; "operations"]
-  in
-  Client.rpc ?endpoint ?hooks ~data POST path client
-
-let post_run_operation ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    ~data client =
-  let path =
+let post_chain_block_helpers_scripts_run_operation ?(chain = "main")
+    ?(block = "head") ?(async = false) data =
+  make
+    POST
     ["chains"; chain; "blocks"; block; "helpers"; "scripts"; "run_operation"]
+    ~query_string:(if async then [("async", "")] else [])
+    ~data
+    Fun.id
+
+let get_chain_chain_id ?(chain = "main") () =
+  make GET ["chains"; chain; "chain_id"] JSON.as_string
+
+let get_chain_block ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block] Fun.id
+
+type block_metadata = {
+  protocol : string;
+  next_protocol : string;
+  proposer : string;
+  max_operations_ttl : int;
+  dal_slot_availability : bool Array.t option;
+}
+
+let get_chain_block_metadata ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "metadata"] @@ fun json ->
+  let dal_slot_availability =
+    match JSON.(json |-> "dal_slot_availability" |> as_string_opt) with
+    | None -> None
+    | Some slots ->
+        let slot_availability = Z.of_string slots in
+        let length = Z.numbits slot_availability in
+        let array = Array.make length false in
+        List.iter
+          (fun i -> if Z.testbit slot_availability i then array.(i) <- true)
+          (range 0 (length - 1)) ;
+        Some array
   in
-  Client.rpc ?endpoint ?hooks ~data POST path client
-
-let post_simulate_operation ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    ~data client =
-  let path =
-    [
-      "chains";
-      chain;
-      "blocks";
-      block;
-      "helpers";
-      "scripts";
-      "simulate_operation";
-    ]
+  let protocol = JSON.(json |-> "protocol" |> as_string) in
+  let next_protocol = JSON.(json |-> "next_protocol" |> as_string) in
+  let proposer =
+    match JSON.(json |-> "proposer" |> as_string_opt) with
+    | None -> (* This should be only for tests protocols *) ""
+    | Some proposer -> proposer
   in
-  Client.rpc ?endpoint ?hooks ~data POST path client
-
-module Big_maps = struct
-  let get ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~id ~key_hash
-      client =
-    let path =
-      ["chains"; chain; "blocks"; block; "context"; "big_maps"; id; key_hash]
-    in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~big_map_id
-      ?offset ?length client =
-    let path =
-      ["chains"; chain; "blocks"; block; "context"; "big_maps"; big_map_id]
-    in
-    let query_string =
-      [
-        Option.map (fun offset -> ("offset", Int.to_string offset)) offset;
-        Option.map (fun length -> ("length", Int.to_string length)) length;
-      ]
-      |> List.filter_map Fun.id
-    in
-    Client.Spawn.rpc ?endpoint ?hooks ~query_string GET path client
-end
-
-let get_ddb ?endpoint ?hooks ?(chain = "main") client =
-  let path = ["workers"; "chain_validators"; chain; "ddb"] in
-  Client.rpc ?endpoint ?hooks GET path client
-
-module Contracts = struct
-  let get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
-    let path = ["chains"; chain; "blocks"; block; "context"; "contracts"] in
-    Client.Spawn.rpc ?endpoint ?hooks GET path client
-
-  let get_all_delegates ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      client =
-    let path = ["chains"; chain; "blocks"; block; "context"; "delegates"] in
-    let* contracts = Client.rpc ?endpoint ?hooks GET path client in
-    return (JSON.as_list contracts |> List.map JSON.as_string)
-
-  let get ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~contract_id
-      client =
-    let path =
-      ["chains"; chain; "blocks"; block; "context"; "contracts"; contract_id]
-    in
-    Client.Spawn.rpc ?endpoint ?hooks GET path client
-
-  let sub_path ~chain ~block ~contract_id field =
-    [
-      "chains";
-      chain;
-      "blocks";
-      block;
-      "context";
-      "contracts";
-      contract_id;
-      field;
-    ]
-
-  let get_sub ?endpoint ?hooks ~chain ~block ~contract_id field client =
-    let path = sub_path ~chain ~block ~contract_id field in
-    Client.Spawn.rpc ?endpoint ?hooks GET path client
-
-  let get_balance ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "balance" client
-
-  let get_frozen_bonds ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "frozen_bonds" client
-
-  let get_balance_and_frozen_bonds ?endpoint ?hooks ?(chain = "main")
-      ?(block = "head") ~contract_id client =
-    get_sub
-      ?endpoint
-      ?hooks
-      ~chain
-      ~block
-      ~contract_id
-      "balance_and_frozen_bonds"
-      client
-
-  let big_map_get ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id ~data client =
-    let path = sub_path ~chain ~block ~contract_id "big_map_get" in
-    Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
-
-  let get_counter ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "counter" client
-
-  let get_delegate ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "delegate" client
-
-  let get_entrypoints ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "entrypoints" client
-
-  let get_manager_key ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "manager_key" client
-
-  let get_script ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "script" client
-
-  let get_storage ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "storage" client
-end
-
-module Delegates = struct
-  let spawn_get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head") client
-      =
-    let path = ["chains"; chain; "blocks"; block; "context"; "delegates"] in
-    Client.spawn_rpc ?endpoint ?hooks GET path client
-
-  let get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
-    let path = ["chains"; chain; "blocks"; block; "context"; "delegates"] in
-    let* contracts = Client.rpc ?endpoint ?hooks GET path client in
-    return (JSON.as_list contracts |> List.map JSON.as_string)
-
-  let spawn_get ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~pkh client
-      =
-    let path =
-      ["chains"; chain; "blocks"; block; "context"; "delegates"; pkh]
-    in
-    Client.spawn_rpc ?endpoint ?hooks GET path client
-
-  let get ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~pkh client =
-    let path =
-      ["chains"; chain; "blocks"; block; "context"; "delegates"; pkh]
-    in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let sub_path ~chain ~block ~pkh field =
-    ["chains"; chain; "blocks"; block; "context"; "delegates"; pkh; field]
-
-  let spawn_get_sub ?endpoint ?hooks ~chain ~block ~pkh field client =
-    let path = sub_path ~chain ~block ~pkh field in
-    Client.spawn_rpc ?endpoint ?hooks GET path client
-
-  let get_sub ?endpoint ?hooks ~chain ~block ~pkh field client =
-    let path = sub_path ~chain ~block ~pkh field in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let spawn_get_balance ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~pkh client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~pkh "balance" client
-
-  let get_balance ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~pkh
-      client =
-    get_sub ?endpoint ?hooks ~chain ~block ~pkh "balance" client
-
-  let spawn_get_full_balance ?endpoint ?hooks ?(chain = "main")
-      ?(block = "head") ~pkh client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~pkh "full_balance" client
-
-  let get_full_balance ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~pkh
-      client =
-    get_sub ?endpoint ?hooks ~chain ~block ~pkh "full_balance" client
-
-  let spawn_get_frozen_deposits ?endpoint ?hooks ?(chain = "main")
-      ?(block = "head") ~pkh client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~pkh "frozen_deposits" client
-
-  let get_frozen_deposits ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~pkh client =
-    get_sub ?endpoint ?hooks ~chain ~block ~pkh "frozen_deposits" client
-
-  let spawn_get_deactivated ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~pkh client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~pkh "deactivated" client
-
-  let get_deactivated ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~pkh
-      client =
-    get_sub ?endpoint ?hooks ~chain ~block ~pkh "deactivated" client
-
-  let spawn_get_delegated_balance ?endpoint ?hooks ?(chain = "main")
-      ?(block = "head") ~pkh client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~pkh "delegated_balance" client
-
-  let get_delegated_balance ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~pkh client =
-    get_sub ?endpoint ?hooks ~chain ~block ~pkh "delegated_balance" client
-
-  let spawn_get_delegated_contracts ?endpoint ?hooks ?(chain = "main")
-      ?(block = "head") ~pkh client =
-    spawn_get_sub
-      ?endpoint
-      ?hooks
-      ~chain
-      ~block
-      ~pkh
-      "delegated_contracts"
-      client
-
-  let get_delegated_contracts ?endpoint ?hooks ?(chain = "main")
-      ?(block = "head") ~pkh client =
-    get_sub ?endpoint ?hooks ~chain ~block ~pkh "delegated_contracts" client
-
-  let spawn_get_frozen_balance ?endpoint ?hooks ?(chain = "main")
-      ?(block = "head") ~pkh client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~pkh "frozen_balance" client
-
-  let get_frozen_balance ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~pkh client =
-    get_sub ?endpoint ?hooks ~chain ~block ~pkh "frozen_balance" client
-
-  let spawn_get_frozen_balance_by_cycle ?endpoint ?hooks ?(chain = "main")
-      ?(block = "head") ~pkh client =
-    spawn_get_sub
-      ?endpoint
-      ?hooks
-      ~chain
-      ~block
-      ~pkh
-      "frozen_balance_by_cycle"
-      client
-
-  let get_frozen_balance_by_cycle ?endpoint ?hooks ?(chain = "main")
-      ?(block = "head") ~pkh client =
-    get_sub ?endpoint ?hooks ~chain ~block ~pkh "frozen_balance_by_cycle" client
-
-  let spawn_get_grace_period ?endpoint ?hooks ?(chain = "main")
-      ?(block = "head") ~pkh client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~pkh "grace_period" client
-
-  let get_grace_period ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~pkh
-      client =
-    get_sub ?endpoint ?hooks ~chain ~block ~pkh "grace_period" client
-
-  let spawn_get_staking_balance ?endpoint ?hooks ?(chain = "main")
-      ?(block = "head") ~pkh client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~pkh "staking_balance" client
-
-  let get_staking_balance ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~pkh client =
-    get_sub ?endpoint ?hooks ~chain ~block ~pkh "staking_balance" client
-
-  let spawn_get_voting_power ?endpoint ?hooks ?(chain = "main")
-      ?(block = "head") ~pkh client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~pkh "voting_power" client
-
-  let get_voting_power ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~pkh
-      client =
-    get_sub ?endpoint ?hooks ~chain ~block ~pkh "voting_power" client
-end
-
-module Votes = struct
-  let sub_path ~chain ~block sub =
-    ["chains"; chain; "blocks"; block; "votes"; sub]
-
-  let get_ballot_list ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      client =
-    let path = sub_path ~chain ~block "ballot_list" in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_ballots ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
-    let path = sub_path ~chain ~block "ballots" in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_current_proposal ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      client =
-    let path = sub_path ~chain ~block "current_proposal" in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_current_quorum ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      client =
-    let path = sub_path ~chain ~block "current_quorum" in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_listings ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
-    let path = sub_path ~chain ~block "listings" in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_proposals ?endpoint ?hooks ?(chain = "main") ?(block = "head") client
-      =
-    let path = sub_path ~chain ~block "proposals" in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_current_period ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      client =
-    let path = sub_path ~chain ~block "current_period" in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_successor_period ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      client =
-    let path = sub_path ~chain ~block "successor_period" in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_total_voting_power ?endpoint ?hooks ?(chain = "main")
-      ?(block = "head") client =
-    let path = sub_path ~chain ~block "total_voting_power" in
-    Client.rpc ?endpoint ?hooks GET path client
-end
-
-module Script_cache = struct
-  let get_cached_contracts ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      client =
-    let path =
-      ["chains"; chain; "blocks"; block; "context"; "cache"; "contracts"; "all"]
-    in
-    Client.rpc ?endpoint ?hooks GET path client
-end
-
-module Tx_rollup = struct
-  let sub_path ?(chain = "main") ?(block = "head") ~rollup sub =
-    ["chains"; chain; "blocks"; block; "context"; "tx_rollup"; rollup] @ sub
-
-  let get_state ?endpoint ?hooks ?chain ?block ~rollup client =
-    let path = sub_path ?chain ?block ~rollup ["state"] in
-    Client.Spawn.rpc ?endpoint ?hooks GET path client
-
-  let get_inbox ?endpoint ?hooks ?chain ?block ~rollup ~level client =
-    let path =
-      sub_path ?chain ?block ~rollup ["inbox"; Format.sprintf "%d" level]
-    in
-    Client.Spawn.rpc ?endpoint ?hooks GET path client
-
-  let get_commitment ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~rollup ~level client =
-    let path =
-      sub_path ~chain ~block ~rollup ["commitment"; Format.sprintf "%d" level]
-    in
-    Client.Spawn.rpc ?endpoint ?hooks GET path client
-
-  let get_pending_bonded_commitments ?endpoint ?hooks ?(chain = "main")
-      ?(block = "head") ~rollup ~pkh client =
-    let path =
-      sub_path ~chain ~block ~rollup ["pending_bonded_commitments"; pkh]
-    in
-    Client.Spawn.rpc ?endpoint ?hooks GET path client
-
-  module Forge = struct
-    module Inbox = struct
-      let message_hash ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-          ~data client =
-        let path =
-          [
-            "chains";
-            chain;
-            "blocks";
-            block;
-            "helpers";
-            "forge";
-            "tx_rollup";
-            "inbox";
-            "message_hash";
-          ]
-        in
-        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
-
-      let merkle_tree_hash ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-          ~data client =
-        let path =
-          [
-            "chains";
-            chain;
-            "blocks";
-            block;
-            "helpers";
-            "forge";
-            "tx_rollup";
-            "inbox";
-            "merkle_tree_hash";
-          ]
-        in
-        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
-
-      let merkle_tree_path ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-          ~data client =
-        let path =
-          [
-            "chains";
-            chain;
-            "blocks";
-            block;
-            "helpers";
-            "forge";
-            "tx_rollup";
-            "inbox";
-            "merkle_tree_path";
-          ]
-        in
-        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
-    end
-
-    module Commitment = struct
-      let merkle_tree_hash ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-          ~data client =
-        let path =
-          [
-            "chains";
-            chain;
-            "blocks";
-            block;
-            "helpers";
-            "forge";
-            "tx_rollup";
-            "commitment";
-            "merkle_tree_hash";
-          ]
-        in
-        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
-
-      let merkle_tree_path ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-          ~data client =
-        let path =
-          [
-            "chains";
-            chain;
-            "blocks";
-            block;
-            "helpers";
-            "forge";
-            "tx_rollup";
-            "commitment";
-            "merkle_tree_path";
-          ]
-        in
-        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
-
-      let message_result_hash ?endpoint ?hooks ?(chain = "main")
-          ?(block = "head") ~data client =
-        let path =
-          [
-            "chains";
-            chain;
-            "blocks";
-            block;
-            "helpers";
-            "forge";
-            "tx_rollup";
-            "commitment";
-            "message_result_hash";
-          ]
-        in
-        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
-    end
-
-    module Withdraw = struct
-      let withdraw_list_hash ?endpoint ?hooks ?(chain = "main")
-          ?(block = "head") ~data client =
-        let path =
-          [
-            "chains";
-            chain;
-            "blocks";
-            block;
-            "helpers";
-            "forge";
-            "tx_rollup";
-            "withdraw";
-            "withdraw_list_hash";
-          ]
-        in
-        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
-    end
-  end
-end
+  let max_operations_ttl = JSON.(json |-> "max_operations_ttl" |> as_int) in
+  {dal_slot_availability; protocol; next_protocol; proposer; max_operations_ttl}
+
+let get_chain_block_hash ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "hash"] JSON.as_string
+
+let get_chain_block_header ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "header"] Fun.id
+
+let patch_chain_bootstrapped ?(chain = "main") bootstrapped =
+  make
+    PATCH
+    ["chains"; chain]
+    ~data:(`O [("bootstrapped", `Bool bootstrapped)])
+    ignore
+
+let get_chain_is_bootstrapped ?(chain = "main") () =
+  make GET ["chains"; chain; "is_bootstrapped"] @@ fun json ->
+  JSON.(json |-> "sync_state" |> as_string)
+
+type block_descriptor = {block_hash : string; level : int}
+
+let parse_block_descriptor json =
+  JSON.
+    {
+      block_hash = json |-> "block_hash" |> as_string;
+      level = json |-> "level" |> as_int;
+    }
+
+let get_chain_level_checkpoint ?(chain = "main") () =
+  make GET ["chains"; chain; "levels"; "checkpoint"] parse_block_descriptor
+
+let get_chain_level_savepoint ?(chain = "main") () =
+  make GET ["chains"; chain; "levels"; "savepoint"] parse_block_descriptor
+
+let get_chain_level_caboose ?(chain = "main") () =
+  make GET ["chains"; chain; "levels"; "caboose"] parse_block_descriptor
+
+let get_worker_block_validator = make GET ["workers"; "block_validator"] Fun.id
+
+let get_workers_chain_validators =
+  make GET ["workers"; "chain_validators"] Fun.id
+
+let get_worker_chain_validator ?(chain = "main") () =
+  make GET ["workers"; "chain_validators"; chain] Fun.id
+
+let get_worker_chain_validator_ddb ?(chain = "main") () =
+  make GET ["workers"; "chain_validators"; chain; "ddb"] Fun.id
+
+let get_worker_chain_validator_peers_validators ?(chain = "main") () =
+  make GET ["workers"; "chain_validators"; chain; "peers_validators"] Fun.id
+
+let get_workers_prevalidators = make GET ["workers"; "prevalidators"] Fun.id
+
+let get_worker_prevalidator ?(chain = "main") () =
+  make GET ["workers"; "prevalidators"; chain] Fun.id
+
+let get_errors = make GET ["errors"] Fun.id
+
+let get_protocol protocol_hash = make GET ["protocols"; protocol_hash] Fun.id
+
+let get_protocols =
+  make
+    GET
+    ["protocols"]
+    JSON.(fun json -> json |> as_list |> List.map as_string)
+
+let get_fetch_protocol protocol_hash =
+  make GET ["fetch_protocol"; protocol_hash] Fun.id
+
+let get_stats_gc = make GET ["stats"; "gc"] Fun.id
+
+let get_stats_memory = make GET ["stats"; "memory"] Fun.id
 
 module Sc_rollup = struct
   let root_path ~chain ~block =
     ["chains"; chain; "blocks"; block; "context"; "sc_rollup"]
 
-  let list ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
-    let path = root_path ~chain ~block in
-    Client.rpc ?endpoint ?hooks GET path client
+  let list ?(chain = "main") ?(block = "head") () =
+    make GET (root_path ~chain ~block) Fun.id
 
-  let path ~chain ~block ~sc_rollup_address =
+  let path ~chain ~block sc_rollup_address =
     root_path ~chain ~block @ [sc_rollup_address]
 
-  let get_inbox ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~sc_rollup_address client =
-    let path = path ~chain ~block ~sc_rollup_address @ ["inbox"] in
-    Client.rpc ?endpoint ?hooks GET path client
+  let get_inbox ?(chain = "main") ?(block = "head") sc_rollup_address =
+    make GET (path ~chain ~block sc_rollup_address @ ["inbox"]) Fun.id
 
-  let get_initial_level ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~sc_rollup_address client =
-    let path = path ~chain ~block ~sc_rollup_address @ ["initial_level"] in
-    Client.rpc ?endpoint ?hooks GET path client
-end
+  let get_genesis_info ?(chain = "main") ?(block = "head") sc_rollup_address =
+    make GET (path ~chain ~block sc_rollup_address @ ["genesis_info"]) Fun.id
 
-let raw_bytes ?endpoint ?hooks ?(chain = "main") ?(block = "head") ?(path = [])
-    client =
-  let path =
-    ["chains"; chain; "blocks"; block; "context"; "raw"; "bytes"] @ path
-  in
-  Client.rpc ?endpoint ?hooks GET path client
+  let get_boot_sector ?(chain = "main") ?(block = "head") sc_rollup_address =
+    make GET (path ~chain ~block sc_rollup_address @ ["boot_sector"]) Fun.id
 
-module Curl = struct
-  let curl_path_cache = ref None
+  let get_last_cemented_commitment_hash_with_level ?(chain = "main")
+      ?(block = "head") sc_rollup_address =
+    make
+      GET
+      (path ~chain ~block sc_rollup_address
+      @ ["last_cemented_commitment_hash_with_level"])
+      Fun.id
 
-  let get () =
-    Process.(
-      try
-        let* curl_path =
-          match !curl_path_cache with
-          | Some curl_path -> return curl_path
-          | None ->
-              let* curl_path =
-                run_and_read_stdout "sh" ["-c"; "command -v curl"]
-              in
-              let curl_path = String.trim curl_path in
-              curl_path_cache := Some curl_path ;
-              return curl_path
-        in
-        return
-        @@ Some
-             (fun ~url ->
-               let* output = run_and_read_stdout curl_path ["-s"; url] in
-               return (JSON.parse ~origin:url output))
-      with _ -> return @@ None)
-
-  let post () =
-    Process.(
-      try
-        let* curl_path =
-          match !curl_path_cache with
-          | Some curl_path -> return curl_path
-          | None ->
-              let* curl_path =
-                run_and_read_stdout "sh" ["-c"; "command -v curl"]
-              in
-              let curl_path = String.trim curl_path in
-              curl_path_cache := Some curl_path ;
-              return curl_path
-        in
-        return
-        @@ Some
-             (fun ~url data ->
-               let* output =
-                 run_and_read_stdout
-                   curl_path
-                   [
-                     "-X";
-                     "POST";
-                     "-H";
-                     "Content-Type: application/json";
-                     "-s";
-                     url;
-                     "-d";
-                     JSON.encode data;
-                   ]
-               in
-               return (JSON.parse ~origin:url output))
-      with _ -> return @@ None)
+  let get_staked_on_commitment ?(chain = "main") ?(block = "head") ~sc_rollup
+      staker =
+    make
+      GET
+      (path ~chain ~block sc_rollup @ ["staker"; staker; "staked_on_commitment"])
+      Fun.id
 end

@@ -604,10 +604,15 @@ module Interpreter_tests = struct
   let test_shielded_tez () =
     init () >>=? fun (genesis, baker, src0, src1) ->
     let memo_size = 8 in
-    originate_contract "contracts/sapling_contract.tz" "{ }" src0 genesis baker
+    originate_contract_hash
+      "contracts/sapling_contract.tz"
+      "{ }"
+      src0
+      genesis
+      baker
     >>=? fun (dst, b1, anti_replay) ->
     let wa = wallet_gen () in
-    let (list_transac, total) =
+    let list_transac, total =
       shield ~memo_size wa.sk 4 wa.vk (Format.sprintf "0x%s") anti_replay
     in
     let parameters = parameters_of_list list_transac in
@@ -615,7 +620,7 @@ module Interpreter_tests = struct
     transac_and_sync ~memo_size b1 parameters total src0 dst baker
     >>=? fun (b2, _state) ->
     (* we shield again on another block, forging with the empty state *)
-    let (list_transac, total) =
+    let list_transac, total =
       shield ~memo_size wa.sk 4 wa.vk (Format.sprintf "0x%s") anti_replay
     in
     let parameters = parameters_of_list list_transac in
@@ -642,13 +647,10 @@ module Interpreter_tests = struct
         (fun addr -> Tezos_sapling.Forge.make_output addr 1L (Bytes.create 8))
         list_addr
     in
-    (let pkh =
-       Alpha_context.Contract.is_implicit src1
-       |> WithExceptions.Option.get ~loc:__LOC__
-     in
+    (let pkh = Context.Contract.pkh src1 in
      (* dummy context used only for pack_data *)
      Block.alpha_context
-       [(Account.activator_account, Tez.of_mutez_exn 100_000_000_000L)]
+       [(Account.activator_account, Tez.of_mutez_exn 100_000_000_000L, None)]
      >>=? fun ctx ->
      Script_ir_translator.pack_data ctx Script_typed_ir.key_hash_t pkh >>= wrap)
     >>=? fun (bound_data, _) ->
@@ -723,10 +725,11 @@ module Interpreter_tests = struct
     (* Here we fail by doing the same transaction again*)
     Incremental.begin_construction b >>=? fun incr ->
     let fee = Test_tez.of_int 10 in
-    Op.transaction ~fee (B b) src0 dst Tez.zero ~parameters
+    let dst = Alpha_context.Contract.Originated dst in
+    Op.transaction ~gas_limit:Max ~fee (B b) src0 dst Tez.zero ~parameters
     >>=? fun operation ->
     Incremental.add_operation (* TODO make more precise *)
-      ~expect_failure:(fun _ -> return_unit)
+      ~expect_apply_failure:(fun _ -> return_unit)
       incr
       operation
     >>=? fun _incr ->
@@ -758,10 +761,10 @@ module Interpreter_tests = struct
     in
     Incremental.begin_construction b >>=? fun incr ->
     let fee = Test_tez.of_int 10 in
-    Op.transaction ~fee (B b) src0 dst Tez.zero ~parameters
+    Op.transaction ~gas_limit:Max ~fee (B b) src0 dst Tez.zero ~parameters
     >>=? fun operation ->
     Incremental.add_operation (* TODO make more precise *)
-      ~expect_failure:(fun _ -> return_unit)
+      ~expect_apply_failure:(fun _ -> return_unit)
       incr
       operation
     >>=? fun _incr -> return_unit
@@ -771,10 +774,15 @@ module Interpreter_tests = struct
     (* Originating a contract to get a sapling_state with ID 0, used in the next contract *)
     >>=?
     fun (block, baker, src, _) ->
-    originate_contract "contracts/sapling_contract.tz" "{ }" src block baker
+    originate_contract_hash
+      "contracts/sapling_contract.tz"
+      "{ }"
+      src
+      block
+      baker
     >>=? fun _ ->
     (* Originating the next contract should fail *)
-    originate_contract
+    originate_contract_hash
       "contracts/sapling_push_sapling_state.tz"
       "{ }"
       src
@@ -799,7 +807,7 @@ module Interpreter_tests = struct
     (* originate_contract "contracts/sapling_contract.tz" "{ }" src block baker
        >>=? fun (_shielded_pool_contract_address, block, _anti_replay_shielded_pool)
                 -> *)
-    originate_contract
+    originate_contract_hash
       "contracts/sapling_use_existing_state.tz"
       "{ }"
       src
@@ -810,7 +818,7 @@ module Interpreter_tests = struct
        it as a parameter
     *)
     let wa = wallet_gen () in
-    let (transactions, _total) =
+    let transactions, _total =
       shield
         ~memo_size
         wa.sk
@@ -840,7 +848,7 @@ module Interpreter_tests = struct
           List.exists
             (function
               | Environment.Ecoproto_error
-                  (Tezos_raw_protocol_alpha.Script_tc_errors
+                  (Tezos_protocol_alpha.Protocol.Script_tc_errors
                    .Unexpected_forged_value _) ->
                   true
               | _ -> false)
@@ -853,7 +861,7 @@ module Interpreter_tests = struct
   let test_transac_and_block () =
     init () >>=? fun (b, baker, src, _) ->
     let memo_size = 8 in
-    originate_contract "contracts/sapling_contract.tz" "{ }" src b baker
+    originate_contract_hash "contracts/sapling_contract.tz" "{ }" src b baker
     >>=? fun (dst, block_start, anti_replay) ->
     let {sk; vk} = wallet_gen () in
     let hex_transac_1 = hex_shield ~memo_size {sk; vk} anti_replay in
@@ -903,30 +911,34 @@ module Interpreter_tests = struct
     let fee = Test_tez.of_int 10 in
     Tez.one_mutez *? Int64.of_int 15 >>?= fun amount_tez ->
     Op.transaction
+      ~gas_limit:Max
       ~fee
       (B block_start)
       src
-      dst
+      (Contract.Originated dst)
       amount_tez
       ~parameters:parameters_1
-    >>=? fun operation ->
+    >>=? fun operation1 ->
     Incremental.begin_construction block_start >>=? fun incr ->
-    Incremental.add_operation incr operation >>=? fun incr ->
     (* We need to manually get the counter here *)
     let ctx = Incremental.alpha_ctxt incr in
-    let pkh =
-      Alpha_context.Contract.is_implicit src
-      |> WithExceptions.Option.get ~loc:__LOC__
-    in
+    let pkh = Context.Contract.pkh src in
     Alpha_context.Contract.get_counter ctx pkh >>= wrap >>=? fun counter ->
     Op.transaction
+      ~gas_limit:Max
       ~counter
       ~fee
       (B block_start)
       src
-      dst
+      (Contract.Originated dst)
       Tez.zero
       ~parameters:parameters_2
+    >>=? fun operation2 ->
+    Op.batch_operations
+      ~recompute_counters:true
+      ~source:src
+      (I incr)
+      [operation1; operation2]
     >>=? fun operation ->
     Incremental.add_operation incr operation >>=? fun incr ->
     Incremental.finalize_block incr >>=? fun block_2 ->
@@ -987,14 +999,27 @@ module Interpreter_tests = struct
      is drop). *)
   let test_drop () =
     init () >>=? fun (b, baker, src, _) ->
-    originate_contract "contracts/sapling_contract_drop.tz" "Unit" src b baker
+    originate_contract_hash
+      "contracts/sapling_contract_drop.tz"
+      "Unit"
+      src
+      b
+      baker
     >>=? fun (dst, b, anti_replay) ->
     let {sk; vk} = wallet_gen () in
-    let (list_transac, _total) =
+    let list_transac, _total =
       shield ~memo_size:8 sk 4 vk (Format.sprintf "0x%s") anti_replay
     in
     let parameters = parameters_of_list list_transac in
-    Op.transaction ~fee:(Test_tez.of_int 10) (B b) src dst Tez.zero ~parameters
+    let dst = Contract.Originated dst in
+    Op.transaction
+      ~gas_limit:Max
+      ~fee:(Test_tez.of_int 10)
+      (B b)
+      src
+      dst
+      Tez.zero
+      ~parameters
     >>=? fun operation ->
     next_block b operation >>=? fun _b -> return_unit
 
@@ -1007,7 +1032,7 @@ module Interpreter_tests = struct
   let test_double () =
     init () >>=? fun (b, baker, src, _) ->
     let memo_size = 8 in
-    originate_contract
+    originate_contract_hash
       "contracts/sapling_contract_double.tz"
       "(Pair { } { })"
       src
@@ -1033,10 +1058,25 @@ module Interpreter_tests = struct
       Alpha_context.Script.(lazy_expr (Expr.from_string str_2))
     in
     let fee = Test_tez.of_int 10 in
-    Op.transaction ~fee (B b) src dst Tez.zero ~parameters:parameters_1
+    let cdst = Contract.Originated dst in
+    Op.transaction
+      ~gas_limit:Max
+      ~fee
+      (B b)
+      src
+      cdst
+      Tez.zero
+      ~parameters:parameters_1
     >>=? fun operation ->
     next_block b operation >>=? fun b ->
-    Op.transaction ~fee (B b) src dst Tez.zero ~parameters:parameters_2
+    Op.transaction
+      ~gas_limit:Max
+      ~fee
+      (B b)
+      src
+      cdst
+      Tez.zero
+      ~parameters:parameters_2
     >>=? fun operation ->
     next_block b operation >>=? fun b ->
     Incremental.begin_construction b >>=? fun incr ->
@@ -1083,14 +1123,19 @@ module Interpreter_tests = struct
 
   let test_state_as_arg () =
     init () >>=? fun (b, baker, src, _) ->
-    originate_contract
+    originate_contract_hash
       "contracts/sapling_contract_state_as_arg.tz"
       "None"
       src
       b
       baker
     >>=? fun (dst, b, anti_replay) ->
-    originate_contract "contracts/sapling_contract_send.tz" "Unit" src b baker
+    originate_contract_hash
+      "contracts/sapling_contract_send.tz"
+      "Unit"
+      src
+      b
+      baker
     >>=? fun (dst_2, b, anti_replay_2) ->
     let w = wallet_gen () in
     let hex_transac_1 = hex_shield ~memo_size:8 w anti_replay in
@@ -1099,7 +1144,9 @@ module Interpreter_tests = struct
       Alpha_context.Script.(lazy_expr (Expr.from_string string))
     in
     let fee = Test_tez.of_int 10 in
-    Op.transaction ~fee (B b) src dst Tez.zero ~parameters >>=? fun operation ->
+    let dst = Contract.Originated dst in
+    Op.transaction ~gas_limit:Max ~fee (B b) src dst Tez.zero ~parameters
+    >>=? fun operation ->
     next_block b operation >>=? fun b ->
     let contract = "0x" ^ to_hex dst Alpha_context.Contract.encoding in
     let hex_transac_2 = hex_shield ~memo_size:8 w anti_replay_2 in
@@ -1107,7 +1154,8 @@ module Interpreter_tests = struct
     let parameters =
       Alpha_context.Script.(lazy_expr (Expr.from_string string))
     in
-    Op.transaction ~fee (B b) src dst_2 Tez.zero ~parameters
+    let dst_2 = Contract.Originated dst_2 in
+    Op.transaction ~gas_limit:Max ~fee (B b) src dst_2 Tez.zero ~parameters
     >>=? fun operation ->
     next_block b operation >>=? fun _b -> return_unit
 end

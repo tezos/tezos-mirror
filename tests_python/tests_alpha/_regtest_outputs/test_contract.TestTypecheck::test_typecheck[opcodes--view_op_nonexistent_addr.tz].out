@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/view_op_nonexistent_addr.tz]
 
 Well typed
-Gas remaining: 1039986.259 units remaining
+Gas remaining: 1039989.559 units remaining
 { parameter (pair nat address) ;
   storage bool ;
   code { DROP

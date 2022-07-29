@@ -31,15 +31,15 @@
             big map RPC and comparing performances with a node. Other
             tests test the proxy server alone.
    Dependencies: tezt/tests/proxy.ml
-  *)
+*)
 
 (** Creates a client that uses a [tezos-proxy-server] as its endpoint. Also
     returns the node backing the proxy server, and the proxy server itself. *)
 let init ?nodes_args ?parameter_file ~protocol () =
-  let* (node, client) =
+  let* node, client =
     Client.init_with_protocol ?nodes_args ?parameter_file `Client ~protocol ()
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* proxy_server = Proxy_server.init node in
   Client.set_mode (Client (Some (Proxy_server proxy_server), None)) client ;
   return (node, proxy_server, client)
@@ -101,7 +101,7 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
       ~base:(Either.right (protocol, None))
       [(["hard_storage_limit_per_operation"], Some "\"99999999\"")]
   in
-  let* (node, client) =
+  let* node, client =
     Client.init_with_protocol ~parameter_file ~protocol `Client ()
   in
   let* (endpoint : Client.endpoint option) =
@@ -122,7 +122,7 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
           | `Proxy_server_rpc -> []
           | `Proxy_server_data_dir -> Proxy_server.[Data_dir]
         in
-        let* () = Client.bake_for client in
+        let* () = Client.bake_for_and_wait client in
         (* We want Debug level events, for [heuristic_event_handler]
            to work properly *)
         let* proxy_server = Proxy_server.init ~args ~event_level:`Debug node in
@@ -147,7 +147,7 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
       ~burn_cap:Tez.(of_int 9999999)
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* mockup_client = Client.init_mockup ~protocol () in
   let*! _ = RPC.Contracts.get_script ?endpoint ~contract_id client in
   let*! _ = RPC.Contracts.get_storage ?endpoint ~contract_id client in
@@ -197,7 +197,7 @@ let test_equivalence =
     ~title:"(Vanilla, proxy_server endpoint) Compare RPC get"
     ~tags:(compare_tags alt_mode)
   @@ fun protocol ->
-  let* (node, _, alternative) = init ~protocol () in
+  let* node, _, alternative = init ~protocol () in
   let vanilla = Client.create ~endpoint:(Node node) () in
   let clients = {vanilla; alternative} in
   let tz_log = [("alpha.proxy_rpc", "debug"); ("proxy_getter", "debug")] in
@@ -209,17 +209,43 @@ let test_wrong_data_dir =
     ~title:"proxy_server wrong data_dir"
     ~tags:["data_dir"]
   @@ fun protocol ->
-  let* (node, _client) = Client.init_with_protocol `Client ~protocol () in
+  let* node, _client = Client.init_with_protocol `Client ~protocol () in
   let wrong_data_dir = Temp.dir "empty" in
   let args = ["--data-dir"; wrong_data_dir] in
   let process = Proxy_server.spawn ~args node in
   let* stderr = Process.check_and_read_stderr ~expect_failure:true process in
-  let re_str = "error reading data-dir.*" in
+  let re_str = "No_such_file_or_directory" in
   let good_match = stderr =~ rex re_str in
   if not good_match then
     Test.fail
       "Unexpected error message: %s. It doesn't match the regexp %S"
       stderr
+      re_str
+  else Lwt.return_unit
+
+let test_proxy_server_redirect_unsupported =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"proxy_server redirect curl"
+    ~tags:["redirect"]
+  @@ fun protocol ->
+  let* node, _client = Client.init_with_protocol `Client ~protocol () in
+  let* _ps = Proxy_server.init node in
+  let p =
+    sf
+      "http://%s:%d/chains/main/blocks/head/header"
+      "localhost"
+      (Proxy_server.rpc_port _ps)
+  in
+  let r = Process.spawn "curl" ["-vL"; p] in
+  let* err = Process.check_and_read_stderr r in
+  let re_str = "301 Moved Permanently" in
+  let re_str' = "200 OK" in
+  let good_match = err =~ rex re_str && err =~ rex re_str' in
+  if not good_match then
+    Test.fail
+      "Unexpected error message: %s. It doesn't match the regexp %S"
+      err
       re_str
   else Lwt.return_unit
 
@@ -241,5 +267,6 @@ let register ~protocols =
   register `Node ;
   register `Proxy_server_data_dir ;
   register `Proxy_server_rpc ;
+  test_proxy_server_redirect_unsupported protocols ;
   test_equivalence protocols ;
   test_wrong_data_dir protocols

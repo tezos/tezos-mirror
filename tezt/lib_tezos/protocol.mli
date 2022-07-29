@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Protocols we may want to test with. *)
-type t = Ithaca | Jakarta | Alpha
+type t = Ithaca | Jakarta | Kathmandu | Alpha
 
 (** Protocol parameters.
 
@@ -208,7 +208,6 @@ val register_regression_test :
   title:string ->
   tags:string list ->
   ?supports:supported_protocols ->
-  output_file:(t -> string) ->
   (t -> unit Lwt.t) ->
   t list ->
   unit

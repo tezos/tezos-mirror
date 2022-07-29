@@ -55,11 +55,12 @@ val create :
   Distributed_db.t ->
   Block_validator_process.t ->
   start_testchain:bool ->
-  t tzresult Lwt.t
+  t Lwt.t
 
 type block_validity =
   | Valid
-  | Invalid_after_precheck of error trace (* precheck succeeded but validation failed *)
+  | Invalid_after_precheck of
+      error trace (* precheck succeeded but validation failed *)
   | Invalid of error trace
 (* Invalid (precheck failed) *)
 

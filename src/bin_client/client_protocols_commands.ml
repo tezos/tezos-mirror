@@ -65,7 +65,7 @@ let commands () =
       (fun () dirname (cctxt : #Client_context.full) ->
         Lwt.catch
           (fun () ->
-            let* (_hash, proto) =
+            let* _hash, proto =
               Tezos_base_unix.Protocol_files.read_dir dirname
             in
             let*! injection_result =

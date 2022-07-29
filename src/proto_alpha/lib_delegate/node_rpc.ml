@@ -132,7 +132,7 @@ let info cctxt ~chain ~block () =
       encoding, while we should use the previous protocol's
       [protocol_data] encoding. For now, this works because the
       encoding has not changed. *)
-   let (payload_hash, payload_round) =
+   let payload_hash, payload_round =
      match
        Data_encoding.Binary.of_bytes_opt
          Protocol.block_header_data_encoding

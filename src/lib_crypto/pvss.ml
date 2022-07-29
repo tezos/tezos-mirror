@@ -134,7 +134,7 @@ module MakeDleq (G : CYCLIC_GROUP) :
   let fiat_shamir ?(exponents = []) elements =
     String.concat
       "||"
-      ("tezosftw" :: List.map G.to_bits elements
+      (("tezosftw" :: List.map G.to_bits elements)
       @ List.map G.Z_m.to_bits exponents)
     |> (fun x -> H.hash_string [x])
     |> H.to_string |> G.Z_m.of_bits_exn
@@ -197,8 +197,8 @@ module MakeDleq (G : CYCLIC_GROUP) :
         *)
         let rec map3 f xs ys zs =
           match (xs, ys, zs) with
-          | ([], [], []) -> []
-          | (x :: xs, y :: ys, z :: zs) ->
+          | [], [], [] -> []
+          | x :: xs, y :: ys, z :: zs ->
               let r = f x y z in
               r :: map3 f xs ys zs
           | _ -> invalid_arg "Pvss: List.map3"
@@ -341,7 +341,7 @@ module MakePvss (G : CYCLIC_GROUP) : PVSS = struct
      commitments to the polynomial coefficients and n encrypted shares for the
      holders of the public keys *)
   let dealer_shares_and_proof ~secret ~threshold ~public_keys =
-    let (coefs, poly) = random_polynomial secret threshold in
+    let coefs, poly = random_polynomial secret threshold in
     let
         (* Cⱼ represents the commitment to the coefficients of the polynomial
            Cⱼ = g₁^(aⱼ) for j in 0 to t-1 *)
@@ -360,8 +360,7 @@ module MakePvss (G : CYCLIC_GROUP) : PVSS = struct
            keys use the g₂ generator of G. Thus pkᵢ = g₂ˢᵏⁱ *)
         y_i =
       List.map2 G.pow public_keys p_i
-    and
-        (* xᵢ = g₁ᵖ⁽ⁱ⁾ for in in 1…n: commitment to polynomial points *)
+    and (* xᵢ = g₁ᵖ⁽ⁱ⁾ for in in 1…n: commitment to polynomial points *)
         x_i =
       List.map G.(pow g1) p_i
     in

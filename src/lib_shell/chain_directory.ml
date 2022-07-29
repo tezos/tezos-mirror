@@ -51,7 +51,7 @@ let get_chain_store_exn store chain =
 let get_checkpoint store (chain : Chain_services.chain) =
   let open Lwt_syntax in
   let* chain_store = get_chain_store_exn store chain in
-  let* (checkpoint_hash, _) = Store.Chain.checkpoint chain_store in
+  let* checkpoint_hash, _ = Store.Chain.checkpoint chain_store in
   Lwt.return checkpoint_hash
 
 let predecessors chain_store ignored length head =
@@ -102,7 +102,7 @@ let list_blocks chain_store ?(length = 1) ?min_date heads =
     | _ :: _ as heads ->
         List.map_p (Store.Block.read_block_opt chain_store) heads
   in
-  let* (_, blocks) =
+  let* _, blocks =
     List.fold_left_es
       (fun (ignored, acc) head ->
         match head with
@@ -145,11 +145,11 @@ let rpc_directory validator =
   register0 S.chain_id (fun chain_store () () ->
       return (Store.Chain.chain_id chain_store)) ;
   register0 S.checkpoint (fun chain_store () () ->
-      let*! (checkpoint_hash, _) = Store.Chain.checkpoint chain_store in
+      let*! checkpoint_hash, _ = Store.Chain.checkpoint chain_store in
       let* block = Store.Block.read_block chain_store checkpoint_hash in
       let checkpoint_header = Store.Block.header block in
-      let*! (_, savepoint_level) = Store.Chain.savepoint chain_store in
-      let*! (_, caboose_level) = Store.Chain.caboose chain_store in
+      let*! _, savepoint_level = Store.Chain.savepoint chain_store in
+      let*! _, caboose_level = Store.Chain.caboose chain_store in
       let history_mode = Store.Chain.history_mode chain_store in
       return (checkpoint_header, savepoint_level, caboose_level, history_mode)) ;
   register0 S.Levels.checkpoint (fun chain_store () () ->

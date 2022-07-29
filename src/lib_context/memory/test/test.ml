@@ -25,7 +25,7 @@
 
 (* shell context *)
 module C = struct
-  include Tezos_context.Context
+  include Tezos_context_disk.Context
 
   (** Basic blocks *)
 
@@ -66,7 +66,7 @@ end
 module M = struct
   include Tezos_context_memory.Context
 
-  let make_context () = Lwt.return empty
+  let make_context () = Lwt.return (Tezos_context_memory.make_empty_context ())
 end
 
 module Make (A : sig

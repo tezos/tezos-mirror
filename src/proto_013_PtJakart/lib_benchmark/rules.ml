@@ -673,7 +673,7 @@ struct
   (* rules *)
 
   (* fresh type variables *)
-  let (alpha, beta) = (-1, -2)
+  let alpha, beta = (-1, -2)
 
   let replacement ~fresh ~typ ~replacement =
     {

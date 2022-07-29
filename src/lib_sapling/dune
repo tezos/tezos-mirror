@@ -1,10 +1,7 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(env
- (_
-  (binaries (%{workspace_root}/src/tooling/node_wrapper.exe as node))
-  (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
+(env (_ (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
 
 (library
  (name tezos_sapling)
@@ -22,11 +19,11 @@
   tezos-lwt-result-stdlib)
  (js_of_ocaml (javascript_files runtime.js))
  (flags
-  (:standard
-   -open Tezos_stdlib
-   -open Tezos_crypto
-   -open Tezos_error_monad
-   -open Tezos_error_monad.TzLwtreslib))
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_crypto
+  -open Tezos_error_monad
+  -open Tezos_error_monad.TzLwtreslib)
  (foreign_stubs
   (language c)
   (flags (:standard -I%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs))

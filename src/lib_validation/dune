@@ -9,15 +9,15 @@
  (libraries
   tezos-base
   tezos-context
-  tezos-shell-context
+  tezos-context-ops
   tezos-shell-services
   tezos-protocol-updater
   tezos-stdlib-unix)
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_context
-   -open Tezos_shell_context
-   -open Tezos_shell_services
-   -open Tezos_protocol_updater
-   -open Tezos_stdlib_unix)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_context
+  -open Tezos_context_ops
+  -open Tezos_shell_services
+  -open Tezos_protocol_updater
+  -open Tezos_stdlib_unix))

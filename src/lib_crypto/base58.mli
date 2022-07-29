@@ -83,6 +83,8 @@ module Prefix : sig
 
   val p256_encrypted_secret_key : string
 
+  val bls12_381_encrypted_secret_key : string
+
   val secp256k1_encrypted_scalar : string
 
   val generic_signature : string
@@ -104,6 +106,8 @@ module Prefix : sig
   val bls12_381_public_key : string
 
   val bls12_381_secret_key : string
+
+  val slot_header : string
 end
 
 (** An extensible sum-type for decoded data: one case per known
@@ -151,7 +155,7 @@ module Alphabet : sig
 
   val make : string -> t
 
-  val all_in_alphabet : t -> string -> bool
+  val all_in_alphabet : ?ignore_case:bool -> t -> string -> bool
 
   val pp : Format.formatter -> t -> unit
 end

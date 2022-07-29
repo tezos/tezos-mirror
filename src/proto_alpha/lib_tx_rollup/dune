@@ -10,7 +10,6 @@
   tezos-base
   tezos-crypto
   tezos-protocol-alpha
-  tezos-protocol-alpha.environment
   tezos-client-alpha
   tezos-client-commands
   tezos-context.encoding
@@ -25,27 +24,30 @@
   tezos-client-base-unix
   tezos-shell
   tezos-store
-  tezos-workers)
+  tezos-workers
+  tezos-protocol-plugin-alpha
+  tezos-injector-alpha)
  (inline_tests (flags -verbose) (modes native))
- (preprocess (pps ppx_inline_test))
+ (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_base
-   -open Tezos_crypto
-   -open Tezos_protocol_alpha
-   -open Tezos_protocol_environment_alpha
-   -open Tezos_client_alpha
-   -open Tezos_client_commands
-   -open Tezos_baking_alpha_commands
-   -open Tezos_stdlib_unix
-   -open Tezos_rpc
-   -open Tezos_rpc_http
-   -open Tezos_rpc_http_client_unix
-   -open Tezos_rpc_http_server
-   -open Tezos_micheline
-   -open Tezos_client_base
-   -open Tezos_client_base_unix
-   -open Tezos_workers)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_base
+  -open Tezos_crypto
+  -open Tezos_protocol_alpha
+  -open Tezos_client_alpha
+  -open Tezos_client_commands
+  -open Tezos_baking_alpha_commands
+  -open Tezos_stdlib_unix
+  -open Tezos_rpc
+  -open Tezos_rpc_http
+  -open Tezos_rpc_http_client_unix
+  -open Tezos_rpc_http_server
+  -open Tezos_micheline
+  -open Tezos_client_base
+  -open Tezos_client_base_unix
+  -open Tezos_workers
+  -open Tezos_protocol_plugin_alpha
+  -open Tezos_injector_alpha))

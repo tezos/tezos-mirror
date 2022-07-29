@@ -89,7 +89,7 @@ module Answer = struct
             return content)
       in
       match rd with
-      | (len, Lwt_unix.ADDR_INET (remote_addr, _))
+      | len, Lwt_unix.ADDR_INET (remote_addr, _)
         when Compare.Int.equal len Message.length -> (
           match Data_encoding.Binary.of_bytes_opt Message.encoding buf with
           | Some (key, remote_peer_id, remote_port)

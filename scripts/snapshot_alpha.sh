@@ -120,7 +120,7 @@ doc_index="docs/index.rst"
     grep -A9999 -F "$alpha_line" "$doc_index" \
       | grep -B9999 -F 'toctree' -m1 \
       | head -n-1 \
-      | sed -e "s/Alpha Development/${label} ${capitalized_label}/g" \
+      | sed -e "s/Alpha Development/${capitalized_label}/g" \
             -e "s,alpha/,${label}/,g"
     grep -B9999 -F "$alpha_line" "$doc_index" \
       | tac \
@@ -150,7 +150,7 @@ sed -i.old -e "s,tezos\.gitlab\.io/alpha/,tezos.gitlab.io/${version}_${label}/,g
            -e "s/_alpha\b/_${version}/g" \
            -e "s/\balpha\b/${version}/g" \
     $(find . -name \*.py)
-echo "Fixing python regtests ouputs"
+echo "Fixing python regtests outputs"
 cd _regtest_outputs
 sed -i.old -e "s/_alpha\b/_${version}/g" *.out
 cd ../..
@@ -201,17 +201,6 @@ do
 done
 
 
-# rename .opam files
-for file in $(find . -name \*.opam)
-do
-    mv "$file" $(echo "$file" | sed s/alpha/${version}-${short_hash}/g)
-done
-
-# fix content of dune and opam files
-sed -i.old -e s/_alpha/_${version}_${short_hash}/g \
-       -e s/-alpha/-${version}-${short_hash}/g \
-    $(find . -name dune -or -name \*.opam)
-
 mv $daemons ..
 cd ..
 rmdir tmp
@@ -222,30 +211,14 @@ cd lib_protocol
 sed -i.old -e 's/"hash": "[^"]*",/"hash": "'$long_hash'",/' \
     TEZOS_PROTOCOL
 
-sed -i.old -e s/protocol_alpha/protocol_${version}_${short_hash}/ \
-           -e s/protocol-alpha/protocol-${version}-${short_hash}/ \
-           -e s/protocol-functor-alpha/protocol-functor-${version}-${short_hash}/ \
-    $(find . -type f)
-
-sed -i.old -e s/-alpha/-${version}-${short_hash}/ \
-           -e s/_alpha/_${version}_${short_hash}/ \
-    $(find . -type f -name dune)
-
-# replace fist the template call with underscore version,
-# then the other occurrences with dash version
-sed -i.old -e 's/"alpha"/"'${version}_${short_hash}'"/' \
-           -e 's/alpha/'${version}-${short_hash}'/' \
-    $(find . -name \*.opam)
-
-for file in  $(find . -name \*.opam)
-do
-    mv "$file" $(echo "$file" | sed s/alpha/${version}-${short_hash}/g)
-done
-
+# We use `--print0` and `xargs -0` instead of just passing the result
+# of find to sed in order to support spaces in filenames.
+find . -type f -print0 | xargs -0 \
+  sed -i.old -e s/protocol_alpha/protocol_${version}_${short_hash}/ \
+             -e s/protocol-alpha/protocol-${version}-${short_hash}/ \
+             -e s/protocol-functor-alpha/protocol-functor-${version}-${short_hash}/
 # add this protocol to the immutable list
 printf \\n$long_hash >> ../../lib_protocol_compiler/final_protocol_versions
-
-dune exec ../../lib_protocol_compiler/bin/replace.exe ../../lib_protocol_compiler/dune_protocol.template.v1 dune.inc ../../lib_protocol_compiler/final_protocol_versions ${version}_${short_hash}
 
 cd ../../..
 

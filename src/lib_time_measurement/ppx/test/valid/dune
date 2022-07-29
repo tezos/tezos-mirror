@@ -3,9 +3,9 @@
  (modules pp)
  (libraries tezos-time-measurement.ppx ppxlib))
 
-(executable
- (name gen_dune_rules)
- (modules gen_dune_rules)
+(executables
+ (names gen_dune_rules gen_ocamlformat_ignore)
+ (modules gen_dune_rules gen_ocamlformat_ignore)
  (libraries tezos_time_measurement_ppx_test)
  (flags (:standard -open Tezos_time_measurement_ppx_test)))
 
@@ -13,7 +13,20 @@
  (targets dune.inc.gen)
  (deps
   (:gen gen_dune_rules.exe)
-  (source_tree .))
+  (glob_files *.ml)
+  (glob_files *.mli))
+ (action
+  (with-stdout-to
+    %{targets}
+   (run %{gen}))))
+
+(rule
+ (targets .ocamlformat-ignore)
+ (deps
+  (:gen gen_ocamlformat_ignore.exe)
+  (glob_files *.ml)
+  (glob_files *.mli))
+ (mode (promote (until-clean)))
  (action
   (with-stdout-to
     %{targets}

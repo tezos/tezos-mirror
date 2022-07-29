@@ -31,6 +31,21 @@ val qcheck_wrap :
   QCheck2.Test.t list ->
   unit Alcotest.test_case list
 
+(** [qcheck_make_result ?print ?pp_error ?count ?check ~name ~gen f]
+    is a wrapper around {!QCheck2.Test.make} where [f] returns a
+    result type. If [check] is not provided and if the result of [f] is
+    an error, {!Qcheck2.Test.fail_reportf} is called and the error is
+    shown if [pp_error] is provided. *)
+val qcheck_make_result :
+  ?count:int ->
+  ?print:'a QCheck2.Print.t ->
+  ?pp_error:(Format.formatter -> 'b -> unit) ->
+  ?check:((bool, 'b) result -> bool) ->
+  name:string ->
+  gen:'a QCheck2.Gen.t ->
+  ('a -> (bool, 'b) result) ->
+  QCheck2.Test.t
+
 (** [qcheck_eq_tests ~eq ~gen ~eq_name] returns
     three tests of [eq]: reflexivity, symmetry, and transitivity.
 
@@ -53,6 +68,15 @@ val qcheck_eq_tests :
 
     If [pp] is provided, use this to print [x] and [y] if they are not equal. *)
 val qcheck_eq :
+  ?pp:(Format.formatter -> 'a -> unit) ->
+  ?cmp:('a -> 'a -> int) ->
+  ?eq:('a -> 'a -> bool) ->
+  'a ->
+  'a ->
+  bool
+
+(** Similar to {!qcheck_eq} but tests that two values are {e not} equal. *)
+val qcheck_neq :
   ?pp:(Format.formatter -> 'a -> unit) ->
   ?cmp:('a -> 'a -> int) ->
   ?eq:('a -> 'a -> bool) ->
@@ -87,10 +111,15 @@ val qcheck_cond :
     and [b] inclusive.
 
     Poorman's implementation until
-    https://github.com/c-cube/qcheck/issues/105 is done.
-
-    This probably spectacularly crashes if [(b - a) > Int64.max_int]. *)
+    https://github.com/c-cube/qcheck/issues/105 is done. *)
 val int64_range_gen : int64 -> int64 -> int64 QCheck2.Gen.t
+
+(** [int32_range_gen a b] generates an [int32] between [a] inclusive
+    and [b] inclusive.
+
+    Poorman's implementation until
+    https://github.com/c-cube/qcheck/issues/105 is done. *)
+val int32_range_gen : int32 -> int32 -> int32 QCheck2.Gen.t
 
 (** [int64_strictly_positive_gen x] generates an [int64] between [1] inclusive
     and [x] inclusive.
@@ -142,6 +171,13 @@ val sublist : 'a list -> 'a list QCheck2.Gen.t
     this generator can produce [], [0], [0, 2], [1, 2], [1], etc. *)
 val holey : 'a list -> 'a list QCheck2.Gen.t
 
+(** [of_option_gen gen] converts a generator [gen] of optional values into a
+    generator of values by rerunning the generator if the generated value
+    was a [None] until a [Some] is generated.
+
+    Be careful: if [None] is always returned, this hangs forever! *)
+val of_option_gen : 'a option QCheck2.Gen.t -> 'a QCheck2.Gen.t
+
 (** Map-related generators. *)
 module MakeMapGen (Map : sig
   type 'a t
@@ -163,3 +199,12 @@ end) : sig
       are generated with [key_gen] and the values with [val_gen]. *)
   val gen : Map.key QCheck2.Gen.t -> 'v QCheck2.Gen.t -> 'v Map.t QCheck2.Gen.t
 end
+
+(** Test the roundtripness of an encoding both in JSON and binary formats. *)
+val test_roundtrip :
+  count:int ->
+  title:string ->
+  gen:'a QCheck2.Gen.t ->
+  eq:('a -> 'a -> bool) ->
+  'a Data_encoding.t ->
+  QCheck2.Test.t

@@ -49,18 +49,18 @@ Their OpenAPI specification can be found at:
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
-Ithaca RPCs
------------
+Jakarta RPCs
+------------
 
-The OpenAPI specification for RPCs which are specific to the Ithaca (``Psithaca``)
+The OpenAPI specification for RPCs which are specific to the Jakarta (``PtJakart``)
 protocol can be found at:
 
-- `ithaca-openapi.json (version 12.0~rc2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/ithaca-openapi.json>`_
+- `jakarta-openapi.json (version 13.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/jakarta-openapi.json>`_
 
 The OpenAPI specification for RPCs which are related to the mempool
-and specific to the Ithaca protocol can be found at:
+and specific to the Jakarta protocol can be found at:
 
-- `ithaca-mempool-openapi.json (version 12.0~rc2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/ithaca-mempool-openapi.json>`_
+- `jakarta-mempool-openapi.json (version 13.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/jakarta-mempool-openapi.json>`_
 
 .. _openapi_generate:
 

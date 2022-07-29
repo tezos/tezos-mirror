@@ -21,7 +21,6 @@
    * Remove floating-point arithmetic
    * Remove string conversion functions for float
    * Remove deprecated functions
-
 *)
 
 (** The initially opened module.

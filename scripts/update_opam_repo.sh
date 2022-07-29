@@ -49,7 +49,7 @@ src_dir="$(dirname "$script_dir")"
 
 . "$script_dir"/version.sh
 
-opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" -name \*.opam -print)
+opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" "$src_dir/opam" -name \*.opam -print | LC_COLLATE=C sort -u)
 
 ## Shallow clone of opam repository (requires git protocol version 2)
 export GIT_WORK_TREE="$tmp_dir"
@@ -63,7 +63,6 @@ git fetch --depth 1 origin "$full_opam_repository_tag"
 packages=
 for opam in $opams; do
 
-    dir=$(dirname $opam)
     file=$(basename $opam)
     package=${file%.opam}
     packages=$packages,$package.dev
@@ -96,8 +95,14 @@ dummy_path=packages/$dummy_pkg/$dummy_pkg.dev
 dummy_opam=$dummy_path/opam
 mkdir -p $dummy_path
 echo 'opam-version: "2.0"' > $dummy_opam
+# Opam doesn't seem to be deterministic when resolving constraints from mirage-crypto-pk
+# (("mirage-no-solo5" & "mirage-no-xen") | "zarith-freestanding" | "mirage-runtime" {>= "4.0"})
+# - Sometime installing mirage-no-xen + mirage-no-solo5
+# - Sometime installing mirage-runtime
+# According to mirage devs, mirage-runtime is the correct dependency to install.
+echo 'depends: [ "mirage-runtime" { >= "4.0.0" } ]' >> $dummy_opam
 echo 'conflicts:[' >> $dummy_opam
-for f in $(find ./ -name opam | xargs -n1 grep "^flags: *\[ *avoid-version *\]" -l);
+grep -r "^flags: *\[ *avoid-version *\]" -l ./ | LC_COLLATE=C sort -u | while read -r f;
 do
     f=$(dirname $f)
     f=$(basename $f)
@@ -109,17 +114,9 @@ echo ']' >> $dummy_opam
 
 # Opam < 2.1 requires opam-depext as a plugin, later versions include it
 # natively:
-extra_warning=""
 case $(opam --version) in
     2.0.* ) opam_depext_dep="opam-depext," ;;
-    * )
-        opam_depext_dep=""
-        extra_warning="
-WARNING you are using opam $(opam --version), your patch
-is potentially removing the opam 2.0.x dependency 'opam-depext', please
-make sure you are not removing it (for instance by editing the patch,
-fixing the resulting merge-request, or re-running with opam 2.0.x)."
-        ;;
+    * )     opam_depext_dep="" ;;
 esac
 #shellcheck disable=SC2086
 OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
@@ -127,7 +124,7 @@ OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
 
 
 ## Adding useful compiler variants
-for variant in afl flambda fp spacetime ; do
+for variant in afl flambda fp ; do
     git checkout packages/ocaml-option-$variant/ocaml-option-$variant.1
 done
 
@@ -139,13 +136,29 @@ for opam in $opams; do
 done
 rm -r "$tmp_dir"/packages/$dummy_pkg
 
-## Adding safer hashes
-opam admin add-hashes sha256 sha512
-
 ## Generating the diff!
 git remote add tezos $opam_repository_git
 git fetch --depth 1 tezos "$opam_repository_tag"
 git reset "$opam_repository_tag"
+
+## opam.2.1 will try to delete opam-depext, we should restore it.
+if [ ! -d packages/opam-depext ]; then
+    git checkout HEAD -- packages/opam-depext
+fi
+
+## Adding safer hashes
+cp -rf packages packages.bak
+
+opam admin add-hashes sha256 sha512
+
+(cd "$src_dir" && dune build src/tooling/opam-lint/opam_lint.exe)
+for i in $(cd packages && find ./ -name opam);
+do
+    "$src_dir/_build/default/src/tooling/opam-lint/opam_lint.exe" "packages/$i" "packages.bak/$i"
+done
+rm -rf packages.bak
+
+##
 git add packages
 git diff HEAD -- packages > "$target"
 
@@ -153,5 +166,4 @@ echo
 echo "Wrote proposed update in: $target."
 echo 'Please add this patch to: `https://gitlab.com/tezos/opam-repository`'
 echo 'And update accordingly the commit hash in: `.gitlab/ci/templates.yml` and `scripts/version.sh`'
-echo "$extra_warning"
 echo

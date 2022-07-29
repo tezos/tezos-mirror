@@ -137,7 +137,7 @@ let parse_client_output_public_keys ~client_output =
   (public_key_hash, public_key)
 
 let parse_client_output ~alias ~client_output =
-  let (public_key_hash, public_key) =
+  let public_key_hash, public_key =
     parse_client_output_public_keys ~client_output
   in
   let secret_key =
@@ -153,7 +153,7 @@ let parse_client_output ~alias ~client_output =
   {alias; public_key_hash; public_key; secret_key}
 
 let parse_client_output_aggregate ~alias ~client_output =
-  let (aggregate_public_key_hash, aggregate_public_key) =
+  let aggregate_public_key_hash, aggregate_public_key =
     parse_client_output_public_keys ~client_output
   in
   let aggregate_secret_key =

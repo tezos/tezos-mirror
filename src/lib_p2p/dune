@@ -17,9 +17,9 @@
   tezos-version
   prometheus)
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base_unix
-   -open Tezos_stdlib_unix
-   -open Tezos_stdlib
-   -open Tezos_p2p_services)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base_unix
+  -open Tezos_stdlib_unix
+  -open Tezos_stdlib
+  -open Tezos_p2p_services))

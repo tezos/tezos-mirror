@@ -262,12 +262,12 @@ module Merkle = struct
       (right : Tezos_shell_services.Block_services.merkle_node) =
     let open Tezos_shell_services.Block_services in
     match (left, right, path_to_ignore) with
-    | (Hash _, Hash _, _) | (Data _, Data _, _) -> None
-    | (Continue left_tree, Continue right_tree, _) -> (
+    | Hash _, Hash _, _ | Data _, Data _, _ -> None
+    | Continue left_tree, Continue right_tree, _ -> (
         trees_shape_match path_to_ignore left_tree right_tree |> function
         | [] -> None
         | errors -> Some errors)
-    | (_, _, ThisPath _) ->
+    | _, _, ThisPath _ ->
         (* Shapes are different but this is the path to ignore. *)
         None
     | _ ->
@@ -287,16 +287,16 @@ module Merkle = struct
     String.Map.merge
       (fun key left_val_opt right_val_opt ->
         match (left_val_opt, right_val_opt, path_to_ignore) with
-        | (Some _, None, _) | (None, Some _, _) ->
+        | Some _, None, _ | None, Some _, _ ->
             Some
               [Format.asprintf "Key \"%s\" is missing in one of the trees." key]
-        | (None, None, _) ->
+        | None, None, _ ->
             (* Unreachable, at least one of the maps has the key *)
             assert false
-        | (Some left_value, Some right_value, ThisPath (hd_key :: tl_key))
+        | Some left_value, Some right_value, ThisPath (hd_key :: tl_key)
           when String.equal hd_key key ->
             nodes_shape_match (ThisPath tl_key) left_value right_value
-        | (Some left_value, Some right_value, _) ->
+        | Some left_value, Some right_value, _ ->
             nodes_shape_match NotThisPath left_value right_value)
       left
       right

@@ -25,8 +25,125 @@
 
 let namespace = Tezos_version.Node_version.namespace
 
+module Worker = struct
+  open Prometheus
+
+  type timestamps = {
+    last_finished_request_push_timestamp : Gauge.t;
+    last_finished_request_treatment_timestamp : Gauge.t;
+    last_finished_request_completion_timestamp : Gauge.t;
+  }
+
+  type counters = {
+    worker_request_count : Counter.t;
+    worker_completion_count : Counter.t;
+    worker_error_count : Counter.t;
+  }
+
+  let declare_timestamps ~label_names ~namespace ?subsystem () =
+    let last_finished_request_push_timestamp =
+      let help =
+        "Reception timestamp of the latest request handled by the worker"
+      in
+      Gauge.v_labels
+        ~label_names
+        ~help
+        ~namespace
+        ?subsystem
+        "last_finished_request_push_timestamp"
+    in
+    let last_finished_request_treatment_timestamp =
+      let help =
+        "Timestamp at which the worker started processing of the latest \
+         request it handled"
+      in
+      Gauge.v_labels
+        ~label_names
+        ~help
+        ~namespace
+        ?subsystem
+        "last_finished_request_treatment_timestamp"
+    in
+    let last_finished_request_completion_timestamp =
+      let help =
+        "Timestamp at which the latest request handled by the worker was \
+         completed"
+      in
+      Gauge.v_labels
+        ~label_names
+        ~help
+        ~namespace
+        ?subsystem
+        "last_finished_request_completion_timestamp"
+    in
+    fun labels ->
+      {
+        last_finished_request_push_timestamp =
+          Gauge.labels last_finished_request_push_timestamp labels;
+        last_finished_request_treatment_timestamp =
+          Gauge.labels last_finished_request_treatment_timestamp labels;
+        last_finished_request_completion_timestamp =
+          Gauge.labels last_finished_request_completion_timestamp labels;
+      }
+
+  let declare_counters ~label_names ~namespace ?subsystem () =
+    let worker_request_count =
+      let help = "Number of requests received by the block validator worker" in
+      Counter.v_labels
+        ~label_names
+        ~help
+        ~namespace
+        ?subsystem
+        "worker_request_count"
+    in
+    let worker_completion_count =
+      let help = "Number of requests completed the block validator worker" in
+      Counter.v_labels
+        ~label_names
+        ~help
+        ~namespace
+        ?subsystem
+        "worker_completion_count"
+    in
+    let worker_error_count =
+      let help = "Number of errors encountered by the block validator worker" in
+      Counter.v_labels
+        ~label_names
+        ~help
+        ~namespace
+        ?subsystem
+        "worker_error_count"
+    in
+    fun labels ->
+      {
+        worker_request_count = Counter.labels worker_request_count labels;
+        worker_completion_count = Counter.labels worker_completion_count labels;
+        worker_error_count = Counter.labels worker_error_count labels;
+      }
+
+  let update_timestamps metrics Worker_types.{pushed; treated; completed} =
+    Prometheus.Gauge.set
+      metrics.last_finished_request_push_timestamp
+      (Ptime.to_float_s pushed) ;
+    Prometheus.Gauge.set
+      metrics.last_finished_request_treatment_timestamp
+      (Ptime.to_float_s treated) ;
+    Prometheus.Gauge.set
+      metrics.last_finished_request_completion_timestamp
+      (Ptime.to_float_s completed)
+end
+
 module Mempool = struct
   open Prometheus
+
+  type t = {worker_counters : Worker.counters}
+
+  let init name =
+    let subsystem = Some (String.concat "_" name) in
+    let worker_counters =
+      Worker.declare_counters ~label_names:[] ~namespace ?subsystem () []
+    in
+    {worker_counters}
 
   let component = "mempool_pending"
 
@@ -140,80 +257,11 @@ module Mempool = struct
     List.iter add metrics
 end
 
-module Worker = struct
-  type t = {
-    last_finished_request_push_timestamp : Prometheus.Gauge.t;
-    last_finished_request_treatment_timestamp : Prometheus.Gauge.t;
-    last_finished_request_completion_timestamp : Prometheus.Gauge.t;
-  }
-
-  let declare ~label_names ~namespace ?subsystem () =
-    let last_finished_request_push_timestamp =
-      let help =
-        "Reception timestamp of the latest request handled by the worker"
-      in
-      Prometheus.Gauge.v_labels
-        ~label_names
-        ~help
-        ~namespace
-        ?subsystem
-        "last_finished_request_push_timestamp"
-    in
-    let last_finished_request_treatment_timestamp =
-      let help =
-        "Timestamp at which the worker started processing of the latest \
-         request it handled"
-      in
-      Prometheus.Gauge.v_labels
-        ~label_names
-        ~help
-        ~namespace
-        ?subsystem
-        "last_finished_request_treatment_timestamp"
-    in
-    let last_finished_request_completion_timestamp =
-      let help =
-        "Timestamp at which the latest request handled by the worker was \
-         completed"
-      in
-      Prometheus.Gauge.v_labels
-        ~label_names
-        ~help
-        ~namespace
-        ?subsystem
-        "last_finished_request_completion_timestamp"
-    in
-    fun labels ->
-      {
-        last_finished_request_push_timestamp =
-          Prometheus.Gauge.labels last_finished_request_push_timestamp labels;
-        last_finished_request_treatment_timestamp =
-          Prometheus.Gauge.labels
-            last_finished_request_treatment_timestamp
-            labels;
-        last_finished_request_completion_timestamp =
-          Prometheus.Gauge.labels
-            last_finished_request_completion_timestamp
-            labels;
-      }
-
-  let update metrics Worker_types.{pushed; treated; completed} =
-    Prometheus.Gauge.set
-      metrics.last_finished_request_push_timestamp
-      (Ptime.to_float_s pushed) ;
-    Prometheus.Gauge.set
-      metrics.last_finished_request_treatment_timestamp
-      (Ptime.to_float_s treated) ;
-    Prometheus.Gauge.set
-      metrics.last_finished_request_completion_timestamp
-      (Ptime.to_float_s completed)
-end
-
 module Distributed_db = struct
   type t = {table_length : Prometheus.Gauge.t}
 
   let init =
-    let subsystem = String.concat "_" ["node"; "distributed_db"; "requester"] in
+    let subsystem = String.concat "_" ["distributed_db"; "requester"] in
     let labels = ["requester_kind"; "entry_type"] in
     let table_length =
       let help = "Number of entries (to grab) from the network present" in
@@ -232,60 +280,64 @@ module Distributed_db = struct
 end
 
 module Block_validator = struct
+  open Prometheus
+
+  type block_validator_collectors = {
+    mutable operations_per_pass : unit -> float list;
+  }
+
+  let block_validator_collectors = {operations_per_pass = (fun () -> [])}
+
+  let set_operation_per_pass_collector fn =
+    block_validator_collectors.operations_per_pass <- fn
+
   type t = {
-    already_commited_blocks_count : Prometheus.Counter.t;
-    outdated_blocks_count : Prometheus.Counter.t;
-    validated_blocks_count : Prometheus.Counter.t;
-    validation_errors_count : Prometheus.Counter.t;
-    preapplied_blocks_count : Prometheus.Counter.t;
-    preapplication_errors_count : Prometheus.Counter.t;
-    validation_errors_after_precheck_count : Prometheus.Counter.t;
-    precheck_failed_count : Prometheus.Counter.t;
-    validation_worker_metrics : Worker.t;
+    already_commited_blocks_count : Counter.t;
+    outdated_blocks_count : Counter.t;
+    validated_blocks_count : Counter.t;
+    validation_errors_count : Counter.t;
+    preapplied_blocks_count : Counter.t;
+    preapplication_errors_count : Counter.t;
+    validation_errors_after_precheck_count : Counter.t;
+    precheck_failed_count : Counter.t;
+    worker_timestamps : Worker.timestamps;
+    worker_counters : Worker.counters;
   }
 
   let init name =
     let subsystem = Some (String.concat "_" name) in
     let already_commited_blocks_count =
       let help = "Number of requests to validate a block already handled" in
-      Prometheus.Counter.v
-        ~help
-        ~namespace
-        ?subsystem
-        "already_commited_blocks_count"
+      Counter.v ~help ~namespace ?subsystem "already_commited_blocks_count"
     in
     let outdated_blocks_count =
       let help =
         "Number of requests to validate a block older than the node's \
          checkpoint"
       in
-      Prometheus.Counter.v ~help ~namespace ?subsystem "outdated_blocks_count"
+      Counter.v ~help ~namespace ?subsystem "outdated_blocks_count"
     in
     let validated_blocks_count =
       let help = "Number of requests to validate a valid block" in
-      Prometheus.Counter.v ~help ~namespace ?subsystem "validated_blocks_count"
+      Counter.v ~help ~namespace ?subsystem "validated_blocks_count"
     in
     let validation_errors_count =
       let help = "Number of requests to validate an invalid block" in
-      Prometheus.Counter.v ~help ~namespace ?subsystem "validation_errors_count"
+      Counter.v ~help ~namespace ?subsystem "validation_errors_count"
     in
     let preapplied_blocks_count =
       let help = "Number of successful application simulations of blocks" in
-      Prometheus.Counter.v ~help ~namespace ?subsystem "preapplied_blocks_count"
+      Counter.v ~help ~namespace ?subsystem "preapplied_blocks_count"
     in
     let preapplication_errors_count =
       let help = "Number of refused application simulations of blocks" in
-      Prometheus.Counter.v
-        ~help
-        ~namespace
-        ?subsystem
-        "preapplication_errors_count"
+      Counter.v ~help ~namespace ?subsystem "preapplication_errors_count"
     in
     let validation_errors_after_precheck_count =
       let help =
         "Number of requests to validate an invalid but precheckable block"
       in
-      Prometheus.Counter.v
+      Counter.v
         ~help
         ~namespace
         ?subsystem
@@ -296,11 +348,41 @@ module Block_validator = struct
         "Number of block validation requests where the prechecking of a block \
          failed"
       in
-      Prometheus.Counter.v ~help ~namespace ?subsystem "precheck_failed_count"
+      Counter.v ~help ~namespace ?subsystem "precheck_failed_count"
     in
-    let validation_worker_metrics =
-      Worker.declare ~label_names:[] ~namespace ?subsystem () []
+    let worker_timestamps =
+      Worker.declare_timestamps ~label_names:[] ~namespace ?subsystem () []
     in
+    let worker_counters =
+      Worker.declare_counters ~label_names:[] ~namespace ?subsystem () []
+    in
+    let operations_per_pass_metrics () =
+      let info =
+        MetricInfo.
+          {
+            name =
+              MetricName.v
+                (String.concat
+                   "_"
+                   ([namespace] @ name @ ["operations_per_pass"]));
+            metric_type = Gauge;
+            help = "Number of operations per pass for the last validated block";
+            label_names = List.map LabelName.v ["pass_id"];
+          }
+      in
+      (* This collector aims to associate a label for each operation
+         validation pass. The label name is based on the index of the
+         list of operations. *)
+      let collector () =
+        List.fold_left_i
+          (fun i map v ->
+            LabelSetMap.add [string_of_int i] [Sample_set.sample v] map)
+          LabelSetMap.empty
+          (block_validator_collectors.operations_per_pass ())
+      in
+      CollectorRegistry.(register default info collector)
+    in
+    operations_per_pass_metrics () ;
     {
       already_commited_blocks_count;
       outdated_blocks_count;
@@ -310,37 +392,93 @@ module Block_validator = struct
       preapplication_errors_count;
       validation_errors_after_precheck_count;
       precheck_failed_count;
-      validation_worker_metrics;
+      worker_timestamps;
+      worker_counters;
     }
 end
 
+module Proto_plugin = struct
+  module type PROTOMETRICS = sig
+    val hash : Protocol_hash.t
+
+    val update_metrics :
+      protocol_metadata:bytes ->
+      Fitness.t ->
+      (cycle:float -> consumed_gas:float -> round:float -> unit) ->
+      unit Lwt.t
+  end
+
+  module UndefinedProtoMetrics (P : sig
+    val hash : Protocol_hash.t
+  end) =
+  struct
+    let hash = P.hash
+
+    let update_metrics ~protocol_metadata:_ _ _ = Lwt.return_unit
+  end
+
+  let proto_metrics_table : (module PROTOMETRICS) Protocol_hash.Table.t =
+    Protocol_hash.Table.create 5
+
+  let register_plugin (module ProtoMetrics : PROTOMETRICS) =
+    Protocol_hash.Table.replace
+      proto_metrics_table
+      ProtoMetrics.hash
+      (module ProtoMetrics)
+
+  let find_plugin = Protocol_hash.Table.find proto_metrics_table
+
+  let safe_get_prevalidator_proto_metrics hash =
+    match find_plugin hash with
+    | Some proto_metrics -> Lwt.return proto_metrics
+    | None ->
+        let module ProtoMetrics = UndefinedProtoMetrics (struct
+          let hash = hash
+        end) in
+        Lwt.return (module ProtoMetrics : PROTOMETRICS)
+end
+
 module Chain_validator = struct
+  open Prometheus
+
   type t = {
-    head_level : Prometheus.Gauge.t;
-    ignored_head_count : Prometheus.Counter.t;
-    branch_switch_count : Prometheus.Counter.t;
-    head_increment_count : Prometheus.Counter.t;
-    validation_worker_metrics : Worker.t;
+    head_level : Gauge.t;
+    ignored_head_count : Counter.t;
+    branch_switch_count : Counter.t;
+    head_increment_count : Counter.t;
+    head_round : Gauge.t;
+    head_cycle : Gauge.t;
+    consumed_gas : Gauge.t;
+    is_bootstrapped : Gauge.t;
+    sync_status : Gauge.t;
+    worker_timestamps : Worker.timestamps;
+    worker_counters : Worker.counters;
   }
+
+  let update_bootstrapped ~metrics b =
+    if b then Gauge.set metrics.is_bootstrapped 1.
+    else Gauge.set metrics.is_bootstrapped 0.
+
+  let update_sync_status ~metrics event =
+    let open Chain_validator_worker_state.Event in
+    match event with
+    | Not_synchronised -> Gauge.set metrics.sync_status 0.
+    | Synchronised {is_chain_stuck = false} -> Gauge.set metrics.sync_status 1.
+    | Synchronised {is_chain_stuck = true} -> Gauge.set metrics.sync_status 2.
 
   let init name =
     let subsystem = Some (String.concat "_" name) in
     let label_name = "chain_id" in
     let head_level =
-      let help = "Current level of the node's head" in
-      Prometheus.Gauge.v_label
-        ~label_name
-        ~help
-        ~namespace
-        ?subsystem
-        "head_level"
+      let help = "Level of the current node's head" in
+      Gauge.v_label ~label_name ~help ~namespace ?subsystem "head_level"
     in
     let ignored_head_count =
       let help =
         "Number of requests where the chain validator ignored a new valid \
          block with a lower fitness than its current head"
       in
-      Prometheus.Counter.v_label
+      Counter.v_label
         ~label_name
         ~help
         ~namespace
@@ -349,7 +487,7 @@ module Chain_validator = struct
     in
     let branch_switch_count =
       let help = "Number of times the chain_validator switched branch" in
-      Prometheus.Counter.v_label
+      Counter.v_label
         ~label_name
         ~help
         ~namespace
@@ -361,15 +499,50 @@ module Chain_validator = struct
         "Number of times the chain_validator incremented its head for a direct \
          successor"
       in
-      Prometheus.Counter.v_label
+      Counter.v_label
         ~label_name
         ~help
         ~namespace
         ?subsystem
         "head_increment_count"
     in
-    let validation_worker_metrics =
-      Worker.declare ~label_names:[label_name] ~namespace ?subsystem ()
+    let head_cycle =
+      let help = "Cycle of the current node's head" in
+      Gauge.v_label ~label_name ~help ~namespace ?subsystem "head_cycle"
+    in
+    let consumed_gas =
+      let help = "Gas consumed in the current node's head" in
+      Gauge.v_label ~label_name ~help ~namespace ?subsystem "head_consumed_gas"
+    in
+    let head_round =
+      let help = "Round of the current node's head" in
+      Gauge.v_label ~label_name ~help ~namespace ?subsystem "head_round"
+    in
+    let is_bootstrapped =
+      let help = "Returns 1 if the node has bootstrapped, 0 otherwise." in
+      Gauge.v_label ~label_name ~help ~namespace ?subsystem "is_bootstrapped"
+    in
+    let sync_status =
+      let help =
+        "Returns 0 if the node is unsynchronised, 1 if the node is \
+         synchronised, 2 if the node is stuck."
+      in
+      Gauge.v_label
+        ~label_name
+        ~help
+        ~namespace
+        ?subsystem
+        "synchronisation_status"
+    in
+    let worker_timestamps =
+      Worker.declare_timestamps
+        ~label_names:[label_name]
+        ~namespace
+        ?subsystem
+        ()
+    in
+    let worker_counters =
+      Worker.declare_counters ~label_names:[label_name] ~namespace ?subsystem ()
     in
     fun chain_id ->
       let label = Chain_id.to_short_b58check chain_id in
@@ -378,8 +551,27 @@ module Chain_validator = struct
         ignored_head_count = ignored_head_count label;
         branch_switch_count = branch_switch_count label;
         head_increment_count = head_increment_count label;
-        validation_worker_metrics = validation_worker_metrics [label];
+        head_round = head_round label;
+        head_cycle = head_cycle label;
+        consumed_gas = consumed_gas label;
+        is_bootstrapped = is_bootstrapped label;
+        sync_status = sync_status label;
+        worker_timestamps = worker_timestamps [label];
+        worker_counters = worker_counters [label];
       }
+
+  let update_proto_metrics_callback ~metrics ~cycle ~consumed_gas ~round =
+    Gauge.set metrics.head_cycle cycle ;
+    Gauge.set metrics.consumed_gas consumed_gas ;
+    Gauge.set metrics.head_round round
+
+  let update_ref = ref (fun () -> Lwt.return_unit)
+
+  let update_proto update = update_ref := update
+
+  let pre_collect () = !update_ref ()
+
+  let () = CollectorRegistry.(register_pre_collect_lwt default) pre_collect
 end
 
 module Version = struct
@@ -420,4 +612,137 @@ module Version = struct
       @@ [version] @ network_version net @ [commit_hash; commit_date]
     in
     ()
+end
+
+module Peer_validator = struct
+  type t = {
+    on_no_request : Prometheus.Counter.t;
+    new_head_completed : Prometheus.Counter.t;
+    new_branch_completed : Prometheus.Counter.t;
+    invalid_locator : Prometheus.Counter.t;
+    invalid_block : Prometheus.Counter.t;
+    system_error : Prometheus.Counter.t;
+    unavailable_protocol : Prometheus.Counter.t;
+    unknown_ancestor : Prometheus.Counter.t;
+    too_short_locator : Prometheus.Counter.t;
+    operations_fetching_canceled_new_branch : Prometheus.Counter.t;
+    operations_fetching_canceled_new_known_valid_head : Prometheus.Counter.t;
+    operations_fetching_canceled_new_unknown_head : Prometheus.Counter.t;
+    unknown_error : Prometheus.Counter.t;
+    connections : Prometheus.Counter.t;
+  }
+
+  let init name =
+    let subsystem = String.concat "_" name in
+    let on_no_request =
+      let help =
+        "Number of time we did no hear new messages from a peer since the last \
+         timeout."
+      in
+      Prometheus.Counter.v ~help ~namespace ~subsystem "on_no_request_count"
+    in
+    let new_head_completed =
+      let help =
+        "Number of time we successfuly completed a new head request from a \
+         peer."
+      in
+      Prometheus.Counter.v ~help ~namespace ~subsystem "new_head_completed"
+    in
+    let new_branch_completed =
+      let help =
+        "Number of time we successfuly completed a new branch request from a \
+         peer."
+      in
+      Prometheus.Counter.v ~help ~namespace ~subsystem "new_branch_completed"
+    in
+    let invalid_locator =
+      let help = "Number of time we received an invalid locator from a peer." in
+      Prometheus.Counter.v ~help ~namespace ~subsystem "invalid_locator"
+    in
+    let invalid_block =
+      let help = "Number of time we received an invalid block from a peer." in
+      Prometheus.Counter.v ~help ~namespace ~subsystem "invalid_block"
+    in
+    let system_error =
+      let help =
+        "Number of time a request trigerred a system error from a peer."
+      in
+      Prometheus.Counter.v ~help ~namespace ~subsystem "system_error"
+    in
+    let unavailable_protocol =
+      let help =
+        "Number of time we received an unknown protocol from a peer."
+      in
+      Prometheus.Counter.v ~help ~namespace ~subsystem "unavailable_protocol"
+    in
+    let unknown_ancestor =
+      let help =
+        "Number of time we received a locator with an unknown ancestor from a \
+         peer."
+      in
+      Prometheus.Counter.v ~help ~namespace ~subsystem "unknown_ancestor"
+    in
+    let too_short_locator =
+      let help =
+        "Number of time we received a too short locator from a peer."
+      in
+      Prometheus.Counter.v ~help ~namespace ~subsystem "too_short_locator"
+    in
+    let operations_fetching_canceled_new_branch =
+      let help =
+        "Number of time we canceled the fetching of operations on a new branch \
+         request for a peer."
+      in
+      Prometheus.Counter.v
+        ~help
+        ~namespace
+        ~subsystem
+        "operations_fetching_canceled_new_branch"
+    in
+    let operations_fetching_canceled_new_known_valid_head =
+      let help =
+        "Number of time we canceled the fetching of operations on a new head \
+         request for a peer."
+      in
+      Prometheus.Counter.v
+        ~help
+        ~namespace
+        ~subsystem
+        "operations_fetching_canceled_new_known_valid_head"
+    in
+    let operations_fetching_canceled_new_unknown_head =
+      let help =
+        "Number of time we canceled the fetching of operations on a new head \
+         request or an unknown head for a peer."
+      in
+      Prometheus.Counter.v
+        ~help
+        ~namespace
+        ~subsystem
+        "operations_fetching_canceled_new_unknown_head"
+    in
+    let unknown_error =
+      let help = "Number of time an unknown error happened for a peer." in
+      Prometheus.Counter.v ~help ~namespace ~subsystem "unknown_error"
+    in
+    let connections =
+      let help = "Number of time we connected to a peer." in
+      Prometheus.Counter.v ~help ~namespace ~subsystem "connections"
+    in
+    {
+      on_no_request;
+      new_head_completed;
+      new_branch_completed;
+      invalid_locator;
+      invalid_block;
+      system_error;
+      unavailable_protocol;
+      unknown_ancestor;
+      too_short_locator;
+      operations_fetching_canceled_new_branch;
+      operations_fetching_canceled_new_known_valid_head;
+      operations_fetching_canceled_new_unknown_head;
+      unknown_error;
+      connections;
+    }
 end

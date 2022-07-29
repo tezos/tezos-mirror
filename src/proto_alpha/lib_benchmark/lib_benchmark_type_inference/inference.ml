@@ -48,10 +48,10 @@ let pp_comparability fmtr (cmp : comparability) =
 
 let sup_comparability (c1 : comparability) (c2 : comparability) =
   match (c1, c2) with
-  | (Unconstrained, c) | (c, Unconstrained) -> Some c
-  | (Comparable, Comparable) -> Some Comparable
-  | (Not_comparable, Not_comparable) -> Some Not_comparable
-  | (Comparable, Not_comparable) | (Not_comparable, Comparable) -> None
+  | Unconstrained, c | c, Unconstrained -> Some c
+  | Comparable, Comparable -> Some Comparable
+  | Not_comparable, Not_comparable -> Some Not_comparable
+  | Comparable, Not_comparable | Not_comparable, Comparable -> None
 
 type michelson_type =
   | Base_type of {repr : Type.Base.t option; comparable : comparability}
@@ -247,7 +247,7 @@ module M = struct
     }
 
   let ( >>= ) m f s =
-    let (x, s) = m s in
+    let x, s = m s in
     f x s
     [@@inline]
 
@@ -257,25 +257,25 @@ module M = struct
 
   let uf_lift : 'a UF.M.t -> 'a t =
    fun computation state ->
-    let (res, uf) = computation state.uf in
+    let res, uf = computation state.uf in
     (res, {state with uf})
    [@@inline]
 
   let repr_lift : 'a Repr_sm.t -> 'a t =
    fun computation state ->
-    let (res, repr) = computation state.repr in
+    let res, repr = computation state.repr in
     (res, {state with repr})
    [@@inline]
 
   let annot_instr_lift : 'a Annot_instr_sm.t -> 'a t =
    fun computation state ->
-    let (res, annot_instr) = computation state.annot_instr in
+    let res, annot_instr = computation state.annot_instr in
     (res, {state with annot_instr})
    [@@inline]
 
   let annot_data_lift : 'a Annot_data_sm.t -> 'a t =
    fun computation state ->
-    let (res, annot_data) = computation state.annot_data in
+    let res, annot_data = computation state.annot_data in
     (res, {state with annot_data})
    [@@inline]
 
@@ -380,17 +380,17 @@ let rec unify (x : Type.Stack.t) (y : Type.Stack.t) : unit M.t =
   if x.tag = y.tag then return ()
   else
     match (x.node, y.node) with
-    | (Empty_t, Empty_t) -> return ()
-    | (Stack_var_t x, Stack_var_t y) ->
+    | Empty_t, Empty_t -> return ()
+    | Stack_var_t x, Stack_var_t y ->
         M.uf_lift (UF.find x) >>= fun root_x ->
         M.uf_lift (UF.find y) >>= fun root_y ->
         get_repr_exn root_x >>= fun repr_x ->
         get_repr_exn root_y >>= fun repr_y ->
         M.uf_lift (UF.union x y) >>= fun root ->
         merge_reprs repr_x repr_y >>= fun repr -> set_repr root repr
-    | (Stack_var_t v, _) -> unify_single_stack v y
-    | (_, Stack_var_t v) -> unify_single_stack v x
-    | (Item_t (ty1, tail1), Item_t (ty2, tail2)) ->
+    | Stack_var_t v, _ -> unify_single_stack v y
+    | _, Stack_var_t v -> unify_single_stack v x
+    | Item_t (ty1, tail1), Item_t (ty2, tail2) ->
         unify_base ty1 ty2 >>= fun () ->
         unify tail1 tail2 >>= fun () -> return ()
     | _ -> raise (Ill_typed_script (Stack_types_incompatible (x, y)))
@@ -412,37 +412,37 @@ and unify_base (x : Type.Base.t) (y : Type.Base.t) : unit M.t =
   if x.tag = y.tag then return ()
   else
     match (x.node, y.node) with
-    | (Unit_t, Unit_t)
-    | (Int_t, Int_t)
-    | (Nat_t, Nat_t)
-    | (Bool_t, Bool_t)
-    | (String_t, String_t)
-    | (Bytes_t, Bytes_t)
-    | (Key_hash_t, Key_hash_t)
-    | (Timestamp_t, Timestamp_t)
-    | (Mutez_t, Mutez_t)
-    | (Key_t, Key_t) ->
+    | Unit_t, Unit_t
+    | Int_t, Int_t
+    | Nat_t, Nat_t
+    | Bool_t, Bool_t
+    | String_t, String_t
+    | Bytes_t, Bytes_t
+    | Key_hash_t, Key_hash_t
+    | Timestamp_t, Timestamp_t
+    | Mutez_t, Mutez_t
+    | Key_t, Key_t ->
         return ()
-    | (Option_t x, Option_t y) -> unify_base x y
-    | (List_t x, List_t y) -> unify_base x y
-    | (Set_t x, Set_t y) -> unify_base x y
-    | (Map_t (kx, vx), Map_t (ky, vy)) ->
+    | Option_t x, Option_t y -> unify_base x y
+    | List_t x, List_t y -> unify_base x y
+    | Set_t x, Set_t y -> unify_base x y
+    | Map_t (kx, vx), Map_t (ky, vy) ->
         unify_base kx ky >>= fun () -> unify_base vx vy
-    | (Pair_t (x, x'), Pair_t (y, y')) ->
+    | Pair_t (x, x'), Pair_t (y, y') ->
         unify_base x y >>= fun () -> unify_base x' y'
-    | (Union_t (x, x'), Union_t (y, y')) ->
+    | Union_t (x, x'), Union_t (y, y') ->
         unify_base x y >>= fun () -> unify_base x' y'
-    | (Lambda_t (x, x'), Lambda_t (y, y')) ->
+    | Lambda_t (x, x'), Lambda_t (y, y') ->
         unify_base x y >>= fun () -> unify_base x' y'
-    | (Var_t x, Var_t y) ->
+    | Var_t x, Var_t y ->
         M.uf_lift (UF.find x) >>= fun root_x ->
         M.uf_lift (UF.find y) >>= fun root_y ->
         get_repr_exn root_x >>= fun repr_x ->
         get_repr_exn root_y >>= fun repr_y ->
         M.uf_lift (UF.union x y) >>= fun root ->
         merge_reprs repr_x repr_y >>= fun repr -> set_repr root repr
-    | (Var_t v, _) -> unify_single_var v y
-    | (_, Var_t v) -> unify_single_var v x
+    | Var_t v, _ -> unify_single_var v y
+    | _, Var_t v -> unify_single_var v x
     | _ ->
         instantiate_base x >>= fun x ->
         instantiate_base y >>= fun y ->
@@ -452,11 +452,11 @@ and merge_reprs (repr1 : michelson_type) (repr2 : michelson_type) :
     michelson_type M.t =
   let open M in
   match (repr1, repr2) with
-  | ((Stack_type None as repr), Stack_type None)
-  | ((Stack_type (Some _) as repr), Stack_type None)
-  | (Stack_type None, (Stack_type (Some _) as repr)) ->
+  | (Stack_type None as repr), Stack_type None
+  | (Stack_type (Some _) as repr), Stack_type None
+  | Stack_type None, (Stack_type (Some _) as repr) ->
       return repr
-  | ((Stack_type (Some sty1) as repr), Stack_type (Some sty2)) ->
+  | (Stack_type (Some sty1) as repr), Stack_type (Some sty2) ->
       unify sty1 sty2 >>= fun () -> return repr
   | ( Base_type {repr = opt1; comparable = cmp1},
       Base_type {repr = opt2; comparable = cmp2} ) -> (
@@ -469,14 +469,14 @@ and merge_reprs (repr1 : michelson_type) (repr2 : michelson_type) :
                   (Comparability_error_types (repr1, repr2))))
       | Some comparable -> (
           match (opt1, opt2) with
-          | (None, None) -> return (Base_type {repr = None; comparable})
-          | ((Some ty as repr), None) ->
+          | None, None -> return (Base_type {repr = None; comparable})
+          | (Some ty as repr), None ->
               assert_comparability comparable ty >>= fun () ->
               return (Base_type {repr; comparable})
-          | (None, (Some ty as repr)) ->
+          | None, (Some ty as repr) ->
               assert_comparability comparable ty >>= fun () ->
               return (Base_type {repr; comparable})
-          | (Some ty1, Some ty2) ->
+          | Some ty1, Some ty2 ->
               unify_base ty1 ty2 >>= fun () ->
               assert_comparability comparable ty1 >>= fun () ->
               assert_comparability comparable ty2 >>= fun () ->
@@ -555,7 +555,7 @@ and get_comparability (ty : Type.Base.t) : comparability M.t =
       get_comparability lt >>= fun lc ->
       get_comparability rt >>= fun rc ->
       match (lc, rc) with
-      | (Comparable, Comparable) -> return Comparable
+      | Comparable, Comparable -> return Comparable
       | _ -> return Unconstrained)
 
 let fresh =
@@ -601,35 +601,35 @@ let parse_uint30 n : int =
 let arith_type (instr : Mikhailsky_prim.prim) (ty1 : Type.Base.t)
     (ty2 : Type.Base.t) : Type.Base.t option =
   match (instr, ty1.node, ty2.node) with
-  | ((I_ADD | I_MUL), Int_t, Int_t)
-  | ((I_ADD | I_MUL), Int_t, Nat_t)
-  | ((I_ADD | I_MUL), Nat_t, Int_t) ->
+  | (I_ADD | I_MUL), Int_t, Int_t
+  | (I_ADD | I_MUL), Int_t, Nat_t
+  | (I_ADD | I_MUL), Nat_t, Int_t ->
       Some Type.int
-  | ((I_ADD | I_MUL), Nat_t, Nat_t) -> Some Type.nat
-  | (I_SUB, Int_t, Int_t)
-  | (I_SUB, Int_t, Nat_t)
-  | (I_SUB, Nat_t, Int_t)
-  | (I_SUB, Nat_t, Nat_t)
-  | (I_SUB, Timestamp_t, Timestamp_t) ->
+  | (I_ADD | I_MUL), Nat_t, Nat_t -> Some Type.nat
+  | I_SUB, Int_t, Int_t
+  | I_SUB, Int_t, Nat_t
+  | I_SUB, Nat_t, Int_t
+  | I_SUB, Nat_t, Nat_t
+  | I_SUB, Timestamp_t, Timestamp_t ->
       Some Type.int
-  | (I_EDIV, Int_t, Int_t)
-  | (I_EDIV, Int_t, Nat_t)
-  | (I_EDIV, Nat_t, Int_t)
-  | (I_EDIV, Nat_t, Nat_t) ->
+  | I_EDIV, Int_t, Int_t
+  | I_EDIV, Int_t, Nat_t
+  | I_EDIV, Nat_t, Int_t
+  | I_EDIV, Nat_t, Nat_t ->
       Some Type.(option (pair nat nat))
   (* Timestamp *)
-  | (I_ADD, Timestamp_t, Int_t)
-  | (I_ADD, Int_t, Timestamp_t)
-  | (I_SUB, Timestamp_t, Int_t) ->
+  | I_ADD, Timestamp_t, Int_t
+  | I_ADD, Int_t, Timestamp_t
+  | I_SUB, Timestamp_t, Int_t ->
       Some Type.timestamp
   (* Mutez *)
-  | (I_ADD, Mutez_t, Mutez_t)
-  | (I_SUB, Mutez_t, Mutez_t)
-  | (I_MUL, Mutez_t, Nat_t)
-  | (I_MUL, Nat_t, Mutez_t) ->
+  | I_ADD, Mutez_t, Mutez_t
+  | I_SUB, Mutez_t, Mutez_t
+  | I_MUL, Mutez_t, Nat_t
+  | I_MUL, Nat_t, Mutez_t ->
       Some Type.mutez
-  | (I_EDIV, Mutez_t, Nat_t) -> Some Type.(option (pair mutez mutez))
-  | (I_EDIV, Mutez_t, Mutez_t) -> Some Type.(option (pair nat mutez))
+  | I_EDIV, Mutez_t, Nat_t -> Some Type.(option (pair mutez mutez))
+  | I_EDIV, Mutez_t, Mutez_t -> Some Type.(option (pair nat mutez))
   | _ -> None
 
 let rec generate_constraints (path : Mikhailsky.Path.t) (node : Mikhailsky.node)

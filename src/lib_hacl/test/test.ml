@@ -260,8 +260,8 @@ let p256_tests =
 
 let test_ed25519 (v : Bytes.t ed25519_test) : unit =
   log_s "Testing Ed25519" ;
-  let (pk1, sk1) = Hacl.Ed25519.keypair () in
-  let (pk2, _) = Hacl.Ed25519.keypair () in
+  let pk1, sk1 = Hacl.Ed25519.keypair () in
+  let pk2, _ = Hacl.Ed25519.keypair () in
   assert (pk1 <> pk2) ;
   log_s "[Ed25519.keypair] Success" ;
   assert (pk1 = Hacl.Ed25519.neuterize sk1) ;
@@ -280,8 +280,8 @@ let test_ed25519 (v : Bytes.t ed25519_test) : unit =
 
 let test_p256 (v : Bytes.t p256_test) : unit =
   log_s "Testing P256" ;
-  let (pk1, sk1) = Hacl.P256.keypair () in
-  let (pk2, _) = Hacl.P256.keypair () in
+  let pk1, sk1 = Hacl.P256.keypair () in
+  let pk2, _ = Hacl.P256.keypair () in
   assert (pk1 <> pk2) ;
   log_s "[P256.keypair] Success" ;
   assert (pk1 = Hacl.P256.neuterize sk1) ;

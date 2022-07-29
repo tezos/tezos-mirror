@@ -67,12 +67,12 @@ module Round_cache_key = struct
       {
         predecessor_timestamp = pred_t;
         predecessor_round = pred_r;
-        time_interval = (t_beg, t_end);
+        time_interval = t_beg, t_end;
       }
       {
         predecessor_timestamp = pred_t';
         predecessor_round = pred_r';
-        time_interval = (t_beg', t_end');
+        time_interval = t_beg', t_end';
       } =
     Timestamp.(pred_t = pred_t')
     && Round.(pred_r = pred_r')

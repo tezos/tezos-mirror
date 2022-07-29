@@ -600,8 +600,8 @@ let test_round_and_offset_correction =
           ~level_offset
       in
       match (computed, expected) with
-      | (Error _, Error _) -> return_unit
-      | (Ok {round; offset}, Ok {round = round'; offset = offset'}) ->
+      | Error _, Error _ -> return_unit
+      | Ok {round; offset}, Ok {round = round'; offset = offset'} ->
           Assert.equal_int32
             ~loc:__LOC__
             (Round_repr.to_int32 round)
@@ -611,8 +611,8 @@ let test_round_and_offset_correction =
             ~loc:__LOC__
             (Period_repr.to_seconds offset)
             (Period_repr.to_seconds offset')
-      | (Ok _, Error _) -> failwith "expected error is ok"
-      | (Error _, Ok _) -> failwith "expected ok is error")
+      | Ok _, Error _ -> failwith "expected error is ok"
+      | Error _, Ok _ -> failwith "expected ok is error")
 
 let tests =
   Tztest.

@@ -28,7 +28,7 @@
    Component:    Michelson
    Invocation:   dune exec tezt/tests/main.exe -- --file views.ml
    Subject:      Call smart contract views to catch performance regressions.
- *)
+*)
 
 (* This contract registers all SOURCE addresses that ever call it. It has views
    that return registered callers count and the last caller address respectively. *)
@@ -99,7 +99,6 @@ let register =
     ~__FILE__
     ~title:"Run views"
     ~tags:["client"; "michelson"]
-    ~output_file:(fun _ -> "run_views")
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* register_callers =

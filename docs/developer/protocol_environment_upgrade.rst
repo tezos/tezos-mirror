@@ -1,7 +1,10 @@
-Add new environment
-===================
+Adding a new protocol environment
+=================================
 
-The economic protocols of Tezos are compiled against a restricted set of libraries. This is for security reasons (so that, e.g., the protocol can never be leveraged for accessing files of the host machine) and safety reasons (so that, e.g., the protocol is immune to some categories of errors).
+The economic protocols of Tezos are compiled against a restricted set of libraries.
+This is for security reasons (so that, e.g., the protocol can never be leveraged for accessing files
+of the host machine) and safety reasons (so that, e.g., the protocol is immune to some categories of errors).
+See the general overview in :doc:`Protocol environment <../shell/protocol_environment>`.
 
 The set of libraries a protocol is compiled against is called the *protocol environment*, or simply, the *environment*.
 
@@ -13,29 +16,31 @@ This page details the process of creating a new environment by copying the lates
 Bootstrap
 ---------
 
-The following steps are roughly the steps taken in the `V5 bootstrap MR <https://gitlab.com/tezos/tezos/-/merge_requests/4071>`__
+The following steps are roughly the steps taken in the `V6 bootstrap MR <https://gitlab.com/tezos/tezos/-/merge_requests/4961>`__
 
 1. Copy the existing environment files:
 
    * Copy the directory ``src/lib_protocol_environment/sigs/v<N-1>`` into ``src/lib_protocol_environment/sigs/v<N>``
 
-   * Copy the file ``src/lib_protocol_environment/sigs/v<N-1>.dune.inc`` into ``src/lib_protocol_environment/sigs/v<N>.dune.inc`` and adapt the version number in it
+   * Copy the file ``src/lib_protocol_environment/sigs/v<N-1>.in.ml`` into ``src/lib_protocol_environment/sigs/v<N>.in.ml``
 
-2. Make the new environment buildable by updating ``src/lib_protocol_environment/sigs/dune``:
+2. Make the new environment buildable by updating ``manifest/main.ml``:
 
-   * Add ``(include v<N>.dune.inc)``
+   * Bump the ``latest_environment_number`` in ``manifest/main.ml``.
 
-   * Add the new version to ``library.modules``
+   * Run ``make -C manifest``
 
 3. Copy the existing compatibility layer if any (see details in `Struct compatibility layer <#struct-compatibility-layer>`__).
 
-   * If the file exists, copy ``src/lib_protocol_environment/structs/v<N-1>.dune.inc`` into ``src/lib_protocol_environment/structs/v<N>.dune.inc`` and do not change its content
+   * Update  ``src/lib_protocol_environment/structs/tezos_protocol_environment_structs.ml`` to add a new submodule ``V<N>`` by copying the submodule ``V<N-1>``.
 
 4. Copy and adapt the environment functor:
 
    * Copy ``src/lib_protocol_environment/environment_V<N-1>.ml[i]`` to ``src/lib_protocol_environment/environment_V<N>.ml[i]``
 
    * Change any reference from ``V<N-1>`` to ``V<N>`` in all those copied files the
+
+   * Update ``src/lib_protocol_environment/environment_context_intf.ml``
 
 5. If the protocol signature is expected to change then copy and adapt it otherwise leave it as is:
 
@@ -49,12 +54,6 @@ The following steps are roughly the steps taken in the `V5 bootstrap MR <https:/
 6. Add references to the new environment version number in the rest of the code:
 
    * Add references to ``src/lib_base/protocol.ml[i]``
-
-   * Add references to ``src/lib_protocol_environment/sigs/v*/protocol.mli`` (in all versions, not just the newly created one)
-
-   * ``src/lib_shell/prevalidation.ml``
-
-   * ``src/lib_store/legacy_store/legacy_state.ml``
 
    * ``src/lib_validation/block_validation.ml``
 
@@ -72,9 +71,9 @@ It is recommended that you test your work more comprehensively offline. To that 
 Struct compatibility layer
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The struct compatibility layer is for providing compatibility between a signature of the protocol environment (which is set in stone) and the interface of an external library that provides it (which might change from version to version). E.g., at the time of the V0 environment the OCaml Stdlib did not include an ``Option`` module and so a custom one was provided in the whole of the Tezos project including the protocol environment; later, when the Tezos project switched to the now available and standard ``Stdlib.Option`` module, the struct compatibility module ``src/lib_protocol_environment/structs/v0/option.ml`` was added.
+The struct compatibility layer is for providing compatibility between a signature of the protocol environment (which is set in stone) and the interface of an external library that provides it (which might change from version to version). E.g., at the time of the V0 environment the OCaml Stdlib did not include an ``Option`` module and so a custom one was provided in the whole of the Tezos project including the protocol environment; later, when the Tezos project switched to the now available and standard ``Stdlib.Option`` module, the struct compatibility module ``src/lib_protocol_environment/structs/v0_option.ml`` was added.
 
-More recent protocol environments generally need less struct compatibility modules. Occasionally, the most recent environment needs no compatibility layer at all. You can know if this is the case by checking the file ``src/lib_protocol_environment/structs/v<N-1>.dune.inc``: if it exists then there is a compatibility layer, if it doesn't then there isn't.
+More recent protocol environments generally need less struct compatibility modules. Occasionally, the most recent environment needs no compatibility layer at all. You can know if this is the case by checking the file ``src/lib_protocol_environment/structs/tezos_protocol_environment_structs.ml``: if the submodule ``V<N>`` exists and is not empty then there is a compatibility layer, otherwise there isn't.
 
 Either way, the instructions in the list above are sufficient for creating the new environment.
 
@@ -97,16 +96,19 @@ How to activate
 To activate the environment you will need to change the following files, adding references to ``V<N>`` to match the references to ``V<N-1>``:
 
 * ``src/lib_protocol_environment/tezos_protocol_environment.ml[i]``
-* ``src/lib_protocol_environment/dune``
 * ``src/lib_protocol_updater/registered_protocol.ml[i]``
 * ``src/lib_protocol_compiler/registerer.ml[i]``
 * ``src/lib_protocol_compiler/embedded_cmis.mli``
 * ``src/lib_protocol_compiler/compiler.ml``
 * ``src/lib_protocol_compiler/dune``
 
+Update ``manifest/main.ml`` to embed the new environment version in ``embedded_cmis.ml``, and then run ``make -C manifest``.
+
+Bump environment version in ``src/bin_client/test/proto_test_injection/TEZOS_PROTOCOL`` and in the embedded ``TEZOS_PROTOCOL`` found in ``tezt/tests/voting.ml``. Update the corresponding test in the multiple ``tests_python/tests_*/test_injection.py`` accordingly.
+
 And finally, bump environment version in ``src/proto_alpha/lib_protocol/dune.inc`` and ``src/proto_alpha/lib_protocol/TEZOS_PROTOCOL``.
 
-For an example, check `the MR in which the environment V3 was activated <https://gitlab.com/tezos/tezos/-/merge_requests/3040>`__.
+For an example, check `the MR in which the environment V6 was activated <https://gitlab.com/tezos/tezos/-/merge_requests/4961>`__.
 
 
 Making changes in the environment
@@ -118,7 +120,7 @@ You can make changes to the newly created environment until it is released. For 
 
   * Add the interface file ``src/lib_protocol_environment/sigs/v3/result.mli``
 
-  * Add a reference to the file in ``src/lib_protocol_environment/sigs/v3.dune.inc``
+  * Add a reference to the file in ``src/lib_protocol_environment/sigs/v3.in.ml``
 
   * Declare the ``Result`` module in the functor in ``src/lib_protocol_environment/environment_V3.ml``
 
@@ -133,4 +135,3 @@ You can make changes to the newly created environment until it is released. For 
   * Replace some of the environment modules with a new one (remove old files)
 
   * Remove struct compatibility module (the new interface is identical to the one in the most recent library)
-

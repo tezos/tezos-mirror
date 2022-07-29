@@ -39,13 +39,13 @@ module Program = Client_aliases.Alias (struct
 
   let encoding =
     Data_encoding.conv
-      (fun ({Michelson_v1_parser.source}, _) -> source)
+      (fun ({Michelson_v1_parser.source; _}, _) -> source)
       (fun source -> Michelson_v1_parser.parse_toplevel source)
       Data_encoding.string
 
   let of_source source = return (Michelson_v1_parser.parse_toplevel source)
 
-  let to_source ({Michelson_v1_parser.source}, _) = return source
+  let to_source ({Michelson_v1_parser.source; _}, _) = return source
 
   let name = "script"
 end)
@@ -160,7 +160,7 @@ let typecheck_program cctxt ~(chain : Chain_services.chain) ~block ?gas
 let print_typecheck_result ~emacs ~show_types ~print_source_on_error program res
     (cctxt : #Client_context.printer) =
   if emacs then
-    let (type_map, errs, _gas) =
+    let type_map, errs, _gas =
       match res with
       | Ok (type_map, gas) -> (type_map, [], Some gas)
       | Error

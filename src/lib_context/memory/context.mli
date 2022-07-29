@@ -24,58 +24,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Implementation of Tezos context fully in memory. *)
-module Make (Encoding : module type of Tezos_context_encoding.Context) : sig
-  type index
+module type TEZOS_CONTEXT_MEMORY = sig
+  type tree
 
   include
-    Tezos_context_sigs.Context.S
-      with type index := index
-       and type kinded_key = [`Value of Context_hash.t | `Node of Context_hash.t]
-
-  val index : t -> index
-
-  val exists : index -> Context_hash.t -> bool Lwt.t
-
-  val checkout : index -> Context_hash.t -> t option Lwt.t
-
-  val checkout_exn : index -> Context_hash.t -> t Lwt.t
-
-  val hash : time:Time.Protocol.t -> ?message:string -> t -> Context_hash.t
-
-  val commit :
-    time:Time.Protocol.t -> ?message:string -> t -> Context_hash.t Lwt.t
-
-  val create : unit -> t
-
-  val empty : t
-
-  val encoding : t Data_encoding.t
-
-  val get_protocol : t -> Protocol_hash.t Lwt.t
-
-  val add_protocol : t -> Protocol_hash.t -> t Lwt.t
-
-  (** Get the hash version used for the context *)
-  val get_hash_version : t -> Context_hash.Version.t
-
-  (** Set the hash version used for the context.  It may recalculate the hashes
-    of the whole context, which can be a long process.
-    Returns an [Error] if the hash version is unsupported. *)
-  val set_hash_version : t -> Context_hash.Version.t -> t tzresult Lwt.t
+    Tezos_context_sigs.Context.TEZOS_CONTEXT
+      with type memory_context_tree := tree
+       and type tree := tree
+       and type value_key = Context_hash.t
+       and type node_key = Context_hash.t
 
   (** Exception raised by [find_tree] and [add_tree] when applied to shallow
     trees. It is exposed so that it can be catched by the proxy where such
     operations on shallow trees are expected. *)
   exception Context_dangling_hash of string
 
-  val add_predecessor_block_metadata_hash :
-    t -> Block_metadata_hash.t -> t Lwt.t
-
-  val add_predecessor_ops_metadata_hash :
-    t -> Operation_metadata_list_list_hash.t -> t Lwt.t
-
-  val get_test_chain : t -> Test_chain_status.t Lwt.t
-
-  val add_test_chain : t -> Test_chain_status.t -> t Lwt.t
+  val encoding : t Data_encoding.t
 end
+
+(** Implementation of Tezos context fully in memory. *)
+module Make (Encoding : module type of Tezos_context_encoding.Context) :
+  TEZOS_CONTEXT_MEMORY

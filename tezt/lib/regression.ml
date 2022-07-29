@@ -52,7 +52,11 @@ let run_and_capture_output ~output_file (f : unit -> 'a Lwt.t) =
     let parent = Filename.dirname filename in
     if String.length parent < String.length filename then (
       create_parent parent ;
-      if not (Sys.file_exists parent) then Unix.mkdir parent 0o755)
+      if not (Sys.file_exists parent) then
+        try Unix.mkdir parent 0o755
+        with Unix.Unix_error (EEXIST, _, _) ->
+          (* Can happen with [-j] in particular. *)
+          ())
   in
   create_parent output_file ;
   let channel = open_out output_file in
@@ -78,20 +82,54 @@ let log_regression_diff diff =
         Log.log ~level:Error ~color "%s" line)
     (String.split_on_char '\n' diff)
 
-let all_output_files = ref String_set.empty
+(* Map from output directories to output files.
+   Output directories are directories that are supposed to only contain output files.
+   Subdirectories of output directories do not appear as keys in this map.
+   In the map, output files can be in subdirectories (i.e. they can contain '/'). *)
+let output_dirs_and_files : String_set.t String_map.t ref = ref String_map.empty
 
-let output_file_extension = "out"
-
-let full_output_file output_file =
-  (Cli.options.regression_dir // output_file) ^ "." ^ output_file_extension
-
-let register ~__FILE__ ~title ~tags ~output_file f =
+let register ~__FILE__ ~title ~tags ?file f =
   let tags = "regression" :: tags in
-  all_output_files := String_set.add output_file !all_output_files ;
+  let output_dir = project_root // Filename.dirname __FILE__ // "expected" in
+  let relative_output_file =
+    let file =
+      match file with
+      | Some file -> file
+      | None ->
+          (* Sanitize title. We exclude ':' because of Windows. *)
+          let sanitize_char = function
+            | ( 'a' .. 'z'
+              | 'A' .. 'Z'
+              | '0' .. '9'
+              | '_' | '-' | '.' | ' ' | '(' | ')' ) as x ->
+                x
+            | _ -> '-'
+          in
+          let full = String.map sanitize_char title in
+          let max_length = 80 in
+          if String.length full > max_length then String.sub full 0 max_length
+          else full
+    in
+    Filename.basename __FILE__ // (file ^ ".out")
+  in
+  let old_relative_output_files =
+    String_map.find_opt output_dir !output_dirs_and_files
+    |> Option.value ~default:String_set.empty
+  in
+  let stored_full_output_file = output_dir // relative_output_file in
+  if String_set.mem relative_output_file old_relative_output_files then
+    invalid_arg
+      (sf
+         "the output of test %S would be stored in %S, which is already used \
+          by another test"
+         title
+         stored_full_output_file) ;
+  output_dirs_and_files :=
+    String_map.add
+      output_dir
+      (String_set.add relative_output_file old_relative_output_files)
+      !output_dirs_and_files ;
   Test.register ~__FILE__ ~title ~tags (fun () ->
-      (* We cannot compute [stored_full_output_file] before [Test.register]
-         because [Cli.init] must have been called. *)
-      let stored_full_output_file = full_output_file output_file in
       (* when the stored output doesn't already exists, must reset regressions *)
       if
         not
@@ -104,15 +142,13 @@ let register ~__FILE__ ~title ~tags ~output_file f =
           (Log.quote_shell stored_full_output_file)
           (Log.quote_shell title) ;
       let capture_f ~full_output_file =
-        run_and_capture_output ~output_file:full_output_file @@ fun () ->
-        capture (output_file ^ "." ^ output_file_extension) ;
-        f ()
+        run_and_capture_output ~output_file:full_output_file f
       in
       if Cli.options.reset_regressions then
         capture_f ~full_output_file:stored_full_output_file
       else
         (* store the current run into a temp file *)
-        let temp_full_output_file = Temp.file output_file in
+        let temp_full_output_file = Temp.file relative_output_file in
         let* () = capture_f ~full_output_file:temp_full_output_file in
         (* compare the captured output with the stored output *)
         let diff_process =
@@ -152,8 +188,12 @@ let register ~__FILE__ ~title ~tags ~output_file f =
               (Log.quote_shell stored_full_output_file)
               (Log.quote_shell title))
 
-let check_unknown_output_files () =
-  let full_output_files = String_set.map full_output_file !all_output_files in
+let check_unknown_output_files output_dir relative_output_files =
+  let full_output_files =
+    String_set.map
+      (fun relative_output_file -> output_dir // relative_output_file)
+      relative_output_files
+  in
   let found_unknown = ref false in
   let mode = Cli.options.on_unknown_regression_files_mode in
   let log_unused = match mode with Fail -> Log.error | _ -> Log.warn in
@@ -177,9 +217,20 @@ let check_unknown_output_files () =
               log_unused "%s is not used by any test and can be deleted." full ;
               found_unknown := true)
     in
-    Array.iter handle_file (Sys.readdir path) ;
+    let try_to_read_dir () =
+      try Sys.readdir path
+      with Sys_error _ ->
+        (* Mostly happens if [path] does not exist or is not a
+           directory, in which case we have nothing to browse.
+           Could also happen because of permissions or other system issues,
+           but since this is just a check to help developers, we
+           don't want to bother them if this happens. *)
+        [||]
+    in
+    Array.iter handle_file (try_to_read_dir ()) ;
     (* Check whether directory is empty now that we may have deleted files. *)
-    match Sys.readdir path with
+    match try_to_read_dir () with
+    | exception Sys_error _ -> ()
     | [||] ->
         if mode = Delete then
           try
@@ -192,7 +243,7 @@ let check_unknown_output_files () =
           found_unknown := true)
     | _ -> ()
   in
-  browse Cli.options.regression_dir ;
+  browse output_dir ;
   if !found_unknown then (
     Log.warn
       "Use --on-unknown-regression-files delete to delete those files and/or \
@@ -204,6 +255,6 @@ let () =
   (* We cannot run [check_unknown_output_files] before [Cli.init],
      and we cannot run it from the [Test] module because it would create
      a circular dependency. *)
-  Test.before_test_run (fun () ->
-      if Cli.options.on_unknown_regression_files_mode <> Ignore then
-        check_unknown_output_files ())
+  Test.before_test_run @@ fun () ->
+  if Cli.options.on_unknown_regression_files_mode <> Ignore then
+    String_map.iter check_unknown_output_files !output_dirs_and_files

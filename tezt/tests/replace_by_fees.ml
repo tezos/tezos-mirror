@@ -106,7 +106,7 @@ let default_fee = 1000
 let replacement_fee = minimal_replacement_fee default_fee
 
 (* Default gas limit used in the tests of this module *)
-let default_gas = 1000
+let default_gas = 1000 + Constant.manager_operation_gas_cost
 
 (* Default transferred amount used in the tests of this module *)
 let default_amount = 1
@@ -147,27 +147,18 @@ let get_counter ?(contract = default_source) client =
 
 (* Auxiliary function that constructs a batch transfer of the given size *)
 let mk_batch client op_data size =
-  let* counter = op_data.get_counter client in
+  let open Operation.Manager in
+  let* counter_opt = op_data.get_counter client in
   let* counter =
-    match counter with None -> get_counter client | Some c -> Lwt.return c
+    match counter_opt with
+    | None -> get_next_counter client
+    | Some c -> Lwt.return c
   in
-  let rec batch_rec nb acc =
-    if nb < 0 then Lwt.return []
-    else if nb = 0 then Lwt.return acc
-    else
-      let* op =
-        Operation.mk_transfer
-          ~source:default_source
-          ~counter:(counter + nb)
-          ~fee:op_data.fee
-          ~gas_limit:op_data.gas
-          ~amount:op_data.amount
-          ~dest:default_source
-          client
-      in
-      batch_rec (nb - 1) (op :: acc)
+  let fee, gas_limit, amount = (op_data.fee, op_data.gas, op_data.amount) in
+  let transfers =
+    List.map (fun _ -> transfer ~dest:default_source ~amount ()) (range 1 size)
   in
-  batch_rec size []
+  make_batch ~counter ~fee ~gas_limit transfers |> return
 
 (* This is a generic function used to write most of the tests below. In
    addition to the test's title the function takes:
@@ -203,43 +194,22 @@ let replacement_test_helper ~title ~__LOC__ ~op1 ?(size1 = 1) ~op2 ?(size2 = 1)
   @@ fun protocol ->
   let* nodes = Helpers.init ~protocol () in
   let client = nodes.main.client in
-  let signer = default_source in
+  let inject batch = Operation.Manager.inject ~force:true batch client in
   let* oph1 =
     let* batch = mk_batch client op1 size1 in
-    incheck1 ~__LOC__ nodes @@ fun () ->
-    Operation.forge_and_inject_operation
-      ~async:true
-      ~force:true
-      ~protocol
-      ~batch
-      ~signer
-      client
+    incheck1 ~__LOC__ nodes @@ fun () -> inject batch
   in
   let* oph2 =
     let* batch = mk_batch client op2 size2 in
-    incheck2 ~__LOC__ nodes @@ fun () ->
-    Operation.forge_and_inject_operation
-      ~async:true
-      ~force:true
-      ~protocol
-      ~batch
-      ~signer
-      client
+    incheck2 ~__LOC__ nodes @@ fun () -> inject batch
   in
   let* () = postcheck2 nodes oph1 oph2 in
   match (op3, incheck3, postcheck3) with
-  | (None, None, None) -> unit
-  | (Some op3, Some incheck3, Some postcheck3) ->
+  | None, None, None -> unit
+  | Some op3, Some incheck3, Some postcheck3 ->
       let* oph3 =
         let* batch = mk_batch client op3 size3 in
-        incheck3 ~__LOC__ nodes @@ fun () ->
-        Operation.forge_and_inject_operation
-          ~async:true
-          ~force:true
-          ~protocol
-          ~batch
-          ~signer
-          client
+        incheck3 ~__LOC__ nodes @@ fun () -> inject batch
       in
       postcheck3 nodes oph1 oph2 oph3
   | _ -> Test.fail ~__LOC__ "Test is illformed"
@@ -441,15 +411,14 @@ let replace_simple_op_with_a_batched_low_fees =
     ~postcheck2:(fun nodes h1 _h2 -> op_is_applied ~__LOC__ nodes h1)
     ()
 
-(* Sum of fees of the second operation is ok, ans gas is ok in the whole batch.
-   So, replacement is ok. *)
+(* Sum of fees of the second operation is ok, and gas is ok in the
+   whole batch. So, replacement is ok. *)
 let replace_simple_op_with_a_batched =
   replacement_test_helper
     ~__LOC__
     ~title:"2nd operation's gas limit is constant. Replacement possible."
-    ~op1:default_op
-    ~op2:
-      {default_op with gas = default_gas / 2; fee = (replacement_fee / 2) + 1}
+    ~op1:{default_op with gas = default_gas * 2}
+    ~op2:{default_op with gas = default_gas; fee = (replacement_fee / 2) + 1}
     ~size2:2
     ~incheck1:check_applied
     ~incheck2:check_applied

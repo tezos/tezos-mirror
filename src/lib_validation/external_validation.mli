@@ -45,6 +45,7 @@ type request =
         Operation_metadata_list_list_hash.t option;
       operations : Operation.t list list;
       max_operations_ttl : int;
+      simulate : bool;
     }
   | Preapply of {
       chain_id : Chain_id.t;
@@ -70,6 +71,7 @@ type request =
     }
   | Commit_genesis of {chain_id : Chain_id.t}
   | Fork_test_chain of {
+      chain_id : Chain_id.t;
       context_hash : Context_hash.t;
       forked_header : Block_header.t;
     }

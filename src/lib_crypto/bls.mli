@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include S.AGGREGATE_SIGNATURE
+include
+  S.AGGREGATE_SIGNATURE
+    with type Public_key.t = Bls12_381.Signature.MinPk.pk
+     and type Secret_key.t = Bls12_381.Signature.sk
+     and type t = Bls12_381.Signature.MinPk.signature
 
 include S.RAW_DATA with type t := t

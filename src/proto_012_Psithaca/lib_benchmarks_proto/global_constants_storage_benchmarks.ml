@@ -612,8 +612,8 @@ module Global_constants_storage_expand_models = struct
       let size = (Micheline_sampler.micheline_size node).nodes in
       let registered_constant = Int (-1, Z.of_int 1) in
       let hash = registered_constant |> node_to_hash in
-      let (context, _) = Execution_context.make ~rng_state |> assert_ok_lwt in
-      let (context, _, _) =
+      let context, _ = Execution_context.make ~rng_state |> assert_ok_lwt in
+      let context, _, _ =
         Alpha_context.Global_constants_storage.register
           context
           (strip_locations registered_constant)
@@ -700,7 +700,7 @@ module Global_constants_storage_expand_models = struct
       let open Micheline in
       let node = Micheline_sampler.sample rng_state in
       let size = (Micheline_sampler.micheline_size node).nodes in
-      let (context, _) = Execution_context.make ~rng_state |> assert_ok_lwt in
+      let context, _ = Execution_context.make ~rng_state |> assert_ok_lwt in
       let expr = strip_locations node in
       let closure () =
         ignore

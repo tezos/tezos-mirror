@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Matrix = Pyplot.Matrix
-
 module Numpy = struct
   let transpose x =
     let npy_transpose = Py.Module.get_function (Pyinit.numpy ()) "transpose" in
@@ -34,7 +32,7 @@ end
 
 module LinearModel = struct
   let assert_matrix_nontrivial (m : Matrix.t) =
-    let (l, c) = Matrix.shape m in
+    let l, c = Matrix.shape m in
     assert (l <> 0 && c <> 0)
 
   let ridge ~(alpha : float) ?(fit_intercept : bool = false)

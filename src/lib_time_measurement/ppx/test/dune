@@ -1,6 +1,4 @@
 
 (library
  (name tezos_time_measurement_ppx_test)
- (modules utils)
- (inline_tests)
- (preprocess (pps ppx_inline_test)))
+ (modules utils))

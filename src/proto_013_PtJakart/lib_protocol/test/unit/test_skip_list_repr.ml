@@ -75,7 +75,7 @@ struct
   let zero = {size = 1; cells = [(0, genesis ())]}
 
   let succ list =
-    let (prev_cell_ptr, prev_cell) = head list in
+    let prev_cell_ptr, prev_cell = head list in
     let cell = next ~prev_cell ~prev_cell_ptr () in
     {size = list.size + 1; cells = (list.size, cell) :: list.cells}
 

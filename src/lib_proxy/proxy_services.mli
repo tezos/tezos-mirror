@@ -40,13 +40,15 @@ type mode =
   | Proxy_client  (** [tezos-client --mode proxy] is running *)
   | Proxy_server of {
       sleep : float -> unit Lwt.t;
-      sym_block_caching_time : int option;
+      sym_block_caching_time : Ptime.span option;
       on_disk_proxy_builder :
-        (Context_hash.t -> Proxy_delegate.t tzresult Lwt.t) option;
+        (Context_hash.t ->
+        Tezos_protocol_environment.Proxy_delegate.t tzresult Lwt.t)
+        option;
     }
       (** [tezos-proxy-server] is running. The [sleep] field is implemented
           by {!Lwt_unix.sleep}. We don't want to depend on it directly
-          (for compiling to Javascript), hence this field. The [int option] field
+          (for compiling to Javascript), hence this field. The [Ptime.span option] field
           is the value of argument [--sym-block-caching-time]. The
           [(Context_hash.t -> Proxy_delegate.t tzresult Lwt.t) option]
           value is constructed from argument [--data-dir]: if the argument

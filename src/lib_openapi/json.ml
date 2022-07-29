@@ -44,7 +44,7 @@ let as_variant json =
 
 let as_variant_named json name =
   match as_variant json with
-  | (name', value) when name' = name -> value
+  | name', value when name' = name -> value
   | _ -> error json "expected a variant named %s" name
 
 let ( |~> ) json name = as_variant_named json name

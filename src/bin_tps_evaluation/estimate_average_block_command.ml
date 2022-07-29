@@ -105,7 +105,7 @@ module Db = struct
       ) AS _final
       WHERE _final.percentage >= ?
     |}
-        [%blob "./sql/get_all_operations.sql"]
+        Sql.get_all_operations_sql
     in
     Caqti_request.Infix.(
       Caqti_type.(tup3 string string float) ->! Encoding.contract_row)
@@ -142,7 +142,7 @@ module Db = struct
       GROUP BY
         total.transaction_kind
     |}
-        [%blob "./sql/get_all_operations.sql"]
+        Sql.get_all_operations_sql
     in
     Caqti_request.Infix.(
       Caqti_type.(tup2 string string) ->! Encoding.summary_row)

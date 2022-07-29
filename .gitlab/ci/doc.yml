@@ -1,10 +1,10 @@
 ---
 
 # Warning: the documentation:linkcheck job must have at least the same
-# restrictions in the rules as documentation:build, otherwise the CI
-# may complain that documentation:linkcheck depends on documentation:build
+# restrictions in the rules as documentation:build_all, otherwise the CI
+# may complain that documentation:linkcheck depends on documentation:build_all
 # which does not exist.
-documentation:build:
+documentation:build_all:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
@@ -14,53 +14,27 @@ documentation:build:
   before_script:
     - . $HOME/.venv/bin/activate
   script:
-    # CLI manuals are not built in this job. This hack removes their inclusion to
-    # suppress the error sphinx would otherwise throw. Unfortunately, there doesn't
-    # seem to be a more elegant way to suppress this warning.
-    - "sed -i 's@:file:.*[.]html@:file: /dev/null@' ./docs/*/cli-commands.rst"
-    - make -C docs -j html
-  artifacts:
-    expose_as: 'Documentation - excluding odoc and CLI manuals'
-    paths:
-      # Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706)
-      - docs/_build/
-    expire_in: 1 week
-
-documentation:build_all:
-  extends:
-    - .default_settings_template
-    - .image_template__runtime_build_test_dependencies_template
-    - .rules_template__development_manual
-  stage: manual
-  needs: []
-  before_script:
-    - . $HOME/.venv/bin/activate
-  script:
     - make -C docs -j all
   artifacts:
-    expose_as: 'Full documentation - including odoc and CLI manuals'
+    expose_as: 'Documentation - excluding old protocols'
     paths:
       # Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706)
       - docs/_build/
     expire_in: 1 week
-  allow_failure: true
 
 documentation:linkcheck:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
-    - .rules_template__development_manual
-  stage: manual
-  needs:
-    - job: documentation:build
-      artifacts: true
+    - .rules_template__development_documentation
+  stage: doc
+  needs: []
   before_script:
     - . ./scripts/version.sh
     - . $HOME/.venv/bin/activate
   script:
     - make -C docs redirectcheck
     - make -C docs linkcheck
-    - make -C docs sanitycheck
   allow_failure: true
 
 # here we use this hack to publish the tezos documentation on
@@ -77,7 +51,6 @@ publish:documentation:
     - .rules_template__master
   stage: doc
   before_script:
-    - sudo apk add --no-cache openssh-client rsync
     - echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519
     - echo "${CI_KH}" > ~/.ssh/known_hosts
     - chmod 400 ~/.ssh/id_ed25519
@@ -86,7 +59,7 @@ publish:documentation:
     - . $HOME/.venv/bin/activate
   script:
     - if [ "${CI_COMMIT_REF_NAME}" == "master" ] ; then
-        make -C docs all ;
+        make -C docs -j full ;
         git clone --depth 5 git@gitlab.com:${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAMESPACE}.gitlab.io gitlab.io ;
         rsync --recursive --links --perms --delete
           --exclude=.doctrees --exclude={{main,alpha,zero}net,master}/index.html
@@ -102,4 +75,5 @@ publish:documentation:
         git commit -m "Import doc of ${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}:${CI_COMMIT_SHA}" ;
         git push origin master ;
       fi
+  # Publish jobs are uninterruptible to avoid publishing partial results.
   interruptible: false

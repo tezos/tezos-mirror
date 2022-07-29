@@ -28,20 +28,7 @@ open Plugin.Mempool
 open Alpha_context
 open Test_utils
 
-type Environment.Error_monad.error += Generation_failure
-
 (** {2. Conversion helpers} *)
-
-let int32_of_timestamp ts =
-  let i64 = Timestamp.to_seconds ts in
-  let i32 = Int64.to_int32 i64 in
-  if Int64.(equal (of_int32 i32) i64) then Ok i32
-  else Environment.Error_monad.error Generation_failure
-
-let int32_of_timestamp_exn ts =
-  match int32_of_timestamp ts with
-  | Ok i32 -> i32
-  | Error _err -> Stdlib.failwith "int32_of_timestamp_exn: number too big"
 
 let timestamp_of_int32 ts = Timestamp.of_seconds (Int64.of_int32 ts)
 
@@ -65,8 +52,6 @@ module Generator = struct
 
   let of_result = Result.value_f ~default:(fun _ -> assert false)
 
-  let print_int32 ?prefix ?suffix () = decorate ?prefix ?suffix Int32.to_string
-
   let small_nat_32 =
     let+ small_nat = small_nat in
     Int32.of_int small_nat
@@ -74,9 +59,6 @@ module Generator = struct
   let small_signed_32 =
     let+ small_signed_int = small_signed_int in
     Int32.of_int small_signed_int
-
-  let print_small_nat ?prefix ?suffix () =
-    decorate ?prefix ?suffix string_of_int
 
   let dup gen =
     let+ x = gen in
@@ -105,24 +87,12 @@ module Generator = struct
   let print_timestamp = Timestamp.to_notation
 
   let near_timestamps =
-    let+ (i, diff) = pair int32 small_signed_32 in
+    let+ i, diff = pair int32 small_signed_32 in
     timestamp_of_int32 i |> fun ts1 ->
     timestamp_of_int32 Int32.(add i diff) |> fun ts2 -> (ts1, ts2)
 
-  let dummy_timestamp =
-    match Timestamp.of_seconds_string "0" with
-    | Some ts -> ts
-    | _ -> assert false
-
-  let unsafe_sub ts1 ts2 =
-    Int64.to_int @@ Period.to_seconds
-    @@
-    match Timestamp.(ts1 -? ts2) with
-    | Ok diff -> diff
-    | Error _ -> assert false
-
   let successive_timestamp =
-    let+ (ts, (diff : int)) = pair timestamp small_nat in
+    let+ ts, (diff : int) = pair timestamp small_nat in
     let x =
       Period.of_seconds (Int64.of_int diff) >>? fun diff ->
       Timestamp.(ts +? diff) >>? fun ts2 -> Ok (ts, ts2)

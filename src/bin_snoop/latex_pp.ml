@@ -61,6 +61,8 @@ and pp_preamble fmtr title =
      \\usepackage{float}\n\
      \\usepackage[export]{adjustbox}\n\
      \\usepackage{libertine}\n\n\
+     \\graphicspath{ {inference_results/} {../inference_results/} \
+     {_snoop/inference_results/} }\n\n\
      \\title{%s}\n\n\
      \\begin{document}\n\n\
      \\maketitle"
@@ -129,7 +131,7 @@ and pp_blob : Format.formatter -> Latex_syntax.blob -> unit =
 and pp_table : Format.formatter -> Latex_syntax.table -> unit =
  fun fmtr table ->
   match table with
-  | (spec, rows) ->
+  | spec, rows ->
       let width = Latex_syntax.spec_width spec in
       if
         not

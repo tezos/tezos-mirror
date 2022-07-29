@@ -10,14 +10,14 @@
   tezos-client-base
   tezos-protocol-002-PsYLVpVv
   tezos-signer-backends
-  tezos-rpc)
+  tezos-rpc
+  uri)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -w -9+27-30-32-40@8
-   -open Tezos_base.TzPervasives
-   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_shell_services
-   -open Tezos_client_base
-   -open Tezos_protocol_002_PsYLVpVv
-   -open Tezos_rpc)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_protocol_002_PsYLVpVv
+  -open Tezos_rpc))

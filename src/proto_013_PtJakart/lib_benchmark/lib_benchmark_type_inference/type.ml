@@ -55,27 +55,26 @@ module Base = struct
 
     let equal (t1 : t) (t2 : t) =
       match (t1, t2) with
-      | (Var_t v1, Var_t v2) -> v1 = v2
-      | (Unit_t, Unit_t)
-      | (Int_t, Int_t)
-      | (Nat_t, Nat_t)
-      | (Bool_t, Bool_t)
-      | (String_t, String_t)
-      | (Bytes_t, Bytes_t)
-      | (Key_hash_t, Key_hash_t)
-      | (Timestamp_t, Timestamp_t)
-      | (Mutez_t, Mutez_t)
-      | (Key_t, Key_t) ->
+      | Var_t v1, Var_t v2 -> v1 = v2
+      | Unit_t, Unit_t
+      | Int_t, Int_t
+      | Nat_t, Nat_t
+      | Bool_t, Bool_t
+      | String_t, String_t
+      | Bytes_t, Bytes_t
+      | Key_hash_t, Key_hash_t
+      | Timestamp_t, Timestamp_t
+      | Mutez_t, Mutez_t
+      | Key_t, Key_t ->
           true
-      | (Option_t ty1, Option_t ty2) -> ty1.tag = ty2.tag
-      | (Pair_t (l1, r1), Pair_t (l2, r2)) -> l1.tag = l2.tag && r1.tag = r2.tag
-      | (Union_t (l1, r1), Union_t (l2, r2)) ->
-          l1.tag = l2.tag && r1.tag = r2.tag
-      | (List_t ty1, List_t ty2) -> ty1.tag = ty2.tag
-      | (Set_t ty1, Set_t ty2) -> ty1.tag = ty2.tag
-      | (Map_t (kty1, vty1), Map_t (kty2, vty2)) ->
+      | Option_t ty1, Option_t ty2 -> ty1.tag = ty2.tag
+      | Pair_t (l1, r1), Pair_t (l2, r2) -> l1.tag = l2.tag && r1.tag = r2.tag
+      | Union_t (l1, r1), Union_t (l2, r2) -> l1.tag = l2.tag && r1.tag = r2.tag
+      | List_t ty1, List_t ty2 -> ty1.tag = ty2.tag
+      | Set_t ty1, Set_t ty2 -> ty1.tag = ty2.tag
+      | Map_t (kty1, vty1), Map_t (kty2, vty2) ->
           kty1.tag = kty2.tag && vty1.tag = vty2.tag
-      | (Lambda_t (dom1, range1), Lambda_t (dom2, range2)) ->
+      | Lambda_t (dom1, range1), Lambda_t (dom2, range2) ->
           dom1.tag = dom2.tag && range1.tag = range2.tag
       | _ -> false
 
@@ -132,9 +131,9 @@ module Stack = struct
 
     let equal (t1 : t) (t2 : t) =
       match (t1, t2) with
-      | (Empty_t, Empty_t) -> true
-      | (Stack_var_t v1, Stack_var_t v2) -> v1 = v2
-      | (Item_t (h1, tl1), Item_t (h2, tl2)) -> h1 == h2 && tl1 == tl2
+      | Empty_t, Empty_t -> true
+      | Stack_var_t v1, Stack_var_t v2 -> v1 = v2
+      | Item_t (h1, tl1), Item_t (h2, tl2) -> h1 == h2 && tl1 == tl2
       | _ -> false
 
     let hash (t : t) = Hashtbl.hash t

@@ -99,8 +99,8 @@ module Events = struct
           json |-> "view" |-> "mempool" |-> "known_valid" |> as_list_opt,
           json |-> "view" |-> "mempool" |-> "pending" |> as_list_opt )
       with
-      | (Some "notify", Some [], Some []) -> None
-      | (Some "notify", Some known_valid, Some pending) ->
+      | Some "notify", Some [], Some [] -> None
+      | Some "notify", Some known_valid, Some pending ->
           let known_valid = List.map JSON.as_string known_valid in
           let pending = List.map JSON.as_string pending in
           Some (known_valid, pending)
@@ -156,8 +156,8 @@ module Operation = struct
 
   let inject_transfers =
     inject_transfers
-      ~gas_limit:
-        1520 (* We make transfers to non allocated contracts in these tests *)
+      ~gas_limit:1520
+        (* We make transfers to non allocated contracts in these tests *)
       ~async:true
       ~force:true
 
@@ -191,23 +191,19 @@ end
 module Helpers = struct
   (** Bake a block and wait for the node to switch to this head *)
   let bake_and_wait_block {client; node} =
-    let* level_json = RPC.get_current_level client in
-    let level = JSON.(level_json |-> "level" |> as_int) in
-    let* () =
-      Client.bake_for ~context_path:(Node.data_dir node // "context") client
-      (* We need to have the client build the block without the
-         /helpers/preapply/block RPC to the node because this RPC serializes the
-         operations before sending them off to Block_validator.preapply.
+    (* We need to have the client build the block without the
+       /helpers/preapply/block RPC to the node because this RPC serializes the
+       operations before sending them off to Block_validator.preapply.
 
-         This is needed to expose the bug where a baker could build an invalid
-         block (wrt. the context hash), if it got the operation deserialized from
-         the mempool and then builds a block without accounting for the
-         deserialization cost of the parameters. (This is captured by the test
-         Deserialization.test_deserialization_gas_accounting.)
-      *)
-    in
-    let* _i = Node.wait_for_level node (level + 1) in
-    Lwt.return_unit
+       This is needed to expose the bug where a baker could build an invalid
+       block (wrt. the context hash), if it got the operation deserialized from
+       the mempool and then builds a block without accounting for the
+       deserialization cost of the parameters. (This is captured by the test
+       Deserialization.test_deserialization_gas_accounting.)
+    *)
+    Client.bake_for_and_wait
+      ~context_path:(Node.data_dir node // "context")
+      client
 
   let contract_file alias =
     `File (Format.sprintf "./tezt/tests/contracts/proto_alpha/%s" alias)
@@ -410,7 +406,7 @@ module Memchecks = struct
     List.map (fun err -> JSON.(err |-> "id" |> as_string)) errs
 
   let is_in_block ?block client oph =
-    let* head = RPC.get_block ?block client in
+    let* head = RPC.Client.call client @@ RPC.get_chain_block ?block () in
     let ops = JSON.(head |-> "operations" |=> 3 |> as_list) in
     Lwt.return
     @@ List.exists (fun op -> oph = JSON.(op |-> "hash" |> as_string)) ops
@@ -516,7 +512,7 @@ module Memchecks = struct
   let check_status_in_block ~__LOC__ ~who ~oph ~expected_statuses
       ?expected_errors ?block client =
     Log.info "- Checking inclusion and status of operation in %s's block." who ;
-    let* head = RPC.get_block ?block client in
+    let* head = RPC.Client.call client @@ RPC.get_chain_block ?block () in
     let ops = JSON.(head |-> "operations" |=> 3 |> as_list) in
     let head_hash = JSON.(head |-> "hash" |> as_string) in
     let op_contents =
@@ -574,7 +570,7 @@ module Memchecks = struct
     Log.info "- Waiting for observer to be notified of operation." ;
     let* observer_result = wait_observer in
     Log.info "- Checking observer received operations." ;
-    let (known_valid, pending) = observer_result in
+    let known_valid, pending = observer_result in
     if List.mem oph known_valid then
       Log.ok "  - %s was propagated to observer node as valid." oph
     else if List.mem oph pending then
@@ -863,7 +859,7 @@ module Deserialisation = struct
   (* Gas to execute call to noop contract without deserialization *)
   let gas_to_execute_rest_noop = function
     | Protocol.Ithaca -> 2049
-    | Jakarta | Alpha -> 2109
+    | Jakarta | Kathmandu | Alpha -> 2109
 
   let inject_call_with_bytes ?(source = Constant.bootstrap5) ?protocol ~contract
       ~size_kB ~gas_limit client =
@@ -878,7 +874,7 @@ module Deserialisation = struct
     in
     Operation.forge_and_inject_operation
       ?protocol
-      ~batch:[op]
+      ~batch:(`Manager [op])
       ~signer:source
       client
 
@@ -911,16 +907,19 @@ module Deserialisation = struct
     in
     unit
 
-  let test_not_enough_gas_deserialization =
+  let test_not_enough_gas_deserialization ~supports ~manager_operation_cost =
     Protocol.register_test
       ~__FILE__
       ~title:"Contract call with not enough gas to deserialize argument"
+      ~supports
       ~tags:["precheck"; "gas"; "deserialization"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* contract = originate_noop_contract nodes.main in
     let size_kB = 20 in
-    let min_deserialization_gas = deserialization_gas ~size_kB in
+    let min_deserialization_gas =
+      manager_operation_cost + deserialization_gas ~size_kB
+    in
     let* _ =
       Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
       inject_call_with_bytes
@@ -931,6 +930,16 @@ module Deserialisation = struct
         nodes.main.client
     in
     unit
+
+  let test_not_enough_gas_deserialization protocols =
+    test_not_enough_gas_deserialization
+      ~supports:(Protocol.Until_protocol 13)
+      ~manager_operation_cost:0
+      protocols ;
+    test_not_enough_gas_deserialization
+      ~supports:(Protocol.From_protocol 14)
+      ~manager_operation_cost:Constant.manager_operation_gas_cost
+      protocols
 
   let test_deserialization_gas_accounting =
     Protocol.register_test
@@ -974,23 +983,11 @@ module Gas_limits = struct
       them.  *)
   let mk_batch ?(source = Constant.bootstrap2) ?(dest = Constant.bootstrap3) ~nb
       ~gas_limit client =
-    let rec loop n counter acc =
-      if n <= 0 then Lwt.return (List.rev acc)
-      else
-        let counter = counter + 1 in
-        let* op =
-          Operation.mk_transfer
-            ~source
-            ~fee:1_000_000
-            ~gas_limit
-            ~dest
-            ~counter
-            client
-        in
-        loop (n - 1) counter (op :: acc)
-    in
-    let* counter = Operation.get_counter client ~source:Constant.bootstrap1 in
-    loop nb counter []
+    let open Operation.Manager in
+    let fee = 1_000_000 in
+    let* counter = get_next_counter client ~source:Constant.bootstrap1 in
+    let transfers = List.map (fun _ -> transfer ~dest ()) (range 1 nb) in
+    make_batch ~source ~gas_limit ~fee ~counter transfers |> return
 
   let block_below_ops_below =
     Protocol.register_test
@@ -1012,12 +1009,7 @@ module Gas_limits = struct
         ~__LOC__
         nodes
         ~expected_statuses:["applied"; "applied"]
-      @@ fun () ->
-      Operation.forge_and_inject_operation
-        ~protocol
-        ~batch
-        ~signer:Constant.bootstrap2
-        nodes.main.client
+      @@ fun () -> Operation.Manager.inject batch nodes.main.client
     in
     unit
 
@@ -1038,11 +1030,7 @@ module Gas_limits = struct
     let* _oph =
       Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
       (* Gas limit per op is too high *)
-      Operation.forge_and_inject_operation
-        ~protocol
-        ~batch
-        ~signer:Constant.bootstrap2
-        nodes.main.client
+      Operation.Manager.inject ~force:true batch nodes.main.client
     in
     unit
 
@@ -1067,11 +1055,7 @@ module Gas_limits = struct
     in
     let* _oph =
       Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
-      Operation.forge_and_inject_operation
-        ~protocol
-        ~batch
-        ~signer:Constant.bootstrap2
-        nodes.main.client
+      Operation.Manager.inject ~force:true batch nodes.main.client
     in
     unit
 
@@ -1083,14 +1067,18 @@ end
 
 module Reveal = struct
   (* This auxiliary function forges and injects a batched operation
-     made of two revelations pk1 and pk2. The tx is signed by the given key. *)
+     made of two revelations pk1 and pk2. The transaction is signed by
+     the given key. *)
   let mk_reveal_twice {client; _} key pk1 pk2 =
     let* cpt = Operation.get_counter client ~source:key in
     let s1 = {key with Account.public_key = pk1} in
     let s2 = {key with Account.public_key = pk2} in
     let* op1 = Operation.mk_reveal ~source:s1 ~counter:(cpt + 1) ~fee client in
     let* op2 = Operation.mk_reveal ~source:s2 ~counter:(cpt + 2) ~fee client in
-    Operation.forge_and_inject_operation ~batch:[op1; op2] ~signer:key client
+    Operation.forge_and_inject_operation
+      ~batch:(`Manager [op1; op2])
+      ~signer:key
+      client
 
   let simple_reveal_bad_pk =
     Protocol.register_test
@@ -1133,29 +1121,49 @@ module Reveal = struct
       Memchecks.with_absent_checks ~__LOC__ nodes @@ fun () ->
       Operation.forge_and_inject_operation
         ~protocol
-        ~batch:[op]
+        ~batch:(`Manager [op])
         ~signer:key
         ~patch_unsigned
         nodes.main.client
     in
     unit
 
-  let revealed_twice_in_batch =
+  let revealed_twice_in_batch ~supports decide_error =
     Protocol.register_test
       ~__FILE__
       ~title:"Correct public key revealed twice in a batch"
       ~tags:["reveal"; "revelation"; "batch"]
+      ~supports
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* key = Helpers.init_fresh_account ~protocol nodes ~amount ~fee in
     Log.section "Make the revelation" ;
     let* _ =
-      Memchecks.with_branch_refused_checks ~__LOC__ nodes @@ fun () ->
+      decide_error nodes @@ fun () ->
       mk_reveal_twice nodes.main key key.public_key key.public_key
     in
     let* () = Memchecks.check_balance ~__LOC__ nodes.main key amount in
     Memchecks.check_revealed ~__LOC__ nodes.main key ~revealed:false
 
+  (* After the work in !5182, which enforces that reveal operations
+      can only be placed at the head of the batch, this test should
+      fail with a permanent, Apply.Incorrect_reveal_position error (see
+      #2774). For Ithaca and Jakarta, we leave the original behaviour
+      which resulted in an Branch Refused error. *)
+  let revealed_twice_in_batch protocols =
+    revealed_twice_in_batch
+      ~supports:(Protocol.Until_protocol 13)
+      (Memchecks.with_branch_refused_checks ~__LOC__)
+      protocols ;
+    revealed_twice_in_batch
+      ~supports:(Protocol.From_protocol 14)
+      (Memchecks.with_refused_checks ~__LOC__)
+      protocols
+
+  (* After the work in !5182, which enforces that reveal operations
+     can only be placed at the head of the batch, this test should
+     fail with a permanent, Apply.Incorrect_reveal_position error (see
+     #2774). *)
   let revealed_twice_in_batch_bad_first_key =
     Protocol.register_test
       ~__FILE__
@@ -1176,17 +1184,18 @@ module Reveal = struct
     let* () = Memchecks.check_balance ~__LOC__ nodes.main key amount in
     Memchecks.check_revealed ~__LOC__ nodes.main key ~revealed:false
 
-  let revealed_twice_in_batch_bad_second_key =
+  let revealed_twice_in_batch_bad_second_key ~supports decide_error =
     Protocol.register_test
       ~__FILE__
       ~title:"Two reveals in a batch. Second key is wrong"
       ~tags:["reveal"; "revelation"]
+      ~supports
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* key = Helpers.init_fresh_account ~protocol nodes ~amount ~fee in
     Log.section "Make the revelation" ;
     let* _ =
-      Memchecks.with_branch_refused_checks ~__LOC__ nodes @@ fun () ->
+      decide_error nodes @@ fun () ->
       mk_reveal_twice
         nodes.main
         key
@@ -1195,6 +1204,21 @@ module Reveal = struct
     in
     let* () = Memchecks.check_balance ~__LOC__ nodes.main key amount in
     Memchecks.check_revealed ~__LOC__ nodes.main key ~revealed:false
+
+  (* After the work in !5182, which enforces that reveal operations
+     can only be placed at the head of the batch, this test should
+     fail with a permanent, Apply.Incorrect_reveal_position error (see
+     #2774). For Ithaca and Jakarta, we leave the original behaviour
+     which resulted in an Branch Refused error. *)
+  let revealed_twice_in_batch_bad_second_key protocols =
+    revealed_twice_in_batch_bad_second_key
+      ~supports:(Protocol.Until_protocol 13)
+      (Memchecks.with_branch_refused_checks ~__LOC__)
+      protocols ;
+    revealed_twice_in_batch_bad_second_key
+      ~supports:(Protocol.From_protocol 14)
+      (Memchecks.with_refused_checks ~__LOC__)
+      protocols
 
   let register ~protocols =
     simple_reveal_bad_pk protocols ;
@@ -1345,8 +1369,8 @@ module Simple_transfers = struct
         ~dest:Constant.bootstrap3
         ~fee:(fee + 1)
         ~amount:(bal - fee)
-        ~counter:
-          (counter + 5) (* Counter too large (aka "in the future"): wrong *)
+        ~counter:(counter + 5)
+          (* Counter too large (aka "in the future"): wrong *)
         nodes.main.client
     in
     let* () =
@@ -1391,20 +1415,16 @@ module Simple_transfers = struct
       Constant.bootstrap2
       ~revealed:true
 
-  let test_simple_transfer_not_enough_gas =
+  let test_simple_transfer_not_enough_gas ~supports decide_error =
     Protocol.register_test
       ~__FILE__
       ~title:"Simple transfer with not enough gas"
       ~tags:["transaction"; "transfer"]
+      ~supports
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* _ =
-      Memchecks.with_applied_checks
-        ~__LOC__
-        nodes
-        ~expected_statuses:["failed"]
-        ~expected_errors:[["gas_exhausted.operation"]]
-      @@ fun () ->
+      decide_error nodes @@ fun () ->
       Operation.inject_transfer
         ~protocol
         ~source:Constant.bootstrap2
@@ -1416,6 +1436,22 @@ module Simple_transfers = struct
       (* Gas too small *)
     in
     unit
+
+  let test_simple_transfer_not_enough_gas protocols =
+    test_simple_transfer_not_enough_gas
+      ~supports:(Protocol.From_protocol 14)
+      (fun nodes -> Memchecks.with_refused_checks ~__LOC__ nodes)
+      protocols ;
+    test_simple_transfer_not_enough_gas
+      ~supports:(Protocol.Until_protocol 13)
+      (fun nodes f ->
+        Memchecks.with_applied_checks
+          ~__LOC__
+          nodes
+          ~expected_statuses:["failed"]
+          ~expected_errors:[["gas_exhausted.operation"]]
+          f)
+      protocols
 
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2077
      Once this issue is fixed change the test to check that the operation is refused
@@ -1564,10 +1600,11 @@ module Simple_transfers = struct
     in
     unit
 
-  let test_simple_transfers_successive_wrong_counters =
+  let test_simple_transfers_successive_wrong_counters ~supports decide_error =
     Protocol.register_test
       ~__FILE__
       ~title:"Test succesive injections with same manager"
+      ~supports
       ~tags:["transaction"; "transfer"; "counters"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1619,13 +1656,7 @@ module Simple_transfers = struct
         nodes.main.client
     in
     let* _ =
-      Memchecks.with_branch_delayed_checks
-        ~__LOC__
-        nodes
-        ~classification_after_flush:`Absent
-        ~should_include:true
-      (* applied after flush *)
-      @@ fun () ->
+      decide_error nodes @@ fun () ->
       Operation.inject_transfer
         ~protocol
         ~source:Constant.bootstrap2
@@ -1636,9 +1667,28 @@ module Simple_transfers = struct
     in
     unit
 
+  let test_simple_transfers_successive_wrong_counters protocols =
+    test_simple_transfers_successive_wrong_counters
+      ~supports:(Protocol.Until_protocol 13)
+      (Memchecks.with_branch_delayed_checks
+         ~__LOC__
+         ~classification_after_flush:`Absent
+         ~should_include:true (* applied after flush *))
+      protocols ;
+    test_simple_transfers_successive_wrong_counters
+      ~supports:(Protocol.From_protocol 14)
+      (Memchecks.with_branch_delayed_checks
+         ~__LOC__ (* ~classification_after_flush:`Branch_delayed *)
+         ~classification_after_flush:`Applied
+         ~should_include:false (* applied after flush *))
+      protocols
+
   let test_simple_transfers_successive_wrong_counters_no_op_pre =
     Protocol.register_test
       ~__FILE__
+      ~supports:(Protocol.Until_protocol 13)
+        (* This test can be run until proto 14, because the manager
+           restriction 1M is enabled with proto 14 *)
       ~title:
         "Test successive injections with same manager (no operation precheck)"
       ~tags:["transaction"; "transfer"; "counters"; "no_operation_precheck"]
@@ -1699,34 +1749,17 @@ module Simple_transfers = struct
     let* counter =
       Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
     in
-    let* op1 =
-      Operation.mk_transfer
-        ~source:Constant.bootstrap2
-        ~dest:Constant.bootstrap3
-        ~counter:(counter + 1)
-        nodes.main.client
+    let make_transfer ~counter =
+      Operation.Manager.(
+        make ~source:Constant.bootstrap2 ~counter
+        @@ transfer ~dest:Constant.bootstrap3 ())
     in
-    let* op2 =
-      Operation.mk_transfer
-        ~source:Constant.bootstrap2
-        ~dest:Constant.bootstrap3
-        ~counter:(counter + 2)
-        nodes.main.client
-    in
-    let* op3 =
-      Operation.mk_transfer
-        ~source:Constant.bootstrap2
-        ~dest:Constant.bootstrap3
-        ~counter:(counter + 2)
-        nodes.main.client
-    in
+    let op1 = make_transfer ~counter:(counter + 1) in
+    let op2 = make_transfer ~counter:(counter + 2) in
+    let op3 = op2 in
     let* _ =
       Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
-      Operation.forge_and_inject_operation
-        ~protocol
-        ~batch:[op1; op2; op3]
-        ~signer:Constant.bootstrap2
-        nodes.main.client
+      Operation.Manager.inject ~force:true [op1; op2; op3] nodes.main.client
     in
     unit
 
@@ -1740,34 +1773,17 @@ module Simple_transfers = struct
     let* counter =
       Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
     in
-    let* op1 =
-      Operation.mk_transfer
-        ~source:Constant.bootstrap2
-        ~dest:Constant.bootstrap3
-        ~counter:(counter + 1)
-        nodes.main.client
+    let make_transfer ~counter =
+      Operation.Manager.(
+        make ~source:Constant.bootstrap2 ~counter
+        @@ transfer ~dest:Constant.bootstrap3 ())
     in
-    let* op2 =
-      Operation.mk_transfer
-        ~source:Constant.bootstrap2
-        ~dest:Constant.bootstrap3
-        ~counter:(counter + 2)
-        nodes.main.client
-    in
-    let* op3 =
-      Operation.mk_transfer
-        ~source:Constant.bootstrap2
-        ~dest:Constant.bootstrap3
-        ~counter:(counter + 4)
-        nodes.main.client
-    in
+    let op1 = make_transfer ~counter:(counter + 1) in
+    let op2 = make_transfer ~counter:(counter + 2) in
+    let op3 = make_transfer ~counter:(counter + 4) in
     let* _ =
       Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
-      Operation.forge_and_inject_operation
-        ~protocol
-        ~batch:[op1; op2; op3]
-        ~signer:Constant.bootstrap2
-        nodes.main.client
+      Operation.Manager.inject ~force:true [op1; op2; op3] nodes.main.client
     in
     unit
 
@@ -1917,6 +1933,8 @@ module Tx_rollup = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Deserialization of transfer ticket"
+        (* TX rollups activated with (Proto 13) Jakarta  *)
+      ~supports:(Protocol.From_protocol 13)
       ~tags:
         [
           "precheck";
@@ -1943,8 +1961,7 @@ module Tx_rollup = struct
       Operation.inject_transfer_ticket
         ~protocol
         ~source:Constant.bootstrap1
-        ~gas_limit:
-          (min_deserialization_gas + 1000)
+        ~gas_limit:(min_deserialization_gas + 1000)
           (* we add 1000 (the gas for manager operation) to avoid failing with
              gas_exhausted right after precheck *)
         ~contents:(`Json (`O [("bytes", `String (make_zero_hex ~size_kB))]))
@@ -1964,6 +1981,8 @@ module Tx_rollup = struct
     Protocol.register_test
       ~__FILE__
       ~title:"Deserialization of transfer ticket too large"
+        (* TX rollups activated with (Proto 13) Jakarta  *)
+      ~supports:(Protocol.From_protocol 13)
       ~tags:
         ["precheck"; "deserialization"; "gas"; "transfer_ticket"; "tx_rollup"]
     @@ fun protocol ->
@@ -2000,4 +2019,4 @@ let register ~protocols =
   Reveal.register ~protocols ;
   Simple_transfers.register ~protocols ;
   Simple_contract_calls.register ~protocols ;
-  Tx_rollup.register ~protocols:[Alpha]
+  Tx_rollup.register ~protocols

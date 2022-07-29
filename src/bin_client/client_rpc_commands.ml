@@ -174,9 +174,9 @@ let editor_fill_in ?(show_optionals = true) schema =
     let editor_cmd =
       let ed =
         match (Sys.getenv_opt "EDITOR", Sys.getenv_opt "VISUAL") with
-        | (Some ed, _) -> ed
-        | (None, Some ed) -> ed
-        | (None, None) when Sys.win32 ->
+        | Some ed, _ -> ed
+        | None, Some ed -> ed
+        | None, None when Sys.win32 ->
             (* TODO: I have no idea what I'm doing here *)
             "notepad.exe"
         | _ ->
@@ -284,16 +284,16 @@ let list url (cctxt : #Client_context.full) =
           ( RPC_service.MethMap.cardinal services,
             Resto.StringMap.bindings subdirs )
         with
-        | (0, []) -> ()
-        | (0, [(n, solo)]) -> display ppf (path @ [n], tpath @ [n], solo)
-        | (_, items) when count tree >= 3 && path <> [] ->
+        | 0, [] -> ()
+        | 0, [(n, solo)] -> display ppf (path @ [n], tpath @ [n], solo)
+        | _, items when count tree >= 3 && path <> [] ->
             Format.fprintf
               ppf
               "@[<v 2>+ %s/@,%a@]"
               (String.concat "/" path)
               (display_list tpath)
               items
-        | (_, items) when count tree >= 3 && path <> [] ->
+        | _, items when count tree >= 3 && path <> [] ->
             Format.fprintf
               ppf
               "@[<v 2>+ %s@,%a@,%a@]"
@@ -302,13 +302,13 @@ let list url (cctxt : #Client_context.full) =
               (path, tpath, services)
               (display_list tpath)
               items
-        | (0, (n, t) :: items) ->
+        | 0, (n, t) :: items ->
             Format.fprintf ppf "%a" display (path @ [n], tpath @ [n], t) ;
             List.iter
               (fun (n, t) ->
                 Format.fprintf ppf "@,%a" display (path @ [n], tpath @ [n], t))
               items
-        | (_, items) ->
+        | _, items ->
             display_services ppf (path, tpath, services) ;
             List.iter
               (fun (n, t) ->
@@ -463,9 +463,9 @@ let call ?body meth raw_url (cctxt : #Client_context.full) =
          body is not given. In that case, the body should be an empty
          JSON object. *)
       match (meth, body) with
-      | (_, Some _) -> body
-      | (`DELETE, None) | (`GET, None) -> None
-      | (`PATCH, None) | (`PUT, None) | (`POST, None) -> Some (`O [])
+      | _, Some _ -> body
+      | `DELETE, None | `GET, None -> None
+      | `PATCH, None | `PUT, None | `POST, None -> Some (`O [])
     in
     let* answer = cctxt#generic_media_type_call meth ?body uri in
     let*! () = display_answer cctxt answer in

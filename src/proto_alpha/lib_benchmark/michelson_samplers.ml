@@ -250,7 +250,7 @@ module type S = sig
       size:int -> Script_ir_translator.ex_comparable_ty sampler
   end
 
-  module rec Random_value : sig
+  module Random_value : sig
     val value : ('a, _) Script_typed_ir.ty -> 'a sampler
 
     val comparable : 'a Script_typed_ir.comparable_ty -> 'a sampler
@@ -372,21 +372,21 @@ end)
       else
         bind (uniform all_non_atomic_type_names) @@ function
         | `TPair -> (
-            let* (lsize, rsize) = pick_split (size - 1) in
+            let* lsize, rsize = pick_split (size - 1) in
             let* (Ex_ty left) = m_type ~size:lsize in
             let* (Ex_ty right) = m_type ~size:rsize in
             match pair_t (-1) left right with
             | Error _ -> assert false
             | Ok (Ty_ex_c res_ty) -> return @@ Ex_ty res_ty)
         | `TLambda -> (
-            let* (lsize, rsize) = pick_split (size - 1) in
+            let* lsize, rsize = pick_split (size - 1) in
             let* (Ex_ty domain) = m_type ~size:lsize in
             let* (Ex_ty range) = m_type ~size:rsize in
             match lambda_t (-1) domain range with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TUnion -> (
-            let* (lsize, rsize) = pick_split (size - 1) in
+            let* lsize, rsize = pick_split (size - 1) in
             let* (Ex_ty left) = m_type ~size:lsize in
             let* (Ex_ty right) = m_type ~size:rsize in
             match union_t (-1) left right with
@@ -398,7 +398,7 @@ end)
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TMap -> (
-            let* (lsize, rsize) = pick_split (size - 1) in
+            let* lsize, rsize = pick_split (size - 1) in
             let* (Ex_comparable_ty key) = m_comparable_type ~size:lsize in
             let* (Ex_ty elt) = m_type ~size:rsize in
             match map_t (-1) key elt with
@@ -483,48 +483,134 @@ end)
   end
 
   (* Type-directed generation of random values. *)
-  module rec Random_value : sig
+  module Random_value : sig
     val value : ('a, _) Script_typed_ir.ty -> 'a sampler
 
     val comparable : 'a Script_typed_ir.comparable_ty -> 'a sampler
 
     val stack : ('a, 'b) Script_typed_ir.stack_ty -> ('a * 'b) sampler
   end = struct
+    let implicit = Crypto_samplers.pkh
+
+    let originated rng_state =
+      (* For a description of the format, see
+         tezos-codec describe alpha.contract binary encoding *)
+      let string =
+        "\001" ^ Base_samplers.uniform_string ~nbytes:20 rng_state ^ "\000"
+      in
+      Data_encoding.Binary.of_string_exn
+        Alpha_context.Contract.originated_encoding
+        string
+
+    let tx_rollup rng_state =
+      let string = Base_samplers.uniform_string ~nbytes:20 rng_state in
+      Data_encoding.Binary.of_string_exn Alpha_context.Tx_rollup.encoding string
+
+    let sc_rollup rng_state =
+      let string = Base_samplers.uniform_string ~nbytes:20 rng_state in
+      Data_encoding.Binary.of_string_exn
+        Alpha_context.Sc_rollup.Address.encoding
+        string
+
+    let entrypoint rng_state =
+      Alpha_context.Entrypoint.of_string_strict_exn
+      @@ Base_samplers.string ~size:{min = 1; max = 31} rng_state
+
     let address rng_state =
       if Base_samplers.uniform_bool rng_state then
-        let contract =
-          Alpha_context.Contract.implicit_contract
-            (Crypto_samplers.pkh rng_state)
+        let destination =
+          Alpha_context.Destination.Contract (Implicit (implicit rng_state))
         in
-        {
-          destination = Contract contract;
-          entrypoint = Alpha_context.Entrypoint.default;
-        }
+        {destination; entrypoint = Alpha_context.Entrypoint.default}
       else
-        (* For a description of the format, see
-           tezos-codec describe alpha.contract binary encoding *)
-        let string =
-          "\001" ^ Base_samplers.uniform_string ~nbytes:20 rng_state ^ "\000"
+        let destination =
+          Alpha_context.Destination.Contract (Originated (originated rng_state))
         in
-        let contract =
-          Data_encoding.Binary.of_string_exn
-            Alpha_context.Contract.encoding
-            string
-        in
-        let ep =
-          Alpha_context.Entrypoint.of_string_strict_exn
-          @@ Base_samplers.string ~size:{min = 1; max = 31} rng_state
-        in
-        {destination = Contract contract; entrypoint = ep}
+        let entrypoint = entrypoint rng_state in
+        {destination; entrypoint}
+
+    let generate_originated_contract :
+        type arg argc.
+        (arg, argc) Script_typed_ir.ty ->
+        arg Script_typed_ir.typed_contract sampler =
+     fun arg_ty ->
+      let open M in
+      let* c = originated in
+      let* entrypoint = entrypoint in
+      let destination = Alpha_context.Destination.Contract (Originated c) in
+      return
+        (Typed_contract.Internal_for_tests.typed_exn
+           arg_ty
+           destination
+           entrypoint)
+
+    let generate_sc_rollup_contract :
+        type arg argc.
+        (arg, argc) Script_typed_ir.ty ->
+        arg Script_typed_ir.typed_contract sampler =
+     fun arg_ty ->
+      let open M in
+      let* ru = sc_rollup in
+      let* entrypoint = entrypoint in
+      let destination = Alpha_context.Destination.Sc_rollup ru in
+      return
+        (Typed_contract.Internal_for_tests.typed_exn
+           arg_ty
+           destination
+           entrypoint)
+
+    let generate_any_type_contract :
+        type arg argc.
+        (arg, argc) Script_typed_ir.ty ->
+        arg Script_typed_ir.typed_contract sampler =
+     fun arg_ty ->
+      let open M in
+      let* b = Base_samplers.uniform_bool in
+      if b then generate_originated_contract arg_ty
+      else generate_sc_rollup_contract arg_ty
+
+    let generate_contract :
+        type arg argc.
+        (arg, argc) Script_typed_ir.ty ->
+        arg Script_typed_ir.typed_contract sampler =
+     fun arg_ty ->
+      let open M in
+      match arg_ty with
+      | Unit_t ->
+          let* b = Base_samplers.uniform_bool in
+          if b then
+            let* pkh = implicit in
+            let destination =
+              Alpha_context.Destination.Contract (Implicit pkh)
+            in
+            let entrypoint = Alpha_context.Entrypoint.default in
+            return
+              (Typed_contract.Internal_for_tests.typed_exn
+                 arg_ty
+                 destination
+                 entrypoint)
+          else generate_any_type_contract arg_ty
+      | Pair_t (Ticket_t _, Tx_rollup_l2_address_t, _, _) ->
+          let* b = Base_samplers.uniform_bool in
+          if b then
+            let* tx_rollup = tx_rollup in
+            let destination = Alpha_context.Destination.Tx_rollup tx_rollup in
+            let entrypoint = Alpha_context.Tx_rollup.deposit_entrypoint in
+            return
+              (Typed_contract.Internal_for_tests.typed_exn
+                 arg_ty
+                 destination
+                 entrypoint)
+          else generate_any_type_contract arg_ty
+      | _ -> generate_any_type_contract arg_ty
 
     let tx_rollup_l2_address rng_state =
       let seed =
         Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255)
       in
-      let secret_key = Bls12_381.Signature.generate_sk seed in
+      let _pkh, public_key, _secret_key = Bls.generate_key ~seed () in
       Tx_rollup_l2_address.Indexable.value
-        (Tx_rollup_l2_address.of_bls_pk
-        @@ Bls12_381.Signature.MinPk.derive_pk secret_key)
+        (Tx_rollup_l2_address.of_bls_pk public_key)
 
     let chain_id rng_state =
       let string = Base_samplers.uniform_string ~nbytes:4 rng_state in
@@ -603,7 +689,7 @@ end)
         =
      fun elt_type ->
       let open M in
-      let* (length, elements) =
+      let* length, elements =
         Structure_samplers.list
           ~range:P.parameters.list_size
           ~sampler:(value elt_type)
@@ -617,7 +703,7 @@ end)
         elt Script_typed_ir.comparable_ty -> elt Script_typed_ir.set sampler =
      fun elt_ty ->
       let open M in
-      let* (_, elements) =
+      let* _, elements =
         Structure_samplers.list
           ~range:P.parameters.set_size
           ~sampler:(value elt_ty)
@@ -656,7 +742,7 @@ end)
         let result =
           Lwt_main.run
             ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-              let big_map = Script_ir_translator.empty_big_map key_ty elt_ty in
+              let big_map = Script_big_map.empty key_ty elt_ty in
               (* Cannot have big maps under big maps *)
               option_t (-1) elt_ty |> Environment.wrap_tzresult
               >>?= fun opt_elt_ty ->
@@ -664,7 +750,7 @@ end)
               Script_map.fold
                 (fun k v acc ->
                   acc >>=? fun (bm, ctxt_acc) ->
-                  Script_ir_translator.big_map_update ctxt_acc k v bm)
+                  Script_big_map.update ctxt_acc k v bm)
                 map
                 (return (big_map, ctxt))
               >|= Environment.wrap_tzresult
@@ -678,15 +764,6 @@ end)
               (Error_monad.TzTrace.pp_print Error_monad.pp)
               e ;
             fail_sampling "raise_if_error"
-
-    and generate_contract :
-        type arg argc.
-        (arg, argc) Script_typed_ir.ty ->
-        arg Script_typed_ir.typed_contract sampler =
-     fun arg_ty ->
-      let open M in
-      let* address = value address_t in
-      return (Typed_contract {arg_ty; address})
 
     and generate_operation : Script_typed_ir.operation sampler =
      fun rng_state ->
@@ -724,7 +801,7 @@ end)
      fun ty rng_state ->
       let contents = value ty rng_state in
       let ticketer =
-        Alpha_context.Contract.implicit_contract (Crypto_samplers.pkh rng_state)
+        Alpha_context.Contract.Implicit (Crypto_samplers.pkh rng_state)
       in
       let amount = Michelson_base.nat rng_state in
       Script_typed_ir.{ticketer; contents; amount}

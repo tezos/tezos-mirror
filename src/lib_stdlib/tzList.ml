@@ -35,7 +35,7 @@ let rev_split_n n l =
   loop [] n l
 
 let split_n n l =
-  let (rev_taken, dropped) = rev_split_n n l in
+  let rev_taken, dropped = rev_split_n n l in
   (List.rev rev_taken, dropped)
 
 let rev_take_n n l = fst (rev_split_n n l)

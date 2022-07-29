@@ -107,7 +107,7 @@ let rec convert :
       | None -> raise (Cannot_get_type (node, path))
       | Some {aft; _} ->
           Inference.instantiate aft >>= fun aft ->
-          let (_, r) = project_union aft in
+          let _, r = project_union aft in
           Inference.instantiate_base r >>= fun r ->
           Autocomp.replace_vars r >>= fun r ->
           let r = unparse_type r in
@@ -119,7 +119,7 @@ let rec convert :
       | None -> raise (Cannot_get_type (node, path))
       | Some {aft; _} ->
           Inference.instantiate aft >>= fun aft ->
-          let (l, _) = project_union aft in
+          let l, _ = project_union aft in
           Inference.instantiate_base l >>= fun l ->
           Autocomp.replace_vars l >>= fun l ->
           let l = unparse_type l in
@@ -135,7 +135,7 @@ let rec convert :
       | None -> raise (Cannot_get_type (node, path))
       | Some {aft; _} ->
           Inference.instantiate aft >>= fun aft ->
-          let (dom, range) = project_lambda aft in
+          let dom, range = project_lambda aft in
           Inference.instantiate_base dom >>= fun dom ->
           Autocomp.replace_vars dom >>= fun dom ->
           Inference.instantiate_base range >>= fun range ->
@@ -165,7 +165,7 @@ let rec convert :
       | None -> raise (Cannot_get_type (node, path))
       | Some {aft; _} ->
           Inference.instantiate aft >>= fun aft ->
-          let (k, v) = project_map aft in
+          let k, v = project_map aft in
           Inference.instantiate_base k >>= fun k ->
           Autocomp.replace_vars k >>= fun k ->
           Inference.instantiate_base v >>= fun v ->

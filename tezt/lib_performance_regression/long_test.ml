@@ -316,7 +316,7 @@ module Slack = struct
     in
     let body = `O [("text", `String message)] in
     let send () =
-      let* (response, body) = http_post_json ~timeout webhook_url body in
+      let* response, body = http_post_json ~timeout webhook_url body in
       match response.status with
       | #Cohttp.Code.success_status -> Cohttp_lwt.Body.drain_body body
       | status ->
@@ -466,8 +466,8 @@ let add_data_point data_point =
 
 let send_data_points () =
   match (!current_test, !config.influxdb) with
-  | (None, _) | (_, None) -> unit
-  | (Some test, Some config) ->
+  | None, _ | _, None -> unit
+  | Some test, Some config ->
       let write () =
         let data_points =
           test.data_points |> String_map.bindings |> List.map snd
@@ -591,7 +591,7 @@ module Stats = struct
        | Float func ->
            [(InfluxDB.column_name_of_func func, string_of_float values)]
        | Pair (a, b) ->
-           let (v, w) = values in
+           let v, w = values in
            gather a v @ gather b w
        | Convert (stats, encode, _) -> gather stats (encode values)
     in
@@ -648,7 +648,7 @@ let get_previous_stats ?limit ?(minimum_count = 3) ?(tags = []) measurement
     | [] -> None
     | _ :: _ :: _ -> failwith "InfluxDB result contains multiple series"
     | [[]] -> failwith "InfluxDB result contains no values"
-    | [(_ :: _ :: _)] -> failwith "InfluxDB result contains multiple values"
+    | [_ :: _ :: _] -> failwith "InfluxDB result contains multiple values"
     | [[value]] ->
         let ((count, _) as stats) = Stats.get value stats in
         if count < minimum_count then None else Some stats

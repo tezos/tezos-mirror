@@ -483,18 +483,18 @@ let may_record_new_state ~previous_state ~new_state =
        if Compare.Int32.(new_current_level = previous_current_level) then
          let is_new_locked_round_consistent =
            match (new_locked_round, previous_locked_round) with
-           | (None, None) -> true
-           | (Some _, None) -> true
-           | (None, Some _) -> false
-           | (Some new_locked_round, Some previous_locked_round) ->
+           | None, None -> true
+           | Some _, None -> true
+           | None, Some _ -> false
+           | Some new_locked_round, Some previous_locked_round ->
                Round.(new_locked_round.round >= previous_locked_round.round)
          in
          let is_new_endorsable_payload_consistent =
            match (new_endorsable_payload, previous_endorsable_payload) with
-           | (None, None) -> true
-           | (Some _, None) -> true
-           | (None, Some _) -> false
-           | (Some new_endorsable_payload, Some previous_endorsable_payload) ->
+           | None, None -> true
+           | Some _, None -> true
+           | None, Some _ -> false
+           | Some new_endorsable_payload, Some previous_endorsable_payload ->
                Round.(
                  new_endorsable_payload.proposal.block.round
                  >= previous_endorsable_payload.proposal.block.round)
@@ -589,7 +589,7 @@ let compute_delegate_slots (cctxt : Protocol_client_context.full) delegates
   (* FIXME? should we not take `Head 0 ? *)
   Plugin.RPC.Validators.get cctxt (chain, `Head 0) ~levels:[level]
   >>=? fun endorsing_rights ->
-  let (own_delegate_slots, all_delegate_slots) =
+  let own_delegate_slots, all_delegate_slots =
     List.fold_left
       (fun (own_map, all_map) slot ->
         let {Plugin.RPC.Validators.delegate; slots; _} = slot in

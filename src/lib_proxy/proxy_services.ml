@@ -118,9 +118,11 @@ type mode =
   | Proxy_client
   | Proxy_server of {
       sleep : float -> unit Lwt.t;
-      sym_block_caching_time : int option;
+      sym_block_caching_time : Ptime.span option;
       on_disk_proxy_builder :
-        (Context_hash.t -> Proxy_delegate.t tzresult Lwt.t) option;
+        (Context_hash.t ->
+        Tezos_protocol_environment.Proxy_delegate.t tzresult Lwt.t)
+        option;
     }
 
 let to_client_server_mode = function
@@ -175,7 +177,7 @@ let schedule_clearing (printer : Tezos_client_base.Client_context.printer)
     chain block =
   let open Lwt_syntax in
   match (mode, raw_hash_of_block block) with
-  | (Light_client _, _) | (Proxy_client, _) | (_, Some _) ->
+  | Light_client _, _ | Proxy_client, _ | _, Some _ ->
       (* - If tezos-client executes: don't clear anything, because the client
            is short-lived and should not observe chain reorganization
          - If raw_hash_of_blocks returns [Some]: don't clear anything, because
@@ -183,15 +185,15 @@ let schedule_clearing (printer : Tezos_client_base.Client_context.printer)
            Remember that contexts are kept in an LRU cache though, so clearing
            will eventually happen; but we don't schedule it. *)
       Lwt.return_unit
-  | (Proxy_server {sleep; sym_block_caching_time; _}, _) ->
-      let (chain_string, block_string) =
+  | Proxy_server {sleep; sym_block_caching_time; _}, _ ->
+      let chain_string, block_string =
         Tezos_shell_services.Block_services.
           (chain_to_string chain, to_string block)
       in
       let* time_between_blocks =
         match sym_block_caching_time with
         | Some sym_block_caching_time ->
-            Lwt.return @@ Int.to_float sym_block_caching_time
+            Lwt.return @@ Ptime.Span.to_float_s sym_block_caching_time
         | None -> (
             let (module Proxy_environment) = proxy_env in
             let* ro =
@@ -276,7 +278,7 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
             let (module C) =
               Light_core.get_core (module Proxy_environment) printer sources
             in
-            let (chain_string, block_string) =
+            let chain_string, block_string =
               Tezos_shell_services.Block_services.
                 (chain_to_string chain, to_string block)
             in
@@ -309,7 +311,7 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
   let get_env_rpc_context chain block =
     let open Lwt_result_syntax in
     let* block_hash_opt = B2H.hash_of_block rpc_context chain block in
-    let (block_key, (fill_b2h : Block_hash.t -> unit)) =
+    let block_key, (fill_b2h : Block_hash.t -> unit) =
       match block_hash_opt with
       | None -> (block, fun block_hash -> B2H.add chain block block_hash)
       | Some block_hash -> (`Hash (block_hash, 0), ignore)
@@ -347,13 +349,36 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
     let open Lwt_syntax in
     let* res = get_env_rpc_context chain block in
     match res with
-    | Error trace ->
-        (* proto_directory expects a unit Directory.t Lwt.t,
-           we can't give it a unit tzresult Directory.t Lwt.t, hence
-           throwing an exception. It's handled in
-           [Tezos_mockup_proxy.RPC_client]. This is not ideal, but
-           it's better than asserting false. *)
-        raise (Rpc_dir_creation_failure trace)
+    | Error trace -> (
+        (* proto_directory expects a unit Directory.t Lwt.t, and we
+           can't give it a unit tzresult Directory.t Lwt.t, hence
+           we throw an exception instead if we can't make the
+           directory.
+
+           This happens notably in the proxy server case when a
+           request is made for a block baked on a protocol differing
+           from the protocol the proxy server is currently running on.
+
+           In the proxy server case, we'd prefer to return a 404
+           instead of a 500. Luckily, Resto handles the [Not_found]
+           exception specially and returns a 404, which our
+           query-forwarding middleware (see
+           Tezos_rpc_http.RPC_middleware) can then turn into a redirect
+           to the node.
+
+           In the client cases, we throw an exception (which Resto
+           turns into a 500) and print the trace. *)
+        match mode with
+        | Proxy_server _ -> raise Not_found
+        | Light_client _ | Proxy_client ->
+            let* () =
+              printer#warning
+                "Error while building RPC directory (perhaps a protocol \
+                 version mismatch between block and client?): %a"
+                Error_monad.pp_print_trace
+                trace
+            in
+            raise (Rpc_dir_creation_failure trace))
     | Ok res -> Lwt.return res
   in
   let proto_directory =

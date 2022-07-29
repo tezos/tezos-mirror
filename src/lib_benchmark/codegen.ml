@@ -78,6 +78,8 @@ module Codegen : Costlang.S with type 'a repr = Parsetree.expression = struct
 
   let log2 x = call ["log2"] [x]
 
+  let sqrt x = call ["sqrt"] [x]
+
   let free ~name = Exp.ident (loc_ident (string_of_fv name))
 
   let lt x y = call ["<"] [x; y]

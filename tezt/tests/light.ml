@@ -29,7 +29,7 @@
    Invokation: dune exec tezt/tests/main.exe -- --file light.ml
    Subject: Tests of the client's --mode light option
    Dependencies: tezt/tests/proxy.ml
- *)
+*)
 
 let init_light ~protocol =
   let get_current_level =
@@ -41,7 +41,7 @@ let init_light ~protocol =
      because it uses RPC.*.get_current_level, which depends on client.ml
      already. In other words, putting this code in client.ml would
      create a cyclic dependency *)
-  let* (client, node0, node1) = Client.init_light () in
+  let* client, node0, node1 = Client.init_light () in
   Log.info "Activating protocol %s" @@ Protocol.tag protocol ;
   let endpoint = Client.(Node node0) in
   let* () = Client.activate_protocol ~endpoint ~protocol client in
@@ -53,10 +53,10 @@ let init_light ~protocol =
   assert (is_light_mode mode_received) ;
   Client.set_mode (Client.Client (Some (Node node0), None)) client ;
   let* () =
-    Client.bake_for ~endpoint ~keys:[Constant.bootstrap1.alias] client
+    Client.bake_for_and_wait ~endpoint ~keys:[Constant.bootstrap1.alias] client
   in
   let* () =
-    Client.bake_for ~endpoint ~keys:[Constant.bootstrap2.alias] client
+    Client.bake_for_and_wait ~endpoint ~keys:[Constant.bootstrap2.alias] client
   in
   let* level_json = get_current_level ~endpoint client in
   let level = JSON.(level_json |-> "level" |> as_int) in
@@ -138,7 +138,7 @@ let test_transfer =
     ~title:"(Light) transfer"
     ~tags:["light"; "client"; "transfer"]
   @@ fun protocol ->
-  let* (_, client) = init_light ~protocol in
+  let* _, client = init_light ~protocol in
   do_transfer client
 
 let test_bake =
@@ -147,10 +147,10 @@ let test_bake =
     ~title:"(Light) bake"
     ~tags:["light"; "client"; "bake"]
   @@ fun protocol ->
-  let* (_, client) = init_light ~protocol in
+  let* _, client = init_light ~protocol in
   let giver = Constant.bootstrap1.alias in
   let* () = do_transfer ~giver client in
-  Client.bake_for ~keys:[giver] client
+  Client.bake_for_and_wait ~keys:[giver] client
 
 module NoUselessRpc = struct
   (** [starts_with prefix s] returns [true] iff [prefix] is a prefix of [s]. *)
@@ -220,7 +220,7 @@ module NoUselessRpc = struct
       ~title:"(Light) No useless RPC call"
       ~tags:["light"; "rpc"; "get"]
     @@ fun protocol ->
-    let* (_, client) = init_light ~protocol in
+    let* _, client = init_light ~protocol in
     let paths =
       [
         (["helpers"; "baking_rights"], []);
@@ -256,7 +256,7 @@ let test_wrong_proto =
     ~title:"(Light) Wrong proto"
     ~tags:["light"; "proto"]
   @@ fun protocol ->
-  let* (_, client) = init_light ~protocol in
+  let* _, client = init_light ~protocol in
   Proxy.wrong_proto protocol client
 
 let test_locations =
@@ -267,7 +267,7 @@ let test_locations =
     ~title:"(Light) RPC get's location"
     ~tags:(locations_tags alt_mode)
   @@ fun protocol ->
-  let* (_, client) = init_light ~protocol in
+  let* _, client = init_light ~protocol in
   check_locations alt_mode client
 
 let test_compare_light =
@@ -278,7 +278,7 @@ let test_compare_light =
     ~title:"(Light) Compare RPC get"
     ~tags:(compare_tags alt_mode)
   @@ fun protocol ->
-  let* (node, light_client) = init_light ~protocol in
+  let* node, light_client = init_light ~protocol in
   let* vanilla = Client.init ~endpoint:(Node node) () in
   let clients = {vanilla; alternative = light_client} in
   let tz_log =

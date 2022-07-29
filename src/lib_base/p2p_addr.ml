@@ -37,7 +37,7 @@ type port = int
 let pp ppf addr =
   match Ipaddr.v4_of_v6 addr with
   | Some addr -> Format.fprintf ppf "%a" Ipaddr.V4.pp addr
-  | None -> Format.fprintf ppf "[%a]" Ipaddr.V6.pp addr
+  | None -> Format.fprintf ppf "%a" Ipaddr.V6.pp addr
 
 let of_string_opt str =
   match Ipaddr.of_string str with

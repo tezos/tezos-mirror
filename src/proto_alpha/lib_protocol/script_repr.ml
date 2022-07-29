@@ -117,7 +117,7 @@ module Micheline_size = struct
   let of_annots acc annots =
     List.fold_left (fun acc s -> add_string acc s) acc annots
 
-  let[@coq_struct "nodes"] rec of_nodes acc nodes more_nodes =
+  let rec of_nodes acc nodes more_nodes =
     let open Micheline in
     match nodes with
     | [] -> (
@@ -302,17 +302,19 @@ let unit =
 
 let unit_parameter = lazy_expr unit
 
+let is_unit v =
+  match Micheline.root v with
+  | Prim (_, Michelson_v1_primitives.D_Unit, [], []) -> true
+  | _ -> false
+
 let is_unit_parameter =
   let unit_bytes = Data_encoding.force_bytes unit_parameter in
   Data_encoding.apply_lazy
-    ~fun_value:(fun v ->
-      match Micheline.root v with
-      | Prim (_, Michelson_v1_primitives.D_Unit, [], []) -> true
-      | _ -> false)
+    ~fun_value:is_unit
     ~fun_bytes:(fun b -> Compare.Bytes.equal b unit_bytes)
     ~fun_combine:(fun res _ -> res)
 
-let[@coq_struct "node"] rec strip_annotations node =
+let rec strip_annotations node =
   let open Micheline in
   match node with
   | (Int (_, _) | String (_, _) | Bytes (_, _)) as leaf -> leaf
@@ -330,8 +332,7 @@ let rec micheline_fold_aux node f acc k =
   | Micheline.Seq (_, subterms) ->
       micheline_fold_nodes subterms f (f acc node) k
 
-and[@coq_mutual_as_notation] [@coq_struct "subterms"] micheline_fold_nodes
-    subterms f acc k =
+and micheline_fold_nodes subterms f acc k =
   match subterms with
   | [] -> k acc
   | node :: nodes ->

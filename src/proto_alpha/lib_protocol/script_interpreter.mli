@@ -40,7 +40,7 @@ type error += Reject of Script.location * Script.expr * execution_trace option
 
 type error += Overflow of Script.location * execution_trace option
 
-type error += Runtime_contract_error of Contract.t
+type error += Runtime_contract_error of Contract_hash.t
 
 type error += Bad_contract_parameter of Contract.t (* `Permanent *)
 
@@ -50,6 +50,7 @@ type error += Cannot_serialize_storage
 
 type error += Michelson_too_many_recursive_calls
 
+(** The result from script interpretation. *)
 type execution_result = {
   script : Script_ir_translator.ex_script;
   code_size : int;
@@ -61,8 +62,8 @@ type execution_result = {
 
 type step_constants = Script_typed_ir.step_constants = {
   source : Contract.t;
-  payer : Contract.t;
-  self : Contract.t;
+  payer : Signature.public_key_hash;
+  self : Contract_hash.t;
   amount : Tez.t;
   balance : Tez.t;
   chain_id : Chain_id.t;
@@ -146,6 +147,7 @@ module Internals : sig
     logger option ->
     Local_gas_counter.outdated_context * step_constants ->
     Local_gas_counter.local_gas_counter ->
+    ('a, 's) stack_ty ->
     ('a, 's, 'r, 'f) continuation ->
     'a ->
     's ->
@@ -189,6 +191,7 @@ module Internals : sig
     logger option ->
     context ->
     step_constants ->
+    ('a, 's) stack_ty ->
     ('a, 's, 'r, 'f) Script_typed_ir.kinstr ->
     'a ->
     's ->

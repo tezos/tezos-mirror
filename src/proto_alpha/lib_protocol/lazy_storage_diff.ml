@@ -186,7 +186,6 @@ let get_ops : type i a u. (i, a, u) Lazy_storage_kind.t -> (i, a, u) ops =
   function
   | Big_map -> (module Big_map)
   | Sapling_state -> (module Sapling_state)
-  [@@coq_axiom_with_reason "gadt"]
 
 type ('id, 'alloc) init = Existing | Copy of {src : 'id} | Alloc of 'alloc
 
@@ -371,12 +370,10 @@ let item_encoding =
              | Neq -> None)
            (fun ((), id, diff) -> Item (k, id, diff)))
        Lazy_storage_kind.all
-  [@@coq_axiom_with_reason "gadt"]
 
 let item_in_memory_size
     (Item
-      ( kind
-      (* kinds are constant tags *),
+      ( kind (* kinds are constant tags *),
         _id_is_a_Z_fitting_in_an_int_for_a_long_time,
         diff )) =
   let open Cache_memory_helpers in
@@ -416,7 +413,6 @@ let fresh :
   else
     let (module OPS) = get_ops kind in
     OPS.Next.incr ctxt
- [@@coq_axiom_with_reason "gadt"]
 
 let init ctxt =
   List.fold_left_es
@@ -425,7 +421,6 @@ let init ctxt =
       OPS.Next.init ctxt)
     ctxt
     Lazy_storage_kind.all
-  [@@coq_axiom_with_reason "gadt"]
 
 let cleanup_temporaries ctxt =
   Raw_context.map_temporary_lazy_storage_ids_s ctxt (fun temp_ids ->
@@ -436,4 +431,3 @@ let cleanup_temporaries ctxt =
         ctxt
         Lazy_storage_kind.all
       >|= fun ctxt -> (ctxt, Lazy_storage_kind.Temp_ids.init))
-  [@@coq_axiom_with_reason "gadt"]

@@ -57,7 +57,7 @@ let test_proto_files = ["main.ml"; "main.mli"]
 let test_proto_TEZOS_PROTOCOL =
   {|{
     "modules": ["Main"],
-    "expected_env_version": 5
+    "expected_env_version": 6
 }
 |}
 
@@ -199,23 +199,13 @@ let check_current_proposal ?level client expected_proposal_hash =
     ~error_msg:"expected current_proposal = %R, got %L" ;
   unit
 
-type block_metadata = {protocol : string; next_protocol : string}
-
-let parse_block_metadata block_metadata =
-  {
-    protocol = JSON.(block_metadata |-> "protocol" |> as_string);
-    next_protocol = JSON.(block_metadata |-> "next_protocol" |> as_string);
-  }
-
 let check_protocols ?level client expected_protocols =
-  let open Lwt.Infix in
-  let* {protocol; next_protocol} =
-    RPC.(
-      get_block_metadata ?block:(Option.map string_of_int level) client
-      >|= parse_block_metadata)
+  let* block_metadata =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_metadata ?block:(Option.map string_of_int level) ()
   in
-  Check.(
-    ((protocol, next_protocol) = expected_protocols) (tuple2 string string))
+  let protocols_got = (block_metadata.protocol, block_metadata.next_protocol) in
+  Check.((protocols_got = expected_protocols) (tuple2 string string))
     ~error_msg:"expected (protocol, next_protocol) = %R, got %L" ;
   unit
 
@@ -272,10 +262,8 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
          (String.concat ", " (List.map Protocol.tag loser_protocols)))
     ~tags:
       ("amendment"
-       ::
-       ("from_" ^ Protocol.tag from_protocol)
-       ::
-       ("to_" ^ target_protocol_tag to_protocol)
+       :: ("from_" ^ Protocol.tag from_protocol)
+       :: ("to_" ^ target_protocol_tag to_protocol)
        :: List.map (fun p -> "loser_" ^ Protocol.tag p) loser_protocols
       @ [
           (match to_protocol with
@@ -297,6 +285,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
     if Protocol.number from_protocol >= 013 then
       [
         (["blocks_per_cycle"], Some "4");
+        (["nonce_revelation_threshold"], Some "2");
         (["cycles_per_voting_period"], Some "1");
       ]
     else
@@ -355,8 +344,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
   in
   Log.info "Current period: proposal." ;
   (* Bake while performing more RPC checks. *)
-  let* () = Client.bake_for client in
-  let* () = Client.bake_for client in
+  let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
   let* () =
     check_current_level
       client
@@ -379,7 +367,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
         remaining = 1;
       }
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* () =
     check_current_period
       client
@@ -412,7 +400,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
       client
   in
   (* Bake and check that the proposals are registered. *)
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* proposals = get_proposals client in
   let expected_proposals =
     to_protocol_hash :: List.map Protocol.hash loser_protocols
@@ -428,13 +416,12 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
       client
   in
   (* Bake and check that the proposals are still registered. *)
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* proposals = get_proposals client in
   Check.((sort proposals = sort expected_proposals) (list string))
     ~error_msg:"expected proposals = %R, got %L" ;
   (* Bake until exploration period while checking RPC behavior. *)
-  let* () = Client.bake_for client in
-  let* () = Client.bake_for client in
+  let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
   let expected_level =
     (* level_position = 7, 4 blocks per cycle =>
        cycle = 7/4 = 1,
@@ -462,7 +449,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
   in
   let* () = check_listings_not_empty client in
   let* () = check_current_proposal client to_protocol_hash in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* () =
     check_current_period
       client
@@ -490,7 +477,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
   let* () = vote Constant.bootstrap2 Yay in
   let* () = vote Constant.bootstrap3 Yay in
   (* Bake until cooldown period while checking RPCs. *)
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* () =
     let expected_level =
       (* level_position = 9, 4 blocks_per_cycle =>
@@ -518,8 +505,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
         remaining = 2;
       }
   in
-  let* () = Client.bake_for client in
-  let* () = Client.bake_for client in
+  let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
   let* () =
     check_current_period
       client
@@ -531,7 +517,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
         remaining = 0;
       }
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* () =
     check_current_period
       client
@@ -551,7 +537,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
     "Current period: cooldown, with current proposal: %s."
     (target_protocol_tag to_protocol) ;
   (* Bake until promotion period while checking RPCs. *)
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* () =
     let expected_level =
       (* level_position = 13, 4 blocks_per_cycle =>
@@ -579,8 +565,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
         remaining = 2;
       }
   in
-  let* () = Client.bake_for client in
-  let* () = Client.bake_for client in
+  let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
   let* () =
     check_current_period
       client
@@ -592,7 +577,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
         remaining = 0;
       }
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* () =
     check_current_period
       client
@@ -618,7 +603,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
   let* () = vote Constant.bootstrap4 Yay in
   let* () = vote Constant.bootstrap5 Nay in
   (* Bake until adoption period while checking RPCs. *)
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* () =
     let expected_level =
       (* level_position = 17, 4 blocks_per_cycle =>
@@ -646,8 +631,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
         remaining = 2;
       }
   in
-  let* () = Client.bake_for client in
-  let* () = Client.bake_for client in
+  let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
   let* () =
     check_current_period
       client
@@ -659,7 +643,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
         remaining = 0;
       }
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* () =
     check_current_period
       client
@@ -679,7 +663,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
     "Current period: adoption, with current proposal: %s."
     (target_protocol_tag to_protocol) ;
   (* Bake until next_protocol changes. *)
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* () =
     let expected_level =
       (* level_position = 21, 4 blocks_per_cycle =>
@@ -707,14 +691,14 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
         remaining = 2;
       }
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* () =
     check_protocols
       client
       (Protocol.hash from_protocol, Protocol.hash from_protocol)
   in
   Log.info "Baking last block of adoption period..." ;
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   match to_protocol with
   | Injected_test ->
       (* The test protocol has no amendment process and no baker. We can't go further.
@@ -826,7 +810,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
         Array.map (fun x -> x.Account.public_key_hash) Account.Bootstrap.keys
         |> Array.to_list
       in
-      let* () = Client.bake_for ~keys:everybody client in
+      let* () = Client.bake_for_and_wait ~keys:everybody client in
       let* () =
         check_current_period
           client
@@ -843,7 +827,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
         "Current period: proposal, with protocol: %s."
         (target_protocol_tag to_protocol) ;
       (* Bake one last block to ensure we can still bake after the transition. *)
-      let* () = Client.bake_for ~keys:everybody client in
+      let* () = Client.bake_for_and_wait ~keys:everybody client in
       let* () =
         check_current_period
           client
@@ -1333,9 +1317,10 @@ let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
     "Verify that the replacement accuser has registered at least one block" ;
   let* accuser_first_block_hash = to_protocol_accuser_received_block in
   let* proposal_first_block_hash =
-    RPC.get_block_hash
-      ~block:(string_of_int expected_level_of_next_proposal)
-      client
+    RPC.Client.call client
+    @@ RPC.get_chain_block_hash
+         ~block:(string_of_int expected_level_of_next_proposal)
+         ()
   in
   Check.((accuser_first_block_hash = proposal_first_block_hash) string)
     ~error_msg:"Expected the accuser to find %R, found %L" ;

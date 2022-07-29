@@ -37,35 +37,47 @@
    Subject: RPC regression tests capture the output of RPC calls and compare it
             with the output from the previous run. The test passes only if the
             outputs match exactly.
-  *)
+*)
 
 (* These hooks must be attached to every process that should be captured for
    regression testing *)
 let hooks = Tezos_regression.hooks
 
-(** This test file is factored out on the Client mode. In Light mode we need some special care regarding waiting for all the nodes to be in sync, otherwise the commands fail as it looks like some nodes are rogue. *)
-let node_wait_for_level level client =
-  match Client.get_mode client with
-  | Light (_min_agreement, nodes) ->
-      Lwt_list.iter_p
-        (function
-          | Client.Node node ->
-              Lwt.map (Fun.const ()) @@ Node.wait_for_level node level
-          | _ -> Lwt.return_unit)
-        nodes
-  | Mockup -> assert false (* This file does not use Mockup mode *)
-  | Client (Some (Client.Node node), _) | Proxy (Client.Node node) ->
-      let* _ = Node.wait_for_level node level in
-      Lwt.return_unit
-  | Client _ | Proxy _ -> Lwt.return_unit
+let title_tag_of_test_mode = function
+  | `Client -> (`Client, "client")
+  | `Client_data_dir_proxy_server -> (`Client, "proxy_server_data_dir")
+  | `Client_rpc_proxy_server -> (`Client, "proxy_server_rpc")
+  | `Light -> (`Light, "light")
+  | `Proxy -> (`Proxy, "proxy")
 
-(** [make_client_bake_for ()] returns a function similar to {!Client.bake_for} which additionally keeps track of the current level, and in Light mode, waits for all nodes to be in sync after baking. *)
-let make_client_bake_for () =
-  let current_level = ref 1 in
-  fun client ->
-    let* () = Client.bake_for client in
-    current_level := !current_level + 1 ;
-    node_wait_for_level !current_level client
+let patch_protocol_parameters protocol = function
+  | None -> Lwt.return_none
+  | Some overrides ->
+      let* file =
+        Protocol.write_parameter_file
+          ~base:(Either.right (protocol, None))
+          (overrides protocol)
+      in
+      Lwt.return_some file
+
+let initialize_chain_for_test client = function
+  | `Client_data_dir_proxy_server | `Client_rpc_proxy_server ->
+      (* Because the proxy server doesn't support genesis. *)
+      Client.bake_for_and_wait client
+  | `Client | `Light | `Proxy -> unit
+
+let endpoint_of_test_mode_tag node = function
+  | `Client | `Light | `Proxy -> Lwt.return_some Client.(Node node)
+  | (`Client_rpc_proxy_server | `Client_data_dir_proxy_server) as
+    proxy_server_mode ->
+      let args =
+        Some
+          (match proxy_server_mode with
+          | `Client_rpc_proxy_server -> [Proxy_server.Data_dir]
+          | `Client_data_dir_proxy_server -> [])
+      in
+      let* proxy_server = Proxy_server.init ?args node in
+      Lwt.return_some Client.(Proxy_server proxy_server)
 
 (* A helper to register a RPC test environment with a node and a client for the
    given protocol version.
@@ -74,76 +86,64 @@ let make_client_bake_for () =
      environment is set up.
    - [parameter_overrides] specifies protocol parameters to change from the default
      sandbox parameters.
-   - [node_parameters] specifies additional parameters to pass to the node.
+   - [nodes_args] specifies additional parameters to pass to the node.
    - [sub_group] is a short identifier for your test, used in the test title and as a tag.
    Additionally, since this uses [Protocol.register_regression_test], this has an
    implicit argument to specify the list of protocols to test. *)
-let check_rpc ~test_mode_tag ~test_function ?parameter_overrides
-    ?node_parameters sub_group =
-  let (client_mode_tag, title_tag) =
-    match test_mode_tag with
-    | `Client -> (`Client, "client")
-    | `Client_data_dir_proxy_server -> (`Client, "proxy_server_data_dir")
-    | `Client_rpc_proxy_server -> (`Client, "proxy_server_rpc")
-    | `Light -> (`Light, "light")
-    | `Proxy -> (`Proxy, "proxy")
-  in
+let check_rpc_regression ~test_mode_tag ~test_function ?parameter_overrides
+    ?nodes_args sub_group =
+  let client_mode_tag, title_tag = title_tag_of_test_mode test_mode_tag in
   Protocol.register_regression_test
     ~__FILE__
     ~title:(sf "(mode %s) RPC regression tests: %s" title_tag sub_group)
-    ~tags:["rpc"; sub_group]
-    ~output_file:(fun p ->
-      "rpc" // sf "%s.%s.%s" (Protocol.tag p) title_tag sub_group)
+    ~tags:["rpc"; title_tag; sub_group]
   @@ fun protocol ->
+  let* parameter_file =
+    patch_protocol_parameters protocol parameter_overrides
+  in
   (* Initialize a node with alpha protocol and data to be used for RPC calls.
      The log of the node is not captured in the regression output. *)
-  let* parameter_file =
-    match parameter_overrides with
-    | None -> Lwt.return_none
-    | Some overrides ->
-        let* file =
-          Protocol.write_parameter_file
-            ~base:(Either.right (protocol, None))
-            (overrides protocol)
-        in
-        Lwt.return_some file
-  in
-  let bake =
-    match test_mode_tag with
-    | `Client_data_dir_proxy_server | `Client_rpc_proxy_server ->
-        (* Because the proxy server doesn't support genesis. *)
-        true
-    | `Client | `Light | `Proxy -> false
-  in
-  let* (node, client) =
+  let* node, client =
     Client.init_with_protocol
       ?parameter_file
-      ?nodes_args:node_parameters
+      ?nodes_args
       ~protocol
       client_mode_tag
       ()
   in
-  let* () = if bake then Client.bake_for client else Lwt.return_unit in
-  let* endpoint =
-    match test_mode_tag with
-    | `Client | `Light | `Proxy -> return Client.(Node node)
-    | (`Client_rpc_proxy_server | `Client_data_dir_proxy_server) as
-      proxy_server_mode ->
-        let args =
-          Some
-            (match proxy_server_mode with
-            | `Client_rpc_proxy_server -> [Proxy_server.Data_dir]
-            | `Client_data_dir_proxy_server -> [])
-        in
-        let* proxy_server = Proxy_server.init ?args node in
-        return Client.(Proxy_server proxy_server)
+  let* () = initialize_chain_for_test client test_mode_tag in
+  let* endpoint = endpoint_of_test_mode_tag node test_mode_tag in
+  let* _ = test_function test_mode_tag protocol ?endpoint client in
+  unit
+
+(* Like [check_rpc_regression], but does not register a regression tests *)
+let check_rpc ~test_mode_tag ~test_function ?parameter_overrides ?nodes_args
+    sub_group =
+  let client_mode_tag, title_tag = title_tag_of_test_mode test_mode_tag in
+  Protocol.register_test
+    ~__FILE__
+    ~title:(sf "(mode %s) RPC tests: %s" title_tag sub_group)
+    ~tags:["rpc"; title_tag; sub_group]
+  @@ fun protocol ->
+  let* parameter_file =
+    patch_protocol_parameters protocol parameter_overrides
   in
-  let* _ = test_function protocol ?endpoint:(Some endpoint) client in
+  (* Initialize a node with alpha protocol and data to be used for RPC calls. *)
+  let* node, client =
+    Client.init_with_protocol
+      ?parameter_file
+      ?nodes_args
+      ~protocol
+      client_mode_tag
+      ()
+  in
+  let* () = initialize_chain_for_test client test_mode_tag in
+  let* endpoint = endpoint_of_test_mode_tag node test_mode_tag in
+  let* _ = test_function test_mode_tag protocol ?endpoint client in
   unit
 
 (* Test the contracts RPC. *)
-let test_contracts _protocol ?endpoint client =
-  let client_bake_for = make_client_bake_for () in
+let test_contracts _test_mode_tag _protocol ?endpoint client =
   let test_implicit_contract contract_id =
     let*! _ = RPC.Contracts.get ?endpoint ~hooks ~contract_id client in
     let*! _ = RPC.Contracts.get_balance ?endpoint ~hooks ~contract_id client in
@@ -154,7 +154,7 @@ let test_contracts _protocol ?endpoint client =
     unit
   in
   let*! _contracts = RPC.Contracts.get_all ?endpoint ~hooks client in
-  let* contracts = RPC.Contracts.get_all_delegates ?endpoint ~hooks client in
+  let* contracts = RPC.Delegates.get_all ?endpoint ~hooks client in
   Log.info "Test implicit baker contract" ;
   let bootstrap = List.hd contracts in
   let* () = test_implicit_contract bootstrap in
@@ -181,7 +181,7 @@ let test_contracts _protocol ?endpoint client =
       ~burn_cap:Constant.implicit_account_burn
       client
   in
-  let* () = client_bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* () = test_implicit_contract simple_implicit_key.public_key_hash in
   let* () =
     Lwt_list.iter_s
@@ -216,11 +216,11 @@ let test_contracts _protocol ?endpoint client =
       ~burn_cap:Constant.implicit_account_burn
       client
   in
-  let* () = client_bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let*! () =
     Client.set_delegate ~src:delegated_implicit ~delegate:bootstrap1 client
   in
-  let* () = client_bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* () = test_implicit_contract delegated_implicit_key.public_key_hash in
   let*! _ =
     RPC.Contracts.get_delegate
@@ -290,7 +290,7 @@ let test_contracts _protocol ?endpoint client =
       ~burn_cap:Tez.(of_int 3)
       client
   in
-  let* () = client_bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* () = test_originated_contract originated_contract_simple in
   (* A smart contract with a big map and entrypoints *)
   Log.info "Test advanced originated contract" ;
@@ -304,7 +304,7 @@ let test_contracts _protocol ?endpoint client =
       ~burn_cap:Tez.(of_int 3)
       client
   in
-  let* () = client_bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* () = test_originated_contract originated_contract_advanced in
   let unique_big_map_key =
     Ezjsonm.value_from_string
@@ -565,23 +565,22 @@ let test_delegates_on_unregistered_hangzhou ~contracts ?endpoint client =
 
 let get_contracts ?endpoint client =
   let*! _ = RPC.Contracts.get_all ?endpoint ~hooks client in
-  let* contracts = RPC.Contracts.get_all_delegates ?endpoint ~hooks client in
+  let* contracts = RPC.Delegates.get_all ?endpoint ~hooks client in
 
   Lwt.return contracts
 
 (* Test the delegates RPC for the specified protocol. *)
-let test_delegates _protocol ?endpoint client =
+let test_delegates _test_mode_tag _protocol ?endpoint client =
   let* contracts = get_contracts ?endpoint client in
   let* () = test_delegates_on_registered_alpha ~contracts ?endpoint client in
   test_delegates_on_unregistered_alpha ~contracts ?endpoint client
 
 (* Test the votes RPC. *)
-let test_votes _protocol ?endpoint client =
-  let client_bake_for = make_client_bake_for () in
+let test_votes _test_mode_tag _protocol ?endpoint client =
   (* initialize data *)
   let proto_hash = "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp" in
   let* () = Client.submit_proposals ~proto_hash client in
-  let* () = client_bake_for client in
+  let* () = Client.bake_for_and_wait client in
   (* RPC calls *)
   let* _ = RPC.Votes.get_ballot_list ?endpoint ~hooks client in
   let* _ = RPC.Votes.get_ballots ?endpoint ~hooks client in
@@ -593,12 +592,11 @@ let test_votes _protocol ?endpoint client =
   let* _ = RPC.Votes.get_successor_period ?endpoint ~hooks client in
   let* _ = RPC.Votes.get_total_voting_power ?endpoint ~hooks client in
   (* bake to testing vote period and submit some ballots *)
-  let* () = client_bake_for client in
-  let* () = client_bake_for client in
+  let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
   let* () = Client.submit_ballot ~key:"bootstrap1" ~proto_hash Yay client in
   let* () = Client.submit_ballot ~key:"bootstrap2" ~proto_hash Nay client in
   let* () = Client.submit_ballot ~key:"bootstrap3" ~proto_hash Pass client in
-  let* () = client_bake_for client in
+  let* () = Client.bake_for_and_wait client in
   (* RPC calls again *)
   let* _ = RPC.Votes.get_ballot_list ?endpoint ~hooks client in
   let* _ = RPC.Votes.get_ballots ?endpoint ~hooks client in
@@ -612,7 +610,7 @@ let test_votes _protocol ?endpoint client =
   unit
 
 (* Test the various other RPCs. *)
-let test_others _protocol ?endpoint client =
+let test_misc_protocol _test_mode_tag _protocol ?endpoint client =
   let* _ = RPC.get_constants ?endpoint ~hooks client in
   let* _ = RPC.get_baking_rights ?endpoint ~hooks client in
   let* _ = RPC.get_current_level ?endpoint ~hooks client in
@@ -660,9 +658,9 @@ let mempool_node_flags =
       Synchronisation_threshold 0;
       (* Node does not need to be synchronized with peers before being
          bootstrapped *)
-      Connections 1;
+      Connections 1
       (* Number of connection allowed for each of our 2 nodes used in the
-         mempool tests *)
+         mempool tests *);
     ]
 
 let bake_empty_block ?endpoint client =
@@ -710,7 +708,7 @@ let bake_empty_block ?endpoint client =
 *)
 (* [mode] is only useful insofar as it helps adapting the test to specific
  * `Proxy mode constraint*)
-let test_mempool protocol ?endpoint client =
+let test_mempool _test_mode_tag protocol ?endpoint client =
   let* node = Node.init mempool_node_flags in
   let* () = Client.Admin.trust_address ?endpoint client ~peer:node in
   let* () = Client.Admin.connect_address ?endpoint client ~peer:node in
@@ -722,12 +720,9 @@ let test_mempool protocol ?endpoint client =
      transfer to trigger the counter_in_the_past error for the following
      transfer. *)
   let* _ =
-    Operation.inject_transfer
-      ~source:Constant.bootstrap1
-      ~dest:Constant.bootstrap2
-      client
+    Operation.Manager.(inject ~force:true [make @@ transfer ()] client)
   in
-  let* _ = Client.bake_for ?endpoint client in
+  let* _ = Client.bake_for_and_wait ?endpoint client in
 
   let* _ = bake_empty_block ?endpoint client in
 
@@ -755,12 +750,7 @@ let test_mempool protocol ?endpoint client =
   let counter = JSON.as_int counter in
   (* Branch_refused op: counter_in_the_past *)
   let* _ =
-    Operation.inject_transfer
-      ~force:true
-      ~source:Constant.bootstrap1
-      ~dest:Constant.bootstrap2
-      ~counter
-      client
+    Operation.Manager.(inject ~force:true [make ~counter @@ transfer ()] client)
   in
   let*! counter =
     RPC.Contracts.get_counter
@@ -770,27 +760,31 @@ let test_mempool protocol ?endpoint client =
   let counter = JSON.as_int counter in
   (* Branch_delayed op: counter_in_the_future *)
   let* _ =
-    Operation.inject_transfer
-      ~force:true
-      ~source:Constant.bootstrap2
-      ~dest:Constant.bootstrap2
-      ~counter:(counter + 5)
-      client
+    Operation.Manager.(
+      inject
+        ~force:true
+        [make ~source:Constant.bootstrap2 ~counter:(counter + 5) @@ transfer ()]
+        client)
   in
   (* Refused op: fees_too_low *)
   let* _ =
-    Operation.inject_transfer
-      ~source:Constant.bootstrap3
-      ~dest:Constant.bootstrap2
-      ~fee:0
-      client
+    Operation.Manager.(
+      inject
+        [
+          make ~source:Constant.bootstrap3 ~fee:0
+          @@ transfer ~dest:Constant.bootstrap2 ();
+        ]
+        client)
   in
   (* Applied op *)
   let* _ =
-    Operation.inject_transfer
-      ~source:Constant.bootstrap4
-      ~dest:Constant.bootstrap2
-      client
+    Operation.Manager.(
+      inject
+        [
+          make ~source:Constant.bootstrap4
+          @@ transfer ~dest:Constant.bootstrap2 ();
+        ]
+        client)
   in
   let* () = Client.Admin.connect_address ?endpoint ~peer:node client in
   let flush_waiter = Node_event_level.wait_for_flush node in
@@ -874,47 +868,223 @@ let test_mempool protocol ?endpoint client =
       {|{ "minimal_fees": "200", "allow_script_failure": true }|}
   in
   let* _ = post_and_get_filter "{}" in
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1765
-
-     Once openapi-diff is integrated, this test could be removed. *)
-  (* Call describe on mempool RPCs and record the output. *)
-  let describe_path =
-    sf
-      "http://localhost:%d/describe/chains/main/mempool?recurse=yes"
-      (get_client_port client)
-  in
-  let describe_path_filtered =
-    "http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes"
-  in
-  let message = Log.quote_shell_command "curl" ["-s"; describe_path_filtered] in
-  Regression.capture ("\n" ^ message) ;
-  let proc_describe = Process.spawn "curl" ["-s"; describe_path] in
-  let* output = Process.check_and_read_stdout proc_describe in
-  (* To ease the reading of the output (which is expected to be a JSON
-     value), we prettify the output. It makes easier to interpret
-     regressions. *)
-  let prettified_output =
-    output
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1766
-
-       End of line characters are trimmed because the /describe/ RPC may
-       introduce them in string litteral which seems forbidden by the JSON
-       standard. *)
-    |> replace_string ~all:true (rex "\n") ~by:""
-    |> JSON.parse ~origin:message |> JSON.encode
-  in
-  Regression.capture prettified_output ;
   unit
 
 let start_with_acl address acl =
-  let node = Node.create ~rpc_host:address [] in
-  let endpoint = Client.(Node node) in
-  let* () = Node.config_init node [] in
-  Node.Config_file.update node (JSON.update "rpc" (JSON.put ("acl", acl))) ;
-  let* () = Node.identity_generate node in
-  let* () = Node.run node [] in
-  let* () = Node.wait_for_ready node in
+  let* node =
+    Node.init
+      ~rpc_host:address
+      ~patch_config:(JSON.update "rpc" (JSON.put ("acl", acl)))
+      []
+  in
+  let endpoint = Client.Node node in
   Client.init ~endpoint ()
+
+let test_network test_mode_tag _protocol ?endpoint client =
+  let test peer_id =
+    let call rpc = RPC.Client.call ?endpoint client rpc in
+    let* _ = call @@ RPC.get_network_connection peer_id in
+    let* _ = call RPC.get_network_greylist_clear in
+    (* Peers *)
+    let* _ = call RPC.get_network_peers in
+    let* _ = call @@ RPC.get_network_peer peer_id in
+    let* _ = call @@ RPC.get_network_peer_ban peer_id in
+    let* _ = call @@ RPC.get_network_peer_banned peer_id in
+    let* _ = call @@ RPC.get_network_peer_unban peer_id in
+    let* _ = call @@ RPC.get_network_peer_untrust peer_id in
+    let* _ = call @@ RPC.get_network_peer_trust peer_id in
+    (* Connections *)
+    let* points = call @@ RPC.get_network_points in
+    let point_id =
+      match points with
+      | (p, _) :: _ -> p
+      | _ -> Test.fail "Expected at least one point."
+    in
+    let* _ = call @@ RPC.get_network_point point_id in
+    let* _ = call @@ RPC.get_network_point_ban point_id in
+    let* _ = call @@ RPC.get_network_point_banned point_id in
+    let* _ = call @@ RPC.get_network_point_unban point_id in
+    let* _ = call @@ RPC.get_network_point_untrust point_id in
+    let* _ = call @@ RPC.get_network_point_trust point_id in
+    let* _ = call RPC.get_network_stat in
+    let* _ = call RPC.get_network_version in
+    let* _ = call RPC.get_network_versions in
+    unit
+  in
+  match test_mode_tag with
+  | `Client_data_dir_proxy_server | `Client_rpc_proxy_server ->
+      Log.info "Skipping network RPCs" ;
+      unit
+  | `Light ->
+      (* In light mode, the node is already connected to another node: use that as peer *)
+      let* peers = RPC.Client.call ?endpoint client @@ RPC.get_network_peers in
+      let peer_id =
+        match peers with
+        | (p, _) :: _ -> p
+        | _ -> Test.fail "Expected at least one peer in light mode."
+      in
+      test peer_id
+  | `Proxy | `Client ->
+      (* Create a second node to get a peer for testing RPCs that are
+         parameterized by a point or peer id *)
+      let* node = Node.init ~name:"node" [Connections 1] in
+      let* () = Client.Admin.trust_address ?endpoint client ~peer:node in
+      let* () = Client.Admin.connect_address ?endpoint client ~peer:node in
+      let* _ = Node.wait_for_level node 1 in
+      let* client = Client.init ~endpoint:(Node node) () in
+      let* peer_id =
+        RPC.Client.call ~endpoint:(Node node) client RPC.get_network_self
+      in
+      test peer_id
+
+let test_workers _test_mode_tag _protocol ?endpoint client =
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_worker_block_validator in
+  let* _ =
+    RPC.Client.call ?endpoint client @@ RPC.get_workers_chain_validators
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client @@ RPC.get_worker_chain_validator ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client @@ RPC.get_worker_chain_validator_ddb ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client
+    @@ RPC.get_worker_chain_validator_peers_validators ()
+  in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_workers_prevalidators in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_worker_prevalidator () in
+  unit
+
+let test_misc_shell _test_mode_tag protocol ?endpoint client =
+  let protocol_hash = Protocol.hash protocol in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_errors in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_protocols in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_protocol protocol_hash in
+  let* _ =
+    RPC.Client.call ?endpoint client @@ RPC.get_fetch_protocol protocol_hash
+  in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_stats_gc in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_stats_memory in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_config in
+  unit
+
+let test_chain _test_mode_tag protocol ?endpoint client =
+  let block_level = 3 in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_blocks () in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_chain_id () in
+  let* _ =
+    RPC.Client.call ?endpoint client @@ RPC.get_chain_invalid_blocks ()
+  in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_block () in
+  let* _ = RPC.get_constants_errors ?endpoint client in
+  let* _ =
+    RPC.Client.call ?endpoint client
+    @@ RPC.get_chain_block_context_nonce block_level
+  in
+  let* () =
+    if Protocol.number protocol >= 013 then
+      let* _ =
+        (* Calls [/chains/main/blocks/head/context/sc_rollup] *)
+        RPC.Client.call ?endpoint client @@ RPC.Sc_rollup.list ()
+      in
+      unit
+    else unit
+  in
+  let* _ =
+    (* Calls [/chains/main/blocks/head/context/raw/bytes] *)
+    RPC.get_context_value ?endpoint client ~ctxt_type:Bytes ~value_path:[]
+  in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_block_hash () in
+  let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_block_header () in
+  let* _ =
+    (* Calls [/chains/main/blocks/head/header/protocol_data] *)
+    RPC.get_protocol_data ?endpoint client
+  in
+  let* _ =
+    (* Calls [/chains/main/blocks/head/header/protocol_data/raw] *)
+    RPC.raw_protocol_data ?endpoint client
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client @@ RPC.get_chain_block_header_raw ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client @@ RPC.get_chain_block_header_raw ()
+  in
+  let* _ =
+    let pkh = Constant.bootstrap1.public_key in
+    let prefix = String.sub pkh 0 10 in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3234
+
+       The result of this RPC endpoint is empty, but I guess it
+       should be a list containing [pkh]. The original python
+       test has the same result. *)
+    RPC.Client.call ?endpoint client
+    @@ RPC.get_chain_block_helper_complete prefix
+  in
+  let* _ =
+    let* () = Client.bake_for_and_wait client in
+    let* head_hash =
+      RPC.Client.call ?endpoint client @@ RPC.get_chain_block_hash ()
+    in
+    let prefix = String.sub head_hash 0 10 in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3234
+
+       The result of this RPC endpoint is empty, but I guess it
+       should be a list containing [head_hash]. The original python
+       test has the same result. *)
+    RPC.Client.call ?endpoint client
+    @@ RPC.get_chain_block_helper_complete prefix
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client @@ RPC.get_chain_block_live_blocks ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client @@ RPC.get_chain_block_metadata ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client @@ RPC.get_chain_block_operation_hashes ()
+  in
+  let* () =
+    let validation_pass = 3 in
+    let operation_offset = 0 in
+    let* () =
+      Client.transfer
+        ~amount:Tez.one
+        ~giver:"bootstrap1"
+        ~receiver:"bootstrap2"
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let* _ =
+      RPC.Client.call ?endpoint client
+      @@ RPC.get_chain_block_operation_hashes ()
+    in
+    let* _ =
+      RPC.Client.call ?endpoint client
+      @@ RPC.get_chain_block_operation_hashes_of_validation_pass validation_pass
+    in
+    let* _ =
+      RPC.Client.call ?endpoint client
+      @@ RPC.get_chain_block_operation_hash
+           ~validation_pass
+           ~operation_offset
+           ()
+    in
+    let* _ = RPC.get_operations ?endpoint client in
+    let* _ =
+      RPC.get_operations_of_validation_pass ?endpoint ~validation_pass client
+    in
+    let* _ =
+      RPC.get_operations_of_validation_pass
+        ?endpoint
+        ~validation_pass
+        ~operation_offset
+        client
+    in
+    unit
+  in
+  unit
 
 (* Test access to RPC regulated with an ACL. *)
 let test_whitelist address () =
@@ -931,7 +1101,7 @@ let test_whitelist address () =
          ]
   in
   let* client = start_with_acl address whitelist in
-  let* success_resp = Client.rpc GET ["chains"; "main"; "blocks"] client in
+  let* success_resp = RPC.Client.call client @@ RPC.get_chain_blocks () in
   let block_hash = JSON.geti 0 success_resp |> JSON.geti 0 |> JSON.as_string in
   let* () =
     if block_hash = "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2" then
@@ -962,7 +1132,7 @@ let test_blacklist address () =
     Client.spawn_rpc GET ["chains"; "main"; "blocks"] client
     |> Process.check_error ~exit_code:1
   in
-  let* _success_resp = Client.rpc GET ["network"; "connections"] client in
+  let* _success_resp = RPC.Client.call client @@ RPC.get_network_connections in
   unit
 
 let binary_regression_test () =
@@ -1027,15 +1197,23 @@ let register protocols =
     ~__FILE__
     ~title:"Binary RPC regression tests"
     ~tags:["rpc"; "regression"; "binary"]
-    ~output_file:"rpc/binary_rpc"
     binary_regression_test ;
   let register protocols test_mode_tag =
-    let check_rpc ?parameter_overrides ?node_parameters ~test_function sub_group
-        =
+    let check_rpc_regression ?parameter_overrides ?nodes_args ~test_function
+        sub_group =
+      check_rpc_regression
+        ~test_mode_tag
+        ?parameter_overrides
+        ?nodes_args
+        ~test_function
+        sub_group
+        protocols
+    in
+    let check_rpc ?parameter_overrides ?nodes_args ~test_function sub_group =
       check_rpc
         ~test_mode_tag
         ?parameter_overrides
-        ?node_parameters
+        ?nodes_args
         ~test_function
         sub_group
         protocols
@@ -1045,37 +1223,78 @@ let register protocols =
         [(["consensus_threshold"], Some "0")]
       else []
     in
-    check_rpc
+    check_rpc_regression
       "contracts"
       ~test_function:test_contracts
       ~parameter_overrides:consensus_threshold ;
-    check_rpc
+    check_rpc_regression
       "delegates"
       ~test_function:test_delegates
       ~parameter_overrides:consensus_threshold ;
-    check_rpc
+    check_rpc_regression
       "votes"
       ~test_function:test_votes
       ~parameter_overrides:(fun protocol ->
         (* reduced periods duration to get to testing vote period faster *)
-        let cycles_per_voting_period =
-          if Protocol.number protocol >= 013 then
-            (["cycles_per_voting_period"], Some "1")
-          else (["blocks_per_voting_period"], Some "4")
-        in
-        [(["blocks_per_cycle"], Some "4"); cycles_per_voting_period]
-        @ consensus_threshold protocol) ;
-    check_rpc
-      "others"
-      ~test_function:test_others
+        if Protocol.number protocol >= 14 then
+          (* We need nonce_revelation_threshold < blocks_per_cycle for sanity
+             checks *)
+          [
+            (["blocks_per_cycle"], Some "4");
+            (["cycles_per_voting_period"], Some "1");
+            (["nonce_revelation_threshold"], Some "3");
+          ]
+        else if Protocol.number protocol >= 13 then
+          [
+            (["blocks_per_cycle"], Some "4");
+            (["cycles_per_voting_period"], Some "1");
+          ]
+        else
+          [
+            (["blocks_per_cycle"], Some "4");
+            (["blocks_per_voting_period"], Some "4");
+          ]
+          @ consensus_threshold protocol) ;
+    check_rpc_regression
+      "misc_protocol"
+      ~test_function:test_misc_protocol
       ~parameter_overrides:consensus_threshold ;
-    match test_mode_tag with
+    (match test_mode_tag with
     | `Client_data_dir_proxy_server | `Client_rpc_proxy_server | `Light -> ()
     | _ ->
-        check_rpc
+        check_rpc_regression
           "mempool"
           ~test_function:test_mempool
-          ~node_parameters:mempool_node_flags
+          ~nodes_args:mempool_node_flags) ;
+    check_rpc
+      "network"
+      ~test_function:test_network
+      ~parameter_overrides:consensus_threshold
+      ~nodes_args:[Connections 1] ;
+    (match test_mode_tag with
+    (* No worker RPCs in these modes *)
+    | `Client_data_dir_proxy_server | `Client_rpc_proxy_server -> ()
+    | _ ->
+        check_rpc
+          "workers"
+          ~test_function:test_workers
+          ~parameter_overrides:consensus_threshold) ;
+    (match test_mode_tag with
+    (* No misc shell RPCs in these modes *)
+    | `Client_data_dir_proxy_server | `Client_rpc_proxy_server -> ()
+    | _ ->
+        check_rpc
+          "misc_shell"
+          ~test_function:test_misc_shell
+          ~parameter_overrides:consensus_threshold) ;
+    match test_mode_tag with
+    (* No chain RPCs in these modes *)
+    | `Client_data_dir_proxy_server | `Client_rpc_proxy_server -> ()
+    | _ ->
+        check_rpc
+          "chain"
+          ~test_function:test_chain
+          ~parameter_overrides:consensus_threshold
   in
   List.iter
     (register protocols)

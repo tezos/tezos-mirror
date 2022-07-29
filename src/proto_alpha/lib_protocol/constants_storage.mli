@@ -35,6 +35,8 @@ val blocks_per_cycle : Raw_context.t -> int32
 
 val blocks_per_commitment : Raw_context.t -> int32
 
+val nonce_revelation_threshold : Raw_context.t -> int32
+
 val blocks_per_stake_snapshot : Raw_context.t -> int32
 
 val cycles_per_voting_period : Raw_context.t -> int32
@@ -51,6 +53,8 @@ val hard_storage_limit_per_operation : Raw_context.t -> Z.t
 val proof_of_work_threshold : Raw_context.t -> int64
 
 val tokens_per_roll : Raw_context.t -> Tez_repr.t
+
+val vdf_difficulty : Raw_context.t -> int64
 
 val seed_nonce_revelation_tip : Raw_context.t -> Tez_repr.t
 
@@ -75,6 +79,10 @@ val liquidity_baking_sunset_level : Raw_context.t -> int32
 val liquidity_baking_toggle_ema_threshold : Raw_context.t -> int32
 
 val parametric : Raw_context.t -> Constants_parametric_repr.t
+
+val tx_rollup : Raw_context.t -> Constants_parametric_repr.tx_rollup
+
+val sc_rollup : Raw_context.t -> Constants_parametric_repr.sc_rollup
 
 val consensus_committee_size : Raw_context.t -> int
 
@@ -121,6 +129,8 @@ val tx_rollup_sunset_level : Raw_context.t -> int32
 val ratio_of_frozen_deposits_slashed_per_double_endorsement :
   Raw_context.t -> Ratio_repr.t
 
+val testnet_dictator : Raw_context.t -> Signature.Public_key_hash.t option
+
 val minimal_block_delay : Raw_context.t -> Period_repr.t
 
 val delay_increment_per_round : Raw_context.t -> Period_repr.t
@@ -131,12 +141,23 @@ val sc_rollup_origination_size : Raw_context.t -> int
 
 val sc_rollup_challenge_window_in_blocks : Raw_context.t -> int
 
-val sc_rollup_max_available_messages : Raw_context.t -> int
+val sc_rollup_max_number_of_messages_per_commitment_period :
+  Raw_context.t -> int
 
-val sc_rollup_stake_amount_in_mutez : Raw_context.t -> int
+val sc_rollup_stake_amount : Raw_context.t -> Tez_repr.t
 
-val sc_rollup_commitment_frequency_in_blocks : Raw_context.t -> int
-
-val sc_rollup_commitment_storage_size_in_bytes : Raw_context.t -> int
+val sc_rollup_commitment_period_in_blocks : Raw_context.t -> int
 
 val sc_rollup_max_lookahead_in_blocks : Raw_context.t -> int32
+
+val sc_rollup_max_active_outbox_levels : Raw_context.t -> int32
+
+val sc_rollup_max_outbox_messages_per_level : Raw_context.t -> int
+
+val sc_rollup_number_of_sections_in_dissection : Raw_context.t -> int
+
+val sc_rollup_timeout_period_in_blocks : Raw_context.t -> int
+
+val dal_number_of_slots : Raw_context.t -> int
+
+val dal_enable : Raw_context.t -> bool

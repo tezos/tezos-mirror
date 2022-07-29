@@ -15,7 +15,7 @@
 # Insert code owner declarations here!
 # ************************************
 
-/docs                        @NicVolanschi @raphael-proust @Saroupille @astefano @eugenz @arvidnl @yrg @dannywillems @hai-nguyen-van @lthms @raphoo_
+/docs                        @NicVolanschi @raphael-proust @Saroupille @astefano @eugenz @arvidnl @yrg @dannywillems @lthms @rafoo_
 
 /src/bin_codec               @raphael-proust
 /src/bin_node                @romain.nl
@@ -54,18 +54,27 @@
 #
 # These users are, as members of the Octez Merge Team, permitted to act as authorities on any code.
 #
+# @andrea.cerone = Andrea Cerone
 # @arvidnl = Arvid Jakobsson
+# @bsall = Boubacar Sall
 # @camlspotter = Jun Furuse
+# @eugenz = Eugen Zalinescu
+# @hans.hoglund = Hans Hoglund
 # @hhugo1 = Hugo Heuzard
 # @igarnier = Ilias Garnier
+# @iguerNL = Mohamed Iguernlala
 # @jobjo = Joel Bjornson
+# @julien.t = Julien Tesson
 # @klakplok = Benjamin Canou
 # @lthms = Thomas Letan
 # @mbouaziz = Mehdi Bouaziz
+# @mebsout = Alain Mebsout
 # @murbard = Arthur B.
 # @naih = Nicolas Ayache
 # @NicVolanschi = Nic Volanschi
+# @ole.kruger = Ole Krüger
 # @paracetamolo = Marco Stronati
+# @picdc = Pierrick Couderc
 # @pirbo = Pierre Boutillier
 # @rafoo_ = Raphaël Cauderlier
 # @raphael-proust = Raphaël Proust
@@ -74,14 +83,15 @@
 # @Saroupille = François Thiré
 # @smelc = Clément Hurlin
 # @smondet = Seb Mondet
-# @sribar = Sylvain R.
+# @sribaroud = Sylvain R.
 # @sventimir = Sventimir
 # @tomjack = Tom Jack
 # @vbotbol = vbot
+# @vch9 = Valentin Chaboche
 # @vect0r = Victor Allombert
 # @yrg = Yann Regis-Gianas
 #
-* @arvidnl @camlspotter @hhugo1 @igarnier @jobjo @klakplok @lthms @mbouaziz @murbard @naih @NicVolanschi @paracetamolo @pirbo @rafoo_ @raphael-proust @richard.bonichon @romain.nl @Saroupille @smelc @smondet @sribar @sventimir @tomjack @vbotbol @vect0r @yrg
+* @andrea.cerone @arvidnl @bsall @camlspotter @eugenz @hans.hoglund @hhugo1 @igarnier @iguerNL @jobjo @julien.t @klakplok @lthms @mbouaziz @mebsout @murbard @naih @NicVolanschi @ole.kruger @paracetamolo @picdc @pirbo @rafoo_ @raphael-proust @richard.bonichon @romain.nl @Saroupille @smelc @smondet @sribaroud @sventimir @tomjack @vbotbol @vch9 @vect0r @yrg
 
 # CODEOWNERS Owners
 #

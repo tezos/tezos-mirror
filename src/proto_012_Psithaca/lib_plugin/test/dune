@@ -12,22 +12,20 @@
   tezos-stdlib-unix
   tezos-micheline
   tezos-protocol-plugin-012-Psithaca
-  tezos-protocol-012-Psithaca.environment
   tezos-protocol-012-Psithaca
-  tezos-protocol-012-Psithaca-parameters
+  tezos-protocol-012-Psithaca.parameters
   tezos-012-Psithaca-test-helpers)
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_base_test_helpers
-   -open Tezos_micheline
-   -open Tezos_protocol_plugin_012_Psithaca
-   -open Tezos_protocol_environment_012_Psithaca
-   -open Tezos_protocol_012_Psithaca
-   -open Tezos_protocol_012_Psithaca.Protocol
-   -open Tezos_protocol_012_Psithaca_parameters
-   -open Tezos_012_Psithaca_test_helpers)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_base_test_helpers
+  -open Tezos_micheline
+  -open Tezos_protocol_plugin_012_Psithaca
+  -open Tezos_protocol_012_Psithaca
+  -open Tezos_protocol_012_Psithaca.Protocol
+  -open Tezos_protocol_012_Psithaca_parameters
+  -open Tezos_012_Psithaca_test_helpers))
 
 (rule
  (alias runtest)

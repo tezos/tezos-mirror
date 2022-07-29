@@ -41,20 +41,20 @@ end
 module Request = struct
   include Request
 
-  type _ t =
+  type (_, _) t =
     | Validated : {
         peer : P2p_peer_id.t option;
         (* The peer who sent the block if it was not injected locally. *)
         block : Store.Block.t;
       }
-        -> Event.update t
-    | Notify_branch : P2p_peer.Id.t * Block_locator.t -> unit t
+        -> (Event.update, error trace) t
+    | Notify_branch : P2p_peer.Id.t * Block_locator.t -> (unit, Empty.t) t
     | Notify_head :
         P2p_peer.Id.t * Block_hash.t * Block_header.t * Mempool.t
-        -> unit t
-    | Disconnection : P2p_peer.Id.t -> unit t
+        -> (unit, Empty.t) t
+    | Disconnection : P2p_peer.Id.t -> (unit, Empty.t) t
 
-  let view (type a) (req : a t) : view =
+  let view (type a b) (req : (a, b) t) : view =
     match req with
     | Validated {block; _} -> Hash (Store.Block.hash block)
     | Notify_branch (peer_id, _) -> PeerId peer_id
@@ -95,8 +95,7 @@ module Types = struct
     new_head_input : Store.Block.t Lwt_watcher.input;
     mutable child : (state * (unit -> unit Lwt.t (* shutdown *))) option;
     prevalidator : Prevalidator.t option ref;
-    active_peers :
-      (Peer_validator.t, Error_monad.tztrace) P2p_peer.Error_table.t;
+    active_peers : (Peer_validator.t, Empty.t) P2p_peer.Error_table.t;
   }
 
   let is_bootstrapped (state : state) =
@@ -110,7 +109,7 @@ module Logger =
       let worker_name = "node_chain_validator"
     end)
 
-module Worker = Worker.Make (Name) (Event) (Request) (Types) (Logger)
+module Worker = Worker.MakeSingle (Name) (Event) (Request) (Types) (Logger)
 open Types
 
 type t = Worker.infinite Worker.queue Worker.t
@@ -178,26 +177,31 @@ let notify_new_block w peer block =
   Worker.Queue.push_request_now w (Validated {peer; block})
 
 let with_activated_peer_validator w peer_id f =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   let nv = Worker.state w in
   let* pv =
     P2p_peer.Error_table.find_or_make nv.active_peers peer_id (fun () ->
-        let*! () = Worker.log_event w (Connection peer_id) in
-        Peer_validator.create
-          ~notify_new_block:(notify_new_block w (Some peer_id))
-          ~notify_termination:(fun _pv ->
-            P2p_peer.Error_table.remove nv.active_peers peer_id)
-          nv.parameters.peer_validator_limits
-          nv.parameters.block_validator
-          nv.chain_db
-          peer_id)
+        let* () = Worker.log_event w (Connection peer_id) in
+        let* pv =
+          Peer_validator.create
+            ~notify_new_block:(notify_new_block w (Some peer_id))
+            ~notify_termination:(fun _pv ->
+              P2p_peer.Error_table.remove nv.active_peers peer_id)
+            nv.parameters.peer_validator_limits
+            nv.parameters.block_validator
+            nv.chain_db
+            peer_id
+        in
+        Lwt.return_ok pv)
   in
-  match Peer_validator.status pv with
-  | Worker_types.Running _ -> f pv
-  | Worker_types.Closing (_, _)
-  | Worker_types.Closed (_, _, _)
-  | Worker_types.Launching _ ->
-      return_unit
+  match pv with
+  | Ok pv -> (
+      match Peer_validator.status pv with
+      | Worker_types.Running _ -> f pv
+      | Worker_types.Closing (_, _)
+      | Worker_types.Closed (_, _, _)
+      | Worker_types.Launching _ ->
+          return_ok_unit)
 
 let may_update_protocol_level chain_store ~block =
   let open Lwt_result_syntax in
@@ -206,7 +210,7 @@ let may_update_protocol_level chain_store ~block =
   let new_proto_level = Store.Block.proto_level block in
   if Compare.Int.(prev_proto_level < new_proto_level) then
     let* context = Store.Block.context chain_store block in
-    let*! new_protocol = Context.get_protocol context in
+    let*! new_protocol = Context_ops.get_protocol context in
     Store.Chain.may_update_protocol_level
       chain_store
       ~pred
@@ -219,8 +223,12 @@ let may_switch_test_chain w active_chains spawn_child block =
   let nv = Worker.state w in
   let may_create_child block test_protocol expiration forking_block_hash =
     let block_header = Store.Block.header block in
-    let genesis_hash = Context.compute_testchain_genesis forking_block_hash in
-    let testchain_id = Context.compute_testchain_chain_id genesis_hash in
+    let genesis_hash =
+      Tezos_context_disk.Context.compute_testchain_genesis forking_block_hash
+    in
+    let testchain_id =
+      Tezos_context_disk.Context.compute_testchain_chain_id genesis_hash
+    in
     let*! activated =
       match nv.child with
       | None -> Lwt.return_false
@@ -255,7 +263,10 @@ let may_switch_test_chain w active_chains spawn_child block =
                 in
                 let bvp = nv.parameters.block_validator_process in
                 let*! r =
-                  Block_validator_process.init_test_chain bvp forking_block
+                  Block_validator_process.init_test_chain
+                    bvp
+                    (Store.Chain.chain_id chain_store)
+                    forking_block
                 in
                 match r with
                 | Ok genesis_header ->
@@ -319,10 +330,10 @@ let may_switch_test_chain w active_chains spawn_child block =
   let*! r =
     let* v = Store.Block.testchain_status nv.parameters.chain_store block in
     match v with
-    | (Not_running, _) ->
+    | Not_running, _ ->
         let*! () = shutdown_child nv active_chains in
         return_unit
-    | ((Forking _ | Running _), None) -> return_unit (* only for snapshots *)
+    | (Forking _ | Running _), None -> return_unit (* only for snapshots *)
     | ( (Forking {protocol; expiration; _} | Running {protocol; expiration; _}),
         Some forking_block_hash ) ->
         may_create_child block protocol expiration forking_block_hash
@@ -414,7 +425,7 @@ let may_flush_or_update_prevalidator parameters event prevalidator chain_db
         let* () = Prevalidator.shutdown old_prevalidator in
         return_ok_unit
       else
-        let* (live_blocks, live_operations) =
+        let* live_blocks, live_operations =
           Store.Chain.live_blocks parameters.chain_store
         in
         Prevalidator.flush
@@ -493,32 +504,41 @@ let on_notify_branch w peer_id locator =
       return_ok_unit)
 
 let on_notify_head w peer_id (hash, header) mempool =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   let nv = Worker.state w in
-  let*! () = check_and_update_synchronisation_state w (hash, header) peer_id in
-  let* () =
+  let* () = check_and_update_synchronisation_state w (hash, header) peer_id in
+  let* (r : (_, Empty.t) result) =
     with_activated_peer_validator w peer_id (fun pv ->
         Peer_validator.notify_head pv hash header ;
-        return_unit)
+        return_ok_unit)
   in
-  match !(nv.prevalidator) with
-  | Some prevalidator ->
-      let*! () = Prevalidator.notify_operations prevalidator peer_id mempool in
-      return_unit
-  | None -> return_unit
+  match r with
+  | Ok () -> (
+      match !(nv.prevalidator) with
+      | Some prevalidator ->
+          let* () =
+            Prevalidator.notify_operations prevalidator peer_id mempool
+          in
+          return_ok_unit
+      | None -> return_ok_unit)
 
 let on_disconnection w peer_id =
   let open Lwt_result_syntax in
   let nv = Worker.state w in
   match P2p_peer.Error_table.find nv.active_peers peer_id with
   | None -> return_unit
-  | Some pv ->
-      let* pv = pv in
-      let*! () = Peer_validator.shutdown pv in
-      return_unit
+  | Some pv -> (
+      let*! pv = pv in
+      match pv with
+      | Ok pv ->
+          let*! () = Peer_validator.shutdown pv in
+          return_unit)
 
-let on_request (type a) w start_testchain active_chains spawn_child
-    (req : a Request.t) : a tzresult Lwt.t =
+let on_request (type a b) w start_testchain active_chains spawn_child
+    (req : (a, b) Request.t) : (a, b) result Lwt.t =
+  let nv = Worker.state w in
+  Prometheus.Counter.inc_one
+    nv.parameters.metrics.worker_counters.worker_request_count ;
   match req with
   | Request.Validated {peer; block} ->
       on_validation_request
@@ -534,7 +554,76 @@ let on_request (type a) w start_testchain active_chains spawn_child
       on_notify_head w peer_id (hash, header) mempool
   | Request.Disconnection peer_id -> on_disconnection w peer_id
 
-let on_completion (type a) w (req : a Request.t) (update : a) request_status =
+let collect_proto ~metrics (chain_store, block) =
+  let open Lwt_syntax in
+  let* metadata_opt = Store.Block.get_block_metadata_opt chain_store block in
+  match metadata_opt with
+  | None -> Lwt.return_unit
+  | Some metadata ->
+      let open Shell_metrics.Proto_plugin in
+      let protocol_metadata = Block_repr.block_metadata metadata in
+      Lwt.catch
+        (fun () ->
+          (* Return Noop if the protocol does not exist, and
+             UndefinedMetric if the plugin for the protocol
+             does not exist *)
+          let* (module ProtoMetrics) =
+            let* protocol = Store.Block.protocol_hash_exn chain_store block in
+            safe_get_prevalidator_proto_metrics protocol
+          in
+          let fitness = Store.Block.fitness block in
+          let* () =
+            ProtoMetrics.update_metrics
+              ~protocol_metadata
+              fitness
+              (Shell_metrics.Chain_validator.update_proto_metrics_callback
+                 ~metrics)
+          in
+          Lwt.return_unit)
+        (fun _ -> Lwt.return_unit)
+
+let on_error (type a b) w st (request : (a, b) Request.t) (errs : b) :
+    unit tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let nv = Worker.state w in
+  Prometheus.Counter.inc_one
+    nv.parameters.metrics.worker_counters.worker_error_count ;
+  let request_view = Request.view request in
+  match request with
+  | Validated _ ->
+      (* If an error happens here, it means that the request
+         [Validated] failed. For this request, the payload
+         associated to the request was validated and therefore is
+         safe. The handler for such request does some I/Os, and
+         therefore a failure could be "No space left on device" for
+         example. If there is an error at this level, it certainly
+         requires a manual operation from the maintener of the
+         node. *)
+      let*! () =
+        Worker.log_event w (Request_failure (request_view, st, errs))
+      in
+      Lwt.return_error errs
+  (* We do not crash the worker in the following cases mainly for one
+     reason: Such request comes from a remote peer. The payload for this
+     request may contain unsafe data. The current policy with tzresult is
+     not clear and there might be a non serious error raised as a [tzresult]
+     to say it was a bad data. If if is the case, we do not want to crash
+     the worker.
+
+     With the current state of the code, it is possible that
+     this branch is not reachable. This would be possible to
+     see it if we relax the interface of [tezos-worker] to use
+     [('a, 'b) result] instead of [tzresult] and if each
+     request uses its own error type. *)
+  | Notify_branch _ -> ( match errs with _ -> .)
+  | Notify_head _ -> ( match errs with _ -> .)
+  | Disconnection _ -> ( match errs with _ -> .)
+
+let on_completion (type a b) w (req : (a, b) Request.t) (update : a)
+    request_status =
+  let nv = Worker.state w in
+  Prometheus.Counter.inc_one
+    nv.parameters.metrics.worker_counters.worker_completion_count ;
   match req with
   | Request.Validated {block; _} ->
       let fitness = Store.Block.fitness block in
@@ -542,12 +631,9 @@ let on_completion (type a) w (req : a Request.t) (update : a) request_status =
       let level = Store.Block.level block in
       let timestamp = Store.Block.timestamp block in
       let () =
-        let nv = Worker.state w in
-        let () =
-          Shell_metrics.Worker.update
-            nv.parameters.metrics.validation_worker_metrics
-            request_status
-        in
+        Shell_metrics.Worker.update_timestamps
+          nv.parameters.metrics.worker_timestamps
+          request_status ;
         match update with
         | Event.Ignored_head ->
             Prometheus.Counter.inc_one nv.parameters.metrics.ignored_head_count
@@ -555,13 +641,21 @@ let on_completion (type a) w (req : a Request.t) (update : a) request_status =
             Prometheus.Counter.inc_one nv.parameters.metrics.branch_switch_count ;
             Prometheus.Gauge.set
               nv.parameters.metrics.head_level
-              (Int32.to_float level)
+              (Int32.to_float level) ;
+            Shell_metrics.Chain_validator.update_proto (fun () ->
+                collect_proto
+                  ~metrics:nv.parameters.metrics
+                  (nv.parameters.chain_store, block))
         | Event.Head_increment ->
             Prometheus.Counter.inc_one
               nv.parameters.metrics.head_increment_count ;
             Prometheus.Gauge.set
               nv.parameters.metrics.head_level
-              (Int32.to_float level)
+              (Int32.to_float level) ;
+            Shell_metrics.Chain_validator.update_proto (fun () ->
+                collect_proto
+                  ~metrics:nv.parameters.metrics
+                  (nv.parameters.chain_store, block))
       in
       Worker.record_event
         w
@@ -595,7 +689,8 @@ let on_close w =
   in
   Lwt.join
     (Option.iter_s Prevalidator.shutdown !(nv.prevalidator)
-     :: Option.iter_s (fun (_, shutdown) -> shutdown ()) nv.child :: pvs)
+    :: Option.iter_s (fun (_, shutdown) -> shutdown ()) nv.child
+    :: pvs)
 
 let may_load_protocols parameters =
   let open Lwt_result_syntax in
@@ -622,6 +717,8 @@ let may_load_protocols parameters =
                return_unit))
     indexed_protocols
 
+type launch_error = error trace
+
 let on_launch w _ parameters =
   let open Lwt_result_syntax in
   let* () = may_load_protocols parameters in
@@ -645,6 +742,9 @@ let on_launch w _ parameters =
   let prevalidator = ref None in
   let when_status_changes status =
     let*! () = Worker.log_event w (Event.Sync_status status) in
+    Shell_metrics.Chain_validator.update_sync_status
+      ~metrics:parameters.metrics
+      status ;
     match status with
     | Synchronisation_heuristic.Synchronised _ ->
         if parameters.start_prevalidator then
@@ -659,8 +759,12 @@ let on_launch w _ parameters =
   in
   let synchronisation_state =
     Synchronisation_heuristic.Bootstrapping.create
-      ~when_bootstrapped_changes:(fun b ->
-        if b then Worker.log_event w Event.Bootstrapped else Lwt.return_unit)
+      ~when_bootstrapped_changes:(fun is_bootstrapped ->
+        Shell_metrics.Chain_validator.update_bootstrapped
+          ~metrics:parameters.metrics
+          is_bootstrapped ;
+        if is_bootstrapped then Worker.log_event w Event.Bootstrapped
+        else Lwt.return_unit)
       ~when_status_changes
       ~threshold:parameters.limits.synchronisation.threshold
       ~latency:parameters.limits.synchronisation.latency
@@ -719,44 +823,19 @@ let rec create ~start_testchain ~active_chains ?parent ~block_validator_process
   let module Handlers = struct
     type self = t
 
+    type nonrec launch_error = launch_error
+
     let on_launch = on_launch
 
     let on_request w = on_request w start_testchain active_chains spawn_child
 
     let on_close = on_close
 
-    let on_error w r st errs =
-      let*! () = Worker.log_event w (Request_failure (r, st, errs)) in
-      match r with
-      | Hash _ ->
-          (* If an error happens here, it means that the request
-             [Validated] failed. For this request, the payload
-             associated to the request was validated and therefore is
-             safe. The handler for such request does some I/Os, and
-             therefore a failure could be "No space left on device" for
-             example. If there is an error at this level, it certainly
-             requires a manual operation from the maintener of the
-             node. *)
-          Lwt.return_error errs
-      | PeerId _ ->
-          (* We do not crash the worker here mainly for one reason:
-             Such request comes from a remote peer. The payload for
-             this request may contain unsafe data. The current policy
-             with tzresult is not clear and there might be a non
-             serious error raised as a [tzresult] to say it was a bad
-             data. If if is the case, we do not want to crash the
-             worker.
-
-             With the current state of the code, it is possible that
-             this branch is not reachable. This would be possible to
-             see it if we relax the interface of [tezos-worker] to use
-             [('a, 'b) result] instead of [tzresult] and if each
-             request uses its own error type. *)
-          return_unit
+    let on_error = on_error
 
     let on_completion = on_completion
 
-    let on_no_request _ = return_unit
+    let on_no_request _ = Lwt.return_unit
   end in
   let chain_id = Store.Chain.chain_id chain_store in
   let parameters =

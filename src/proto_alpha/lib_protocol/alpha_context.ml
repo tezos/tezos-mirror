@@ -51,14 +51,63 @@ module Timestamp = struct
 end
 
 module Slot = Slot_repr
+module Sc_rollup_repr = Sc_rollup_repr
 
 module Sc_rollup = struct
   module Tick = Sc_rollup_tick_repr
   include Sc_rollup_repr
-  module Inbox = Sc_rollup_inbox_repr
+  include Sc_rollup_PVM_sem
+  module ArithPVM = Sc_rollup_arith
+  module Wasm_2_0_0PVM = Sc_rollup_wasm.V2_0_0
+
+  module Inbox = struct
+    include Sc_rollup_inbox_repr
+    include Sc_rollup_inbox_storage
+    module Message = Sc_rollup_inbox_message_repr
+  end
+
+  module Proof = Sc_rollup_proof_repr
+  module Game = Sc_rollup_game_repr
+
+  module Commitment = struct
+    include Sc_rollup_commitment_repr
+    include Sc_rollup_commitment_storage
+  end
+
+  module Stake_storage = struct
+    include Sc_rollup_stake_storage
+  end
+
+  module Refutation_storage = Sc_rollup_refutation_storage
   include Sc_rollup_storage
+  include Sc_rollups
+
+  module Outbox = struct
+    include Sc_rollup_outbox_storage
+    module Message = Sc_rollup_outbox_message_repr
+  end
+
+  module Errors = Sc_rollup_errors
 end
 
+module Dal = struct
+  module Slot_index = struct
+    include Dal_slot_repr.Index
+  end
+
+  module Endorsement = struct
+    include Dal_endorsement_repr
+    include Raw_context.Dal
+  end
+
+  module Slot = struct
+    include Dal_slot_repr
+    include Dal_slot_storage
+    include Raw_context.Dal
+  end
+end
+
+module Dal_errors = Dal_errors_repr
 module Entrypoint = Entrypoint_repr
 include Operation_repr
 
@@ -93,28 +142,6 @@ end
 module Ratio = Ratio_repr
 module Raw_level = Raw_level_repr
 module Cycle = Cycle_repr
-
-module Script = struct
-  include Michelson_v1_primitives
-  include Script_repr
-
-  type consume_deserialization_gas = Always | When_needed
-
-  let force_decode_in_context ~consume_deserialization_gas ctxt lexpr =
-    let gas_cost =
-      match consume_deserialization_gas with
-      | Always -> Script_repr.stable_force_decode_cost lexpr
-      | When_needed -> Script_repr.force_decode_cost lexpr
-    in
-    Raw_context.consume_gas ctxt gas_cost >>? fun ctxt ->
-    Script_repr.force_decode lexpr >|? fun v -> (v, ctxt)
-
-  let force_bytes_in_context ctxt lexpr =
-    Raw_context.consume_gas ctxt (Script_repr.force_bytes_cost lexpr)
-    >>? fun ctxt ->
-    Script_repr.force_bytes lexpr >|? fun v -> (v, ctxt)
-end
-
 module Fees = Fees_storage
 
 type public_key = Signature.Public_key.t
@@ -158,13 +185,9 @@ end
 module Gas = struct
   include Gas_limit_repr
 
-  type error += Gas_limit_too_high = Raw_context.Gas_limit_too_high
-
   type error += Block_quota_exceeded = Raw_context.Block_quota_exceeded
 
   type error += Operation_quota_exceeded = Raw_context.Operation_quota_exceeded
-
-  let check_limit_is_valid = Raw_context.check_gas_limit_is_valid
 
   let set_limit = Raw_context.set_gas_limit
 
@@ -173,6 +196,24 @@ module Gas = struct
   let set_unlimited = Raw_context.set_gas_unlimited
 
   let consume = Raw_context.consume_gas
+
+  let consume_from available_gas cost =
+    match raw_consume available_gas cost with
+    | Some remaining_gas -> ok remaining_gas
+    | None -> error Operation_quota_exceeded
+
+  let check_limit_and_consume_from_block_gas
+      ~(hard_gas_limit_per_operation : Arith.integral)
+      ~(remaining_block_gas : Arith.fp) ~(gas_limit : Arith.integral) =
+    let open Result_syntax in
+    let* () = check_gas_limit ~hard_gas_limit_per_operation ~gas_limit in
+    let gas_limit_fp = Arith.fp gas_limit in
+    let* () =
+      error_unless
+        Arith.(gas_limit_fp <= remaining_block_gas)
+        Block_quota_exceeded
+    in
+    return (Arith.sub remaining_block_gas gas_limit_fp)
 
   let remaining_operation_gas = Raw_context.remaining_operation_gas
 
@@ -191,6 +232,31 @@ module Gas = struct
 
   (* Necessary to inject costs for Storage_costs into Gas.cost *)
   let cost_of_repr cost = cost
+end
+
+module Script = struct
+  include Michelson_v1_primitives
+  include Script_repr
+
+  type consume_deserialization_gas = Always | When_needed
+
+  let force_decode_in_context ~consume_deserialization_gas ctxt lexpr =
+    let gas_cost =
+      match consume_deserialization_gas with
+      | Always -> Script_repr.stable_force_decode_cost lexpr
+      | When_needed -> Script_repr.force_decode_cost lexpr
+    in
+    Raw_context.consume_gas ctxt gas_cost >>? fun ctxt ->
+    Script_repr.force_decode lexpr >|? fun v -> (v, ctxt)
+
+  let force_bytes_in_context ctxt lexpr =
+    Raw_context.consume_gas ctxt (Script_repr.force_bytes_cost lexpr)
+    >>? fun ctxt ->
+    Script_repr.force_bytes lexpr >|? fun v -> (v, ctxt)
+
+  let consume_decoding_gas available_gas lexpr =
+    let gas_cost = Script_repr.stable_force_decode_cost lexpr in
+    Gas.consume_from available_gas gas_cost
 end
 
 module Level = struct
@@ -219,6 +285,8 @@ module Contract = struct
   include Contract_storage
 
   let is_manager_key_revealed = Contract_manager_storage.is_manager_key_revealed
+
+  let check_public_key = Contract_manager_storage.check_public_key
 
   let reveal_manager_key = Contract_manager_storage.reveal_manager_key
 

@@ -58,7 +58,11 @@ type ('msg, 'peer_meta, 'conn_meta) dependencies = {
   point_state_info_trusted :
     ('msg, 'peer_meta, 'conn_meta) P2p_conn.t P2p_point_state.Info.t -> bool;
       (** [P2p_point_state.Info.trusted] *)
-  fd_connect : P2p_fd.t -> Unix.sockaddr -> unit Lwt.t;  (** [P2p_fd.connect] *)
+  fd_connect :
+    P2p_fd.t ->
+    Unix.sockaddr ->
+    (unit, [`Unexpected_error of exn | `Connection_refused]) result Lwt.t;
+      (** [P2p_fd.connect] *)
   socket_authenticate :
     canceler:Lwt_canceler.t ->
     proof_of_work_target:Crypto_box.pow_target ->
@@ -292,7 +296,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
   let incoming = point_info = None in
   let incoming_str = if incoming then "incoming" else "outgoing" in
   let*! () = Events.(emit authenticate_start) (point, incoming_str) in
-  let* (info, auth_conn) =
+  let* info, auth_conn =
     protect
       ~canceler
       (fun () ->
@@ -350,7 +354,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
   in
   let remote_point_info =
     match info.id_point with
-    | (addr, Some port) -> P2p_pool.register_new_point t.pool (addr, port)
+    | addr, Some port -> P2p_pool.register_new_point t.pool (addr, port)
     | _ -> None
   in
   let connection_point_info = Option.either point_info remote_point_info in
@@ -511,8 +515,8 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
         match
           (info.id_point, Option.map P2p_point_state.Info.point point_info)
         with
-        | ((addr, _), Some (_, port)) -> (addr, Some port)
-        | (id_point, None) -> id_point
+        | (addr, _), Some (_, port) -> (addr, Some port)
+        | id_point, None -> id_point
       in
       let conn =
         create_connection
@@ -560,8 +564,8 @@ let accept t fd point =
   then
     Error_monad.dont_wait
       (fun () -> P2p_fd.close fd)
-      (fun trace ->
-        Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace)
+      (fun (`Unexpected_error ex) ->
+        Format.eprintf "Uncaught error: %s\n%!" (Printexc.to_string ex))
       (fun exc ->
         Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
   else
@@ -623,28 +627,38 @@ let connect ?timeout t point =
       let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
       let*! () = Events.(emit connect_status) ("start", point) in
       let* () =
-        protect
-          ~canceler
-          (fun () ->
+        protect ~canceler (fun () ->
             t.log (Outgoing_connection point) ;
-            let*! () = t.dependencies.fd_connect fd uaddr in
-            return_unit)
-          ~on_error:(fun err ->
-            let*! () = Events.(emit connect_error) (point, err) in
-            let timestamp = Time.System.now () in
-            P2p_point_state.set_disconnected
-              ~timestamp
-              t.config.reconnection_config
-              point_info ;
-            let*! close_res = P2p_fd.close fd in
-            Result.iter_error
-              (fun trace ->
-                Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace)
-              close_res ;
-            match err with
-            | [Exn (Unix.Unix_error (Unix.ECONNREFUSED, _, _))] ->
-                tzfail P2p_errors.Connection_refused
-            | err -> Lwt.return_error err)
+            let*! r = t.dependencies.fd_connect fd uaddr in
+            Result.map_error_es
+              (fun err ->
+                let timestamp = Time.System.now () in
+                P2p_point_state.set_disconnected
+                  ~timestamp
+                  t.config.reconnection_config
+                  point_info ;
+                let*! close_res = P2p_fd.close fd in
+                let*! () =
+                  match close_res with
+                  | Ok () -> Lwt.return_unit
+                  | Error (`Unexpected_error ex) ->
+                      Events.(emit connect_close_error)
+                        (point, lazy (Printexc.to_string ex))
+                in
+                match err with
+                | `Unexpected_error ex ->
+                    let*! () =
+                      Events.(emit connect_error)
+                        (point, lazy (Printexc.to_string ex))
+                    in
+                    Lwt.return_error (TzTrace.make (error_of_exn ex))
+                | `Connection_refused ->
+                    let*! () =
+                      Events.(emit connect_error)
+                        (point, lazy "connection_refused")
+                    in
+                    tzfail P2p_errors.Connection_refused)
+              r)
       in
       let*! () = Events.(emit connect_status) ("authenticate", point) in
       authenticate t ~point_info canceler fd point)
@@ -671,7 +685,10 @@ module Internal_for_tests = struct
       bool;
     point_state_info_trusted :
       ('msg, 'peer_meta, 'conn_meta) P2p_conn.t P2p_point_state.Info.t -> bool;
-    fd_connect : P2p_fd.t -> Unix.sockaddr -> unit Lwt.t;
+    fd_connect :
+      P2p_fd.t ->
+      Unix.sockaddr ->
+      (unit, [`Unexpected_error of exn | `Connection_refused]) result Lwt.t;
     socket_authenticate :
       canceler:Lwt_canceler.t ->
       proof_of_work_target:Crypto_box.pow_target ->
@@ -701,7 +718,7 @@ module Internal_for_tests = struct
       pool_greylist_peer = (fun _ _ -> ());
       peer_state_info_trusted = (fun _ -> true);
       point_state_info_trusted = (fun _ -> true);
-      fd_connect = (fun _ _ -> Lwt.return_unit);
+      fd_connect = (fun _ _ -> Lwt.return_ok ());
       socket_authenticate =
         (fun ~canceler:_
              ~proof_of_work_target:_

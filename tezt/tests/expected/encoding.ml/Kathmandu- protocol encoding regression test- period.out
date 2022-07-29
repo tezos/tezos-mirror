@@ -1,0 +1,12 @@
+
+./tezos-codec encode 014-PtKathma.period from '"2789"'
+0000000000000ae5
+
+./tezos-codec decode 014-PtKathma.period from 0000000000000ae5
+"2789"
+
+./tezos-codec encode 014-PtKathma.period from '"0"'
+0000000000000000
+
+./tezos-codec decode 014-PtKathma.period from 0000000000000000
+"0"

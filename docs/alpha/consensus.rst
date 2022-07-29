@@ -8,9 +8,9 @@ History
 -------
 
 Before Tenderbake, there was
-`Emmy* <https://gitlab.com/tzip/tzip/-/blob/master/drafts/current/draft_emmy-star.md>`_,
+`Emmy* <https://gitlab.com/tezos/tzip/-/blob/master/drafts/current/draft_emmy-star.md>`_,
 a Nakamoto-style consensus consisting of a series of improvements of the one in
-the `Tezos whitepaper <https://whitepaper.io/document/376/tezos-whitepaper>`_.
+the `Tezos whitepaper <https://tezos.com/whitepaper.pdf>`_.
 
 Emmy*, like any Nakamoto-style consensus algorithm (such as `Bitcoin
 <https://bitcoin.org/bitcoin.pdf>`_ or `Ouroboros
@@ -20,7 +20,7 @@ with a probability that increases rapidly with fork length.
 
 `Tenderbake <https://arxiv.org/abs/2001.11965>`_ instead, like any classic
 BFT-style consensus algorithm (such as
-`PBFT <http://pmg.csail.mit.edu/papers/osdi99.pdf>`_ or
+`PBFT <https://pmg.csail.mit.edu/papers/osdi99.pdf>`_ or
 `Tendermint <https://arxiv.org/abs/1807.04938>`_), offers *deterministic*
 finality: a block that has just been appended to the chain of some node is known
 to be final once it has two additional blocks on top of it, regardless of
@@ -36,7 +36,7 @@ for blockchains.
 
 Tenderbake adapts Tendermint to the Tezos blockchain, but the adjustments
 required are
-`substantive <https://blog.nomadic-labs.com/a-look-ahead-to-tenderbake.html#the-tezos-architecture>`_:
+`substantive <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html#the-tezos-architecture>`_:
 
 * Tenderbake is tailored to match the Tezos architecture by using only
   communication primitives and network assumptions which Tezos supports.
@@ -47,7 +47,7 @@ required are
 The design of Tenderbake and its rationale are described at
 length in the `technical report <https://arxiv.org/abs/2001.11965>`_ and in a
 `Nomadic Labs's blog
-post <https://blog.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_. Here we
+post <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_. Here we
 only provide a user/developer perspective.
 
 .. _tb_validator_alpha:
@@ -88,7 +88,7 @@ Schematically, a round consists in the following steps:
 .. _quorum_alpha:
 
 Unlike Emmy*, Tenderbake has `two types of
-votes <https://blog.nomadic-labs.com/a-look-ahead-to-tenderbake.html#why-do-we-need-preendorsements>`_:
+votes <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html#why-do-we-need-preendorsements>`_:
 before endorsing a block ``b``, a validator preendorses ``b``. Furthermore,
 to be able to endorse, a validator must have observed a preendorsement *quorum*, that is a
 set of preendorsements from validators having at least ``CONSENSUS_THRESHOLD`` validator slots. Similarly, to be able to decide, a validator must have observed an endorsement quorum, that is, a set of endorsements from validators having at least ``CONSENSUS_THRESHOLD`` validator slots. The
@@ -138,6 +138,8 @@ should be taken at round 0, meaning that the time between blocks would be
 :math:`round\_duration(0)` seconds i.e., parameter ``MINIMAL_BLOCK_DELAY``.
 
 
+.. _active_stake_alpha:
+
 Validator selection: staking balance, active stake, and frozen deposits
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -179,9 +181,9 @@ not the other way around.):
 - ``spendable balance`` is obtained with ``../context/contracts/<pkh>/balance``
 
 Delegates can set an upper limit to their frozen deposits with the
-commands ``tezos-client set deposit limit for <delegate> to
+command ``tezos-client set deposits limit for <delegate> to
 <deposit_limit>``, and unset this limit with the command ``tezos-client
-unset deposit limit for <delegate>``. These commands are implemented by
+unset deposits limit for <delegate>``. These commands are implemented
 using a new manager operation ``Set_deposits_limit``. When emitting such a
 command in cycle ``c``, it affects the active stake for cycles starting
 with ``c + PRESERVED_CYCLES + 1``; the new active stake is
@@ -192,8 +194,21 @@ latest (because up to that cycle the frozen deposit also depends on the
 active stake at cycles before cycle ``c+1``).
 
 The active stake is computed ``PRESERVED_CYCLES`` in advance: at
-the end of cycle ``c`` for cycle ``c + PRESERVED_CYCLES`` (as in Emmy*). Intuitively,
-the active stake is set to 10 times the delegate's chosen frozen
+the end of cycle ``c`` for cycle ``c + 1 + PRESERVED_CYCLES`` (as in Emmy*),
+before updating the delegates' :ref:`activity status<active_delegate_alpha>`.
+
+..
+   This entails that a delegate which was participating until cycle ``c -
+   1`` and is no longer participating in cycle ``c`,
+   will lose its rights from cycle
+   ``c + 2 * PRESERVED_CYCLES + 2`` onwards -- at the end of cycle ``c +
+   PRESERVED_CYCLES``, the rights for cycle ``c + 2 *
+   PRESERVED_CYCLES + 1`` are computed, and only then is the delegate
+   declared passive. Here "participation" means *having baked a final
+   block* or *having a preendorsement or endorsement included in a final
+   block*.
+
+Intuitively, the active stake is set to 10 times the delegate's chosen frozen
 deposit limit, without going beyond its available staking balance,
 nor its maximum staking capacity (determined by its full balance).
 More precisely, the active stake is the minimum between:

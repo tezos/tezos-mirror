@@ -26,6 +26,7 @@
 open Configuration
 open Protocol.Alpha_context
 open Plugin
+open Injector_common
 
 (**
 
@@ -39,6 +40,24 @@ let synchronization_failure e =
     Error_monad.(TzTrace.pp_print_top pp)
     e ;
   Lwt_exit.exit_and_raise 1
+
+type error += Cannot_find_block of Block_hash.t
+
+let () =
+  register_error_kind
+    ~id:"sc_rollup.node.cannot_find_block"
+    ~title:"Cannot find block from L1"
+    ~description:"A block couldn't be found from the L1 node"
+    ~pp:(fun ppf hash ->
+      Format.fprintf
+        ppf
+        "Block with hash %a was not found on the L1 node."
+        Block_hash.pp
+        hash)
+    `Temporary
+    Data_encoding.(obj1 (req "hash" Block_hash.encoding))
+    (function Cannot_find_block hash -> Some hash | _ -> None)
+    (fun hash -> Cannot_find_block hash)
 
 (**
 
@@ -94,9 +113,43 @@ module State = struct
 
       let value_encoding = head_encoding
     end)
-  end
 
-  let already_seen = Store.Blocks.mem
+    module Levels = Store.Make_updatable_map (struct
+      let path = ["tezos"; "levels"]
+
+      let keep_last_n_entries_in_memory = reorganization_window_length
+
+      type key = int32
+
+      let string_of_key = Int32.to_string
+
+      type value = block_hash
+
+      let value_encoding = Block_hash.encoding
+    end)
+
+    module ProcessedHashes = Store.Make_append_only_map (struct
+      let path = ["tezos"; "processed_blocks"]
+
+      let keep_last_n_entries_in_memory = reorganization_window_length
+
+      type key = block_hash
+
+      let string_of_key = Block_hash.to_b58check
+
+      type value = unit
+
+      let value_encoding = Data_encoding.unit
+    end)
+
+    module LastProcessedHead = Store.Make_mutable_value (struct
+      let path = ["tezos"; "processed_head"]
+
+      type value = head
+
+      let value_encoding = head_encoding
+    end)
+  end
 
   let last_seen_head = Store.Head.find
 
@@ -105,7 +158,29 @@ module State = struct
   let store_block = Store.Blocks.add
 
   let block_of_hash = Store.Blocks.get
+
+  module Blocks_cache =
+    Ringo_lwt.Functors.Make_opt
+      ((val Ringo.(
+              map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
+         (Block_hash))
+
+  let mark_processed_head store (Head {hash; _} as head) =
+    let open Lwt_syntax in
+    let* () = Store.ProcessedHashes.add store hash () in
+    Store.LastProcessedHead.set store head
+
+  let is_processed = Store.ProcessedHashes.mem
+
+  let last_processed_head = Store.LastProcessedHead.find
+
+  let hash_of_level = Store.Levels.get
+
+  let set_hash_of_level = Store.Levels.add
 end
+
+type blocks_cache =
+  Protocol_client_context.Alpha_block_services.block_info State.Blocks_cache.t
 
 (**
 
@@ -123,6 +198,13 @@ let same_branch new_head intermediate_heads =
 
 let rollback new_head = Rollback {new_head}
 
+type t = {
+  blocks_cache : blocks_cache;
+  events : chain_event Lwt_stream.t;
+  cctxt : Protocol_client_context.full;
+  stopper : RPC_context.stopper;
+}
+
 (**
 
    Helpers
@@ -133,6 +215,11 @@ let rollback new_head = Rollback {new_head}
 let genesis_hash =
   Block_hash.of_b58check_exn
     "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2"
+
+let chain_event_head_hash = function
+  | SameBranch {new_head = Head {hash; _}; _}
+  | Rollback {new_head = Head {hash; _}} ->
+      hash
 
 (** [blocks_of_heads base heads] given a list of successive heads
    connected to [base], returns an associative list mapping block hash
@@ -156,7 +243,9 @@ let store_chain_event store base =
       let* () = Layer1_event.setting_new_head hash level in
       let* () = State.set_new_head store head in
       blocks_of_heads base (intermediate_heads @ [head])
-      |> List.iter_s (fun (hash, block) -> State.store_block store hash block)
+      |> List.iter_s (fun (hash, (Block {level; _} as block)) ->
+             let* () = State.store_block store hash block in
+             State.set_hash_of_level store level hash)
   | Rollback {new_head = Head {hash; level} as base} ->
       let* () = Layer1_event.rollback hash level in
       State.set_new_head store base
@@ -236,7 +325,7 @@ let catch_up cctxt store chain last_seen_head new_head =
       (* We have reconnected to the last seen head. *)
       Lwt.return (ancestor_hash, [same_branch new_head heads])
     else
-      State.already_seen store ancestor_hash >>= function
+      State.is_processed store ancestor_hash >>= function
       | true ->
           (* We have reconnected to a previously known head.
              [new_head] and [last_seen_head] are not the same branch. *)
@@ -270,54 +359,31 @@ let chain_events cctxt store chain =
       | None -> Head {hash = genesis_hash; level = 0l}
       | Some last_seen_head -> last_seen_head
     in
-    let*! (base, events) = catch_up cctxt store chain last_seen_head new_head in
+    let*! base, events = catch_up cctxt store chain last_seen_head new_head in
     let*! () = List.iter_s (store_chain_event store base) events in
     Lwt.return events
   in
-  let+ (heads, _) = Tezos_shell_services.Monitor_services.heads cctxt chain in
-  Lwt_stream.map_list_s on_head heads
-
-let check_sc_rollup_address_exists sc_rollup_address
-    (cctxt : Protocol_client_context.full) =
-  let open Lwt_result_syntax in
-  let* kind_opt =
-    RPC.Sc_rollup.kind cctxt (cctxt#chain, cctxt#block) sc_rollup_address ()
+  let+ heads, stopper =
+    Tezos_shell_services.Monitor_services.heads cctxt chain
   in
-  let*! () =
-    match kind_opt with
-    | None ->
-        cctxt#error "%a does not exist" Sc_rollup.Address.pp sc_rollup_address
-    | Some kind -> Event.rollup_exists ~addr:sc_rollup_address ~kind
-  in
-  return_unit
-
-type info = {origination_level : int32}
-
-let gather_info (cctxt : Protocol_client_context.full) sc_rollup_address =
-  let open Lwt_result_syntax in
-  let* origination_level =
-    RPC.Sc_rollup.initial_level
-      cctxt
-      (cctxt#chain, cctxt#block)
-      sc_rollup_address
-  in
-  return {origination_level = Raw_level.to_int32 origination_level}
+  (Lwt_stream.map_list_s on_head heads, stopper)
 
 (** [discard_pre_origination_blocks info chain_events] filters [chain_events] in order to
     discard all heads that occur before the SC rollup origination. *)
-let discard_pre_origination_blocks info chain_events =
+let discard_pre_origination_blocks
+    (genesis_info : Sc_rollup.Commitment.genesis_info) chain_events =
+  let origination_level = Raw_level.to_int32 genesis_info.level in
   let at_or_after_origination event =
     match event with
     | SameBranch {new_head = Head {level; _} as new_head; intermediate_heads}
-      when level >= info.origination_level ->
+      when level >= origination_level ->
         let intermediate_heads =
           List.filter
-            (fun (Head {level; _}) -> level >= info.origination_level)
+            (fun (Head {level; _}) -> level >= origination_level)
             intermediate_heads
         in
         Some (SameBranch {new_head; intermediate_heads})
-    | Rollback {new_head = Head {level; _}} when level >= info.origination_level
-      ->
+    | Rollback {new_head = Head {level; _}} when level >= origination_level ->
         Some event
     | _ -> None
   in
@@ -326,12 +392,25 @@ let discard_pre_origination_blocks info chain_events =
 let start configuration (cctxt : Protocol_client_context.full) store =
   let open Lwt_result_syntax in
   let*! () = Layer1_event.starting () in
-  let* () =
-    check_sc_rollup_address_exists configuration.sc_rollup_address cctxt
+  let* kind =
+    RPC.Sc_rollup.kind
+      cctxt
+      (cctxt#chain, cctxt#block)
+      configuration.sc_rollup_address
+      ()
   in
-  let* event_stream = chain_events cctxt store `Main in
-  let* info = gather_info cctxt configuration.sc_rollup_address in
-  return (discard_pre_origination_blocks info event_stream)
+  let*! () = Event.rollup_exists ~addr:configuration.sc_rollup_address ~kind in
+  let* genesis_info =
+    RPC.Sc_rollup.genesis_info
+      cctxt
+      (cctxt#chain, cctxt#block)
+      configuration.sc_rollup_address
+  in
+  let+ event_stream, stopper = chain_events cctxt store `Main in
+  let events = discard_pre_origination_blocks genesis_info event_stream in
+  ( {cctxt; events; blocks_cache = State.Blocks_cache.create 32; stopper},
+    genesis_info,
+    kind )
 
 let current_head_hash store =
   let open Lwt_syntax in
@@ -342,6 +421,13 @@ let current_level store =
   let open Lwt_syntax in
   let+ head = State.last_seen_head store in
   Option.map (fun (Head {level; _}) -> level) head
+
+let hash_of_level = State.hash_of_level
+
+let level_of_hash store hash =
+  let open Lwt_syntax in
+  let* (Block {level; _}) = State.block_of_hash store hash in
+  return level
 
 let predecessor store (Head {hash; _}) =
   let open Lwt_syntax in
@@ -355,3 +441,51 @@ let processed = function
   | SameBranch {new_head; intermediate_heads} ->
       List.iter_s processed_head (intermediate_heads @ [new_head])
   | Rollback {new_head} -> processed_head new_head
+
+let mark_processed_head store head = State.mark_processed_head store head
+
+let last_processed_head_hash store =
+  let open Lwt_syntax in
+  let+ info = State.last_processed_head store in
+  Option.map (fun (Head {hash; _}) -> hash) info
+
+(* We forget about the last seen heads that are not processed so that
+   the rollup node can process them when restarted. Notice that this
+   does prevent skipping heads when the node is interrupted in a bad
+   way. *)
+
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3205
+
+   More generally, The rollup node should be able to restart properly
+   after an abnormal interruption at every point of its process.
+   Currently, the state is not persistent enough and the processing is
+   not idempotent enough to achieve that property. *)
+let shutdown store =
+  let open Lwt_syntax in
+  let* last_processed_head = State.last_processed_head store in
+  match last_processed_head with
+  | None -> return_unit
+  | Some head -> State.set_new_head store head
+
+(** [fetch_tezos_block l1_ctxt hash] returns a block info given a block
+    hash. Looks for the block in the blocks cache first, and fetches it from the
+    L1 node otherwise. *)
+let fetch_tezos_block l1_ctxt hash =
+  trace (Cannot_find_block hash)
+  @@ fetch_tezos_block
+       l1_ctxt.cctxt
+       hash
+       ~find_in_cache:(State.Blocks_cache.find_or_replace l1_ctxt.blocks_cache)
+
+(** Returns the reorganization of L1 blocks (if any) for [new_head]. *)
+let get_tezos_reorg_for_new_head l1_state store new_head_hash =
+  let open Lwt_result_syntax in
+  let*! old_head_hash = current_head_hash store in
+  match old_head_hash with
+  | None ->
+      (* No known tezos head, consider the new head as being on top of a previous
+         tezos block. *)
+      let+ new_head = fetch_tezos_block l1_state new_head_hash in
+      {old_chain = []; new_chain = [new_head]}
+  | Some old_head_hash ->
+      tezos_reorg (fetch_tezos_block l1_state) ~old_head_hash ~new_head_hash

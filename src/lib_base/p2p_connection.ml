@@ -53,12 +53,12 @@ module Id = struct
   let of_point (addr, port) = (addr, Some port)
 
   let to_point = function
-    | (_, None) -> None
-    | (addr, Some port) -> Some (addr, port)
+    | _, None -> None
+    | addr, Some port -> Some (addr, port)
 
   let to_point_exn = function
-    | (_, None) -> invalid_arg "to_point_exn"
-    | (addr, Some port) -> (addr, port)
+    | _, None -> invalid_arg "to_point_exn"
+    | addr, Some port -> (addr, port)
 
   let encoding =
     let open Data_encoding in
@@ -138,7 +138,7 @@ module Info = struct
   let pp pp_meta ppf
       {
         incoming;
-        id_point = (remote_addr, remote_port);
+        id_point = remote_addr, remote_port;
         remote_socket_port;
         peer_id;
         announced_version;

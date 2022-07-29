@@ -461,10 +461,10 @@ let test_parse_comb_data () =
       (a, ac1) Script_typed_ir.ty -> (a, ac2) Script_typed_ir.ty -> bool =
    fun ty1 ty2 ->
     match Script_typed_ir.(is_comparable ty1, is_comparable ty2) with
-    | (Yes, Yes) -> ty1 = ty2
-    | (No, No) -> ty1 = ty2
-    | (Yes, No) -> assert false
-    | (No, Yes) -> assert false
+    | Yes, Yes -> ty1 = ty2
+    | No, No -> ty1 = ty2
+    | Yes, No -> assert false
+    | No, Yes -> assert false
    (*
       These last two cases can't happen because the comparable character of a
       type is a function of its concrete type.
@@ -628,9 +628,9 @@ let test_optimal_comb () =
           ty
           v
       >>=? fun (unparsed, ctxt) ->
-        let (unparsed_canonical, unparsed_size) = size_of_micheline unparsed in
+        let unparsed_canonical, unparsed_size = size_of_micheline unparsed in
         List.iter_es (fun other_repr ->
-            let (other_repr_canonical, other_repr_size) =
+            let other_repr_canonical, other_repr_size =
               size_of_micheline other_repr
             in
             if other_repr_size < unparsed_size then
@@ -669,7 +669,7 @@ let test_optimal_comb () =
 (* Check that UNPACK on contract is forbidden.
    See https://gitlab.com/tezos/tezos/-/issues/301 for the motivation
    behind this restriction.
-  *)
+*)
 let test_contract_not_packable () =
   let contract_unit =
     Prim (0, Script.T_contract, [Prim (0, T_unit, [], [])], [])

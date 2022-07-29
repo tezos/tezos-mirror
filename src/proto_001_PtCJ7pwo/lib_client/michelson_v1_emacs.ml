@@ -85,7 +85,7 @@ let print_type_map ppf (parsed, type_map) =
   and print_item ppf loc =
     (let ( >?? ) = Option.bind in
      List.assoc ~equal:Int.equal loc parsed.Michelson_v1_parser.expansion_table
-     >?? fun ({start = {point = s}; stop = {point = e}}, locs) ->
+     >?? fun ({start = {point = s; _}; stop = {point = e; _}}, locs) ->
      let locs = List.sort Stdlib.compare locs in
      List.hd locs >?? fun hd_loc ->
      List.assoc ~equal:Int.equal hd_loc type_map >?? fun (bef, aft) ->
@@ -130,7 +130,7 @@ let first_error_location errs =
   find errs
 
 let report_errors ppf (parsed, errs) =
-  let (eco, out) =
+  let eco, out =
     List.fold_left
       (fun (eco, out) -> function
         | Environment.Ecoproto_error err -> (err :: eco, out)
@@ -138,7 +138,7 @@ let report_errors ppf (parsed, errs) =
       ([], [])
       errs
   in
-  let (eco, out) = (List.rev eco, List.rev out) in
+  let eco, out = (List.rev eco, List.rev out) in
   Format.fprintf
     ppf
     "(@[<v 0>%a@,%a@])"
@@ -157,7 +157,7 @@ let report_errors ppf (parsed, errs) =
       in
       match errs with
       | top :: errs ->
-          let (errs, loc) =
+          let errs, loc =
             ( List.map (fun e -> Environment.Ecoproto_error e) (top :: errs),
               match top with
               | Ill_typed_contract (expr, _) | Ill_typed_data (_, expr, _) ->
@@ -182,7 +182,7 @@ let report_errors ppf (parsed, errs) =
                  ~parsed)
               errs
           in
-          let {start = {point = s}; stop = {point = e}} = loc in
+          let {start = {point = s; _}; stop = {point = e; _}} = loc in
           Format.fprintf ppf "(%d %d %S)" (s + 1) (e + 1) message
       | [] -> ())
     eco
@@ -210,9 +210,9 @@ let report_errors ppf (parsed, errs) =
            | Unterminated_integer loc
            | Unterminated_comment loc
            | Invalid_hex_bytes loc
-           | Unclosed {loc}
-           | Unexpected {loc}
-           | Extra {loc} ->
+           | Unclosed {loc; _}
+           | Unexpected {loc; _}
+           | Extra {loc; _} ->
                loc
            | Misaligned node -> location node
            | _ -> find_location 0
@@ -226,6 +226,6 @@ let report_errors ppf (parsed, errs) =
                 ~parsed)
              [err]
          in
-         let {start = {point = s}; stop = {point = e}} = loc in
+         let {start = {point = s; _}; stop = {point = e; _}} = loc in
          Format.fprintf ppf "(%d %d %S)" (s + 1) (e + 1) message))
     out

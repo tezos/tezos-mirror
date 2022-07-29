@@ -28,8 +28,6 @@ open Protocol
 open Alpha_context
 open Protocol_client_context
 
-val tez_sym : string
-
 val entrypoint_parameter : (Entrypoint.t, full) Clic.parameter
 
 val init_arg : (string, full) Clic.arg
@@ -45,6 +43,8 @@ val gas_limit_arg : (Gas.Arith.integral option, full) Clic.arg
 val default_gas_limit_arg : (Gas.Arith.integral option, full) Clic.arg
 
 val run_gas_limit_arg : (Gas.Arith.integral option, full) Clic.arg
+
+val unlimited_gas_arg : (bool, full) Clic.arg
 
 val storage_limit_arg : (Z.t option, full) Clic.arg
 
@@ -69,12 +69,6 @@ val minimal_fees_arg : (Tez.tez, full) Clic.arg
 val minimal_nanotez_per_gas_unit_arg : (Q.t, full) Clic.arg
 
 val minimal_nanotez_per_byte_arg : (Q.t, full) Clic.arg
-
-val force_low_fee_arg : (bool, full) Clic.arg
-
-val fee_cap_arg : (Tez.t, full) Clic.arg
-
-val burn_cap_arg : (Tez.t, full) Clic.arg
 
 val replace_by_fees_arg : (bool, full) Clic.arg
 
@@ -112,6 +106,8 @@ val non_negative_z_param :
   ('a, full) Clic.params ->
   (Z.t -> 'a, full) Clic.params
 
+val non_negative_parameter : (int, full) Clic.parameter
+
 val global_constant_param :
   name:string ->
   desc:string ->
@@ -138,7 +134,20 @@ val bytes_of_prefixed_string : string -> Bytes.t tzresult Lwt.t
 
 val bytes_parameter : (Bytes.t, full) Clic.parameter
 
+val file_or_text :
+  from_text:(string -> 'a tzresult Lwt.t) ->
+  read_file:(string -> string tzresult Lwt.t) ->
+  string ->
+  'a tzresult Lwt.t
+
+val file_or_text_parameter :
+  from_text:(string -> 'a tzresult Lwt.t) -> unit -> ('a, full) Clic.parameter
+
+val json_parameter : (Data_encoding.Json.t, full) Clic.parameter
+
 val data_parameter : (Michelson_v1_parser.parsed, full) Clic.parameter
+
+val raw_level_parameter : (Raw_level.t, full) Clic.parameter
 
 val unparsing_mode_arg :
   default:string -> (Script_ir_translator.unparsing_mode, full) Clic.arg
@@ -231,3 +240,27 @@ module Tx_rollup : sig
     ('a, full) Clic.params ->
     (Tx_rollup_inbox.Merkle.root -> 'a, full) Clic.params
 end
+
+module Sc_rollup_params : sig
+  val sc_rollup_address_parameter : (Sc_rollup.t, full) Clic.parameter
+
+  val rollup_kind_parameter : (Sc_rollup.PVM.t, full) Clic.parameter
+
+  val boot_sector_parameter :
+    ((module Sc_rollup.PVM.S) -> string tzresult Lwt.t, full) Clic.parameter
+
+  val messages_parameter :
+    ([`Bin of string | `Json of Data_encoding.json], full) Clic.parameter
+
+  val commitment_hash_parameter :
+    (Sc_rollup.Commitment.Hash.t, full) Clic.parameter
+
+  val unchecked_payload_parameter : (string, full) Clic.parameter
+
+  val compressed_state_parameter : (Sc_rollup.State_hash.t, full) Clic.parameter
+
+  val number_of_ticks_parameter :
+    (Sc_rollup.Number_of_ticks.t, full) Clic.parameter
+end
+
+val fee_parameter_args : (Injection.fee_parameter, full) Clic.arg

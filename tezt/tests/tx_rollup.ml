@@ -43,10 +43,12 @@ type t = {node : Node.t; client : Client.t; rollup : string}
 
 let assert_some res = match res with Some r -> r | None -> assert false
 
+let counter = ref 0
+
 let init_with_tx_rollup ?additional_bootstrap_account_count
-    ?(parameters = Parameters.default) ~protocol () =
+    ?(parameters = Parameters.default) ?alias ~protocol () =
   let* parameter_file = Parameters.parameter_file ~parameters protocol in
-  let* (node, client) =
+  let* node, client =
     Client.init_with_protocol
       ?additional_bootstrap_account_count
       ~parameter_file
@@ -54,16 +56,17 @@ let init_with_tx_rollup ?additional_bootstrap_account_count
       ~protocol
       ()
   in
+
   (* We originate a dumb rollup to be able to generate a paths for
      tx_rollups related RPCs. *)
   let*! rollup =
     Client.Tx_rollup.originate
       ~hooks
       ~src:Constant.bootstrap1.public_key_hash
+      ?alias
       client
   in
-  let* () = Client.bake_for client in
-  let* _ = Node.wait_for_level node 2 in
+  let* () = Client.bake_for_and_wait client in
   return {node; client; rollup}
 
 let submit_batch :
@@ -71,7 +74,7 @@ let submit_batch :
     ?batches:([> `Batch of Hex.t] * string) list ->
     t ->
     unit Lwt.t =
- fun ~batch:(`Batch content) ?(batches = []) {rollup; client; node} ->
+ fun ~batch:(`Batch content) ?(batches = []) {rollup; client; node = _} ->
   let*! () =
     Client.Tx_rollup.submit_batch
       ~hooks
@@ -89,13 +92,10 @@ let submit_batch :
         return ())
       batches
   in
-  let current_level = Node.get_level node in
-  let* () = Client.bake_for client in
-  let* _ = Node.wait_for_level node (current_level + 1) in
-  return ()
+  Client.bake_for_and_wait client
 
 let submit_commitment ?(src = Constant.bootstrap1.public_key_hash) ?predecessor
-    ~level ~roots ~inbox_content {rollup; client; node} =
+    ~level ~roots ~inbox_content {rollup; client; node = _} =
   let* inbox_merkle_root =
     match inbox_content with
     | `Root inbox_merkle_root -> inbox_merkle_root
@@ -114,10 +114,7 @@ let submit_commitment ?(src = Constant.bootstrap1.public_key_hash) ?predecessor
       ~src
       client
   in
-  let current_level = Node.get_level node in
-  let* () = Client.bake_for client in
-  let* _ = Node.wait_for_level node (current_level + 1) in
-  return ()
+  Client.bake_for_and_wait client
 
 let submit_return_bond ?(src = Constant.bootstrap1.public_key_hash)
     {rollup; client; node = _} =
@@ -135,6 +132,7 @@ let submit_remove_commitment ?(src = Constant.bootstrap1.public_key_hash)
 let submit_rejection ?(src = Constant.bootstrap1.public_key_hash) ~level
     ~message ~position ~proof {rollup; client; node = _} ~context_hash
     ~withdraw_list_hash =
+  let message = Ezjsonm.value_to_string @@ Rollup.json_of_message message in
   Client.Tx_rollup.submit_rejection
     ~hooks
     ~level
@@ -147,22 +145,14 @@ let submit_rejection ?(src = Constant.bootstrap1.public_key_hash) ~level
     ~withdraw_list_hash
     client
 
-let bake_and_wait ?(nb = 1) client node =
-  repeat nb (fun () ->
-      let current_level = Node.get_level node in
-      let* () = Client.bake_for client in
-      let* _n = Node.wait_for_level node (current_level + 1) in
-      unit)
-
 (* This module only registers regressions tests. Those regressions
    tests should be used to ensure there is no regressions with the
    various RPCs exported by the tx_rollups. *)
 module Regressions = struct
-  module RPC = struct
+  module RPC_tests = struct
     let rpc_state =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_rpc_state")
         ~title:"RPC (tx_rollup, regression) - state"
         ~tags:["tx_rollup"; "rpc"]
       @@ fun protocol ->
@@ -173,7 +163,6 @@ module Regressions = struct
     let rpc_inbox =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_rpc_inbox")
         ~title:"RPC (tx_rollups, regression) - inbox"
         ~tags:["tx_rollup"; "rpc"; "inbox"]
       @@ fun protocol ->
@@ -192,11 +181,10 @@ module Regressions = struct
     let rpc_inbox_message_hash =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_rpc_inbox_message_hash")
         ~title:"RPC (tx_rollups, regression) - inbox message hash"
         ~tags:["tx_rollup"; "rpc"; "inbox"; "message"]
       @@ fun protocol ->
-      let* (_node, client) = Client.init_with_protocol `Client ~protocol () in
+      let* _node, client = Client.init_with_protocol `Client ~protocol () in
       let message = Rollup.make_batch "blob" in
       let*! _hash = Rollup.message_hash ~hooks ~message client in
       unit
@@ -204,11 +192,10 @@ module Regressions = struct
     let rpc_inbox_merkle_tree_hash =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_rpc_inbox_merkle_tree_hash")
         ~title:"RPC (tx_rollups, regression) - inbox merkle tree hash"
         ~tags:["tx_rollup"; "rpc"; "inbox"; "merkle_tree_hash"]
       @@ fun protocol ->
-      let* (_node, client) = Client.init_with_protocol `Client ~protocol () in
+      let* _node, client = Client.init_with_protocol `Client ~protocol () in
       let messages = List.map Rollup.make_batch ["blob"; "gloubiboulga"] in
       let* message_hashes =
         Lwt_list.map_p
@@ -225,11 +212,10 @@ module Regressions = struct
     let rpc_inbox_merkle_tree_path =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_rpc_inbox_merkle_tree_path")
         ~title:"RPC (tx_rollups, regression) - inbox merkle tree path"
         ~tags:["tx_rollup"; "rpc"; "inbox"; "merkle_tree_path"]
       @@ fun protocol ->
-      let* (_node, client) = Client.init_with_protocol `Client ~protocol () in
+      let* _node, client = Client.init_with_protocol `Client ~protocol () in
       let messages =
         List.map
           Rollup.make_batch
@@ -263,7 +249,7 @@ module Regressions = struct
       (* The content of the batch does not matter for the regression test. *)
       let batch = Rollup.make_batch "blob" in
       let* () = submit_batch ~batch state in
-      let* () = Client.bake_for client in
+      let* () = Client.bake_for_and_wait client in
       let inbox_content = `Content [batch] in
       let* () =
         submit_commitment
@@ -292,7 +278,6 @@ module Regressions = struct
     let rpc_commitment =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_rpc_commitment")
         ~title:"RPC (tx_rollups, regression) - commitment"
         ~tags:["tx_rollup"; "rpc"; "commitment"]
       @@ fun protocol ->
@@ -312,12 +297,11 @@ module Regressions = struct
     let rpc_commitment_remove =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_rpc_commitment_remove")
         ~title:"RPC (tx_rollups, regression) - commitment remove"
         ~tags:["tx_rollup"; "rpc"; "commitment"]
       @@ fun protocol ->
       let parameters = Parameters.{finality_period = 2; withdraw_period = 2} in
-      let* ({rollup; client; node} as state) =
+      let* ({rollup; client; _} as state) =
         init_with_tx_rollup ~protocol ~parameters ()
       in
       let src = Constant.bootstrap1.public_key_hash in
@@ -326,7 +310,8 @@ module Regressions = struct
 
       Log.info "Step 2. Bake before finalizing. But one block is missing" ;
       let* () =
-        bake_and_wait ~nb:(parameters.finality_period - 1) client node
+        repeat (parameters.finality_period - 1) (fun () ->
+            Client.bake_for_and_wait client)
       in
 
       Log.info "Step 3. Submit finalize commitment that should fail" ;
@@ -338,16 +323,17 @@ module Regressions = struct
       in
 
       Log.info "Step 4. Bake the missing level to be able to finalize" ;
-      let* () = bake_and_wait ~nb:1 client node in
+      let* () = Client.bake_for_and_wait client in
 
       Log.info "Step 5. Submit finalize commitment and bake" ;
       let*! () = submit_finalize_commitment state in
-      let* () = bake_and_wait client node in
+      let* () = Client.bake_for_and_wait client in
 
       Log.info
         "Step 6. Bake before removing the commitment. But one block is missing" ;
       let* () =
-        bake_and_wait ~nb:(parameters.withdraw_period - 1) client node
+        repeat (parameters.withdraw_period - 1) (fun () ->
+            Client.bake_for_and_wait client)
       in
 
       Log.info "Step 7. Submit remove commitment that should fail" ;
@@ -355,7 +341,12 @@ module Regressions = struct
         submit_remove_commitment ~src:Constant.bootstrap2.public_key_hash state
       in
       let* () =
-        Process.check_error ~msg:(rex "tx_rollup_remove_commitment_too_early") p
+        let error =
+          match protocol with
+          | Jakarta -> "tx_rollup_no_commitment_to_remove"
+          | _ -> "tx_rollup_remove_commitment_too_early"
+        in
+        Process.check_error ~msg:(rex error) p
       in
 
       Log.info "Step 8. Last_removed_commitments_hashes is None before removing" ;
@@ -366,13 +357,13 @@ module Regressions = struct
           "last_removed_commitments_hashes mismatch. Expected %R, but got %L" ;
 
       Log.info "Step 9. Bake the missing level to be able to remove commit." ;
-      let* () = bake_and_wait ~nb:1 client node in
+      let* () = Client.bake_for_and_wait client in
 
       Log.info "Step 10. Submit remove commitment and bake" ;
       let*! () =
         submit_remove_commitment ~src:Constant.bootstrap2.public_key_hash state
       in
-      let* () = bake_and_wait client node in
+      let* () = Client.bake_for_and_wait client in
 
       Log.info "Step 11. Check the new value of last_removed_commitments_hashes" ;
       let*! r_state = Rollup.get_state ~hooks ~rollup client in
@@ -392,7 +383,6 @@ module Regressions = struct
     let rpc_pending_bonded_commitment =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_rpc_pending_bonded_commitments")
         ~title:"RPC (tx_rollups, regression) - pending bonded commitments"
         ~tags:["tx_rollup"; "rpc"; "commitment"; "bond"]
       @@ fun protocol ->
@@ -402,7 +392,7 @@ module Regressions = struct
       (* The content of the batch does not matter for the regression test. *)
       let batch = Rollup.make_batch "blob" in
       let* () = submit_batch ~batch state in
-      let* () = Client.bake_for client in
+      let* () = Client.bake_for_and_wait client in
       let inbox_content = `Content [batch] in
       let* () =
         submit_commitment
@@ -433,7 +423,6 @@ module Regressions = struct
     let batch_encoding =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_batch_encoding")
         ~title:"RPC (tx_rollups, regression) - batch encoding"
         ~tags:["tx_rollup"; "batch"; "encoding"]
       @@ fun protocol ->
@@ -443,7 +432,7 @@ module Regressions = struct
       (* Batch with all possible characters. *)
       let batch = Rollup.make_batch (String.init 256 Char.chr) in
       let* () = submit_batch ~batch state in
-      let* block = RPC.get_block ~block:"head" client in
+      let* block = RPC.Client.call client @@ RPC.get_chain_block () in
       let op = JSON.(block |-> "operations" |=> 3 |=> 0 |-> "contents" |=> 0) in
       Check.(
         ((JSON.(op |-> "kind" |> as_string) = "tx_rollup_submit_batch")
@@ -480,14 +469,21 @@ module Regressions = struct
 
   module Limits = struct
     (* The constant comes from the default parameters of the protocol. *)
-    let batch_limit = 5_000
+    type limits = {batch_limit : int; inbox_limit : int}
 
-    let inbox_limit = 100_000
+    let get_limits client =
+      let* json = RPC.get_constants client in
+      let batch_limit =
+        JSON.(json |-> "tx_rollup_hard_size_limit_per_message" |> as_int)
+      in
+      let inbox_limit =
+        JSON.(json |-> "tx_rollup_hard_size_limit_per_inbox" |> as_int)
+      in
+      return {batch_limit; inbox_limit}
 
     let submit_empty_batch =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_limit_empty_batch")
         ~title:"Submit empty batch"
         ~tags:["tx_rollup"; "batch"; "client"]
       @@ fun protocol ->
@@ -499,11 +495,11 @@ module Regressions = struct
     let submit_maximum_size_batch =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_limit_maximum_size_batch")
         ~title:"Submit maximum size batch"
         ~tags:["tx_rollup"; "batch"; "client"]
       @@ fun protocol ->
       let* state = init_with_tx_rollup ~protocol () in
+      let* {batch_limit; _} = get_limits state.client in
       let batch = Rollup.make_batch (String.make batch_limit 'b') in
       let* () = submit_batch ~batch state in
       let (`Batch content) =
@@ -526,14 +522,25 @@ module Regressions = struct
     let inbox_maximum_size =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_limit_maximum_size_inbox")
         ~title:"Submit maximum size inbox"
         ~tags:["tx_rollup"; "inbox"; "client"]
       @@ fun protocol ->
+      (* We need a first client to fetch the protocol constants *)
+      let* old_parameter_file =
+        Parameters.(parameter_file ~parameters:default protocol)
+      in
+      let* _, old_client =
+        Client.init_with_protocol
+          ~parameter_file:old_parameter_file
+          `Client
+          ~protocol
+          ()
+      in
+      let* {inbox_limit; batch_limit} = get_limits old_client in
       (* The test assumes inbox_limit % batch_limit = 0 *)
       let max_batch_number_per_inbox = inbox_limit / batch_limit in
       let additional_bootstrap_account_count = max_batch_number_per_inbox - 5 in
-      let* {client; rollup; node} =
+      let* {client; rollup; node = _} =
         init_with_tx_rollup ~additional_bootstrap_account_count ~protocol ()
       in
       let (`Batch content) = Rollup.make_batch (String.make batch_limit 'a') in
@@ -541,13 +548,18 @@ module Regressions = struct
         fold max_batch_number_per_inbox () (fun i () ->
             let src = Account.Bootstrap.alias (i + 1) in
             let*! () =
-              Client.Tx_rollup.submit_batch ~hooks ~content ~rollup ~src client
+              Client.Tx_rollup.submit_batch
+                ~hooks
+                ~log_output:false
+                ~log_command:false
+                ~content
+                ~rollup
+                ~src
+                client
             in
             unit)
       in
-      let current_level = Node.get_level node in
-      let* () = Client.bake_for client in
-      let* _ = Node.wait_for_level node (current_level + 1) in
+      let* () = Client.bake_for_and_wait client in
       let*! inbox = Rollup.get_inbox ~hooks ~rollup ~level:0 client in
       let inbox = assert_some inbox in
       Check.(inbox.cumulated_size = inbox_limit)
@@ -561,13 +573,11 @@ module Regressions = struct
       let open Tezt_tezos in
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ ->
-          "tx_rollup_client_submit_batch_invalid_rollup_address")
         ~title:"Submit a batch to an invalid rollup address should fail"
         ~tags:["tx_rollup"; "client"; "fail"; "batch"]
       @@ fun protocol ->
       let* parameter_file = Parameters.parameter_file protocol in
-      let* (_node, client) =
+      let* _node, client =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let invalid_address = "this is an invalid tx rollup address" in
@@ -596,24 +606,22 @@ module Regressions = struct
     let client_submit_finalize_commitment_no_batch =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_finalize_commitment_no_batch")
         ~title:"Submit a finalize commitment operation without batch"
         ~tags:["tx_rollup"; "client"; "fail"; "finalize"]
       @@ fun protocol ->
       let* ({rollup = _; client; node = _} as state) =
         init_with_tx_rollup ~protocol ()
       in
-      let* () = Client.bake_for client in
+      let* () = Client.bake_for_and_wait client in
       let*? process = submit_finalize_commitment state in
       Process.check_error
         ~exit_code:1
-        ~msg:(rex "proto.alpha.tx_rollup_no_commitment_to_finalize")
+        ~msg:(rex "tx_rollup_no_commitment_to_finalize")
         process
 
     let client_submit_finalize_commitment_no_commitment =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_finalize_commitment_no_commitment")
         ~title:"Submit a finalize commitment operation without commitment"
         ~tags:["tx_rollup"; "client"; "fail"; "finalize"]
       @@ fun protocol ->
@@ -623,17 +631,16 @@ module Regressions = struct
       (* The content of the batch does not matter for the regression test. *)
       let batch = Rollup.make_batch "blob" in
       let* () = submit_batch ~batch state in
-      let* () = Client.bake_for client in
+      let* () = Client.bake_for_and_wait client in
       let*? process = submit_finalize_commitment state in
       Process.check_error
         ~exit_code:1
-        ~msg:(rex "proto.alpha.tx_rollup_no_commitment_to_finalize")
+        ~msg:(rex "tx_rollup_no_commitment_to_finalize")
         process
 
     let client_submit_finalize_commitment_future =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_finalize_commitment_future")
         ~title:
           "Submit a finalize commitment operation for a commitment in the \
            future"
@@ -645,17 +652,16 @@ module Regressions = struct
       (* The content of the batch does not matter for the regression test. *)
       let batch = Rollup.make_batch "blob" in
       let* () = submit_batch ~batch state in
-      let* () = Client.bake_for client in
+      let* () = Client.bake_for_and_wait client in
       let*? process = submit_finalize_commitment state in
       Process.check_error
         ~exit_code:1
-        ~msg:(rex "proto.alpha.tx_rollup_no_commitment_to_finalize")
+        ~msg:(rex "tx_rollup_no_commitment_to_finalize")
         process
 
     let client_submit_finalize_too_recent_commitment =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_finalize_too_recent_commitment")
         ~title:"Try to finalize a too recent commitment"
         ~tags:["tx_rollup"; "client"; "fail"; "finalize"]
       @@ fun protocol ->
@@ -665,7 +671,7 @@ module Regressions = struct
       (* The content of the batch does not matter for the regression test. *)
       let batch = Rollup.make_batch "blob" in
       let* () = submit_batch ~batch state in
-      let* () = Client.bake_for client in
+      let* () = Client.bake_for_and_wait client in
       let inbox_content = `Content [batch] in
       let* () =
         submit_commitment
@@ -674,25 +680,25 @@ module Regressions = struct
           ~inbox_content
           state
       in
-      let* () = Client.bake_for client in
+      let* () = Client.bake_for_and_wait client in
       let*? process = submit_finalize_commitment state in
       Process.check_error
         ~exit_code:1
-        ~msg:(rex "proto.alpha.tx_rollup_no_commitment_to_finalize")
+        ~msg:(rex "tx_rollup_no_commitment_to_finalize")
         process
   end
 
   let register protocols =
-    RPC.rpc_state protocols ;
-    RPC.rpc_inbox protocols ;
-    RPC.rpc_inbox_message_hash protocols ;
-    RPC.rpc_inbox_merkle_tree_hash protocols ;
-    RPC.rpc_inbox_merkle_tree_path protocols ;
-    RPC.rpc_commitment protocols ;
-    RPC.rpc_commitment_remove protocols ;
-    RPC.rpc_pending_bonded_commitment protocols ;
-    RPC.batch_encoding protocols ;
-    RPC.rpc_inbox_future protocols ;
+    RPC_tests.rpc_state protocols ;
+    RPC_tests.rpc_inbox protocols ;
+    RPC_tests.rpc_inbox_message_hash protocols ;
+    RPC_tests.rpc_inbox_merkle_tree_hash protocols ;
+    RPC_tests.rpc_inbox_merkle_tree_path protocols ;
+    RPC_tests.rpc_commitment protocols ;
+    RPC_tests.rpc_commitment_remove protocols ;
+    RPC_tests.rpc_pending_bonded_commitment protocols ;
+    RPC_tests.batch_encoding protocols ;
+    RPC_tests.rpc_inbox_future protocols ;
     Limits.submit_empty_batch protocols ;
     Limits.submit_maximum_size_batch protocols ;
     Limits.inbox_maximum_size protocols ;
@@ -721,7 +727,7 @@ let submit_three_batches_and_check_size ~rollup ~tezos_level ~tx_level node
         unit)
       batches
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* _ = Node.wait_for_level node tezos_level in
   (* Check the inbox has been created, with the expected cumulated size. *)
   let* expected_inbox =
@@ -744,17 +750,17 @@ let test_submit_batches_in_several_blocks =
     ~tags:["tx_rollup"]
   @@ fun protocol ->
   let* parameter_file = Parameters.parameter_file protocol in
-  let* (node, client) =
+  let* node, client =
     Client.init_with_protocol ~parameter_file `Client ~protocol ()
   in
   let*! rollup =
     Client.Tx_rollup.originate
       ~hooks
       ~src:Constant.bootstrap1.public_key_hash
+      ~alias:"tx_rollup"
       client
   in
-  let* () = Client.bake_for client in
-  let* _ = Node.wait_for_level node 2 in
+  let* () = Client.bake_for_and_wait client in
   (* We check the rollup exists by trying to fetch its state. Since it
      is a regression test, we can detect changes to this default
      state. *)
@@ -837,7 +843,7 @@ let test_submit_from_originated_source =
     ~tags:["tx_rollup"; "client"]
   @@ fun protocol ->
   let* parameter_file = Parameters.parameter_file protocol in
-  let* (node, client) =
+  let* _node, client =
     Client.init_with_protocol ~parameter_file `Client ~protocol ()
   in
   (* We begin by originating a contract *)
@@ -851,13 +857,15 @@ let test_submit_from_originated_source =
       ~burn_cap:Tez.(of_int 3)
       client
   in
-  let* () = Client.bake_for client in
-  let* _ = Node.wait_for_level node 2 in
+  let* () = Client.bake_for_and_wait client in
   (* We originate a tx_rollup using an implicit account *)
   let*! rollup =
-    Client.Tx_rollup.originate ~src:Constant.bootstrap1.public_key_hash client
+    Client.Tx_rollup.originate
+      ~src:Constant.bootstrap1.public_key_hash
+      ~alias:"tx_rollup"
+      client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let (`Batch content) = Rollup.Tx_rollup.make_batch "tezos" in
   (* Finally, we submit a batch to the tx_rollup from an originated contract *)
   let*? process =
@@ -888,7 +896,7 @@ let test_rollup_with_two_commitments =
   in
   let batch = Rollup.make_batch "blob" in
   let* () = submit_batch ~batch state in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let inbox_content = `Content [batch] in
   let* () =
     submit_commitment
@@ -898,7 +906,8 @@ let test_rollup_with_two_commitments =
       state
   in
   let* () =
-    repeat parameters.finality_period (fun () -> Client.bake_for client)
+    repeat parameters.finality_period (fun () ->
+        Client.bake_for_and_wait client)
   in
   let*! commitment = Rollup.get_commitment ~hooks ~rollup ~level:0 client in
   let first_commitment_level = (assert_some commitment).commitment.level in
@@ -916,7 +925,7 @@ let test_rollup_with_two_commitments =
   let*! () =
     submit_finalize_commitment ~src:Constant.bootstrap2.public_key_hash state
   in
-  let* _ = Client.bake_for client in
+  let* _ = Client.bake_for_and_wait client in
   let*! inbox = Rollup.get_inbox ~hooks ~rollup ~level:0 client in
   Check.(inbox = None)
     (Check.option Rollup.Check.inbox)
@@ -946,18 +955,18 @@ let test_rollup_with_two_commitments =
   let* () =
     Process.check_error
       ~exit_code:1
-      ~msg:(rex "proto.alpha.tx_rollup_no_commitment_to_finalize")
+      ~msg:(rex "tx_rollup_no_commitment_to_finalize")
       process
   in
   let batch = Rollup.make_batch "blob" in
   let* () = submit_batch ~batch state in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let*! commitment = Rollup.get_commitment ~hooks ~rollup ~level:0 client in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let*! () =
     submit_remove_commitment ~src:Constant.bootstrap2.public_key_hash state
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let predecessor =
     Option.map
       (fun (c : Rollup.submitted_commitment) -> c.commitment_hash)
@@ -973,7 +982,8 @@ let test_rollup_with_two_commitments =
       state
   in
   let* () =
-    repeat parameters.finality_period (fun () -> Client.bake_for client)
+    repeat parameters.finality_period (fun () ->
+        Client.bake_for_and_wait client)
   in
   let*! () =
     submit_finalize_commitment ~src:Constant.bootstrap2.public_key_hash state
@@ -982,7 +992,7 @@ let test_rollup_with_two_commitments =
   Check.(inbox <> None)
     (Check.option Rollup.Check.inbox)
     ~error_msg:"Expected some inbox" ;
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let*! inbox = Rollup.get_inbox ~hooks ~rollup ~level:0 client in
   Check.(inbox = None)
     (Check.option Rollup.Check.inbox)
@@ -992,11 +1002,11 @@ let test_rollup_with_two_commitments =
   Check.(commitment = None)
     (Check.option Rollup.Check.commitment)
     ~error_msg:"Expected no commitment" ;
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let*! () =
     submit_remove_commitment ~src:Constant.bootstrap2.public_key_hash state
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let*! _commitment = Rollup.get_commitment ~hooks ~rollup ~level:0 client in
   let*! commitment = Rollup.get_commitment ~hooks ~rollup ~level:1 client in
   Check.(commitment = None)
@@ -1014,7 +1024,6 @@ let test_rollup_with_two_commitments =
 let test_rollup_last_commitment_is_rejected =
   Protocol.register_regression_test
     ~__FILE__
-    ~output_file:(fun _ -> "tx_rollup_rejection")
     ~title:"RPC (tx_rollup, regression) - rejection"
     ~tags:["tx_rollup"; "rejection"]
   @@ fun protocol ->
@@ -1025,7 +1034,7 @@ let test_rollup_last_commitment_is_rejected =
   let content = String.make 5_000 'b' in
   let batch = Rollup.make_batch content in
   let* () = submit_batch ~batch state in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let inbox_content = `Content [batch] in
   let* () =
     submit_commitment
@@ -1035,7 +1044,8 @@ let test_rollup_last_commitment_is_rejected =
       state
   in
   let* () =
-    repeat parameters.finality_period (fun () -> Client.bake_for client)
+    repeat parameters.finality_period (fun () ->
+        Client.bake_for_and_wait client)
   in
   let*! _ = RPC.Tx_rollup.get_state ~rollup client in
   let*! message_hash =
@@ -1047,13 +1057,7 @@ let test_rollup_last_commitment_is_rejected =
       ~position:0
       client
   in
-  (* This is the encoding of [batch]. *)
-  let message =
-    Format.sprintf
-      "{ \"batch\": \"%s\"}"
-      (let (`Hex s) = Hex.of_string content in
-       s)
-  in
+  let message = Rollup.make_batch content in
   let message_result_hash =
     "txmr2DouKqJu5o8KEVGe6gLoiw1J3krjsxhf6C2a1kDNTTr8BdKpf2"
   in
@@ -1076,12 +1080,12 @@ let test_rollup_last_commitment_is_rejected =
       ~agreed_message_result_path
       ~proof:Constant.tx_rollup_proof_initial_state
       ~context_hash:Constant.tx_rollup_empty_l2_context
-      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list
+      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list_hash
       state
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let*! _ = RPC.Tx_rollup.get_state ~rollup client in
-  let* _ = RPC.get_block client in
+  let* _ = RPC.Client.call client @@ RPC.get_chain_block () in
   unit
 
 let test_rollup_reject_position_one =
@@ -1095,14 +1099,14 @@ let test_rollup_reject_position_one =
     init_with_tx_rollup ~parameters ~protocol ()
   in
   let batch = Rollup.make_batch "blob" in
+  let message = batch in
   let* () =
     submit_batch
       ~batch
       ~batches:[(batch, Constant.bootstrap2.public_key_hash)]
       state
   in
-  let* _ = RPC.get_block client in
-
+  let* _ = RPC.Client.call client @@ RPC.get_chain_block () in
   let inbox_content = `Content [batch; batch] in
   let* () =
     submit_commitment
@@ -1116,24 +1120,16 @@ let test_rollup_reject_position_one =
       state
   in
   let* () =
-    repeat parameters.finality_period (fun () -> Client.bake_for client)
+    repeat parameters.finality_period (fun () ->
+        Client.bake_for_and_wait client)
   in
   let*! _ = RPC.Tx_rollup.get_state ~rollup client in
-  let*! message_hash =
-    Rollup.message_hash ~message:(Rollup.make_batch "blob") client
-  in
+  let*! message_hash = Rollup.message_hash ~message client in
   let*! path =
     Rollup.inbox_merkle_tree_path
       ~message_hashes:[message_hash; message_hash]
       ~position:1
       client
-  in
-  (* This is the encoding of [batch]. *)
-  let message =
-    Format.sprintf
-      "{ \"batch\": \"%s\"}"
-      (let (`Hex s) = Hex.of_string "blob" in
-       s)
   in
   let*! agreed_message_result_path =
     Rollup.commitment_merkle_tree_path
@@ -1167,12 +1163,12 @@ let test_rollup_reject_position_one =
       ~agreed_message_result_path:(agreed_message_result_path |> JSON.encode)
       ~proof:Constant.tx_rollup_proof_initial_state
       ~context_hash:Constant.tx_rollup_empty_l2_context
-      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list
+      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list_hash
       state
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let*! _ = RPC.Tx_rollup.get_state ~rollup client in
-  let* _ = RPC.get_block client in
+  let* _ = RPC.Client.call client @@ RPC.get_chain_block () in
   unit
 
 let test_rollup_wrong_rejection =
@@ -1187,7 +1183,7 @@ let test_rollup_wrong_rejection =
   in
   let batch = Rollup.make_batch "blob" in
   let* () = submit_batch ~batch state in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let inbox_content = `Content [batch] in
   let* () =
     submit_commitment
@@ -1197,21 +1193,18 @@ let test_rollup_wrong_rejection =
       state
   in
   let* () =
-    repeat parameters.finality_period (fun () -> Client.bake_for client)
+    repeat parameters.finality_period (fun () ->
+        Client.bake_for_and_wait client)
   in
-  (* This is the encoding of [batch]. *)
   let message = batch in
-  let*! _ = RPC.Tx_rollup.get_state ~rollup client in
-  let*! message_hash =
-    Rollup.message_hash ~message:(Rollup.make_batch "blob") client
-  in
+  let*! message_hash = Rollup.message_hash ~message client in
   let*! path =
     Rollup.inbox_merkle_tree_path
       ~message_hashes:[message_hash]
       ~position:0
       client
   in
-  let message_path = List.map (fun x -> JSON.as_string x) (JSON.as_list path) in
+
   let message_result_hash = Constant.tx_rollup_initial_message_result in
   let*! message_result_path =
     Rollup.commitment_merkle_tree_path
@@ -1221,10 +1214,8 @@ let test_rollup_wrong_rejection =
   in
   (* The proof is invalid, as the submitted batch is stupid, the after
      hash should be the same as before. *)
-  let* (`OpHash _op) =
-    Operation.inject_rejection
-      ~source:Constant.bootstrap1
-      ~tx_rollup:state.rollup
+  let*? process =
+    submit_rejection
       ~proof:
         {|{ "version": 3,
   "before": { "node": "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF" } ,
@@ -1232,35 +1223,20 @@ let test_rollup_wrong_rejection =
   "state": [] }|}
       ~level:0
       ~message
-      ~message_position:0
-      ~message_path
+      ~position:0
+      ~path:(JSON.encode path)
       ~message_result_hash
-      ~message_result_path:(JSON.unannotate message_result_path)
-      ~previous_message_result_path:(`A [])
-      ~previous_message_context_hash:Constant.tx_rollup_empty_l2_context
-      ~previous_message_withdraw_list_hash:
-        Constant.tx_rollup_empty_withdraw_list
-      state.client
+      ~rejected_message_result_path:(JSON.encode message_result_path)
+      ~agreed_message_result_path:"[]"
+      ~context_hash:Constant.tx_rollup_empty_l2_context
+      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list_hash
+      state
   in
-  let* () = Client.bake_for client in
+  let* () =
+    Process.check_error ~msg:(rex "tx_rollup_proof_failed_to_reject") process
+  in
+  let* () = Client.bake_for_and_wait client in
   let*! state = Rollup.get_state ~rollup client in
-  let* json = RPC.get_block client in
-  let operation_result =
-    JSON.(
-      json |-> "operations" |=> 3 |=> 0 |-> "contents" |=> 0 |-> "metadata"
-      |-> "operation_result")
-  in
-  let status = JSON.(operation_result |-> "status" |> as_string) in
-  Check.(status = "failed")
-    Check.string
-    ~error_msg:"Expected status: %R. Got %L" ;
-
-  let error_id =
-    JSON.(operation_result |-> "errors" |=> 0 |-> "id" |> as_string)
-  in
-  Check.(error_id = "proto.alpha.tx_rollup_proof_failed_to_reject")
-    Check.string
-    ~error_msg:"Expected error id: %R. Got %L" ;
   match state.unfinalized_commitments with
   | Interval (0, _) -> unit
   | _ -> Test.fail "Wrong rollup state: Expected commitment head at level 0"
@@ -1277,7 +1253,7 @@ let test_rollup_wrong_path_for_rejection =
   in
   let batch = Rollup.make_batch "blob" in
   let* () = submit_batch ~batch state in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let inbox_content = `Content [batch] in
   let* () =
     submit_commitment
@@ -1287,7 +1263,8 @@ let test_rollup_wrong_path_for_rejection =
       state
   in
   let* () =
-    repeat parameters.finality_period (fun () -> Client.bake_for client)
+    repeat parameters.finality_period (fun () ->
+        Client.bake_for_and_wait client)
   in
   let message_result_hash = Constant.tx_rollup_initial_message_result in
   let*! message_result_path =
@@ -1297,40 +1274,23 @@ let test_rollup_wrong_path_for_rejection =
       client
   in
   let*! _ = RPC.Tx_rollup.get_state ~rollup client in
-  let* (`OpHash _op) =
-    Operation.inject_rejection
-      ~source:Constant.bootstrap1
-      ~tx_rollup:state.rollup
+  let*? process =
+    submit_rejection
       ~proof:Constant.tx_rollup_proof_initial_state
       ~level:0
       ~message:batch
-      ~message_position:0
-      ~message_path:[]
+      ~position:0
+      ~path:"[]"
       ~message_result_hash
-      ~message_result_path:(message_result_path |> JSON.unannotate)
-      ~previous_message_result_path:(`A [])
-      ~previous_message_context_hash:Constant.tx_rollup_empty_l2_context
-      ~previous_message_withdraw_list_hash:
-        Constant.tx_rollup_empty_withdraw_list
-      client
+      ~rejected_message_result_path:(JSON.encode message_result_path)
+      ~agreed_message_result_path:"[]"
+      ~context_hash:Constant.tx_rollup_empty_l2_context
+      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list_hash
+      state
   in
-  let* () = Client.bake_for client in
-  let* json = RPC.get_block client in
-  let operation_result =
-    JSON.(
-      json |-> "operations" |=> 3 |=> 0 |-> "contents" |=> 0 |-> "metadata"
-      |-> "operation_result")
+  let* () =
+    Process.check_error ~msg:(rex "tx_rollup_wrong_message_path") process
   in
-  let status = JSON.(operation_result |-> "status" |> as_string) in
-  Check.(status = "failed")
-    Check.string
-    ~error_msg:"Expected status: %R. Got %L" ;
-  let error_id =
-    JSON.(operation_result |-> "errors" |=> 0 |-> "id" |> as_string)
-  in
-  Check.(error_id = "proto.alpha.tx_rollup_wrong_message_path")
-    Check.string
-    ~error_msg:"Expected error id: %R. Got %L" ;
   unit
 
 let test_rollup_wrong_rejection_long_path =
@@ -1345,7 +1305,7 @@ let test_rollup_wrong_rejection_long_path =
   in
   let batch = Rollup.make_batch "blob" in
   let* () = submit_batch ~batch state in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let inbox_content = `Content [batch] in
   let* () =
     submit_commitment
@@ -1355,7 +1315,8 @@ let test_rollup_wrong_rejection_long_path =
       state
   in
   let* () =
-    repeat parameters.finality_period (fun () -> Client.bake_for client)
+    repeat parameters.finality_period (fun () ->
+        Client.bake_for_and_wait client)
   in
   let message = batch in
   let*! message_hash = Rollup.message_hash ~message client in
@@ -1370,8 +1331,6 @@ let test_rollup_wrong_rejection_long_path =
   in
   let bad_path = JSON.encode bad_path in
   let good_path = JSON.encode good_path in
-  let (`Batch (`Hex content)) = batch in
-  let message = Ezjsonm.value_to_string @@ `O [("batch", `String content)] in
   let message_result_hash = Constant.tx_rollup_initial_message_result in
   let*! rejected_message_result_path =
     Rollup.commitment_merkle_tree_path
@@ -1381,9 +1340,7 @@ let test_rollup_wrong_rejection_long_path =
   in
   let agreed_message_result_path = "[]" in
   let*? process =
-    Client.Tx_rollup.submit_rejection
-      ~src:Constant.bootstrap1.alias
-      ~rollup:state.rollup
+    submit_rejection
       ~proof:Constant.tx_rollup_proof_initial_state
       ~level:0
       ~message
@@ -1393,20 +1350,16 @@ let test_rollup_wrong_rejection_long_path =
       ~rejected_message_result_path:(rejected_message_result_path |> JSON.encode)
       ~agreed_message_result_path
       ~context_hash:Constant.tx_rollup_empty_l2_context
-      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list
-      state.client
+      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list_hash
+      state
   in
   let* () =
-    Process.check_error
-      ~msg:(rex "proto.alpha.tx_rollup_wrong_message_path_depth")
-      process
+    Process.check_error ~msg:(rex "tx_rollup_wrong_message_path_depth") process
   in
   (* We check here the path is valid but the operation is rejected for
      a different reason. *)
   let*? process =
-    Client.Tx_rollup.submit_rejection
-      ~src:Constant.bootstrap1.alias
-      ~rollup:state.rollup
+    submit_rejection
       ~proof:Constant.tx_rollup_proof_initial_state
       ~level:0
       ~message
@@ -1416,12 +1369,10 @@ let test_rollup_wrong_rejection_long_path =
       ~rejected_message_result_path:(rejected_message_result_path |> JSON.encode)
       ~agreed_message_result_path
       ~context_hash:Constant.tx_rollup_empty_l2_context
-      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list
-      state.client
+      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list_hash
+      state
   in
-  Process.check_error
-    ~msg:(rex "proto.alpha.tx_rollup_wrong_message_path")
-    process
+  Process.check_error ~msg:(rex "tx_rollup_wrong_message_path") process
 
 let check_bond_is ~src client ~expected =
   let*! bond = RPC.Contracts.get_frozen_bonds ~contract_id:src client in
@@ -1509,7 +1460,7 @@ let test_rollup_bond_return =
           let* () =
             (* +1 because [submit_finalize_commitment] does not bake *)
             repeat (parameters.withdraw_period + 1) (fun () ->
-                Client.bake_for client)
+                Client.bake_for_and_wait client)
           in
           let () = step "7. Submit remove_commitment and bake" in
           let*! () = submit_remove_commitment state in
@@ -1547,7 +1498,7 @@ let test_deposit_withdraw_max_big_tickets =
     ~tags:["tx_rollup"; "withdraw"; "deposit"; "ticket"]
   @@ fun protocol ->
   let parameters = Parameters.{finality_period = 4; withdraw_period = 4} in
-  let* ({rollup; client; node} as state) =
+  let* ({rollup; client; _} as state) =
     init_with_tx_rollup ~parameters ~protocol ()
   in
   let* constants = RPC.get_constants client in
@@ -1558,7 +1509,7 @@ let test_deposit_withdraw_max_big_tickets =
 
        This value has been fetched from the failing test, and acts as a
        regression value. *)
-    let overhead = 232 in
+    let overhead = 256 in
     JSON.(constants |-> "tx_rollup_max_ticket_payload_size" |> as_int)
     - overhead
   in
@@ -1585,7 +1536,7 @@ let test_deposit_withdraw_max_big_tickets =
       ~burn_cap:Tez.one
       client
   in
-  let* () = bake_and_wait client node in
+  let* () = Client.bake_for_and_wait client in
   (* 2. Deposit tickets to the tx_rollup. *)
   (* deposit [max_withdrawals_per_batch] times to be able to withdraw [max_int *
      max_withdrawals_per_batch] in one operation. Last iteration is done outside
@@ -1608,8 +1559,7 @@ let test_deposit_withdraw_max_big_tickets =
             ~burn_cap:Tez.one
             client
         in
-        let* () = bake_and_wait client node in
-        unit)
+        Client.bake_for_and_wait client)
   in
   let process =
     Client.spawn_transfer
@@ -1636,7 +1586,7 @@ let test_deposit_withdraw_max_big_tickets =
           client_output
     | Some hash -> return hash
   in
-  let* () = bake_and_wait client node in
+  let* () = Client.bake_for_and_wait client in
   (* 3. commit the new inbox with deposit and withdraw at the same time. *)
   let deposit =
     Rollup.make_deposit
@@ -1672,12 +1622,13 @@ let test_deposit_withdraw_max_big_tickets =
   in
   let* () =
     (* bake until the finality period is over to be able to withdraw *)
-    bake_and_wait ~nb:parameters.finality_period client node
+    repeat parameters.finality_period (fun () ->
+        Client.bake_for_and_wait client)
   in
 
   (* 4. finalize the commitment *)
   let*! () = submit_finalize_commitment state in
-  let* () = bake_and_wait client node in
+  let* () = Client.bake_for_and_wait client in
 
   (* 5. dispatch tickets from withdrawals to implicit account.*)
 
@@ -1722,7 +1673,7 @@ let test_deposit_withdraw_max_big_tickets =
       ~ticket_dispatch_info_data_list
       client
   in
-  let* () = bake_and_wait client node in
+  let* () = Client.bake_for_and_wait client in
 
   (* 6. Transfer tickets from implicit account to originated account. *)
 
@@ -1738,7 +1689,7 @@ let test_deposit_withdraw_max_big_tickets =
       ~burn_cap:Tez.one
       client
   in
-  let* () = bake_and_wait client node in
+  let* () = Client.bake_for_and_wait client in
   (* repeat the operation to ensure all tickets can be transfered *)
   let* () =
     repeat max_withdrawals_per_batch (fun () ->
@@ -1754,8 +1705,7 @@ let test_deposit_withdraw_max_big_tickets =
             ~burn_cap:Tez.one
             client
         in
-        let* () = bake_and_wait client node in
-        unit)
+        Client.bake_for_and_wait client)
   in
   unit
 

@@ -169,7 +169,7 @@ For example, the following directive includes a script fragment detailing a step
   .. literalinclude:: compile-sources.sh
     :language: shell
     :start-after: [install packages]
-    :end-before: [test executable]
+    :end-before: [test executables]
 
 Whenever appropriate, in addition to including the script (fragment) in the documentation as above, make sure it is regularly tested, manually and/or within a CI job.
 

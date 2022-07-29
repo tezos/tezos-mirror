@@ -255,10 +255,10 @@ let test_merkle2 () =
          "87a086ae7d2252d58729b30263fb7b66308bf94ef59a76c9c86e7ea016536505"
   in
   (* compute the root *)
-  let (_, root) =
+  let _, root =
     Array.fold_left
       (fun a b ->
-        let (i, hash) = a in
+        let i, hash = a in
         (i + 1, Core.Hash.merkle_hash ~height:i hash b))
       (0, h)
       witness_unflat

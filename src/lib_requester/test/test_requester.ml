@@ -93,7 +93,7 @@ let test_full_requester_create_with_global_input _ () =
   let (global_input : (Parameters.key * Parameters.value) Lwt_watcher.input) =
     Lwt_watcher.create_input ()
   in
-  let (stream, stopper) = Lwt_watcher.create_stream global_input in
+  let stream, stopper = Lwt_watcher.create_stream global_input in
   let requester = init_full_requester ~global_input () in
   (* Fetch two values *)
   let f1 = Test_Requester.fetch requester "foo" precheck_pass in
@@ -148,7 +148,7 @@ let test_read_known_read_opt _ () =
 *)
 let test_full_requester_disk_found_value _ () =
   let open Lwt_syntax in
-  let (requester, store) = init_full_requester_disk () in
+  let requester, store = init_full_requester_disk () in
   let* b = Test_Requester.known requester "boo" in
   let* () = lwt_assert_false "empty requester has no values" b in
   (* add initial value 'boo' to disk requester *)
@@ -367,7 +367,7 @@ let test_pending_timeout _ () =
 let test_full_requester_test_simple_watch _ () =
   let open Lwt_syntax in
   let requester = init_full_requester () in
-  let (stream, stopper) = Test_Requester.watch requester in
+  let stream, stopper = Test_Requester.watch requester in
   (* Fetch two values *)
   let f1 = Test_Requester.fetch requester "foo" precheck_pass in
   let f2 = Test_Requester.fetch requester "bar" precheck_pass in
@@ -392,7 +392,7 @@ let test_full_requester_test_simple_watch _ () =
 let test_full_requester_test_notify_non_fetched_watch _ () =
   let open Lwt_syntax in
   let requester = init_full_requester () in
-  let (stream, stopper) = Test_Requester.watch requester in
+  let stream, stopper = Test_Requester.watch requester in
   (* Notify the a value that not been requested, should be ignored and
      hence not visible to the watcher. *)
   let* () = Test_Requester.notify requester P2p_peer.Id.zero "foo" 1 in
@@ -406,8 +406,8 @@ let test_full_requester_test_notify_non_fetched_watch _ () =
 let test_full_requester_test_double_watcher _ () =
   let open Lwt_syntax in
   let requester = init_full_requester () in
-  let (stream1, stopper1) = Test_Requester.watch requester in
-  let (stream2, stopper2) = Test_Requester.watch requester in
+  let stream1, stopper1 = Test_Requester.watch requester in
+  let stream2, stopper2 = Test_Requester.watch requester in
   (* Fetch a values *)
   let f1 = Test_Requester.fetch requester "foo" precheck_pass in
   (* Notify the value *)
@@ -457,7 +457,7 @@ let test_full_requester_test_inject_memory _ () =
 (** Injects a value present on disk: false should be returned. *)
 let test_full_requester_test_inject_disk _ () =
   let open Lwt_syntax in
-  let (req, store) = init_full_requester_disk () in
+  let req, store = init_full_requester_disk () in
   Test_disk_table_hash.add store "foo" 1 ;
   let* b = Test_Requester.inject req "foo" 1 in
   lwt_assert_false "Inject is false when present on disk" b
@@ -533,7 +533,7 @@ let test_full_requester_test_notify_unfetched _ () =
     be ignored (not sure how to test this, but this code runs through
     that code path).  *)
 let test_full_requester_test_notify_disk_duplicate _ () =
-  let (req, store) = init_full_requester_disk () in
+  let req, store = init_full_requester_disk () in
   (* Put value on disk *)
   Test_disk_table_hash.add store "foo" 1 ;
   (* Fetch valid value  *)

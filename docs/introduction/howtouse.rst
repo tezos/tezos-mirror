@@ -29,8 +29,8 @@ After a successful compilation, you should have the following binaries:
 
 The daemons other than the node are suffixed with the name of the protocol they are
 bound to, and up to some version, also by its number.
-For instance, ``tezos-baker-012-Psithaca`` is the baker
-for the Ithaca protocol, and ``tezos-baker-alpha`` is the baker
+For instance, ``tezos-baker-013-PtJakart`` is the baker
+for the Jakarta protocol, and ``tezos-baker-alpha`` is the baker
 of the development protocol.
 The ``tezos-node`` daemon is not suffixed by any protocol name, because it is independent of the economic protocol. See also the `Node's Protocol`_ section below.
 
@@ -126,7 +126,7 @@ connect to the network::
 .. note::
 
     If the node prompts you to install the Zcash parameter file, follow
-    the :ref`corresponding instructions <setup_zcash_params>`.
+    the :ref:`corresponding instructions <setup_zcash_params>`.
 
 The identity comprises a pair of cryptographic
 keys that nodes use to encrypt messages sent to each other, and an
@@ -136,7 +136,7 @@ Note that this is merely a network identity and it is not related in
 any way to a Tezos address on the blockchain.
 
 If you wish to run your node on a test network, now is also a good time
-to configure your node (see :ref:`multinetwork`).
+to configure your node (see :ref:`builtin_networks`).
 
 Node Synchronization
 ~~~~~~~~~~~~~~~~~~~~
@@ -232,7 +232,7 @@ Putting together all the above instructions, you may want to run a node as follo
     # Configure the node for running on <test-net>:
     tezos-node config init --data-dir ~/.tezos-node-<test-net> --network <test-net>
     # Import the snapshot into the node data directory:
-    tezos-node snapshot --data-dir ~/.tezos-node-<test-net> import --block <block-hash> <snapshot-file>
+    tezos-node snapshot import --data-dir ~/.tezos-node-<test-net> --block <block-hash> <snapshot-file>
     # Run the node:
     tezos-node run --data-dir ~/.tezos-node-<test-net> --rpc-addr 127.0.0.1
 
@@ -262,26 +262,20 @@ protocol run by the node. For instance, ``get timestamp`` isn't available when
 the node runs the genesis protocol, which may happen for a few minutes when
 launching a node for the first time.
 
-.. _faucet:
+.. _using_faucet:
 
 Get Free Tez
 ~~~~~~~~~~~~
 
 To test the networks and help users get familiar with the system, on
-:doc:`test networks<test_networks>` you can obtain free tez from a
-`faucet <https://faucet.tzalpha.net>`__.
+:doc:`test networks<test_networks>` you can obtain free tez from
+:ref:`a faucet <faucet>`.
 
 This will provide a faucet account in the form of a JSON file
 ``tz1__xxxxxxxxx__.json``, that can be activated with the following
 command::
 
     tezos-client activate account alice with "tz1__xxxxxxxxx__.json"
-
-If you run Tezos using Docker images (via the ``tezos-docker-manager.sh`` script, renamed as ``ithacanet.sh``
-to run the Ithacanet test network for instance), you should prefix the file
-with ``container:`` in order to copy it into the Docker image::
-
-    ./ithacanet.sh client activate account alice with "container:tz1__xxxxxxxxx__.json"
 
 Let's check the balance of the new account with::
 

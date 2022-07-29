@@ -29,7 +29,7 @@ let hide_progress_line s =
 
 let display_progress ?(refresh_rate = (1, 1)) msgf =
   if Unix.isatty Unix.stderr then
-    let (index, rate) = refresh_rate in
+    let index, rate = refresh_rate in
     if index mod rate == 0 then
       msgf
         (Format.kasprintf (fun msg ->

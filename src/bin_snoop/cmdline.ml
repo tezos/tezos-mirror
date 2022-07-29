@@ -73,6 +73,7 @@ type infer_parameters_options = {
   save_solution : string option;
   (* Serialise solution to given file *)
   dot_file : string option; (* Export dependency graph to graphviz format *)
+  display : Display.options;
 }
 
 (* Outcome of command-line parsing. *)

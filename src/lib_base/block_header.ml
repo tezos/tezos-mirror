@@ -100,10 +100,10 @@ include Compare.Make (struct
     let ( >> ) = Compare.or_else in
     let rec list compare xs ys =
       match (xs, ys) with
-      | ([], []) -> 0
-      | (_ :: _, []) -> -1
-      | ([], _ :: _) -> 1
-      | (x :: xs, y :: ys) -> compare x y >> fun () -> list compare xs ys
+      | [], [] -> 0
+      | _ :: _, [] -> -1
+      | [], _ :: _ -> 1
+      | x :: xs, y :: ys -> compare x y >> fun () -> list compare xs ys
     in
     Block_hash.compare b1.shell.predecessor b2.shell.predecessor >> fun () ->
     compare b1.protocol_data b2.protocol_data >> fun () ->

@@ -50,75 +50,46 @@ module Address : sig
 
   (** [encoded_size] is the number of bytes needed to represent an address. *)
   val encoded_size : int
+
+  val of_b58data : Base58.data -> t option
+
+  (** [prefix] is the prefix of smart contract rollup addresses. *)
+  val prefix : string
 end
 
 module Internal_for_tests : sig
   val originated_sc_rollup : Origination_nonce.t -> Address.t
 end
 
-module Commitment_hash : S.HASH
+module State_hash : sig
+  include S.HASH
 
-module State_hash : S.HASH
+  (** [context_hash_to_state_hash ch] turns an (Irmin) context hash
+      into a state hash. *)
+  val context_hash_to_state_hash : Context_hash.t -> t
 
-(** Number of messages consumed by a single commitment. This represents a claim
-    about the shape of the Inbox, which can be disputed as part of a commitment
-    dispute.
+  (* Hackish way to disable hash_bytes and hash_string to force people to use
+     context_hash_to_state_hash (without changing content of HASH.S) *)
+  type unreachable = |
 
-    See also {!Sc_rollup_repr.Commitments}. *)
-module Number_of_messages : Bounded.Int32.S
+  val hash_bytes : unreachable -> t
+
+  val hash_string : unreachable -> t
+end
 
 (** Number of ticks computed by a single commitment. This represents a claim
     about the state of the PVM, which can be disputed as part of a commitment
     dispute.
 
-    See also {!Sc_rollup_repr.Commitments}. *)
-module Number_of_ticks : Bounded.Int32.S
+    See also {!Commitment_repr.}. *)
+module Number_of_ticks : sig
+  include Bounded.Int32.S
 
-(** A commitment represents a claim about the state of the Inbox and PVM at
-    some Inbox level.
-
-    More formally, a commitment is a claim that:
-
-    {ul
-      {li assuming the PVM and Inbox are in a state implied by [predecessor]}
-      {li the PVM consumes [number_of_messages] messages tagged with
-      [inbox_level] from the Inbox}
-      {li the PVM advances to the state [compressed_state] over
-      [number_of_ticks] ticks }
-    }
-
-    Commitments are disjoint. The next correct commitment is a function of the
-    previous machine state and Inbox.
-
-    [number_of_messages] and [inbox_level] can be proven/disproven by Merkle
-    proofs on the Inbox state.
-
-    [compressed_state] and [number_of_ticks] can be proven/disproven by PVM
-    execution, or equivalently, by an interactive proof game between
-    conflicting parties, such that a correct executor always wins the game.
- *)
-module Commitment : sig
-  type t = {
-    compressed_state : State_hash.t;
-    inbox_level : Raw_level_repr.t;
-    predecessor : Commitment_hash.t;
-    number_of_messages : Number_of_messages.t;
-    number_of_ticks : Number_of_ticks.t;
-  }
-
-  val pp : Format.formatter -> t -> unit
-
-  val encoding : t Data_encoding.t
-
-  val hash : t -> Commitment_hash.t
+  val zero : t
 end
 
 (** A smart contract rollup is identified by its address. *)
 type t = Address.t
-
-(** A [Staker] is an implicit account, identified by its public key hash. *)
-module Staker :
-  S.SIGNATURE_PUBLIC_KEY_HASH with type t = Signature.Public_key_hash.t
 
 val encoding : t Data_encoding.t
 
@@ -126,26 +97,13 @@ val rpc_arg : t RPC_arg.t
 
 val pp : Format.formatter -> t -> unit
 
+(** [in_memory_size sc_rollup] returns the number of bytes [sc_rollup]
+    uses in RAM. *)
+val in_memory_size : t -> Cache_memory_helpers.sint
+
+(** A [Staker] is an implicit account, identified by its public key hash. *)
+module Staker :
+  S.SIGNATURE_PUBLIC_KEY_HASH with type t = Signature.Public_key_hash.t
+
 (** The data model uses an index of these addresses. *)
 module Index : Storage_description.INDEX with type t = Address.t
-
-module Commitment_hash_index :
-  Storage_description.INDEX with type t = Commitment_hash.t
-
-(** A smart contract rollup has a kind, which assigns meaning to
-   rollup operations. *)
-module Kind : sig
-  (**
-
-     The list of available rollup kinds.
-
-     This list must only be appended for backward compatibility.
-  *)
-  type t = Example_arith
-
-  val encoding : t Data_encoding.t
-
-  val equal : t -> t -> bool
-
-  val pp : Format.formatter -> t -> unit
-end

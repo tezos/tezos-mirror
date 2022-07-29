@@ -29,6 +29,7 @@ open Alpha_context
 val init :
   rollup:Tx_rollup.t ->
   signer:Signature.public_key_hash ->
+  batch_burn_limit:Tez.t option ->
   Context.index ->
   Constants.t ->
   unit tzresult Lwt.t
@@ -62,3 +63,6 @@ val batch : unit -> unit tzresult Lwt.t
 
 (** Notifies a new L2 head to the batcher worker. *)
 val new_head : L2block.t -> unit tzresult Lwt.t
+
+(** Shutdown the batcher, waiting for the ongoing request to be processed. *)
+val shutdown : unit -> unit Lwt.t

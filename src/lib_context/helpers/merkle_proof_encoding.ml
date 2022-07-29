@@ -86,7 +86,7 @@ struct
       let rec f c bit = function
         | [] -> close c bit
         | i :: is ->
-            let (c, bit) = write c bit i in
+            let c, bit = write c bit i in
             f c bit is
       in
       f 0 0 is ;
@@ -121,10 +121,10 @@ struct
       let rec read c rembit l s =
         if l = 0 then []
         else
-          let (c, s, rembit) =
+          let c, s, rembit =
             if rembit >= 5 then (c, s, rembit)
             else
-              let (c', s) = head s in
+              let c', s = head s in
               ((c * 256) + c', s, rembit + 8)
           in
           let rembit = rembit - 5 in
@@ -158,7 +158,7 @@ struct
       let rec f c bit = function
         | [] -> close c bit
         | i :: is ->
-            let (c, bit) = write c bit i in
+            let c, bit = write c bit i in
             f c bit is
       in
       f 0 0 is ;
@@ -193,10 +193,10 @@ struct
       let rec read c rembit l s =
         if l = 0 then []
         else
-          let (c, s, rembit) =
+          let c, s, rembit =
             if rembit >= 1 then (c, s, rembit)
             else
-              let (c', s) = head s in
+              let c', s = head s in
               ((c * 256) + c', s, rembit + 8)
           in
           let rembit = rembit - 1 in
@@ -225,10 +225,10 @@ struct
         | [] -> invalid_arg "cannot encode ill-formed Merkle proof"
         | _ -> invalid_arg "cannot encode non binary proof tree")
       (function
-        | (Some x, Some y) -> Ok [(0, x); (1, y)]
-        | (Some x, None) -> Ok [(0, x)]
-        | (None, Some y) -> Ok [(1, y)]
-        | (None, None) -> Error "cannot decode ill-formed Merkle proof")
+        | Some x, Some y -> Ok [(0, x); (1, y)]
+        | Some x, None -> Ok [(0, x)]
+        | None, Some y -> Ok [(1, y)]
+        | None, None -> Error "cannot decode ill-formed Merkle proof")
       (tup2 a a)
 
   let inode_proofs_encoding_gen a =
@@ -300,7 +300,7 @@ struct
     @@ obj3 length_field (req "segment" segment_encoding) (req "proof" a)
 
   (* data-encoding.0.4/test/mu.ml for building mutually recursive data_encodings *)
-  let (_inode_tree_encoding, tree_encoding) =
+  let _inode_tree_encoding, tree_encoding =
     let unoptionize enc =
       conv_with_guard
         (fun v -> Some v)
@@ -554,10 +554,10 @@ struct
         | [] -> invalid_arg "cannot encode ill-formed Merkle proof"
         | _ -> invalid_arg "cannot encode non binary proof tree")
       (function
-        | (Some x, Some y) -> [(0, x); (1, y)]
-        | (Some x, None) -> [(0, x)]
-        | (None, Some y) -> [(1, y)]
-        | (None, None) -> invalid_arg "cannot decode ill-formed Merkle proof")
+        | Some x, Some y -> [(0, x); (1, y)]
+        | Some x, None -> [(0, x)]
+        | None, Some y -> [(1, y)]
+        | None, None -> invalid_arg "cannot decode ill-formed Merkle proof")
       (tup2 a a)
 
   let inode_proofs_encoding_32 a =
@@ -650,7 +650,7 @@ struct
         assert false
 
   (* data-encoding.0.4/test/mu.ml for building mutually recursive data_encodings *)
-  let (_inode_tree_encoding, tree_encoding) =
+  let _inode_tree_encoding, tree_encoding =
     let unoptionize enc =
       conv_with_guard
         (fun v -> Some v)

@@ -28,9 +28,9 @@ type inode_child_order =
 
 let equal_inode_child_order x y =
   match (x, y) with
-  | (`Seeded_hash, `Seeded_hash) -> true
-  | (`Hash_bits, `Hash_bits) -> true
-  | (`Custom x, `Custom y) -> x == y
+  | `Seeded_hash, `Seeded_hash -> true
+  | `Hash_bits, `Hash_bits -> true
+  | `Custom x, `Custom y -> x == y
   | _ -> false
 
 type t = {

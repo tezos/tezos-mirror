@@ -1,0 +1,50 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executables
+ (names test test_locator)
+ (libraries
+  tezos-base
+  tezos-context-ops
+  tezos-store.shared
+  tezos-store.unix
+  tezos-store.unix-reconstruction
+  tezos-store.unix-snapshots
+  tezos-shell-services
+  tezos-stdlib-unix
+  tezos-validation
+  tezos-embedded-protocol-demo-noops
+  tezos-embedded-protocol-genesis
+  tezos-embedded-protocol-alpha
+  tezos-protocol-alpha.parameters
+  tezos-protocol-plugin-alpha
+  alcotest-lwt
+  tezos-test-helpers
+  tezos-test-helpers-extra)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_context_ops
+  -open Tezos_store_shared
+  -open Tezos_store_unix
+  -open Tezos_store_unix_reconstruction
+  -open Tezos_store_unix_snapshots
+  -open Tezos_shell_services
+  -open Tezos_stdlib_unix
+  -open Tezos_validation
+  -open Tezos_protocol_alpha_parameters
+  -open Tezos_protocol_plugin_alpha))
+
+(rule
+ (alias runtest)
+ (package tezos-store)
+ (action (setenv SLOW_TEST false (run %{exe:test.exe}))))
+
+(rule
+ (alias test_slow_manual)
+ (action (setenv SLOW_TEST true (run %{exe:test.exe}))))
+
+(rule
+ (alias runtest_locator_bench)
+ (package tezos-store)
+ (action (run %{exe:test_locator.exe} --bench)))

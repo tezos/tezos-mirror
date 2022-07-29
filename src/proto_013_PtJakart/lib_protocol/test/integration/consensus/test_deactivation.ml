@@ -88,7 +88,7 @@ let check_no_stake ~loc (b : Block.t) (account : Account.t) =
     (check_stake). *)
 let test_simple_staking_rights () =
   Context.init 2 >>=? fun (b, accounts) ->
-  let (a1, _a2) = account_pair accounts in
+  let a1, _a2 = account_pair accounts in
   Context.Contract.balance (B b) a1 >>=? fun balance ->
   Context.Contract.pkh a1 >>=? fun delegate1 ->
   Context.Delegate.current_frozen_deposits (B b) delegate1
@@ -111,7 +111,7 @@ let test_simple_staking_rights () =
     rights. *)
 let test_simple_staking_rights_after_baking () =
   Context.init ~consensus_threshold:0 2 >>=? fun (b, accounts) ->
-  let (a1, a2) = account_pair accounts in
+  let a1, a2 = account_pair accounts in
   Context.Contract.manager (B b) a1 >>=? fun m1 ->
   Context.Contract.manager (B b) a2 >>=? fun m2 ->
   Block.bake_n ~policy:(By_account m2.pkh) 5 b >>=? fun b ->
@@ -131,7 +131,7 @@ let check_active_staking_balance ~loc ~deactivated b (m : Account.t) =
 
 let run_until_deactivation () =
   Context.init ~consensus_threshold:0 2 >>=? fun (b, accounts) ->
-  let (a1, a2) = account_pair accounts in
+  let a1, a2 = account_pair accounts in
   Context.Contract.balance (B b) a1 >>=? fun balance_start ->
   Context.Contract.manager (B b) a1 >>=? fun m1 ->
   Context.Contract.manager (B b) a2 >>=? fun m2 ->
@@ -298,7 +298,7 @@ let test_deactivation_then_empty_then_self_delegation_then_recredit () =
    first and third accounts. *)
 let test_delegation () =
   Context.init ~consensus_threshold:0 2 >>=? fun (b, accounts) ->
-  let (a1, a2) = account_pair accounts in
+  let a1, a2 = account_pair accounts in
   let m3 = Account.new_account () in
   Account.add_account m3 ;
   Context.Contract.manager (B b) a1 >>=? fun m1 ->

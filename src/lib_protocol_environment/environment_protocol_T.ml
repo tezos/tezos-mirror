@@ -49,26 +49,18 @@ open Environment_context
    environment ([module type Vx_T]).
 
    If you want to mock this module type, see {!Environment_protocol_T_test}. *)
-module type T = sig
-  (* Documentation for this interface may be found in
-     module type [PROTOCOL] of [sigs/v3/updater.mli]. *)
+module type T = Environment_protocol_T_V6.T
+(* Documentation for this interface may be found in
+   module type [PROTOCOL] of [sigs/v6/updater.mli]. *)
 
-  include Environment_protocol_T_V3.T
-
-  val set_log_message_consumer :
-    (Internal_event.level -> string -> unit) -> unit
-
-  val environment_version : Protocol.env_version
-end
-
-module V0toV3
+module V0toV6
     (E : Environment_protocol_T_V0.T
            with type context := Context.t
             and type quota := quota
             and type validation_result := validation_result
             and type rpc_context := rpc_context
             and type 'a tzresult := 'a Error_monad.tzresult) :
-  Environment_protocol_T_V3.T
+  Environment_protocol_T_V6.T
     with type context := Context.t
      and type quota := quota
      and type validation_result := validation_result
@@ -100,6 +92,8 @@ module V0toV3
   type cache_key = Context.Cache.key
 
   type cache_value = Context.Cache.value
+
+  let init _chain_id c hd = init c hd
 end
 
 (* [module type PROTOCOL] is protocol signature that the shell can use.
@@ -107,7 +101,6 @@ end
    A module of this signature is typically obtained through an adapter
    (see Lift functors in environment definitions) of the Main module
    (which complies with the [Updater] signature).
-
 *)
 module type PROTOCOL = sig
   include
@@ -119,6 +112,9 @@ module type PROTOCOL = sig
        and type 'a tzresult := 'a Error_monad.tzresult
        and type cache_key := Context.Cache.key
        and type cache_value := Context.Cache.value
+
+  val set_log_message_consumer :
+    (Internal_event.level -> string -> unit) -> unit
 
   val environment_version : Protocol.env_version
 
@@ -176,10 +172,10 @@ module IgnoreCaches
 struct
   include P
 
-  let init context header =
+  let init chain_id context header =
     let open Lwt_syntax in
     let* context = Context.Cache.set_cache_layout context [] in
-    init context header
+    init chain_id context header
 
   let begin_partial_application ~chain_id ~ancestor_context
       ~(predecessor : Block_header.t) ~predecessor_hash:_ ~cache:_

@@ -74,7 +74,7 @@ let hash pk = Public_key_hash.hash_bytes [Box.unsafe_to_bytes pk]
 let tag_length = Box.tagbytes
 
 let random_keypair () =
-  let (pk, sk) = Box.keypair () in
+  let pk, sk = Box.keypair () in
   (sk, pk, hash pk)
 
 let zero_nonce = Bytes.make Nonce.size '\x00'
@@ -93,7 +93,7 @@ let init_to_resp_seed = Bytes.of_string "Init -> Resp"
 let resp_to_init_seed = Bytes.of_string "Resp -> Init"
 
 let generate_nonces ~incoming ~sent_msg ~recv_msg =
-  let ((init_msg, resp_msg, false) | (resp_msg, init_msg, true)) =
+  let (init_msg, resp_msg, false | resp_msg, init_msg, true) =
     (sent_msg, recv_msg, incoming)
   in
   let nonce_init_to_resp =
@@ -129,7 +129,7 @@ let compare_pow_target hash pow_target =
 
 let make_pow_target f =
   if f < 0. || 256. < f then invalid_arg "Cryptobox.target_of_float" ;
-  let (frac, shift) = modf f in
+  let frac, shift = modf f in
   let shift = int_of_float shift in
   let m =
     Z.of_int64

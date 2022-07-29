@@ -56,8 +56,7 @@ and 'key description =
     }
       -> 'key description
 
-let[@coq_struct "function_parameter"] rec pp :
-    type a. Format.formatter -> a t -> unit =
+let rec pp : type a. Format.formatter -> a t -> unit =
  fun ppf {dir; _} ->
   match dir with
   | Empty -> Format.fprintf ppf "Empty"
@@ -72,8 +71,7 @@ let[@coq_struct "function_parameter"] rec pp :
       let name = Format.asprintf "<%s>" (RPC_arg.descr arg).name in
       pp_item ppf (name, subdir)
 
-and[@coq_mutual_as_notation] pp_item :
-    type a. Format.formatter -> string * a t -> unit =
+and pp_item : type a. Format.formatter -> string * a t -> unit =
  fun ppf (name, desc) -> Format.fprintf ppf "@[<hv 2>%s@ %a@]" name pp desc
 
 let pp_rev_path ppf path =
@@ -89,8 +87,8 @@ let pp_rev_path ppf path =
 let rec register_named_subcontext : type r. r t -> string list -> r t =
  fun desc names ->
   match (desc.dir, names) with
-  | (_, []) -> desc
-  | (Value _, _) | (IndexedDir _, _) ->
+  | _, [] -> desc
+  | Value _, _ | IndexedDir _, _ ->
       Format.kasprintf
         invalid_arg
         "Could not register a named subcontext at %a because of an existing %a."
@@ -98,11 +96,11 @@ let rec register_named_subcontext : type r. r t -> string list -> r t =
         desc.rev_path
         pp
         desc
-  | (Empty, name :: names) ->
+  | Empty, name :: names ->
       let subdir = {rev_path = name :: desc.rev_path; dir = Empty} in
       desc.dir <- NamedDir (StringMap.singleton name subdir) ;
       register_named_subcontext subdir names
-  | (NamedDir map, name :: names) ->
+  | NamedDir map, name :: names ->
       let subdir =
         match StringMap.find name map with
         | Some subdir -> subdir
@@ -130,10 +128,9 @@ let rec unpack : type a b c. (a, b, c) args -> c -> a * b = function
       let unpack_l = unpack l in
       let unpack_r = unpack r in
       fun x ->
-        let (c, d) = unpack_r x in
-        let (b, a) = unpack_l c in
+        let c, d = unpack_r x in
+        let b, a = unpack_l c in
         (b, (a, d))
-  [@@coq_axiom_with_reason "gadt"]
 
 let rec pack : type a b c. (a, b, c) args -> a -> b -> c = function
   | One _ -> fun b a -> (b, a)
@@ -143,7 +140,6 @@ let rec pack : type a b c. (a, b, c) args -> a -> b -> c = function
       fun b (a, d) ->
         let c = pack_l b a in
         pack_r c d
-  [@@coq_axiom_with_reason "gadt"]
 
 let rec compare : type a b c. (a, b, c) args -> b -> b -> int = function
   | One {compare; _} -> compare
@@ -152,7 +148,6 @@ let rec compare : type a b c. (a, b, c) args -> b -> b -> int = function
       let compare_r = compare r in
       fun (a1, b1) (a2, b2) ->
         match compare_l a1 a2 with 0 -> compare_r b1 b2 | x -> x)
-  [@@coq_axiom_with_reason "gadt"]
 
 let destutter equal l =
   match l with
@@ -174,7 +169,7 @@ let rec register_indexed_subcontext :
       let equal_left x y = Compare.Int.(compare_left x y = 0) in
       let list_left r = list r >|=? fun l -> destutter equal_left l in
       let list_right r =
-        let (a, k) = unpack left r in
+        let a, k = unpack left r in
         list a >|=? fun l ->
         List.map snd (List.filter (fun (x, _) -> equal_left x k) l)
       in
@@ -216,7 +211,6 @@ let rec register_indexed_subcontext :
                 (RPC_arg.descr arg).name
                 (RPC_arg.descr inner_arg).name
           | Some RPC_arg.Eq -> subdir))
- [@@coq_axiom_with_reason "gadt"]
 
 let register_value :
     type a b.
@@ -277,7 +271,6 @@ let rec combine_object = function
               handler.get k i >>=? fun v1 ->
               handlers.get k i >|=? fun v2 -> (v1, v2));
         }
-  [@@coq_axiom_with_reason "gadt"]
 
 type query = {depth : int}
 
@@ -352,7 +345,7 @@ let build_directory : type key. key t -> key RPC_directory.t =
                 (Tag 0)
                 ~title:"Leaf"
                 (dynamic_size arg_encoding)
-                (function (key, None) -> Some key | _ -> None)
+                (function key, None -> Some key | _ -> None)
                 (fun key -> (key, None));
               case
                 (Tag 1)
@@ -360,7 +353,7 @@ let build_directory : type key. key t -> key RPC_directory.t =
                 (tup2
                    (dynamic_size arg_encoding)
                    (dynamic_size handler.encoding))
-                (function (key, Some value) -> Some (key, value) | _ -> None)
+                (function key, Some value -> Some (key, value) | _ -> None)
                 (fun (key, value) -> (key, Some value));
             ]
         in
@@ -385,4 +378,3 @@ let build_directory : type key. key t -> key RPC_directory.t =
   in
   ignore (build_handler dir RPC_path.open_root : key opt_handler) ;
   !rpc_dir
- [@@coq_axiom_with_reason "gadt"]

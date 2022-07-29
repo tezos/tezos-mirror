@@ -1,8 +1,7 @@
 #!/bin/sh
 
-set -e
+set -eu
 
-original_pwd="$(pwd)"
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 
 usage="Usage: $0 <VERSION_NUMBER> <TARBALL_URL> [OPAM_REPOSITORY_CLONE_DIR]
@@ -19,9 +18,9 @@ Default value for OPAM_REPOSITORY_CLONE_DIR is 'opam-repository'.
 TARBALL_URL is the URL to put in opam files.
 The script downloads it to compute sha256 and sha512 checksums for you."
 
-version="$1"
-url="$2"
-opam_dir="$3"
+version="${1:-}"
+url="${2:-}"
+opam_dir="${3:-opam-repository}"
 
 if [ -z "$version" ] ; then
     echo "$usage"
@@ -33,13 +32,11 @@ if [ -z "$url" ] ; then
     exit 1
 fi
 
-if [ -z "$opam_dir" ] ; then
-    opam_dir="opam-repository"
-fi
-
 log () {
     echo '\e[1m'"$1"'\e[0m'
 }
+
+current_dir=$(pwd)
 
 if [ -d "$opam_dir" ] ; then
     log "Checking $opam_dir..."
@@ -65,36 +62,12 @@ if git rev-parse "$branch_name" > /dev/null 2> /dev/null ; then
     exit 1
 fi
 
-tarball=$(mktemp tezos_tarball.XXXXXXXX --tmpdir)
-
-clean_tarball() {
-    log "Cleaning up..."
-    rm -f "$tarball"
-}
-trap clean_tarball EXIT
-
-log "Downloading tarball from $url..."
-curl "$url" --output "$tarball"
-
-log "Hashing tarball..."
-sha256=$(sha256sum "$tarball" | cut -d ' ' -f 1)
-log "SHA256: $sha256"
-sha512=$(sha512sum "$tarball" | cut -d ' ' -f 1)
-log "SHA512: $sha512"
-
-log "Generating opam files for release..."
-cd "$script_dir"/../manifest
-make manifest
-./manifest \
-    --packages-dir "$opam_dir/packages" \
-    --url "$url" \
-    --sha256 "$sha256" \
-    --sha512 "$sha512" \
-    --release "$version"
+cd "$current_dir"
+# We need to move back to current_dir because $url could be relative path
+"$script_dir/opam-prepare-repo.sh" "$version" "$url" "$opam_dir"
+cd "$opam_dir"
 
 log "Creating commit..."
-cd "$original_pwd"
-cd "$opam_dir"
 branch="octez-""$(echo "$version" | tr '~' -)"
 git checkout -b "$branch"
 git add packages

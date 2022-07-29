@@ -28,6 +28,22 @@ open Data_encoding
 
 type chain = [`Main | `Test | `Hash of Chain_id.t]
 
+let metadata_rpc_arg =
+  let construct = function `Always -> "always" | `Never -> "never" in
+  let destruct arg =
+    Result.catch_f
+      (fun () ->
+        match arg with
+        | "always" -> `Always
+        | "never" -> `Never
+        | s -> invalid_arg (Format.sprintf "unrecognize parameter %s" s))
+      (fun exn ->
+        Format.sprintf "Invalid argument: %s" (Printexc.to_string exn))
+  in
+  let description = "defines the way metadata are queried" in
+  let name = "metadata_rpc_arg" in
+  RPC_arg.make ~descr:description ~name ~construct ~destruct ()
+
 let parse_chain s =
   try
     match s with
@@ -94,33 +110,33 @@ let parse_block s =
   in
   try
     match split_on_delim (count_delims s) with
-    | (["genesis"], _) -> Ok `Genesis
-    | (["genesis"; n], '+') -> Ok (`Level (Int32.of_string n))
-    | (["head"], _) -> Ok (`Head 0)
-    | (["head"; n], '~') | (["head"; n], '-') -> Ok (`Head (int_of_string n))
-    | (["checkpoint"], _) -> Ok (`Alias (`Checkpoint, 0))
-    | (["checkpoint"; n], '~') | (["checkpoint"; n], '-') ->
+    | ["genesis"], _ -> Ok `Genesis
+    | ["genesis"; n], '+' -> Ok (`Level (Int32.of_string n))
+    | ["head"], _ -> Ok (`Head 0)
+    | ["head"; n], '~' | ["head"; n], '-' -> Ok (`Head (int_of_string n))
+    | ["checkpoint"], _ -> Ok (`Alias (`Checkpoint, 0))
+    | ["checkpoint"; n], '~' | ["checkpoint"; n], '-' ->
         Ok (`Alias (`Checkpoint, int_of_string n))
-    | (["checkpoint"; n], '+') -> Ok (`Alias (`Checkpoint, -int_of_string n))
-    | (["savepoint"], _) -> Ok (`Alias (`Savepoint, 0))
-    | (["savepoint"; n], '~') | (["savepoint"; n], '-') ->
+    | ["checkpoint"; n], '+' -> Ok (`Alias (`Checkpoint, -int_of_string n))
+    | ["savepoint"], _ -> Ok (`Alias (`Savepoint, 0))
+    | ["savepoint"; n], '~' | ["savepoint"; n], '-' ->
         Ok (`Alias (`Savepoint, int_of_string n))
-    | (["savepoint"; n], '+') -> Ok (`Alias (`Savepoint, -int_of_string n))
-    | (["caboose"], _) -> Ok (`Alias (`Caboose, 0))
-    | (["caboose"; n], '~') | (["caboose"; n], '-') ->
+    | ["savepoint"; n], '+' -> Ok (`Alias (`Savepoint, -int_of_string n))
+    | ["caboose"], _ -> Ok (`Alias (`Caboose, 0))
+    | ["caboose"; n], '~' | ["caboose"; n], '-' ->
         Ok (`Alias (`Caboose, int_of_string n))
-    | (["caboose"; n], '+') -> Ok (`Alias (`Caboose, -int_of_string n))
-    | ([hol], _) -> (
+    | ["caboose"; n], '+' -> Ok (`Alias (`Caboose, -int_of_string n))
+    | [hol], _ -> (
         match Block_hash.of_b58check_opt hol with
         | Some h -> Ok (`Hash (h, 0))
         | None -> to_level (to_valid_level_id s))
-    | ([hol; n], '~') | ([hol; n], '-') -> (
+    | [hol; n], '~' | [hol; n], '-' -> (
         match Block_hash.of_b58check_opt hol with
         | Some h -> Ok (`Hash (h, int_of_string n))
         | None ->
             let offset = to_valid_level_id n in
             to_level ~offset (to_valid_level_id hol))
-    | ([hol; n], '+') -> (
+    | [hol; n], '+' -> (
         match Block_hash.of_b58check_opt hol with
         | Some h -> Ok (`Hash (h, -int_of_string n))
         | None ->
@@ -188,9 +204,9 @@ type raw_context = Key of Bytes.t | Dir of raw_context String.Map.t | Cut
 
 let rec raw_context_eq rc1 rc2 =
   match (rc1, rc2) with
-  | (Key bytes1, Key bytes2) -> Bytes.equal bytes1 bytes2
-  | (Dir dir1, Dir dir2) -> String.Map.(equal raw_context_eq dir1 dir2)
-  | (Cut, Cut) -> true
+  | Key bytes1, Key bytes2 -> Bytes.equal bytes1 bytes2
+  | Dir dir1, Dir dir2 -> String.Map.(equal raw_context_eq dir1 dir2)
+  | Cut, Cut -> true
   | _ -> false
 
 let rec pp_raw_context ppf = function
@@ -263,9 +279,9 @@ and merkle_tree = merkle_node String.Map.t
 
 let rec merkle_node_eq n1 n2 =
   match (n1, n2) with
-  | (Hash (mhk1, s1), Hash (mhk2, s2)) -> mhk1 = mhk2 && String.equal s1 s2
-  | (Data rc1, Data rc2) -> raw_context_eq rc1 rc2
-  | (Continue mtree1, Continue mtree2) -> merkle_tree_eq mtree1 mtree2
+  | Hash (mhk1, s1), Hash (mhk2, s2) -> mhk1 = mhk2 && String.equal s1 s2
+  | Data rc1, Data rc2 -> raw_context_eq rc1 rc2
+  | Continue mtree1, Continue mtree2 -> merkle_tree_eq mtree1 mtree2
   | _ -> false
 
 and merkle_tree_eq mtree1 mtree2 = String.Map.equal merkle_node_eq mtree1 mtree2
@@ -516,25 +532,23 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
              Proto.operation_data_encoding
              (obj1 (req "metadata" (constant "too large"))))
           (function
-            | (operation_data, Too_large) -> Some (operation_data, ())
-            | _ -> None)
+            | operation_data, Too_large -> Some (operation_data, ()) | _ -> None)
           (fun (operation_data, ()) -> (operation_data, Too_large));
         case
           ~title:"Operation without metadata"
           (Tag 1)
           Proto.operation_data_encoding
-          (function
-            | (operation_data, Empty) -> Some operation_data | _ -> None)
+          (function operation_data, Empty -> Some operation_data | _ -> None)
           (fun operation_data -> (operation_data, Empty));
         case
           ~title:"Operation with metadata"
           (Tag 2)
           Proto.operation_data_and_receipt_encoding
           (function
-            | (operation_data, Receipt receipt) -> Some (operation_data, receipt)
+            | operation_data, Receipt receipt -> Some (operation_data, receipt)
             | _ -> None)
           (function
-            | (operation_data, receipt) -> (operation_data, Receipt receipt));
+            | operation_data, receipt -> (operation_data, Receipt receipt));
       ]
 
   let operation_encoding =
@@ -658,16 +672,28 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
     let force_operation_metadata_query =
       let open RPC_query in
-      query (fun force_metadata ->
+      query (fun force_metadata metadata ->
           object
             method force_metadata = force_metadata
+
+            method metadata = metadata
           end)
       |+ flag
            "force_metadata"
            ~descr:
-             "Forces to recompute the operations metadata if it was considered \
-              as too large."
+             "DEPRECATED: Forces to recompute the operations metadata if it \
+              was considered as too large."
            (fun x -> x#force_metadata)
+      |+ opt_field
+           "metadata"
+           ~descr:
+             "Specifies whether or not if the operations metadata should be \
+              returned. To get the metadata, even if it is needed to recompute \
+              them, use \"always\". To avoid getting the metadata, use \
+              \"never\". By default, the metadata will be returned depending \
+              on the node's metadata size limit policy."
+           metadata_rpc_arg
+           (fun x -> x#metadata)
       |> seal
 
     module Operations = struct
@@ -860,7 +886,10 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
         let operations =
           RPC_service.post_service
-            ~description:"Simulate the validation of an operation."
+            ~description:
+              "Simulate the application of the operations with the context of \
+               the given block and return the result of each operation \
+               application."
             ~query:RPC_query.empty
             ~input:(list next_operation_encoding)
             ~output:
@@ -1419,7 +1448,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
   module Operations = struct
     module S = S.Operations
 
-    let operations ctxt ?(force_metadata = false) =
+    let operations ctxt ?(force_metadata = false) ?metadata =
       let f = make_call0 S.operations ctxt in
       fun ?(chain = `Main) ?(block = `Head 0) () ->
         f
@@ -1427,10 +1456,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           block
           (object
              method force_metadata = force_metadata
+
+             method metadata = metadata
           end)
           ()
 
-    let operations_in_pass ctxt ?(force_metadata = false) =
+    let operations_in_pass ctxt ?(force_metadata = false) ?metadata =
       let f = make_call1 S.operations_in_pass ctxt in
       fun ?(chain = `Main) ?(block = `Head 0) n ->
         f
@@ -1439,10 +1470,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           n
           (object
              method force_metadata = force_metadata
+
+             method metadata = metadata
           end)
           ()
 
-    let operation ctxt ?(force_metadata = false) =
+    let operation ctxt ?(force_metadata = false) ?metadata =
       let f = make_call2 S.operation ctxt in
       fun ?(chain = `Main) ?(block = `Head 0) n m ->
         f
@@ -1452,6 +1485,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           m
           (object
              method force_metadata = force_metadata
+
+             method metadata = metadata
           end)
           ()
   end
@@ -1564,7 +1599,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       fun ?(chain = `Main) ?(block = `Head 0) s -> f chain block s () ()
   end
 
-  let info ctxt ?(force_metadata = false) =
+  let info ctxt ?(force_metadata = false) ?metadata =
     let f = make_call0 S.info ctxt in
     fun ?(chain = `Main) ?(block = `Head 0) () ->
       f
@@ -1572,6 +1607,8 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         block
         (object
            method force_metadata = force_metadata
+
+           method metadata = metadata
         end)
         ()
 

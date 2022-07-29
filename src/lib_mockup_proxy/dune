@@ -12,6 +12,8 @@
   tezos-rpc-http
   resto-cohttp-self-serving-client
   tezos-rpc-http-client
-  tezos-shell-services)
- (flags (:standard
-         -open Tezos_base.TzPervasives)))
+  tezos-shell-services
+  uri)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives))

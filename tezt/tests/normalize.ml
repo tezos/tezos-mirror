@@ -28,7 +28,7 @@
    Component: Client - normalize command
    Invocation: dune exec tezt/tests/main.exe -- --file normalize.ml
    Subject: Test the client's command 'normalize data .. of type ...'
-  *)
+*)
 
 let data = "{Pair 0 3 6 9; Pair 1 (Pair 4 (Pair 7 10)); {2; 5; 8; 11}}"
 
@@ -72,7 +72,7 @@ let test_normalize_proxy =
     ~title:"normalize data (proxy)"
     ~tags:["proxy"; "normalize"; "data"]
   @@ fun protocol ->
-  let* (_, client) = Proxy.init ~protocol () in
+  let* _, client = Proxy.init ~protocol () in
   let* _ = execute_all_modes client in
   Lwt.return_unit
 

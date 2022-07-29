@@ -86,8 +86,6 @@ let test_scons_compute_equiv ~count =
 
 let ok_exn = function Ok x -> x | Error _ -> raise (Invalid_argument "ok_exn")
 
-let is_error = function Ok _ -> false | Error _ -> true
-
 let test_check_path ~count =
   let open Merkle_list_helper in
   QCheck2.Test.make ~count ~name:"check_path" input_and_pos (fun (pos, input) ->

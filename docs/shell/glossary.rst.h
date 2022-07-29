@@ -35,7 +35,10 @@ _`Fitness` (a.k.a. score, a.k.a. weight)
     This measure is computed by the consensus protocol.
     The shell changes the head of the chain to the valid block that has the highest fitness.
 
-_`Level`
+_`Height`
+    See level_.
+
+_`Level` (a.k.a. height)
     The position of a block in the chain, that is, the number of blocks
     since the genesis block, where the genesis block is at level 0.
 
@@ -51,7 +54,7 @@ _`Metadata`
 
     A block's metadata is the collections of operations metadata for all the operations included in the block (if the validation was successful).
 
-    For a detailed metadata content check the :ref:`rpc_index` under
+    For a detailed metadata content check the :doc:`./rpc` under
     the prefix ``../<block_id>/metadata``.
 
 _`Node`

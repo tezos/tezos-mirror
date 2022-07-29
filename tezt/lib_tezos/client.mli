@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -180,6 +181,7 @@ val rpc :
   ?hooks:Process.hooks ->
   ?env:string String_map.t ->
   ?data:JSON.u ->
+  ?filename:string ->
   ?query_string:query_string ->
   meth ->
   path ->
@@ -196,6 +198,7 @@ val spawn_rpc :
   ?hooks:Process.hooks ->
   ?env:string String_map.t ->
   ?data:JSON.u ->
+  ?filename:string ->
   ?query_string:query_string ->
   meth ->
   path ->
@@ -214,6 +217,7 @@ module Spawn : sig
     ?hooks:Process.hooks ->
     ?env:string String_map.t ->
     ?data:JSON.u ->
+    ?filename:string ->
     ?query_string:query_string ->
     meth ->
     path ->
@@ -247,8 +251,15 @@ module Admin : sig
   (** Ask a node to trust the address and port of another node. *)
   val trust_address : ?endpoint:endpoint -> peer:Node.t -> t -> unit Lwt.t
 
+  (** Ask a node to untrust the address and port of another node. *)
+  val untrust_address : ?endpoint:endpoint -> peer:Node.t -> t -> unit Lwt.t
+
   (** Same as [trust_address], but do not wait for the process to exit. *)
   val spawn_trust_address : ?endpoint:endpoint -> peer:Node.t -> t -> Process.t
+
+  (** Same as [untrust_address], but do not wait for the process to exit. *)
+  val spawn_untrust_address :
+    ?endpoint:endpoint -> peer:Node.t -> t -> Process.t
 
   (** Connect a node to another peer. *)
   val connect_address : ?endpoint:endpoint -> peer:Node.t -> t -> unit Lwt.t
@@ -343,7 +354,10 @@ val empty_mempool_file : ?filename:string -> unit -> string
 
 (** Run [tezos-client bake for].
 
-    Default [key] is {!Constant.bootstrap1.alias}. *)
+    Default [key] is {!Constant.bootstrap1.alias}.
+
+    If you want to wait until the node switches its head to the baked block,
+    consider using {!bake_for_and_wait} below. *)
 val bake_for :
   ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
@@ -493,7 +507,7 @@ val gen_and_show_keys : ?alias:string -> t -> Account.key Lwt.t
 
 (** Run [tezos-client bls gen keys <alias>]. *)
 val bls_gen_keys :
-  ?hooks:Process.hooks -> ?force:bool -> alias:string -> t -> unit Lwt.t
+  ?hooks:Process.hooks -> ?force:bool -> ?alias:string -> t -> string Lwt.t
 
 (** Run [tezos-client bls list keys].
 
@@ -524,6 +538,10 @@ v}
 val bls_show_address :
   ?hooks:Process.hooks -> alias:string -> t -> Account.aggregate_key Lwt.t
 
+(** A helper to run [tezos-client bls gen keys] followed by
+    [tezos-client bls show address] to get the generated key. *)
+val bls_gen_and_show_keys : ?alias:string -> t -> Account.aggregate_key Lwt.t
+
 (** Run [tezos-client bls import secret key <account.aggregate_alias>
     <account.aggregate_secret_key>]. *)
 val bls_import_secret_key :
@@ -545,6 +563,7 @@ val transfer :
   ?storage_limit:int ->
   ?counter:int ->
   ?arg:string ->
+  ?simulation:bool ->
   ?force:bool ->
   ?expect_failure:bool ->
   amount:Tez.t ->
@@ -565,6 +584,7 @@ val spawn_transfer :
   ?storage_limit:int ->
   ?counter:int ->
   ?arg:string ->
+  ?simulation:bool ->
   ?force:bool ->
   amount:Tez.t ->
   giver:string ->
@@ -673,6 +693,8 @@ val submit_proposals :
   ?wait:string ->
   ?proto_hash:string ->
   ?proto_hashes:string list ->
+  ?force:bool ->
+  ?expect_failure:bool ->
   t ->
   unit Lwt.t
 
@@ -682,6 +704,7 @@ val spawn_submit_proposals :
   ?wait:string ->
   ?proto_hash:string ->
   ?proto_hashes:string list ->
+  ?force:bool ->
   t ->
   Process.t
 
@@ -716,6 +739,17 @@ val unset_deposits_limit :
   t ->
   string Lwt.t
 
+(** Run [tezos-client increase the paid storage of <contract> by <amount> bytes from <payer>] *)
+val increase_paid_storage :
+  ?hooks:Process.hooks ->
+  ?endpoint:endpoint ->
+  ?wait:string ->
+  contract:string ->
+  amount:string ->
+  payer:string ->
+  t ->
+  string Lwt.t
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2336
    [amount] should be named [transferring] *)
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2336
@@ -730,6 +764,8 @@ val originate_contract :
   ?wait:string ->
   ?init:string ->
   ?burn_cap:Tez.t ->
+  ?gas_limit:int ->
+  ?dry_run:bool ->
   alias:string ->
   amount:Tez.t ->
   src:string ->
@@ -745,6 +781,8 @@ val spawn_originate_contract :
   ?wait:string ->
   ?init:string ->
   ?burn_cap:Tez.t ->
+  ?gas_limit:int ->
+  ?dry_run:bool ->
   alias:string ->
   amount:Tez.t ->
   src:string ->
@@ -980,6 +1018,39 @@ val spawn_typecheck_script :
   t ->
   Process.t
 
+(** Same as [run_view] but does not wait for the process to exit. *)
+val spawn_run_view :
+  ?hooks:Process.hooks ->
+  ?source:string ->
+  ?payer:string ->
+  ?gas:int ->
+  ?unparsing_mode:normalize_mode ->
+  view:string ->
+  contract:string ->
+  ?input:string ->
+  ?unlimited_gas:bool ->
+  t ->
+  Process.t
+
+(** Run [tezos-client run view .. on contract .. with input ..].
+
+    Returns the value returned by a view as a string.
+
+    Fails if the view or the contract does not exist. If [input] is [None], it
+    runs [tezos-client run view .. on contract ..]. *)
+val run_view :
+  ?hooks:Process.hooks ->
+  ?source:string ->
+  ?payer:string ->
+  ?gas:int ->
+  ?unparsing_mode:normalize_mode ->
+  view:string ->
+  contract:string ->
+  ?input:string ->
+  ?unlimited_gas:bool ->
+  t ->
+  string Lwt.t
+
 (** Run [tezos-client list mode protocols].
 
     Note: the [list protocols] command (without mode) is an admin command
@@ -1008,7 +1079,9 @@ module Tx_rollup : sig
     ?wait:string ->
     ?burn_cap:Tez.t ->
     ?storage_limit:int ->
+    ?fee:Tez.t ->
     ?hooks:Process.hooks ->
+    ?alias:string ->
     src:string ->
     t ->
     string Runnable.process
@@ -1019,6 +1092,8 @@ module Tx_rollup : sig
     ?burn_cap:Tez.t ->
     ?storage_limit:int ->
     ?hooks:Process.hooks ->
+    ?log_output:bool ->
+    ?log_command:bool ->
     content:Hex.t ->
     rollup:string ->
     src:string ->
@@ -1141,6 +1216,7 @@ module Sc_rollup : sig
     ?burn_cap:Tez.t ->
     src:string ->
     kind:string ->
+    parameters_ty:string ->
     boot_sector:string ->
     t ->
     string Lwt.t
@@ -1152,6 +1228,7 @@ module Sc_rollup : sig
     ?burn_cap:Tez.t ->
     src:string ->
     kind:string ->
+    parameters_ty:string ->
     boot_sector:string ->
     t ->
     Process.t
@@ -1177,6 +1254,45 @@ module Sc_rollup : sig
     dst:string ->
     t ->
     Process.t
+
+  (** Run [tezos-client publish commitment from <src> for sc rollup <sc_rollup>
+      with compressed state <compressed_state> at inbox level <inbox_level>
+      and predecessor <predecessor> and number of ticks <number_of_ticks>. *)
+  val publish_commitment :
+    ?hooks:Process.hooks ->
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    src:string ->
+    sc_rollup:string ->
+    compressed_state:string ->
+    inbox_level:int ->
+    predecessor:string ->
+    number_of_ticks:int ->
+    t ->
+    unit Runnable.process
+
+  (** Run [tezos-client cement commitment <hash> from <src> for sc rollup <rollup>]. *)
+  val cement_commitment :
+    ?hooks:Process.hooks ->
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    hash:string ->
+    src:string ->
+    dst:string ->
+    t ->
+    unit Runnable.process
+
+  (** Run [tezos-client submit sc rollup recover bond to <sc_rollup> from <src>]. *)
+  val submit_recover_bond :
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    ?storage_limit:int ->
+    ?fee:Tez.t ->
+    ?hooks:Process.hooks ->
+    rollup:string ->
+    src:string ->
+    t ->
+    unit Runnable.process
 end
 
 (** {2 High-Level Functions} *)
@@ -1314,10 +1430,12 @@ val register_key : string -> t -> unit Lwt.t
 (** Get contract storage for a contract. Returns a Micheline expression
     representing the storage as a string. *)
 val contract_storage :
-  ?unparsing_mode:[`Optimized | `Optimized_legacy | `Readable] ->
-  string ->
-  t ->
-  string Lwt.t
+  ?unparsing_mode:normalize_mode -> string -> t -> string Lwt.t
+
+(** Get contract code for a contract. Returns a Micheline expression
+    representing the code as a string. *)
+val contract_code :
+  ?unparsing_mode:normalize_mode -> string -> t -> string Lwt.t
 
 (** Sign a string of bytes with secret key of the given account. *)
 val sign_bytes : signer:string -> data:string -> t -> string Lwt.t

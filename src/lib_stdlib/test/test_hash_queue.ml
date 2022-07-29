@@ -50,21 +50,16 @@ let gen_values n =
 let add_multiple_values q vs = List.iter (fun (k, v) -> Queue.replace q k v) vs
 
 (* Invariants:
-  - (key, value) are ("val<i>", i) for i in [0, n-1]
-  - keys are added in increasing order, hence ("val<0>", 0) is always the oldest
-    value if `capacity` >= `n`.
-  - there is no capacity check. If n > capacity, the oldest values are replaced
-  *)
+   - (key, value) are ("val<i>", i) for i in [0, n-1]
+   - keys are added in increasing order, hence ("val<0>", 0) is always the oldest
+     value if `capacity` >= `n`.
+   - there is no capacity check. If n > capacity, the oldest values are replaced
+*)
 let init_queue capacity n =
   let q = Queue.create capacity in
   let vs = gen_values n in
   add_multiple_values q vs ;
   q
-
-let string_of_opt_int = function None -> "None" | Some i -> string_of_int i
-
-let string_of_int_list l =
-  Printf.sprintf "[%s]" @@ (List.map string_of_int l |> String.concat ";")
 
 let test_create () =
   let q = Queue.create 10 in
@@ -178,7 +173,7 @@ let test_fold () =
 
 let test_elements () =
   let q = init_queue 10 10 in
-  let (_, vs) = gen_values 10 |> List.split in
+  let _, vs = gen_values 10 |> List.split in
   let elts = Queue.elements q in
   Assert.Int.List.equal ~loc:__LOC__ vs elts
 
@@ -198,6 +193,7 @@ let () =
         [
           ("capacity (create n) = n", `Quick, test_create);
           ("replace", `Quick, test_replace);
+          ("replace_incr_length", `Quick, test_replace_incr_length);
           ("replace_existing", `Quick, test_replace_existing);
           ("peek", `Quick, test_peek);
           ("peek_empty", `Quick, test_peek_empty);

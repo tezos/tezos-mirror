@@ -25,8 +25,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type mode = Accuser | Batcher | Custom | Maintenance | Observer | Operator
+
 module Parameters = struct
   type persistent_state = {
+    protocol : Protocol.t;
     tezos_node : Node.t;
     client : Client.t;
     data_dir : string;
@@ -36,10 +39,13 @@ module Parameters = struct
     batch_signer : string option;
     finalize_commitment_signer : string option;
     remove_commitment_signer : string option;
+    dispatch_withdrawals_signer : string option;
     rejection_signer : string option;
-    rollup_genesis : string;
+    origination_level : int option;
     rpc_addr : string;
+    allow_deposit : bool;
     dormant_mode : bool;
+    mode : mode;
     mutable pending_ready : unit option Lwt.u list;
     mutable pending_level : (int * int option Lwt.u) list;
   }
@@ -70,22 +76,34 @@ let spawn_command node =
 let add_option flag str_opt command =
   command @ match str_opt with None -> [] | Some o -> [flag; o]
 
-let spawn_config_init node rollup_id rollup_genesis =
+let string_of_mode = function
+  | Observer -> "observer"
+  | Accuser -> "accuser"
+  | Batcher -> "batcher"
+  | Maintenance -> "maintenance"
+  | Operator -> "operator"
+  | Custom -> "custom"
+
+let spawn_init_config ?(force = false) node =
   spawn_command
     node
-    ([
-       "config";
-       "init";
-       "on";
-       "--data-dir";
-       data_dir node;
-       "--rollup-id";
-       rollup_id;
-       "--rollup-genesis";
-       rollup_genesis;
-       "--rpc-addr";
-       rpc_addr node;
-     ]
+    (([
+        "--base-dir";
+        Client.base_dir node.persistent_state.client;
+        "init";
+        string_of_mode node.persistent_state.mode;
+        "config";
+        "for";
+        node.persistent_state.rollup_id;
+        "--data-dir";
+        data_dir node;
+        "--rpc-addr";
+        rpc_addr node;
+      ]
+     @ (if force then ["--force"] else [])
+     @ if node.persistent_state.allow_deposit then ["--allow-deposit"] else [])
+    |> add_option "--origination-level"
+       @@ Option.map string_of_int node.persistent_state.origination_level
     |> add_option "--operator" @@ operator node
     |> add_option "--batch-signer" node.persistent_state.batch_signer
     |> add_option
@@ -94,10 +112,13 @@ let spawn_config_init node rollup_id rollup_genesis =
     |> add_option
          "--remove-commitment-signer"
          node.persistent_state.remove_commitment_signer
+    |> add_option
+         "--dispatch-withdrawals-signer"
+         node.persistent_state.dispatch_withdrawals_signer
     |> add_option "--rejection-signer" node.persistent_state.rejection_signer)
 
-let config_init node rollup_id rollup_genesis =
-  let process = spawn_config_init node rollup_id rollup_genesis in
+let init_config ?force node =
+  let process = spawn_init_config ?force node in
   let* output = Process.check_and_read_stdout process in
   match output =~* rex "Configuration written in ([^\n]*)" with
   | None -> failwith "Configuration initialization failed"
@@ -153,10 +174,15 @@ let wait_for_ready node =
   match node.status with
   | Running {session_state = {ready = true; _}; _} -> unit
   | Not_running | Running {session_state = {ready = false; _}; _} ->
-      let (promise, resolver) = Lwt.task () in
+      let promise, resolver = Lwt.task () in
       node.persistent_state.pending_ready <-
         resolver :: node.persistent_state.pending_ready ;
       check_event node "tx_rollup_node_is_ready.v0" promise
+
+let process node =
+  match node.status with
+  | Running {process; _} -> Some process
+  | Not_running -> None
 
 let wait_for_tezos_level node level =
   match node.status with
@@ -164,7 +190,7 @@ let wait_for_tezos_level node level =
     when current_level >= level ->
       return current_level
   | Not_running | Running _ ->
-      let (promise, resolver) = Lwt.task () in
+      let promise, resolver = Lwt.task () in
       node.persistent_state.pending_level <-
         (level, resolver) :: node.persistent_state.pending_level ;
       check_event
@@ -174,7 +200,7 @@ let wait_for_tezos_level node level =
         promise
 
 let wait_for_full ?where node name filter =
-  let (promise, resolver) = Lwt.task () in
+  let promise, resolver = Lwt.task () in
   let current_events =
     String_map.find_opt name node.one_shot_event_handlers
     |> Option.value ~default:[]
@@ -201,11 +227,11 @@ let event_from_full_event_filter filter json =
 let wait_for ?where node name filter =
   wait_for_full ?where node name (event_from_full_event_filter filter)
 
-let create ?(path = Constant.tx_rollup_node) ?runner ?data_dir
-    ?(addr = "127.0.0.1") ?(dormant_mode = false) ?color ?event_pipe ?name
-    ~rollup_id ~rollup_genesis ?operator ?batch_signer
-    ?finalize_commitment_signer ?remove_commitment_signer ?rejection_signer
-    client tezos_node =
+let create ~protocol ?runner ?data_dir ?(addr = "127.0.0.1")
+    ?(dormant_mode = false) ?color ?event_pipe ?name mode ~rollup_id
+    ?origination_level ?operator ?batch_signer ?finalize_commitment_signer
+    ?remove_commitment_signer ?dispatch_withdrawals_signer ?rejection_signer
+    ?(allow_deposit = false) client tezos_node =
   let name = match name with None -> fresh_name () | Some name -> name in
   let rpc_addr =
     match String.rindex_opt addr ':' with
@@ -215,6 +241,9 @@ let create ?(path = Constant.tx_rollup_node) ?runner ?data_dir
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
   in
+  let path =
+    String.concat "-" [Constant.tx_rollup_node; Protocol.daemon_name protocol]
+  in
   let tx_node =
     create
       ?runner
@@ -223,21 +252,25 @@ let create ?(path = Constant.tx_rollup_node) ?runner ?data_dir
       ?color
       ?event_pipe
       {
+        protocol;
         tezos_node;
         data_dir;
         rollup_id;
         rpc_addr;
-        rollup_genesis;
+        origination_level;
         runner;
         operator;
         batch_signer;
         finalize_commitment_signer;
         remove_commitment_signer;
+        dispatch_withdrawals_signer;
         rejection_signer;
+        allow_deposit;
         client;
         pending_ready = [];
         pending_level = [];
         dormant_mode;
+        mode;
       }
   in
   on_event tx_node (handle_event tx_node) ;
@@ -265,13 +298,86 @@ let do_runlike_command node arguments =
 let run node =
   do_runlike_command
     node
-    [
-      "--base-dir";
-      Client.base_dir node.persistent_state.client;
-      "run";
-      "--data-dir";
-      node.persistent_state.data_dir;
-    ]
+    (([
+        "--base-dir";
+        Client.base_dir node.persistent_state.client;
+        "run";
+        string_of_mode node.persistent_state.mode;
+        "for";
+        node.persistent_state.rollup_id;
+        "--data-dir";
+        data_dir node;
+        "--rpc-addr";
+        rpc_addr node;
+      ]
+     @ if node.persistent_state.allow_deposit then ["--allow-deposit"] else [])
+    |> add_option "--origination-level"
+       @@ Option.map string_of_int node.persistent_state.origination_level
+    |> add_option "--operator" @@ operator node
+    |> add_option "--batch-signer" node.persistent_state.batch_signer
+    |> add_option
+         "--finalize-commitment-signer"
+         node.persistent_state.finalize_commitment_signer
+    |> add_option
+         "--remove-commitment-signer"
+         node.persistent_state.remove_commitment_signer
+    |> add_option
+         "--dispatch-withdrawals-signer"
+         node.persistent_state.dispatch_withdrawals_signer
+    |> add_option "--rejection-signer" node.persistent_state.rejection_signer)
+
+let change_signers ?operator ?batch_signer ?finalize_commitment_signer
+    ?remove_commitment_signer ?dispatch_withdrawals_signer ?rejection_signer
+    ?mode ?allow_deposit (tx_node : t) =
+  let operator =
+    Option.value operator ~default:tx_node.persistent_state.operator
+  in
+  let batch_signer =
+    Option.value batch_signer ~default:tx_node.persistent_state.batch_signer
+  in
+  let finalize_commitment_signer =
+    Option.value
+      finalize_commitment_signer
+      ~default:tx_node.persistent_state.finalize_commitment_signer
+  in
+  let remove_commitment_signer =
+    Option.value
+      remove_commitment_signer
+      ~default:tx_node.persistent_state.remove_commitment_signer
+  in
+  let dispatch_withdrawals_signer =
+    Option.value
+      dispatch_withdrawals_signer
+      ~default:tx_node.persistent_state.dispatch_withdrawals_signer
+  in
+  let rejection_signer =
+    Option.value
+      rejection_signer
+      ~default:tx_node.persistent_state.rejection_signer
+  in
+  let mode = Option.value mode ~default:tx_node.persistent_state.mode in
+  let allow_deposit =
+    Option.value allow_deposit ~default:tx_node.persistent_state.allow_deposit
+  in
+  let tmp_tx_node =
+    {
+      tx_node with
+      persistent_state =
+        {
+          tx_node.persistent_state with
+          operator;
+          batch_signer;
+          finalize_commitment_signer;
+          remove_commitment_signer;
+          dispatch_withdrawals_signer;
+          rejection_signer;
+          mode;
+          allow_deposit;
+        };
+    }
+  in
+  let* _ = init_config ~force:true tmp_tx_node in
+  unit
 
 module Inbox = struct
   type l2_context_hash = {irmin_hash : string; tree_hash : string}
@@ -282,7 +388,7 @@ module Inbox = struct
     l2_context_hash : l2_context_hash;
   }
 
-  type t = {contents : message list; cumulated_size : int}
+  type t = message list
 end
 
 module Client = struct
@@ -308,13 +414,7 @@ module Client = struct
       in
       Inbox.{message; result; l2_context_hash}
     in
-    let parse_json json =
-      let cumulated_size = JSON.(json |-> "cumulated_size" |> as_int) in
-      let contents =
-        JSON.(json |-> "contents" |> as_list) |> List.map parse_message
-      in
-      Inbox.{cumulated_size; contents}
-    in
+    let parse_json json = JSON.(json |> as_list) |> List.map parse_message in
     let* json = raw_tx_node_rpc tx_node ~url:("block/" ^ block ^ "/inbox") in
     return (parse_json json)
 
@@ -345,4 +445,20 @@ module Client = struct
     raw_tx_node_rpc
       tx_node
       ~url:("block/" ^ block ^ "/proof/message/" ^ message_pos)
+
+  let get_ticket ~tx_node ~block ~ticket_id =
+    raw_tx_node_rpc tx_node ~url:("context/" ^ block ^ "/tickets/" ^ ticket_id)
+
+  let get_ticket_index ~tx_node ~block ~ticket_id =
+    let parse_json json =
+      match JSON.(json |> as_int_opt) with
+      | Some level -> level
+      | None -> Test.fail "Cannot retrieve ticket of %s" ticket_id
+    in
+    let* json =
+      raw_tx_node_rpc
+        tx_node
+        ~url:("context/" ^ block ^ "/tickets/" ^ ticket_id ^ "/index")
+    in
+    return (parse_json json)
 end

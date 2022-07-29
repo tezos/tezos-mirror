@@ -96,8 +96,8 @@ let expect_result line pr exp got =
   let* got = protect got in
   if
     match (got, exp) with
-    | (Ok got, Ok exp) -> got = exp
-    | (Error got, Error exp) ->
+    | Ok got, Ok exp -> got = exp
+    | Error got, Error exp ->
         let got = Format.asprintf "%a" pp_print_trace got in
         Stringext.find_from got ~pattern:exp <> None
     | _ -> false
@@ -332,7 +332,7 @@ let int_param ~autocomplete next =
 let test_autocompletion_case ~commands ~args ~expected () =
   let open Lwt_result_syntax in
   let script = "script" in
-  let (prev_arg, cur_arg) =
+  let prev_arg, cur_arg =
     match List.rev args with
     | [] -> (script, "")
     | [cur_arg] -> (script, cur_arg)

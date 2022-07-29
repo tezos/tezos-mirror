@@ -73,9 +73,9 @@ let nth xs n =
   else
     let rec aux xs n =
       match (xs, n) with
-      | ([], _) -> None
-      | (x :: _, 0) -> Some x
-      | (_ :: xs, n) -> (aux [@ocaml.tailcall]) xs (n - 1)
+      | [], _ -> None
+      | x :: _, 0 -> Some x
+      | _ :: xs, n -> (aux [@ocaml.tailcall]) xs (n - 1)
     in
     aux xs n
 
@@ -98,18 +98,18 @@ let rec iter2 ~when_different_lengths f xs ys =
       The same remark applies to the other 2-list iterators.
   *)
   match (xs, ys) with
-  | ([], []) -> Result_syntax.return_unit
-  | ([], _ :: _) | (_ :: _, []) -> Error when_different_lengths
-  | (x :: xs, y :: ys) ->
+  | [], [] -> Result_syntax.return_unit
+  | [], _ :: _ | _ :: _, [] -> Error when_different_lengths
+  | x :: xs, y :: ys ->
       f x y ;
       (iter2 [@ocaml.tailcall]) ~when_different_lengths f xs ys
 
 let rev_map2 ~when_different_lengths f xs ys =
   let rec aux zs xs ys =
     match (xs, ys) with
-    | ([], []) -> Ok zs
-    | ([], _ :: _) | (_ :: _, []) -> Error when_different_lengths
-    | (x :: xs, y :: ys) ->
+    | [], [] -> Ok zs
+    | [], _ :: _ | _ :: _, [] -> Error when_different_lengths
+    | x :: xs, y :: ys ->
         let z = f x y in
         (aux [@ocaml.tailcall]) (z :: zs) xs ys
   in
@@ -121,9 +121,9 @@ let map2 ~when_different_lengths f xs ys =
 let fold_left2 ~when_different_lengths f a xs ys =
   let rec aux acc xs ys =
     match (xs, ys) with
-    | ([], []) -> Ok acc
-    | ([], _ :: _) | (_ :: _, []) -> Error when_different_lengths
-    | (x :: xs, y :: ys) ->
+    | [], [] -> Ok acc
+    | [], _ :: _ | _ :: _, [] -> Error when_different_lengths
+    | x :: xs, y :: ys ->
         let acc = f acc x y in
         (aux [@ocaml.tailcall]) acc xs ys
   in
@@ -132,9 +132,9 @@ let fold_left2 ~when_different_lengths f a xs ys =
 let fold_right2 ~when_different_lengths f xs ys a =
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], []) -> Ok a
-    | ([], _ :: _) | (_ :: _, []) -> Error when_different_lengths
-    | (x :: xs, y :: ys) ->
+    | [], [] -> Ok a
+    | [], _ :: _ | _ :: _, [] -> Error when_different_lengths
+    | x :: xs, y :: ys ->
         let open Result_syntax in
         let* acc = aux xs ys in
         return (f x y acc)
@@ -144,9 +144,9 @@ let fold_right2 ~when_different_lengths f xs ys a =
 let for_all2 ~when_different_lengths f xs ys =
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], []) -> Ok true
-    | ([], _ :: _) | (_ :: _, []) -> Error when_different_lengths
-    | (x :: xs, y :: ys) -> (
+    | [], [] -> Ok true
+    | [], _ :: _ | _ :: _, [] -> Error when_different_lengths
+    | x :: xs, y :: ys -> (
         match f x y with
         | true -> (aux [@ocaml.tailcall]) xs ys
         | false -> Ok false)
@@ -156,9 +156,9 @@ let for_all2 ~when_different_lengths f xs ys =
 let exists2 ~when_different_lengths f xs ys =
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], []) -> Ok false
-    | ([], _ :: _) | (_ :: _, []) -> Error when_different_lengths
-    | (x :: xs, y :: ys) -> (
+    | [], [] -> Ok false
+    | [], _ :: _ | _ :: _, [] -> Error when_different_lengths
+    | x :: xs, y :: ys -> (
         match f x y with
         | true -> Ok true
         | false -> (aux [@ocaml.tailcall]) xs ys)
@@ -169,7 +169,7 @@ let fold_left_map f accu l =
   let rec aux accu rev_list_accu = function
     | [] -> (accu, rev rev_list_accu)
     | x :: xs ->
-        let (accu, y) = f accu x in
+        let accu, y = f accu x in
         (aux [@ocaml.tailcall]) accu (y :: rev_list_accu) xs
   in
   aux accu [] l
@@ -179,7 +179,7 @@ let fold_left_map_e f accu l =
     | [] -> Ok (accu, rev rev_list_accu)
     | x :: xs ->
         let open Result_syntax in
-        let* (accu, y) = f accu x in
+        let* accu, y = f accu x in
         (aux [@ocaml.tailcall]) accu (y :: rev_list_accu) xs
   in
   aux accu [] l
@@ -189,13 +189,13 @@ let fold_left_map_s f accu l =
   let rec aux accu rev_list_accu = function
     | [] -> return (accu, rev rev_list_accu)
     | x :: xs ->
-        let* (accu, y) = f accu x in
+        let* accu, y = f accu x in
         (aux [@ocaml.tailcall]) accu (y :: rev_list_accu) xs
   in
   match l with
   | [] -> return (accu, [])
   | x :: xs ->
-      let* (accu, y) = lwt_apply2 f accu x in
+      let* accu, y = lwt_apply2 f accu x in
       (aux [@ocaml.tailcall]) accu [y] xs
 
 let fold_left_map_es f accu l =
@@ -203,13 +203,13 @@ let fold_left_map_es f accu l =
   let rec aux accu rev_list_accu = function
     | [] -> return (accu, rev rev_list_accu)
     | x :: xs ->
-        let* (accu, y) = f accu x in
+        let* accu, y = f accu x in
         (aux [@ocaml.tailcall]) accu (y :: rev_list_accu) xs
   in
   match l with
   | [] -> return (accu, [])
   | x :: xs ->
-      let* (accu, y) = lwt_apply2 f accu x in
+      let* accu, y = lwt_apply2 f accu x in
       (aux [@ocaml.tailcall]) accu [y] xs
 
 let rec mem ~equal x = function
@@ -802,7 +802,7 @@ let fold_left_i f init l =
 
 let fold_left_i_e f acc l =
   let open Result_syntax in
-  let* (_, acc) =
+  let* _, acc =
     fold_left_e
       (fun (i, acc) x ->
         let* acc = f i acc x in
@@ -814,7 +814,7 @@ let fold_left_i_e f acc l =
 
 let fold_left_i_s f acc l =
   let open Lwt_syntax in
-  let* (_, acc) =
+  let* _, acc =
     fold_left_s
       (fun (i, acc) x ->
         let* acc = f i acc x in
@@ -826,7 +826,7 @@ let fold_left_i_s f acc l =
 
 let fold_left_i_es f acc l =
   let open Lwt_result_syntax in
-  let* (_, acc) =
+  let* _, acc =
     fold_left_es
       (fun (i, acc) x ->
         let* acc = f i acc x in
@@ -1016,11 +1016,11 @@ let rev_map2_e ~when_different_lengths f xs ys =
   let open Result_syntax in
   let rec aux zs xs ys =
     match (xs, ys) with
-    | ([], []) -> return zs
-    | (x :: xs, y :: ys) ->
+    | [], [] -> return zs
+    | x :: xs, y :: ys ->
         let* z = f x y in
         (aux [@ocaml.tailcall]) (z :: zs) xs ys
-    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
+    | [], _ :: _ | _ :: _, [] -> fail when_different_lengths
   in
   aux [] xs ys
 
@@ -1028,35 +1028,35 @@ let rev_map2_s ~when_different_lengths f xs ys =
   let open Lwt_syntax in
   let rec aux zs xs ys =
     match (xs, ys) with
-    | ([], []) -> return_ok zs
-    | (x :: xs, y :: ys) ->
+    | [], [] -> return_ok zs
+    | x :: xs, y :: ys ->
         let* z = f x y in
         (aux [@ocaml.tailcall]) (z :: zs) xs ys
-    | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
+    | [], _ :: _ | _ :: _, [] -> return_error when_different_lengths
   in
   match (xs, ys) with
-  | ([], []) -> return_ok_nil
-  | (x :: xs, y :: ys) ->
+  | [], [] -> return_ok_nil
+  | x :: xs, y :: ys ->
       let* z = lwt_apply2 f x y in
       aux [z] xs ys
-  | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
+  | [], _ :: _ | _ :: _, [] -> return_error when_different_lengths
 
 let rev_map2_es ~when_different_lengths f xs ys =
   let open Lwt_result_syntax in
   let rec aux zs xs ys =
     match (xs, ys) with
-    | ([], []) -> return zs
-    | (x :: xs, y :: ys) ->
+    | [], [] -> return zs
+    | x :: xs, y :: ys ->
         let* z = f x y in
         (aux [@ocaml.tailcall]) (z :: zs) xs ys
-    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
+    | [], _ :: _ | _ :: _, [] -> fail when_different_lengths
   in
   match (xs, ys) with
-  | ([], []) -> return []
-  | (x :: xs, y :: ys) ->
+  | [], [] -> return []
+  | x :: xs, y :: ys ->
       let* z = lwt_apply2 f x y in
       aux [z] xs ys
-  | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
+  | [], _ :: _ | _ :: _, [] -> fail when_different_lengths
 
 let map2_e ~when_different_lengths f xs ys =
   rev_map2_e ~when_different_lengths f xs ys |> Result.map rev
@@ -1071,11 +1071,11 @@ let iter2_e ~when_different_lengths f xs ys =
   let open Result_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], []) -> return_unit
-    | (x :: xs, y :: ys) ->
+    | [], [] -> return_unit
+    | x :: xs, y :: ys ->
         let* () = f x y in
         (aux [@ocaml.tailcall]) xs ys
-    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
+    | [], _ :: _ | _ :: _, [] -> fail when_different_lengths
   in
   aux xs ys
 
@@ -1083,45 +1083,45 @@ let iter2_s ~when_different_lengths f xs ys =
   let open Lwt_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], []) -> return_ok_unit
-    | (x :: xs, y :: ys) ->
+    | [], [] -> return_ok_unit
+    | x :: xs, y :: ys ->
         let* () = f x y in
         (aux [@ocaml.tailcall]) xs ys
-    | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
+    | [], _ :: _ | _ :: _, [] -> return_error when_different_lengths
   in
   match (xs, ys) with
-  | ([], []) -> return_ok_unit
-  | (x :: xs, y :: ys) ->
+  | [], [] -> return_ok_unit
+  | x :: xs, y :: ys ->
       let* () = lwt_apply2 f x y in
       aux xs ys
-  | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
+  | [], _ :: _ | _ :: _, [] -> return_error when_different_lengths
 
 let iter2_es ~when_different_lengths f xs ys =
   let open Lwt_result_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], []) -> return_unit
-    | (x :: xs, y :: ys) ->
+    | [], [] -> return_unit
+    | x :: xs, y :: ys ->
         let* () = f x y in
         (aux [@ocaml.tailcall]) xs ys
-    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
+    | [], _ :: _ | _ :: _, [] -> fail when_different_lengths
   in
   match (xs, ys) with
-  | ([], []) -> return_unit
-  | (x :: xs, y :: ys) ->
+  | [], [] -> return_unit
+  | x :: xs, y :: ys ->
       let* () = lwt_apply2 f x y in
       aux xs ys
-  | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
+  | [], _ :: _ | _ :: _, [] -> fail when_different_lengths
 
 let fold_left2_e ~when_different_lengths f init xs ys =
   let open Result_syntax in
   let rec aux acc xs ys =
     match (xs, ys) with
-    | ([], []) -> return acc
-    | (x :: xs, y :: ys) ->
+    | [], [] -> return acc
+    | x :: xs, y :: ys ->
         let* acc = f acc x y in
         (aux [@ocaml.tailcall]) acc xs ys
-    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
+    | [], _ :: _ | _ :: _, [] -> fail when_different_lengths
   in
   aux init xs ys
 
@@ -1129,45 +1129,45 @@ let fold_left2_s ~when_different_lengths f init xs ys =
   let open Lwt_syntax in
   let rec aux acc xs ys =
     match (xs, ys) with
-    | ([], []) -> return_ok acc
-    | (x :: xs, y :: ys) ->
+    | [], [] -> return_ok acc
+    | x :: xs, y :: ys ->
         let* acc = f acc x y in
         (aux [@ocaml.tailcall]) acc xs ys
-    | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
+    | [], _ :: _ | _ :: _, [] -> return_error when_different_lengths
   in
   match (xs, ys) with
-  | ([], []) -> return_ok init
-  | (x :: xs, y :: ys) ->
+  | [], [] -> return_ok init
+  | x :: xs, y :: ys ->
       let* acc = lwt_apply3 f init x y in
       aux acc xs ys
-  | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
+  | [], _ :: _ | _ :: _, [] -> return_error when_different_lengths
 
 let fold_left2_es ~when_different_lengths f init xs ys =
   let open Lwt_result_syntax in
   let rec aux acc xs ys =
     match (xs, ys) with
-    | ([], []) -> return acc
-    | (x :: xs, y :: ys) ->
+    | [], [] -> return acc
+    | x :: xs, y :: ys ->
         let* acc = f acc x y in
         (aux [@ocaml.tailcall]) acc xs ys
-    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
+    | [], _ :: _ | _ :: _, [] -> fail when_different_lengths
   in
   match (xs, ys) with
-  | ([], []) -> return init
-  | (x :: xs, y :: ys) ->
+  | [], [] -> return init
+  | x :: xs, y :: ys ->
       let* acc = lwt_apply3 f init x y in
       (aux [@ocaml.tailcall]) acc xs ys
-  | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
+  | [], _ :: _ | _ :: _, [] -> fail when_different_lengths
 
 let fold_right2_e ~when_different_lengths f xs ys init =
   let open Result_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], []) -> return init
-    | (x :: xs, y :: ys) ->
+    | [], [] -> return init
+    | x :: xs, y :: ys ->
         let* acc = aux xs ys in
         f x y acc
-    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
+    | [], _ :: _ | _ :: _, [] -> fail when_different_lengths
   in
   aux xs ys
 
@@ -1175,9 +1175,9 @@ let fold_right2_s ~when_different_lengths f xs ys init =
   let open Lwt_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
-    | ([], []) -> return_ok init
-    | (x :: xs, y :: ys) -> (
+    | [], _ :: _ | _ :: _, [] -> return_error when_different_lengths
+    | [], [] -> return_ok init
+    | x :: xs, y :: ys -> (
         let* acc = aux xs ys in
         match acc with
         | Error _ -> return acc
@@ -1191,9 +1191,9 @@ let fold_right2_es ~when_different_lengths f xs ys init =
   let open Lwt_result_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
-    | ([], []) -> return init
-    | (x :: xs, y :: ys) ->
+    | [], _ :: _ | _ :: _, [] -> fail when_different_lengths
+    | [], [] -> return init
+    | x :: xs, y :: ys ->
         let* acc = aux xs ys in
         f x y acc
   in
@@ -1291,9 +1291,9 @@ let for_all2_e ~when_different_lengths f xs ys =
   let open Result_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
-    | ([], []) -> return_true
-    | (x :: xs, y :: ys) ->
+    | [], _ :: _ | _ :: _, [] -> fail when_different_lengths
+    | [], [] -> return_true
+    | x :: xs, y :: ys ->
         let* b = f x y in
         if b then (aux [@ocaml.tailcall]) xs ys else return_false
   in
@@ -1303,16 +1303,16 @@ let for_all2_s ~when_different_lengths f xs ys =
   let open Lwt_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
-    | ([], []) -> return_ok_true
-    | (x :: xs, y :: ys) ->
+    | [], _ :: _ | _ :: _, [] -> return_error when_different_lengths
+    | [], [] -> return_ok_true
+    | x :: xs, y :: ys ->
         let* b = f x y in
         if b then (aux [@ocaml.tailcall]) xs ys else return_ok_false
   in
   match (xs, ys) with
-  | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
-  | ([], []) -> return_ok_true
-  | (x :: xs, y :: ys) ->
+  | [], _ :: _ | _ :: _, [] -> return_error when_different_lengths
+  | [], [] -> return_ok_true
+  | x :: xs, y :: ys ->
       let* b = lwt_apply2 f x y in
       if b then aux xs ys else return_ok_false
 
@@ -1320,16 +1320,16 @@ let for_all2_es ~when_different_lengths f xs ys =
   let open Lwt_result_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
-    | ([], []) -> return_true
-    | (x :: xs, y :: ys) ->
+    | [], _ :: _ | _ :: _, [] -> fail when_different_lengths
+    | [], [] -> return_true
+    | x :: xs, y :: ys ->
         let* b = f x y in
         if b then (aux [@ocaml.tailcall]) xs ys else return_false
   in
   match (xs, ys) with
-  | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
-  | ([], []) -> return_true
-  | (x :: xs, y :: ys) ->
+  | [], _ :: _ | _ :: _, [] -> fail when_different_lengths
+  | [], [] -> return_true
+  | x :: xs, y :: ys ->
       let* b = lwt_apply2 f x y in
       if b then aux xs ys else return_false
 
@@ -1337,9 +1337,9 @@ let exists2_e ~when_different_lengths f xs ys =
   let open Result_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
-    | ([], []) -> return_false
-    | (x :: xs, y :: ys) ->
+    | [], _ :: _ | _ :: _, [] -> fail when_different_lengths
+    | [], [] -> return_false
+    | x :: xs, y :: ys ->
         let* b = f x y in
         if b then return_true else (aux [@ocaml.tailcall]) xs ys
   in
@@ -1349,16 +1349,16 @@ let exists2_s ~when_different_lengths f xs ys =
   let open Lwt_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
-    | ([], []) -> return_ok_false
-    | (x :: xs, y :: ys) ->
+    | [], _ :: _ | _ :: _, [] -> return_error when_different_lengths
+    | [], [] -> return_ok_false
+    | x :: xs, y :: ys ->
         let* b = f x y in
         if b then return_ok_true else (aux [@ocaml.tailcall]) xs ys
   in
   match (xs, ys) with
-  | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
-  | ([], []) -> return_ok_false
-  | (x :: xs, y :: ys) ->
+  | [], _ :: _ | _ :: _, [] -> return_error when_different_lengths
+  | [], [] -> return_ok_false
+  | x :: xs, y :: ys ->
       let* b = lwt_apply2 f x y in
       if b then return_ok_true else aux xs ys
 
@@ -1366,16 +1366,16 @@ let exists2_es ~when_different_lengths f xs ys =
   let open Lwt_result_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
-    | ([], []) -> return_false
-    | (x :: xs, y :: ys) ->
+    | [], _ :: _ | _ :: _, [] -> fail when_different_lengths
+    | [], [] -> return_false
+    | x :: xs, y :: ys ->
         let* b = f x y in
         if b then return_true else (aux [@ocaml.tailcall]) xs ys
   in
   match (xs, ys) with
-  | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
-  | ([], []) -> return_false
-  | (x :: xs, y :: ys) ->
+  | [], _ :: _ | _ :: _, [] -> fail when_different_lengths
+  | [], [] -> return_false
+  | x :: xs, y :: ys ->
       let* b = lwt_apply2 f x y in
       if b then return_true else aux xs ys
 
@@ -1400,7 +1400,7 @@ let rev_partition_result xs =
   aux [] [] xs
 
 let partition_result xs =
-  let (rev_oks, rev_errors) = rev_partition_result xs in
+  let rev_oks, rev_errors = rev_partition_result xs in
   (rev rev_oks, rev rev_errors)
 
 let rev_partition_either xs =
@@ -1414,7 +1414,7 @@ let rev_partition_either xs =
   aux [] [] xs
 
 let partition_either xs =
-  let (rev_lefts, rev_rights) = rev_partition_either xs in
+  let rev_lefts, rev_rights = rev_partition_either xs in
   (rev rev_lefts, rev rev_rights)
 
 let rev_partition_e f l =
@@ -1600,20 +1600,18 @@ let rev_combine ~when_different_lengths xs ys =
 let combine_with_leftovers xs ys =
   let rec aux rev_combined xs ys =
     match (xs, ys) with
-    | ([], []) -> (rev rev_combined, None)
-    | ((_ :: _ as left), []) -> (rev rev_combined, Some (Either.Left left))
-    | ([], (_ :: _ as right)) -> (rev rev_combined, Some (Either.Right right))
-    | (x :: xs, y :: ys) ->
-        (aux [@ocaml.tailcall]) ((x, y) :: rev_combined) xs ys
+    | [], [] -> (rev rev_combined, None)
+    | (_ :: _ as left), [] -> (rev rev_combined, Some (Either.Left left))
+    | [], (_ :: _ as right) -> (rev rev_combined, Some (Either.Right right))
+    | x :: xs, y :: ys -> (aux [@ocaml.tailcall]) ((x, y) :: rev_combined) xs ys
   in
   aux [] xs ys
 
 let combine_drop xs ys =
   let rec aux rev_combined xs ys =
     match (xs, ys) with
-    | (x :: xs, y :: ys) ->
-        (aux [@ocaml.tailcall]) ((x, y) :: rev_combined) xs ys
-    | ([], []) | (_ :: _, []) | ([], _ :: _) -> rev rev_combined
+    | x :: xs, y :: ys -> (aux [@ocaml.tailcall]) ((x, y) :: rev_combined) xs ys
+    | [], [] | _ :: _, [] | [], _ :: _ -> rev rev_combined
   in
   aux [] xs ys
 
@@ -1636,15 +1634,15 @@ let shuffle ~rng l =
 
 let rec compare ecomp xs ys =
   match (xs, ys) with
-  | ([], []) -> 0
-  | ([], _ :: _) -> -1
-  | (_ :: _, []) -> 1
-  | (x :: xs, y :: ys) ->
+  | [], [] -> 0
+  | [], _ :: _ -> -1
+  | _ :: _, [] -> 1
+  | x :: xs, y :: ys ->
       let ec = ecomp x y in
       if ec = 0 then compare ecomp xs ys else ec
 
 let rec equal eeq xs ys =
   match (xs, ys) with
-  | ([], []) -> true
-  | ([], _ :: _) | (_ :: _, []) -> false
-  | (x :: xs, y :: ys) -> eeq x y && equal eeq xs ys
+  | [], [] -> true
+  | [], _ :: _ | _ :: _, [] -> false
+  | x :: xs, y :: ys -> eeq x y && equal eeq xs ys

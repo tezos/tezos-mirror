@@ -8,9 +8,9 @@ History
 -------
 
 Before Tenderbake, there was
-`Emmy* <https://gitlab.com/tzip/tzip/-/blob/master/drafts/current/draft_emmy-star.md>`_,
+`Emmy* <https://gitlab.com/tezos/tzip/-/blob/master/drafts/current/draft_emmy-star.md>`_,
 a Nakamoto-style consensus consisting of a series of improvements of the one in
-the `Tezos whitepaper <https://whitepaper.io/document/376/tezos-whitepaper>`_.
+the `Tezos whitepaper <https://tezos.com/whitepaper.pdf>`_.
 
 Emmy*, like any Nakamoto-style consensus algorithm (such as `Bitcoin
 <https://bitcoin.org/bitcoin.pdf>`_ or `Ouroboros
@@ -20,7 +20,7 @@ with a probability that increases rapidly with fork length.
 
 `Tenderbake <https://arxiv.org/abs/2001.11965>`_ instead, like any classic
 BFT-style consensus algorithm (such as
-`PBFT <http://pmg.csail.mit.edu/papers/osdi99.pdf>`_ or
+`PBFT <https://pmg.csail.mit.edu/papers/osdi99.pdf>`_ or
 `Tendermint <https://arxiv.org/abs/1807.04938>`_), offers *deterministic*
 finality: a block that has just been appended to the chain of some node is known
 to be final once it has two additional blocks on top of it, regardless of
@@ -36,7 +36,7 @@ for blockchains.
 
 Tenderbake adapts Tendermint to the Tezos blockchain, but the adjustments
 required are
-`substantive <https://blog.nomadic-labs.com/a-look-ahead-to-tenderbake.html#the-tezos-architecture>`_:
+`substantive <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html#the-tezos-architecture>`_:
 
 * Tenderbake is tailored to match the Tezos architecture by using only
   communication primitives and network assumptions which Tezos supports.
@@ -47,9 +47,10 @@ required are
 The design of Tenderbake and its rationale are described at
 length in the `technical report <https://arxiv.org/abs/2001.11965>`_ and in a
 `Nomadic Labs's blog
-post <https://blog.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_. Here we
+post <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_. Here we
 only provide a user/developer perspective.
 
+.. _tb_validator:
 .. _tb_validator_jakarta:
 
 Tenderbake is executed for each new block level by a "committee" whose members
@@ -79,16 +80,18 @@ Round durations thus increase linearly with ``DELAY_INCREMENT_PER_ROUND``.
 
 Schematically, a round consists in the following steps:
 
+.. _candidate_block:
 .. _candidate_block_jakarta:
 
 * a validator designated for that round injects a *candidate block* (representing a proposal) and consensus operations (representing votes) into the node to which it is attached, which then
 * diffuses those blocks and consensus operations to other nodes of the network, and thus
 * communicates them to the validators attached to those nodes, to carry out voting on which block to accept.
 
+.. _quorum:
 .. _quorum_jakarta:
 
 Unlike Emmy*, Tenderbake has `two types of
-votes <https://blog.nomadic-labs.com/a-look-ahead-to-tenderbake.html#why-do-we-need-preendorsements>`_:
+votes <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html#why-do-we-need-preendorsements>`_:
 before endorsing a block ``b``, a validator preendorses ``b``. Furthermore,
 to be able to endorse, a validator must have observed a preendorsement *quorum*, that is a
 set of preendorsements from validators having at least ``CONSENSUS_THRESHOLD`` validator slots. Similarly, to be able to decide, a validator must have observed an endorsement quorum, that is, a set of endorsements from validators having at least ``CONSENSUS_THRESHOLD`` validator slots. The
@@ -105,6 +108,7 @@ the same *payload* as
 the initial block. We talk about a *re-proposal* in this case.
 
 
+.. _finality:
 .. _finality_jakarta:
 
 Transaction and block finality
@@ -137,6 +141,9 @@ normal network conditions, and with active and compliant validators, decisions
 should be taken at round 0, meaning that the time between blocks would be
 :math:`round\_duration(0)` seconds i.e., parameter ``MINIMAL_BLOCK_DELAY``.
 
+
+.. _active_stake:
+.. _active_stake_jakarta:
 
 Validator selection: staking balance, active stake, and frozen deposits
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -179,9 +186,9 @@ not the other way around.):
 - ``spendable balance`` is obtained with ``../context/contracts/<pkh>/balance``
 
 Delegates can set an upper limit to their frozen deposits with the
-commands ``tezos-client set deposit limit for <delegate> to
+command ``tezos-client set deposits limit for <delegate> to
 <deposit_limit>``, and unset this limit with the command ``tezos-client
-unset deposit limit for <delegate>``. These commands are implemented by
+unset deposits limit for <delegate>``. These commands are implemented
 using a new manager operation ``Set_deposits_limit``. When emitting such a
 command in cycle ``c``, it affects the active stake for cycles starting
 with ``c + PRESERVED_CYCLES + 1``; the new active stake is
@@ -192,8 +199,21 @@ latest (because up to that cycle the frozen deposit also depends on the
 active stake at cycles before cycle ``c+1``).
 
 The active stake is computed ``PRESERVED_CYCLES`` in advance: at
-the end of cycle ``c`` for cycle ``c + PRESERVED_CYCLES`` (as in Emmy*). Intuitively,
-the active stake is set to 10 times the delegate's chosen frozen
+the end of cycle ``c`` for cycle ``c + 1 + PRESERVED_CYCLES`` (as in Emmy*),
+before updating the delegates' :ref:`activity status<active_delegate_alpha>`.
+
+..
+   This entails that a delegate which was participating until cycle ``c -
+   1`` and is no longer participating in cycle ``c`,
+   will lose its rights from cycle
+   ``c + 2 * PRESERVED_CYCLES + 2`` onwards -- at the end of cycle ``c +
+   PRESERVED_CYCLES``, the rights for cycle ``c + 2 *
+   PRESERVED_CYCLES + 1`` are computed, and only then is the delegate
+   declared passive. Here "participation" means *having baked a final
+   block* or *having a preendorsement or endorsement included in a final
+   block*.
+
+Intuitively, the active stake is set to 10 times the delegate's chosen frozen
 deposit limit, without going beyond its available staking balance,
 nor its maximum staking capacity (determined by its full balance).
 More precisely, the active stake is the minimum between:
@@ -355,6 +375,7 @@ included during that cycle has been ``3,123,456`` slots. Given that this number 
 bigger than the minimum required (``2,867,200 * 2 / 3``), it receives an endorsing
 reward of ``2,867,200 * 0.002857 = 8191.59`` tez for that cycle.
 
+.. _slashing:
 .. _slashing_jakarta:
 
 Slashing
@@ -383,6 +404,7 @@ correct validators have more than two thirds of the total stake, these correct
 validators have sufficient power for agreement to be reached, thus the lack of
 participation of a selfish baker does not have an impact.
 
+.. _cs_constants:
 .. _cs_constants_jakarta:
 
 Consensus related protocol parameters
@@ -420,6 +442,7 @@ Consensus related protocol parameters
      - ``endorsing_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.002857 tez
 
 
+.. _shell_proto_revisit:
 .. _shell_proto_revisit_jakarta:
 
 Shell-protocol interaction revisited
@@ -436,6 +459,7 @@ As in Emmy*, the protocol-specific header contains the fields:
 
 There are two additional fields: ``payload_hash`` and ``payload_round`` which are needed for establishing if a block is :ref:`final<finality_jakarta>`.
 
+.. _fitness:
 .. _fitness_jakarta:
 
 The fitness is given by the tuple ``(version, level, locked_round, - predecessor_round - 1, round)``.

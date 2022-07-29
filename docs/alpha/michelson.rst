@@ -2339,6 +2339,20 @@ Operations on timelock
    ::  chest_key : chest : nat : 'S -> or bytes bool : 'S
 
 
+Events
+~~~~~~
+
+- ``EMIT %tag 'ty``: constructs an operation that will write an event into
+  the transaction receipt after the successful execution of this contract.
+  It accepts as arguments an annotation as a tag to the emitted event and
+  the type of data attachment.
+
+  See :doc:`Event <event>` for more information.
+
+::
+    
+    :: 'ty : 'S -> operation : 'S
+
 
 Removed instructions
 ~~~~~~~~~~~~~~~~~~~~
@@ -2735,12 +2749,13 @@ are capitalized.
 
 All domain specific constants are Micheline constants with specific
 formats. Some have two variants accepted by the data type checker: a
-readable one in a string and an optimized.
+readable one in a string, and an optimized one using a more compact
+encoding.
 
 -  ``mutez`` amounts are written as naturals.
 -  ``timestamp``\ s are written either using ``RFC3339`` notation
    in a string (readable), or as the number of seconds since Epoch
-   in a natural (optimized).
+   (when positive) or before Epoch (when negative) (optimized).
 -  ``contract``\ s, ``address``\ es, ``key``\ s and ``signature``\ s
    are written as strings, in their usual Base58 encoded versions
    (readable), or as their raw bytes (optimized).

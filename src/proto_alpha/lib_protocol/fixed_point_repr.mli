@@ -39,7 +39,7 @@ type integral_tag (* Tag for integral computations *)
     Such numbers represent standard arithmetic, rounding (converting fp
     flavour to integral one) and comparisons (which can work across flavours). *)
 module type Safe = sig
-  type 'a t [@@coq_phantom]
+  type 'a t
 
   type fp = fp_tag t
 
@@ -97,7 +97,7 @@ module type Safe = sig
 end
 
 module type Full = sig
-  type 'a t [@@coq_phantom]
+  type 'a t
 
   include Safe with type 'a t := 'a t
 

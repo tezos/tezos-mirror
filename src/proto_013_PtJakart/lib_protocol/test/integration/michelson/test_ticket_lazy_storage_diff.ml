@@ -46,7 +46,7 @@ let assert_equal_string_list ~loc msg =
 let string_list_of_ex_token_diffs ctxt token_diffs =
   let accum (xs, ctxt)
       (Ticket_token.Ex_token {ticketer; contents_type; contents}, amount) =
-    let* (x, ctxt) =
+    let* x, ctxt =
       wrap
       @@ Script_ir_translator.unparse_comparable_data
            ~loc:()
@@ -67,23 +67,23 @@ let string_list_of_ex_token_diffs ctxt token_diffs =
     in
     return (str :: xs, ctxt)
   in
-  let* (xs, ctxt) = List.fold_left_es accum ([], ctxt) token_diffs in
+  let* xs, ctxt = List.fold_left_es accum ([], ctxt) token_diffs in
   return (List.rev xs, ctxt)
 
 let make_ex_token ctxt ~ticketer ~type_exp ~content_exp =
-  let* (Script_ir_translator.Ex_comparable_ty contents_type, ctxt) =
+  let* Script_ir_translator.Ex_comparable_ty contents_type, ctxt =
     let node = Micheline.root @@ Expr.from_string type_exp in
     wrap @@ Lwt.return @@ Script_ir_translator.parse_comparable_ty ctxt node
   in
   let* ticketer = wrap @@ Lwt.return @@ Contract.of_b58check ticketer in
-  let* (contents, ctxt) =
+  let* contents, ctxt =
     let node = Micheline.root @@ Expr.from_string content_exp in
     wrap @@ Script_ir_translator.parse_comparable_data ctxt contents_type node
   in
   return (Ticket_token.Ex_token {ticketer; contents_type; contents}, ctxt)
 
 let assert_equal_balances ~loc ctxt given expected =
-  let* (ctxt, tbs1) =
+  let* ctxt, tbs1 =
     List.fold_left_map_es
       (fun ctxt ((ticketer, content), delta) ->
         make_ex_token
@@ -95,8 +95,8 @@ let assert_equal_balances ~loc ctxt given expected =
       ctxt
       expected
   in
-  let* (tbs1, ctxt) = string_list_of_ex_token_diffs ctxt tbs1 in
-  let* (tbs2, _ctxt) = string_list_of_ex_token_diffs ctxt given in
+  let* tbs1, ctxt = string_list_of_ex_token_diffs ctxt tbs1 in
+  let* tbs2, _ctxt = string_list_of_ex_token_diffs ctxt given in
   assert_equal_string_list
     ~loc
     "Compare token balances"
@@ -108,7 +108,7 @@ let wrap_result res = wrap (Lwt.return res)
 let updates_of_key_values ctxt key_values =
   List.fold_right_es
     (fun (key, value) (kvs, ctxt) ->
-      let* (key_hash, ctxt) =
+      let* key_hash, ctxt =
         wrap
           (Script_ir_translator.hash_comparable_data
              ctxt
@@ -133,9 +133,9 @@ let make_alloc big_map_id alloc updates =
     (Update {init = Lazy_storage.Alloc alloc; updates})
 
 let init () =
-  let* (block, contracts) = Context.init 1 in
+  let* block, contracts = Context.init 1 in
   let source = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
-  let* (operation, originated) =
+  let* operation, originated =
     Op.contract_origination (B block) source ~script:Op.dummy_script
   in
   let* block = Block.bake ~operation block in
@@ -143,15 +143,15 @@ let init () =
   return (originated, Incremental.alpha_ctxt inc)
 
 let setup ctxt contract ~key_type ~value_type entries =
-  let* (ctxt, big_map_id) = wrap @@ Big_map.fresh ~temporary:false ctxt in
+  let* ctxt, big_map_id = wrap @@ Big_map.fresh ~temporary:false ctxt in
   let key_type = Expr.from_string key_type in
   let value_type = Expr.from_string value_type in
-  let* (updates, ctxt) = updates_of_key_values ctxt entries in
+  let* updates, ctxt = updates_of_key_values ctxt entries in
   let alloc = make_alloc big_map_id Big_map.{key_type; value_type} updates in
   return (alloc, big_map_id, contract, ctxt)
 
 let new_big_map ctxt contract ~key_type ~value_type entries =
-  let* (alloc, big_map_id, contract, ctxt) =
+  let* alloc, big_map_id, contract, ctxt =
     setup ctxt contract ~key_type ~value_type
     @@ List.map (fun (k, v) -> (k, Some v)) entries
   in
@@ -162,7 +162,7 @@ let new_big_map ctxt contract ~key_type ~value_type entries =
   return (big_map_id, ctxt)
 
 let alloc_diff ctxt contract ~key_type ~value_type entries =
-  let* (allocations, _, _, ctxt) =
+  let* allocations, _, _, ctxt =
     setup
       ctxt
       contract
@@ -173,17 +173,17 @@ let alloc_diff ctxt contract ~key_type ~value_type entries =
   return (allocations, ctxt)
 
 let remove_diff ctxt contract ~key_type ~value_type ~existing_entries =
-  let* (big_map_id, ctxt) =
+  let* big_map_id, ctxt =
     new_big_map ctxt contract ~key_type ~value_type existing_entries
   in
   return (Lazy_storage.make Lazy_storage.Kind.Big_map big_map_id Remove, ctxt)
 
 let copy_diff ctxt contract ~key_type ~value_type ~existing_entries ~updates =
-  let* (big_map_id, ctxt) =
+  let* big_map_id, ctxt =
     new_big_map ctxt contract ~key_type ~value_type existing_entries
   in
-  let* (updates, ctxt) = updates_of_key_values ctxt updates in
-  let* (ctxt, new_big_map_id) = wrap @@ Big_map.fresh ctxt ~temporary:false in
+  let* updates, ctxt = updates_of_key_values ctxt updates in
+  let* ctxt, new_big_map_id = wrap @@ Big_map.fresh ctxt ~temporary:false in
   return
     ( Lazy_storage.make
         Lazy_storage.Kind.Big_map
@@ -193,10 +193,10 @@ let copy_diff ctxt contract ~key_type ~value_type ~existing_entries ~updates =
 
 let existing_diff ctxt contract ~key_type ~value_type ~existing_entries ~updates
     =
-  let* (big_map_id, ctxt) =
+  let* big_map_id, ctxt =
     new_big_map ctxt contract ~key_type ~value_type existing_entries
   in
-  let* (updates, ctxt) = updates_of_key_values ctxt updates in
+  let* updates, ctxt = updates_of_key_values ctxt updates in
   return
     ( Lazy_storage.make
         Lazy_storage.Kind.Big_map
@@ -207,11 +207,11 @@ let existing_diff ctxt contract ~key_type ~value_type ~existing_entries ~updates
 (** Test that no ticket-tokens are extracted from a diff for allocating an empty
     big-map. *)
 let test_allocate_new_empty () =
-  let* (contract, ctxt) = init () in
-  let* (diff, ctxt) =
+  let* contract, ctxt = init () in
+  let* diff, ctxt =
     alloc_diff ctxt contract ~key_type:"int" ~value_type:"ticket string" []
   in
-  let* (diff, ctxt) =
+  let* diff, ctxt =
     wrap
       (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
   in
@@ -220,8 +220,8 @@ let test_allocate_new_empty () =
 (** Test that no ticket-tokens are extracted from a lazy-diff of a big-map
     that does not contain tickets. *)
 let test_allocate_new_no_tickets () =
-  let* (contract, ctxt) = init () in
-  let* (diff, ctxt) =
+  let* contract, ctxt = init () in
+  let* diff, ctxt =
     alloc_diff
       ctxt
       contract
@@ -229,7 +229,7 @@ let test_allocate_new_no_tickets () =
       ~value_type:"string"
       [(1, {|"A"|}); (2, {|"B"|}); (3, {|"C"|})]
   in
-  let* (diff, ctxt) =
+  let* diff, ctxt =
     wrap
       (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
   in
@@ -238,8 +238,8 @@ let test_allocate_new_no_tickets () =
 (** Test that ticket-tokens can be extracted from a lazy-diff for allocating a
     new big-map. *)
 let test_allocate_new () =
-  let* (contract, ctxt) = init () in
-  let* (diff, ctxt) =
+  let* contract, ctxt = init () in
+  let* diff, ctxt =
     alloc_diff
       ctxt
       contract
@@ -251,7 +251,7 @@ let test_allocate_new () =
         (3, {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 3|});
       ]
   in
-  let* (diff, ctxt) =
+  let* diff, ctxt =
     wrap
       (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
   in
@@ -268,8 +268,8 @@ let test_allocate_new () =
 (** Test that ticket-tokens with negative balances are extracted from a
     lazy-diff that removes a big-map. *)
 let test_remove_big_map () =
-  let* (contract, ctxt) = init () in
-  let* (diff, ctxt) =
+  let* contract, ctxt = init () in
+  let* diff, ctxt =
     remove_diff
       ctxt
       contract
@@ -282,7 +282,7 @@ let test_remove_big_map () =
           (3, {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 3|});
         ]
   in
-  let* (diff, ctxt) =
+  let* diff, ctxt =
     wrap
       (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
   in
@@ -299,8 +299,8 @@ let test_remove_big_map () =
 (** Test that there are no ticket-token balance deltas extracted from a
     lazy-diff that applies no updates. *)
 let test_no_updates_to_existing_big_map () =
-  let* (contract, ctxt) = init () in
-  let* (diff, ctxt) =
+  let* contract, ctxt = init () in
+  let* diff, ctxt =
     existing_diff
       ctxt
       contract
@@ -314,7 +314,7 @@ let test_no_updates_to_existing_big_map () =
         ]
       ~updates:[]
   in
-  let* (diff, ctxt) =
+  let* diff, ctxt =
     wrap
       (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
   in
@@ -324,8 +324,8 @@ let test_no_updates_to_existing_big_map () =
     extracted from a lazy-diff that modifies an existing big-map.
  *)
 let test_update_existing_big_map () =
-  let* (contract, ctxt) = init () in
-  let* (diff, ctxt) =
+  let* contract, ctxt = init () in
+  let* diff, ctxt =
     existing_diff
       ctxt
       contract
@@ -347,7 +347,7 @@ let test_update_existing_big_map () =
           (4, Some {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "pink" 5|});
         ]
   in
-  let* (diff, ctxt) =
+  let* diff, ctxt =
     wrap
       (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
   in
@@ -367,8 +367,8 @@ let test_update_existing_big_map () =
     multiple updates to the same key.
  *)
 let test_update_same_key_multiple_times_existing_big_map () =
-  let* (contract, ctxt) = init () in
-  let* (diff, ctxt) =
+  let* contract, ctxt = init () in
+  let* diff, ctxt =
     existing_diff
       ctxt
       contract
@@ -384,7 +384,7 @@ let test_update_same_key_multiple_times_existing_big_map () =
           (1, Some {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 1|});
         ]
   in
-  let* (diff, ctxt) =
+  let* diff, ctxt =
     wrap
       (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
   in
@@ -404,8 +404,8 @@ let test_update_same_key_multiple_times_existing_big_map () =
     multiple removals of the same item.
  *)
 let test_remove_same_key_multiple_times_existing_big_map () =
-  let* (contract, ctxt) = init () in
-  let* (diff, ctxt) =
+  let* contract, ctxt = init () in
+  let* diff, ctxt =
     existing_diff
       ctxt
       contract
@@ -421,7 +421,7 @@ let test_remove_same_key_multiple_times_existing_big_map () =
           (1, None);
         ]
   in
-  let* (diff, ctxt) =
+  let* diff, ctxt =
     wrap
       (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
   in
@@ -436,8 +436,8 @@ let test_remove_same_key_multiple_times_existing_big_map () =
     multiple additions and removals of the same item.
  *)
 let test_update_and_remove_same_key_multiple_times_existing_big_map () =
-  let* (contract, ctxt) = init () in
-  let* (diff, ctxt) =
+  let* contract, ctxt = init () in
+  let* diff, ctxt =
     existing_diff
       ctxt
       contract
@@ -457,7 +457,7 @@ let test_update_and_remove_same_key_multiple_times_existing_big_map () =
           (1, Some {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 1|});
         ]
   in
-  let* (diff, ctxt) =
+  let* diff, ctxt =
     wrap
       (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
   in
@@ -475,8 +475,8 @@ let test_update_and_remove_same_key_multiple_times_existing_big_map () =
 (** Test that the extracted ticket-tokens from a lazy diff for copying a big-map
     reflects the tokens of the source as well as the updates. *)
 let test_copy_big_map () =
-  let* (contract, ctxt) = init () in
-  let* (diff, ctxt) =
+  let* contract, ctxt = init () in
+  let* diff, ctxt =
     copy_diff
       ctxt
       contract
@@ -490,7 +490,7 @@ let test_copy_big_map () =
         ]
       ~updates:[]
   in
-  let* (diff, ctxt) =
+  let* diff, ctxt =
     wrap
       (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
   in
@@ -507,8 +507,8 @@ let test_copy_big_map () =
 (** Test that the extracted ticket-tokens from a lazy diff for copying a big-map
     reflects the tokens of the source as well as the updates. *)
 let test_copy_big_map_with_updates () =
-  let* (contract, ctxt) = init () in
-  let* (diff, ctxt) =
+  let* contract, ctxt = init () in
+  let* diff, ctxt =
     copy_diff
       ctxt
       contract
@@ -530,7 +530,7 @@ let test_copy_big_map_with_updates () =
           (4, Some {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "pink" 5|});
         ]
   in
-  let* (diff, ctxt) =
+  let* diff, ctxt =
     wrap
       (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
   in
@@ -552,8 +552,8 @@ let test_copy_big_map_with_updates () =
     with multiple updates to the same key reflects the tokens of the source as
     well as the updates. *)
 let test_copy_big_map_with_updates_to_same_key () =
-  let* (contract, ctxt) = init () in
-  let* (diff, ctxt) =
+  let* contract, ctxt = init () in
+  let* diff, ctxt =
     copy_diff
       ctxt
       contract
@@ -571,7 +571,7 @@ let test_copy_big_map_with_updates_to_same_key () =
           (1, None);
         ]
   in
-  let* (diff, ctxt) =
+  let* diff, ctxt =
     wrap
       (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff ctxt [diff])
   in
@@ -592,8 +592,8 @@ let test_copy_big_map_with_updates_to_same_key () =
 
 (** Test combinations of lazy-diffs. *)
 let test_mix_lazy_diffs () =
-  let* (contract, ctxt) = init () in
-  let* (diff_copy, ctxt) =
+  let* contract, ctxt = init () in
+  let* diff_copy, ctxt =
     copy_diff
       ctxt
       contract
@@ -609,7 +609,7 @@ let test_mix_lazy_diffs () =
           (2, Some {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 2|});
         ]
   in
-  let* (diff_existing, ctxt) =
+  let* diff_existing, ctxt =
     existing_diff
       ctxt
       contract
@@ -625,7 +625,7 @@ let test_mix_lazy_diffs () =
           (3, Some {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 3|});
         ]
   in
-  let* (diff_remove, ctxt) =
+  let* diff_remove, ctxt =
     remove_diff
       ctxt
       contract
@@ -637,7 +637,7 @@ let test_mix_lazy_diffs () =
           (2, {|Pair "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "black" 1|});
         ]
   in
-  let* (diff, ctxt) =
+  let* diff, ctxt =
     wrap
       (Ticket_lazy_storage_diff.ticket_diffs_of_lazy_storage_diff
          ctxt

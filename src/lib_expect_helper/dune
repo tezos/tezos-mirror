@@ -1,0 +1,7 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_expect_helper)
+ (public_name tezos-expect-helper)
+ (instrumentation (backend bisect_ppx)))

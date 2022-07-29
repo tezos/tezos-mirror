@@ -35,16 +35,13 @@ module NMap = Stats.Finbij.Make (Free_variable)
 type problem =
   | Non_degenerate of {
       lines : constrnt list;
-      input : Scikit.Matrix.t;
-      output : Scikit.Matrix.t;
+      input : Matrix.t;
+      output : Matrix.t;
       nmap : NMap.t;
     }
-  | Degenerate of {predicted : Scikit.Matrix.t; measured : Scikit.Matrix.t}
+  | Degenerate of {predicted : Matrix.t; measured : Matrix.t}
 
-type solution = {
-  mapping : (Free_variable.t * float) list;
-  weights : Scikit.Matrix.t;
-}
+type solution = {mapping : (Free_variable.t * float) list; weights : Matrix.t}
 
 type solver =
   | Ridge of {alpha : float; normalize : bool}
@@ -72,8 +69,8 @@ let establish_bijection (lines : constrnt list) : NMap.t =
 let line_list_to_ols (lines : constrnt list) =
   let nmap = establish_bijection lines in
   let lcount = List.length lines in
-  let inputs = Scikit.Matrix.create ~lines:lcount ~cols:(NMap.support nmap) in
-  let outputs = Scikit.Matrix.create ~lines:lcount ~cols:1 in
+  let inputs = Matrix.create ~lines:lcount ~cols:(NMap.support nmap) in
+  let outputs = Matrix.create ~lines:lcount ~cols:1 in
   (* initialize inputs *)
   List.iteri
     (fun i line ->
@@ -82,9 +79,9 @@ let line_list_to_ols (lines : constrnt list) =
           Free_variable.Sparse_vec.iter
             (fun variable multiplicity ->
               let dim = NMap.idx_exn nmap variable in
-              Scikit.Matrix.set inputs i dim multiplicity)
+              Matrix.set inputs i dim multiplicity)
             affine.linear_comb ;
-          Scikit.Matrix.set outputs i 0 (qty -. affine.const) ;
+          Matrix.set outputs i 0 (qty -. affine.const) ;
           Tezos_stdlib_unix.Utils.display_progress (fun m ->
               m "Initializing matrices %d/%d%!" (i + 1) lcount))
     lines ;
@@ -120,13 +117,11 @@ let pp_error_statistics fmtr err_stat =
     err_stat.underestimated_measured
 
 let column_to_floatarray column =
-  let open Scikit in
   assert (Matrix.dim2 column = 1) ;
   let rows = Matrix.dim1 column in
   Array.init rows (fun i -> Matrix.get column i 0)
 
 let compute_error_statistics ~predicted ~measured =
-  let open Scikit in
   assert (Matrix.shape predicted = Matrix.shape measured) ;
   assert (Matrix.dim2 predicted = 1) ;
   let predicted = column_to_floatarray predicted in
@@ -194,23 +189,23 @@ let make_problem_from_workloads :
         Free_variable.Sparse_vec.is_empty affine.linear_comb)
       lines
   then
-    let (predicted, measured) =
+    let predicted, measured =
       List.map (fun (Full (affine, Quantity q)) -> (affine.const, q)) lines
       |> List.split
     in
     let measured =
       let measured = Array.of_list measured in
-      Scikit.Matrix.init ~lines:(Array.length measured) ~cols:1 ~f:(fun l _c ->
+      Matrix.init ~lines:(Array.length measured) ~cols:1 ~f:(fun l _c ->
           measured.(l))
     in
     let predicted =
       let predicted = Array.of_list predicted in
-      Scikit.Matrix.init ~lines:(Array.length predicted) ~cols:1 ~f:(fun l _c ->
+      Matrix.init ~lines:(Array.length predicted) ~cols:1 ~f:(fun l _c ->
           predicted.(l))
     in
     Degenerate {predicted; measured}
   else
-    let (input, output, nmap) = line_list_to_ols lines in
+    let input, output, nmap = line_list_to_ols lines in
     Non_degenerate {lines; input; output; nmap}
 
 let make_problem :
@@ -237,28 +232,28 @@ let make_problem :
 
 let fv_to_string fv = Format.asprintf "%a" Free_variable.pp fv
 
-let to_list_of_rows (m : Scikit.Matrix.t) : float list list =
-  let (lines, cols) = Scikit.Matrix.shape m in
+let to_list_of_rows (m : Matrix.t) : float list list =
+  let lines, cols = Matrix.shape m in
   let init n f =
     List.init ~when_negative_length:() n f
     |> (* lines/column count cannot be negative *)
     WithExceptions.Result.get_ok ~loc:__LOC__
   in
-  init lines (fun l -> init cols (fun c -> Scikit.Matrix.get m l c))
+  init lines (fun l -> init cols (fun c -> Matrix.get m l c))
 
-let of_list_of_rows (m : float list list) : Scikit.Matrix.t =
+let of_list_of_rows (m : float list list) : Matrix.t =
   let lines = List.length m in
   let cols =
     List.length (WithExceptions.Option.get ~loc:__LOC__ @@ List.hd m)
   in
-  let mat = Scikit.Matrix.create ~lines ~cols in
+  let mat = Matrix.create ~lines ~cols in
   List.iteri
-    (fun l row -> List.iteri (fun c elt -> Scikit.Matrix.set mat l c elt) row)
+    (fun l row -> List.iteri (fun c elt -> Matrix.set mat l c elt) row)
     m ;
   mat
 
-let model_matrix_to_csv (m : Scikit.Matrix.t) (nmap : NMap.t) : Csv.csv =
-  let (_, cols) = Scikit.Matrix.shape m in
+let model_matrix_to_csv (m : Matrix.t) (nmap : NMap.t) : Csv.csv =
+  let _, cols = Matrix.shape m in
   let names =
     List.init ~when_negative_length:() cols (fun i ->
         fv_to_string (NMap.nth_exn nmap i))
@@ -269,7 +264,7 @@ let model_matrix_to_csv (m : Scikit.Matrix.t) (nmap : NMap.t) : Csv.csv =
   let rows = List.map (List.map string_of_float) rows in
   names :: rows
 
-let timing_matrix_to_csv colname (m : Scikit.Matrix.t) : Csv.csv =
+let timing_matrix_to_csv colname (m : Matrix.t) : Csv.csv =
   let rows = to_list_of_rows m in
   let rows = List.map (List.map string_of_float) rows in
   [colname] :: rows
@@ -299,8 +294,7 @@ let solution_to_csv : solution -> Csv.csv option =
 let solve_problem : problem -> solver -> solution =
  fun problem solver ->
   match problem with
-  | Degenerate _ ->
-      {mapping = []; weights = Scikit.Matrix.create ~lines:0 ~cols:0}
+  | Degenerate _ -> {mapping = []; weights = Matrix.create ~lines:0 ~cols:0}
   | Non_degenerate {input; output; nmap; _} ->
       let weights =
         match solver with
@@ -316,9 +310,9 @@ let solve_problem : problem -> solver -> solution =
               ()
         | NNLS -> Scikit.LinearModel.nnls ~input ~output
       in
-      let lines = Scikit.Matrix.dim1 weights in
+      let lines = Matrix.dim1 weights in
       if lines <> NMap.support nmap then
-        let cols = Scikit.Matrix.dim2 weights in
+        let cols = Matrix.dim2 weights in
         let dims = Format.asprintf "%d x %d" lines cols in
         let err =
           Format.asprintf
@@ -331,7 +325,7 @@ let solve_problem : problem -> solver -> solution =
         let mapping =
           NMap.fold
             (fun variable dim acc ->
-              let param = Scikit.Matrix.get weights dim 0 in
+              let param = Matrix.get weights dim 0 in
               (variable, param) :: acc)
             nmap
             []

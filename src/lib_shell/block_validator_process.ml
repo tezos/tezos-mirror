@@ -35,6 +35,7 @@ type validator_kind =
   | Internal : Store.Chain.chain_store -> validator_kind
   | External : {
       genesis : Genesis.t;
+      readonly : bool;
       data_dir : string;
       context_root : string;
       protocol_root : string;
@@ -50,6 +51,7 @@ module type S = sig
   val close : t -> unit Lwt.t
 
   val apply_block :
+    simulate:bool ->
     t ->
     Store.chain_store ->
     predecessor:Store.Block.t ->
@@ -85,7 +87,8 @@ module type S = sig
   val commit_genesis : t -> chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t
 
   (** [init_test_chain] must only be called on a forking block. *)
-  val init_test_chain : t -> Store.Block.t -> Block_header.t tzresult Lwt.t
+  val init_test_chain :
+    t -> Chain_id.t -> Store.Block.t -> Block_header.t tzresult Lwt.t
 
   val reconfigure_event_logging :
     t -> Internal_event_unix.Configuration.t -> unit tzresult Lwt.t
@@ -151,8 +154,10 @@ module Internal_validator_process = struct
        validator process. For this reason, we maintain the collection
        of caches passed from one block to the next one here.
     *)
-    mutable cache : Environment_context.Context.block_cache option;
-    mutable preapply_result : (Block_validation.apply_result * Context.t) option;
+    mutable cache : Tezos_protocol_environment.Context.block_cache option;
+    mutable preapply_result :
+      (Block_validation.apply_result * Tezos_protocol_environment.Context.t)
+      option;
   }
 
   let init
@@ -192,7 +197,7 @@ module Internal_validator_process = struct
     let context_hash = predecessor_block_header.shell.context in
     let context_index = get_context_index chain_store in
     let* predecessor_context =
-      let*! o = Context.checkout context_index context_hash in
+      let*! o = Context_ops.checkout context_index context_hash in
       match o with
       | None ->
           tzfail
@@ -218,8 +223,8 @@ module Internal_validator_process = struct
         operation_metadata_size_limit;
       }
 
-  let apply_block validator chain_store ~predecessor ~max_operations_ttl
-      block_header operations =
+  let apply_block ~simulate validator chain_store ~predecessor
+      ~max_operations_ttl block_header operations =
     let open Lwt_result_syntax in
     let* env =
       make_apply_environment
@@ -239,6 +244,7 @@ module Internal_validator_process = struct
     in
     let* {result; cache} =
       Block_validation.apply
+        ~simulate
         ?cached_result:validator.preapply_result
         env
         block_header
@@ -264,7 +270,7 @@ module Internal_validator_process = struct
     in
     let context_hash = predecessor_shell_header.Block_header.context in
     let* predecessor_context =
-      let*! o = Context.checkout context_index context_hash in
+      let*! o = Context_ops.checkout context_index context_hash in
       match o with
       | None ->
           tzfail
@@ -278,7 +284,7 @@ module Internal_validator_process = struct
     let operation_metadata_size_limit =
       validator.operation_metadata_size_limit
     in
-    let* (result, apply_result) =
+    let* result, apply_result =
       Block_validation.preapply
         ~chain_id
         ~user_activated_upgrades
@@ -309,7 +315,7 @@ module Internal_validator_process = struct
     let predecessor_block_header = Store.Block.header predecessor in
     let context_hash = predecessor_block_header.Block_header.shell.context in
     let* predecessor_context =
-      let*! o = Context.checkout context_index context_hash in
+      let*! o = Context_ops.checkout context_index context_hash in
       match o with
       | None ->
           tzfail
@@ -335,17 +341,17 @@ module Internal_validator_process = struct
   let commit_genesis validator ~chain_id =
     let context_index = get_context_index validator.chain_store in
     let genesis = Store.Chain.genesis validator.chain_store in
-    Context.commit_genesis
+    Context_ops.commit_genesis
       context_index
       ~chain_id
       ~time:genesis.time
       ~protocol:genesis.protocol
 
-  let init_test_chain validator forking_block =
+  let init_test_chain validator chain_id forking_block =
     let open Lwt_result_syntax in
     let forked_header = Store.Block.header forking_block in
     let* context = Store.Block.context validator.chain_store forking_block in
-    Block_validation.init_test_chain context forked_header
+    Block_validation.init_test_chain chain_id context forked_header
 
   let reconfigure_event_logging _ _ = Lwt_result_syntax.return_unit
 end
@@ -500,8 +506,9 @@ module External_validator_process = struct
   type process_status = Uninitialized | Running of validator_process | Exiting
 
   type t = {
-    data_dir : string;
     genesis : Genesis.t;
+    readonly : bool;
+    data_dir : string;
     context_root : string;
     protocol_root : string;
     user_activated_upgrades : User_activated.upgrades;
@@ -533,9 +540,12 @@ module External_validator_process = struct
     let canceler = Lwt_canceler.create () in
     (* We assume that there is only one validation process per socket *)
     let socket_dir = get_temporary_socket_dir () in
+    let args =
+      ["tezos-validator"; "--socket-dir"; socket_dir]
+      @ match vp.readonly with true -> ["--readonly"] | false -> []
+    in
     let process =
-      Lwt_process.open_process_none
-        (vp.process_path, [|"tezos-validator"; "--socket-dir"; socket_dir|])
+      Lwt_process.open_process_none (vp.process_path, Array.of_list args)
     in
     let socket_path =
       External_validation.socket_path ~socket_dir ~pid:process#pid
@@ -561,7 +571,7 @@ module External_validator_process = struct
       Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
           clean_process_fd socket_path)
     in
-    let* (process_socket, _) =
+    let* process_socket, _ =
       Lwt.finalize
         (fun () ->
           let* process_socket =
@@ -637,7 +647,7 @@ module External_validator_process = struct
 
   let send_request vp request result_encoding =
     let open Lwt_result_syntax in
-    let* (process, process_stdin, process_stdout) =
+    let* process, process_stdin, process_stdout =
       match vp.validator_process with
       | Running
           {
@@ -710,13 +720,14 @@ module External_validator_process = struct
          operation_metadata_size_limit;
          _;
        } :
-        validator_environment) ~genesis ~data_dir ~context_root ~protocol_root
-      ~process_path ~sandbox_parameters =
+        validator_environment) ~genesis ~data_dir ~readonly ~context_root
+      ~protocol_root ~process_path ~sandbox_parameters =
     let open Lwt_result_syntax in
     let*! () = Events.(emit init ()) in
     let validator =
       {
         data_dir;
+        readonly;
         genesis;
         context_root;
         protocol_root;
@@ -734,8 +745,8 @@ module External_validator_process = struct
     in
     return validator
 
-  let apply_block validator chain_store ~predecessor ~max_operations_ttl
-      block_header operations =
+  let apply_block ~simulate validator chain_store ~predecessor
+      ~max_operations_ttl block_header operations =
     let chain_id = Store.Chain.chain_id chain_store in
     let predecessor_block_header = Store.Block.header predecessor in
     let predecessor_block_metadata_hash =
@@ -754,6 +765,7 @@ module External_validator_process = struct
           predecessor_ops_metadata_hash;
           operations;
           max_operations_ttl;
+          simulate;
         }
     in
     send_request validator request Block_validation.result_encoding
@@ -801,11 +813,12 @@ module External_validator_process = struct
     let request = External_validation.Commit_genesis {chain_id} in
     send_request validator request Context_hash.encoding
 
-  let init_test_chain validator forking_block =
+  let init_test_chain validator chain_id forking_block =
     let forked_header = Store.Block.header forking_block in
     let context_hash = forked_header.shell.context in
     let request =
-      External_validation.Fork_test_chain {context_hash; forked_header}
+      External_validation.Fork_test_chain
+        {chain_id; context_hash; forked_header}
     in
     send_request validator request Block_header.encoding
 
@@ -879,6 +892,7 @@ let init validator_environment validator_kind =
   | External
       {
         genesis;
+        readonly;
         data_dir;
         context_root;
         protocol_root;
@@ -890,6 +904,7 @@ let init validator_environment validator_kind =
           validator_environment
           ~genesis
           ~data_dir
+          ~readonly
           ~context_root
           ~protocol_root
           ~process_path
@@ -906,12 +921,13 @@ let reconfigure_event_logging (E {validator_process = (module VP); validator})
     config =
   VP.reconfigure_event_logging validator config
 
-let apply_block (E {validator_process = (module VP); validator}) chain_store
-    ~predecessor header operations =
+let apply_block ?(simulate = false)
+    (E {validator_process = (module VP); validator}) chain_store ~predecessor
+    header operations =
   let open Lwt_result_syntax in
   let* metadata = Store.Block.get_block_metadata chain_store predecessor in
   let max_operations_ttl = Store.Block.max_operations_ttl metadata in
-  let* (live_blocks, live_operations) =
+  let* live_blocks, live_operations =
     Store.Chain.compute_live_blocks chain_store ~block:predecessor
   in
   let block_hash = Block_header.hash header in
@@ -923,6 +939,7 @@ let apply_block (E {validator_process = (module VP); validator}) chain_store
       operations
   in
   VP.apply_block
+    ~simulate
     validator
     chain_store
     ~predecessor
@@ -937,15 +954,15 @@ let precheck_block (E {validator_process = (module VP); validator}) chain_store
 let commit_genesis (E {validator_process = (module VP); validator}) ~chain_id =
   VP.commit_genesis validator ~chain_id
 
-let init_test_chain (E {validator_process = (module VP); validator})
+let init_test_chain (E {validator_process = (module VP); validator}) chain_id
     forked_block =
-  VP.init_test_chain validator forked_block
+  VP.init_test_chain validator chain_id forked_block
 
 let preapply_block (E {validator_process = (module VP); validator} : t)
     chain_store ~predecessor ~protocol_data ~timestamp operations =
   let open Lwt_result_syntax in
   let chain_id = Store.Chain.chain_id chain_store in
-  let* (live_blocks, live_operations) =
+  let* live_blocks, live_operations =
     Store.Chain.compute_live_blocks chain_store ~block:predecessor
   in
   let predecessor_shell_header = Store.Block.shell_header predecessor in

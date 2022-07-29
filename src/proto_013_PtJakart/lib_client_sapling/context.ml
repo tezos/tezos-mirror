@@ -280,7 +280,7 @@ module Contract_state = struct
     let vks =
       Accounts.fold (fun account acc -> Account.(account.vk) :: acc) accounts []
     in
-    let (size, _) = Storage.size storage in
+    let size, _ = Storage.size storage in
     let rec aux pos accounts =
       if pos < size then
         (* try to decrypt each inputs with all vks *)
@@ -300,7 +300,7 @@ module Contract_state = struct
         | _ -> assert false (* got more than one decrypting key *)
       else accounts
     in
-    let (current_size, _) = Storage.size state.storage in
+    let current_size, _ = Storage.size state.storage in
     let accounts = aux current_size accounts in
     {accounts; storage}
 
@@ -392,7 +392,7 @@ module Client_state = struct
   let sync_and_scan cctxt contract =
     load cctxt >>=? fun state ->
     find cctxt contract state >>=? fun contract_state ->
-    let (cm_pos, nf_pos) = Storage.size contract_state.storage in
+    let cm_pos, nf_pos = Storage.size contract_state.storage in
     get_diff cctxt contract cm_pos nf_pos >>=? fun diff ->
     let contract_state = Contract_state.update_storage contract_state diff in
     let state = Map.add contract contract_state state in

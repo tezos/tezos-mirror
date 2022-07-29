@@ -42,7 +42,7 @@ struct
   (** Tests that a signature of [s] by a generated key and [X.sign] is
       accepted by [X.check] with the same key.  *)
   let test_prop_sign_check (s : string) =
-    let (_, pk, sk) = X.generate_key () in
+    let _, pk, sk = X.generate_key () in
     let data = Bytes.of_string s in
     let signed = X.sign sk data in
     X.check pk signed data
@@ -67,9 +67,9 @@ struct
       aggregation of all these signatures obtained using
       [X.aggregate_signature_opt] is accepted by [X.aggregate_check]. *)
   let test_prop_sign_check ((seed1, msg1), (seed2, msg2), (seed3, msg3)) =
-    let (_, pk1, sk1) = X.generate_key ~seed:seed1 () in
-    let (_, pk2, sk2) = X.generate_key ~seed:seed2 () in
-    let (_, pk3, sk3) = X.generate_key ~seed:seed3 () in
+    let _, pk1, sk1 = X.generate_key ~seed:seed1 () in
+    let _, pk2, sk2 = X.generate_key ~seed:seed2 () in
+    let _, pk3, sk3 = X.generate_key ~seed:seed3 () in
     let signed1 = X.sign sk1 msg1 in
     let signed2 = X.sign sk2 msg2 in
     let signed3 = X.sign sk3 msg3 in

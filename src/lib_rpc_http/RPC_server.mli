@@ -36,6 +36,7 @@ val launch :
   ?cors:cors ->
   ?agent:string ->
   ?acl:Resto_acl.Acl.t ->
+  ?middleware:Resto_cohttp_server.Server.middleware ->
   media_types:Media_type.t list ->
   Conduit_lwt_unix.server ->
   unit RPC_directory.t ->

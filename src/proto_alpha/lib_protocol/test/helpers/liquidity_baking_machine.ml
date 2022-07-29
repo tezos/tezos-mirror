@@ -119,14 +119,10 @@ let far_future = Script_timestamp.of_zint (Z.of_int 42_000)
 (* --------------------------------------------------------------------------- *)
 
 (** {1 Miscellaneous Helpers} *)
-
-let is_implicit_exn account =
-  match Contract.is_implicit account with Some k -> k | _ -> assert false
-
 module List_helpers = struct
   let rec zip l r =
     match (l, r) with
-    | (xl :: rstl, xr :: rstr) -> (xl, xr) :: zip rstl rstr
+    | xl :: rstl, xr :: rstr -> (xl, xr) :: zip rstl rstr
     | _ -> []
 
   let nth_exn l n =
@@ -480,7 +476,7 @@ module Machine = struct
       get_cpmm_total_liquidity env state >>= fun lqtTotal ->
       let lqtTotal = Z.of_int lqtTotal in
       let amount = Tez.of_mutez_exn xtz_deposit in
-      let (_, tokens_deposited) =
+      let _, tokens_deposited =
         Cpmm_logic.Simulate_raw.addLiquidity
           ~tokenPool
           ~xtzPool
@@ -764,7 +760,7 @@ module ConcreteBaseMachine :
 
   let bake ~invariant ~baker ops env blk =
     Incremental.begin_construction
-      ~policy:(Block.By_account (is_implicit_exn baker))
+      ~policy:(Block.By_account (Context.Contract.pkh baker))
       blk
     >>= fun incr ->
     fold_m Incremental.add_operation incr ops >>= fun incr ->
@@ -858,7 +854,7 @@ module ConcreteBaseMachine :
 
   let init ~invariant ?subsidy accounts_balances =
     let liquidity_baking_subsidy = Option.map Tez.of_mutez_exn subsidy in
-    let (n, initial_balances) = initial_xtz_repartition accounts_balances in
+    let n, initial_balances = initial_xtz_repartition accounts_balances in
     Context.init_n
       n
       ~consensus_threshold:0
@@ -873,7 +869,7 @@ module ConcreteBaseMachine :
       ?liquidity_baking_subsidy
       ()
     >>= function
-    | (blk, holder :: accounts) ->
+    | blk, holder :: accounts ->
         let ctxt = Context.B blk in
         Context.get_liquidity_baking_cpmm_address ctxt >>= fun cpmm_contract ->
         Context.Contract.storage ctxt cpmm_contract >>= fun storage ->
@@ -893,10 +889,10 @@ module ConcreteBaseMachine :
         Context.get_liquidity_baking_subsidy (B blk) >>=? fun subsidy ->
         let env =
           {
-            cpmm_contract;
-            tzbtc_contract;
+            cpmm_contract = Contract.Originated cpmm_contract;
+            tzbtc_contract = Contract.Originated tzbtc_contract;
             tzbtc_admin;
-            liquidity_contract;
+            liquidity_contract = Contract.Originated liquidity_contract;
             liquidity_admin;
             implicit_accounts = accounts;
             holder;
@@ -1059,13 +1055,13 @@ module AbstractMachine = struct
         Z.of_int @@ get_tzbtc_balance env.cpmm_contract env state
       in
       let tokensSold = Z.of_int tzbtc in
-      let (xtz_bought, xtz_net_bought) =
+      let xtz_bought, xtz_net_bought =
         Cpmm_logic.Simulate_raw.tokenToXtz ~xtzPool ~tokenPool ~tokensSold
       in
       (Z.to_int64 xtz_net_bought, Tez.to_mutez xtz_bought)
 
     let token_to_xtz ~src dst amount env _ state =
-      let (xtz_bought, xtz_net_bought) = xtz_bought amount env state in
+      let xtz_bought, xtz_net_bought = xtz_bought amount env state in
       state
       |> transfer_tzbtc_balance src env.cpmm_contract amount
       |> update_xtz_balance env.cpmm_contract (fun b -> Int64.sub b xtz_bought)
@@ -1079,13 +1075,13 @@ module AbstractMachine = struct
         Z.of_int @@ get_tzbtc_balance env.cpmm_contract env state
       in
       let amount = Tez.of_mutez_exn amount in
-      let (tzbtc_bought, xtz_earnt) =
+      let tzbtc_bought, xtz_earnt =
         Cpmm_logic.Simulate_raw.xtzToToken ~xtzPool ~tokenPool ~amount
       in
       (Z.to_int tzbtc_bought, Z.to_int64 xtz_earnt)
 
     let xtz_to_token ~src dst amount env _ state =
-      let (tzbtc_bought, xtz_earnt) = tzbtc_bought env state amount in
+      let tzbtc_bought, xtz_earnt = tzbtc_bought env state amount in
       update_xtz_balance src (fun b -> Int64.sub b amount) state
       |> update_xtz_balance env.cpmm_contract (Int64.add xtz_earnt)
       |> transfer_tzbtc_balance env.cpmm_contract dst tzbtc_bought
@@ -1104,7 +1100,7 @@ module AbstractMachine = struct
       in
       let lqtTotal = Z.of_int state.cpmm_total_liquidity in
       let amount = Tez.of_mutez_exn xtz_deposit in
-      let (lqt_minted, tokens_deposited) =
+      let lqt_minted, tokens_deposited =
         Cpmm_logic.Simulate_raw.addLiquidity
           ~tokenPool
           ~xtzPool
@@ -1132,7 +1128,7 @@ module AbstractMachine = struct
       in
       let lqtTotal = Z.of_int state.cpmm_total_liquidity in
       let lqtBurned = Z.of_int lqt_burned in
-      let (xtz_withdrawn, tokens_withdrawn) =
+      let xtz_withdrawn, tokens_withdrawn =
         Cpmm_logic.Simulate_raw.removeLiquidity
           ~tokenPool
           ~xtzPool
@@ -1185,7 +1181,7 @@ module SymbolicBaseMachine :
   end)
 
   let init ~invariant:_ ?(subsidy = default_subsidy) accounts_balances =
-    let (_, initial_balances) = initial_xtz_repartition accounts_balances in
+    let _, initial_balances = initial_xtz_repartition accounts_balances in
     let len = Int64.of_int (List.length accounts_balances) in
     match initial_balances with
     | holder_xtz :: accounts ->
@@ -1197,15 +1193,12 @@ module SymbolicBaseMachine :
             cpmm_total_liquidity = cpmm_initial_liquidity_supply;
             accounts_balances =
               (Cpmm, {cpmm_initial_balance with xtz = xtz_cpmm})
-              ::
-              (Holder, {xtz = holder_xtz; tzbtc = 0; liquidity = 0})
-              ::
-              (TzBTCAdmin, {xtz = 0L; tzbtc = 0; liquidity = 0})
-              ::
-              List.mapi
-                (fun i xtz ->
-                  (ImplicitAccount i, {xtz; tzbtc = 0; liquidity = 0}))
-                accounts;
+              :: (Holder, {xtz = holder_xtz; tzbtc = 0; liquidity = 0})
+              :: (TzBTCAdmin, {xtz = 0L; tzbtc = 0; liquidity = 0})
+              :: List.mapi
+                   (fun i xtz ->
+                     (ImplicitAccount i, {xtz; tzbtc = 0; liquidity = 0}))
+                   accounts;
           },
           {
             cpmm_contract = Cpmm;
@@ -1329,7 +1322,7 @@ module ValidationBaseMachine :
       ?subsidy
       balances
     >>= fun (blk, env) ->
-    let (state, _) =
+    let state, _ =
       SymbolicBaseMachine.init ~invariant:(fun _ _ -> true) ?subsidy balances
     in
     let state = refine_state env state in

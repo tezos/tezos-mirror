@@ -37,14 +37,14 @@ let to_json_and_bytes branch message =
     Data_encoding.Binary.to_bytes_exn encoding op )
 
 let sign_message (cctxt : #full) ~src_sk ~block ~message =
-  let (json, bytes) = to_json_and_bytes block message in
+  let json, bytes = to_json_and_bytes block message in
   cctxt#message "signed content: @[%a@]" Data_encoding.Json.pp json
   >>= fun () ->
   Client_keys.sign cctxt ~watermark:Signature.Generic_operation src_sk bytes
 
 let check_message (cctxt : #full) ~block ~key_locator ~quiet ~message ~signature
     =
-  let (json, bytes) = to_json_and_bytes block message in
+  let json, bytes = to_json_and_bytes block message in
   (if quiet then Lwt.return_unit
   else cctxt#message "checked content: @[%a@]" Data_encoding.Json.pp json)
   >>= fun () ->

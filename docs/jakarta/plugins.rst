@@ -6,7 +6,7 @@ This document describes the protocol plugins implemented in Octez.
 Protocol-specific shell plugins, simply called protocol plugins,
 implement extra APIs needed by the shell in order to interact with the
 economic protocol, beyond the one provided by the :doc:`protocol
-environment <../developer/protocol_environment>`.
+environment <../shell/protocol_environment>`.
 This code is not strictly speaking part of the protocol
 code base, so this is not subject to on-chain governance (see
 :doc:`voting procedure <voting>`), but it is still protocol-dependent,
@@ -35,6 +35,7 @@ In turn protocol plugins may, for example:
 - implement some common operations that are customized for each
   protocol (e.g., :ref:`prevalidator_filters_jakarta`).
 
+.. _prevalidator_filters:
 .. _prevalidator_filters_jakarta:
 
 Prevalidator filters
@@ -50,10 +51,11 @@ the filters of the previous protocol. Notice that prevalidator filters are not
 mandatory, their absence does not break the Tezos blockchain protocol.
 
 The interface of the prevalidator plugin is described at the `mempool plugin API
-<https://tezos.gitlab.io/api/odoc/_html/tezos-protocol-plugin-alpha/Tezos_protocol_plugin_alpha/Plugin/Mempool/index.html>`__
+<https://tezos.gitlab.io/api/odoc/_html/tezos-protocol-plugin-alpha/Tezos_protocol_plugin_alpha/Mempool/index.html>`__
 
 The different kinds of prevalidator filters are described below.
 
+.. _fees_filter:
 .. _fees_filter_jakarta:
 
 Fees filter
@@ -71,6 +73,7 @@ configuration of your node.
 This filtering strategy is implemented in the ``prefilter`` (see
 :doc:`../shell/prevalidation`).
 
+.. _consensus_filter:
 .. _consensus_filter_jakarta:
 
 Consensus filter
@@ -133,6 +136,14 @@ included in a block. To be able to replace the first operation, the fee and the
 by a factor (currently fixed to 5%). In case of successful replacement, the old
 operation is re-classified as ``Outdated``.
 
+Concretely, a user can replace a successfully prechecked manager operation in the
+mempool, with the help of ``tezos-client``, using two methods :
+
+- manually provide a higher fee to bump the "fee/gas limit" ratio by at least 5% for the new
+  operation,
+- via option ``--replace``: In this case, ``tezos-client`` will automatically
+  compute the minimal amount of fee for the second operation to be able to
+  replace the one in the mempool.
 
 Operations prioritization and ordering
 ......................................
@@ -188,6 +199,7 @@ to be the smallest manager operation, with 126 Bytes, so there are at most
 512 * 1024 / 126 = 4161 manager operations per block.
 
 
+.. _active_filter_rpc:
 .. _active_filter_rpc_jakarta:
 
 Filters RPCs

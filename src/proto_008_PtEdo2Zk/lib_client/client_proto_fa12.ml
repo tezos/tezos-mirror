@@ -272,7 +272,7 @@ type type_eq_combinator = node * (node -> bool)
    check functions, and returns a type of n-ary pair of such types and
    a function checking syntactical equivalence with another node. *)
 let t_pair ?(loc = 0) l : type_eq_combinator =
-  let (values, are_ty) = List.split l in
+  let values, are_ty = List.split l in
   let is_pair p =
     match p with
     | Micheline.Prim (_, Script.T_pair, l, _) -> (
@@ -535,8 +535,8 @@ let parse_callback error expr =
           let len = String.length s - pos - 1 in
           let name = String.sub s (pos + 1) len in
           match (String.sub s 0 pos, name) with
-          | (addr, "default") -> of_b58_check (addr, None)
-          | (addr, name) -> of_b58_check (addr, Some name)))
+          | addr, "default" -> of_b58_check (addr, None)
+          | addr, name -> of_b58_check (addr, Some name)))
   | _ -> error ()
 
 let action_of_expr ~entrypoint expr =
@@ -647,7 +647,7 @@ let derive_action expr t_param =
     | ( Micheline.Prim (_, Script.D_Right, [right], _),
         Micheline.Prim (_, Script.T_or, [_; t_right], _) ) ->
         derive right t_right
-    | (_, Micheline.Prim (_, _, _, annots)) ->
+    | _, Micheline.Prim (_, _, _, annots) ->
         find_entrypoint_in_annot error annots expr
     | _ -> error ()
   in
@@ -729,7 +729,7 @@ let parse_error =
   | ( "NotEnoughAllowance",
       Prim (_, Script.D_Pair, [Int (_, required); Int (_, present)], _) ) ->
       Some (Not_enough_allowance (required, present))
-  | ("UnsafeAllowanceChange", Int (_, previous)) ->
+  | "UnsafeAllowanceChange", Int (_, previous) ->
       Some (Unsafe_allowance_change previous)
   | _ -> None
 
@@ -753,7 +753,7 @@ let call_contract (cctxt : #Protocol_client_context.full) ~chain ~block
     ~contract ~action ~tez_amount ?fee ?gas_limit ?storage_limit ?counter
     ~fee_parameter () =
   contract_has_fa12_interface cctxt ~chain ~block ~contract () >>=? fun () ->
-  let (entrypoint, arg) = translate_action_to_argument action in
+  let entrypoint, arg = translate_action_to_argument action in
   Client_proto_context.transfer
     cctxt
     ~chain

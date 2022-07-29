@@ -27,7 +27,7 @@ Octez is an implementation of Tezos software, including a node, a client, a bake
 This implementation is available at https://gitlab.com/tezos/tezos.
 The source code is placed under the MIT Open Source License.
 
-The current release of Octez is :doc:`../releases/version-12`.
+The current release of Octez is :doc:`../releases/version-13`.
 
 This website
 ------------
@@ -50,17 +50,17 @@ The Community
 
     - https://tzstats.com
     - https://tezblock.io
-    - https://teztracker.com/
-    - https://tzkt.io (Baking focused Explorer)
-    - https://arronax.io
+    - https://tzkt.io (Baking focused explorer)
+    - https://arronax.io (Analytics-oriented explorer)
     - https://mininax.io
-    - https://baking-bad.org (Reward Tracker)
-    - https://better-call.dev (Smart-contract Explorer)
+    - https://baking-bad.org (Baking rewards tracker)
+    - https://better-call.dev (Smart contracts explorer)
 
 - A few community-run websites collect useful Tezos links:
 
     - https://www.tezos.help
-    - https://tezos.rocks
+    - https://tezoscommons.org/
+    - https://tqtezos.com/
 
 - More resources can be found in the :doc:`introduction/support` page.
 
@@ -87,7 +87,7 @@ Test Networks
 
 There are several test networks for the Tezos blockchain with a
 faucet to obtain free tez (see :ref:`faucet`).
-It is the reference network for developers wanting to test their
+These networks are intended for developers wanting to test their
 software before going to beta and for users who want to familiarize
 themselves with Tezos before using their real tez.
 
@@ -142,13 +142,14 @@ in the :ref:`introduction <howtoget>`.
    shell/sync
    shell/p2p
    shell/p2p_api
+   shell/protocol_environment
    shell/micheline
    shell/cli-commands
    shell/rpc
 
 .. toctree::
    :maxdepth: 2
-   :caption: Ithaca Protocol doc:
+   :caption: Jakarta Protocol doc:
 
    active/protocol
    active/glossary
@@ -157,12 +158,12 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Jakarta Protocol doc:
+   :caption: Kathmandu Protocol doc:
 
-   jakarta/protocol
-   jakarta/glossary
-   jakarta/cli-commands
-   jakarta/rpc
+   kathmandu/protocol
+   kathmandu/glossary
+   kathmandu/cli-commands
+   kathmandu/rpc
 
 .. toctree::
    :maxdepth: 2
@@ -180,6 +181,7 @@ in the :ref:`introduction <howtoget>`.
    developer/rpc
    developer/encodings
    developer/data_encoding
+   developer/merkle-proof-encoding-formats
    developer/gadt
    developer/error_monad
    developer/clic
@@ -188,7 +190,6 @@ in the :ref:`introduction <howtoget>`.
    developer/entering_alpha
    developer/protocol_release_checklist
    developer/howto-freeze-protocols
-   developer/protocol_environment
    developer/protocol_environment_upgrade
    developer/event_logging_framework
    developer/testing_index
@@ -218,6 +219,7 @@ in the :ref:`introduction <howtoget>`.
    protocols/011_hangzhou
    protocols/012_ithaca
    protocols/013_jakarta
+   protocols/014_kathmandu
    protocols/alpha
 
 .. toctree::
@@ -237,6 +239,7 @@ in the :ref:`introduction <howtoget>`.
    releases/version-10
    releases/version-11
    releases/version-12
+   releases/version-13
 
 .. toctree::
    :maxdepth: 2

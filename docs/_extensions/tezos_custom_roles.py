@@ -30,7 +30,7 @@ def setup(app):
             parts = re.match("^([^/]*)[.]opam$", file)
             if parts:
                 name = parts.group(1)
-                OPAM_CACHE[name] = path
+                OPAM_CACHE[name] = path.lstrip('../')
     print("package_role: cached", len(OPAM_CACHE), "opam packages")
     return {'parallel_read_safe': True}
 
@@ -62,7 +62,8 @@ def package_role(
     src = find_dot_opam(lib)
     branch = os.environ.get('CI_COMMIT_REF_NAME', 'master')
     project_url = os.environ.get(
-        'CI_PROJECT_URL', 'https://gitlab.com/tezos/tezos'
+        'CI_MERGE_REQUEST_SOURCE_PROJECT_URL',
+        os.environ.get('CI_PROJECT_URL', 'https://gitlab.com/tezos/tezos'),
     )
     src_url = project_url + "/tree/" + branch + "/" + src
     if os.path.isdir('_build/api/odoc/_html/' + lib):
@@ -77,7 +78,7 @@ def package_role(
             )
         ):
             lib = lib + '/' + lib.replace('-', '_').capitalize()
-        url = "api/api-inline.html#" + lib + '/index.html'
+        url = "api/odoc/_html/" + lib + '/index.html'
         for _ in range(1, rel_lvl):
             url = '../' + url
     else:
@@ -124,7 +125,8 @@ def src_role(_name, rawtext, text, lineno, inliner, options={}, _content=[]):
 
     branch = os.environ.get('CI_COMMIT_REF_NAME', 'master')
     project_url = os.environ.get(
-        'CI_PROJECT_URL', 'https://gitlab.com/tezos/tezos'
+        'CI_MERGE_REQUEST_SOURCE_PROJECT_URL',
+        os.environ.get('CI_PROJECT_URL', 'https://gitlab.com/tezos/tezos'),
     )
     if Path(TEZOS_HOME, file).is_file():
         url = project_url + "/-/blob/" + branch + "/" + src

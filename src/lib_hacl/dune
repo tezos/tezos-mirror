@@ -1,10 +1,7 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(env
- (_
-  (binaries (%{workspace_root}/src/tooling/node_wrapper.exe as node))
-  (env-vars (NODE_PRELOAD hacl-wasm))))
+(env (_ (env-vars (NODE_PRELOAD hacl-wasm))))
 
 (library
  (name tezos_hacl)

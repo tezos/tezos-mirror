@@ -44,7 +44,7 @@ open Alpha_context
 (** Bake two block at the same level using the same policy (i.e. same
     baker). *)
 let block_fork ?policy contracts b =
-  let (contract_a, contract_b) =
+  let contract_a, contract_b =
     match contracts with x :: y :: _ -> (x, y) | _ -> assert false
   in
   Op.transaction (B b) contract_a contract_b Alpha_context.Tez.one_cent
@@ -61,7 +61,7 @@ let order_block_hashes ~correct_order bh1 bh2 =
   else (bh1, bh2)
 
 let double_baking ctxt ?(correct_order = true) bh1 bh2 =
-  let (bh1, bh2) = order_block_hashes ~correct_order bh1 bh2 in
+  let bh1, bh2 = order_block_hashes ~correct_order bh1 bh2 in
   Op.double_baking ctxt bh1 bh2
 
 (****************************************************************)
@@ -107,7 +107,7 @@ let order_endorsements ~correct_order op1 op2 =
    [test_valid_double_baking_followed_by_double_endorsing] and
    [test_valid_double_endorsing_followed_by_double_baking] *)
 let double_endorsement ctxt ?(correct_order = true) op1 op2 =
-  let (e1, e2) = order_endorsements ~correct_order op1 op2 in
+  let e1, e2 = order_endorsements ~correct_order op1 op2 in
   Op.double_endorsement ctxt e1 e2
 
 let test_valid_double_baking_followed_by_double_endorsing () =

@@ -27,7 +27,6 @@
 
 open Protocol
 module Proto_Nonce = Nonce (* Renamed otherwise is masked by Alpha_context *)
-
 open Alpha_context
 
 (* This type collects a block and the context that results from its application *)
@@ -292,7 +291,7 @@ let prepare_main_init_params ?bootstrap_contracts commitments constants
     Data_encoding.Binary.to_bytes_exn Data_encoding.json json
   in
   Tezos_protocol_environment.Context.(
-    let empty = Memory_context.empty in
+    let empty = Tezos_protocol_environment.Memory_context.empty in
     add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
     add ctxt protocol_param_key proto_params)
 
@@ -381,7 +380,7 @@ let genesis_with_parameters parameters =
     Data_encoding.Binary.to_bytes_exn Data_encoding.json json
   in
   Tezos_protocol_environment.Context.(
-    let empty = Memory_context.empty in
+    let empty = Tezos_protocol_environment.Memory_context.empty in
     add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
     add ctxt protocol_param_key proto_params)
   >>= fun ctxt ->
@@ -658,10 +657,10 @@ let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
     ?payload_round ~baking_mode ?liquidity_baking_toggle_vote pred =
   let operations =
     match (operation, operations) with
-    | (Some op, Some ops) -> Some (op :: ops)
-    | (Some op, None) -> Some [op]
-    | (None, Some ops) -> Some ops
-    | (None, None) -> None
+    | Some op, Some ops -> Some (op :: ops)
+    | Some op, None -> Some [op]
+    | None, Some ops -> Some ops
+    | None, None -> None
   in
   Forge.forge_header
     ?payload_round

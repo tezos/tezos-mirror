@@ -14,14 +14,15 @@
   tezos-p2p-services
   tezos-stdlib-unix
   tezos-signer-backends
-  data-encoding)
+  data-encoding
+  uri)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_rpc
-   -open Tezos_clic_unix
-   -open Tezos_client_base
-   -open Tezos_shell_services
-   -open Tezos_p2p_services
-   -open Data_encoding)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_rpc
+  -open Tezos_clic_unix
+  -open Tezos_client_base
+  -open Tezos_shell_services
+  -open Tezos_p2p_services
+  -open Data_encoding))

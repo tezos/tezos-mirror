@@ -104,6 +104,7 @@ let info =
 module Node_metrics_command = struct
   let dump_metrics () =
     let open Prometheus in
+    let open Lwt_syntax in
     let metric_type_to_string = function
       | Counter -> "Counter"
       | Gauge -> "Gauge"
@@ -117,19 +118,25 @@ module Node_metrics_command = struct
         fmt
     in
     Format.printf "@[<v>Name,Type,Description,Labels" ;
-    List.iter
-      (fun (v, _) ->
-        Format.printf
-          "@,@[%a@],%s,\"%s\",%a"
-          MetricName.pp
-          v.MetricInfo.name
-          (metric_type_to_string v.MetricInfo.metric_type)
-          v.MetricInfo.help
-          pp_label_names
-          v.MetricInfo.label_names)
-      (Prometheus.MetricFamilyMap.to_list
-         Prometheus.CollectorRegistry.(collect default)) ;
-    Format.printf "@]@."
+    let* metrics = Prometheus.CollectorRegistry.(collect default) in
+    let print_metrics metrics =
+      List.iter
+        (fun (v, _) ->
+          Format.printf
+            "@,@[%a@],%s,\"%s\",%a"
+            MetricName.pp
+            v.MetricInfo.name
+            (metric_type_to_string v.MetricInfo.metric_type)
+            v.MetricInfo.help
+            pp_label_names
+            v.MetricInfo.label_names)
+        (Prometheus.MetricFamilyMap.to_list metrics)
+    in
+    print_metrics metrics ;
+    Format.printf "@]@." ;
+    return_unit
+
+  let dump_metrics () = Lwt_main.run (dump_metrics ())
 
   module Term = struct
     let process _ = `Ok (dump_metrics ())
@@ -177,21 +184,6 @@ let commands =
       Node_storage_command.cmd;
       Node_metrics_command.cmd;
     ]
-
-(* This call is not strictly necessary as the parameters are initialized
-   lazily the first time a Sapling operation (validation or forging) is
-   done. This is what the client does.
-   For a long running binary however it is important to make sure that the
-   parameters files are there at the start and avoid failing much later while
-   validating an operation. Plus paying this cost upfront means that the first
-   validation will not be more expensive. *)
-let () =
-  try Tezos_sapling.Core.Validator.init_params ()
-  with exn ->
-    Printf.eprintf
-      "Failed to initialize Zcash parameters: %s"
-      (Printexc.to_string exn) ;
-    exit 1
 
 let () =
   Random.self_init () ;

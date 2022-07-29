@@ -26,6 +26,13 @@
 (** Smart-Contract Rollup client state *)
 type t
 
+type commitment = {
+  compressed_state : string;
+  inbox_level : int;
+  predecessor : string;
+  number_of_ticks : int;
+}
+
 (** [create ?name ?path ?base_dir ?path node] returns a fresh client
    identified by a specified [name], logging in [color], executing the
    program at [path], storing local information in [base_dir], and
@@ -54,5 +61,57 @@ val ticks : ?hooks:Process.hooks -> t -> int Lwt.t
 (** [state_hash client] gets the corresponding PVM state hash for the current head block. *)
 val state_hash : ?hooks:Process.hooks -> t -> string Lwt.t
 
+(** [state_value client key] gets the corresponding PVM state value
+   mapped to [key] for the current head block. *)
+val state_value : ?hooks:Process.hooks -> t -> key:string -> bytes Lwt.t
+
 (** [status client] gets the corresponding PVM status for the current head block. *)
 val status : ?hooks:Process.hooks -> t -> string Lwt.t
+
+(** [commitment_from_json] parses a commitment from its JSON representation. *)
+val commitment_from_json : JSON.t -> commitment option
+
+(** [commitment_with_hash_and_level_from_json] parses a commitment, its hash
+    and the level when the commitment was first published (if any), from the
+    JSON representation. *)
+val commitment_with_hash_and_level_from_json :
+  JSON.t -> (string * commitment * int option) option
+
+(** [last_stored_commitment client] gets the last commitment with its hash
+    stored by the rollup node. *)
+val last_stored_commitment :
+  ?hooks:Process.hooks -> t -> (string * commitment * int option) option Lwt.t
+
+(** [last_published_commitment client] gets the last commitment published by the rollup node,
+with its hash and level when the commitment was first published. *)
+val last_published_commitment :
+  ?hooks:Process.hooks -> t -> (string * commitment * int option) option Lwt.t
+
+(** [dal_slot_subscriptions client] gets the slots to which the rollup node is subscribed to *)
+val dal_slot_subscriptions : ?hooks:Process.hooks -> t -> int list Lwt.t
+
+(** [generate_keys ~alias client] generates new unencrypted keys for [alias]. *)
+val generate_keys :
+  ?hooks:Process.hooks -> ?force:bool -> alias:string -> t -> unit Lwt.t
+
+(** [list_keys client] returns the known aliases with their public key hash from
+    client.
+
+    Fails if the format isn't in the form `<alias>: <public key hash>`. *)
+val list_keys : ?hooks:Process.hooks -> t -> (string * string) list Lwt.t
+
+(** [show_address ~alias client] returns the BLS account associated with [alias].
+
+    Fails if the output from the client isn't in the expected format (see
+    {!Client.show_address}). *)
+val show_address :
+  ?hooks:Process.hooks -> alias:string -> t -> Account.aggregate_key Lwt.t
+
+(** [import_secret_key account] imports [account.alias] as alias to
+    [account.secret_key] into the client. *)
+val import_secret_key :
+  ?hooks:Process.hooks ->
+  ?force:bool ->
+  Account.aggregate_key ->
+  t ->
+  unit Lwt.t

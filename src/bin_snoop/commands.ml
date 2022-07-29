@@ -41,17 +41,11 @@ module Benchmark_cmd = struct
   (* Handling the options of the benchmarker *)
   open Measure
 
-  let set_flush_cache flush_opt options = {options with flush_cache = flush_opt}
-
-  let set_stabilize_gc stabilize_gc options = {options with stabilize_gc}
-
   let set_seed seed (options : options) = {options with seed = Some seed}
 
   let set_nsamples nsamples options = {options with nsamples}
 
   let set_determinizer determinizer options = {options with determinizer}
-
-  let set_cpu_affinity cpu_affinity options = {options with cpu_affinity}
 
   let set_save_file save_file options = {options with save_file}
 
@@ -70,12 +64,9 @@ module Benchmark_cmd = struct
   let default_benchmark_options =
     let options =
       {
-        flush_cache = `Dont;
-        stabilize_gc = false;
         seed = None;
         nsamples = 3000;
         determinizer = Percentile 50;
-        cpu_affinity = None;
         bench_number = 300;
         minor_heap_size = `words (256 * 1024);
         config_dir = None;
@@ -115,24 +106,18 @@ module Benchmark_cmd = struct
   (* "benchmark" command handler *)
 
   let benchmark_handler
-      ( cache,
-        gc,
-        det,
+      ( det,
         nsamples,
         seed,
-        cpu_affinity,
         bench_number,
         minor_heap_size,
         config_dir,
         csv_export ) bench_name save_file () =
     let options =
       default_benchmark_options.options
-      |> lift_opt set_flush_cache cache
-      |> set_stabilize_gc gc
       |> lift_opt set_determinizer det
       |> lift_opt set_nsamples nsamples
       |> lift_opt set_seed seed
-      |> set_cpu_affinity cpu_affinity
       |> lift_opt set_bench_number bench_number
       |> lift_opt set_minor_heap_size minor_heap_size
       |> set_config_dir config_dir
@@ -146,28 +131,6 @@ module Benchmark_cmd = struct
     Lwt.return_ok ()
 
   module Options = struct
-    (* Argument --flush-cache mb
-       Parmeter: size in megabytes of the cache. *)
-    let flush_cache_arg =
-      let flush_cache_arg_param =
-        parse_parameter
-          (fun p ->
-            Option.map (fun p -> `Cache_megabytes p) (int_of_string_opt p))
-          "Error while parsing --flush-cache argument."
-      in
-      Clic.arg
-        ~doc:"Force flushing the cache before each measurement"
-        ~long:"flush-cache"
-        ~placeholder:"cache size in megabytes"
-        flush_cache_arg_param
-
-    (* Boolean argument --stabilize-gc *)
-    let stabilize_gc_arg =
-      Clic.switch
-        ~doc:"Major GC until fixpoint before each measurement"
-        ~long:"stabilize-gc"
-        ()
-
     (* Sum type [mean| percentile [1-100]] argument --determinizer *)
     let determinizer_arg =
       let determinizer_arg_param =
@@ -195,20 +158,6 @@ module Benchmark_cmd = struct
         ~long:"determinizer"
         ~placeholder:"{mean | percentile@[1-100]}"
         determinizer_arg_param
-
-    (* Int argument --cpu-affinity
-       Parameter: Id of the CPU where to preferentially pin the benchmark *)
-    let cpu_affinity_arg =
-      let cpu_affinity_arg_param =
-        parse_parameter
-          int_of_string_opt
-          "Error while parsing --cpu-affinity argument."
-      in
-      Clic.arg
-        ~doc:"Sets CPU affinity"
-        ~long:"cpu-affinity"
-        ~placeholder:"CPU id"
-        cpu_affinity_arg_param
 
     (* Integer argument --nsamples *)
     let nsamples_arg =
@@ -285,13 +234,10 @@ module Benchmark_cmd = struct
 
   let options =
     let open Options in
-    Clic.args10
-      flush_cache_arg
-      stabilize_gc_arg
+    Clic.args7
       determinizer_arg
       nsamples_arg
       seed_arg
-      cpu_affinity_arg
       bench_number_arg
       minor_heap_size_arg
       config_dir_arg
@@ -346,6 +292,7 @@ module Infer_cmd = struct
       report = NoReport;
       save_solution = None;
       dot_file = None;
+      display = Display.default_options;
     }
 
   let set_print_problem print_problem options = {options with print_problem}
@@ -374,6 +321,13 @@ module Infer_cmd = struct
 
   let set_dot_file dot_file options = {options with dot_file}
 
+  let set_full_plot_verbosity full_plot_verbosity options =
+    {
+      options with
+      display =
+        {options.display with reduced_plot_verbosity = not full_plot_verbosity};
+    }
+
   let list_solvers () =
     Printf.eprintf "ridge --ridge-alpha=<float>\n" ;
     Printf.eprintf "lasso --lasso-alpha=<float> --lasso-positive\n" ;
@@ -389,7 +343,8 @@ module Infer_cmd = struct
         report,
         override_files,
         save_solution,
-        dot_file ) model_name workload_data solver () =
+        dot_file,
+        full_plot_verbosity ) model_name workload_data solver () =
     let options =
       default_infer_parameters_options
       |> set_print_problem print_problem
@@ -401,6 +356,7 @@ module Infer_cmd = struct
       |> set_override_files override_files
       |> set_save_solution save_solution
       |> set_dot_file dot_file
+      |> set_full_plot_verbosity full_plot_verbosity
     in
     commandline_outcome_ref :=
       Some (Infer {model_name; workload_data; solver; infer_opts = options}) ;
@@ -506,11 +462,17 @@ module Infer_cmd = struct
         ~long:"dot-file"
         ~placeholder:"filename"
         override_file_param
+
+    let full_plot_verbosity_arg =
+      Clic.switch
+        ~doc:"Produces all (possibly redundant) plots"
+        ~long:"full-plot-verbosity"
+        ()
   end
 
   let options =
     let open Options in
-    Clic.args10
+    Clic.args11
       print_problem
       dump_csv_arg
       plot_arg
@@ -521,6 +483,7 @@ module Infer_cmd = struct
       override_arg
       save_solution_arg
       dot_file_arg
+      full_plot_verbosity_arg
 
   let model_param =
     Clic.param
@@ -893,7 +856,7 @@ let usage () =
     ~global_options:Global_options.options
     commands_with_man
 
-let (original_args, autocomplete) =
+let original_args, autocomplete =
   (* for shell aliases *)
   let rec move_autocomplete_token_upfront acc = function
     | "bash_autocomplete" :: prev_arg :: cur_arg :: script :: args ->
@@ -906,7 +869,7 @@ let (original_args, autocomplete) =
   | _ :: args -> move_autocomplete_token_upfront [] args
   | [] -> ([], None)
 
-let (list_solvers, list_models) =
+let list_solvers, list_models =
   ignore
     Clic.(
       setup_formatter
@@ -916,7 +879,7 @@ let (list_solvers, list_models) =
   let result =
     Lwt_main.run
       (let open Lwt_result_syntax in
-      let* (list_flags, args) =
+      let* list_flags, args =
         Clic.parse_global_options Global_options.options () original_args
       in
       match autocomplete with

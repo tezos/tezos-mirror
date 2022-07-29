@@ -117,8 +117,8 @@ let get_block_offset level =
 let get_payload_hash (type kind) (op_kind : kind consensus_operation_type)
     (op : kind Operation.t) =
   match (op_kind, op.protocol_data.contents) with
-  | (Preendorsement, Single (Preendorsement consensus_content))
-  | (Endorsement, Single (Endorsement consensus_content)) ->
+  | Preendorsement, Single (Preendorsement consensus_content)
+  | Endorsement, Single (Endorsement consensus_content) ->
       consensus_content.block_payload_hash
   | _ -> .
 
@@ -155,10 +155,10 @@ let process_consensus_op (type kind) cctxt
            get_payload_hash op_kind existing_op
            <> get_payload_hash op_kind new_op) ->
       (* same level and round, and different payload hash for this slot *)
-      let (new_op_hash, existing_op_hash) =
+      let new_op_hash, existing_op_hash =
         (Operation.hash new_op, Operation.hash existing_op)
       in
-      let (op1, op2) =
+      let op1, op2 =
         if Operation_hash.(new_op_hash < existing_op_hash) then
           (new_op, existing_op)
         else (existing_op, new_op)
@@ -176,7 +176,7 @@ let process_consensus_op (type kind) cctxt
         ()
       >>=? fun bytes ->
       let bytes = Signature.concat bytes Signature.zero in
-      let (double_op_detected, double_op_denounced) =
+      let double_op_detected, double_op_denounced =
         Events.(
           match op_kind with
           | Endorsement ->
@@ -286,7 +286,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
           context_block_header cctxt ~chain new_hash >>=? fun bh2 ->
           let hash1 = Block_header.hash bh1 in
           let hash2 = Block_header.hash bh2 in
-          let (bh1, bh2) =
+          let bh1, bh2 =
             if Block_hash.(hash1 < hash2) then (bh1, bh2) else (bh2, bh1)
           in
           (* If the blocks are on different chains then skip it *)

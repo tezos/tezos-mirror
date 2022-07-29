@@ -28,6 +28,8 @@
 
 type error += Connection_closed
 
+type error += Connection_error
+
 let () =
   (* Connection closed *)
   register_error_kind
@@ -39,7 +41,17 @@ let () =
       Format.fprintf ppf "IO error: connection with a peer is closed.")
     Data_encoding.empty
     (function Connection_closed -> Some () | _ -> None)
-    (fun () -> Connection_closed)
+    (fun () -> Connection_closed) ;
+  register_error_kind
+    `Permanent
+    ~id:"node.p2p_io_scheduler.connection_error"
+    ~title:"Connection error"
+    ~description:"IO error: connection error while reading from a peer."
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "IO error: connection error while reading from a peer.")
+    Data_encoding.empty
+    (function Connection_error -> Some () | _ -> None)
+    (fun () -> Connection_error)
 
 (***************************** p2p socket *********************************)
 

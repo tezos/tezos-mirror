@@ -53,7 +53,7 @@ val seq_embedded : unit -> Protocol_hash.t Seq.t
 val get_embedded_sources : Protocol_hash.t -> Protocol.t option
 
 module Register_embedded_V0
-    (Env : Tezos_protocol_environment.V0)
+    (Env : Tezos_protocol_environment.V0.T)
     (Proto : Env.Updater.PROTOCOL) (Source : sig
       val hash : Protocol_hash.t option
 
@@ -66,7 +66,7 @@ module Register_embedded_V0
      and type P.validation_state = Proto.validation_state
 
 module Register_embedded_V1
-    (Env : Tezos_protocol_environment.V1)
+    (Env : Tezos_protocol_environment.V1.T)
     (Proto : Env.Updater.PROTOCOL) (Source : sig
       val hash : Protocol_hash.t option
 
@@ -79,7 +79,7 @@ module Register_embedded_V1
      and type P.validation_state = Proto.validation_state
 
 module Register_embedded_V2
-    (Env : Tezos_protocol_environment.V2)
+    (Env : Tezos_protocol_environment.V2.T)
     (Proto : Env.Updater.PROTOCOL) (Source : sig
       val hash : Protocol_hash.t option
 
@@ -93,7 +93,7 @@ module Register_embedded_V2
      and type P.validation_state = Proto.validation_state
 
 module Register_embedded_V3
-    (Env : Tezos_protocol_environment.V3)
+    (Env : Tezos_protocol_environment.V3.T)
     (Proto : Env.Updater.PROTOCOL) (Source : sig
       val hash : Protocol_hash.t option
 
@@ -107,7 +107,7 @@ module Register_embedded_V3
      and type P.validation_state = Proto.validation_state
 
 module Register_embedded_V4
-    (Env : Tezos_protocol_environment.V4)
+    (Env : Tezos_protocol_environment.V4.T)
     (Proto : Env.Updater.PROTOCOL) (Source : sig
       val hash : Protocol_hash.t option
 
@@ -121,7 +121,21 @@ module Register_embedded_V4
      and type P.validation_state = Proto.validation_state
 
 module Register_embedded_V5
-    (Env : Tezos_protocol_environment.V5)
+    (Env : Tezos_protocol_environment.V5.T)
+    (Proto : Env.Updater.PROTOCOL) (Source : sig
+      val hash : Protocol_hash.t option
+
+      val sources : Protocol.t
+    end) :
+  T
+    with type P.block_header_data = Proto.block_header_data
+     and type P.operation_data = Proto.operation_data
+     and type P.operation = Proto.operation
+     and type P.operation_receipt = Proto.operation_receipt
+     and type P.validation_state = Proto.validation_state
+
+module Register_embedded_V6
+    (Env : Tezos_protocol_environment.V6.T)
     (Proto : Env.Updater.PROTOCOL) (Source : sig
       val hash : Protocol_hash.t option
 

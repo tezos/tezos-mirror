@@ -176,7 +176,7 @@ end
 let terminate pid =
   let open Lwt_syntax in
   (try Unix.kill pid Sys.sigterm with _ -> ()) ;
-  let* (_pid, _status) = Lwt_unix.waitpid [] pid in
+  let* _pid, _status = Lwt_unix.waitpid [] pid in
   Lwt.return_unit
 
 let wait ~value_encoding ~flags pid result_ch =
@@ -185,11 +185,11 @@ let wait ~value_encoding ~flags pid result_ch =
     (fun () ->
       let*! s = Lwt_unix.waitpid [] pid in
       match s with
-      | (_, Lwt_unix.WEXITED 0) ->
+      | _, Lwt_unix.WEXITED 0 ->
           received_result ~value_encoding ~flags result_ch
-      | (_, Lwt_unix.WEXITED n) -> fail_with_exn (Exited n)
-      | (_, Lwt_unix.WSIGNALED n) -> fail_with_exn (Signaled n)
-      | (_, Lwt_unix.WSTOPPED n) -> fail_with_exn (Stopped n))
+      | _, Lwt_unix.WEXITED n -> fail_with_exn (Exited n)
+      | _, Lwt_unix.WSIGNALED n -> fail_with_exn (Signaled n)
+      | _, Lwt_unix.WSTOPPED n -> fail_with_exn (Stopped n))
     (function
       | Lwt.Canceled ->
           let*! () = terminate pid in
@@ -217,9 +217,9 @@ let detach ?(prefix = "") ?canceler ?input_encoding ?output_encoding
   protect
     ~canceler
     (fun () ->
-      let (main_in, child_out) = Lwt_io.pipe () in
-      let (child_in, main_out) = Lwt_io.pipe () in
-      let (main_result, child_exit) = Lwt_io.pipe () in
+      let main_in, child_out = Lwt_io.pipe () in
+      let child_in, main_out = Lwt_io.pipe () in
+      let main_result, child_exit = Lwt_io.pipe () in
       match Lwt_unix.fork () with
       | 0 ->
           Lwt_log.default :=
@@ -327,7 +327,7 @@ module Assoc = struct
 end
 
 (* [group_by f h l] for all elements [e] of [l] groups all [g e] that have the same value
-   for [f e]  *)
+   for [f e] *)
 let group_by ~equal f g l =
   let rec aux l res =
     match l with
@@ -386,7 +386,7 @@ let pp_grouped ppf plist pp_trace =
 (* Print the status of a list of detached process.
    Grouped by final result.
    TODO: either print the OK result, or ignore the result
-   value when Ok.  *)
+   value when Ok. *)
 let pp_results ppf plist =
   let pp_res plural ppf res =
     match res with
@@ -422,7 +422,7 @@ let wait_all_results (processes : ('a, 'b, 'c) t list) =
     match processes with
     | [] -> return_none
     | processes ->
-        let* (finished, remaining) = Lwt.nchoose_split processes in
+        let* finished, remaining = Lwt.nchoose_split processes in
         let rec handle = function
           | [] -> loop remaining
           | Ok _ :: finished -> handle finished
@@ -445,8 +445,8 @@ let wait_all_results (processes : ('a, 'b, 'c) t list) =
       let* () = lwt_log_info "All done!" in
       let* terminated = all terminations in
       match List.partition_result terminated with
-      | (_, _ :: _) -> assert false
-      | (terminated, []) -> return_ok terminated)
+      | _, _ :: _ -> assert false
+      | terminated, [] -> return_ok terminated)
   | Some (_err, remaining) -> (
       let* () = lwt_log_error "Early error! Canceling remaining process." in
       List.iter Lwt.cancel remaining ;
@@ -457,8 +457,8 @@ let wait_all_results (processes : ('a, 'b, 'c) t list) =
       let errors =
         List.filter_map
           (function
-            | (_, _, Ok _) -> None
-            | (i, prefix, Error []) ->
+            | _, _, Ok _ -> None
+            | i, prefix, Error [] ->
                 Some
                   (TzTrace.make
                      (Exn
@@ -467,7 +467,7 @@ let wait_all_results (processes : ('a, 'b, 'c) t list) =
                               "process %d(%s) returned an empty error trace"
                               i
                               (String.trim prefix)))))
-            | (i, prefix, Error trace) ->
+            | i, prefix, Error trace ->
                 Some
                   (TzTrace.cons
                      (Exn

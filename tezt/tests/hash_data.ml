@@ -38,7 +38,7 @@
             with the output from the previous run. The test passes only if the
             outputs match exactly. It is important that return values
             of `hash data` remain constant over time.
-  *)
+*)
 
 (* These hooks must be attached to every process that should be captured for
    regression testing. Not plugged for negative tests, since tezos-client
@@ -54,7 +54,6 @@ let test_good_hash_data =
     ~__FILE__
     ~title:"hash data ... of type ... (good)"
     ~tags:["hash"; "data"; "mockup"]
-    ~output_file:(fun _ -> "hash_data" // "good")
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let data_n_type =
@@ -151,7 +150,6 @@ let test_bad_hash_data =
     ~__FILE__
     ~title:"hash data ... of type ... (bad)"
     ~tags:["hash"; "data"; "mockup"]
-    ~output_file:(fun _ -> "hash_data" // "bad")
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let data_n_type =

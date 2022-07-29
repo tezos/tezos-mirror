@@ -208,7 +208,8 @@ module Garbled = struct
   let write_bad_all conns =
     let bad_msg = Bytes.of_string (String.make 16 '\000') in
     List.iter_ep
-      (fun conn -> trace Write @@ P2p_conn.raw_write_sync conn bad_msg)
+      (fun conn ->
+        trace Write @@ P2p_conn.Internal_for_tests.raw_write_sync conn bad_msg)
       conns
 
   let node (node : Node.t) =
@@ -392,7 +393,7 @@ module Overcrowded = struct
     | Error _ as res -> Lwt.return res
 
   let client_knowledge pool all_points =
-    let (unknowns, known) =
+    let unknowns, known =
       P2p_pool.Points.fold_known
         pool
         ~init:(all_points, [])
@@ -407,7 +408,7 @@ module Overcrowded = struct
     (unknowns, known)
 
   let client_check pool all_points legacy =
-    let (unknowns, _known) = client_knowledge pool all_points in
+    let unknowns, _known = client_knowledge pool all_points in
     let advert_succeed = unknowns = [] in
     if legacy || advert_succeed then
       log_info
@@ -476,8 +477,8 @@ module Overcrowded = struct
           in
           (unknown_points, id :: knowns))
     in
-    let (unknowns, knowns) = unknowns_knowns () in
-    let (log, stopper) = Lwt_watcher.create_stream node.watcher in
+    let unknowns, knowns = unknowns_knowns () in
+    let log, stopper = Lwt_watcher.create_stream node.watcher in
     let*! () =
       lwt_debug "trusted : %a" P2p_point.Id.pp_list node.trusted_points
     in
@@ -796,8 +797,8 @@ let wrap n f =
         let* r = f () in
         match r with
         | Ok () -> Lwt.return_unit
-        | Error
-            (Exn (Unix.Unix_error ((EADDRINUSE | EADDRNOTAVAIL), _, _)) :: _) ->
+        | Error (Exn (Unix.Unix_error ((EADDRINUSE | EADDRNOTAVAIL), _, _)) :: _)
+          ->
             warn "Conflict on ports, retry the test." ;
             gen_points () ;
             aux n f

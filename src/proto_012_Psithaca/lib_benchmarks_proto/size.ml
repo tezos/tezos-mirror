@@ -139,7 +139,7 @@ let public_key (public_key : Signature.public_key) : t =
 let chain_id (_chain_id : Chain_id.t) : t = Chain_id.size
 
 let address (addr : Script_typed_ir.address) : t =
-  let (_contract, entrypoint) = addr in
+  let _contract, entrypoint = addr in
   Signature.Public_key_hash.size + String.length entrypoint
 
 let list (list : 'a Script_typed_ir.boxed_list) : t =

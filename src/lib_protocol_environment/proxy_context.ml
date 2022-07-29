@@ -36,7 +36,7 @@ module M = struct
      behave like [Memory_context]. *)
   type t = {proxy : Proxy_delegate.t option; local : Local.t}
 
-  let empty = Local.Tree.empty Local.empty
+  let empty = Tezos_context_memory.make_empty_tree ()
 end
 
 module C = struct
@@ -378,7 +378,7 @@ module C = struct
 
   let map_f f tree =
     let open Lwt_syntax in
-    let+ (t, r) = f (of_local tree) in
+    let+ t, r = f (of_local tree) in
     (t.tree, r)
 
   let verify verifier proof f =
@@ -395,13 +395,14 @@ module C = struct
   let equal_config = Local.equal_config
 end
 
-open Tezos_protocol_environment
+open Environment_context
 include Environment_context.Register (C)
 
 let proxy_impl_name = "proxy"
 
 let empty proxy =
-  let ctxt = M.{proxy; local = Local.empty} in
+  let local = Tezos_context_memory.make_empty_context () in
+  let ctxt = M.{proxy; local} in
   Context.make
     ~ops
     ~ctxt

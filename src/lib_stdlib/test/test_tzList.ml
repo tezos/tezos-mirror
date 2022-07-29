@@ -43,7 +43,7 @@ let test_repeat _ =
 
 let test_drop_take_split _ =
   let t loc n l =
-    let (a, b) = split_n n l in
+    let a, b = split_n n l in
     let aa = take_n n l in
     Assert.equal ~msg:(string_of_int __LINE__ ^ "/" ^ loc) a aa ;
     let bb = drop_n n l in
@@ -73,7 +73,7 @@ let test_drop_take_split _ =
 
 let test_drop_take_split_rev _ =
   let t loc n l =
-    let (a, b) = rev_split_n n l in
+    let a, b = rev_split_n n l in
     let aa = rev_take_n n l in
     Assert.equal ~msg:(string_of_int __LINE__ ^ "/" ^ loc) a aa ;
     let bb = drop_n n l in

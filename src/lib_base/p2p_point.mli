@@ -74,7 +74,7 @@ module Id : sig
      [port] while the character '#' separates the [addr] or the [port]
      from the [id]. The function assumes that [addr] can be either an
      Ipv6 address, an Ipv4 address or a domain. The address is
-     formatted so that it can be given to [Lwt.getaddrinfo]. This
+     formatted so that it can be given to [Lwt_unix.getaddrinfo]. This
      means that square brackets around ipv6 addresses are removed. *)
   val parse_addr_port_id : string -> (addr_port_id, parsing_error) result
 

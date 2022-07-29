@@ -96,7 +96,7 @@ module Apply_diff_bench : Benchmark.S = struct
           Lazy_storage_kind.Sapling_state.Id.parse_z state_id
         in
         Alpha_context.Sapling.(state_from_id ctxt external_state_id)
-        >|= Protocol.Environment.wrap_tzresult
+        >|= Environment.wrap_tzresult
         >>=? fun (state, ctxt) ->
         Format.eprintf "state hash: %d@." (Hashtbl.hash state.diff) ;
         Format.eprintf

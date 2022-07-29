@@ -174,7 +174,7 @@ let select_commands ctxt {chain; block; protocol; _} =
   let open Lwt_syntax in
   let timeout = timeout_seconds () in
   let* network = check_network ~timeout ctxt in
-  let* (_, commands_for_version) =
+  let* _, commands_for_version =
     get_commands_for_version ~timeout ctxt network chain block protocol
   in
   Lwt.return_ok

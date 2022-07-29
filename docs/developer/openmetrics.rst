@@ -28,7 +28,7 @@ Usage
 To instruct the Octez node to produce metrics, the user needs to pass the option
 ``--metrics-addr=<ADDR>:<PORT>``. The port specified on the command line is the port
 where the integrated open metrics server will be available (9932 by default).
-The address defaults to localhost. 
+The address defaults to localhost.
 When the option is not supplied at all, no metrics are produced.
 Ex.::
 
@@ -62,3 +62,21 @@ source - using adequate values:
       scheme: http
       static_configs:
         - targets: ['localhost:9091']
+
+
+Monitoring the node with metrics
+--------------------------------
+
+Once the node is correctly set up to export metrics
+and those are collected by a `Prometheus server <https://prometheus.io/docs/introduction/overview/>`_,
+you can graphically monitor your node with a `Grafana dashboard <https://grafana.com/>`_.
+
+Dashboards suited for Octez can be easily built with the `Grafazos <https://gitlab.com/nomadic-labs/grafazos/>`_ tool.
+Grafazos provides several ready-to-use dashboards for Octez on the `Grafazos packages page <https://gitlab.com/nomadic-labs/grafazos/-/packages>`__, as plain JSON files.
+Their sources are also available as `jsonnet <https://jsonnet.org/>`__ files, that can be adjusted to build customized dashboards, if needed:
+
+
+- ``octez-basic``: A basic dashboard with all the node metrics
+- ``octez-full``: A full dashboard with the logs and hardware data.
+  This dashboard should be used with `Netdata <https://www.netdata.cloud/>`_  (for supporting hardware data) and `Promtail <https://grafana.com/docs/loki/latest/clients/promtail/>`_ (for exporting the logs).
+- ``octez-compact``: A compact dashboard that gives a brief overwiev of the various node metrics on a single page.

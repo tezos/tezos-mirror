@@ -29,7 +29,7 @@
    Invocation:   dune exec src/lib_shell/test/test_shell.exe \
                  -- test '^consensus heuristic'
    Subject:      Test the consensus heuristic
- *)
+*)
 
 module Assert = Lib_test.Assert
 open Consensus_heuristic
@@ -138,7 +138,7 @@ let job_sleep () =
   Assert.equal ~pp (Lwt.state p) Lwt.Sleep
 
 let job_protected () =
-  let (t, u) = Lwt.task () in
+  let t, u = Lwt.task () in
   let worker =
     Worker.create
       ~expire_time:Ptime.Span.zero
@@ -153,7 +153,7 @@ let job_protected () =
   Assert.equal ~pp (Lwt.state p') (Lwt.state (Lwt.return Block_hash.zero))
 
 let worker_canceled () =
-  let (t, _) = Lwt.task () in
+  let t, _ = Lwt.task () in
   let worker =
     Worker.create
       ~expire_time:Ptime.Span.zero
@@ -254,7 +254,7 @@ let job_on_next_consensus_1 () =
 let job_on_next_consensus_2 () =
   let open Lwt_syntax in
   let cpt = ref 0 in
-  let (t, u) = Lwt.task () in
+  let t, u = Lwt.task () in
   let worker =
     Worker.create
       ~expire_time:Ptime.Span.zero
@@ -288,7 +288,7 @@ let job_on_all_consensus_1 () =
 let job_on_all_consensus_2 () =
   let open Lwt_syntax in
   let cpt = ref 0 in
-  let (t, u) = Lwt.task () in
+  let t, u = Lwt.task () in
   let worker =
     Worker.create
       ~expire_time:Ptime.Span.zero
@@ -308,7 +308,7 @@ let job_on_all_consensus_2 () =
 let job_on_all_consensus_3 () =
   let open Lwt_syntax in
   let cpt = ref 0 in
-  let (t, u) = Lwt.task () in
+  let t, u = Lwt.task () in
   let worker =
     Worker.create
       ~expire_time:Ptime.Span.zero
@@ -331,7 +331,7 @@ let job_on_all_consensus_3 () =
 let job_on_next_consensus_3 () =
   let open Lwt_syntax in
   let cpt = ref 0 in
-  let (t, u) = Lwt.task () in
+  let t, u = Lwt.task () in
   let worker =
     Worker.create
       ~expire_time:Ptime.Span.zero

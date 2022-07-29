@@ -143,7 +143,7 @@ let transfer_with_script (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     contents
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   Lwt.return (Injection.originated_contracts ~force result)
   >>=? fun contracts ->
   match Apply_results.pack_contents_list op result with
@@ -211,7 +211,7 @@ let reveal cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing ?branch
     ~src_sk
     ~fee_parameter
     contents
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -248,7 +248,7 @@ let delegate_contract cctxt ~chain ~block ?branch ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     operation
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -257,21 +257,21 @@ let list_contract_labels cctxt ~chain ~block =
   Alpha_services.Contract.list cctxt (chain, block) >>=? fun contracts ->
   List.rev_map_es
     (fun h ->
-      (match Contract.is_implicit h with
-      | Some m -> (
+      (match (h : Contract.t) with
+      | Implicit m -> (
           Public_key_hash.rev_find cctxt m >>=? function
           | None -> return ""
           | Some nm -> (
               RawContractAlias.find_opt cctxt nm >>=? function
               | None -> return (" (known as " ^ nm ^ ")")
               | Some _ -> return (" (known as key:" ^ nm ^ ")")))
-      | None -> (
+      | Originated _ -> (
           RawContractAlias.rev_find cctxt h >>=? function
           | None -> return ""
           | Some nm -> return (" (known as " ^ nm ^ ")")))
       >>=? fun nm ->
       let kind =
-        match Contract.is_implicit h with Some _ -> " (implicit)" | None -> ""
+        match h with Implicit _ -> " (implicit)" | Originated _ -> ""
       in
       let h_b58 = Contract.to_b58check h in
       return (nm, h_b58, kind))
@@ -343,7 +343,41 @@ let set_deposits_limit cctxt ~chain ~block ?confirmations ?dry_run
     ~src_sk:manager_sk
     ~fee_parameter
     operation
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+      return (oph, op, result)
+
+let increase_paid_storage cctxt ~chain ~block ?force ?dry_run ?verbose_signing
+    ?fee ?confirmations ?simulation ~source ~destination ~src_pk ~manager_sk
+    ~fee_parameter ~amount_in_bytes () =
+  let operation = Increase_paid_storage {amount_in_bytes; destination} in
+  let operation =
+    Injection.prepare_manager_operation
+      ~fee:(Limit.of_option fee)
+      ~gas_limit:Limit.unknown
+      ~storage_limit:Limit.unknown
+      operation
+  in
+  let operation = Annotated_manager_operation.Single_manager operation in
+  Injection.inject_manager_operation
+    cctxt
+    ~chain
+    ~block
+    ?confirmations
+    ?force
+    ?dry_run
+    ?verbose_signing
+    ?simulation
+    ~source
+    ~fee:(Limit.of_option fee)
+    ~gas_limit:Limit.unknown
+    ~storage_limit:Limit.unknown
+    ~src_pk
+    ~src_sk:manager_sk
+    ~fee_parameter
+    operation
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -352,8 +386,24 @@ let save_contract ~force cctxt alias_name contract =
   RawContractAlias.add ~force cctxt alias_name contract >>=? fun () ->
   message_added_contract cctxt alias_name >>= fun () -> return_unit
 
-let build_origination_operation ?fee ?gas_limit ?storage_limit ~initial_storage
-    ~code ~delegate ~balance () =
+let check_for_timelock code =
+  let open Tezos_micheline.Micheline in
+  let rec has_timelock_opcodes = function
+    | Prim (_, (Script.T_chest | T_chest_key | I_OPEN_CHEST), _, _) -> true
+    | Seq (_, exprs) | Prim (_, _, exprs, _) ->
+        List.exists has_timelock_opcodes exprs
+    | Int _ | String _ | Bytes _ -> false
+  in
+  has_timelock_opcodes (root code)
+
+let build_origination_operation ?(allow_timelock = false) ?fee ?gas_limit
+    ?storage_limit ~initial_storage ~code ~delegate ~balance () =
+  (if (not allow_timelock) && check_for_timelock code then
+   failwith
+     "Origination of contracts containing time lock related instructions is \
+      disabled in the client because of a vulnerability."
+  else return_unit)
+  >>=? fun () ->
   (* With the change of making implicit accounts delegatable, the following
      3 arguments are being defaulted before they can be safely removed. *)
   Lwt.return (Michelson_v1_parser.parse_expression initial_storage)
@@ -375,6 +425,7 @@ let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?branch ?fee ?gas_limit ?storage_limit ~delegate
     ~initial_storage ~balance ~source ~src_pk ~src_sk ~code ~fee_parameter () =
   build_origination_operation
+    ~allow_timelock:false
     ?fee
     ?gas_limit
     ?storage_limit
@@ -401,13 +452,13 @@ let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     origination
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   (match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result))
   >>=? fun res ->
   Lwt.return (Injection.originated_contracts ~force:false result) >>=? function
-  | [contract] -> return (res, contract)
+  | [contract] -> return (res, Contract.Originated contract)
   | contracts ->
       failwith
         "The origination introduced %d contracts instead of one."
@@ -450,7 +501,7 @@ let register_global_constant (cctxt : #full) ~chain ~block ?confirmations
     ~src_sk
     ~fee_parameter
     op
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -562,7 +613,6 @@ let inject_activate_operation cctxt ~chain ~block ?confirmations ?dry_run alias
     ?dry_run
     ~chain
     ~block
-    ~fee_parameter:Injection.dummy_fee_parameter
     contents
   >>=? fun (oph, op, result) ->
   (match confirmations with
@@ -571,14 +621,14 @@ let inject_activate_operation cctxt ~chain ~block ?confirmations ?dry_run alias
       Alpha_services.Contract.balance
         cctxt
         (chain, block)
-        (Contract.implicit_contract (Ed25519 pkh))
+        (Contract.Implicit (Ed25519 pkh))
       >>=? fun balance ->
       cctxt#message
         "Account %s (%a) activated with %s%a."
         alias
         Ed25519.Public_key_hash.pp
         pkh
-        Client_proto_args.tez_sym
+        Operation_result.tez_sym
         Tez.pp
         balance
       >>= fun () -> return_unit)
@@ -695,7 +745,6 @@ let submit_proposals ?dry_run ?verbose_signing (cctxt : #full) ~chain ~block
     ~chain
     ~block
     ?confirmations
-    ~fee_parameter:Injection.dummy_fee_parameter
     ?dry_run
     ~src_sk
     contents
@@ -713,7 +762,6 @@ let submit_ballot ?dry_run ?verbose_signing (cctxt : #full) ~chain ~block
     ~chain
     ~block
     ?confirmations
-    ~fee_parameter:Injection.dummy_fee_parameter
     ?dry_run
     ~src_sk
     contents
@@ -721,18 +769,18 @@ let submit_ballot ?dry_run ?verbose_signing (cctxt : #full) ~chain ~block
 
 let pp_operation formatter (a : Alpha_block_services.operation) =
   match (a.receipt, a.protocol_data) with
-  | (Receipt (Apply_results.Operation_metadata omd), Operation_data od) -> (
+  | Receipt (Apply_results.Operation_metadata omd), Operation_data od -> (
       match Apply_results.kind_equal_list od.contents omd.contents with
       | Some Apply_results.Eq ->
           Operation_result.pp_operation_result
             formatter
             (od.contents, omd.contents)
       | None -> Stdlib.failwith "Unexpected result.")
-  | (Empty, _) ->
+  | Empty, _ ->
       Stdlib.failwith
         "Pruned metadata: the operation receipt was removed accordingly to the \
          node's history mode."
-  | (Too_large, _) -> Stdlib.failwith "Too large metadata."
+  | Too_large, _ -> Stdlib.failwith "Too large metadata."
   | _ -> Stdlib.failwith "Unexpected result."
 
 let get_operation_from_block (cctxt : #full) ~chain predecessors operation_hash
@@ -812,7 +860,7 @@ let originate_tx_rollup (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     contents
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -847,7 +895,7 @@ let submit_tx_rollup_batch (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     contents
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -886,7 +934,7 @@ let submit_tx_rollup_commitment (cctxt : #full) ~chain ~block ?confirmations
     ~src_sk
     ~fee_parameter
     contents
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -922,7 +970,7 @@ let submit_tx_rollup_finalize_commitment (cctxt : #full) ~chain ~block
     ~src_sk
     ~fee_parameter
     contents
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -958,7 +1006,7 @@ let submit_tx_rollup_remove_commitment (cctxt : #full) ~chain ~block
     ~src_sk
     ~fee_parameter
     contents
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -1014,7 +1062,7 @@ let submit_tx_rollup_rejection (cctxt : #full) ~chain ~block ?confirmations
     ~src_sk
     ~fee_parameter
     contents
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -1048,7 +1096,7 @@ let submit_tx_rollup_return_bond (cctxt : #full) ~chain ~block ?confirmations
     ~src_sk
     ~fee_parameter
     contents
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -1093,7 +1141,7 @@ let tx_rollup_dispatch_tickets (cctxt : #full) ~chain ~block ?confirmations
     ~src_sk
     ~fee_parameter
     contents
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -1134,21 +1182,24 @@ let transfer_ticket (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     operation
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
 
 let sc_rollup_originate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
-    ~kind ~boot_sector ~src_pk ~src_sk ~fee_parameter () =
+    ~kind ~boot_sector ~parameters_ty ~src_pk ~src_sk ~fee_parameter () =
+  Client_proto_rollups.ScRollup.origination_proof_exn ~boot_sector kind
+  >>= fun origination_proof ->
   let op =
     Annotated_manager_operation.Single_manager
       (Injection.prepare_manager_operation
          ~fee:(Limit.of_option fee)
          ~gas_limit:(Limit.of_option gas_limit)
          ~storage_limit:(Limit.of_option storage_limit)
-         (Sc_rollup_originate {kind; boot_sector}))
+         (Sc_rollup_originate
+            {kind; boot_sector; origination_proof; parameters_ty}))
   in
   Injection.inject_manager_operation
     cctxt
@@ -1167,7 +1218,7 @@ let sc_rollup_originate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     op
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -1200,7 +1251,7 @@ let sc_rollup_add_messages (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     op
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -1233,7 +1284,7 @@ let sc_rollup_cement (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     op
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -1266,7 +1317,182 @@ let sc_rollup_publish (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     op
-  >>=? fun (oph, op, result) ->
+  >>=? fun (oph, _, op, result) ->
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+      return (oph, op, result)
+
+let sc_rollup_execute_outbox_message (cctxt : #full) ~chain ~block
+    ?confirmations ?dry_run ?verbose_signing ?simulation ?fee ?gas_limit
+    ?storage_limit ?counter ~source ~rollup ~cemented_commitment ~output_proof
+    ~src_pk ~src_sk ~fee_parameter () =
+  let op =
+    Annotated_manager_operation.Single_manager
+      (Injection.prepare_manager_operation
+         ~fee:(Limit.of_option fee)
+         ~gas_limit:(Limit.of_option gas_limit)
+         ~storage_limit:(Limit.of_option storage_limit)
+         (Sc_rollup_execute_outbox_message
+            {rollup; cemented_commitment; output_proof}))
+  in
+  Injection.inject_manager_operation
+    cctxt
+    ~chain
+    ~block
+    ?confirmations
+    ?dry_run
+    ?verbose_signing
+    ?simulation
+    ?counter
+    ~source
+    ~fee:(Limit.of_option fee)
+    ~storage_limit:(Limit.of_option storage_limit)
+    ~gas_limit:(Limit.of_option gas_limit)
+    ~src_pk
+    ~src_sk
+    ~fee_parameter
+    op
+  >>=? fun (oph, _, op, result) ->
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+      return (oph, op, result)
+
+let sc_rollup_recover_bond (cctxt : #full) ~chain ~block ?confirmations ?dry_run
+    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
+    ~src_pk ~src_sk ~fee_parameter ~sc_rollup () =
+  let contents :
+      Kind.sc_rollup_recover_bond Annotated_manager_operation.annotated_list =
+    Annotated_manager_operation.Single_manager
+      (Injection.prepare_manager_operation
+         ~fee:(Limit.of_option fee)
+         ~gas_limit:(Limit.of_option gas_limit)
+         ~storage_limit:(Limit.of_option storage_limit)
+         (Sc_rollup_recover_bond {sc_rollup}))
+  in
+  (* TODO/Fixme: https://gitlab.com/tezos/tezos/-/issues/2609
+     Decide if we should enforce ~successor_level:true for simulation.
+     See https://gitlab.com/tezos/tezos/-/merge_requests/5395#note_958326685 *)
+  Injection.inject_manager_operation
+    cctxt
+    ~chain
+    ~block
+    ?confirmations
+    ?dry_run
+    ?verbose_signing
+    ?simulation
+    ?counter
+    ~source
+    ~fee:(Limit.of_option fee)
+    ~storage_limit:(Limit.of_option storage_limit)
+    ~gas_limit:(Limit.of_option gas_limit)
+    ~src_pk
+    ~src_sk
+    ~fee_parameter
+    contents
+  >>=? fun (oph, _, op, result) ->
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+      return (oph, op, result)
+
+let sc_rollup_dal_slot_subscribe (cctxt : #full) ~chain ~block ?confirmations
+    ?dry_run ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit
+    ?counter ~source ~rollup ~slot_index ~src_pk ~src_sk ~fee_parameter () =
+  match Dal.Slot_index.of_int slot_index with
+  | None -> failwith "Dal slot index either negative or above hard limit"
+  | Some slot_index -> (
+      let op =
+        Annotated_manager_operation.Single_manager
+          (Injection.prepare_manager_operation
+             ~fee:(Limit.of_option fee)
+             ~gas_limit:(Limit.of_option gas_limit)
+             ~storage_limit:(Limit.of_option storage_limit)
+             (Sc_rollup_dal_slot_subscribe {rollup; slot_index}))
+      in
+      Injection.inject_manager_operation
+        cctxt
+        ~chain
+        ~block
+        ?confirmations
+        ?dry_run
+        ?verbose_signing
+        ?simulation
+        ?counter
+        ~source
+        ~fee:(Limit.of_option fee)
+        ~storage_limit:(Limit.of_option storage_limit)
+        ~gas_limit:(Limit.of_option gas_limit)
+        ~src_pk
+        ~src_sk
+        ~fee_parameter
+        op
+      >>=? fun (oph, _, op, result) ->
+      match Apply_results.pack_contents_list op result with
+      | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+          return (oph, op, result))
+
+let sc_rollup_refute (cctxt : #full) ~chain ~block ?confirmations ?dry_run
+    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
+    ~rollup ~refutation ~opponent ~src_pk ~src_sk ~fee_parameter () =
+  let op =
+    Annotated_manager_operation.Single_manager
+      (Injection.prepare_manager_operation
+         ~fee:(Limit.of_option fee)
+         ~gas_limit:(Limit.of_option gas_limit)
+         ~storage_limit:(Limit.of_option storage_limit)
+         (Sc_rollup_refute {rollup; refutation; opponent}))
+  in
+  Injection.inject_manager_operation
+    cctxt
+    ~chain
+    ~block
+    ?confirmations
+    ?dry_run
+    ?verbose_signing
+    ?simulation
+    ?counter
+    ~source
+    ~fee:(Limit.of_option fee)
+    ~storage_limit:(Limit.of_option storage_limit)
+    ~gas_limit:(Limit.of_option gas_limit)
+    ~src_pk
+    ~src_sk
+    ~fee_parameter
+    op
+  >>=? fun (oph, _, op, result) ->
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+      return (oph, op, result)
+
+let sc_rollup_timeout (cctxt : #full) ~chain ~block ?confirmations ?dry_run
+    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
+    ~rollup ~alice ~bob ~src_pk ~src_sk ~fee_parameter () =
+  let stakers = Sc_rollup.Game.Index.make alice bob in
+  let op =
+    Annotated_manager_operation.Single_manager
+      (Injection.prepare_manager_operation
+         ~fee:(Limit.of_option fee)
+         ~gas_limit:(Limit.of_option gas_limit)
+         ~storage_limit:(Limit.of_option storage_limit)
+         (Sc_rollup_timeout {rollup; stakers}))
+  in
+  Injection.inject_manager_operation
+    cctxt
+    ~chain
+    ~block
+    ?confirmations
+    ?dry_run
+    ?verbose_signing
+    ?simulation
+    ?counter
+    ~source
+    ~fee:(Limit.of_option fee)
+    ~storage_limit:(Limit.of_option storage_limit)
+    ~gas_limit:(Limit.of_option gas_limit)
+    ~src_pk
+    ~src_sk
+    ~fee_parameter
+    op
+  >>=? fun (oph, _, op, result) ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)

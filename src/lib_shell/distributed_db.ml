@@ -217,8 +217,9 @@ let deactivate chain_db =
     chain_db.reader_chain_db.block_header_db
 
 let get_chain global_db chain_id =
-  let f reader_chain_db = {global_db; reader_chain_db} in
-  Option.map f (Chain_id.Table.find global_db.active_chains chain_id)
+  let open Option_syntax in
+  let+ reader_chain_db = Chain_id.Table.find global_db.active_chains chain_id in
+  {global_db; reader_chain_db}
 
 let greylist {global_db = {p2p; _}; _} peer_id =
   Lwt.return (P2p.greylist_peer p2p peer_id)

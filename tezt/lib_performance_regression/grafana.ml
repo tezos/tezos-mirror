@@ -267,7 +267,7 @@ let update_dashboard config dashboard =
         body = None;
       }
     in
-    let* (response, body) = http_call delete_request config in
+    let* response, body = http_call delete_request config in
     match response.status with
     | #Cohttp.Code.success_status | `Not_found ->
         Cohttp_lwt.Body.drain_body body
@@ -283,11 +283,11 @@ let update_dashboard config dashboard =
       meth = `POST;
       headers =
         Cohttp.Header.of_list
-        @@ ("Content-Type", "application/json") :: authorization;
+        @@ (("Content-Type", "application/json") :: authorization);
       body = Option.some @@ Cohttp_lwt.Body.of_string body;
     }
   in
-  let* (response, body) = http_call create_request config in
+  let* response, body = http_call create_request config in
   match response.status with
   | #Cohttp.Code.success_status -> Cohttp_lwt.Body.drain_body body
   | status -> handle_http_error status body create_request

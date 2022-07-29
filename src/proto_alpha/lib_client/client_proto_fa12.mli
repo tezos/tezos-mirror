@@ -62,7 +62,7 @@ val action_of_expr :
   (_, Script.prim) Tezos_micheline.Micheline.node ->
   action tzresult
 
-(** [convert_wrapped_parameter_into_action ccctx ~chain ~block
+(** [convert_wrapped_parameter_into_action cctxt ~chain ~block
    ~contract parameter] converts a wrapped FA1.2 contract [parameter]
    into the corresponding FA1.2 [action].
 
@@ -76,7 +76,7 @@ val convert_wrapped_parameter_into_action :
   full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  Contract.t ->
+  Contract_hash.t ->
   Script.node ->
   action tzresult Lwt.t
 
@@ -85,7 +85,7 @@ val contract_has_fa12_interface :
   full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  contract:Alpha_context.Contract.t ->
+  contract:Contract_hash.t ->
   unit ->
   unit tzresult Lwt.t
 
@@ -100,7 +100,7 @@ val call_contract :
   source:public_key_hash ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
-  contract:Contract.t ->
+  contract:Contract_hash.t ->
   action:action ->
   tez_amount:Tez.t ->
   ?fee:Tez.t ->
@@ -109,7 +109,8 @@ val call_contract :
   ?counter:Z.t ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
-  (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
+  (Kind.transaction Kind.manager Injection.result * Contract_hash.t list)
+  tzresult
   Lwt.t
 
 (** Single transfer operation. *)
@@ -152,9 +153,9 @@ val run_view_action :
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   ?source:Contract.t ->
-  contract:Contract.t ->
+  contract:Contract_hash.t ->
   action:action ->
-  ?payer:Contract.t ->
+  ?payer:Signature.public_key_hash ->
   ?gas:Gas.Arith.integral ->
   unparsing_mode:Script_ir_translator.unparsing_mode ->
   unit ->

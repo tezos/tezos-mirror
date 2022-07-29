@@ -60,14 +60,118 @@ Prerequisites:
 
 Summing up, a typical installation proceeds as follows::
 
-  # 1. install poetry
-  # 2. install pyenv
-  # 3. restart shell, to ensure "pyenv init -" has been evaluated
-  # 4. then:
+  # 1. install pyenv
+  # 2. restart shell, to ensure "pyenv init -" has been evaluated
+  # 3. then install python using pyenv:
   pyenv install 3.9.5
-  pyenv local 3.9.5
+  pyenv global 3.9.5
+  # 4. install poetry
+  # 5. restart shell, to activate the poetry setup
+  # 6. then install dependencies for Octez using poetry:
+  cd tezos/
   poetry install
   cd tests_python/
+
+Installation details for Ubuntu 20.04
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+First, make sure ``curl`` and ``git`` are installed, as they are required by the ``pyenv`` and ``poetry`` installers:
+
+.. literalinclude:: install-python-debian-ubuntu.sh
+   :language: shell
+   :start-after: [install pyenv system dependencies]
+   :end-before: [install python build dependencies]
+
+For ``pyenv`` to compile Python, you'll have to install `python's build dependencies <https://github.com/pyenv/pyenv/wiki#suggested-build-environment>`__:
+
+.. literalinclude:: install-python-debian-ubuntu.sh
+   :language: shell
+   :start-after: [install python build dependencies]
+   :end-before: [install pyenv]
+
+Now, install ``pyenv`` using `pyenv-installer <https://github.com/pyenv/pyenv-installer>`__:
+
+.. literalinclude:: install-python-debian-ubuntu.sh
+   :language: shell
+   :start-after: [install pyenv]
+   :end-before: [setup shell for pyenv]
+
+To make ``pyenv`` available in your shell session, `add the following
+to your shell configuration file <https://github.com/pyenv/pyenv/#set-up-your-shell-environment-for-pyenv>`__,
+e.g. ``~/.bashrc`` or ``~/.zshrc``:
+
+.. literalinclude:: install-python-debian-ubuntu.sh
+   :language: shell
+   :start-after: [setup shell for pyenv]
+   :end-before: [print pyenv version]
+
+To verify the ``pyenv`` installation, restart your terminal and try
+executing ``pyenv``:
+
+.. literalinclude:: install-python-debian-ubuntu.sh
+   :language: shell
+   :start-after: [print pyenv version]
+   :end-before: [verify pyenv installation]
+
+Now we can use ``pyenv`` to install Python 3.9.5 and set it as the
+default version to use:
+
+.. literalinclude:: install-python-debian-ubuntu.sh
+   :language: shell
+   :start-after: [install python through pyenv]
+   :end-before: [print python version]
+
+Now verify that the correct version is called when running ``python``:
+
+.. literalinclude:: install-python-debian-ubuntu.sh
+   :language: shell
+   :start-after: [print python version]
+   :end-before: [verify python version]
+
+Now, on to installing ``poetry``. We'll use `poetry's official installer <https://python-poetry.org/docs/master/#installing-with-the-official-installer>`__:
+
+.. literalinclude:: install-python-debian-ubuntu.sh
+   :language: shell
+   :start-after: [install poetry]
+   :end-before: [setup shell for poetry]
+
+As for ``pyenv``, we need to do some shell setup to put ``poetry`` in
+the shells path. Add the following to your shell configuration file,
+e.g. ``~/.bashrc`` or ``~/.zshrc``:
+
+.. literalinclude:: install-python-debian-ubuntu.sh
+   :language: shell
+   :start-after: [setup shell for poetry]
+   :end-before: [print poetry version]
+
+Restart the terminal and verify that the correct version is called
+when running ``poetry``:
+
+.. literalinclude:: install-python-debian-ubuntu.sh
+   :language: shell
+   :start-after: [print poetry version]
+   :end-before: [verify poetry version]
+
+Finally, let's use ``poetry`` to install the python dependencies of
+Octez. This command needs to run in the root of the an Octez checkout:
+
+.. literalinclude:: install-python-debian-ubuntu.sh
+   :language: shell
+   :start-after: [install octez python dev-dependencies]
+   :end-before: [print pytest/sphinx-build versions]
+
+If the installation went well, you should now have the correct version
+when executing poetry in the Octez checkout for our main dependencies:
+``pytest`` for system testing (with our custom version of ``pytest-regtest``)
+and ``sphinx-build`` for documentation:
+
+.. literalinclude:: install-python-debian-ubuntu.sh
+   :language: shell
+   :start-after: [print pytest/sphinx-build versions]
+   :end-before: [verify pytest/sphinx-build version]
+
+Using poetry to execute pytest
+------------------------------
 
 Examples of test executions:
 

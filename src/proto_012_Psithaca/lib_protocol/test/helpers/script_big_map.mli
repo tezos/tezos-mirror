@@ -28,7 +28,7 @@ val update :
   ('key, 'value) Protocol.Script_typed_ir.big_map ->
   Protocol.Alpha_context.t ->
   (('key, 'value) Protocol.Script_typed_ir.big_map * Protocol.Alpha_context.t)
-  Protocol.Environment.Error_monad.tzresult
+  Environment.Error_monad.tzresult
   Lwt.t
 
 (** Convert a list to a [Script_big_map]. If the list contains duplicate keys,
@@ -40,5 +40,5 @@ val of_list :
   ('key * 'value) list ->
   Protocol.Alpha_context.t ->
   (('key, 'value) Protocol.Script_typed_ir.big_map * Protocol.Alpha_context.t)
-  Protocol.Environment.Error_monad.tzresult
+  Environment.Error_monad.tzresult
   Lwt.t

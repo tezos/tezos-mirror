@@ -30,7 +30,7 @@
 
     This is internally a [Z.t].
     This module mostly adds signedness preservation guarantees. *)
-type 't repr [@@coq_phantom]
+type 't repr
 
 (** [num] is made algebraic in order to distinguish it from the other type
     parameters of [Script_typed_ir.ty]. *)

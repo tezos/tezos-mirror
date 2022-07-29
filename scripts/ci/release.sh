@@ -5,17 +5,12 @@
 # shellcheck disable=SC2034
 architectures='x86_64 arm64'
 
-binaries='tezos-admin-client tezos-client tezos-node tezos-signer tezos-codec'
+current_dir=$(cd "$(dirname "${0}")" && pwd)
+scripts_dir=$(dirname "$current_dir")
+src_dir=$(dirname "$scripts_dir")
+script_inputs_dir="$src_dir/script-inputs"
 
-while read -r  proto
-do
-  if [ "${proto}" = '011-PtHangz2' ]
-  then
-    binaries="${binaries} tezos-accuser-${proto} tezos-baker-${proto} tezos-endorser-${proto}"
-  else
-    binaries="${binaries} tezos-accuser-${proto} tezos-baker-${proto}"
-  fi
-done < active_protocol_versions
+binaries="$(cat "$script_inputs_dir/binaries-for-release")"
 
 ### Compute GitLab release names
 

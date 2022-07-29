@@ -14,8 +14,11 @@ misc_checks:
     - make -C tests_python typecheck
     # Ensure that all unit tests are restricted to their opam package
     - make lint-tests-pkg
-    # Ensure there are no mli docstring syntax errors in alpha protocol
-    - ODOC_WARN_ERROR=true dune build @src/proto_alpha/lib_protocol/doc
+    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2971
+    # The new version of odoc (2.1.0) is stricter than the old version (1.5.3),
+    # we temporarily deactivate the odoc checks.
+    ## Ensure there are no mli docstring syntax errors in alpha protocol
+    #- ODOC_WARN_ERROR=true dune build @src/proto_alpha/lib_protocol/doc
     # check that the hack-module patch applies cleanly
     - git apply devtools/protocol-print/add-hack-module.patch
     # check that yes-wallet builds correctly
@@ -35,6 +38,7 @@ misc_opam_checks:
 
 semgrep:
   extends:
+    - .default_settings_template
     - .rules_template__development
   # We specify the image by hash to avoid flakiness. Indeed, if we took the
   # latest release, then an update in the parser or analyser could result in new
@@ -69,43 +73,43 @@ check_scripts_b58_prefix:
     - poetry run pylint scripts/b58_prefix/b58_prefix.py --disable=missing-docstring --disable=invalid-name
     - poetry run pytest scripts/b58_prefix/test_b58_prefix.py -v
 
-# TODO: https://gitlab.com/tezos/tezos/-/issues/2860
-# Disabled until compatible with ocaml 4.14
+ometrics-code-quality-default:
+  stage: test
+  extends:
+    - .template__code_quality
+    # See https://gitlab.com/gitlab-org/gitlab/-/issues/215279
+    # In short, GitLab requires a code quality report from the target branch.
+    # As ometrics tries to find code quality issues against the target branch
+    # (i.e. previously introduced issues will not be reported), we create a fake
+    # empty report on the default branch which is supposed to be the target branch
+    # in most cases.
+    - .rules_template__tezos_default_branch_only
+  needs: []
+  interruptible: true
+  script:
+    - mkdir -p _reports/
+    - echo "[]" > $CODE_QUALITY_REPORT
+  artifacts:
+    paths:
+      - $CODE_QUALITY_REPORT
 
-# ometrics-code-quality-default:
-#   stage: test
-#   extends:
-#     - .template__code_quality
-#     # See https://gitlab.com/gitlab-org/gitlab/-/issues/215279
-#     # In short, GitLab requires a code quality report from the target branch.
-#     # As ometrics tries to find code quality issues against the target branch
-#     # (i.e. previously introduced issues will not be reported), we create a fake
-#     # empty report on the default branch which is supposed to be the target branch
-#     # in most cases.
-#     - .rules_template__tezos_default_branch_only
-#   script:
-#     - mkdir -p _reports/
-#     - echo "[]" > $CODE_QUALITY_REPORT
-#   artifacts:
-#     paths:
-#       - $CODE_QUALITY_REPORT
-
-# ometrics-code-quality:
-#   stage: test
-#   needs: []
-#   extends:
-#     - .default_settings_template
-#     - .image_template__runtime_build_test_dependencies_template
-#     - .template__code_quality
-#     - .rules_template__merge_request_only
-#   allow_failure: true
-#   script:
-#     - OMETRICS_GIT=$CI_MERGE_REQUEST_SOURCE_PROJECT_URL OMETRICS_BRANCH=$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME make lint-ometrics-gitlab
-#   artifacts:
-#     expose_as: 'Code quality report'
-#     when: always
-#     reports:
-#       codequality: $CODE_QUALITY_REPORT
-#     paths:
-#       - _reports/
-#     expire_in: 15 days
+ometrics-code-quality:
+  stage: test
+  needs: []
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .template__code_quality
+    - .rules_template__merge_request_only
+  allow_failure: true
+  interruptible: true
+  script:
+    - OMETRICS_GIT=$CI_MERGE_REQUEST_SOURCE_PROJECT_URL OMETRICS_BRANCH=$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME make lint-ometrics-gitlab
+  artifacts:
+    expose_as: 'Code quality report'
+    when: always
+    reports:
+      codequality: $CODE_QUALITY_REPORT
+    paths:
+      - _reports/
+    expire_in: 15 days

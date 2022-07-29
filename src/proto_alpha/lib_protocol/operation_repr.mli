@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -67,7 +68,11 @@ module Kind : sig
 
   type endorsement = endorsement_consensus_kind consensus
 
+  type dal_slot_availability = Dal_slot_availability_kind
+
   type seed_nonce_revelation = Seed_nonce_revelation_kind
+
+  type vdf_revelation = Vdf_revelation_kind
 
   type 'a double_consensus_operation_evidence =
     | Double_consensus_operation_evidence
@@ -94,7 +99,11 @@ module Kind : sig
 
   type delegation = Delegation_kind
 
+  type event = Event_kind
+
   type set_deposits_limit = Set_deposits_limit_kind
+
+  type increase_paid_storage = Increase_paid_storage_kind
 
   type failing_noop = Failing_noop_kind
 
@@ -118,6 +127,8 @@ module Kind : sig
 
   type transfer_ticket = Transfer_ticket_kind
 
+  type dal_publish_slot_header = Dal_publish_slot_header_kind
+
   type sc_rollup_originate = Sc_rollup_originate_kind
 
   type sc_rollup_add_messages = Sc_rollup_add_messages_kind
@@ -126,13 +137,26 @@ module Kind : sig
 
   type sc_rollup_publish = Sc_rollup_publish_kind
 
+  type sc_rollup_refute = Sc_rollup_refute_kind
+
+  type sc_rollup_timeout = Sc_rollup_timeout_kind
+
+  type sc_rollup_execute_outbox_message =
+    | Sc_rollup_execute_outbox_message_kind
+
+  type sc_rollup_recover_bond = Sc_rollup_recover_bond_kind
+
+  type sc_rollup_dal_slot_subscribe = Sc_rollup_dal_slot_subscribe_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
     | Origination_manager_kind : origination manager
     | Delegation_manager_kind : delegation manager
+    | Event_manager_kind : event manager
     | Register_global_constant_manager_kind : register_global_constant manager
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
+    | Increase_paid_storage_manager_kind : increase_paid_storage manager
     | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
     | Tx_rollup_submit_batch_manager_kind : tx_rollup_submit_batch manager
     | Tx_rollup_commit_manager_kind : tx_rollup_commit manager
@@ -145,10 +169,18 @@ module Kind : sig
     | Tx_rollup_dispatch_tickets_manager_kind
         : tx_rollup_dispatch_tickets manager
     | Transfer_ticket_manager_kind : transfer_ticket manager
+    | Dal_publish_slot_header_manager_kind : dal_publish_slot_header manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
     | Sc_rollup_add_messages_manager_kind : sc_rollup_add_messages manager
     | Sc_rollup_cement_manager_kind : sc_rollup_cement manager
     | Sc_rollup_publish_manager_kind : sc_rollup_publish manager
+    | Sc_rollup_refute_manager_kind : sc_rollup_refute manager
+    | Sc_rollup_timeout_manager_kind : sc_rollup_timeout manager
+    | Sc_rollup_execute_outbox_message_manager_kind
+        : sc_rollup_execute_outbox_message manager
+    | Sc_rollup_recover_bond_manager_kind : sc_rollup_recover_bond manager
+    | Sc_rollup_dal_slot_subscribe_manager_kind
+        : sc_rollup_dal_slot_subscribe manager
 end
 
 type 'a consensus_operation_type =
@@ -176,6 +208,7 @@ val pp_consensus_content : Format.formatter -> consensus_content -> unit
 type consensus_watermark =
   | Endorsement of Chain_id.t
   | Preendorsement of Chain_id.t
+  | Dal_slot_availability of Chain_id.t
 
 val to_watermark : consensus_watermark -> Signature.watermark
 
@@ -184,19 +217,6 @@ val of_watermark : Signature.watermark -> consensus_watermark option
 type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
 
 val raw_encoding : raw Data_encoding.t
-
-type transaction = {
-  amount : Tez_repr.tez;
-  parameters : Script_repr.lazy_expr;
-  entrypoint : Entrypoint_repr.t;
-  destination : Destination_repr.t;
-}
-
-type origination = {
-  delegate : Signature.Public_key_hash.t option;
-  script : Script_repr.t;
-  credit : Tez_repr.tez;
-}
 
 (** An [operation] contains the operation header information in [shell]
     and all data related to the operation itself in [protocol_data]. *)
@@ -232,6 +252,12 @@ and _ contents =
   (* Endorsement: About consensus, endorsement of a block held by a
      validator. *)
   | Endorsement : consensus_content -> Kind.endorsement contents
+  (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
+
+     Temporary operation to avoid modifying endorsement encoding. *)
+  | Dal_slot_availability :
+      Signature.Public_key_hash.t * Dal_endorsement_repr.t
+      -> Kind.dal_slot_availability contents
   (* Seed_nonce_revelation: Nonces are created by bakers and are
      combined to create pseudo-random seeds. Bakers are urged to reveal their
      nonces after a given number of cycles to keep their block rewards
@@ -241,6 +267,12 @@ and _ contents =
       nonce : Seed_repr.nonce;
     }
       -> Kind.seed_nonce_revelation contents
+  (* Vdf_revelation: VDF are computed from the seed generated by the revealed
+     nonces. *)
+  | Vdf_revelation : {
+      solution : Seed_repr.vdf_solution;
+    }
+      -> Kind.vdf_revelation contents
   (* Double_preendorsement_evidence: Double-preendorsement is a
      kind of malicious attack where a byzantine attempts to fork
      the chain by preendorsing blocks with different
@@ -316,10 +348,21 @@ and _ manager_operation =
   | Reveal : Signature.Public_key.t -> Kind.reveal manager_operation
   (* [Transaction] of some amount to some destination contract. It can
      also be used to execute/call smart-contracts. *)
-  | Transaction : transaction -> Kind.transaction manager_operation
+  | Transaction : {
+      amount : Tez_repr.tez;
+      parameters : Script_repr.lazy_expr;
+      entrypoint : Entrypoint_repr.t;
+      destination : Contract_repr.t;
+    }
+      -> Kind.transaction manager_operation
   (* [Origination] of a contract using a smart-contract [script] and
      initially credited with the amount [credit]. *)
-  | Origination : origination -> Kind.origination manager_operation
+  | Origination : {
+      delegate : Signature.Public_key_hash.t option;
+      script : Script_repr.t;
+      credit : Tez_repr.tez;
+    }
+      -> Kind.origination manager_operation
   (* [Delegation] to some staking contract (designated by its public
      key hash). When this value is None, delegation is reverted as it
      is set to nobody. *)
@@ -339,6 +382,13 @@ and _ manager_operation =
   | Set_deposits_limit :
       Tez_repr.t option
       -> Kind.set_deposits_limit manager_operation
+  (* [Increase_paid_storage] allows a sender to pay to increase the paid storage of
+     some contract by some amount. *)
+  | Increase_paid_storage : {
+      amount_in_bytes : Z.t;
+      destination : Contract_hash.t;
+    }
+      -> Kind.increase_paid_storage manager_operation
   (* [Tx_rollup_origination] allows an implicit contract to originate
      a new transactional rollup. *)
   | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
@@ -417,12 +467,21 @@ and _ manager_operation =
           (** The entrypoint of the smart contract address that should receive the tickets. *)
     }
       -> Kind.transfer_ticket manager_operation
-  (* [Sc_rollup_originate] allows an implicit account to originate a new
-     smart contract rollup (initialized with a given boot
-     sector). *)
+  | Dal_publish_slot_header : {
+      slot : Dal_slot_repr.t;
+    }
+      -> Kind.dal_publish_slot_header manager_operation
+      (** [Sc_rollup_originate] allows an implicit account to originate a new
+          smart contract rollup (initialized with a given boot sector).
+          The [parameters_ty] field allows to provide the expected interface
+          of the rollup being originated (i.e. its entrypoints with their
+          associated signatures) as a Michelson type.
+      *)
   | Sc_rollup_originate : {
-      kind : Sc_rollup_repr.Kind.t;
+      kind : Sc_rollups.Kind.t;
       boot_sector : string;
+      origination_proof : Sc_rollups.wrapped_proof;
+      parameters_ty : Script_repr.lazy_expr;
     }
       -> Kind.sc_rollup_originate manager_operation
   (* [Sc_rollup_add_messages] adds messages to a given rollup's
@@ -434,14 +493,53 @@ and _ manager_operation =
       -> Kind.sc_rollup_add_messages manager_operation
   | Sc_rollup_cement : {
       rollup : Sc_rollup_repr.t;
-      commitment : Sc_rollup_repr.Commitment_hash.t;
+      commitment : Sc_rollup_commitment_repr.Hash.t;
     }
       -> Kind.sc_rollup_cement manager_operation
   | Sc_rollup_publish : {
       rollup : Sc_rollup_repr.t;
-      commitment : Sc_rollup_repr.Commitment.t;
+      commitment : Sc_rollup_commitment_repr.t;
     }
       -> Kind.sc_rollup_publish manager_operation
+  | Sc_rollup_refute : {
+      rollup : Sc_rollup_repr.t;
+      opponent : Sc_rollup_repr.Staker.t;
+      refutation : Sc_rollup_game_repr.refutation option;
+    }
+      -> Kind.sc_rollup_refute manager_operation
+      (** [Sc_rollup_refute { rollup; opponent; refutation }] makes a move
+          in a refutation game between the source of the operation and the
+          [opponent] under the given [rollup]. Both players must be stakers
+          on commitments in conflict. When [refutation = None], the game is
+          initialized. Next, when [refutation = Some move], [move] is the
+          next play for the current player. See {!Sc_rollup_game_repr} for
+          details. **)
+  | Sc_rollup_timeout : {
+      rollup : Sc_rollup_repr.t;
+      stakers : Sc_rollup_game_repr.Index.t;
+    }
+      -> Kind.sc_rollup_timeout manager_operation
+  (* [Sc_rollup_execute_outbox_message] executes a message from the rollup's
+      outbox. Messages may involve transactions to smart contract accounts on
+      Layer 1. *)
+  | Sc_rollup_execute_outbox_message : {
+      rollup : Sc_rollup_repr.t;  (** The smart-contract rollup. *)
+      cemented_commitment : Sc_rollup_commitment_repr.Hash.t;
+          (** The hash of the last cemented commitment that the proof refers to. *)
+      output_proof : string;
+          (** A message along with a proof that it is included in the outbox
+              at a given outbox level and message index.*)
+    }
+      -> Kind.sc_rollup_execute_outbox_message manager_operation
+  | Sc_rollup_recover_bond : {
+      sc_rollup : Sc_rollup_repr.t;
+    }
+      -> Kind.sc_rollup_recover_bond manager_operation
+  | Sc_rollup_dal_slot_subscribe : {
+      rollup : Sc_rollup_repr.t;
+      slot_index : Dal_slot_repr.Index.t;
+    }
+      -> Kind.sc_rollup_dal_slot_subscribe manager_operation
 
 (** Counters are used as anti-replay protection mechanism in
     manager operations: each manager account stores a counter and
@@ -522,7 +620,11 @@ module Encoding : sig
 
   val endorsement_case : Kind.endorsement case
 
+  val dal_slot_availability_case : Kind.dal_slot_availability case
+
   val seed_nonce_revelation_case : Kind.seed_nonce_revelation case
+
+  val vdf_revelation_case : Kind.vdf_revelation case
 
   val double_preendorsement_evidence_case :
     Kind.double_preendorsement_evidence case
@@ -552,6 +654,8 @@ module Encoding : sig
 
   val set_deposits_limit_case : Kind.set_deposits_limit Kind.manager case
 
+  val increase_paid_storage_case : Kind.increase_paid_storage Kind.manager case
+
   val tx_rollup_origination_case : Kind.tx_rollup_origination Kind.manager case
 
   val tx_rollup_submit_batch_case :
@@ -574,6 +678,9 @@ module Encoding : sig
 
   val transfer_ticket_case : Kind.transfer_ticket Kind.manager case
 
+  val dal_publish_slot_header_case :
+    Kind.dal_publish_slot_header Kind.manager case
+
   val sc_rollup_originate_case : Kind.sc_rollup_originate Kind.manager case
 
   val sc_rollup_add_messages_case :
@@ -582,6 +689,19 @@ module Encoding : sig
   val sc_rollup_cement_case : Kind.sc_rollup_cement Kind.manager case
 
   val sc_rollup_publish_case : Kind.sc_rollup_publish Kind.manager case
+
+  val sc_rollup_refute_case : Kind.sc_rollup_refute Kind.manager case
+
+  val sc_rollup_timeout_case : Kind.sc_rollup_timeout Kind.manager case
+
+  val sc_rollup_execute_outbox_message_case :
+    Kind.sc_rollup_execute_outbox_message Kind.manager case
+
+  val sc_rollup_recover_bond_case :
+    Kind.sc_rollup_recover_bond Kind.manager case
+
+  val sc_rollup_dal_slot_subscribe_case :
+    Kind.sc_rollup_dal_slot_subscribe Kind.manager case
 
   module Manager_operations : sig
     type 'b case =
@@ -597,21 +717,17 @@ module Encoding : sig
 
     val reveal_case : Kind.reveal case
 
-    val transaction_tag : int
-
     val transaction_case : Kind.transaction case
 
-    val origination_tag : int
-
     val origination_case : Kind.origination case
-
-    val delegation_tag : int
 
     val delegation_case : Kind.delegation case
 
     val register_global_constant_case : Kind.register_global_constant case
 
     val set_deposits_limit_case : Kind.set_deposits_limit case
+
+    val increase_paid_storage_case : Kind.increase_paid_storage case
 
     val tx_rollup_origination_case : Kind.tx_rollup_origination case
 
@@ -632,6 +748,8 @@ module Encoding : sig
 
     val transfer_ticket_case : Kind.transfer_ticket case
 
+    val dal_publish_slot_header_case : Kind.dal_publish_slot_header case
+
     val sc_rollup_originate_case : Kind.sc_rollup_originate case
 
     val sc_rollup_add_messages_case : Kind.sc_rollup_add_messages case
@@ -639,5 +757,17 @@ module Encoding : sig
     val sc_rollup_cement_case : Kind.sc_rollup_cement case
 
     val sc_rollup_publish_case : Kind.sc_rollup_publish case
+
+    val sc_rollup_refute_case : Kind.sc_rollup_refute case
+
+    val sc_rollup_timeout_case : Kind.sc_rollup_timeout case
+
+    val sc_rollup_execute_outbox_message_case :
+      Kind.sc_rollup_execute_outbox_message case
+
+    val sc_rollup_recover_bond_case : Kind.sc_rollup_recover_bond case
+
+    val sc_rollup_dal_slot_subscribe_case :
+      Kind.sc_rollup_dal_slot_subscribe case
   end
 end

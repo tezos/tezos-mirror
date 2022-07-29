@@ -39,7 +39,7 @@ let change_logging_configuration =
       ~timestamp:(Ago (Ptime.Span.of_int_s 1_000_000))
       client
   in
-  let* () = repeat 2 (fun () -> Client.bake_for client) in
+  let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
   let should_fail msg f =
     let* actually_failed =
       Lwt.catch

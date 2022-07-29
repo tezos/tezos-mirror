@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module RingoMaker : Ringo.MAP_MAKER =
-(val Ringo.(map_maker ~replacement:FIFO ~overflow:Strong ~accounting:Precise))
+  (val Ringo.(map_maker ~replacement:FIFO ~overflow:Strong ~accounting:Precise))
 
 module Make
     (K : Hashtbl.HashedType) (V : sig

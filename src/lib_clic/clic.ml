@@ -86,10 +86,12 @@ type ('a, 'ctx) arg =
       -> ('p, 'ctx) arg
   | Switch : {label : label; doc : string} -> (bool, 'ctx) arg
   | Constant : 'a -> ('a, 'ctx) arg
-
-type ('a, 'arg) args =
-  | NoArgs : (unit, 'args) args
-  | AddArg : ('a, 'args) arg * ('b, 'args) args -> ('a * 'b, 'args) args
+  | Map : {
+      spec : ('a, 'ctx) arg;
+      converter : 'ctx -> 'a -> 'b tzresult Lwt.t;
+    }
+      -> ('b, 'ctx) arg
+  | Pair : ('a, 'ctx) arg * ('b, 'ctx) arg -> ('a * 'b, 'ctx) arg
 
 (* A simple structure for command interpreters.
    This is more generic than the exported one, see end of file. *)
@@ -110,12 +112,9 @@ type ('a, 'ctx) params =
       * ('a -> 'b, 'ctx) params
       -> ('p list -> 'a -> 'b, 'ctx) params
 
-type (_, _) options =
-  | Argument : {
-      spec : ('a, 'arg) args;
-      converter : 'a -> 'b;
-    }
-      -> ('b, 'arg) options
+type ('a, 'ctx) options = ('a, 'ctx) arg
+
+let aggregate spec = spec
 
 (* A command group *)
 type group = {name : string; title : string}
@@ -153,7 +152,7 @@ let trim s =
   TzString.split_no_empty '\n' s |> List.map String.trim |> String.concat "\n"
 
 let print_desc ppf doc =
-  let (short, long) =
+  let short, long =
     match String.index_opt doc '\n' with
     | None -> (doc, None)
     | Some len ->
@@ -174,62 +173,64 @@ let print_label ppf = function
   | {long; short = None} -> Format.fprintf ppf "--%s" long
   | {long; short = Some short} -> Format.fprintf ppf "-%c --%s" short long
 
-let print_options_detailed (type ctx) =
-  let help_option : type a. Format.formatter -> (a, ctx) arg -> unit =
-   fun ppf -> function
-    | Arg {label; placeholder; doc; _} ->
-        Format.fprintf
-          ppf
-          "@{<opt>%a <%s>@}: %a"
-          print_label
-          label
-          placeholder
-          print_desc
-          doc
-    | DefArg {label; placeholder; doc; default; _} ->
-        Format.fprintf
-          ppf
-          "@{<opt>%a <%s>@}: %a"
-          print_label
-          label
-          placeholder
-          print_desc
-          (doc ^ "\nDefaults to `" ^ default ^ "`.")
-    | Switch {label; doc} ->
-        Format.fprintf ppf "@{<opt>%a@}: %a" print_label label print_desc doc
-    | Constant _ -> ()
-  in
-  let rec help : type b. Format.formatter -> (b, ctx) args -> unit =
-   fun ppf -> function
-    | NoArgs -> ()
-    | AddArg (arg, NoArgs) -> Format.fprintf ppf "%a" help_option arg
-    | AddArg (arg, rest) ->
-        Format.fprintf ppf "%a@,%a" help_option arg help rest
-  in
-  help
+let rec print_options_detailed :
+    type ctx a. Format.formatter -> (a, ctx) options -> unit =
+ fun ppf -> function
+  | Arg {label; placeholder; doc; _} ->
+      Format.fprintf
+        ppf
+        "@{<opt>%a <%s>@}: %a"
+        print_label
+        label
+        placeholder
+        print_desc
+        doc
+  | DefArg {label; placeholder; doc; default; _} ->
+      Format.fprintf
+        ppf
+        "@{<opt>%a <%s>@}: %a"
+        print_label
+        label
+        placeholder
+        print_desc
+        (doc ^ "\nDefaults to `" ^ default ^ "`.")
+  | Switch {label; doc} ->
+      Format.fprintf ppf "@{<opt>%a@}: %a" print_label label print_desc doc
+  | Constant _ -> ()
+  | Pair (speca, specb) ->
+      Format.fprintf
+        ppf
+        "%a@,%a"
+        print_options_detailed
+        speca
+        print_options_detailed
+        specb
+  | Map {spec; converter = _} -> print_options_detailed ppf spec
 
-let has_args : type a ctx. (a, ctx) args -> bool = function
-  | NoArgs -> false
-  | AddArg (_, _) -> true
+let rec has_args : type a ctx. (a, ctx) arg -> bool = function
+  | Constant _ -> false
+  | Arg _ | DefArg _ | Switch _ -> true
+  | Pair (speca, specb) -> has_args speca || has_args specb
+  | Map {spec; _} -> has_args spec
 
-let print_options_brief (type ctx) =
-  let help_option : type a. Format.formatter -> (a, ctx) arg -> unit =
-   fun ppf -> function
-    | DefArg {label; placeholder; _} ->
-        Format.fprintf ppf "[@{<opt>%a <%s>@}]" print_label label placeholder
-    | Arg {label; placeholder; _} ->
-        Format.fprintf ppf "[@{<opt>%a <%s>@}]" print_label label placeholder
-    | Switch {label; _} -> Format.fprintf ppf "[@{<opt>%a@}]" print_label label
-    | Constant _ -> ()
-  in
-  let rec help : type b. Format.formatter -> (b, ctx) args -> unit =
-   fun ppf -> function
-    | NoArgs -> ()
-    | AddArg (arg, NoArgs) -> Format.fprintf ppf "%a" help_option arg
-    | AddArg (arg, rest) ->
-        Format.fprintf ppf "%a@ %a" help_option arg help rest
-  in
-  help
+let rec print_options_brief :
+    type ctx a. Format.formatter -> (a, ctx) arg -> unit =
+ fun ppf -> function
+  | DefArg {label; placeholder; _} ->
+      Format.fprintf ppf "[@{<opt>%a <%s>@}]" print_label label placeholder
+  | Arg {label; placeholder; _} ->
+      Format.fprintf ppf "[@{<opt>%a <%s>@}]" print_label label placeholder
+  | Switch {label; _} -> Format.fprintf ppf "[@{<opt>%a@}]" print_label label
+  | Constant _ -> ()
+  | Pair (speca, specb) ->
+      Format.fprintf
+        ppf
+        "%a@ %a"
+        print_options_brief
+        speca
+        print_options_brief
+        specb
+  | Map {spec; converter = _} -> print_options_brief ppf spec
 
 let print_highlight highlight_strings formatter str =
   let rec print_string = function
@@ -288,25 +289,22 @@ let print_commandline ppf (highlights, options, args) =
   Format.fprintf ppf "@{<commandline>%a@}" print args
 
 let rec print_params_detailed :
-    type a b ctx. (b, ctx) args -> Format.formatter -> (a, ctx) params -> unit =
+    type a b ctx. (b, ctx) arg -> Format.formatter -> (a, ctx) params -> unit =
  fun spec ppf -> function
   | Stop -> print_options_detailed ppf spec
-  | Seq (n, desc, _) -> (
+  | Seq (n, desc, _) ->
       Format.fprintf ppf "@{<arg>%s@}: %a" n print_desc (trim desc) ;
-      match spec with
-      | NoArgs -> ()
-      | _ -> Format.fprintf ppf "@,%a" print_options_detailed spec)
-  | NonTerminalSeq (n, desc, _, _, next) -> (
+      if has_args spec then
+        Format.fprintf ppf "@,%a" print_options_detailed spec
+  | NonTerminalSeq (n, desc, _, _, next) ->
       Format.fprintf ppf "@{<arg>%s@}: %a" n print_desc (trim desc) ;
-      match spec with
-      | NoArgs -> ()
-      | _ -> Format.fprintf ppf "@,%a" (print_params_detailed spec) next)
+      if has_args spec then
+        Format.fprintf ppf "@,%a" (print_params_detailed spec) next
   | Prefix (_, next) -> print_params_detailed spec ppf next
-  | Param (n, desc, _, Stop) -> (
+  | Param (n, desc, _, Stop) ->
       Format.fprintf ppf "@{<arg>%s@}: %a" n print_desc (trim desc) ;
-      match spec with
-      | NoArgs -> ()
-      | _ -> Format.fprintf ppf "@,%a" print_options_detailed spec)
+      if has_args spec then
+        Format.fprintf ppf "@,%a" print_options_detailed spec
   | Param (n, desc, _, next) ->
       Format.fprintf
         ppf
@@ -317,10 +315,9 @@ let rec print_params_detailed :
         (print_params_detailed spec)
         next
 
-let contains_params_args :
-    type arg ctx. (arg, ctx) params -> (_, ctx) args -> bool =
+let contains_params_args : type a ctx. (a, ctx) params -> (_, ctx) arg -> bool =
  fun params args ->
-  let rec help : (arg, ctx) params -> bool = function
+  let rec help : (a, ctx) params -> bool = function
     | Stop -> has_args args
     | Seq (_, _, _) -> true
     | NonTerminalSeq (_, _, _, _, _) -> true
@@ -339,18 +336,18 @@ let print_command :
  fun ?(prefix = fun _ () -> ())
      ?(highlights = [])
      ppf
-     (Command {params; desc; options = Argument {spec; _}; _}) ->
-  if contains_params_args params spec then
+     (Command {params; desc; options; _}) ->
+  if contains_params_args params options then
     Format.fprintf
       ppf
       "@{<command>%a%a@{<short>@,@{<commanddoc>%a@,%a@}@}@}"
       prefix
       ()
       print_commandline
-      (highlights, spec, params)
+      (highlights, options, params)
       print_desc
       desc
-      (print_params_detailed spec)
+      (print_params_detailed options)
       params
   else
     Format.fprintf
@@ -359,14 +356,14 @@ let print_command :
       prefix
       ()
       print_commandline
-      (highlights, spec, params)
+      (highlights, options, params)
       print_desc
       desc
 
 type ex_command = Ex : _ command -> ex_command
 
 let group_commands commands =
-  let (grouped, ungrouped) =
+  let grouped, ungrouped =
     List.fold_left
       (fun (grouped, ungrouped) (Ex (Command {group; _}) as command) ->
         match group with
@@ -708,7 +705,6 @@ let restore_formatter ppf (out_functions, tag_functions, tags) =
 let usage_internal ppf ~executable_name ~global_options ?(highlights = [])
     commands =
   let by_group = group_commands commands in
-  let (Argument {spec; _}) = global_options in
   let print_groups =
     Format.pp_print_list
       ~pp_sep:(fun ppf () -> Format.fprintf ppf "@,@,")
@@ -741,7 +737,7 @@ let usage_internal ppf ~executable_name ~global_options ?(highlights = [])
     executable_name
     executable_name
     print_options_detailed
-    spec
+    global_options
     (fun ppf () -> if by_group <> [] then Format.fprintf ppf "@,@,")
     ()
     print_groups
@@ -755,9 +751,118 @@ let arg ~doc ?short ~long ~placeholder kind =
 let default_arg ~doc ?short ~long ~placeholder ~default kind =
   DefArg {doc; placeholder; label = {long; short}; kind; default}
 
+let map_arg ~f:converter spec = Map {spec; converter}
+
+let args1 a = a
+
+let args2 a b = Pair (a, b)
+
+let args3 a b c =
+  map_arg
+    ~f:(fun _ ((a, b), c) -> Lwt_result_syntax.return (a, b, c))
+    (args2 (args2 a b) c)
+
+let args4 a b c d =
+  map_arg
+    ~f:(fun _ ((a, b), (c, d)) -> Lwt_result_syntax.return (a, b, c, d))
+    (args2 (args2 a b) (args2 c d))
+
+let args5 a b c d e =
+  map_arg
+    ~f:(fun _ ((a, b, c, d), e) -> Lwt_result_syntax.return (a, b, c, d, e))
+    (args2 (args4 a b c d) e)
+
+let args6 a b c d e f =
+  map_arg
+    ~f:(fun _ ((a, b, c, d), (e, f)) ->
+      Lwt_result_syntax.return (a, b, c, d, e, f))
+    (args2 (args4 a b c d) (args2 e f))
+
+let args7 a b c d e f g =
+  map_arg
+    ~f:(fun _ ((a, b, c, d), (e, f, g)) ->
+      Lwt_result_syntax.return (a, b, c, d, e, f, g))
+    (args2 (args4 a b c d) (args3 e f g))
+
+let args8 a b c d e f g h =
+  map_arg
+    ~f:(fun _ ((a, b, c, d), (e, f, g, h)) ->
+      Lwt_result_syntax.return (a, b, c, d, e, f, g, h))
+    (args2 (args4 a b c d) (args4 e f g h))
+
+let args9 a b c d e f g h i =
+  map_arg
+    ~f:(fun _ ((a, b, c, d, e, f, g, h), i) ->
+      Lwt_result_syntax.return (a, b, c, d, e, f, g, h, i))
+    (args2 (args8 a b c d e f g h) i)
+
+let args10 a b c d e f g h i j =
+  map_arg
+    ~f:(fun _ ((a, b, c, d, e, f, g, h), (i, j)) ->
+      Lwt_result_syntax.return (a, b, c, d, e, f, g, h, i, j))
+    (args2 (args8 a b c d e f g h) (args2 i j))
+
+let args11 a b c d e f g h i j k =
+  map_arg
+    ~f:(fun _ ((a, b, c, d, e, f, g, h), (i, j, k)) ->
+      Lwt_result_syntax.return (a, b, c, d, e, f, g, h, i, j, k))
+    (args2 (args8 a b c d e f g h) (args3 i j k))
+
+let args12 a b c d e f g h i j k l =
+  map_arg
+    ~f:(fun _ ((a, b, c, d, e, f, g, h), (i, j, k, l)) ->
+      Lwt_result_syntax.return (a, b, c, d, e, f, g, h, i, j, k, l))
+    (args2 (args8 a b c d e f g h) (args4 i j k l))
+
+let args13 a b c d e f g h i j k l m =
+  map_arg
+    ~f:(fun _ ((a, b, c, d, e, f, g, h), (i, j, k, l, m)) ->
+      Lwt_result_syntax.return (a, b, c, d, e, f, g, h, i, j, k, l, m))
+    (args2 (args8 a b c d e f g h) (args5 i j k l m))
+
+let args14 a b c d e f g h i j k l m n =
+  map_arg
+    ~f:(fun _ ((a, b, c, d, e, f, g, h), (i, j, k, l, m, n)) ->
+      Lwt_result_syntax.return (a, b, c, d, e, f, g, h, i, j, k, l, m, n))
+    (args2 (args8 a b c d e f g h) (args6 i j k l m n))
+
+let args15 a b c d e f g h i j k l m n o =
+  map_arg
+    ~f:(fun _ ((a, b, c, d, e, f, g, h), (i, j, k, l, m, n, o)) ->
+      Lwt_result_syntax.return (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o))
+    (args2 (args8 a b c d e f g h) (args7 i j k l m n o))
+
+let args16 a b c d e f g h i j k l m n o p =
+  map_arg
+    ~f:(fun _ ((a, b, c, d, e, f, g, h), (i, j, k, l, m, n, o, p)) ->
+      Lwt_result_syntax.return (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p))
+    (args2 (args8 a b c d e f g h) (args8 i j k l m n o p))
+
+let args17 a b c d e f g h i j k l m n o p q =
+  map_arg
+    ~f:(fun _ ((a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p), q) ->
+      Lwt_result_syntax.return
+        (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q))
+    (args2 (args16 a b c d e f g h i j k l m n o p) q)
+
+let args18 a b c d e f g h i j k l m n o p q r =
+  map_arg
+    ~f:(fun _ ((a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p), (q, r)) ->
+      Lwt_result_syntax.return
+        (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r))
+    (args2 (args16 a b c d e f g h i j k l m n o p) (args2 q r))
+
+let args19 a b c d e f g h i j k l m n o p q r s =
+  map_arg
+    ~f:(fun _ ((a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p), (q, r, s)) ->
+      Lwt_result_syntax.return
+        (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s))
+    (args2 (args16 a b c d e f g h i j k l m n o p) (args3 q r s))
+
 let switch ~doc ?short ~long () = Switch {doc; label = {long; short}}
 
-let parse_arg :
+(* Argument parsing *)
+let rec parse_arg :
     type a ctx.
     ?command:_ command ->
     (a, ctx) arg ->
@@ -798,46 +903,37 @@ let parse_arg :
       | Some [_] -> return_true
       | Some (_ :: _) -> tzfail (Multiple_occurrences (long, command)))
   | Constant c -> return c
-
-(* Argument parsing *)
-let rec parse_args :
-    type a ctx.
-    ?command:_ command ->
-    (a, ctx) args ->
-    string list StringMap.t ->
-    ctx ->
-    a tzresult Lwt.t =
- fun ?command spec args_dict ctx ->
-  let open Lwt_result_syntax in
-  match spec with
-  | NoArgs -> return_unit
-  | AddArg (arg, rest) ->
-      let* arg = parse_arg ?command arg args_dict ctx in
-      let+ rest = parse_args ?command rest args_dict ctx in
-      (arg, rest)
+  | Pair (speca, specb) ->
+      let* arga = parse_arg ?command speca args_dict ctx in
+      let* argb = parse_arg ?command specb args_dict ctx in
+      return (arga, argb)
+  | Map {spec; converter} ->
+      let* arg = parse_arg ?command spec args_dict ctx in
+      converter ctx arg
 
 let empty_args_dict = StringMap.empty
 
 let rec make_arities_dict :
     type a b.
-    (a, b) args -> (int * string) StringMap.t -> (int * string) StringMap.t =
- fun args acc ->
-  match args with
-  | NoArgs -> acc
-  | AddArg (arg, rest) -> (
-      let recur {long; short} num =
-        (match short with
-        | None -> acc
-        | Some c -> StringMap.add ("-" ^ String.make 1 c) (num, long) acc)
-        |> StringMap.add ("-" ^ long) (num, long)
-        |> StringMap.add ("--" ^ long) (num, long)
-        |> make_arities_dict rest
-      in
-      match arg with
-      | Arg {label; _} -> recur label 1
-      | DefArg {label; _} -> recur label 1
-      | Switch {label; _} -> recur label 0
-      | Constant _c -> make_arities_dict rest acc)
+    (a, b) arg -> (int * string) StringMap.t -> (int * string) StringMap.t =
+ fun arg acc ->
+  let add {long; short} num =
+    (match short with
+    | None -> acc
+    | Some c -> StringMap.add ("-" ^ String.make 1 c) (num, long) acc)
+    |> StringMap.add ("-" ^ long) (num, long)
+    |> StringMap.add ("--" ^ long) (num, long)
+  in
+  match arg with
+  | Arg {label; _} -> add label 1
+  | DefArg {label; _} -> add label 1
+  | Switch {label; _} -> add label 0
+  | Constant _c -> acc
+  | Pair (speca, specb) ->
+      let acc = make_arities_dict speca acc in
+      let acc = make_arities_dict specb acc in
+      acc
+  | Map {spec; _} -> make_arities_dict spec acc
 
 type error += Version : error
 
@@ -872,21 +968,21 @@ let make_args_dict_consume ?command spec args =
           | Some (arity, long) -> (
               let* () = check_help_flag ?command tl in
               match (arity, tl) with
-              | (0, tl') ->
+              | 0, tl' ->
                   make_args_dict
                     completing
                     arities
                     (add_occurrence long "" acc)
                     tl'
-              | (1, value :: tl') ->
+              | 1, value :: tl' ->
                   make_args_dict
                     completing
                     arities
                     (add_occurrence long value acc)
                     tl'
-              | (1, []) when completing -> return (acc, [])
-              | (1, []) -> tzfail (Option_expected_argument (arg, None))
-              | (_, _) ->
+              | 1, [] when completing -> return (acc, [])
+              | 1, [] -> tzfail (Option_expected_argument (arg, None))
+              | _, _ ->
                   Stdlib.failwith
                     "cli_entries: Arguments with arity not equal to 1 or 0 \
                      unsupported")
@@ -910,598 +1006,30 @@ let make_args_dict_filter ?command spec args =
         | Some (arity, long) -> (
             let* () = check_help_flag ?command tl in
             match (arity, tl) with
-            | (0, tl) ->
+            | 0, tl ->
                 make_args_dict
                   arities
                   (add_occurrence long "" dict, other_args)
                   tl
-            | (1, value :: tl') ->
+            | 1, value :: tl' ->
                 make_args_dict
                   arities
                   (add_occurrence long value dict, other_args)
                   tl'
-            | (1, []) -> tzfail (Option_expected_argument (arg, command))
-            | (_, _) ->
+            | 1, [] -> tzfail (Option_expected_argument (arg, command))
+            | _, _ ->
                 Stdlib.failwith
                   "cli_entries: Arguments with arity not equal to 1 or 0 \
                    unsupported")
         | None -> make_args_dict arities (dict, arg :: other_args) tl)
   in
-  let+ (dict, remaining) =
+  let+ dict, remaining =
     make_args_dict
       (make_arities_dict spec StringMap.empty)
       (StringMap.empty, [])
       args
   in
   (dict, List.rev remaining)
-
-let ( >> ) arg1 arg2 = AddArg (arg1, arg2)
-
-let args1 spec =
-  Argument {spec = spec >> NoArgs; converter = (fun (arg, ()) -> arg)}
-
-let args2 spec1 spec2 =
-  Argument
-    {
-      spec = spec1 >> (spec2 >> NoArgs);
-      converter = (fun (arg1, (arg2, ())) -> (arg1, arg2));
-    }
-
-let args3 spec1 spec2 spec3 =
-  Argument
-    {
-      spec = spec1 >> (spec2 >> (spec3 >> NoArgs));
-      converter = (fun (arg1, (arg2, (arg3, ()))) -> (arg1, arg2, arg3));
-    }
-
-let args4 spec1 spec2 spec3 spec4 =
-  Argument
-    {
-      spec = spec1 >> (spec2 >> (spec3 >> (spec4 >> NoArgs)));
-      converter =
-        (fun (arg1, (arg2, (arg3, (arg4, ())))) -> (arg1, arg2, arg3, arg4));
-    }
-
-let args5 spec1 spec2 spec3 spec4 spec5 =
-  Argument
-    {
-      spec = spec1 >> (spec2 >> (spec3 >> (spec4 >> (spec5 >> NoArgs))));
-      converter =
-        (fun (arg1, (arg2, (arg3, (arg4, (arg5, ()))))) ->
-          (arg1, arg2, arg3, arg4, arg5));
-    }
-
-let args6 spec1 spec2 spec3 spec4 spec5 spec6 =
-  Argument
-    {
-      spec =
-        spec1 >> (spec2 >> (spec3 >> (spec4 >> (spec5 >> (spec6 >> NoArgs)))));
-      converter =
-        (fun (arg1, (arg2, (arg3, (arg4, (arg5, (spec6, ())))))) ->
-          (arg1, arg2, arg3, arg4, arg5, spec6));
-    }
-
-let args7 spec1 spec2 spec3 spec4 spec5 spec6 spec7 =
-  Argument
-    {
-      spec =
-        spec1
-        >> (spec2
-           >> (spec3 >> (spec4 >> (spec5 >> (spec6 >> (spec7 >> NoArgs))))));
-      converter =
-        (fun (arg1, (arg2, (arg3, (arg4, (arg5, (spec6, (spec7, ()))))))) ->
-          (arg1, arg2, arg3, arg4, arg5, spec6, spec7));
-    }
-
-let args8 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 =
-  Argument
-    {
-      spec =
-        spec1
-        >> (spec2
-           >> (spec3
-              >> (spec4 >> (spec5 >> (spec6 >> (spec7 >> (spec8 >> NoArgs))))))
-           );
-      converter =
-        (fun ( arg1,
-               (arg2, (arg3, (arg4, (arg5, (spec6, (spec7, (spec8, ()))))))) ) ->
-          (arg1, arg2, arg3, arg4, arg5, spec6, spec7, spec8));
-    }
-
-let args9 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 =
-  Argument
-    {
-      spec =
-        spec1
-        >> (spec2
-           >> (spec3
-              >> (spec4
-                 >> (spec5 >> (spec6 >> (spec7 >> (spec8 >> (spec9 >> NoArgs)))))
-                 )));
-      converter =
-        (fun ( arg1,
-               ( arg2,
-                 (arg3, (arg4, (arg5, (spec6, (spec7, (spec8, (spec9, ())))))))
-               ) ) ->
-          (arg1, arg2, arg3, arg4, arg5, spec6, spec7, spec8, spec9));
-    }
-
-let args10 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 =
-  Argument
-    {
-      spec =
-        spec1
-        >> (spec2
-           >> (spec3
-              >> (spec4
-                 >> (spec5
-                    >> (spec6
-                       >> (spec7 >> (spec8 >> (spec9 >> (spec10 >> NoArgs))))))
-                 )));
-      converter =
-        (fun ( arg1,
-               ( arg2,
-                 ( arg3,
-                   ( arg4,
-                     (arg5, (spec6, (spec7, (spec8, (spec9, (spec10, ())))))) )
-                 ) ) ) ->
-          (arg1, arg2, arg3, arg4, arg5, spec6, spec7, spec8, spec9, spec10));
-    }
-
-let args11 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11 =
-  Argument
-    {
-      spec =
-        spec1
-        >> (spec2
-           >> (spec3
-              >> (spec4
-                 >> (spec5
-                    >> (spec6
-                       >> (spec7
-                          >> (spec8 >> (spec9 >> (spec10 >> (spec11 >> NoArgs))))
-                          ))))));
-      converter =
-        (fun ( arg1,
-               ( arg2,
-                 ( arg3,
-                   ( arg4,
-                     ( arg5,
-                       (spec6, (spec7, (spec8, (spec9, (spec10, (spec11, ()))))))
-                     ) ) ) ) ) ->
-          ( arg1,
-            arg2,
-            arg3,
-            arg4,
-            arg5,
-            spec6,
-            spec7,
-            spec8,
-            spec9,
-            spec10,
-            spec11 ));
-    }
-
-let args12 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11
-    spec12 =
-  Argument
-    {
-      spec =
-        spec1
-        >> (spec2
-           >> (spec3
-              >> (spec4
-                 >> (spec5
-                    >> (spec6
-                       >> (spec7
-                          >> (spec8
-                             >> (spec9
-                                >> (spec10 >> (spec11 >> (spec12 >> NoArgs)))))
-                          ))))));
-      converter =
-        (fun ( arg1,
-               ( arg2,
-                 ( arg3,
-                   ( arg4,
-                     ( arg5,
-                       ( spec6,
-                         ( spec7,
-                           (spec8, (spec9, (spec10, (spec11, (spec12, ()))))) )
-                       ) ) ) ) ) ) ->
-          ( arg1,
-            arg2,
-            arg3,
-            arg4,
-            arg5,
-            spec6,
-            spec7,
-            spec8,
-            spec9,
-            spec10,
-            spec11,
-            spec12 ));
-    }
-
-let args13 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11
-    spec12 spec13 =
-  Argument
-    {
-      spec =
-        spec1
-        >> (spec2
-           >> (spec3
-              >> (spec4
-                 >> (spec5
-                    >> (spec6
-                       >> (spec7
-                          >> (spec8
-                             >> (spec9
-                                >> (spec10
-                                   >> (spec11 >> (spec12 >> (spec13 >> NoArgs)))
-                                   )))))))));
-      converter =
-        (fun ( arg1,
-               ( arg2,
-                 ( arg3,
-                   ( arg4,
-                     ( arg5,
-                       ( spec6,
-                         ( spec7,
-                           ( spec8,
-                             (spec9, (spec10, (spec11, (spec12, (spec13, ())))))
-                           ) ) ) ) ) ) ) ) ->
-          ( arg1,
-            arg2,
-            arg3,
-            arg4,
-            arg5,
-            spec6,
-            spec7,
-            spec8,
-            spec9,
-            spec10,
-            spec11,
-            spec12,
-            spec13 ));
-    }
-
-let args14 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11
-    spec12 spec13 spec14 =
-  Argument
-    {
-      spec =
-        spec1
-        >> (spec2
-           >> (spec3
-              >> (spec4
-                 >> (spec5
-                    >> (spec6
-                       >> (spec7
-                          >> (spec8
-                             >> (spec9
-                                >> (spec10
-                                   >> (spec11
-                                      >> (spec12
-                                         >> (spec13 >> (spec14 >> NoArgs)))))))
-                          ))))));
-      converter =
-        (fun ( arg1,
-               ( arg2,
-                 ( arg3,
-                   ( arg4,
-                     ( arg5,
-                       ( spec6,
-                         ( spec7,
-                           ( spec8,
-                             ( spec9,
-                               ( spec10,
-                                 (spec11, (spec12, (spec13, (spec14, ())))) ) )
-                           ) ) ) ) ) ) ) ) ->
-          ( arg1,
-            arg2,
-            arg3,
-            arg4,
-            arg5,
-            spec6,
-            spec7,
-            spec8,
-            spec9,
-            spec10,
-            spec11,
-            spec12,
-            spec13,
-            spec14 ));
-    }
-
-let args15 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11
-    spec12 spec13 spec14 spec15 =
-  Argument
-    {
-      spec =
-        spec1
-        >> (spec2
-           >> (spec3
-              >> (spec4
-                 >> (spec5
-                    >> (spec6
-                       >> (spec7
-                          >> (spec8
-                             >> (spec9
-                                >> (spec10
-                                   >> (spec11
-                                      >> (spec12
-                                         >> (spec13
-                                            >> (spec14 >> (spec15 >> NoArgs))))
-                                      ))))))))));
-      converter =
-        (fun ( arg1,
-               ( arg2,
-                 ( arg3,
-                   ( arg4,
-                     ( arg5,
-                       ( spec6,
-                         ( spec7,
-                           ( spec8,
-                             ( spec9,
-                               ( spec10,
-                                 ( spec11,
-                                   (spec12, (spec13, (spec14, (spec15, ())))) )
-                               ) ) ) ) ) ) ) ) ) ) ->
-          ( arg1,
-            arg2,
-            arg3,
-            arg4,
-            arg5,
-            spec6,
-            spec7,
-            spec8,
-            spec9,
-            spec10,
-            spec11,
-            spec12,
-            spec13,
-            spec14,
-            spec15 ));
-    }
-
-let args16 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11
-    spec12 spec13 spec14 spec15 spec16 =
-  Argument
-    {
-      spec =
-        spec1
-        >> (spec2
-           >> (spec3
-              >> (spec4
-                 >> (spec5
-                    >> (spec6
-                       >> (spec7
-                          >> (spec8
-                             >> (spec9
-                                >> (spec10
-                                   >> (spec11
-                                      >> (spec12
-                                         >> (spec13
-                                            >> (spec14
-                                               >> (spec15 >> (spec16 >> NoArgs))
-                                               )))))))))))));
-      converter =
-        (fun ( arg1,
-               ( arg2,
-                 ( arg3,
-                   ( arg4,
-                     ( arg5,
-                       ( spec6,
-                         ( spec7,
-                           ( spec8,
-                             ( spec9,
-                               ( spec10,
-                                 ( spec11,
-                                   ( spec12,
-                                     (spec13, (spec14, (spec15, (spec16, ()))))
-                                   ) ) ) ) ) ) ) ) ) ) ) ) ->
-          ( arg1,
-            arg2,
-            arg3,
-            arg4,
-            arg5,
-            spec6,
-            spec7,
-            spec8,
-            spec9,
-            spec10,
-            spec11,
-            spec12,
-            spec13,
-            spec14,
-            spec15,
-            spec16 ));
-    }
-
-let args17 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11
-    spec12 spec13 spec14 spec15 spec16 spec17 =
-  Argument
-    {
-      spec =
-        spec1
-        >> (spec2
-           >> (spec3
-              >> (spec4
-                 >> (spec5
-                    >> (spec6
-                       >> (spec7
-                          >> (spec8
-                             >> (spec9
-                                >> (spec10
-                                   >> (spec11
-                                      >> (spec12
-                                         >> (spec13
-                                            >> (spec14
-                                               >> (spec15
-                                                  >> (spec16
-                                                    >> (spec17 >> NoArgs)))))))
-                                   )))))))));
-      converter =
-        (fun ( arg1,
-               ( arg2,
-                 ( arg3,
-                   ( arg4,
-                     ( arg5,
-                       ( spec6,
-                         ( spec7,
-                           ( spec8,
-                             ( spec9,
-                               ( spec10,
-                                 ( spec11,
-                                   ( spec12,
-                                     ( spec13,
-                                       (spec14, (spec15, (spec16, (spec17, ()))))
-                                     ) ) ) ) ) ) ) ) ) ) ) ) ) ->
-          ( arg1,
-            arg2,
-            arg3,
-            arg4,
-            arg5,
-            spec6,
-            spec7,
-            spec8,
-            spec9,
-            spec10,
-            spec11,
-            spec12,
-            spec13,
-            spec14,
-            spec15,
-            spec16,
-            spec17 ));
-    }
-
-let args18 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11
-    spec12 spec13 spec14 spec15 spec16 spec17 spec18 =
-  Argument
-    {
-      spec =
-        spec1
-        >> (spec2
-           >> (spec3
-              >> (spec4
-                 >> (spec5
-                    >> (spec6
-                       >> (spec7
-                          >> (spec8
-                             >> (spec9
-                                >> (spec10
-                                   >> (spec11
-                                      >> (spec12
-                                         >> (spec13
-                                            >> (spec14
-                                               >> (spec15
-                                                  >> (spec16
-                                                     >> (spec17
-                                                       >> (spec18 >> NoArgs))))
-                                               )))))))))))));
-      converter =
-        (fun ( arg1,
-               ( arg2,
-                 ( arg3,
-                   ( arg4,
-                     ( arg5,
-                       ( spec6,
-                         ( spec7,
-                           ( spec8,
-                             ( spec9,
-                               ( spec10,
-                                 ( spec11,
-                                   ( spec12,
-                                     ( spec13,
-                                       ( spec14,
-                                         ( spec15,
-                                           (spec16, (spec17, (spec18, ()))) ) )
-                                     ) ) ) ) ) ) ) ) ) ) ) ) ) ->
-          ( arg1,
-            arg2,
-            arg3,
-            arg4,
-            arg5,
-            spec6,
-            spec7,
-            spec8,
-            spec9,
-            spec10,
-            spec11,
-            spec12,
-            spec13,
-            spec14,
-            spec15,
-            spec16,
-            spec17,
-            spec18 ));
-    }
-
-let args19 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11
-    spec12 spec13 spec14 spec15 spec16 spec17 spec18 spec19 =
-  Argument
-    {
-      spec =
-        spec1
-        >> (spec2
-           >> (spec3
-              >> (spec4
-                 >> (spec5
-                    >> (spec6
-                       >> (spec7
-                          >> (spec8
-                             >> (spec9
-                                >> (spec10
-                                   >> (spec11
-                                      >> (spec12
-                                         >> (spec13
-                                            >> (spec14
-                                               >> (spec15
-                                                  >> (spec16
-                                                     >> (spec17
-                                                        >> (spec18
-                                                          >> (spec19 >> NoArgs)
-                                                           )))))))))))))))));
-      converter =
-        (fun ( arg1,
-               ( arg2,
-                 ( arg3,
-                   ( arg4,
-                     ( arg5,
-                       ( spec6,
-                         ( spec7,
-                           ( spec8,
-                             ( spec9,
-                               ( spec10,
-                                 ( spec11,
-                                   ( spec12,
-                                     ( spec13,
-                                       ( spec14,
-                                         ( spec15,
-                                           ( spec16,
-                                             (spec17, (spec18, (spec19, ()))) )
-                                         ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ->
-          ( arg1,
-            arg2,
-            arg3,
-            arg4,
-            arg5,
-            spec6,
-            spec7,
-            spec8,
-            spec9,
-            spec10,
-            spec11,
-            spec12,
-            spec13,
-            spec14,
-            spec15,
-            spec16,
-            spec17,
-            spec18,
-            spec19 ));
-    }
 
 (* Some combinators for writing commands concisely. *)
 let param ~name ~desc kind next = Param (name, desc, kind, next)
@@ -1513,8 +1041,8 @@ let seq_of_param param =
 
 let non_terminal_seq ~suffix param next =
   match (suffix, param Stop) with
-  | ([], _) -> invalid_arg "Clic.non_terminal_seq: empty suffix"
-  | (_, Param (n, desc, parameter, Stop)) ->
+  | [], _ -> invalid_arg "Clic.non_terminal_seq: empty suffix"
+  | _, Param (n, desc, parameter, Stop) ->
       NonTerminalSeq (n, desc, parameter, suffix, next)
   | _ -> invalid_arg "Clic.non_terminal_seq"
 
@@ -1527,7 +1055,7 @@ let rec prefixes p next =
 
 let stop = Stop
 
-let no_options = Argument {spec = NoArgs; converter = (fun () -> ())}
+let no_options = Constant ()
 
 let command ?group ~desc options params handler =
   Command {params; options; handler; desc; group; conv = (fun x -> x)}
@@ -1568,22 +1096,16 @@ let search_command keyword (Command {params; _}) =
 
 (* Command execution *)
 let exec (type ctx)
-    (Command
-       {
-         options = Argument {converter; spec = options_spec};
-         params = spec;
-         handler;
-         conv;
-         _;
-       } as command) (ctx : ctx) params args_dict =
+    (Command {options = options_spec; params = spec; handler; conv; _} as
+    command) (ctx : ctx) params args_dict =
   let open Lwt_result_syntax in
   let rec exec :
       type ctx a.
       int -> ctx -> (a, ctx) params -> a -> string list -> unit tzresult Lwt.t =
    fun i ctx spec cb params ->
     match (spec, params) with
-    | (Stop, _) -> cb ctx
-    | (Seq (_, _, {converter; _}), seq) ->
+    | Stop, _ -> cb ctx
+    | Seq (_, _, {converter; _}), seq ->
         let rec do_seq i acc = function
           | [] -> return (List.rev acc)
           | p :: rest ->
@@ -1595,20 +1117,20 @@ let exec (type ctx)
         in
         let* parsed = do_seq i [] seq in
         cb parsed ctx
-    | (NonTerminalSeq (_, _, {converter; _}, suffix, next), seq) ->
+    | NonTerminalSeq (_, _, {converter; _}, suffix, next), seq ->
         let rec do_seq i acc = function
           | [] -> return (List.rev acc, [])
           | p :: rest as params ->
               (* try to match suffix first *)
               let rec match_suffix = function
-                | (param :: params, suffix :: suffixes) when param = suffix ->
+                | param :: params, suffix :: suffixes when param = suffix ->
                     match_suffix (params, suffixes)
-                | (params, []) ->
+                | params, [] ->
                     (* all of the suffix parts have been matched *)
                     (params, true)
-                | (_, _) -> (params, false)
+                | _, _ -> (params, false)
               in
-              let (unmatched_rest, matched) = match_suffix (params, suffix) in
+              let unmatched_rest, matched = match_suffix (params, suffix) in
               if matched then return (List.rev acc, unmatched_rest)
               else
                 (* if suffix is not match, try to continue with the sequence *)
@@ -1616,10 +1138,10 @@ let exec (type ctx)
                     let* v = converter ctx p in
                     do_seq (succ i) (v :: acc) rest)
         in
-        let* (parsed, rest) = do_seq i [] seq in
+        let* parsed, rest = do_seq i [] seq in
         exec (succ i) ctx next (cb parsed) rest
-    | (Prefix (n, next), p :: rest) when n = p -> exec (succ i) ctx next cb rest
-    | (Param (_, _, {converter; _}, next), p :: rest) ->
+    | Prefix (n, next), p :: rest when n = p -> exec (succ i) ctx next cb rest
+    | Param (_, _, {converter; _}, next), p :: rest ->
         let* v =
           Error_monad.catch_es (fun () -> converter ctx p)
           |> trace (Bad_argument (i, p))
@@ -1628,8 +1150,8 @@ let exec (type ctx)
     | _ -> Stdlib.failwith "cli_entries internal error: exec no case matched"
   in
   let ctx = conv ctx in
-  let* parsed_options = parse_args ~command options_spec args_dict ctx in
-  exec 1 ctx spec (handler (converter parsed_options)) params
+  let* parsed_options = parse_arg ~command options_spec args_dict ctx in
+  exec 1 ctx spec (handler parsed_options) params
 
 [@@@ocaml.warning "-30"]
 
@@ -1665,12 +1187,7 @@ and 'ctx tree =
   | TEmpty : 'ctx tree
 
 let has_options : type ctx. ctx command -> bool =
- fun (Command {options = Argument {spec; _}; _}) ->
-  let args_help : type a ctx. (a, ctx) args -> bool = function
-    | NoArgs -> false
-    | AddArg (_, _) -> true
-  in
-  args_help spec
+ fun (Command {options; _}) -> has_args options
 
 let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
  fun root (Command {params; conv; _} as command) ->
@@ -1688,47 +1205,46 @@ let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
     in
     let conv_autocomplete = Option.map (fun a c -> a (conv c)) in
     match (t, c) with
-    | (TEmpty, Stop) -> TStop command
-    | (TEmpty, Seq (_, _, {autocomplete; _})) ->
+    | TEmpty, Stop -> TStop command
+    | TEmpty, Seq (_, _, {autocomplete; _}) ->
         TSeq (command, conv_autocomplete autocomplete)
-    | (TEmpty, Param (_, _, {autocomplete; _}, next)) ->
+    | TEmpty, Param (_, _, {autocomplete; _}, next) ->
         let autocomplete = conv_autocomplete autocomplete in
         TParam {tree = insert_tree TEmpty next; stop = None; autocomplete}
-    | (TEmpty, NonTerminalSeq (name, desc, {autocomplete; _}, suffix, next)) ->
+    | TEmpty, NonTerminalSeq (name, desc, {autocomplete; _}, suffix, next) ->
         let autocomplete = conv_autocomplete autocomplete in
         let tree = suffix_to_tree suffix next in
         TNonTerminalSeq {stop = None; tree; autocomplete; suffix; name; desc}
-    | (TEmpty, Prefix (n, next)) ->
+    | TEmpty, Prefix (n, next) ->
         TPrefix {stop = None; prefix = [(n, insert_tree TEmpty next)]}
-    | (TStop cmd, Param (_, _, {autocomplete; _}, next)) ->
+    | TStop cmd, Param (_, _, {autocomplete; _}, next) ->
         let autocomplete = conv_autocomplete autocomplete in
         if not (has_options cmd) then
           TParam {tree = insert_tree TEmpty next; stop = Some cmd; autocomplete}
         else Stdlib.failwith "Command cannot have both prefix and options"
-    | (TStop cmd, Prefix (n, next)) ->
+    | TStop cmd, Prefix (n, next) ->
         TPrefix {stop = Some cmd; prefix = [(n, insert_tree TEmpty next)]}
-    | (TStop cmd, NonTerminalSeq (name, desc, {autocomplete; _}, suffix, next))
-      ->
+    | TStop cmd, NonTerminalSeq (name, desc, {autocomplete; _}, suffix, next) ->
         let autocomplete = conv_autocomplete autocomplete in
         let tree = suffix_to_tree suffix next in
         TNonTerminalSeq
           {stop = Some cmd; tree; autocomplete; suffix; name; desc}
-    | (TParam t, Param (_, _, _, next)) ->
+    | TParam t, Param (_, _, _, next) ->
         TParam {t with tree = insert_tree t.tree next}
-    | (TPrefix ({prefix; _} as l), Prefix (n, next)) ->
+    | TPrefix ({prefix; _} as l), Prefix (n, next) ->
         let rec insert_prefix = function
           | [] -> [(n, insert_tree TEmpty next)]
           | (n', t) :: rest when n = n' -> (n, insert_tree t next) :: rest
           | item :: rest -> item :: insert_prefix rest
         in
         TPrefix {l with prefix = insert_prefix prefix}
-    | (TPrefix ({stop = None; _} as l), Stop) ->
+    | TPrefix ({stop = None; _} as l), Stop ->
         TPrefix {l with stop = Some command}
-    | (TParam ({stop = None; _} as l), Stop) ->
+    | TParam ({stop = None; _} as l), Stop ->
         TParam {l with stop = Some command}
-    | (TParam t, Prefix (_n, next)) ->
+    | TParam t, Prefix (_n, next) ->
         TParam {t with tree = insert_tree t.tree next}
-    | (TNonTerminalSeq t, NonTerminalSeq (n, desc, _, suffix, next)) ->
+    | TNonTerminalSeq t, NonTerminalSeq (n, desc, _, suffix, next) ->
         if
           n <> t.name || desc <> t.desc || t.suffix <> suffix
           (* we should match the parameter too but this would require a bit of refactoring*)
@@ -1739,12 +1255,12 @@ let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
         else
           let params = suffix_to_params suffix next in
           TNonTerminalSeq {t with tree = insert_tree t.tree params}
-    | (_, _) ->
+    | _, _ ->
         Stdlib.failwith
           (Format.asprintf
              "Clic.Command_tree.insert: conflicting commands \"%a\""
-             (fun ppf (Command {params; options = Argument {spec; _}; _}) ->
-               print_commandline ppf ([], spec, params))
+             (fun ppf (Command {params; options; _}) ->
+               print_commandline ppf ([], options, params))
              command)
   in
   insert_tree conv root params
@@ -1781,11 +1297,10 @@ let find_command tree initial_arguments =
         | [] -> assert false
         | [command] -> tzfail (Help (Some command))
         | more -> tzfail (Unterminated_command (initial_arguments, more)))
-    | (TStop c, []) -> return (c, empty_args_dict, initial_arguments)
-    | (TStop (Command {options = Argument {spec; _}; _} as command), remaining)
-      -> (
-        let* (args_dict, unparsed) =
-          make_args_dict_filter ~command spec remaining
+    | TStop c, [] -> return (c, empty_args_dict, initial_arguments)
+    | TStop (Command {options; _} as command), remaining -> (
+        let* args_dict, unparsed =
+          make_args_dict_filter ~command options remaining
         in
         match unparsed with
         | [] -> return (command, args_dict, initial_arguments)
@@ -1793,32 +1308,31 @@ let find_command tree initial_arguments =
             if String.length hd > 0 && hd.[0] = '-' then
               tzfail (Unknown_option (hd, Some command))
             else tzfail (Extra_arguments (unparsed, command)))
-    | ( TSeq ((Command {options = Argument {spec; _}; _} as command), _),
-        remaining ) ->
+    | TSeq ((Command {options; _} as command), _), remaining ->
         if
           List.exists
             (function "-h" | "--help" -> true | _ -> false)
             remaining
         then tzfail (Help (Some command))
         else
-          let+ (dict, remaining) =
-            make_args_dict_filter ~command spec remaining
+          let+ dict, remaining =
+            make_args_dict_filter ~command options remaining
           in
           (command, dict, List.rev_append acc remaining)
-    | (TNonTerminalSeq {stop = None; _}, ([] | ("-h" | "--help") :: _)) ->
+    | TNonTerminalSeq {stop = None; _}, ([] | ("-h" | "--help") :: _) ->
         tzfail (Unterminated_command (initial_arguments, gather_commands tree))
-    | (TNonTerminalSeq {stop = Some c; _}, []) ->
+    | TNonTerminalSeq {stop = Some c; _}, [] ->
         return (c, empty_args_dict, initial_arguments)
     | ( (TNonTerminalSeq {tree; suffix; _} as nts),
         (parameter :: arguments' as remaining) ) ->
         (* try to match suffix first *)
         let rec match_suffix matched_acc = function
-          | (param :: params, suffix :: suffixes) when param = suffix ->
+          | param :: params, suffix :: suffixes when param = suffix ->
               match_suffix (param :: matched_acc) (params, suffixes)
-          | (_, []) ->
+          | _, [] ->
               (* all of the suffix parts have been matched *)
               true
-          | (_, _) -> false
+          | _, _ -> false
         in
         let matched = match_suffix [] (remaining, suffix) in
         if matched then
@@ -1827,41 +1341,33 @@ let find_command tree initial_arguments =
         else
           (* continue traversing with the current node (non-terminal sequence) *)
           traverse nts arguments' (parameter :: acc)
-    | (TPrefix {stop = Some cmd; _}, []) ->
+    | TPrefix {stop = Some cmd; _}, [] ->
         return (cmd, empty_args_dict, initial_arguments)
-    | (TPrefix {stop = None; prefix}, ([] | ("-h" | "--help") :: _)) ->
+    | TPrefix {stop = None; prefix}, ([] | ("-h" | "--help") :: _) ->
         tzfail (Unterminated_command (initial_arguments, gather_assoc prefix))
-    | (TPrefix {prefix; _}, hd_arg :: tl) -> (
+    | TPrefix {prefix; _}, hd_arg :: tl -> (
         match List.assoc ~equal:String.equal hd_arg prefix with
         | None -> tzfail (Command_not_found (List.rev acc, gather_assoc prefix))
         | Some tree' -> traverse tree' tl (hd_arg :: acc))
-    | (TParam {stop = None; _}, ([] | ("-h" | "--help") :: _)) ->
+    | TParam {stop = None; _}, ([] | ("-h" | "--help") :: _) ->
         tzfail (Unterminated_command (initial_arguments, gather_commands tree))
-    | (TParam {stop = Some c; _}, []) ->
+    | TParam {stop = Some c; _}, [] ->
         return (c, empty_args_dict, initial_arguments)
-    | (TParam {tree; _}, parameter :: arguments') ->
+    | TParam {tree; _}, parameter :: arguments' ->
         traverse tree arguments' (parameter :: acc)
-    | (TEmpty, _) -> tzfail (Command_not_found (List.rev acc, []))
+    | TEmpty, _ -> tzfail (Command_not_found (List.rev acc, []))
   in
   traverse tree initial_arguments []
 
-let get_arg_label (type a) (arg : (a, _) arg) =
-  match arg with
-  | Arg {label; _} -> label
-  | DefArg {label; _} -> label
-  | Switch {label; _} -> label
-  | Constant _ -> assert false
-
-let get_arg : type a ctx. (a, ctx) arg -> string list =
- fun arg ->
-  let {long; short} = get_arg_label arg in
+let get_arg {long; short} =
   ("--" ^ long)
   :: (match short with None -> [] | Some c -> ["-" ^ String.make 1 c])
 
-let rec list_args : type arg ctx. (arg, ctx) args -> string list = function
-  | NoArgs -> []
-  | AddArg (Constant _, args) -> list_args args
-  | AddArg (arg, args) -> get_arg arg @ list_args args
+let rec list_args : type a ctx. (a, ctx) arg -> string list = function
+  | Constant _ -> []
+  | Arg {label; _} | DefArg {label; _} | Switch {label; _} -> get_arg label
+  | Pair (speca, specb) -> list_args speca @ list_args specb
+  | Map {spec; _} -> list_args spec
 
 let complete_func autocomplete cctxt =
   let open Lwt_result_syntax in
@@ -1869,41 +1375,38 @@ let complete_func autocomplete cctxt =
   | None -> return_nil
   | Some autocomplete -> autocomplete cctxt
 
-let list_command_args (Command {options = Argument {spec; _}; _}) =
-  list_args spec
+let list_command_args (Command {options; _}) = list_args options
 
-let complete_arg : type a ctx. ctx -> (a, ctx) arg -> string list tzresult Lwt.t
-    =
- fun ctx ->
-  let open Lwt_result_syntax in
-  function
-  | Arg {kind = {autocomplete; _}; _} -> complete_func autocomplete ctx
-  | DefArg {kind = {autocomplete; _}; _} -> complete_func autocomplete ctx
-  | Switch _ -> return_nil
-  | Constant _ -> return_nil
-
-let rec remaining_spec : type a ctx. StringSet.t -> (a, ctx) args -> string list
+let rec remaining_spec : type a ctx. StringSet.t -> (a, ctx) arg -> string list
     =
  fun seen -> function
-  | NoArgs -> []
-  | AddArg (Constant _, rest) -> remaining_spec seen rest
-  | AddArg (arg, rest) ->
-      let {long; _} = get_arg_label arg in
-      if StringSet.mem long seen then remaining_spec seen rest
-      else get_arg arg @ remaining_spec seen rest
+  | Constant _ -> []
+  | Arg {label; _} | DefArg {label; _} | Switch {label; _} ->
+      if StringSet.mem label.long seen then [] else get_arg label
+  | Pair (speca, specb) -> remaining_spec seen speca @ remaining_spec seen specb
+  | Map {spec; _} -> remaining_spec seen spec
 
 let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
   let arities = make_arities_dict args_spec StringMap.empty in
   let rec complete_spec :
-      type a. string -> (a, ctx) args -> string list tzresult Lwt.t =
+      type a. string -> (a, ctx) arg -> string list option tzresult Lwt.t =
    fun name ->
     let open Lwt_result_syntax in
     function
-    | NoArgs -> return_nil
-    | AddArg (Constant _, rest) -> complete_spec name rest
-    | AddArg (arg, rest) ->
-        if (get_arg_label arg).long = name then complete_arg ctx arg
-        else complete_spec name rest
+    | Constant _ -> return_none
+    | DefArg {kind = {autocomplete; _}; label; _}
+    | Arg {kind = {autocomplete; _}; label; _}
+      when label.long = name ->
+        let* p = complete_func autocomplete ctx in
+        return_some p
+    | Switch {label; _} when label.long = name -> return_some []
+    | Arg _ | DefArg _ | Switch _ -> return_none
+    | Pair (speca, specb) -> (
+        let* resa = complete_spec name speca in
+        match resa with
+        | Some _ -> return resa
+        | None -> complete_spec name specb)
+    | Map {spec; _} -> complete_spec name spec
   in
   let rec help args ind seen =
     let open Lwt_result_syntax in
@@ -1917,12 +1420,14 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
         | Some (arity, long) -> (
             let seen = StringSet.add long seen in
             match (arity, tl) with
-            | (0, args) when ind = 0 ->
+            | 0, args when ind = 0 ->
                 let+ cont_args = continuation args 0 in
                 remaining_spec seen args_spec @ cont_args
-            | (0, args) -> help args (ind - 1) seen
-            | (1, _) when ind = 1 -> complete_spec arg args_spec
-            | (1, _ :: tl) -> help tl (ind - 2) seen
+            | 0, args -> help args (ind - 1) seen
+            | 1, _ when ind = 1 ->
+                let* res = complete_spec arg args_spec in
+                return (Option.value ~default:[] res)
+            | 1, _ :: tl -> help tl (ind - 2) seen
             | _ -> Stdlib.failwith "cli_entries internal error, invalid arity")
         | None -> continuation args ind)
   in
@@ -1948,7 +1453,7 @@ let complete_next_tree cctxt =
   | TEmpty -> return_nil
 
 let rec args_starting_from_suffix original_suffix ind matched_args = function
-  | ((s :: s_rest as suffix), a :: a_rest) ->
+  | (s :: s_rest as suffix), a :: a_rest ->
       if s = a then
         args_starting_from_suffix
           original_suffix
@@ -1966,7 +1471,7 @@ let rec args_starting_from_suffix original_suffix ind matched_args = function
         (* After there is a suffix match, the rest of the suffix has
            to be matched in the following args, unless it's empty. *)
         None
-  | (unmatched_suffix, args)
+  | unmatched_suffix, args
   (* Partial or full suffix match found *)
     when Compare.List_lengths.(unmatched_suffix < original_suffix) ->
       Some (matched_args @ args, ind)
@@ -1978,20 +1483,19 @@ let complete_tree cctxt tree index args =
     if ind = 0 then complete_next_tree cctxt tree
     else
       match (tree, args) with
-      | (TSeq _, _) -> complete_next_tree cctxt tree
-      | ((TNonTerminalSeq {tree; suffix; _} as this_tree), _ :: _tl) -> (
+      | TSeq _, _ -> complete_next_tree cctxt tree
+      | (TNonTerminalSeq {tree; suffix; _} as this_tree), _ :: _tl -> (
           match args_starting_from_suffix suffix ind [] (suffix, args) with
           | Some (args, ind) -> help tree args ind
           | _ -> complete_next_tree cctxt this_tree)
-      | (TPrefix {prefix; _}, hd :: tl) -> (
+      | TPrefix {prefix; _}, hd :: tl -> (
           match List.assoc ~equal:String.equal hd prefix with
           | None -> return_nil
           | Some p -> help p tl (ind - 1))
-      | (TParam {tree; _}, _ :: tl) -> help tree tl (ind - 1)
-      | (TStop (Command {options = Argument {spec; _}; conv; _}), args) ->
-          complete_options (fun _ _ -> return_nil) args spec ind (conv cctxt)
-      | ((TParam _ | TPrefix _ | TNonTerminalSeq _), []) | (TEmpty, _) ->
-          return_nil
+      | TParam {tree; _}, _ :: tl -> help tree tl (ind - 1)
+      | TStop (Command {options; conv; _}), args ->
+          complete_options (fun _ _ -> return_nil) args options ind (conv cctxt)
+      | (TParam _ | TPrefix _ | TNonTerminalSeq _), [] | TEmpty, _ -> return_nil
   in
   help tree args index
 
@@ -2009,17 +1513,15 @@ let autocompletion ~script ~cur_arg ~prev_arg ~args ~global_options commands
   let+ completions =
     if prev_arg = script then
       let+ command_completions = complete_next_tree cctxt tree in
-      let (Argument {spec; _}) = global_options in
-      list_args spec @ command_completions
+      list_args global_options @ command_completions
     else
       match ind 0 args with
       | None -> return_nil
       | Some index ->
-          let (Argument {spec; _}) = global_options in
           complete_options
             (fun args ind -> complete_tree cctxt tree ind args)
             args
-            spec
+            global_options
             index
             cctxt
   in
@@ -2030,10 +1532,9 @@ let autocompletion ~script ~cur_arg ~prev_arg ~args ~global_options commands
 
 let parse_global_options global_options ctx args =
   let open Lwt_result_syntax in
-  let (Argument {spec; converter}) = global_options in
-  let* (dict, remaining) = make_args_dict_consume spec args in
-  let* nested = parse_args spec dict ctx in
-  return (converter nested, remaining)
+  let* dict, remaining = make_args_dict_consume global_options args in
+  let* nested = parse_arg global_options dict ctx in
+  return (nested, remaining)
 
 let dispatch commands ctx args =
   let open Lwt_result_syntax in
@@ -2050,7 +1551,7 @@ let dispatch commands ctx args =
       tzfail (Help None)
   | [("-h" | "--help")] -> tzfail (Help None)
   | _ ->
-      let* (command, args_dict, filtered_args) = find_command tree args in
+      let* command, args_dict, filtered_args = find_command tree args in
       exec command ctx filtered_args args_dict
 
 type error += No_manual_entry of string list
@@ -2202,9 +1703,8 @@ let pp_cli_errors ppf ~executable_name ~global_options ~default errs =
         Format.fprintf
           ppf
           "@[<v 2>Unterminated command, here are possible completions.@,%a@]"
-          (Format.pp_print_list
-             (fun ppf (Command {params; options = Argument {spec; _}; _}) ->
-               print_commandline ppf ([], spec, params)))
+          (Format.pp_print_list (fun ppf (Command {params; options; _}) ->
+               print_commandline ppf ([], options, params)))
           commands ;
         Some (List.map (fun c -> Ex c) commands)
     | Command_not_found ([], _all_commands) ->
@@ -2219,9 +1719,8 @@ let pp_cli_errors ppf ~executable_name ~global_options ~default errs =
           "@[<v 0>Unrecognized command.@,\
            Did you mean one of the following?@,\
           \  @[<v 0>%a@]@]"
-          (Format.pp_print_list
-             (fun ppf (Command {params; options = Argument {spec; _}; _}) ->
-               print_commandline ppf ([], spec, params)))
+          (Format.pp_print_list (fun ppf (Command {params; options; _}) ->
+               print_commandline ppf ([], options, params)))
           commands ;
         Some (List.map (fun c -> Ex c) commands)
     | err ->
@@ -2231,9 +1730,9 @@ let pp_cli_errors ppf ~executable_name ~global_options ~default errs =
   let rec pp acc errs =
     let return command =
       match (command, acc) with
-      | (None, _) -> acc
-      | (Some command, Some commands) -> Some (command @ commands)
-      | (Some command, None) -> Some command
+      | None, _ -> acc
+      | Some command, Some commands -> Some (command @ commands)
+      | Some command, None -> Some command
     in
     match errs with
     | [] -> None

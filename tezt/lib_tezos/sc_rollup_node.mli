@@ -109,9 +109,9 @@ val wait : t -> Unix.process_status Lwt.t
     a SIGKILL is sent instead of a SIGTERM. *)
 val terminate : ?kill:bool -> t -> unit Lwt.t
 
-(** Run [tezos-sc-rollup-node-alpha config init rollup_address].
+(** Run [tezos-sc-rollup-node-alpha config init ?loser_mode rollup_address].
     Returns the name of the resulting configuration file. *)
-val config_init : t -> string -> string Lwt.t
+val config_init : t -> ?loser_mode:string -> string -> string Lwt.t
 
 module Config_file : sig
   (** Sc node configuration files. *)
@@ -138,7 +138,10 @@ val wait_for_ready : t -> unit Lwt.t
 (** Wait until the layer 1 of the sc node is synchronized with some
    given tezos level.
 
-    More precisely, wait until a [new_head] event with a large enough
+   More precisely, wait until a [new_head] event with a large enough
    level occurs.  If such an event already occurred, return
-   immediately. *)
-val wait_for_level : t -> int -> int Lwt.t
+   immediately.
+
+   If [timeout] is provided, stop waiting if [timeout] seconds have
+   passed. *)
+val wait_for_level : ?timeout:float -> t -> int -> int Lwt.t

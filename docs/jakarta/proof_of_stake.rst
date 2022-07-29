@@ -53,6 +53,7 @@ from the delegates' own balance.
 Active and passive delegates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. _active_delegate:
 .. _active_delegate_jakarta:
 
 A delegate can be marked as either active or passive. A passive
@@ -60,9 +61,9 @@ delegate cannot participate in the consensus algorithm.
 
 A delegate is marked as active at its registration.
 
-A delegate becomes passive for cycle ``n`` when they
-fail to participate in the consensus algorithm in
-the past ``PRESERVED_CYCLES`` cycles, that is, in cycles ``n-1``,
+A delegate becomes passive at the end of cycle ``n`` when it has
+failed to participate in the consensus algorithm in
+the past ``PRESERVED_CYCLES + 1`` cycles, that is, in cycles ``n``, ``n-1``,
 ``n-2``, ..., ``n - PRESERVED_CYCLES``.
 
 Delegates' rights selection
@@ -71,6 +72,7 @@ Delegates' rights selection
 Tezos being proof-of-stake, the delegates' rights are selected at random based on their
 stake. In what follows we detail the selection mechanism used in Tezos.
 
+.. _random_seed:
 .. _random_seed_jakarta:
 
 Random seed
@@ -93,7 +95,7 @@ previous cycle, they first commit to nonces and they only reveal their
 committed nonces later, in the current cycle.
 
 We make the assumption that at least one participant is honest, that
-is, it has indeed chosen a random value and this values was revealed.  This is a necessary
+is, it has indeed chosen a random value and this value was revealed.  This is a necessary
 condition for the seed to be random. The randomness could however
 be biased as this protocol suffers from the following low-impact weakness:
 if a malicious participant can make sure she is the last revealer,
@@ -126,6 +128,7 @@ is the seed of cycle ``n-1``; at each iteration, the new bitstring is
 the hash of the concatenation of the previous bitstring with the iterated
 revealed nonce.
 
+.. _snapshots:
 .. _snapshots_jakarta:
 
 Stake snapshots
@@ -148,6 +151,7 @@ cycle ``n``.
 
 Only the stake of active delegates with the minimal stake of ``TOKENS_PER_ROLL`` is snapshot.
 
+.. _rights:
 .. _rights_jakarta:
 
 Slot selection
@@ -180,6 +184,7 @@ simple procedure which has as its initial state: the level, the
 level belongs, and the slot.
 
 
+.. _protocol_constants:
 .. _protocol_constants_jakarta:
 
 Protocol constants
@@ -193,6 +198,7 @@ The values of protocol constants can be found using a :ref:`specific RPC call <G
 
 In particular, the protocol constants related to the proof-of-stake mechanism are detailed below.
 
+.. _ps_constants:
 .. _ps_constants_jakarta:
 
 Proof-of-stake parameters
@@ -225,7 +231,7 @@ Further External Resources
 
 The original design of the proof-of-stake mechanism in Tezos can be
 found in the `whitepaper
-<https://whitepaper.io/document/376/tezos-whitepaper>`_.
+<https://tezos.com/whitepaper.pdf>`_.
 
 Another presentation of the Tezos' proof-of-stake mechanism can be
 found in the `Tezos agora wiki entry

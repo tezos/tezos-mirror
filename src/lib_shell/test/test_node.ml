@@ -41,6 +41,7 @@ let init_config (* (f : 'a -> unit -> unit Lwt.t) *) f test_dir switch () :
     unit Lwt.t =
   let sandbox_parameters : Data_encoding.json = `Null in
   let config : Node.config =
+    let open Filename.Infix in
     {
       genesis = Shell_test_helpers.genesis;
       chain_name = Distributed_db_version.Name.zero;
@@ -49,9 +50,9 @@ let init_config (* (f : 'a -> unit -> unit Lwt.t) *) f test_dir switch () :
       user_activated_protocol_overrides = [];
       operation_metadata_size_limit = None;
       data_dir = test_dir;
-      store_root = test_dir;
-      context_root = test_dir;
-      protocol_root = test_dir;
+      store_root = test_dir // "store";
+      context_root = test_dir // "context";
+      protocol_root = test_dir // "protocol";
       patch_context = None;
       p2p = None;
       target = None;

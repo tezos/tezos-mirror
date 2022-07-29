@@ -32,7 +32,7 @@ type shell_error = error = ..
 open Environment_context
 open Environment_protocol_T
 
-module type V5 = sig
+module type T = sig
   include
     Tezos_protocol_environment_sigs.V5.T
       with type Format.formatter = Format.formatter
@@ -77,7 +77,7 @@ module type V5 = sig
        and type Signature.watermark = Signature.watermark
        and type Pvss_secp256k1.Commitment.t = Pvss_secp256k1.Commitment.t
        and type Pvss_secp256k1.Encrypted_share.t =
-            Pvss_secp256k1.Encrypted_share.t
+        Pvss_secp256k1.Encrypted_share.t
        and type Pvss_secp256k1.Clear_share.t = Pvss_secp256k1.Clear_share.t
        and type Pvss_secp256k1.Public_key.t = Pvss_secp256k1.Public_key.t
        and type Pvss_secp256k1.Secret_key.t = Pvss_secp256k1.Secret_key.t
@@ -89,7 +89,7 @@ module type V5 = sig
        and type ('a, 'b) RPC_path.t = ('a, 'b) RPC_path.t
        and type RPC_service.meth = RPC_service.meth
        and type (+'m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t =
-            ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
+        ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
        and type Error_monad.shell_tztrace = Error_monad.tztrace
        and type 'a Error_monad.shell_tzresult = ('a, Error_monad.tztrace) result
        and type Timelock.chest = Timelock.chest
@@ -129,7 +129,7 @@ module type V5 = sig
     -> ['block] RPC_context.simple
 end
 
-module MakeV5 (Param : sig
+module Make (Param : sig
   val name : string
 end)
 () =
@@ -197,7 +197,6 @@ struct
   module Map = Tezos_error_monad.TzLwtreslib.Map
   module Int32 = Int32
   module Int64 = Int64
-  module Buffer = Buffer
   module Format = Format
   module FallbackArray = FallbackArray
 
@@ -249,7 +248,6 @@ struct
 
   module Z = Z
   module Lwt = Lwt
-  module Uri = Uri
 
   module Data_encoding = struct
     include Data_encoding
@@ -686,7 +684,7 @@ struct
         (Tezos_error_monad.TzLwtreslib.Monad)
 
     (* Backwards compatibility additions (dont_wait, trace helpers) *)
-    include Tezos_protocol_environment_structs.V5.M.Error_monad_infix_globals
+    include Tezos_protocol_environment_structs.V5.Error_monad_infix_globals
 
     let fail e = Lwt.return_error (TzTrace.make e)
 
@@ -1231,7 +1229,7 @@ struct
       let+ r = finalize_block c shell_header in
       wrap_tzresult r
 
-    let init c bh =
+    let init _chain_id c bh =
       let open Lwt_syntax in
       let+ r = init c bh in
       wrap_tzresult r

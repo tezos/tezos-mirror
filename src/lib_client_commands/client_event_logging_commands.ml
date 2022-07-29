@@ -161,7 +161,7 @@ let commands () =
             let time_query =
               Option.merge (fun a b -> `And (a, b)) since until
             in
-            let* (errors_and_warnings, ()) =
+            let* errors_and_warnings, () =
               File_event_sink.Query.fold
                 ?only_names
                 ?on_unknown

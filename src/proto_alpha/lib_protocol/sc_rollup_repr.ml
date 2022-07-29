@@ -70,6 +70,8 @@ module Address = struct
     |> function
     | None -> error Error_sc_rollup_address_generation
     | Some nonce -> ok @@ hash_bytes [nonce]
+
+  let of_b58data = function H.Data h -> Some h | _ -> None
 end
 
 module Internal_for_tests = struct
@@ -78,35 +80,6 @@ module Internal_for_tests = struct
       Data_encoding.Binary.to_bytes_exn Origination_nonce.encoding nonce
     in
     Address.hash_bytes [data]
-end
-
-(* 32 *)
-let commitment_hash_prefix = "\017\144\021\100" (* scc1(54) *)
-
-module Commitment_hash = struct
-  let prefix = "scc1"
-
-  let encoded_size = 54
-
-  module H =
-    Blake2B.Make
-      (Base58)
-      (struct
-        let name = "commitment_hash"
-
-        let title = "The hash of a commitment of a smart contract rollup"
-
-        let b58check_prefix = commitment_hash_prefix
-
-        (* defaults to 32 *)
-        let size = None
-      end)
-
-  include H
-
-  let () = Base58.check_encoded_prefix b58check_encoding prefix encoded_size
-
-  include Path_encoding.Make_hex (H)
 end
 
 (* 32 *)
@@ -136,11 +109,24 @@ module State_hash = struct
   let () = Base58.check_encoded_prefix b58check_encoding prefix encoded_size
 
   include Path_encoding.Make_hex (H)
+
+  let context_hash_to_state_hash =
+    (* Both State_hash and Context_hash's hashes are supposed to have the
+       same size. This top-level check enforces this invariant, in which case,
+       no exception could be thrown by [of_bytes_exn] below *)
+    let () = assert (Compare.Int.equal size Context_hash.size) in
+    fun h -> of_bytes_exn @@ Context_hash.to_bytes h
+
+  (* Hackish way to disable hash_bytes and hash_string to force people to use
+     context_hash_to_state_hash (without changing content of HASH.S) *)
+  type unreachable = |
+
+  let hash_bytes = function (_ : unreachable) -> .
+
+  let hash_string = function (_ : unreachable) -> .
 end
 
 type t = Address.t
-
-module Staker = Signature.Public_key_hash
 
 let description =
   "A smart contract rollup is identified by a base58 address starting with "
@@ -193,6 +179,12 @@ let rpc_arg =
     ~destruct
     ()
 
+let in_memory_size (_ : t) =
+  let open Cache_memory_helpers in
+  h1w +! string_size_gen Address.size
+
+module Staker = Signature.Public_key_hash
+
 module Index = struct
   type t = Address.t
 
@@ -217,119 +209,15 @@ module Index = struct
   let compare = Address.compare
 end
 
-module Commitment_hash_index = struct
-  include Commitment_hash
-end
+module Number_of_ticks = struct
+  include Bounded.Int32.Make (struct
+    let min_int = 0l
 
-module Number_of_messages = Bounded.Int32.Make (struct
-  let min_int = 1l
+    let max_int = Int32.max_int
+  end)
 
-  let max_int = 4096l
-  (* TODO: check this is reasonable.
-     See https://gitlab.com/tezos/tezos/-/issues/2373
-  *)
-end)
-
-module Number_of_ticks = Bounded.Int32.Make (struct
-  let min_int = 1l
-
-  let max_int = Int32.max_int
-end)
-
-module Commitment = struct
-  type t = {
-    compressed_state : State_hash.t;
-    inbox_level : Raw_level_repr.t;
-    predecessor : Commitment_hash.t;
-    number_of_messages : Number_of_messages.t;
-    number_of_ticks : Number_of_ticks.t;
-  }
-
-  let pp fmt
-      {
-        compressed_state;
-        inbox_level;
-        predecessor;
-        number_of_messages;
-        number_of_ticks;
-      } =
-    Format.fprintf
-      fmt
-      "@[<v 2>SCORU Commitment:@ compressed_state: %a@ inbox_level: %a@ \
-       predecessor: %a@ number_of_messages: %d@ number_of_ticks: %d@]"
-      State_hash.pp
-      compressed_state
-      Raw_level_repr.pp
-      inbox_level
-      Commitment_hash.pp
-      predecessor
-      (Int32.to_int (Number_of_messages.to_int32 number_of_messages))
-      (Int32.to_int (Number_of_ticks.to_int32 number_of_ticks))
-
-  let encoding =
-    let open Data_encoding in
-    conv
-      (fun {
-             compressed_state;
-             inbox_level;
-             predecessor;
-             number_of_messages;
-             number_of_ticks;
-           } ->
-        ( compressed_state,
-          inbox_level,
-          predecessor,
-          number_of_messages,
-          number_of_ticks ))
-      (fun ( compressed_state,
-             inbox_level,
-             predecessor,
-             number_of_messages,
-             number_of_ticks ) ->
-        {
-          compressed_state;
-          inbox_level;
-          predecessor;
-          number_of_messages;
-          number_of_ticks;
-        })
-      (obj5
-         (req "compressed_state" State_hash.encoding)
-         (req "inbox_level" Raw_level_repr.encoding)
-         (req "predecessor" Commitment_hash.encoding)
-         (req "number_of_messages" Number_of_messages.encoding)
-         (req "number_of_ticks" Number_of_ticks.encoding))
-
-  let hash commitment =
-    let commitment_bytes =
-      Data_encoding.Binary.to_bytes_exn encoding commitment
-    in
-    Commitment_hash.hash_bytes [commitment_bytes]
-end
-
-module Kind = struct
-  (*
-
-      Each time we add a data constructor to [t], we also need:
-      - to extend [Sc_rollups.all] with this new constructor ;
-      - to update [Sc_rollups.kind_of_string] and [encoding].
-
-  *)
-  type t = Example_arith
-
-  let example_arith_case =
-    Data_encoding.(
-      case
-        ~title:"Example_arith smart contract rollup kind"
-        (Tag 0)
-        unit
-        (function Example_arith -> Some ())
-        (fun () -> Example_arith))
-
-  let encoding = Data_encoding.union ~tag_size:`Uint16 [example_arith_case]
-
-  let equal x y = match (x, y) with (Example_arith, Example_arith) -> true
-
-  let pp fmt kind =
-    match kind with Example_arith -> Format.fprintf fmt "Example_arith"
+  let zero =
+    match of_int32 0l with
+    | Some zero -> zero
+    | None -> assert false (* unreachable case, since [min_int = 0l] *)
 end

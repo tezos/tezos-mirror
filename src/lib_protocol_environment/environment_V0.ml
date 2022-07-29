@@ -27,7 +27,7 @@
 open Environment_context
 open Environment_protocol_T
 
-module type V0 = sig
+module type T = sig
   include
     Tezos_protocol_environment_sigs.V0.T
       with type Format.formatter = Format.formatter
@@ -44,7 +44,7 @@ module type V0 = sig
        and type Context_hash.t = Context_hash.t
        and type Protocol_hash.t = Protocol_hash.t
        and type Time.t = Time.Protocol.t
-       and type MBytes.t = Tezos_protocol_environment_structs.V0.M.MBytes.t
+       and type MBytes.t = Tezos_protocol_environment_structs.V0.MBytes.t
        and type Operation.shell_header = Operation.shell_header
        and type Operation.t = Operation.t
        and type Block_header.shell_header = Block_header.shell_header
@@ -70,7 +70,7 @@ module type V0 = sig
        and type ('a, 'b) RPC_path.t = ('a, 'b) RPC_path.t
        and type RPC_service.meth = RPC_service.meth
        and type (+'m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t =
-            ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
+        ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
        and type Error_monad.shell_error = Error_monad.error
 
   type error += Ecoproto_error of Error_monad.error
@@ -98,7 +98,7 @@ module type V0 = sig
     -> ['block] RPC_context.simple
 end
 
-module MakeV0 (Param : sig
+module Make (Param : sig
   val name : string
 end)
 () =
@@ -109,7 +109,7 @@ struct
      shadow modules from [Stdlib]/[Base]/etc. with backwards compatible
      versions. Thus we open the module, hiding the incompatible, newer modules.
   *)
-  open Tezos_protocol_environment_structs.V0.M
+  open Tezos_protocol_environment_structs.V0
   module Pervasives = Stdlib
   module Compare = Compare
   module List = List
@@ -117,7 +117,6 @@ struct
   module Bytes = struct
     include Bytes
     include EndianBytes.BigEndian
-    module LE = EndianBytes.LittleEndian
   end
 
   module String = struct
@@ -130,8 +129,6 @@ struct
   module Map = Stdlib.Map
   module Int32 = Int32
   module Int64 = Int64
-  module Nativeint = Nativeint
-  module Buffer = Buffer
   module Format = Format
   module Option = Option
   module MBytes = MBytes
@@ -161,10 +158,8 @@ struct
     let of_bits bytes = of_bits (MBytes.to_string bytes)
   end
 
-  module Lwt_sequence = Lwt_sequence
   module Lwt = Lwt
   module Lwt_list = Lwt_list
-  module Uri = Uri
 
   module Data_encoding = struct
     include Data_encoding
@@ -344,7 +339,7 @@ struct
         (struct
           let id = Format.asprintf "proto.%s." Param.name
         end)
-        (Tezos_protocol_environment_structs.V0.M.Error_monad_classification)
+        (Tezos_protocol_environment_structs.V0.Error_monad_trace_eval)
 
     let error_encoding = Data_encoding.dynamic_size error_encoding
   end
@@ -826,14 +821,13 @@ struct
       wrap_error r
   end
 
-  module Lift (P : Updater.PROTOCOL) =
-  Environment_protocol_T.IgnoreCaches (struct
-    let environment_version = Protocol.V0
+  module Lift (P : Updater.PROTOCOL) = struct
+    include IgnoreCaches (Environment_protocol_T.V0toV6 (LiftV0 (P)))
 
     let set_log_message_consumer _ = ()
 
-    include Environment_protocol_T.V0toV3 (LiftV0 (P))
-  end)
+    let environment_version = Protocol.V0
+  end
 
   class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.RPC_context.t)
     (prefix : (unit, (unit * 'chain) * 'block) RPC_path.t) =

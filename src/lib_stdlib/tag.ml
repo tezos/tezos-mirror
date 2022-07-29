@@ -172,9 +172,9 @@ let union f =
       merger =
         (fun tag a b ->
           match (a, b) with
-          | (Some aa, Some bb) -> Some (f.unioner tag aa bb)
-          | (Some _, None) -> a
-          | (None, _) -> b);
+          | Some aa, Some bb -> Some (f.unioner tag aa bb)
+          | Some _, None -> a
+          | None, _ -> b);
     }
 
 (* no compare and equal, compare especially makes little sense *)

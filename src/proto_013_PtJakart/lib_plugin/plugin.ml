@@ -599,7 +599,7 @@ module Mempool = struct
   (** Returns the weight of an operation, i.e. the fees w.r.t the gas and size
       consumption in the block. *)
   let weight_manager_operation ~validation_state ?size ~fee ~gas op =
-    let (weight, _resources) =
+    let weight, _resources =
       weight_and_resources_manager_operation
         ~validation_state
         ?size
@@ -624,7 +624,7 @@ module Mempool = struct
     match validation_state with
     | None -> `Weight_ok (`No_replace, [])
     | Some validation_state -> (
-        let (weight, op_resources) =
+        let weight, op_resources =
           weight_and_resources_manager_operation
             ~validation_state
             ~fee
@@ -915,7 +915,7 @@ module Mempool = struct
     match
       (grandparent_level_start, validation_state_before, round_zero_duration)
     with
-    | (None, _, _) | (_, None, _) | (_, _, None) -> Lwt.return_true
+    | None, _, _ | _, None, _ | _, _, None -> Lwt.return_true
     | ( Some grandparent_level_start,
         Some validation_state_before,
         Some round_zero_duration ) -> (
@@ -1313,6 +1313,10 @@ module View_helpers = struct
   type Environment.Error_monad.error +=
     | View_unexpected_return of Entrypoint.t * Contract.t
 
+  type Environment.Error_monad.error += View_not_found of Contract.t * string
+
+  type Environment.Error_monad.error += Viewer_unexpected_storage
+
   let () =
     Environment.Error_monad.register_error_kind
       `Permanent
@@ -1400,12 +1404,38 @@ module View_helpers = struct
           (req "entrypoint" Entrypoint.simple_encoding)
           (req "callback" Contract.encoding))
       (function View_never_returns (e, c) -> Some (e, c) | _ -> None)
-      (fun (e, c) -> View_never_returns (e, c))
+      (fun (e, c) -> View_never_returns (e, c)) ;
+    Environment.Error_monad.register_error_kind
+      `Permanent
+      ~id:"viewNotFound"
+      ~title:"A view could not be found"
+      ~description:"The contract does not have a view of the given name."
+      ~pp:(fun ppf (contract, name) ->
+        Format.fprintf
+          ppf
+          "The contract %a does not have a view named `%s`."
+          Contract.pp
+          contract
+          name)
+      Data_encoding.(
+        obj2 (req "contract" Contract.encoding) (req "view" string))
+      (function View_not_found (k, n) -> Some (k, n) | _ -> None)
+      (fun (k, n) -> View_not_found (k, n)) ;
+    Environment.Error_monad.register_error_kind
+      `Permanent
+      ~id:"viewerUnexpectedStorage"
+      ~title:"A VIEW instruction returned an unexpected value"
+      ~description:"A VIEW instruction returned an unexpected value."
+      ~pp:(fun ppf () ->
+        Format.fprintf ppf "The simulated view returned an unexpected value.")
+      Data_encoding.unit
+      (function Viewer_unexpected_storage -> Some () | _ -> None)
+      (fun () -> Viewer_unexpected_storage)
 
   (* This script is actually never run, its usage is to ensure a
      contract that has the type `contract <ty>` is originated, which
      will be required as callback of the view. *)
-  let make_viewer_script ty : Script.t =
+  let make_tzip4_viewer_script ty : Script.t =
     let loc = 0 in
     let ty = Micheline.root ty in
     let code =
@@ -1485,6 +1515,58 @@ module View_helpers = struct
         Environment.Error_monad.error
           (View_never_returns (entrypoint, callback))
     | _ -> unexpected_return
+
+  (* [make_michelson_viewer_script contract view input input_ty output_ty]
+     generates a script that calls a view from a given contract, and stores the
+     result in its storage. *)
+  let make_michelson_viewer_script address view input input_ty output_ty :
+      Script.t =
+    let loc = 0 in
+    let address = Micheline.String (loc, Contract.to_b58check address) in
+    let push ty value = Micheline.Prim (loc, Script.I_PUSH, [ty; value], []) in
+    let storage_decl = Micheline.Prim (loc, Script.T_option, [output_ty], []) in
+    let body =
+      Micheline.Seq
+        ( loc,
+          [
+            Micheline.Prim (loc, Script.I_DROP, [], []);
+            push (Micheline.Prim (loc, Script.T_address, [], [])) address;
+            push input_ty (Micheline.root input);
+            Micheline.Prim
+              (loc, Script.I_VIEW, [Micheline.String (loc, view); output_ty], []);
+            Micheline.Prim
+              ( loc,
+                Script.I_NIL,
+                [Micheline.Prim (loc, Script.T_operation, [], [])],
+                [] );
+            Micheline.Prim (loc, Script.I_PAIR, [], []);
+          ] )
+    in
+    let code =
+      Micheline.strip_locations
+      @@ Micheline.Seq
+           ( loc,
+             [
+               Micheline.Prim
+                 ( loc,
+                   Script.K_parameter,
+                   [Micheline.Prim (loc, Script.T_unit, [], [])],
+                   [] );
+               Micheline.Prim (loc, Script.K_storage, [storage_decl], []);
+               Micheline.Prim (loc, Script.K_code, [body], []);
+             ] )
+    in
+    let storage =
+      Micheline.strip_locations (Micheline.Prim (loc, Script.D_None, [], []))
+    in
+    {code = Script.lazy_expr code; storage = Script.lazy_expr storage}
+
+  (* Extracts the value from the mock script generated by
+     [make_michelson_viewer_script]. *)
+  let extract_value_from_storage (storage : Script.expr) =
+    match Micheline.root storage with
+    | Micheline.Prim (_, Script.D_Some, [value], []) -> ok value
+    | _ -> Environment.Error_monad.error @@ Viewer_unexpected_storage
 end
 
 module RPC = struct
@@ -1655,7 +1737,7 @@ module RPC = struct
              (req "trace" trace_encoding)
              (opt "lazy_storage_diff" Lazy_storage.encoding))
 
-      let run_view_encoding =
+      let run_tzip4_view_encoding =
         let open Data_encoding in
         obj10
           (req "contract" Contract.encoding)
@@ -1668,6 +1750,22 @@ module RPC = struct
           (req "unparsing_mode" unparsing_mode_encoding)
           (opt "now" Script_timestamp.encoding)
           (opt "level" Script_int.n_encoding)
+
+      let run_script_view_encoding =
+        let open Data_encoding in
+        merge_objs
+          (obj10
+             (req "contract" Contract.encoding)
+             (req "view" string)
+             (req "input" Script.expr_encoding)
+             (dft "unlimited_gas" bool false)
+             (req "chain_id" Chain_id.encoding)
+             (opt "source" Contract.encoding)
+             (opt "payer" Contract.encoding)
+             (opt "gas" Gas.Arith.z_integral_encoding)
+             (req "unparsing_mode" unparsing_mode_encoding)
+             (opt "now" Script_timestamp.encoding))
+          (obj1 (opt "level" Script_int.n_encoding))
 
       let run_code =
         RPC_service.post_service
@@ -1686,15 +1784,24 @@ module RPC = struct
           ~output:trace_code_output_encoding
           RPC_path.(path / "trace_code")
 
-      let run_view =
+      let run_tzip4_view =
         RPC_service.post_service
           ~description:
             "Simulate a call to a view following the TZIP-4 standard. See \
              https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints."
-          ~input:run_view_encoding
+          ~input:run_tzip4_view_encoding
           ~output:(obj1 (req "data" Script.expr_encoding))
           ~query:RPC_query.empty
+          (* This path should be deprecated in the future *)
           RPC_path.(path / "run_view")
+
+      let run_script_view =
+        RPC_service.post_service
+          ~description:"Simulate a call to a michelson view"
+          ~input:run_script_view_encoding
+          ~output:(obj1 (req "data" Script.expr_encoding))
+          ~query:RPC_query.empty
+          RPC_path.(path / "run_script_view")
 
       let typecheck_code =
         RPC_service.post_service
@@ -1792,7 +1899,10 @@ module RPC = struct
 
       let run_operation =
         RPC_service.post_service
-          ~description:"Run an operation without signature checks"
+          ~description:
+            "Run an operation with the context of the given block and without \
+             signature checks. Return the operation application result, \
+             including the consumed gas."
           ~query:RPC_query.empty
           ~input:
             (obj2
@@ -1817,7 +1927,14 @@ module RPC = struct
 
       let simulate_operation =
         RPC_service.post_service
-          ~description:"Simulate an operation"
+          ~description:
+            "Simulate running an operation at some future moment (based on the \
+             number of blocks given in the `latency` argument), and return the \
+             operation application result. The result is the same as \
+             run_operation except for the consumed gas, which depends on the \
+             contents of the cache at that future moment. This RPC estimates \
+             future gas consumption by trying to predict the state of the \
+             cache using some heuristics."
           ~query:simulate_query
           ~input:
             (obj4
@@ -1892,8 +2009,8 @@ module RPC = struct
             type a s.
             (a, s) Script_typed_ir.stack_ty * (a * s) ->
             Script.expr list tzresult Lwt.t = function
-          | (Bot_t, (EmptyCell, EmptyCell)) -> return_nil
-          | (Item_t (ty, rest_ty), (v, rest)) ->
+          | Bot_t, (EmptyCell, EmptyCell) -> return_nil
+          | Item_t (ty, rest_ty), (v, rest) ->
               Script_ir_translator.unparse_data
                 ctxt
                 Unparsing_mode.unparsing_mode
@@ -2222,11 +2339,11 @@ module RPC = struct
               balance
             >>=? fun bal -> return (ctxt, addr, bal))
         >>=? fun (ctxt, self, balance) ->
-        let (source, payer) =
+        let source, payer =
           match (src_opt, pay_opt) with
-          | (None, None) -> (self, self)
-          | (Some c, None) | (None, Some c) -> (c, c)
-          | (Some src, Some pay) -> (src, pay)
+          | None, None -> (self, self)
+          | Some c, None | None, Some c -> (c, c)
+          | Some src, Some pay -> (src, pay)
         in
         return (ctxt, {balance; self; source; payer})
       in
@@ -2248,6 +2365,18 @@ module RPC = struct
             >>? fun (r, _ctxt) ->
             r >|? fun (Ex_ty_cstr {original_type_expr; _}) ->
             Micheline.strip_locations original_type_expr )
+      in
+      let script_view_type ctxt contract expr view =
+        let ctxt = Gas.set_unlimited ctxt in
+        let legacy = false in
+        let open Script_ir_translator in
+        parse_toplevel ctxt ~legacy expr >>=? fun ({views; _}, _) ->
+        Lwt.return
+          ( Script_string.of_string view >>? fun view_name ->
+            match Script_map.get view_name views with
+            | None -> error (View_helpers.View_not_found (contract, view))
+            | Some Script_typed_ir.{input_ty; output_ty; _} ->
+                ok (input_ty, output_ty) )
       in
       Registration.register0
         ~chunked:true
@@ -2394,7 +2523,7 @@ module RPC = struct
             lazy_storage_diff )) ;
       Registration.register0
         ~chunked:true
-        S.run_view
+        S.run_tzip4_view
         (fun
           ctxt
           ()
@@ -2424,15 +2553,15 @@ module RPC = struct
           Error_monad.trace View_helpers.View_callback_origination_failed
           @@ originate_dummy_contract
                ctxt
-               (View_helpers.make_viewer_script ty)
+               (View_helpers.make_tzip4_viewer_script ty)
                Tez.zero
           >>=? fun (ctxt, viewer_contract) ->
-          let (source, payer) =
+          let source, payer =
             match (source, payer) with
-            | (Some source, Some payer) -> (source, payer)
-            | (Some source, None) -> (source, source)
-            | (None, Some payer) -> (payer, payer)
-            | (None, None) -> (contract, contract)
+            | Some source, Some payer -> (source, payer)
+            | Some source, None -> (source, source)
+            | None, Some payer -> (payer, payer)
+            | None, None -> (contract, contract)
           in
           let gas =
             Option.value
@@ -2492,6 +2621,109 @@ module RPC = struct
             viewer_contract
           >>?= fun parameter -> Lwt.return (Script_repr.force_decode parameter)) ;
       Registration.register0
+        ~chunked:true
+        S.run_script_view
+        (fun
+          ctxt
+          ()
+          ( ( contract,
+              view,
+              input,
+              unlimited_gas,
+              chain_id,
+              source,
+              payer,
+              gas,
+              unparsing_mode,
+              now ),
+            level )
+        ->
+          Contract.get_script ctxt contract >>=? fun (ctxt, script_opt) ->
+          Option.fold
+            ~some:ok
+            ~none:(Error_monad.error View_helpers.Viewed_contract_has_no_script)
+            script_opt
+          >>?= fun script ->
+          Script_repr.(force_decode script.code) >>?= fun decoded_script ->
+          script_view_type ctxt contract decoded_script view
+          >>=? fun (input_ty, output_ty) ->
+          Contract.get_balance ctxt contract >>=? fun balance ->
+          let source, payer =
+            match (source, payer) with
+            | Some source, Some payer -> (source, payer)
+            | Some source, None -> (source, source)
+            | None, Some payer -> (payer, payer)
+            | None, None -> (contract, contract)
+          in
+          let now =
+            match now with None -> Script_timestamp.now ctxt | Some t -> t
+          in
+          (* Using [Gas.set_unlimited] won't work, since the interpreter doesn't
+             use this mode (see !4034#note_774734253) and still consumes gas.
+             Our best shot to emulate this is to use the maximum amount of
+             milligas possible which is represented by [2^62 - 1] according to
+             [Saturation_repr.saturated], which is [max_int]. *)
+          let max_gas = Gas.fp_of_milligas_int max_int in
+          let gas =
+            Option.value
+              ~default:(Constants.hard_gas_limit_per_operation ctxt)
+              gas
+          in
+          let ctxt =
+            if unlimited_gas then Gas.set_limit ctxt max_gas
+            else Gas.set_limit ctxt gas
+          in
+          let level =
+            Option.value
+              level
+              ~default:
+                ((Level.current ctxt).level |> Raw_level.to_int32
+               |> Script_int.of_int32 |> Script_int.abs)
+          in
+          let step_constants =
+            {
+              Script_interpreter.source;
+              payer;
+              self = contract;
+              amount = Tez.zero;
+              balance;
+              chain_id;
+              now;
+              level;
+            }
+          in
+          let viewer_script =
+            View_helpers.make_michelson_viewer_script
+              contract
+              view
+              input
+              input_ty
+              output_ty
+          in
+          let parameter =
+            Micheline.(strip_locations (Prim (0, Script.D_Unit, [], [])))
+          in
+          Script_interpreter.execute
+            ctxt
+            unparsing_mode
+            step_constants
+            ~script:viewer_script
+            ~cached_script:None
+            ~entrypoint:Entrypoint.default
+            ~parameter
+            ~internal:true
+          >>=? fun ( {
+                       Script_interpreter.operations = _;
+                       script = _;
+                       code_size = _;
+                       storage;
+                       lazy_storage_diff = _;
+                       ticket_diffs = _;
+                     },
+                     _ctxt ) ->
+          View_helpers.extract_value_from_storage storage >>?= fun value ->
+          return (Micheline.strip_locations value)) ;
+      Registration.register0
         ~chunked:false
         S.typecheck_code
         (fun ctxt () (expr, maybe_gas, legacy, show_types) ->
@@ -2547,7 +2779,7 @@ module RPC = struct
                    storage;
                  })
           in
-          let (size, cost) = Script_ir_translator.script_size script in
+          let size, cost = Script_ir_translator.script_size script in
           Gas.consume ctxt cost >>?= fun _ctxt -> return @@ size) ;
 
       Registration.register0
@@ -2642,7 +2874,7 @@ module RPC = struct
             ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
             >|? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
               ->
-              let (unreachable_entrypoint, map) =
+              let unreachable_entrypoint, map =
                 Script_ir_translator.list_entrypoints_uncarbonated
                   arg_type
                   entrypoints
@@ -2696,10 +2928,10 @@ module RPC = struct
             entrypoint ),
           (unparsing_mode, gas, now, level) )
 
-    let run_view ?gas ~contract ~entrypoint ~input ~chain_id ~now ~level ?source
-        ?payer ~unparsing_mode ctxt block =
+    let run_tzip4_view ?gas ~contract ~entrypoint ~input ~chain_id ~now ~level
+        ?source ?payer ~unparsing_mode ctxt block =
       RPC_context.make_call0
-        S.run_view
+        S.run_tzip4_view
         ctxt
         block
         ()
@@ -2712,6 +2944,27 @@ module RPC = struct
           gas,
           unparsing_mode,
           now,
+          level )
+
+    (** [run_script_view] is an helper function to call the corresponding
+        RPC. [unlimited_gas] is set to [false] by default. *)
+    let run_script_view ?gas ~contract ~view ~input ?(unlimited_gas = false)
+        ~chain_id ~now ~level ?source ?payer ~unparsing_mode ctxt block =
+      RPC_context.make_call0
+        S.run_script_view
+        ctxt
+        block
+        ()
+        ( ( contract,
+            view,
+            input,
+            unlimited_gas,
+            chain_id,
+            source,
+            payer,
+            gas,
+            unparsing_mode,
+            now ),
           level )
 
     let typecheck_code ?gas ?legacy ~script ?show_types ctxt block =
@@ -3007,6 +3260,39 @@ module RPC = struct
       RPC_context.make_call1 S.initial_level ctxt block sc_rollup_address ()
   end
 
+  module Tx_rollup = struct
+    open Data_encoding
+
+    module S = struct
+      let path : RPC_context.t RPC_path.context =
+        RPC_path.(open_root / "context" / "tx_rollup")
+
+      let has_bond =
+        RPC_service.get_service
+          ~description:
+            "Returns true if the public key hash already deposited a bond  for \
+             the given rollup"
+          ~query:RPC_query.empty
+          ~output:bool
+          RPC_path.(
+            path /: Tx_rollup.rpc_arg / "has_bond"
+            /: Signature.Public_key_hash.rpc_arg)
+    end
+
+    let register_has_bond () =
+      Registration.register2
+        ~chunked:false
+        S.has_bond
+        (fun ctxt rollup operator () () ->
+          Tx_rollup_commitment.has_bond ctxt rollup operator
+          >>=? fun (_ctxt, has_bond) -> return has_bond)
+
+    let register () = register_has_bond ()
+
+    let has_bond ctxt block rollup operator =
+      RPC_context.make_call2 S.has_bond ctxt block rollup operator () ()
+  end
+
   module Forge = struct
     module S = struct
       open Data_encoding
@@ -3114,6 +3400,27 @@ module RPC = struct
               ~output:
                 (obj1 (req "path" Tx_rollup_commitment.Merkle.path_encoding))
               RPC_path.(path / "merkle_tree_path")
+
+          let message_result_hash =
+            RPC_service.post_service
+              ~description:"Compute the message result hash"
+              ~query:RPC_query.empty
+              ~input:Tx_rollup_message_result.encoding
+              ~output:(obj1 (req "hash" Tx_rollup_message_result_hash.encoding))
+              RPC_path.(path / "message_result_hash")
+        end
+
+        module Withdraw = struct
+          let path = RPC_path.(path / "withdraw")
+
+          let withdraw_list_hash =
+            RPC_service.post_service
+              ~description:"Compute the hash of a withdraw list"
+              ~query:RPC_query.empty
+              ~input:
+                (obj1 (req "withdraw_list" (list Tx_rollup_withdraw.encoding)))
+              ~output:(obj1 (req "hash" Tx_rollup_withdraw_list_hash.encoding))
+              RPC_path.(path / "withdraw_list_hash")
         end
       end
     end
@@ -3177,12 +3484,22 @@ module RPC = struct
         (fun () (message_result_hashes, position) ->
           let open Tx_rollup_commitment.Merkle in
           let tree = List.fold_left snoc nil message_result_hashes in
-          Lwt.return (compute_path tree position))
+          Lwt.return (compute_path tree position)) ;
+      Registration.register0_noctxt
+        ~chunked:true
+        S.Tx_rollup.Commitment.message_result_hash
+        (fun () message_result ->
+          return
+            (Tx_rollup_message_result_hash.hash_uncarbonated message_result)) ;
+      Registration.register0_noctxt
+        ~chunked:true
+        S.Tx_rollup.Withdraw.withdraw_list_hash
+        (fun () withdrawals ->
+          return (Tx_rollup_withdraw_list_hash.hash_uncarbonated withdrawals))
 
     module Manager = struct
-      let[@coq_axiom_with_reason "cast on e"] operations ctxt block ~branch
-          ~source ?sourcePubKey ~counter ~fee ~gas_limit ~storage_limit
-          operations =
+      let operations ctxt block ~branch ~source ?sourcePubKey ~counter ~fee
+          ~gas_limit ~storage_limit operations =
         Contract_services.manager_key ctxt block source >>= function
         | Error _ as e -> Lwt.return e
         | Ok revealed ->
@@ -3203,8 +3520,8 @@ module RPC = struct
             in
             let ops =
               match (sourcePubKey, revealed) with
-              | (None, _) | (_, Some _) -> ops
-              | (Some pk, None) ->
+              | None, _ | _, Some _ -> ops
+              | Some pk, None ->
                   let operation = Reveal pk in
                   Contents
                     (Manager_operation
@@ -3426,8 +3743,8 @@ module RPC = struct
 
   let requested_levels ~default_level ctxt cycles levels =
     match (levels, cycles) with
-    | ([], []) -> [default_level]
-    | (levels, cycles) ->
+    | [], [] -> [default_level]
+    | levels, cycles ->
         (* explicitly fail when requested levels or cycle are in the past...
            or too far in the future...
            TODO: https://gitlab.com/tezos/tezos/-/issues/2335
@@ -3892,6 +4209,7 @@ module RPC = struct
     Endorsing_rights.register () ;
     Validators.register () ;
     Sc_rollup.register () ;
+    Tx_rollup.register () ;
     Registration.register0 ~chunked:false S.current_level (fun ctxt q () ->
         if q.offset < 0l then fail Negative_level_offset
         else

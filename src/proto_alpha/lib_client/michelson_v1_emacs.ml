@@ -129,7 +129,7 @@ let first_error_location errs =
   find errs
 
 let report_errors ppf (parsed, errs) =
-  let (eco, out) =
+  let eco, out =
     List.fold_left
       (fun (eco, out) -> function
         | Environment.Ecoproto_error err -> (err :: eco, out)
@@ -137,7 +137,7 @@ let report_errors ppf (parsed, errs) =
       ([], [])
       errs
   in
-  let (eco, out) = (List.rev eco, List.rev out) in
+  let eco, out = (List.rev eco, List.rev out) in
   Format.fprintf
     ppf
     "(@[<v 0>%a@,%a@])"
@@ -156,7 +156,7 @@ let report_errors ppf (parsed, errs) =
       in
       match errs with
       | top :: errs ->
-          let (errs, loc) =
+          let errs, loc =
             ( List.map (fun e -> Environment.Ecoproto_error e) (top :: errs),
               match top with
               | Ill_typed_contract (expr, _) | Ill_typed_data (_, expr, _) ->

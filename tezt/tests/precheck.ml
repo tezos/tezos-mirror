@@ -139,12 +139,7 @@ let forge_block ?client node ~key ~with_op =
   let* () = Client.Admin.kick_peer ~peer:node2_id client in
   let* () =
     if with_op then
-      let* _ =
-        Operation.inject_transfer
-          ~source:Constant.bootstrap1
-          ~dest:Constant.bootstrap2
-          client2
-      in
+      let* _ = Operation.Manager.(inject [make @@ transfer ()] client2) in
       unit
     else unit
   in
@@ -209,7 +204,7 @@ let propagate_precheckable_bad_block =
     List.init blocks_to_bake Fun.id
     |> List.map succ
     |> Lwt_list.iter_s (fun i ->
-           let* () = Client.bake_for ~keys:[bootstrap1] client in
+           let* () = Client.bake_for_and_wait ~keys:[bootstrap1] client in
            wait_for_cluster_at_level cluster i)
   in
   let* block_header = forge_block ~client n1 ~key:bootstrap1 ~with_op:false in
@@ -291,7 +286,7 @@ let propagate_precheckable_bad_block =
     "Bake a valid block and check the cluster receives it (ensuring the \
      cluster is still connected)." ;
   (* One final bake to ensure everyone is at the same level *)
-  let* () = Client.bake_for ~keys:[bootstrap1] client in
+  let* () = Client.bake_for_and_wait ~keys:[bootstrap1] client in
   (* activation block + four blocks + the final bake *)
   wait_for_cluster_at_level cluster (1 + blocks_to_bake + 1)
 
@@ -333,7 +328,7 @@ let propagate_precheckable_bad_block_signature =
     List.init blocks_to_bake Fun.id
     |> List.map succ
     |> Lwt_list.iter_s (fun i ->
-           let* () = Client.bake_for ~keys:[bootstrap1] client in
+           let* () = Client.bake_for_and_wait ~keys:[bootstrap1] client in
            wait_for_cluster_at_level cluster i)
   in
   let* op_block_header = forge_block ~client n1 ~key:bootstrap1 ~with_op:true in
@@ -411,12 +406,12 @@ let propagate_precheckable_bad_block_signature =
     Client.spawn_rpc ~data:injection_json POST ["injection"; "block"] client
     |> Process.check_error ~msg:(rex "Invalid payload hash")
   in
-  let* _ = RPC.get_block client in
+  let* _ = RPC.Client.call client @@ RPC.get_chain_block () in
   Log.info
     "Bake a valid block and check the cluster receives it (ensuring the \
      cluster is still connected)." ;
   (* One final bake to ensure everyone is at the same level *)
-  let* () = Client.bake_for ~keys:[bootstrap1] client in
+  let* () = Client.bake_for_and_wait ~keys:[bootstrap1] client in
   (* activation block + four blocks + the final bake *)
   wait_for_cluster_at_level cluster (1 + blocks_to_bake + 1)
 

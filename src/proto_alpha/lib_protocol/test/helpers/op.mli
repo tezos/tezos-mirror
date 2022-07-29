@@ -26,6 +26,9 @@
 open Protocol
 open Alpha_context
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3181
+   Improve documentation of the operation helpers *)
+
 val endorsement :
   ?delegate:public_key_hash * Slot.t list ->
   ?slot:Slot.t ->
@@ -56,10 +59,24 @@ val miss_signed_endorsement :
   Context.t ->
   Kind.endorsement Operation.t tzresult Lwt.t
 
+type gas_limit =
+  | Max  (** Max corresponds to the [max_gas_limit_per_operation] constant. *)
+  | High
+      (** High corresponds to [50_000] gas unit which should cover a
+      majority of use-cases. This is the default used when forging
+      manager operations. *)
+  | Low  (** Low corresponds to the gas entry cost of a manager operation *)
+  | Zero
+  | Custom_gas of Gas.Arith.integral
+
+(** Pretty printer for gas_limit type. *)
+val pp_gas_limit : Format.formatter -> gas_limit -> unit
+
 val transaction :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?fee:Tez.tez ->
-  ?gas_limit:Gas.Arith.integral ->
+  ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   ?parameters:Script.lazy_expr ->
   ?entrypoint:Entrypoint.t ->
@@ -73,38 +90,90 @@ val transaction :
     parameter. It is said unsafe because it can construct transactions
     that will always fail, such as
 
-    {ul {li Transaction to the deposit entrypoint of a transaction rollup,
-            as these transactions are necessarily internals.}}
- *)
+    {ul {li Transaction to the deposit entrypoint of a transaction
+    rollup, as these transactions are necessarily internals.}}
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+    [source]'s public key if the latter has not been revealed
+    yet. Disabled (set to [false]) by default.}} *)
 val unsafe_transaction :
-  ?counter:Z.t ->
-  ?fee:Tez.tez ->
-  ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:Z.t ->
-  ?parameters:Script.lazy_expr ->
-  ?entrypoint:Entrypoint.t ->
+  ?force_reveal:bool ->
+  ?counter:counter ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:counter ->
+  ?parameters:
+    Michelson_v1_primitives.prim Micheline.canonical Data_encoding.lazy_t ->
+  ?entrypoint:Entrypoint_repr.t ->
   Context.t ->
   Contract.t ->
-  Destination.t ->
+  Contract.t ->
   Tez.t ->
-  Operation.packed tzresult Lwt.t
+  packed_operation tzresult Lwt.t
 
 val delegation :
+  ?force_reveal:bool ->
   ?fee:Tez.tez ->
+  ?gas_limit:gas_limit ->
+  ?counter:Z.t ->
+  ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
   public_key_hash option ->
   Operation.packed tzresult Lwt.t
 
 val set_deposits_limit :
+  ?force_reveal:bool ->
   ?fee:Tez.tez ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  ?counter:Z.t ->
   Context.t ->
   Contract.t ->
   Tez.tez option ->
   Operation.packed tzresult Lwt.t
 
+val increase_paid_storage :
+  ?force_reveal:bool ->
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  source:Contract.t ->
+  destination:Contract_hash.t ->
+  Z.t ->
+  Operation.packed tzresult Lwt.t
+
+(** [revelation ?fee ?gas_limit ?forge_pkh ctxt pkh] Creates a new
+    [Reveal] {!manager_operation} to reveal a public key [pkh]
+    applying to current context [ctxt].
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?fee:Tez.tez]: specify a fee, otherwise set to
+    [Tez.zero].}
+
+    {li [?gas_limit:Gas.Arith.integral]: force a gas limit, otherwise
+    set to 10000 gas units.}
+
+    {li [?forge_pkh]: use a provided [pkh] as source, instead of
+    hashing [pkh]. Useful for forging non-honest reveal operations}
+
+    {li [?storage_limit:counter]: forces a storage limit, otherwise
+    set to [Z.zero]}
+*)
 val revelation :
-  ?fee:Tez.tez -> Context.t -> public_key -> Operation.packed tzresult Lwt.t
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:counter ->
+  ?counter:counter ->
+  ?forge_pkh:public_key_hash option ->
+  Context.t ->
+  public_key ->
+  (packed_operation, tztrace) result Lwt.t
 
 val failing_noop :
   Context.t -> public_key_hash -> string -> Operation.packed tzresult Lwt.t
@@ -112,29 +181,51 @@ val failing_noop :
 (** [contract_origination ctxt source] Create a new contract origination
     operation, sign it with [source] and returns it alongside the contract
     address. The contract address is using the initial origination nonce with the
-    hash of the operation. If this operation is combine with [combine_operations]
+    hash of the operation. If this operation is combined with [combine_operations]
     then the contract address is false as the nonce is not based on the correct
-    operation hash. *)
+    operation hash.
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+    [source]'s public key if the latter has not been revealed
+    yet. Disabled (set to [false]) by default.}} *)
 val contract_origination :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?delegate:public_key_hash ->
   script:Script.t ->
   ?public_key:public_key ->
   ?credit:Tez.tez ->
   ?fee:Tez.tez ->
-  ?gas_limit:Gas.Arith.integral ->
+  ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
-  Contract.contract ->
-  (Operation.packed * Contract.contract) tzresult Lwt.t
+  Contract.t ->
+  (Operation.packed * Contract.t) tzresult Lwt.t
 
-val originated_contract : Operation.packed -> Contract.contract
+val contract_origination_hash :
+  ?force_reveal:bool ->
+  ?counter:Z.t ->
+  ?delegate:public_key_hash ->
+  script:Script.t ->
+  ?public_key:public_key ->
+  ?credit:Tez.tez ->
+  ?fee:Tez.tez ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  (Operation.packed * Contract_hash.t) tzresult Lwt.t
+
+val originated_contract : Operation.packed -> Contract.t
 
 val register_global_constant :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?public_key:Signature.public_key ->
   ?fee:Tez.tez ->
-  ?gas_limit:Alpha_context.Gas.Arith.integral ->
+  ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
   (* Account doing the registration *)
@@ -176,9 +267,11 @@ val combine_operations :
   packed_operation list ->
   packed_operation tzresult Lwt.t
 
-(** Batch a list of (already signed) operations and (re-)sign with the [source].
-    No revelation is inserted and the counters are kept as they are. *)
+(** Batch a list of (already signed) operations and (re-)sign with the
+    [source]. No revelation is inserted and the counters are kept as
+    they are unless [recompute_counters] is set to [true] (defaults false). *)
 val batch_operations :
+  ?recompute_counters:bool ->
   source:Contract.t ->
   Context.t ->
   packed_operation list ->
@@ -187,6 +280,9 @@ val batch_operations :
 (** Reveals a seed_nonce that was previously committed at a certain level *)
 val seed_nonce_revelation :
   Context.t -> Raw_level.t -> Nonce.t -> Operation.packed
+
+(** Reveals a VDF with a proof of correctness *)
+val vdf_revelation : Context.t -> Seed.vdf_solution -> Operation.packed
 
 (** Propose a list of protocol hashes during the approval voting *)
 val proposals :
@@ -214,9 +310,10 @@ val dummy_script_cost : Tez.t
     tx rollup address is false as the nonce is not based on the correct operation
     hash. *)
 val tx_rollup_origination :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?fee:Tez.tez ->
-  ?gas_limit:Gas.Arith.integral ->
+  ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
@@ -224,12 +321,19 @@ val tx_rollup_origination :
 
 (** [tx_rollup_submit_batch ctxt source tx_rollup batch] submits
     [batch], an array of bytes that is expected to be a batch of L2
-    transactions, to be appended in the inbox of [tx_rollup].  *)
+    transactions, to be appended in the inbox of [tx_rollup].
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+    [source]'s public key if the latter has not been revealed
+    yet. Disabled (set to [false]) by default.}} *)
 val tx_rollup_submit_batch :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?fee:Tez.tez ->
   ?burn_limit:Tez.tez ->
-  ?gas_limit:Gas.Arith.integral ->
+  ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
@@ -237,12 +341,19 @@ val tx_rollup_submit_batch :
   string ->
   Operation.packed tzresult Lwt.t
 
-(** [tx_rollup_commit ctxt source tx_rollup commitment] Commits to a tx
-    rollup state. *)
+(** [tx_rollup_commit ctxt source tx_rollup commitment] Commits to a
+    tx.
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+    [source]'s public key if the latter has not been revealed
+    yet. Disabled (set to [false]) by default.}} *)
 val tx_rollup_commit :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?fee:Tez.tez ->
-  ?gas_limit:Gas.Arith.integral ->
+  ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
@@ -250,23 +361,38 @@ val tx_rollup_commit :
   Tx_rollup_commitment.Full.t ->
   Operation.packed tzresult Lwt.t
 
-(** [tx_rollup_return_bond ctxt source tx_rollup] returns a commitment bond. *)
+(** [tx_rollup_return_bond ctxt source tx_rollup] returns a commitment
+    bond.
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+    [source]'s public key if the latter has not been revealed
+    yet. Disabled (set to [false]) by default..}} *)
 val tx_rollup_return_bond :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?fee:Tez.tez ->
-  ?gas_limit:Gas.Arith.integral ->
+  ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
   Tx_rollup.t ->
   Operation.packed tzresult Lwt.t
 
-(** [tx_rollup_finalize ctxt source tx_rollup] finalizes the most recent
-    final level of a rollup. *)
+(** [tx_rollup_finalize ctxt source tx_rollup] finalizes the most
+    recent final level of a rollup.
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+    [source]'s public key if the latter has not been revealed
+    yet. Disabled (set to [false]) by default.}} *)
 val tx_rollup_finalize :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?fee:Tez.tez ->
-  ?gas_limit:Gas.Arith.integral ->
+  ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
@@ -276,9 +402,10 @@ val tx_rollup_finalize :
 (** [tx_rollup_remove_commitment ctxt source tx_rollup] tries to
     remove a commitment from the rollup context. *)
 val tx_rollup_remove_commitment :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?fee:Tez.tez ->
-  ?gas_limit:Gas.Arith.integral ->
+  ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
@@ -289,11 +416,18 @@ val tx_rollup_remove_commitment :
     level context_hash tickets_info] sends all tickets from
     [tickets_info] to the appropriate implicit accounts, as authorized
     by the [message_index]th hash of the commitment of [tx_rollup]
-    posted for [level]. *)
+    posted for [level].
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+    [source]'s public key if the latter has not been revealed
+    yet. Disabled (set to [false]) by default.}} *)
 val tx_rollup_dispatch_tickets :
+  ?force_reveal:bool ->
   ?counter:counter ->
   ?fee:Tez.t ->
-  ?gas_limit:Gas.Arith.integral ->
+  ?gas_limit:gas_limit ->
   ?storage_limit:counter ->
   Context.t ->
   source:Contract.t ->
@@ -322,11 +456,18 @@ val tx_rollup_dispatch_tickets :
       {li [destination:Contract.t]: the destination contract that
           should receive the ticket of the withdrawal}
       {li [Entrypoint_repr.t]: the entrypoint of the destination
-          contract to which the ticket should be sent}} *)
+          contract to which the ticket should be sent}}
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+    [source]'s public key if the latter has not been revealed
+    yet. Disabled (set to [false]) by default.}} *)
 val transfer_ticket :
+  ?force_reveal:bool ->
   ?counter:counter ->
   ?fee:Tez.t ->
-  ?gas_limit:Gas.Arith.integral ->
+  ?gas_limit:gas_limit ->
   ?storage_limit:counter ->
   Context.t ->
   source:Contract.t ->
@@ -339,11 +480,18 @@ val transfer_ticket :
   (packed_operation, tztrace) result Lwt.t
 
 (** [tx_rollup_reject ctxt source tx_rollup tx_rollup level message
-    index proof] Rejects a tx rollup commitment. *)
+    index proof] Rejects a tx rollup commitment.
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+    [source]'s public key if the latter has not been revealed
+    yet. Disabled (set to [false]) by default.}} *)
 val tx_rollup_reject :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?fee:Tez.tez ->
-  ?gas_limit:Gas.Arith.integral ->
+  ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
@@ -359,26 +507,44 @@ val tx_rollup_reject :
   previous_message_result_path:Tx_rollup_commitment.Merkle.path ->
   Operation.packed tzresult Lwt.t
 
-(** [sc_rollup_origination ctxt source kind boot_sector] originates a new
-    smart contract rollup of some given [kind] booting using [boot_sector].
-    The process is the same as in [tx_rollup_origination]. *)
+(** [sc_rollup_origination ctxt source kind boot_sector] originates a
+    new smart contract rollup of some given [kind] booting using
+    [boot_sector].  The process is the same as in
+    [tx_rollup_origination].
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+    [source]'s public key if the latter has not been revealed
+    yet. Disabled (set to [false]) by default.}} *)
 val sc_rollup_origination :
+  ?force_reveal:bool ->
   ?counter:counter ->
   ?fee:Tez.t ->
-  ?gas_limit:Gas.Arith.integral ->
+  ?gas_limit:gas_limit ->
   ?storage_limit:counter ->
+  ?origination_proof:Sc_rollup.wrapped_proof ->
   Context.t ->
   Contract.t ->
   Sc_rollup.Kind.t ->
   string ->
+  Script.lazy_expr ->
   (packed_operation * Sc_rollup.t) tzresult Lwt.t
 
-(** [sc_rollup_publish ctxt source rollup commitment] tries to publish a
-    commitment to the SCORU. *)
+(** [sc_rollup_publish ctxt source rollup commitment] tries to publish
+    a commitment to the SCORU.  Optional arguments allow to override
+    defaults:
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+    [source]'s public key if the latter has not been revealed
+    yet. Disabled (set to [false]) by default.}} *)
 val sc_rollup_publish :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?fee:Tez.tez ->
-  ?gas_limit:Gas.Arith.integral ->
+  ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
@@ -386,15 +552,95 @@ val sc_rollup_publish :
   Sc_rollup.Commitment.t ->
   Operation.packed tzresult Lwt.t
 
-(** [sc_rollup_cement ctxt source rollup commitment] tries to cement the
-    specified commitment. *)
+(** [sc_rollup_cement ctxt source rollup commitment] tries to cement
+    the specified commitment.
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+    [source]'s public key if the latter has not been revealed
+    yet. Disabled (set to [false]) by default.}} *)
 val sc_rollup_cement :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?fee:Tez.tez ->
-  ?gas_limit:Gas.Arith.integral ->
+  ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
   Sc_rollup.t ->
-  Sc_rollup.Commitment_hash.t ->
+  Sc_rollup.Commitment.Hash.t ->
   Operation.packed tzresult Lwt.t
+
+val sc_rollup_execute_outbox_message :
+  ?counter:counter ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:counter ->
+  ?force_reveal:bool ->
+  Context.t ->
+  Contract.t ->
+  Sc_rollup.t ->
+  Sc_rollup.Commitment.Hash.t ->
+  output_proof:string ->
+  (packed_operation, tztrace) result Lwt.t
+
+(** [sc_rollup_recover_bond ctxt source sc_rollup] returns a commitment bond. *)
+val sc_rollup_recover_bond :
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  ?force_reveal:bool ->
+  Context.t ->
+  Contract.t ->
+  Sc_rollup.t ->
+  Operation.packed tzresult Lwt.t
+
+val sc_rollup_add_messages :
+  ?force_reveal:bool ->
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  Sc_rollup.t ->
+  string list ->
+  Operation.packed tzresult Lwt.t
+
+val sc_rollup_refute :
+  ?force_reveal:bool ->
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  Sc_rollup.t ->
+  public_key_hash ->
+  Sc_rollup.Game.refutation option ->
+  Operation.packed tzresult Lwt.t
+
+val sc_rollup_timeout :
+  ?force_reveal:bool ->
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  Sc_rollup.t ->
+  Sc_rollup.Game.Index.t ->
+  Operation.packed tzresult Lwt.t
+
+val dal_publish_slot_header :
+  ?force_reveal:bool ->
+  ?counter:counter ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:counter ->
+  Context.t ->
+  Contract.t ->
+  Dal.Slot.t ->
+  (packed_operation, tztrace) result Lwt.t

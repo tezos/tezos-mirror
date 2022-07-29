@@ -70,7 +70,7 @@ let data_dir : string option Term.t =
   let docv = "DATA_DIR" in
   Arg.(value & opt (some string) None & info ["d"; "data-dir"] ~docv ~doc)
 
-let sym_block_caching_time : int option Term.t =
+let sym_block_caching_time : Ptime.span option Term.t =
   let doc =
     "The duration (in seconds) during which data for a symbolic block \
      identifier (like head) is kept. Smaller values increase the endpoint's \
@@ -79,7 +79,9 @@ let sym_block_caching_time : int option Term.t =
      this value)."
   in
   let docv = "SYM_BLOCK_CACHING_TIME" in
-  Arg.(value & opt (some int) None & info ["sym-block-caching-time"] ~docv ~doc)
+  Term.(app @@ const @@ Option.map @@ Ptime.Span.of_int_s)
+    Arg.(
+      value & opt (some int) None & info ["sym-block-caching-time"] ~docv ~doc)
 
 let load_config_from_file (config_file : string) =
   let open Lwt_result_syntax in
@@ -179,7 +181,7 @@ let main_promise (config_file : string option)
               (Tezos_shell_context.Proxy_delegate_maker.make_index
                  ~context_path))
           (function
-            | Index_unix__Raw.Not_written ->
+            | Index_unix.Private.Raw.Not_written ->
                 failwith
                   "error reading data-dir: %s is not a valid context directory"
                   context_path
@@ -220,13 +222,14 @@ let main_promise (config_file : string option)
       address = rpc_server_address;
       port = rpc_server_port;
       tls_cert_and_key = rpc_server_tls;
+      forwarding_endpoint = endpoint;
     }
   in
   Proxy_server_main_run.run dir server_args
 
 let main (config_file : string option) (log_requests : bool)
     (endpoint : string option) (rpc_addr : string option)
-    (rpc_tls : string option) (sym_block_caching_time : int option)
+    (rpc_tls : string option) (sym_block_caching_time : Ptime.span option)
     (data_dir : string option) =
   let config_args =
     Proxy_server_config.make

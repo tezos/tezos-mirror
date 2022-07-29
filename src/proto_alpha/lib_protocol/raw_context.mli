@@ -105,6 +105,10 @@ val current_timestamp : t -> Time.t
 
 val constants : t -> Constants_parametric_repr.t
 
+val tx_rollup : t -> Constants_parametric_repr.tx_rollup
+
+val sc_rollup : t -> Constants_parametric_repr.sc_rollup
+
 val patch_constants :
   t -> (Constants_parametric_repr.t -> Constants_parametric_repr.t) -> t Lwt.t
 
@@ -125,10 +129,17 @@ val spend_collected_fees_only_call_from_token : t -> Tez_repr.t -> t tzresult
     producer's account at finalize_application *)
 val get_collected_fees : t -> Tez_repr.t
 
-type error += Gas_limit_too_high (* `Permanent *)
+(** [consume_gas_limit_in_block ctxt gas_limit] checks that
+    [gas_limit] is well-formed (i.e. it does not exceed the hard gas
+    limit per operation as defined in [ctxt], and it is positive), then
+    consumes [gas_limit] in the current block gas level of [ctxt].
 
-val check_gas_limit_is_valid : t -> 'a Gas_limit_repr.Arith.t -> unit tzresult
+    @return [Error Gas_limit_repr.Gas_limit_too_high] if [gas_limit]
+    is greater than the allowed limit for operation gas level or
+    negative.
 
+    @return [Error Block_quota_exceeded] if not enough gas remains in
+    the block. *)
 val consume_gas_limit_in_block : t -> 'a Gas_limit_repr.Arith.t -> t tzresult
 
 val set_gas_limit : t -> 'a Gas_limit_repr.Arith.t -> t
@@ -366,7 +377,39 @@ module Tx_rollup : sig
 end
 
 module Sc_rollup_in_memory_inbox : sig
-  val current_messages : t -> Sc_rollup_repr.t -> (Context.tree * t) tzresult
+  val current_messages :
+    t -> Sc_rollup_repr.t -> (Context.tree option * t) tzresult
 
   val set_current_messages : t -> Sc_rollup_repr.t -> Context.tree -> t tzresult
+end
+
+module Dal : sig
+  (** [record_available_shards ctxt slots shards] records that the
+     list of shards [shards] were declared available. The function
+     assumes that a shard belongs to the interval [0; number_of_shards
+     - 1]. Otherwise, for each shard outside this interval, it is a
+     no-op. *)
+  val record_available_shards : t -> Dal_endorsement_repr.t -> int list -> t
+
+  (** [register_slot ctxt slot] returns a new context where the new
+     candidate [slot] have been taken into account. Returns [Some
+     (ctxt,updated)] where [updated=true] if the candidate is
+     registered. [Some (ctxt,false)] if another candidate was already
+     registered previously. Returns an error if the slot is
+     invalid. *)
+  val register_slot : t -> Dal_slot_repr.t -> (t * bool) tzresult
+
+  (** [candidates ctxt] returns the current list of slot for which
+     there is at least one candidate. *)
+  val candidates : t -> Dal_slot_repr.t list
+
+  (** [is_slot_available ctxt slot_index] returns [true] if the
+     [slot_index] is declared available by the protocol. [false]
+     otherwise. If the [index] is out of the interval
+     [0;number_of_slots - 1], returns [false]. *)
+  val is_slot_available : t -> Dal_slot_repr.Index.t -> bool
+
+  (** [shards ctxt ~endorser] returns the shard assignment for the
+     [endorser] for the current level. *)
+  val shards : t -> endorser:Signature.Public_key_hash.t -> int list
 end

@@ -51,7 +51,7 @@ let check_client_force =
       ~burn_cap:Tez.(of_int 1)
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* () =
     Client.transfer
       ~gas_limit:100_000
@@ -65,11 +65,11 @@ let check_client_force =
       ~force:true
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* first_manager_operation =
-    Client.rpc
-      Client.GET
-      ["chains"; "main"; "blocks"; "head"; "operations"; "3"; "0"]
+    RPC.get_operations_of_validation_pass
+      ~validation_pass:3
+      ~operation_offset:0
       client
   in
   let first_operation_result =

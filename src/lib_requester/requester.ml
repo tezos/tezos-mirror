@@ -371,10 +371,9 @@ end = struct
                   Table.replace state.pending key next ;
                   let requests =
                     key
-                    ::
-                    Option.value
-                      ~default:[]
-                      (P2p_peer.Map.find requested_peer acc)
+                    :: Option.value
+                         ~default:[]
+                         (P2p_peer.Map.find requested_peer acc)
                   in
                   P2p_peer.Map.add requested_peer requests acc)
             state.pending
@@ -556,7 +555,7 @@ module Make
                disk-table query. *)
             match Memory_table.find s.memory k with
             | None ->
-                let (waiter, wakener) = Lwt.wait () in
+                let waiter, wakener = Lwt.wait () in
                 Memory_table.add
                   s.memory
                   k

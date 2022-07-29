@@ -145,7 +145,7 @@ let read t =
   let open Lwt_syntax in
   Lwt.catch
     (fun () ->
-      let* (s, msg) = Lwt_pipe.Maybe_bounded.pop t.messages in
+      let* s, msg = Lwt_pipe.Maybe_bounded.pop t.messages in
       let* () =
         Events.(emit bytes_popped_from_queue)
           (s, (P2p_socket.info t.conn).peer_id)
@@ -164,8 +164,6 @@ let is_readable t =
 let write t msg = P2p_socket.write t.conn (Message msg)
 
 let write_sync t msg = P2p_socket.write_sync t.conn (Message msg)
-
-let raw_write_sync t buf = P2p_socket.raw_write_sync t.conn buf
 
 let write_now t msg = P2p_socket.write_now t.conn (Message msg)
 
@@ -198,3 +196,8 @@ let peer_id t = t.peer_id
 let trusted_node t = t.trusted_node
 
 let negotiated_version t = t.negotiated_version
+
+module Internal_for_tests = struct
+  let raw_write_sync t buf =
+    P2p_socket.Internal_for_tests.raw_write_sync t.conn buf
+end

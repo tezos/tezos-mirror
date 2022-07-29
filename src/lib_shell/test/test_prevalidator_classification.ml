@@ -103,7 +103,7 @@ module Extra_generators = struct
   let event_gen t =
     let open QCheck2.Gen in
     let add_gen =
-      let+ (classification, op) =
+      let+ classification, op =
         pair
           Generators.classification_gen
           (Generators.operation_with_hash_gen ())
@@ -200,7 +200,7 @@ let check_invariants ?fail_msg (t : unit Classification.t) =
     Operation_hash.Map.to_seq map |> Seq.map fst |> Operation_hash.Set.of_seq
   in
   let expected_in_mempool = disjoint_union_classified_fields ?fail_msg t in
-  let mempool_as_set = to_set (Classification.Sized_map.to_map t.in_mempool) in
+  let mempool_as_set = to_set t.in_mempool in
   if not (Operation_hash.Set.equal expected_in_mempool mempool_as_set) then
     let set_pp ppf set =
       set |> Operation_hash.Set.elements
@@ -593,12 +593,12 @@ module To_map = struct
   let eq_mod_op m1 (k, v_opt) m2 =
     let diff = remove_all m2 m1 in
     match (Operation_hash.Map.bindings diff, v_opt) with
-    | ([], _) -> true
-    | ([(kdiff, vdiff)], Some v)
+    | [], _ -> true
+    | [(kdiff, vdiff)], Some v
       when Operation_hash.equal kdiff k
            && Operation.equal v.Prevalidation.raw vdiff.Prevalidation.raw ->
         true
-    | ([(kdiff, _)], None) when Operation_hash.equal kdiff k -> true
+    | [(kdiff, _)], None when Operation_hash.equal kdiff k -> true
     | _ -> false
 
   (** [to_map_all] calls [Classification.to_map] with all named

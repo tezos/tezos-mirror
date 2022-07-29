@@ -36,6 +36,17 @@ let get_sc_rollup_addresses_command () =
       RPC.get_sc_rollup_addresses_command cctxt >>=? fun addr ->
       cctxt#message "@[%a@]" Sc_rollup.Address.pp addr >>= fun () -> return_unit)
 
+let get_state_value_command () =
+  command
+    ~desc:"Observe a key in the PVM state."
+    no_options
+    (prefixes ["get"; "state"; "value"; "for"]
+    @@ string ~name:"key" ~desc:"The key of the state value"
+    @@ stop)
+    (fun () key (cctxt : #Configuration.sc_client_context) ->
+      RPC.get_state_value_command cctxt key >>=? fun bytes ->
+      cctxt#message "@[%S@]" (String.of_bytes bytes) >>= fun () -> return_unit)
+
 (** [display_answer cctxt answer] prints an RPC answer. *)
 let display_answer (cctxt : #Configuration.sc_client_context) :
     RPC_context.generic_call_result -> unit Lwt.t = function
@@ -89,4 +100,64 @@ let rpc_get_command =
     (prefixes ["rpc"; "get"] @@ string ~name:"url" ~desc:"the RPC URL" @@ stop)
     (fun () url cctxt -> call_get cctxt url)
 
-let all () = [get_sc_rollup_addresses_command (); rpc_get_command]
+module Keys = struct
+  open Tezos_client_base.Client_keys
+
+  let generate_keys () =
+    command
+      ~desc:"Generate a pair of keys."
+      (args1 (Secret_key.force_switch ()))
+      (prefixes ["gen"; "unencrypted"; "keys"]
+      @@ Aggregate_alias.Secret_key.fresh_alias_param @@ stop)
+      (fun force name (cctxt : #Configuration.sc_client_context) ->
+        Client_keys_commands.Bls_commands.generate_keys
+          ~force
+          ~encrypted:false
+          name
+          cctxt)
+
+  let list_keys () =
+    command
+      ~desc:"List keys."
+      no_options
+      (prefixes ["list"; "keys"] @@ stop)
+      (fun () (cctxt : #Configuration.sc_client_context) ->
+        Client_keys_commands.Bls_commands.list_keys cctxt)
+
+  let show_address () =
+    command
+      ~desc:"Show the keys associated with an account."
+      no_options
+      (prefixes ["show"; "address"]
+      @@ Aggregate_alias.Public_key_hash.alias_param @@ stop)
+      (fun () (name, _pkh) (cctxt : #Configuration.sc_client_context) ->
+        Client_keys_commands.Bls_commands.show_address
+          ~show_private:true
+          name
+          cctxt)
+
+  let import_secret_key () =
+    command
+      ~desc:"Add a secret key to the wallet."
+      (args1 (Aggregate_alias.Secret_key.force_switch ()))
+      (prefixes ["import"; "secret"; "key"]
+      @@ Aggregate_alias.Secret_key.fresh_alias_param @@ aggregate_sk_uri_param
+      @@ stop)
+      (fun force name sk_uri (cctxt : #Configuration.sc_client_context) ->
+        Client_keys_commands.Bls_commands.import_secret_key
+          ~force
+          name
+          sk_uri
+          cctxt)
+end
+
+let all () =
+  [
+    get_sc_rollup_addresses_command ();
+    get_state_value_command ();
+    rpc_get_command;
+    Keys.generate_keys ();
+    Keys.list_keys ();
+    Keys.show_address ();
+    Keys.import_secret_key ();
+  ]

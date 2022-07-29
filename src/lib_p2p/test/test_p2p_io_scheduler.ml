@@ -59,11 +59,14 @@ let rec listen ?port addr =
 
 let accept main_socket =
   let open Lwt_syntax in
-  let* (fd, _sockaddr) = P2p_fd.accept main_socket in
-  return_ok fd
+  let* r = P2p_fd.accept main_socket in
+  match r with
+  | Error (`Socket_error ex | `System_error ex | `Unexpected_error ex) ->
+      Lwt.fail ex
+  | Ok (fd, _) -> Lwt.return fd
 
 let rec accept_n main_socket n =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   if n <= 0 then return_nil
   else
     let* acc = accept_n main_socket (n - 1) in
@@ -74,8 +77,10 @@ let connect addr port =
   let open Lwt_syntax in
   let* fd = P2p_fd.socket PF_INET6 SOCK_STREAM 0 in
   let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
-  let* () = P2p_fd.connect fd uaddr in
-  return_ok fd
+  let* r = P2p_fd.connect fd uaddr in
+  match r with
+  | Error _ -> Lwt.fail Alcotest.Test_error
+  | Ok () -> Lwt.return fd
 
 let simple_msgs =
   [|
@@ -110,7 +115,7 @@ let receive conn =
 
 let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
     ~read_buffer_size main_socket n =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   let sched =
     P2p_io_scheduler.create
       ?max_download_speed
@@ -130,12 +135,13 @@ let server ?(display_client_stat = true) ?max_download_speed ?read_queue_size
   (* Accept and read message until the connection is closed. *)
   let* conns = accept_n main_socket n in
   let conns = List.map (P2p_io_scheduler.register sched) conns in
-  let*! () =
-    List.iter_p receive (List.map P2p_io_scheduler.to_readable conns)
-  in
-  let* () = List.iter_ep P2p_io_scheduler.close conns in
-  log_notice "OK %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
-  return_unit
+  let* () = List.iter_p receive (List.map P2p_io_scheduler.to_readable conns) in
+  let* r = List.iter_ep P2p_io_scheduler.close conns in
+  match r with
+  | Ok () ->
+      log_notice "OK %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
+      return_ok ()
+  | Error _ -> Lwt.fail Alcotest.Test_error
 
 let max_size ?max_upload_speed () =
   match max_upload_speed with
@@ -149,14 +155,16 @@ let max_size ?max_upload_speed () =
       loop nb_simple_msgs
 
 let rec send conn nb_simple_msgs =
-  let open Lwt_result_syntax in
-  let*! () = Lwt.pause () in
+  let open Lwt_syntax in
+  let* () = Lwt.pause () in
   let msg = simple_msgs.(Random.int nb_simple_msgs) in
-  let* () = P2p_io_scheduler.write conn msg in
-  send conn nb_simple_msgs
+  let* r = P2p_io_scheduler.write conn msg in
+  match r with
+  | Error err -> Lwt.fail (Error err)
+  | Ok () -> send conn nb_simple_msgs
 
 let client ?max_upload_speed ?write_queue_size addr port time _n =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   let sched =
     P2p_io_scheduler.create
       ?max_upload_speed
@@ -166,19 +174,22 @@ let client ?max_upload_speed ?write_queue_size addr port time _n =
   in
   let* conn = connect addr port in
   let conn = P2p_io_scheduler.register sched conn in
-  let nb_simple_msgs = max_size ?max_upload_speed () in
+  let _nb_simple_msgs = max_size ?max_upload_speed () in
   let* () =
     Lwt.pick
       [
         send conn nb_simple_msgs;
-        (let*! () = Lwt_unix.sleep time in
+        (let* () = Lwt_unix.sleep time in
          return_unit);
       ]
   in
-  let* () = P2p_io_scheduler.close conn in
-  let stat = P2p_io_scheduler.stat conn in
-  let*! () = lwt_log_notice "Client OK %a" P2p_stat.pp stat in
-  return_unit
+  let* r = P2p_io_scheduler.close conn in
+  match r with
+  | Error err -> Lwt.fail (Error err)
+  | Ok () ->
+      let stat = P2p_io_scheduler.stat conn in
+      let* () = lwt_log_notice "Client OK %a" P2p_stat.pp stat in
+      return_ok ()
 
 (** Listens to address [addr] on port [port] to open a socket [main_socket].
     Spawns a server on it, and [n] clients connecting to the server. Then,
@@ -186,35 +197,44 @@ let client ?max_upload_speed ?write_queue_size addr port time _n =
 *)
 let run ?display_client_stat ?max_download_speed ?max_upload_speed
     ~read_buffer_size ?read_queue_size ?write_queue_size addr port time n =
-  let open Lwt_result_syntax in
-  let*! () = Tezos_base_unix.Internal_event_unix.init () in
-  let*! (main_socket, port) = listen ?port addr in
+  let open Lwt_syntax in
+  let* () = Tezos_base_unix.Internal_event_unix.init () in
+  let* main_socket, port = listen ?port addr in
   let* server_node =
-    Process.detach
-      ~prefix:"server: "
-      (fun (_ : (unit, unit) Process.Channel.t) ->
-        server
-          ?display_client_stat
-          ?max_download_speed
-          ~read_buffer_size
-          ?read_queue_size
-          main_socket
-          n)
+    let* r =
+      Process.detach
+        ~prefix:"server: "
+        (fun (_ : (unit, unit) Process.Channel.t) ->
+          server
+            ?display_client_stat
+            ?max_download_speed
+            ~read_buffer_size
+            ?read_queue_size
+            main_socket
+            n)
+    in
+    match r with
+    | Error err -> Lwt.fail (Error err)
+    | Ok node -> Lwt.return node
   in
+
   let client n =
     let prefix = Printf.sprintf "client(%d): " n in
-    Process.detach ~prefix (fun _ ->
-        let*! () =
-          let*! r = Lwt_utils_unix.safe_close main_socket in
-          Result.iter_error
-            (Format.eprintf "Uncaught error: %a\n%!" pp_print_trace)
-            r ;
-          Lwt.return_unit
+    Process.detach ~prefix (fun (_ : (unit, unit) Process.Channel.t) ->
+        let* () =
+          Lwt.catch
+            (fun () -> Lwt_unix.close main_socket)
+            (function
+              (* the connection was already closed *)
+              | Unix.Unix_error (EBADF, _, _) -> return_unit
+              | err -> Lwt.fail err)
         in
         client ?max_upload_speed ?write_queue_size addr port time n)
   in
-  let* client_nodes = List.map_es client (1 -- n) in
-  Process.wait_all (server_node :: client_nodes)
+  let* r = List.map_es client (1 -- n) in
+  match r with
+  | Error err -> Lwt.fail (Error err)
+  | Ok client_nodes -> Process.wait_all (server_node :: client_nodes)
 
 let () = Random.self_init ()
 

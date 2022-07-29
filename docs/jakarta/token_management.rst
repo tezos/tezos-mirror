@@ -67,6 +67,7 @@ The value of the additional field ``category`` designates one of the following f
 * ``"subsidy"`` is the source of tokens minted to subsidize the liquidity baking CPMM contract
 * ``"invoice"`` is the source of tokens minted to compensate some users who have contributed to the betterment of the chain
 * ``"commitment"`` is the source of tokens minted to match commitments made by some users to supply funds for the chain
+* ``"Tx_rollup_rejection_rewards"`` is the source of tokens minted to reward an account for injecting a transaction-rollup-rejection operation
 * ``"bootstrap"`` is analogous to ``"commitment"`` but is for internal use or testing.
   It will not be used during normal operation on mainnet, but may be used on test networks or in sandboxed mode
 * ``"minted"`` is only for internal use and may be used to mint tokens for testing.
@@ -82,13 +83,21 @@ The field ``kind`` allows to identify the type of container account, it can have
 * ``"freezer"`` represents frozen accounts, and comes with the additional field ``category`` that can have one of the following values:
 
   - ``"legacy_deposits"``, ``"legacy_fees"``, or ``"legacy_rewards"`` represent the accounts of frozen deposits, frozen fees or frozen rewards up to protocol HANGZHOU.
-    These types of accounts are further identified by the following additional fields:
+    Accounts in this category are further identified by the following additional fields:
 
     - the field ``delegate`` contains the public key hash of the delegate who owns the frozen funds
     - the field ``cycle`` contains the cycle at which the funds have been deposited or granted.
 
-  - ``"deposits"`` represents the account of frozen deposits in subsequent protocols (replacing the legacy container account ``"legacy_deposits"`` above).
-    This type of account is further identified by the additional field ``delegate`` whose value is the public key hash of the delegate who owns the frozen funds.
+  - ``"deposits"`` represents the accounts of frozen deposits in subsequent protocols (replacing the legacy container account ``"legacy_deposits"`` above).
+    Accounts in this category are further identified by the additional field ``delegate`` whose value is the public key hash of the delegate who owns the frozen funds.
+
+  - ``"bonds"`` represents the accounts of frozen bonds.
+    Bonds are like deposits.
+    However, they can be associated to implicit or originated accounts, unlike deposits that only apply to implicit accounts that are also delegates.
+    Accounts in this category are further identified by the following additional fields:
+
+    - the field ``contract`` contains the public key hash of the implicit account, or the contract hash of the originated account
+    - the field ``bond_id`` contains the identifier of the bond (e.g. a rollup hash if the bond is associated to a transaction rollup).
 * ``"accumulator"`` represents accounts used to store tokens for some short period of time.
   This type of account is further identified by the additional field ``category`` whose (only possible) value ``"block fees"`` designates the container account used to collect manager operation fees while block's operations are being applied.
   Other categories may be added in the future.
@@ -111,6 +120,7 @@ The field ``category`` of a sink account may have one of the following values:
   - the field ``delegate`` contains the public key hash of the delegate
   - the field ``participation`` has the value ``"true"`` if participation was not sufficient and has the value ``"false"`` otherwise
   - the field ``revelation`` has the value ``"true"`` if the delegate has not revealed his nonce and has the value ``"false"`` otherwise.
+* ``"Tx_rollup_rejection_punishments"`` is the destination of tokens burned as punishment for submitting erroneous commitments
 * ``"burned"`` is only for internal use and testing.
   It will not appear on mainnet, but may appear on test networks or in sandboxed mode.
 

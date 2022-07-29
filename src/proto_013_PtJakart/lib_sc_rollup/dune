@@ -9,15 +9,15 @@
   tezos-base
   tezos-protocol-013-PtJakart
   tezos-protocol-plugin-013-PtJakart
-  tezos-protocol-013-PtJakart-parameters
+  tezos-protocol-013-PtJakart.parameters
   tezos-rpc)
  (inline_tests (flags -verbose) (modes native))
- (preprocess (pps ppx_inline_test))
+ (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_protocol_013_PtJakart
-   -open Tezos_protocol_plugin_013_PtJakart
-   -open Tezos_protocol_013_PtJakart_parameters
-   -open Tezos_rpc)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_013_PtJakart
+  -open Tezos_protocol_plugin_013_PtJakart
+  -open Tezos_protocol_013_PtJakart_parameters
+  -open Tezos_rpc))

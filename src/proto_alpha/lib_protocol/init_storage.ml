@@ -25,31 +25,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(*
-  To add invoices, you can use a helper function like this one:
+(** Invoice a contract at a given address with a given amount. Returns the
+    updated context and a  balance update receipt (singleton list). The address
+    must be a valid base58 hash, otherwise this is no-op and returns an empty
+    receipts list.
 
-  (** Invoice a contract at a given address with a given amount. Returns the
-      updated context and a  balance update receipt (singleton list). The address
-      must be a valid base58 hash, otherwise this is no-op and returns an empty
-      receipts list.
-
-      Do not fail if something goes wrong.
-  *)
-  let invoice_contract ctxt ~address ~amount_mutez =
-    match Tez_repr.of_mutez amount_mutez with
-    | None -> Lwt.return (ctxt, [])
-    | Some amount -> (
-        ( Contract_repr.of_b58check address >>?= fun recipient ->
-          Token.transfer
-            ~origin:Protocol_migration
-            ctxt
-            `Invoice
-            (`Contract recipient)
-            amount )
-        >|= function
-        | Ok res -> res
-        | Error _ -> (ctxt, []))
+    Do not fail if something goes wrong.
 *)
+let invoice_contract ctxt ~address ~amount_mutez =
+  match Tez_repr.of_mutez amount_mutez with
+  | None -> Lwt.return (ctxt, [])
+  | Some amount -> (
+      ( Contract_repr.of_b58check address >>?= fun recipient ->
+        Token.transfer
+          ~origin:Protocol_migration
+          ctxt
+          `Invoice
+          (`Contract recipient)
+          amount )
+      >|= function
+      | Ok res -> res
+      | Error _ -> (ctxt, []))
 
 (*
   To patch code of legacy contracts you can add a helper function here and call
@@ -58,7 +54,71 @@
   See !3730 for an example.
 *)
 
-let prepare_first_block ctxt ~typecheck ~level ~timestamp =
+module Patch_dictator_for_ghostnet = struct
+  let ghostnet_id =
+    let id = Chain_id.of_b58check_exn "NetXnHfVqm9iesp" in
+    if Chain_id.equal id Constants_repr.mainnet_id then assert false else id
+
+  let oxhead_testnet_baker =
+    Signature.Public_key_hash.of_b58check_exn
+      "tz1Xf8zdT3DbAX9cHw3c3CXh79rc4nK4gCe8"
+
+  let patch_constant chain_id ctxt =
+    if Chain_id.equal chain_id ghostnet_id then
+      Raw_context.patch_constants ctxt (fun c ->
+          {
+            c with
+            testnet_dictator = Some oxhead_testnet_baker;
+            cycles_per_voting_period = 1l;
+          })
+    else Lwt.return ctxt
+end
+
+let patch_script (address, hash, patched_code) ctxt =
+  Contract_repr.of_b58check address >>?= fun contract ->
+  Storage.Contract.Code.find ctxt contract >>=? fun (ctxt, code_opt) ->
+  Logging.log Notice "Patching %s... " address ;
+  match code_opt with
+  | Some old_code ->
+      let old_bin = Data_encoding.force_bytes old_code in
+      let old_hash = Script_expr_hash.hash_bytes [old_bin] in
+      if Script_expr_hash.equal old_hash hash then (
+        let new_code = Script_repr.lazy_expr patched_code in
+        Storage.Contract.Code.update ctxt contract new_code
+        >>=? fun (ctxt, size_diff) ->
+        Logging.log Notice "Contract %s successfully patched" address ;
+        let size_diff = Z.of_int size_diff in
+        Storage.Contract.Used_storage_space.get ctxt contract
+        >>=? fun prev_size ->
+        let new_size = Z.add prev_size size_diff in
+        Storage.Contract.Used_storage_space.update ctxt contract new_size
+        >>=? fun ctxt ->
+        if Z.(gt size_diff zero) then
+          Storage.Contract.Paid_storage_space.get ctxt contract
+          >>=? fun prev_paid_size ->
+          let paid_size = Z.add prev_paid_size size_diff in
+          Storage.Contract.Paid_storage_space.update ctxt contract paid_size
+        else return ctxt)
+      else (
+        Logging.log
+          Error
+          "Patching %s was skipped because its script does not have the \
+           expected hash (expected: %a, found: %a)"
+          address
+          Script_expr_hash.pp
+          hash
+          Script_expr_hash.pp
+          old_hash ;
+        return ctxt)
+  | None ->
+      Logging.log
+        Error
+        "Patching %s was skipped because no script was found for it in the \
+         context."
+        address ;
+      return ctxt
+
+let prepare_first_block chain_id ctxt ~typecheck ~level ~timestamp =
   Raw_context.prepare_first_block ~level ~timestamp ctxt
   >>=? fun (previous_protocol, ctxt) ->
   let parametric = Raw_context.constants ctxt in
@@ -118,13 +178,23 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp =
         ( ctxt,
           commitments_balance_updates @ bootstrap_balance_updates
           @ deposits_balance_updates )
-  | Jakarta_013 ->
+  | Jakarta_013
+  (* Please update [next_protocol] and [previous_protocol] in
+     [tezt/lib_tezos/protocol.ml] when you update this value. *) ->
       (* TODO (#2704): possibly handle endorsements for migration block (in bakers);
          if that is done, do not set Storage.Tenderbake.First_level_of_protocol. *)
       Raw_level_repr.of_int32 level >>?= fun level ->
       Storage.Tenderbake.First_level_of_protocol.update ctxt level
-      >>=? fun ctxt -> return (ctxt, []))
+      >>=? fun ctxt ->
+      Patch_dictator_for_ghostnet.patch_constant chain_id ctxt >>= fun ctxt ->
+      invoice_contract
+        ctxt
+        ~address:"tz1X81bCXPtMiHu1d4UZF4GPhMPkvkp56ssb"
+        ~amount_mutez:3_000_000_000L
+      >>= fun (ctxt, balance_updates) -> return (ctxt, balance_updates))
   >>=? fun (ctxt, balance_updates) ->
+  List.fold_right_es patch_script Legacy_script_patches.addresses_to_patch ctxt
+  >>=? fun ctxt ->
   Receipt_repr.group_balance_updates balance_updates >>?= fun balance_updates ->
   Storage.Pending_migration.Balance_updates.add ctxt balance_updates
   >>= fun ctxt -> return ctxt

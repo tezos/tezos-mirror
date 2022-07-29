@@ -173,7 +173,7 @@ struct
 
     let public_key uri =
       let open Lwt_result_syntax in
-      let* (path, pkh) = parse (uri : pk_uri :> Uri.t) in
+      let* path, pkh = parse (uri : pk_uri :> Uri.t) in
       public_key path pkh
 
     let neuterize uri =
@@ -190,22 +190,22 @@ struct
 
     let sign ?watermark uri msg =
       let open Lwt_result_syntax in
-      let* (path, pkh) = parse (uri : sk_uri :> Uri.t) in
+      let* path, pkh = parse (uri : sk_uri :> Uri.t) in
       sign ?watermark path pkh msg
 
     let deterministic_nonce uri msg =
       let open Lwt_result_syntax in
-      let* (path, pkh) = parse (uri : sk_uri :> Uri.t) in
+      let* path, pkh = parse (uri : sk_uri :> Uri.t) in
       deterministic_nonce path pkh msg
 
     let deterministic_nonce_hash uri msg =
       let open Lwt_result_syntax in
-      let* (path, pkh) = parse (uri : sk_uri :> Uri.t) in
+      let* path, pkh = parse (uri : sk_uri :> Uri.t) in
       deterministic_nonce_hash path pkh msg
 
     let supports_deterministic_nonces uri =
       let open Lwt_result_syntax in
-      let* (path, pkh) = parse (uri : sk_uri :> Uri.t) in
+      let* path, pkh = parse (uri : sk_uri :> Uri.t) in
       supports_deterministic_nonces path pkh
   end
 
@@ -224,9 +224,9 @@ struct
       let open Result_syntax in
       assert (Uri.scheme uri = Some scheme) ;
       match (Uri.host uri, Uri.port uri) with
-      | (None, _) -> error_with "Missing host address"
-      | (_, None) -> error_with "Missing host port"
-      | (Some path, Some port) ->
+      | None, _ -> error_with "Missing host address"
+      | _, None -> error_with "Missing host port"
+      | Some path, Some port ->
           let pkh = Uri.path uri in
           let pkh = try String.(sub pkh 1 (length pkh - 1)) with _ -> "" in
           let+ pkh = Signature.Public_key_hash.of_b58check pkh in
@@ -240,7 +240,7 @@ struct
 
     let public_key uri =
       let open Lwt_result_syntax in
-      let* (path, pkh) = parse (uri : pk_uri :> Uri.t) in
+      let* path, pkh = parse (uri : pk_uri :> Uri.t) in
       public_key path pkh
 
     let neuterize uri =
@@ -257,22 +257,22 @@ struct
 
     let sign ?watermark uri msg =
       let open Lwt_result_syntax in
-      let* (path, pkh) = parse (uri : sk_uri :> Uri.t) in
+      let* path, pkh = parse (uri : sk_uri :> Uri.t) in
       sign ?watermark path pkh msg
 
     let deterministic_nonce uri msg =
       let open Lwt_result_syntax in
-      let* (path, pkh) = parse (uri : sk_uri :> Uri.t) in
+      let* path, pkh = parse (uri : sk_uri :> Uri.t) in
       deterministic_nonce path pkh msg
 
     let deterministic_nonce_hash uri msg =
       let open Lwt_result_syntax in
-      let* (path, pkh) = parse (uri : sk_uri :> Uri.t) in
+      let* path, pkh = parse (uri : sk_uri :> Uri.t) in
       deterministic_nonce_hash path pkh msg
 
     let supports_deterministic_nonces uri =
       let open Lwt_result_syntax in
-      let* (path, pkh) = parse (uri : sk_uri :> Uri.t) in
+      let* path, pkh = parse (uri : sk_uri :> Uri.t) in
       supports_deterministic_nonces path pkh
   end
 end

@@ -90,7 +90,7 @@ module Fold_benchmark : Benchmark.S = struct
 
   let benchmark rng_state config () =
     let module M = Carbonated_map.Make (Int) in
-    let (_, list) =
+    let _, list =
       let sampler rng_state =
         let key = Base_samplers.int rng_state ~size:{min = 1; max = 5} in
         (* Value should not be important *)
@@ -239,7 +239,7 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
       ]
 
     let benchmark rng_state (config : config) () =
-      let (_, list) =
+      let _, list =
         let sampler rng_state = (CS.sampler rng_state, ()) in
         Structure_samplers.list
           rng_state

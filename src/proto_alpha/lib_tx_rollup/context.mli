@@ -110,7 +110,7 @@ type 'a produce_proof_result = {
     constructed using low-levels accesses to the three, that is, it needs the
     modified tree to be included in the [f]'s result to calculate the proof.
 
-    Beside the proof production, this function can be used to perform sementical
+    Beside the proof production, this function can be used to perform semantical
     changes in the {!Prover_context}. Thus, we give the possibility to return a
     result in {!'a produce_proof_result} to observe [f]'s results.
 *)
@@ -134,3 +134,37 @@ val add_tree :
   context -> tree -> (context * Protocol.Tx_rollup_l2_context_hash.t) Lwt.t
 
 val tree_hash_of_context : context -> Context_hash.t tzresult Lwt.t
+
+(** {2 Sub-context for tickets } *)
+
+(** Adds a new association [ticket index -> ticket] in the context. *)
+val register_ticket :
+  context ->
+  Protocol.Tx_rollup_l2_context_sig.ticket_index ->
+  Ticket.t ->
+  context Lwt.t
+
+(** [get_ticket ctxt ticket_index] retrieves the ticket associated to
+    [ticket_index] in the context [ctxt]. Resolves with [None] if there is no
+    ticket associated to [ticket_hash]. *)
+val get_ticket :
+  context ->
+  Protocol.Tx_rollup_l2_context_sig.ticket_index ->
+  Ticket.t option Lwt.t
+
+(** {2 Sub-context for address indexes } *)
+
+(** Adds a new association [address index -> address] in the context. *)
+val register_address :
+  context ->
+  Protocol.Tx_rollup_l2_context_sig.address_index ->
+  Protocol.Tx_rollup_l2_address.t ->
+  context Lwt.t
+
+(** [get_address ctxt address_index] retrieves the address associated to
+    [address_index] in the context [ctxt]. Resolves with [None] if there is no
+    address associated to [address_index]. *)
+val get_address :
+  context ->
+  Protocol.Tx_rollup_l2_context_sig.address_index ->
+  Protocol.Tx_rollup_l2_address.t option Lwt.t

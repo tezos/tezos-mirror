@@ -55,7 +55,7 @@ common plugin interface. Then, it restricts the typing environment of
 the protocol’s code so that it only calls authorized modules and
 functions. Seeing protocols as plug-ins, it means that the code only
 called primitives from the plug-in API. It is a form of statically
-enforced sandboxing.
+enforced sandboxing (see :doc:`./protocol_environment`).
 
 Note that the economic protocol on the chain is subject to an amendment
 procedure. On-chain operations can be used to switch from one protocol to
@@ -178,11 +178,16 @@ economic protocol, as a form of static sandboxing. It also generates a
 functorized version of the protocol, to make the execution of the
 protocol in an alternative environment possible.
 
-  - :package:`tezos-protocol-environment` contains the modules
-    that are available to the economic protocol. A review of this
-    sandbox is available :doc:`here <../developer/protocol_environment>`. These
-    modules include a stripped-down standard library, and interfaces
+  - :package:`tezos-protocol-environment` contains the protocol
+    generic environment, that is the API of the modules that are available to
+    the economic protocol and the exported protocol API. A review of this 
+    sandbox is available :doc:`here <../shell/protocol_environment>`.
+    These modules include a stripped-down standard library, and interfaces
     to the crypto APIs, RPC definitions, and a key-value store.
+    It also defines two different context instances: one that simulates
+    the key-value store in memory for testing, and one whose context function
+    are dummy ones which can be used when only the types and noncontextual
+    functions of the protocol are needed.
 
   - :package:`tezos-protocol-compiler` is the compiler for economic
     protocols: an alternative driver to the OCaml
@@ -197,13 +202,6 @@ protocol in an alternative environment possible.
   - :package:`tezos-shell-context` implements a context representation
     that is accepted by the protocol environment. The node uses this
     instance to read and write data on disk.
-
-  - :package:`tezos-protocol-environment` contains the protocol
-    generic environment. It also defines two different context
-    instances: one that simulates the key-value store in memory for
-    testing, and one whose context function are dummy ones which can
-    be used when only the types and noncontextual functions of the
-    protocol are needed.
 
   - ``tezos-embedded-protocol-xxx`` contains a version of the protocol
     ``xxx`` whose standard library is pre-instantiated to the shell's
@@ -263,12 +261,6 @@ compatible, and library vs command-line interface.
   - :package:`tezos-client-alpha` provides some functions to perform
     the operations of protocol Alpha using the wallet and signers from
     the client context.
-  - :package:`tezos-client-commands` plugs the basic context access
-    functions from :package:`tezos-client-base` as handlers for the
-    commands of the ``tezos-client`` command-line wallet.
-  - :package:`tezos-client-alpha-commands` plugs the functions from
-    :package:`tezos-client-alpha` as handlers for the Alpha specific
-    commands of the ``tezos-client`` command-line wallet.
   - :package:`tezos-client-genesis` contains the basic activator
     commands available on the genesis protocol.
   - :package:`tezos-client-base-unix` implements configuration file
@@ -302,7 +294,7 @@ run them.
    (in directory :src:`src/lib_context/test/`):
    tests for the versioned key-value context.
  - :package-name:`tezos-store`
-   (in directory :src:`src/lib_store/test/`):
+   (in directory :src:`src/lib_store/unix/test/`):
    tests for the on-disk store.
  - :package-name:`tezos-protocol-alpha`
    (in directory :src:`src/proto_alpha/lib_protocol/test/`):

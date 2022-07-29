@@ -125,9 +125,9 @@ let eq_prechecked_managers =
 let eq_state s1 s2 =
   let eq_min_prechecked_op_weight =
     match (s1.min_prechecked_op_weight, s2.min_prechecked_op_weight) with
-    | (None, None) -> true
-    | (Some _, None) | (None, Some _) -> false
-    | (Some w1, Some w2) ->
+    | None, None -> true
+    | Some _, None | None, Some _ -> false
+    | Some w1, Some w2 ->
         Operation_hash.equal w1.operation_hash w2.operation_hash
         && Q.equal w1.weight w2.weight
   in

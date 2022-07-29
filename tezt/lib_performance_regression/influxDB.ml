@@ -130,7 +130,7 @@ let make_url (V1_8 {url; database; credentials; _}) path =
     in
     Uri.with_path url path
   in
-  Uri.add_query_params' url @@ ("db", database) :: creds_as_uri_params
+  Uri.add_query_params' url @@ (("db", database) :: creds_as_uri_params)
 
 (* https://docs.influxdata.com/influxdb/v1.8/write_protocols/line_protocol_reference *)
 module Line_protocol = struct
@@ -188,7 +188,7 @@ module Line_protocol = struct
       {
         measurement;
         tags;
-        first_field = (first_field_key, first_field_value);
+        first_field = first_field_key, first_field_value;
         other_fields;
         timestamp;
       } =
@@ -252,7 +252,7 @@ let write (V1_8 cfg as config) data_points =
       ( with_buffer 256 @@ fun buffer ->
         Line_protocol.write_data_points buffer data_points )
   in
-  let* (response, body) =
+  let* response, body =
     with_timeout config
     @@ Cohttp_lwt_unix.Client.call ~body `POST (make_url config "write")
   in
@@ -618,7 +618,7 @@ let raw_query config select =
   let select = prefix_measurement config select in
   let query = show_select select in
   let url = Uri.add_query_param' (make_url config "query") ("q", query) in
-  let* (response, body) =
+  let* response, body =
     with_timeout config @@ Cohttp_lwt_unix.Client.call `GET url
   in
   let* body = Cohttp_lwt.Body.to_string body in
@@ -660,7 +660,7 @@ let query config select =
     with Not_supported -> None
   in
   match (select.from, supported_aggregate_functions) with
-  | (Select sub_query, Some functions) ->
+  | Select sub_query, Some functions ->
       let* sub_query_results = raw_query config sub_query in
       let aggregate (results : result_data_point list) : result_data_point =
         let get_field field = List.map (get field JSON.as_float) results in

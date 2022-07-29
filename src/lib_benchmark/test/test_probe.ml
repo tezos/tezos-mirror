@@ -32,10 +32,10 @@ module Aspect = struct
 
   let compare (x : t) (y : t) =
     match (x, y) with
-    | (Hashing_Sha256, Hashing_Sha256) -> 0
-    | (Hashing_Blake2b, Hashing_Blake2b) -> 0
-    | (Hashing_Blake2b, Hashing_Sha256) -> -1
-    | (Hashing_Sha256, Hashing_Blake2b) -> 1
+    | Hashing_Sha256, Hashing_Sha256 -> 0
+    | Hashing_Blake2b, Hashing_Blake2b -> 0
+    | Hashing_Blake2b, Hashing_Sha256 -> -1
+    | Hashing_Sha256, Hashing_Blake2b -> 1
 end
 
 type workload = Blake2b of {nbytes : int} | Sha256 of {nbytes : int}
@@ -133,13 +133,10 @@ end
 let bench_opts =
   let open Measure in
   {
-    flush_cache = `Dont;
-    stabilize_gc = false;
     seed = Some 1337;
     nsamples = 30;
     (* Percentile 50 = Median *)
     determinizer = Percentile 50;
-    cpu_affinity = None;
     bench_number = 10;
     minor_heap_size = `words (256 * 1024);
     config_dir = None;

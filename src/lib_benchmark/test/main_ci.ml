@@ -30,5 +30,7 @@ let () =
       ("sparse_vec", Test_sparse_vec.tests);
       ("costlang", Test_costlang.tests);
       ("probing", Test_probe.tests);
+      ("measure", Test_measure.tests);
+      ("benchmark_helpers", Test_benchmark_helpers.tests);
     ]
   |> Lwt_main.run

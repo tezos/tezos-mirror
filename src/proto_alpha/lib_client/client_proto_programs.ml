@@ -86,7 +86,7 @@ let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed =
          %a@]@]@."
         print_expr
         storage
-        (Format.pp_print_list Operation_result.pp_internal_operation_result)
+        (Format.pp_print_list Operation_result.pp_internal_operation)
         operations
         (fun ppf -> function
           | None -> ()
@@ -109,7 +109,7 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
          %a@]@]@."
         print_expr
         storage
-        (Format.pp_print_list Operation_result.pp_internal_operation_result)
+        (Format.pp_print_list Operation_result.pp_internal_operation)
         operations
         (fun ppf -> function
           | None -> ()
@@ -126,14 +126,21 @@ type simulation_params = {
   now : Script_timestamp.t option;
   level : Script_int.n Script_int.num option;
   source : Contract.t option;
-  payer : Contract.t option;
+  payer : Signature.public_key_hash option;
   gas : Gas.Arith.integral option;
 }
 
 type run_view_params = {
   shared_params : simulation_params;
-  contract : Contract.t;
+  contract : Contract_hash.t;
   entrypoint : Entrypoint.t;
+}
+
+type run_script_view_params = {
+  shared_params : simulation_params;
+  contract : Contract_hash.t;
+  view : string;
+  unlimited_gas : bool;
 }
 
 type run_params = {
@@ -143,7 +150,7 @@ type run_params = {
   program : Michelson_v1_parser.parsed;
   storage : Michelson_v1_parser.parsed;
   entrypoint : Entrypoint.t option;
-  self : Contract.t option;
+  self : Contract_hash.t option;
 }
 
 let run_view (cctxt : #Protocol_client_context.rpc_context)
@@ -156,13 +163,39 @@ let run_view (cctxt : #Protocol_client_context.rpc_context)
     params
   in
   Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
-  Plugin.RPC.Scripts.run_view
+  Plugin.RPC.Scripts.run_tzip4_view
     cctxt
     (chain, block)
     ?gas
     ~contract
     ~entrypoint
     ~input:input.expanded
+    ~chain_id
+    ?source
+    ?payer
+    ~unparsing_mode
+    ~now
+    ~level
+
+let run_script_view (cctxt : #Protocol_client_context.rpc_context)
+    ~(chain : Chain_services.chain) ~block (params : run_script_view_params) =
+  let {
+    shared_params = {input; unparsing_mode; now; level; source; payer; gas};
+    contract;
+    view;
+    unlimited_gas;
+  } =
+    params
+  in
+  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
+  Plugin.RPC.Scripts.run_script_view
+    cctxt
+    (chain, block)
+    ?gas
+    ~contract
+    ~view
+    ~input:input.expanded
+    ~unlimited_gas
     ~chain_id
     ?source
     ?payer
@@ -270,7 +303,7 @@ let script_size cctxt ~(chain : Chain_services.chain) ~block ?gas ?legacy
 let print_typecheck_result ~emacs ~show_types ~print_source_on_error program res
     (cctxt : #Client_context.printer) =
   if emacs then
-    let (type_map, errs, _gas) =
+    let type_map, errs, _gas =
       match res with
       | Ok (type_map, gas) -> (type_map, [], Some gas)
       | Error

@@ -1,0 +1,28 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name test_workers_unit)
+ (libraries
+  tezos-stdlib
+  tezos-stdlib-unix
+  tezos-base
+  tezos-workers
+  tezos-test-helpers
+  tezos-base-test-helpers
+  alcotest-lwt)
+ (flags
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_stdlib_unix
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.Worker_types
+  -open Tezos_workers
+  -open Lib_test
+  -open Tezos_base_test_helpers))
+
+(rule
+ (alias runtest)
+ (package tezos-workers)
+ (action (run %{dep:./test_workers_unit.exe})))

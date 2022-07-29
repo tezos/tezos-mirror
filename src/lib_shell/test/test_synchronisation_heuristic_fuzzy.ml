@@ -109,7 +109,7 @@ module Reference : S = struct
       if Compare.List_length_with.(candidates < threshold) then Not_synchronised
       else
         match (best_of candidates, least_of candidates) with
-        | ((best, _), (least, _)) ->
+        | (best, _), (least, _) ->
             let least_timestamp_drifted =
               Time.Protocol.add least (Int64.of_int latency)
             in

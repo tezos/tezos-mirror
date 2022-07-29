@@ -161,7 +161,7 @@ let handshake input output =
     (not (Bytes.equal magic External_validation.magic))
     (inconsistent_handshake "bad magic")
 
-let init input =
+let init ~readonly input =
   let open Lwt_syntax in
   let* () = Events.(emit initialization_request ()) in
   let* {
@@ -180,7 +180,14 @@ let init input =
   in
   let* context_index =
     Context.init
-      ~patch_context:(Patch_context.patch_context genesis sandbox_parameters)
+      ~patch_context:(fun ctxt ->
+        let open Lwt_result_syntax in
+        let ctxt = Shell_context.wrap_disk_context ctxt in
+        let+ ctxt =
+          Patch_context.patch_context genesis sandbox_parameters ctxt
+        in
+        Shell_context.unwrap_disk_context ctxt)
+      ~readonly
       context_root
   in
   Lwt.return
@@ -191,7 +198,7 @@ let init input =
       user_activated_protocol_overrides,
       operation_metadata_size_limit )
 
-let run input output =
+let run ~readonly input output =
   let open Lwt_result_syntax in
   let* () = handshake input output in
   let*! ( context_index,
@@ -200,9 +207,9 @@ let run input output =
           user_activated_upgrades,
           user_activated_protocol_overrides,
           operation_metadata_size_limit ) =
-    init input
+    init ~readonly input
   in
-  let rec loop (cache : Environment_context.Context.block_cache option)
+  let rec loop (cache : Tezos_protocol_environment.Context.block_cache option)
       cached_result =
     let*! recved =
       External_validation.recv input External_validation.request_encoding
@@ -243,6 +250,7 @@ let run input output =
           predecessor_ops_metadata_hash;
           operations;
           max_operations_ttl;
+          simulate;
         } ->
         let*! () = Events.(emit validation_request block_header) in
         let*! block_application_result =
@@ -253,13 +261,13 @@ let run input output =
                 in
                 let*! o = Context.checkout context_index pred_context_hash in
                 match o with
-                | Some context -> return context
+                | Some c -> return (Shell_context.wrap_disk_context c)
                 | None ->
                     tzfail
                       (Block_validator_errors.Failed_to_checkout_context
                          pred_context_hash))
           in
-          let*! protocol_hash = Context.get_protocol predecessor_context in
+          let*! protocol_hash = Context_ops.get_protocol predecessor_context in
           let* () = load_protocol protocol_hash protocol_root in
           let env =
             {
@@ -282,13 +290,14 @@ let run input output =
           in
           with_retry_to_load_protocol protocol_root (fun () ->
               Block_validation.apply
+                ~simulate
                 ?cached_result
                 env
                 block_header
                 operations
                 ~cache)
         in
-        let (block_application_result, cache) =
+        let block_application_result, cache =
           match block_application_result with
           | Error [Validation_errors.Inconsistent_hash _] as err ->
               (* This is a special case added for Hangzhou that could
@@ -331,13 +340,14 @@ let run input output =
                   Context.checkout context_index pred_context_hash
                 in
                 match context with
-                | Some context -> return context
+                | Some context ->
+                    return (Shell_context.wrap_disk_context context)
                 | None ->
                     tzfail
                       (Block_validator_errors.Failed_to_checkout_context
                          pred_context_hash))
           in
-          let*! protocol_hash = Context.get_protocol predecessor_context in
+          let*! protocol_hash = Context_ops.get_protocol predecessor_context in
           let* () = load_protocol protocol_hash protocol_root in
           with_retry_to_load_protocol protocol_root (fun () ->
               Block_validation.preapply
@@ -398,7 +408,8 @@ let run input output =
                     predecessor_block_header.shell.context
                 in
                 match o with
-                | Some context -> return context
+                | Some context ->
+                    return (Shell_context.wrap_disk_context context)
                 | None ->
                     tzfail
                       (Block_validator_errors.Failed_to_checkout_context
@@ -426,15 +437,17 @@ let run input output =
             block_precheck_result
         in
         loop cache cached_result
-    | External_validation.Fork_test_chain {context_hash; forked_header} ->
+    | External_validation.Fork_test_chain
+        {chain_id; context_hash; forked_header} ->
         let*! () = Events.(emit fork_test_chain_request forked_header) in
         let*! context_opt = Context.checkout context_index context_hash in
         let*! () =
           match context_opt with
           | Some ctxt ->
+              let ctxt = Shell_context.wrap_disk_context ctxt in
               let*! test_chain_init_result =
                 with_retry_to_load_protocol protocol_root (fun () ->
-                    Block_validation.init_test_chain ctxt forked_header)
+                    Block_validation.init_test_chain chain_id ctxt forked_header)
               in
               External_validation.send
                 output
@@ -467,10 +480,10 @@ let run input output =
   let*! () = loop None None in
   return_unit
 
-let main ?socket_dir () =
+let main ?socket_dir ~readonly () =
   let open Lwt_result_syntax in
   let canceler = Lwt_canceler.create () in
-  let*! (in_channel, out_channel) =
+  let*! in_channel, out_channel =
     match socket_dir with
     | Some socket_dir ->
         let*! () = Tezos_base_unix.Internal_event_unix.init () in
@@ -487,7 +500,7 @@ let main ?socket_dir () =
   let*! () = Events.(emit initialized ()) in
   let*! r =
     Error_monad.catch_es (fun () ->
-        let* () = run in_channel out_channel in
+        let* () = run ~readonly in_channel out_channel in
         let*! r = Lwt_canceler.cancel canceler in
         match r with
         | Ok () | Error [] -> return_unit

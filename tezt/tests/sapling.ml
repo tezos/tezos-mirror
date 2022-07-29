@@ -42,27 +42,37 @@ module Helpers = struct
       =~* rex "Total Sapling funds ?(\\d*)ꜩ"
       |> Option.get |> int_of_string
 
+    let mutez_of_string s =
+      match String.split_on_char '.' s with
+      | [int] -> int_of_string int * 1_000_000
+      | [int; dec] ->
+          let zeroes_to_add = 6 - String.length dec in
+          if zeroes_to_add < 0 then
+            failwith (Format.sprintf "Decimal part too long in %S" s)
+          else int_of_string (int ^ dec ^ String.make zeroes_to_add '0')
+      | _ -> failwith (Format.sprintf "Malformed mutez string %S" s)
+
     (* These regexs only work from protocol J, before there is no field
        `storage fees`. *)
     let balance_diff ~dst client_output =
       let fees =
         let re = ".*fees.* \\.* \\+ꜩ?(\\d*[.\\d*]*)" in
         let res = matches client_output (rex re) in
-        List.map float_of_string res |> List.fold_left ( +. ) 0.
+        List.map mutez_of_string res |> List.fold_left ( + ) 0
       in
       let amount_pos =
         let re = dst ^ ".*\\+ꜩ?(\\d*[.\\d*]*)" in
         match matches client_output (rex re) with
-        | [s] -> float_of_string s
-        | _ -> 0.
+        | [s] -> mutez_of_string s
+        | _ -> 0
       in
       let amount_neg =
         let re = dst ^ ".*\\-ꜩ?(\\d*[.\\d*]*)" in
         match matches client_output (rex re) with
-        | [s] -> float_of_string s
-        | _ -> 0.
+        | [s] -> mutez_of_string s
+        | _ -> 0
       in
-      (amount_pos -. amount_neg, fees)
+      (amount_pos - amount_neg, fees)
   end
 
   let init protocol contract =
@@ -87,7 +97,7 @@ module Helpers = struct
         ~prg
         client
     in
-    let* () = Client.bake_for client in
+    let* () = Client.bake_for_and_wait client in
     Log.info "  - Originated %s." contract ;
     return (client, contract_address)
 
@@ -134,7 +144,7 @@ module Helpers = struct
     assert (balance = amount) ;
     unit
 
-  let shield ?(expect_failure = false) (client, contract) src dst amount =
+  let shield ?(expect_failure = false) (client, contract) src dst amount_tez =
     let* client_output =
       Client.spawn_command
         client
@@ -142,7 +152,7 @@ module Helpers = struct
         @ [
             "sapling";
             "shield";
-            string_of_int amount;
+            string_of_int amount_tez;
             "from";
             Account.(src.alias);
             "to";
@@ -154,13 +164,14 @@ module Helpers = struct
           ])
       |> Process.check_and_read_stdout ~expect_failure
     in
-    if expect_failure then return (0., 0.)
+    if expect_failure then return (0, 0)
     else
-      let* () = Client.bake_for client in
+      let* () = Client.bake_for_and_wait client in
       Log.info "shield" ;
       return @@ Re.balance_diff ~dst:contract client_output
 
-  let transfer ?(expect_failure = false) (client, contract) src dst amount =
+  let transfer ?(expect_failure = false) (client, contract) src dst amount_tez =
+    let temp_sapling_transaction_file = Temp.file "sapling_transaction" in
     let* () =
       Client.spawn_command
         client
@@ -168,13 +179,15 @@ module Helpers = struct
           "sapling";
           "forge";
           "transaction";
-          string_of_int amount;
+          string_of_int amount_tez;
           "from";
           src;
           "to";
           dst;
           "using";
           contract;
+          "--file";
+          temp_sapling_transaction_file;
         ]
       |> Process.check ~expect_failure
     in
@@ -187,7 +200,7 @@ module Helpers = struct
           @ [
               "sapling";
               "submit";
-              "sapling_transaction";
+              temp_sapling_transaction_file;
               "from";
               Constant.bootstrap1.alias;
               "using";
@@ -197,11 +210,11 @@ module Helpers = struct
             ])
         |> Process.check
       in
-      let* () = Client.bake_for client in
+      let* () = Client.bake_for_and_wait client in
       Log.info "transfer" ;
       unit
 
-  let unshield ?(expect_failure = false) (client, contract) src dst amount =
+  let unshield ?(expect_failure = false) (client, contract) src dst amount_tez =
     let* client_output =
       Client.spawn_command
         client
@@ -209,7 +222,7 @@ module Helpers = struct
         @ [
             "sapling";
             "unshield";
-            string_of_int amount;
+            string_of_int amount_tez;
             "from";
             src;
             "to";
@@ -221,16 +234,15 @@ module Helpers = struct
           ])
       |> Process.check_and_read_stdout ~expect_failure
     in
-    if expect_failure then return (0., 0.)
+    if expect_failure then return (0, 0)
     else
-      let* () = Client.bake_for client in
+      let* () = Client.bake_for_and_wait client in
       Log.info "unshield" ;
       return @@ Re.balance_diff ~dst:contract client_output
 
   let balance_tz1 (client, _contract) pkh =
     let*! bal = RPC.Contracts.get_balance ~contract_id:pkh client in
-    let f = JSON.as_int bal |> float_of_int in
-    return (f /. 1_000_000.)
+    return (JSON.as_int bal)
 end
 
 let contract = "sapling_contract.tz"
@@ -300,26 +312,26 @@ let successful_roundtrip =
   let* () = assert_balance c "alice" 0 in
   let* () = assert_balance c "bob" 0 in
   let* balance_alice_tz1_before = balance_tz1 c alice_tz1.public_key_hash in
-  let* (amount, fees) = shield c alice_tz1 alice_address 10 in
+  let* amount, fees = shield c alice_tz1 alice_address 10 in
   let* balance_alice_tz1_after = balance_tz1 c alice_tz1.public_key_hash in
-  assert (amount = 10.) ;
-  assert (balance_alice_tz1_after = balance_alice_tz1_before -. 10. -. fees) ;
+  assert (amount = 10_000_000) ;
+  assert (balance_alice_tz1_after = balance_alice_tz1_before - 10_000_000 - fees) ;
   let* balance_contract = balance_tz1 c (snd c) in
-  assert (balance_contract = 10.) ;
+  assert (balance_contract = 10_000_000) ;
   let* () = assert_balance c "alice" 10 in
   let* () = assert_balance c "bob" 0 in
   let* () = transfer c "alice" bob_address 10 in
   let* balance_contract = balance_tz1 c (snd c) in
-  assert (balance_contract = 10.) ;
+  assert (balance_contract = 10_000_000) ;
   let* () = assert_balance c "alice" 0 in
   let* () = assert_balance c "bob" 10 in
   let* balance_alice_tz1_before = balance_tz1 c alice_tz1.public_key_hash in
-  let* (amount, fees) = unshield c "bob" alice_tz1 10 in
+  let* amount, fees = unshield c "bob" alice_tz1 10 in
   let* balance_alice_tz1_after = balance_tz1 c alice_tz1.public_key_hash in
-  assert (amount = -10.) ;
-  assert (balance_alice_tz1_after = balance_alice_tz1_before +. 10. -. fees) ;
+  assert (amount = -10_000_000) ;
+  assert (balance_alice_tz1_after = balance_alice_tz1_before + 10_000_000 - fees) ;
   let* balance_contract = balance_tz1 c (snd c) in
-  assert (balance_contract = 0.) ;
+  assert (balance_contract = 0) ;
   let* () = assert_balance c "alice" 0 in
   let* () = assert_balance c "bob" 0 in
   unit

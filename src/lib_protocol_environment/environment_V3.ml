@@ -28,7 +28,7 @@
 open Environment_context
 open Environment_protocol_T
 
-module type V3 = sig
+module type T = sig
   include
     Tezos_protocol_environment_sigs.V3.T
       with type Format.formatter = Format.formatter
@@ -68,7 +68,7 @@ module type V3 = sig
        and type Signature.watermark = Signature.watermark
        and type Pvss_secp256k1.Commitment.t = Pvss_secp256k1.Commitment.t
        and type Pvss_secp256k1.Encrypted_share.t =
-            Pvss_secp256k1.Encrypted_share.t
+        Pvss_secp256k1.Encrypted_share.t
        and type Pvss_secp256k1.Clear_share.t = Pvss_secp256k1.Clear_share.t
        and type Pvss_secp256k1.Public_key.t = Pvss_secp256k1.Public_key.t
        and type Pvss_secp256k1.Secret_key.t = Pvss_secp256k1.Secret_key.t
@@ -79,7 +79,7 @@ module type V3 = sig
        and type ('a, 'b) RPC_path.t = ('a, 'b) RPC_path.t
        and type RPC_service.meth = RPC_service.meth
        and type (+'m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t =
-            ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
+        ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
        and type Error_monad.shell_tztrace = Error_monad.tztrace
        and type 'a Error_monad.shell_tzresult = ('a, Error_monad.tztrace) result
        and type Timelock.chest = Timelock.chest
@@ -116,7 +116,7 @@ module type V3 = sig
     -> ['block] RPC_context.simple
 end
 
-module MakeV3 (Param : sig
+module Make (Param : sig
   val name : string
 end)
 () =
@@ -137,7 +137,7 @@ struct
         Stdlib.exit 1
 
   include Stdlib
-  open Tezos_protocol_environment_structs.V3.M
+  open Tezos_protocol_environment_structs.V3
   module Pervasives = Stdlib
 
   module Logging = struct
@@ -172,7 +172,7 @@ struct
   module List = struct
     include Tezos_error_monad.TzLwtreslib.List
 
-    include Tezos_protocol_environment_structs.V3.M.Lwtreslib_list_combine
+    include Tezos_protocol_environment_structs.V3.Lwtreslib_list_combine
   end
 
   module Char = Char
@@ -184,7 +184,7 @@ struct
 
   module Set = struct
     module type S =
-      Tezos_protocol_environment_structs.V3.M.Replicated_signatures.Set.S
+      Tezos_protocol_environment_structs.V3.Replicated_signatures.Set.S
         with type 'a error_monad_trace := 'a Error_monad.trace
 
     module Make (Ord : Compare.COMPARABLE) : S with type elt = Ord.t =
@@ -193,7 +193,7 @@ struct
 
   module Map = struct
     module type S =
-      Tezos_protocol_environment_structs.V3.M.Replicated_signatures.Map.S
+      Tezos_protocol_environment_structs.V3.Replicated_signatures.Map.S
         with type 'a error_monad_trace := 'a Error_monad.trace
 
     module Make (Ord : Compare.COMPARABLE) : S with type key = Ord.t =
@@ -202,7 +202,6 @@ struct
 
   module Int32 = Int32
   module Int64 = Int64
-  module Buffer = Buffer
   module Format = Format
   module FallbackArray = FallbackArray
 
@@ -254,7 +253,6 @@ struct
 
   module Z = Z
   module Lwt = Lwt
-  module Uri = Uri
 
   module Data_encoding = struct
     include Data_encoding
@@ -626,7 +624,7 @@ struct
         (struct
           let id = Format.asprintf "proto.%s." Param.name
         end)
-        (Tezos_protocol_environment_structs.V3.M.Error_monad_classification)
+        (Tezos_protocol_environment_structs.V3.Error_monad_trace_eval)
 
     let error_encoding = Data_encoding.dynamic_size error_encoding
   end
@@ -664,12 +662,12 @@ struct
         (Tezos_error_monad.TzLwtreslib.Monad)
 
     (* Backwards compatibility additions (dont_wait, trace helpers) *)
-    include Tezos_protocol_environment_structs.V3.M.Error_monad_infix_globals
+    include Tezos_protocol_environment_structs.V3.Error_monad_infix_globals
 
     include
-      Tezos_protocol_environment_structs.V3.M.Error_monad_preallocated_values
+      Tezos_protocol_environment_structs.V3.Error_monad_preallocated_values
 
-    include Tezos_protocol_environment_structs.V3.M.Error_monad_trace_eval
+    include Tezos_protocol_environment_structs.V3.Error_monad_trace_eval
 
     let fail e = Lwt.return_error (TzTrace.make e)
 
@@ -1228,7 +1226,7 @@ struct
       let+ r = finalize_block c shell_header in
       wrap_tzresult r
 
-    let init c bh =
+    let init _chain_id c bh =
       let open Lwt_syntax in
       let+ r = init c bh in
       wrap_tzresult r

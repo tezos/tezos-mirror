@@ -1,5 +1,10 @@
 #!/bin/sh
 
+# This scripts runs in the CI where echo flags are supported.
+# shellcheck disable=SC3037
+
+set -eu
+
 # This script is called in the opam tests of the Gitlab CI. It
 # collects the outputs of the opam builds, puts them in the folder
 # opam_logs for storage as artifacts. Additionally, it merges the
@@ -25,6 +30,7 @@ rsync --recursive --prune-empty-dirs \
 rsync --recursive "$OPAM_DIR"/log \
       --include "*/" \
       --include '*.info' \
+      --include '*.out' \
       --exclude '*' "$OPAM_LOGS"
 
  # for ease of readability, produce a merged log
@@ -50,12 +56,28 @@ merged_html="$OPAM_LOGS"/merged_output.html
 
 if [ "$CI_JOB_STATUS" != 'success' ]; then
     merged_output_url=$CI_SERVER_URL/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/-/jobs/$CI_JOB_ID/artifacts/file/"$OPAM_LOGS"/merged_output.html
-    echo "-- Job was non-successful (job status: ${CI_JOB_STATUS:-N/A}), merged output:"
+
+    cutoff_head=40
+    cutoff_tail=960
+
+    # Print the first $cutoff_head lines
+    header="-- Job was non-successful (job status: ${CI_JOB_STATUS:-N/A}), merged output:"
+    echo -e "\e[0Ksection_start:$(date +%s):merged_opam_output_head[collapsed=false]\r\e[0K$header"
     echo ""
-    cutoff=1000
-    head -n $cutoff "$merged"
+    head -n $cutoff_head "$merged"
+    echo -e "\e[0Ksection_end:$(date +%s):merged_opam_output_head\r\e[0K"
+
+    # Then print the remaining $cutoff_tail lines in a collapsed section
     line_count=$(wc -l "$merged" | cut -d' ' -f1)
-    if [ "$line_count" -gt $cutoff ]; then
+    if [ "$line_count" -gt $(( cutoff_head )) ]; then
+        header="... more merged opam output:"
+        echo -e "\e[0Ksection_start:$(date +%s):merged_opam_output_tail[collapsed=true]\r\e[0K$header"
+        tail -n+$((cutoff_head + 1)) "$merged" | head -n$cutoff_tail
+        echo -e "\e[0Ksection_end:$(date +%s):merged_opam_output_tail\r\e[0K"
+    fi
+
+    # If there are even more lines, link to the artifacts
+    if [ "$line_count" -gt $(( cutoff_head + cutoff_tail )) ]; then
         echo "... see artifacts for full output at $merged_output_url";
     fi
 fi

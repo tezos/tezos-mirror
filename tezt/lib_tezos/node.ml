@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Cli_arg
+
 type history_mode = Archive | Full of int option | Rolling of int option
 
 type media_type = Json | Binary | Any
@@ -176,11 +178,8 @@ let spawn_config_init node arguments =
   in
   spawn_command
     node
-    ("config"
-     ::
-     "init"
-     ::
-     "--data-dir" :: node.persistent_state.data_dir :: make_arguments arguments)
+    ("config" :: "init" :: "--data-dir" :: node.persistent_state.data_dir
+   :: make_arguments arguments)
 
 let config_init node arguments =
   spawn_config_init node arguments |> Process.check
@@ -247,6 +246,28 @@ module Config_file = struct
         ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
       ]
 
+  let ghostnet_sandbox_network_config =
+    `O
+      [
+        ( "genesis",
+          `O
+            [
+              ("timestamp", `String "2022-01-25T15:00:00Z");
+              ( "block",
+                `String "BLockGenesisGenesisGenesisGenesisGenesis1db77eJNeJ9" );
+              ("protocol", `String Protocol.genesis_hash);
+            ] );
+        ( "genesis_parameters",
+          `O
+            [
+              ( "values",
+                `O [("genesis_pubkey", `String Constant.activator.public_key)]
+              );
+            ] );
+        ("chain_name", `String "TEZOS");
+        ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
+      ]
+
   let set_sandbox_network_with_user_activated_upgrades upgrade_points old_config
       =
     let network =
@@ -288,7 +309,61 @@ module Config_file = struct
                      overrides) )
     in
     JSON.put ("network", network) old_config
+
+  let set_ghostnet_sandbox_network ?user_activated_upgrades () old_config =
+    let may_patch_user_activated_upgrades =
+      match user_activated_upgrades with
+      | None -> Fun.id
+      | Some upgrade_points ->
+          JSON.put
+            ( "user_activated_upgrades",
+              JSON.annotate ~origin:"user_activated_upgrades"
+              @@ `A
+                   (List.map
+                      (fun (level, protocol) ->
+                        `O
+                          [
+                            ("level", `Float (float level));
+                            ( "replacement_protocol",
+                              `String (Protocol.hash protocol) );
+                          ])
+                      upgrade_points) )
+    in
+
+    JSON.put
+      ( "network",
+        JSON.annotate
+          ~origin:"set_ghostnet_sandbox_network"
+          ghostnet_sandbox_network_config
+        |> may_patch_user_activated_upgrades )
+      old_config
 end
+
+type snapshot_history_mode = Rolling_history | Full_history
+
+let spawn_snapshot_export ?(history_mode = Full_history) ?export_level node file
+    =
+  spawn_command
+    node
+    (["snapshot"; "export"; "--data-dir"; node.persistent_state.data_dir]
+    @ (match history_mode with
+      | Full_history -> []
+      | Rolling_history -> ["--rolling"])
+    @ optional_arg "block" string_of_int export_level
+    @ [file])
+
+let snapshot_export ?history_mode ?export_level node file =
+  spawn_snapshot_export ?history_mode ?export_level node file |> Process.check
+
+let spawn_snapshot_import ?(reconstruct = false) node file =
+  spawn_command
+    node
+    (["snapshot"; "import"; "--data-dir"; node.persistent_state.data_dir]
+    @ (if reconstruct then ["--reconstruct"] else [])
+    @ [file])
+
+let snapshot_import ?reconstruct node file =
+  spawn_snapshot_import ?reconstruct node file |> Process.check
 
 let trigger_ready node value =
   let pending = node.persistent_state.pending_ready in
@@ -367,7 +442,7 @@ let wait_for_ready node =
   match node.status with
   | Running {session_state = {ready = true; _}; _} -> unit
   | Not_running | Running {session_state = {ready = false; _}; _} ->
-      let (promise, resolver) = Lwt.task () in
+      let promise, resolver = Lwt.task () in
       node.persistent_state.pending_ready <-
         resolver :: node.persistent_state.pending_ready ;
       check_event node "node_is_ready.v0" promise
@@ -378,7 +453,7 @@ let wait_for_level node level =
     when current_level >= level ->
       return current_level
   | Not_running | Running _ ->
-      let (promise, resolver) = Lwt.task () in
+      let promise, resolver = Lwt.task () in
       node.persistent_state.pending_level <-
         (level, resolver) :: node.persistent_state.pending_level ;
       check_event
@@ -397,7 +472,7 @@ let wait_for_identity node =
   | Running {session_state = {identity = Known identity; _}; _} ->
       return identity
   | Not_running | Running _ ->
-      let (promise, resolver) = Lwt.task () in
+      let promise, resolver = Lwt.task () in
       node.persistent_state.pending_identity <-
         resolver :: node.persistent_state.pending_identity ;
       check_event node "read_identity.v0" promise
@@ -489,6 +564,13 @@ let point_and_id ?from node =
   let* id = wait_for_identity node in
   Lwt.return (address ^ string_of_int (net_port node) ^ "#" ^ id)
 
+let point ?from node =
+  let from =
+    match from with None -> None | Some peer -> peer.persistent_state.runner
+  in
+  let address = Runner.address ?from node.persistent_state.runner in
+  (address, net_port node)
+
 let add_peer_with_id node peer =
   let* peer = point_and_id ~from:node peer in
   add_argument node (Peer peer) ;
@@ -504,7 +586,7 @@ let get_peers node =
     line arguments needed to spawn a [command] like [run]
     or [replay] for the given [node] and extra [arguments]. *)
 let runlike_command_arguments node command arguments =
-  let (net_addr, rpc_addr) =
+  let net_addr, rpc_addr =
     match node.persistent_state.runner with
     | None -> ("127.0.0.1:", node.persistent_state.rpc_host ^ ":")
     | Some _ ->
@@ -519,18 +601,11 @@ let runlike_command_arguments node command arguments =
     | None -> command_args
     | Some port -> "--advertised-net-port" :: string_of_int port :: command_args
   in
-  command
-  ::
-  "--data-dir"
-  ::
-  node.persistent_state.data_dir
-  ::
-  "--net-addr"
-  ::
-  (net_addr ^ string_of_int node.persistent_state.net_port)
-  ::
-  "--rpc-addr"
-  :: (rpc_addr ^ string_of_int node.persistent_state.rpc_port) :: command_args
+  command :: "--data-dir" :: node.persistent_state.data_dir :: "--net-addr"
+  :: (net_addr ^ string_of_int node.persistent_state.net_port)
+  :: "--rpc-addr"
+  :: (rpc_addr ^ string_of_int node.persistent_state.rpc_port)
+  :: command_args
 
 let do_runlike_command ?(on_terminate = fun _ -> ()) ?event_level
     ?event_sections_levels node arguments =
@@ -581,7 +656,7 @@ let replay ?on_terminate ?event_level ?event_sections_levels
 
 let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
     ?advertised_net_port ?rpc_host ?rpc_port ?event_level ?event_sections_levels
-    arguments =
+    ?patch_config ?snapshot arguments =
   let node =
     create
       ?runner
@@ -598,6 +673,16 @@ let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
   in
   let* () = identity_generate node in
   let* () = config_init node [] in
+  let () =
+    match patch_config with
+    | None -> ()
+    | Some patch -> Config_file.update node patch
+  in
+  let* () =
+    match snapshot with
+    | Some (file, reconstruct) -> snapshot_import ~reconstruct node file
+    | None -> unit
+  in
   let* () = run ?event_level ?event_sections_levels node [] in
   let* () = wait_for_ready node in
   return node

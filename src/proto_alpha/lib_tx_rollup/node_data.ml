@@ -37,6 +37,8 @@ let l2blocks_data data_dir = store_dir data_dir // "l2blocks_data"
 
 let tezos_blocks_index data_dir = store_dir data_dir // "tezos_blocks_index"
 
+let commitments_index data_dir = store_dir data_dir // "commitments_index"
+
 let levels_index data_dir = store_dir data_dir // "levels_index"
 
 let head_file data_dir = store_dir data_dir // "head"

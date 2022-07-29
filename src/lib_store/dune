@@ -6,29 +6,19 @@
  (public_name tezos-store)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-shell-services
   tezos-base
-  tezos-version
-  index
-  irmin-pack
-  tezos-context
-  tezos-validation
-  tezos-protocol-updater
-  tezos-stdlib-unix
-  tezos-stdlib
   lwt-watcher
-  ringo-lwt
-  camlzip
-  tar
-  tar-unix
-  prometheus)
+  tezos-shell-services
+  tezos-validation
+  tezos-context-ops
+  tezos-store.shared)
  (flags
-  (:standard
-   -open Tezos_shell_services
-   -open Tezos_base
-   -open Tezos_base.TzPervasives
-   -open Tezos_context
-   -open Tezos_validation
-   -open Tezos_protocol_updater
-   -open Tezos_stdlib_unix
-   -open Tezos_stdlib)))
+  (:standard)
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_shell_services
+  -open Tezos_validation
+  -open Tezos_context_ops
+  -open Tezos_store_shared)
+ (virtual_modules store)
+ (default_implementation tezos-store.real))

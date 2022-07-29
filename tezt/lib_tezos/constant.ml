@@ -40,9 +40,9 @@ let sc_rollup_node = "./tezos-sc-rollup-node-alpha"
 
 let sc_rollup_client = "./tezos-sc-rollup-client-alpha"
 
-let tx_rollup_node = "./tezos-tx-rollup-node-alpha"
+let tx_rollup_node = "./tezos-tx-rollup-node"
 
-let tx_rollup_client = "./tezos-tx-rollup-client-alpha"
+let tx_rollup_client = "./tezos-tx-rollup-client"
 
 (** Key pair used to activate a protocol from genesis with [--network sandbox].
     The public key is hard-coded in the node. *)
@@ -78,6 +78,10 @@ let implicit_account_burn =
 (** The default time to live of an operation (in block) *)
 let max_op_ttl = 120
 
+(** Constant gas cost required for every manager operation. Should
+    match [Michelson_v1_gas.Cost_of.manager_operation]. *)
+let manager_operation_gas_cost = 1000
+
 (** A valid base58 encoded layer-2 address to be used to test
     transaction rollups. *)
 let tx_rollup_l2_address = "tz4MSfZsn6kMDczShy8PMeB628TNukn9hi2K"
@@ -85,7 +89,7 @@ let tx_rollup_l2_address = "tz4MSfZsn6kMDczShy8PMeB628TNukn9hi2K"
 let tx_rollup_empty_l2_context =
   "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF"
 
-let tx_rollup_empty_withdraw_list =
+let tx_rollup_empty_withdraw_list_hash =
   "txw1sFoLju3ySMAdY6v1dcHUMqJ4Zxc1kcynC8xkYgCmH6bpNSDhV"
 
 let tx_rollup_initial_message_result =
@@ -97,6 +101,10 @@ let tx_rollup_proof_initial_state =
   "before": { "node": "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF" },
   "after": { "node": "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF" } ,
   "state": [] }|}
+
+(** A valid base58 encoded compressed state hash. *)
+let sc_rollup_compressed_state =
+  "scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf"
 
 (** A valid base58 encoded layer-2 account to be used to test transaction and
     smart contract rollups. *)

@@ -57,13 +57,13 @@ let context_init n =
    rollup when the feature flag is deactivated and checks that it
    fails. *)
 let test_disable_feature_flag () =
-  let* (b, contracts) = Context.init 1 in
+  let* b, contracts = Context.init 1 in
   let contract =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
   in
   let* i = Incremental.begin_construction b in
   let kind = Sc_rollup.Kind.Example_arith in
-  let* (op, _) = Op.sc_rollup_origination (I i) contract kind "" in
+  let* op, _ = Op.sc_rollup_origination (I i) contract kind "" in
   let expect_failure = function
     | Environment.Ecoproto_error (Apply.Sc_rollup_feature_disabled as e) :: _ ->
         Assert.test_error_encodings e ;
@@ -109,14 +109,12 @@ let test_sc_rollups_all_well_defined () =
 
 (** Initializes the context and originates a SCORU. *)
 let init_and_originate n =
-  let* (ctxt, contracts) = context_init n in
+  let* ctxt, contracts = context_init n in
   let contract =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
   in
   let kind = Sc_rollup.Kind.Example_arith in
-  let* (operation, rollup) =
-    Op.sc_rollup_origination (B ctxt) contract kind ""
-  in
+  let* operation, rollup = Op.sc_rollup_origination (B ctxt) contract kind "" in
   let* b = Block.bake ~operation ctxt in
   return (b, contracts, rollup)
 
@@ -150,7 +148,7 @@ let dummy_commitment =
 (** [test_publish_and_cement] creates a rollup, publishes a
     commitment and then 20 blocks later cements that commitment *)
 let test_publish_and_cement () =
-  let* (ctxt, contracts, rollup) = init_and_originate 2 in
+  let* ctxt, contracts, rollup = init_and_originate 2 in
   let contract =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1
   in
@@ -172,7 +170,7 @@ let test_publish_and_cement () =
     without waiting for the challenge period to elapse. We check that
     this fails with the correct error. *)
 let test_cement_fails_if_premature () =
-  let* (ctxt, contracts, rollup) = init_and_originate 2 in
+  let* ctxt, contracts, rollup = init_and_originate 2 in
   let contract =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1
   in
@@ -200,7 +198,7 @@ let test_cement_fails_if_premature () =
     publishes two different commitments with the same staker. We check
     that the second publish fails. *)
 let test_publish_fails_on_backtrack () =
-  let* (ctxt, contracts, rollup) = init_and_originate 2 in
+  let* ctxt, contracts, rollup = init_and_originate 2 in
   let contract =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1
   in
@@ -230,7 +228,7 @@ let test_publish_fails_on_backtrack () =
     cement one of the commitments; it checks that this fails because the
     commitment is contested. *)
 let test_cement_fails_on_conflict () =
-  let* (ctxt, contracts, rollup) = init_and_originate 3 in
+  let* ctxt, contracts, rollup = init_and_originate 3 in
   let contract1 =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1
   in

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -38,7 +39,11 @@ module Kind = struct
 
   type endorsement = endorsement_consensus_kind consensus
 
+  type dal_slot_availability = Dal_slot_availability_kind
+
   type seed_nonce_revelation = Seed_nonce_revelation_kind
+
+  type vdf_revelation = Vdf_revelation_kind
 
   type 'a double_consensus_operation_evidence =
     | Double_consensus_operation_evidence
@@ -65,7 +70,11 @@ module Kind = struct
 
   type delegation = Delegation_kind
 
+  type event = Event_kind
+
   type set_deposits_limit = Set_deposits_limit_kind
+
+  type increase_paid_storage = Increase_paid_storage_kind
 
   type failing_noop = Failing_noop_kind
 
@@ -89,6 +98,8 @@ module Kind = struct
 
   type transfer_ticket = Transfer_ticket_kind
 
+  type dal_publish_slot_header = Dal_publish_slot_header_kind
+
   type sc_rollup_originate = Sc_rollup_originate_kind
 
   type sc_rollup_add_messages = Sc_rollup_add_messages_kind
@@ -97,13 +108,26 @@ module Kind = struct
 
   type sc_rollup_publish = Sc_rollup_publish_kind
 
+  type sc_rollup_refute = Sc_rollup_refute_kind
+
+  type sc_rollup_timeout = Sc_rollup_timeout_kind
+
+  type sc_rollup_execute_outbox_message =
+    | Sc_rollup_execute_outbox_message_kind
+
+  type sc_rollup_recover_bond = Sc_rollup_recover_bond_kind
+
+  type sc_rollup_dal_slot_subscribe = Sc_rollup_dal_slot_subscribe_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
     | Origination_manager_kind : origination manager
     | Delegation_manager_kind : delegation manager
+    | Event_manager_kind : event manager
     | Register_global_constant_manager_kind : register_global_constant manager
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
+    | Increase_paid_storage_manager_kind : increase_paid_storage manager
     | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
     | Tx_rollup_submit_batch_manager_kind : tx_rollup_submit_batch manager
     | Tx_rollup_commit_manager_kind : tx_rollup_commit manager
@@ -116,10 +140,18 @@ module Kind = struct
     | Tx_rollup_dispatch_tickets_manager_kind
         : tx_rollup_dispatch_tickets manager
     | Transfer_ticket_manager_kind : transfer_ticket manager
+    | Dal_publish_slot_header_manager_kind : dal_publish_slot_header manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
     | Sc_rollup_add_messages_manager_kind : sc_rollup_add_messages manager
     | Sc_rollup_cement_manager_kind : sc_rollup_cement manager
     | Sc_rollup_publish_manager_kind : sc_rollup_publish manager
+    | Sc_rollup_refute_manager_kind : sc_rollup_refute manager
+    | Sc_rollup_timeout_manager_kind : sc_rollup_timeout manager
+    | Sc_rollup_execute_outbox_message_manager_kind
+        : sc_rollup_execute_outbox_message manager
+    | Sc_rollup_recover_bond_manager_kind : sc_rollup_recover_bond manager
+    | Sc_rollup_dal_slot_subscribe_manager_kind
+        : sc_rollup_dal_slot_subscribe manager
 end
 
 type 'a consensus_operation_type =
@@ -174,10 +206,16 @@ let pp_consensus_content ppf content =
 type consensus_watermark =
   | Endorsement of Chain_id.t
   | Preendorsement of Chain_id.t
+  | Dal_slot_availability of Chain_id.t
 
 let bytes_of_consensus_watermark = function
   | Preendorsement chain_id ->
       Bytes.cat (Bytes.of_string "\x12") (Chain_id.to_bytes chain_id)
+  | Dal_slot_availability chain_id
+  (* We reuse the watermark of an endorsement. This is because this
+     operation is temporary and aims to be merged with an endorsement
+     later on. Moreover, there is a leak of abstraction with the shell
+     which makes adding a new watermark a bit awkward. *)
   | Endorsement chain_id ->
       Bytes.cat (Bytes.of_string "\x13") (Chain_id.to_bytes chain_id)
 
@@ -195,6 +233,10 @@ let of_watermark = function
             Option.map
               (fun chain_id -> Preendorsement chain_id)
               (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
+        | '\x14' ->
+            Option.map
+              (fun chain_id -> Dal_slot_availability chain_id)
+              (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
         | _ -> None
       else None
   | _ -> None
@@ -202,19 +244,6 @@ let of_watermark = function
 type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
 
 let raw_encoding = Operation.encoding
-
-type transaction = {
-  amount : Tez_repr.tez;
-  parameters : Script_repr.lazy_expr;
-  entrypoint : Entrypoint_repr.t;
-  destination : Destination_repr.t;
-}
-
-type origination = {
-  delegate : Signature.Public_key_hash.t option;
-  script : Script_repr.t;
-  credit : Tez_repr.tez;
-}
 
 type 'kind operation = {
   shell : Operation.shell_header;
@@ -235,11 +264,18 @@ and _ contents_list =
 and _ contents =
   | Preendorsement : consensus_content -> Kind.preendorsement contents
   | Endorsement : consensus_content -> Kind.endorsement contents
+  | Dal_slot_availability :
+      Signature.Public_key_hash.t * Dal_endorsement_repr.t
+      -> Kind.dal_slot_availability contents
   | Seed_nonce_revelation : {
       level : Raw_level_repr.t;
       nonce : Seed_repr.nonce;
     }
       -> Kind.seed_nonce_revelation contents
+  | Vdf_revelation : {
+      solution : Seed_repr.vdf_solution;
+    }
+      -> Kind.vdf_revelation contents
   | Double_preendorsement_evidence : {
       op1 : Kind.preendorsement operation;
       op2 : Kind.preendorsement operation;
@@ -286,8 +322,19 @@ and _ contents =
 
 and _ manager_operation =
   | Reveal : Signature.Public_key.t -> Kind.reveal manager_operation
-  | Transaction : transaction -> Kind.transaction manager_operation
-  | Origination : origination -> Kind.origination manager_operation
+  | Transaction : {
+      amount : Tez_repr.tez;
+      parameters : Script_repr.lazy_expr;
+      entrypoint : Entrypoint_repr.t;
+      destination : Contract_repr.t;
+    }
+      -> Kind.transaction manager_operation
+  | Origination : {
+      delegate : Signature.Public_key_hash.t option;
+      script : Script_repr.t;
+      credit : Tez_repr.tez;
+    }
+      -> Kind.origination manager_operation
   | Delegation :
       Signature.Public_key_hash.t option
       -> Kind.delegation manager_operation
@@ -298,6 +345,11 @@ and _ manager_operation =
   | Set_deposits_limit :
       Tez_repr.t option
       -> Kind.set_deposits_limit manager_operation
+  | Increase_paid_storage : {
+      amount_in_bytes : Z.t;
+      destination : Contract_hash.t;
+    }
+      -> Kind.increase_paid_storage manager_operation
   | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
   | Tx_rollup_submit_batch : {
       tx_rollup : Tx_rollup_repr.t;
@@ -353,9 +405,15 @@ and _ manager_operation =
       entrypoint : Entrypoint_repr.t;
     }
       -> Kind.transfer_ticket manager_operation
+  | Dal_publish_slot_header : {
+      slot : Dal_slot_repr.t;
+    }
+      -> Kind.dal_publish_slot_header manager_operation
   | Sc_rollup_originate : {
-      kind : Sc_rollup_repr.Kind.t;
+      kind : Sc_rollups.Kind.t;
       boot_sector : string;
+      origination_proof : Sc_rollups.wrapped_proof;
+      parameters_ty : Script_repr.lazy_expr;
     }
       -> Kind.sc_rollup_originate manager_operation
   | Sc_rollup_add_messages : {
@@ -365,14 +423,40 @@ and _ manager_operation =
       -> Kind.sc_rollup_add_messages manager_operation
   | Sc_rollup_cement : {
       rollup : Sc_rollup_repr.t;
-      commitment : Sc_rollup_repr.Commitment_hash.t;
+      commitment : Sc_rollup_commitment_repr.Hash.t;
     }
       -> Kind.sc_rollup_cement manager_operation
   | Sc_rollup_publish : {
       rollup : Sc_rollup_repr.t;
-      commitment : Sc_rollup_repr.Commitment.t;
+      commitment : Sc_rollup_commitment_repr.t;
     }
       -> Kind.sc_rollup_publish manager_operation
+  | Sc_rollup_refute : {
+      rollup : Sc_rollup_repr.t;
+      opponent : Sc_rollup_repr.Staker.t;
+      refutation : Sc_rollup_game_repr.refutation option;
+    }
+      -> Kind.sc_rollup_refute manager_operation
+  | Sc_rollup_timeout : {
+      rollup : Sc_rollup_repr.t;
+      stakers : Sc_rollup_game_repr.Index.t;
+    }
+      -> Kind.sc_rollup_timeout manager_operation
+  | Sc_rollup_execute_outbox_message : {
+      rollup : Sc_rollup_repr.t;
+      cemented_commitment : Sc_rollup_commitment_repr.Hash.t;
+      output_proof : string;
+    }
+      -> Kind.sc_rollup_execute_outbox_message manager_operation
+  | Sc_rollup_recover_bond : {
+      sc_rollup : Sc_rollup_repr.t;
+    }
+      -> Kind.sc_rollup_recover_bond manager_operation
+  | Sc_rollup_dal_slot_subscribe : {
+      rollup : Sc_rollup_repr.t;
+      slot_index : Dal_slot_repr.Index.t;
+    }
+      -> Kind.sc_rollup_dal_slot_subscribe manager_operation
 
 and counter = Z.t
 
@@ -384,6 +468,7 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Delegation _ -> Kind.Delegation_manager_kind
   | Register_global_constant _ -> Kind.Register_global_constant_manager_kind
   | Set_deposits_limit _ -> Kind.Set_deposits_limit_manager_kind
+  | Increase_paid_storage _ -> Kind.Increase_paid_storage_manager_kind
   | Tx_rollup_origination -> Kind.Tx_rollup_origination_manager_kind
   | Tx_rollup_submit_batch _ -> Kind.Tx_rollup_submit_batch_manager_kind
   | Tx_rollup_commit _ -> Kind.Tx_rollup_commit_manager_kind
@@ -395,10 +480,18 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Tx_rollup_rejection _ -> Kind.Tx_rollup_rejection_manager_kind
   | Tx_rollup_dispatch_tickets _ -> Kind.Tx_rollup_dispatch_tickets_manager_kind
   | Transfer_ticket _ -> Kind.Transfer_ticket_manager_kind
+  | Dal_publish_slot_header _ -> Kind.Dal_publish_slot_header_manager_kind
   | Sc_rollup_originate _ -> Kind.Sc_rollup_originate_manager_kind
   | Sc_rollup_add_messages _ -> Kind.Sc_rollup_add_messages_manager_kind
   | Sc_rollup_cement _ -> Kind.Sc_rollup_cement_manager_kind
   | Sc_rollup_publish _ -> Kind.Sc_rollup_publish_manager_kind
+  | Sc_rollup_refute _ -> Kind.Sc_rollup_refute_manager_kind
+  | Sc_rollup_timeout _ -> Kind.Sc_rollup_timeout_manager_kind
+  | Sc_rollup_execute_outbox_message _ ->
+      Kind.Sc_rollup_execute_outbox_message_manager_kind
+  | Sc_rollup_recover_bond _ -> Kind.Sc_rollup_recover_bond_manager_kind
+  | Sc_rollup_dal_slot_subscribe _ ->
+      Kind.Sc_rollup_dal_slot_subscribe_manager_kind
 
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation
@@ -434,9 +527,9 @@ let rec of_list_internal = function
   | Contents o :: os -> (
       of_list_internal os >>? fun (Contents_list os) ->
       match (o, os) with
-      | (Manager_operation _, Single (Manager_operation _)) ->
+      | Manager_operation _, Single (Manager_operation _) ->
           Ok (Contents_list (Cons (o, os)))
-      | (Manager_operation _, Cons _) -> Ok (Contents_list (Cons (o, os)))
+      | Manager_operation _, Cons _ -> Ok (Contents_list (Cons (o, os)))
       | _ ->
           Error
             "Operation list of length > 1 should only contains manager \
@@ -482,6 +575,21 @@ let sc_rollup_operation_cement_tag = sc_rollup_operation_tag_offset + 2
 
 let sc_rollup_operation_publish_tag = sc_rollup_operation_tag_offset + 3
 
+let sc_rollup_operation_refute_tag = sc_rollup_operation_tag_offset + 4
+
+let sc_rollup_operation_timeout_tag = sc_rollup_operation_tag_offset + 5
+
+let sc_rollup_execute_outbox_message_tag = sc_rollup_operation_tag_offset + 6
+
+let sc_rollup_operation_recover_bond_tag = sc_rollup_operation_tag_offset + 7
+
+let sc_rollup_operation_dal_slot_subscribe_tag =
+  sc_rollup_operation_tag_offset + 8
+
+let dal_offset = 230
+
+let dal_publish_slot_header_tag = dal_offset + 0
+
 module Encoding = struct
   open Data_encoding
 
@@ -504,9 +612,8 @@ module Encoding = struct
           inj : 'a -> 'kind manager_operation;
         }
           -> 'kind case
-    [@@coq_force_gadt]
 
-    let[@coq_axiom_with_reason "gadt"] reveal_case =
+    let reveal_case =
       MCase
         {
           tag = 0;
@@ -517,17 +624,15 @@ module Encoding = struct
           inj = (fun pkh -> Reveal pkh);
         }
 
-    let transaction_tag = 1
-
-    let[@coq_axiom_with_reason "gadt"] transaction_case =
+    let transaction_case =
       MCase
         {
-          tag = transaction_tag;
+          tag = 1;
           name = "transaction";
           encoding =
             obj3
               (req "amount" Tez_repr.encoding)
-              (req "destination" Destination_repr.encoding)
+              (req "destination" Contract_repr.encoding)
               (opt
                  "parameters"
                  (obj2
@@ -548,7 +653,7 @@ module Encoding = struct
                 (amount, destination, parameters));
           inj =
             (fun (amount, destination, parameters) ->
-              let (entrypoint, parameters) =
+              let entrypoint, parameters =
                 match parameters with
                 | None -> (Entrypoint_repr.default, Script_repr.unit_parameter)
                 | Some (entrypoint, value) -> (entrypoint, value)
@@ -556,12 +661,10 @@ module Encoding = struct
               Transaction {amount; destination; parameters; entrypoint});
         }
 
-    let origination_tag = 2
-
-    let[@coq_axiom_with_reason "gadt"] origination_case =
+    let origination_case =
       MCase
         {
-          tag = origination_tag;
+          tag = 2;
           name = "origination";
           encoding =
             obj3
@@ -579,12 +682,10 @@ module Encoding = struct
               Origination {credit; delegate; script});
         }
 
-    let delegation_tag = 3
-
-    let[@coq_axiom_with_reason "gadt"] delegation_case =
+    let delegation_case =
       MCase
         {
-          tag = delegation_tag;
+          tag = 3;
           name = "delegation";
           encoding = obj1 (opt "delegate" Signature.Public_key_hash.encoding);
           select =
@@ -593,7 +694,7 @@ module Encoding = struct
           inj = (fun key -> Delegation key);
         }
 
-    let[@coq_axiom_with_reason "gadt"] register_global_constant_case =
+    let register_global_constant_case =
       MCase
         {
           tag = 4;
@@ -606,7 +707,7 @@ module Encoding = struct
           inj = (fun value -> Register_global_constant {value});
         }
 
-    let[@coq_axiom_with_reason "gadt"] set_deposits_limit_case =
+    let set_deposits_limit_case =
       MCase
         {
           tag = 5;
@@ -619,7 +720,28 @@ module Encoding = struct
           inj = (fun key -> Set_deposits_limit key);
         }
 
-    let[@coq_axiom_with_reason "gadt"] tx_rollup_origination_case =
+    let increase_paid_storage_case =
+      MCase
+        {
+          tag = 9;
+          name = "increase_paid_storage";
+          encoding =
+            obj2
+              (req "amount" Data_encoding.z)
+              (req "destination" Contract_repr.originated_encoding);
+          select =
+            (function
+            | Manager (Increase_paid_storage _ as op) -> Some op | _ -> None);
+          proj =
+            (function
+            | Increase_paid_storage {amount_in_bytes; destination} ->
+                (amount_in_bytes, destination));
+          inj =
+            (fun (amount_in_bytes, destination) ->
+              Increase_paid_storage {amount_in_bytes; destination});
+        }
+
+    let tx_rollup_origination_case =
       MCase
         {
           tag = tx_rollup_operation_origination_tag;
@@ -638,7 +760,7 @@ module Encoding = struct
          encoding which is in hexadecimal for JSON. *)
       conv Bytes.of_string Bytes.to_string bytes
 
-    let[@coq_axiom_with_reason "gadt"] tx_rollup_submit_batch_case =
+    let tx_rollup_submit_batch_case =
       MCase
         {
           tag = tx_rollup_operation_submit_batch_tag;
@@ -660,7 +782,7 @@ module Encoding = struct
               Tx_rollup_submit_batch {tx_rollup; content; burn_limit});
         }
 
-    let[@coq_axiom_with_reason "gadt"] tx_rollup_commit_case =
+    let tx_rollup_commit_case =
       MCase
         {
           tag = tx_rollup_operation_commit_tag;
@@ -680,7 +802,7 @@ module Encoding = struct
               Tx_rollup_commit {tx_rollup; commitment});
         }
 
-    let[@coq_axiom_with_reason "gadt"] tx_rollup_return_bond_case =
+    let tx_rollup_return_bond_case =
       MCase
         {
           tag = tx_rollup_operation_return_bond_tag;
@@ -693,7 +815,7 @@ module Encoding = struct
           inj = (fun tx_rollup -> Tx_rollup_return_bond {tx_rollup});
         }
 
-    let[@coq_axiom_with_reason "gadt"] tx_rollup_finalize_commitment_case =
+    let tx_rollup_finalize_commitment_case =
       MCase
         {
           tag = tx_rollup_operation_finalize_commitment_tag;
@@ -708,7 +830,7 @@ module Encoding = struct
           inj = (fun tx_rollup -> Tx_rollup_finalize_commitment {tx_rollup});
         }
 
-    let[@coq_axiom_with_reason "gadt"] tx_rollup_remove_commitment_case =
+    let tx_rollup_remove_commitment_case =
       MCase
         {
           tag = tx_rollup_operation_remove_commitment_tag;
@@ -723,7 +845,7 @@ module Encoding = struct
           inj = (fun tx_rollup -> Tx_rollup_remove_commitment {tx_rollup});
         }
 
-    let[@coq_axiom_with_reason "gadt"] tx_rollup_rejection_case =
+    let tx_rollup_rejection_case =
       MCase
         {
           tag = tx_rollup_operation_rejection_tag;
@@ -802,7 +924,7 @@ module Encoding = struct
                 });
         }
 
-    let[@coq_axiom_with_reason "gadt"] tx_rollup_dispatch_tickets_case =
+    let tx_rollup_dispatch_tickets_case =
       MCase
         {
           tag = tx_rollup_operation_dispatch_tickets_tag;
@@ -858,7 +980,7 @@ module Encoding = struct
                 });
         }
 
-    let[@coq_axiom_with_reason "gadt"] transfer_ticket_case =
+    let transfer_ticket_case =
       MCase
         {
           tag = transfer_ticket_tag;
@@ -885,26 +1007,45 @@ module Encoding = struct
                 {contents; ty; ticketer; amount; destination; entrypoint});
         }
 
-    let[@coq_axiom_with_reason "gadt"] sc_rollup_originate_case =
+    let sc_rollup_originate_case =
       MCase
         {
           tag = sc_rollup_operation_origination_tag;
           name = "sc_rollup_originate";
           encoding =
-            obj2
-              (req "kind" Sc_rollup_repr.Kind.encoding)
-              (req "boot_sector" Data_encoding.string);
+            obj4
+              (req "kind" Sc_rollups.Kind.encoding)
+              (req "boot_sector" Data_encoding.string)
+              (req "origination_proof" Sc_rollups.wrapped_proof_encoding)
+              (req "parameters_ty" Script_repr.lazy_expr_encoding);
           select =
             (function
             | Manager (Sc_rollup_originate _ as op) -> Some op | _ -> None);
           proj =
             (function
-            | Sc_rollup_originate {kind; boot_sector} -> (kind, boot_sector));
+            | Sc_rollup_originate
+                {kind; boot_sector; origination_proof; parameters_ty} ->
+                (kind, boot_sector, origination_proof, parameters_ty));
           inj =
-            (fun (kind, boot_sector) -> Sc_rollup_originate {kind; boot_sector});
+            (fun (kind, boot_sector, origination_proof, parameters_ty) ->
+              Sc_rollup_originate
+                {kind; boot_sector; origination_proof; parameters_ty});
         }
 
-    let[@coq_axiom_with_reason "gadt"] sc_rollup_add_messages_case =
+    let dal_publish_slot_header_case =
+      MCase
+        {
+          tag = dal_publish_slot_header_tag;
+          name = "dal_publish_slot_header";
+          encoding = obj1 (req "slot" Dal_slot_repr.encoding);
+          select =
+            (function
+            | Manager (Dal_publish_slot_header _ as op) -> Some op | _ -> None);
+          proj = (function Dal_publish_slot_header {slot} -> slot);
+          inj = (fun slot -> Dal_publish_slot_header {slot});
+        }
+
+    let sc_rollup_add_messages_case =
       MCase
         {
           tag = sc_rollup_operation_add_message_tag;
@@ -924,7 +1065,7 @@ module Encoding = struct
               Sc_rollup_add_messages {rollup; messages});
         }
 
-    let[@coq_axiom_with_reason "gadt"] sc_rollup_cement_case =
+    let sc_rollup_cement_case =
       MCase
         {
           tag = sc_rollup_operation_cement_tag;
@@ -932,7 +1073,7 @@ module Encoding = struct
           encoding =
             obj2
               (req "rollup" Sc_rollup_repr.encoding)
-              (req "commitment" Sc_rollup_repr.Commitment_hash.encoding);
+              (req "commitment" Sc_rollup_commitment_repr.Hash.encoding);
           select =
             (function
             | Manager (Sc_rollup_cement _ as op) -> Some op | _ -> None);
@@ -943,7 +1084,7 @@ module Encoding = struct
             (fun (rollup, commitment) -> Sc_rollup_cement {rollup; commitment});
         }
 
-    let[@coq_axiom_with_reason "gadt"] sc_rollup_publish_case =
+    let sc_rollup_publish_case =
       MCase
         {
           tag = sc_rollup_operation_publish_tag;
@@ -951,7 +1092,7 @@ module Encoding = struct
           encoding =
             obj2
               (req "rollup" Sc_rollup_repr.encoding)
-              (req "commitment" Sc_rollup_repr.Commitment.encoding);
+              (req "commitment" Sc_rollup_commitment_repr.encoding);
           select =
             (function
             | Manager (Sc_rollup_publish _ as op) -> Some op | _ -> None);
@@ -960,6 +1101,108 @@ module Encoding = struct
             | Sc_rollup_publish {rollup; commitment} -> (rollup, commitment));
           inj =
             (fun (rollup, commitment) -> Sc_rollup_publish {rollup; commitment});
+        }
+
+    let sc_rollup_refute_case =
+      MCase
+        {
+          tag = sc_rollup_operation_refute_tag;
+          name = "sc_rollup_refute";
+          encoding =
+            obj3
+              (req "rollup" Sc_rollup_repr.encoding)
+              (req "opponent" Sc_rollup_repr.Staker.encoding)
+              (opt "refutation" Sc_rollup_game_repr.refutation_encoding);
+          select =
+            (function
+            | Manager (Sc_rollup_refute _ as op) -> Some op | _ -> None);
+          proj =
+            (function
+            | Sc_rollup_refute {rollup; opponent; refutation} ->
+                (rollup, opponent, refutation));
+          inj =
+            (fun (rollup, opponent, refutation) ->
+              Sc_rollup_refute {rollup; opponent; refutation});
+        }
+
+    let sc_rollup_timeout_case =
+      MCase
+        {
+          tag = sc_rollup_operation_timeout_tag;
+          name = "sc_rollup_timeout";
+          encoding =
+            obj2
+              (req "rollup" Sc_rollup_repr.encoding)
+              (req "stakers" Sc_rollup_game_repr.Index.encoding);
+          select =
+            (function
+            | Manager (Sc_rollup_timeout _ as op) -> Some op | _ -> None);
+          proj =
+            (function
+            | Sc_rollup_timeout {rollup; stakers} -> (rollup, stakers));
+          inj = (fun (rollup, stakers) -> Sc_rollup_timeout {rollup; stakers});
+        }
+
+    let sc_rollup_execute_outbox_message_case =
+      MCase
+        {
+          tag = sc_rollup_execute_outbox_message_tag;
+          name = "sc_rollup_execute_outbox_message";
+          encoding =
+            obj3
+              (req "rollup" Sc_rollup_repr.encoding)
+              (req
+                 "cemented_commitment"
+                 Sc_rollup_commitment_repr.Hash.encoding)
+              (req "output_proof" Data_encoding.string);
+          select =
+            (function
+            | Manager (Sc_rollup_execute_outbox_message _ as op) -> Some op
+            | _ -> None);
+          proj =
+            (function
+            | Sc_rollup_execute_outbox_message
+                {rollup; cemented_commitment; output_proof} ->
+                (rollup, cemented_commitment, output_proof));
+          inj =
+            (fun (rollup, cemented_commitment, output_proof) ->
+              Sc_rollup_execute_outbox_message
+                {rollup; cemented_commitment; output_proof});
+        }
+
+    let sc_rollup_recover_bond_case =
+      MCase
+        {
+          tag = sc_rollup_operation_recover_bond_tag;
+          name = "sc_rollup_recover_bond";
+          encoding = obj1 (req "rollup" Sc_rollup_repr.Address.encoding);
+          select =
+            (function
+            | Manager (Sc_rollup_recover_bond _ as op) -> Some op | _ -> None);
+          proj = (function Sc_rollup_recover_bond {sc_rollup} -> sc_rollup);
+          inj = (fun sc_rollup -> Sc_rollup_recover_bond {sc_rollup});
+        }
+
+    let sc_rollup_dal_slot_subscribe_case =
+      MCase
+        {
+          tag = sc_rollup_operation_dal_slot_subscribe_tag;
+          name = "sc_rollup_dal_slot_subscribe";
+          encoding =
+            obj2
+              (req "rollup" Sc_rollup_repr.encoding)
+              (req "slot_index" Dal_slot_repr.Index.encoding);
+          select =
+            (function
+            | Manager (Sc_rollup_dal_slot_subscribe _ as op) -> Some op
+            | _ -> None);
+          proj =
+            (function
+            | Sc_rollup_dal_slot_subscribe {rollup; slot_index} ->
+                (rollup, slot_index));
+          inj =
+            (fun (rollup, slot_index) ->
+              Sc_rollup_dal_slot_subscribe {rollup; slot_index});
         }
   end
 
@@ -1028,7 +1271,7 @@ module Encoding = struct
         select =
           (function Contents (Endorsement _ as op) -> Some op | _ -> None);
         proj =
-          (fun [@coq_match_with_default] (Endorsement consensus_content) ->
+          (fun (Endorsement consensus_content) ->
             ( consensus_content.slot,
               consensus_content.level,
               consensus_content.round,
@@ -1038,7 +1281,7 @@ module Encoding = struct
             Endorsement {slot; level; round; block_payload_hash});
       }
 
-  let[@coq_axiom_with_reason "gadt"] endorsement_encoding =
+  let endorsement_encoding =
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
       case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
     in
@@ -1060,7 +1303,29 @@ module Encoding = struct
                   @@ union [make endorsement_case]))
                (varopt "signature" Signature.encoding)))
 
-  let[@coq_axiom_with_reason "gadt"] seed_nonce_revelation_case =
+  let dal_slot_availability_encoding =
+    obj2
+      (req "endorser" Signature.Public_key_hash.encoding)
+      (req "endorsement" Dal_endorsement_repr.encoding)
+
+  let dal_slot_availability_case =
+    Case
+      {
+        tag = 22;
+        name = "dal_slot_availability";
+        encoding = dal_slot_availability_encoding;
+        select =
+          (function
+          | Contents (Dal_slot_availability _ as op) -> Some op | _ -> None);
+        proj =
+          (fun (Dal_slot_availability (endorser, endorsement)) ->
+            (endorser, endorsement));
+        inj =
+          (fun (endorser, endorsement) ->
+            Dal_slot_availability (endorser, endorsement));
+      }
+
+  let seed_nonce_revelation_case =
     Case
       {
         tag = 1;
@@ -1076,7 +1341,19 @@ module Encoding = struct
         inj = (fun (level, nonce) -> Seed_nonce_revelation {level; nonce});
       }
 
-  let[@coq_axiom_with_reason "gadt"] double_preendorsement_evidence_case :
+  let vdf_revelation_case =
+    Case
+      {
+        tag = 8;
+        name = "vdf_revelation";
+        encoding = obj1 (req "solution" Seed_repr.vdf_solution_encoding);
+        select =
+          (function Contents (Vdf_revelation _ as op) -> Some op | _ -> None);
+        proj = (function Vdf_revelation {solution} -> solution);
+        inj = (fun solution -> Vdf_revelation {solution});
+      }
+
+  let double_preendorsement_evidence_case :
       Kind.double_preendorsement_evidence case =
     Case
       {
@@ -1094,8 +1371,7 @@ module Encoding = struct
         inj = (fun (op1, op2) -> Double_preendorsement_evidence {op1; op2});
       }
 
-  let[@coq_axiom_with_reason "gadt"] double_endorsement_evidence_case :
-      Kind.double_endorsement_evidence case =
+  let double_endorsement_evidence_case : Kind.double_endorsement_evidence case =
     Case
       {
         tag = 2;
@@ -1112,7 +1388,7 @@ module Encoding = struct
         inj = (fun (op1, op2) -> Double_endorsement_evidence {op1; op2});
       }
 
-  let[@coq_axiom_with_reason "gadt"] double_baking_evidence_case =
+  let double_baking_evidence_case =
     Case
       {
         tag = 3;
@@ -1128,7 +1404,7 @@ module Encoding = struct
         inj = (fun (bh1, bh2) -> Double_baking_evidence {bh1; bh2});
       }
 
-  let[@coq_axiom_with_reason "gadt"] activate_account_case =
+  let activate_account_case =
     Case
       {
         tag = 4;
@@ -1147,7 +1423,7 @@ module Encoding = struct
           (fun (id, activation_code) -> Activate_account {id; activation_code});
       }
 
-  let[@coq_axiom_with_reason "gadt"] proposals_case =
+  let proposals_case =
     Case
       {
         tag = 5;
@@ -1167,7 +1443,7 @@ module Encoding = struct
             Proposals {source; period; proposals});
       }
 
-  let[@coq_axiom_with_reason "gadt"] ballot_case =
+  let ballot_case =
     Case
       {
         tag = 6;
@@ -1196,8 +1472,7 @@ module Encoding = struct
         encoding = obj1 (req "arbitrary" Data_encoding.string);
         select =
           (function Contents (Failing_noop _ as op) -> Some op | _ -> None);
-        proj =
-          (function[@coq_match_with_default] Failing_noop message -> message);
+        proj = (function Failing_noop message -> message);
         inj = (function message -> Failing_noop message);
       }
 
@@ -1209,8 +1484,7 @@ module Encoding = struct
       (req "gas_limit" (check_size 10 Gas_limit_repr.Arith.n_integral_encoding))
       (req "storage_limit" (check_size 10 n))
 
-  let extract : type kind. kind Kind.manager contents -> _ =
-    function[@coq_match_with_default]
+  let extract : type kind. kind Kind.manager contents -> _ = function
     | Manager_operation
         {source; fee; counter; gas_limit; storage_limit; operation = _} ->
         (source, fee, counter, gas_limit, storage_limit)
@@ -1219,7 +1493,7 @@ module Encoding = struct
     Manager_operation
       {source; fee; counter; gas_limit; storage_limit; operation}
 
-  let[@coq_axiom_with_reason "gadt"] make_manager_case tag (type kind)
+  let make_manager_case tag (type kind)
       (Manager_operations.MCase mcase : kind Manager_operations.case) =
     Case
       {
@@ -1255,6 +1529,9 @@ module Encoding = struct
 
   let set_deposits_limit_case =
     make_manager_case 112 Manager_operations.set_deposits_limit_case
+
+  let increase_paid_storage_case =
+    make_manager_case 113 Manager_operations.increase_paid_storage_case
 
   let tx_rollup_origination_case =
     make_manager_case
@@ -1301,6 +1578,11 @@ module Encoding = struct
       transfer_ticket_tag
       Manager_operations.transfer_ticket_case
 
+  let dal_publish_slot_header_case =
+    make_manager_case
+      dal_publish_slot_header_tag
+      Manager_operations.dal_publish_slot_header_case
+
   let sc_rollup_originate_case =
     make_manager_case
       sc_rollup_operation_origination_tag
@@ -1321,6 +1603,31 @@ module Encoding = struct
       sc_rollup_operation_publish_tag
       Manager_operations.sc_rollup_publish_case
 
+  let sc_rollup_refute_case =
+    make_manager_case
+      sc_rollup_operation_refute_tag
+      Manager_operations.sc_rollup_refute_case
+
+  let sc_rollup_timeout_case =
+    make_manager_case
+      sc_rollup_operation_timeout_tag
+      Manager_operations.sc_rollup_timeout_case
+
+  let sc_rollup_execute_outbox_message_case =
+    make_manager_case
+      sc_rollup_execute_outbox_message_tag
+      Manager_operations.sc_rollup_execute_outbox_message_case
+
+  let sc_rollup_recover_bond_case =
+    make_manager_case
+      sc_rollup_operation_recover_bond_tag
+      Manager_operations.sc_rollup_recover_bond_case
+
+  let sc_rollup_dal_slot_subscribe_case =
+    make_manager_case
+      sc_rollup_operation_dal_slot_subscribe_tag
+      Manager_operations.sc_rollup_dal_slot_subscribe_case
+
   let contents_encoding =
     let make (Case {tag; name; encoding; select; proj; inj}) =
       case
@@ -1335,7 +1642,9 @@ module Encoding = struct
          [
            make endorsement_case;
            make preendorsement_case;
+           make dal_slot_availability_case;
            make seed_nonce_revelation_case;
+           make vdf_revelation_case;
            make double_endorsement_evidence_case;
            make double_preendorsement_evidence_case;
            make double_baking_evidence_case;
@@ -1347,6 +1656,7 @@ module Encoding = struct
            make origination_case;
            make delegation_case;
            make set_deposits_limit_case;
+           make increase_paid_storage_case;
            make failing_noop_case;
            make register_global_constant_case;
            make tx_rollup_origination_case;
@@ -1358,10 +1668,16 @@ module Encoding = struct
            make tx_rollup_rejection_case;
            make tx_rollup_dispatch_tickets_case;
            make transfer_ticket_case;
+           make dal_publish_slot_header_case;
            make sc_rollup_originate_case;
            make sc_rollup_add_messages_case;
            make sc_rollup_cement_case;
            make sc_rollup_publish_case;
+           make sc_rollup_refute_case;
+           make sc_rollup_timeout_case;
+           make sc_rollup_execute_outbox_message_case;
+           make sc_rollup_recover_bond_case;
+           make sc_rollup_dal_slot_subscribe_case;
          ]
 
   let contents_list_encoding =
@@ -1421,9 +1737,11 @@ let acceptable_passes (op : packed_operation) =
   | Single (Failing_noop _) -> []
   | Single (Preendorsement _) -> [0]
   | Single (Endorsement _) -> [0]
+  | Single (Dal_slot_availability _) -> [0]
   | Single (Proposals _) -> [1]
   | Single (Ballot _) -> [1]
   | Single (Seed_nonce_revelation _) -> [2]
+  | Single (Vdf_revelation _) -> [2]
   | Single (Double_endorsement_evidence _) -> [2]
   | Single (Double_preendorsement_evidence _) -> [2]
   | Single (Double_baking_evidence _) -> [2]
@@ -1499,11 +1817,16 @@ let check_signature (type kind) key chain_id
             ~watermark:(to_watermark (Endorsement chain_id))
             (Contents_list contents)
             signature
+      | Single (Dal_slot_availability _) as contents ->
+          check
+            ~watermark:(to_watermark (Dal_slot_availability chain_id))
+            (Contents_list contents)
+            signature
       | Single
           ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
-          | Double_endorsement_evidence _ | Double_preendorsement_evidence _
-          | Double_baking_evidence _ | Activate_account _ | Manager_operation _
-            ) ->
+          | Vdf_revelation _ | Double_endorsement_evidence _
+          | Double_preendorsement_evidence _ | Double_baking_evidence _
+          | Activate_account _ | Manager_operation _ ) ->
           check
             ~watermark:Generic_operation
             (Contents_list protocol_data.contents)
@@ -1530,91 +1853,109 @@ let hash_packed (o : packed_operation) =
   in
   Operation.hash {shell = o.shell; proto}
 
-type ('a, 'b) eq = Eq : ('a, 'a) eq [@@coq_force_gadt]
+type ('a, 'b) eq = Eq : ('a, 'a) eq
 
 let equal_manager_operation_kind :
     type a b. a manager_operation -> b manager_operation -> (a, b) eq option =
  fun op1 op2 ->
   match (op1, op2) with
-  | (Reveal _, Reveal _) -> Some Eq
-  | (Reveal _, _) -> None
-  | (Transaction _, Transaction _) -> Some Eq
-  | (Transaction _, _) -> None
-  | (Origination _, Origination _) -> Some Eq
-  | (Origination _, _) -> None
-  | (Delegation _, Delegation _) -> Some Eq
-  | (Delegation _, _) -> None
-  | (Register_global_constant _, Register_global_constant _) -> Some Eq
-  | (Register_global_constant _, _) -> None
-  | (Set_deposits_limit _, Set_deposits_limit _) -> Some Eq
-  | (Set_deposits_limit _, _) -> None
-  | (Tx_rollup_origination, Tx_rollup_origination) -> Some Eq
-  | (Tx_rollup_origination, _) -> None
-  | (Tx_rollup_submit_batch _, Tx_rollup_submit_batch _) -> Some Eq
-  | (Tx_rollup_submit_batch _, _) -> None
-  | (Tx_rollup_commit _, Tx_rollup_commit _) -> Some Eq
-  | (Tx_rollup_commit _, _) -> None
-  | (Tx_rollup_return_bond _, Tx_rollup_return_bond _) -> Some Eq
-  | (Tx_rollup_return_bond _, _) -> None
-  | (Tx_rollup_finalize_commitment _, Tx_rollup_finalize_commitment _) ->
+  | Reveal _, Reveal _ -> Some Eq
+  | Reveal _, _ -> None
+  | Transaction _, Transaction _ -> Some Eq
+  | Transaction _, _ -> None
+  | Origination _, Origination _ -> Some Eq
+  | Origination _, _ -> None
+  | Delegation _, Delegation _ -> Some Eq
+  | Delegation _, _ -> None
+  | Register_global_constant _, Register_global_constant _ -> Some Eq
+  | Register_global_constant _, _ -> None
+  | Set_deposits_limit _, Set_deposits_limit _ -> Some Eq
+  | Set_deposits_limit _, _ -> None
+  | Increase_paid_storage _, Increase_paid_storage _ -> Some Eq
+  | Increase_paid_storage _, _ -> None
+  | Tx_rollup_origination, Tx_rollup_origination -> Some Eq
+  | Tx_rollup_origination, _ -> None
+  | Tx_rollup_submit_batch _, Tx_rollup_submit_batch _ -> Some Eq
+  | Tx_rollup_submit_batch _, _ -> None
+  | Tx_rollup_commit _, Tx_rollup_commit _ -> Some Eq
+  | Tx_rollup_commit _, _ -> None
+  | Tx_rollup_return_bond _, Tx_rollup_return_bond _ -> Some Eq
+  | Tx_rollup_return_bond _, _ -> None
+  | Tx_rollup_finalize_commitment _, Tx_rollup_finalize_commitment _ -> Some Eq
+  | Tx_rollup_finalize_commitment _, _ -> None
+  | Tx_rollup_remove_commitment _, Tx_rollup_remove_commitment _ -> Some Eq
+  | Tx_rollup_remove_commitment _, _ -> None
+  | Tx_rollup_rejection _, Tx_rollup_rejection _ -> Some Eq
+  | Tx_rollup_rejection _, _ -> None
+  | Tx_rollup_dispatch_tickets _, Tx_rollup_dispatch_tickets _ -> Some Eq
+  | Tx_rollup_dispatch_tickets _, _ -> None
+  | Transfer_ticket _, Transfer_ticket _ -> Some Eq
+  | Transfer_ticket _, _ -> None
+  | Dal_publish_slot_header _, Dal_publish_slot_header _ -> Some Eq
+  | Dal_publish_slot_header _, _ -> None
+  | Sc_rollup_originate _, Sc_rollup_originate _ -> Some Eq
+  | Sc_rollup_originate _, _ -> None
+  | Sc_rollup_add_messages _, Sc_rollup_add_messages _ -> Some Eq
+  | Sc_rollup_add_messages _, _ -> None
+  | Sc_rollup_cement _, Sc_rollup_cement _ -> Some Eq
+  | Sc_rollup_cement _, _ -> None
+  | Sc_rollup_publish _, Sc_rollup_publish _ -> Some Eq
+  | Sc_rollup_publish _, _ -> None
+  | Sc_rollup_refute _, Sc_rollup_refute _ -> Some Eq
+  | Sc_rollup_refute _, _ -> None
+  | Sc_rollup_timeout _, Sc_rollup_timeout _ -> Some Eq
+  | Sc_rollup_timeout _, _ -> None
+  | Sc_rollup_execute_outbox_message _, Sc_rollup_execute_outbox_message _ ->
       Some Eq
-  | (Tx_rollup_finalize_commitment _, _) -> None
-  | (Tx_rollup_remove_commitment _, Tx_rollup_remove_commitment _) -> Some Eq
-  | (Tx_rollup_remove_commitment _, _) -> None
-  | (Tx_rollup_rejection _, Tx_rollup_rejection _) -> Some Eq
-  | (Tx_rollup_rejection _, _) -> None
-  | (Tx_rollup_dispatch_tickets _, Tx_rollup_dispatch_tickets _) -> Some Eq
-  | (Tx_rollup_dispatch_tickets _, _) -> None
-  | (Transfer_ticket _, Transfer_ticket _) -> Some Eq
-  | (Transfer_ticket _, _) -> None
-  | (Sc_rollup_originate _, Sc_rollup_originate _) -> Some Eq
-  | (Sc_rollup_originate _, _) -> None
-  | (Sc_rollup_add_messages _, Sc_rollup_add_messages _) -> Some Eq
-  | (Sc_rollup_add_messages _, _) -> None
-  | (Sc_rollup_cement _, Sc_rollup_cement _) -> Some Eq
-  | (Sc_rollup_cement _, _) -> None
-  | (Sc_rollup_publish _, Sc_rollup_publish _) -> Some Eq
-  | (Sc_rollup_publish _, _) -> None
+  | Sc_rollup_execute_outbox_message _, _ -> None
+  | Sc_rollup_recover_bond _, Sc_rollup_recover_bond _ -> Some Eq
+  | Sc_rollup_recover_bond _, _ -> None
+  | Sc_rollup_dal_slot_subscribe _, Sc_rollup_dal_slot_subscribe _ -> Some Eq
+  | Sc_rollup_dal_slot_subscribe _, _ -> None
 
 let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
     =
  fun op1 op2 ->
   match (op1, op2) with
-  | (Preendorsement _, Preendorsement _) -> Some Eq
-  | (Preendorsement _, _) -> None
-  | (Endorsement _, Endorsement _) -> Some Eq
-  | (Endorsement _, _) -> None
-  | (Seed_nonce_revelation _, Seed_nonce_revelation _) -> Some Eq
-  | (Seed_nonce_revelation _, _) -> None
-  | (Double_endorsement_evidence _, Double_endorsement_evidence _) -> Some Eq
-  | (Double_endorsement_evidence _, _) -> None
-  | (Double_preendorsement_evidence _, Double_preendorsement_evidence _) ->
+  | Preendorsement _, Preendorsement _ -> Some Eq
+  | Preendorsement _, _ -> None
+  | Endorsement _, Endorsement _ -> Some Eq
+  | Endorsement _, _ -> None
+  | Dal_slot_availability _, Dal_slot_availability _ -> Some Eq
+  | Dal_slot_availability _, _ -> None
+  | Seed_nonce_revelation _, Seed_nonce_revelation _ -> Some Eq
+  | Seed_nonce_revelation _, _ -> None
+  | Vdf_revelation _, Vdf_revelation _ -> Some Eq
+  | Vdf_revelation _, _ -> None
+  | Double_endorsement_evidence _, Double_endorsement_evidence _ -> Some Eq
+  | Double_endorsement_evidence _, _ -> None
+  | Double_preendorsement_evidence _, Double_preendorsement_evidence _ ->
       Some Eq
-  | (Double_preendorsement_evidence _, _) -> None
-  | (Double_baking_evidence _, Double_baking_evidence _) -> Some Eq
-  | (Double_baking_evidence _, _) -> None
-  | (Activate_account _, Activate_account _) -> Some Eq
-  | (Activate_account _, _) -> None
-  | (Proposals _, Proposals _) -> Some Eq
-  | (Proposals _, _) -> None
-  | (Ballot _, Ballot _) -> Some Eq
-  | (Ballot _, _) -> None
-  | (Failing_noop _, Failing_noop _) -> Some Eq
-  | (Failing_noop _, _) -> None
-  | (Manager_operation op1, Manager_operation op2) -> (
+  | Double_preendorsement_evidence _, _ -> None
+  | Double_baking_evidence _, Double_baking_evidence _ -> Some Eq
+  | Double_baking_evidence _, _ -> None
+  | Activate_account _, Activate_account _ -> Some Eq
+  | Activate_account _, _ -> None
+  | Proposals _, Proposals _ -> Some Eq
+  | Proposals _, _ -> None
+  | Ballot _, Ballot _ -> Some Eq
+  | Ballot _, _ -> None
+  | Failing_noop _, Failing_noop _ -> Some Eq
+  | Failing_noop _, _ -> None
+  | Manager_operation op1, Manager_operation op2 -> (
       match equal_manager_operation_kind op1.operation op2.operation with
       | None -> None
       | Some Eq -> Some Eq)
-  | (Manager_operation _, _) -> None
+  | Manager_operation _, _ -> None
 
 let rec equal_contents_kind_list :
     type a b. a contents_list -> b contents_list -> (a, b) eq option =
  fun op1 op2 ->
   match (op1, op2) with
-  | (Single op1, Single op2) -> equal_contents_kind op1 op2
-  | (Single _, Cons _) -> None
-  | (Cons _, Single _) -> None
-  | (Cons (op1, ops1), Cons (op2, ops2)) -> (
+  | Single op1, Single op2 -> equal_contents_kind op1 op2
+  | Single _, Cons _ -> None
+  | Cons _, Single _ -> None
+  | Cons (op1, ops1), Cons (op2, ops2) -> (
       match equal_contents_kind op1 op2 with
       | None -> None
       | Some Eq -> (

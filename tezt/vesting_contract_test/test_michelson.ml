@@ -101,11 +101,11 @@ let encoding =
     Data_encoding.string
 
 let parse code =
-  let (tokens, errors) = Micheline_parser.tokenize code in
+  let tokens, errors = Micheline_parser.tokenize code in
   let* () =
     if List.compare_length_with errors 0 >= 0 then Lwt.return ()
     else Test.fail "Couldn't tokenize Micheline!"
   in
-  let (expr, errors) = Micheline_parser.parse_expression tokens in
+  let expr, errors = Micheline_parser.parse_expression tokens in
   if List.compare_length_with errors 0 >= 0 then Lwt.return expr
   else Test.fail "Couldn't parse Micheline!"

@@ -496,12 +496,15 @@ let incr_requests (msgs : messages) (req : requests_kind) =
       msgs.predecessor_header <- msgs.predecessor_header + one
   | Other -> msgs.other <- msgs.other + one
 
-let incr_unadvertised {unadvertised = u; _} = function
+let incr_unadvertised t k =
+  let {unadvertised = u; _} = t in
+  match k with
   | Block -> u.block <- u.block + one
   | Operations -> u.operations <- u.operations + one
   | Protocol -> u.protocol <- u.protocol + one
 
-let incr ({responses = rsps; requests = rqst; _} as m) metadata =
+let incr m metadata =
+  let {responses = rsps; requests = rqst; _} = m in
   match metadata with
   (* requests *)
   | Received_request req -> incr_requests rqst.received req
@@ -600,11 +603,15 @@ let incr ({responses = rsps; requests = rqst; _} as m) metadata =
         }
 
 (* shortcuts to update sent/failed requests/responses *)
-let update_requests {requests = {sent; failed; _}; _} kind = function
+let update_requests t kind b =
+  let {requests = {sent; failed; _}; _} = t in
+  match b with
   | true -> incr_requests sent kind
   | false -> incr_requests failed kind
 
-let update_responses {responses = {sent; failed; _}; _} kind = function
+let update_responses t kind b =
+  let {requests = {sent; failed; _}; _} = t in
+  match b with
   | true -> incr_requests sent kind
   | false -> incr_requests failed kind
 

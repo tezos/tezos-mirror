@@ -64,7 +64,7 @@ let add_bootstrap_secret cctxt {name; sk_uri} =
               --force"
              name)
   in
-  let* (pkh, public_key) =
+  let* pkh, public_key =
     Client_keys.import_secret_key ~io:(cctxt :> Client_context.io_wallet) pk_uri
   in
   let*! () =

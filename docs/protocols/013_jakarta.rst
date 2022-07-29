@@ -1,5 +1,9 @@
 Protocol Jakarta
-==================
+================
+
+**Important**: revision `PtJakarta...nGw` of protocol Jakarta contains
+`two critical bugs <https://research-development.nomadic-labs.com/we-found-two-bugs-in-torus-jakarta.html>`_
+that have been corrected in the latest version `PtJakart2...SqY`.
 
 This page contains all the relevant information for protocol Jakarta
 (see :ref:`naming_convention`).
@@ -8,7 +12,7 @@ The code can be found in the :src:`src/proto_013_PtJakart` directory of the
 ``master`` branch of Tezos.
 
 This page documents the changes brought by protocol Jakarta with respect
-to Protocol I.
+to Ithaca.
 
 .. contents::
 
@@ -97,7 +101,7 @@ details. (MRs :gl:`!3915`, :gl:`!4198`, :gl:`!4200`, :gl:`!4203`, :gl:`!4332`,
 :gl:`!4772`, :gl:`!4782`, :gl:`!4790`, :gl:`!4801`, :gl:`!4740`, :gl:`!4376`,
 :gl:`!4793`, :gl:`!4841`, :gl:`!4930`, :gl:`!4917`, :gl:`!4835`, :gl:`!4951`,
 :gl:`!4878`, :gl:`!4913`, :gl:`!4956`, :gl:`!4963`, :gl:`!4965`, :gl:`!4972`,
-:gl:`!4976`, :gl:`!4984`, :gl:`!4999`)
+:gl:`!4976`, :gl:`!4984`, :gl:`!4999`, :gl:`!5078`, :gl:`!5080`)
 
 Smart Contract Optimistic Rollups (ongoing)
 -------------------------------------------
@@ -129,7 +133,7 @@ Breaking Changes
 - The binary encoding of the result of the ``Transaction`` operation
   has changed.  Its contents now vary depending on the kind of
   destination. The default cases (implicit and smart contracts) are
-  prefixed with the tag ``0``.
+  prefixed with the tag ``0``. (MR :gl:`!4205`)
 
 - The `consumed_gas` field in the encoding of operations becomes
   **deprecated** in favour of `consumed_milligas`, which contains
@@ -192,6 +196,14 @@ Breaking Changes
   the proportion Off/(On + Off) of toggle votes the following formula
   can be used: liquidity_baking_toggle_ema / 2,000,000,000.
 
+- Receipts and balance updates may now refer to a new type of account
+  with the kind ``"freezer"`` and the category ``"bonds"``.
+  Bonds are like deposits.
+  However, they can be associated to implicit or originated accounts,
+  unlike deposits that only apply to implicit accounts that are also
+  delegates (see :doc:`../active/token_management`).
+  (MR :gl:`!4437`)
+
 Bug Fixes
 ---------
 
@@ -205,11 +217,7 @@ Bug Fixes
 Minor Changes
 -------------
 
-- The RPC ``../context/delegates`` takes two additional Boolean flags
-  ``with_minimal_stake`` and ``without_minimal_stake``, which allow to
-  enumerate only the delegates that have at least a minimal stake to
-  participate in consensus and in governance, or do not have such a
-  minimal stake, respectively. (MR :gl:`!3951`)
+- The RPC ``../context/delegates`` can take two additional Boolean flags, ``with_minimal_stake`` or ``without_minimal_stake``, to select delegates that have at least a minimal stake to participate in consensus and governance, or do not have such a minimal stake, respectively. (MR :gl:`!3951`)
 
 - Make cache layout a parametric constant of the protocol. (MR :gl:`!4035`)
 

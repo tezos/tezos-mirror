@@ -12,14 +12,14 @@ and "current protocol" refers to its successor, N+1. For instance, if
 "protocol" refers to 008, "current protocol" refers to 009.
 
 The various pieces of code to be removed are within directory
-`src/proto_<N>_<Hash>/`, unless indicated otherwise.
+``src/proto_<N>_<Hash>/``, unless indicated otherwise.
 
 Remove Accuser, Baker
 ---------------------
 
 These daemons are no longer needed. Thus, the code in
-`bin_{accuser,baker}/` can be safely removed and the files
-`active_protocol_versions` and `active_testing_protocol_versions` should be
+``bin_{accuser,baker}/`` can be safely removed and the files
+``script-inputs/active_protocol_versions`` and ``script-inputs/active_testing_protocol_versions`` should be
 modified accordingly.
 
 Remove Protocol Tests
@@ -29,9 +29,9 @@ All tests developed for the protocol can be removed.
 
 These are defined in
 
-- `lib_client/test`
-- `lib_protocol/test`
-- `tests_python/tests_XXX`
+- ``lib_client/test``
+- ``lib_protocol/test``
+- ``tests_python/tests_XXX``
 
 Remove ``lib_delegate``
 -----------------------
@@ -42,13 +42,7 @@ Remove Protocol Tests From Tezt
 -------------------------------
 
 The code of Tezt must be updated manually removing the protocol from the type
-`Protocol.t` and adapting the tests accordingly.
-
-Remove Testnets From ``tezos-docker-manager.sh``
-------------------------------------------------
-
-Mentions of the protocol's testnests should be removed from the script
-:src:`scripts/tezos-docker-manager.sh`.
+``Protocol.t`` and adapting the tests accordingly.
 
 Remove Testnet From ``bin_node``
 --------------------------------
@@ -58,7 +52,7 @@ In particular the file :src:`src/bin_node/node_config_file.ml` should be
 amended.
 
 The protocol plugin registration module should be removed from
-:src:`src/bin_node/dune` and :src:`src/bin_node/tezos-node.opam`.
+:src:`src/bin_node/dune` and :src:`opam/tezos-node.opam`.
 
 Remove Protocol From Python Tests of Current Protocol
 -----------------------------------------------------
@@ -74,7 +68,7 @@ Remove RW Commands From ``lib_client_commands``
 -----------------------------------------------
 
 The client commands at
-`proto_XXX/lib_client_commands/client_proto_context_commands.ml`
+``proto_XXX/lib_client_commands/client_proto_context_commands.ml``
 define both read-only and read-write commands, where reads and
 writes refer to accesses to and modifications of the state of the
 chain. The RW commands can now be safely removed as they are no longer
@@ -83,15 +77,15 @@ needed.
 Remove Mempool Protocol Plugins
 -------------------------------
 
-The Mempool protocol plugin located in `proto_XXX/lib_plugin/plugin.ml` can be
+The Mempool protocol plugin located in ``proto_XXX/lib_plugin/plugin.ml`` can be
 removed.  This implies removing the plugin code, and remove the registration of
-the plugin in the file `proto_XXX/lib_plugin/plugin_registration.ml`.
+the plugin in the file ``proto_XXX/lib_plugin/plugin_registration.ml``.
 
 Other plugins should be evaluated case-by-case. At the moment of writing, the
-`Mempool` plugin is the only one that can be safely removed.
+``Mempool`` plugin is the only one that can be safely removed.
 
-Add an Entry in `CHANGES.rst`
------------------------------
+Add an Entry in ``CHANGES.rst``
+-------------------------------
 
 Add an entry in :src:`CHANGES.rst` to summarize all changes for the user.
 

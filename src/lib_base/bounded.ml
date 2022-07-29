@@ -46,7 +46,6 @@ module Int32 = struct
 
   module Make (B : BOUNDS) = struct
     include Compare.Int32 (* This includes [type t = int32] *)
-
     include B
 
     let to_int32 x = x
@@ -66,4 +65,10 @@ module Int32 = struct
             | Some x -> Ok x)
           int32)
   end
+
+  module NonNegative = Make (struct
+    let min_int = 0l
+
+    let max_int = Int32.max_int
+  end)
 end

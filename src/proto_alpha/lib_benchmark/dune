@@ -14,23 +14,22 @@
   tezos-benchmark-type-inference-alpha
   tezos-protocol-alpha
   tezos-crypto
-  tezos-protocol-alpha-parameters
+  tezos-protocol-alpha.parameters
   hashcons
-  benchmark-utils
   tezos-alpha-test-helpers
   prbnmcn-stats)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_stdlib
-   -open Tezos_base
-   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_error_monad
-   -open Tezos_micheline
-   -open Tezos_micheline_rewriting
-   -open Tezos_benchmark
-   -open Tezos_benchmark_type_inference_alpha
-   -open Tezos_protocol_alpha
-   -open Tezos_crypto
-   -open Tezos_alpha_test_helpers))
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_base
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_error_monad
+  -open Tezos_micheline
+  -open Tezos_micheline_rewriting
+  -open Tezos_benchmark
+  -open Tezos_benchmark_type_inference_alpha
+  -open Tezos_protocol_alpha
+  -open Tezos_crypto
+  -open Tezos_alpha_test_helpers)
  (private_modules kernel rules state_space))

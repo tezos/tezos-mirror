@@ -65,7 +65,7 @@ applied, then the operation is propagated over the gossip network.
 
 Currently, the ``precheck`` filter is only implemented for manager operations.
 The prevalidator makes the assumption that it is faster to run than ``apply_operation``.
-It can be disabled via the ``--disable-precheck`` node option.
+It can be disabled via the ``--disable-mempool-precheck`` node option.
 
 The ``postfilter`` is executed on applied operations and can
 be used to reject some of them based on their respective (application) receipts.

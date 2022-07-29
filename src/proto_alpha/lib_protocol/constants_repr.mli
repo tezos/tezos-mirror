@@ -25,6 +25,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+val mainnet_id : Chain_id.t
+
 val fitness_version_number : string
 
 val proof_of_work_nonce_size : int
@@ -71,6 +73,14 @@ val max_allowed_global_constant_depth : int
     representation. See [Script_typed_ir.TYPE_SIZE].
  *)
 val michelson_maximum_type_size : int
+
+(** A size limit for {!Sc_rollups.wrapped_proof} binary encoding. *)
+val sc_max_wrapped_proof_binary_size : int
+
+(** A limit on the size of the binary encoding for sc rollup messages:
+    {!Sc_rollup_inbox_message_repr.t} and {!Sc_rollup_outbox_message_repr.t}
+*)
+val sc_rollup_message_size_limit : int
 
 type fixed
 

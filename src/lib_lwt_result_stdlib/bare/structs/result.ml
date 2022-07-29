@@ -88,16 +88,16 @@ let is_error = function Ok _ -> false | Error _ -> true
 
 let equal ~ok ~error x y =
   match (x, y) with
-  | (Ok x, Ok y) -> ok x y
-  | (Error x, Error y) -> error x y
-  | (Ok _, Error _) | (Error _, Ok _) -> false
+  | Ok x, Ok y -> ok x y
+  | Error x, Error y -> error x y
+  | Ok _, Error _ | Error _, Ok _ -> false
 
 let compare ~ok ~error x y =
   match (x, y) with
-  | (Ok x, Ok y) -> ok x y
-  | (Error x, Error y) -> error x y
-  | (Ok _, Error _) -> -1
-  | (Error _, Ok _) -> 1
+  | Ok x, Ok y -> ok x y
+  | Error x, Error y -> error x y
+  | Ok _, Error _ -> -1
+  | Error _, Ok _ -> 1
 
 let to_option = function Ok v -> Some v | Error _ -> None
 

@@ -28,7 +28,7 @@
    Component: Node
    Invocation: dune exec tezt/long_tests/main.exe -- --file qcheck_rpc.ml
    Subject: Property testing the RPC server
-  *)
+*)
 
 (*
    {0 Description}
@@ -63,7 +63,7 @@ let protocol = Protocol.Alpha
 
    Note: this is not exhaustive; it includes the inputs
    that are easy to generate (e.g., excluding a ["sapling_state_id"])
- *)
+*)
 type path_input =
   | Chain_ID
   | Block_hash
@@ -287,7 +287,7 @@ module RPC_Index = struct
     let proto_url = url_prefix ^ "chains/main/blocks/head?recurse=yes" in
     let mempool_url = url_prefix ^ "chains/main/mempool?recurse=yes" in
     let urls = [shell_url; proto_url; mempool_url] in
-    let* (envs, endpts) = Lwt.(get_endpoints port urls >|= List.split) in
+    let* envs, endpts = Lwt.(get_endpoints port urls >|= List.split) in
     let env = Convert.merge_env_list envs in
     return @@ parse_endpoints env endpts
 end
@@ -295,13 +295,13 @@ end
 (* Generate random data for RPC calls *)
 (* ------------------------------------------------------------------------- *)
 module Gen = struct
-  type 'a t = 'a QCheck.Gen.t
+  type 'a t = 'a QCheck2.Gen.t
 
   (* Prerequisites of [path_gen] *)
   (* ---------------------------- *)
 
   let chain_id_gen : string t =
-    let open QCheck.Gen in
+    let open QCheck2.Gen in
     let open Tezos_crypto in
     let non_alias =
       list string >|= Chain_id.hash_string >|= Chain_id.to_string
@@ -309,7 +309,7 @@ module Gen = struct
     frequency [(4, pure "main"); (2, pure "test"); (1, non_alias)]
 
   let block_hash_gen : string t =
-    let open QCheck.Gen in
+    let open QCheck2.Gen in
     let open Tezos_crypto in
     let non_alias =
       list string >|= Block_hash.hash_string >|= Block_hash.to_string
@@ -317,11 +317,11 @@ module Gen = struct
     frequency [(4, pure "head"); (2, pure "genesis"); (1, non_alias)]
 
   let protocol_hash_gen : string t =
-    let open QCheck.Gen in
+    let open QCheck2.Gen in
     let open Tezos_crypto in
     list string >|= Protocol_hash.hash_string >|= Protocol_hash.to_string
 
-  let path_int_gen : string t = QCheck.Gen.(map Int.to_string small_nat)
+  let path_int_gen : string t = QCheck2.Gen.(map Int.to_string small_nat)
 
   (* Prerequisites of [known_input_gen] *)
   (* ----------------------------------- *)
@@ -334,18 +334,18 @@ module Gen = struct
     nums ^ alpha ^ String.capitalize_ascii alpha |> String.to_seq |> List.of_seq
 
   let even_alpha_num_gen : string t =
-    let alpha_num_gen = QCheck.Gen.oneofl alpha_num_alphabet in
-    let even_gen = QCheck.Gen.map (( * ) 2) QCheck.Gen.(0 -- 100) in
-    QCheck.Gen.string_size ~gen:alpha_num_gen even_gen
+    let alpha_num_gen = QCheck2.Gen.oneofl alpha_num_alphabet in
+    let even_gen = QCheck2.Gen.map (( * ) 2) QCheck2.Gen.(0 -- 100) in
+    QCheck2.Gen.string_size ~gen:alpha_num_gen even_gen
 
   let rec take n xs : 'a list =
     match (n, xs) with
-    | (0, _) -> []
-    | (_, []) -> []
-    | (n, y :: ys) -> y :: take (n - 1) ys
+    | 0, _ -> []
+    | _, [] -> []
+    | n, y :: ys -> y :: take (n - 1) ys
 
   let pick_some_elems xs : 'a list t =
-    let open QCheck.Gen in
+    let open QCheck2.Gen in
     let shuffle_gen = pair (shuffle_l xs) (0 -- List.length xs) in
     map (fun (ys, n) -> take n ys) shuffle_gen
 
@@ -354,7 +354,7 @@ module Gen = struct
     let open Tezos_protocol_alpha.Protocol.Michelson_v1_primitives in
     let open Tezos_micheline in
     let open Micheline_encoding in
-    let open QCheck.Gen in
+    let open QCheck2.Gen in
     let l_gen = return (-1) in
     let annot_gen = return [] in
     let micheline_node_gen =
@@ -369,7 +369,7 @@ module Gen = struct
   (* ---------------------- *)
 
   let path_gen path : string list t =
-    let open QCheck.Gen in
+    let open QCheck2.Gen in
     let path_str_gen = string_size (1 -- 100) in
     let elem_to_gen : (string, path_input) Either.t -> string t = function
       | Either.Left s -> pure s
@@ -389,7 +389,7 @@ module Gen = struct
   (* ---------------------------- *)
 
   let rec known_input_gen : rpc_input -> Ezjsonm.value t =
-    let open QCheck.Gen in
+    let open QCheck2.Gen in
     function
     | Boolean -> map Ezjsonm.bool bool
     | Integer {min; max} ->
@@ -411,7 +411,7 @@ module Gen = struct
         list_size (0 -- 10) (known_input_gen rpc_input) |> map (fun l -> `A l)
     | One_of rpc_inputs -> oneof @@ List.map known_input_gen rpc_inputs
     | Object properties ->
-        let open QCheck.Gen in
+        let open QCheck2.Gen in
         List.partition (fun x -> x.required) properties |> fun (req, not_req) ->
         pick_some_elems not_req >>= fun some_elems ->
         req @ some_elems
@@ -419,18 +419,18 @@ module Gen = struct
         |> List.split
         |> fun (names, payloads) ->
         List.map known_input_gen payloads
-        |> QCheck.Gen.flatten_l
-        |> QCheck.Gen.map (fun inputs -> `O (List.combine names inputs))
+        |> QCheck2.Gen.flatten_l
+        |> QCheck2.Gen.map (fun inputs -> `O (List.combine names inputs))
     | Mich_exp -> micheline_exp_gen
 
   let input_gen opt_rpc_input : Ezjsonm.value option t =
-    Option.map known_input_gen opt_rpc_input |> QCheck.Gen.flatten_opt
+    Option.map known_input_gen opt_rpc_input |> QCheck2.Gen.flatten_opt
 
   (* Random RPC instance generation *)
   (* ------------------------------ *)
 
   let instance_gen {description; meth; path; data} : rpc_instance t =
-    let open QCheck.Gen in
+    let open QCheck2.Gen in
     pair (input_gen data) (path_gen path)
     |> map (fun (input, full_path) -> {description; meth; full_path; input})
 end
@@ -497,11 +497,11 @@ module Test = struct
     (* Log description of RPC *)
     let () = Log.info "%s\n\n" rpc_description.description in
     (* Start node and client *)
-    let* (node, client) = Client.init_with_protocol `Client ~protocol () in
+    let* node, client = Client.init_with_protocol `Client ~protocol () in
     (* Generate and test instances *)
     let* () =
       rpc_description |> Gen.instance_gen
-      |> QCheck.Gen.generate ~n:num_rand_inputs
+      |> QCheck2.Gen.generate ~n:num_rand_inputs
       |> Lwt_list.iter_s (test_instance client)
     in
     Node.terminate node

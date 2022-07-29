@@ -1,0 +1,12 @@
+parameter (pair address string) ;
+storage unit ;
+code { UNPAIR ;
+       DIP { NIL operation };
+       UNPAIR ;
+       CONTRACT string ;
+       ASSERT_SOME;
+       SWAP;
+       DIP { PUSH mutez 0 };
+       TRANSFER_TOKENS;
+       CONS;
+       PAIR; }

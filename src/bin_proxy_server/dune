@@ -1,8 +1,6 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(env (static (flags (:standard -ccopt -static))))
-
 (executable
  (name main_proxy_server)
  (public_name tezos-proxy-server)
@@ -22,6 +20,7 @@
   tezos-shell-services
   tezos-shell-context
   tezos-version
+  uri
   (select void_for_linking-tezos-client-genesis from
    (tezos-client-genesis -> void_for_linking-tezos-client-genesis.empty)
    (-> void_for_linking-tezos-client-genesis.empty))
@@ -91,18 +90,26 @@
   (select void_for_linking-tezos-protocol-plugin-013-PtJakart from
    (tezos-protocol-plugin-013-PtJakart -> void_for_linking-tezos-protocol-plugin-013-PtJakart.empty)
    (-> void_for_linking-tezos-protocol-plugin-013-PtJakart.empty))
+  (select void_for_linking-tezos-client-014-PtKathma from
+   (tezos-client-014-PtKathma -> void_for_linking-tezos-client-014-PtKathma.empty)
+   (-> void_for_linking-tezos-client-014-PtKathma.empty))
+  (select void_for_linking-tezos-protocol-plugin-014-PtKathma from
+   (tezos-protocol-plugin-014-PtKathma -> void_for_linking-tezos-protocol-plugin-014-PtKathma.empty)
+   (-> void_for_linking-tezos-protocol-plugin-014-PtKathma.empty))
   (select void_for_linking-tezos-client-alpha from
    (tezos-client-alpha -> void_for_linking-tezos-client-alpha.empty)
    (-> void_for_linking-tezos-client-alpha.empty))
   (select void_for_linking-tezos-protocol-plugin-alpha from
    (tezos-protocol-plugin-alpha -> void_for_linking-tezos-protocol-plugin-alpha.empty)
    (-> void_for_linking-tezos-protocol-plugin-alpha.empty)))
- (link_flags (:standard -linkall))
+ (link_flags
+  (:standard -linkall)
+  (:include %{workspace_root}/static-link-flags.sexp))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base
-   -open Tezos_stdlib_unix)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base
+  -open Tezos_stdlib_unix))
 
 (rule
  (action
@@ -130,5 +137,7 @@
    (write-file void_for_linking-tezos-protocol-plugin-012-Psithaca.empty "")
    (write-file void_for_linking-tezos-client-013-PtJakart.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-013-PtJakart.empty "")
+   (write-file void_for_linking-tezos-client-014-PtKathma.empty "")
+   (write-file void_for_linking-tezos-protocol-plugin-014-PtKathma.empty "")
    (write-file void_for_linking-tezos-client-alpha.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-alpha.empty ""))))

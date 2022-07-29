@@ -27,6 +27,62 @@
 
 (** Describes the different representations that can be stored persistently. *)
 
+(** {2 Signatures} *)
+
+(** A store composed of a single file on disk *)
+module type SINGLETON_STORE = sig
+  (** The type of the singleton store. *)
+  type t
+
+  (** The type of values stored in this singleton store. *)
+  type value
+
+  (** Reads the current value from the disk. Returns [None] if the
+      file does not exist or if it is corrupted. *)
+  val read : t -> value option Lwt.t
+
+  (** Write the value to disk. *)
+  val write : t -> value -> unit tzresult Lwt.t
+
+  (** Deletes the value from the disk. *)
+  val delete : t -> unit Lwt.t
+end
+
+(** An index store mapping keys to values. It is composed of an index only. *)
+module type INDEXABLE_STORE = sig
+  (** The type of store build in indexes *)
+  type t
+
+  (** The type of keys for the *)
+  type key
+
+  (** The type of values stored in the index *)
+  type value
+
+  (** Returns [true] if the key has a value associated in
+      the store. *)
+  val mem : t -> key -> bool Lwt.t
+
+  (** Returns the value associated to a key in the store,
+      or [None] otherwise. *)
+  val find : t -> key -> value option Lwt.t
+
+  (** Add an association from a key to a value in the
+      store. If [flush] (default to [true]) is set, the index is written on disk
+      right away. *)
+  val add : ?flush:bool -> t -> key -> value -> unit Lwt.t
+end
+
+(** An index store mapping keys to values. Keys are associated to optional
+    values in the index which allows them to be removed. *)
+module type INDEXABLE_REMOVABLE_STORE = sig
+  include INDEXABLE_STORE
+
+  (** Removes an association from the store. Does nothing if the key was not
+      registered. *)
+  val remove : ?flush:bool -> t -> key -> unit Lwt.t
+end
+
 (** {2 Indexed stores}  *)
 
 (** A persistent store on disk for storing L2 blocks. It is composed of an index
@@ -65,110 +121,71 @@ end
     processed by the Tx rollup node. When there is no inbox for a Tezos block, we
     associate to it the L2 block of its predecessor. *)
 module Tezos_block_store : sig
-  (** The type of store for Tezos block hashes *)
-  type t
-
-  type info = {
-    l2_block : L2block.hash;
+  type value = {
+    l2_block : L2block.hash option;
     level : int32;
     predecessor : Block_hash.t;
   }
 
-  (** Returns [true] if the Tezos block hash has a L2 block hash associated in
-      the store. *)
-  val mem : t -> Block_hash.t -> bool Lwt.t
-
-  (** Returns the L2 block hash associated to a Tezos block hash in the store,
-      or [None] otherwise. *)
-  val find : t -> Block_hash.t -> info option Lwt.t
-
-  (** Add an association from a Tezos block hash to an L2 block hash in the
-      store. If [flush] (default to [true]) is set, the index is written on disk
-      right away. *)
-  val add : ?flush:bool -> t -> Block_hash.t -> info -> unit Lwt.t
+  include INDEXABLE_STORE with type key := Block_hash.t and type value := value
 end
 
 (** An index store to map L2 block level to L2 block hashes. It is composed
     of an index only. *)
-module Level_store : sig
-  (** The type of store for L2 block levels *)
-  type t
+module Level_store :
+  INDEXABLE_REMOVABLE_STORE
+    with type key := L2block.level
+     and type value := L2block.hash
 
-  (** Returns [true] if the L2 block level exists in the store. *)
-  val mem : t -> L2block.level -> bool Lwt.t
+(** An index store to map commitment hashes to their inclusion information. *)
+module Commitment_store : sig
+  type value = {
+    block : Block_hash.t;
+        (** Tezos block in which the commitment is included. *)
+    operation : Operation_hash.t;
+        (** Operation of the block in which the commitment is included. *)
+  }
 
-  (** Returns the L2 block hash associated to a L2 block level in the store,
-      or [None] otherwise. *)
-  val find : t -> L2block.level -> L2block.hash option Lwt.t
-
-  (** Add an association from a L2 block level to an L2 block hash in the
-      store. If [flush] (default to [true]) is set, the index is written on disk
-      right away. *)
-  val add : ?flush:bool -> t -> L2block.level -> L2block.hash -> unit Lwt.t
-
-  (** Removes a level from the store. Does nothing if the level was not
-      registered. *)
-  val remove : ?flush:bool -> t -> L2block.level -> unit Lwt.t
+  include
+    INDEXABLE_REMOVABLE_STORE
+      with type key := Protocol.Alpha_context.Tx_rollup_commitment_hash.t
+       and type value := value
 end
 
 (** {2 Singleton stores}  *)
 
 (** A store composed of a single file on disk to store the current head *)
-module Head_store : sig
-  (** The type of store for the head. *)
-  type t
-
-  (** Reads the current L2 head block hash from the disk. Returns [None] if the
-      file does not exist or if it is corrupted. *)
-  val read : t -> L2block.hash option Lwt.t
-
-  (** Write the head block hash to disk. *)
-  val write : t -> L2block.hash -> unit tzresult Lwt.t
-end
+module Head_store : SINGLETON_STORE with type value := L2block.hash
 
 (** A store composed of a single file on disk to store the current Tezos head *)
-module Tezos_head_store : sig
-  (** The type of store for the Tezos head. *)
-  type t
-
-  (** Reads the current tezos head block hash from the disk. Returns [None] if the
-      file does not exist or if it is corrupted. *)
-  val read : t -> Block_hash.t option Lwt.t
-
-  (** Write the tezos head block hash to disk. *)
-  val write : t -> Block_hash.t -> unit tzresult Lwt.t
-end
+module Tezos_head_store : SINGLETON_STORE with type value := Block_hash.t
 
 (** Type for on disk information about a rollup *)
 type rollup_info = {
   rollup_id : Protocol.Alpha_context.Tx_rollup.t;
-  origination_block : Block_hash.t;
-  origination_level : int32;
+  origination_level : int32 option;
 }
 
 (** A store composed of a single file on disk to store the rollup
     information. This is used to guarantee consistency between several runs of
     the Tx rollup node. *)
-module Rollup_info_store : sig
-  (** The type of store for the rollup origination information. *)
-  type t
+module Rollup_info_store : SINGLETON_STORE with type value := rollup_info
 
-  (** Reads the current rollup information from disk. Returns [None]
-      if the file does not exist or if it is corrupted. *)
-  val read : t -> rollup_info option Lwt.t
-
-  (** Write the rollup information to disk. *)
-  val write : t -> rollup_info -> unit tzresult Lwt.t
-end
+(** A store composed of a single file on disk to store the last finalized rollup
+    level (on L1) *)
+module Finalized_level_store :
+  SINGLETON_STORE with type value := Protocol.Alpha_context.Tx_rollup_level.t
 
 (** The type of all stores of the Tx rollup node. *)
 type t = {
   blocks : L2_block_store.t;
   tezos_blocks : Tezos_block_store.t;
   levels : Level_store.t;
+  commitments : Commitment_store.t;
   head : Head_store.t;
   tezos_head : Tezos_head_store.t;
   rollup_info : Rollup_info_store.t;
+  finalized_level : Finalized_level_store.t;
 }
 
 (** [init ~data_dir ~readonly ~blocks_cache_size] creates or loads existing

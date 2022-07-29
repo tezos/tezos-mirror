@@ -21,27 +21,30 @@
   tezos-context
   tezos-context.memory
   tezos-rpc-http-client-unix
+  tezos-context-ops
   tezos-rpc
   tezos-rpc-http
   lwt-canceler
-  lwt-exit)
+  lwt-exit
+  uri)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_protocol_012_Psithaca
-   -open Tezos_protocol_plugin_012_Psithaca
-   -open Tezos_shell_services
-   -open Tezos_client_base
-   -open Tezos_client_012_Psithaca
-   -open Tezos_client_commands
-   -open Tezos_stdlib
-   -open Tezos_stdlib_unix
-   -open Tezos_shell_context
-   -open Tezos_context
-   -open Tezos_rpc
-   -open Tezos_rpc_http))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_012_Psithaca
+  -open Tezos_protocol_plugin_012_Psithaca
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_012_Psithaca
+  -open Tezos_client_commands
+  -open Tezos_stdlib
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_context
+  -open Tezos_context
+  -open Tezos_context_ops
+  -open Tezos_rpc
+  -open Tezos_rpc_http)
  (modules (:standard \ Baking_commands Baking_commands_registration)))
 
 (library
@@ -58,20 +61,21 @@
   tezos-client-012-Psithaca
   tezos-client-commands
   tezos-baking-012-Psithaca
-  tezos-rpc)
+  tezos-rpc
+  uri)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_protocol_012_Psithaca
-   -open Tezos_stdlib_unix
-   -open Tezos_shell_services
-   -open Tezos_client_base
-   -open Tezos_client_012_Psithaca
-   -open Tezos_client_commands
-   -open Tezos_baking_012_Psithaca
-   -open Tezos_rpc))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_012_Psithaca
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_012_Psithaca
+  -open Tezos_client_commands
+  -open Tezos_baking_012_Psithaca
+  -open Tezos_rpc)
  (modules Baking_commands))
 
 (library
@@ -91,14 +95,14 @@
   tezos-rpc)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_protocol_012_Psithaca
-   -open Tezos_shell_services
-   -open Tezos_client_base
-   -open Tezos_client_012_Psithaca
-   -open Tezos_client_commands
-   -open Tezos_baking_012_Psithaca
-   -open Tezos_baking_012_Psithaca_commands
-   -open Tezos_rpc))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_012_Psithaca
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_012_Psithaca
+  -open Tezos_client_commands
+  -open Tezos_baking_012_Psithaca
+  -open Tezos_baking_012_Psithaca_commands
+  -open Tezos_rpc)
  (modules Baking_commands_registration))

@@ -94,7 +94,6 @@ type options = {
   mutable global_timeout : float option;
   mutable test_timeout : float option;
   mutable retry : int;
-  mutable regression_dir : string;
   mutable reset_regressions : bool;
   mutable on_unknown_regression_files_mode : on_unknown_regression_files_mode;
   mutable loop_mode : loop_mode;

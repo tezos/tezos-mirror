@@ -68,7 +68,7 @@ let get_first_different_endorsers ctxt =
 (** Bake two block at the same level using the same policy (i.e. same
     baker). *)
 let block_fork ?policy contracts b =
-  let (contract_a, contract_b) = get_hd_hd contracts in
+  let contract_a, contract_b = get_hd_hd contracts in
   Op.transaction (B b) contract_a contract_b Alpha_context.Tez.one_cent
   >>=? fun operation ->
   Block.bake ?policy ~operation b >>=? fun blk_a ->
@@ -83,7 +83,7 @@ let order_block_hashes ~correct_order bh1 bh2 =
   else (bh1, bh2)
 
 let double_baking ctxt ?(correct_order = true) bh1 bh2 =
-  let (bh1, bh2) = order_block_hashes ~correct_order bh1 bh2 in
+  let bh1, bh2 = order_block_hashes ~correct_order bh1 bh2 in
   Op.double_baking ctxt bh1 bh2
 
 (****************************************************************)

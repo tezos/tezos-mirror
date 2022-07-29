@@ -35,11 +35,7 @@ module Hash : S.HASH
 type hash = Hash.t
 
 (** The level of an L2 block  *)
-type level =
-  | Genesis
-      (** When the rollup has not received any inbox, it is at level Genesis  *)
-  | Rollup_level of Tx_rollup_level.t
-      (** When the rollup has had at least one inbox *)
+type level = Tx_rollup_level.t
 
 (** Type of L2 block headers *)
 type header = {
@@ -47,18 +43,37 @@ type header = {
   tezos_block : Block_hash.t;
       (** The Tezos block on which this L2 block in anchored, i.e. the Tezos block
       in which the inbox was sent *)
-  predecessor : hash;  (** The hash predecessor L2 block *)
+  predecessor : hash option;  (** The hash predecessor L2 block *)
   context : Tx_rollup_l2_context_hash.t;
       (** The hash of the context resulting of the application of the L2 block's inbox *)
+  commitment : Tx_rollup_commitment_hash.t;
+      (** The hash of the commitment for the inbox of this block *)
 }
 
 (** L2 blocks are composed of a header and an inbox. The inbox contains the
     actual messages. The hash in the block structure corresponds the hash of the
     header. *)
-type t = {hash : hash; header : header; inbox : Inbox.t}
+type 'inbox block = {
+  hash : hash;
+  header : header;
+  inbox : 'inbox;
+  commitment : Tx_rollup_commitment.Full.t;
+}
 
-(** Build the genesis block  *)
-val genesis_block : Context.t -> Tx_rollup.t -> Block_hash.t -> t Lwt.t
+type t = Inbox.t block
+
+type commitment_included_info = {
+  block : Block_hash.t;
+  operation : Operation_hash.t;
+}
+
+(** Metadata for the block  *)
+type metadata = {
+  commitment_included : commitment_included_info option;
+      (** Contains information if the commitment for this block has been included on L1 *)
+  finalized : bool;
+      (** Flag to signal if the commitment for this block is finalized on L1 *)
+}
 
 (**  {2 Encoding} *)
 
@@ -68,7 +83,11 @@ val level_to_string : level -> string
 
 val header_encoding : header Data_encoding.t
 
+val block_encoding : 'inbox Data_encoding.t -> 'inbox block Data_encoding.t
+
 val encoding : t Data_encoding.t
+
+val metadata_encoding : metadata Data_encoding.t
 
 (**  {2 Hashing} *)
 

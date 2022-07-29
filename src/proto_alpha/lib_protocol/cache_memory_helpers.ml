@@ -128,6 +128,10 @@ let bytes_size b = string_size_gen (Bytes.length b)
 
 let string_size s = string_size_gen (String.length s)
 
+let blake2b_hash_size = h1w +! string_size_gen 20
+
+let public_key_hash_in_memory_size = h1w +! blake2b_hash_size
+
 let ret_adding (nodes, size) added = (nodes, size +! added)
 
 let ret_succ_adding (nodes, size) added = (Nodes.succ nodes, size +! added)
@@ -142,8 +146,7 @@ let option_size_vec some x =
   let some x = ret_adding (some x) h1w in
   Option.fold ~none:zero ~some x
 
-let list_cell_size elt_size =
-  header_size +! word_size +! word_size +! elt_size
+let list_cell_size elt_size = header_size +! word_size +! word_size +! elt_size
   [@@ocaml.inline always]
 
 let list_fold_size elt_size list =
@@ -152,12 +155,15 @@ let list_fold_size elt_size list =
     zero
     list
 
-let boxed_tup2 x y =
-  header_size +! word_size +! word_size +! x +! y
+let boxed_tup2 x y = header_size +! word_size +! word_size +! x +! y
   [@@ocaml.inline always]
 
 let node_size =
   let open Micheline in
+  (* An OCaml list item occupies 3 words of memory: one for the (::)
+     constructor, one for the item itself (head) and one for the
+     remainder of the list (tail). *)
+  let list_size sns = word_size *? (List.length sns * 3) in
   let annotation_size a =
     List.fold_left
       (fun accu s -> ret_succ_adding accu (h2w +! string_size s))
@@ -168,8 +174,9 @@ let node_size =
     | Int (_, z) -> (Nodes.one, h2w +! z_size z)
     | String (_, s) -> (Nodes.one, h2w +! string_size s)
     | Bytes (_, s) -> (Nodes.one, h2w +! bytes_size s)
-    | Prim (_, _, _, a) -> ret_succ_adding (annotation_size a) h4w
-    | Seq (_, _) -> (Nodes.one, h2w)
+    | Prim (_, _, args, a) ->
+        ret_succ_adding (annotation_size a) (list_size args +! h4w)
+    | Seq (_, terms) -> (Nodes.one, list_size terms +! h2w)
   in
   fun node ->
     Script_repr.fold node zero @@ fun accu node ->

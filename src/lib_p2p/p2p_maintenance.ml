@@ -42,9 +42,16 @@ type config = {
   time_between_looking_for_peers : Ptime.span;
 }
 
+type test_config = {
+  trigger_swap : bool;
+  trigger_too_few_connections : bool;
+  trigger_too_many_connections : bool;
+}
+
 type ('msg, 'meta, 'meta_conn) t = {
   canceler : Lwt_canceler.t;
   config : config;
+  debug_config : test_config option;
   bounds : bounds;
   pool : ('msg, 'meta, 'meta_conn) P2p_pool.t;
   connect_handler : ('msg, 'meta, 'meta_conn) P2p_connect_handler.t;
@@ -117,10 +124,10 @@ let connectable t start_time expected seen_points =
 
     let compare (t1, _) (t2, _) =
       match (t1, t2) with
-      | (None, None) -> 0
-      | (None, Some _) -> 1
-      | (Some _, None) -> -1
-      | (Some t1, Some t2) -> Time.System.compare t2 t1
+      | None, None -> 0
+      | None, Some _ -> 1
+      | Some _, None -> -1
+      | Some t1, Some t2 -> Time.System.compare t2 t1
   end) in
   let acc = Bounded_point_info.create expected in
   let f point pi seen_points =
@@ -152,7 +159,7 @@ let rec try_to_contact_loop t start_time ~seen_points min_to_contact
   let open Lwt_syntax in
   if min_to_contact <= 0 then Lwt.return_true
   else
-    let (candidates, seen_points) =
+    let candidates, seen_points =
       connectable t start_time max_to_contact seen_points
     in
     if candidates = [] then
@@ -230,9 +237,13 @@ let rec do_maintain ~rng t =
   let open Lwt_result_syntax in
   let n_connected = P2p_pool.active_connections t.pool in
   if n_connected < t.bounds.min_threshold then
-    too_few_connections ~rng t n_connected
+    match t.debug_config with
+    | Some {trigger_too_few_connections = false; _} -> return_unit
+    | _ -> too_few_connections ~rng t n_connected
   else if t.bounds.max_threshold < n_connected then
-    too_many_connections ~rng t n_connected
+    match t.debug_config with
+    | Some {trigger_too_many_connections = false; _} -> return_unit
+    | _ -> too_many_connections ~rng t n_connected
   else (
     (* end of maintenance when enough users have been reached *)
     Lwt_condition.broadcast t.just_maintained () ;
@@ -267,7 +278,10 @@ let rec worker_loop ~rng t =
       || t.bounds.max_threshold < n_connected
     then do_maintain ~rng t
     else (
-      if not t.config.private_mode then send_swap_request t ;
+      (if not t.config.private_mode then
+       match t.debug_config with
+       | Some {trigger_swap = false; _} -> ()
+       | _ -> send_swap_request t) ;
       protect ~canceler:t.canceler (fun () ->
           Lwt_result.ok
           @@ Lwt.pick
@@ -296,36 +310,50 @@ let bounds ~min ~expected ~max =
     max_threshold = max - step_max;
   }
 
-let create ?discovery config pool connect_handler triggers ~log =
-  let bounds =
-    bounds
-      ~min:config.min_connections
-      ~expected:config.expected_connections
-      ~max:config.max_connections
-  in
-  {
-    canceler = Lwt_canceler.create ();
-    config;
-    bounds;
-    discovery;
-    pool;
-    connect_handler;
-    just_maintained = Lwt_condition.create ();
-    please_maintain = Lwt_condition.create ();
-    maintain_worker = Lwt.return_unit;
-    triggers;
-    log;
+module Internal = struct
+  type nonrec test_config = test_config = {
+    trigger_swap : bool;
+    trigger_too_few_connections : bool;
+    trigger_too_many_connections : bool;
   }
 
-let activate t =
-  let rng = Random.State.make_self_init () in
-  t.maintain_worker <-
-    Lwt_utils.worker
-      "maintenance"
-      ~on_event:Internal_event.Lwt_worker_event.on_event
-      ~run:(fun () -> worker_loop ~rng t)
-      ~cancel:(fun () -> Error_monad.cancel_with_exceptions t.canceler) ;
-  Option.iter P2p_discovery.activate t.discovery
+  let create ?discovery config ?debug_config pool connect_handler triggers ~log
+      =
+    let bounds =
+      bounds
+        ~min:config.min_connections
+        ~expected:config.expected_connections
+        ~max:config.max_connections
+    in
+    {
+      canceler = Lwt_canceler.create ();
+      config;
+      debug_config;
+      bounds;
+      discovery;
+      pool;
+      connect_handler;
+      just_maintained = Lwt_condition.create ();
+      please_maintain = Lwt_condition.create ();
+      maintain_worker = Lwt.return_unit;
+      triggers;
+      log;
+    }
+
+  let activate ?(rng = Random.State.make_self_init ()) t =
+    t.maintain_worker <-
+      Lwt_utils.worker
+        "maintenance"
+        ~on_event:Internal_event.Lwt_worker_event.on_event
+        ~run:(fun () -> worker_loop ~rng t)
+        ~cancel:(fun () -> Error_monad.cancel_with_exceptions t.canceler) ;
+    Option.iter P2p_discovery.activate t.discovery
+end
+
+let create ?discovery config pool connect_handler triggers ~log =
+  Internal.create ?discovery config pool connect_handler triggers ~log
+
+let activate t = Internal.activate t
 
 let maintain t =
   let wait = Lwt_condition.wait t.just_maintained in
@@ -339,3 +367,5 @@ let shutdown {canceler; discovery; maintain_worker; just_maintained; _} =
   let* () = maintain_worker in
   Lwt_condition.broadcast just_maintained () ;
   Lwt.return_unit
+
+module Internal_for_tests = Internal

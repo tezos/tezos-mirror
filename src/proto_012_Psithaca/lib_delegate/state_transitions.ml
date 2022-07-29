@@ -162,14 +162,14 @@ let may_update_endorsable_payload_with_internal_pqc state
   match
     (new_proposal.block.prequorum, state.level_state.endorsable_payload)
   with
-  | (None, _) ->
+  | None, _ ->
       (* The proposal does not contain a PQC: no need to update *)
       state
-  | (Some {round = new_round; _}, Some {prequorum = {round = old_round; _}; _})
+  | Some {round = new_round; _}, Some {prequorum = {round = old_round; _}; _}
     when Round.(new_round < old_round) ->
       (* The proposal pqc is outdated, do not update *)
       state
-  | (Some better_prequorum, _) ->
+  | Some better_prequorum, _ ->
       assert (
         Block_payload_hash.(
           better_prequorum.block_payload_hash = new_proposal.block.payload_hash)) ;
@@ -307,17 +307,17 @@ and may_switch_branch state new_proposal =
   in
   let current_endorsable_payload = state.level_state.endorsable_payload in
   match (current_endorsable_payload, new_proposal.block.prequorum) with
-  | (None, Some _) | (None, None) ->
+  | None, Some _ | None, None ->
       Events.(emit branch_proposal_has_better_fitness ()) >>= fun () ->
       (* The new branch contains a PQC (and we do not) or a better
          fitness, we switch. *)
       switch_branch state
-  | (Some _, None) ->
+  | Some _, None ->
       (* We have a better PQC, we don't switch as we are able to
          propose a better chain if we stay on our current one. *)
       Events.(emit branch_proposal_has_no_prequorum ()) >>= fun () ->
       do_nothing state
-  | (Some {prequorum = current_pqc; _}, Some new_pqc) ->
+  | Some {prequorum = current_pqc; _}, Some new_pqc ->
       if Round.(current_pqc.round > new_pqc.round) then
         Events.(emit branch_proposal_has_lower_prequorum ()) >>= fun () ->
         (* The other's branch PQC is lower than ours, do not
@@ -557,11 +557,11 @@ let time_to_bake state at_round =
       at_round
   in
   match (state.level_state.elected_block, round_proposer_opt) with
-  | (None, _) | (_, None) ->
+  | None, _ | _, None ->
       (* Unreachable: the [Time_to_bake_next_level] event can only be
          triggered when we have a slot and an elected block *)
       assert false
-  | (Some elected_block, Some (delegate, _)) ->
+  | Some elected_block, Some (delegate, _) ->
       let endorsements = elected_block.endorsement_qc in
       let new_level_state =
         {state.level_state with next_level_proposed_round = Some at_round}
@@ -681,15 +681,15 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
   Events.(emit step_current_phase (phase, event)) >>= fun () ->
   match (phase, event) with
   (* Handle timeouts *)
-  | (_, Timeout (End_of_round {ending_round})) ->
+  | _, Timeout (End_of_round {ending_round}) ->
       (* If the round is ending, stop everything currently going on and
          increment the round. *)
       end_of_round state ending_round
-  | (_, Timeout (Time_to_bake_next_level {at_round})) ->
+  | _, Timeout (Time_to_bake_next_level {at_round}) ->
       (* If it is time to bake the next level, stop everything currently
          going on and propose the next level block *)
       time_to_bake state at_round
-  | (Idle, New_proposal block_info) ->
+  | Idle, New_proposal block_info ->
       Events.(
         emit
           new_head
@@ -697,8 +697,8 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
             block_info.block.shell.level,
             block_info.block.round ))
       >>= fun () -> handle_new_proposal state block_info
-  | (Awaiting_endorsements, New_proposal block_info)
-  | (Awaiting_preendorsements, New_proposal block_info) ->
+  | Awaiting_endorsements, New_proposal block_info
+  | Awaiting_preendorsements, New_proposal block_info ->
       Events.(
         emit
           new_head
@@ -718,8 +718,8 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
       Quorum_reached (candidate, _voting_power, endorsement_qc) ) ->
       quorum_reached_when_waiting_endorsements state candidate endorsement_qc
   (* Unreachable cases *)
-  | (Idle, (Prequorum_reached _ | Quorum_reached _))
-  | (Awaiting_preendorsements, Quorum_reached _)
-  | (Awaiting_endorsements, Prequorum_reached _) ->
+  | Idle, (Prequorum_reached _ | Quorum_reached _)
+  | Awaiting_preendorsements, Quorum_reached _
+  | Awaiting_endorsements, Prequorum_reached _ ->
       (* This cannot/should not happen *)
       do_nothing state

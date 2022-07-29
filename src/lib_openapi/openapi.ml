@@ -85,10 +85,8 @@ module Schema = struct
       | Ref name -> [field "$ref" (string ("#/components/schemas/" ^ name))]
       | Other {title; description; nullable; kind} ->
           field_opt "title" title string
-          ::
-          field_opt "description" description string
-          ::
-          (if nullable then field "nullable" (bool true) else [])
+          :: field_opt "description" description string
+          :: (if nullable then field "nullable" (bool true) else [])
           ::
           (match kind with
           | Boolean -> [typ "boolean"]
@@ -403,7 +401,7 @@ module Service = struct
   let parameters_of_json in_ json =
     List.filter_map
       (fun query_json ->
-        let (required, parameter, in_result) = Parameter.of_json query_json in
+        let required, parameter, in_result = Parameter.of_json query_json in
         if String.equal in_result in_ then Some {required; parameter} else None)
       json
 
@@ -484,8 +482,7 @@ module Endpoint = struct
       path;
       methods =
         List.filter_map
-          (function
-            | ((_ : Method.t), None) -> None | (m, Some s) -> Some (m, s))
+          (function (_ : Method.t), None -> None | m, Some s -> Some (m, s))
           [
             (GET, get);
             (POST, post);
@@ -514,13 +511,13 @@ module Endpoint = struct
     (Path.to_string endpoint.path, encode_parameters endpoint.methods parameters)
 
   let of_json (path, json) =
-    let (methods, p) =
+    let methods, p =
       let get_service method_ =
         let service = json |-> Method.to_openapi_string method_ in
         match unannotate service with
         | `Null -> []
         | _ ->
-            let (service, parameters) = Service.of_json service in
+            let service, parameters = Service.of_json service in
             [((method_, service), parameters)]
       in
       get_service Method.GET @ get_service Method.POST @ get_service Method.PUT
@@ -595,7 +592,7 @@ let to_json openapi =
     ]
 
 let of_json (json : Json.t) =
-  let (title, description, version) =
+  let title, description, version =
     let info = json |-> "info" in
     let title = info |-> "title" |> as_string in
     let description = info |-> "description" |> as_string_opt in

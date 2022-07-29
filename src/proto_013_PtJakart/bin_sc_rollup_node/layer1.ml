@@ -270,11 +270,11 @@ let chain_events cctxt store chain =
       | None -> Head {hash = genesis_hash; level = 0l}
       | Some last_seen_head -> last_seen_head
     in
-    let*! (base, events) = catch_up cctxt store chain last_seen_head new_head in
+    let*! base, events = catch_up cctxt store chain last_seen_head new_head in
     let*! () = List.iter_s (store_chain_event store base) events in
     Lwt.return events
   in
-  let+ (heads, _) = Tezos_shell_services.Monitor_services.heads cctxt chain in
+  let+ heads, _ = Tezos_shell_services.Monitor_services.heads cctxt chain in
   Lwt_stream.map_list_s on_head heads
 
 let check_sc_rollup_address_exists sc_rollup_address

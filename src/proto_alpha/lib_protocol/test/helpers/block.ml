@@ -27,7 +27,6 @@
 
 open Protocol
 module Proto_Nonce = Nonce (* Renamed otherwise is masked by Alpha_context *)
-
 open Alpha_context
 
 (* This type collects a block and the context that results from its application *)
@@ -258,12 +257,23 @@ let protocol_param_key = ["protocol_parameters"]
 
 let check_constants_consistency constants =
   let open Constants.Parametric in
-  let {blocks_per_cycle; blocks_per_commitment; blocks_per_stake_snapshot; _} =
+  let {
+    blocks_per_cycle;
+    blocks_per_commitment;
+    nonce_revelation_threshold;
+    blocks_per_stake_snapshot;
+    _;
+  } =
     constants
   in
   Error_monad.unless (blocks_per_commitment <= blocks_per_cycle) (fun () ->
       failwith
         "Inconsistent constants : blocks per commitment must be less than \
+         blocks per cycle")
+  >>=? fun () ->
+  Error_monad.unless (nonce_revelation_threshold <= blocks_per_cycle) (fun () ->
+      failwith
+        "Inconsistent constants : blocks per reveal period must be less than \
          blocks per cycle")
   >>=? fun () ->
   Error_monad.unless (blocks_per_cycle >= blocks_per_stake_snapshot) (fun () ->
@@ -276,8 +286,8 @@ let prepare_main_init_params ?bootstrap_contracts commitments constants
   let open Tezos_protocol_alpha_parameters in
   let bootstrap_accounts =
     List.map
-      (fun (Account.{pk; pkh; _}, amount) ->
-        Default_parameters.make_bootstrap_account (pkh, pk, amount))
+      (fun (Account.{pk; pkh; _}, amount, delegate_to) ->
+        Default_parameters.make_bootstrap_account (pkh, pk, amount, delegate_to))
       initial_accounts
   in
   let parameters =
@@ -292,20 +302,20 @@ let prepare_main_init_params ?bootstrap_contracts commitments constants
     Data_encoding.Binary.to_bytes_exn Data_encoding.json json
   in
   Tezos_protocol_environment.Context.(
-    let empty = Memory_context.empty in
+    let empty = Tezos_protocol_environment.Memory_context.empty in
     add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
     add ctxt protocol_param_key proto_params)
 
-let initial_context ?(commitments = []) ?bootstrap_contracts constants header
-    initial_accounts =
+let initial_context ?(commitments = []) ?bootstrap_contracts chain_id constants
+    header initial_accounts =
   prepare_main_init_params
     ?bootstrap_contracts
     commitments
     constants
     initial_accounts
   >>= fun ctxt ->
-  Main.init ctxt header >|= Environment.wrap_tzresult >|=? fun {context; _} ->
-  context
+  Main.init chain_id ctxt header >|= Environment.wrap_tzresult
+  >|=? fun {context; _} -> context
 
 let initial_alpha_context ?(commitments = []) constants
     (block_header : Block_header.shell_header) initial_accounts =
@@ -345,7 +355,12 @@ let initial_alpha_context ?(commitments = []) constants
     in
     (({script with storage}, lazy_storage_diff), ctxt)
   in
-  Alpha_context.prepare_first_block ~typecheck ~level ~timestamp ctxt
+  Alpha_context.prepare_first_block
+    ~typecheck
+    ~level
+    ~timestamp
+    Chain_id.zero
+    ctxt
   >|= Environment.wrap_tzresult
 
 let genesis_with_parameters parameters =
@@ -381,11 +396,13 @@ let genesis_with_parameters parameters =
     Data_encoding.Binary.to_bytes_exn Data_encoding.json json
   in
   Tezos_protocol_environment.Context.(
-    let empty = Memory_context.empty in
+    let empty = Tezos_protocol_environment.Memory_context.empty in
     add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
     add ctxt protocol_param_key proto_params)
   >>= fun ctxt ->
-  Main.init ctxt shell >|= Environment.wrap_tzresult >|=? fun {context; _} ->
+  let chain_id = Chain_id.of_block_hash hash in
+  Main.init chain_id ctxt shell >|= Environment.wrap_tzresult
+  >|=? fun {context; _} ->
   {
     hash;
     header = {shell; protocol_data = {contents; signature = Signature.zero}};
@@ -393,7 +410,9 @@ let genesis_with_parameters parameters =
     context;
   }
 
-let validate_initial_accounts (initial_accounts : (Account.t * Tez.t) list)
+let validate_initial_accounts
+    (initial_accounts :
+      (Account.t * Tez.t * Signature.Public_key_hash.t option) list)
     tokens_per_roll =
   if initial_accounts = [] then
     Stdlib.failwith "Must have one account with a roll to bake" ;
@@ -401,7 +420,7 @@ let validate_initial_accounts (initial_accounts : (Account.t * Tez.t) list)
   Lwt.catch
     (fun () ->
       List.fold_left_es
-        (fun acc (_, amount) ->
+        (fun acc (_, amount, _) ->
           Environment.wrap_tzresult @@ Tez.( +? ) acc amount >>?= fun acc ->
           if acc >= tokens_per_roll then raise Exit else return acc)
         Tez.zero
@@ -415,6 +434,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
     ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
     ?blocks_per_cycle ?cycles_per_voting_period ?tx_rollup_enable
     ?tx_rollup_sunset_level ?tx_rollup_origination_size ?sc_rollup_enable
+    ?dal_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold
     initial_accounts =
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
@@ -459,20 +479,33 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
     Option.value ~default:constants.consensus_threshold consensus_threshold
   in
   let tx_rollup_enable =
-    Option.value ~default:constants.tx_rollup_enable tx_rollup_enable
+    Option.value ~default:constants.tx_rollup.enable tx_rollup_enable
   in
   let tx_rollup_sunset_level =
     Option.value
-      ~default:constants.tx_rollup_sunset_level
+      ~default:constants.tx_rollup.sunset_level
       tx_rollup_sunset_level
   in
   let tx_rollup_origination_size =
     Option.value
-      ~default:constants.tx_rollup_origination_size
+      ~default:constants.tx_rollup.origination_size
       tx_rollup_origination_size
   in
   let sc_rollup_enable =
-    Option.value ~default:constants.sc_rollup_enable sc_rollup_enable
+    Option.value ~default:constants.sc_rollup.enable sc_rollup_enable
+  in
+  let dal_enable =
+    Option.value ~default:constants.dal.feature_enable dal_enable
+  in
+  let hard_gas_limit_per_block =
+    Option.value
+      ~default:constants.hard_gas_limit_per_block
+      hard_gas_limit_per_block
+  in
+  let nonce_revelation_threshold =
+    Option.value
+      ~default:constants.nonce_revelation_threshold
+      nonce_revelation_threshold
   in
   let constants =
     {
@@ -487,17 +520,24 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       cost_per_byte;
       liquidity_baking_subsidy;
       consensus_threshold;
-      tx_rollup_enable;
-      tx_rollup_sunset_level;
-      tx_rollup_origination_size;
-      sc_rollup_enable;
+      tx_rollup =
+        {
+          constants.tx_rollup with
+          enable = tx_rollup_enable;
+          sunset_level = tx_rollup_sunset_level;
+          origination_size = tx_rollup_origination_size;
+        };
+      sc_rollup = {constants.sc_rollup with enable = sc_rollup_enable};
+      dal = {constants.dal with feature_enable = dal_enable};
+      hard_gas_limit_per_block;
+      nonce_revelation_threshold;
     }
   in
   (* Check there is at least one roll *)
   Lwt.catch
     (fun () ->
       List.fold_left_es
-        (fun acc (_, amount) ->
+        (fun acc (_, amount, _) ->
           Environment.wrap_tzresult @@ Tez.( +? ) acc amount >>?= fun acc ->
           if acc >= constants.tokens_per_roll then raise Exit else return acc)
         Tez.zero
@@ -538,8 +578,10 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?endorsing_reward_per_slot ?baking_reward_bonus_per_slot
     ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
     ?cycles_per_voting_period ?tx_rollup_enable ?tx_rollup_sunset_level
-    ?tx_rollup_origination_size ?sc_rollup_enable
-    (initial_accounts : (Account.t * Tez.t) list) =
+    ?tx_rollup_origination_size ?sc_rollup_enable ?dal_enable
+    ?hard_gas_limit_per_block ?nonce_revelation_threshold
+    (initial_accounts :
+      (Account.t * Tez.t * Signature.Public_key_hash.t option) list) =
   prepare_initial_context_params
     ?consensus_threshold
     ?min_proposal_quorum
@@ -556,11 +598,15 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?tx_rollup_sunset_level
     ?tx_rollup_origination_size
     ?sc_rollup_enable
+    ?dal_enable
+    ?hard_gas_limit_per_block
+    ?nonce_revelation_threshold
     initial_accounts
   >>=? fun (constants, shell, hash) ->
   initial_context
     ?commitments
     ?bootstrap_contracts
+    (Chain_id.of_block_hash hash)
     constants
     shell
     initial_accounts
@@ -580,7 +626,8 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
   }
 
 let alpha_context ?commitments ?min_proposal_quorum
-    (initial_accounts : (Account.t * Tez.t) list) =
+    (initial_accounts :
+      (Account.t * Tez.t * Signature.Public_key_hash.t option) list) =
   prepare_initial_context_params ?min_proposal_quorum initial_accounts
   >>=? fun (constants, shell, _hash) ->
   initial_alpha_context ?commitments constants shell initial_accounts
@@ -619,8 +666,8 @@ let get_construction_vstate ?(policy = By_round 0) ?timestamp
     ()
   >|= Environment.wrap_tzresult
 
-let apply_with_metadata ?(policy = By_round 0) ~baking_mode header
-    ?(operations = []) pred =
+let apply_with_metadata ?(policy = By_round 0) ?(check_size = true) ~baking_mode
+    header ?(operations = []) pred =
   let open Environment.Error_monad in
   ( (match baking_mode with
     | Application ->
@@ -639,6 +686,18 @@ let apply_with_metadata ?(policy = By_round 0) ~baking_mode header
   >>=? fun vstate ->
     List.fold_left_es
       (fun vstate op ->
+        (if check_size then
+         let operation_size =
+           Data_encoding.Binary.length Operation.encoding op
+         in
+         if operation_size > Constants_repr.max_operation_data_length then
+           raise
+             (invalid_arg
+                (Format.sprintf
+                   "The operation size is %d, it exceeds the constant maximum \
+                    size %d"
+                   operation_size
+                   Constants_repr.max_operation_data_length))) ;
         apply_operation vstate op >|= Environment.wrap_tzresult
         >|=? fun (state, _result) -> state)
       vstate
@@ -655,13 +714,13 @@ let apply header ?(operations = []) pred =
   >>=? fun (t, _metadata) -> return t
 
 let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
-    ?payload_round ~baking_mode ?liquidity_baking_toggle_vote pred =
+    ?payload_round ?check_size ~baking_mode ?liquidity_baking_toggle_vote pred =
   let operations =
     match (operation, operations) with
-    | (Some op, Some ops) -> Some (op :: ops)
-    | (Some op, None) -> Some [op]
-    | (None, Some ops) -> Some ops
-    | (None, None) -> None
+    | Some op, Some ops -> Some (op :: ops)
+    | Some op, None -> Some [op]
+    | None, Some ops -> Some ops
+    | None, None -> None
   in
   Forge.forge_header
     ?payload_round
@@ -673,10 +732,11 @@ let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
     pred
   >>=? fun header ->
   Forge.sign_header header >>=? fun header ->
-  apply_with_metadata ?policy ~baking_mode header ?operations pred
+  apply_with_metadata ?policy ?check_size ~baking_mode header ?operations pred
 
 let bake ?(baking_mode = Application) ?payload_round ?locked_round ?policy
-    ?timestamp ?operation ?operations ?liquidity_baking_toggle_vote pred =
+    ?timestamp ?operation ?operations ?liquidity_baking_toggle_vote ?check_size
+    pred =
   bake_with_metadata
     ?payload_round
     ~baking_mode
@@ -686,6 +746,7 @@ let bake ?(baking_mode = Application) ?payload_round ?locked_round ?policy
     ?operation
     ?operations
     ?liquidity_baking_toggle_vote
+    ?check_size
     pred
   >>=? fun (t, (_metadata : block_header_metadata)) -> return t
 
@@ -716,6 +777,7 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
             let open Apply_results in
             fun (Successful_manager_result r) ->
               match r with
+              | Transaction_result (Transaction_to_sc_rollup_result _)
               | Reveal_result _ | Delegation_result _
               | Set_deposits_limit_result _ | Tx_rollup_origination_result _
               | Tx_rollup_submit_batch_result _ | Tx_rollup_commit_result _
@@ -724,15 +786,20 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
               | Tx_rollup_remove_commitment_result _
               | Tx_rollup_rejection_result _ | Transfer_ticket_result _
               | Tx_rollup_dispatch_tickets_result _
-              | Sc_rollup_originate_result _ | Sc_rollup_add_messages_result _
-              | Sc_rollup_cement_result _ | Sc_rollup_publish_result _ ->
+              | Dal_publish_slot_header_result _ | Sc_rollup_originate_result _
+              | Sc_rollup_add_messages_result _ | Sc_rollup_cement_result _
+              | Sc_rollup_publish_result _ | Sc_rollup_refute_result _
+              | Sc_rollup_timeout_result _
+              | Sc_rollup_execute_outbox_message_result _
+              | Sc_rollup_recover_bond_result _
+              | Sc_rollup_dal_slot_subscribe_result _ ->
                   balance_updates_rev
               | Transaction_result
-                  (Transaction_to_contract_result {balance_updates; _})
-              | Transaction_result
-                  (Transaction_to_tx_rollup_result {balance_updates; _})
+                  ( Transaction_to_contract_result {balance_updates; _}
+                  | Transaction_to_tx_rollup_result {balance_updates; _} )
               | Origination_result {balance_updates; _}
-              | Register_global_constant_result {balance_updates; _} ->
+              | Register_global_constant_result {balance_updates; _}
+              | Increase_paid_storage_result {balance_updates; _} ->
                   List.rev_append balance_updates balance_updates_rev)
           balance_updates_rev
           metadata.implicit_operations_results
@@ -756,6 +823,7 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
             | Successful_manager_result (Transaction_result _)
             | Successful_manager_result (Register_global_constant_result _)
             | Successful_manager_result (Set_deposits_limit_result _)
+            | Successful_manager_result (Increase_paid_storage_result _)
             | Successful_manager_result (Tx_rollup_origination_result _)
             | Successful_manager_result (Tx_rollup_submit_batch_result _)
             | Successful_manager_result (Tx_rollup_commit_result _)
@@ -765,10 +833,18 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
             | Successful_manager_result (Tx_rollup_rejection_result _)
             | Successful_manager_result (Tx_rollup_dispatch_tickets_result _)
             | Successful_manager_result (Transfer_ticket_result _)
+            | Successful_manager_result (Dal_publish_slot_header_result _)
             | Successful_manager_result (Sc_rollup_originate_result _)
             | Successful_manager_result (Sc_rollup_add_messages_result _)
             | Successful_manager_result (Sc_rollup_cement_result _)
-            | Successful_manager_result (Sc_rollup_publish_result _) ->
+            | Successful_manager_result (Sc_rollup_publish_result _)
+            | Successful_manager_result (Sc_rollup_refute_result _)
+            | Successful_manager_result (Sc_rollup_timeout_result _)
+            | Successful_manager_result
+                (Sc_rollup_execute_outbox_message_result _)
+            | Successful_manager_result (Sc_rollup_recover_bond_result _)
+            | Successful_manager_result (Sc_rollup_dal_slot_subscribe_result _)
+              ->
                 origination_results_rev
             | Successful_manager_result (Origination_result x) ->
                 Origination_result x :: origination_results_rev)

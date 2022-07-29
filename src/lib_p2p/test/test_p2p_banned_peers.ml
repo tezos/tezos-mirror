@@ -148,10 +148,10 @@ let () =
           [
             ("empty", test_empty);
             ("ban", test_ban);
-            ("clear", test_clear);
+            ("clear", test_clear)
             (* FIXME flaky test:
                ("test_gc", test_gc)
-            *)
+            *);
           ] );
     ]
   |> Lwt_main.run

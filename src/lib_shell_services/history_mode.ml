@@ -156,16 +156,14 @@ let encoding =
 
 let equal hm1 hm2 =
   match (hm1, hm2) with
-  | (Archive, Archive) | (Full None, Full None) | (Rolling None, Rolling None)
-    ->
-      true
-  | (Full (Some {offset}), Full (Some {offset = offset'}))
-  | (Rolling (Some {offset}), Rolling (Some {offset = offset'})) ->
+  | Archive, Archive | Full None, Full None | Rolling None, Rolling None -> true
+  | Full (Some {offset}), Full (Some {offset = offset'})
+  | Rolling (Some {offset}), Rolling (Some {offset = offset'}) ->
       Compare.Int.(offset = offset')
-  | ((full, Full (Some {offset})) | (Full (Some {offset}), full))
+  | (full, Full (Some {offset}) | Full (Some {offset}), full)
     when offset = default_offset && full = default_full ->
       true
-  | ((rolling, Rolling (Some {offset})) | (Rolling (Some {offset}), rolling))
+  | (rolling, Rolling (Some {offset}) | Rolling (Some {offset}), rolling)
     when offset = default_offset && rolling = default_rolling ->
       true
   | _ -> false

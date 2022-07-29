@@ -627,7 +627,7 @@ module Parsed_account = struct
     Client_keys.list_keys wallet >>=? fun all_keys ->
     List.iter_s
       (function
-        | (name, pkh, _pk_opt, Some sk_uri) -> (
+        | name, pkh, _pk_opt, Some sk_uri -> (
             let contract = Contract.implicit_contract pkh in
             Client_proto_context.get_balance
               rpc_context
@@ -766,7 +766,7 @@ type block = {
   hash : Block_hash.t;
   header : Block_header.t;
   operations : Operation.packed list;
-  context : Protocol.Environment.Context.t;
+  context : Environment.Context.t;
 }
 
 module Forge = struct
@@ -805,11 +805,11 @@ let initial_context chain_id (header : Block_header.shell_header)
     Data_encoding.Binary.to_bytes_exn Data_encoding.json json
   in
   Tezos_protocol_environment.Context.(
-    let empty = Memory_context.empty in
+    let empty = Tezos_protocol_environment.Memory_context.empty in
     add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
     add ctxt ["protocol_parameters"] proto_params)
   >>= fun ctxt ->
-  Protocol.Main.init ctxt header >|= Protocol.Environment.wrap_tzresult
+  Protocol.Main.init ctxt header >|= Environment.wrap_tzresult
   >>=? fun {context; _} ->
   let ({
          timestamp = predecessor_timestamp;
@@ -839,7 +839,7 @@ let initial_context chain_id (header : Block_header.shell_header)
     ~predecessor_fitness
     ~predecessor
     ~timestamp
-  >|= Protocol.Environment.wrap_tzresult
+  >|= Environment.wrap_tzresult
   >>=? fun value_of_key ->
   (*
       In the mockup mode, reactivity is important and there are
@@ -851,7 +851,7 @@ let initial_context chain_id (header : Block_header.shell_header)
     predecessor
     context
     `Lazy
-    (fun key -> value_of_key key >|= Protocol.Environment.wrap_tzresult)
+    (fun key -> value_of_key key >|= Environment.wrap_tzresult)
   >>=? fun context -> return context
 
 let mem_init :
@@ -871,7 +871,7 @@ let mem_init :
   | None -> return Protocol_constants_overrides.no_overrides
   | Some json -> (
       match Data_encoding.Json.destruct lib_parameters_json_encoding json with
-      | (_, x) -> return x
+      | _, x -> return x
       | exception error ->
           failwith
             "cannot read protocol constants overrides: %a"
@@ -957,7 +957,7 @@ let migrate :
   let Tezos_protocol_environment.{block_hash; context; block_header} =
     rpc_context
   in
-  Protocol.Main.init context block_header >|= Protocol.Environment.wrap_tzresult
+  Protocol.Main.init context block_header >|= Environment.wrap_tzresult
   >>=? fun {context; _} ->
   let rpc_context =
     Tezos_protocol_environment.{block_hash; block_header; context}

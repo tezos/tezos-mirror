@@ -36,8 +36,8 @@ module Sc_rollup_address_comparable = struct
   let compare_cost _rollup = Saturation_repr.safe_int 15
 end
 
-(* This will not create the map yet, as functions to consume gas have not 
-   been defined yet. However, it will make the type of the carbonated map 
+(* This will not create the map yet, as functions to consume gas have not
+   been defined yet. However, it will make the type of the carbonated map
    available to be used in the definition of type back.
 *)
 module Sc_rollup_address_map_builder =
@@ -247,6 +247,21 @@ type back = {
   tx_rollup_current_messages :
     Tx_rollup_inbox_repr.Merkle.tree Tx_rollup_repr.Map.t;
   sc_rollup_current_messages : Context.tree Sc_rollup_address_map_builder.t;
+  dal_slot_fee_market : Dal_slot_repr.Slot_market.t;
+  (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3105
+
+     We associate to a slot header some fees. This enable the use
+     of a fee market for slot publication. However, this is not
+     resilient from the game theory point of view. Probably we can find
+     better incentives here. In any case, because we want the following
+     invariant:
+
+         - For each level and for each slot there is at most one slot
+     header.
+
+         - We need to provide an incentive to avoid byzantines to post
+     dummy slot headers. *)
+  dal_endorsement_slot_accountability : Dal_endorsement_repr.Accountability.t;
 }
 
 (*
@@ -282,6 +297,10 @@ let[@inline] round_durations ctxt = ctxt.back.round_durations
 let[@inline] cycle_eras ctxt = ctxt.back.cycle_eras
 
 let[@inline] constants ctxt = ctxt.back.constants
+
+let[@inline] tx_rollup ctxt = ctxt.back.constants.tx_rollup
+
+let[@inline] sc_rollup ctxt = ctxt.back.constants.sc_rollup
 
 let[@inline] recover ctxt = ctxt.back.context
 
@@ -477,19 +496,6 @@ let get_origination_nonce ctxt =
 
 let unset_origination_nonce ctxt = update_origination_nonce ctxt None
 
-type error += Gas_limit_too_high (* `Permanent *)
-
-let () =
-  let open Data_encoding in
-  register_error_kind
-    `Permanent
-    ~id:"gas_limit_too_high"
-    ~title:"Gas limit out of protocol hard bounds"
-    ~description:"A transaction tried to exceed the hard limit on gas"
-    empty
-    (function Gas_limit_too_high -> Some () | _ -> None)
-    (fun () -> Gas_limit_too_high)
-
 let gas_level ctxt =
   let open Gas_limit_repr in
   if unlimited_operation_gas ctxt then Unaccounted
@@ -497,19 +503,14 @@ let gas_level ctxt =
 
 let block_gas_level = remaining_block_gas
 
-let check_gas_limit_is_valid ctxt (remaining : 'a Gas_limit_repr.Arith.t) =
-  if
-    Gas_limit_repr.Arith.(
-      remaining > (constants ctxt).hard_gas_limit_per_operation
-      || remaining < zero)
-  then error Gas_limit_too_high
-  else Result.return_unit
-
-let consume_gas_limit_in_block ctxt (limit : 'a Gas_limit_repr.Arith.t) =
+let consume_gas_limit_in_block ctxt gas_limit =
   let open Gas_limit_repr in
-  check_gas_limit_is_valid ctxt limit >>? fun () ->
+  check_gas_limit
+    ~hard_gas_limit_per_operation:(constants ctxt).hard_gas_limit_per_operation
+    ~gas_limit
+  >>? fun () ->
   let block_gas = block_gas_level ctxt in
-  let limit = Arith.fp limit in
+  let limit = Arith.fp gas_limit in
   if Arith.(limit > block_gas) then error Block_quota_exceeded
   else
     let level = Arith.sub (block_gas_level ctxt) limit in
@@ -536,14 +537,14 @@ let check_enough_gas ctxt cost =
 
 let gas_consumed ~since ~until =
   match (gas_level since, gas_level until) with
-  | (Limited {remaining = before}, Limited {remaining = after}) ->
+  | Limited {remaining = before}, Limited {remaining = after} ->
       Gas_limit_repr.Arith.sub before after
-  | (_, _) -> Gas_limit_repr.Arith.zero
+  | _, _ -> Gas_limit_repr.Arith.zero
 
-(* Once gas consuming functions have been defined, 
-   we can instantiate the carbonated map. 
+(* Once gas consuming functions have been defined,
+   we can instantiate the carbonated map.
    See [Sc_rollup_carbonated_map_maker] above.
- *)
+*)
 
 module Gas = struct
   type context = t
@@ -817,6 +818,12 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
         stake_distribution_for_current_cycle = None;
         tx_rollup_current_messages = Tx_rollup_repr.Map.empty;
         sc_rollup_current_messages = Sc_rollup_carbonated_map.empty;
+        dal_slot_fee_market =
+          Dal_slot_repr.Slot_market.init
+            ~length:constants.Constants_parametric_repr.dal.number_of_slots;
+        dal_endorsement_slot_accountability =
+          Dal_endorsement_repr.Accountability.init
+            ~length:constants.Constants_parametric_repr.dal.number_of_slots;
       };
   }
 
@@ -885,18 +892,34 @@ let prepare_first_block ~level ~timestamp ctxt =
       add_constants ctxt param.constants >|= ok
   | Jakarta_013 ->
       get_previous_protocol_constants ctxt >>= fun c ->
+      let dal =
+        Constants_parametric_repr.
+          {
+            feature_enable = false;
+            number_of_slots = 256;
+            number_of_shards = 2048;
+            endorsement_lag = 1;
+            availability_threshold = 50;
+          }
+      in
       let constants =
         Constants_parametric_repr.
           {
             preserved_cycles = c.preserved_cycles;
             blocks_per_cycle = c.blocks_per_cycle;
             blocks_per_commitment = c.blocks_per_commitment;
+            nonce_revelation_threshold =
+              (if Compare.Int32.(256l < c.blocks_per_cycle) then 256l
+              else (* not on mainnet *) Int32.div c.blocks_per_cycle 2l);
             blocks_per_stake_snapshot = c.blocks_per_stake_snapshot;
             cycles_per_voting_period = c.cycles_per_voting_period;
             hard_gas_limit_per_operation = c.hard_gas_limit_per_operation;
             hard_gas_limit_per_block = c.hard_gas_limit_per_block;
             proof_of_work_threshold = c.proof_of_work_threshold;
             tokens_per_roll = c.tokens_per_roll;
+            vdf_difficulty =
+              (if Compare.Int32.(256l < c.blocks_per_cycle) then 8_000_000_000L
+              else (* not on mainnet *) 50_000L);
             seed_nonce_revelation_tip = c.seed_nonce_revelation_tip;
             origination_size = c.origination_size;
             max_operations_time_to_live = c.max_operations_time_to_live;
@@ -923,50 +946,64 @@ let prepare_first_block ~level ~timestamp ctxt =
             double_baking_punishment = c.double_baking_punishment;
             ratio_of_frozen_deposits_slashed_per_double_endorsement =
               c.ratio_of_frozen_deposits_slashed_per_double_endorsement;
+            (* The `testnet_dictator` should absolutely be None on mainnet *)
+            testnet_dictator = None;
             initial_seed = c.initial_seed;
             cache_script_size = c.cache_script_size;
             cache_stake_distribution_cycles = c.cache_stake_distribution_cycles;
             cache_sampler_state_cycles = c.cache_sampler_state_cycles;
-            tx_rollup_enable = c.tx_rollup_enable;
-            tx_rollup_origination_size = c.tx_rollup_origination_size;
-            tx_rollup_hard_size_limit_per_inbox =
-              c.tx_rollup_hard_size_limit_per_inbox;
-            tx_rollup_hard_size_limit_per_message =
-              c.tx_rollup_hard_size_limit_per_message;
-            tx_rollup_max_withdrawals_per_batch =
-              c.tx_rollup_max_withdrawals_per_batch;
-            tx_rollup_max_ticket_payload_size =
-              c.tx_rollup_max_ticket_payload_size;
-            tx_rollup_commitment_bond = c.tx_rollup_commitment_bond;
-            tx_rollup_finality_period = c.tx_rollup_finality_period;
-            tx_rollup_withdraw_period = c.tx_rollup_withdraw_period;
-            tx_rollup_max_inboxes_count = c.tx_rollup_max_inboxes_count;
-            tx_rollup_max_messages_per_inbox =
-              c.tx_rollup_max_messages_per_inbox;
-            tx_rollup_max_commitments_count = c.tx_rollup_max_commitments_count;
-            tx_rollup_cost_per_byte_ema_factor =
-              c.tx_rollup_cost_per_byte_ema_factor;
-            tx_rollup_rejection_max_proof_size =
-              c.tx_rollup_rejection_max_proof_size;
-            tx_rollup_sunset_level = c.tx_rollup_sunset_level;
-            sc_rollup_enable = false;
-            (* The following value is chosen to prevent spam. *)
-            sc_rollup_origination_size = 6_314;
-            sc_rollup_challenge_window_in_blocks = 20_160;
-            (* The following value is chosen to limit the maximal
-               length of an inbox refutation proof. *)
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2556
-               The follow constants need to be refined. *)
-            sc_rollup_max_available_messages = 1_000_000;
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
-               The following constants need to be refined. *)
-            sc_rollup_stake_amount_in_mutez = 32_000_000;
-            sc_rollup_commitment_frequency_in_blocks = 20;
-            (* 76 for Commitments entry + 4 for Commitment_stake_count entry
-               + 4 for Commitment_added entry
-               + 0 for Staker_count_update entry *)
-            sc_rollup_commitment_storage_size_in_bytes = 84;
-            sc_rollup_max_lookahead_in_blocks = 30_000l;
+            tx_rollup =
+              {
+                enable = c.tx_rollup_enable;
+                origination_size = c.tx_rollup_origination_size;
+                hard_size_limit_per_inbox =
+                  c.tx_rollup_hard_size_limit_per_inbox;
+                hard_size_limit_per_message =
+                  c.tx_rollup_hard_size_limit_per_message;
+                max_withdrawals_per_batch =
+                  c.tx_rollup_max_withdrawals_per_batch;
+                max_ticket_payload_size = c.tx_rollup_max_ticket_payload_size;
+                commitment_bond = c.tx_rollup_commitment_bond;
+                finality_period = c.tx_rollup_finality_period;
+                withdraw_period = c.tx_rollup_withdraw_period;
+                max_inboxes_count = c.tx_rollup_max_inboxes_count;
+                max_messages_per_inbox = c.tx_rollup_max_messages_per_inbox;
+                max_commitments_count = c.tx_rollup_max_commitments_count;
+                cost_per_byte_ema_factor = c.tx_rollup_cost_per_byte_ema_factor;
+                rejection_max_proof_size = c.tx_rollup_rejection_max_proof_size;
+                sunset_level = c.tx_rollup_sunset_level;
+              };
+            dal;
+            sc_rollup =
+              {
+                enable = false;
+                origination_size = c.sc_rollup_origination_size;
+                challenge_window_in_blocks = 20_160;
+                (* The following value is chosen to limit the maximal
+                   length of an inbox refutation proof. *)
+                (* TODO: https://gitlab.com/tezos/tezos/-/issues/2373
+                   check this is reasonable. *)
+                max_number_of_messages_per_commitment_period = 32_765;
+                (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
+                   The following constants need to be refined. *)
+                stake_amount = Tez_repr.of_mutez_exn 10_000_000_000L;
+                commitment_period_in_blocks = 30;
+                max_lookahead_in_blocks = 30_000l;
+                (* Number of active levels kept for executing outbox messages.
+                   WARNING: Changing this value impacts the storage charge for
+                   applying messages from the outbox. It also requires migration for
+                   remapping existing active outbox levels to new indices. *)
+                max_active_outbox_levels = 20_160l;
+                (* Maximum number of outbox messages per level.
+                   WARNING: changing this value impacts the storage cost charged
+                   for applying messages from the outbox. *)
+                max_outbox_messages_per_level = 100;
+                (* The default number of required sections in a dissection *)
+                number_of_sections_in_dissection = 32;
+                (* TODO: https://gitlab.com/tezos/tezos/-/issues/2902
+                   This constant needs to be refined. *)
+                timeout_period_in_blocks = 20_160;
+              };
           }
       in
       add_constants ctxt constants >>= fun ctxt -> return ctxt)
@@ -1402,19 +1439,17 @@ end
 module Sc_rollup_in_memory_inbox = struct
   let current_messages ctxt rollup =
     let open Tzresult_syntax in
-    let+ (messages, ctxt) =
+    let+ messages, ctxt =
       Sc_rollup_carbonated_map.find
         ctxt
         rollup
         ctxt.back.sc_rollup_current_messages
     in
-    match messages with
-    | None -> (Tree.empty ctxt, ctxt)
-    | Some tree -> (tree, ctxt)
+    (messages, ctxt)
 
   let set_current_messages ctxt rollup tree =
     let open Tzresult_syntax in
-    let+ (sc_rollup_current_messages, ctxt) =
+    let+ sc_rollup_current_messages, ctxt =
       Sc_rollup_carbonated_map.update
         ctxt
         rollup
@@ -1423,4 +1458,98 @@ module Sc_rollup_in_memory_inbox = struct
     in
     let back = {ctxt.back with sc_rollup_current_messages} in
     {ctxt with back}
+end
+
+module Dal = struct
+  type error +=
+    | Dal_register_invalid_slot of {length : int; slot : Dal_slot_repr.t}
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"dal_register_invalid_slot"
+      ~title:"Dal register invalid slot"
+      ~description:
+        "Attempt to register a slot which is invalid (the index is out of \
+         bounds)."
+      ~pp:(fun ppf (length, slot) ->
+        Format.fprintf
+          ppf
+          "The slot provided is invalid. Slot index should be between 0 and \
+           %d. Found: %a."
+          length
+          Dal_slot_repr.Index.pp
+          slot.Dal_slot_repr.index)
+      Data_encoding.(
+        obj2 (req "length" int31) (req "slot" Dal_slot_repr.encoding))
+      (function
+        | Dal_register_invalid_slot {length; slot} -> Some (length, slot)
+        | _ -> None)
+      (fun (length, slot) -> Dal_register_invalid_slot {length; slot})
+
+  let record_available_shards ctxt slots shards =
+    let dal_endorsement_slot_accountability =
+      Dal_endorsement_repr.Accountability.record_shards_availability
+        ctxt.back.dal_endorsement_slot_accountability
+        slots
+        shards
+    in
+    {ctxt with back = {ctxt.back with dal_endorsement_slot_accountability}}
+
+  let register_slot ctxt slot =
+    match
+      Dal_slot_repr.Slot_market.register ctxt.back.dal_slot_fee_market slot
+    with
+    | None ->
+        let length =
+          Dal_slot_repr.Slot_market.length ctxt.back.dal_slot_fee_market
+        in
+        error (Dal_register_invalid_slot {length; slot})
+    | Some (dal_slot_fee_market, updated) ->
+        ok ({ctxt with back = {ctxt.back with dal_slot_fee_market}}, updated)
+
+  let candidates ctxt =
+    Dal_slot_repr.Slot_market.candidates ctxt.back.dal_slot_fee_market
+
+  let is_slot_available ctxt =
+    let threshold =
+      ctxt.back.constants.Constants_parametric_repr.dal.availability_threshold
+    in
+    let number_of_shards =
+      ctxt.back.constants.Constants_parametric_repr.dal.number_of_shards
+    in
+    Dal_endorsement_repr.Accountability.is_slot_available
+      ctxt.back.dal_endorsement_slot_accountability
+      ~threshold
+      ~number_of_shards
+
+  (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3110
+
+     We have to choose for the sampling. Here we use the one used by
+     the consensus which is hackish and probably not what we want at
+     the end. However, it should be enough for a prototype. This has a
+     very bad complexity too. *)
+  let rec compute_shards ?(index = 0) ctxt ~endorser =
+    let max_shards = ctxt.back.constants.dal.number_of_shards in
+    Slot_repr.Map.fold_e
+      (fun _ (_, public_key_hash, power) (index, shards) ->
+        let limit = Compare.Int.min (index + power) max_shards in
+        (* Early fail when we have reached the desired number of shards *)
+        if Compare.Int.(index >= max_shards) then Error shards
+        else if Signature.Public_key_hash.(public_key_hash = endorser) then
+          let shards = Misc.(index --> (limit - 1)) in
+          Ok (index + power, shards)
+        else Ok (index + power, shards))
+      ctxt.back.consensus.allowed_endorsements
+      (index, [])
+    |> function
+    | Ok (index, []) ->
+        (* This happens if the number of Tenderbake slots is below the
+           number of shards. Therefore, we reuse the committee using a
+           shift (index being the size of the committee). *)
+        compute_shards ~index ctxt ~endorser
+    | Ok (_index, shards) -> shards
+    | Error shards -> shards
+
+  let shards ctxt ~endorser = compute_shards ~index:0 ctxt ~endorser
 end

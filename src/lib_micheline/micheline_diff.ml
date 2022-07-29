@@ -109,10 +109,10 @@ let initial =
   }
 
 let rec zip_nodes = function
-  | ([], []) -> []
-  | (p :: prevs, []) -> Left_only p :: zip_nodes (prevs, [])
-  | ([], c :: curs) -> Right_only c :: zip_nodes ([], curs)
-  | (p :: prevs, c :: curs) -> Both (p, c) :: zip_nodes (prevs, curs)
+  | [], [] -> []
+  | p :: prevs, [] -> Left_only p :: zip_nodes (prevs, [])
+  | [], c :: curs -> Right_only c :: zip_nodes ([], curs)
+  | p :: prevs, c :: curs -> Both (p, c) :: zip_nodes (prevs, curs)
 
 let add_stack_level ~constr ~children ~diff state_stack =
   let Micheline_printer.{comment} = diff in
@@ -150,16 +150,16 @@ let accumulate_child (is_different, node) = function
 
 let diff_simple prev cur state =
   match (prev, cur) with
-  | (Int (_, p), Int (_, c)) when Z.equal p c ->
+  | Int (_, p), Int (_, c) when Z.equal p c ->
       accumulate_child (false, Int (no_comment, p)) state
-  | (String (_, p), String (_, c)) when String.equal p c ->
+  | String (_, p), String (_, c) when String.equal p c ->
       accumulate_child (false, String (no_comment, p)) state
-  | (Bytes (_, p), Bytes (_, c)) when Bytes.equal p c ->
+  | Bytes (_, p), Bytes (_, c) when Bytes.equal p c ->
       accumulate_child (false, Bytes (no_comment, p)) state
   (* This function won't be called with pairs (Seq, Seq) or (Prim, Prim),
      so we don't care about looking inside those. This is taken care of
      elsewhere. *)
-  | (prev, cur) ->
+  | prev, cur ->
       accumulate_child (true, replace_location (replaced cur) prev) state
 
 let rec dequeue = function
@@ -228,7 +228,5 @@ and diff_step state nodes =
       diff_simple prev cur state
 
 let diff ~prev ~current () =
-  let (is_different, diff) =
-    diff_step (Bottom initial) (Both (prev, current))
-  in
+  let is_different, diff = diff_step (Bottom initial) (Both (prev, current)) in
   if is_different then Some diff else None

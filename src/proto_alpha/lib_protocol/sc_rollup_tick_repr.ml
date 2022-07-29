@@ -30,6 +30,8 @@ let initial = zero
 
 let next = succ
 
+let jump tick z = max initial (add tick z)
+
 let pp = pp_print
 
 let encoding = Data_encoding.n
@@ -39,6 +41,11 @@ let distance tick1 tick2 = Z.abs (Z.sub tick1 tick2)
 let of_int x = if Compare.Int.(x < 0) then None else Some (Z.of_int x)
 
 let to_int x = if Z.fits_int x then Some (Z.to_int x) else None
+
+let of_z x = x
+
+let of_number_of_ticks x =
+  Z.of_int32 (Sc_rollup_repr.Number_of_ticks.to_int32 x)
 
 let ( <= ) = leq
 

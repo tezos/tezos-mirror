@@ -1,8 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,1022 +23,351 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** In all RPCs, default [chain] is "main" and default [block] is
-   "head~2" to pick the finalized branch for Tenderbake. *)
+(** Octez RPCs. *)
 
-(** {2 Shell RPCs} *)
+(** [RPC_core] contains functions to declare and call RPCs.
+    It does not contain any RPC definition: those are in this module. *)
+include module type of RPC_core
 
-(** Call RPC /network/connections if [peer_id] is [None].
-    Call RPC /network/connections/[peer_id] otherwise. *)
-val get_connections :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?peer_id:string ->
-  Client.t ->
-  JSON.t Lwt.t
+(** [RPC_legacy] contains RPCs implemented using a deprecated approach
+    that does not allow to use cohttp. If you need to call functions
+    from [RPC_legacy], it is recommended to port them to this module
+    in order to be able to use cohttp, which is more efficient than using
+    the client. *)
+include module type of RPC_legacy
 
-(** Call RPC /network/greylist/ips *)
-val get_greylist_ips : ?hooks:Process.hooks -> Client.t -> JSON.t Lwt.t
+(** {2 Naming Conventions} *)
 
-(** Call RPC /chain/[chain]/chain_id *)
-val get_chain_id :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  Client.t ->
-  JSON.t Lwt.t
+(** Functions in this module are named after the RPC they implement.
 
-(** Call RPC /chain/[chain]/blocks/[block] *)
-val get_block :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  Client.t ->
-  JSON.t Lwt.t
+    - The name starts with the HTTP verb, in lowercase, followed by an underscore.
+      E.g. [get_] for GET, [patch_] for PATCH, [delete_] for DELETE, etc.
 
-(** Call RPC /chain/[chain]/blocks/[block]/hash *)
-val get_block_hash :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  Client.t ->
-  string Lwt.t
+    - Then the name contains all constant parts of the endpoint path,
+      separated by underscores.
+      E.g. [chain_levels_caboose] for [GET /chains/[chain]/levels/caboose].
+      The dynamic part [[chain]] is dropped (it becomes an argument of the function).
 
-(** Call RPC /chain/[chain]/blocks/[block]/metadata *)
-val get_block_metadata :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  Client.t ->
-  JSON.t Lwt.t
+    - When a word is plural, it becomes singular if the RPC selects one element.
+      For instance, [GET /network/connections] becomes [get_network_connections]
+      because it returns all elements of the list, but [GET /network/connections/<peer_id>]
+      becomes [get_network_connection] because it returns only one connection.
+      This allows to differentiate the two RPCs.
+      Another example is [GET /chains/[chain]/blocks/[block]/metadata] which becomes
+      [get_chain_block_metadata] since it selects one block.
+      Another example is [GET /chains/[chain]/levels/checkpoint] which becomes
+      [get_chain_level_checkpoint], which illustrates that the selector (here [checkpoint])
+      does not need to be dynamic for this rule to apply.
 
-(** Call RPC /chain/[chain] *)
-val force_bootstrapped :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?bootstrapped:bool ->
-  Client.t ->
-  JSON.t Lwt.t
+    - Submodules are not used. Do not group all [/network] RPCs in a [Network]
+      submodule for instance. *)
 
-(** Call RPC /chain/[chain]/is_bootstrapped *)
-val is_bootstrapped :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  Client.t ->
-  JSON.t Lwt.t
+(** {2 RPC Definitions} *)
 
-(** Call RPC /chain/[chain]/levels/checkpoint *)
-val get_checkpoint :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  Client.t ->
-  JSON.t Lwt.t
+(** RPC: [GET /config] *)
+val get_config : JSON.t t
 
-(** Call RPC /chain/[chain]/levels/savepoint *)
-val get_savepoint :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  Client.t ->
-  JSON.t Lwt.t
+(** RPC: [GET /network/connections]
 
-(** Call RPC /chain/[chain]/levels/caboose *)
-val get_caboose :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  Client.t ->
-  JSON.t Lwt.t
+    Returns the list of [(address, port)] pairs. *)
+val get_network_connections : (string * int) list t
 
-(** Call RPC /injection/operation *)
-val inject_operation :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?async:bool ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Runnable.process
+(** RPC: [GET /network/connections/<peer_id>]
 
-(** Call RPC /private/injection/operation *)
-val private_inject_operation :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?async:bool ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Runnable.process
+    Returns the address and port of the given peer ID if connected.
+    This RPC returns 404 Not Found if the peer ID is not connected. *)
+val get_network_connection : string -> (string * int) t
 
-(** Call RPC /injection/block *)
-val inject_block :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Lwt.t
+(** RPC: [GET /network/self] *)
+val get_network_self : string t
 
-(** Run [tezos-client rpc /chains/<chain>/blocks/<block>/header/protocol/raw]. *)
-val raw_protocol_data :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  Client.t ->
-  string Lwt.t
+(** RPC: [GET /network/greylist/ips] *)
+val get_network_greylist_ips : JSON.t t
 
-(** Call RPC /chain/[chain]/blocks/[block]/header/protocol_data *)
-val get_protocol_data :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  ?offset:int ->
-  Client.t ->
-  JSON.t Lwt.t
+(** RPC: [GET /network/greylist/clear] *)
+val get_network_greylist_clear : JSON.t t
 
-(** Call RPC /chain/[chain]/blocks/head~[offset]/hash where default [offset] is [2]. *)
-val get_branch :
-  ?offset:int ->
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  Client.t ->
-  JSON.t Lwt.t
+(** RPC: [GET /chains/<chain>/blocks]
 
-(** Call RPC /chain/[chain]/blocks/[block]/operations *)
-val get_operations :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  Client.t ->
-  JSON.t Lwt.t
+    [chain] defaults to ["main"]. *)
+val get_chain_blocks : ?chain:string -> unit -> JSON.t t
 
-(** Call RPC /chains/[chain]/mempool/pending_operations *)
-val get_mempool_pending_operations :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?version:string ->
-  ?applied:bool ->
-  ?branch_delayed:bool ->
-  ?branch_refused:bool ->
-  ?refused:bool ->
-  ?outdated:bool ->
-  Client.t ->
-  JSON.t Lwt.t
+(** RPC: [GET /chains/<chain>/invalid_blocks]
 
-(** Call RPC /chains/[chain]/mempool/request_operations *)
-val mempool_request_operations :
-  ?endpoint:Client.endpoint ->
-  ?chain:string ->
-  ?peer:string ->
-  Client.t ->
-  JSON.t Lwt.t
+    [chain] defaults to ["main"]. *)
+val get_chain_invalid_blocks : ?chain:string -> unit -> JSON.t t
 
-(** Call RPC /chains/[chain]/mempool/ban_operation *)
-val mempool_ban_operation :
-  ?endpoint:Client.endpoint ->
-  ?chain:string ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Lwt.t
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/nonces/<block_level>]
 
-(** Call RPC /chains/[chain]/mempool/unban_operation *)
-val mempool_unban_operation :
-  ?endpoint:Client.endpoint ->
-  ?chain:string ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Lwt.t
+    [chain] defaults to ["main"]. *)
+val get_chain_block_context_nonce :
+  ?chain:string -> ?block:string -> int -> JSON.t t
 
-(** Call RPC /chains/[chain]/mempool/unban_all_operations *)
-val mempool_unban_all_operations :
-  ?endpoint:Client.endpoint -> ?chain:string -> Client.t -> JSON.t Lwt.t
+(** RPC: [GET /chains/<chain>/blocks/<block>/header/raw]
 
-(** Call RPC GET /chains/[chain]/mempool/filter *)
-val get_mempool_filter :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?include_default:bool ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC POST /chains/[chain]/mempool/filter *)
-val post_mempool_filter :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/helpers/preapply/block *)
-val preapply_block :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/helpers/forge/operations *)
-val post_forge_operations :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/helpers/scripts/run_operation *)
-val post_run_operation :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/helpers/scripts/simulate_operation *)
-val post_simulate_operation :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** {2 Protocol RPCs} *)
-
-type ctxt_type = Bytes | Json
-
-(** Call RPC /chain/[chain]/blocks/[block]/context/raw/[ctxt_type]/[value_path]
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
 *)
-val get_context_value :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
+val get_chain_block_header_raw :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/live_blocks]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_live_blocks :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/operation_hashes]
+
+    - [chain] defaults to ["main"].
+    - [block] defaults to ["head"].
+*)
+val get_chain_block_operation_hashes :
+  ?chain:string -> ?block:string -> unit -> string list list t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/operation_hashes/<validation_pass>]
+
+    - [chain] defaults to ["main"].
+    - [block] defaults to ["head"].
+*)
+val get_chain_block_operation_hashes_of_validation_pass :
+  ?chain:string -> ?block:string -> int -> string list t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/operation_hashes/<validation_pass>/<operation_offset>]
+
+    - [chain] defaults to ["main"].
+    - [block] defaults to ["head"].
+*)
+val get_chain_block_operation_hash :
   ?chain:string ->
   ?block:string ->
-  ?ctxt_type:ctxt_type ->
-  value_path:string list ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/context/constants *)
-val get_constants :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/context/constants/errors *)
-val get_constants_errors :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/helpers/baking_rights *)
-val get_baking_rights :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  ?delegate:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/helpers/current_level *)
-val get_current_level :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  ?offset:int ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/helpers/endorsing_rights *)
-val get_endorsing_rights :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  ?delegate:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/helpers/levels_in_current_cycle *)
-val get_levels_in_current_cycle :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /workers/chain_validators/[chain]/ddb *)
-val get_ddb :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
-module Big_maps : sig
-  (** Call RPC /chain/[chain]/blocks/[block]/context/big_maps/[id]/[key_hash] *)
-  val get :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    id:string ->
-    key_hash:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/big_maps/[big_map_id]?offset=[int]&length=[int] *)
-  val get_all :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    big_map_id:string ->
-    ?offset:int ->
-    ?length:int ->
-    Client.t ->
-    JSON.t Runnable.process
-end
-
-module Contracts : sig
-  (** Common protocol RPSs for contracts (i.e. under [/contracts]). *)
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts *)
-  val get_all :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates *)
-  val get_all_delegates :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    string list Lwt.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id] *)
-  val get :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/balance *)
-  val get_balance :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/frozen_bonds *)
-  val get_frozen_bonds :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/balance_and_frozen_bonds *)
-  val get_balance_and_frozen_bonds :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/big_map_get *)
-  val big_map_get :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    data:JSON.u ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/counter *)
-  val get_counter :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/delegate *)
-  val get_delegate :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/entrypoints *)
-  val get_entrypoints :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/manager_key *)
-  val get_manager_key :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/script *)
-  val get_script :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/storage *)
-  val get_storage :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    Client.t ->
-    JSON.t Runnable.process
-end
-
-module Delegates : sig
-  (** Common protocol RPSs for delegates (i.e. under [/delegates]). *)
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates *)
-  val get_all :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    string list Lwt.t
-
-  (** Same as [get_all], but do not wait for the process to exit. *)
-  val spawn_get_all :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    Process.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh] *)
-  val get :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get], but do not wait for the process to exit. *)
-  val spawn_get :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    Process.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/balance *)
-  val get_balance :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get_balance], but do not wait for the process to exit. *)
-  val spawn_get_balance :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    Process.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/full_balance *)
-  val get_full_balance :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get_full_balance], but do not wait for the process to exit. *)
-  val spawn_get_full_balance :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    Process.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/frozen_deposits *)
-  val get_frozen_deposits :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get_frozen_deposits], but do not wait for the process to exit. *)
-  val spawn_get_frozen_deposits :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    Process.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/deactivated *)
-  val get_deactivated :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get_deactivated], but do not wait for the process to exit. *)
-  val spawn_get_deactivated :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    Process.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/delegated_balance *)
-  val get_delegated_balance :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get_delegated_balance], but do not wait for the process to exit. *)
-  val spawn_get_delegated_balance :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    Process.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/delegated_contracts *)
-  val get_delegated_contracts :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get_delegated_contracts], but do not wait for the process to exit. *)
-  val spawn_get_delegated_contracts :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    Process.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/frozen_balance *)
-  val get_frozen_balance :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get_frozen_balance], but do not wait for the process to exit. *)
-  val spawn_get_frozen_balance :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    Process.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/frozen_balance_by_cycle *)
-  val get_frozen_balance_by_cycle :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get_frozen_balance_by_cycle], but do not wait for the process to exit. *)
-  val spawn_get_frozen_balance_by_cycle :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    Process.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/grace_period *)
-  val get_grace_period :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get_grace_period], but do not wait for the process to exit. *)
-  val spawn_get_grace_period :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    Process.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/staking_balance *)
-  val get_staking_balance :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get_staking_balance], but do not wait for the process to exit. *)
-  val spawn_get_staking_balance :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    Process.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/voting_power *)
-  val get_voting_power :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get_voting_power], but do not wait for the process to exit. *)
-  val spawn_get_voting_power :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    pkh:string ->
-    Client.t ->
-    Process.t
-end
-
-module Votes : sig
-  (** Common protocol RPSs for votes (i.e. under [/votes]). *)
-
-  (** Call RPC /chain/[chain]/blocks/[block]/votes/ballot_list *)
-  val get_ballot_list :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/votes/ballots *)
-  val get_ballots :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/votes/current_proposal *)
-  val get_current_proposal :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/votes/current_quorum *)
-  val get_current_quorum :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/votes/listings *)
-  val get_listings :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/votes/proposals *)
-  val get_proposals :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/votes/current_period *)
-  val get_current_period :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/votes/successor_period *)
-  val get_successor_period :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
-  (** Call RPC /chain/[chain]/blocks/[block]/votes/total_voting_power *)
-  val get_total_voting_power :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    JSON.t Lwt.t
-end
-
-module Script_cache : sig
-  (** Call RPC /chain/[chain]/blocks/[block]/context/cache/contracts/all *)
-  val get_cached_contracts :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    JSON.t Lwt.t
-end
-
-module Tx_rollup : sig
-  (** Call RPC /chain/[chain]/blocks/[block]/context/tx_rollup/[tx_rollup_id]/state *)
-  val get_state :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    rollup:string ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/tx_rollup/[tx_rollup_id]/inbox/[level] *)
-  val get_inbox :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    rollup:string ->
-    level:int ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/tx_rollup/[rollup_hash]/commitment/[level] *)
-  val get_commitment :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    rollup:string ->
-    level:int ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  (** Call RPC /chain/[chain]/blocks/[block]/context/[rollup_hash]/pending_bonded_commitments *)
-  val get_pending_bonded_commitments :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    rollup:string ->
-    pkh:string ->
-    Client.t ->
-    JSON.t Runnable.process
-
-  module Forge : sig
-    module Inbox : sig
-      val message_hash :
-        ?endpoint:Client.endpoint ->
-        ?hooks:Process.hooks ->
-        ?chain:string ->
-        ?block:string ->
-        data:JSON.u ->
-        Client.t ->
-        JSON.t Runnable.process
-
-      val merkle_tree_hash :
-        ?endpoint:Client.endpoint ->
-        ?hooks:Process.hooks ->
-        ?chain:string ->
-        ?block:string ->
-        data:JSON.u ->
-        Client.t ->
-        JSON.t Runnable.process
-
-      val merkle_tree_path :
-        ?endpoint:Client.endpoint ->
-        ?hooks:Process.hooks ->
-        ?chain:string ->
-        ?block:string ->
-        data:JSON.u ->
-        Client.t ->
-        JSON.t Runnable.process
-    end
-
-    module Commitment : sig
-      val merkle_tree_hash :
-        ?endpoint:Client.endpoint ->
-        ?hooks:Process.hooks ->
-        ?chain:string ->
-        ?block:string ->
-        data:JSON.u ->
-        Client.t ->
-        JSON.t Runnable.process
-
-      val merkle_tree_path :
-        ?endpoint:Client.endpoint ->
-        ?hooks:Process.hooks ->
-        ?chain:string ->
-        ?block:string ->
-        data:JSON.u ->
-        Client.t ->
-        JSON.t Runnable.process
-
-      val message_result_hash :
-        ?endpoint:Client.endpoint ->
-        ?hooks:Process.hooks ->
-        ?chain:string ->
-        ?block:string ->
-        data:JSON.u ->
-        Client.t ->
-        JSON.t Runnable.process
-    end
-
-    module Withdraw : sig
-      val withdraw_list_hash :
-        ?endpoint:Client.endpoint ->
-        ?hooks:Process.hooks ->
-        ?chain:string ->
-        ?block:string ->
-        data:JSON.u ->
-        Client.t ->
-        JSON.t Runnable.process
-    end
-  end
-end
+  validation_pass:int ->
+  operation_offset:int ->
+  unit ->
+  string t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/helpers/complete/<prefix>]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_helper_complete :
+  ?chain:string -> ?block:string -> string -> JSON.t t
+
+(** RPC: [GET /network/peers] *)
+val get_network_peers : (string * JSON.t) list t
+
+(** RPC: [GET /network/peers/<peer_id>] *)
+val get_network_peer : string -> JSON.t t
+
+(** RPC: [GET /network/peer/<peer_id>/ban] *)
+val get_network_peer_ban : string -> JSON.t t
+
+(** RPC: [GET /network/peers/<peer_id>/banned] *)
+val get_network_peer_banned : string -> JSON.t t
+
+(** RPC: [GET /network/peers/<peer_id>/unban] *)
+val get_network_peer_unban : string -> JSON.t t
+
+(** RPC: [GET /network/peers/<peer_id>/untrust] *)
+val get_network_peer_untrust : string -> JSON.t t
+
+(** RPC: [GET /network/peers/<peer_id>/trust] *)
+val get_network_peer_trust : string -> JSON.t t
+
+(** RPC: [GET /network/points] *)
+val get_network_points : (string * JSON.t) list t
+
+(** RPC: [GET /network/points/<point_id>] *)
+val get_network_point : string -> JSON.t t
+
+(** RPC: [GET /network/points/<point_id>/ban] *)
+val get_network_point_ban : string -> JSON.t t
+
+(** RPC: [GET /network/points/<point_id>/banned] *)
+val get_network_point_banned : string -> JSON.t t
+
+(** RPC: [GET /network/points/<point_id>/unban] *)
+val get_network_point_unban : string -> JSON.t t
+
+(** RPC: [GET /network/points/<point_id>/untrust] *)
+val get_network_point_untrust : string -> JSON.t t
+
+(** RPC: [GET /network/points/<point_id>/trust] *)
+val get_network_point_trust : string -> JSON.t t
+
+(** RPC: [GET /network/stat] *)
+val get_network_stat : JSON.t t
+
+(** RPC: [GET /network/version] *)
+val get_network_version : JSON.t t
+
+(** RPC: [GET /network/versions] *)
+val get_network_versions : JSON.t t
+
+(** RPC: [POST /private/injection/operations]
+
+    Returns the hashes of the operations that were injected. *)
+val post_private_injection_operations :
+  ?force:bool ->
+  ?async:bool ->
+  ops:Hex.t list ->
+  unit ->
+  [`OpHash of string] list t
+
+(** RPC: [POST /injection/operation] *)
+val post_injection_operation : ?async:bool -> JSON.u -> JSON.t t
+
+(** RPC: [POST /private/injection/operation] *)
+val post_private_injection_operation : ?async:bool -> JSON.u -> JSON.t t
+
+(** RPC: [POST /chains/<chain>/blocks/<block>/helpers/scripts/run_operation]
+
+    Tries to validate and apply the operation represented by the given
+    json, directly on top of the [block]. Only skips signature
+    checks. If successful, returns the operation together with the
+    metadata produced by its application.
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val post_chain_block_helpers_scripts_run_operation :
+  ?chain:string -> ?block:string -> ?async:bool -> JSON.u -> JSON.t t
+
+(** RPC: [GET /chains/[chain]/chain_id]
+
+    Returns the chain ID. *)
+val get_chain_chain_id : ?chain:string -> unit -> string t
+
+(** RPC: [GET /chains/[chain]/blocks/[block]]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block : ?chain:string -> ?block:string -> unit -> JSON.t t
+
+type block_metadata = {
+  protocol : string;
+  next_protocol : string;
+  proposer : string;
+  max_operations_ttl : int;
+  dal_slot_availability : bool Array.t option;
+      (** This field is [None] if and only if the [DAL] feature flag is disabled. *)
+}
+
+(** RPC: [GET /chains/[chain]/blocks/[block]/metadata]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_metadata :
+  ?chain:string -> ?block:string -> unit -> block_metadata t
+
+(** RPC: [GET /chains/[chain]/blocks/[block]/hash]
+
+    Returns the hash. *)
+val get_chain_block_hash : ?chain:string -> ?block:string -> unit -> string t
+
+(** RPC: [GET /chains/[chain]/blocks/[block]/header]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_header : ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [PATCH /chains/[chain]] to set ["bootstrapped"]
+
+    Example: to force the chain to be considered bootstrapped,
+    use [patch_chain_bootstrapped true]. *)
+val patch_chain_bootstrapped : ?chain:string -> bool -> unit t
+
+(** RPC: [GET /chains/[chain]/is_bootstrapped]
+
+    Returns the value of [sync_state], e.g. ["synced"]. *)
+val get_chain_is_bootstrapped : ?chain:string -> unit -> string t
+
+(** A level and its hash *)
+type block_descriptor = {block_hash : string; level : int}
+
+(** RPC: [GET /chains/[chain]/levels/checkpoint]
+
+    [chain] defaults to ["main"]. *)
+val get_chain_level_checkpoint : ?chain:string -> unit -> block_descriptor t
+
+(** RPC: [GET /chains/[chain]/levels/savepoint]
+
+    [chain] defaults to ["main"]. *)
+val get_chain_level_savepoint : ?chain:string -> unit -> block_descriptor t
+
+(** RPC: [GET /chains/[chain]/levels/caboose]
+
+    [chain] defaults to ["main"]. *)
+val get_chain_level_caboose : ?chain:string -> unit -> block_descriptor t
+
+(** RPC: [GET /workers/block_validator] *)
+val get_worker_block_validator : JSON.t t
+
+(** RPC: [GET /workers/chain_validators] *)
+val get_workers_chain_validators : JSON.t t
+
+(** RPC: [GET /workers/chain_validators/<chain>]
+
+      [chain] defaults to ["main"]. *)
+val get_worker_chain_validator : ?chain:string -> unit -> JSON.t t
+
+(** RPC: [GET /workers/chain_validators/<chain>/ddb]
+
+      [chain] defaults to ["main"]. *)
+val get_worker_chain_validator_ddb : ?chain:string -> unit -> JSON.t t
+
+(** RPC: [GET /workers/chain_validators/<chain>/peers_validators]
+
+      [chain] defaults to ["main"]. *)
+val get_worker_chain_validator_peers_validators :
+  ?chain:string -> unit -> JSON.t t
+
+(** RPC: [GET /workers/prevalidators] *)
+val get_workers_prevalidators : JSON.t t
+
+(** RPC: [GET /workers/prevalidators/[chain]]
+
+      [chain] defaults to ["main"]. *)
+val get_worker_prevalidator : ?chain:string -> unit -> JSON.t t
+
+(** RPC: [GET /errors] *)
+val get_errors : JSON.t t
+
+(** RPC: [GET /protocols *)
+val get_protocols : string list t
+
+(** RPC: [GET /protocols/<protocol_hash>] *)
+val get_protocol : string -> JSON.t t
+
+(** RPC: [GET /fetch_protocol/<protocol_hash>] *)
+val get_fetch_protocol : string -> JSON.t t
+
+(** RPC: [GET /stats/gc] *)
+val get_stats_gc : JSON.t t
+
+(** RPC: [GET /stats/memory] *)
+val get_stats_memory : JSON.t t
+
+(** Smart contract rollup RPC module. *)
 module Sc_rollup : sig
-  (** Call RPC /chain/[chain]/blocks/[block]/context/sc_rollup *)
-  val list :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    JSON.t Lwt.t
+  (** RPC: [GET chain/[chain]/blocks/[block]/context/sc_rollup] *)
+  val list : ?chain:string -> ?block:string -> unit -> JSON.t t
 
-  (** Call RPC /chain/[chain]/blocks/[block]/context/sc_rollup/[rollup_hash]/state *)
-  val get_inbox :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    sc_rollup_address:string ->
-    Client.t ->
-    JSON.t Lwt.t
+  (** RPC: [GET chain/[chain]/blocks/[block]/context/sc_rollup/<sc_rollup_address>/inbox] *)
+  val get_inbox : ?chain:string -> ?block:string -> string -> JSON.t t
 
-  (** Call RPC /chain/[chain]/blocks/[block]/context/sc_rollup/[rollup_hash]/initial_level *)
-  val get_initial_level :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    sc_rollup_address:string ->
-    Client.t ->
-    JSON.t Lwt.t
-end
+  (** RPC: [GET chain/[chain]/blocks/[block]/context/sc_rollup/<sc_rollup_address>/genesis_info] *)
+  val get_genesis_info : ?chain:string -> ?block:string -> string -> JSON.t t
 
-val raw_bytes :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  ?path:string list ->
-  Client.t ->
-  JSON.t Lwt.t
+  (** RPC: [GET chain/[chain]/blocks/[block]/context/sc_rollup/<sc_rollup_address>/boot_sector] *)
+  val get_boot_sector : ?chain:string -> ?block:string -> string -> JSON.t t
 
-module Curl : sig
-  (** [get ()] returns [Some curl] where [curl ~url] returns the raw response obtained
-      by curl when requesting [url]. Returns [None] if [curl] cannot be found. *)
-  val get : unit -> (url:string -> JSON.t Lwt.t) option Lwt.t
+  (** RPC: [GET chain/[chain]/blocks/[block]/context/sc_rollup/<sc_rollup_address>/get_last_cemented_commitment_hash_with_level] *)
+  val get_last_cemented_commitment_hash_with_level :
+    ?chain:string -> ?block:string -> string -> JSON.t t
 
-  (** [post data] returns [Some curl] where [curl ~url data] returns the raw
-      response obtained by curl when posting the data to [url]. Returns [None] if
-      [curl] cannot be found. *)
-  val post : unit -> (url:string -> JSON.t -> JSON.t Lwt.t) option Lwt.t
+  (** Call RPC /chain/[chain]/blocks/[block]/context/sc_rollup/[rollup_hash]/staker/[staker]/staked_on_commitment *)
+  val get_staked_on_commitment :
+    ?chain:string -> ?block:string -> sc_rollup:string -> string -> JSON.t t
 end

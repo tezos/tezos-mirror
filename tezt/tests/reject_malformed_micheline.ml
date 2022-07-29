@@ -64,26 +64,26 @@ let make_data s =
     to an RPC endpoint.
  *)
 let reject_malformed_micheline =
-  Protocol.register_test ~__FILE__ ~title:"Reject malformed micheline" ~tags:[]
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Reject malformed micheline"
+    ~tags:
+      [
+        "micheline";
+        "empty_implicit_contract";
+        "malformed_annotation";
+        "run_operation";
+      ]
   @@ fun protocol ->
-  let* (node, _client) = Client.init_with_protocol `Client ~protocol () in
+  let* node, _client = Client.init_with_protocol `Client ~protocol () in
   let send_operation data =
-    (* This RPC path is used because it doesn't require valid signatures. *)
-    let rpc_path =
-      sf
-        "http://localhost:%d/chains/main/blocks/head/helpers/scripts/run_operation"
-      @@ Node.rpc_port node
+    (* The [run_operation] RPC is used because it doesn't require
+       valid signatures. *)
+    let json = Ezjsonm.from_string data in
+    let* response =
+      RPC.(call_raw node (post_chain_block_helpers_scripts_run_operation json))
     in
-    let proc_malformed_annots =
-      (* We cannot use the client to test the injection of malformed
-         annotations. This is because the client will reject the invalid
-         annotations and will not propagate the malformed data to the server.
-         Instead we have to use RPCs directly. Hence [curl]. *)
-      Process.spawn
-        "curl"
-        ["-H"; "Content-type: application/json"; "-d"; data; rpc_path]
-    in
-    Process.check_and_read_stdout proc_malformed_annots
+    return response.body
   in
   (* We send a valid annotation. *)
   let* output = send_operation @@ make_data "\"%test\"" in

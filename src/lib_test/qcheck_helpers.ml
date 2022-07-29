@@ -29,9 +29,9 @@ let qcheck_wrap ?verbose ?long ?rand =
 let qcheck_eq ?pp ?cmp ?eq expected actual =
   let pass =
     match (eq, cmp) with
-    | (Some eq, _) -> eq expected actual
-    | (None, Some cmp) -> cmp expected actual = 0
-    | (None, None) -> Stdlib.compare expected actual = 0
+    | Some eq, _ -> eq expected actual
+    | None, Some cmp -> cmp expected actual = 0
+    | None, None -> Stdlib.compare expected actual = 0
   in
   if pass then true
   else
@@ -46,6 +46,28 @@ let qcheck_eq ?pp ?cmp ?eq expected actual =
           expected
           pp
           actual
+
+let qcheck_neq ?pp ?cmp ?eq left right =
+  let pass =
+    match (eq, cmp) with
+    | Some eq, _ -> eq left right
+    | None, Some cmp -> cmp left right = 0
+    | None, None -> Stdlib.compare left right = 0
+  in
+  if not pass then true
+  else
+    match pp with
+    | None ->
+        QCheck.Test.fail_reportf
+          "@[<h 0>Values are unexpectedly equal, but no pretty printer was \
+           provided.@]"
+    | Some pp ->
+        QCheck.Test.fail_reportf
+          "@[<v 2>Inequality check failed!@,left:@,%a@,right:@,%a@]"
+          pp
+          left
+          pp
+          right
 
 let qcheck_eq_tests ~eq ~arb ~eq_name =
   let reflexivity_test =
@@ -119,7 +141,7 @@ let endpoint_arb =
     ":" ^ Int.to_string port
   in
   let url_string_gen =
-    let+ (protocol, path, opt_part) =
+    let+ protocol, path, opt_part =
       triple protocol_gen path_gen (opt port_arb)
     in
     String.concat "" [protocol; "://"; path; Option.value ~default:"" opt_part]

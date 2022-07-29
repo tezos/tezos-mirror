@@ -105,15 +105,15 @@ module Make
   and get_subterm_at : node list -> int -> forward_path -> node =
    fun subterms index path ->
     match (subterms, index) with
-    | ([], _) ->
+    | [], _ ->
         let msg =
           Printf.sprintf
             "get_subterm_at: non-empty path (%s)"
             (string_of_forward_path path)
         in
         raise (Rewrite_error (msg, None))
-    | (hd :: _, 0) -> get_subterm_aux ~term:hd ~path
-    | (_ :: tl, _) -> get_subterm_at tl (index - 1) path
+    | hd :: _, 0 -> get_subterm_aux ~term:hd ~path
+    | _ :: tl, _ -> get_subterm_at tl (index - 1) path
 
   let get_subterm : term:node -> path:path -> node =
    fun ~term ~path ->
@@ -137,11 +137,11 @@ module Make
   and subst_at : node list -> int -> forward_path -> node -> node list =
    fun subterms index path replacement ->
     match (subterms, index) with
-    | ([], _) ->
+    | [], _ ->
         let msg = Printf.sprintf "subst_at: empty list (%d)" index in
         raise (Rewrite_error (msg, None))
-    | (hd :: tl, 0) -> subst_aux ~term:hd ~path ~replacement :: tl
-    | (hd :: tl, _) -> hd :: subst_at tl (index - 1) path replacement
+    | hd :: tl, 0 -> subst_aux ~term:hd ~path ~replacement :: tl
+    | hd :: tl, _ -> hd :: subst_at tl (index - 1) path replacement
 
   let subst :
       term:('l, head) Micheline.node -> path:Path.t -> replacement:node -> node

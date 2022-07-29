@@ -1,0 +1,17 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_crypto_dal)
+ (public_name tezos-crypto.dal)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-stdlib
+  tezos-error-monad
+  data-encoding
+  tezos-bls12-381-polynomial)
+ (flags
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_error_monad
+  -open Data_encoding))

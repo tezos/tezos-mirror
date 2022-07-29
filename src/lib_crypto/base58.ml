@@ -60,9 +60,15 @@ module Alphabet = struct
 
   let default = bitcoin
 
-  let all_in_alphabet alphabet string =
+  let all_in_alphabet ?(ignore_case = false) alphabet string =
     let ok = Array.make 256 false in
-    String.iter (fun x -> ok.(Char.code x) <- true) alphabet.encode ;
+    String.iter
+      (fun x ->
+        if ignore_case then ok.(Char.code x) <- true
+        else (
+          ok.(Char.code (Char.lowercase_ascii x)) <- true ;
+          ok.(Char.code (Char.uppercase_ascii x)) <- true))
+      alphabet.encode ;
     let res = ref true in
     for i = 0 to String.length string - 1 do
       res := !res && ok.(Char.code string.[i])
@@ -103,7 +109,7 @@ let raw_encode ?(alphabet = Alphabet.default) s =
   let rec loop s i =
     if s = Z.zero then i
     else
-      let (s, r) = Z.div_rem s zbase in
+      let s, r = Z.div_rem s zbase in
       Bytes.set res i (to_char ~alphabet (Z.to_int r)) ;
       loop s (i - 1)
   in
@@ -112,19 +118,26 @@ let raw_encode ?(alphabet = Alphabet.default) s =
   String.make zeros zero ^ ress
 
 let raw_decode ?(alphabet = Alphabet.default) s =
-  TzString.fold_left
-    (fun a c ->
-      match (a, of_char ~alphabet c) with
-      | (Some a, Some i) -> Some Z.(add (of_int i) (mul a zbase))
-      | _ -> None)
-    (Some Z.zero)
-    s
-  |> Option.map (fun res ->
-         let res = Z.to_bits res in
-         let res_tzeros = count_trailing_char res '\000' in
-         let len = String.length res - res_tzeros in
-         let zeros = count_leading_char s alphabet.encode.[0] in
-         String.make zeros '\000' ^ String.init len (fun i -> res.[len - i - 1]))
+  let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Option_syntax in
+  let slen = String.length s in
+  let rec decode acc index =
+    if index >= slen then return acc
+    else
+      match of_char ~alphabet s.[index] with
+      | Some i ->
+          let acc = Z.(add (of_int i) (mul acc zbase)) in
+          (decode [@ocaml.tailcall]) acc (index + 1)
+      | _ -> fail
+  in
+  let* res = decode Z.zero 0 in
+  let res = Z.to_bits res in
+  let res_tzeros = count_trailing_char res '\000' in
+  let len = String.length res - res_tzeros in
+  let zeros = count_leading_char s alphabet.encode.[0] in
+  let v =
+    String.make zeros '\000' ^ String.init len (fun i -> res.[len - i - 1])
+  in
+  return v
 
 let checksum s =
   let hash = Hacl.Hash.SHA256.(digest (digest (Bytes.of_string s))) in
@@ -134,14 +147,15 @@ let checksum s =
 let safe_encode ?alphabet s = raw_encode ?alphabet (s ^ checksum s)
 
 let safe_decode ?alphabet s =
-  Option.bind (raw_decode ?alphabet s) (fun s ->
-      let len = String.length s in
-      if len < 4 then None
-      else
-        (* only if the string is long enough to extract a checksum do we check it *)
-        let msg = String.sub s 0 (len - 4) in
-        let msg_hash = String.sub s (len - 4) 4 in
-        if msg_hash <> checksum msg then None else Some msg)
+  let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Option_syntax in
+  let* s = raw_decode ?alphabet s in
+  let len = String.length s in
+  if len < 4 then fail
+  else
+    (* only if the string is long enough to extract a checksum do we check it *)
+    let msg = String.sub s 0 (len - 4) in
+    let msg_hash = String.sub s (len - 4) 4 in
+    if msg_hash <> checksum msg then fail else return msg
 
 type data = ..
 
@@ -214,7 +228,7 @@ struct
       assert (String.length s = length) ;
       of_raw s
     in
-    let (encoded_prefix, encoded_length) = make_encoded_prefix prefix length in
+    let encoded_prefix, encoded_length = make_encoded_prefix prefix length in
     check_ambiguous_prefix encoded_prefix encoded_length !encodings ;
     let encoding =
       {prefix; length; encoded_prefix; encoded_length; to_raw; of_raw; wrap}
@@ -238,14 +252,14 @@ struct
         enc.encoded_length
 
   let decode ?alphabet s =
-    let rec find s = function
-      | [] -> None
-      | Encoding {prefix; of_raw; wrap; _} :: encodings -> (
-          match TzString.remove_prefix ~prefix s with
-          | None -> find s encodings
-          | Some msg -> of_raw msg |> Option.map wrap)
-    in
-    Option.bind (safe_decode ?alphabet s) (fun s -> find s !encodings)
+    let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Option_syntax in
+    let* s = safe_decode ?alphabet s in
+    List.find_map
+      (fun (Encoding {prefix; of_raw; wrap; _}) ->
+        let* msg = TzString.remove_prefix ~prefix s in
+        let+ v = of_raw msg in
+        wrap v)
+      !encodings
 end
 
 type 'a resolver =
@@ -272,7 +286,7 @@ struct
     let min = raw_decode ~alphabet (request ^ String.make (len - n) zero) in
     let max = raw_decode ~alphabet (request ^ String.make (len - n) last) in
     match (min, max) with
-    | (Some min, Some max) ->
+    | Some min, Some max ->
         let prefix_len = TzString.common_prefix min max in
         Some (String.sub min 0 prefix_len)
     | _ -> None
@@ -421,13 +435,21 @@ module Prefix = struct
   (* 43 *)
   let sapling_address = "\018\071\040\223" (* zet1(69) *)
 
-  (* 96 *)
+  (* 141 *)
+  let generic_aggregate_signature = "\002\075\234\101" (* asig(96) *)
 
-  let generic_aggregate_signature = "\002\075\234\101" (* asig(141) *)
+  (* 142 *)
+  let bls12_381_signature = "\040\171\064\207" (* BLsig(96) *)
 
-  let bls12_381_signature = "\040\171\064\207" (* BLsig(142) *)
+  (* 76 *)
+  let bls12_381_public_key = "\006\149\135\204" (* BLpk(48) *)
 
-  let bls12_381_public_key = "\006\149\135\204" (* BLpk(76) *)
+  (* 54 *)
+  let bls12_381_secret_key = "\003\150\192\040" (* BLsk(32) *)
 
-  let bls12_381_secret_key = "\003\150\192\040" (* BLsk(54) *)
+  (* 88 *)
+  let bls12_381_encrypted_secret_key = "\002\005\030\053\025" (* BLesk(58) *)
+
+  (* 48 *)
+  let slot_header = "\002\116\180" (* sh(74) *)
 end

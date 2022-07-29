@@ -259,7 +259,7 @@ let test_reconstruct () =
     Pvss.reconstruct
       (List.map
          (fun n ->
-           let (_, (r, _)) = List.nth Setup.reveals n in
+           let _, (r, _) = List.nth Setup.reveals n in
            r)
          indices)
       indices
@@ -282,7 +282,7 @@ let test_invalid_reconstruct () =
     Pvss.reconstruct
       (List.map
          (fun n ->
-           let (_, (r, _)) = List.nth Setup.reveals n in
+           let _, (r, _) = List.nth Setup.reveals n in
            r)
          indices)
       indices
@@ -314,13 +314,13 @@ let test_randomness_commitment_protocol () =
       endorsers
   in
   (* Client: A baker creates a randomness commitment *)
-  let (secret_nonce, public_nonce) =
+  let secret_nonce, public_nonce =
     Setup.random_keypairs 1 |> List.hd |> fun Setup.{secret_key; public_key} ->
     (secret_key, public_key)
   in
   (* Client: A baker creates shares for block endorsers, a list of commitments
      of length equal to the threshold and a proof *)
-  let (shares, commitments, proof) =
+  let shares, commitments, proof =
     Pvss.dealer_shares_and_proof
       ~secret:secret_nonce
       ~threshold
@@ -349,7 +349,7 @@ let test_randomness_commitment_protocol () =
         let encrypted_share = List.nth shares index in
         let Setup.{secret_key; public_key} = List.nth bakers index in
         (* Client: Endorsers may reveal their shares *)
-        let (clear_share, proof) =
+        let clear_share, proof =
           Pvss.reveal_share encrypted_share ~secret_key ~public_key
         in
         (* Protocol: The revealed shares are verified with the proof *)

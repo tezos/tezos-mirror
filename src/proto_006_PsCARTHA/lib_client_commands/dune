@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_006_PsCARTHA_commands)
- (public_name tezos-client-006-PsCARTHA-commands)
+ (public_name tezos-client-006-PsCARTHA.commands)
  (libraries
   tezos-base
   tezos-protocol-006-PsCARTHA
@@ -16,21 +16,21 @@
   tezos-rpc)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_protocol_006_PsCARTHA
-   -open Tezos_stdlib_unix
-   -open Tezos_shell_services
-   -open Tezos_client_base
-   -open Tezos_client_006_PsCARTHA
-   -open Tezos_client_commands
-   -open Tezos_rpc))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_006_PsCARTHA
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_006_PsCARTHA
+  -open Tezos_client_commands
+  -open Tezos_rpc)
  (modules (:standard \ alpha_commands_registration)))
 
 (library
  (name tezos_client_006_PsCARTHA_commands_registration)
- (public_name tezos-client-006-PsCARTHA-commands.registration)
+ (public_name tezos-client-006-PsCARTHA.commands-registration)
  (libraries
   tezos-base
   tezos-protocol-006-PsCARTHA
@@ -39,18 +39,18 @@
   tezos-client-base
   tezos-client-006-PsCARTHA
   tezos-client-commands
-  tezos-client-006-PsCARTHA-commands
+  tezos-client-006-PsCARTHA.commands
   tezos-rpc)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_protocol_006_PsCARTHA
-   -open Tezos_shell_services
-   -open Tezos_client_base
-   -open Tezos_client_006_PsCARTHA
-   -open Tezos_client_commands
-   -open Tezos_client_006_PsCARTHA_commands
-   -open Tezos_rpc))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_006_PsCARTHA
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_006_PsCARTHA
+  -open Tezos_client_commands
+  -open Tezos_client_006_PsCARTHA_commands
+  -open Tezos_rpc)
  (modules alpha_commands_registration))

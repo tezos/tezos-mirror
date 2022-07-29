@@ -1,8 +1,6 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(env (static (flags (:standard -ccopt -static))))
-
 (executable
  (name main)
  (public_name tezos-node)
@@ -19,6 +17,8 @@
   tezos-p2p
   tezos-shell
   tezos-store
+  tezos-store.unix-reconstruction
+  tezos-store.unix-snapshots
   tezos-context
   tezos-validator
   tezos-validation
@@ -31,6 +31,7 @@
   tls
   prometheus-app.unix
   lwt-exit
+  uri
   (select void_for_linking-tezos-embedded-protocol-genesis from
    (tezos-embedded-protocol-genesis -> void_for_linking-tezos-embedded-protocol-genesis.empty)
    (-> void_for_linking-tezos-embedded-protocol-genesis.empty))
@@ -99,30 +100,36 @@
   tezos-protocol-plugin-012-Psithaca-registerer
   tezos-embedded-protocol-013-PtJakart
   tezos-protocol-plugin-013-PtJakart-registerer
+  tezos-embedded-protocol-014-PtKathma
+  tezos-protocol-plugin-014-PtKathma-registerer
   (select void_for_linking-tezos-embedded-protocol-alpha from
    (tezos-embedded-protocol-alpha -> void_for_linking-tezos-embedded-protocol-alpha.empty)
    (-> void_for_linking-tezos-embedded-protocol-alpha.empty))
   (select void_for_linking-tezos-protocol-plugin-alpha-registerer from
    (tezos-protocol-plugin-alpha-registerer -> void_for_linking-tezos-protocol-plugin-alpha-registerer.empty)
    (-> void_for_linking-tezos-protocol-plugin-alpha-registerer.empty)))
- (link_flags (:standard -linkall))
+ (link_flags
+  (:standard -linkall)
+  (:include %{workspace_root}/static-link-flags.sexp))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base
-   -open Tezos_stdlib_unix
-   -open Tezos_shell_services
-   -open Tezos_rpc_http
-   -open Tezos_rpc_http_server
-   -open Tezos_p2p
-   -open Tezos_shell
-   -open Tezos_store
-   -open Tezos_context
-   -open Tezos_validator
-   -open Tezos_validation
-   -open Tezos_shell_context
-   -open Tezos_workers
-   -open Tezos_protocol_updater)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_services
+  -open Tezos_rpc_http
+  -open Tezos_rpc_http_server
+  -open Tezos_p2p
+  -open Tezos_shell
+  -open Tezos_store
+  -open Tezos_store_unix_reconstruction
+  -open Tezos_store_unix_snapshots
+  -open Tezos_context
+  -open Tezos_validator
+  -open Tezos_validation
+  -open Tezos_shell_context
+  -open Tezos_workers
+  -open Tezos_protocol_updater))
 
 (rule
  (action

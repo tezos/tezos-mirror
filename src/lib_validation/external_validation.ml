@@ -45,6 +45,7 @@ type request =
         Operation_metadata_list_list_hash.t option;
       operations : Operation.t list list;
       max_operations_ttl : int;
+      simulate : bool;
     }
   | Preapply of {
       chain_id : Chain_id.t;
@@ -70,6 +71,7 @@ type request =
     }
   | Commit_genesis of {chain_id : Chain_id.t}
   | Fork_test_chain of {
+      chain_id : Chain_id.t;
       context_hash : Context_hash.t;
       forked_header : Block_header.t;
     }
@@ -166,14 +168,15 @@ let case_validate tag =
   case
     tag
     ~title:"validate"
-    (obj7
+    (obj8
        (req "chain_id" Chain_id.encoding)
        (req "block_header" (dynamic_size Block_header.encoding))
        (req "pred_header" (dynamic_size Block_header.encoding))
        (opt "pred_block_metadata_hash" Block_metadata_hash.encoding)
        (opt "pred_ops_metadata_hash" Operation_metadata_list_list_hash.encoding)
        (req "max_operations_ttl" int31)
-       (req "operations" (list (list (dynamic_size Operation.encoding)))))
+       (req "operations" (list (list (dynamic_size Operation.encoding))))
+       (req "simulate" bool))
     (function
       | Validate
           {
@@ -184,6 +187,7 @@ let case_validate tag =
             predecessor_ops_metadata_hash;
             max_operations_ttl;
             operations;
+            simulate;
           } ->
           Some
             ( chain_id,
@@ -192,7 +196,8 @@ let case_validate tag =
               predecessor_block_metadata_hash,
               predecessor_ops_metadata_hash,
               max_operations_ttl,
-              operations )
+              operations,
+              simulate )
       | _ -> None)
     (fun ( chain_id,
            block_header,
@@ -200,7 +205,8 @@ let case_validate tag =
            predecessor_block_metadata_hash,
            predecessor_ops_metadata_hash,
            max_operations_ttl,
-           operations ) ->
+           operations,
+           simulate ) ->
       Validate
         {
           chain_id;
@@ -210,6 +216,7 @@ let case_validate tag =
           predecessor_ops_metadata_hash;
           max_operations_ttl;
           operations;
+          simulate;
         })
 
 let case_preapply tag =
@@ -352,15 +359,16 @@ let request_encoding =
       case
         (Tag 3)
         ~title:"fork_test_chain"
-        (obj2
+        (obj3
+           (req "chain_id" Chain_id.encoding)
            (req "context_hash" Context_hash.encoding)
            (req "forked_header" Block_header.encoding))
         (function
-          | Fork_test_chain {context_hash; forked_header} ->
-              Some (context_hash, forked_header)
+          | Fork_test_chain {chain_id; context_hash; forked_header} ->
+              Some (chain_id, context_hash, forked_header)
           | _ -> None)
-        (fun (context_hash, forked_header) ->
-          Fork_test_chain {context_hash; forked_header});
+        (fun (chain_id, context_hash, forked_header) ->
+          Fork_test_chain {chain_id; context_hash; forked_header});
       case
         (Tag 4)
         ~title:"terminate"

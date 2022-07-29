@@ -11,7 +11,7 @@ sanity_ci:
     # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
     - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
     - make -C manifest check
-    - src/tooling/lint.sh --check-gitlab-ci-yml
+    - scripts/lint.sh --check-gitlab-ci-yml
 
 docker:hadolint:
   extends:

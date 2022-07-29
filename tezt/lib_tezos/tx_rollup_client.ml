@@ -23,11 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Cli_arg
+
 type t = {
   name : string;
   path : string;
   tx_node : Tx_rollup_node.t;
   base_dir : string;
+  wallet_dir : string;
   color : Log.Color.t;
 }
 
@@ -36,27 +39,30 @@ let next_name = ref 1
 let fresh_name () =
   let index = !next_name in
   incr next_name ;
-  "client" ^ string_of_int index
+  "tx_rollup_client" ^ string_of_int index
 
 let () = Test.declare_reset_function @@ fun () -> next_name := 1
 
-let create ?name ?path ?base_dir ?(color = Log.Color.FG.green) tx_node =
-  let name = match name with None -> fresh_name () | Some name -> name in
+let create ~protocol ?name ?base_dir ?wallet_dir ?(color = Log.Color.FG.green)
+    tx_node =
   let path =
-    match path with None -> Constant.tx_rollup_client | Some p -> p
+    String.concat "-" [Constant.tx_rollup_client; Protocol.daemon_name protocol]
   in
+  let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
     match base_dir with None -> Temp.dir name | Some dir -> dir
   in
-  {name; path; tx_node; base_dir; color}
+  let wallet_dir =
+    match wallet_dir with None -> Temp.dir name | Some dir -> dir
+  in
+  {name; path; tx_node; base_dir; wallet_dir; color}
 
 let base_dir_arg tx_client = ["--base-dir"; tx_client.base_dir]
 
+let wallet_dir_arg tx_client = ["--wallet-dir"; tx_client.wallet_dir]
+
 let endpoint_arg tx_client =
   ["--endpoint"; Tx_rollup_node.endpoint tx_client.tx_node]
-
-let optional_arg ~name f =
-  Option.fold ~none:[] ~some:(fun x -> ["--" ^ name; f x])
 
 let spawn_command ?hooks tx_client command =
   Process.spawn
@@ -64,14 +70,15 @@ let spawn_command ?hooks tx_client command =
     ~color:tx_client.color
     ?hooks
     tx_client.path
-    (base_dir_arg tx_client @ endpoint_arg tx_client @ command)
+    (base_dir_arg tx_client @ wallet_dir_arg tx_client @ endpoint_arg tx_client
+   @ command)
 
 let get_balance ?block tx_client ~tz4_address ~ticket_id =
   let* out =
     spawn_command
       tx_client
       (["get"; "balance"; "for"; tz4_address; "of"; ticket_id]
-      @ optional_arg ~name:"block" Fun.id block)
+      @ optional_arg "block" Fun.id block)
     |> Process.check_and_read_stdout
   in
   let json = JSON.parse ~origin:"tx_client_get_balance" out in
@@ -86,14 +93,16 @@ let get_inbox ?(block = "head") tx_client =
   in
   Lwt.return out
 
-let get_block tx_client ~block =
+let get_block ?(style = `Fancy) tx_client ~block =
+  let style = match style with `Raw -> ["--raw"] | `Fancy -> [] in
   let* out =
-    spawn_command tx_client ["get"; "block"; block]
+    spawn_command tx_client (["get"; "block"; block] @ style)
     |> Process.check_and_read_stdout
   in
   Lwt.return out
 
-let craft_tx_transaction ?counter tx_client ~qty ~signer ~dest ~ticket =
+let craft_tx_transaction tx_client ~signer ?counter
+    Rollup.Tx_rollup.(`Transfer {qty; destination; ticket}) =
   let qty = Int64.to_string qty in
   let* out =
     spawn_command
@@ -106,18 +115,100 @@ let craft_tx_transaction ?counter tx_client ~qty ~signer ~dest ~ticket =
          "from";
          signer;
          "to";
+         destination;
+         "for";
+         ticket;
+       ]
+      @ optional_arg "counter" Int64.to_string counter)
+    |> Process.check_and_read_stdout
+  in
+  Lwt.return @@ JSON.parse ~origin:"tx_rollup_client" out
+
+let sign_transaction ?(aggregate = false) ?aggregated_signature tx_client
+    ~transaction ~signers =
+  let* out =
+    spawn_command
+      tx_client
+      (["sign"; "transaction"; JSON.encode transaction; "with"]
+      @ signers
+      @ optional_switch "aggregate" aggregate
+      @ optional_arg "aggregated-signature" Fun.id aggregated_signature)
+    |> Process.check_and_read_stdout
+  in
+  Lwt.return @@ String.trim out
+
+let craft_tx_transfers tx_client ~signer ?counter transfers =
+  let contents_json =
+    let open Data_encoding in
+    Json.construct
+      (list Rollup.Tx_rollup.operation_content_encoding)
+      (transfers :> Rollup.Tx_rollup.operation_content list)
+    |> Json.to_string
+  in
+  let* out =
+    spawn_command
+      tx_client
+      (["craft"; "tx"; "transfers"; "from"; signer; "using"; contents_json]
+      @ optional_arg "counter" Int64.to_string counter)
+    |> Process.check_and_read_stdout
+  in
+  Lwt.return @@ JSON.parse ~origin:"tx_rollup_client" out
+
+let craft_tx_withdraw ?counter tx_client ~qty ~signer ~dest ~ticket =
+  let qty = Int64.to_string qty in
+  let* out =
+    spawn_command
+      tx_client
+      ([
+         "craft";
+         "tx";
+         "withdrawing";
+         qty;
+         "from";
+         signer;
+         "to";
          dest;
          "for";
          ticket;
        ]
-      @ optional_arg ~name:"counter" Int64.to_string counter)
+      @ optional_arg "counter" Int64.to_string counter)
+    |> Process.check_and_read_stdout
+  in
+  Lwt.return @@ JSON.parse ~origin:"tx_rollup_client" out
+
+let craft_tx_batch ?(show_hex = false) tx_client ~transactions_and_sig =
+  let* out =
+    spawn_command
+      tx_client
+      (["craft"; "batch"; "with"; JSON.encode transactions_and_sig]
+      @ optional_switch "bytes" show_hex)
+    |> Process.check_and_read_stdout
+  in
+  Lwt.return
+  @@
+  if show_hex then `Hex (String.trim out)
+  else `Json (JSON.parse ~origin:"tx_rollup_client.craft_tx_batch" out)
+
+let transfer ?counter tx_client ~source
+    Rollup.Tx_rollup.(`Transfer {qty; destination; ticket}) =
+  let qty = Int64.to_string qty in
+  let* out =
+    spawn_command
+      tx_client
+      (["transfer"; qty; "of"; ticket; "from"; source; "to"; destination]
+      @ optional_arg "counter" Int64.to_string counter)
     |> Process.check_and_read_stdout
   in
   Lwt.return out
 
-let craft_tx_batch tx_client ~batch ~signatures =
+let withdraw ?counter tx_client ~source
+    Rollup.Tx_rollup.(`Withdraw {qty; destination; ticket}) =
+  let qty = Int64.to_string qty in
   let* out =
-    spawn_command tx_client ["craft"; "batch"; "with"; batch; "for"; signatures]
+    spawn_command
+      tx_client
+      (["withdraw"; qty; "of"; ticket; "from"; source; "to"; destination]
+      @ optional_arg "counter" Int64.to_string counter)
     |> Process.check_and_read_stdout
   in
   Lwt.return out
@@ -136,9 +227,50 @@ let get_batcher_transaction tx_client ~transaction_hash =
   in
   Lwt.return out
 
-let inject_batcher_transaction tx_client ?expect_failure signed_tx_json =
+let inject_batcher_transaction ?expect_failure tx_client ~transactions_and_sig =
   let* out =
-    spawn_command tx_client ["inject"; "batcher"; "transaction"; signed_tx_json]
-    |> Process.check_and_read_both ?expect_failure
+    Process.check_and_read_both ?expect_failure
+    @@ spawn_command
+         tx_client
+         ["inject"; "batcher"; "transaction"; JSON.encode transactions_and_sig]
   in
   Lwt.return out
+
+let get_message_proof ?(block = "head") tx_client ~message_position =
+  let* out =
+    spawn_command
+      tx_client
+      [
+        "get";
+        "proof";
+        "for";
+        "message";
+        "at";
+        "position";
+        string_of_int message_position;
+        "in";
+        "block";
+        block;
+      ]
+    |> Process.check_and_read_stdout
+  in
+  Lwt.return out
+
+module RPC = struct
+  let get tx_client uri =
+    let* out =
+      spawn_command tx_client ["rpc"; "get"; uri]
+      |> Process.check_and_read_stdout
+    in
+    Lwt.return out
+
+  let post tx_client ?data uri =
+    let data =
+      Option.fold ~none:[] ~some:(fun x -> ["with"; JSON.encode_u x]) data
+    in
+    let* out =
+      spawn_command tx_client (["rpc"; "post"; uri] @ data)
+      |> Process.check_and_read_stdout
+    in
+    Lwt.return out
+end

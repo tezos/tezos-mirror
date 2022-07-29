@@ -31,6 +31,35 @@ type t = {
   color : Log.Color.t;
 }
 
+type commitment = {
+  compressed_state : string;
+  inbox_level : int;
+  predecessor : string;
+  number_of_ticks : int;
+}
+
+let commitment_from_json json =
+  if JSON.is_null json then None
+  else
+    let compressed_state = JSON.as_string @@ JSON.get "compressed_state" json in
+    let inbox_level = JSON.as_int @@ JSON.get "inbox_level" json in
+    let predecessor = JSON.as_string @@ JSON.get "predecessor" json in
+    let number_of_ticks = JSON.as_int @@ JSON.get "number_of_ticks" json in
+    Some {compressed_state; inbox_level; predecessor; number_of_ticks}
+
+let commitment_with_hash_and_level_from_json json =
+  let hash, commitment_json, published_at_level =
+    ( JSON.get "hash" json,
+      JSON.get "commitment" json,
+      JSON.get "published_at_level" json )
+  in
+  Option.map
+    (fun commitment ->
+      ( JSON.as_string hash,
+        commitment,
+        published_at_level |> JSON.as_opt |> Option.map JSON.as_int ))
+    (commitment_from_json commitment_json)
+
 let next_name = ref 1
 
 let fresh_name () =
@@ -70,6 +99,13 @@ let sc_rollup_address sc_client =
   in
   return (String.trim out)
 
+let state_value ?hooks sc_client ~key =
+  let* out =
+    spawn_command ?hooks sc_client ["get"; "state"; "value"; "for"; key]
+    |> Process.check_and_read_stdout
+  in
+  return (Scanf.sscanf (String.trim out) "%S" (fun s -> s) |> String.to_bytes)
+
 let rpc_get ?hooks sc_client path =
   let process =
     spawn_command ?hooks sc_client ["rpc"; "get"; Client.string_of_path path]
@@ -79,20 +115,94 @@ let rpc_get ?hooks sc_client path =
 
 let ticks ?hooks sc_client =
   let open Lwt.Syntax in
-  let+ res = rpc_get ?hooks sc_client ["ticks"] in
+  let+ res = rpc_get ?hooks sc_client ["global"; "ticks"] in
   JSON.as_int res
 
 let total_ticks ?hooks sc_client =
   let open Lwt.Syntax in
-  let+ res = rpc_get ?hooks sc_client ["total_ticks"] in
+  let+ res = rpc_get ?hooks sc_client ["global"; "total_ticks"] in
   JSON.as_int res
 
 let state_hash ?hooks sc_client =
   let open Lwt.Syntax in
-  let+ res = rpc_get ?hooks sc_client ["state_hash"] in
+  let+ res = rpc_get ?hooks sc_client ["global"; "state_hash"] in
   JSON.as_string res
 
 let status ?hooks sc_client =
   let open Lwt.Syntax in
-  let+ res = rpc_get ?hooks sc_client ["status"] in
+  let+ res = rpc_get ?hooks sc_client ["global"; "status"] in
   JSON.as_string res
+
+let last_stored_commitment ?hooks sc_client =
+  let open Lwt.Syntax in
+  let+ json = rpc_get ?hooks sc_client ["global"; "last_stored_commitment"] in
+  commitment_with_hash_and_level_from_json json
+
+let last_published_commitment ?hooks sc_client =
+  let open Lwt.Syntax in
+  let+ json = rpc_get ?hooks sc_client ["local"; "last_published_commitment"] in
+  commitment_with_hash_and_level_from_json json
+
+let dal_slot_subscriptions ?hooks sc_client =
+  let open Lwt.Syntax in
+  let+ json = rpc_get ?hooks sc_client ["global"; "dal"; "slots"] in
+  JSON.as_list json |> List.map JSON.as_int
+
+let spawn_generate_keys ?hooks ?(force = false) ~alias sc_client =
+  spawn_command
+    ?hooks
+    sc_client
+    (["gen"; "unencrypted"; "keys"; alias] @ if force then ["--force"] else [])
+
+let generate_keys ?hooks ?force ~alias sc_client =
+  spawn_generate_keys ?hooks ?force ~alias sc_client |> Process.check
+
+let spawn_list_keys ?hooks sc_client =
+  spawn_command ?hooks sc_client ["list"; "keys"]
+
+let parse_list_keys output =
+  output |> String.trim |> String.split_on_char '\n'
+  |> List.fold_left (fun acc s -> (s =~** rex "^(\\w+): (\\w{36})") :: acc) []
+  |> List.fold_left
+       (fun acc k ->
+         match (k, acc) with
+         | None, _ | _, None -> None
+         | Some k, Some acc -> Some (k :: acc))
+       (Some [])
+  |> function
+  | None ->
+      Test.fail
+        ~__LOC__
+        "Cannot extract `list keys` format from client_output: %s"
+        output
+  | Some l -> l
+
+let list_keys ?hooks sc_client =
+  let* out =
+    spawn_list_keys ?hooks sc_client |> Process.check_and_read_stdout
+  in
+  return (parse_list_keys out)
+
+let spawn_show_address ?hooks ~alias sc_client =
+  spawn_command ?hooks sc_client ["show"; "address"; alias]
+
+let show_address ?hooks ~alias sc_client =
+  let* out =
+    spawn_show_address ?hooks ~alias sc_client |> Process.check_and_read_stdout
+  in
+  return (Account.parse_client_output_aggregate ~alias ~client_output:out)
+
+let spawn_import_secret_key ?hooks ?(force = false)
+    (key : Account.aggregate_key) sc_client =
+  let sk_uri =
+    let (Unencrypted sk) = key.aggregate_secret_key in
+    "aggregate_unencrypted:" ^ sk
+  in
+  spawn_command
+    ?hooks
+    sc_client
+    (["import"; "secret"; "key"; key.aggregate_alias; sk_uri]
+    @ if force then ["--force"] else [])
+
+let import_secret_key ?hooks ?force key sc_client =
+  spawn_import_secret_key ?hooks ?force key sc_client |> Process.check

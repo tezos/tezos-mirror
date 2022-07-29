@@ -81,12 +81,11 @@ let gen_diffs idx :
     list =
   let open Lazy_storage_diff in
   Remove
-  ::
-  (gen_inits idx
-  |> List.map (fun (init, updates_lens) ->
-         gen_updates_list updates_lens
-         |> List.map (fun updates -> Update {init; updates}))
-  |> List.flatten)
+  :: (gen_inits idx
+     |> List.map (fun (init, updates_lens) ->
+            gen_updates_list updates_lens
+            |> List.map (fun updates -> Update {init; updates}))
+     |> List.flatten)
 
 let gen_diffs_items idx : Lazy_storage_diff.diffs_item list =
   let id = ids.(idx) in

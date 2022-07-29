@@ -1,24 +1,15 @@
-opam:create_pipeline:
+opam:prepare:
   extends:
     - .default_settings_template
-    - .image_template__alpine
-    - .rules_template__trigger_opam_pipeline
+    - .image_template__runtime_prebuild_dependencies_template
+    - .rules_template__trigger_opam_batch_1
   stage: packaging
-  script:
-    - ./scripts/generate_opam_pipeline.sh | tee opam-ci.yml
   needs: []
+  script:
+    - git init _opam-repo-for-release
+    - ./scripts/opam-prepare-repo.sh dev ./ ./_opam-repo-for-release
+    - git -C _opam-repo-for-release add packages
+    - git -C _opam-repo-for-release commit -m "tezos packages"
   artifacts:
     paths:
-      - opam-ci.yml
-
-opam:trigger:
-  extends:
-    - .rules_template__trigger_opam_pipeline
-  stage: packaging
-  needs:
-    - "opam:create_pipeline"
-  trigger:
-    include:
-      - artifact: opam-ci.yml
-        job: "opam:create_pipeline"
-    strategy: depend
+      - _opam-repo-for-release/

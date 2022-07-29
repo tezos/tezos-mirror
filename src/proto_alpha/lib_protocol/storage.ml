@@ -312,6 +312,8 @@ module Contract = struct
     let add ctxt contract value =
       consume_serialize_gas ctxt value >>?= fun ctxt ->
       I.add ctxt contract value
+
+    let keys_unaccounted = I.keys_unaccounted
   end
 
   module Code = Make_carbonated_map_expr (struct
@@ -395,11 +397,11 @@ module Global_constants = struct
            let name = ["global_constant"]
          end))
          (Make_index (Script_expr_hash))
-         (struct
-           type t = Script_repr.expr
+      (struct
+        type t = Script_repr.expr
 
-           let encoding = Script_repr.expr_encoding
-         end)
+        let encoding = Script_repr.expr_encoding
+      end)
 end
 
 (** Big maps handling *)
@@ -480,11 +482,7 @@ module Big_map = struct
         let encoding = Script_repr.expr_encoding
       end)
 
-  module Contents :
-    Non_iterable_indexed_carbonated_data_storage_with_values
-      with type key = Script_expr_hash.t
-       and type value = Script_repr.expr
-       and type t := key = struct
+  module Contents = struct
     module I =
       Storage_functors.Make_indexed_carbonated_data_storage
         (Make_subcontext (Registered) (Indexed_context.Raw_context)
@@ -492,11 +490,11 @@ module Big_map = struct
              let name = ["contents"]
            end))
            (Make_index (Script_expr_hash))
-           (struct
-             type t = Script_repr.expr
+        (struct
+          type t = Script_repr.expr
 
-             let encoding = Script_repr.expr_encoding
-           end)
+          let encoding = Script_repr.expr_encoding
+        end)
 
     type context = I.context
 
@@ -518,7 +516,10 @@ module Big_map = struct
 
     let add = I.add
 
-    let list_values = I.list_values
+    let list_values ?offset ?length (ctxt, id) =
+      let open Lwt_tzresult_syntax in
+      let* ctxt, values = I.list_values ?offset ?length (ctxt, id) in
+      return (ctxt, List.map snd values)
 
     let consume_deserialize_gas ctxt value =
       Raw_context.consume_gas ctxt (Script_repr.deserialized_cost value)
@@ -536,6 +537,8 @@ module Big_map = struct
       | None -> ok (ctxt, None)
       | Some value ->
           consume_deserialize_gas ctxt value >|? fun ctxt -> (ctxt, value_opt)
+
+    let keys_unaccounted = I.keys_unaccounted
   end
 end
 
@@ -938,7 +941,7 @@ module Cycle = struct
            let name = ["slashed_deposits"]
          end))
          (Pair (Make_index (Raw_level_repr.Index)) (Public_key_hash_index))
-            (Slashed_level)
+      (Slashed_level)
 
   module Selected_stake_distribution =
     Indexed_context.Make_map
@@ -1017,11 +1020,11 @@ module Cycle = struct
            let name = ["nonces"]
          end))
          (Make_index (Raw_level_repr.Index))
-         (struct
-           type t = nonce_status
+      (struct
+        type t = nonce_status
 
-           let encoding = nonce_status_encoding
-         end)
+        let encoding = nonce_status_encoding
+      end)
 
   module Seed =
     Indexed_context.Make_map
@@ -1197,11 +1200,29 @@ module type FOR_CYCLE = sig
 
   val get : Raw_context.t -> Cycle_repr.t -> Seed_repr.seed tzresult Lwt.t
 
+  val update :
+    Raw_context.t ->
+    Cycle_repr.t ->
+    Seed_repr.seed ->
+    Seed_repr.seed_status ->
+    Raw_context.t tzresult Lwt.t
+
   val remove_existing :
     Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 end
 
 (** Seed *)
+
+module Seed_status =
+  Make_single_data_storage (Registered) (Raw_context)
+    (struct
+      let name = ["seed_status"]
+    end)
+    (struct
+      type t = Seed_repr.seed_status
+
+      let encoding = Seed_repr.seed_status_encoding
+    end)
 
 module Seed = struct
   type unrevealed_nonce = Cycle.unrevealed_nonce = {
@@ -1247,7 +1268,36 @@ module Seed = struct
       Cycle.Nonce.remove (ctxt, l.cycle) l.level
   end
 
-  module For_cycle : FOR_CYCLE = Cycle.Seed
+  module VDF_setup =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["vdf_challenge"]
+      end)
+      (struct
+        type t = Seed_repr.vdf_setup
+
+        let encoding = Seed_repr.vdf_setup_encoding
+      end)
+
+  module For_cycle : FOR_CYCLE = struct
+    let init ctxt cycle seed =
+      let open Lwt_result_syntax in
+      let* ctxt = Cycle.Seed.init ctxt cycle seed in
+      let*! ctxt = Seed_status.add ctxt Seed_repr.RANDAO_seed in
+      return ctxt
+
+    let mem = Cycle.Seed.mem
+
+    let get = Cycle.Seed.get
+
+    let update ctxt cycle seed status =
+      Cycle.Seed.update ctxt cycle seed >>=? fun ctxt ->
+      Seed_status.update ctxt status
+
+    let remove_existing = Cycle.Seed.remove_existing
+  end
+
+  let get_status = Seed_status.get
 end
 
 (** Commitments *)
@@ -1259,7 +1309,7 @@ module Commitments =
          let name = ["commitments"]
        end))
        (Make_index (Blinded_public_key_hash.Index))
-       (Tez_repr)
+    (Tez_repr)
 
 (** Ramp up rewards... *)
 
@@ -1277,33 +1327,33 @@ module Ramp_up = struct
            let name = ["ramp_up"; "rewards"]
          end))
          (Make_index (Cycle_repr.Index))
-         (struct
-           type t = reward
+      (struct
+        type t = reward
 
-           let encoding =
-             Data_encoding.(
-               conv
-                 (fun {
-                        baking_reward_fixed_portion;
-                        baking_reward_bonus_per_slot;
-                        endorsing_reward_per_slot;
-                      } ->
-                   ( baking_reward_fixed_portion,
-                     baking_reward_bonus_per_slot,
-                     endorsing_reward_per_slot ))
-                 (fun ( baking_reward_fixed_portion,
-                        baking_reward_bonus_per_slot,
-                        endorsing_reward_per_slot ) ->
-                   {
+        let encoding =
+          Data_encoding.(
+            conv
+              (fun {
                      baking_reward_fixed_portion;
                      baking_reward_bonus_per_slot;
                      endorsing_reward_per_slot;
-                   })
-                 (obj3
-                    (req "baking_reward_fixed_portion" Tez_repr.encoding)
-                    (req "baking_reward_bonus_per_slot" Tez_repr.encoding)
-                    (req "endorsing_reward_per_slot" Tez_repr.encoding)))
-         end)
+                   } ->
+                ( baking_reward_fixed_portion,
+                  baking_reward_bonus_per_slot,
+                  endorsing_reward_per_slot ))
+              (fun ( baking_reward_fixed_portion,
+                     baking_reward_bonus_per_slot,
+                     endorsing_reward_per_slot ) ->
+                {
+                  baking_reward_fixed_portion;
+                  baking_reward_bonus_per_slot;
+                  endorsing_reward_per_slot;
+                })
+              (obj3
+                 (req "baking_reward_fixed_portion" Tez_repr.encoding)
+                 (req "baking_reward_bonus_per_slot" Tez_repr.encoding)
+                 (req "endorsing_reward_per_slot" Tez_repr.encoding)))
+      end)
 end
 
 module Pending_migration = struct
@@ -1366,7 +1416,12 @@ module Liquidity_baking = struct
       (struct
         let name = ["liquidity_baking_cpmm_address"]
       end)
-      (Contract_repr)
+      (struct
+        type t = Contract_hash.t
+
+        (* Keeping contract-compatible encoding to avoid migrating this. *)
+        let encoding = Contract_repr.originated_encoding
+      end)
 end
 
 module Ticket_balance = struct
@@ -1485,19 +1540,73 @@ module Sc_rollup = struct
          end))
          (Make_index (Sc_rollup_repr.Index))
 
+  module Make_versioned
+      (Versioned_value : Sc_rollup_data_version_sig.S) (Data_storage : sig
+        type context
+
+        type key
+
+        type value = Versioned_value.versioned
+
+        val get : context -> key -> (Raw_context.t * value) tzresult Lwt.t
+
+        val find :
+          context -> key -> (Raw_context.t * value option) tzresult Lwt.t
+
+        val update :
+          context -> key -> value -> (Raw_context.t * int) tzresult Lwt.t
+
+        val init :
+          context -> key -> value -> (Raw_context.t * int) tzresult Lwt.t
+
+        val add :
+          context -> key -> value -> (Raw_context.t * int * bool) tzresult Lwt.t
+
+        val add_or_remove :
+          context ->
+          key ->
+          value option ->
+          (Raw_context.t * int * bool) tzresult Lwt.t
+      end) =
+  struct
+    include Data_storage
+
+    type value = Versioned_value.t
+
+    let get ctxt key =
+      let open Lwt_result_syntax in
+      let* ctxt, versioned = get ctxt key in
+      return (ctxt, Versioned_value.of_versioned versioned)
+
+    let find ctxt key =
+      let open Lwt_result_syntax in
+      let* ctxt, versioned = find ctxt key in
+      return (ctxt, Option.map Versioned_value.of_versioned versioned)
+
+    let update ctxt key value =
+      update ctxt key (Versioned_value.to_versioned value)
+
+    let init ctxt key value = init ctxt key (Versioned_value.to_versioned value)
+
+    let add ctxt key value = add ctxt key (Versioned_value.to_versioned value)
+
+    let add_or_remove ctxt key value =
+      add_or_remove ctxt key (Option.map Versioned_value.to_versioned value)
+  end
+
   module PVM_kind =
-    Indexed_context.Make_map
+    Indexed_context.Make_carbonated_map
       (struct
         let name = ["kind"]
       end)
       (struct
-        type t = Sc_rollup_repr.Kind.t
+        type t = Sc_rollups.Kind.t
 
-        let encoding = Sc_rollup_repr.Kind.encoding
+        let encoding = Sc_rollups.Kind.encoding
       end)
 
   module Boot_sector =
-    Indexed_context.Make_map
+    Indexed_context.Make_carbonated_map
       (struct
         let name = ["boot_sector"]
       end)
@@ -1507,27 +1616,43 @@ module Sc_rollup = struct
         let encoding = Data_encoding.string
       end)
 
-  module Initial_level =
+  module Parameters_type =
+    Indexed_context.Make_carbonated_map
+      (struct
+        let name = ["parameters_type"]
+      end)
+      (struct
+        type t = Script_repr.lazy_expr
+
+        let encoding = Script_repr.lazy_expr_encoding
+      end)
+
+  module Genesis_info =
     Indexed_context.Make_map
       (struct
-        let name = ["initial_level"]
+        let name = ["genesis_info"]
       end)
       (struct
-        type t = Raw_level_repr.t
+        type t = Sc_rollup_commitment_repr.genesis_info
 
-        let encoding = Raw_level_repr.encoding
+        let encoding = Sc_rollup_commitment_repr.genesis_info_encoding
       end)
 
-  module Inbox =
+  module Inbox_versioned =
     Indexed_context.Make_carbonated_map
       (struct
         let name = ["inbox"]
       end)
       (struct
-        type t = Sc_rollup_inbox_repr.t
+        type t = Sc_rollup_inbox_repr.versioned
 
-        let encoding = Sc_rollup_inbox_repr.encoding
+        let encoding = Sc_rollup_inbox_repr.versioned_encoding
       end)
+
+  module Inbox = struct
+    include Inbox_versioned
+    include Make_versioned (Sc_rollup_inbox_repr) (Inbox_versioned)
+  end
 
   module Last_cemented_commitment =
     Indexed_context.Make_carbonated_map
@@ -1535,9 +1660,9 @@ module Sc_rollup = struct
         let name = ["last_cemented_commitment"]
       end)
       (struct
-        type t = Sc_rollup_repr.Commitment_hash.t
+        type t = Sc_rollup_commitment_repr.Hash.t
 
-        let encoding = Sc_rollup_repr.Commitment_hash.encoding
+        let encoding = Sc_rollup_commitment_repr.Hash.encoding
       end)
 
   module Stakers =
@@ -1548,10 +1673,13 @@ module Sc_rollup = struct
          end))
          (Public_key_hash_index)
       (struct
-        type t = Sc_rollup_repr.Commitment_hash.t
+        type t = Sc_rollup_commitment_repr.Hash.t
 
-        let encoding = Sc_rollup_repr.Commitment_hash.encoding
+        let encoding = Sc_rollup_commitment_repr.Hash.encoding
       end)
+
+  let stakers (ctxt : Raw_context.t) (rollup : Sc_rollup_repr.t) =
+    Stakers.list_values (ctxt, rollup)
 
   module Staker_count =
     Indexed_context.Make_carbonated_map
@@ -1564,18 +1692,23 @@ module Sc_rollup = struct
         let encoding = Data_encoding.int32
       end)
 
-  module Commitments =
+  module Commitments_versioned =
     Make_indexed_carbonated_data_storage
       (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct
            let name = ["commitments"]
          end))
-         (Make_index (Sc_rollup_repr.Commitment_hash_index))
-         (struct
-           type t = Sc_rollup_repr.Commitment.t
+         (Make_index (Sc_rollup_commitment_repr.Hash))
+      (struct
+        type t = Sc_rollup_commitment_repr.versioned
 
-           let encoding = Sc_rollup_repr.Commitment.encoding
-         end)
+        let encoding = Sc_rollup_commitment_repr.versioned_encoding
+      end)
+
+  module Commitments = struct
+    include Commitments_versioned
+    include Make_versioned (Sc_rollup_commitment_repr) (Commitments_versioned)
+  end
 
   module Commitment_stake_count =
     Make_indexed_carbonated_data_storage
@@ -1583,12 +1716,12 @@ module Sc_rollup = struct
          (struct
            let name = ["commitment_stake_count"]
          end))
-         (Make_index (Sc_rollup_repr.Commitment_hash_index))
-         (struct
-           type t = int32
+         (Make_index (Sc_rollup_commitment_repr.Hash))
+      (struct
+        type t = int32
 
-           let encoding = Data_encoding.int32
-         end)
+        let encoding = Data_encoding.int32
+      end)
 
   module Commitment_added =
     Make_indexed_carbonated_data_storage
@@ -1596,10 +1729,170 @@ module Sc_rollup = struct
          (struct
            let name = ["commitment_added"]
          end))
-         (Make_index (Sc_rollup_repr.Commitment_hash_index))
-         (struct
-           type t = Raw_level_repr.t
+         (Make_index (Sc_rollup_commitment_repr.Hash))
+      (struct
+        type t = Raw_level_repr.t
 
-           let encoding = Raw_level_repr.encoding
-         end)
+        let encoding = Raw_level_repr.encoding
+      end)
+
+  module Game_versioned =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["game"]
+         end))
+         (Make_index (Sc_rollup_game_repr.Index))
+      (struct
+        type t = Sc_rollup_game_repr.versioned
+
+        let encoding = Sc_rollup_game_repr.versioned_encoding
+      end)
+
+  module Game = struct
+    include Game_versioned
+    include Make_versioned (Sc_rollup_game_repr) (Game_versioned)
+  end
+
+  module Game_timeout =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["game_timeout"]
+         end))
+         (Make_index (Sc_rollup_game_repr.Index))
+      (struct
+        type t = Raw_level_repr.t
+
+        let encoding = Raw_level_repr.encoding
+      end)
+
+  module Opponent =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["opponent"]
+         end))
+         (Public_key_hash_index)
+      (struct
+        type t = Sc_rollup_repr.Staker.t
+
+        let encoding = Sc_rollup_repr.Staker.encoding
+      end)
+
+  (** An index used for a SCORU's outbox levels. An outbox level is mapped to
+     the index through: [outbox_level % sc_rollup_max_active_outbox_levels].
+     That way we keep a limited number of entries. The current value of an
+     entry contains the most recently added level that maps to the index. *)
+  module Level_index = struct
+    type t = int32
+
+    let rpc_arg =
+      let construct = Int32.to_string in
+      let destruct hash =
+        Int32.of_string_opt hash
+        |> Result.of_option ~error:"Cannot parse level index"
+      in
+      RPC_arg.make
+        ~descr:"The level index for applied outbox message records"
+        ~name:"level_index"
+        ~construct
+        ~destruct
+        ()
+
+    let encoding =
+      Data_encoding.def
+        "level_index"
+        ~title:"Level index"
+        ~description:"The level index for applied outbox message records"
+        Data_encoding.int32
+
+    let compare = Compare.Int32.compare
+
+    let path_length = 1
+
+    let to_path c l = Int32.to_string c :: l
+
+    let of_path = function [c] -> Int32.of_string_opt c | _ -> None
+  end
+
+  module Level_index_context =
+    Make_indexed_subcontext
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["level_index"]
+         end))
+         (Make_index (Level_index))
+
+  module Bitset_and_level = struct
+    type t = Raw_level_repr.t * Bitset.t
+
+    let encoding =
+      Data_encoding.(
+        obj2
+          (req "level" Raw_level_repr.encoding)
+          (req "bitset" Bitset.encoding))
+  end
+
+  module Applied_outbox_messages =
+    Level_index_context.Make_carbonated_map
+      (struct
+        let name = ["applied_outbox_messages"]
+      end)
+      (Bitset_and_level)
+
+  (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3172.
+     Implement support for unsubscribing from a slot. *)
+  (* We map levels into (non-empty) list of slots. If a rollup is subscribed to a slot
+     index s at level l, then the slot index s will appear in the map entry for level l.
+  *)
+  module Dal_level_index =
+    Make_indexed_subcontext
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["dal"; "level"]
+         end))
+         (Make_index (Raw_level_repr.Index))
+
+  module Slot_subscriptions =
+    Dal_level_index.Make_map
+      (struct
+        let name = ["slot_subscriptions"]
+      end)
+      (struct
+        type t = Bitset.t
+
+        let encoding = Bitset.encoding
+      end)
+end
+
+module Dal = struct
+  module Raw_context =
+    Make_subcontext (Registered) (Raw_context)
+      (struct
+        let name = ["dal"]
+      end)
+
+  module Level_context =
+    Make_indexed_subcontext
+      (Make_subcontext (Registered) (Raw_context)
+         (struct
+           let name = ["level"]
+         end))
+         (Make_index (Raw_level_repr.Index))
+
+  (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3113
+
+     This is only for prototyping. Probably something smarter would be
+     to index each header directly. *)
+  module Slot_headers =
+    Level_context.Make_map
+      (struct
+        let name = ["slots"]
+      end)
+      (struct
+        type t = Dal_slot_repr.t list
+
+        let encoding = Data_encoding.(list Dal_slot_repr.encoding)
+      end)
 end

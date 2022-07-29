@@ -141,14 +141,14 @@ module Make (M : Tezos_error_monad.TzLwtreslib.Map.S) :
 
   let swap vec i j =
     match (M.find_opt i vec, M.find_opt j vec) with
-    | (None, None) -> vec
-    | (Some elt, None) ->
+    | None, None -> vec
+    | Some elt, None ->
         let vec = set vec i R.zero in
         set vec j elt
-    | (None, Some elt) ->
+    | None, Some elt ->
         let vec = set vec j R.zero in
         set vec i elt
-    | (Some e1, Some e2) ->
+    | Some e1, Some e2 ->
         let vec = set vec i e2 in
         set vec j e1
 

@@ -121,7 +121,7 @@ let rec convert_element (element : Json_schema.element) : Openapi.Schema.t =
         in
         fun ?title ?description ?(nullable = false) () ->
           match (title, description, nullable) with
-          | (None, None, false) -> Openapi.Schema.reference name
+          | None, None, false -> Openapi.Schema.reference name
           | _ ->
               (* OpenAPI does not allow other fields next to "$ref" fields.
                  So we have to cheat a little bit. *)
@@ -158,13 +158,13 @@ let rec convert_element (element : Json_schema.element) : Openapi.Schema.t =
         let minimum =
           Option.map
             (function
-              | (f, `Exclusive) -> int_of_float (ceil f) | _ -> assert false)
+              | f, `Exclusive -> int_of_float (ceil f) | _ -> assert false)
             minimum
         in
         let maximum =
           Option.map
             (function
-              | (f, `Exclusive) -> int_of_float (floor f) | _ -> assert false)
+              | f, `Exclusive -> int_of_float (floor f) | _ -> assert false)
             maximum
         in
         Openapi.Schema.integer ?enum ?minimum ?maximum
@@ -174,14 +174,10 @@ let rec convert_element (element : Json_schema.element) : Openapi.Schema.t =
         (* Note: there is currently a bug in Json_schema:
            `Exclusive and `Inclusive are inverted... *)
         let minimum =
-          Option.map
-            (function (f, `Exclusive) -> f | _ -> assert false)
-            minimum
+          Option.map (function f, `Exclusive -> f | _ -> assert false) minimum
         in
         let maximum =
-          Option.map
-            (function (f, `Exclusive) -> f | _ -> assert false)
-            maximum
+          Option.map (function f, `Exclusive -> f | _ -> assert false) maximum
         in
         Openapi.Schema.number ?minimum ?maximum
     | Boolean ->
@@ -208,9 +204,9 @@ let empty_env = String_map.empty
 let merge_envs (a : env) (b : env) : env =
   let merge_key _name a b =
     match (a, b) with
-    | (None, None) -> None
-    | (None, (Some _ as x)) | ((Some _ as x), None) -> x
-    | (Some a, Some _b) ->
+    | None, None -> None
+    | None, (Some _ as x) | (Some _ as x), None -> x
+    | Some a, Some _b ->
         (* TODO: check that a and b are equivalent *)
         Some a
   in
@@ -258,13 +254,13 @@ let convert_response ?code (schemas : Api.schemas option) :
   match schemas with
   | None -> (empty_env, [])
   | Some schemas ->
-      let (env, schema) = convert_schema schemas.json_schema in
+      let env, schema = convert_schema schemas.json_schema in
       (env, [Openapi.Response.make ?code ~description:"" schema])
 
 let opt_map_with_env f = function
   | None -> (empty_env, None)
   | Some x ->
-      let (env, y) = f x in
+      let env, y = f x in
       (env, Some y)
 
 let convert_query_parameter {Api.id = _; name; description; kind} :
@@ -293,12 +289,12 @@ let convert_service expected_path expected_method
       "expected path %s but found %s"
       (Api.show_path expected_path)
       (Api.show_path path) ;
-  let (env_1, request_body) =
+  let env_1, request_body =
     opt_map_with_env (fun x -> convert_schema x.Api.json_schema) input
   in
   (* 200 is the HTTP code for OK. *)
-  let (env_2, output) = convert_response ~code:200 output in
-  let (env_3, error) = convert_response error in
+  let env_2, output = convert_response ~code:200 output in
+  let env_3, error = convert_response error in
   let responses = List.flatten [output; error] in
   let query = List.map convert_query_parameter query in
   let service =
@@ -322,15 +318,13 @@ let convert_path (path : Api.path) : Openapi.Path.t =
 let convert_endpoint (endpoint : Api.service Api.endpoint) :
     env * Openapi.Endpoint.t =
   let convert_service = convert_service endpoint.path in
-  let (env_1, get) = opt_map_with_env (convert_service GET) endpoint.get in
-  let (env_2, post) = opt_map_with_env (convert_service POST) endpoint.post in
-  let (env_3, put) = opt_map_with_env (convert_service PUT) endpoint.put in
-  let (env_4, delete) =
+  let env_1, get = opt_map_with_env (convert_service GET) endpoint.get in
+  let env_2, post = opt_map_with_env (convert_service POST) endpoint.post in
+  let env_3, put = opt_map_with_env (convert_service PUT) endpoint.put in
+  let env_4, delete =
     opt_map_with_env (convert_service DELETE) endpoint.delete
   in
-  let (env_5, patch) =
-    opt_map_with_env (convert_service PATCH) endpoint.patch
-  in
+  let env_5, patch = opt_map_with_env (convert_service PATCH) endpoint.patch in
   let endpoint =
     Openapi.Endpoint.make
       ?get
@@ -345,7 +339,7 @@ let convert_endpoint (endpoint : Api.service Api.endpoint) :
 
 let convert_api version (endpoints : Api.service Api.endpoint list) : Openapi.t
     =
-  let (envs, endpoints) = List.map convert_endpoint endpoints |> List.split in
+  let envs, endpoints = List.map convert_endpoint endpoints |> List.split in
   Openapi.make
     ~title:"Tezos RPC"
     ~description:"Tezos client RPC API."

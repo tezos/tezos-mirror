@@ -31,7 +31,7 @@
     Subject:      Roundtrips for functions built on the HACL* NaCl API.
 *)
 
-let (sk, pk, pkh) = Crypto_box.random_keypair ()
+let sk, pk, pkh = Crypto_box.random_keypair ()
 
 let zero_nonce = Crypto_box.zero_nonce
 

@@ -25,7 +25,6 @@
 
 open Protocol
 module Proto_Nonce = Nonce (* Renamed otherwise is masked by Alpha_context *)
-
 open Alpha_context
 
 type t = {
@@ -161,12 +160,12 @@ let add_operation ?expect_apply_failure ?expect_failure st op =
   let open Apply_results in
   apply_operation st.state op >|= Environment.wrap_tzresult >>= fun result ->
   match (expect_apply_failure, result) with
-  | (Some _, Ok _) -> failwith "Error expected while adding operation"
-  | (Some f, Error err) -> f err >|=? fun () -> st
-  | (None, result) -> (
+  | Some _, Ok _ -> failwith "Error expected while adding operation"
+  | Some f, Error err -> f err >|=? fun () -> st
+  | None, result -> (
       result >>?= fun result ->
       match result with
-      | (state, (Operation_metadata result as metadata)) ->
+      | state, (Operation_metadata result as metadata) ->
           detect_script_failure result |> fun result ->
           (match expect_failure with
           | None -> Lwt.return result
@@ -181,7 +180,7 @@ let add_operation ?expect_apply_failure ?expect_failure st op =
             rev_operations = op :: st.rev_operations;
             rev_tickets = metadata :: st.rev_tickets;
           }
-      | (state, (No_operation_metadata as metadata)) ->
+      | state, (No_operation_metadata as metadata) ->
           return
             {
               st with

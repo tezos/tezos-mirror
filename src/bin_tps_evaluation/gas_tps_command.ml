@@ -39,7 +39,7 @@ let estimate_gas_tps ~average_block_path () =
       ~base:(Either.right (protocol, Some protocol_constants))
       []
   in
-  let* (node, client) =
+  let* node, client =
     Client.init_with_protocol
       ~nodes_args:Node.[Connections 0; Synchronisation_threshold 0]
       ~parameter_file

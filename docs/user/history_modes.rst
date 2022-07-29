@@ -41,7 +41,7 @@ Three history modes are provided:
 
     + Only requires a minimal and bounded disk storage.
     + Can run on low resources architectures.
-    + Can be bootstrapped within minutes.
+    + Can be bootstrapped within minutes, thanks to a rolling snapshot import.
 
   * Downsides
 

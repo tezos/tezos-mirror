@@ -30,9 +30,9 @@
    {!FunctionalArray}.
 *)
 
-(*  TODO: https://gitlab.com/tezos/tezos/-/issues/1586
-          Use monolith to improve these tests.
- *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/1586
+         Use monolith to improve these tests.
+*)
 
 open Alcotest
 
@@ -89,7 +89,7 @@ struct
 
   let check_out_of_bounds (s, d, _) =
     let a = make s d in
-    let (a, _) =
+    let a, _ =
       Utils.fold_n_times s (fun (a, i) -> (set a i "tezos", i + 1)) (a, 0)
     in
     if not (get a (-1) = d) then fail "get a (-1) = d" ;
@@ -97,18 +97,14 @@ struct
 
   let check_iter (s, _, _) =
     let a = make s 0 in
-    let (a, _) =
-      Utils.fold_n_times s (fun (a, i) -> (set a i 1, i + 1)) (a, 0)
-    in
+    let a, _ = Utils.fold_n_times s (fun (a, i) -> (set a i 1, i + 1)) (a, 0) in
     let r = ref 0 in
     iter (fun x -> r := !r + x) a ;
     if not (!r = s) then fail "iter f a should iterate over a."
 
   let check_map (s, _, _) =
     let a = make s 0 in
-    let (a, _) =
-      Utils.fold_n_times s (fun (a, i) -> (set a i 1, i + 1)) (a, 0)
-    in
+    let a, _ = Utils.fold_n_times s (fun (a, i) -> (set a i 1, i + 1)) (a, 0) in
     let b = map succ a in
     let r = ref 0 in
     iter (fun x -> r := !r + x) b ;
@@ -116,9 +112,7 @@ struct
 
   let check_fold (s, _, _) =
     let a = make s 100 in
-    let (a, _) =
-      Utils.fold_n_times s (fun (a, i) -> (set a i 1, i + 1)) (a, 0)
-    in
+    let a, _ = Utils.fold_n_times s (fun (a, i) -> (set a i 1, i + 1)) (a, 0) in
     let r' = fold ( + ) a 0 in
     let r = ref 0 in
     iter (fun x -> r := !r + x) a ;
@@ -129,10 +123,8 @@ struct
 
   let check_fold_map (s, _, _) =
     let a = make s 100 in
-    let (a, _) =
-      Utils.fold_n_times s (fun (a, i) -> (set a i 1, i + 1)) (a, 0)
-    in
-    let (r', a') = fold_map (fun accu x -> (accu + x, x)) a 0 0 in
+    let a, _ = Utils.fold_n_times s (fun (a, i) -> (set a i 1, i + 1)) (a, 0) in
+    let r', a' = fold_map (fun accu x -> (accu + x, x)) a 0 0 in
     let r = ref 0 in
     iter (fun x -> r := !r + x) a' ;
     if not (!r = r') then

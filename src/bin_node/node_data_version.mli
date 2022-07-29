@@ -24,19 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The abstract type for data versions. *)
-type t
-
 (** Errors related to checks related to the data dir. *)
 type error += Invalid_data_dir of {data_dir : string; msg : string option}
 
-type error += Invalid_data_dir_version of t * t
-
 type error += Could_not_read_data_dir_version of string
-
-(** The current data version. *)
-
-val data_version : t
 
 (** Default file names to store the informations about the node's network
     identity, peers and configuration. *)

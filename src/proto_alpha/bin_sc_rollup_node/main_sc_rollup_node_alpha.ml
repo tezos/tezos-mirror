@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -82,6 +83,99 @@ let data_dir_arg =
     ~default
     Client_proto_args.string_parameter
 
+let minimal_fees_arg =
+  let open Protocol.Alpha_context in
+  let default =
+    Configuration.default_fee_parameter.minimal_fees |> Tez.to_string
+  in
+  Clic.default_arg
+    ~long:"minimal-fees"
+    ~placeholder:"amount"
+    ~doc:
+      "Exclude operations with fees lower than this threshold (in tez) when \
+       injecting."
+    ~default
+    (Clic.parameter (fun _ s ->
+         match Tez.of_string s with
+         | Some t -> return t
+         | None -> fail (Sc_rollup_node_errors.Bad_minimal_fees s)))
+
+let minimal_nanotez_per_gas_unit_arg =
+  let default =
+    Configuration.default_fee_parameter.minimal_nanotez_per_gas_unit
+    |> Q.to_string
+  in
+  Clic.default_arg
+    ~long:"minimal-nanotez-per-gas-unit"
+    ~placeholder:"amount"
+    ~doc:
+      "Exclude operations with fees per gas lower than this threshold (in \
+       nanotez) when injecting."
+    ~default
+    (Clic.parameter (fun _ s ->
+         try return (Q.of_string s)
+         with _ -> fail (Sc_rollup_node_errors.Bad_minimal_fees s)))
+
+let minimal_nanotez_per_byte_arg =
+  let default =
+    Configuration.default_fee_parameter.minimal_nanotez_per_byte |> Q.to_string
+  in
+  Clic.default_arg
+    ~long:"minimal-nanotez-per-byte"
+    ~placeholder:"amount"
+    ~default
+    ~doc:
+      "Exclude operations with fees per byte lower than this threshold (in \
+       nanotez) when injecting."
+    (Clic.parameter (fun _ s ->
+         try return (Q.of_string s)
+         with _ -> fail (Sc_rollup_node_errors.Bad_minimal_fees s)))
+
+let force_low_fee_arg =
+  Clic.switch
+    ~long:"force-low-fee"
+    ~doc:
+      "Don't check that the fee is lower than the estimated default value when \
+       injecting."
+    ()
+
+let fee_cap_arg =
+  let open Protocol.Alpha_context in
+  let default = Configuration.default_fee_parameter.fee_cap |> Tez.to_string in
+  Clic.default_arg
+    ~long:"fee-cap"
+    ~placeholder:"amount"
+    ~default
+    ~doc:"Set the fee cap when injecting."
+    (Clic.parameter (fun _ s ->
+         match Tez.of_string s with
+         | Some t -> return t
+         | None -> failwith "Bad fee cap"))
+
+let burn_cap_arg =
+  let open Protocol.Alpha_context in
+  let default = Configuration.default_fee_parameter.burn_cap |> Tez.to_string in
+  Clic.default_arg
+    ~long:"burn-cap"
+    ~placeholder:"amount"
+    ~default
+    ~doc:"Set the burn cap when injecting."
+    (Clic.parameter (fun _ s ->
+         match Tez.of_string s with
+         | Some t -> return t
+         | None -> failwith "Bad burn cap"))
+
+let loser_mode =
+  Clic.default_arg
+    ~long:"loser-mode"
+    ~placeholder:"mode"
+    ~default:""
+    ~doc:"Set the rollup node failure points (for test only!)."
+    (Clic.parameter (fun _ s ->
+         match Loser_mode.make s with
+         | Some t -> return t
+         | None -> failwith "Invalid syntax for failure points"))
+
 let group =
   {
     Clic.name = "sc_rollup.node";
@@ -93,12 +187,31 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure the smart-contract rollup node."
-    (args3 data_dir_arg rpc_addr_arg rpc_port_arg)
+    (args10
+       data_dir_arg
+       rpc_addr_arg
+       rpc_port_arg
+       minimal_fees_arg
+       minimal_nanotez_per_byte_arg
+       minimal_nanotez_per_gas_unit_arg
+       force_low_fee_arg
+       fee_cap_arg
+       burn_cap_arg
+       loser_mode)
     (prefixes ["config"; "init"; "on"]
     @@ sc_rollup_address_param
     @@ prefixes ["with"; "operator"]
     @@ sc_rollup_node_operator_param stop)
-    (fun (data_dir, rpc_addr, rpc_port)
+    (fun ( data_dir,
+           rpc_addr,
+           rpc_port,
+           minimal_fees,
+           minimal_nanotez_per_byte,
+           minimal_nanotez_per_gas_unit,
+           force_low_fee,
+           fee_cap,
+           burn_cap,
+           loser_mode )
          sc_rollup_address
          sc_rollup_node_operator
          cctxt ->
@@ -110,6 +223,16 @@ let config_init_command =
           sc_rollup_node_operator;
           rpc_addr;
           rpc_port;
+          fee_parameter =
+            {
+              minimal_fees;
+              minimal_nanotez_per_byte;
+              minimal_nanotez_per_gas_unit;
+              force_low_fee;
+              fee_cap;
+              burn_cap;
+            };
+          loser_mode;
         }
       in
       save config >>=? fun () ->
@@ -135,6 +258,4 @@ let sc_rollup_commands () =
 let select_commands _ _ =
   return (sc_rollup_commands () @ Client_helpers_commands.commands ())
 
-let main () = ()
-
-let () = Client_main_run.run (module Client_config) ~select_commands
+let () = Client_main_run.run (module Daemon_config) ~select_commands

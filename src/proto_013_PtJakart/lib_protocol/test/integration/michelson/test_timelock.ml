@@ -36,11 +36,11 @@ open Protocol
 let wrap e = Lwt.return (Environment.wrap_tzresult e)
 
 let simple_test () =
-  let (public, secret) = Timelock.gen_rsa_keys () in
+  let public, secret = Timelock.gen_rsa_keys () in
   let locked_value = Timelock.gen_locked_value public in
   let time = 1000 in
   let unlocked_value = Timelock.unlock_with_secret secret ~time locked_value in
-  let (same_unlocked, proof) =
+  let same_unlocked, proof =
     Timelock.unlock_and_prove_without_secret public ~time locked_value
   in
   assert (unlocked_value = same_unlocked) ;
@@ -78,11 +78,11 @@ let contract_test () =
   Context.init ~consensus_threshold:0 3 >>=? fun (b, contracts) ->
   let src = match contracts with hd :: _ -> hd | _ -> assert false in
   originate_contract "contracts/timelock.tz" "0xaa" src b >>=? fun (dst, b) ->
-  let (public, secret) = Timelock.gen_rsa_keys () in
+  let public, secret = Timelock.gen_rsa_keys () in
   let locked_value = Timelock.gen_locked_value public in
   let time = 1000 in
   let unlocked_value = Timelock.unlock_with_secret secret ~time locked_value in
-  let (_same_unlocked, proof) =
+  let _same_unlocked, proof =
     Timelock.unlock_and_prove_without_secret public ~time locked_value
   in
   let sym_key = Timelock.unlocked_value_to_symmetric_key unlocked_value in
@@ -139,13 +139,13 @@ let contract_test () =
     (Hex.show (Hex.of_bytes message))
   >>=? fun () ->
   (* We redo an RSA parameters generation to create incorrect cipher and proof *)
-  let (public_bogus, secret_bogus) = Timelock.gen_rsa_keys () in
+  let public_bogus, secret_bogus = Timelock.gen_rsa_keys () in
   let locked_value_bogus = Timelock.gen_locked_value public_bogus in
   let time = 1000 in
   let unlocked_value_bogus =
     Timelock.unlock_with_secret secret_bogus ~time locked_value_bogus
   in
-  let (_same_unlocked, proof_bogus) =
+  let _same_unlocked, proof_bogus =
     Timelock.unlock_and_prove_without_secret public ~time locked_value_bogus
   in
   let sym_key_bogus =

@@ -29,13 +29,21 @@
 
    This rollup is a stack machine equipped with addition.
 
-   It processed postfix arithmetic expressions written as sequence of
+   It processes postfix arithmetic expressions written as sequence of
    (space separated) [int] and [+] using the following rules:
 
    - a number [x] is interpreted as pushing [x] on the stack ;
 
+   - a variable [a] is interpreted as storing the topmost element of the
+     stack in the storage under the name "a" ;
+
+   - a variable [out] is interpreted as adding a message to the outbox
+     containing a single transaction batch with the topmost element of the
+     stack as payload, the zero contract as destination, and a default
+     entrypoint ;
+
    - a symbol [+] pops two integers [x] and [y] and pushes [x + y] on
-   the stack.
+     the stack ;
 
    If a message is not syntactically correct or does not evaluate
    correctly, the machine stops its evaluation and waits for the next
@@ -44,13 +52,12 @@
    The machine has a boot sector which is a mere string used a prefix
    for each message.
 
-   The module implements the {!Sc_rollup_PVM_sem.S} interface to be
+   The module implements the {!Sc_rollup_PVM_sem.S}Î interface to be
    used in the smart contract rollup infrastructure.
 
    The machine exposes extra operations to be used in the rollup node.
 
 *)
-open Alpha_context
 
 module type S = sig
   include Sc_rollup_PVM_sem.S
@@ -70,16 +77,19 @@ module type S = sig
   val pp : state -> (Format.formatter -> unit -> unit) Lwt.t
 
   (** [get_tick state] returns the current tick of [state]. *)
-  val get_tick : state -> Sc_rollup.Tick.t Lwt.t
+  val get_tick : state -> Sc_rollup_tick_repr.t Lwt.t
 
-  (** The machine has three possible states: *)
+  (** The machine has three possible statuses: *)
   type status = Halted | WaitingForInputMessage | Parsing | Evaluating
 
   (** [get_status state] returns the machine status in [state]. *)
   val get_status : state -> status Lwt.t
 
-  (** The machine has only two instructions. *)
-  type instruction = IPush : int -> instruction | IAdd : instruction
+  (** The machine has only three instructions. *)
+  type instruction =
+    | IPush : int -> instruction
+    | IAdd : instruction
+    | IStore : string -> instruction
 
   (** [equal_instruction i1 i2] is [true] iff [i1] equals [i2]. *)
   val equal_instruction : instruction -> instruction -> bool
@@ -100,6 +110,10 @@ module type S = sig
   (** [get_stack state] returns the current stack. *)
   val get_stack : state -> int list Lwt.t
 
+  (** [get_var state x] returns the current value of variable [x].
+      Returns [None] if [x] does not exist. *)
+  val get_var : state -> string -> int option Lwt.t
+
   (** [get_evaluation_result state] returns [Some true] if the current
       message evaluation succeeds, [Some false] if it failed, and
       [None] if the evaluation has not been done yet. *)
@@ -112,31 +126,48 @@ module type S = sig
   val get_is_stuck : state -> string option Lwt.t
 end
 
-module ProtocolImplementation : S with type context = Context.t
+type 'a proof = {
+  tree_proof : 'a;
+  given : Sc_rollup_PVM_sem.input option;
+  requested : Sc_rollup_PVM_sem.input_request;
+}
+
+module ProtocolImplementation :
+  S
+    with type context = Context.t
+     and type state = Context.tree
+     and type proof = Context.Proof.tree Context.Proof.t proof
+
+(** This is the state hash of reference that both the prover of the
+    node and the verifier of the protocol {!ProtocolImplementation}
+    have to agree on (if they do, it means they are using the same
+    tree structure). *)
+val reference_initial_state_hash : Sc_rollup_repr.State_hash.t
 
 module type P = sig
   module Tree : Context.TREE with type key = string list and type value = bytes
 
   type tree = Tree.tree
 
+  val hash_tree : tree -> Sc_rollup_repr.State_hash.t
+
   type proof
 
   val proof_encoding : proof Data_encoding.t
 
-  val proof_start_state : proof -> Sc_rollup.State_hash.t
+  val proof_before : proof -> Sc_rollup_repr.State_hash.t
 
-  val proof_stop_state : proof -> Sc_rollup.State_hash.t
+  val proof_after : proof -> Sc_rollup_repr.State_hash.t
 
   val verify_proof :
-    proof ->
-    (tree -> (tree * 'a) Lwt.t) ->
-    ( tree * 'a,
-      [ `Proof_mismatch of string
-      | `Stream_too_long of string
-      | `Stream_too_short of string ] )
-    result
-    Lwt.t
+    proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t
+
+  val produce_proof :
+    Tree.t -> tree -> (tree -> (tree * 'a) Lwt.t) -> (proof * 'a) option Lwt.t
 end
 
 module Make (Context : P) :
-  S with type context = Context.Tree.t and type state = Context.tree
+  S
+    with type context = Context.Tree.t
+     and type state = Context.tree
+     and type proof = Context.proof proof

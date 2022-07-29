@@ -27,7 +27,7 @@ open Alpha_context
 open Protocol_client_context
 open Tezos_micheline
 
-let return_single_manager_result (oph, op, result) =
+let return_single_manager_result (oph, _, op, result) =
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
@@ -326,8 +326,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~src_sk
     ~fee_parameter
     operation
-  >>=? fun (oph, op, result) ->
+  >>=? fun ((_, _, _, result) as res) ->
   Lwt.return (Injection.originated_contracts ~force result)
   >>=? fun contracts ->
-  return_single_manager_result (oph, op, result) >>=? fun res ->
-  return (res, contracts)
+  return_single_manager_result res >>=? fun res -> return (res, contracts)

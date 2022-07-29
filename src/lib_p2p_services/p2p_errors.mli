@@ -28,6 +28,8 @@
 
 type error += Connection_closed
 
+type error += Connection_error
+
 (* P2P socket *)
 
 type error += Decipher_error

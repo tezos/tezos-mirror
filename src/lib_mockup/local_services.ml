@@ -461,13 +461,13 @@ module Make (E : MENV) = struct
                      ~protocol_data
                      ()
                  in
-                 let* (validation_passes, validation_state, preapply_results) =
+                 let* validation_passes, validation_state, preapply_results =
                    List.fold_left_es
                      (fun ( validation_passes,
                             validation_state,
                             validation_result )
                           operations ->
-                       let* (state, result) =
+                       let* state, result =
                          List.fold_left_es
                            simulate_operation
                            (validation_state, Preapply_result.empty)
@@ -485,7 +485,7 @@ module Make (E : MENV) = struct
                      operations
                  in
                  let cache_nonce = Some E.rpc_context.block_header in
-                 let* (validation_result, _metadata) =
+                 let* validation_result, _metadata =
                    E.Protocol.finalize_block validation_state cache_nonce
                  in
                  (* Similar to lib_shell.Prevalidation.preapply *)
@@ -541,10 +541,10 @@ module Make (E : MENV) = struct
            with_chain ~caller_name:"preapply operations" chain (fun () ->
                let*! outcome =
                  let* state = partial_construction ~cache:`Lazy () in
-                 let* (state, acc) =
+                 let* state, acc =
                    List.fold_left_es
                      (fun (state, acc) op ->
-                       let* (state, result) =
+                       let* state, result =
                          E.Protocol.apply_operation state op
                        in
                        return (state, (op.protocol_data, result) :: acc))
@@ -585,7 +585,7 @@ module Make (E : MENV) = struct
     else
       let operations = op :: mempool_operations in
       let* validation_state = partial_construction ~cache:`Lazy () in
-      let* (validation_state, preapply_result) =
+      let* validation_state, preapply_result =
         List.fold_left_es
           (fun rstate (shell, protocol_data) ->
             simulate_operation rstate E.Protocol.{shell; protocol_data})
@@ -655,11 +655,11 @@ module Make (E : MENV) = struct
             in
             let*! result =
               let* state = partial_construction ~cache:`Lazy () in
-              let* (state, receipt) = E.Protocol.apply_operation state op in
+              let* state, receipt = E.Protocol.apply_operation state op in
               (* The following finalization does not have to update protocol
                  caches because we are not interested in block creation here.
                  Hence, [cache_nonce] is set to [None]. *)
-              let* (validation_result, _block_header_metadata) =
+              let* validation_result, _block_header_metadata =
                 E.Protocol.finalize_block state None
               in
               return (validation_result, receipt)
@@ -696,7 +696,7 @@ module Make (E : MENV) = struct
               {shell = block_header.shell; protocol_data}
               ~cache:`Lazy
           in
-          let* (validation_state, _) =
+          let* validation_state, _ =
             List.fold_left_es
               (List.fold_left_es (fun (validation_state, results) op ->
                    match
@@ -712,7 +712,7 @@ module Make (E : MENV) = struct
                            protocol_data = operation_data;
                          }
                        in
-                       let* (validation_state, receipt) =
+                       let* validation_state, receipt =
                          E.Protocol.apply_operation validation_state op
                        in
                        return (validation_state, receipt :: results)))
@@ -733,7 +733,7 @@ module Make (E : MENV) = struct
         | None -> RPC_answer.fail [Cannot_parse_op]
         | Some block_header -> (
             let*! r =
-              let* ({context; _}, _) = reconstruct operations block_header in
+              let* {context; _}, _ = reconstruct operations block_header in
               let rpc_context =
                 Tezos_protocol_environment.
                   {

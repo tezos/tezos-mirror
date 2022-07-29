@@ -2,11 +2,19 @@ Proxy server
 ------------
 
 This page describes the *proxy server*, a readonly frontend to ``tezos-node``
-which is designed to lower the load of nodes. It is named after two things:
+which is designed to lower the load of full nodes. It can be run separately from
+a node and will handle some RPC requests by itself. It is named after two
+things:
 
 * The :doc:`proxy mode<proxy>` of the client on which it builds upon.
 * Regular HTTP proxies, as proxy servers are meant to be deployed
   in front of a node, to lower the node's load.
+
+While the proxy server can only serve a subset of the RPCs a full node can serve
+(detailed :ref:`below <what_the_proxy_server_serves>`), one can transparently
+use a proxy server as a replacement for a full node, in the manner described
+:ref:`below <unsupported_rpcs>`: it will use HTTP redirects to redirect clients
+to the node when it cannot handle a certain request.
 
 Launching a proxy server
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -262,21 +270,47 @@ All arguments are optional as they can either be specified in the configuration
 file or on the command line. However, the union of the configuration file
 and the command line should specify the endpoint to use and the RPC address to serve.
 
+.. _what_the_proxy_server_serves:
+
 What the proxy server serves
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The proxy server serves a subset of what a node serves. The proxy server
-serves the protocol-specific RPCs, which are listed
-`here <https://tezos.gitlab.io/alpha/rpc.html#protocol-alpha>`_ for protocol Alpha.
-The proxy server's purpose is to serve only readonly requests (``GET`` requests, as well
-as a subset of the ``POST`` requests), as it's a readonly frontend for the underlying node.
-Requests that are not readonly should be sent to the node.
+The proxy server itself serves protocol-specific RPCs, which are listed
+`here <https://tezos.gitlab.io/alpha/rpc.html#protocol-alpha>`_ for protocol Alpha,
+but not all of them: since the proxy server is a readonly frontend for the
+underlying node, it only serves the readonly requests (``GET`` requests, as
+well as a subset of the ``POST`` requests).
 
 Because computations done by the proxy server are protocol dependent, the proxy server
 does not support all protocols. However, it is expected than, at any
 given time, the proxy server supports ``Alpha`` and the three protocols
 before that. In doubt, execute
 ``tezos-client list proxy protocols`` to see the supported protocols.
+
+.. _unsupported_rpcs:
+
+Unsupported RPCs
+~~~~~~~~~~~~~~~~
+
+Requests that are not readonly can only be handled by a full node. However, it
+is possible to *send* any RPC to the proxy server: if the RPC is not supported
+by the proxy server, it will redirect clients to the appropriate endpoint on the
+underlying node using an HTTP redirect (``301 Moved Permanently``), and the node
+will then handle the request.
+
+This can be easily demonstrated with a simple test: start a proxy server, and
+make a request to it with ``curl -vL <proxy server endpoint>/<any node-only RPC>``.
+(For example, ``/chains/main/blocks/head/header`` is one such RPC.) The output
+from ``curl`` will show that the proxy server asks curl to follow a redirect to
+the node's endpoint, which it will do because of the ``-L`` flag, and
+then it is finally responded to by the node. Any RPC that can be handled by the
+proxy server itself will of course not show this behaviour.
+
+Clearly, making such requests to the proxy server does not decrease the load of
+the node. (To be precise, it in fact also adds a slight delay to the HTTP
+request if the redirect is not cached by the client.) However, it does allow the
+use of a single endpoint for all RPC requests, which may be more convenient for
+certain use-cases.
 
 Deployment
 ~~~~~~~~~~
@@ -312,7 +346,7 @@ see the :ref:`Support <proxy_server_support>` section.
 Support
 ~~~~~~~
 
-The proxy server is a project led by `smelc <https://gitlab.com/smelc>`_.
+The proxy server is a project led by `evertedsphere <https://gitlab.com/evertedsphere>`_.
 To contact us:
 
 * We are on the `Tezos-dev slack <https://tezos-dev.slack.com>`_, or

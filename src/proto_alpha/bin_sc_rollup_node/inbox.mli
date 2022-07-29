@@ -34,12 +34,11 @@
 *)
 open Protocol
 
-(** [update node_ctxt store chain_event] changes the state of the inbox to react to
-    the [chain_event]. In particular, this process requests the tezos node
-    through the context client [cctxt] to retrieve the messages published
-    during this [chain_event]. *)
-val update :
-  Node_context.t -> Store.t -> Layer1.chain_event -> unit tzresult Lwt.t
+(** [process_head node_ctxt store head operations] changes the state
+   of the inbox to react to [head]. In particular, this process
+   filters the provided [operations] of the [head] block. *)
+val process_head :
+  Node_context.t -> Store.t -> Layer1.head -> unit tzresult Lwt.t
 
 (** [inbox_of_hash node_ctxt store block_hash] returns the rollup inbox at the end of the
     given validation of [block_hash]. *)
@@ -47,7 +46,17 @@ val inbox_of_hash :
   Node_context.t ->
   Store.t ->
   Block_hash.t ->
-  Alpha_context.Sc_rollup.Inbox.t Lwt.t
+  Alpha_context.Sc_rollup.Inbox.t tzresult Lwt.t
+
+(** [history_of_hash node_ctxt store block_hash] returns the rollup
+    inbox history at the end of the given validation of [block_hash]. *)
+val history_of_hash :
+  Node_context.t ->
+  Store.t ->
+  Block_hash.t ->
+  Store.Inbox.history tzresult Lwt.t
+
+val find_message_tree : Store.t -> Block_hash.t -> Store.tree option Lwt.t
 
 (** [start ()] initializes the inbox to track the messages being published. *)
 val start : unit -> unit Lwt.t

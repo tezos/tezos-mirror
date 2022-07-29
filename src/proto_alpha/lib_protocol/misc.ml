@@ -31,15 +31,15 @@ type 'a lazy_list_t = LCons of 'a * 'a lazy_list_t tzresult Lwt.t lazyt
 
 type 'a lazy_list = 'a lazy_list_t tzresult Lwt.t
 
-let[@coq_struct "i"] rec ( --> ) i j =
+let rec ( --> ) i j =
   (* [i; i+1; ...; j] *)
   if Compare.Int.(i > j) then [] else i :: (succ i --> j)
 
-let[@coq_struct "j"] rec ( <-- ) i j =
+let rec ( <-- ) i j =
   (* [j; j-1; ...; i] *)
   if Compare.Int.(i > j) then [] else j :: (i <-- pred j)
 
-let[@coq_struct "i"] rec ( ---> ) i j =
+let rec ( ---> ) i j =
   (* [i; i+1; ...; j] *)
   if Compare.Int32.(i > j) then [] else i :: (Int32.succ i ---> j)
 
@@ -63,7 +63,6 @@ let split delim ?(limit = max_int) path =
     else do_component acc limit i (j + 1)
   in
   if Compare.Int.(limit > 0) then do_slashes [] limit 0 else [path]
-  [@@coq_axiom_with_reason "non-top-level mutual recursion"]
 
 let pp_print_paragraph ppf description =
   Format.fprintf

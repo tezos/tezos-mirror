@@ -77,25 +77,26 @@ Ubuntu Launchpad PPA with Tezos packages
 If you're using Ubuntu, you can install packages with Tezos binaries from a Launchpad PPA.
 Currently it supports Focal and Bionic versions.
 
-In order to add the stable release PPA repository to your machine, run:
+In order to add the stable release PPA repository to your machine, do:
 
 .. literalinclude:: install-bin-ubuntu.sh
    :language: shell
-   :start-after: [setup repository]
-   :end-before: [install tezos]
+   :start-after: [setup stable repository]
+   :end-before: [end]
 
-Alternatively, to add the release candidates PPA instead, run:
+Alternatively, to add the release candidates PPA instead, do:
 
-.. literalinclude:: install-bin-rc-ubuntu.sh
+.. literalinclude:: install-bin-ubuntu.sh
    :language: shell
-   :start-after: [setup repository]
-   :end-before: [install tezos]
+   :start-after: [setup rc repository]
+   :end-before: [end]
 
 Then, to install the binaries, run the following commands:
 
 .. literalinclude:: install-bin-ubuntu.sh
    :language: shell
    :start-after: [install tezos]
+   :end-before: [test executables]
 
 Upgrading to a newer release is made easy by the APT package manager, using
 commands such as ``apt-get update``, ``apt-get upgrade <package>``, and
@@ -110,25 +111,26 @@ Fedora Copr repository with Tezos packages
 If you're using Fedora, you can install packages with Tezos binaries from a Copr repository.
 Currently it supports Fedora 34.
 
-In order to add the stable Copr repository to your machine, run:
+In order to add the stable Copr repository to your machine, do:
 
 .. literalinclude:: install-bin-fedora.sh
    :language: shell
-   :start-after: [setup repository]
-   :end-before: [install tezos]
+   :start-after: [setup stable repository]
+   :end-before: [end]
 
-Alternatively, to add the release candidates Copr repository instead, run:
+Alternatively, to add the release candidates Copr repository instead, do:
 
-.. literalinclude:: install-bin-rc-fedora.sh
+.. literalinclude:: install-bin-fedora.sh
    :language: shell
-   :start-after: [setup repository]
-   :end-before: [install tezos]
+   :start-after: [setup rc repository]
+   :end-before: [end]
 
 Then, to install the binaries, run the following commands:
 
 .. literalinclude:: install-bin-fedora.sh
    :language: shell
    :start-after: [install tezos]
+   :end-before: [test executables]
 
 Upgrading to a newer release is made easy by the DNF package manager, using
 commands such as ``dnf upgrade <package>``, and
@@ -152,71 +154,9 @@ An example Docker Compose script is provided in
 :src:`scripts/docker/docker-compose-generic.yml`.
 It launches a node, a baker, and an accuser for protocol Alpha.
 You can adapt it to run the baker and accuser for other protocols
-by replacing all instances of ``alpha`` to e.g. ``012-Psithaca`` for Ithaca.
+by replacing all instances of ``alpha`` to e.g. ``013-PtJakart`` for Jakarta.
 Replacing the value of the ``PROTOCOL`` environment variable is enough
 but you may want to update the ``hostname`` and the container name too.
-
-Deprecated: Tezos Docker Manager Script
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-**This section is deprecated. The** ``tezos-docker-manager.sh`` **script may
-be removed from Octez version 14.0.**
-
-The script ``tezos-docker-manager.sh`` (formally known as ``alphanet.sh``) is
-provided to download the right image for each network and run a
-simple node.  Its only requirement is a working installation of
-`Docker <https://www.docker.com/>`__ (including both Docker Engine and Docker Compose) on a machine
-with architecture **x86_64**.  Although we only officially support
-Linux, the script has been tested with success in the past on
-Windows, OS X, and Linux.
-
-The same script can be used to run Tezos on Mainnet, on Ithacanet, or on other network: it
-suffices to rename it as it downloads a different image based on its
-name.
-For example, to run Tezos on the Ithacanet test network with the latest release:
-
-.. literalinclude:: use-docker-ithacanet.sh
-   :language: shell
-   :start-after: [get testnet]
-   :end-before: [start testnet]
-
-Alternatively, to run on Mainnet::
-
-   wget -O mainnet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
-   chmod +x mainnet.sh
-
-In the following we assume you are running on the Ithacanet test network.
-You are now one step away from a working node:
-
-.. literalinclude:: use-docker-ithacanet.sh
-   :language: shell
-   :start-after: [start testnet]
-
-This will download the right Docker image for your chosen network, launch two
-Docker containers running the node and the baker. Keep in mind
-that when a Tezos node is launched, it needs to connect to new peers and
-synchronize the chain. This can be *lengthy* on the first launch
-considering that the chain takes up several gigabytes of data. See
-:ref:`how to use Tezos<howtouse>` for more details.
-
-Every call to ``ithacanet.sh`` will check for updates of the node and
-will fail if your node is not up-to-date. For updating the node, simply
-run::
-
-    ./ithacanet.sh restart
-
-If you prefer to temporarily disable automatic updates, you just have to
-set an environment variable::
-
-   export TEZOS_ALPHANET_DO_NOT_PULL=yes
-
-See ``./ithacanet.sh --help`` for more information about the
-script. In particular see ``./ithacanet.sh client --help`` or the
-:ref:`online manual<client_manual>` for more information about
-the client. Every command to the ``tezos-client`` can be equivalently
-executed by using ``./ithacanet.sh client``, passing the needed arguments. Similarly, ``tezos-admin-client``
-can be executed using ``./ithacanet.sh admin-client``.
-
 
 .. _building_with_opam:
 
@@ -322,6 +262,7 @@ Now, install all the binaries by:
 .. literalinclude:: install-opam.sh
   :language: shell
   :start-after: [install tezos]
+  :end-before: [test executables]
 
 You can be more specific and only ``opam install tezos-node``, ``opam
 install tezos-baker-alpha``, ... In that case, it is enough to install
@@ -386,12 +327,19 @@ If you plan to contribute to the Tezos codebase, the way to go is to set up a
 complete development environment, by cloning the repository and compiling the
 sources using the provided makefile.
 
-**TL;DR**: From a fresh Debian Buster x86_64, you typically want to do:
+**TL;DR**: From a fresh Debian Buster x86_64, you typically want to select a source branch, e.g.:
+
+.. literalinclude:: compile-sources.sh
+  :language: shell
+  :start-after: [select branch]
+  :end-before: [end]
+
+and then do:
 
 .. literalinclude:: compile-sources.sh
   :language: shell
   :start-after: [install packages]
-  :end-before: [test executable]
+  :end-before: [test executables]
 
 
 The following sections describe the individual steps above in more detail.
@@ -472,6 +420,8 @@ and ``sapling-output.params``. Here is where you should expect to find those fil
 
    Some operating systems may not be covered by the list of directories above.
    If Zcash is located elsewhere on your system (typically, on MacOS X), you may try creating a symbolic link such as: ``ln -s ~/Library/Application\ Support/ZcashParams ~/.zcash-params``.
+
+Note that the script ``fetch-params.sh`` downloads a third file containing parameters for Sprout (currently called ``sprout-groth16.params``), which is not loaded by Sapling and can be deleted to save a significant amount of space (this file is *much* bigger than the two other files).
 
 Get the sources
 ~~~~~~~~~~~~~~~

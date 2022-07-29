@@ -127,14 +127,14 @@ let rec gen_rcm state =
 let add_input diff vk index position sum state =
   let rcm = gen_rcm state in
   let amount = random_amount sum in
-  let (new_idx, address) =
+  let new_idx, address =
     Tezos_sapling.Core.Client.Viewing_key.new_address vk index
   in
   let cv =
     Tezos_sapling.Core.Client.CV.of_bytes (random_bytes state 32)
     |> WithExceptions.Option.get ~loc:__LOC__
   in
-  let (ciphertext, cm) =
+  let ciphertext, cm =
     Tezos_sapling.Core.Client.Forge.Output.to_ciphertext
       Tezos_sapling.Core.Client.Forge.Output.
         {address; amount; memo = Bytes.empty}
@@ -189,7 +189,7 @@ let rec add_root nb_root ctxt id vk index size diff state =
     add_input Protocol.Sapling_storage.empty_diff vk index size 0L state
     >>=? fun (diff_to_add, {position = size; _}, new_idx) ->
     Protocol.Sapling_storage.apply_diff ctxt id diff_to_add
-    >|= Protocol.Environment.wrap_tzresult
+    >|= Environment.wrap_tzresult
     >>=? fun (ctxt, _) ->
     (* We call it nb_root -1 because one root is already present*)
     add_root
@@ -221,7 +221,7 @@ let output proving_ctx vk sum =
   let amount = random_amount sum in
   let rcm = Tezos_sapling.Core.Client.Rcm.random () in
   let esk = Tezos_sapling.Core.Client.DH.esk_random () in
-  let (cv_o, proof_o) =
+  let cv_o, proof_o =
     Tezos_sapling.Core.Client.Proving.output_proof
       proving_ctx
       esk
@@ -229,7 +229,7 @@ let output proving_ctx vk sum =
       rcm
       ~amount
   in
-  let (ciphertext, cm) =
+  let ciphertext, cm =
     Tezos_sapling.Core.Client.Forge.Output.to_ciphertext
       Tezos_sapling.Core.Client.Forge.Output.
         {address; amount; memo = Bytes.empty}
@@ -246,7 +246,7 @@ let outputs nb_output proving_ctx vk =
     match nb_output with
     | 0 -> (output_amount, list_outputs)
     | nb_output ->
-        let (output, amount) = output proving_ctx vk sum in
+        let output, amount = output proving_ctx vk sum in
         assert (
           Int64.compare
             amount
@@ -268,7 +268,7 @@ let make_inputs to_forge local_state proving_ctx sk vk root anti_replay =
     (fun {rcm; position; amount; address; nf} ->
       let witness = Tezos_sapling.Storage.get_witness local_state position in
       let ar = Tezos_sapling.Core.Client.Proving.ar_random () in
-      let (cv, rk, proof) =
+      let cv, rk, proof =
         Tezos_sapling.Core.Client.Proving.spend_proof
           proving_ctx
           vk
@@ -296,7 +296,7 @@ let make_inputs to_forge local_state proving_ctx sk vk root anti_replay =
     to_forge
 
 let init_fresh_sapling_state ctxt =
-  let open Protocol.Environment.Error_monad in
+  let open Environment.Error_monad in
   Protocol.Lazy_storage_diff.fresh
     Protocol.Lazy_storage_kind.Sapling_state
     ~temporary:false
@@ -323,10 +323,10 @@ let prepare_seeded_state_internal ~(nb_input : int) ~(nb_nf : int)
     * Protocol.Lazy_storage_kind.Sapling_state.Id.t)
     tzresult
     Lwt.t =
-  init_fresh_sapling_state ctxt >|= Protocol.Environment.wrap_tzresult
+  init_fresh_sapling_state ctxt >|= Environment.wrap_tzresult
   >>=? fun (ctxt, id) ->
   let index_start = Tezos_sapling.Core.Client.Viewing_key.default_index in
-  let (sk, vk) = generate_spending_and_viewing_keys state in
+  let sk, vk = generate_spending_and_viewing_keys state in
   generate_commitments
     ~vk
     ~nb_input
@@ -336,8 +336,7 @@ let prepare_seeded_state_internal ~(nb_input : int) ~(nb_nf : int)
     ~index:index_start
     state
   >>=? fun (diff, to_forge) ->
-  Protocol.Sapling_storage.apply_diff ctxt id diff
-  >|= Protocol.Environment.wrap_tzresult
+  Protocol.Sapling_storage.apply_diff ctxt id diff >|= Environment.wrap_tzresult
   >>=? fun (ctxt, _size) -> return (diff, to_forge, sk, vk, ctxt, id)
 
 let prepare_seeded_state
@@ -364,7 +363,7 @@ let generate ~(nb_input : int) ~(nb_output : int) ~(nb_nf : int) ~(nb_cm : int)
   Tezos_sapling.Core.Client.Proving.with_proving_ctx (fun proving_ctx ->
       make_inputs to_forge local_state proving_ctx sk vk root anti_replay
       >>=? fun inputs ->
-      let (output_amount, outputs) = outputs nb_output proving_ctx vk in
+      let output_amount, outputs = outputs nb_output proving_ctx vk in
       let input_amount =
         List.fold_left
           (fun sum {amount; _} ->
@@ -561,6 +560,6 @@ let generate (save_to : string) (tx_count : int)
   match result with Ok txs -> save ~filename:save_to ~txs | Error _ -> ()
 
 let apply_diff ctxt id diff =
-  let open Protocol.Environment.Error_monad in
+  let open Environment.Error_monad in
   Sapling_storage.apply_diff (alpha_to_raw ctxt) id diff
   >>=? fun (ctxt, size) -> return (raw_to_alpha ctxt, size)

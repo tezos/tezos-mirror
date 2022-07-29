@@ -345,7 +345,7 @@ module Signer_config = struct
 
   let parse_config_args ctx argv =
     let open Lwt_result_syntax in
-    let* ((base_dir, require_auth, password_filename), remaining) =
+    let* (base_dir, require_auth, password_filename), remaining =
       Clic.parse_global_options (global_options ()) ctx argv
     in
     return

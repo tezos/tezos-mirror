@@ -4,9 +4,7 @@
  (targets test_addition_actual.ml)
  (deps (:pp pp.exe) (:input test_addition_input.ml))
  (action
-   (progn
-      (run ./%{pp} --impl %{input} -o %{targets})
-      (run ocamlformat %{targets} -i))))
+   (run ./%{pp} --impl %{input} -o %{targets})))
 
 ; Compares preprocessed output with expected output
 (rule
@@ -34,9 +32,7 @@
  (targets test_benchmark_flow_actual.ml)
  (deps (:pp pp.exe) (:input test_benchmark_flow_input.ml))
  (action
-   (progn
-      (run ./%{pp} --impl %{input} -o %{targets})
-      (run ocamlformat %{targets} -i))))
+   (run ./%{pp} --impl %{input} -o %{targets})))
 
 ; Compares preprocessed output with expected output
 (rule
@@ -64,9 +60,7 @@
  (targets test_checkpoint_metadata_actual.ml)
  (deps (:pp pp.exe) (:input test_checkpoint_metadata_input.ml))
  (action
-   (progn
-      (run ./%{pp} --impl %{input} -o %{targets})
-      (run ocamlformat %{targets} -i))))
+   (run ./%{pp} --impl %{input} -o %{targets})))
 
 ; Compares preprocessed output with expected output
 (rule
@@ -94,9 +88,7 @@
  (targets test_flush_binding_actual.ml)
  (deps (:pp pp.exe) (:input test_flush_binding_input.ml))
  (action
-   (progn
-      (run ./%{pp} --impl %{input} -o %{targets})
-      (run ocamlformat %{targets} -i))))
+   (run ./%{pp} --impl %{input} -o %{targets})))
 
 ; Compares preprocessed output with expected output
 (rule
@@ -124,9 +116,7 @@
  (targets test_flush_identifier_actual.ml)
  (deps (:pp pp.exe) (:input test_flush_identifier_input.ml))
  (action
-   (progn
-      (run ./%{pp} --impl %{input} -o %{targets})
-      (run ocamlformat %{targets} -i))))
+   (run ./%{pp} --impl %{input} -o %{targets})))
 
 ; Compares preprocessed output with expected output
 (rule
@@ -154,9 +144,7 @@
  (targets test_funapp_actual.ml)
  (deps (:pp pp.exe) (:input test_funapp_input.ml))
  (action
-   (progn
-      (run ./%{pp} --impl %{input} -o %{targets})
-      (run ocamlformat %{targets} -i))))
+   (run ./%{pp} --impl %{input} -o %{targets})))
 
 ; Compares preprocessed output with expected output
 (rule
@@ -184,9 +172,7 @@
  (targets test_lwt_addition_actual.ml)
  (deps (:pp pp.exe) (:input test_lwt_addition_input.ml))
  (action
-   (progn
-      (run ./%{pp} --impl %{input} -o %{targets})
-      (run ocamlformat %{targets} -i))))
+   (run ./%{pp} --impl %{input} -o %{targets})))
 
 ; Compares preprocessed output with expected output
 (rule
@@ -214,9 +200,7 @@
  (targets test_metadata_variable_actual.ml)
  (deps (:pp pp.exe) (:input test_metadata_variable_input.ml))
  (action
-   (progn
-      (run ./%{pp} --impl %{input} -o %{targets})
-      (run ocamlformat %{targets} -i))))
+   (run ./%{pp} --impl %{input} -o %{targets})))
 
 ; Compares preprocessed output with expected output
 (rule
@@ -244,9 +228,7 @@
  (targets test_pattern_matching_actual.ml)
  (deps (:pp pp.exe) (:input test_pattern_matching_input.ml))
  (action
-   (progn
-      (run ./%{pp} --impl %{input} -o %{targets})
-      (run ocamlformat %{targets} -i))))
+   (run ./%{pp} --impl %{input} -o %{targets})))
 
 ; Compares preprocessed output with expected output
 (rule
@@ -274,9 +256,7 @@
  (targets test_preserve_attributes_actual.ml)
  (deps (:pp pp.exe) (:input test_preserve_attributes_input.ml))
  (action
-   (progn
-      (run ./%{pp} --impl %{input} -o %{targets})
-      (run ocamlformat %{targets} -i))))
+   (run ./%{pp} --impl %{input} -o %{targets})))
 
 ; Compares preprocessed output with expected output
 (rule
@@ -304,9 +284,7 @@
  (targets test_sub_expr_actual.ml)
  (deps (:pp pp.exe) (:input test_sub_expr_input.ml))
  (action
-   (progn
-      (run ./%{pp} --impl %{input} -o %{targets})
-      (run ocamlformat %{targets} -i))))
+   (run ./%{pp} --impl %{input} -o %{targets})))
 
 ; Compares preprocessed output with expected output
 (rule
@@ -334,9 +312,7 @@
  (targets test_try_actual.ml)
  (deps (:pp pp.exe) (:input test_try_input.ml))
  (action
-   (progn
-      (run ./%{pp} --impl %{input} -o %{targets})
-      (run ocamlformat %{targets} -i))))
+   (run ./%{pp} --impl %{input} -o %{targets})))
 
 ; Compares preprocessed output with expected output
 (rule

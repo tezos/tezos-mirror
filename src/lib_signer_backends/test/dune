@@ -11,15 +11,16 @@
   tezos-crypto
   tezos-client-base
   tezos-signer-backends
-  alcotest-lwt)
+  alcotest-lwt
+  uri)
  (flags
-  (:standard
-   -open Tezos_stdlib
-   -open Tezos_error_monad
-   -open Tezos_error_monad.TzLwtreslib
-   -open Tezos_crypto
-   -open Tezos_client_base
-   -open Tezos_signer_backends)))
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_error_monad
+  -open Tezos_error_monad.TzLwtreslib
+  -open Tezos_crypto
+  -open Tezos_client_base
+  -open Tezos_signer_backends))
 
 (rule
  (alias runtest)

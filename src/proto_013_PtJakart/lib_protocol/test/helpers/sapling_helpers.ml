@@ -85,7 +85,7 @@ module Common = struct
     let rec aux n index res =
       if Compare.Int.( <= ) n 0 then res
       else
-        let (new_index, new_addr) =
+        let new_index, new_addr =
           Tezos_sapling.Core.Client.Viewing_key.new_address vk index
         in
         aux (n - 1) new_index (new_addr :: res)
@@ -316,7 +316,7 @@ module Alpha_context_helpers = struct
 
   let transfer w cs is =
     let anti_replay = "anti-replay" in
-    let (ins, outs) = transfer_inputs_outputs w cs is in
+    let ins, outs = transfer_inputs_outputs w cs is in
     (* change the wallet of this last line *)
     Tezos_sapling.Forge.forge_transaction
       ins
@@ -328,7 +328,7 @@ module Alpha_context_helpers = struct
 
   let transfer_legacy w cs is =
     let anti_replay = "anti-replay" in
-    let (ins, outs) = transfer_inputs_outputs w cs is in
+    let ins, outs = transfer_inputs_outputs w cs is in
     (* change the wallet of this last line *)
     Tezos_sapling.Forge.forge_transaction_legacy ins outs w.sk anti_replay cs
 
@@ -422,7 +422,7 @@ module Interpreter_helpers = struct
     let rec aux number_transac number_outputs index amount_output total res =
       if Compare.Int.(number_transac <= 0) then (res, total)
       else
-        let (new_index, new_addr) =
+        let new_index, new_addr =
           Tezos_sapling.Core.Wallet.Viewing_key.(new_address vk index)
         in
         let outputs =

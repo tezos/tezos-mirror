@@ -10,22 +10,19 @@
   tezos-shell-services
   tezos-client-base
   tezos-protocol-009-PsFLoren
-  tezos-mockup-registration
-  tezos-proxy
   tezos-signer-backends
   tezos-protocol-plugin-009-PsFLoren
-  tezos-protocol-009-PsFLoren-parameters
-  tezos-rpc)
+  tezos-rpc
+  uri)
  (inline_tests (flags -verbose) (modes native))
- (preprocess (pps ppx_inline_test))
+ (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_shell_services
-   -open Tezos_client_base
-   -open Tezos_protocol_009_PsFLoren
-   -open Tezos_protocol_plugin_009_PsFLoren
-   -open Tezos_protocol_009_PsFLoren_parameters
-   -open Tezos_rpc)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_protocol_009_PsFLoren
+  -open Tezos_protocol_plugin_009_PsFLoren
+  -open Tezos_rpc))

@@ -27,8 +27,10 @@
 
 type t
 
+type mode = Accuser | Batcher | Custom | Maintenance | Observer | Operator
+
 val create :
-  ?path:string ->
+  protocol:Protocol.t ->
   ?runner:Runner.t ->
   ?data_dir:string ->
   ?addr:string ->
@@ -36,13 +38,16 @@ val create :
   ?color:Log.Color.t ->
   ?event_pipe:string ->
   ?name:string ->
+  mode ->
   rollup_id:string ->
-  rollup_genesis:string ->
+  ?origination_level:int ->
   ?operator:string ->
   ?batch_signer:string ->
   ?finalize_commitment_signer:string ->
   ?remove_commitment_signer:string ->
+  ?dispatch_withdrawals_signer:string ->
   ?rejection_signer:string ->
+  ?allow_deposit:bool ->
   Client.t ->
   Node.t ->
   t
@@ -56,6 +61,10 @@ val endpoint : t -> string
     If such an event already occurred, return immediately. *)
 val wait_for_ready : t -> unit Lwt.t
 
+(** Returns [None] if node is already terminated or returns the node process if
+    it still running. *)
+val process : t -> Process.t option
+
 (** Wait for a given Tezos chain level.
 
     More precisely, wait until the rollup node have successfully
@@ -63,6 +72,18 @@ val wait_for_ready : t -> unit Lwt.t
     it is connected to.
     If such an event already occurred, return immediately. *)
 val wait_for_tezos_level : t -> int -> int Lwt.t
+
+val change_signers :
+  ?operator:string option ->
+  ?batch_signer:string option ->
+  ?finalize_commitment_signer:string option ->
+  ?remove_commitment_signer:string option ->
+  ?dispatch_withdrawals_signer:string option ->
+  ?rejection_signer:string option ->
+  ?mode:mode ->
+  ?allow_deposit:bool ->
+  t ->
+  unit Lwt.t
 
 (** Wait for a custom event to occur.
 
@@ -104,9 +125,11 @@ val wait_for_full :
       look like. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
-(** Connected to a tezos node.
-    Returns the name of the configuration file. *)
-val config_init : t -> string -> string -> string Lwt.t
+(** Write the configuration file for a rollup node, overwriting when [force] is
+    [true].  Returns the name of the configuration file. *)
+val init_config : ?force:bool -> t -> string Lwt.t
+
+val spawn_init_config : ?force:bool -> t -> Process.t
 
 (** [run node] launches the given transaction rollup node. *)
 val run : t -> unit Lwt.t
@@ -126,7 +149,7 @@ module Inbox : sig
     l2_context_hash : l2_context_hash;
   }
 
-  type t = {contents : message list; cumulated_size : int}
+  type t = message list
 end
 
 (* FIXME/TORU: This is a temporary way of querying the node without
@@ -150,4 +173,9 @@ module Client : sig
 
   val get_merkle_proof :
     tx_node:t -> block:string -> message_pos:string -> JSON.t Lwt.t
+
+  val get_ticket : tx_node:t -> block:string -> ticket_id:string -> JSON.t Lwt.t
+
+  val get_ticket_index :
+    tx_node:t -> block:string -> ticket_id:string -> int Lwt.t
 end

@@ -133,8 +133,7 @@ let commands () =
          return the signed block."
       no_options
       (prefixes ["sign"; "block"]
-      @@ unsigned_block_header_param
-      @@ prefixes ["for"]
+      @@ unsigned_block_header_param @@ prefixes ["for"]
       @@ Client_keys.Public_key_hash.source_param
            ~name:"delegate"
            ~desc:"signing delegate"

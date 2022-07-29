@@ -34,4 +34,5 @@ type error += Invalid_node_configuration
     If the [config.disable_config_validation] is set to true, the validation is not applied
     and [check config] returns unit. *)
 
-val check : Node_config_file.t -> unit tzresult Lwt.t
+val check :
+  ?ignore_testchain_warning:bool -> Node_config_file.t -> unit tzresult Lwt.t

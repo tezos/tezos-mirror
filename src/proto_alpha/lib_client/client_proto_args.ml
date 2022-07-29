@@ -137,8 +137,6 @@ let () =
     (function Forbidden_Negative_int str -> Some str | _ -> None)
     (fun str -> Forbidden_Negative_int str)
 
-let tez_sym = "\xEA\x9C\xA9"
-
 let string_parameter = parameter (fun _ x -> return x)
 
 let int_parameter =
@@ -158,22 +156,37 @@ let bytes_of_prefixed_string s =
 
 let bytes_parameter = parameter (fun _ s -> bytes_of_prefixed_string s)
 
+let parse_file ~from_text ~read_file ~path =
+  let open Lwt_result_syntax in
+  let* content = read_file path in
+  from_text content
+
+let file_or_text ~from_text ~read_file =
+  Client_aliases.parse_alternatives
+    [
+      ("file", fun path -> parse_file ~from_text ~read_file ~path);
+      ("text", from_text);
+    ]
+
+let file_or_text_parameter ~from_text () =
+  parameter (fun (cctxt : #Client_context.full) ->
+      file_or_text ~from_text ~read_file:cctxt#read_file)
+
+let json_parameter =
+  let from_text s =
+    match Data_encoding.Json.from_string s with
+    | Ok json -> return json
+    | Error err -> failwith "'%s' is not a valid JSON-encoded value: %s" s err
+  in
+  file_or_text_parameter ~from_text ()
+
 let data_parameter =
   let open Lwt_syntax in
-  let parse input =
+  let from_text input =
     return @@ Tezos_micheline.Micheline_parser.no_parsing_error
     @@ Michelson_v1_parser.parse_expression input
   in
-  parameter (fun (cctxt : #Client_context.full) ->
-      Client_aliases.parse_alternatives
-        [
-          ( "file",
-            fun filename ->
-              let open Lwt_result_syntax in
-              let* input = catch_es (fun () -> cctxt#read_file filename) in
-              parse input );
-          ("text", parse);
-        ])
+  file_or_text_parameter ~from_text ()
 
 let entrypoint_parameter =
   parameter (fun _ str ->
@@ -300,6 +313,12 @@ let non_negative_z_parameter =
 let non_negative_z_param ~name ~desc next =
   Clic.param ~name ~desc non_negative_z_parameter next
 
+let non_negative_parameter =
+  Clic.parameter (fun _ s ->
+      match int_of_string_opt s with
+      | Some i when i >= 0 -> return i
+      | _ -> failwith "Parameter should be a non-negative integer literal")
+
 let fee_arg =
   arg
     ~long:"fee"
@@ -326,6 +345,16 @@ let level_arg =
     ~placeholder:"level"
     ~doc:"Set the level to be returned by the LEVEL instruction"
     level_kind
+
+let raw_level_parameter =
+  parameter (fun _ s ->
+      match Int32.of_string_opt s with
+      | Some i when i >= 0l ->
+          Lwt.return @@ Environment.wrap_tzresult (Raw_level.of_int32 i)
+      | _ ->
+          failwith
+            "'%s' is not a valid level (should be a non-negative int32 value)"
+            s)
 
 let timestamp_parameter =
   parameter (fun _ s ->
@@ -379,6 +408,12 @@ let run_gas_limit_arg =
     ~doc:"Initial quantity of gas for typechecking and execution"
     ~placeholder:"gas"
     gas_limit_kind
+
+let unlimited_gas_arg =
+  switch
+    ~long:"unlimited-gas"
+    ~doc:"Allows interpretation with virtually unlimited gas"
+    ()
 
 let storage_limit_kind =
   parameter (fun _ s ->
@@ -464,34 +499,6 @@ let minimal_nanotez_per_byte_arg =
        nanotez)"
     (parameter (fun _ s ->
          try return (Q.of_string s) with _ -> fail (Bad_minimal_fees s)))
-
-let force_low_fee_arg =
-  switch
-    ~long:"force-low-fee"
-    ~doc:"Don't check that the fee is lower than the estimated default value"
-    ()
-
-let fee_cap_arg =
-  default_arg
-    ~long:"fee-cap"
-    ~placeholder:"amount"
-    ~default:"1.0"
-    ~doc:"Set the fee cap"
-    (parameter (fun _ s ->
-         match Tez.of_string s with
-         | Some t -> return t
-         | None -> failwith "Bad fee cap"))
-
-let burn_cap_arg =
-  default_arg
-    ~long:"burn-cap"
-    ~placeholder:"amount"
-    ~default:"0"
-    ~doc:"Set the burn cap"
-    (parameter (fun _ s ->
-         match Tez.of_string s with
-         | Some t -> return t
-         | None -> failwith "Bad burn cap"))
 
 let replace_by_fees_arg =
   switch
@@ -594,12 +601,6 @@ let display_names_flag =
     ~long:"display-names"
     ~doc:"Print names of scripts passed to this command"
     ()
-
-let json_parameter =
-  Clic.parameter (fun _ s ->
-      match Data_encoding.Json.from_string s with
-      | Ok json -> return json
-      | Error err -> failwith "'%s' is not a valid JSON-encoded valie: %s" s err)
 
 module Daemon = struct
   let baking_switch =
@@ -886,3 +887,151 @@ module Tx_rollup = struct
       inbox_root_hash_parameter
       next
 end
+
+module Sc_rollup_params = struct
+  let sc_rollup_address_parameter =
+    Clic.parameter (fun _ s ->
+        match Alpha_context.Sc_rollup.Address.of_b58check_opt s with
+        | Some c -> return c
+        | None ->
+            failwith
+              "Parameter '%s' is an invalid smart contract rollup address \
+               encoded in a base58 string."
+              s)
+
+  let rollup_kind_parameter =
+    Clic.parameter (fun _ name ->
+        match Sc_rollup.Kind.pvm_of_name ~name with
+        | None ->
+            failwith
+              "Parameter '%s' is not a valid rollup name (must be one of %s)"
+              name
+              (String.concat ", " Sc_rollup.Kind.all_names)
+        | Some k -> return k)
+
+  let boot_sector_parameter =
+    let from_text s =
+      return (fun (module R : Sc_rollup.PVM.S) ->
+          R.parse_boot_sector s |> function
+          | None -> failwith "Invalid boot sector"
+          | Some boot_sector -> return boot_sector)
+    in
+    file_or_text_parameter ~from_text ()
+
+  let messages_parameter =
+    let open Lwt_result_syntax in
+    let from_json text =
+      try return (`Json (Ezjsonm.from_string text))
+      with Ezjsonm.Parse_error _ ->
+        failwith "Given text is not valid JSON: '%s'" text
+    in
+    let from_bin_file (cctxt : #Client_context.full) path =
+      let* bin = cctxt#read_file path in
+      return (`Bin bin)
+    in
+    let from_json_file (cctxt : #Client_context.full) path =
+      let* json_string = cctxt#read_file path in
+      from_json json_string
+    in
+    Clic.parameter (fun (cctxt : #Client_context.full) p ->
+        Client_aliases.parse_alternatives
+          [
+            ("text", from_json);
+            ("file", from_json_file cctxt);
+            ("bin", from_bin_file cctxt);
+          ]
+          p)
+
+  let commitment_hash_parameter =
+    Clic.parameter (fun _ commitment_hash ->
+        match Sc_rollup.Commitment.Hash.of_b58check_opt commitment_hash with
+        | None ->
+            failwith
+              "Parameter '%s' is not a valid B58-encoded rollup commitment hash"
+              commitment_hash
+        | Some hash -> return hash)
+
+  let unchecked_payload_parameter = file_or_text_parameter ~from_text:return ()
+
+  let compressed_state_parameter =
+    Clic.parameter (fun _ state_hash ->
+        match Sc_rollup.State_hash.of_b58check_opt state_hash with
+        | None ->
+            failwith
+              "Parameter '%s' is not a valid B58-encoded compressed state"
+              state_hash
+        | Some hash -> return hash)
+
+  let number_of_ticks_parameter =
+    Clic.parameter (fun _ nb_of_ticks ->
+        match Int32.of_string_opt nb_of_ticks with
+        | Some nb_of_ticks -> (
+            match Sc_rollup.Number_of_ticks.of_int32 nb_of_ticks with
+            | None ->
+                failwith
+                  "Parameter '%ld' is out of bounds, it should be between %ld \
+                   and %ld"
+                  nb_of_ticks
+                  Sc_rollup.Number_of_ticks.min_int
+                  Sc_rollup.Number_of_ticks.max_int
+            | Some nb_of_ticks -> return nb_of_ticks)
+        | None ->
+            failwith "'%s' is not valid, should be a int32 value" nb_of_ticks)
+end
+
+let fee_parameter_args =
+  let open Clic in
+  let force_low_fee_arg =
+    switch
+      ~long:"force-low-fee"
+      ~doc:"Don't check that the fee is lower than the estimated default value"
+      ()
+  in
+  let fee_cap_arg =
+    default_arg
+      ~long:"fee-cap"
+      ~placeholder:"amount"
+      ~default:"1.0"
+      ~doc:"Set the fee cap"
+      (parameter (fun _ s ->
+           match Tez.of_string s with
+           | Some t -> return t
+           | None -> failwith "Bad fee cap"))
+  in
+  let burn_cap_arg =
+    default_arg
+      ~long:"burn-cap"
+      ~placeholder:"amount"
+      ~default:"0"
+      ~doc:"Set the burn cap"
+      (parameter (fun _ s ->
+           match Tez.of_string s with
+           | Some t -> return t
+           | None -> failwith "Bad burn cap"))
+  in
+  Clic.map_arg
+    ~f:
+      (fun _cctxt
+           ( minimal_fees,
+             minimal_nanotez_per_byte,
+             minimal_nanotez_per_gas_unit,
+             force_low_fee,
+             fee_cap,
+             burn_cap ) ->
+      return
+        {
+          Injection.minimal_fees;
+          minimal_nanotez_per_byte;
+          minimal_nanotez_per_gas_unit;
+          force_low_fee;
+          fee_cap;
+          burn_cap;
+        })
+    (Clic.aggregate
+       (Clic.args6
+          minimal_fees_arg
+          minimal_nanotez_per_byte_arg
+          minimal_nanotez_per_gas_unit_arg
+          force_low_fee_arg
+          fee_cap_arg
+          burn_cap_arg))

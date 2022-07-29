@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Ithaca | Jakarta | Alpha
+type t = Ithaca | Jakarta | Kathmandu | Alpha
 
 type constants = Constants_sandbox | Constants_mainnet | Constants_test
 
@@ -33,13 +33,19 @@ let name = function
   | Alpha -> "Alpha"
   | Ithaca -> "Ithaca"
   | Jakarta -> "Jakarta"
+  | Kathmandu -> "Kathmandu"
 
-let number = function Ithaca -> 012 | Jakarta -> 013 | Alpha -> 014
+let number = function
+  | Ithaca -> 012
+  | Jakarta -> 013
+  | Kathmandu -> 014
+  | Alpha -> 015
 
 let directory = function
   | Alpha -> "proto_alpha"
   | Ithaca -> "proto_012_Psithaca"
   | Jakarta -> "proto_013_PtJakart"
+  | Kathmandu -> "proto_014_PtKathma"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
@@ -48,6 +54,7 @@ let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | Ithaca -> "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
   | Jakarta -> "PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY"
+  | Kathmandu -> "PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg"
 
 let genesis_hash = "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
@@ -68,6 +75,7 @@ let daemon_name = function
   | Alpha -> "alpha"
   | Ithaca -> "012-Psithaca"
   | Jakarta -> "013-PtJakart"
+  | Kathmandu -> "014-PtKathma"
 
 let accuser proto = "./tezos-accuser-" ^ daemon_name proto
 
@@ -129,15 +137,17 @@ let write_parameter_file :
 
 let next_protocol = function
   | Ithaca -> Some Jakarta
-  | Jakarta -> None
+  | Jakarta -> Some Kathmandu
+  | Kathmandu -> None (* To update once the migration starts from Kathmandu. *)
   | Alpha -> None
 
 let previous_protocol = function
-  | Alpha -> Some Jakarta
+  | Alpha -> Some Jakarta (* To update once the migration starts from K. *)
   | Jakarta -> Some Ithaca
+  | Kathmandu -> Some Jakarta
   | Ithaca -> None
 
-let all = [Alpha; Ithaca; Jakarta]
+let all = [Alpha; Ithaca; Jakarta; Kathmandu]
 
 type supported_protocols =
   | Any_protocol
@@ -179,23 +189,17 @@ let add_to_test_parameters protocol title tags =
 
 let register_test ~__FILE__ ~title ~tags ?supports body protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
-  let (title, tags) = add_to_test_parameters protocol title tags in
+  let title, tags = add_to_test_parameters protocol title tags in
   Test.register ~__FILE__ ~title ~tags (fun () -> body protocol)
 
 let register_long_test ~__FILE__ ~title ~tags ?supports ?team ~executors
     ~timeout body protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
-  let (title, tags) = add_to_test_parameters protocol title tags in
+  let title, tags = add_to_test_parameters protocol title tags in
   Long_test.register ~__FILE__ ~title ~tags ?team ~executors ~timeout (fun () ->
       body protocol)
 
-let register_regression_test ~__FILE__ ~title ~tags ?supports ~output_file body
-    protocols =
+let register_regression_test ~__FILE__ ~title ~tags ?supports body protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
-  let (title, tags) = add_to_test_parameters protocol title tags in
-  Regression.register
-    ~__FILE__
-    ~title
-    ~tags
-    ~output_file:(output_file protocol)
-    (fun () -> body protocol)
+  let title, tags = add_to_test_parameters protocol title tags in
+  Regression.register ~__FILE__ ~title ~tags (fun () -> body protocol)

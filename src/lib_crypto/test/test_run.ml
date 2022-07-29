@@ -16,8 +16,8 @@ let runtest l =
          l)
   in
   ()
-
 ;;
+
 runtest
   [
     (module Test_base58);

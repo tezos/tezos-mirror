@@ -88,7 +88,7 @@ exception Empty_csv_file
 let import ~filename ?(separator = ',') () : csv =
   Format.eprintf "Importing %s@." filename ;
   let lines = read_lines filename in
-  let (header, rows) =
+  let header, rows =
     match lines with
     | [] -> raise Empty_csv_file
     | header :: tail -> (header, tail)

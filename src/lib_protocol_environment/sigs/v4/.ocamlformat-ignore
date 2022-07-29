@@ -1,3 +1,4 @@
+bls_signature.mli
 bytes.mli
 char.mli
 format.mli

@@ -28,7 +28,6 @@
 *)
 open Protocol
 open Alpha_context
-module Block_services = Block_services.Make (Protocol) (Protocol)
 
 let lift = Lwt.map Environment.wrap_tzresult
 
@@ -46,55 +45,118 @@ module State = struct
 
   let add_history = Store.Histories.add
 
+  (** [inbox_of_hash node_ctxt store block_hash] returns the latest
+      inbox at the given [block_hash]. This function always returns
+      [Some inbox] for all levels after the rollup genesis even when
+      no messages has been issued at this specific [block_hash]. In
+      this case, the inbox is the same as the one found in the level
+      when the latest message has been inserted. *)
   let inbox_of_hash node_ctxt store block_hash =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     let open Node_context in
-    let+ possible_inbox = Store.Inboxes.find store block_hash in
+    let*! possible_inbox = Store.Inboxes.find store block_hash in
     match possible_inbox with
     | None ->
         (* We won't find inboxes for blocks before the rollup origination level.
            Fortunately this case will only ever be called once when dealing with
            the rollup origination block. After that we would always find an
            inbox. *)
-        Sc_rollup.Inbox.empty node_ctxt.rollup_address node_ctxt.initial_level
-    | Some inbox -> inbox
+        let*! block_level = Layer1.level_of_hash store block_hash in
+        let block_level = Raw_level.of_int32_exn block_level in
+        if Raw_level.(block_level <= node_ctxt.genesis_info.level) then
+          let*! inbox =
+            Store.Inbox.empty store node_ctxt.rollup_address Raw_level.root
+          in
+          return inbox
+        else
+          failwith
+            "The inbox for block hash %a (level = %a) is missing."
+            Block_hash.pp
+            block_hash
+            Raw_level.pp
+            block_level
+    | Some inbox -> return inbox
 
-  let history_of_hash store block_hash =
-    Store.Histories.find_with_default store block_hash ~on_default:(fun () ->
-        Store.Inbox.history_at_genesis ~bound:(Int64.of_int 60000))
+  let history_of_hash node_ctxt store block_hash =
+    let open Lwt_result_syntax in
+    let open Node_context in
+    let*! res = Store.Histories.find store block_hash in
+    match res with
+    | Some history -> return history
+    | None ->
+        (* We won't find inboxes for blocks before the rollup origination level.
+           Fortunately this case will only ever be called once when dealing with
+           the rollup origination block. After that we would always find an
+           inbox. *)
+        let*! block_level = Layer1.level_of_hash store block_hash in
+        let block_level = Raw_level.of_int32_exn block_level in
+        if Raw_level.(block_level <= node_ctxt.genesis_info.level) then
+          return @@ Store.Inbox.history_at_genesis ~bound:(Int64.of_int 60000)
+        else
+          failwith
+            "The inbox history for hash %a is missing."
+            Block_hash.pp
+            block_hash
 
-  let get_message_tree = Store.MessageTrees.get
+  let find_message_tree = Store.MessageTrees.find
 
   let set_message_tree = Store.MessageTrees.set
 end
 
-let get_messages cctxt head rollup =
-  let open Lwt_result_syntax in
-  let open Block_services in
-  let+ operations =
-    Operations.operations cctxt ~chain:`Main ~block:(`Level (snd head)) ()
-  in
-  let is_add_message = function
-    | Contents
-        (Manager_operation
-          {operation = Sc_rollup_add_messages {rollup = rollup'; messages}; _})
-      when Sc_rollup.Address.(rollup' = rollup) ->
-        messages
-    | _ -> []
-  in
-  let process_contents {protocol_data = Operation_data {contents; _}; _} =
-    let operations = Operation.to_list (Contents_list contents) in
-    List.concat_map is_add_message operations
-  in
-  let process_operations operations =
-    List.concat_map process_contents operations
-  in
-  List.concat_map process_operations operations
+let find_message_tree = State.find_message_tree
 
-let process_head Node_context.({cctxt; rollup_address; _} as node_ctxt) store
-    Layer1.(Head {level; hash = head_hash} as head) =
+let get_messages Node_context.{l1_ctxt; rollup_address; _} head =
   let open Lwt_result_syntax in
-  let*! res = get_messages cctxt (head_hash, level) rollup_address in
+  let* block = Layer1.fetch_tezos_block l1_ctxt head in
+  let apply (type kind) accu ~source:_ (operation : kind manager_operation)
+      _result =
+    let open Result_syntax in
+    let+ accu = accu in
+    match operation with
+    | Sc_rollup_add_messages {rollup; messages}
+      when Sc_rollup.Address.(rollup = rollup_address) ->
+        let messages =
+          List.map
+            (fun message -> Store.Inbox.Message.External message)
+            messages
+        in
+        List.rev_append messages accu
+    | _ -> accu
+  in
+  let apply_internal (type kind) accu ~source
+      (operation : kind Apply_internal_results.internal_operation)
+      (result :
+        kind Apply_internal_results.successful_internal_operation_result) =
+    let open Result_syntax in
+    let* accu = accu in
+    match (operation, result) with
+    | ( {
+          operation = Transaction {destination = Sc_rollup rollup; parameters; _};
+          source = Originated sender;
+          _;
+        },
+        ITransaction_result (Transaction_to_sc_rollup_result _) )
+      when Sc_rollup.Address.(rollup = rollup_address) ->
+        let+ payload =
+          Environment.wrap_tzresult @@ Script_repr.force_decode parameters
+        in
+        let message = Store.Inbox.Message.{payload; sender; source} in
+        Store.Inbox.Message.Internal message :: accu
+    | _ -> return accu
+  in
+  let*? messages =
+    Layer1_services.(
+      process_applied_manager_operations
+        (Ok [])
+        block.operations
+        {apply; apply_internal})
+  in
+  return (List.rev messages)
+
+let process_head node_ctxt store Layer1.(Head {level; hash = head_hash} as head)
+    =
+  let open Lwt_result_syntax in
+  let*! res = get_messages node_ctxt head_hash in
   match res with
   | Error e -> head_processing_failure e
   | Ok messages ->
@@ -110,37 +172,33 @@ let process_head Node_context.({cctxt; rollup_address; _} as node_ctxt) store
 
       *)
       let*! predecessor = Layer1.predecessor store head in
-      let*! inbox = State.inbox_of_hash node_ctxt store predecessor in
+      let* inbox = State.inbox_of_hash node_ctxt store predecessor in
+      let* history = State.history_of_hash node_ctxt store predecessor in
       lift
-      @@ let*! history = State.history_of_hash store predecessor in
-         let*! messages_tree = State.get_message_tree store predecessor in
+      @@ let*! messages_tree = State.find_message_tree store predecessor in
          let*? level = Raw_level.of_int32 level in
-         let* (messages_tree, history, inbox) =
-           Store.Inbox.add_messages history inbox level messages messages_tree
+         let*? messages = List.map_e Store.Inbox.Message.serialize messages in
+         let* history, inbox =
+           if messages = [] then return (history, inbox)
+           else
+             let* messages_tree, history, inbox =
+               Store.Inbox.add_messages
+                 store
+                 history
+                 inbox
+                 level
+                 messages
+                 messages_tree
+             in
+             let*! () = State.set_message_tree store head_hash messages_tree in
+             return (history, inbox)
          in
-         let*! () = State.set_message_tree store head_hash messages_tree in
          let*! () = State.add_inbox store head_hash inbox in
          let*! () = State.add_history store head_hash history in
          return_unit
 
-let update node_ctxt store chain_event =
-  let open Lwt_result_syntax in
-  let open Layer1 in
-  match chain_event with
-  | SameBranch {new_head; intermediate_heads} ->
-      let* () =
-        List.iter_es (process_head node_ctxt store) intermediate_heads
-      in
-      process_head node_ctxt store new_head
-  | Rollback {new_head = _} ->
-      (*
-
-          Since [process_head] is robust to chain reorganizations, we do
-          need a specific treatment of [Rollback] events.
-
-      *)
-      return_unit
-
 let inbox_of_hash = State.inbox_of_hash
+
+let history_of_hash = State.history_of_hash
 
 let start () = Inbox_event.starting ()

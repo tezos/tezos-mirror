@@ -56,7 +56,7 @@ module Helpers = struct
   let random_contents rng_state base_dir index context key_set commit_batch_size
       =
     let open Lwt_syntax in
-    let* (index, context, _) =
+    let* index, context, _ =
       Key_map.fold_lwt
         (fun path size (index, context, current_commit_batch_size) ->
           let* context =
@@ -66,7 +66,7 @@ module Helpers = struct
             Lwt.return (index, context, current_commit_batch_size + 1)
           else
             (* save and proceed with fresh diff *)
-            let* (context, index) =
+            let* context, index =
               Io_helpers.commit_and_reload base_dir index context
             in
             Lwt.return (index, context, 0))
@@ -99,12 +99,12 @@ module Helpers = struct
       Io_helpers.assert_ok ~msg:"Io_helpers.prepare_empty_context"
       @@ Lwt_main.run (Io_helpers.prepare_empty_context base_dir)
     in
-    let (context, index) =
+    let context, index =
       Io_helpers.load_context_from_disk base_dir context_hash
     in
     Lwt_main.run
       (let open Lwt_syntax in
-      let* (context, index) =
+      let* context, index =
         random_contents rng_state base_dir index context keys commit_batch_size
       in
       Io_helpers.commit_and_reload base_dir index context)
@@ -264,7 +264,7 @@ module Context_size_dependent_read_bench : Benchmark.S = struct
         ~key_card:cfg.key_card
         ~insertions
     in
-    let (random_key, value_size) = sample_accessed_key rng_state cfg keys in
+    let random_key, value_size = sample_accessed_key rng_state cfg keys in
     let keys = Key_map.insert random_key value_size keys in
     Format.eprintf "preparing bench: insertions = %d@." insertions ;
     let closure context =
@@ -291,7 +291,7 @@ module Context_size_dependent_read_bench : Benchmark.S = struct
     let with_context f =
       let base_dir = Filename.temp_file ?temp_dir:cfg.temp_dir name "" in
       Io_helpers.prepare_base_dir base_dir ;
-      let (context, index) =
+      let context, index =
         Helpers.prepare_random_context
           rng_state
           base_dir
@@ -350,7 +350,7 @@ module Context_size_dependent_write_bench : Benchmark.S = struct
         ~key_card:cfg.key_card
         ~insertions
     in
-    let (random_key, value_size) = sample_accessed_key rng_state cfg keys in
+    let random_key, value_size = sample_accessed_key rng_state cfg keys in
     Format.eprintf "preparing bench: insertions = %d@." insertions ;
     let closure context =
       Lwt_main.run
@@ -371,7 +371,7 @@ module Context_size_dependent_write_bench : Benchmark.S = struct
     let with_context f =
       let base_dir = Filename.temp_file ?temp_dir:cfg.temp_dir name "" in
       Io_helpers.prepare_base_dir base_dir ;
-      let (context, index) =
+      let context, index =
         Helpers.prepare_random_context
           rng_state
           base_dir
@@ -525,7 +525,7 @@ module Irmin_pack_read_bench : Benchmark.S = struct
         "Irmin_pack_read_bench: irmin_pack_max_width < 256, invalid \
          configuration"
     else
-      let (_prefix, directories) =
+      let _prefix, directories =
         sample_irmin_directory rng_state ~cfg ~key_set
       in
       let dir_width = Array.length directories in
@@ -605,7 +605,7 @@ module Irmin_pack_read_bench : Benchmark.S = struct
         ~key_card:cfg.key_card
         ~insertions
     in
-    let (target_key, value_size, keys, irmin_pack_paths) =
+    let target_key, value_size, keys, irmin_pack_paths =
       prepare_irmin_directory rng_state ~cfg ~key_set:keys
     in
     let irmin_width = Array.length irmin_pack_paths in
@@ -635,7 +635,7 @@ module Irmin_pack_read_bench : Benchmark.S = struct
     let with_context f =
       let base_dir = Filename.temp_file ?temp_dir:cfg.temp_dir name "" in
       Io_helpers.prepare_base_dir base_dir ;
-      let (context, index) =
+      let context, index =
         Helpers.prepare_random_context
           rng_state
           base_dir
@@ -675,12 +675,12 @@ module Irmin_pack_write_bench : Benchmark.S = struct
         "Irmin_pack_read_bench: irmin_pack_max_width < 256, invalid \
          configuration"
     else
-      let (_prefix, directories) =
+      let _prefix, directories =
         sample_irmin_directory rng_state ~cfg ~key_set
       in
       let total_keys_in_pack = Array.length directories in
       let number_of_keys_written = Random.int total_keys_in_pack in
-      let (keys_written_to, keys_not_written_to) =
+      let keys_written_to, keys_not_written_to =
         Io_helpers.sample_without_replacement
           number_of_keys_written
           (Array.to_list directories)
@@ -798,7 +798,7 @@ module Irmin_pack_write_bench : Benchmark.S = struct
     in
     let with_context f =
       Io_helpers.prepare_base_dir base_dir ;
-      let (context, index) =
+      let context, index =
         Helpers.prepare_random_context
           rng_state
           base_dir
@@ -916,10 +916,10 @@ module Read_random_key_bench : Benchmark.S = struct
   let make_bench rng_state config keys () =
     let card = Array.length keys in
     assert (card > 0) ;
-    let (key, value_size) = keys.(Random.State.int rng_state card) in
+    let key, value_size = keys.(Random.State.int rng_state card) in
     let with_context f =
-      let (context, index) =
-        let (base_dir, context_hash) = config.existing_context in
+      let context, index =
+        let base_dir, context_hash = config.existing_context in
         Io_helpers.load_context_from_disk base_dir context_hash
       in
       let finalizer () =
@@ -949,7 +949,7 @@ module Read_random_key_bench : Benchmark.S = struct
     Generator.With_context {workload; closure; with_context}
 
   let create_benchmarks ~rng_state ~bench_num config =
-    let (base_dir, context_hash) = config.existing_context in
+    let base_dir, context_hash = config.existing_context in
     let tree =
       Io_helpers.with_context ~base_dir ~context_hash (fun context ->
           Io_stats.load_tree context config.subdirectory)
@@ -1076,10 +1076,10 @@ module Write_random_keys_bench : Benchmark.S = struct
         total_keys_in_directory
         (Random.State.int rng_state cfg.max_written_keys)
     in
-    let (keys_written_to, _keys_not_written_to) =
+    let keys_written_to, _keys_not_written_to =
       Io_helpers.sample_without_replacement number_of_keys_written keys
     in
-    let (source_base_dir, context_hash) = cfg.existing_context in
+    let source_base_dir, context_hash = cfg.existing_context in
     let value_size =
       Base_samplers.sample_in_interval rng_state ~range:cfg.storage_chunks
       * cfg.storage_chunk_bytes
@@ -1091,7 +1091,7 @@ module Write_random_keys_bench : Benchmark.S = struct
       in
       Io_helpers.copy_rec source_base_dir target_base_dir ;
       Format.eprintf "Finished copying original context to %s@." target_base_dir ;
-      let (context, index) =
+      let context, index =
         Io_helpers.load_context_from_disk target_base_dir context_hash
       in
       let context =
@@ -1133,7 +1133,7 @@ module Write_random_keys_bench : Benchmark.S = struct
     Generator.With_context {workload; closure; with_context}
 
   let create_benchmarks ~rng_state ~bench_num config =
-    let (base_dir, context_hash) = config.existing_context in
+    let base_dir, context_hash = config.existing_context in
     let tree =
       Io_helpers.with_context ~base_dir ~context_hash (fun context ->
           Io_stats.load_tree context config.subdirectory)

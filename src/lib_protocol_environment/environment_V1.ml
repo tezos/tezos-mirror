@@ -28,7 +28,7 @@
 open Environment_context
 open Environment_protocol_T
 
-module type V1 = sig
+module type T = sig
   include
     Tezos_protocol_environment_sigs.V1.T
       with type Format.formatter = Format.formatter
@@ -65,7 +65,7 @@ module type V1 = sig
        and type Signature.watermark = Signature.watermark
        and type Pvss_secp256k1.Commitment.t = Pvss_secp256k1.Commitment.t
        and type Pvss_secp256k1.Encrypted_share.t =
-            Pvss_secp256k1.Encrypted_share.t
+        Pvss_secp256k1.Encrypted_share.t
        and type Pvss_secp256k1.Clear_share.t = Pvss_secp256k1.Clear_share.t
        and type Pvss_secp256k1.Public_key.t = Pvss_secp256k1.Public_key.t
        and type Pvss_secp256k1.Secret_key.t = Pvss_secp256k1.Secret_key.t
@@ -76,7 +76,7 @@ module type V1 = sig
        and type ('a, 'b) RPC_path.t = ('a, 'b) RPC_path.t
        and type RPC_service.meth = RPC_service.meth
        and type (+'m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t =
-            ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
+        ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
        and type Error_monad.shell_error = Error_monad.error
        and module Sapling = Tezos_sapling.Core.Validator_legacy
 
@@ -105,7 +105,7 @@ module type V1 = sig
     -> ['block] RPC_context.simple
 end
 
-module MakeV1 (Param : sig
+module Make (Param : sig
   val name : string
 end)
 () =
@@ -116,7 +116,7 @@ struct
      shadow modules from [Stdlib]/[Base]/etc. with backwards compatible
      versions. Thus we open the module, hiding the incompatible, newer modules.
   *)
-  open Tezos_protocol_environment_structs.V1.M
+  open Tezos_protocol_environment_structs.V1
   module Pervasives = Stdlib
   module Compare = Compare
   module List = List
@@ -129,7 +129,6 @@ struct
   module Map = Stdlib.Map
   module Int32 = Int32
   module Int64 = Int64
-  module Buffer = Buffer
   module Format = Format
   module Option = Option
 
@@ -150,7 +149,6 @@ struct
   module Z = Z
   module Lwt = Lwt
   module Lwt_list = Lwt_list
-  module Uri = Uri
 
   module Data_encoding = struct
     include Data_encoding
@@ -531,7 +529,7 @@ struct
         (struct
           let id = Format.asprintf "proto.%s." Param.name
         end)
-        (Tezos_protocol_environment_structs.V1.M.Error_monad_classification)
+        (Tezos_protocol_environment_structs.V1.Error_monad_trace_eval)
 
     let error_encoding = Data_encoding.dynamic_size error_encoding
   end
@@ -1024,13 +1022,13 @@ struct
       wrap_error r
   end
 
-  module Lift (P : Updater.PROTOCOL) = IgnoreCaches (struct
+  module Lift (P : Updater.PROTOCOL) = struct
+    include IgnoreCaches (Environment_protocol_T.V0toV6 (LiftV1 (P)))
+
     let set_log_message_consumer _ = ()
 
     let environment_version = Protocol.V1
-
-    include Environment_protocol_T.V0toV3 (LiftV1 (P))
-  end)
+  end
 
   class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.RPC_context.t)
     (prefix : (unit, (unit * 'chain) * 'block) RPC_path.t) =

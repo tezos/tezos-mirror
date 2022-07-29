@@ -41,10 +41,10 @@ type candidate = Time.Protocol.t * P2p_peer.Id.t
 
 let earlier_o l r =
   match (l, r) with
-  | (None, None) -> false
-  | (None, Some _) -> true
-  | (Some (i, _), Some (j, _)) -> Time.Protocol.(i < j)
-  | (Some _, None) -> false
+  | None, None -> false
+  | None, Some _ -> true
+  | Some (i, _), Some (j, _) -> Time.Protocol.(i < j)
+  | Some _, None -> false
 
 let earlier_ro (i, _) r =
   match r with Some (j, _) -> Time.Protocol.(i < j) | None -> false
@@ -54,8 +54,8 @@ let earlier l (j, _) =
 
 let coincident_o l r =
   match (l, r) with
-  | (None, None) -> true
-  | (Some (i, _), Some (j, _)) -> Time.Protocol.(i = j)
+  | None, None -> true
+  | Some (i, _), Some (j, _) -> Time.Protocol.(i = j)
   | _ -> false
 
 let earlier_or_coincident_o l r = earlier_o l r || coincident_o l r
@@ -138,10 +138,10 @@ module Core = struct
         ( state.candidates.(state.index_of_youngest_candidate),
           state.candidates.(state.index_of_oldest_candidate) )
       with
-      | (None, _) | (_, None) ->
+      | None, _ | _, None ->
           (* The threshold is not reached *)
           Not_synchronised
-      | (Some (best, _), Some (least, _)) ->
+      | Some (best, _), Some (least, _) ->
           let least_timestamp_drifted =
             Time.Protocol.add least (Int64.of_int state.latency)
           in

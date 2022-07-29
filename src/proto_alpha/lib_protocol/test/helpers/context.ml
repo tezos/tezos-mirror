@@ -181,6 +181,9 @@ let get_seed_nonce_hash ctxt =
 
 let get_seed ctxt = Alpha_services.Seed.get rpc_ctxt ctxt
 
+let get_seed_computation ctxt =
+  Alpha_services.Seed_computation.get rpc_ctxt ctxt
+
 let get_constants ctxt = Alpha_services.Constants.all rpc_ctxt ctxt
 
 let default_test_constants =
@@ -264,10 +267,9 @@ module Contract = struct
 
   let equal a b = Alpha_context.Contract.compare a b = 0
 
-  let pkh c =
-    match Alpha_context.Contract.is_implicit c with
-    | Some p -> p
-    | None -> Stdlib.failwith "pkh: only for implicit contracts"
+  let pkh = function
+    | Contract.Implicit p -> p
+    | Originated _ -> Stdlib.failwith "pkh: only for implicit contracts"
 
   let balance ctxt contract =
     Alpha_services.Contract.balance rpc_ctxt ctxt contract
@@ -278,20 +280,20 @@ module Contract = struct
   let balance_and_frozen_bonds ctxt contract =
     Alpha_services.Contract.balance_and_frozen_bonds rpc_ctxt ctxt contract
 
-  let counter ctxt contract =
-    match Contract.is_implicit contract with
-    | None -> invalid_arg "Helpers.Context.counter"
-    | Some mgr -> Alpha_services.Contract.counter rpc_ctxt ctxt mgr
+  let counter ctxt (contract : Contract.t) =
+    match contract with
+    | Originated _ -> invalid_arg "Helpers.Context.counter"
+    | Implicit mgr -> Alpha_services.Contract.counter rpc_ctxt ctxt mgr
 
-  let manager _ contract =
-    match Contract.is_implicit contract with
-    | None -> invalid_arg "Helpers.Context.manager"
-    | Some pkh -> Account.find pkh
+  let manager _ (contract : Contract.t) =
+    match contract with
+    | Originated _ -> invalid_arg "Helpers.Context.manager"
+    | Implicit pkh -> Account.find pkh
 
-  let is_manager_key_revealed ctxt contract =
-    match Contract.is_implicit contract with
-    | None -> invalid_arg "Helpers.Context.is_manager_key_revealed"
-    | Some mgr ->
+  let is_manager_key_revealed ctxt (contract : Contract.t) =
+    match contract with
+    | Originated _ -> invalid_arg "Helpers.Context.is_manager_key_revealed"
+    | Implicit mgr ->
         Alpha_services.Contract.manager_key rpc_ctxt ctxt mgr >|=? fun res ->
         res <> None
 
@@ -363,6 +365,27 @@ module Tx_rollup = struct
     Tx_rollup_services.commitment rpc_ctxt ctxt tx_rollup
 end
 
+module Sc_rollup = struct
+  let inbox ctxt sc_rollup =
+    Environment.RPC_context.make_call1
+      Plugin.RPC.Sc_rollup.S.inbox
+      rpc_ctxt
+      ctxt
+      sc_rollup
+      ()
+      ()
+
+  let commitment ctxt sc_rollup hash =
+    Environment.RPC_context.make_call2
+      Plugin.RPC.Sc_rollup.S.commitment
+      rpc_ctxt
+      ctxt
+      sc_rollup
+      hash
+      ()
+      ()
+end
+
 type (_, _) tup =
   | T1 : ('a, 'a) tup
   | T2 : ('a, 'a * 'a) tup
@@ -372,11 +395,11 @@ type (_, _) tup =
 let tup_hd : type a r. (a, r) tup -> r -> a =
  fun tup elts ->
   match (tup, elts) with
-  | (T1, v) -> v
-  | (T2, (v, _)) -> v
-  | (T3, (v, _, _)) -> v
-  | (TList _, v :: _) -> v
-  | (TList _, []) -> assert false
+  | T1, v -> v
+  | T2, (v, _) -> v
+  | T3, (v, _, _) -> v
+  | TList _, v :: _ -> v
+  | TList _, [] -> assert false
 
 let tup_n : type a r. (a, r) tup -> int = function
   | T1 -> 1
@@ -387,23 +410,31 @@ let tup_n : type a r. (a, r) tup -> int = function
 let tup_get : type a r. (a, r) tup -> a list -> r =
  fun tup list ->
   match (tup, list) with
-  | (T1, [v]) -> v
-  | (T2, [v1; v2]) -> (v1, v2)
-  | (T3, [v1; v2; v3]) -> (v1, v2, v3)
-  | (TList _, l) -> l
+  | T1, [v] -> v
+  | T2, [v1; v2] -> (v1, v2)
+  | T3, [v1; v2; v3] -> (v1, v2, v3)
+  | TList _, l -> l
   | _ -> assert false
 
 let init_gen tup ?rng_state ?commitments ?(initial_balances = [])
-    ?consensus_threshold ?min_proposal_quorum ?bootstrap_contracts ?level
-    ?cost_per_byte ?liquidity_baking_subsidy ?endorsing_reward_per_slot
-    ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
-    ?blocks_per_cycle ?cycles_per_voting_period ?tx_rollup_enable
-    ?tx_rollup_sunset_level ?tx_rollup_origination_size ?sc_rollup_enable () =
+    ?consensus_threshold ?min_proposal_quorum ?bootstrap_contracts
+    ?bootstrap_delegations ?level ?cost_per_byte ?liquidity_baking_subsidy
+    ?endorsing_reward_per_slot ?baking_reward_bonus_per_slot
+    ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
+    ?cycles_per_voting_period ?tx_rollup_enable ?tx_rollup_sunset_level
+    ?tx_rollup_origination_size ?sc_rollup_enable ?dal_enable
+    ?hard_gas_limit_per_block ?nonce_revelation_threshold () =
   let n = tup_n tup in
-  let accounts = Account.generate_accounts ?rng_state ~initial_balances n in
+  let accounts =
+    Account.generate_accounts
+      ?rng_state
+      ~initial_balances
+      ?bootstrap_delegations
+      n
+  in
   let contracts =
     List.map
-      (fun (a, _) -> Alpha_context.Contract.implicit_contract Account.(a.pkh))
+      (fun (a, _, _) -> Alpha_context.Contract.Implicit Account.(a.pkh))
       accounts
   in
   Block.genesis
@@ -424,6 +455,9 @@ let init_gen tup ?rng_state ?commitments ?(initial_balances = [])
     ?tx_rollup_sunset_level
     ?tx_rollup_origination_size
     ?sc_rollup_enable
+    ?dal_enable
+    ?hard_gas_limit_per_block
+    ?nonce_revelation_threshold
     accounts
   >|=? fun blk -> (blk, tup_get tup contracts)
 
@@ -440,15 +474,15 @@ let init_with_constants_gen tup constants =
   let accounts = Account.generate_accounts n in
   let contracts =
     List.map
-      (fun (a, _) -> Alpha_context.Contract.implicit_contract Account.(a.pkh))
+      (fun (a, _, _) -> Alpha_context.Contract.Implicit Account.(a.pkh))
       accounts
   in
   let open Tezos_protocol_alpha_parameters in
   let bootstrap_accounts =
     List.map
-      (fun (acc, tez) ->
+      (fun (acc, tez, delegate_to) ->
         Default_parameters.make_bootstrap_account
-          (acc.Account.pkh, acc.Account.pk, tez))
+          (acc.Account.pkh, acc.Account.pk, tez, delegate_to))
       accounts
   in
   let parameters =
@@ -470,8 +504,8 @@ let default_raw_context () =
   let open Tezos_protocol_alpha_parameters in
   let bootstrap_accounts =
     List.map
-      (fun (Account.{pk; pkh; _}, amount) ->
-        Default_parameters.make_bootstrap_account (pkh, pk, amount))
+      (fun (Account.{pk; pkh; _}, amount, delegate_to) ->
+        Default_parameters.make_bootstrap_account (pkh, pk, amount, delegate_to))
       initial_accounts
   in
   Block.prepare_initial_context_params initial_accounts
@@ -488,12 +522,13 @@ let default_raw_context () =
   in
   let protocol_param_key = ["protocol_parameters"] in
   Tezos_protocol_environment.Context.(
-    let empty = Memory_context.empty in
+    let empty = Tezos_protocol_environment.Memory_context.empty in
     add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
     add ctxt protocol_param_key proto_params)
   >>= fun context ->
   let typecheck ctxt script_repr = return ((script_repr, None), ctxt) in
   Init_storage.prepare_first_block
+    Chain_id.zero
     context
     ~level:0l
     ~timestamp:(Time.Protocol.of_seconds 1643125688L)

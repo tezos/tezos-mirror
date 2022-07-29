@@ -33,8 +33,12 @@ type t
 (** The initial tick. *)
 val initial : t
 
-(** [next tick] returns the counter successor of [tick]. No overflow can happen. *)
+(** [next tick] returns the counter successor of [tick]. *)
 val next : t -> t
+
+(** [jump tick k] moves [tick] by [k] (possibly negative) steps.
+    The move stops at [initial] when going back in time. *)
+val jump : t -> Z.t -> t
 
 (** [distance t1 t2] is the absolute value of the difference between [t1] and [t2]. *)
 val distance : t -> t -> Z.t
@@ -45,6 +49,15 @@ val of_int : int -> t option
 
 (** [to_int tick] converts the [tick] into an integer. *)
 val to_int : t -> int option
+
+(** [of_number_of_ticks] converts from the bounded int type defined in
+    the [Sc_rollup_repr] module. [Number_of_ticks] is used inside of
+    commitments to limit the maximum possible storage requirement. It is
+    bounded between one and [max_int] meaning that this can never return
+    a negative number so an [option] isn't required. *)
+val of_number_of_ticks : Sc_rollup_repr.Number_of_ticks.t -> t
+
+val of_z : Z.t -> t
 
 val encoding : t Data_encoding.t
 

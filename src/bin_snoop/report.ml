@@ -101,6 +101,10 @@ module Pp_impl : S with type 'a repr = printed and type size = string = struct
     unprotect_in_context [Lam_body; Add; Sub; Mul; Div] (fun fmtr () ->
         Format.fprintf fmtr "log2 @[<h>%a@]" x Arg_app)
 
+  let sqrt x =
+    unprotect_in_context [Lam_body; Add; Sub; Mul; Div] (fun fmtr () ->
+        Format.fprintf fmtr "sqrt @[<h>%a@]" x Arg_app)
+
   let free ~name fmtr _c = Format.fprintf fmtr "free(%a)" Free_variable.pp name
 
   let lt x y =
@@ -194,12 +198,6 @@ let maths s =
   Inline_math_blob s
 
 let benchmark_options_table (bench_opts : Measure.options) =
-  let flush_cache =
-    match bench_opts.flush_cache with
-    | `Cache_megabytes i -> normal_text (Printf.sprintf "%d megabytes" i)
-    | `Dont -> normal_text "no"
-  in
-  let stabilize_gc = normal_text (string_of_bool bench_opts.stabilize_gc) in
   let seed =
     match bench_opts.seed with
     | None -> normal_text "self-init"
@@ -214,21 +212,13 @@ let benchmark_options_table (bench_opts : Measure.options) =
     | Percentile i -> normal_text (Printf.sprintf "percentile@%d" i)
     | Mean -> normal_text "mean"
   in
-  let cpu_affinity =
-    match bench_opts.cpu_affinity with
-    | None -> normal_text "none"
-    | Some i -> normal_text (Printf.sprintf "cpu %d" i)
-  in
   let open Latex_syntax in
   let rows =
     [
       Hline;
-      Row [[normal_text "flush cache"]; [flush_cache]];
-      Row [[normal_text "stabilize gc"]; [stabilize_gc]];
       Row [[normal_text "seed"]; [seed]];
       Row [[normal_text "nsamples"]; [nsamples]];
       Row [[normal_text "determinizer"]; [determinizer]];
-      Row [[normal_text "cpu affinity"]; [cpu_affinity]];
       Hline;
     ]
   in
@@ -255,7 +245,9 @@ let inferred_params_table (solution : Inference.solution) =
               (fun l -> Latex_syntax.Row (List.map (fun x -> [maths x]) l))
               lines
           in
-          let rows = Latex_syntax.Hline :: hdr :: data @ [Latex_syntax.Hline] in
+          let rows =
+            (Latex_syntax.Hline :: hdr :: data) @ [Latex_syntax.Hline]
+          in
           Some (spec, rows))
 
 let overrides_table (overrides : float Free_variable.Map.t) =
@@ -273,7 +265,7 @@ let overrides_table (overrides : float Free_variable.Map.t) =
         overrides
         []
     in
-    let rows = Latex_syntax.Hline :: hdr :: data @ [Latex_syntax.Hline] in
+    let rows = (Latex_syntax.Hline :: hdr :: data) @ [Latex_syntax.Hline] in
     Some (spec, rows)
 
 module Int_set = Set.Make (Int)
@@ -331,7 +323,7 @@ let model_table (type c t) ((module Bench) : (c, t) Benchmark.poly) =
   ([Vbar; L; Vbar], splice Hline rows)
 
 let report ~(measure : Measure.packed_measurement)
-    ~(solution : Inference.solution) ~(figs_file : string option)
+    ~(solution : Inference.solution) ~(figs_files : string list)
     ~(overrides_map : float Free_variable.Map.t) ~short : Latex_syntax.section =
   let (Measure.Measurement ((module Bench), measurement)) = measure in
   let {Measure.bench_opts; workload_data; date = _} = measurement in
@@ -355,14 +347,13 @@ let report ~(measure : Measure.packed_measurement)
     Table (benchmark_options_table bench_opts)
   in
   let figure =
-    match figs_file with
-    | None -> []
-    | Some figs_file ->
-        [
-          Figure
-            ( [normal_text Bench.name],
-              {filename = figs_file; size = Some (Width_cm 17)} );
-        ]
+    List.map
+      (fun figs_file ->
+        Figure
+          ( [normal_text Bench.name],
+            {filename = Filename.basename figs_file; size = Some (Width_cm 17)}
+          ))
+      figs_files
   in
   let model_table : section_content = Table (model_table (module Bench)) in
   let short_table =
@@ -401,64 +392,29 @@ let create_empty ~name = Latex_syntax.{title = name; sections = []}
 
 let add_section ~(measure : Measure.packed_measurement) ~(model_name : string)
     ~(problem : Inference.problem) ~(solution : Inference.solution)
-    ~overrides_map ~short ?report_folder document =
+    ~overrides_map ~short ~display_options document =
   let (Measure.Measurement ((module Bench), _)) = measure in
-  let name = Bench.name ^ "_" ^ model_name in
-  let figs_file =
-    match report_folder with
-    | None ->
-        let filename = Filename.temp_file "figure" ".pdf" in
-        let plot_target = Display.Save {file = Some filename} in
-        if
-          Display.perform_plot
-            ~measure
-            ~model_name
-            ~problem
-            ~solution
-            ~plot_target
-        then Some filename
-        else None
-    | Some folder -> (
-        (match Unix.stat folder with
-        | exception Unix.Unix_error _ ->
-            Format.eprintf "Folder %s does not exist, creating it.\n" folder ;
-            Unix.mkdir folder 0o700
-        | {st_kind = S_DIR; _} -> ()
-        | _ ->
-            Format.eprintf "%s is not a folder, exiting.\n" folder ;
-            exit 1) ;
-        let filename = Filename.Infix.(folder // (name ^ ".pdf")) in
-        Format.eprintf "Saving plot in %s\n" filename ;
-        match Unix.stat filename with
-        | exception Unix.Unix_error _ ->
-            let fd = Unix.openfile filename [O_CREAT; O_EXCL; O_WRONLY] 0o600 in
-            Unix.close fd ;
-            let plot_target = Display.Save {file = Some filename} in
-            if
-              Display.perform_plot
-                ~measure
-                ~model_name
-                ~problem
-                ~solution
-                ~plot_target
-            then Some (name ^ ".pdf")
-            else None
-        | {st_size; _} when st_size > 0 ->
-            Format.eprintf "Plot exists, skipping.\n" ;
-            Some (name ^ ".pdf")
-        | _ ->
-            let plot_target = Display.Save {file = Some filename} in
-            if
-              Display.perform_plot
-                ~measure
-                ~model_name
-                ~problem
-                ~solution
-                ~plot_target
-            then Some (name ^ ".pdf")
-            else None)
+  let figs_files =
+    let plot_target = Display.Save in
+    let save_directory = display_options.Display.save_directory in
+    (match Unix.stat save_directory with
+    | exception Unix.Unix_error _ ->
+        Format.eprintf "Folder %s does not exist, creating it.@." save_directory ;
+        Unix.mkdir save_directory 0o700
+    | {st_kind = S_DIR; _} -> ()
+    | _ ->
+        Format.eprintf "%s is not a folder, exiting.@." save_directory ;
+        exit 1) ;
+    Format.eprintf "Saving plot in folder %s@." save_directory ;
+    Display.perform_plot
+      ~measure
+      ~model_name
+      ~problem
+      ~solution
+      ~plot_target
+      ~options:display_options
   in
-  let section = report ~measure ~solution ~figs_file ~overrides_map ~short in
+  let section = report ~measure ~solution ~figs_files ~overrides_map ~short in
   let open Latex_syntax in
   {document with sections = document.sections @ [section]}
 

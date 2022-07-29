@@ -162,9 +162,9 @@ let blockchain_network_hangzhounet =
         "hangzhounet.boot.tez.ie";
       ]
 
-let blockchain_network_ithacanet =
+let blockchain_network_ghostnet =
   make_blockchain_network
-    ~alias:"ithacanet"
+    ~alias:"ghostnet"
     {
       time = Time.Protocol.of_notation_exn "2022-01-25T15:00:00Z";
       block =
@@ -188,13 +188,18 @@ let blockchain_network_ithacanet =
     ~chain_name:"TEZOS_ITHACANET_2022-01-25T15:00:00Z"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
     ~user_activated_upgrades:
-      [(8191l, "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A")]
+      [
+        (8191l, "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A");
+        (765952l, "PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY");
+      ]
     ~default_bootstrap_peers:
       [
-        "ithacanet.teztnets.xyz";
-        "ithacanet.smartpy.io";
-        "ithacanet.kaml.fr";
-        "ithacanet.boot.ecadinfra.com";
+        "ghostnet.teztnets.xyz";
+        "ghostnet.smartpy.io";
+        "ghostnet.boot.ecadinfra.com";
+        "ghostnet.kaml.fr";
+        "ghostnet.stakenow.de:9733";
+        "ghostnet.visualtez.com";
       ]
 
 let blockchain_network_jakartanet =
@@ -230,6 +235,40 @@ let blockchain_network_jakartanet =
         "jakartanet.boot.ecadinfra.com";
         "jakartanet.kaml.fr";
         "jakartanet.visualtez.com";
+      ]
+
+let blockchain_network_kathmandunet =
+  make_blockchain_network
+    ~alias:"kathmandunet"
+    {
+      time = Time.Protocol.of_notation_exn "2022-07-28T15:00:00Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BLPZJvbTNPG2kgX97n2eCzPAFicqbxZNWSf6BkWsud5uihNua3a";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
+    }
+    ~genesis_parameters:
+      {
+        context_key = "sandbox_parameter";
+        values =
+          `O
+            [
+              ( "genesis_pubkey",
+                `String "edpkuYLienS3Xdt5c1vfRX1ibMxQuvfM67ByhJ9nmRYYKGAAoTq1UC"
+              );
+            ];
+      }
+    ~chain_name:"TEZOS_KATHMANDUNET_2022-07-28T15:00:00Z"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~user_activated_upgrades:
+      [(8192l, "PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg")]
+    ~default_bootstrap_peers:
+      [
+        "kathmandunet.teztnets.xyz";
+        "kathmandunet.boot.ecadinfra.com";
+        "kathmandunet.stakenow.de:9733";
       ]
 
 let blockchain_network_sandbox =
@@ -331,8 +370,9 @@ let builtin_blockchain_networks_with_tags =
     (1, blockchain_network_sandbox);
     (4, blockchain_network_mainnet);
     (16, blockchain_network_hangzhounet);
-    (17, blockchain_network_ithacanet);
     (18, blockchain_network_jakartanet);
+    (19, blockchain_network_ghostnet);
+    (20, blockchain_network_kathmandunet);
   ]
   |> List.map (fun (tag, network) ->
          match network.alias with
@@ -678,11 +718,15 @@ let limit : P2p.limits Data_encoding.t =
              (opt "incoming-app-message-queue-size" int31)
              (opt "incoming-message-queue-size" int31)
              (opt "outgoing-message-queue-size" int31)
-             (opt "max_known_points" (tup2 uint16 uint16))))
+             (opt
+                "max_known_points"
+                ~description:
+                  "The max and target size for the known address table."
+                (tup2 uint16 uint16))))
        (obj6
           (opt
              "max_known_peer_ids"
-             ~description:"The max and target size for the known address table."
+             ~description:"The max and target size for the known peers table."
              (tup2 uint16 uint16))
           (dft
              "peer_greylist_size"
@@ -816,10 +860,11 @@ let p2p =
        (dft
           "enable_testchain"
           ~description:
-            "If set to [true], the node will spawn a testchain during the \
-             protocol's testing voting period. Default value is [false]. It is \
-             disabled to decrease the node storage usage and computation by \
-             dropping the validation of the test network blocks."
+            "DEPRECATED. If set to [true], the node will spawn a testchain \
+             during the protocol's testing voting period. Default value is \
+             [false]. It is disabled to decrease the node storage usage and \
+             computation by dropping the validation of the test network \
+             blocks."
           bool
           false)
        (let open P2p_point_state.Info in
@@ -835,7 +880,7 @@ let rpc : rpc Data_encoding.t =
   let open Data_encoding in
   conv
     (fun {cors_origins; cors_headers; listen_addrs; tls; acl; media_type} ->
-      let (cert, key) =
+      let cert, key =
         match tls with
         | None -> (None, None)
         | Some {cert; key} -> (Some cert, Some key)
@@ -858,15 +903,15 @@ let rpc : rpc Data_encoding.t =
            media_type ) ->
       let tls =
         match (cert, key) with
-        | (None, _) | (_, None) -> None
-        | (Some cert, Some key) -> Some {cert; key}
+        | None, _ | _, None -> None
+        | Some cert, Some key -> Some {cert; key}
       in
       let listen_addrs =
         match (listen_addrs, legacy_listen_addr) with
-        | (Some addrs, None) -> addrs
-        | (None, Some addr) -> [addr]
-        | (None, None) -> default_rpc.listen_addrs
-        | (Some _, Some _) ->
+        | Some addrs, None -> addrs
+        | None, Some addr -> [addr]
+        | None, None -> default_rpc.listen_addrs
+        | Some _, Some _ ->
             Stdlib.failwith
               "Config file: Use only \"listen-addrs\" and not (legacy) \
                \"listen-addr\"."
@@ -1505,9 +1550,9 @@ let resolve_addr ~default_addr ?(no_peer_id_expected = true) ?default_port
   | Ok {addr; port; peer_id} ->
       let service_port =
         match (port, default_port) with
-        | (Some port, _) -> port
-        | (None, Some default_port) -> default_port
-        | (None, None) -> default_p2p_port
+        | Some port, _ -> port
+        | None, Some default_port -> default_port
+        | None, None -> default_p2p_port
       in
       let service = string_of_int service_port in
       let node = if addr = "" || addr = "_" then default_addr else addr in

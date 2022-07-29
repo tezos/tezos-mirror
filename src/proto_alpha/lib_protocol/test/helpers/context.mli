@@ -70,6 +70,8 @@ val get_seed_nonce_hash : t -> Nonce_hash.t tzresult Lwt.t
 (** Returns the seed of the cycle to which the block belongs to. *)
 val get_seed : t -> Seed.seed tzresult Lwt.t
 
+val get_seed_computation : t -> Seed.seed_computation_status tzresult Lwt.t
+
 (** Returns all the constants of the protocol *)
 val get_constants : t -> Constants.t tzresult Lwt.t
 
@@ -86,7 +88,7 @@ val get_endorsing_reward :
 
 val get_liquidity_baking_subsidy : t -> Tez.t tzresult Lwt.t
 
-val get_liquidity_baking_cpmm_address : t -> Contract.t tzresult Lwt.t
+val get_liquidity_baking_cpmm_address : t -> Contract_hash.t tzresult Lwt.t
 
 module Vote : sig
   val get_ballots : t -> Vote.ballots tzresult Lwt.t
@@ -145,11 +147,11 @@ module Contract : sig
 
   val delegate_opt : t -> Contract.t -> public_key_hash option tzresult Lwt.t
 
-  val storage : t -> Contract.t -> Script.expr tzresult Lwt.t
+  val storage : t -> Contract_hash.t -> Script.expr tzresult Lwt.t
 
-  val script : t -> Contract.t -> Script.expr tzresult Lwt.t
+  val script : t -> Contract_hash.t -> Script.expr tzresult Lwt.t
 
-  val script_hash : t -> Contract.t -> Script_expr_hash.t tzresult Lwt.t
+  val script_hash : t -> Contract_hash.t -> Script_expr_hash.t tzresult Lwt.t
 end
 
 module Delegate : sig
@@ -211,6 +213,16 @@ module Tx_rollup : sig
     Tx_rollup_commitment.Submitted_commitment.t option tzresult Lwt.t
 end
 
+module Sc_rollup : sig
+  val inbox : t -> Sc_rollup.t -> Sc_rollup.Inbox.t tzresult Lwt.t
+
+  val commitment :
+    t ->
+    Sc_rollup.t ->
+    Sc_rollup.Commitment.Hash.t ->
+    Sc_rollup.Commitment.t tzresult Lwt.t
+end
+
 type (_, _) tup =
   | T1 : ('a, 'a) tup
   | T2 : ('a, 'a * 'a) tup
@@ -226,6 +238,8 @@ type 'accounts init :=
   ?consensus_threshold:int ->
   ?min_proposal_quorum:int32 ->
   ?bootstrap_contracts:Parameters.bootstrap_contract list ->
+  ?bootstrap_delegations:
+    (Signature.Public_key_hash.t * Signature.Public_key_hash.t) list ->
   ?level:int32 ->
   ?cost_per_byte:Tez.t ->
   ?liquidity_baking_subsidy:Tez.t ->
@@ -239,6 +253,9 @@ type 'accounts init :=
   ?tx_rollup_sunset_level:int32 ->
   ?tx_rollup_origination_size:int ->
   ?sc_rollup_enable:bool ->
+  ?dal_enable:bool ->
+  ?hard_gas_limit_per_block:Gas.Arith.integral ->
+  ?nonce_revelation_threshold:int32 ->
   unit ->
   (Block.t * 'accounts) tzresult Lwt.t
 

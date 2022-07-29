@@ -13,7 +13,7 @@ See details in :ref:`Test Networks<test-networks>`
 and instructions to join in :ref:`How to get Tezos<howtoget>`.
 
 The source code of this proposal is available in `this tar archive
-<https://blog.nomadic-labs.com/files/delphi_007_PsDELPH1.tar>`_ and its
+<https://research-development.nomadic-labs.com/files/delphi_007_PsDELPH1.tar>`_ and its
 full hash is ``PsDELPH1Kxsxt8f9eWbxQeRxkjfbxoqM52jvs5Y5fBxWWh4ifpo``.
 
 **This protocol contains several breaking changes with respect to Carthage.**

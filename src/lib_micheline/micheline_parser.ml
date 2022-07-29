@@ -104,7 +104,7 @@ let token_value_encoding =
           | Comment s -> Some (s, false)
           | Eol_comment s -> Some (s, true)
           | _ -> None)
-        (function (s, false) -> Comment s | (s, true) -> Eol_comment s);
+        (function s, false -> Comment s | s, true -> Eol_comment s);
       case
         (Tag 4)
         ~title:"Punctuation"
@@ -201,8 +201,8 @@ let tokenize source =
   in
   let rec skip acc =
     match next () with
-    | (`End, _) -> List.rev acc
-    | (`Uchar c, start) -> (
+    | `End, _ -> List.rev acc
+    | `Uchar c, start -> (
         match uchar_to_char c with
         | Some ('a' .. 'z' | 'A' .. 'Z') -> ident acc start (fun s _ -> Ident s)
         | Some ('@' | ':' | '$' | '&' | '%' | '!' | '?') ->
@@ -212,7 +212,7 @@ let tokenize source =
                 Annot str)
         | Some '-' -> (
             match next () with
-            | (`End, stop) ->
+            | `End, stop ->
                 errors := Unterminated_integer {start; stop} :: !errors ;
                 List.rev acc
             | (`Uchar c, stop) as first -> (
@@ -235,7 +235,7 @@ let tokenize source =
         | Some '#' -> eol_comment acc start
         | Some '/' -> (
             match next () with
-            | (`Uchar c, _) when Uchar.equal c (Uchar.of_char '*') ->
+            | `Uchar c, _ when Uchar.equal c (Uchar.of_char '*') ->
                 comment acc start 0
             | ((`Uchar _ | `End), _) as charloc ->
                 errors := Unexpected_character (start, "/") :: !errors ;
@@ -309,10 +309,10 @@ let tokenize source =
       tok start (here ()) (String (String.concat "" (List.rev sacc)))
     in
     match next () with
-    | (`End, stop) ->
+    | `End, stop ->
         errors := Unterminated_string {start; stop} :: !errors ;
         skip (tok () :: acc)
-    | (`Uchar c, stop) -> (
+    | `Uchar c, stop -> (
         match uchar_to_char c with
         | Some '"' -> skip (tok () :: acc)
         | Some ('\n' | '\r') ->
@@ -320,10 +320,10 @@ let tokenize source =
             skip (tok () :: acc)
         | Some '\\' -> (
             match next () with
-            | (`End, stop) ->
+            | `End, stop ->
                 errors := Unterminated_string {start; stop} :: !errors ;
                 skip (tok () :: acc)
-            | (`Uchar c, loc) -> (
+            | `Uchar c, loc -> (
                 match uchar_to_char c with
                 | Some '"' -> string acc ("\"" :: sacc) start
                 | Some 'r' -> string acc ("\r" :: sacc) start
@@ -359,15 +359,15 @@ let tokenize source =
   and annot acc start ret = generic_ident allowed_annot_char acc start ret
   and comment acc start lvl =
     match next () with
-    | (`End, stop) ->
+    | `End, stop ->
         errors := Unterminated_comment {start; stop} :: !errors ;
         let text = String.sub source start.byte (stop.byte - start.byte) in
         skip (tok start stop (Comment text) :: acc)
-    | (`Uchar c, _) -> (
+    | `Uchar c, _ -> (
         match uchar_to_char c with
         | Some '*' -> (
             match next () with
-            | (`Uchar c, _) when Uchar.equal c (Uchar.of_char '/') ->
+            | `Uchar c, _ when Uchar.equal c (Uchar.of_char '/') ->
                 if lvl = 0 then
                   let stop = here () in
                   let text =
@@ -380,7 +380,7 @@ let tokenize source =
                 comment acc start lvl)
         | Some '/' -> (
             match next () with
-            | (`Uchar c, _) when Uchar.equal c (Uchar.of_char '*') ->
+            | `Uchar c, _ when Uchar.equal c (Uchar.of_char '*') ->
                 comment acc start (lvl + 1)
             | other ->
                 back other ;
@@ -392,7 +392,7 @@ let tokenize source =
       tok start stop (Eol_comment text)
     in
     match next () with
-    | (`Uchar c, stop) -> (
+    | `Uchar c, stop -> (
         match uchar_to_char c with
         | Some '\n' -> skip (tok stop :: acc)
         | Some _ | None -> eol_comment acc start)
@@ -475,7 +475,7 @@ type error += Empty
 
 let rec annots = function
   | {token = Annot annot; _} :: rest ->
-      let (annots, rest) = annots rest in
+      let annots, rest = annots rest in
       (annot :: annots, rest)
   | rest -> ([], rest)
 
@@ -487,29 +487,29 @@ let rec parse ?(check = true) errors tokens stack =
   (* Start by preventing all absurd cases, so now the pattern
      matching exhaustivity can tell us that we treater all
      possible tokens for all possible valid states. *)
-  | ([], _)
-  | ([Wrapped _], _)
-  | ([Unwrapped _], _)
-  | (Unwrapped _ :: Unwrapped _ :: _, _)
-  | (Unwrapped _ :: Wrapped _ :: _, _)
-  | (Toplevel _ :: _ :: _, _)
-  | (Expression _ :: _ :: _, _) ->
+  | [], _
+  | [Wrapped _], _
+  | [Unwrapped _], _
+  | Unwrapped _ :: Unwrapped _ :: _, _
+  | Unwrapped _ :: Wrapped _ :: _, _
+  | Toplevel _ :: _ :: _, _
+  | Expression _ :: _ :: _, _ ->
       assert false
   (* Return *)
-  | (Expression (Some result) :: _, []) -> ([result], List.rev errors)
-  | (Expression (Some _) :: _, token :: rem) ->
+  | Expression (Some result) :: _, [] -> ([result], List.rev errors)
+  | Expression (Some _) :: _, token :: rem ->
       let errors = Unexpected token :: errors in
       parse ~check errors rem (* skip *) stack
-  | (Expression None :: _, []) ->
+  | Expression None :: _, [] ->
       let errors = Empty :: errors in
       let ghost = {start = point_zero; stop = point_zero} in
       ([Seq (ghost, [])], List.rev errors)
-  | ([Toplevel [(Seq (_, exprs) as expr)]], []) ->
+  | [Toplevel [(Seq (_, exprs) as expr)]], [] ->
       let errors =
         if check then do_check ~toplevel:false errors expr else errors
       in
       (exprs, List.rev errors)
-  | ([Toplevel exprs], []) ->
+  | [Toplevel exprs], [] ->
       let exprs = List.rev exprs in
       let loc = {start = min_point exprs; stop = max_point exprs} in
       let expr = Seq (loc, exprs) in
@@ -518,19 +518,22 @@ let rec parse ?(check = true) errors tokens stack =
       in
       (exprs, List.rev errors)
   (* Ignore comments *)
-  | (_, {token = Eol_comment _ | Comment _; _} :: rest) ->
+  | _, {token = Eol_comment _ | Comment _; _} :: rest ->
       parse ~check errors rest stack
   | ( (Expression None | Sequence _ | Toplevel _) :: _,
       ({token = Int _ | String _ | Bytes _; _} as token)
-      :: {token = Eol_comment _ | Comment _; _} :: rest )
+      :: {token = Eol_comment _ | Comment _; _}
+      :: rest )
   | ( (Wrapped _ | Unwrapped _) :: _,
       ({token = Open_paren; _} as token)
-      :: {token = Eol_comment _ | Comment _; _} :: rest ) ->
+      :: {token = Eol_comment _ | Comment _; _}
+      :: rest ) ->
       parse ~check errors (token :: rest) stack
   (* Erroneous states *)
   | ( (Wrapped _ | Unwrapped _) :: _,
       ({token = Open_paren; _} as token)
-      :: {token = Open_paren | Open_brace; _} :: rem )
+      :: {token = Open_paren | Open_brace; _}
+      :: rem )
   | ( Unwrapped _ :: Expression _ :: _,
       ({token = Semi | Close_brace | Close_paren; _} as token) :: rem )
   | ( Expression None :: _,
@@ -546,7 +549,7 @@ let rec parse ?(check = true) errors tokens stack =
       {token = Open_paren; _}
       :: ({token = Int _ | String _ | Bytes _ | Annot _ | Close_paren; _} as
          token)
-         :: rem )
+      :: rem )
   | ( (Expression None | Sequence _ | Toplevel _) :: _,
       {token = Int _ | String _ | Bytes _; _}
       :: ({
@@ -555,29 +558,28 @@ let rec parse ?(check = true) errors tokens stack =
               | Open_paren | Open_brace );
             _;
           } as token)
-         :: rem )
+      :: rem )
   | ( Unwrapped (_, _, _, _) :: Toplevel _ :: _,
       ({token = Close_brace; _} as token) :: rem )
-  | (Unwrapped (_, _, _, _) :: _, ({token = Close_paren; _} as token) :: rem)
-  | ([Toplevel _], ({token = Close_paren; _} as token) :: rem)
-  | ([Toplevel _], ({token = Open_paren; _} as token) :: rem)
-  | ([Toplevel _], ({token = Close_brace; _} as token) :: rem)
-  | (Sequence _ :: _, ({token = Open_paren; _} as token) :: rem)
-  | (Sequence _ :: _, ({token = Close_paren; _} as token) :: rem)
+  | Unwrapped (_, _, _, _) :: _, ({token = Close_paren; _} as token) :: rem
+  | [Toplevel _], ({token = Close_paren; _} as token) :: rem
+  | [Toplevel _], ({token = Open_paren; _} as token) :: rem
+  | [Toplevel _], ({token = Close_brace; _} as token) :: rem
+  | Sequence _ :: _, ({token = Open_paren; _} as token) :: rem
+  | Sequence _ :: _, ({token = Close_paren; _} as token) :: rem
   | ( (Wrapped _ | Unwrapped _) :: _,
       ({token = Open_paren; _} as token)
       :: (({token = Close_brace | Semi; _} :: _ | []) as rem) )
-  | (_, ({token = Annot _; _} as token) :: rem) ->
+  | _, ({token = Annot _; _} as token) :: rem ->
       let errors = Unexpected token :: errors in
       parse ~check errors rem (* skip *) stack
-  | (Wrapped (token, _, _, _) :: _, ([] | {token = Close_brace | Semi; _} :: _))
+  | Wrapped (token, _, _, _) :: _, ([] | {token = Close_brace | Semi; _} :: _)
     ->
       let errors = Unclosed token :: errors in
       let fake = {token with token = Close_paren} in
       let tokens = (* insert *) fake :: tokens in
       parse ~check errors tokens stack
-  | ((Sequence (token, _) :: _ | Unwrapped _ :: Sequence (token, _) :: _), [])
-    ->
+  | (Sequence (token, _) :: _ | Unwrapped _ :: Sequence (token, _) :: _), [] ->
       let errors = Unclosed token :: errors in
       let fake = {token with token = Close_brace} in
       let tokens = (* insert *) fake :: tokens in
@@ -585,14 +587,14 @@ let rec parse ?(check = true) errors tokens stack =
   (* Valid states *)
   | ( (Toplevel _ | Sequence (_, _)) :: _,
       {token = Ident name; loc} :: ({token = Annot _; _} :: _ as rest) ) ->
-      let (annots, rest) = annots rest in
+      let annots, rest = annots rest in
       let mode = Unwrapped (loc, name, [], annots) in
       parse ~check errors rest (push_mode mode stack)
   | ( (Expression None | Toplevel _ | Sequence (_, _)) :: _,
       {token = Ident name; loc} :: rest ) ->
       let mode = Unwrapped (loc, name, [], []) in
       parse ~check errors rest (push_mode mode stack)
-  | ((Unwrapped _ | Wrapped _) :: _, {token = Int value; loc} :: rest)
+  | (Unwrapped _ | Wrapped _) :: _, {token = Int value; loc} :: rest
   | ( (Expression None | Sequence _ | Toplevel _) :: _,
       {token = Int value; loc}
       :: (([] | {token = Semi | Close_brace; _} :: _) as rest) ) ->
@@ -601,7 +603,7 @@ let rec parse ?(check = true) errors tokens stack =
         if check then do_check ~toplevel:false errors expr else errors
       in
       parse ~check errors rest (fill_mode expr stack)
-  | ((Unwrapped _ | Wrapped _) :: _, {token = String contents; loc} :: rest)
+  | (Unwrapped _ | Wrapped _) :: _, {token = String contents; loc} :: rest
   | ( (Expression None | Sequence _ | Toplevel _) :: _,
       {token = String contents; loc}
       :: (([] | {token = Semi | Close_brace; _} :: _) as rest) ) ->
@@ -610,11 +612,11 @@ let rec parse ?(check = true) errors tokens stack =
         if check then do_check ~toplevel:false errors expr else errors
       in
       parse ~check errors rest (fill_mode expr stack)
-  | ((Unwrapped _ | Wrapped _) :: _, {token = Bytes contents; loc} :: rest)
+  | (Unwrapped _ | Wrapped _) :: _, {token = Bytes contents; loc} :: rest
   | ( (Expression None | Sequence _ | Toplevel _) :: _,
       {token = Bytes contents; loc}
       :: (([] | {token = Semi | Close_brace; _} :: _) as rest) ) ->
-      let (errors, bytes) =
+      let errors, bytes =
         match
           Hex.to_bytes
             (`Hex (String.sub contents 2 (String.length contents - 2)))
@@ -635,7 +637,7 @@ let rec parse ?(check = true) errors tokens stack =
         if check then do_check ~toplevel:false errors expr else errors
       in
       parse ~check errors rest (fill_mode expr (pop_mode stack))
-  | ((Sequence _ | Toplevel _) :: _, {token = Semi; _} :: rest) ->
+  | (Sequence _ | Toplevel _) :: _, {token = Semi; _} :: rest ->
       parse ~check errors rest stack
   | ( Unwrapped ({start; stop}, name, exprs, annot) :: Expression _ :: _,
       ([] as rest) )
@@ -654,15 +656,16 @@ let rec parse ?(check = true) errors tokens stack =
       parse ~check errors rest (fill_mode expr (pop_mode stack))
   | ( (Wrapped _ | Unwrapped _) :: _,
       ({token = Open_paren; _} as token)
-      :: {token = Ident name; _} :: ({token = Annot _; _} :: _ as rest) ) ->
-      let (annots, rest) = annots rest in
+      :: {token = Ident name; _}
+      :: ({token = Annot _; _} :: _ as rest) ) ->
+      let annots, rest = annots rest in
       let mode = Wrapped (token, name, [], annots) in
       parse ~check errors rest (push_mode mode stack)
   | ( (Wrapped _ | Unwrapped _) :: _,
       ({token = Open_paren; _} as token) :: {token = Ident name; _} :: rest ) ->
       let mode = Wrapped (token, name, [], []) in
       parse ~check errors rest (push_mode mode stack)
-  | ((Wrapped _ | Unwrapped _) :: _, {token = Ident name; loc} :: rest) ->
+  | (Wrapped _ | Unwrapped _) :: _, {token = Ident name; loc} :: rest ->
       let expr = Micheline.Prim (loc, name, [], []) in
       let errors =
         if check then do_check ~toplevel:false errors expr else errors
@@ -706,8 +709,10 @@ let parse_expression ?check tokens =
   let result =
     match tokens with
     | ({token = Open_paren; _} as token)
-      :: {token = Ident name; _} :: {token = Annot annot; _} :: rest ->
-        let (annots, rest) = annots rest in
+      :: {token = Ident name; _}
+      :: {token = Annot annot; _}
+      :: rest ->
+        let annots, rest = annots rest in
         let mode = Wrapped (token, name, [], annot :: annots) in
         parse ?check [] rest [mode; Expression None]
     | ({token = Open_paren; _} as token) :: {token = Ident name; _} :: rest ->
@@ -715,7 +720,7 @@ let parse_expression ?check tokens =
         parse ?check [] rest [mode; Expression None]
     | _ -> parse ?check [] tokens [Expression None]
   in
-  match result with ([single], errors) -> (single, errors) | _ -> assert false
+  match result with [single], errors -> (single, errors) | _ -> assert false
 
 let parse_toplevel ?check tokens = parse ?check [] tokens [Toplevel []]
 
@@ -960,5 +965,5 @@ let check_annot s =
   String.length s <= max_annot_length
   &&
   match tokenize s with
-  | ([{token = Annot s'; _}], [] (* no errors *)) -> String.equal s s'
+  | [{token = Annot s'; _}], [] (* no errors *) -> String.equal s s'
   | _ -> false

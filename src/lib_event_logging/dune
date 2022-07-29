@@ -1,8 +1,6 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(env (_ (binaries (%{workspace_root}/src/tooling/node_wrapper.exe as node))))
-
 (library
  (name tezos_event_logging)
  (public_name tezos-event-logging)
@@ -12,11 +10,12 @@
   data-encoding
   tezos-error-monad
   tezos-lwt-result-stdlib
-  lwt_log.core)
+  lwt_log.core
+  uri)
  (js_of_ocaml)
  (flags
-  (:standard
-   -open Tezos_stdlib
-   -open Data_encoding
-   -open Tezos_error_monad
-   -open Tezos_error_monad.TzLwtreslib)))
+  (:standard)
+  -open Tezos_stdlib
+  -open Data_encoding
+  -open Tezos_error_monad
+  -open Tezos_error_monad.TzLwtreslib))

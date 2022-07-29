@@ -42,8 +42,8 @@ let rec elim_arities :
     type elt m1 m2 a. (elt, m1, a) arity -> (elt, m2, a) arity -> (m1, m2) eq =
   fun (type elt m1 m2 a) (ar1 : (elt, m1, a) arity) (ar2 : (elt, m2, a) arity) ->
    match (ar1, ar2) with
-   | (Zero_arity, Zero_arity) -> (Eq : (m1, m2) eq)
-   | (Succ_arity a1, Succ_arity a2) -> (
+   | Zero_arity, Zero_arity -> (Eq : (m1, m2) eq)
+   | Succ_arity a1, Succ_arity a2 -> (
        match elim_arities a1 a2 with Eq -> (Eq : (m1, m2) eq))
    | _ -> .
 
@@ -102,7 +102,7 @@ let apply_model : 'arg -> 'arg model -> applied =
        match arity with
        | Zero_arity -> f
        | Succ_arity ar ->
-           let (arg, rest) = arg in
+           let arg, rest = arg in
            apply conv ar (X.app f (conv arg)) rest
 
      let applied = apply X.int arity model elim
@@ -128,7 +128,7 @@ module Instantiate (X : Costlang.S) (M : Model_impl) :
     match arity with
     | Zero_arity -> f
     | Succ_arity ar ->
-        let (arg, rest) = arg in
+        let arg, rest = arg in
         apply conv ar (X.app f (conv arg)) rest
 
   let model elim = apply X.int arity model elim
@@ -306,6 +306,43 @@ let nlogn ~intercept ~coeff =
   end in
   (module M : Model_impl with type arg_type = int * unit)
 
+let nsqrtn_const ~intercept ~coeff =
+  let module M = struct
+    type arg_type = int * unit
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size
+
+      let arity = arity_1
+
+      let model =
+        lam ~name:"size" @@ fun size ->
+        free ~name:intercept + (free ~name:coeff * (size * sqrt size))
+    end
+  end in
+  (module M : Model_impl with type arg_type = int * unit)
+
+let nsqrtn_split_const ~intercept1 ~intercept2 ~coeff =
+  let module M = struct
+    type arg_type = int * unit
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size
+
+      let arity = arity_1
+
+      let model =
+        lam ~name:"size" @@ fun size ->
+        free ~name:intercept1 + free ~name:intercept2
+        + (free ~name:coeff * (size * sqrt size))
+    end
+  end in
+  (module M : Model_impl with type arg_type = int * unit)
+
 let logn ~coeff =
   let module M = struct
     type arg_type = int * unit
@@ -455,6 +492,27 @@ let nlogm ~intercept ~coeff =
         lam ~name:"size2" @@ fun size2 ->
         free ~name:intercept
         + (free ~name:coeff * (size1 * log2 (int 1 + size2)))
+    end
+  end in
+  (module M : Model_impl with type arg_type = int * (int * unit))
+
+let n_plus_logm ~intercept ~linear_coeff ~log_coeff =
+  let module M = struct
+    type arg_type = int * (int * unit)
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size -> size
+
+      let arity = arity_2
+
+      let model =
+        lam ~name:"size1" @@ fun size1 ->
+        lam ~name:"size2" @@ fun size2 ->
+        free ~name:intercept
+        + (free ~name:linear_coeff * size1)
+        + (free ~name:log_coeff * log2 (int 1 + size2))
     end
   end in
   (module M : Model_impl with type arg_type = int * (int * unit))

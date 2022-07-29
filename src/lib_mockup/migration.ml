@@ -55,7 +55,7 @@ let migrate_mockup ~(cctxt : Tezos_client_base.Client_context.full)
             Format.fprintf fmtr "is not a mockup base directory.")
     | Base_dir_is_mockup -> return_unit
   in
-  let* ((module Current_mockup_env), registration_data) =
+  let* (module Current_mockup_env), registration_data =
     get_mockup_context_from_disk ~base_dir ~protocol_hash cctxt
   in
   let* (module Next_mockup_env) =

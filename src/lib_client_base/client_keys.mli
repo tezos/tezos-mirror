@@ -101,10 +101,6 @@ module PVSS_secret_key : Client_aliases.Alias with type t = pvss_sk_uri
 
     See [Client_aliases] for more information about Aliases.*)
 module Aggregate_alias : sig
-  type pk_uri = private Uri.t
-
-  type sk_uri = private Uri.t
-
   module Public_key_hash :
     Client_aliases.Alias with type t = Aggregate_signature.Public_key_hash.t
 
@@ -379,6 +375,12 @@ val alias_aggregate_keys :
   option
   tzresult
   Lwt.t
+
+val aggregate_sign :
+  #Client_context.wallet ->
+  aggregate_sk_uri ->
+  Bytes.t ->
+  Aggregate_signature.t tzresult Lwt.t
 
 (**/**)
 

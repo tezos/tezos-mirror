@@ -142,7 +142,7 @@ let locaction_of_rewriter = function
 
 let error loc err =
   let open Format in
-  let (msg, hint) =
+  let msg, hint =
     match err with
     | `Too_many_Detection attribute_name ->
         ( sprintf

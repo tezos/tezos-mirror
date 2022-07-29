@@ -4,4 +4,11 @@
 # can still do it on the in-development protocol
 # (src/proto_alpha/lib_protocol/*.ml). The `exclude` pattern below expresses
 # this.
-semgrep --metrics=off --error -l ocaml -c scripts/semgrep/ --exclude "src/proto_[0-9]*/lib_protocol/*.ml*" src/
+semgrep \
+  --metrics=off \
+  --error \
+  -l ocaml \
+  -c scripts/semgrep/ \
+  --exclude "src/proto_[0-9]*/lib_protocol/*.ml*" \
+  --exclude "src/lib_webassembly/*" \
+  src/

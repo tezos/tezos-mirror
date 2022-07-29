@@ -26,7 +26,7 @@ export OPAMYES=true
 export OPAMSOLVERTIMEOUT=1200
 # [install ocaml compiler]
 wget -O latest-release:version.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/version.sh
-. latest-release:version.sh
+. ./latest-release:version.sh
 opam switch create for_tezos $ocaml_version
 eval $(opam env)
 # [get system dependencies]
@@ -34,3 +34,5 @@ eval $(opam env)
 opam depext tezos
 # [install tezos]
 opam install -y tezos
+# [test executables]
+tezos-client --version

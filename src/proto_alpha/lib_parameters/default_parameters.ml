@@ -29,6 +29,48 @@ open Protocol.Alpha_context
 
 let tx_rollup_finality_period = 40_000
 
+(** The challenge window is about a week with 30s block-time (604800s / 30s).
+    WARNING: changing this value also impacts
+    [sc_rollup_max_active_outbox_levels]. See below. *)
+let sc_rollup_challenge_window_in_blocks = 20_160
+
+(** Number of active levels kept for executing outbox messages.
+
+    WARNING: Changing this value impacts the storage charge for
+    applying messages from the outbox. It also requires migration for
+    remapping existing active outbox levels to new indices. *)
+let sc_rollup_max_active_outbox_levels =
+  Int32.of_int sc_rollup_challenge_window_in_blocks
+
+(** Maximum number of outbox messages per level.
+
+    WARNING: changing this value impacts the storage size a rollup has to
+    pay for at origination time. *)
+let sc_rollup_max_outbox_messages_per_level = 100
+
+(** The timeout period is about a week with 30s block-time (604800s / 30s).
+
+    It suffers from the same risk of censorship as
+    {!sc_rollup_challenge_windows_in_blocks} so we use the same value.
+
+    TODO: https://gitlab.com/tezos/tezos/-/issues/2902
+    This constant needs to be refined.
+*)
+let sc_rollup_timeout_period_in_blocks = 20_160
+
+(* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3177
+
+   Think harder about those values. *)
+let default_dal =
+  Constants.Parametric.
+    {
+      feature_enable = false;
+      number_of_slots = 256;
+      number_of_shards = 2048;
+      endorsement_lag = 1;
+      availability_threshold = 50;
+    }
+
 let constants_mainnet =
   let consensus_committee_size = 7000 in
   let block_time = 30 in
@@ -47,12 +89,21 @@ let constants_mainnet =
     Constants.Parametric.preserved_cycles = 5;
     blocks_per_cycle = 8192l;
     blocks_per_commitment = 64l;
+    nonce_revelation_threshold = 256l;
     blocks_per_stake_snapshot = 512l;
     cycles_per_voting_period = 5l;
     hard_gas_limit_per_operation = Gas.Arith.(integral_of_int_exn 1_040_000);
     hard_gas_limit_per_block = Gas.Arith.(integral_of_int_exn 5_200_000);
     proof_of_work_threshold = Int64.(sub (shift_left 1L 46) 1L);
     tokens_per_roll = Tez.(mul_exn one 6_000);
+    (* VDF's difficulty must be a multiple of `nonce_revelation_threshold` times
+       the block time. At the moment it is equal to 8B = 8000 * 5 * .2M with
+          - 8000 ~= 256 * 30 that is nonce_revelation_threshold * block time
+          - .2M  ~= number of modular squaring per second on benchmark machine
+         with 2.8GHz CPU
+          - 5: security factor (strictly higher than the ratio between highest CPU
+         clock rate and benchmark machine that is 8.43/2.8 ~= 3 *)
+    vdf_difficulty = 8_000_000_000L;
     seed_nonce_revelation_tip =
       (match Tez.(one /? 8L) with Ok c -> c | Error _ -> assert false);
     origination_size = 257;
@@ -91,6 +142,8 @@ let constants_mainnet =
     double_baking_punishment = Tez.(mul_exn one 640);
     ratio_of_frozen_deposits_slashed_per_double_endorsement =
       {numerator = 1; denominator = 2};
+    (* The `testnet_dictator` should absolutely be None on mainnet *)
+    testnet_dictator = None;
     initial_seed = None;
     (* A cache for contract source code and storage. Its size has been
        chosen not too exceed 100 000 000 bytes. *)
@@ -100,69 +153,88 @@ let constants_mainnet =
     cache_stake_distribution_cycles = 8;
     (* One for the sampler state for all cycles stored at any moment (as above). *)
     cache_sampler_state_cycles = 8;
-    tx_rollup_enable = true;
-    (* Based on how storage burn is implemented for
-       transaction rollups, this means that a rollup operator
-       can create 100 inboxes (40 bytes per inboxes) before
-       having to pay storage burn. *)
-    tx_rollup_origination_size = 4_000;
-    (* Considering an average size of layer-2 operations of
-       20, this gives a TPS per rollup higher than 400, and
-       the capability to have two rollups at full speed on
-       mainnet (as long as they do not reach scalability
-       issues related to proof size). *)
-    tx_rollup_hard_size_limit_per_inbox = 500_000;
-    tx_rollup_hard_size_limit_per_message = 5_000;
-    tx_rollup_commitment_bond = Tez.of_mutez_exn 10_000_000_000L;
-    tx_rollup_finality_period;
-    tx_rollup_max_inboxes_count = tx_rollup_finality_period + 100;
-    (* [60_000] blocks is about two weeks. *)
-    tx_rollup_withdraw_period = tx_rollup_finality_period;
-    tx_rollup_max_messages_per_inbox = 1_010;
-    (* Must be greater than the withdraw period. *)
-    tx_rollup_max_commitments_count = (2 * tx_rollup_finality_period) + 100;
-    tx_rollup_cost_per_byte_ema_factor = 120;
-    (* Tickets are transmitted in batches in the
-       [Tx_rollup_dispatch_tickets] operation.
+    tx_rollup =
+      {
+        enable = true;
+        (* Based on how storage burn is implemented for
+           transaction rollups, this means that a rollup operator
+           can create 100 inboxes (40 bytes per inbox) before
+           having to pay storage burn. *)
+        origination_size = 4_000;
+        (* Considering an average size of layer-2 operations of
+           20, this gives a TPS per rollup higher than 400, and
+           the capability to have two rollups at full speed on
+           mainnet (as long as they do not reach scalability
+           issues related to proof size). *)
+        hard_size_limit_per_inbox = 500_000;
+        hard_size_limit_per_message = 5_000;
+        commitment_bond = Tez.of_mutez_exn 10_000_000_000L;
+        finality_period = tx_rollup_finality_period;
+        max_inboxes_count = tx_rollup_finality_period + 100;
+        (* [60_000] blocks is about two weeks. *)
+        withdraw_period = tx_rollup_finality_period;
+        max_messages_per_inbox = 1_010;
+        (* Must be greater than the withdraw period. *)
+        max_commitments_count = (2 * tx_rollup_finality_period) + 100;
+        cost_per_byte_ema_factor = 120;
+        (* Tickets are transmitted in batches in the
+           [Tx_rollup_dispatch_tickets] operation.
 
-       The semantics is that this operation is used to
-       concretize the withdraw orders emitted by the layer-2,
-       one layer-1 operation per messages of an
-       inbox. Therefore, it is of significant importance that
-       a valid batch does not produce a list of withdraw
-       orders which could not fit in a layer-1 operation.
+           The semantics is that this operation is used to
+           concretize the withdraw orders emitted by the layer-2,
+           one layer-1 operation per messages of an
+           inbox. Therefore, it is of significant importance that
+           a valid batch does not produce a list of withdraw
+           orders which could not fit in a layer-1 operation.
 
-       With these values, at least 2048 bytes remain available
-       to store the rest of the operands of
-       [Tx_rollup_dispatch_tickets] (in practice, even more,
-       because we overapproximate the size of tickets). So we
-       are safe. *)
-    tx_rollup_max_withdrawals_per_batch = 15;
-    tx_rollup_max_ticket_payload_size = 2_048;
-    (* Must be smaller than maximum limit of a manager operation
-       (minus overhead), since we need to limit our proofs to those
-       that can fit in an operation. *)
-    tx_rollup_rejection_max_proof_size = 30000;
-    (* This is the first block of cycle 618, which is expected to be
-       about one year after the activation of protocol J.
-       See https://tzstats.com/cycle/618 *)
-    tx_rollup_sunset_level = 3_473_409l;
-    sc_rollup_enable = false;
-    (* The following value is chosen to prevent spam. *)
-    sc_rollup_origination_size = 6_314;
-    (* The challenge window is about a week with 30s block-time (604800s / 30s). *)
-    sc_rollup_challenge_window_in_blocks = 20_160;
-    (* The following value is chosen to limit the length of inbox refutation proofs. *)
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/2556
-       The follow constants need to be refined. *)
-    sc_rollup_max_available_messages = 1_000_000;
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
-       The following constants need to be refined. *)
-    sc_rollup_stake_amount_in_mutez = 32_000_000;
-    sc_rollup_commitment_frequency_in_blocks = 20;
-    sc_rollup_commitment_storage_size_in_bytes = 84;
-    sc_rollup_max_lookahead_in_blocks = 30_000l;
+           With these values, at least 2048 bytes remain available
+           to store the rest of the operands of
+           [Tx_rollup_dispatch_tickets] (in practice, even more,
+           because we overapproximate the size of tickets). So we
+           are safe. *)
+        max_withdrawals_per_batch = 15;
+        max_ticket_payload_size = 2_048;
+        (* Must be smaller than maximum limit of a manager operation
+           (minus overhead), since we need to limit our proofs to those
+           that can fit in an operation. *)
+        rejection_max_proof_size = 30000;
+        (* This is the first block of cycle 618, which is expected to be
+           about one year after the activation of protocol J.
+           See https://tzstats.com/cycle/618 *)
+        sunset_level = 3_473_409l;
+      };
+    dal = default_dal;
+    sc_rollup =
+      {
+        enable = false;
+        (* The following value is chosen to prevent spam. *)
+        origination_size = 6_314;
+        challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
+        (* The following value is chosen to limit the length of inbox refutation proofs. *)
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/2373
+           check this is reasonable. *)
+        max_number_of_messages_per_commitment_period = 32_765;
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
+           The following constants need to be refined. *)
+        stake_amount = Tez.of_mutez_exn 10_000_000_000L;
+        commitment_period_in_blocks = 30;
+        max_lookahead_in_blocks = 30_000l;
+        max_active_outbox_levels = sc_rollup_max_active_outbox_levels;
+        max_outbox_messages_per_level = sc_rollup_max_outbox_messages_per_level;
+        number_of_sections_in_dissection = 32;
+        timeout_period_in_blocks = sc_rollup_timeout_period_in_blocks;
+      };
   }
+
+let default_dal_sandbox =
+  Constants.Parametric.
+    {
+      feature_enable = false;
+      number_of_slots = 16;
+      number_of_shards = 256;
+      endorsement_lag = 1;
+      availability_threshold = 50;
+    }
 
 let constants_sandbox =
   let consensus_committee_size = 256 in
@@ -180,12 +252,15 @@ let constants_sandbox =
   in
   {
     constants_mainnet with
+    dal = default_dal_sandbox;
     Constants.Parametric.preserved_cycles = 2;
     blocks_per_cycle = 8l;
     blocks_per_commitment = 4l;
+    nonce_revelation_threshold = 4l;
     blocks_per_stake_snapshot = 4l;
     cycles_per_voting_period = 8l;
     proof_of_work_threshold = Int64.of_int (-1);
+    vdf_difficulty = 50_000L;
     liquidity_baking_sunset_level = 128l;
     minimal_block_delay = Period.of_seconds_exn (Int64.of_int block_time);
     delay_increment_per_round = Period.one_second;
@@ -216,9 +291,11 @@ let constants_test =
     Constants.Parametric.preserved_cycles = 3;
     blocks_per_cycle = 12l;
     blocks_per_commitment = 4l;
+    nonce_revelation_threshold = 4l;
     blocks_per_stake_snapshot = 4l;
     cycles_per_voting_period = 2l;
     proof_of_work_threshold = Int64.of_int (-1);
+    vdf_difficulty = 50_000L;
     liquidity_baking_sunset_level = 4096l;
     consensus_committee_size;
     consensus_threshold (* 17 slots *);
@@ -275,12 +352,13 @@ let compute_accounts =
           public_key_hash;
           public_key = Some public_key;
           amount = bootstrap_balance;
+          delegate_to = None;
         })
 
 let bootstrap_accounts = compute_accounts bootstrap_accounts_strings
 
-let make_bootstrap_account (pkh, pk, amount) =
-  Parameters.{public_key_hash = pkh; public_key = Some pk; amount}
+let make_bootstrap_account (pkh, pk, amount, delegate_to) =
+  Parameters.{public_key_hash = pkh; public_key = Some pk; amount; delegate_to}
 
 let parameters_of_constants ?(bootstrap_accounts = bootstrap_accounts)
     ?(bootstrap_contracts = []) ?(commitments = []) constants =

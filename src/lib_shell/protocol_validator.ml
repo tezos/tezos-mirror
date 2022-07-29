@@ -113,7 +113,7 @@ let validate state hash protocol =
       in
       match Protocol_hash.Map.find hash state.pending with
       | None ->
-          let (res, wakener) = Lwt.task () in
+          let res, wakener = Lwt.task () in
           let broadcast = Protocol_hash.Map.cardinal state.pending = 0 in
           state.pending <-
             Protocol_hash.Map.add hash (protocol, res, wakener) state.pending ;
@@ -159,14 +159,14 @@ let fetch_and_compile_protocols pv ?peer ?timeout (block : Store.Block.t) =
   | Some chain_store ->
       let* context = Store.Block.context chain_store block in
       let protocol =
-        let*! protocol_hash = Context.get_protocol context in
+        let*! protocol_hash = Context_ops.get_protocol context in
         let* _p = fetch_and_compile_protocol pv ?peer ?timeout protocol_hash in
         Store.Chain.may_update_protocol_level
           chain_store
           ~protocol_level
           (block, protocol_hash)
       and test_protocol =
-        let*! v = Context.get_test_chain context in
+        let*! v = Context_ops.get_test_chain context in
         match v with
         | Not_running -> return_unit
         | Forking {protocol; _} | Running {protocol; _} -> (

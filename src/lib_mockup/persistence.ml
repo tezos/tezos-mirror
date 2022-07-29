@@ -327,7 +327,7 @@ module Make (Registration : Registration.S) = struct
             "%s is not empty, please specify a fresh base directory"
             base_dir
     in
-    let* (_mockup_env, {chain = chain_id; rpc_context; protocol_data}) =
+    let* _mockup_env, {chain = chain_id; rpc_context; protocol_data} =
       init_mockup_context_by_protocol_hash
         ~cctxt:(cctxt :> Tezos_client_base.Client_context.printer)
         ~protocol_hash

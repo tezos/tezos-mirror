@@ -343,7 +343,7 @@ let check ?watermark pk signature msg =
 let generate_key ?seed () =
   match seed with
   | None ->
-      let (pk, sk) = keypair () in
+      let pk, sk = keypair () in
       (Public_key.hash pk, pk, sk)
   | Some seed -> (
       let seedlen = Bytes.length seed in

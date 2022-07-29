@@ -69,9 +69,6 @@ let list_contract_labels (cctxt : #Alpha_client_context.full) ~chain ~block =
       return (nm, h_b58, kind))
     contracts
 
-let message_added_contract (cctxt : #Alpha_client_context.full) name =
-  cctxt#message "Contract memorized as %s." name
-
 let get_manager (cctxt : #Alpha_client_context.full) ~chain ~block source =
   Client_proto_contracts.get_manager cctxt ~chain ~block source
   >>=? fun src_pkh ->
@@ -80,18 +77,18 @@ let get_manager (cctxt : #Alpha_client_context.full) ~chain ~block source =
 
 let pp_operation formatter (a : Alpha_block_services.operation) =
   match (a.receipt, a.protocol_data) with
-  | (Receipt (Apply_results.Operation_metadata omd), Operation_data od) -> (
+  | Receipt (Apply_results.Operation_metadata omd), Operation_data od -> (
       match Apply_results.kind_equal_list od.contents omd.contents with
       | Some Apply_results.Eq ->
           Operation_result.pp_operation_result
             formatter
             (od.contents, omd.contents)
       | None -> Stdlib.failwith "Unexpected result.")
-  | (Empty, _) ->
+  | Empty, _ ->
       Stdlib.failwith
         "Pruned metadata: the operation receipt was removed accordingly to the \
          node's history mode."
-  | (Too_large, _) -> Stdlib.failwith "Too large metadata."
+  | Too_large, _ -> Stdlib.failwith "Too large metadata."
   | _ -> Stdlib.failwith "Unexpected result."
 
 let get_operation_from_block (cctxt : #Client_context.full) ~chain predecessors

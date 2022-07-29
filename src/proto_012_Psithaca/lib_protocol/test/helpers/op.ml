@@ -201,8 +201,8 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
         let legit_ops = List.length operations in
         let index = Random.int legit_ops in
         match List.split_n index operations with
-        | (preserved_prefix, preserved_suffix) ->
-            preserved_prefix @ op :: preserved_suffix)
+        | preserved_prefix, preserved_suffix ->
+            preserved_prefix @ (op :: preserved_suffix))
   in
   Environment.wrap_tzresult @@ Operation.of_list operations
   >>?= fun operations -> return @@ sign account.sk ctxt operations

@@ -1,6 +1,10 @@
 Protocol Ithaca
 ===============
 
+**Important**: revision `PsiThaCaT...jVP` of protocol Ithaca contains
+`bugs <https://research-development.nomadic-labs.com/announcing-ithaca-2.html>`_
+that have been corrected in the latest version `Psithaca2...z6A`.
+
 This page contains all the relevant information for protocol Ithaca
 (see :ref:`naming_convention`).
 
@@ -170,4 +174,4 @@ Minor Changes
   Context entries located in
   ``/chains/main/blocks/<block>/context/raw/bytes/cycle/<cycle>/roll_snapshot``
   are no longer accessible after Tenderbake.
-  As observed in issue `:gl:`#2764`, the RPC is buggy for cycle ``474``: the correct result for that cycle is index 16 (not 4).
+  As observed in issue :gl:`#2764`, the RPC is buggy for cycle ``474``: the correct result for that cycle is index 16 (not 4).

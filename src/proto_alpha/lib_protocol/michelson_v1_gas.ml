@@ -48,7 +48,9 @@ module Cost_of = struct
 
   let int_bytes (z : 'a Script_int.num) = z_bytes (Script_int.to_zint z)
 
-  let manager_operation = step_cost @@ S.safe_int 1_000
+  let manager_operation_int = 1_000
+
+  let manager_operation = step_cost @@ S.safe_int manager_operation_int
 
   module Generated_costs = struct
     (* Automatically generated costs functions. *)
@@ -270,11 +272,11 @@ module Cost_of = struct
     let cost_N_IDup = S.safe_int 10
 
     (* model N_IDupN *)
-    (* Approximating 1.129785 x term *)
+    (* Approximating 1.222263 x term *)
     let cost_N_IDupN size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 20 + v0 + (v0 lsr 3)
+      S.safe_int 20 + v0 + (v0 lsr 2)
 
     let cost_div_int size1 size2 =
       let q = size1 - size2 in
@@ -886,25 +888,25 @@ module Cost_of = struct
     let cost_ENCODING_SIGNATURE_secp256k1 = S.safe_int 45
 
     (* model ENCODING_Chest_key *)
-    let cost_ENCODING_Chest_key = S.safe_int 13500
+    let cost_ENCODING_Chest_key = S.safe_int 10_000
 
     (* model ENCODING_Chest *)
     (* Approximating 0.120086 x term *)
     let cost_ENCODING_Chest ~plaintext_size =
       let open S_syntax in
       let v0 = S.safe_int plaintext_size in
-      S.safe_int 16630 + (v0 lsr 3)
+      S.safe_int 12_200 + (v0 lsr 3)
 
     (* model TIMESTAMP_READABLE_DECODING *)
-    (* Approximating 0.354278 x term *)
+    (* Approximating 0.045400 x term *)
     let cost_TIMESTAMP_READABLE_DECODING ~bytes =
       let open S_syntax in
       let b = S.safe_int bytes in
       let v0 = S.mul (S.sqrt b) b in
-      S.safe_int 800 + ((v0 lsr 2) + (v0 lsr 3))
+      S.safe_int 105 + ((v0 lsr 5) + (v0 lsr 6))
 
     (* model TIMESTAMP_READABLE_ENCODING *)
-    let cost_TIMESTAMP_READABLE_ENCODING = S.safe_int 100
+    let cost_TIMESTAMP_READABLE_ENCODING = S.safe_int 820
 
     (* model CHECK_PRINTABLE *)
     let cost_CHECK_PRINTABLE size =
@@ -960,6 +962,9 @@ module Cost_of = struct
     (* model SAPLING_DIFF_ENCODING *)
     let cost_SAPLING_DIFF_ENCODING ~nfs ~cms =
       S.safe_int ((nfs * 22) + (cms * 215))
+
+    (* model IEmit *)
+    let cost_N_IEmit = S.safe_int 30
   end
 
   module Interpreter = struct
@@ -1404,8 +1409,8 @@ module Cost_of = struct
         | Chain_id_t -> (apply [@tailcall]) Gas.(acc +@ compare_chain_id) k
         | Pair_t (tl, tr, _, YesYes) ->
             (* Reasonable over-approximation of the cost of lexicographic comparison. *)
-            let (xl, xr) = x in
-            let (yl, yr) = y in
+            let xl, xr = x in
+            let yl, yr = y in
             (compare [@tailcall])
               tl
               xl
@@ -1414,21 +1419,21 @@ module Cost_of = struct
               (Compare (tr, xr, yr, k))
         | Union_t (tl, tr, _, YesYes) -> (
             match (x, y) with
-            | (L x, L y) ->
+            | L x, L y ->
                 (compare [@tailcall]) tl x y Gas.(acc +@ compare_union_tag) k
-            | (L _, R _) -> (apply [@tailcall]) Gas.(acc +@ compare_union_tag) k
-            | (R _, L _) -> (apply [@tailcall]) Gas.(acc +@ compare_union_tag) k
-            | (R x, R y) ->
+            | L _, R _ -> (apply [@tailcall]) Gas.(acc +@ compare_union_tag) k
+            | R _, L _ -> (apply [@tailcall]) Gas.(acc +@ compare_union_tag) k
+            | R x, R y ->
                 (compare [@tailcall]) tr x y Gas.(acc +@ compare_union_tag) k)
         | Option_t (t, _, Yes) -> (
             match (x, y) with
-            | (None, None) ->
+            | None, None ->
                 (apply [@tailcall]) Gas.(acc +@ compare_option_tag) k
-            | (None, Some _) ->
+            | None, Some _ ->
                 (apply [@tailcall]) Gas.(acc +@ compare_option_tag) k
-            | (Some _, None) ->
+            | Some _, None ->
                 (apply [@tailcall]) Gas.(acc +@ compare_option_tag) k
-            | (Some x, Some y) ->
+            | Some x, Some y ->
                 (compare [@tailcall]) t x y Gas.(acc +@ compare_option_tag) k)
       and apply cost k =
         match k with
@@ -1436,7 +1441,6 @@ module Cost_of = struct
         | Return -> cost
       in
       compare ty x y Gas.free Return
-     [@@coq_axiom_with_reason "non top-level mutually recursive function"]
 
     let set_mem (type a) (elt : a) (set : a Script_typed_ir.set) =
       let open S_syntax in
@@ -1505,6 +1509,8 @@ module Cost_of = struct
       Gas.(
         contents_comparison +@ compare_address
         +@ add_nat ticket_a.amount ticket_b.amount)
+
+    let emit = atomic_step_cost cost_N_IEmit
 
     (* Continuations *)
     module Control = struct
@@ -1654,7 +1660,7 @@ module Cost_of = struct
     let contract_optimized = key_hash_optimized
 
     (* Reasonable approximation *)
-    let contract_readable = Gas.(S.safe_int 2 *@ key_hash_readable)
+    let contract_readable = key_hash_readable
 
     let bls12_381_g1 = atomic_step_cost cost_DECODING_BLS_G1
 
@@ -1823,4 +1829,8 @@ module Cost_of = struct
     let chest ~plaintext_size =
       atomic_step_cost (cost_ENCODING_Chest ~plaintext_size)
   end
+end
+
+module Internal_for_tests = struct
+  let int_cost_of_manager_operation = Cost_of.manager_operation_int
 end

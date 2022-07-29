@@ -63,11 +63,11 @@ end = struct
 
   let compare a b =
     match (a, b) with
-    | (Error {name = x; _}, Error {name = y; _}) -> compare x y
-    | (From_spec {name = x; _}, From_spec {name = y; _}) -> compare x y
-    | (Proxy {name = x; _}, Proxy {name = y; _}) -> compare x y
-    | (Unimplemented {name = x; _}, Unimplemented {name = y; _}) -> compare x y
-    | (a, b) -> compare a b
+    | Error {name = x; _}, Error {name = y; _} -> compare x y
+    | From_spec {name = x; _}, From_spec {name = y; _} -> compare x y
+    | Proxy {name = x; _}, Proxy {name = y; _} -> compare x y
+    | Unimplemented {name = x; _}, Unimplemented {name = y; _} -> compare x y
+    | a, b -> compare a b
 
   let size_to_js s args =
     match s with
@@ -130,16 +130,16 @@ end = struct
         List.iter
           (fun (v : Api_json.arg) ->
             match (v.index, v.typ) with
-            | (None, _) -> ()
-            | (Some _i, Buffer) ->
+            | None, _ -> ()
+            | Some _i, Buffer ->
                 f
                   "  var a_%s = hacl_create_buffer(%s,%s)@."
                   v.name
                   v.name
                   (size_to_js v.size spec.args)
-            | (Some _i, Uint32) ->
+            | Some _i, Uint32 ->
                 f "  var i_%s = integers_int32_of_uint32(%s)@." v.name v.name
-            | (Some _, Uint8) -> ()
+            | Some _, Uint8 -> ()
             | _ -> assert false)
           spec.args ;
         (* Call the underlying api *)
@@ -216,53 +216,53 @@ let rec compute_arity : 'a. 'a Ctypes_static.fn -> int =
 let unify_type (type a) (typ : a Ctypes_static.typ) (api : Api_json.typ) :
     Api_json.typ =
   match (typ, api) with
-  | (Void, Void) -> Void
-  | (Primitive Uint32_t, Int) -> Uint32
-  | (Primitive Uint8_t, Int) -> Uint8
-  | (Primitive Bool, Bool) -> Bool
-  | (OCaml Bytes, Buffer) -> Buffer
-  | (Void, _) -> assert false
-  | (Primitive Char, _) -> assert false
-  | (Primitive Schar, _) -> assert false
-  | (Primitive Uchar, _) -> assert false
-  | (Primitive Bool, _) -> assert false
-  | (Primitive Short, _) -> assert false
-  | (Primitive Int, _) -> assert false
-  | (Primitive Long, _) -> assert false
-  | (Primitive Llong, _) -> assert false
-  | (Primitive Ushort, _) -> assert false
-  | (Primitive Sint, _) -> assert false
-  | (Primitive Uint, _) -> assert false
-  | (Primitive Ulong, _) -> assert false
-  | (Primitive Ullong, _) -> assert false
-  | (Primitive Size_t, _) -> assert false
-  | (Primitive Int8_t, _) -> assert false
-  | (Primitive Int16_t, _) -> assert false
-  | (Primitive Int32_t, _) -> assert false
-  | (Primitive Int64_t, _) -> assert false
-  | (Primitive Uint8_t, _) -> assert false
-  | (Primitive Uint16_t, _) -> assert false
-  | (Primitive Uint32_t, _) -> assert false
-  | (Primitive Uint64_t, _) -> assert false
-  | (Primitive Camlint, _) -> assert false
-  | (Primitive Nativeint, _) -> assert false
-  | (Primitive Float, _) -> assert false
-  | (Primitive Double, _) -> assert false
-  | (Primitive LDouble, _) -> assert false
-  | (Primitive Complex32, _) -> assert false
-  | (Primitive Complex64, _) -> assert false
-  | (Primitive Complexld, _) -> assert false
-  | (Pointer _t, _) -> assert false
-  | (Funptr _fn, _) -> assert false
-  | (Struct _, _) -> assert false
-  | (Union _, _) -> assert false
-  | (Abstract _, _) -> assert false
-  | (View _, _) -> assert false
-  | (Array _, _) -> assert false
-  | (Bigarray _, _) -> assert false
-  | (OCaml String, _) -> assert false
-  | (OCaml Bytes, _) -> assert false
-  | (OCaml FloatArray, _) -> assert false
+  | Void, Void -> Void
+  | Primitive Uint32_t, Int -> Uint32
+  | Primitive Uint8_t, Int -> Uint8
+  | Primitive Bool, Bool -> Bool
+  | OCaml Bytes, Buffer -> Buffer
+  | Void, _ -> assert false
+  | Primitive Char, _ -> assert false
+  | Primitive Schar, _ -> assert false
+  | Primitive Uchar, _ -> assert false
+  | Primitive Bool, _ -> assert false
+  | Primitive Short, _ -> assert false
+  | Primitive Int, _ -> assert false
+  | Primitive Long, _ -> assert false
+  | Primitive Llong, _ -> assert false
+  | Primitive Ushort, _ -> assert false
+  | Primitive Sint, _ -> assert false
+  | Primitive Uint, _ -> assert false
+  | Primitive Ulong, _ -> assert false
+  | Primitive Ullong, _ -> assert false
+  | Primitive Size_t, _ -> assert false
+  | Primitive Int8_t, _ -> assert false
+  | Primitive Int16_t, _ -> assert false
+  | Primitive Int32_t, _ -> assert false
+  | Primitive Int64_t, _ -> assert false
+  | Primitive Uint8_t, _ -> assert false
+  | Primitive Uint16_t, _ -> assert false
+  | Primitive Uint32_t, _ -> assert false
+  | Primitive Uint64_t, _ -> assert false
+  | Primitive Camlint, _ -> assert false
+  | Primitive Nativeint, _ -> assert false
+  | Primitive Float, _ -> assert false
+  | Primitive Double, _ -> assert false
+  | Primitive LDouble, _ -> assert false
+  | Primitive Complex32, _ -> assert false
+  | Primitive Complex64, _ -> assert false
+  | Primitive Complexld, _ -> assert false
+  | Pointer _t, _ -> assert false
+  | Funptr _fn, _ -> assert false
+  | Struct _, _ -> assert false
+  | Union _, _ -> assert false
+  | Abstract _, _ -> assert false
+  | View _, _ -> assert false
+  | Array _, _ -> assert false
+  | Bigarray _, _ -> assert false
+  | OCaml String, _ -> assert false
+  | OCaml Bytes, _ -> assert false
+  | OCaml FloatArray, _ -> assert false
 
 let rec unify_types :
           'a.
@@ -273,12 +273,12 @@ let rec unify_types :
           Api_json.arg list * Api_json.typ =
   fun (type a) acc (t : a Ctypes_static.fn) args return ->
    match (t, args) with
-   | (Ctypes_static.Returns t, []) -> (List.rev acc, unify_type t return)
-   | (Ctypes_static.Returns _, _) -> assert false
-   | (Function (t, x), a :: args) ->
+   | Ctypes_static.Returns t, [] -> (List.rev acc, unify_type t return)
+   | Ctypes_static.Returns _, _ -> assert false
+   | Function (t, x), a :: args ->
        let typ = unify_type t a.Api_json.typ in
        unify_types ({a with typ} :: acc) x args return
-   | (Function _, []) -> assert false
+   | Function _, [] -> assert false
 
 let gen_fn ~api ~manually_implemented ~required ~name ~ctypes_name add fn : unit
     =
@@ -371,9 +371,7 @@ let gen_fn ~api ~manually_implemented ~required ~name ~ctypes_name add fn : unit
           let api_spec =
             List.find (fun api -> name = api.Api_json.wasm_fun_name) api
           in
-          let (args, return) =
-            unify_types [] fn api_spec.args api_spec.return
-          in
+          let args, return = unify_types [] fn api_spec.args api_spec.return in
           let unprefixed_alias = String_set.mem name required in
           add
             (Entry.From_spec
@@ -563,7 +561,7 @@ let entries =
 
   let api = Api_json.parse_file !api_json in
 
-  let (manually_implemented, required) =
+  let manually_implemented, required =
     let provides_r = Str.regexp "//Provides: *\\([a-zA-z0-9_]*\\)" in
     let requires_r = Str.regexp "//Requires: *\\([a-zA-z0-9_, ]*\\)" in
     let implemented = ref String_set.empty in

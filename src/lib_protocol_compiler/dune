@@ -8,9 +8,10 @@
  (libraries
   tezos-base
   tezos-protocol-environment.sigs)
- (flags (:standard
-         -opaque
-         -open Tezos_base.TzPervasives))
+ (flags
+  (:standard)
+  -opaque
+  -open Tezos_base.TzPervasives)
  (modules Registerer))
 
 (rule
@@ -31,7 +32,8 @@
    %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V2.cmi}
    %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V3.cmi}
    %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V4.cmi}
-   %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V5.cmi})))
+   %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V5.cmi}
+   %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V6.cmi})))
 
 (library
  (name tezos_protocol_compiler)
@@ -48,11 +50,18 @@
   ocplib-ocamlres
   unix)
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base_unix
-   -open Tezos_stdlib_unix))
- (modules Embedded_cmis Packer Compiler))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base_unix
+  -open Tezos_stdlib_unix)
+ (modules Embedded_cmis Packer Compiler Defaults))
+
+(rule
+ (targets defaults.ml)
+ (action
+  (write-file
+   %{targets}
+   "let warnings = \"+a-4-40..42-44-45-48-60-67-69-70\"")))
 
 (library
  (name tezos_protocol_compiler_native)
@@ -63,16 +72,12 @@
   tezos-protocol-compiler
   compiler-libs.optcomp)
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_protocol_compiler))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_compiler)
  (modules Native))
 
 (install
+ (package tezos-protocol-compiler)
  (section libexec)
- (files
-  dune_protocol.v0
-  dune_protocol.v1
-  dune_protocol.template.v0
-  dune_protocol.template.v1
-  final_protocol_versions))
+ (files final_protocol_versions))

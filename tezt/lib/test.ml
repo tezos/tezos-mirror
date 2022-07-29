@@ -43,7 +43,7 @@ let sigint =
   fun () ->
     if !received_sigint then unit
     else
-      let (promise, resolver) = Lwt.task () in
+      let promise, resolver = Lwt.task () in
       Sys.(set_signal sigint)
         (Signal_handle
            (fun _ ->
@@ -163,11 +163,10 @@ let really_run test =
     | None -> test.result <- Some new_result
     | Some old_result -> (
         match (old_result, new_result) with
-        | (Successful, _) | (Failed _, Aborted) ->
-            test.result <- Some new_result
-        | (Failed _, (Successful | Failed _)) | (Aborted, _) -> ())
+        | Successful, _ | Failed _, Aborted -> test.result <- Some new_result
+        | Failed _, (Successful | Failed _) | Aborted, _ -> ())
   in
-  let (fail_promise, fail_awakener) = Lwt.task () in
+  let fail_promise, fail_awakener = Lwt.task () in
   (* Ensure that errors raised from background promises are logged
      and cause the test to fail immediately. *)
   let already_woke_up_fail_promise = ref false in
@@ -233,7 +232,7 @@ let really_run test =
     Lwt.catch
       (fun () ->
         Lwt.pick
-          (run_test () :: handle_sigint () :: fail_promise :: global_timeout
+          ((run_test () :: handle_sigint () :: fail_promise :: global_timeout)
           @ test_timeout))
       handle_exception
   in
@@ -372,7 +371,7 @@ let list_tests format =
         (file, title, String.concat ", " tags)
       in
       (* Compute the size of each column. *)
-      let (file_size, title_size, tags_size) =
+      let file_size, title_size, tags_size =
         List.fold_left
           (fun (max_file, max_title, max_tags) (file, title, tags) ->
             ( max max_file (String.length file),
@@ -580,14 +579,14 @@ let knapsack (type a) bag_count (items : (int64 * a) list) :
       let best_index = ref 0 in
       let best_weight = ref Int64.max_int in
       for i = 0 to bag_count - 1 do
-        let (bag_weight, _) = bags.(i) in
+        let bag_weight, _ = bags.(i) in
         if bag_weight < !best_weight then (
           best_index := i ;
           best_weight := bag_weight)
       done ;
       !best_index
     in
-    let (bag_weight, bag_items) = bags.(smallest_bag) in
+    let bag_weight, bag_items = bags.(smallest_bag) in
     bags.(smallest_bag) <- (Int64.add bag_weight item_weight, item :: bag_items)
   in
   let longest_first (a, _) (b, _) = Int64.compare b a in
@@ -619,7 +618,7 @@ let select_job () =
       (* [Cli] ensures that [1 <= job_index <= job_count],
          and [split_tests_into_balanced_jobs] ensures that its result
          has length [job_count] if [job_count >= 1]. *)
-      let (_, job_tests) = jobs.(job_index - 1) in
+      let _, job_tests = jobs.(job_index - 1) in
       (* Reset the list of tests to run to re-fill it with the requested job. *)
       registered := String_map.empty ;
       List.iter
@@ -688,7 +687,7 @@ let output_junit filename =
         output_char ch '\n')
       x
   in
-  let (count, fail_count, skipped_count, total_time) =
+  let count, fail_count, skipped_count, total_time =
     fold_registered (0, 0, 0, 0.)
     @@ fun (count, fail_count, skipped_count, total_time) test ->
     ( count + 1,
@@ -887,8 +886,8 @@ end = struct
   let spawn_worker () =
     let worker_id = !next_worker_id in
     incr next_worker_id ;
-    let (pipe_to_worker_exit, pipe_to_worker_entrance) = Unix.pipe () in
-    let (pipe_from_worker_exit, pipe_from_worker_entrance) = Unix.pipe () in
+    let pipe_to_worker_exit, pipe_to_worker_entrance = Unix.pipe () in
+    let pipe_from_worker_exit, pipe_from_worker_entrance = Unix.pipe () in
     let pid = Lwt_unix.fork () in
     if pid = 0 then (
       (* This is now a worker process. *)
@@ -978,7 +977,7 @@ end = struct
              So if there is no working worker, we can stop the loop. *)
           ()
       | _ :: _ ->
-          let (ready, _, _) =
+          let ready, _, _ =
             (* In case of SIGINT, this returns EINTR. *)
             try Unix.select file_descriptors_to_read [] [] (-1.)
             with Unix.Unix_error (EINTR, _, _) -> ([], [], [])
@@ -1071,12 +1070,12 @@ let run () =
   skip_test () ;
   (* Actually run the tests (or list them). *)
   match (Cli.options.list, Cli.options.suggest_jobs) with
-  | (Some format, false) -> list_tests format
-  | (None, true) -> suggest_jobs ()
-  | (Some _, true) ->
+  | Some format, false -> list_tests format
+  | None, true -> suggest_jobs ()
+  | Some _, true ->
       prerr_endline
         "Cannot use both --list and --suggest-jobs at the same time."
-  | (None, false) ->
+  | None, false ->
       let test_count = String_map.cardinal !registered in
       let failure_count = ref 0 in
       let test_queue = Queue.create () in

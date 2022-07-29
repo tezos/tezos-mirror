@@ -140,6 +140,9 @@ module Internal_for_tests : sig
   (** Returns the {!Operation.t} underlying an {!operation} *)
   val to_raw : _ operation -> Operation.t
 
+  (** The hash of an {!operation} *)
+  val hash_of : _ operation -> Operation_hash.t
+
   (** A constructor for the [operation] datatype. It by-passes the
       checks done by the [parse] function. *)
   val make_operation : Operation.t -> Operation_hash.t -> 'a -> 'a operation
@@ -159,7 +162,10 @@ module Internal_for_tests : sig
     type chain_store
 
     (** [context store block] checkouts and returns the context of [block] *)
-    val context : chain_store -> Store.Block.t -> Context.t tzresult Lwt.t
+    val context :
+      chain_store ->
+      Store.Block.t ->
+      Tezos_protocol_environment.Context.t tzresult Lwt.t
 
     (** [chain_id store] returns the {!Chain_id.t} to which [store]
         corresponds *)

@@ -12,11 +12,12 @@
   tezos-test-helpers
   tezos-shell-services-test-helpers
   qcheck-alcotest
-  alcotest-lwt)
+  alcotest-lwt
+  uri)
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base_test_helpers)))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base_test_helpers))
 
 (rule
  (alias runtest)

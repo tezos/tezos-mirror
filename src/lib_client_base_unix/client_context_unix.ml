@@ -26,6 +26,8 @@
 
 class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
   object (self)
+    val lock_mutex = Lwt_mutex.create ()
+
     method load_passwords =
       match password_filename with
       | None -> None
@@ -50,34 +52,35 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
 
     method with_lock : type a. (unit -> a Lwt.t) -> a Lwt.t =
       fun f ->
-        let open Lwt_syntax in
-        let unlock fd =
-          let fd = Lwt_unix.unix_file_descr fd in
-          Unix.lockf fd Unix.F_ULOCK 0 ;
-          Unix.close fd
-        in
-        let lock () =
-          let* fd =
-            Lwt_unix.openfile
-              (Filename.concat base_dir "wallet_lock")
-              Lwt_unix.[O_CREAT; O_WRONLY]
-              0o644
-          in
-          let* () = Lwt_unix.lockf fd Unix.F_LOCK 0 in
-          let sighandler =
-            Lwt_unix.on_signal Sys.sigint (fun _s -> unlock fd)
-          in
-          Lwt.return (fd, sighandler)
-        in
-        let* (fd, sh) = lock () in
-        (* catch might be useless if f always uses the error monad *)
-        let* res =
-          Lwt.finalize f (fun () ->
-              unlock fd ;
-              Lwt.return_unit)
-        in
-        Lwt_unix.disable_signal_handler sh ;
-        Lwt.return res
+        Lwt_mutex.with_lock lock_mutex (fun () ->
+            let open Lwt_syntax in
+            let unlock fd =
+              let fd = Lwt_unix.unix_file_descr fd in
+              Unix.lockf fd Unix.F_ULOCK 0 ;
+              Unix.close fd
+            in
+            let lock () =
+              let* fd =
+                Lwt_unix.openfile
+                  (Filename.concat base_dir "wallet_lock")
+                  Lwt_unix.[O_CREAT; O_WRONLY]
+                  0o644
+              in
+              let* () = Lwt_unix.lockf fd Unix.F_LOCK 0 in
+              let sighandler =
+                Lwt_unix.on_signal Sys.sigint (fun _s -> unlock fd)
+              in
+              Lwt.return (fd, sighandler)
+            in
+            let* fd, sh = lock () in
+            (* catch might be useless if f always uses the error monad *)
+            let* res =
+              Lwt.finalize f (fun () ->
+                  unlock fd ;
+                  Lwt.return_unit)
+            in
+            Lwt_unix.disable_signal_handler sh ;
+            Lwt.return res)
 
     method load : type a.
         string -> default:a -> a Data_encoding.encoding -> a tzresult Lwt.t =

@@ -192,6 +192,14 @@ module Event = struct
       (* may be negative in case of signals *)
       ("exit_code", Data_encoding.int31)
 
+  let metrics_ended =
+    declare_1
+      ~section
+      ~name:"metrics_ended"
+      ~level:Error
+      ~msg:"metrics server ended with error {stacktrace}"
+      ("stacktrace", Data_encoding.string)
+
   let incorrect_history_mode =
     declare_2
       ~section
@@ -235,7 +243,7 @@ let init_node ?sandbox ?target ~identity ~singleprocess
       Event.(emit disabled_config_validation) ()
     else Lwt.return_unit
   in
-  let* (discovery_addr, discovery_port) =
+  let* discovery_addr, discovery_port =
     match config.p2p.discovery_addr with
     | None ->
         let*! () = Event.(emit disabled_discovery_addr) () in
@@ -246,7 +254,7 @@ let init_node ?sandbox ?target ~identity ~singleprocess
         | [] -> failwith "Cannot resolve P2P discovery address: %S" addr
         | (addr, port) :: _ -> return (Some addr, Some port))
   in
-  let* (listening_addr, listening_port) =
+  let* listening_addr, listening_port =
     match config.p2p.listen_addr with
     | None ->
         let*! () = Event.(emit disabled_listen_addr) () in
@@ -259,11 +267,11 @@ let init_node ?sandbox ?target ~identity ~singleprocess
   in
   let* p2p_config =
     match (listening_addr, sandbox) with
-    | (Some addr, Some _) when Ipaddr.V6.(compare addr unspecified) = 0 ->
+    | Some addr, Some _ when Ipaddr.V6.(compare addr unspecified) = 0 ->
         return_none
-    | (Some addr, Some _) when not (Ipaddr.V6.is_private addr) ->
+    | Some addr, Some _ when not (Ipaddr.V6.is_private addr) ->
         tzfail (Non_private_sandbox addr)
-    | (None, Some _) -> return_none
+    | None, Some _ -> return_none
     | _ ->
         let* trusted_points =
           Node_config_file.resolve_bootstrap_addrs
@@ -294,10 +302,10 @@ let init_node ?sandbox ?target ~identity ~singleprocess
   in
   let* sandbox_param =
     match (config.blockchain_network.genesis_parameters, sandbox) with
-    | (None, None) -> return_none
-    | (Some parameters, None) ->
+    | None, None -> return_none
+    | Some parameters, None ->
         return_some (parameters.context_key, parameters.values)
-    | (_, Some filename) ->
+    | _, Some filename ->
         let* json =
           trace (Invalid_sandbox_file filename)
           @@ Lwt_utils_unix.Json.read_file filename
@@ -358,6 +366,14 @@ let sanitize_cors_headers ~default headers =
   |> String.Set.(union (of_list default))
   |> String.Set.elements
 
+let metric =
+  Prometheus.Summary.v_labels
+    ~label_names:["endpoint"; "method"]
+    ~help:"RPC endpoint call counts and sum of execution times."
+    ~namespace:Tezos_version.Node_version.namespace
+    ~subsystem:"rpc"
+    "calls"
+
 let launch_rpc_server ~acl_policy ~media_types (config : Node_config_file.t)
     node (addr, port) =
   let open Lwt_result_syntax in
@@ -388,6 +404,37 @@ let launch_rpc_server ~acl_policy ~media_types (config : Node_config_file.t)
   let cors_headers =
     sanitize_cors_headers ~default:["Content-Type"] rpc_config.cors_headers
   in
+  let metric_middleware =
+    let transform_callback callback connection request body =
+      let do_call () = callback connection request body in
+      let cohttp_meth = Cohttp.Request.meth request in
+      let uri = Cohttp.Request.uri request in
+      let path = Uri.path uri in
+      let decoded = Resto.Utils.decode_split_path path in
+      let*! description =
+        let* resto_meth =
+          match cohttp_meth with
+          | #Resto.meth as meth -> Lwt.return_ok meth
+          | _ -> Lwt.return_error @@ `Method_not_allowed []
+        in
+        let* uri_desc =
+          RPC_directory.lookup_uri_desc dir () resto_meth decoded
+        in
+        Lwt.return_ok (uri_desc, Resto.string_of_meth resto_meth)
+      in
+      match description with
+      | Ok (uri, meth) ->
+          (* We update the metric only if the URI can succesfully
+             be matched in the directory tree. *)
+          Prometheus.Summary.(time (labels metric [uri; meth]) Sys.time do_call)
+      | Error _ ->
+          (* Otherwise, the call must be done anyway. *)
+          do_call ()
+    in
+    let is_metric_collection_enable = List.is_empty config.metrics_addr in
+    if is_metric_collection_enable then None
+    else Some Resto_cohttp_server.Server.{transform_callback}
+  in
   Lwt.catch
     (fun () ->
       let*! server =
@@ -396,6 +443,7 @@ let launch_rpc_server ~acl_policy ~media_types (config : Node_config_file.t)
           mode
           dir
           ~acl
+          ?middleware:metric_middleware
           ~media_types:(Media_type.Command_line.of_command_line media_types)
           ~cors:
             {
@@ -454,7 +502,25 @@ let metrics_serve metrics_addrs =
   in
   return servers
 
-let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
+(* This call is not strictly necessary as the parameters are initialized
+   lazily the first time a Sapling operation (validation or forging) is
+   done. This is what the client does.
+   For a long running binary however it is important to make sure that the
+   parameters files are there at the start and avoid failing much later while
+   validating an operation. Plus paying this cost upfront means that the first
+   validation will not be more expensive. *)
+let init_zcash () =
+  try
+    Tezos_sapling.Core.Validator.init_params () ;
+    Lwt.return_unit
+  with exn ->
+    Lwt.fail_with
+      (Printf.sprintf
+         "Failed to initialize Zcash parameters: %s"
+         (Printexc.to_string exn))
+
+let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
+    ?ignore_testchain_warning ~singleprocess ~force_history_mode_switch
     (config : Node_config_file.t) =
   let open Lwt_result_syntax in
   let* () = Node_data_version.ensure_data_dir config.data_dir in
@@ -470,7 +536,10 @@ let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
       ~configuration:config.internal_events
       ()
   in
-  let* () = Node_config_validation.check config in
+  let*! () =
+    Lwt_list.iter_s (fun evt -> Internal_event.Simple.emit evt ()) cli_warnings
+  in
+  let* () = Node_config_validation.check ?ignore_testchain_warning config in
   let* identity = init_identity_file config in
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
   let*! () =
@@ -479,6 +548,7 @@ let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
         Tezos_version.Current_git_info.version,
         Tezos_version.Current_git_info.abbreviated_commit_hash )
   in
+  let*! () = init_zcash () in
   let*! node =
     init_node
       ?sandbox
@@ -521,7 +591,16 @@ let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
         let*! () = Event.(emit bye) exit_status in
         Tezos_base_unix.Internal_event_unix.close ())
   in
-  let _ = metrics_serve config.metrics_addr in
+  Lwt.dont_wait
+    (fun () ->
+      let*! r = metrics_serve config.metrics_addr in
+      match r with
+      | Ok _ -> Lwt.return_unit
+      | Error err ->
+          Event.(emit metrics_ended (Format.asprintf "%a" pp_print_trace err)))
+    (fun exn ->
+      Event.(
+        emit__dont_wait__use_with_care metrics_ended (Printexc.to_string exn))) ;
   Lwt_utils.never_ending ()
 
 let process sandbox verbosity target singleprocess force_history_mode_switch
@@ -532,10 +611,14 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
     match verbosity with [] -> None | [_] -> Some Info | _ -> Some Debug
   in
   let main_promise =
+    let cli_warnings = ref [] in
     let* config =
       Node_shared_arg.read_and_patch_config_file
         ~ignore_bootstrap_peers:
           (match sandbox with Some _ -> true | None -> false)
+        ~emit:(fun event () ->
+          cli_warnings := event :: !cli_warnings ;
+          Lwt.return_unit)
         args
     in
     let* () =
@@ -578,6 +661,8 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
           ?target
           ~singleprocess
           ~force_history_mode_switch
+          ~cli_warnings:!cli_warnings
+          ~ignore_testchain_warning:args.enable_testchain
           config)
       (function exn -> fail_with_exn exn)
   in
@@ -692,8 +777,8 @@ module Manpage = struct
       `P
         ("The environment variable $(b,TEZOS_LOG) is used to fine-tune what is \
           going to be logged. The syntax is \
-          $(b,TEZOS_LOG='<section> -> <level> [ ; ...]') where section is \
-          one of $(i," ^ log_sections
+          $(b,TEZOS_LOG='<section> -> <level> [ ; ...]') where section is one \
+          of $(i," ^ log_sections
        ^ ") and level is one of $(i,fatal), $(i,error), $(i,warn), \
           $(i,notice), $(i,info) or $(i,debug). A $(b,*) can be used as a \
           wildcard in sections, i.e. $(b, node* -> debug). The rules are \

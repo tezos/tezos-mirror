@@ -714,9 +714,7 @@ let commands () =
           path
         >>= fun () ->
         (* TODO must pass contract address for now *)
-        let (_, contract) =
-          WithExceptions.Option.get ~loc:__LOC__ contract_opt
-        in
+        let _, contract = WithExceptions.Option.get ~loc:__LOC__ contract_opt in
         Context.Client_state.register
           cctxt
           ~default_memo_size

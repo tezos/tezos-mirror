@@ -9,10 +9,10 @@
   tezos-base
   tezos-protocol-009-PsFLoren)
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_protocol_009_PsFLoren))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_009_PsFLoren)
  (modules (:standard \ Plugin_registerer)))
 
 (library
@@ -25,10 +25,10 @@
   tezos-protocol-plugin-009-PsFLoren
   tezos-shell)
  (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_embedded_protocol_009_PsFLoren
-   -open Tezos_protocol_plugin_009_PsFLoren
-   -open Tezos_shell))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_embedded_protocol_009_PsFLoren
+  -open Tezos_protocol_plugin_009_PsFLoren
+  -open Tezos_shell)
  (modules Plugin_registerer))

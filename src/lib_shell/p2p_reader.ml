@@ -368,7 +368,7 @@ let handle_msg state msg =
           match o with
           | None -> Lwt.return_unit
           | Some (_, block) ->
-              let (ops, path) = Store.Block.operations_path block ofs in
+              let ops, path = Store.Block.operations_path block ofs in
               Peer_metadata.update_responses meta Operations_for_block
               @@ P2p.try_send state.p2p state.conn
               @@ Operations_for_block (hash, ofs, ops, path) ;
@@ -392,7 +392,7 @@ let handle_msg state msg =
   | Get_checkpoint chain_id -> (
       Peer_metadata.incr meta @@ Received_request Checkpoint ;
       may_handle_global state chain_id @@ fun chain_db ->
-      let* (checkpoint_hash, _) = Store.Chain.checkpoint chain_db.chain_store in
+      let* checkpoint_hash, _ = Store.Chain.checkpoint chain_db.chain_store in
       let* o =
         Store.Block.read_block_opt chain_db.chain_store checkpoint_hash
       in

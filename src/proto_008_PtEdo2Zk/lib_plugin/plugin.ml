@@ -727,12 +727,12 @@ module RPC = struct
         let code = Script.lazy_expr code in
         originate_dummy_contract ctxt {storage; code} balance
         >>=? fun (ctxt, dummy_contract) ->
-        let (source, payer) =
+        let source, payer =
           match (source, payer) with
-          | (Some source, Some payer) -> (source, payer)
-          | (Some source, None) -> (source, source)
-          | (None, Some payer) -> (payer, payer)
-          | (None, None) -> (dummy_contract, dummy_contract)
+          | Some source, Some payer -> (source, payer)
+          | Some source, None -> (source, source)
+          | None, Some payer -> (payer, payer)
+          | None, None -> (dummy_contract, dummy_contract)
         in
         let gas =
           match gas with
@@ -783,12 +783,12 @@ module RPC = struct
              (View_helpers.make_viewer_script ty)
              Tez.zero
         >>=? fun (ctxt, viewer_contract) ->
-        let (source, payer) =
+        let source, payer =
           match (source, payer) with
-          | (Some source, Some payer) -> (source, payer)
-          | (Some source, None) -> (source, source)
-          | (None, Some payer) -> (payer, payer)
-          | (None, None) -> (contract, contract)
+          | Some source, Some payer -> (source, payer)
+          | Some source, None -> (source, source)
+          | None, Some payer -> (payer, payer)
+          | None, None -> (contract, contract)
         in
         let gas =
           Option.value
@@ -852,8 +852,8 @@ module RPC = struct
                 (Script.expr * string option) list
                 Environment.Error_monad.tzresult
                 Lwt.t = function
-              | (Empty_t, ()) -> return_nil
-              | (Item_t (ty, rest_ty, annot), (v, rest)) ->
+              | Empty_t, () -> return_nil
+              | Item_t (ty, rest_ty, annot), (v, rest) ->
                   Script_ir_translator.unparse_data ctxt unparsing_mode ty v
                   >>=? fun (data, _ctxt) ->
                   unparse_stack (rest_ty, rest) >|=? fun rest ->
@@ -894,12 +894,12 @@ module RPC = struct
         let code = Script.lazy_expr code in
         originate_dummy_contract ctxt {storage; code} balance
         >>=? fun (ctxt, dummy_contract) ->
-        let (source, payer) =
+        let source, payer =
           match (source, payer) with
-          | (Some source, Some payer) -> (source, payer)
-          | (Some source, None) -> (source, source)
-          | (None, Some payer) -> (payer, payer)
-          | (None, None) -> (dummy_contract, dummy_contract)
+          | Some source, Some payer -> (source, payer)
+          | Some source, None -> (source, source)
+          | None, Some payer -> (payer, payer)
+          | None, None -> (dummy_contract, dummy_contract)
         in
         let gas =
           match gas with

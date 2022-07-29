@@ -1,0 +1,16 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_scoru_wasm)
+ (public_name tezos-scoru-wasm)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-webassembly-interpreter
+  tezos-context.sigs
+  tezos-lwt-result-stdlib
+  data-encoding)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives))

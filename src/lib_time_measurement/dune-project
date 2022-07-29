@@ -1,4 +1,4 @@
-(lang dune 2.9)
+(lang dune 3.0)
 (formatting (enabled_for ocaml))
 (name tezos-time-measurement)
 
@@ -19,7 +19,5 @@
     (data-encoding (>= 0.4))
     (lwt (>= 5.4.2))
     (tezos-event-logging :dev)
-    (ppx_inline_test :with-test)
-    (ocamlformat :with-test)
   )
 )

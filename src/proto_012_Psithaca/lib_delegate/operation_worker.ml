@@ -241,7 +241,7 @@ let monitor_operations (cctxt : #Protocol_client_context.full) =
 
 let make_initial_state ?(monitor_node_operations = true) () =
   let qc_event_stream =
-    let (stream, push) = Lwt_stream.create () in
+    let stream, push = Lwt_stream.create () in
     {stream; push}
   in
   let canceler = Lwt_canceler.create () in
@@ -280,7 +280,7 @@ let update_monitoring ?(should_lock = true) state ops =
            _;
          } as proposal_watched)) ->
       let preendorsements = Operation_pool.filter_preendorsements ops in
-      let (preendorsements_count, voting_power) =
+      let preendorsements_count, voting_power =
         List.fold_left
           (fun (count, power) (op : Kind.preendorsement Operation.t) ->
             let {
@@ -340,7 +340,7 @@ let update_monitoring ?(should_lock = true) state ops =
            _;
          } as proposal_watched)) ->
       let endorsements = Operation_pool.filter_endorsements ops in
-      let (endorsements_count, voting_power) =
+      let endorsements_count, voting_power =
         List.fold_left
           (fun (count, power) (op : Kind.endorsement Operation.t) ->
             let {
@@ -523,6 +523,29 @@ let create ?(monitor_node_operations = true)
     (fun exn ->
       Events.(emit__dont_wait__use_with_care ended (Printexc.to_string exn))) ;
   Lwt.return state
+
+let retrieve_pending_operations cctxt state =
+  let open Protocol_client_context in
+  Alpha_block_services.Mempool.pending_operations
+    cctxt
+    ~chain:cctxt#chain
+    ~applied:true
+    ~branch_delayed:true
+    ~branch_refused:false
+    ~refused:false
+    ~outdated:false
+    ()
+  >>=? fun pending_mempool ->
+  state.operation_pool <-
+    Operation_pool.add_operations state.operation_pool
+    @@ List.rev_map snd pending_mempool.applied ;
+  state.operation_pool <-
+    Operation_pool.add_operations
+      state.operation_pool
+      (List.rev_map
+         (fun (_, (op, _)) -> op)
+         (Operation_hash.Map.bindings pending_mempool.branch_delayed)) ;
+  return_unit
 
 let get_current_operations state = state.operation_pool
 

@@ -40,8 +40,8 @@ module List_extra = struct
   let rec common_elem ~(equal : 'a -> 'a -> bool) (l1 : 'a list) (l2 : 'a list)
       =
     match (l1, l2) with
-    | ([], _) -> None
-    | (e1 :: rest1, _) ->
+    | [], _ -> None
+    | e1 :: rest1, _ ->
         if List.exists (equal e1) l2 then Some e1
         else common_elem ~equal rest1 l2
 
@@ -114,7 +114,7 @@ module Tree = struct
   let rec values : 'a tree -> 'a list = function
     | Leaf a -> [a]
     | Node1 (a, t1) -> a :: values t1
-    | Node2 (a, t1, t2) -> a :: values t1 @ values t2
+    | Node2 (a, t1, t2) -> (a :: values t1) @ values t2
 
   (** Predicate to check that all values are different. We want
       this property for trees of blocks. If generation of block
@@ -150,7 +150,7 @@ module Tree = struct
     | Node2 (e, subtree1, subtree2) ->
         let child1 = value subtree1 in
         let child2 = value subtree2 in
-        (child1, e) :: (child2, e) :: predecessor_pairs subtree1
+        ((child1, e) :: (child2, e) :: predecessor_pairs subtree1)
         @ predecessor_pairs subtree2
 
   (** Returns the predecessors of a tree node. I.e., given
@@ -374,12 +374,12 @@ let tree_gen ?blocks () =
           | Some sub -> ret (Tree.Node1 (x, sub))
         else
           let* n = QCheck2.Gen.int_bound (List.length xs - 1) in
-          let (left, right) = List.split_n n xs in
+          let left, right = List.split_n n xs in
           let* left = go left and* right = go right in
           match (left, right) with
-          | (None, None) -> ret (Tree.Leaf x)
-          | (None, Some sub) | (Some sub, None) -> ret (Tree.Node1 (x, sub))
-          | (Some left, Some right) -> ret (Tree.Node2 (x, left, right)))
+          | None, None -> ret (Tree.Leaf x)
+          | None, Some sub | Some sub, None -> ret (Tree.Node1 (x, sub))
+          | Some left, Some right -> ret (Tree.Node2 (x, left, right)))
   in
   (* The assertion cannot break, because we made sure that [blocks] is
      not empty. *)
@@ -420,7 +420,7 @@ let new_blocks (type a) ~(equal : a -> a -> bool) (tree : a Tree.tree)
         ( to_parents,
           List_extra.take_until_if_found ~pred:(( = ) ancestor) to_parents )
       with
-      | ([], _) ->
+      | [], _ ->
           (* This case is not supported, because the production
              implementation of new_blocks doesn't support it either
              (since it MUST return an ancestor, acccording to its return
@@ -430,11 +430,11 @@ let new_blocks (type a) ~(equal : a -> a -> bool) (tree : a Tree.tree)
              of new_blocks should allow this case, hereby allowing
              a more general test. *)
           assert false
-      | (_, None) ->
+      | _, None ->
           (* Should not happen, because [ancestor]
              is a member of [to_parents] *)
           assert false
-      | (_, Some path) ->
+      | _, Some path ->
           (* Because [to_block] must be included in new_blocks'
              returned value. *)
           let path = to_block :: path in

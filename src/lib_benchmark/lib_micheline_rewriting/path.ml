@@ -57,10 +57,10 @@ module Without_hash_consing : S = struct
 
   let rec compare path1 path2 =
     match (path1.rev_path_desc, path2.rev_path_desc) with
-    | (Root, Root) -> 0
-    | (Root, _) -> -1
-    | (_, Root) -> 1
-    | (At_index (i1, p1), At_index (i2, p2)) ->
+    | Root, Root -> 0
+    | Root, _ -> -1
+    | _, Root -> 1
+    | At_index (i1, p1), At_index (i2, p2) ->
         let c = Compare.Int.compare i1 i2 in
         if c = 0 then compare p1 p2 else c
 

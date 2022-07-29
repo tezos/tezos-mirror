@@ -47,17 +47,17 @@ let create ?ssh_alias ?ssh_user ?ssh_port ?ssh_id ~address () =
 
 let address ?(hostname = false) ?from runner =
   match (from, runner) with
-  | (None, None) -> if hostname then "localhost" else "127.0.0.1"
-  | (None, Some host) -> host.address
-  | (Some _peer, None) -> get_local_public_ip ()
-  | (Some peer, Some host) ->
+  | None, None -> if hostname then "localhost" else "127.0.0.1"
+  | None, Some host -> host.address
+  | Some _peer, None -> get_local_public_ip ()
+  | Some peer, Some host ->
       if peer.address = host.address then "127.0.0.1" else host.address
 
 (* With ssh-agent, the environment variables SSH_AGENT_PID and SSH_AUTH_SOCK
    must be added in the environment. *)
 let ssh_env () =
   match (Sys.getenv_opt "SSH_AGENT_PID", Sys.getenv_opt "SSH_AUTH_SOCK") with
-  | (Some agent, Some sock) ->
+  | Some agent, Some sock ->
       [|"SSH_AGENT_PID=" ^ agent; "SSH_AUTH_SOCK=" ^ sock|]
   | _ ->
       (* Here, we assume we don't have an agent running. *)
@@ -175,7 +175,7 @@ module Sys = struct
 
   (* WARNING: synchronous method so it can block. *)
   let run_unix_with_ssh runner shell =
-    let (ssh, ssh_args) = wrap_with_ssh runner shell in
+    let ssh, ssh_args = wrap_with_ssh runner shell in
     let unix_cmd = String.concat " " (ssh :: ssh_args) in
     let ssh_env = ssh_env () in
     Unix.open_process_full unix_cmd ssh_env

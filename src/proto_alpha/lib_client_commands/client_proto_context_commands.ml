@@ -29,8 +29,14 @@ open Protocol
 open Alpha_context
 open Client_proto_context
 open Client_proto_contracts
+open Client_proto_rollups
 open Client_keys
 open Client_proto_args
+
+let save_tx_rollup ~force (cctxt : #Client_context.full) alias_name tx_rollup =
+  TxRollupAlias.add ~force cctxt alias_name tx_rollup >>=? fun () ->
+  cctxt#message "Transaction rollup memorized as %s" alias_name >>= fun () ->
+  return_unit
 
 let encrypted_switch =
   Clic.switch ~long:"encrypted" ~doc:"encrypt the key on-disk" ()
@@ -64,81 +70,10 @@ let report_michelson_errors ?(no_print_source = false) ~msg
       cctxt#error "%s" msg >>= fun () -> Lwt.return_none
   | Ok data -> Lwt.return_some data
 
-let parse_file parse path =
-  Lwt_utils_unix.read_file path >>= fun contents -> parse contents
-
-let file_or_text_parameter ~from_text
-    ?(from_path = parse_file (from_text ~heuristic:false)) () =
-  Clic.parameter @@ fun _ p ->
-  match String.split ~limit:1 ':' p with
-  | ["text"; text] -> from_text ~heuristic:false text
-  | ["file"; path] -> from_path path
-  | _ -> if Sys.file_exists p then from_path p else from_text ~heuristic:true p
-
-let json_file_or_text_parameter =
-  let from_text ~heuristic s =
-    try return (Ezjsonm.from_string s)
-    with Ezjsonm.Parse_error _ when heuristic ->
-      failwith "Neither an existing file nor valid JSON: '%s'" s
-  in
-  let from_path = Lwt_utils_unix.Json.read_file in
-  file_or_text_parameter ~from_text ~from_path ()
-
-let non_negative_param =
-  Clic.parameter (fun _ s ->
-      match int_of_string_opt s with
-      | Some i when i >= 0 -> return i
-      | _ -> failwith "Parameter should be a non-negative integer literal")
-
 let block_hash_param =
   Clic.parameter (fun _ s ->
       try return (Block_hash.of_b58check_exn s)
       with _ -> failwith "Parameter '%s' is an invalid block hash" s)
-
-let rollup_kind_param =
-  Clic.parameter (fun _ name ->
-      match Sc_rollups.from ~name with
-      | None ->
-          failwith
-            "Parameter '%s' is not a valid rollup name (must be one of %s)"
-            name
-            (String.concat ", " Sc_rollups.all_names)
-      | Some k -> return k)
-
-let boot_sector_param =
-  let from_text ~heuristic:_ s =
-    return (fun (module R : Sc_rollups.PVM.S) ->
-        R.parse_boot_sector s |> function
-        | None -> failwith "Invalid boot sector"
-        | Some boot_sector -> return boot_sector)
-  in
-  file_or_text_parameter ~from_text ()
-
-let messages_param =
-  let from_path path =
-    Lwt_utils_unix.Json.read_file path >>=? fun json -> return (`Json json)
-  in
-  let from_text text =
-    try return (`Json (Ezjsonm.from_string text))
-    with Ezjsonm.Parse_error _ ->
-      failwith "Given text is not valid JSON: '%s'" text
-  in
-  Clic.parameter @@ fun _ p ->
-  match String.split ~limit:1 ':' p with
-  | ["bin"; path] ->
-      Lwt_utils_unix.read_file path >>= fun bin -> return (`Bin bin)
-  | ["text"; text] -> from_text text
-  | ["file"; path] -> from_path path
-  | _ -> if Sys.file_exists p then from_path p else from_text p
-
-let rollup_address_param =
-  Clic.parameter (fun _ name ->
-      match Sc_rollup.Address.of_b58check_opt name with
-      | None ->
-          failwith
-            "Parameter '%s' is not a valid B58-encoded rollup address"
-            name
-      | Some addr -> return addr)
 
 let group =
   {
@@ -206,8 +141,7 @@ let commands_ro () =
         cached_contracts cctxt ~chain:cctxt#chain ~block:cctxt#block
         >>=? fun keys ->
         List.iter_s
-          (fun (key, size) ->
-            cctxt#message "%a %d" Alpha_context.Contract.pp key size)
+          (fun (key, size) -> cctxt#message "%a %d" Contract_hash.pp key size)
           keys
         >>= fun () -> return_unit);
     command
@@ -215,17 +149,14 @@ let commands_ro () =
       ~desc:"Get the key rank of a cache key."
       no_options
       (prefixes ["get"; "cached"; "contract"; "rank"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"contract"
+      @@ OriginatedContractAlias.destination_param ~name:"src" ~desc:"contract"
       @@ stop)
-      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun () contract (cctxt : Protocol_client_context.full) ->
         contract_rank cctxt ~chain:cctxt#chain ~block:cctxt#block contract
         >>=? fun rank ->
         match rank with
         | None ->
-            cctxt#error
-              "Invalid contract: %a"
-              Alpha_context.Contract.pp
-              contract
+            cctxt#error "Invalid contract: %a" Contract_hash.pp contract
             >>= fun () -> return_unit
         | Some rank -> cctxt#message "%d" rank >>= fun () -> return_unit);
     command
@@ -253,19 +184,21 @@ let commands_ro () =
       (prefixes ["get"; "balance"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
-      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun () contract (cctxt : Protocol_client_context.full) ->
         get_balance cctxt ~chain:cctxt#chain ~block:cctxt#block contract
         >>=? fun amount ->
-        cctxt#answer "%a %s" Tez.pp amount Client_proto_args.tez_sym
+        cctxt#answer "%a %s" Tez.pp amount Operation_result.tez_sym
         >>= fun () -> return_unit);
     command
       ~group
       ~desc:"Get the storage of a contract."
       (args1 (unparsing_mode_arg ~default:"Readable"))
       (prefixes ["get"; "contract"; "storage"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"source contract"
       @@ stop)
-      (fun unparsing_mode (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun unparsing_mode contract (cctxt : Protocol_client_context.full) ->
         get_storage
           cctxt
           ~chain:cctxt#chain
@@ -288,9 +221,11 @@ let commands_ro () =
       @@ prefixes ["of"; "type"]
       @@ Clic.param ~name:"type" ~desc:"type of the key" data_parameter
       @@ prefix "in"
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"source contract"
       @@ stop)
-      (fun () key key_type (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun () key key_type contract (cctxt : Protocol_client_context.full) ->
         get_contract_big_map_value
           cctxt
           ~chain:cctxt#chain
@@ -334,10 +269,12 @@ let commands_ro () =
       ~desc:"Get the code of a contract."
       (args2 (unparsing_mode_arg ~default:"Readable") normalize_types_switch)
       (prefixes ["get"; "contract"; "code"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"source contract"
       @@ stop)
       (fun (unparsing_mode, normalize_types)
-           (_, contract)
+           contract
            (cctxt : Protocol_client_context.full) ->
         get_script
           cctxt
@@ -362,9 +299,11 @@ let commands_ro () =
       ~desc:"Get the `BLAKE2B` script hash of a contract."
       no_options
       (prefixes ["get"; "contract"; "script"; "hash"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"source contract"
       @@ stop)
-      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun () contract (cctxt : Protocol_client_context.full) ->
         get_script_hash cctxt ~chain:cctxt#chain ~block:cctxt#block contract
         >>= function
         | Error errs -> cctxt#error "%a" pp_print_trace errs
@@ -380,11 +319,13 @@ let commands_ro () =
            ~desc:"the entrypoint to describe"
            entrypoint_parameter
       @@ prefixes ["for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"source contract"
       @@ stop)
       (fun normalize_types
            entrypoint
-           (_, contract)
+           contract
            (cctxt : Protocol_client_context.full) ->
         Michelson_v1_entrypoints.contract_entrypoint_type
           cctxt
@@ -403,9 +344,11 @@ let commands_ro () =
       ~desc:"Get the entrypoint list of a contract."
       (args1 normalize_types_switch)
       (prefixes ["get"; "contract"; "entrypoints"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"source contract"
       @@ stop)
-      (fun normalize_types (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun normalize_types contract (cctxt : Protocol_client_context.full) ->
         Michelson_v1_entrypoints.list_contract_entrypoints
           cctxt
           ~chain:cctxt#chain
@@ -421,9 +364,11 @@ let commands_ro () =
       ~desc:"Get the list of unreachable paths in a contract's parameter type."
       no_options
       (prefixes ["get"; "contract"; "unreachable"; "paths"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"source contract"
       @@ stop)
-      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun () contract (cctxt : Protocol_client_context.full) ->
         Michelson_v1_entrypoints.list_contract_unreachables
           cctxt
           ~chain:cctxt#chain
@@ -440,7 +385,7 @@ let commands_ro () =
       (prefixes ["get"; "delegate"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
-      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun () contract (cctxt : Protocol_client_context.full) ->
         Client_proto_contracts.get_delegate
           cctxt
           ~chain:cctxt#chain
@@ -464,7 +409,7 @@ let commands_ro () =
             ~placeholder:"num_blocks"
             ~doc:"number of previous blocks to check"
             ~default:"10"
-            non_negative_param))
+            non_negative_parameter))
       (prefixes ["get"; "receipt"; "for"]
       @@ param
            ~name:"operation"
@@ -533,7 +478,7 @@ let commands_ro () =
                           p
                           Tez.pp
                           (Tez.of_mutez_exn w)
-                          Client_proto_args.tez_sym
+                          Operation_result.tez_sym
                           (if List.mem ~equal:Protocol_hash.equal p known_protos
                           then ""
                           else "not "))
@@ -558,21 +503,21 @@ let commands_ro () =
                  Current in favor %a %s, needed supermajority %a %s@]"
                 Tez.pp
                 (Tez.of_mutez_exn ballots_info.ballots.yay)
-                Client_proto_args.tez_sym
+                Operation_result.tez_sym
                 Tez.pp
                 (Tez.of_mutez_exn ballots_info.ballots.nay)
-                Client_proto_args.tez_sym
+                Operation_result.tez_sym
                 Tez.pp
                 (Tez.of_mutez_exn ballots_info.ballots.pass)
-                Client_proto_args.tez_sym
+                Operation_result.tez_sym
                 (Int32.to_float ballots_info.participation /. 100.)
                 (Int32.to_float ballots_info.current_quorum /. 100.)
                 Tez.pp
                 (Tez.of_mutez_exn ballots_info.ballots.yay)
-                Client_proto_args.tez_sym
+                Operation_result.tez_sym
                 Tez.pp
                 (Tez.of_mutez_exn ballots_info.supermajority)
-                Client_proto_args.tez_sym
+                Operation_result.tez_sym
               >>= fun () -> return_unit
             else
               cctxt#message "The ballots have already been cleared."
@@ -612,15 +557,15 @@ let commands_ro () =
       (prefixes ["get"; "deposits"; "limit"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source delegate"
       @@ stop)
-      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
-        match Contract.is_implicit contract with
-        | None ->
+      (fun () contract (cctxt : Protocol_client_context.full) ->
+        match contract with
+        | Originated _ ->
             cctxt#error
               "Cannot change deposits limit on contract %a. This operation is \
                invalid on originated contracts."
               Contract.pp
               contract
-        | Some delegate -> (
+        | Implicit delegate -> (
             get_frozen_deposits_limit
               cctxt
               ~chain:cctxt#chain
@@ -629,33 +574,33 @@ let commands_ro () =
             >>=? function
             | None -> cctxt#answer "unlimited" >>= return
             | Some limit ->
-                cctxt#answer "%a %s" Tez.pp limit Client_proto_args.tez_sym
+                cctxt#answer "%a %s" Tez.pp limit Operation_result.tez_sym
                 >>= return));
   ]
 
 (* ----------------------------------------------------------------------------*)
 (* After the activation of a new version of the protocol, the older protocols
- are only kept in the code base to replay the history of the chain and to query
- old states.
+   are only kept in the code base to replay the history of the chain and to query
+   old states.
 
- The commands that are not useful anymore in the old protocols are removed,
- this is called protocol freezing. The commands below are those that can be
- removed during protocol freezing.
+   The commands that are not useful anymore in the old protocols are removed,
+   this is called protocol freezing. The commands below are those that can be
+   removed during protocol freezing.
 
- The rule of thumb to know if a command should be kept at freezing is that all
- commands that modify the state of the chain should be removed and conversely
- all commands that are used to query the context should be kept. For this
- reason, we call read-only (or RO for short) the commands that are kept and
- read-write (or RW for short) the commands that are removed.
+   The rule of thumb to know if a command should be kept at freezing is that all
+   commands that modify the state of the chain should be removed and conversely
+   all commands that are used to query the context should be kept. For this
+   reason, we call read-only (or RO for short) the commands that are kept and
+   read-write (or RW for short) the commands that are removed.
 
- There are some exceptions to this rule however, for example the command
- "tezos-client wait for <op> to be included" is classified as RW despite having
- no effect on the context because it has no use case once all RW commands are
- removed.
+   There are some exceptions to this rule however, for example the command
+   "tezos-client wait for <op> to be included" is classified as RW despite having
+   no effect on the context because it has no use case once all RW commands are
+   removed.
 
- Keeping this in mind, the developer should decide where to add a new command.
- At the end of the file, RO and RW commands are concatenated into one list that
- is then exported in the mli file.  *)
+   Keeping this in mind, the developer should decide where to add a new command.
+   At the end of the file, RO and RW commands are concatenated into one list that
+   is then exported in the mli file. *)
 (* ----------------------------------------------------------------------------*)
 
 let dry_run_switch =
@@ -686,7 +631,8 @@ let force_switch =
        switch requires --gas-limit, --storage-limit, and --fee."
     ()
 
-let transfer_command amount source destination (cctxt : #Client_context.printer)
+let transfer_command amount (source : Contract.t) destination
+    (cctxt : #Client_context.printer)
     ( fee,
       dry_run,
       verbose_signing,
@@ -697,25 +643,10 @@ let transfer_command amount source destination (cctxt : #Client_context.printer)
       counter,
       arg,
       no_print_source,
-      minimal_fees,
-      minimal_nanotez_per_byte,
-      minimal_nanotez_per_gas_unit,
-      force_low_fee,
-      fee_cap,
-      burn_cap,
+      fee_parameter,
       entrypoint,
       replace_by_fees,
       successor_level ) =
-  let fee_parameter =
-    {
-      Injection.minimal_fees;
-      minimal_nanotez_per_byte;
-      minimal_nanotez_per_gas_unit;
-      force_low_fee;
-      fee_cap;
-      burn_cap;
-    }
-  in
   (* When --force is used we want to inject the transfer even if it fails.
      In that case we cannot rely on simulation to compute limits and fees
      so we require the corresponding options to be set. *)
@@ -726,16 +657,17 @@ let transfer_command amount source destination (cctxt : #Client_context.printer)
           name
     | _ -> Lwt.return_unit
   in
-  (if force then
+  (if force && not simulation then
    check_force_dependency "--gas-limit" gas_limit >>= fun () ->
    check_force_dependency "--storage-limit" storage_limit >>= fun () ->
    check_force_dependency "--fee" fee
   else Lwt.return_unit)
   >>= fun () ->
-  (match Contract.is_implicit source with
-  | None ->
+  (match source with
+  | Originated contract_hash ->
       let contract = source in
-      Managed_contract.get_contract_manager cctxt source >>=? fun source ->
+      Managed_contract.get_contract_manager cctxt contract_hash
+      >>=? fun source ->
       Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
       Managed_contract.transfer
         cctxt
@@ -760,9 +692,8 @@ let transfer_command amount source destination (cctxt : #Client_context.printer)
         ?storage_limit
         ?counter
         ()
-  | Some source ->
+  | Implicit source ->
       Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-      let destination : Alpha_context.Destination.t = Contract destination in
       transfer
         cctxt
         ~chain:cctxt#chain
@@ -796,9 +727,9 @@ let transfer_command amount source destination (cctxt : #Client_context.printer)
   | Some (_res, _contracts) -> return_unit
 
 let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
-    ?entrypoint source index batch =
+    ?entrypoint (source : Contract.t) index batch =
   Client_proto_contracts.ContractAlias.find_destination cctxt batch.destination
-  >>=? fun (_, destination) ->
+  >>=? fun destination ->
   tez_of_string_exn index "amount" batch.amount >>=? fun amount ->
   tez_of_opt_string_exn index "fee" batch.fee >>=? fun batch_fee ->
   let fee = Option.either batch_fee fee in
@@ -807,8 +738,8 @@ let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
   let storage_limit = Option.either batch.storage_limit storage_limit in
   let entrypoint = Option.either batch.entrypoint entrypoint in
   parse_arg_transfer arg >>=? fun parameters ->
-  (match Contract.is_implicit source with
-  | None ->
+  (match source with
+  | Originated _ ->
       Managed_contract.build_transaction_operation
         cctxt
         ~chain:cctxt#chain
@@ -822,7 +753,7 @@ let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
         ?gas_limit
         ?storage_limit
         ()
-  | Some _ ->
+  | Implicit _ ->
       return
         (build_transaction_operation
            ~amount
@@ -831,7 +762,7 @@ let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
            ?fee
            ?gas_limit
            ?storage_limit
-           (Contract destination)))
+           destination))
   >>=? fun operation ->
   return (Annotated_manager_operation.Annotated_manager_operation operation)
 
@@ -845,14 +776,13 @@ let commands_network network () =
           ~desc:"Register and activate an Alphanet/Zeronet faucet account."
           (args2 (Secret_key.force_switch ()) encrypted_switch)
           (prefixes ["activate"; "account"]
-          @@ Secret_key.fresh_alias_param
-          @@ prefixes ["with"]
+          @@ Secret_key.fresh_alias_param @@ prefixes ["with"]
           @@ param
                ~name:"activation_key"
                ~desc:
                  "Activate an Alphanet/Zeronet faucet account from the JSON \
                   (file or directly inlined)."
-               json_file_or_text_parameter
+               json_parameter
           @@ stop)
           (fun (force, encrypted) name activation_json cctxt ->
             Secret_key.of_fresh cctxt force name >>=? fun name ->
@@ -888,8 +818,7 @@ let commands_network network () =
           ~desc:"Activate a fundraiser account."
           (args1 dry_run_switch)
           (prefixes ["activate"; "fundraiser"; "account"]
-          @@ Public_key_hash.alias_param
-          @@ prefixes ["with"]
+          @@ Public_key_hash.alias_param @@ prefixes ["with"]
           @@ param
                ~name:"code"
                (Clic.parameter (fun _ctx code ->
@@ -920,17 +849,12 @@ let commands_rw () =
     command
       ~group
       ~desc:"Set the delegate of a contract."
-      (args10
+      (args5
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg)
+         fee_parameter_args)
       (prefixes ["set"; "delegate"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ prefix "to"
@@ -938,31 +862,12 @@ let commands_rw () =
            ~name:"dlgt"
            ~desc:"new delegate of the contract"
       @@ stop)
-      (fun ( fee,
-             dry_run,
-             verbose_signing,
-             simulation,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
-             force_low_fee,
-             fee_cap,
-             burn_cap )
-           (_, contract)
+      (fun (fee, dry_run, verbose_signing, simulation, fee_parameter)
+           contract
            delegate
            (cctxt : Protocol_client_context.full) ->
-        let fee_parameter =
-          {
-            Injection.minimal_fees;
-            minimal_nanotez_per_byte;
-            minimal_nanotez_per_gas_unit;
-            force_low_fee;
-            fee_cap;
-            burn_cap;
-          }
-        in
-        match Contract.is_implicit contract with
-        | None ->
+        match contract with
+        | Originated contract ->
             Managed_contract.get_contract_manager cctxt contract
             >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
@@ -988,7 +893,7 @@ let commands_rw () =
               cctxt
               errors
             >>= fun _ -> return_unit
-        | Some mgr ->
+        | Implicit mgr ->
             Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
             set_delegate
               cctxt
@@ -1008,42 +913,15 @@ let commands_rw () =
     command
       ~group
       ~desc:"Withdraw the delegate from a contract."
-      (args9
-         fee_arg
-         dry_run_switch
-         verbose_signing_switch
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg)
+      (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
       (prefixes ["withdraw"; "delegate"; "from"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
-      (fun ( fee,
-             dry_run,
-             verbose_signing,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
-             force_low_fee,
-             fee_cap,
-             burn_cap )
-           (_, contract)
+      (fun (fee, dry_run, verbose_signing, fee_parameter)
+           contract
            (cctxt : Protocol_client_context.full) ->
-        let fee_parameter =
-          {
-            Injection.minimal_fees;
-            minimal_nanotez_per_byte;
-            minimal_nanotez_per_gas_unit;
-            force_low_fee;
-            fee_cap;
-            burn_cap;
-          }
-        in
-        match Contract.is_implicit contract with
-        | None ->
+        match contract with
+        | Originated contract ->
             Managed_contract.get_contract_manager cctxt contract
             >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
@@ -1068,7 +946,7 @@ let commands_rw () =
               cctxt
               errors
             >>= fun _ -> return_unit
-        | Some mgr ->
+        | Implicit mgr ->
             Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
             set_delegate
               cctxt
@@ -1087,7 +965,7 @@ let commands_rw () =
     command
       ~group
       ~desc:"Launch a smart contract on the blockchain."
-      (args15
+      (args10
          fee_arg
          dry_run_switch
          verbose_signing_switch
@@ -1097,12 +975,7 @@ let commands_rw () =
          (Client_keys.force_switch ())
          init_arg
          no_print_source_flag
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg)
+         fee_parameter_args)
       (prefixes ["originate"; "contract"]
       @@ RawContractAlias.fresh_alias_param
            ~name:"new"
@@ -1129,36 +1002,21 @@ let commands_rw () =
              force,
              initial_storage,
              no_print_source,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
-             force_low_fee,
-             fee_cap,
-             burn_cap )
+             fee_parameter )
            alias_name
            balance
-           (_, source)
+           source
            program
            (cctxt : Protocol_client_context.full) ->
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program)
         >>=? fun {expanded = code; _} ->
-        match Contract.is_implicit source with
-        | None ->
+        match source with
+        | Originated _ ->
             failwith
               "only implicit accounts can be the source of an origination"
-        | Some source -> (
+        | Implicit source -> (
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            let fee_parameter =
-              {
-                Injection.minimal_fees;
-                minimal_nanotez_per_byte;
-                minimal_nanotez_per_gas_unit;
-                force_low_fee;
-                fee_cap;
-                burn_cap;
-              }
-            in
             originate_contract
               cctxt
               ~chain:cctxt#chain
@@ -1196,7 +1054,7 @@ let commands_rw () =
       ~desc:
         "Execute multiple transfers from a single source account.\n\
          If one of the transfers fails, none of them get executed."
-      (args17
+      (args12
          default_fee_arg
          dry_run_switch
          verbose_signing_switch
@@ -1206,12 +1064,7 @@ let commands_rw () =
          counter_arg
          default_arg_arg
          no_print_source_flag
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg
+         fee_parameter_args
          default_entrypoint_arg
          replace_by_fees_arg)
       (prefixes ["multiple"; "transfers"; "from"]
@@ -1228,7 +1081,7 @@ let commands_rw () =
               \"amount\": qty (, <field>: <val> ...) } (, ...) ]', where an \
               optional <field> can either be \"fee\", \"gas-limit\", \
               \"storage-limit\", \"arg\", or \"entrypoint\"."
-           json_file_or_text_parameter
+           json_parameter
       @@ stop)
       (fun ( fee,
              dry_run,
@@ -1239,27 +1092,12 @@ let commands_rw () =
              counter,
              arg,
              no_print_source,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
-             force_low_fee,
-             fee_cap,
-             burn_cap,
+             fee_parameter,
              entrypoint,
              replace_by_fees )
-           (_, source)
+           source
            operations_json
            cctxt ->
-        let fee_parameter =
-          {
-            Injection.minimal_fees;
-            minimal_nanotez_per_byte;
-            minimal_nanotez_per_gas_unit;
-            force_low_fee;
-            fee_cap;
-            burn_cap;
-          }
-        in
         let prepare i =
           prepare_batch_operation
             cctxt
@@ -1279,13 +1117,13 @@ let commands_rw () =
         with
         | [] -> failwith "Empty operation list"
         | operations ->
-            (match Contract.is_implicit source with
-            | None ->
-                Managed_contract.get_contract_manager cctxt source
+            (match source with
+            | Originated contract ->
+                Managed_contract.get_contract_manager cctxt contract
                 >>=? fun source ->
                 Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
                 return (source, src_pk, src_sk)
-            | Some source ->
+            | Implicit source ->
                 Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
                 return (source, src_pk, src_sk))
             >>=? fun (source, src_pk, src_sk) ->
@@ -1319,7 +1157,7 @@ let commands_rw () =
         | exception (Data_encoding.Json.Cannot_destruct (path, exn2) as exn)
           -> (
             match (path, operations_json) with
-            | ([`Index n], `A lj) -> (
+            | [`Index n], `A lj -> (
                 match List.nth_opt lj n with
                 | Some j ->
                     failwith
@@ -1345,7 +1183,7 @@ let commands_rw () =
     command
       ~group
       ~desc:"Transfer tokens / call a smart contract."
-      (args19
+      (args14
          fee_arg
          dry_run_switch
          verbose_signing_switch
@@ -1356,12 +1194,7 @@ let commands_rw () =
          counter_arg
          arg_arg
          no_print_source_flag
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg
+         fee_parameter_args
          entrypoint_arg
          replace_by_fees_arg
          successor_level_arg)
@@ -1386,18 +1219,13 @@ let commands_rw () =
              counter,
              arg,
              no_print_source,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
-             force_low_fee,
-             fee_cap,
-             burn_cap,
+             fee_parameter,
              entrypoint,
              replace_by_fees,
              successor_level )
            amount
-           (_, source)
-           (_, destination)
+           source
+           destination
            cctxt ->
         transfer_command
           amount
@@ -1414,31 +1242,21 @@ let commands_rw () =
             counter,
             arg,
             no_print_source,
-            minimal_fees,
-            minimal_nanotez_per_byte,
-            minimal_nanotez_per_gas_unit,
-            force_low_fee,
-            fee_cap,
-            burn_cap,
+            fee_parameter,
             entrypoint,
             replace_by_fees,
             successor_level ));
     command
       ~group
       ~desc:"Register a global constant"
-      (args12
+      (args7
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
+         fee_parameter_args
          storage_limit_arg
-         counter_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg)
+         counter_arg)
       (prefixes ["register"; "global"; "constant"]
       @@ global_constant_param
            ~name:"expression"
@@ -1454,32 +1272,17 @@ let commands_rw () =
              dry_run,
              verbose_signing,
              simulation,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
+             fee_parameter,
              storage_limit,
-             counter,
-             force_low_fee,
-             fee_cap,
-             burn_cap )
+             counter )
            global_constant_str
-           (_, source)
+           source
            cctxt ->
-        match Contract.is_implicit source with
-        | None ->
+        match source with
+        | Originated _ ->
             failwith "Only implicit accounts can register global constants"
-        | Some source ->
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            let fee_parameter =
-              {
-                Injection.minimal_fees;
-                minimal_nanotez_per_byte;
-                minimal_nanotez_per_gas_unit;
-                force_low_fee;
-                fee_cap;
-                burn_cap;
-              }
-            in
             register_global_constant
               cctxt
               ~chain:cctxt#chain
@@ -1507,7 +1310,7 @@ let commands_rw () =
     command
       ~group
       ~desc:"Call a smart contract (same as 'transfer 0')."
-      (args19
+      (args14
          fee_arg
          dry_run_switch
          verbose_signing_switch
@@ -1518,12 +1321,7 @@ let commands_rw () =
          counter_arg
          arg_arg
          no_print_source_flag
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg
+         fee_parameter_args
          entrypoint_arg
          replace_by_fees_arg
          successor_level_arg)
@@ -1546,17 +1344,12 @@ let commands_rw () =
              counter,
              arg,
              no_print_source,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
-             force_low_fee,
-             fee_cap,
-             burn_cap,
+             fee_parameter,
              entrypoint,
              replace_by_fees,
              successor_level )
-           (_, destination)
-           (_, source)
+           destination
+           source
            cctxt ->
         let amount = Tez.zero in
         transfer_command
@@ -1574,58 +1367,24 @@ let commands_rw () =
             counter,
             arg,
             no_print_source,
-            minimal_fees,
-            minimal_nanotez_per_byte,
-            minimal_nanotez_per_gas_unit,
-            force_low_fee,
-            fee_cap,
-            burn_cap,
+            fee_parameter,
             entrypoint,
             replace_by_fees,
             successor_level ));
     command
       ~group
       ~desc:"Reveal the public key of the contract manager."
-      (args9
-         fee_arg
-         dry_run_switch
-         verbose_signing_switch
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg)
+      (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
       (prefixes ["reveal"; "key"; "for"]
       @@ ContractAlias.alias_param
            ~name:"src"
            ~desc:"name of the source contract"
       @@ stop)
-      (fun ( fee,
-             dry_run,
-             verbose_signing,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
-             force_low_fee,
-             fee_cap,
-             burn_cap )
-           (_, source)
-           cctxt ->
-        match Contract.is_implicit source with
-        | None -> failwith "only implicit accounts can be revealed"
-        | Some source ->
+      (fun (fee, dry_run, verbose_signing, fee_parameter) source cctxt ->
+        match source with
+        | Originated _ -> failwith "only implicit accounts can be revealed"
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            let fee_parameter =
-              {
-                Injection.minimal_fees;
-                minimal_nanotez_per_byte;
-                minimal_nanotez_per_gas_unit;
-                force_low_fee;
-                fee_cap;
-                burn_cap;
-              }
-            in
             reveal
               cctxt
               ~dry_run
@@ -1643,42 +1402,13 @@ let commands_rw () =
     command
       ~group
       ~desc:"Register the public key hash as a delegate."
-      (args9
-         fee_arg
-         dry_run_switch
-         verbose_signing_switch
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg)
+      (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
       (prefixes ["register"; "key"]
       @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
       @@ prefixes ["as"; "delegate"]
       @@ stop)
-      (fun ( fee,
-             dry_run,
-             verbose_signing,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
-             force_low_fee,
-             fee_cap,
-             burn_cap )
-           src_pkh
-           cctxt ->
+      (fun (fee, dry_run, verbose_signing, fee_parameter) src_pkh cctxt ->
         Client_keys.get_key cctxt src_pkh >>=? fun (_, src_pk, src_sk) ->
-        let fee_parameter =
-          {
-            Injection.minimal_fees;
-            minimal_nanotez_per_byte;
-            minimal_nanotez_per_gas_unit;
-            force_low_fee;
-            fee_cap;
-            burn_cap;
-          }
-        in
         register_as_delegate
           cctxt
           ~chain:cctxt#chain
@@ -1706,13 +1436,13 @@ let commands_rw () =
               "wait until 'N' additional blocks after the operation appears in \
                the considered chain"
             ~default:"0"
-            non_negative_param)
+            non_negative_parameter)
          (default_arg
             ~long:"check-previous"
             ~placeholder:"num_blocks"
             ~doc:"number of previous blocks to check"
             ~default:"10"
-            non_negative_param)
+            non_negative_parameter)
          (arg
             ~long:"branch"
             ~placeholder:"block_hash"
@@ -1766,12 +1496,12 @@ let commands_rw () =
                        Error_monad.failwith "Invalid proposal hash: '%s'" x
                    | Some hash -> return hash))))
       (fun (dry_run, verbose_signing, force)
-           (_name, source)
+           source
            proposals
            (cctxt : Protocol_client_context.full) ->
-        match Contract.is_implicit source with
-        | None -> failwith "only implicit accounts can submit proposals"
-        | Some src_pkh -> (
+        match source with
+        | Originated _ -> failwith "only implicit accounts can submit proposals"
+        | Implicit src_pkh -> (
             Client_keys.get_key cctxt src_pkh
             >>=? fun (src_name, _src_pk, src_sk) ->
             get_period_info
@@ -1948,13 +1678,13 @@ let commands_rw () =
                 | s -> failwith "Invalid ballot: '%s'" s))
       @@ stop)
       (fun (verbose_signing, dry_run, force)
-           (_name, source)
+           source
            proposal
            ballot
            (cctxt : Protocol_client_context.full) ->
-        match Contract.is_implicit source with
-        | None -> failwith "only implicit accounts can submit ballot"
-        | Some src_pkh ->
+        match source with
+        | Originated _ -> failwith "only implicit accounts can submit ballot"
+        | Implicit src_pkh ->
             Client_keys.get_key cctxt src_pkh
             >>=? fun (src_name, _src_pk, src_sk) ->
             get_period_info
@@ -1970,7 +1700,7 @@ let commands_rw () =
               (cctxt#chain, cctxt#block)
             >>=? fun current_proposal ->
             (match (info.current_period_kind, current_proposal) with
-            | ((Exploration | Promotion), Some current_proposal) ->
+            | (Exploration | Promotion), Some current_proposal ->
                 if Protocol_hash.equal proposal current_proposal then
                   return_unit
                 else
@@ -2019,17 +1749,12 @@ let commands_rw () =
     command
       ~group
       ~desc:"Set the deposits limit of a registered delegate."
-      (args10
+      (args5
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg)
+         fee_parameter_args)
       (prefixes ["set"; "deposits"; "limit"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ prefix "to"
@@ -2037,38 +1762,19 @@ let commands_rw () =
            ~name:"deposits limit"
            ~desc:"the maximum amount of frozen deposits"
       @@ stop)
-      (fun ( fee,
-             dry_run,
-             verbose_signing,
-             simulation,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
-             force_low_fee,
-             fee_cap,
-             burn_cap )
-           (_, contract)
+      (fun (fee, dry_run, verbose_signing, simulation, fee_parameter)
+           contract
            limit
            (cctxt : Protocol_client_context.full) ->
-        let fee_parameter =
-          {
-            Injection.minimal_fees;
-            minimal_nanotez_per_byte;
-            minimal_nanotez_per_gas_unit;
-            force_low_fee;
-            fee_cap;
-            burn_cap;
-          }
-        in
-        match Contract.is_implicit contract with
-        | None ->
+        match contract with
+        | Originated _ ->
             cctxt#error
               "Cannot change deposits limit on contract %a. This operation is \
                invalid on originated contracts or unregistered delegate \
                contracts."
               Contract.pp
               contract
-        | Some mgr ->
+        | Implicit mgr ->
             Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
             set_deposits_limit
               cctxt
@@ -2088,51 +1794,27 @@ let commands_rw () =
     command
       ~group
       ~desc:"Remove the deposits limit of a registered delegate."
-      (args10
+      (args5
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg)
+         fee_parameter_args)
       (prefixes ["unset"; "deposits"; "limit"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
-      (fun ( fee,
-             dry_run,
-             verbose_signing,
-             simulation,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
-             force_low_fee,
-             fee_cap,
-             burn_cap )
-           (_, contract)
+      (fun (fee, dry_run, verbose_signing, simulation, fee_parameter)
+           contract
            (cctxt : Protocol_client_context.full) ->
-        let fee_parameter =
-          {
-            Injection.minimal_fees;
-            minimal_nanotez_per_byte;
-            minimal_nanotez_per_gas_unit;
-            force_low_fee;
-            fee_cap;
-            burn_cap;
-          }
-        in
-        match Contract.is_implicit contract with
-        | None ->
+        match contract with
+        | Originated _ ->
             cctxt#error
               "Cannot change deposits limit on contract %a. This operation is \
                invalid on originated contracts or unregistered delegate \
                contracts."
               Contract.pp
               contract
-        | Some mgr ->
+        | Implicit mgr ->
             Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
             set_deposits_limit
               cctxt
@@ -2151,55 +1833,86 @@ let commands_rw () =
             >>=? fun _ -> return_unit);
     command
       ~group
-      ~desc:"Launch a new transaction rollup."
-      (args12
+      ~desc:"Increase the paid storage of a smart contract."
+      (args6
+         force_switch
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
+         fee_parameter_args)
+      (prefixes ["increase"; "the"; "paid"; "storage"; "of"]
+      @@ OriginatedContractAlias.destination_param
+           ~name:"contract"
+           ~desc:"name of the smart contract"
+      @@ prefix "by"
+      @@ non_negative_z_param ~name:"amount" ~desc:"amount of increase in bytes"
+      @@ prefixes ["bytes"; "from"]
+      @@ Public_key_hash.source_param
+           ~name:"payer"
+           ~desc:"payer of the storage increase"
+      @@ stop)
+      (fun (force, fee, dry_run, verbose_signing, simulation, fee_parameter)
+           contract
+           amount_in_bytes
+           payer
+           (cctxt : Protocol_client_context.full) ->
+        Client_keys.get_key cctxt payer >>=? fun (_, src_pk, manager_sk) ->
+        increase_paid_storage
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~force
+          ~dry_run
+          ~verbose_signing
+          ?fee
+          ?confirmations:cctxt#confirmations
+          ~simulation
+          ~source:payer
+          ~src_pk
+          ~manager_sk
+          ~destination:contract
+          ~fee_parameter
+          ~amount_in_bytes
+          ()
+        >>=? fun _ -> return_unit);
+    command
+      ~group
+      ~desc:"Launch a new transaction rollup."
+      (args8
+         force_switch
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         fee_parameter_args
          storage_limit_arg
-         counter_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg)
+         counter_arg)
       (prefixes ["originate"; "tx"; "rollup"]
+      @@ TxRollupAlias.fresh_alias_param
+           ~name:"tx_rollup"
+           ~desc:"Fresh name for a transaction rollup"
       @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
            ~desc:"Account originating the transaction rollup."
       @@ stop)
-      (fun ( fee,
+      (fun ( force,
+             fee,
              dry_run,
              verbose_signing,
              simulation,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
+             fee_parameter,
              storage_limit,
-             counter,
-             force_low_fee,
-             fee_cap,
-             burn_cap )
-           (_, source)
+             counter )
+           alias
+           source
            cctxt ->
-        match Contract.is_implicit source with
-        | None ->
+        match source with
+        | Originated _ ->
             failwith "Only implicit accounts can originate transaction rollups"
-        | Some source ->
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            let fee_parameter =
-              {
-                Injection.minimal_fees;
-                minimal_nanotez_per_byte;
-                minimal_nanotez_per_gas_unit;
-                force_low_fee;
-                fee_cap;
-                burn_cap;
-              }
-            in
             originate_tx_rollup
               cctxt
               ~chain:cctxt#chain
@@ -2216,23 +1929,33 @@ let commands_rw () =
               ~src_sk
               ~fee_parameter
               ()
-            >>=? fun _res -> return_unit);
+            >>=? fun res ->
+            TxRollupAlias.of_fresh cctxt force alias >>=? fun alias_name ->
+            (match res with
+            | ( _,
+                _,
+                Apply_results.Manager_operation_result
+                  {
+                    operation_result =
+                      Apply_operation_result.Applied
+                        (Apply_results.Tx_rollup_origination_result
+                          {originated_tx_rollup; _});
+                    _;
+                  } ) ->
+                ok originated_tx_rollup
+            | _ -> error_with "transaction rollup was not correctly originated")
+            >>?= fun res -> save_tx_rollup ~force cctxt alias_name res);
     command
       ~group
       ~desc:"Submit a batch of transaction rollup operations."
-      (args12
+      (args7
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
+         fee_parameter_args
          storage_limit_arg
-         counter_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg)
+         counter_arg)
       (prefixes ["submit"; "tx"; "rollup"; "batch"]
       @@ Clic.param
            ~name:"batch"
@@ -2246,40 +1969,25 @@ let commands_rw () =
       @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
-           ~desc:"Account submiting the transaction rollup batches."
+           ~desc:"Account submitting the transaction rollup batches."
       @@ stop)
       (fun ( fee,
              dry_run,
              verbose_signing,
              simulation,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
+             fee_parameter,
              storage_limit,
-             counter,
-             force_low_fee,
-             fee_cap,
-             burn_cap )
+             counter )
            content
            tx_rollup
-           (_, source)
+           source
            cctxt ->
-        match Contract.is_implicit source with
-        | None ->
+        match source with
+        | Originated _ ->
             failwith
               "Only implicit accounts can submit transaction rollup batches"
-        | Some source ->
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            let fee_parameter =
-              {
-                Injection.minimal_fees;
-                minimal_nanotez_per_byte;
-                minimal_nanotez_per_gas_unit;
-                force_low_fee;
-                fee_cap;
-                burn_cap;
-              }
-            in
             submit_tx_rollup_batch
               cctxt
               ~chain:cctxt#chain
@@ -2305,19 +2013,14 @@ let commands_rw () =
         "Commit to a transaction rollup for an inbox and level.\n\n\
          The provided list of message result hash must be ordered in the same \
          way the messages were ordered in the inbox."
-      (args13
+      (args8
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
+         fee_parameter_args
          storage_limit_arg
          counter_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg
          (Tx_rollup.commitment_hash_arg
             ~long:"predecessor-hash"
             ~usage:
@@ -2329,7 +2032,7 @@ let commands_rw () =
       @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
-           ~desc:"Account commiting to the transaction rollup."
+           ~desc:"Account committing to the transaction rollup."
       @@ prefixes ["for"; "level"]
       @@ Tx_rollup.level_param ~usage:"Level used for the commitment."
       @@ prefixes ["with"; "inbox"; "hash"]
@@ -2344,37 +2047,22 @@ let commands_rw () =
              dry_run,
              verbose_signing,
              simulation,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
+             fee_parameter,
              storage_limit,
              counter,
-             force_low_fee,
-             fee_cap,
-             burn_cap,
              predecessor )
            tx_rollup
-           (_, source)
+           source
            level
            inbox_merkle_root
            messages
            cctxt ->
-        match Contract.is_implicit source with
-        | None ->
+        match source with
+        | Originated _ ->
             failwith
               "Only implicit accounts can submit transaction rollup commitments"
-        | Some source ->
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            let fee_parameter =
-              {
-                Injection.minimal_fees;
-                minimal_nanotez_per_byte;
-                minimal_nanotez_per_gas_unit;
-                force_low_fee;
-                fee_cap;
-                burn_cap;
-              }
-            in
             submit_tx_rollup_commitment
               cctxt
               ~chain:cctxt#chain
@@ -2399,23 +2087,18 @@ let commands_rw () =
             >>=? fun _res -> return_unit);
     command
       ~group
-      ~desc:"Finalize a commitment of an transaction rollup."
-      (args12
+      ~desc:"Finalize a commitment of a transaction rollup."
+      (args7
          fee_arg
          dry_run_switch
          verbose_signing_switch
-         simulate_switch
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
          storage_limit_arg
-         counter_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg)
+         fee_parameter_args
+         simulate_switch
+         counter_arg)
       (prefixes ["finalize"; "commitment"; "of"; "tx"; "rollup"]
       @@ Tx_rollup.tx_rollup_address_param
-           ~usage:"Tx rollup that have his commitment finalized."
+           ~usage:"Tx rollup that have its commitment finalized."
       @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
@@ -2424,32 +2107,18 @@ let commands_rw () =
       (fun ( fee,
              dry_run,
              verbose_signing,
-             simulation,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
              storage_limit,
-             counter,
-             force_low_fee,
-             fee_cap,
-             burn_cap )
+             fee_parameter,
+             simulation,
+             counter )
            tx_rollup
-           (_, source)
+           source
            cctxt ->
-        match Contract.is_implicit source with
-        | None -> failwith "Only implicit accounts can finalize commitments"
-        | Some source ->
+        match source with
+        | Originated _ ->
+            failwith "Only implicit accounts can finalize commitments"
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            let fee_parameter =
-              {
-                Injection.minimal_fees;
-                minimal_nanotez_per_byte;
-                minimal_nanotez_per_gas_unit;
-                force_low_fee;
-                fee_cap;
-                burn_cap;
-              }
-            in
             submit_tx_rollup_finalize_commitment
               cctxt
               ~chain:cctxt#chain
@@ -2470,20 +2139,15 @@ let commands_rw () =
             >>=? fun _res -> return_unit);
     command
       ~group
-      ~desc:"Recover commitment bond from an transaction rollup."
-      (args12
+      ~desc:"Recover commitment bond from a transaction rollup."
+      (args7
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
+         fee_parameter_args
          storage_limit_arg
-         counter_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg)
+         counter_arg)
       (prefixes ["recover"; "bond"; "of"]
       @@ ContractAlias.destination_param
            ~name:"src"
@@ -2495,31 +2159,17 @@ let commands_rw () =
              dry_run,
              verbose_signing,
              simulation,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
+             fee_parameter,
              storage_limit,
-             counter,
-             force_low_fee,
-             fee_cap,
-             burn_cap )
-           (_, source)
+             counter )
+           source
            tx_rollup
            cctxt ->
-        match Contract.is_implicit source with
-        | None -> failwith "Only implicit accounts can deposit/recover bonds"
-        | Some source ->
+        match source with
+        | Originated _ ->
+            failwith "Only implicit accounts can deposit/recover bonds"
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            let fee_parameter =
-              {
-                Injection.minimal_fees;
-                minimal_nanotez_per_byte;
-                minimal_nanotez_per_gas_unit;
-                force_low_fee;
-                fee_cap;
-                burn_cap;
-              }
-            in
             submit_tx_rollup_return_bond
               cctxt
               ~chain:cctxt#chain
@@ -2540,23 +2190,18 @@ let commands_rw () =
             >>=? fun _res -> return_unit);
     command
       ~group
-      ~desc:"Remove a commitment from an transaction rollup."
-      (args12
+      ~desc:"Remove a commitment from a transaction rollup."
+      (args7
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
+         fee_parameter_args
          storage_limit_arg
-         counter_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg)
+         counter_arg)
       (prefixes ["remove"; "commitment"; "of"; "tx"; "rollup"]
       @@ Tx_rollup.tx_rollup_address_param
-           ~usage:"Tx rollup that have his commitment removed."
+           ~usage:"Tx rollup that have its commitment removed."
       @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
@@ -2566,31 +2211,17 @@ let commands_rw () =
              dry_run,
              verbose_signing,
              simulation,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
+             fee_parameter,
              storage_limit,
-             counter,
-             force_low_fee,
-             fee_cap,
-             burn_cap )
+             counter )
            tx_rollup
-           (_, source)
+           source
            cctxt ->
-        match Contract.is_implicit source with
-        | None -> failwith "Only implicit accounts can remove commitments."
-        | Some source ->
+        match source with
+        | Originated _ ->
+            failwith "Only implicit accounts can remove commitments."
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            let fee_parameter =
-              {
-                Injection.minimal_fees;
-                minimal_nanotez_per_byte;
-                minimal_nanotez_per_gas_unit;
-                force_low_fee;
-                fee_cap;
-                burn_cap;
-              }
-            in
             submit_tx_rollup_remove_commitment
               cctxt
               ~chain:cctxt#chain
@@ -2611,23 +2242,18 @@ let commands_rw () =
             >>=? fun _res -> return_unit);
     command
       ~group
-      ~desc:"Reject a commitment of an transaction rollup."
-      (args12
+      ~desc:"Reject a commitment of a transaction rollup."
+      (args7
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
+         fee_parameter_args
          storage_limit_arg
-         counter_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg)
+         counter_arg)
       (prefixes ["reject"; "commitment"; "of"; "tx"; "rollup"]
       @@ Tx_rollup.tx_rollup_address_param
-           ~usage:"Tx rollup that have one of his commitment rejected."
+           ~usage:"Tx rollup that have one of its commitment rejected."
       @@ prefixes ["at"; "level"]
       @@ Tx_rollup.level_param ~usage:"Level of the commitment disputed."
       @@ prefixes ["with"; "result"; "hash"]
@@ -2642,7 +2268,7 @@ let commands_rw () =
            ~desc:
              "Position of the message in the inbox with the result being \
               disputed."
-           non_negative_param
+           non_negative_parameter
       @@ prefixes ["with"; "content"]
       @@ Tx_rollup.message_param
            ~usage:"Message content with the result being disputed."
@@ -2681,44 +2307,29 @@ let commands_rw () =
              dry_run,
              verbose_signing,
              simulation,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
+             fee_parameter,
              storage_limit,
-             counter,
-             force_low_fee,
-             fee_cap,
-             burn_cap )
+             counter )
            tx_rollup
            level
            rejected_message_result_hash
            rejected_message_result_path
-           confliting_message_position
-           confliting_message
-           confliting_message_path
+           conflicting_message_position
+           conflicting_message
+           conflicting_message_path
            previous_context_hash
            previous_withdraw_list_hash
            previous_message_result_path
            proof
-           (_, source)
+           source
            cctxt ->
-        match Contract.is_implicit source with
-        | None ->
+        match source with
+        | Originated _ ->
             failwith
               "Only implicit accounts can reject transaction rollup \
                commitments."
-        | Some source ->
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            let fee_parameter =
-              {
-                Injection.minimal_fees;
-                minimal_nanotez_per_byte;
-                minimal_nanotez_per_gas_unit;
-                force_low_fee;
-                fee_cap;
-                burn_cap;
-              }
-            in
             submit_tx_rollup_rejection
               cctxt
               ~chain:cctxt#chain
@@ -2736,9 +2347,9 @@ let commands_rw () =
               ~fee_parameter
               ~tx_rollup
               ~level
-              ~message:confliting_message
-              ~message_position:confliting_message_position
-              ~message_path:confliting_message_path
+              ~message:conflicting_message
+              ~message_position:conflicting_message_position
+              ~message_path:conflicting_message_path
               ~message_result_hash:rejected_message_result_hash
               ~message_result_path:rejected_message_result_path
               ~proof
@@ -2757,19 +2368,14 @@ let commands_rw () =
          See transaction rollups documentation for more information.\n\n\
          The provided list of ticket information must be ordered as in \
          withdrawal list computed by the application of the message."
-      (args12
+      (args7
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
+         fee_parameter_args
          storage_limit_arg
-         counter_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg)
+         counter_arg)
       (prefixes ["dispatch"; "tickets"; "of"; "tx"; "rollup"]
       @@ Tx_rollup.tx_rollup_address_param
            ~usage:"Tx rollup which have some tickets dispatched."
@@ -2786,7 +2392,7 @@ let commands_rw () =
       @@ Clic.param
            ~name:"message index"
            ~desc:"Index of the message whose withdrawals will be dispatched."
-           non_negative_param
+           non_negative_parameter
       @@ prefixes ["with"; "the"; "context"; "hash"]
       @@ Tx_rollup.context_hash_param
            ~usage:
@@ -2804,39 +2410,24 @@ let commands_rw () =
              dry_run,
              verbose_signing,
              simulation,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
+             fee_parameter,
              storage_limit,
-             counter,
-             force_low_fee,
-             fee_cap,
-             burn_cap )
+             counter )
            tx_rollup
-           (_, source)
+           source
            level
            message_position
            context_hash
            message_result_path
            tickets_info
            cctxt ->
-        match Contract.is_implicit source with
-        | None ->
+        match source with
+        | Originated _ ->
             failwith
               "Only implicit account can dispatch tickets for a transaction \
                rollup."
-        | Some source ->
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            let fee_parameter =
-              {
-                Injection.minimal_fees;
-                minimal_nanotez_per_byte;
-                minimal_nanotez_per_gas_unit;
-                force_low_fee;
-                fee_cap;
-                burn_cap;
-              }
-            in
             tx_rollup_dispatch_tickets
               cctxt
               ~chain:cctxt#chain
@@ -2863,19 +2454,14 @@ let commands_rw () =
     command
       ~group
       ~desc:"Transfer tickets from an implicit account to a contract."
-      (args12
+      (args7
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
+         fee_parameter_args
          storage_limit_arg
-         counter_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg)
+         counter_arg)
       (prefix "transfer"
       @@ non_negative_z_param ~name:"qty" ~desc:"Amount of tickets to transfer."
       @@ prefixes ["tickets"; "from"]
@@ -2910,36 +2496,22 @@ let commands_rw () =
              dry_run,
              verbose_signing,
              simulation,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
+             fee_parameter,
              storage_limit,
-             counter,
-             force_low_fee,
-             fee_cap,
-             burn_cap )
+             counter )
            amount
-           (_, source)
-           (_, destination)
+           source
+           destination
            entrypoint
            contents
            ty
-           (_, ticketer)
+           ticketer
            cctxt ->
-        match Contract.is_implicit source with
-        | None -> failwith "Only implicit accounts can transfer tickets."
-        | Some source ->
+        match source with
+        | Originated _ ->
+            failwith "Only implicit accounts can transfer tickets."
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            let fee_parameter =
-              {
-                Injection.minimal_fees;
-                minimal_nanotez_per_byte;
-                minimal_nanotez_per_gas_unit;
-                force_low_fee;
-                fee_cap;
-                burn_cap;
-              }
-            in
             transfer_ticket
               cctxt
               ~chain:cctxt#chain
@@ -2966,67 +2538,57 @@ let commands_rw () =
     command
       ~group
       ~desc:"Originate a new smart-contract rollup."
-      (args12
+      (args7
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
+         fee_parameter_args
          storage_limit_arg
-         counter_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg)
+         counter_arg)
       (prefixes ["originate"; "sc"; "rollup"; "from"]
       @@ ContractAlias.destination_param
            ~name:"src"
-           ~desc:"name of the account originating the smart-contract rollup"
+           ~desc:"Name of the account originating the smart-contract rollup."
       @@ prefixes ["of"; "kind"]
       @@ param
            ~name:"sc_rollup_kind"
-           ~desc:"kind of the smart-contract rollup to be originated"
-           rollup_kind_param
+           ~desc:"Kind of the smart-contract rollup to be originated."
+           Sc_rollup_params.rollup_kind_parameter
+      @@ prefixes ["of"; "type"]
+      @@ param
+           ~name:"parameters_type"
+           ~desc:
+             "The interface of the smart-contract rollup including its \
+              entrypoints and their signatures."
+           data_parameter
       @@ prefixes ["booting"; "with"]
       @@ param
            ~name:"boot_sector"
-           ~desc:"the initialization state for the smart-contract rollup"
-           boot_sector_param
+           ~desc:"The initialization state for the smart-contract rollup."
+           Sc_rollup_params.boot_sector_parameter
       @@ stop)
       (fun ( fee,
              dry_run,
              verbose_signing,
              simulation,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
+             fee_parameter,
              storage_limit,
-             counter,
-             force_low_fee,
-             fee_cap,
-             burn_cap )
-           (_, source)
+             counter )
+           source
            pvm
+           parameters_ty
            boot_sector
            cctxt ->
-        match Contract.is_implicit source with
-        | None ->
+        match source with
+        | Originated _ ->
             failwith
               "Only implicit accounts can originate smart-contract rollups"
-        | Some source ->
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            let fee_parameter =
-              {
-                Injection.minimal_fees;
-                minimal_nanotez_per_byte;
-                minimal_nanotez_per_gas_unit;
-                force_low_fee;
-                fee_cap;
-                burn_cap;
-              }
-            in
-            let (module R : Sc_rollups.PVM.S) = pvm in
+            let (module R : Alpha_context.Sc_rollup.PVM.S) = pvm in
+            let Michelson_v1_parser.{expanded; _} = parameters_ty in
+            let parameters_ty = Script.lazy_expr expanded in
             boot_sector pvm >>=? fun boot_sector ->
             sc_rollup_originate
               cctxt
@@ -3043,63 +2605,55 @@ let commands_rw () =
               ~src_pk
               ~src_sk
               ~fee_parameter
-              ~kind:(Sc_rollups.kind_of pvm)
+              ~kind:(Sc_rollup.Kind.of_pvm pvm)
               ~boot_sector
+              ~parameters_ty
               ()
             >>=? fun _res -> return_unit);
     command
       ~group
       ~desc:"Send one or more messages to a smart-contract rollup."
-      (args12
+      (args7
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
-         minimal_fees_arg
-         minimal_nanotez_per_byte_arg
-         minimal_nanotez_per_gas_unit_arg
+         fee_parameter_args
          storage_limit_arg
-         counter_arg
-         force_low_fee_arg
-         fee_cap_arg
-         burn_cap_arg)
+         counter_arg)
       (prefixes ["send"; "sc"; "rollup"; "message"]
       @@ param
            ~name:"messages"
            ~desc:
-             "the message(s) to be sent to the rollup (syntax: \
+             "The message(s) to be sent to the rollup (syntax: \
               bin:<path_to_binary_file>|text:<json list of string \
-              messages>|file:<json_file>)"
-           messages_param
+              messages>|file:<json_file>)."
+           Sc_rollup_params.messages_parameter
       @@ prefixes ["from"]
       @@ ContractAlias.destination_param
            ~name:"src"
-           ~desc:"name of the source contract"
+           ~desc:"Name of the source contract."
       @@ prefixes ["to"]
       @@ param
            ~name:"dst"
-           ~desc:"address of the destination rollup"
-           rollup_address_param
+           ~desc:"Address of the destination smart-contract rollup."
+           Sc_rollup_params.sc_rollup_address_parameter
       @@ stop)
       (fun ( fee,
              dry_run,
              verbose_signing,
              simulation,
-             minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
+             fee_parameter,
              storage_limit,
-             counter,
-             force_low_fee,
-             fee_cap,
-             burn_cap )
+             counter )
            messages
-           (_, source)
+           source
            rollup
            cctxt ->
-        (match Contract.is_implicit source with
-        | None -> failwith "Only implicit accounts can send messages to rollups"
-        | Some source -> return source)
+        (match source with
+        | Originated _ ->
+            failwith "Only implicit accounts can send messages to rollups"
+        | Implicit source -> return source)
         >>=? fun source ->
         (match messages with
         | `Bin message -> return [message]
@@ -3111,16 +2665,6 @@ let commands_rw () =
             | messages -> return messages))
         >>=? fun messages ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-        let fee_parameter =
-          {
-            Injection.minimal_fees;
-            minimal_nanotez_per_byte;
-            minimal_nanotez_per_gas_unit;
-            force_low_fee;
-            fee_cap;
-            burn_cap;
-          }
-        in
         sc_rollup_add_messages
           cctxt
           ~chain:cctxt#chain
@@ -3142,6 +2686,156 @@ let commands_rw () =
         >>=? fun _res -> return_unit);
     command
       ~group
+      ~desc:"Publish a commitment for a sc rollup"
+      (args7
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         storage_limit_arg
+         counter_arg
+         fee_parameter_args)
+      (prefixes ["publish"; "commitment"]
+      @@ prefixes ["from"]
+      @@ ContractAlias.destination_param
+           ~name:"src"
+           ~desc:"Name of the source contract."
+      @@ prefixes ["for"; "sc"; "rollup"]
+      @@ param
+           ~name:"sc_rollup"
+           ~desc:
+             "The address of the sc rollup where the commitment will be \
+              published."
+           Sc_rollup_params.sc_rollup_address_parameter
+      @@ prefixes ["with"; "compressed"; "state"]
+      @@ param
+           ~name:"compressed_state"
+           ~desc:"The compressed state of the sc rollup for the commitment."
+           Sc_rollup_params.compressed_state_parameter
+      @@ prefixes ["at"; "inbox"; "level"]
+      @@ param
+           ~name:"inbox_level"
+           ~desc:"The inbox level for the commitment."
+           raw_level_parameter
+      @@ prefixes ["and"; "predecessor"]
+      @@ param
+           ~name:"predecessor"
+           ~desc:"The hash of the commitment's predecessor"
+           Sc_rollup_params.commitment_hash_parameter
+      @@ prefixes ["and"; "number"; "of"; "ticks"]
+      @@ param
+           ~name:"number_of_ticks"
+           ~desc:"The number of ticks for the commitment."
+           Sc_rollup_params.number_of_ticks_parameter
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             storage_limit,
+             counter,
+             fee_parameter )
+           source
+           rollup
+           compressed_state
+           inbox_level
+           predecessor
+           number_of_ticks
+           cctxt ->
+        (match source with
+        | Originated _ ->
+            failwith "Only implicit accounts can publish commitments"
+        | Implicit source -> return source)
+        >>=? fun source ->
+        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        let commitment : Alpha_context.Sc_rollup.Commitment.t =
+          {compressed_state; inbox_level; predecessor; number_of_ticks}
+        in
+        sc_rollup_publish
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~dry_run
+          ~verbose_signing
+          ?fee
+          ?storage_limit
+          ?counter
+          ?confirmations:cctxt#confirmations
+          ~simulation
+          ~source
+          ~rollup
+          ~commitment
+          ~src_pk
+          ~src_sk
+          ~fee_parameter
+          ()
+        >>=? fun _res -> return_unit);
+    command
+      ~group
+      ~desc:"Cement a commitment for a sc rollup."
+      (args7
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         storage_limit_arg
+         counter_arg
+         fee_parameter_args)
+      (prefixes ["cement"; "commitment"]
+      @@ param
+           ~name:"commitment"
+           ~desc:"The hash of the commitment to be cemented for a sc rollup."
+           Sc_rollup_params.commitment_hash_parameter
+      @@ prefixes ["from"]
+      @@ ContractAlias.destination_param
+           ~name:"src"
+           ~desc:"Name of the source contract."
+      @@ prefixes ["for"; "sc"; "rollup"]
+      @@ param
+           ~name:"sc_rollup"
+           ~desc:
+             "The address of the sc rollup where the commitment will be \
+              cemented."
+           Sc_rollup_params.sc_rollup_address_parameter
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             storage_limit,
+             counter,
+             fee_parameter )
+           commitment
+           source
+           rollup
+           cctxt ->
+        (match source with
+        | Originated _ ->
+            failwith "Only implicit accounts can cement commitments"
+        | Implicit source -> return source)
+        >>=? fun source ->
+        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        sc_rollup_cement
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~dry_run
+          ~verbose_signing
+          ?fee
+          ?storage_limit
+          ?counter
+          ?confirmations:cctxt#confirmations
+          ~simulation
+          ~source
+          ~rollup
+          ~commitment
+          ~src_pk
+          ~src_sk
+          ~fee_parameter
+          ()
+        >>=? fun _res -> return_unit);
+    command
+      ~group
       ~desc:"List originated smart-contract rollups."
       no_options
       (prefixes ["list"; "sc"; "rollups"] @@ stop)
@@ -3152,6 +2846,136 @@ let commands_rw () =
           (fun addr -> cctxt#message "%s" (Sc_rollup.Address.to_b58check addr))
           rollups
         >>= fun () -> return_unit);
+    command
+      ~group
+      ~desc:
+        "Execute a message from a smart-contract rollup's outbox of a cemented \
+         commitment."
+      (args7
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         fee_parameter_args
+         storage_limit_arg
+         counter_arg)
+      (prefixes ["execute"; "outbox"; "message"; "of"; "sc"; "rollup"]
+      @@ param
+           ~name:"rollup"
+           ~desc:
+             "The address of the smart-contract rollup where the message \
+              resides."
+           Sc_rollup_params.sc_rollup_address_parameter
+      @@ prefix "from"
+      @@ ContractAlias.destination_param
+           ~name:"source"
+           ~desc:"The account used for executing the outbox message."
+      @@ prefixes ["for"; "commitment"; "hash"]
+      @@ param
+           ~name:"cemented commitment"
+           ~desc:"The hash of the cemented commitment of the rollup."
+           Sc_rollup_params.commitment_hash_parameter
+      @@ prefixes ["and"; "output"; "proof"]
+      @@ param
+           ~name:"output proof"
+           ~desc:
+             "The output proof containing the outbox level, index and message."
+           Sc_rollup_params.unchecked_payload_parameter
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             fee_parameter,
+             storage_limit,
+             counter )
+           rollup
+           source
+           cemented_commitment
+           output_proof
+           cctxt ->
+        (match source with
+        | Originated _ ->
+            failwith
+              "Only implicit accounts can execute an sc rollup batch of \
+               transactions"
+        | Implicit source -> return source)
+        >>=? fun source ->
+        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        sc_rollup_execute_outbox_message
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~dry_run
+          ~verbose_signing
+          ?fee
+          ?storage_limit
+          ?counter
+          ?confirmations:cctxt#confirmations
+          ~simulation
+          ~source
+          ~rollup
+          ~cemented_commitment
+          ~output_proof
+          ~src_pk
+          ~src_sk
+          ~fee_parameter
+          ()
+        >>=? fun _res -> return_unit);
+    command
+      ~group
+      ~desc:"Recover commitment bond from a smart contract rollup."
+      (args7
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         fee_parameter_args
+         storage_limit_arg
+         counter_arg)
+      (prefixes ["recover"; "bond"; "of"]
+      @@ ContractAlias.destination_param
+           ~name:"src"
+           ~desc:"The implicit account that owns the frozen bond."
+      @@ prefixes ["for"; "sc"; "rollup"]
+      @@ Clic.param
+           ~name:"smart contract rollup address"
+           ~desc:"The address of the smart-contract rollup of the bond."
+           Sc_rollup_params.sc_rollup_address_parameter
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             fee_parameter,
+             storage_limit,
+             counter )
+           source
+           sc_rollup
+           cctxt ->
+        match source with
+        | Originated _ ->
+            failwith "Only implicit accounts can deposit/recover bonds"
+        | Implicit source ->
+            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            sc_rollup_recover_bond
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ~dry_run
+              ~verbose_signing
+              ?fee
+              ?storage_limit
+              ?counter
+              ?confirmations:cctxt#confirmations
+              ~simulation
+              ~source
+              ~src_pk
+              ~src_sk
+              ~fee_parameter
+              ~sc_rollup
+              ()
+            >>=? fun _res -> return_unit);
   ]
 
 let commands network () =

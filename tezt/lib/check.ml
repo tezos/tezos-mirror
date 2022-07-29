@@ -93,17 +93,17 @@ let pp_list ?(left = "[") ?(right = "]") pp_item fmt list =
 (* Note: available as List.equal in OCaml 4.12. *)
 let rec equal_lists eq_items a b =
   match (a, b) with
-  | ([], []) -> true
-  | ([], _ :: _) | (_ :: _, []) -> false
-  | (hda :: tla, hdb :: tlb) -> eq_items hda hdb && equal_lists eq_items tla tlb
+  | [], [] -> true
+  | [], _ :: _ | _ :: _, [] -> false
+  | hda :: tla, hdb :: tlb -> eq_items hda hdb && equal_lists eq_items tla tlb
 
 (* Note: available as List.compare in OCaml 4.12. *)
 let rec compare_lists cmp_items a b =
   match (a, b) with
-  | ([], []) -> 0
-  | ([], _ :: _) -> -1
-  | (_ :: _, []) -> 1
-  | (hda :: tla, hdb :: tlb) ->
+  | [], [] -> 0
+  | [], _ :: _ -> -1
+  | _ :: _, [] -> 1
+  | hda :: tla, hdb :: tlb ->
       let c = cmp_items hda hdb in
       if c = 0 then compare_lists cmp_items tla tlb else c
 
@@ -134,16 +134,16 @@ let compare_arrays cmp_items a b =
   let rec loop i =
     (* All items up to [i - 1] are equal. *)
     match (i >= len_a, i >= len_b) with
-    | (true, true) ->
+    | true, true ->
         (* Both arrays have the same size. *)
         0
-    | (true, false) ->
+    | true, false ->
         (* [a] is smaller than [b]. *)
         -1
-    | (false, true) ->
+    | false, true ->
         (* [a] is longer than [b]. *)
         1
-    | (false, false) ->
+    | false, false ->
         let c = cmp_items a.(i) b.(i) in
         if c = 0 then loop (i + 1) else c
   in

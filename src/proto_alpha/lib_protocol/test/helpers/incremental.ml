@@ -25,7 +25,6 @@
 
 open Protocol
 module Proto_Nonce = Nonce (* Renamed otherwise is masked by Alpha_context *)
-
 open Alpha_context
 
 type t = {
@@ -126,12 +125,14 @@ let detect_script_failure :
   let rec detect_script_failure :
       type kind. kind Apply_results.contents_result_list -> _ =
     let open Apply_results in
+    let open Apply_operation_result in
+    let open Apply_internal_results in
     let detect_script_failure_single (type kind)
         (Manager_operation_result
            {operation_result; internal_operation_results; _} :
           kind Kind.manager Apply_results.contents_result) =
       let detect_script_failure (type kind)
-          (result : kind manager_operation_result) =
+          (result : (kind, _, _) operation_result) =
         match result with
         | Applied _ -> Ok ()
         | Skipped _ -> assert false
@@ -143,8 +144,7 @@ let detect_script_failure :
       in
       detect_script_failure operation_result >>? fun () ->
       List.iter_e
-        (fun (Internal_manager_operation_result (_, r)) ->
-          detect_script_failure r)
+        (fun (Internal_operation_result (_, r)) -> detect_script_failure r)
         internal_operation_results
     in
     function
@@ -157,22 +157,46 @@ let detect_script_failure :
   in
   fun {contents} -> detect_script_failure contents
 
-let add_operation ?expect_apply_failure ?expect_failure ?(check_size = false) st
-    op =
-  let open Apply_results in
+let apply_operation ?(check_size = true) st op =
   (if check_size then
    let operation_size = Data_encoding.Binary.length Operation.encoding op in
-   assert (operation_size < Constants_repr.max_operation_data_length)) ;
-  apply_operation st.state op >|= Environment.wrap_tzresult >>= fun result ->
-  match (expect_apply_failure, result) with
-  | (Some _, Ok _) -> failwith "Error expected while adding operation"
-  | (Some f, Error err) -> f err >|=? fun () -> st
-  | (None, result) -> (
+   if operation_size > Constants_repr.max_operation_data_length then
+     raise
+       (invalid_arg
+          (Format.sprintf
+             "The operation size is %d, it exceeds the constant maximum size %d"
+             operation_size
+             Constants_repr.max_operation_data_length))) ;
+  apply_operation st.state op >|= Environment.wrap_tzresult
+
+let validate_operation ?expect_failure ?check_size st op =
+  apply_operation ?check_size st op >>= fun result ->
+  match (expect_failure, result) with
+  | Some _, Ok _ -> failwith "Error expected while validating operation"
+  | Some f, Error err -> f err >|=? fun () -> st
+  | None, Error err -> failwith "Error %a was not expected" pp_print_trace err
+  | None, Ok (state, (Operation_metadata _ as metadata))
+  | None, Ok (state, (No_operation_metadata as metadata)) ->
+      return
+        {
+          st with
+          state;
+          rev_operations = op :: st.rev_operations;
+          rev_tickets = metadata :: st.rev_tickets;
+        }
+
+let add_operation ?expect_failure ?expect_apply_failure ?check_size st op =
+  let open Apply_results in
+  apply_operation ?check_size st op >>= fun result ->
+  match (expect_failure, result) with
+  | Some _, Ok _ -> failwith "Error expected while adding operation"
+  | Some f, Error err -> f err >|=? fun () -> st
+  | None, result -> (
       result >>?= fun result ->
       match result with
-      | (state, (Operation_metadata result as metadata)) ->
+      | state, (Operation_metadata result as metadata) ->
           detect_script_failure result |> fun result ->
-          (match expect_failure with
+          (match expect_apply_failure with
           | None -> Lwt.return result
           | Some f -> (
               match result with
@@ -185,7 +209,7 @@ let add_operation ?expect_apply_failure ?expect_failure ?(check_size = false) st
             rev_operations = op :: st.rev_operations;
             rev_tickets = metadata :: st.rev_tickets;
           }
-      | (state, (No_operation_metadata as metadata)) ->
+      | state, (No_operation_metadata as metadata) ->
           return
             {
               st with

@@ -20,8 +20,9 @@
   alcotest-lwt
   qcheck-alcotest
   tezos-test-helpers)
- (flags (:standard
-         -open Tezos_lwt_result_stdlib)))
+ (flags
+  (:standard)
+  -open Tezos_lwt_result_stdlib))
 
 (rule
  (alias runtest)

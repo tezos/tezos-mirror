@@ -39,15 +39,23 @@ type simulation_params = {
   now : Script_timestamp.t option;
   level : Script_int.n Script_int.num option;
   source : Contract.t option;
-  payer : Contract.t option;
+  payer : Signature.public_key_hash option;
   gas : Gas.Arith.integral option;
 }
 
-(* Parameters specific to simulations of views *)
+(* Parameters specific to simulations of TZIP4 views *)
 type run_view_params = {
   shared_params : simulation_params;
-  contract : Contract.t;
+  contract : Contract_hash.t;
   entrypoint : Entrypoint.t;
+}
+
+(* Parameters specific to simulations of Michelson views *)
+type run_script_view_params = {
+  shared_params : simulation_params;
+  contract : Contract_hash.t;
+  view : string;
+  unlimited_gas : bool;
 }
 
 (* Parameters specific to simulations of contract calls *)
@@ -58,9 +66,10 @@ type run_params = {
   program : Michelson_v1_parser.parsed;
   storage : Michelson_v1_parser.parsed;
   entrypoint : Entrypoint.t option;
-  self : Contract.t option;
+  self : Contract_hash.t option;
 }
 
+(** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Scripts.run_tzip4_view} *)
 val run_view :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
@@ -68,24 +77,37 @@ val run_view :
   run_view_params ->
   Script.expr tzresult Lwt.t
 
+(** [run_script_view cctxt ~chain ~block params]
+    executes {!Tezos_protocol_plugin_alpha.Plugin.RPC.Scripts.run_script_view},
+    the RPC to run a Michelson view offchain and returns its value.
+ *)
+val run_script_view :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  run_script_view_params ->
+  Script.expr tzresult Lwt.t
+
+(** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Scripts.run_code} *)
 val run :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   run_params ->
   (Script.expr
-  * Apply_results.packed_internal_contents list
+  * Apply_internal_results.packed_internal_operation list
   * Lazy_storage.diffs option)
   tzresult
   Lwt.t
 
+(** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Scripts.trace_code} *)
 val trace :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   run_params ->
   (Script.expr
-  * Apply_results.packed_internal_contents list
+  * Apply_internal_results.packed_internal_operation list
   * Script_typed_ir.execution_trace
   * Lazy_storage.diffs option)
   tzresult
@@ -101,7 +123,7 @@ val print_run_result :
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
   (Script_repr.expr
-  * Apply_results.packed_internal_contents list
+  * Apply_internal_results.packed_internal_operation list
   * Lazy_storage.diffs option)
   tzresult ->
   unit tzresult Lwt.t
@@ -111,12 +133,13 @@ val print_trace_result :
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
   (Script_repr.expr
-  * Apply_results.packed_internal_contents list
+  * Apply_internal_results.packed_internal_operation list
   * Script_typed_ir.execution_trace
   * Lazy_storage.diffs option)
   tzresult ->
   unit tzresult Lwt.t
 
+(** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Scripts.typecheck_data} *)
 val typecheck_data :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
@@ -128,6 +151,7 @@ val typecheck_data :
   unit ->
   Gas.t tzresult Lwt.t
 
+(** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Scripts.typecheck_code} *)
 val typecheck_program :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
@@ -147,6 +171,7 @@ val print_typecheck_result :
   #Client_context.printer ->
   unit tzresult Lwt.t
 
+(** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Scripts.script_size} *)
 val script_size :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
@@ -176,6 +201,7 @@ val print_entrypoint_type :
   Script_repr.expr option tzresult ->
   unit tzresult Lwt.t
 
+(** Calls {!Michelson_v1_entrypoints.list_entrypoints} *)
 val list_entrypoints :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
@@ -199,6 +225,7 @@ val list_unreachables :
   Michelson_v1_parser.parsed ->
   Michelson_v1_primitives.prim list list tzresult Lwt.t
 
+(** Calls {!Michelson_v1_entrypoints.print_unreachables} *)
 val print_unreachables :
   #Protocol_client_context.full ->
   emacs:bool ->

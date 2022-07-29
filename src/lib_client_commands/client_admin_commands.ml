@@ -95,7 +95,7 @@ let commands () =
       no_options
       (fixed ["show"; "current"; "checkpoint"])
       (fun () (cctxt : #Client_context.full) ->
-        let* (checkpoint_hash, checkpoint_level) =
+        let* checkpoint_hash, checkpoint_level =
           Shell_services.Chain.Levels.checkpoint cctxt ~chain:cctxt#chain ()
         in
         let*! () =

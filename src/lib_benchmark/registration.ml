@@ -72,8 +72,8 @@ let all_benchmarks_with_all_of (tags : string list) : Benchmark.t list =
 
 let rec list_equal l1 l2 =
   match (l1, l2) with
-  | ([], []) -> true
-  | (x :: t, y :: u) -> String.equal x y && list_equal t u
+  | [], [] -> true
+  | x :: t, y :: u -> String.equal x y && list_equal t u
   | _ -> false
 
 let all_benchmarks_with_exactly (tags : string list) : Benchmark.t list =

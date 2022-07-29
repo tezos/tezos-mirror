@@ -37,14 +37,14 @@ open Alpha_context
 
 let context_with_constants constants =
   let open Lwt_result_syntax in
-  let* (block, _contracts) = Context.init_with_constants constants 1 in
+  let* block, _contracts = Context.init_with_constants constants 1 in
   let+ incremental = Incremental.begin_construction block in
   Incremental.alpha_ctxt incremental
 
 let test_min_block_time () =
   let open Lwt_result_syntax in
   let* context = context_with_constants Default_parameters.constants_mainnet in
-  let* (result, _) =
+  let* result, _ =
     Contract_helpers.run_script
       context
       ~storage:"0"

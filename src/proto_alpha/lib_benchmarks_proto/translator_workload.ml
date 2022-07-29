@@ -88,7 +88,7 @@ let pp fmtr (trace : t) =
         consumed
 
 let workload_to_sparse_vec (trace : t) =
-  let (name, {Size.traversal; int_bytes; string_bytes}, consumed) =
+  let name, {Size.traversal; int_bytes; string_bytes}, consumed =
     match trace with
     | Typechecker_workload {t_kind; code_or_data; micheline_size; consumed} ->
         let name =

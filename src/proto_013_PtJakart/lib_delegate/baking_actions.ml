@@ -228,7 +228,7 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
   >>?= fun timestamp ->
   let external_operation_source = state.global_state.config.extra_operations in
   Operations_source.retrieve external_operation_source >>= fun extern_ops ->
-  let (simulation_kind, payload_round) =
+  let simulation_kind, payload_round =
     match kind with
     | Fresh pool ->
         let pool =
@@ -269,13 +269,29 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
   in
   (* Set liquidity_baking_toggle_vote for this block *)
   let default = state.global_state.config.liquidity_baking_toggle_vote in
-  (match state.global_state.config.per_block_vote_file with
+  let per_block_vote_file = state.global_state.config.per_block_vote_file in
+  (match per_block_vote_file with
   | None -> Lwt.return default
   | Some per_block_vote_file ->
       Liquidity_baking_vote_file.read_liquidity_baking_toggle_vote_no_fail
         ~default
         ~per_block_vote_file)
   >>= fun liquidity_baking_toggle_vote ->
+  (* Cache last toggle vote to use in case of vote file errors *)
+  let updated_state =
+    {
+      updated_state with
+      global_state =
+        {
+          updated_state.global_state with
+          config =
+            {
+              updated_state.global_state.config with
+              liquidity_baking_toggle_vote;
+            };
+        };
+    }
+  in
   Events.(emit vote_for_liquidity_baking_toggle) liquidity_baking_toggle_vote
   >>= fun () ->
   Block_forge.forge
@@ -517,7 +533,7 @@ let prepare_waiting_for_quorum state =
   (consensus_threshold, get_consensus_operation_voting_power, candidate)
 
 let start_waiting_for_preendorsement_quorum state =
-  let (consensus_threshold, get_preendorsement_voting_power, candidate) =
+  let consensus_threshold, get_preendorsement_voting_power, candidate =
     prepare_waiting_for_quorum state
   in
   let operation_worker = state.global_state.operation_worker in
@@ -528,7 +544,7 @@ let start_waiting_for_preendorsement_quorum state =
     candidate
 
 let start_waiting_for_endorsement_quorum state =
-  let (consensus_threshold, get_endorsement_voting_power, candidate) =
+  let consensus_threshold, get_endorsement_voting_power, candidate =
     prepare_waiting_for_quorum state
   in
   let operation_worker = state.global_state.operation_worker in

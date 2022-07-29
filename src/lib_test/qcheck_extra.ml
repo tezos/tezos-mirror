@@ -145,7 +145,7 @@ module Stateful_gen = struct
     let return x _ = F.return x
 
     let bind m f g =
-      let (g1, g2) = Random_pure.split g in
+      let g1, g2 = Random_pure.split g in
       F.bind (m g1) (fun a -> f a g2)
 
     let ( let* ) = bind
@@ -155,7 +155,7 @@ module Stateful_gen = struct
       return (f a)
 
     let map2 f x y g =
-      let (g1, g2) = Random_pure.split g in
+      let g1, g2 = Random_pure.split g in
       F.map2 f (x g1) (y g2)
 
     let join x =

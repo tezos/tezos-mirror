@@ -261,9 +261,9 @@ module Generators = struct
       | [] -> ([], None)
       | hd :: tl -> (
           match replace_with_constant hd loc with
-          | (node, Some x) -> (node :: tl, Some x)
-          | (_, None) ->
-              let (l, x) = loop tl in
+          | node, Some x -> (node :: tl, Some x)
+          | _, None ->
+              let l, x = loop tl in
               (hd :: l, x))
     in
     match node with
@@ -283,7 +283,7 @@ module Generators = struct
           in
           (Prim (-1, H_constant, [String (-1, hash)], []), Some node)
         else
-          let (result, x) = loop args in
+          let result, x = loop args in
           (Prim (l, prim, result, annot), x)
     | Seq (l, args) as node ->
         if l = loc then
@@ -293,7 +293,7 @@ module Generators = struct
           in
           (Prim (-1, H_constant, [String (-1, hash)], []), Some node)
         else
-          let (result, x) = loop args in
+          let result, x = loop args in
           (Seq (l, result), x)
 
   let micheline_gen p_gen annot_gen =
@@ -318,8 +318,8 @@ module Generators = struct
     let size = Script_repr.micheline_nodes (root expr) in
     0 -- (size - 1) >|= fun loc ->
     match replace_with_constant (root expr) loc with
-    | (_, None) -> assert false
-    | (node, Some replaced_node) ->
+    | _, None -> assert false
+    | node, Some replaced_node ->
         (expr, strip_locations node, strip_locations replaced_node)
 
   let canonical_with_constant_arbitrary () =

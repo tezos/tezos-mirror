@@ -112,7 +112,7 @@ let wait_for_ready accuser =
   match accuser.status with
   | Running {session_state = {ready = true; _}; _} -> unit
   | Not_running | Running {session_state = {ready = false; _}; _} ->
-      let (promise, resolver) = Lwt.task () in
+      let promise, resolver = Lwt.task () in
       accuser.persistent_state.pending_ready <-
         resolver :: accuser.persistent_state.pending_ready ;
       check_event accuser "Accuser started." promise

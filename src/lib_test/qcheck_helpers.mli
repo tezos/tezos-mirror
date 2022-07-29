@@ -72,6 +72,15 @@ val qcheck_eq' :
   unit ->
   bool
 
+(** Similar to {!qcheck_eq} but tests that two values are {e not} equal. *)
+val qcheck_neq :
+  ?pp:(Format.formatter -> 'a -> unit) ->
+  ?cmp:('a -> 'a -> int) ->
+  ?eq:('a -> 'a -> bool) ->
+  'a ->
+  'a ->
+  bool
+
 (** [int64_range_gen a b] generates an [int64] between [a] inclusive
     and [b] inclusive.
 

@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -27,6 +27,8 @@
 open Protocol
 open Alpha_context
 open Apply_results
+open Apply_operation_result
+open Apply_internal_results
 open Protocol_client_context
 
 let get_branch (rpc_config : #Protocol_client_context.full) ~chain
@@ -86,16 +88,6 @@ type fee_parameter = {
   burn_cap : Tez.t;
 }
 
-let dummy_fee_parameter =
-  {
-    minimal_fees = Tez.zero;
-    minimal_nanotez_per_byte = Q.zero;
-    minimal_nanotez_per_gas_unit = Q.zero;
-    force_low_fee = false;
-    fee_cap = Tez.one;
-    burn_cap = Tez.zero;
-  }
-
 (* Rounding up (see Z.cdiv) *)
 let z_mutez_of_q_nanotez (ntz : Q.t) =
   let q_mutez = Q.div ntz (Q.of_int 1000) in
@@ -117,10 +109,10 @@ let check_fees :
           "The proposed fee (%s%a) are higher than the configured fee cap \
            (%s%a).@\n\
           \ Use `--fee-cap %a` to emit this operation anyway."
-          Client_proto_args.tez_sym
+          Operation_result.tez_sym
           Tez.pp
           fee
-          Client_proto_args.tez_sym
+          Operation_result.tez_sym
           Tez.pp
           config.fee_cap
           Tez.pp
@@ -164,10 +156,10 @@ let check_fees :
             "The proposed fee (%s%a) are lower than the fee that baker expect \
              by default (%s%a).@\n\
             \ Use `--force-low-fee` to emit this operation anyway."
-            Client_proto_args.tez_sym
+            Operation_result.tez_sym
             Tez.pp
             fee
-            Client_proto_args.tez_sym
+            Operation_result.tez_sym
             Tez.pp
             estimated_fees
           >>= fun () -> exit 1
@@ -243,7 +235,7 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
   | Some src_sk ->
       let watermark =
         match contents with
-        (* TODO-TB sign endosrement? *)
+        (* TODO-TB sign endorsement? *)
         | _ -> Signature.Generic_operation
       in
       (if verbose_signing then
@@ -275,14 +267,14 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
         ( Operation.equal op {shell = {branch}; protocol_data = op'},
           Apply_results.kind_equal_list contents result.contents )
       with
-      | (Some Operation.Eq, Some Apply_results.Eq) ->
+      | Some Operation.Eq, Some Apply_results.Eq ->
           return ((oph, op, result) : t preapply_result)
       | _ -> failwith "Unexpected result")
   | _ -> failwith "Unexpected result"
 
 let simulate (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
     ?(successor_level = false) ?branch
-    ?(latency = Plugin.default_operation_inclusion_latency)
+    ?(latency = Plugin.RPC.default_operation_inclusion_latency)
     (contents : t contents_list) =
   get_branch cctxt ~chain ~block branch >>=? fun (_chain_id, branch) ->
   let op : _ Operation.t =
@@ -298,12 +290,12 @@ let simulate (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
     ~chain_id
     ~latency
   >>=? function
-  | (Operation_data op', Operation_metadata result) -> (
+  | Operation_data op', Operation_metadata result -> (
       match
         ( Operation.equal op {shell = {branch}; protocol_data = op'},
           Apply_results.kind_equal_list contents result.contents )
       with
-      | (Some Operation.Eq, Some Apply_results.Eq) ->
+      | Some Operation.Eq, Some Apply_results.Eq ->
           return ((oph, op, result) : t preapply_result)
       | _ -> failwith "Unexpected result")
   | _ -> failwith "Unexpected result"
@@ -313,49 +305,67 @@ let estimated_gas_single (type kind)
       kind Kind.manager contents_result) =
   let consumed_gas (type kind) (result : kind manager_operation_result) =
     match result with
-    | Applied
-        (Transaction_result (Transaction_to_contract_result {consumed_gas; _}))
-    | Applied
-        (Transaction_result (Transaction_to_tx_rollup_result {consumed_gas; _}))
-      ->
-        Ok consumed_gas
-    | Applied (Origination_result {consumed_gas; _}) -> Ok consumed_gas
-    | Applied (Reveal_result {consumed_gas}) -> Ok consumed_gas
-    | Applied (Delegation_result {consumed_gas}) -> Ok consumed_gas
-    | Applied (Register_global_constant_result {consumed_gas; _}) ->
-        Ok consumed_gas
-    | Applied (Set_deposits_limit_result {consumed_gas}) -> Ok consumed_gas
-    | Applied (Tx_rollup_origination_result {consumed_gas; _}) ->
-        Ok consumed_gas
-    | Applied (Tx_rollup_submit_batch_result {consumed_gas; _}) ->
-        Ok consumed_gas
-    | Applied (Tx_rollup_commit_result {consumed_gas; _}) -> Ok consumed_gas
-    | Applied (Tx_rollup_return_bond_result {consumed_gas; _}) ->
-        Ok consumed_gas
-    | Applied (Tx_rollup_finalize_commitment_result {consumed_gas; _}) ->
-        Ok consumed_gas
-    | Applied (Tx_rollup_remove_commitment_result {consumed_gas; _}) ->
-        Ok consumed_gas
-    | Applied (Tx_rollup_rejection_result {consumed_gas; _}) -> Ok consumed_gas
-    | Applied (Tx_rollup_dispatch_tickets_result {consumed_gas; _}) ->
-        Ok consumed_gas
-    | Applied (Transfer_ticket_result {consumed_gas; _}) -> Ok consumed_gas
-    | Applied (Sc_rollup_originate_result {consumed_gas; _}) -> Ok consumed_gas
-    | Applied (Sc_rollup_add_messages_result {consumed_gas; _}) ->
-        Ok consumed_gas
-    | Applied (Sc_rollup_cement_result {consumed_gas; _}) -> Ok consumed_gas
-    | Applied (Sc_rollup_publish_result {consumed_gas; _}) -> Ok consumed_gas
+    | Applied res | Backtracked (res, _) -> (
+        match res with
+        | Transaction_result
+            ( Transaction_to_contract_result {consumed_gas; _}
+            | Transaction_to_tx_rollup_result {consumed_gas; _}
+            | Transaction_to_sc_rollup_result {consumed_gas; _} ) ->
+            Ok consumed_gas
+        | Origination_result {consumed_gas; _} -> Ok consumed_gas
+        | Reveal_result {consumed_gas} -> Ok consumed_gas
+        | Delegation_result {consumed_gas} -> Ok consumed_gas
+        | Register_global_constant_result {consumed_gas; _} -> Ok consumed_gas
+        | Set_deposits_limit_result {consumed_gas} -> Ok consumed_gas
+        | Increase_paid_storage_result {consumed_gas; _} -> Ok consumed_gas
+        | Tx_rollup_origination_result {consumed_gas; _} -> Ok consumed_gas
+        | Tx_rollup_submit_batch_result {consumed_gas; _} -> Ok consumed_gas
+        | Tx_rollup_commit_result {consumed_gas; _} -> Ok consumed_gas
+        | Tx_rollup_return_bond_result {consumed_gas; _} -> Ok consumed_gas
+        | Tx_rollup_finalize_commitment_result {consumed_gas; _} ->
+            Ok consumed_gas
+        | Tx_rollup_remove_commitment_result {consumed_gas; _} ->
+            Ok consumed_gas
+        | Tx_rollup_rejection_result {consumed_gas; _} -> Ok consumed_gas
+        | Tx_rollup_dispatch_tickets_result {consumed_gas; _} -> Ok consumed_gas
+        | Transfer_ticket_result {consumed_gas; _} -> Ok consumed_gas
+        | Dal_publish_slot_header_result {consumed_gas; _} -> Ok consumed_gas
+        | Sc_rollup_originate_result {consumed_gas; _} -> Ok consumed_gas
+        | Sc_rollup_add_messages_result {consumed_gas; _} -> Ok consumed_gas
+        | Sc_rollup_cement_result {consumed_gas; _} -> Ok consumed_gas
+        | Sc_rollup_publish_result {consumed_gas; _} -> Ok consumed_gas
+        | Sc_rollup_refute_result {consumed_gas; _} -> Ok consumed_gas
+        | Sc_rollup_timeout_result {consumed_gas; _} -> Ok consumed_gas
+        | Sc_rollup_execute_outbox_message_result {consumed_gas; _} ->
+            Ok consumed_gas
+        | Sc_rollup_recover_bond_result {consumed_gas; _} -> Ok consumed_gas
+        | Sc_rollup_dal_slot_subscribe_result {consumed_gas; _} ->
+            Ok consumed_gas)
     | Skipped _ ->
         Ok Gas.Arith.zero (* there must be another error for this to happen *)
-    | Backtracked (_, None) ->
+    | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
+  in
+  let internal_consumed_gas (type kind)
+      (result : kind internal_operation_result) =
+    match result with
+    | Applied res | Backtracked (res, _) -> (
+        match res with
+        | ITransaction_result
+            ( Transaction_to_contract_result {consumed_gas; _}
+            | Transaction_to_tx_rollup_result {consumed_gas; _}
+            | Transaction_to_sc_rollup_result {consumed_gas; _} )
+        | IOrigination_result {consumed_gas; _}
+        | IDelegation_result {consumed_gas}
+        | IEvent_result {consumed_gas} ->
+            Ok consumed_gas)
+    | Skipped _ ->
         Ok Gas.Arith.zero (* there must be another error for this to happen *)
-    | Backtracked (_, Some errs) -> Error (Environment.wrap_tztrace errs)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
   in
   consumed_gas operation_result >>? fun gas ->
   List.fold_left_e
-    (fun acc (Internal_manager_operation_result (_, r)) ->
-      consumed_gas r >>? fun gas -> Ok (Gas.Arith.add acc gas))
+    (fun acc (Internal_operation_result (_, r)) ->
+      internal_consumed_gas r >>? fun gas -> Ok (Gas.Arith.add acc gas))
     gas
     internal_operation_results
 
@@ -365,59 +375,90 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
       kind Kind.manager contents_result) =
   let storage_size_diff (type kind) (result : kind manager_operation_result) =
     match result with
-    | Applied
-        (Transaction_result
-          (Transaction_to_contract_result
-            {paid_storage_size_diff; allocated_destination_contract; _})) ->
-        if allocated_destination_contract then
-          Ok (Z.add paid_storage_size_diff origination_size)
-        else Ok paid_storage_size_diff
-    | Applied (Transaction_result (Transaction_to_tx_rollup_result _)) ->
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
-           Storage fees for transaction rollup.
-           We need to charge for newly allocated storage (as we do for
-           Michelson’s big map). *)
-        Ok Z.zero
-    | Applied (Origination_result {paid_storage_size_diff; _}) ->
-        Ok (Z.add paid_storage_size_diff origination_size)
-    | Applied (Reveal_result _) -> Ok Z.zero
-    | Applied (Delegation_result _) -> Ok Z.zero
-    | Applied (Register_global_constant_result {size_of_constant; _}) ->
-        Ok size_of_constant
-    | Applied (Set_deposits_limit_result _) -> Ok Z.zero
-    | Applied (Tx_rollup_origination_result _) -> Ok tx_rollup_origination_size
-    | Applied (Tx_rollup_submit_batch_result {paid_storage_size_diff; _}) ->
-        Ok paid_storage_size_diff
-    | Applied (Tx_rollup_commit_result _) -> Ok Z.zero
-    | Applied (Tx_rollup_return_bond_result _) -> Ok Z.zero
-    | Applied (Tx_rollup_finalize_commitment_result _) -> Ok Z.zero
-    | Applied (Tx_rollup_remove_commitment_result _) -> Ok Z.zero
-    | Applied (Tx_rollup_rejection_result _) -> Ok Z.zero
-    | Applied (Tx_rollup_dispatch_tickets_result {paid_storage_size_diff; _}) ->
-        Ok paid_storage_size_diff
-    | Applied (Transfer_ticket_result {paid_storage_size_diff; _}) ->
-        Ok paid_storage_size_diff
-    | Applied (Sc_rollup_originate_result {size; _}) -> Ok size
-    | Applied (Sc_rollup_add_messages_result _) -> Ok Z.zero
-    (* The following Sc_rollup operations have zero storage cost because we
-       consider them to be paid in the stake deposit.
+    | Applied res | Backtracked (res, _) -> (
+        match res with
+        | Transaction_result
+            (Transaction_to_contract_result
+              {paid_storage_size_diff; allocated_destination_contract; _}) ->
+            if allocated_destination_contract then
+              Ok (Z.add paid_storage_size_diff origination_size)
+            else Ok paid_storage_size_diff
+        | Transaction_result (Transaction_to_tx_rollup_result _) ->
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
+               Storage fees for transaction rollup.
+               We need to charge for newly allocated storage (as we do for
+               Michelson’s big map). *)
+            Ok Z.zero
+        | Transaction_result (Transaction_to_sc_rollup_result _) -> Ok Z.zero
+        | Origination_result {paid_storage_size_diff; _} ->
+            Ok (Z.add paid_storage_size_diff origination_size)
+        | Reveal_result _ -> Ok Z.zero
+        | Delegation_result _ -> Ok Z.zero
+        | Register_global_constant_result {size_of_constant; _} ->
+            Ok size_of_constant
+        | Set_deposits_limit_result _ -> Ok Z.zero
+        | Increase_paid_storage_result _ -> Ok Z.zero
+        | Tx_rollup_origination_result _ -> Ok tx_rollup_origination_size
+        | Tx_rollup_submit_batch_result {paid_storage_size_diff; _}
+        | Sc_rollup_execute_outbox_message_result {paid_storage_size_diff; _} ->
+            Ok paid_storage_size_diff
+        | Tx_rollup_commit_result _ -> Ok Z.zero
+        | Tx_rollup_return_bond_result _ -> Ok Z.zero
+        | Tx_rollup_finalize_commitment_result _ -> Ok Z.zero
+        | Tx_rollup_remove_commitment_result _ -> Ok Z.zero
+        | Tx_rollup_rejection_result _ -> Ok Z.zero
+        | Tx_rollup_dispatch_tickets_result {paid_storage_size_diff; _} ->
+            Ok paid_storage_size_diff
+        | Transfer_ticket_result {paid_storage_size_diff; _} ->
+            Ok paid_storage_size_diff
+        | Dal_publish_slot_header_result _ -> Ok Z.zero
+        | Sc_rollup_originate_result {size; _} -> Ok size
+        | Sc_rollup_add_messages_result _ -> Ok Z.zero
+        (* The following Sc_rollup operations have zero storage cost because we
+           consider them to be paid in the stake deposit.
 
-       TODO: https://gitlab.com/tezos/tezos/-/issues/2686
-       Document why this is safe.
-    *)
-    | Applied (Sc_rollup_cement_result _) -> Ok Z.zero
-    | Applied (Sc_rollup_publish_result _) -> Ok Z.zero
+           TODO: https://gitlab.com/tezos/tezos/-/issues/2686
+           Document why this is safe.
+        *)
+        | Sc_rollup_cement_result _ -> Ok Z.zero
+        | Sc_rollup_publish_result _ -> Ok Z.zero
+        | Sc_rollup_refute_result _ -> Ok Z.zero
+        | Sc_rollup_timeout_result _ -> Ok Z.zero
+        | Sc_rollup_recover_bond_result _ -> Ok Z.zero
+        | Sc_rollup_dal_slot_subscribe_result _ -> Ok Z.zero)
     | Skipped _ ->
         Ok Z.zero (* there must be another error for this to happen *)
-    | Backtracked (_, None) ->
+    | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
+  in
+  let internal_storage_size_diff (type kind)
+      (result : kind internal_operation_result) =
+    match result with
+    | Applied res | Backtracked (res, _) -> (
+        match res with
+        | ITransaction_result
+            (Transaction_to_contract_result
+              {paid_storage_size_diff; allocated_destination_contract; _}) ->
+            if allocated_destination_contract then
+              Ok (Z.add paid_storage_size_diff origination_size)
+            else Ok paid_storage_size_diff
+        | ITransaction_result (Transaction_to_tx_rollup_result _) ->
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
+               Storage fees for transaction rollup.
+               We need to charge for newly allocated storage (as we do for
+               Michelson’s big map). *)
+            Ok Z.zero
+        | ITransaction_result (Transaction_to_sc_rollup_result _) -> Ok Z.zero
+        | IOrigination_result {paid_storage_size_diff; _} ->
+            Ok (Z.add paid_storage_size_diff origination_size)
+        | IDelegation_result _ | IEvent_result _ -> Ok Z.zero)
+    | Skipped _ ->
         Ok Z.zero (* there must be another error for this to happen *)
-    | Backtracked (_, Some errs) -> Error (Environment.wrap_tztrace errs)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
   in
   storage_size_diff operation_result >>? fun storage ->
   List.fold_left_e
-    (fun acc (Internal_manager_operation_result (_, r)) ->
-      storage_size_diff r >>? fun storage -> Ok (Z.add acc storage))
+    (fun acc (Internal_operation_result (_, r)) ->
+      internal_storage_size_diff r >>? fun storage -> Ok (Z.add acc storage))
     storage
     internal_operation_results
 
@@ -446,41 +487,67 @@ let originated_contracts_single (type kind)
   let originated_contracts (type kind) (result : kind manager_operation_result)
       =
     match result with
-    | Applied
-        (Transaction_result
-          (Transaction_to_contract_result {originated_contracts; _})) ->
-        Ok originated_contracts
-    | Applied (Transaction_result (Transaction_to_tx_rollup_result _)) -> Ok []
-    | Applied (Origination_result {originated_contracts; _}) ->
-        Ok originated_contracts
-    | Applied (Register_global_constant_result _) -> Ok []
-    | Applied (Reveal_result _) -> Ok []
-    | Applied (Delegation_result _) -> Ok []
-    | Applied (Set_deposits_limit_result _) -> Ok []
-    | Applied (Tx_rollup_origination_result _) -> Ok []
-    | Applied (Tx_rollup_submit_batch_result _) -> Ok []
-    | Applied (Tx_rollup_commit_result _) -> Ok []
-    | Applied (Tx_rollup_return_bond_result _) -> Ok []
-    | Applied (Tx_rollup_finalize_commitment_result _) -> Ok []
-    | Applied (Tx_rollup_remove_commitment_result _) -> Ok []
-    | Applied (Tx_rollup_rejection_result _) -> Ok []
-    | Applied (Tx_rollup_dispatch_tickets_result _) -> Ok []
-    | Applied (Transfer_ticket_result _) -> Ok []
-    | Applied (Sc_rollup_originate_result _) -> Ok []
-    | Applied (Sc_rollup_add_messages_result _) -> Ok []
-    | Applied (Sc_rollup_cement_result _) -> Ok []
-    | Applied (Sc_rollup_publish_result _) -> Ok []
+    | Applied res | Backtracked (res, _) -> (
+        match res with
+        | Transaction_result
+            (Transaction_to_contract_result {originated_contracts; _}) ->
+            Ok originated_contracts
+        | Transaction_result
+            ( Transaction_to_tx_rollup_result _
+            | Transaction_to_sc_rollup_result _ ) ->
+            Ok []
+        | Origination_result {originated_contracts; _} ->
+            Ok originated_contracts
+        | Register_global_constant_result _ -> Ok []
+        | Reveal_result _ -> Ok []
+        | Delegation_result _ -> Ok []
+        | Set_deposits_limit_result _ -> Ok []
+        | Increase_paid_storage_result _ -> Ok []
+        | Tx_rollup_origination_result _ -> Ok []
+        | Tx_rollup_submit_batch_result _ -> Ok []
+        | Tx_rollup_commit_result _ -> Ok []
+        | Tx_rollup_return_bond_result _ -> Ok []
+        | Tx_rollup_finalize_commitment_result _ -> Ok []
+        | Tx_rollup_remove_commitment_result _ -> Ok []
+        | Tx_rollup_rejection_result _ -> Ok []
+        | Tx_rollup_dispatch_tickets_result _ -> Ok []
+        | Transfer_ticket_result _ -> Ok []
+        | Dal_publish_slot_header_result _ -> Ok []
+        | Sc_rollup_originate_result _ -> Ok []
+        | Sc_rollup_add_messages_result _ -> Ok []
+        | Sc_rollup_cement_result _ -> Ok []
+        | Sc_rollup_publish_result _ -> Ok []
+        | Sc_rollup_refute_result _ -> Ok []
+        | Sc_rollup_timeout_result _ -> Ok []
+        | Sc_rollup_execute_outbox_message_result _ -> Ok []
+        | Sc_rollup_recover_bond_result _ -> Ok []
+        | Sc_rollup_dal_slot_subscribe_result _ -> Ok [])
     | Skipped _ -> Ok [] (* there must be another error for this to happen *)
-    | Backtracked (_, None) ->
-        Ok [] (* there must be another error for this to happen *)
-    | Backtracked (_, Some errs) -> Error (Environment.wrap_tztrace errs)
+    | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
+  in
+  let internal_originated_contracts (type kind)
+      (result : kind internal_operation_result) =
+    match result with
+    | Applied res | Backtracked (res, _) -> (
+        match res with
+        | ITransaction_result
+            (Transaction_to_contract_result {originated_contracts; _}) ->
+            Ok originated_contracts
+        | ITransaction_result
+            ( Transaction_to_tx_rollup_result _
+            | Transaction_to_sc_rollup_result _ ) ->
+            Ok []
+        | IOrigination_result {originated_contracts; _} ->
+            Ok originated_contracts
+        | IDelegation_result _ | IEvent_result _ -> Ok [])
+    | Skipped _ -> Ok [] (* there must be another error for this to happen *)
     | Failed (_, errs) -> Error (Environment.wrap_tztrace errs)
   in
   originated_contracts operation_result >>? fun contracts ->
   let contracts = List.rev contracts in
   List.fold_left_e
-    (fun acc (Internal_manager_operation_result (_, r)) ->
-      originated_contracts r >>? fun contracts ->
+    (fun acc (Internal_operation_result (_, r)) ->
+      internal_originated_contracts r >>? fun contracts ->
       Ok (List.rev_append contracts acc))
     contracts
     internal_operation_results
@@ -526,7 +593,7 @@ let detect_script_failure : type kind. kind operation_metadata -> _ =
            {operation_result; internal_operation_results; _} :
           kind Kind.manager contents_result) =
       let detect_script_failure (type kind)
-          (result : kind manager_operation_result) =
+          (result : (kind, _, _) operation_result) =
         match result with
         | Applied _ -> Ok ()
         | Skipped _ -> assert false
@@ -544,8 +611,7 @@ let detect_script_failure : type kind. kind operation_metadata -> _ =
       in
       detect_script_failure operation_result >>? fun () ->
       List.iter_e
-        (fun (Internal_manager_operation_result (_, r)) ->
-          detect_script_failure r)
+        (fun (Internal_operation_result (_, r)) -> detect_script_failure r)
         internal_operation_results
     in
     function
@@ -579,7 +645,7 @@ let safety_guard = Gas.Arith.(integral_of_int_exn 100)
         do specify their limit
    2. the algorithm retrieves the effectively consumed gas and storage from the
       receipt
-   3. the algorithm assigns slight overapproximations to the operation
+   3. the algorithm assigns slight over-approximations to the operation
    4. a default fee is computed and set
 
 *)
@@ -599,7 +665,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
                  hard_gas_limit_per_block;
                  hard_storage_limit_per_operation;
                  origination_size;
-                 tx_rollup_origination_size;
+                 tx_rollup = {origination_size = tx_rollup_origination_size; _};
                  cost_per_byte;
                  _;
                };
@@ -640,7 +706,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
     | Single_manager minfo ->
         gas_patching_stats minfo need_patching gas_consumed
     | Cons_manager (minfo, rest) ->
-        let (need_patching, gas_consumed) =
+        let need_patching, gas_consumed =
           gas_patching_stats minfo need_patching gas_consumed
         in
         gas_patching_stats_list rest need_patching gas_consumed
@@ -690,7 +756,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
           in
           let rest_opt = loop rest in
           match (annotated_op_opt, rest_opt) with
-          | (None, None) -> None
+          | None, None -> None
           | _ ->
               let op = Option.value ~default:annotated_op annotated_op_opt in
               let rest = Option.value ~default:rest rest_opt in
@@ -759,7 +825,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
       kind Annotated_manager_operation.t * kind Kind.manager contents_result ->
       kind Kind.manager contents tzresult Lwt.t =
    fun ~first -> function
-    | ((Manager_info c as op), (Manager_operation_result _ as result)) ->
+    | (Manager_info c as op), (Manager_operation_result _ as result) ->
         (if user_gas_limit_needs_patching c.gas_limit then
          Lwt.return (estimated_gas_single result) >>= fun gas ->
          match gas with
@@ -784,10 +850,9 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
              else
                let safety_guard =
                  match c.operation with
-                 | Transaction {destination = Contract destination; _}
-                   when Option.is_some (Contract.is_implicit destination) ->
-                     Gas.Arith.zero
-                 | Reveal _ | Delegation _ | Set_deposits_limit _ ->
+                 | Transaction {destination = Implicit _; _}
+                 | Reveal _ | Delegation _ | Set_deposits_limit _
+                 | Increase_paid_storage _ ->
                      Gas.Arith.zero
                  | _ -> safety_guard
                in
@@ -855,16 +920,16 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
       kind Kind.manager contents_list tzresult Lwt.t =
    fun first annotated_list result_list ->
     match (annotated_list, result_list) with
-    | (Single_manager annotated, Single_result res) ->
+    | Single_manager annotated, Single_result res ->
         patch ~first (annotated, res) >>=? fun op -> return (Single op)
-    | (Cons_manager (annotated, annotated_rest), Cons_result (res, res_rest)) ->
+    | Cons_manager (annotated, annotated_rest), Cons_result (res, res_rest) ->
         patch ~first (annotated, res) >>=? fun op ->
         patch_list false annotated_rest res_rest >>=? fun rest ->
         return (Cons (op, rest))
     | _ -> assert false
   in
   let gas_limit_per_patched_op =
-    let (need_gas_patching, gas_consumed) =
+    let need_gas_patching, gas_consumed =
       gas_patching_stats_list annotated_contents 0 Gas.Arith.zero
     in
     if need_gas_patching = 0 then hard_gas_limit_per_operation
@@ -916,10 +981,10 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
             "The operation will burn %s%a which is higher than the configured \
              burn cap (%s%a).@\n\
             \ Use `--burn-cap %a` to emit this operation."
-            Client_proto_args.tez_sym
+            Operation_result.tez_sym
             Tez.pp
             burn
-            Client_proto_args.tez_sym
+            Operation_result.tez_sym
             Tez.pp
             fee_parameter.burn_cap
             Tez.pp
@@ -952,10 +1017,10 @@ let tenderbake_adjust_confirmations (cctxt : #Client_context.full) = function
 
    Any value greater than the tenderbake_finality_confirmations is treated as if it
    were tenderbake_finality_confirmations.
- *)
+*)
 let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
     ?(dry_run = false) ?(simulation = false) ?(force = false) ?successor_level
-    ?branch ?src_sk ?verbose_signing ~fee_parameter
+    ?branch ?src_sk ?verbose_signing ?fee_parameter
     (contents : kind contents_list) =
   (if simulation then
    simulate cctxt ~chain ~block ?successor_level ?branch contents
@@ -964,7 +1029,7 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
       cctxt
       ~chain
       ~block
-      ~fee_parameter
+      ?fee_parameter
       ?verbose_signing
       ?branch
       ?src_sk
@@ -996,7 +1061,7 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
       "@[<v 2>Simulation result:@,%a@]"
       Operation_result.pp_operation_result
       (op.protocol_data.contents, result.contents)
-    >>= fun () -> return (oph, op.protocol_data.contents, result.contents)
+    >>= fun () -> return (oph, op, result.contents)
   else
     Shell_services.Injection.operation cctxt ~chain bytes >>=? fun oph ->
     cctxt#message "Operation successfully injected in the node." >>= fun () ->
@@ -1057,7 +1122,7 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
     Lwt.return (originated_contracts result.contents ~force)
     >>=? fun contracts ->
     List.iter_s
-      (fun c -> cctxt#message "New contract %a originated." Contract.pp c)
+      (fun c -> cctxt#message "New contract %a originated." Contract_hash.pp c)
       contracts
     >>= fun () ->
     (match confirmations with
@@ -1081,11 +1146,11 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
             tenderbake_finality_confirmations
             Block_hash.pp
             op.shell.branch)
-    >>= fun () -> return (oph, op.protocol_data.contents, result.contents)
+    >>= fun () -> return (oph, op, result.contents)
 
 let inject_operation (type kind) cctxt ~chain ~block ?confirmations
     ?(dry_run = false) ?(simulation = false) ?successor_level ?branch ?src_sk
-    ?verbose_signing ~fee_parameter (contents : kind contents_list) =
+    ?verbose_signing ?fee_parameter (contents : kind contents_list) =
   Tezos_client_base.Client_confirmations.wait_for_bootstrapped cctxt
   >>=? fun () ->
   inject_operation_internal
@@ -1099,8 +1164,9 @@ let inject_operation (type kind) cctxt ~chain ~block ?confirmations
     ?branch
     ?src_sk
     ?verbose_signing
-    ~fee_parameter
+    ?fee_parameter
     (contents : kind contents_list)
+  >|=? fun (oph, op, result) -> (oph, op.protocol_data.contents, result)
 
 let prepare_manager_operation ~fee ~gas_limit ~storage_limit operation =
   Annotated_manager_operation.Manager_info
@@ -1300,6 +1366,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
     ~fee_parameter (type kind)
     (operations : kind Annotated_manager_operation.annotated_list) :
     (Operation_hash.t
+    * packed_operation
     * kind Kind.manager contents_list
     * kind Kind.manager contents_result_list)
     tzresult
@@ -1392,10 +1459,10 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
         ~src_sk
         contents
       >>=? fun (oph, op, result) ->
-      match pack_contents_list op result with
+      match pack_contents_list op.protocol_data.contents result with
       | Cons_and_result (_, _, rest) ->
-          let (op, result) = unpack_contents_list rest in
-          return (oph, op, result)
+          let second_op, second_result = unpack_contents_list rest in
+          return (oph, Operation.pack op, second_op, second_result)
       | _ -> assert false)
   | Some _ when has_reveal operations ->
       failwith "The manager key was previously revealed."
@@ -1432,3 +1499,5 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
         ?branch
         ~src_sk
         contents
+      >>=? fun (oph, op, result) ->
+      return (oph, Operation.pack op, op.protocol_data.contents, result)

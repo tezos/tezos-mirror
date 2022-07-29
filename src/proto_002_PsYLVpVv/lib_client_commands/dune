@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_002_PsYLVpVv_commands)
- (public_name tezos-client-002-PsYLVpVv-commands)
+ (public_name tezos-client-002-PsYLVpVv.commands)
  (libraries
   tezos-base
   tezos-protocol-002-PsYLVpVv
@@ -16,22 +16,21 @@
   tezos-rpc)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -w -9+27-30-32-40@8
-   -open Tezos_base.TzPervasives
-   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_protocol_002_PsYLVpVv
-   -open Tezos_stdlib_unix
-   -open Tezos_shell_services
-   -open Tezos_client_base
-   -open Tezos_client_002_PsYLVpVv
-   -open Tezos_client_commands
-   -open Tezos_rpc))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_002_PsYLVpVv
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_002_PsYLVpVv
+  -open Tezos_client_commands
+  -open Tezos_rpc)
  (modules (:standard \ alpha_commands_registration)))
 
 (library
  (name tezos_client_002_PsYLVpVv_commands_registration)
- (public_name tezos-client-002-PsYLVpVv-commands.registration)
+ (public_name tezos-client-002-PsYLVpVv.commands-registration)
  (libraries
   tezos-base
   tezos-protocol-002-PsYLVpVv
@@ -40,19 +39,18 @@
   tezos-client-base
   tezos-client-002-PsYLVpVv
   tezos-client-commands
-  tezos-client-002-PsYLVpVv-commands
+  tezos-client-002-PsYLVpVv.commands
   tezos-rpc)
  (library_flags (:standard -linkall))
  (flags
-  (:standard
-   -w -9+27-30-32-40@8
-   -open Tezos_base.TzPervasives
-   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_protocol_002_PsYLVpVv
-   -open Tezos_shell_services
-   -open Tezos_client_base
-   -open Tezos_client_002_PsYLVpVv
-   -open Tezos_client_commands
-   -open Tezos_client_002_PsYLVpVv_commands
-   -open Tezos_rpc))
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_protocol_002_PsYLVpVv
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_002_PsYLVpVv
+  -open Tezos_client_commands
+  -open Tezos_client_002_PsYLVpVv_commands
+  -open Tezos_rpc)
  (modules alpha_commands_registration))

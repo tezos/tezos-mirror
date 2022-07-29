@@ -26,7 +26,7 @@
 let test_size () =
   let open Signature in
   let length =
-    let (_pkh, pk, _sk) = generate_key ~algo:Ed25519 () in
+    let _pkh, pk, _sk = generate_key ~algo:Ed25519 () in
     Public_key.size pk
   in
   let expected =
@@ -37,7 +37,7 @@ let test_size () =
   in
   assert (Compare.Int.(expected = length)) ;
   let length =
-    let (_pkh, pk, _sk) = generate_key ~algo:P256 () in
+    let _pkh, pk, _sk = generate_key ~algo:P256 () in
     Public_key.size pk
   in
   let expected =
@@ -48,7 +48,7 @@ let test_size () =
   in
   assert (Compare.Int.(expected = length)) ;
   let length =
-    let (_pkh, pk, _sk) = generate_key ~algo:Secp256k1 () in
+    let _pkh, pk, _sk = generate_key ~algo:Secp256k1 () in
     Public_key.size pk
   in
   let expected =
@@ -62,7 +62,7 @@ let test_size () =
 let test_of_bytes_without_validation () =
   List.iter
     (fun algo ->
-      let (_pkh, pk, _sk) = Signature.generate_key ~algo () in
+      let _pkh, pk, _sk = Signature.generate_key ~algo () in
       let bytes =
         Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding pk
       in

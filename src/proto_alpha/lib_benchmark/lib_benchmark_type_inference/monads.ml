@@ -65,7 +65,7 @@ module Make_state_monad (X : Stores.S) :
   type 'a t = state -> 'a * state
 
   let ( >>= ) m f s =
-    let (x, s) = m s in
+    let x, s = m s in
     f x s
 
   let return x s = (x, s)

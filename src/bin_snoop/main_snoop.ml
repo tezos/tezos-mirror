@@ -144,6 +144,7 @@ and infer_cmd_one_shot model_name workload_data solver
               ~solution
               ~overrides_map
               ~short:false
+              ~display_options:infer_opts.display
               (Report.create_empty ~name:"Report")
           in
           Report.to_latex report
@@ -171,13 +172,14 @@ and infer_cmd_full_auto model_name workload_data solver
     | None -> Free_variable.Map.empty
     | Some filenames -> Override.load ~filenames
   in
-  let report_folder =
+  let display_options =
     match infer_opts.report with
-    | Cmdline.ReportToFile s -> Some (Filename.dirname s)
-    | _ -> None
+    | Cmdline.ReportToFile s ->
+        {infer_opts.display with Display.save_directory = Filename.dirname s}
+    | _ -> infer_opts.display
   in
   let solver = solver_of_string solver infer_opts in
-  let (graph, measurements) = Dep_graph.load_files model_name workload_files in
+  let graph, measurements = Dep_graph.load_files model_name workload_files in
   if Dep_graph.G.is_empty graph then (
     Format.eprintf "Empty dependency graph.@." ;
     exit 1) ;
@@ -193,7 +195,7 @@ and infer_cmd_full_auto model_name workload_data solver
       Dep_graph.D.output_graph oc graph ;
       close_out oc)
     infer_opts.dot_file ;
-  let (map, report) =
+  let map, report =
     Dep_graph.T.fold
       (fun workload_file (overrides_map, report) ->
         Format.eprintf "Processing: %s@." workload_file ;
@@ -224,7 +226,7 @@ and infer_cmd_full_auto model_name workload_data solver
                ~problem
                ~solution
                ~overrides_map
-               ?report_folder
+               ~display_options
                ~short:true)
             report
         in
@@ -248,11 +250,11 @@ and infer_cmd_full_auto model_name workload_data solver
   in
   perform_save_solution map infer_opts ;
   match (infer_opts.report, report) with
-  | (Cmdline.NoReport, _) -> ()
-  | (Cmdline.ReportToStdout, Some report) ->
+  | Cmdline.NoReport, _ -> ()
+  | Cmdline.ReportToStdout, Some report ->
       let s = Report.to_latex report in
       Format.printf "%s" s
-  | (Cmdline.ReportToFile output_file, Some report) ->
+  | Cmdline.ReportToFile output_file, Some report ->
       let s = Report.to_latex report in
       Lwt_main.run
         (let open Lwt_syntax in
@@ -306,15 +308,14 @@ and perform_save_solution (solution : float Free_variable.Map.t)
 and perform_plot measure model_name problem solution
     (infer_opts : Cmdline.infer_parameters_options) =
   if infer_opts.plot then
-    if
-      Display.perform_plot
-        ~measure
-        ~model_name
-        ~problem
-        ~solution
-        ~plot_target:Display.Show
-    then ()
-    else Format.eprintf "Could not plot given data."
+    ignore
+    @@ Display.perform_plot
+         ~measure
+         ~model_name
+         ~problem
+         ~solution
+         ~plot_target:Display.Show
+         ~options:infer_opts.Cmdline.display
   else ()
 
 and get_all_workload_data_files directory =

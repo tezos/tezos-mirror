@@ -58,12 +58,12 @@ val create : ?maxlength:int -> ?fresh_buf_size:int -> unit -> t
    Behaviour is unspecified if [fill_using] writes more than [maxlen]
    data or lies on the number of written bytes.
 
-   It returns a data descriptor for the supposedly written chunk.  *)
+   It returns a data descriptor for the supposedly written chunk. *)
 val write :
   maxlen:int ->
-  fill_using:(Bytes.t -> int -> int -> int Lwt.t) ->
+  fill_using:(Bytes.t -> int -> int -> (int, 'error) result Lwt.t) ->
   t ->
-  data Lwt.t
+  (data, 'error) result Lwt.t
 
 (** [read data ~len ~into:buf buffer ~offset] copies [len] data from the [data] chunk into [buf].
     If [len] is not provided, it copies all the data.

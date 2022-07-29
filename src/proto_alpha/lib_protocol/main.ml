@@ -135,6 +135,8 @@ type validation_state = {
   liquidity_baking_toggle_ema : Alpha_context.Liquidity_baking.Toggle_EMA.t;
   implicit_operations_results :
     Apply_results.packed_successful_manager_operation_result list;
+  validate_operation_info : Validate_operation.validate_operation_info;
+  validate_operation_state : Validate_operation.validate_operation_state;
 }
 
 let begin_partial_application ~chain_id ~ancestor_context:ctxt
@@ -177,6 +179,9 @@ let begin_partial_application ~chain_id ~ancestor_context:ctxt
         block_producer;
       }
   in
+  let validate_operation_info, validate_operation_state =
+    Validate_operation.init_info_and_state ctxt Block chain_id
+  in
   return
     {
       mode;
@@ -189,6 +194,8 @@ let begin_partial_application ~chain_id ~ancestor_context:ctxt
         Apply_results.pack_migration_operation_results
           migration_operation_results
         @ liquidity_baking_operations_results;
+      validate_operation_info;
+      validate_operation_state;
     }
 
 (* During applications the valid consensus operations are:
@@ -233,6 +240,9 @@ let begin_application ~chain_id ~predecessor_context:ctxt ~predecessor_timestamp
         block_producer;
       }
   in
+  let validate_operation_info, validate_operation_state =
+    Validate_operation.init_info_and_state ctxt Block chain_id
+  in
   return
     {
       mode;
@@ -245,6 +255,8 @@ let begin_application ~chain_id ~predecessor_context:ctxt ~predecessor_timestamp
         Apply_results.pack_migration_operation_results
           migration_operation_results
         @ liquidity_baking_operations_results;
+      validate_operation_info;
+      validate_operation_state;
     }
 
 let begin_construction ~chain_id ~predecessor_context:ctxt
@@ -276,11 +288,16 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
             predecessor_round;
           }
       in
+      let validate_operation_info, validate_operation_state =
+        Validate_operation.init_info_and_state ctxt Mempool chain_id
+      in
       return
         ( mode,
           ctxt,
           liquidity_baking_operations_results,
-          liquidity_baking_toggle_ema )
+          liquidity_baking_toggle_ema,
+          validate_operation_info,
+          validate_operation_state )
   | Some proto_header ->
       Alpha_context.Fitness.round_from_raw predecessor_fitness
       >>?= fun predecessor_round ->
@@ -323,15 +340,22 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
             predecessor_level;
           }
       in
+      let validate_operation_info, validate_operation_state =
+        Validate_operation.init_info_and_state ctxt Block chain_id
+      in
       return
         ( mode,
           ctxt,
           liquidity_baking_operations_results,
-          liquidity_baking_toggle_ema ))
+          liquidity_baking_toggle_ema,
+          validate_operation_info,
+          validate_operation_state ))
   >|=? fun ( mode,
              ctxt,
              liquidity_baking_operations_results,
-             liquidity_baking_toggle_ema ) ->
+             liquidity_baking_toggle_ema,
+             validate_operation_info,
+             validate_operation_state ) ->
   {
     mode;
     chain_id;
@@ -342,23 +366,33 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
     implicit_operations_results =
       Apply_results.pack_migration_operation_results migration_operation_results
       @ liquidity_baking_operations_results;
+    validate_operation_info;
+    validate_operation_state;
   }
 
 let apply_operation_with_mode mode ctxt chain_id data op_count operation
     ~payload_producer =
   let {shell; protocol_data = Operation_data protocol_data} = operation in
   let operation : _ Alpha_context.operation = {shell; protocol_data} in
+  let oph = Alpha_context.Operation.hash operation in
+  Validate_operation.validate_operation
+    data.validate_operation_info
+    data.validate_operation_state
+    oph
+    operation
+  >>=? fun (validate_operation_state, op_validated_stamp) ->
   Apply.apply_operation
     ctxt
     chain_id
     mode
-    Optimized
     ~payload_producer
-    (Alpha_context.Operation.hash operation)
+    op_validated_stamp
+    oph
     operation
   >|=? fun (ctxt, result) ->
   let op_count = op_count + 1 in
-  ({data with ctxt; op_count}, Operation_metadata result)
+  ( {data with ctxt; op_count; validate_operation_state},
+    Operation_metadata result )
 
 let apply_operation ({mode; chain_id; ctxt; op_count; _} as data)
     (operation : Alpha_context.packed_operation) =
@@ -583,6 +617,7 @@ let finalize_block
               balance_updates = migration_balance_updates;
               liquidity_baking_toggle_ema;
               implicit_operations_results;
+              dal_slot_availability = None;
             } )
   | Partial_application {fitness; block_producer; _} ->
       (* For partial application we do not completely check the block validity.
@@ -622,6 +657,7 @@ let finalize_block
             balance_updates = migration_balance_updates;
             liquidity_baking_toggle_ema;
             implicit_operations_results;
+            dal_slot_availability = None;
           } )
   | Application
       {
@@ -683,52 +719,58 @@ let relative_position_within_block op1 op2 =
   let open Alpha_context in
   let (Operation_data op1) = op1.protocol_data in
   let (Operation_data op2) = op2.protocol_data in
-  match[@coq_match_with_default] (op1.contents, op2.contents) with
-  | (Single (Preendorsement _), Single (Preendorsement _)) -> 0
-  | (Single (Preendorsement _), _) -> -1
-  | (_, Single (Preendorsement _)) -> 1
-  | (Single (Endorsement _), Single (Endorsement _)) -> 0
-  | (Single (Endorsement _), _) -> -1
-  | (_, Single (Endorsement _)) -> 1
-  | (Single (Seed_nonce_revelation _), Single (Seed_nonce_revelation _)) -> 0
-  | (_, Single (Seed_nonce_revelation _)) -> 1
-  | (Single (Seed_nonce_revelation _), _) -> -1
+  match (op1.contents, op2.contents) with
+  | Single (Preendorsement _), Single (Preendorsement _) -> 0
+  | Single (Preendorsement _), _ -> -1
+  | _, Single (Preendorsement _) -> 1
+  | Single (Endorsement _), Single (Endorsement _) -> 0
+  | Single (Endorsement _), _ -> -1
+  | _, Single (Endorsement _) -> 1
+  | Single (Dal_slot_availability _), Single (Dal_slot_availability _) -> 0
+  | Single (Dal_slot_availability _), _ -> -1
+  | _, Single (Dal_slot_availability _) -> 1
+  | Single (Seed_nonce_revelation _), Single (Seed_nonce_revelation _) -> 0
+  | _, Single (Seed_nonce_revelation _) -> 1
+  | Single (Seed_nonce_revelation _), _ -> -1
+  | Single (Vdf_revelation _), Single (Vdf_revelation _) -> 0
+  | _, Single (Vdf_revelation _) -> 1
+  | Single (Vdf_revelation _), _ -> -1
   | ( Single (Double_preendorsement_evidence _),
       Single (Double_preendorsement_evidence _) ) ->
       0
-  | (_, Single (Double_preendorsement_evidence _)) -> 1
-  | (Single (Double_preendorsement_evidence _), _) -> -1
+  | _, Single (Double_preendorsement_evidence _) -> 1
+  | Single (Double_preendorsement_evidence _), _ -> -1
   | ( Single (Double_endorsement_evidence _),
       Single (Double_endorsement_evidence _) ) ->
       0
-  | (_, Single (Double_endorsement_evidence _)) -> 1
-  | (Single (Double_endorsement_evidence _), _) -> -1
-  | (Single (Double_baking_evidence _), Single (Double_baking_evidence _)) -> 0
-  | (_, Single (Double_baking_evidence _)) -> 1
-  | (Single (Double_baking_evidence _), _) -> -1
-  | (Single (Activate_account _), Single (Activate_account _)) -> 0
-  | (_, Single (Activate_account _)) -> 1
-  | (Single (Activate_account _), _) -> -1
-  | (Single (Proposals _), Single (Proposals _)) -> 0
-  | (_, Single (Proposals _)) -> 1
-  | (Single (Proposals _), _) -> -1
-  | (Single (Ballot _), Single (Ballot _)) -> 0
-  | (_, Single (Ballot _)) -> 1
-  | (Single (Ballot _), _) -> -1
-  | (Single (Failing_noop _), Single (Failing_noop _)) -> 0
-  | (_, Single (Failing_noop _)) -> 1
-  | (Single (Failing_noop _), _) -> -1
+  | _, Single (Double_endorsement_evidence _) -> 1
+  | Single (Double_endorsement_evidence _), _ -> -1
+  | Single (Double_baking_evidence _), Single (Double_baking_evidence _) -> 0
+  | _, Single (Double_baking_evidence _) -> 1
+  | Single (Double_baking_evidence _), _ -> -1
+  | Single (Activate_account _), Single (Activate_account _) -> 0
+  | _, Single (Activate_account _) -> 1
+  | Single (Activate_account _), _ -> -1
+  | Single (Proposals _), Single (Proposals _) -> 0
+  | _, Single (Proposals _) -> 1
+  | Single (Proposals _), _ -> -1
+  | Single (Ballot _), Single (Ballot _) -> 0
+  | _, Single (Ballot _) -> 1
+  | Single (Ballot _), _ -> -1
+  | Single (Failing_noop _), Single (Failing_noop _) -> 0
+  | _, Single (Failing_noop _) -> 1
+  | Single (Failing_noop _), _ -> -1
   (* Manager operations with smaller counter are pre-validated first. *)
-  | (Single (Manager_operation op1), Single (Manager_operation op2)) ->
+  | Single (Manager_operation op1), Single (Manager_operation op2) ->
       Z.compare op1.counter op2.counter
-  | (Cons (Manager_operation op1, _), Single (Manager_operation op2)) ->
+  | Cons (Manager_operation op1, _), Single (Manager_operation op2) ->
       Z.compare op1.counter op2.counter
-  | (Single (Manager_operation op1), Cons (Manager_operation op2, _)) ->
+  | Single (Manager_operation op1), Cons (Manager_operation op2, _) ->
       Z.compare op1.counter op2.counter
-  | (Cons (Manager_operation op1, _), Cons (Manager_operation op2, _)) ->
+  | Cons (Manager_operation op1, _), Cons (Manager_operation op2, _) ->
       Z.compare op1.counter op2.counter
 
-let init ctxt block_header =
+let init chain_id ctxt block_header =
   let level = block_header.Block_header.level in
   let timestamp = block_header.timestamp in
   let typecheck (ctxt : Alpha_context.context) (script : Alpha_context.Script.t)
@@ -773,7 +815,7 @@ let init ctxt block_header =
       ~round:Alpha_context.Round.zero
       ~predecessor_round:Alpha_context.Round.zero
   in
-  Alpha_context.prepare_first_block ~typecheck ~level ~timestamp ctxt
+  Alpha_context.prepare_first_block chain_id ~typecheck ~level ~timestamp ctxt
   >>=? fun ctxt ->
   let cache_nonce =
     cache_nonce_from_block_header
@@ -798,18 +840,12 @@ let value_of_key ~chain_id:_ ~predecessor_context:ctxt ~predecessor_timestamp
   Alpha_context.prepare ctxt ~level ~predecessor_timestamp ~timestamp
   >>=? fun (ctxt, _, _) -> return (Apply.value_of_key ctxt)
 
-let check_manager_signature {chain_id; ctxt; _} op raw_op =
-  Apply.check_manager_signature ctxt chain_id op raw_op
-
-let precheck_manager {ctxt; _} op =
-  (* We do not account for the gas limit of the batch in the block
-     since this function does not return a context, but we check that
-     this limit is within bounds (and fail otherwise with a
-     permanenent error). *)
-  Apply.precheck_manager_contents_list ctxt op ~mempool_mode:true
-  >|=? fun (_ :
-             Alpha_context.t
-             * 'kind Alpha_context.Kind.manager
-               Apply_results.prechecked_contents_list) -> ()
+let precheck_manager {validate_operation_info; validate_operation_state; _}
+    contents_list should_check_signature =
+  Validate_operation.TMP_for_plugin.precheck_manager
+    validate_operation_info
+    validate_operation_state
+    contents_list
+    should_check_signature
 
 (* Vanity nonce: TBD *)

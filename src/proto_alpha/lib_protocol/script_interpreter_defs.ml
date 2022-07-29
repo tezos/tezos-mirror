@@ -38,6 +38,23 @@ open Script_typed_ir
 open Script_ir_translator
 open Local_gas_counter
 
+type error += Rollup_invalid_transaction_amount
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"operation.rollup_invalid_transaction_amount"
+    ~title:"Transaction amount to a rollup must be zero"
+    ~description:
+      "Because rollups are outside of the delegation mechanism of Tezos, they \
+       cannot own Tez, and therefore transactions targeting a rollup must have \
+       its amount field set to zero."
+    ~pp:(fun ppf () ->
+      Format.pp_print_string ppf "Transaction amount to a rollup must be zero.")
+    Data_encoding.unit
+    (function Rollup_invalid_transaction_amount -> Some () | _ -> None)
+    (fun () -> Rollup_invalid_transaction_amount)
+
 (*
 
    Computing the cost of Michelson instructions
@@ -65,10 +82,10 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       let set = accu in
       Interp_costs.set_iter set
   | ISet_mem _ ->
-      let v = accu and (set, _) = stack in
+      let v = accu and set, _ = stack in
       Interp_costs.set_mem v set
   | ISet_update _ ->
-      let v = accu and (_, (set, _)) = stack in
+      let v = accu and _, (set, _) = stack in
       Interp_costs.set_update v set
   | IMap_map _ ->
       let map = accu in
@@ -77,59 +94,59 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       let map = accu in
       Interp_costs.map_iter map
   | IMap_mem _ ->
-      let v = accu and (map, _) = stack in
+      let v = accu and map, _ = stack in
       Interp_costs.map_mem v map
   | IMap_get _ ->
-      let v = accu and (map, _) = stack in
+      let v = accu and map, _ = stack in
       Interp_costs.map_get v map
   | IMap_update _ ->
-      let k = accu and (_, (map, _)) = stack in
+      let k = accu and _, (map, _) = stack in
       Interp_costs.map_update k map
   | IMap_get_and_update _ ->
-      let k = accu and (_, (map, _)) = stack in
+      let k = accu and _, (map, _) = stack in
       Interp_costs.map_get_and_update k map
   | IBig_map_mem _ ->
-      let (Big_map map, _) = stack in
+      let Big_map map, _ = stack in
       Interp_costs.big_map_mem map.diff
   | IBig_map_get _ ->
-      let (Big_map map, _) = stack in
+      let Big_map map, _ = stack in
       Interp_costs.big_map_get map.diff
   | IBig_map_update _ ->
-      let (_, (Big_map map, _)) = stack in
+      let _, (Big_map map, _) = stack in
       Interp_costs.big_map_update map.diff
   | IBig_map_get_and_update _ ->
-      let (_, (Big_map map, _)) = stack in
+      let _, (Big_map map, _) = stack in
       Interp_costs.big_map_get_and_update map.diff
   | IAdd_seconds_to_timestamp _ ->
-      let n = accu and (t, _) = stack in
+      let n = accu and t, _ = stack in
       Interp_costs.add_seconds_timestamp n t
   | IAdd_timestamp_to_seconds _ ->
-      let t = accu and (n, _) = stack in
+      let t = accu and n, _ = stack in
       Interp_costs.add_timestamp_seconds t n
   | ISub_timestamp_seconds _ ->
-      let t = accu and (n, _) = stack in
+      let t = accu and n, _ = stack in
       Interp_costs.sub_timestamp_seconds t n
   | IDiff_timestamps _ ->
-      let t1 = accu and (t2, _) = stack in
+      let t1 = accu and t2, _ = stack in
       Interp_costs.diff_timestamps t1 t2
   | IConcat_string_pair _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.concat_string_pair x y
   | IConcat_string _ ->
       let ss = accu in
       Interp_costs.concat_string_precheck ss
   | ISlice_string _ ->
       let _offset = accu in
-      let (_length, (s, _)) = stack in
+      let _length, (s, _) = stack in
       Interp_costs.slice_string s
   | IConcat_bytes_pair _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.concat_bytes_pair x y
   | IConcat_bytes _ ->
       let ss = accu in
       Interp_costs.concat_string_precheck ss
   | ISlice_bytes _ ->
-      let (_, (s, _)) = stack in
+      let _, (s, _) = stack in
       Interp_costs.slice_bytes s
   | IMul_teznat _ -> Interp_costs.mul_teznat
   | IMul_nattez _ -> Interp_costs.mul_nattez
@@ -140,28 +157,28 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       let x = accu in
       Interp_costs.neg x
   | IAdd_int _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.add_int x y
   | IAdd_nat _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.add_nat x y
   | ISub_int _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.sub_int x y
   | IMul_int _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.mul_int x y
   | IMul_nat _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.mul_nat x y
   | IEdiv_teznat _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.ediv_teznat x y
   | IEdiv_int _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.ediv_int x y
   | IEdiv_nat _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.ediv_nat x y
   | ILsl_nat _ ->
       let x = accu in
@@ -170,25 +187,25 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       let x = accu in
       Interp_costs.lsr_nat x
   | IOr_nat _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.or_nat x y
   | IAnd_nat _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.and_nat x y
   | IAnd_int_nat _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.and_int_nat x y
   | IXor_nat _ ->
-      let x = accu and (y, _) = stack in
+      let x = accu and y, _ = stack in
       Interp_costs.xor_nat x y
   | INot_int _ ->
       let x = accu in
       Interp_costs.not_int x
   | ICompare (_, ty, _) ->
-      let a = accu and (b, _) = stack in
+      let a = accu and b, _ = stack in
       Interp_costs.compare ty a b
   | ICheck_signature _ ->
-      let key = accu and (_, (message, _)) = stack in
+      let key = accu and _, (message, _) = stack in
       Interp_costs.check_signature key message
   | IHash_key _ ->
       let pk = accu in
@@ -223,10 +240,10 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       let outputs = List.length tx.outputs in
       Interp_costs.sapling_verify_update_deprecated ~inputs ~outputs
   | ISplit_ticket _ ->
-      let ticket = accu and ((amount_a, amount_b), _) = stack in
+      let ticket = accu and (amount_a, amount_b), _ = stack in
       Interp_costs.split_ticket ticket.amount amount_a amount_b
   | IJoin_tickets (_, ty, _) ->
-      let (ticket_a, ticket_b) = accu in
+      let ticket_a, ticket_b = accu in
       Interp_costs.join_tickets ty ticket_a ticket_b
   | IHalt _ -> Interp_costs.halt
   | IDrop _ -> Interp_costs.drop
@@ -322,7 +339,7 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       let z = accu in
       Interp_costs.mul_bls12_381_fr_z z
   | IMul_bls12_381_z_fr _ ->
-      let (z, _) = stack in
+      let z, _ = stack in
       Interp_costs.mul_bls12_381_z_fr z
   | IDup_n (_, n, _, _) -> Interp_costs.dupn n
   | IComb (_, n, _, _) -> Interp_costs.comb n
@@ -332,11 +349,11 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | ITicket _ -> Interp_costs.ticket
   | IRead_ticket _ -> Interp_costs.read_ticket
   | IOpen_chest _ ->
-      let _chest_key = accu and (chest, (time, _)) = stack in
+      let _chest_key = accu and chest, (time, _) = stack in
       Interp_costs.open_chest ~chest ~time:(Script_int.to_zint time)
+  | IEmit _ -> Interp_costs.emit
   | ILog _ -> Gas.free
  [@@ocaml.inline always]
- [@@coq_axiom_with_reason "unreachable expression `.` not handled"]
 
 let cost_of_control : type a s r f. (a, s, r, f) continuation -> Gas.cost =
  fun ks ->
@@ -346,15 +363,15 @@ let cost_of_control : type a s r f. (a, s, r, f) continuation -> Gas.cost =
   | KCons (_, _) -> Interp_costs.Control.cons
   | KReturn _ -> Interp_costs.Control.return
   | KMap_head (_, _) -> Interp_costs.Control.map_head
-  | KUndip (_, _) -> Interp_costs.Control.undip
+  | KUndip (_, _, _) -> Interp_costs.Control.undip
   | KLoop_in (_, _) -> Interp_costs.Control.loop_in
   | KLoop_in_left (_, _) -> Interp_costs.Control.loop_in_left
-  | KIter (_, _, _) -> Interp_costs.Control.iter
-  | KList_enter_body (_, xs, _, len, _) ->
+  | KIter (_, _, _, _) -> Interp_costs.Control.iter
+  | KList_enter_body (_, xs, _, _, len, _) ->
       Interp_costs.Control.list_enter_body xs len
-  | KList_exit_body (_, _, _, _, _) -> Interp_costs.Control.list_exit_body
-  | KMap_enter_body (_, _, _, _) -> Interp_costs.Control.map_enter_body
-  | KMap_exit_body (_, _, map, key, _) ->
+  | KList_exit_body (_, _, _, _, _, _) -> Interp_costs.Control.list_exit_body
+  | KMap_enter_body (_, _, _, _, _) -> Interp_costs.Control.map_enter_body
+  | KMap_exit_body (_, _, map, key, _, _) ->
       Interp_costs.Control.map_exit_body key map
   | KView_exit (_, _) -> Interp_costs.Control.view_exit
 
@@ -379,59 +396,10 @@ let consume_control local_gas_counter ks =
   consume_opt local_gas_counter cost
   [@@ocaml.inline always]
 
-(*
-
-   Auxiliary functions used by the instrumentation
-   ===============================================
-
-*)
-
-let log_entry logger ctxt gas k accu stack =
-  let kinfo = kinfo_of_kinstr k in
-  let ctxt = update_context gas ctxt in
-  logger.log_entry k ctxt kinfo.iloc kinfo.kstack_ty (accu, stack)
-
-let log_exit logger ctxt gas kinfo_prev k accu stack =
-  let kinfo = kinfo_of_kinstr k in
-  let ctxt = update_context gas ctxt in
-  logger.log_exit k ctxt kinfo_prev.iloc kinfo.kstack_ty (accu, stack)
-
-let log_control logger ks = logger.log_control ks
-
 let get_log = function
   | None -> Lwt.return (Ok None)
   | Some logger -> logger.get_log ()
   [@@ocaml.inline always]
-
-(* [log_kinstr logger i] emits an instruction to instrument the
-   execution of [i] with [logger]. *)
-let log_kinstr logger i = ILog (kinfo_of_kinstr i, LogEntry, logger, i)
-
-(* [log_next_kinstr logger i] instruments the next instruction of [i]
-   with the [logger].
-
-   Notice that the instrumentation breaks the sharing of continuations
-   that is normally enforced between branches of conditionals. This
-   has a performance cost. Anyway, the instrumentation allocates many
-   new [ILog] instructions and [KLog] continuations which makes
-   the execution of instrumented code significantly slower than
-   non-instrumented code. "Zero-cost logging" means that the normal
-   non-instrumented execution is not impacted by the ability to
-   instrument it, not that the logging itself has no cost.
-
-*)
-let log_next_kinstr logger i =
-  let apply k =
-    ILog
-      ( kinfo_of_kinstr k,
-        LogExit (kinfo_of_kinstr i),
-        logger,
-        log_kinstr logger k )
-  in
-  kinstr_rewritek i {apply}
-
-(* We pass the identity function when no instrumentation is needed. *)
-let id x = x [@@inline]
 
 (*
 
@@ -451,9 +419,9 @@ let rec kundip :
     a * s * (e, z, b, t) kinstr =
  fun w accu stack k ->
   match w with
-  | KPrefix (kinfo, w) ->
-      let k = IConst (kinfo, accu, k) in
-      let (accu, stack) = stack in
+  | KPrefix (loc, ty, w) ->
+      let k = IConst (loc, ty, accu, k) in
+      let accu, stack = stack in
       kundip w accu stack k
   | KRest -> (accu, stack, k)
 
@@ -475,14 +443,11 @@ let apply ctxt gas capture_ty capture lam =
           kbef = arg_stack_ty;
           kaft = descr.kaft;
           kinstr =
-            (let kinfo_const = {iloc = descr.kloc; kstack_ty = arg_stack_ty} in
-             let kinfo_pair =
-               {
-                 iloc = descr.kloc;
-                 kstack_ty = Item_t (capture_ty, arg_stack_ty);
-               }
-             in
-             IConst (kinfo_const, capture, ICons_pair (kinfo_pair, descr.kinstr)));
+            IConst
+              ( descr.kloc,
+                capture_ty,
+                capture,
+                ICons_pair (descr.kloc, descr.kinstr) );
         }
       in
       let full_expr =
@@ -495,86 +460,147 @@ let apply ctxt gas capture_ty capture lam =
             ] )
       in
       let lam' = Lam (full_descr, full_expr) in
-      let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
+      let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
       return (lam', ctxt, gas)
 
-(* [transfer (ctxt, sc) gas tez parameters_ty parameters destination entrypoint]
-   creates an operation that transfers an amount of [tez] to
-   a contract determined by [(destination, entrypoint)]
-   instantiated with argument [parameters] of type [parameters_ty]. *)
-let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
-    entrypoint =
-  (* [craft_transfer_parameters ctxt tp p] reorganizes, if need be, the
-     parameters submitted by the interpreter to prepare them for the
-     [Transaction] operation. *)
-  let craft_transfer_parameters :
-      type a ac.
-      context ->
-      (a, ac) ty ->
-      (location, prim) Micheline.node ->
-      Destination.t ->
-      ((location, prim) Micheline.node * context) tzresult =
-   fun ctxt tp p -> function
-    | Contract _ -> ok (p, ctxt)
-    (* The entrypoints of a transaction rollup are polymorphic wrt. the
-       tickets it can process. However, two Michelson values can have
-       the same Micheline representation, but different types. What
-       this means is that when we start the execution of a transaction
-       rollup, the type of its argument is lost if we just give it the
-       values provided by the Michelson script.
+let make_transaction_to_tx_rollup (type t) ctxt ~destination ~amount
+    ~(parameters_ty : ((t ticket, tx_rollup_l2_address) pair, _) ty) ~parameters
+    =
+  (* The entrypoints of a transaction rollup are polymorphic wrt. the
+     tickets it can process. However, two Michelson values can have
+     the same Micheline representation, but different types. What
+     this means is that when we start the execution of a transaction
+     rollup, the type of its argument is lost if we just give it the
+     values provided by the Michelson script.
 
-       To address this issue, we instrument a transfer to a transaction
-       rollup to inject the exact type of the entrypoint as used by
-       the smart contract. This allows the transaction rollup to extract
-       the type of the ticket. *)
-    | Tx_rollup _ -> (
-        let open Micheline in
-        match tp with
-        | Pair_t (Ticket_t (tp, _), _, _, _) ->
-            Script_ir_translator.unparse_ty ~loc:dummy_location ctxt tp
-            >|? fun (ty, ctxt) -> (Seq (dummy_location, [p; ty]), ctxt)
-        | _ ->
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2455
-               Refute this branch thanks to the type system.
-               Thanks to the implementation of the [CONTRACT]
-               instruction, this branch is unreachable. But this is
-               not enforced by the type system, which means we are one
-               refactoring away to reach it. *)
-            assert false)
-  in
-
-  let ctxt = update_context gas ctxt in
-  collect_lazy_storage ctxt parameters_ty parameters
-  >>?= fun (to_duplicate, ctxt) ->
-  let to_update = no_lazy_storage_id in
-  extract_lazy_storage_diff
-    ctxt
-    Optimized
-    parameters_ty
-    parameters
-    ~to_duplicate
-    ~to_update
-    ~temporary:true
-  >>=? fun (parameters, lazy_storage_diff, ctxt) ->
+     To address this issue, we instrument a transfer to a transaction
+     rollup to inject the exact type of the entrypoint as used by
+     the smart contract. This allows the transaction rollup to extract
+     the type of the ticket. *)
+  error_unless Tez.(amount = zero) Rollup_invalid_transaction_amount
+  >>?= fun () ->
+  let (Pair_t (Ticket_t (tp, _), _, _, _)) = parameters_ty in
   unparse_data ctxt Optimized parameters_ty parameters
   >>=? fun (unparsed_parameters, ctxt) ->
-  craft_transfer_parameters ctxt parameters_ty unparsed_parameters destination
-  >>?= fun (unparsed_parameters, ctxt) ->
-  Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
-  >>?= fun ctxt ->
-  let transaction =
-    let parameters =
-      Script.lazy_expr (Micheline.strip_locations unparsed_parameters)
-    in
-    {amount; destination; entrypoint; parameters}
-  in
-  let operation =
-    Transaction {transaction; location; parameters_ty; parameters}
-  in
+  Lwt.return
+    ( Script_ir_translator.unparse_ty ~loc:Micheline.dummy_location ctxt tp
+    >>? fun (ty, ctxt) ->
+      let unparsed_parameters =
+        Micheline.Seq (Micheline.dummy_location, [unparsed_parameters; ty])
+      in
+      Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
+      >|? fun ctxt ->
+      let unparsed_parameters = Micheline.strip_locations unparsed_parameters in
+      ( Transaction_to_tx_rollup
+          {destination; parameters_ty; parameters; unparsed_parameters},
+        ctxt ) )
+
+let make_transaction_to_sc_rollup ctxt ~destination ~amount ~entrypoint
+    ~parameters_ty ~parameters =
+  error_unless Tez.(amount = zero) Rollup_invalid_transaction_amount
+  >>?= fun () ->
+  unparse_data ctxt Optimized parameters_ty parameters
+  >>=? fun (unparsed_parameters, ctxt) ->
+  Lwt.return
+    ( Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
+    >|? fun ctxt ->
+      let unparsed_parameters = Micheline.strip_locations unparsed_parameters in
+      ( Transaction_to_sc_rollup
+          {
+            destination;
+            entrypoint;
+            parameters_ty;
+            parameters;
+            unparsed_parameters;
+          },
+        ctxt ) )
+
+(** [emit_event] generates an internal operation that will effect an event emission
+    if the contract code returns this successfully. *)
+let emit_event (type t tc) (ctxt, sc) gas ~(event_type : (t, tc) ty)
+    ~unparsed_ty ~tag ~(event_data : t) =
+  let ctxt = update_context gas ctxt in
+  (* No need to take care of lazy storage as only packable types are allowed *)
+  let lazy_storage_diff = None in
+  unparse_data ctxt Optimized event_type event_data
+  >>=? fun (unparsed_data, ctxt) ->
+  Gas.consume ctxt (Script.strip_locations_cost unparsed_data) >>?= fun ctxt ->
+  let unparsed_data = Micheline.strip_locations unparsed_data in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
-  let iop = {source = sc.self; operation; nonce} in
+  let operation = Event {ty = unparsed_ty; tag; unparsed_data} in
+  let iop = {source = Contract.Originated sc.self; operation; nonce} in
   let res = {piop = Internal_operation iop; lazy_storage_diff} in
-  let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
+  let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
+  return (res, ctxt, gas)
+
+(* [transfer (ctxt, sc) gas tez parameters_ty parameters destination entrypoint]
+   creates an operation that transfers an amount of [tez] to a destination and
+   an entrypoint instantiated with argument [parameters] of type
+   [parameters_ty]. *)
+let transfer (type t) (ctxt, sc) gas amount location
+    (typed_contract : t typed_contract) (parameters : t) =
+  let ctxt = update_context gas ctxt in
+  (match typed_contract with
+  | Typed_implicit destination ->
+      let () = parameters in
+      return (Transaction_to_implicit {destination; amount}, None, ctxt)
+  | Typed_originated
+      {arg_ty = parameters_ty; contract_hash = destination; entrypoint} ->
+      collect_lazy_storage ctxt parameters_ty parameters
+      >>?= fun (to_duplicate, ctxt) ->
+      let to_update = no_lazy_storage_id in
+      extract_lazy_storage_diff
+        ctxt
+        Optimized
+        parameters_ty
+        parameters
+        ~to_duplicate
+        ~to_update
+        ~temporary:true
+      >>=? fun (parameters, lazy_storage_diff, ctxt) ->
+      unparse_data ctxt Optimized parameters_ty parameters
+      >>=? fun (unparsed_parameters, ctxt) ->
+      Lwt.return
+        ( Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
+        >|? fun ctxt ->
+          let unparsed_parameters =
+            Micheline.strip_locations unparsed_parameters
+          in
+          ( Transaction_to_smart_contract
+              {
+                destination;
+                amount;
+                entrypoint;
+                location;
+                parameters_ty;
+                parameters;
+                unparsed_parameters;
+              },
+            lazy_storage_diff,
+            ctxt ) )
+  | Typed_tx_rollup {arg_ty = parameters_ty; tx_rollup = destination} ->
+      make_transaction_to_tx_rollup
+        ctxt
+        ~destination
+        ~amount
+        ~parameters_ty
+        ~parameters
+      >|=? fun (operation, ctxt) -> (operation, None, ctxt)
+  | Typed_sc_rollup
+      {arg_ty = parameters_ty; sc_rollup = destination; entrypoint} ->
+      make_transaction_to_sc_rollup
+        ctxt
+        ~destination
+        ~amount
+        ~entrypoint
+        ~parameters_ty
+        ~parameters
+      >|=? fun (operation, ctxt) -> (operation, None, ctxt))
+  >>=? fun (operation, lazy_storage_diff, ctxt) ->
+  fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
+  let iop = {source = Contract.Originated sc.self; operation; nonce} in
+  let res = {piop = Internal_operation iop; lazy_storage_diff} in
+  let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
   return (res, ctxt, gas)
 
 (** [create_contract (ctxt, sc) gas storage_ty code delegate credit init]
@@ -596,25 +622,27 @@ let create_contract (ctxt, sc) gas storage_type code delegate credit init =
   >>=? fun (init, lazy_storage_diff, ctxt) ->
   unparse_data ctxt Optimized storage_type init >>=? fun (storage, ctxt) ->
   Gas.consume ctxt (Script.strip_locations_cost storage) >>?= fun ctxt ->
-  let storage = Micheline.strip_locations storage in
-  Contract.fresh_contract_from_current_nonce ctxt >>?= fun (ctxt, contract) ->
-  let origination =
-    {
-      credit;
-      delegate;
-      script =
-        {code = Script.lazy_expr code; storage = Script.lazy_expr storage};
-    }
-  in
+  let unparsed_storage = Micheline.strip_locations storage in
+  Contract.fresh_contract_from_current_nonce ctxt
+  >>?= fun (ctxt, preorigination) ->
   let operation =
     Origination
-      {origination; preorigination = contract; storage_type; storage = init}
+      {
+        credit;
+        delegate;
+        code;
+        unparsed_storage;
+        preorigination;
+        storage_type;
+        storage = init;
+      }
   in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
-  let piop = Internal_operation {source = sc.self; operation; nonce} in
+  let source = Contract.Originated sc.self in
+  let piop = Internal_operation {source; operation; nonce} in
   let res = {piop; lazy_storage_diff} in
-  let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
-  return (res, contract, ctxt, gas)
+  let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
+  return (res, preorigination, ctxt, gas)
 
 (* [unpack ctxt ty bytes] deserialize [bytes] into a value of type [ty]. *)
 let unpack ctxt ~ty ~bytes =
@@ -659,10 +687,10 @@ let rec interp_stack_prefix_preserving_operation :
     (d * w) * result =
  fun f n accu stk ->
   match (n, stk) with
-  | (KPrefix (_, n), rest) ->
+  | KPrefix (_, _, n), rest ->
       interp_stack_prefix_preserving_operation f n (fst rest) (snd rest)
       |> fun ((v, rest'), result) -> ((accu, (v, rest')), result)
-  | (KRest, v) -> f accu v
+  | KRest, v -> f accu v
 
 (*
 
@@ -671,7 +699,15 @@ let rec interp_stack_prefix_preserving_operation :
 
    To improve readibility, we introduce their types as abbreviations:
 
-*)
+ *)
+
+(* A function of this type either introduces type-preserving
+   instrumentation of a continuation for the purposes of logging
+   or returns given continuation unchanged. *)
+type ('a, 'b, 'c, 'd) cont_instrumentation =
+  ('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation
+
+let id x = x
 
 type ('a, 's, 'b, 't, 'r, 'f) step_type =
   outdated_context * step_constants ->
@@ -682,41 +718,56 @@ type ('a, 's, 'b, 't, 'r, 'f) step_type =
   's ->
   ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'm, 'n, 'o) kmap_exit_type =
-  (('c, 'd, 'e, 'f) continuation -> ('a, 'b, 'g, 'h) continuation) ->
+type ('a, 'b, 'c, 'e, 'f, 'm, 'n, 'o) kmap_exit_type =
+  ('a, 'b, 'e, 'f) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('m * 'n, 'c * 'd, 'o, 'c * 'd) kinstr * ('m * 'n) list * ('m, 'o) map * 'm ->
-  (('m, 'o) map, 'c * 'd, 'e, 'f) continuation ->
+  ('m * 'n, 'a * 'b, 'o, 'a * 'b) kinstr ->
+  ('m * 'n) list ->
+  (('m, 'o) map, 'c) ty ->
+  ('m, 'o) map ->
+  'm ->
+  (('m, 'o) map, 'a * 'b, 'e, 'f) continuation ->
   'o ->
   'a * 'b ->
-  ('g * 'h * outdated_context * local_gas_counter) tzresult Lwt.t
+  ('e * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'j, 'k) kmap_enter_type =
-  (('a, 'b * 'c, 'd, 'e) continuation -> ('a, 'b * 'c, 'd, 'e) continuation) ->
+type ('a, 'b, 'c, 'd, 'e, 'f, 'j, 'k) kmap_enter_type =
+  ('a, 'b * 'c, 'd, 'e) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('j * 'k, 'b * 'c, 'a, 'b * 'c) kinstr * ('j * 'k) list * ('j, 'a) map ->
+  ('j * 'k, 'b * 'c, 'a, 'b * 'c) kinstr ->
+  ('j * 'k) list ->
+  (('j, 'a) map, 'f) ty ->
+  ('j, 'a) map ->
   (('j, 'a) map, 'b * 'c, 'd, 'e) continuation ->
   'b ->
   'c ->
   ('d * 'e * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'i, 'j) klist_exit_type =
-  (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
+type ('a, 'b, 'c, 'd, 'e, 'i, 'j) klist_exit_type =
+  ('a, 'b, 'c, 'd) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('i, 'a * 'b, 'j, 'a * 'b) kinstr * 'i list * 'j list * int ->
+  ('i, 'a * 'b, 'j, 'a * 'b) kinstr ->
+  'i list ->
+  'j list ->
+  ('j boxed_list, 'e) ty ->
+  int ->
   ('j boxed_list, 'a * 'b, 'c, 'd) continuation ->
   'j ->
   'a * 'b ->
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'j) klist_enter_type =
-  (('b, 'a * 'c, 'd, 'e) continuation -> ('b, 'a * 'c, 'd, 'e) continuation) ->
+type ('a, 'b, 'c, 'd, 'e, 'f, 'j) klist_enter_type =
+  ('b, 'a * 'c, 'd, 'e) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('j, 'a * 'c, 'b, 'a * 'c) kinstr * 'j list * 'b list * int ->
+  ('j, 'a * 'c, 'b, 'a * 'c) kinstr ->
+  'j list ->
+  'b list ->
+  ('b boxed_list, 'f) ty ->
+  int ->
   ('b boxed_list, 'a * 'c, 'd, 'e) continuation ->
   'a ->
   'c ->
@@ -742,62 +793,73 @@ type ('a, 'b, 'c, 'r, 'f, 's) kloop_in_type =
   'a * 's ->
   ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 's, 'r, 'f) kiter_type =
-  (('a, 's, 'r, 'f) continuation -> ('a, 's, 'r, 'f) continuation) ->
+type ('a, 'b, 's, 'r, 'f, 'c) kiter_type =
+  ('a, 's, 'r, 'f) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('b, 'a * 's, 'a, 's) kinstr * 'b list ->
+  ('b, 'a * 's, 'a, 's) kinstr ->
+  ('b, 'c) ty ->
+  'b list ->
   ('a, 's, 'r, 'f) continuation ->
   'a ->
   's ->
   ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) ilist_map_type =
-  (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
+type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) ilist_map_type =
+  ('a, 'b, 'c, 'd) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('e, 'a * 'b, 'f, 'a * 'b) kinstr * ('f boxed_list, 'a * 'b, 'g, 'h) kinstr ->
+  ('e, 'a * 'b, 'f, 'a * 'b) kinstr ->
+  ('f boxed_list, 'a * 'b, 'g, 'h) kinstr ->
   ('g, 'h, 'c, 'd) continuation ->
+  ('f boxed_list, 'i) ty ->
   'e boxed_list ->
   'a * 'b ->
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'f, 'g) ilist_iter_type =
-  (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
+type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'cmp) ilist_iter_type =
+  ('a, 'b, 'c, 'd) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('e, 'a * 'b, 'a, 'b) kinstr * ('a, 'b, 'f, 'g) kinstr ->
+  ('e, 'a * 'b, 'a, 'b) kinstr ->
+  ('e, 'cmp) ty ->
+  ('a, 'b, 'f, 'g) kinstr ->
   ('f, 'g, 'c, 'd) continuation ->
   'e boxed_list ->
   'a * 'b ->
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g) iset_iter_type =
-  (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
+  ('a, 'b, 'c, 'd) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('e, 'a * 'b, 'a, 'b) kinstr * ('a, 'b, 'f, 'g) kinstr ->
+  ('e, 'a * 'b, 'a, 'b) kinstr ->
+  'e comparable_ty ->
+  ('a, 'b, 'f, 'g) kinstr ->
   ('f, 'g, 'c, 'd) continuation ->
   'e set ->
   'a * 'b ->
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) imap_map_type =
-  (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
+type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) imap_map_type =
+  ('a, 'b, 'c, 'd) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('e * 'f, 'a * 'b, 'g, 'a * 'b) kinstr
-  * (('e, 'g) map, 'a * 'b, 'h, 'i) kinstr ->
+  ('e * 'f, 'a * 'b, 'g, 'a * 'b) kinstr ->
+  (('e, 'g) map, 'a * 'b, 'h, 'i) kinstr ->
   ('h, 'i, 'c, 'd) continuation ->
+  (('e, 'g) map, 'j) ty ->
   ('e, 'f) map ->
   'a * 'b ->
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) imap_iter_type =
-  (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
+type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'cmp) imap_iter_type =
+  ('a, 'b, 'c, 'd) cont_instrumentation ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('e * 'f, 'a * 'b, 'a, 'b) kinstr * ('a, 'b, 'g, 'h) kinstr ->
+  ('e * 'f, 'a * 'b, 'a, 'b) kinstr ->
+  ('e * 'f, 'cmp) ty ->
+  ('a, 'b, 'g, 'h) kinstr ->
   ('g, 'h, 'c, 'd) continuation ->
   ('e, 'f) map ->
   'a * 'b ->
@@ -807,7 +869,8 @@ type ('a, 'b, 'c, 'd, 'e, 'f) imul_teznat_type =
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  (Tez.t, 'a) kinfo * (Tez.t, 'b, 'c, 'd) kinstr ->
+  Script.location ->
+  (Tez.t, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Tez.t ->
   Script_int.n Script_int.num * 'b ->
@@ -817,7 +880,8 @@ type ('a, 'b, 'c, 'd, 'e, 'f) imul_nattez_type =
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  (Script_int.n Script_int.num, 'a) kinfo * (Tez.t, 'b, 'c, 'd) kinstr ->
+  Script.location ->
+  (Tez.t, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Script_int.n Script_int.num ->
   Tez.t * 'b ->
@@ -827,8 +891,8 @@ type ('a, 'b, 'c, 'd, 'e, 'f) ilsl_nat_type =
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  (Script_int.n Script_int.num, 'a) kinfo
-  * (Script_int.n Script_int.num, 'b, 'c, 'd) kinstr ->
+  Script.location ->
+  (Script_int.n Script_int.num, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Script_int.n Script_int.num ->
   Script_int.n Script_int.num * 'b ->
@@ -838,8 +902,8 @@ type ('a, 'b, 'c, 'd, 'e, 'f) ilsr_nat_type =
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  (Script_int.n Script_int.num, 'a) kinfo
-  * (Script_int.n Script_int.num, 'b, 'c, 'd) kinstr ->
+  Script.location ->
+  (Script_int.n Script_int.num, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Script_int.n Script_int.num ->
   Script_int.n Script_int.num * 'b ->
@@ -859,11 +923,25 @@ type ifailwith_type = {
 [@@unboxed]
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g) iexec_type =
+  ('a, end_of_stack, 'e, 'f) cont_instrumentation ->
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
+  ('a, 'b) stack_ty ->
   ('a, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   'g ->
   ('g, 'a) lambda * 'b ->
+  ('e * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
+
+type ('a, 'b, 'c, 'd, 'e, 'f, 'i, 'o) iview_type =
+  ('o, end_of_stack, 'e, 'f) cont_instrumentation ->
+  outdated_context * step_constants ->
+  local_gas_counter ->
+  ('i, 'o) view_signature ->
+  ('o, 'a * 'b) stack_ty ->
+  ('o option, 'a * 'b, 'c, 'd) kinstr ->
+  ('c, 'd, 'e, 'f) continuation ->
+  'i ->
+  address * ('a * 'b) ->
   ('e * 'f * outdated_context * local_gas_counter) tzresult Lwt.t

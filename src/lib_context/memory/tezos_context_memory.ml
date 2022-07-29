@@ -30,3 +30,20 @@ module Context_binary = Context.Make (Tezos_context_encoding.Context_binary)
 
 (** Variant of [Tezos_context.Context] purely in-memory. *)
 module Context = Context.Make (Tezos_context_encoding.Context)
+
+let make_empty_context ?(root = "/tmp") () =
+  let open Lwt_syntax in
+  let context_promise =
+    let+ index = Context.init root in
+    Context.empty index
+  in
+  match Lwt.state context_promise with
+  | Lwt.Return result -> result
+  | Lwt.Fail exn -> raise exn
+  | Lwt.Sleep ->
+      (* The in-memory context should never block *)
+      assert false
+
+let make_empty_tree =
+  let dummy_context = make_empty_context ~root:"dummy" () in
+  fun () -> Context.Tree.empty dummy_context
