@@ -2238,6 +2238,7 @@ let octez_shell =
       "Tezos: core of `tezos-node` (gossip, validation scheduling, mempool, \
        ...)"
     ~documentation:[Dune.[S "package"; S "tezos-shell"]]
+    ~inline_tests:ppx_expect
     ~deps:
       [
         lwt_watcher;

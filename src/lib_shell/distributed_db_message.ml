@@ -27,126 +27,163 @@
 module Bounded_encoding = struct
   open Data_encoding
 
-  let block_header_max_size = ref (8 * 1024 * 1024)
+  module M : sig
+    type 'a t
 
-  let block_locator_max_length = ref 1000
+    val create : 'a -> 'a t * ('a -> unit)
 
-  (* FIXME: arbitrary *)
+    val map : 'a t -> ('a -> 'b) -> 'b t
 
-  let block_header_cache =
-    ref (Block_header.bounded_encoding ~max_size:!block_header_max_size ())
+    val map2 : 'a t -> 'b t -> ('a -> 'b -> 'c) -> 'c t
 
-  let block_locator_cache =
-    ref
-      (Block_locator.bounded_encoding
-         ~max_header_size:!block_header_max_size
-         ~max_length:!block_locator_max_length
-         ())
+    val encoding : 'a Data_encoding.t t -> 'a Data_encoding.t
+  end = struct
+    type 'a t = {get : unit -> 'a; mutable on_update : (unit -> unit) list}
 
-  let update_block_header_encoding () =
-    block_header_cache :=
-      Block_header.bounded_encoding ~max_size:!block_header_max_size () ;
-    block_locator_cache :=
-      Block_locator.bounded_encoding
-        ~max_header_size:!block_header_max_size
-        ~max_length:!block_locator_max_length
-        ()
+    type deps = D : 'a t -> deps
 
-  let set_block_header_max_size max =
-    block_header_max_size := max ;
-    update_block_header_encoding ()
+    let register_on_update f (D x) =
+      let old = x.on_update in
+      x.on_update <- f :: old
 
-  let set_block_locator_max_length max =
-    block_locator_max_length := max ;
-    update_block_header_encoding ()
+    let make_with_deps cache deps f =
+      let res =
+        {
+          get =
+            (fun () ->
+              match !cache with
+              | Some x -> x
+              | None ->
+                  let r = f () in
+                  cache := Some r ;
+                  r);
+          on_update = [];
+        }
+      in
+      let invalidate () =
+        cache := None ;
+        List.iter (fun f -> f ()) res.on_update
+      in
+      List.iter (register_on_update invalidate) deps ;
+      res
 
-  let block_header = delayed (fun () -> !block_header_cache)
+    let create x =
+      let cache = ref (Some x) in
+      let res =
+        make_with_deps cache [] (fun () ->
+            (* The cache is always set to some value, this function will never be called *)
+            assert false)
+      in
+      let set x =
+        cache := Some x ;
+        List.iter (fun f -> f ()) res.on_update
+      in
+      (res, set)
 
-  let block_locator = delayed (fun () -> !block_locator_cache)
+    let map x f = make_with_deps (ref None) [D x] (fun () -> f (x.get ()))
 
-  (* FIXME: all constants below are arbitrary high bounds until we
-     have the mechanism to update them properly *)
-  let operation_max_size = ref (Some (128 * 1024)) (* FIXME: arbitrary *)
+    let map2 x y f =
+      make_with_deps (ref None) [D x; D y] (fun () -> f (x.get ()) (y.get ()))
 
-  let operation_list_max_size = ref (Some (1024 * 1024)) (* FIXME: arbitrary *)
+    let get x = x.get ()
 
-  let operation_list_max_length = ref None (* FIXME: arbitrary *)
+    let encoding x = delayed (fun () -> get x)
 
-  let operation_max_pass = ref (Some 8) (* FIXME: arbitrary *)
+    let%expect_test _ =
+      let x, set_x = create 4 in
+      let y, _set_y = create 4 in
+      let z =
+        map2 x y (fun x y ->
+            print_endline "compute z" ;
+            x + y)
+      in
+      [%expect {||}] ;
+      print_int (get z) ;
+      [%expect {|
+        compute z
+        8 |}] ;
+      print_int (get z) ;
+      [%expect {| 8 |}] ;
+      set_x 1 ;
+      print_int (get x) ;
+      [%expect {| 1 |}] ;
+      print_int (get z) ;
+      [%expect {|
+        compute z
+        5 |}]
+  end
 
-  let operation_cache =
-    ref (Operation.bounded_encoding ?max_size:!operation_max_size ())
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3370
+     all constants below are arbitrary high bounds until we have the
+     mechanism to update them properly. *)
 
-  let operation_list_cache =
-    ref
-      (Operation.bounded_list_encoding
-         ?max_length:!operation_list_max_length
-         ?max_size:!operation_list_max_size
-         ?max_operation_size:!operation_max_size
-         ?max_pass:!operation_max_pass
-         ())
+  let block_header_max_size, set_block_header_max_size =
+    M.create (8 * 1024 * 1024)
 
-  let update_operation_list_encoding () =
-    operation_list_cache :=
-      Operation.bounded_list_encoding
-        ?max_length:!operation_list_max_length
-        ?max_size:!operation_list_max_size
-        ?max_operation_size:!operation_max_size
-        ?max_pass:!operation_max_pass
-        ()
+  let block_locator_max_length, set_block_locator_max_length = M.create 1000
 
-  let update_operation_hash_list_encoding () =
-    operation_list_cache :=
-      Operation.bounded_list_encoding
-        ?max_length:!operation_list_max_length
-        ?max_pass:!operation_max_pass
-        ()
+  let operation_max_size, set_operation_max_size = M.create (Some (128 * 1024))
 
-  let update_operation_encoding () =
-    operation_cache :=
-      Operation.bounded_encoding ?max_size:!operation_max_size ()
+  let operation_list_max_size, set_operation_list_max_size =
+    M.create (Some (1024 * 1024))
 
-  let set_operation_max_size max =
-    operation_max_size := max ;
-    update_operation_encoding () ;
-    update_operation_list_encoding ()
+  let operation_list_max_length, set_operation_list_max_length = M.create None
 
-  let set_operation_list_max_size max =
-    operation_list_max_size := max ;
-    update_operation_list_encoding ()
+  let operation_max_pass, set_operation_max_pass = M.create (Some 8)
 
-  let set_operation_list_max_length max =
-    operation_list_max_length := max ;
-    update_operation_list_encoding () ;
-    update_operation_hash_list_encoding ()
+  let protocol_max_size, set_protocol_max_size =
+    M.create (Some (2 * 1024 * 1024))
 
-  let set_operation_max_pass max =
-    operation_max_pass := max ;
-    update_operation_list_encoding () ;
-    update_operation_hash_list_encoding ()
+  let mempool_max_operations, set_mempool_max_operations = M.create (Some 4000)
 
-  let operation = delayed (fun () -> !operation_cache)
+  let block_header =
+    M.map block_header_max_size (fun max_size ->
+        Block_header.bounded_encoding ~max_size ())
+    |> M.encoding
 
-  let operation_list = delayed (fun () -> !operation_list_cache)
+  let block_locator =
+    M.map2
+      block_header_max_size
+      block_locator_max_length
+      (fun max_header_size max_length ->
+        Block_locator.bounded_encoding ~max_header_size ~max_length ())
+    |> M.encoding
 
-  let protocol_max_size = ref (Some (2 * 1024 * 1024)) (* FIXME: arbitrary *)
+  let operation =
+    M.map operation_max_size (fun max_size ->
+        Operation.bounded_encoding ?max_size ())
+    |> M.encoding
 
-  let protocol_cache =
-    ref (Protocol.bounded_encoding ?max_size:!protocol_max_size ())
+  let map4 x y z t f =
+    M.map2
+      (M.map2 x y (fun x y -> (x, y)))
+      (M.map2 z t (fun z t -> (z, t)))
+      (fun (x, y) (z, t) -> f x y z t)
 
-  let set_protocol_max_size max = protocol_max_size := max
+  let operation_list =
+    map4
+      operation_list_max_length
+      operation_list_max_size
+      operation_max_size
+      operation_max_pass
+      (fun max_length max_size max_operation_size max_pass ->
+        Operation.bounded_list_encoding
+          ?max_length
+          ?max_size
+          ?max_operation_size
+          ?max_pass
+          ())
+    |> M.encoding
 
-  let protocol = delayed (fun () -> !protocol_cache)
+  let protocol =
+    M.map protocol_max_size (fun max_size ->
+        Protocol.bounded_encoding ?max_size ())
+    |> M.encoding
 
-  (* Twice the current max size of a mempoool *)
-  let mempool_max_operations = ref (Some 4000)
-
-  let mempool_cache =
-    ref (Mempool.bounded_encoding ?max_operations:!mempool_max_operations ())
-
-  let set_mempool_max_operations max = mempool_max_operations := max
-
-  let mempool = delayed (fun () -> !mempool_cache)
+  let mempool =
+    M.map mempool_max_operations (fun max_operations ->
+        Mempool.bounded_encoding ?max_operations ())
+    |> M.encoding
 end
 
 type t =
