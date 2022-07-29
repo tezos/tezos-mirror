@@ -1044,6 +1044,7 @@ module Manager = struct
     | Gas_quota_exceeded_init_deserialize
     | Tx_rollup_feature_disabled
     | Sc_rollup_feature_disabled
+    | Zk_rollup_feature_disabled
 
   let () =
     register_error_kind
@@ -1160,7 +1161,19 @@ module Manager = struct
       ~pp:(fun ppf () -> Format.fprintf ppf "%s" scoru_disabled_description)
       Data_encoding.unit
       (function Sc_rollup_feature_disabled -> Some () | _ -> None)
-      (fun () -> Sc_rollup_feature_disabled)
+      (fun () -> Sc_rollup_feature_disabled) ;
+    let zkru_disabled_description =
+      "ZK rollups will be enabled in a future proposal."
+    in
+    register_error_kind
+      `Permanent
+      ~id:"validate_operation.zk_rollup_disabled"
+      ~title:"ZK rollups are disabled"
+      ~description:zkru_disabled_description
+      ~pp:(fun ppf () -> Format.fprintf ppf "%s" zkru_disabled_description)
+      Data_encoding.unit
+      (function Zk_rollup_feature_disabled -> Some () | _ -> None)
+      (fun () -> Zk_rollup_feature_disabled)
 end
 
 type error += Failing_noop_error

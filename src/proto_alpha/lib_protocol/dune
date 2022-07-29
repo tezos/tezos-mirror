@@ -232,6 +232,7 @@
   Sc_rollup_management_protocol
   Sc_rollup_operations
   Dal_apply
+  Zk_rollup_apply
   Baking
   Validate_errors
   Amendment
@@ -484,6 +485,7 @@
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli
   dal_apply.ml dal_apply.mli
+  zk_rollup_apply.ml zk_rollup_apply.mli
   baking.ml baking.mli
   validate_errors.ml validate_errors.mli
   amendment.ml amendment.mli
@@ -716,6 +718,7 @@
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli
   dal_apply.ml dal_apply.mli
+  zk_rollup_apply.ml zk_rollup_apply.mli
   baking.ml baking.mli
   validate_errors.ml validate_errors.mli
   amendment.ml amendment.mli
@@ -953,6 +956,7 @@
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli
   dal_apply.ml dal_apply.mli
+  zk_rollup_apply.ml zk_rollup_apply.mli
   baking.ml baking.mli
   validate_errors.ml validate_errors.mli
   amendment.ml amendment.mli

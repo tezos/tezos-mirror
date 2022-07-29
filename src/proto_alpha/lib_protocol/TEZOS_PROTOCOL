@@ -222,6 +222,7 @@
         "Sc_rollup_operations",
 
         "Dal_apply",
+        "Zk_rollup_apply",
 
         "Baking",
         "Validate_errors",

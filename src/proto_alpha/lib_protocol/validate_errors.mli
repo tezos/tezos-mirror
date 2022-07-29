@@ -178,6 +178,7 @@ module Manager : sig
     | Gas_quota_exceeded_init_deserialize
     | Tx_rollup_feature_disabled
     | Sc_rollup_feature_disabled
+    | Zk_rollup_feature_disabled
 end
 
 type error += Failing_noop_error

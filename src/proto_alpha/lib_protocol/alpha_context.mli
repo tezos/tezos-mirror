@@ -3902,6 +3902,8 @@ module Kind : sig
 
   type sc_rollup_dal_slot_subscribe = Sc_rollup_dal_slot_subscribe_kind
 
+  type zk_rollup_origination = Zk_rollup_origination_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -3935,6 +3937,7 @@ module Kind : sig
     | Sc_rollup_recover_bond_manager_kind : sc_rollup_recover_bond manager
     | Sc_rollup_dal_slot_subscribe_manager_kind
         : sc_rollup_dal_slot_subscribe manager
+    | Zk_rollup_origination_manager_kind : zk_rollup_origination manager
 end
 
 (** All the definitions below are re-exported from {!Operation_repr}. *)
@@ -4172,6 +4175,13 @@ and _ manager_operation =
       slot_index : Dal.Slot_index.t;
     }
       -> Kind.sc_rollup_dal_slot_subscribe manager_operation
+  | Zk_rollup_origination : {
+      public_parameters : Plonk.public_parameters;
+      circuits_info : bool Zk_rollup.Account.SMap.t;
+      init_state : Zk_rollup.State.t;
+      nb_ops : int;
+    }
+      -> Kind.zk_rollup_origination manager_operation
 
 and counter = Z.t
 
@@ -4358,6 +4368,9 @@ module Operation : sig
     val sc_rollup_dal_slot_subscribe_case :
       Kind.sc_rollup_dal_slot_subscribe Kind.manager case
 
+    val zk_rollup_origination_case :
+      Kind.zk_rollup_origination Kind.manager case
+
     module Manager_operations : sig
       type 'b case =
         | MCase : {
@@ -4425,6 +4438,8 @@ module Operation : sig
 
       val sc_rollup_dal_slot_subscribe_case :
         Kind.sc_rollup_dal_slot_subscribe case
+
+      val zk_rollup_origination_case : Kind.zk_rollup_origination case
     end
   end
 
@@ -4732,6 +4747,14 @@ module Fees : sig
     (context * Z.t * Receipt.balance_updates) tzresult Lwt.t
 
   val burn_sc_rollup_origination_fees :
+    ?origin:Receipt.update_origin ->
+    context ->
+    storage_limit:Z.t ->
+    payer:Token.source ->
+    Z.t ->
+    (context * Z.t * Receipt.balance_updates) tzresult Lwt.t
+
+  val burn_zk_rollup_origination_fees :
     ?origin:Receipt.update_origin ->
     context ->
     storage_limit:Z.t ->
