@@ -592,6 +592,7 @@ module Inner = struct
     Ok n_poly
 
   let polynomial_from_shards t shards =
+    let open Result_syntax in
     if t.k > IntMap.cardinal shards * t.shard_size then
       Error
         (`Not_enough_shards
@@ -655,7 +656,6 @@ module Inner = struct
       let eval_a' = Evaluations.evaluation_fft t.domain_n a' in
 
       (* 4. Computing N(x). *)
-      let open Result_syntax in
       let* n_poly = compute_n t eval_a' shards in
 
       (* 5. Computing B(x). *)
