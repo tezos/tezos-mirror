@@ -468,6 +468,10 @@ let segment_mode_gen =
   let+ mode = oneof [passive; active; declarative] in
   no_region mode
 
+let start_gen =
+  let+ sfunc = var_gen in
+  no_region Ast.{sfunc}
+
 let module_key_and_instance_gen ?module_reg () =
   let module_reg =
     match module_reg with

@@ -743,4 +743,354 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
         (value [] Data_encoding.string)
         [dkstart_case; dkmode_case; dkinit_case; dkstop_case]
   end
+
+  module Field = struct
+    (* TODO: keep region? *)
+    let no_region_encoding enc =
+      conv (fun s -> Source.(s @@ no_region)) (fun {it; _} -> it) enc
+
+    let type_field_encoding =
+      scope
+        ["module"; "types"]
+        (vector_encoding (no_region_encoding Func_type.func_type_encoding))
+
+    let import_field_encoding =
+      scope
+        ["module"; "imports"]
+        (vector_encoding (no_region_encoding Import.import_encoding))
+
+    let func_field_encoding =
+      scope
+        ["module"; "funcs"]
+        (vector_encoding (value [] Interpreter_encodings.Ast.var_encoding))
+
+    let table_field_encoding =
+      scope
+        ["module"; "tables"]
+        (vector_encoding (value [] Interpreter_encodings.Ast.table_encoding))
+
+    let memory_field_encoding =
+      scope
+        ["module"; "memories"]
+        (vector_encoding (value [] Interpreter_encodings.Ast.memory_encoding))
+
+    let global_field_encoding =
+      scope
+        ["module"; "globals"]
+        (vector_encoding (value [] Interpreter_encodings.Ast.global_encoding))
+
+    let export_field_encoding =
+      scope
+        ["module"; "exports"]
+        (vector_encoding (no_region_encoding Export.export_encoding))
+
+    let start_field_encoding =
+      value_option ["module"; "start"] Interpreter_encodings.Ast.start_encoding
+
+    let elem_field_encoding =
+      scope
+        ["module"; "elem_segments"]
+        (vector_encoding (no_region_encoding Elem.elem_encoding))
+
+    let data_count_field_encoding =
+      value_option ["module"; "data_count"] Data_encoding.int32
+
+    let code_field_encoding =
+      scope ["module"; "code"] (vector_encoding Code.func_encoding)
+
+    let data_field_encoding =
+      scope
+        ["module"; "data_segments"]
+        (vector_encoding (no_region_encoding Data.data_segment_encoding))
+
+    let building_state_encoding =
+      conv
+        (fun ( types,
+               imports,
+               vars,
+               tables,
+               memories,
+               globals,
+               exports,
+               start,
+               (elems, data_count, code, datas) ) ->
+          Decode.
+            {
+              types;
+              imports;
+              vars;
+              tables;
+              memories;
+              globals;
+              exports;
+              start;
+              elems;
+              data_count;
+              code;
+              datas;
+            })
+        (fun Decode.
+               {
+                 types;
+                 imports;
+                 vars;
+                 tables;
+                 memories;
+                 globals;
+                 exports;
+                 start;
+                 elems;
+                 data_count;
+                 code;
+                 datas;
+               } ->
+          ( types,
+            imports,
+            vars,
+            tables,
+            memories,
+            globals,
+            exports,
+            start,
+            (elems, data_count, code, datas) ))
+        (tup9
+           ~flatten:true
+           type_field_encoding
+           import_field_encoding
+           func_field_encoding
+           table_field_encoding
+           memory_field_encoding
+           global_field_encoding
+           export_field_encoding
+           start_field_encoding
+           (tup4
+              ~flatten:true
+              elem_field_encoding
+              data_count_field_encoding
+              code_field_encoding
+              data_field_encoding))
+
+    (* Only used to encode field_type. *)
+    type packed_field_type =
+      | FieldType : ('a, 'repr) Decode.field_type -> packed_field_type
+
+    let packed_field_type_encoding =
+      let open Decode in
+      let type_field_encoding =
+        let tag = "TypeField" in
+        case
+          tag
+          (value [] (Data_encoding.constant tag))
+          (function FieldType TypeField -> Some () | _ -> None)
+          (fun () -> FieldType TypeField)
+      in
+      let import_field_encoding =
+        let tag = "ImportField" in
+        case
+          tag
+          (value [] (Data_encoding.constant tag))
+          (function FieldType ImportField -> Some () | _ -> None)
+          (fun () -> FieldType ImportField)
+      in
+      let func_field_encoding =
+        let tag = "FuncField" in
+        case
+          tag
+          (value [] (Data_encoding.constant tag))
+          (function FieldType FuncField -> Some () | _ -> None)
+          (fun () -> FieldType FuncField)
+      in
+      let table_field_encoding =
+        let tag = "TableField" in
+        case
+          tag
+          (value [] (Data_encoding.constant tag))
+          (function FieldType TableField -> Some () | _ -> None)
+          (fun () -> FieldType TableField)
+      in
+      let memory_field_encoding =
+        let tag = "MemoryField" in
+        case
+          tag
+          (value [] (Data_encoding.constant tag))
+          (function FieldType MemoryField -> Some () | _ -> None)
+          (fun () -> FieldType MemoryField)
+      in
+      let global_field_encoding =
+        let tag = "GlobalField" in
+        case
+          tag
+          (value [] (Data_encoding.constant tag))
+          (function FieldType GlobalField -> Some () | _ -> None)
+          (fun () -> FieldType GlobalField)
+      in
+      let export_field_encoding =
+        let tag = "ExportField" in
+        case
+          tag
+          (value [] (Data_encoding.constant tag))
+          (function FieldType ExportField -> Some () | _ -> None)
+          (fun () -> FieldType ExportField)
+      in
+      let start_field_encoding =
+        let tag = "StartField" in
+        case
+          tag
+          (value [] (Data_encoding.constant tag))
+          (function FieldType StartField -> Some () | _ -> None)
+          (fun () -> FieldType StartField)
+      in
+      let elem_field_encoding =
+        let tag = "ElemField" in
+        case
+          tag
+          (value [] (Data_encoding.constant tag))
+          (function FieldType ElemField -> Some () | _ -> None)
+          (fun () -> FieldType ElemField)
+      in
+      let data_count_field_encoding =
+        let tag = "DataCountField" in
+        case
+          tag
+          (value [] (Data_encoding.constant tag))
+          (function FieldType DataCountField -> Some () | _ -> None)
+          (fun () -> FieldType DataCountField)
+      in
+      let code_field_encoding =
+        let tag = "CodeField" in
+        case
+          tag
+          (value [] (Data_encoding.constant tag))
+          (function FieldType CodeField -> Some () | _ -> None)
+          (fun () -> FieldType CodeField)
+      in
+      let data_field_encoding =
+        let tag = "DataField" in
+        case
+          tag
+          (value [] (Data_encoding.constant tag))
+          (function FieldType DataField -> Some () | _ -> None)
+          (fun () -> FieldType DataField)
+      in
+      tagged_union
+        (value [] Data_encoding.string)
+        [
+          type_field_encoding;
+          import_field_encoding;
+          func_field_encoding;
+          table_field_encoding;
+          memory_field_encoding;
+          global_field_encoding;
+          export_field_encoding;
+          start_field_encoding;
+          elem_field_encoding;
+          data_count_field_encoding;
+          code_field_encoding;
+          data_field_encoding;
+        ]
+
+    (* Only used to encode lazy vector parameterized by the field type in the
+       continuation. *)
+    type packed_typed_lazy_vec =
+      | TypedLazyVec :
+          ('a, Decode.vec_repr) Decode.field_type * 'a Decode.lazy_vec_kont
+          -> packed_typed_lazy_vec
+
+    let packed_typed_lazy_vec_encoding =
+      let open Decode in
+      let type_field_encoding =
+        let tag = "TypeField" in
+        case
+          tag
+          (Lazy_vec.raw_encoding type_field_encoding)
+          (function TypedLazyVec (TypeField, vec) -> Some vec | _ -> None)
+          (fun vec -> TypedLazyVec (TypeField, vec))
+      in
+      let import_field_encoding =
+        let tag = "ImportField" in
+        case
+          tag
+          (Lazy_vec.raw_encoding import_field_encoding)
+          (function TypedLazyVec (ImportField, vec) -> Some vec | _ -> None)
+          (fun vec -> TypedLazyVec (ImportField, vec))
+      in
+      let func_field_encoding =
+        let tag = "FuncField" in
+        case
+          tag
+          (Lazy_vec.raw_encoding func_field_encoding)
+          (function TypedLazyVec (FuncField, vec) -> Some vec | _ -> None)
+          (fun vec -> TypedLazyVec (FuncField, vec))
+      in
+      let table_field_encoding =
+        let tag = "TableField" in
+        case
+          tag
+          (Lazy_vec.raw_encoding table_field_encoding)
+          (function TypedLazyVec (TableField, vec) -> Some vec | _ -> None)
+          (fun vec -> TypedLazyVec (TableField, vec))
+      in
+      let memory_field_encoding =
+        let tag = "MemoryField" in
+        case
+          tag
+          (Lazy_vec.raw_encoding memory_field_encoding)
+          (function TypedLazyVec (MemoryField, vec) -> Some vec | _ -> None)
+          (fun vec -> TypedLazyVec (MemoryField, vec))
+      in
+      let global_field_encoding =
+        let tag = "GlobalField" in
+        case
+          tag
+          (Lazy_vec.raw_encoding global_field_encoding)
+          (function TypedLazyVec (GlobalField, vec) -> Some vec | _ -> None)
+          (fun vec -> TypedLazyVec (GlobalField, vec))
+      in
+      let export_field_encoding =
+        let tag = "ExportField" in
+        case
+          tag
+          (Lazy_vec.raw_encoding export_field_encoding)
+          (function TypedLazyVec (ExportField, vec) -> Some vec | _ -> None)
+          (fun vec -> TypedLazyVec (ExportField, vec))
+      in
+      let elem_field_encoding =
+        let tag = "ElemField" in
+        case
+          tag
+          (Lazy_vec.raw_encoding elem_field_encoding)
+          (function TypedLazyVec (ElemField, vec) -> Some vec | _ -> None)
+          (fun vec -> TypedLazyVec (ElemField, vec))
+      in
+      let code_field_encoding =
+        let tag = "CodeField" in
+        case
+          tag
+          (Lazy_vec.raw_encoding code_field_encoding)
+          (function TypedLazyVec (CodeField, vec) -> Some vec | _ -> None)
+          (fun vec -> TypedLazyVec (CodeField, vec))
+      in
+      let data_field_encoding =
+        let tag = "DataField" in
+        case
+          tag
+          (Lazy_vec.raw_encoding data_field_encoding)
+          (function TypedLazyVec (DataField, vec) -> Some vec | _ -> None)
+          (fun vec -> TypedLazyVec (DataField, vec))
+      in
+      tagged_union
+        (value [] Data_encoding.string)
+        [
+          type_field_encoding;
+          import_field_encoding;
+          func_field_encoding;
+          table_field_encoding;
+          memory_field_encoding;
+          global_field_encoding;
+          export_field_encoding;
+          elem_field_encoding;
+          code_field_encoding;
+          data_field_encoding;
+        ]
+  end
 end

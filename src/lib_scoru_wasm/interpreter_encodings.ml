@@ -683,4 +683,43 @@ module Ast = struct
         ]
     in
     Source.phrase_encoding unannotated_encoding
+
+  let table_encoding =
+    let open Data_encoding in
+    let unannoted_encoding =
+      conv
+        (fun {ttype} -> ttype)
+        (fun ttype -> {ttype})
+        Types.table_type_encoding
+    in
+    Source.phrase_encoding unannoted_encoding
+
+  let memory_encoding =
+    let open Data_encoding in
+    let unannoted_encoding =
+      conv
+        (fun {mtype} -> mtype)
+        (fun mtype -> {mtype})
+        Types.memory_type_encoding
+    in
+    Source.phrase_encoding unannoted_encoding
+
+  let global_encoding =
+    let open Data_encoding in
+    let unannoted_encoding =
+      conv
+        (fun {gtype; ginit} -> (gtype, ginit))
+        (fun (gtype, ginit) -> {gtype; ginit})
+        (tup2
+           Types.global_type_encoding
+           (Source.phrase_encoding block_label_encoding))
+    in
+    Source.phrase_encoding unannoted_encoding
+
+  let start_encoding =
+    let open Data_encoding in
+    let unannoted_encoding =
+      conv (fun {sfunc} -> sfunc) (fun sfunc -> {sfunc}) var_encoding
+    in
+    Source.phrase_encoding unannoted_encoding
 end

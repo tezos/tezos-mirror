@@ -822,7 +822,203 @@ module Data = struct
   let tests = [tztest "Data" `Quick (make_test Parser.Data.encoding gen check)]
 end
 
+module Field = struct
+  open Utils
+
+  let no_region gen = QCheck2.Gen.map (fun v -> Source.(v @@ no_region)) gen
+
+  let type_field_gen = Vec.gen (no_region Func_type.func_type_gen)
+
+  let import_field_gen = Vec.gen (no_region Imports.import_gen)
+
+  let func_field_gen = Vec.gen Ast_generators.var_gen
+
+  let table_field_gen =
+    let open QCheck2.Gen in
+    let table_gen =
+      let+ ttype = Ast_generators.table_type_gen in
+      Ast.{ttype}
+    in
+    Vec.gen (no_region table_gen)
+
+  let memory_field_gen =
+    let open QCheck2.Gen in
+    let memory_gen =
+      let+ mtype = Ast_generators.memory_type_gen in
+      Ast.{mtype}
+    in
+    Vec.gen (no_region memory_gen)
+
+  let global_field_gen =
+    let open QCheck2.Gen in
+    let global_gen =
+      let* ginit = no_region Ast_generators.block_label_gen in
+      let+ gtype = Ast_generators.global_type_gen in
+      Ast.{gtype; ginit}
+    in
+    Vec.gen (no_region global_gen)
+
+  let export_field_gen = Vec.gen (no_region Exports.export_gen)
+
+  let start_field_gen = QCheck2.Gen.opt Ast_generators.start_gen
+
+  let elem_field_gen = Vec.gen (no_region Elem.elem_gen)
+
+  let data_count_field_gen = QCheck2.Gen.(opt int32)
+
+  let code_field_gen = Vec.gen Code.func_gen
+
+  let data_field_gen = Vec.gen (no_region Data.data_gen)
+
+  let field_type_gen =
+    let open QCheck2.Gen in
+    let pack f = Parser.Field.FieldType f in
+    oneofl
+      [
+        pack Decode.TypeField;
+        pack ImportField;
+        pack FuncField;
+        pack TableField;
+        pack MemoryField;
+        pack GlobalField;
+        pack ExportField;
+        pack StartField;
+        pack ElemField;
+        pack DataCountField;
+        pack CodeField;
+        pack DataField;
+      ]
+
+  let check_field_type :
+      type a a' repr repr'.
+      (a, repr) Decode.field_type -> (a', repr') Decode.field_type -> bool =
+   fun ft ft' ->
+    match (ft, ft') with
+    | Decode.DataCountField, Decode.DataCountField -> true
+    | StartField, StartField -> true
+    | TypeField, TypeField -> true
+    | ImportField, ImportField -> true
+    | FuncField, FuncField -> true
+    | TableField, TableField -> true
+    | MemoryField, MemoryField -> true
+    | GlobalField, GlobalField -> true
+    | ExportField, ExportField -> true
+    | ElemField, ElemField -> true
+    | CodeField, CodeField -> true
+    | DataField, DataField -> true
+    | _, _ -> false
+
+  let check_packed_field_type (Parser.Field.FieldType ft)
+      (Parser.Field.FieldType ft') =
+    Lwt.return_ok (check_field_type ft ft')
+
+  let building_state_gen =
+    let open QCheck2.Gen in
+    let* types = type_field_gen in
+    let* imports = import_field_gen in
+    let* vars = func_field_gen in
+    let* tables = table_field_gen in
+    let* memories = memory_field_gen in
+    let* globals = global_field_gen in
+    let* exports = export_field_gen in
+    let* start = start_field_gen in
+    let* elems = elem_field_gen in
+    let* data_count = data_count_field_gen in
+    let* code = code_field_gen in
+    let+ datas = data_field_gen in
+    Decode.
+      {
+        types;
+        imports;
+        vars;
+        tables;
+        memories;
+        globals;
+        exports;
+        start;
+        elems;
+        data_count;
+        code;
+        datas;
+      }
+
+  let building_state_check
+      Decode.
+        {
+          types;
+          imports;
+          vars;
+          tables;
+          memories;
+          globals;
+          exports;
+          start;
+          elems;
+          data_count;
+          code;
+          datas;
+        }
+      Decode.
+        {
+          types = types';
+          imports = imports';
+          vars = vars';
+          tables = tables';
+          memories = memories';
+          globals = globals';
+          exports = exports';
+          start = start';
+          elems = elems';
+          data_count = data_count';
+          code = code';
+          datas = datas';
+        } =
+    let open Lwt_result_syntax in
+    let check_no_region check v v' = check v.Source.it v'.Source.it in
+    let eq v v' = return (v = v') in
+    let* eq_types =
+      Vec.check (check_no_region Func_type.func_type_check) types types'
+    in
+    let* eq_imports =
+      Vec.check (check_no_region Imports.import_check) imports imports'
+    in
+    let* eq_vars = Vec.check (check_no_region eq) vars vars' in
+    let* eq_tables = Vec.check (check_no_region eq) tables tables' in
+    let* eq_memories = Vec.check (check_no_region eq) memories memories' in
+    let* eq_globals = Vec.check (check_no_region eq) globals globals' in
+    let* eq_exports =
+      Vec.check (check_no_region Exports.export_check) exports exports'
+    in
+    let* eq_start = return (start = start') in
+    let* eq_elems = Vec.check (check_no_region Elem.elem_check) elems elems' in
+    let* eq_data_count = return (data_count = data_count') in
+    let* eq_code = Vec.check (check_no_region Code.check_func) code code' in
+    let+ eq_datas = Vec.check (check_no_region Data.data_check) datas datas' in
+    eq_types && eq_imports && eq_vars && eq_tables && eq_memories && eq_globals
+    && eq_exports && eq_start && eq_elems && eq_data_count && eq_code
+    && eq_datas
+
+  let tests =
+    [
+      tztest
+        "Field"
+        `Quick
+        (make_test
+           Parser.Field.building_state_encoding
+           building_state_gen
+           building_state_check);
+      tztest
+        "Field.Packed"
+        `Quick
+        (make_test
+           Parser.Field.packed_field_type_encoding
+           field_type_gen
+           check_packed_field_type);
+    ]
+end
+
 let tests =
   Byte_vector.tests @ Vec.tests @ LazyVec.tests @ Names.tests @ Func_type.tests
   @ Imports.tests @ LazyStack.tests @ Exports.tests @ Instr_block.tests
   @ Block.tests @ Size.tests @ Code.tests @ Elem.tests @ Data.tests
+  @ Field.tests
