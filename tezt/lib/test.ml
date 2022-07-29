@@ -1115,6 +1115,7 @@ let run () =
         | Some (test, test_instance) ->
             let start = Unix.gettimeofday () in
             let on_response (Scheduler.Test_result test_result) =
+              test.result <- Some test_result ;
               let time = Unix.gettimeofday () -. start in
               (match test_result with
               | Failed _ -> incr failure_count
