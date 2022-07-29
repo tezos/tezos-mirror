@@ -42,7 +42,7 @@ val fail : ?__LOC__:string -> ('a, Format.formatter, unit, 'b) format4 -> 'a
 (** Register a test.
 
     The [__FILE__] argument, which should be equal to [__FILE__]
-    (i.e. just write [Test.run ~__FILE__]), is used to let the user
+    (i.e. just write [Test.register ~__FILE__]), is used to let the user
     select which files to run from the command-line.
 
     One should be able to infer, from [title], what the test will do.
