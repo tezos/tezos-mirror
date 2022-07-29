@@ -106,6 +106,11 @@ end
 module Byte_vector = struct
   open Utils
 
+  let gen_chunked_byte_vector =
+    let open QCheck2.Gen in
+    let+ values = string in
+    C.of_string values
+
   let gen_buffer =
     let open QCheck2.Gen in
     let* buffer = Ast_generators.data_label_gen in
@@ -131,6 +136,13 @@ module Byte_vector = struct
     return
       (buffer = buffer' && Int64.equal offset offset'
      && Int64.equal length length')
+
+  let check_vector vector vector' =
+    let open Lwt_result_syntax in
+    assert (C.length vector = C.length vector') ;
+    let*! str = C.to_string vector in
+    let*! str' = C.to_string vector' in
+    return (String.equal str str')
 
   let check bv bv' =
     match (bv, bv') with
@@ -222,6 +234,12 @@ module LazyVec = struct
       (Decode.LazyVec {vector = vector'; offset = offset'}) =
     let open Lwt_result_syntax in
     let* eq_lzvecs = Vec.check eq_value vector vector' in
+    return (eq_lzvecs && offset = offset')
+
+  let check_possibly_different eq_value (Decode.LazyVec {vector; offset})
+      (Decode.LazyVec {vector = vector'; offset = offset'}) =
+    let open Lwt_result_syntax in
+    let* eq_lzvecs = Vec.check_possibly_different eq_value vector vector' in
     return (eq_lzvecs && offset = offset')
 
   let tests =
@@ -889,6 +907,26 @@ module Field = struct
         pack DataField;
       ]
 
+  let typed_lazy_vec_gen =
+    let open QCheck2.Gen in
+    let pack f gen_vec =
+      let+ vec = LazyVec.gen_with_vec gen_vec in
+      Parser.Field.TypedLazyVec (f, vec)
+    in
+    oneof
+      [
+        pack Decode.TypeField type_field_gen;
+        pack ImportField import_field_gen;
+        pack FuncField func_field_gen;
+        pack TableField table_field_gen;
+        pack MemoryField memory_field_gen;
+        pack GlobalField global_field_gen;
+        pack ExportField export_field_gen;
+        pack ElemField elem_field_gen;
+        pack CodeField code_field_gen;
+        pack DataField data_field_gen;
+      ]
+
   let check_field_type :
       type a a' repr repr'.
       (a, repr) Decode.field_type -> (a', repr') Decode.field_type -> bool =
@@ -911,6 +949,30 @@ module Field = struct
   let check_packed_field_type (Parser.Field.FieldType ft)
       (Parser.Field.FieldType ft') =
     Lwt.return_ok (check_field_type ft ft')
+
+  let check_field_type_value :
+      type a a' repr repr'.
+      (a, repr) Decode.field_type ->
+      (a', repr') Decode.field_type ->
+      a ->
+      a' ->
+      (bool, _) result Lwt.t =
+   fun ft ft' x y ->
+    let open Lwt_result_syntax in
+    match (ft, ft') with
+    | Decode.DataCountField, Decode.DataCountField -> return (x = y)
+    | StartField, StartField -> return (x = y)
+    | TypeField, TypeField -> Func_type.func_type_check x.Source.it y.Source.it
+    | ImportField, ImportField -> Imports.import_check x.Source.it y.Source.it
+    | FuncField, FuncField -> return (x = y)
+    | TableField, TableField -> return (x = y)
+    | MemoryField, MemoryField -> return (x = y)
+    | GlobalField, GlobalField -> return (x = y)
+    | ExportField, ExportField -> Exports.export_check x.Source.it y.Source.it
+    | ElemField, ElemField -> Elem.elem_check x.Source.it y.Source.it
+    | CodeField, CodeField -> Code.check_func x.Source.it y.Source.it
+    | DataField, DataField -> Data.data_check x.Source.it y.Source.it
+    | _, _ -> return_false
 
   let building_state_gen =
     let open QCheck2.Gen in
@@ -1017,8 +1079,334 @@ module Field = struct
     ]
 end
 
+module Module = struct
+  open Utils
+
+  (* Different version from Ast_generators.allocations_gen: the vector
+     is never created lazily. *)
+  let allocations_gen =
+    let open QCheck2.Gen in
+    let* blocks = Vec.gen (Vec.gen Ast_generators.instr_gen) in
+    let+ datas = Vec.gen Byte_vector.gen_chunked_byte_vector in
+    Ast.{blocks; datas}
+
+  let module_gen =
+    let open QCheck2.Gen in
+    let open Field in
+    let* types = type_field_gen in
+    let* globals = global_field_gen in
+    let* tables = table_field_gen in
+    let* memories = memory_field_gen in
+    let* funcs = code_field_gen in
+    let* start = start_field_gen in
+    let* elems = elem_field_gen in
+    let* datas = data_field_gen in
+    let* imports = import_field_gen in
+    let* exports = export_field_gen in
+    let+ allocations = allocations_gen in
+    Ast.
+      {
+        types;
+        globals;
+        tables;
+        memories;
+        funcs;
+        start;
+        elems;
+        datas;
+        imports;
+        exports;
+        allocations;
+      }
+
+  let gen =
+    let open QCheck2.Gen in
+    let start = return Decode.MKStart in
+    let skip_custom =
+      let+ packed_ft_opt = opt Field.field_type_gen in
+      match packed_ft_opt with
+      | Some (Parser.Field.FieldType ft) -> Decode.MKSkipCustom (Some ft)
+      | None -> MKSkipCustom None
+    in
+    let field_start =
+      let+ (Parser.Field.FieldType ft) = Field.field_type_gen in
+      Decode.MKFieldStart ft
+    in
+    let field =
+      let* size = Size.gen in
+      let+ (Parser.Field.TypedLazyVec (ft, vec)) = Field.typed_lazy_vec_gen in
+      Decode.MKField (ft, size, vec)
+    in
+    let elaborate_func =
+      let* func_types = Vec.gen Ast_generators.var_gen in
+      let* func_bodies = Field.code_field_gen in
+      let* func_kont = LazyVec.gen Code.func_gen in
+      let+ datas_in_func = bool in
+      Decode.MKElaborateFunc (func_types, func_bodies, func_kont, datas_in_func)
+    in
+    let build =
+      let* funcs = opt (Vec.gen Code.func_gen) in
+      let+ datas_in_func = bool in
+      Decode.MKBuild (funcs, datas_in_func)
+    in
+    let stop =
+      let+ modl = module_gen in
+      Decode.MKStop modl
+    in
+    let types =
+      let* func_type_kont = Func_type.gen in
+      let* pos = small_nat in
+      let* size = Size.gen in
+      let+ vec_kont = LazyVec.gen_with_vec Field.type_field_gen in
+      Decode.MKTypes (func_type_kont, pos, size, vec_kont)
+    in
+    let imports =
+      let* import_kont = Imports.gen in
+      let* pos = small_nat in
+      let* size = Size.gen in
+      let+ vec_kont = LazyVec.gen_with_vec Field.import_field_gen in
+      Decode.MKImport (import_kont, pos, size, vec_kont)
+    in
+    let exports =
+      let* export_kont = Exports.gen in
+      let* pos = small_nat in
+      let* size = Size.gen in
+      let+ vec_kont = LazyVec.gen_with_vec Field.export_field_gen in
+      Decode.MKExport (export_kont, pos, size, vec_kont)
+    in
+    let global =
+      let* global_type = Ast_generators.global_type_gen in
+      let* pos = small_nat in
+      let* block_kont = Block.gen in
+      let* size = Size.gen in
+      let+ vec_kont = LazyVec.gen_with_vec Field.global_field_gen in
+      Decode.MKGlobal (global_type, pos, block_kont, size, vec_kont)
+    in
+    let elem =
+      let* elem_kont = Elem.gen in
+      let* pos = small_nat in
+      let* size = Size.gen in
+      let+ vec_kont = LazyVec.gen_with_vec Field.elem_field_gen in
+      Decode.MKElem (elem_kont, pos, size, vec_kont)
+    in
+    let data =
+      let* data_kont = Data.gen in
+      let* pos = small_nat in
+      let* size = Size.gen in
+      let+ vec_kont = LazyVec.gen_with_vec Field.data_field_gen in
+      Decode.MKData (data_kont, pos, size, vec_kont)
+    in
+    let code =
+      let* code_kont = Code.gen in
+      let* pos = small_nat in
+      let* size = Size.gen in
+      let+ vec_kont = LazyVec.gen_with_vec Field.code_field_gen in
+      Decode.MKCode (code_kont, pos, size, vec_kont)
+    in
+    oneof
+      [
+        start;
+        skip_custom;
+        field_start;
+        field;
+        elaborate_func;
+        build;
+        stop;
+        types;
+        imports;
+        exports;
+        global;
+        elem;
+        data;
+        code;
+      ]
+
+  let check_allocations allocations allocations' =
+    let open Lwt_result_syntax in
+    let eq_instr i i' = return (i = i') in
+    let* eq_blocks =
+      Vec.check
+        (Vec.check eq_instr)
+        allocations.Ast.blocks
+        allocations'.Ast.blocks
+    in
+    let+ eq_datas =
+      Vec.check Byte_vector.check_vector allocations.datas allocations'.datas
+    in
+    eq_blocks && eq_datas
+
+  let check_module
+      Ast.
+        {
+          types;
+          globals;
+          tables;
+          memories;
+          funcs;
+          start;
+          elems;
+          datas;
+          imports;
+          exports;
+          allocations;
+        }
+      Ast.
+        {
+          types = types';
+          globals = globals';
+          tables = tables';
+          memories = memories';
+          funcs = funcs';
+          start = start';
+          elems = elems';
+          datas = datas';
+          imports = imports';
+          exports = exports';
+          allocations = allocations';
+        } =
+    let open Lwt_result_syntax in
+    let check_no_region check v v' = check v.Source.it v'.Source.it in
+    let eq v v' = return (v = v') in
+    let* eq_types =
+      Vec.check (check_no_region Func_type.func_type_check) types types'
+    in
+    let* eq_globals = Vec.check (check_no_region eq) globals globals' in
+    let* eq_tables = Vec.check (check_no_region eq) tables tables' in
+    let* eq_memories = Vec.check (check_no_region eq) memories memories' in
+    let* eq_funcs = Vec.check (check_no_region Code.check_func) funcs funcs' in
+    let* eq_start = return (start = start') in
+    let* eq_elems = Vec.check (check_no_region Elem.elem_check) elems elems' in
+    let* eq_datas = Vec.check (check_no_region Data.data_check) datas datas' in
+    let* eq_imports =
+      Vec.check (check_no_region Imports.import_check) imports imports'
+    in
+    let* eq_exports =
+      Vec.check (check_no_region Exports.export_check) exports exports'
+    in
+    let+ eq_allocations = check_allocations allocations allocations' in
+    eq_types && eq_globals && eq_funcs && eq_tables && eq_memories && eq_start
+    && eq_elems && eq_datas && eq_imports && eq_exports && eq_allocations
+
+  let check_without_region check x y = check x.Source.it y.Source.it
+
+  let check mk mk' =
+    let open Lwt_result_syntax in
+    match (mk, mk') with
+    | Decode.MKStart, Decode.MKStart -> return_true
+    | MKSkipCustom None, MKSkipCustom None -> return_true
+    | MKSkipCustom (Some ft), MKSkipCustom (Some ft') ->
+        return @@ Field.check_field_type ft ft'
+    | MKFieldStart ft, MKFieldStart ft' ->
+        return @@ Field.check_field_type ft ft'
+    | MKField (ft, size, kont), MKField (ft', size', kont') ->
+        let* eq_kont =
+          LazyVec.check_possibly_different
+            (Field.check_field_type_value ft ft')
+            kont
+            kont'
+        in
+        let+ eq_size = Size.check size size' in
+        eq_kont && eq_size && Field.check_field_type ft ft'
+    | ( MKElaborateFunc (fts, fbs, kont, datas),
+        MKElaborateFunc (fts', fbs', kont', datas') ) ->
+        let eq_vars v v' = return (v = v') in
+        let* eq_fts = Vec.check eq_vars fts fts' in
+        let* eq_fbs =
+          Vec.check (check_without_region Code.check_func) fbs fbs'
+        in
+        let+ eq_kont =
+          LazyVec.check (check_without_region Code.check_func) kont kont'
+        in
+        eq_fts && eq_fbs && eq_kont && datas = datas'
+    | MKBuild (Some funcs, datas), MKBuild (Some funcs', datas') ->
+        let+ eq_funcs =
+          Vec.check (check_without_region Code.check_func) funcs funcs'
+        in
+        eq_funcs && datas = datas'
+    | MKBuild (None, datas), MKBuild (None, datas') -> return (datas = datas')
+    | MKStop m, MKStop m' -> check_module m m'
+    | ( MKTypes (func_type_kont, pos, size, vec_kont),
+        MKTypes (func_type_kont', pos', size', vec_kont') ) ->
+        let* eq_func_type_kont =
+          Func_type.check func_type_kont func_type_kont'
+        in
+        let* eq_size = Size.check size size' in
+        let+ eq_vec_kont =
+          LazyVec.check
+            (check_without_region Func_type.func_type_check)
+            vec_kont
+            vec_kont'
+        in
+        eq_func_type_kont && eq_size && eq_vec_kont && pos = pos'
+    | ( MKImport (import_kont, pos, size, vec_kont),
+        MKImport (import_kont', pos', size', vec_kont') ) ->
+        let* eq_import_kont = Imports.check import_kont import_kont' in
+        let* eq_size = Size.check size size' in
+        let+ eq_vec_kont =
+          LazyVec.check
+            (check_without_region Imports.import_check)
+            vec_kont
+            vec_kont'
+        in
+        eq_import_kont && eq_size && eq_vec_kont && pos = pos'
+    | ( MKExport (export_kont, pos, size, vec_kont),
+        MKExport (export_kont', pos', size', vec_kont') ) ->
+        let* eq_export_kont = Exports.check export_kont export_kont' in
+        let* eq_size = Size.check size size' in
+        let+ eq_vec_kont =
+          LazyVec.check
+            (check_without_region Exports.export_check)
+            vec_kont
+            vec_kont'
+        in
+        eq_export_kont && eq_size && eq_vec_kont && pos = pos'
+    | ( MKGlobal (global_type, pos, block_kont, size, vec_kont),
+        MKGlobal (global_type', pos', block_kont', size', vec_kont') ) ->
+        let* eq_block_kont = Block.check block_kont block_kont' in
+        let* eq_size = Size.check size size' in
+        let+ eq_vec_kont =
+          LazyVec.check (fun g g' -> return (g = g')) vec_kont vec_kont'
+        in
+        eq_block_kont && eq_size && eq_vec_kont && pos = pos'
+        && global_type = global_type'
+    | ( MKElem (elem_kont, pos, size, vec_kont),
+        MKElem (elem_kont', pos', size', vec_kont') ) ->
+        let* eq_elem_kont = Elem.check elem_kont elem_kont' in
+        let* eq_size = Size.check size size' in
+        let+ eq_vec_kont =
+          LazyVec.check
+            (check_without_region Elem.elem_check)
+            vec_kont
+            vec_kont'
+        in
+        eq_elem_kont && eq_size && eq_vec_kont && pos = pos'
+    | ( MKData (data_kont, pos, size, vec_kont),
+        MKData (data_kont', pos', size', vec_kont') ) ->
+        let* eq_data_kont = Data.check data_kont data_kont' in
+        let* eq_size = Size.check size size' in
+        let+ eq_vec_kont =
+          LazyVec.check (fun d d' -> return (d = d')) vec_kont vec_kont'
+        in
+        eq_data_kont && eq_size && eq_vec_kont && pos = pos'
+    | ( MKCode (code_kont, pos, size, vec_kont),
+        MKCode (code_kont', pos', size', vec_kont') ) ->
+        let* eq_code_kont = Code.check code_kont code_kont' in
+        let* eq_size = Size.check size size' in
+        let+ eq_vec_kont =
+          LazyVec.check
+            (check_without_region Code.check_func)
+            vec_kont
+            vec_kont'
+        in
+        eq_code_kont && eq_size && eq_vec_kont && pos = pos'
+    | _, _ -> return_false
+
+  let tests =
+    [tztest "Module" `Quick (make_test Parser.Module.encoding gen check)]
+end
+
 let tests =
   Byte_vector.tests @ Vec.tests @ LazyVec.tests @ Names.tests @ Func_type.tests
   @ Imports.tests @ LazyStack.tests @ Exports.tests @ Instr_block.tests
   @ Block.tests @ Size.tests @ Code.tests @ Elem.tests @ Data.tests
-  @ Field.tests
+  @ Field.tests @ Module.tests

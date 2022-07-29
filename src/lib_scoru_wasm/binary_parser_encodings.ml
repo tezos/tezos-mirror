@@ -1093,4 +1093,283 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
           data_field_encoding;
         ]
   end
+
+  module Module = struct
+    let mkstart_case =
+      case
+        "MKStart"
+        (value [] Data_encoding.unit)
+        (function Decode.MKStart -> Some () | _ -> None)
+        (fun () -> Decode.MKStart)
+
+    let mkskipcustom_case =
+      case
+        "MKSkipCustom"
+        (option Field.packed_field_type_encoding)
+        (function
+          | Decode.MKSkipCustom (Some field_type) ->
+              Some (Some (Field.FieldType field_type))
+          | Decode.MKSkipCustom None -> Some None
+          | _ -> None)
+        (function
+          | None -> MKSkipCustom None
+          | Some (FieldType ft) -> MKSkipCustom (Some ft))
+
+    let mkfieldstart_case =
+      case
+        "MKFieldStart"
+        Field.packed_field_type_encoding
+        (function
+          | Decode.MKFieldStart field_type -> Some (Field.FieldType field_type)
+          | _ -> None)
+        (fun (FieldType ft) -> MKFieldStart ft)
+
+    let mkfield_case =
+      case
+        "MKField"
+        (tup2 ~flatten:true Field.packed_typed_lazy_vec_encoding Size.encoding)
+        (function
+          | Decode.MKField (field_type, size, vec) ->
+              Some (Field.TypedLazyVec (field_type, vec), size)
+          | _ -> None)
+        (fun (TypedLazyVec (ft, vec), size) -> MKField (ft, size, vec))
+
+    let mkelaboratefunc_case =
+      let func_types = Field.func_field_encoding in
+      let func_bodies = Field.code_field_encoding in
+      let func_kont =
+        scope ["func_kont"] (Lazy_vec.encoding Code.func_encoding)
+      in
+      let no_datas_in_func = value ["no-datas-in-funcs"] Data_encoding.bool in
+      case
+        "MKElaborateFunc"
+        (tup4 ~flatten:true func_types func_bodies func_kont no_datas_in_func)
+        (function
+          | Decode.MKElaborateFunc
+              (func_types, func_bodies, func_kont, no_datas_in_func) ->
+              Some (func_types, func_bodies, func_kont, no_datas_in_func)
+          | _ -> None)
+        (fun (func_types, func_bodies, func_kont, no_datas_in_func) ->
+          MKElaborateFunc (func_types, func_bodies, func_kont, no_datas_in_func))
+
+    let module_funcs_encoding =
+      scope ["module"; "funcs"] (vector_encoding Code.func_encoding)
+
+    let mkbuild_case =
+      let no_datas_in_func = value ["no-datas-in-funcs"] Data_encoding.bool in
+      case
+        "MKBuild"
+        (tup2 ~flatten:true (option module_funcs_encoding) no_datas_in_func)
+        (function
+          | Decode.MKBuild (funcs, no_datas_in_func) ->
+              Some (funcs, no_datas_in_func)
+          | _ -> None)
+        (fun (funcs, no_datas_in_func) -> MKBuild (funcs, no_datas_in_func))
+
+    let mktypes_case =
+      let func_type_kont = scope ["func_type_kont"] Func_type.encoding in
+      let pos = value ["pos"] Data_encoding.int31 in
+      let size = scope ["size"] Size.encoding in
+      let type_accumulator = Lazy_vec.raw_encoding Field.type_field_encoding in
+      case
+        "MKTypes"
+        (tup4 ~flatten:true func_type_kont pos size type_accumulator)
+        (function
+          | Decode.MKTypes (func_type_kont, pos, size, types_acc) ->
+              Some (func_type_kont, pos, size, types_acc)
+          | _ -> None)
+        (fun (func_type_kont, pos, size, types_acc) ->
+          MKTypes (func_type_kont, pos, size, types_acc))
+
+    let mkimport_case =
+      let import_kont = scope ["import_kont"] Import.encoding in
+      let pos = value ["pos"] Data_encoding.int31 in
+      let size = scope ["size"] Size.encoding in
+      let import_accumulator =
+        Lazy_vec.raw_encoding Field.import_field_encoding
+      in
+      case
+        "MKImport"
+        (tup4 ~flatten:true import_kont pos size import_accumulator)
+        (function
+          | Decode.MKImport (import_kont, pos, size, import_acc) ->
+              Some (import_kont, pos, size, import_acc)
+          | _ -> None)
+        (fun (import_kont, pos, size, import_acc) ->
+          MKImport (import_kont, pos, size, import_acc))
+
+    let mkexport_case =
+      let export_kont = scope ["export_kont"] Export.encoding in
+      let pos = value ["pos"] Data_encoding.int31 in
+      let size = scope ["size"] Size.encoding in
+      let export_accumulator =
+        Lazy_vec.raw_encoding Field.export_field_encoding
+      in
+      case
+        "MKExport"
+        (tup4 ~flatten:true export_kont pos size export_accumulator)
+        (function
+          | Decode.MKExport (export_kont, pos, size, export_acc) ->
+              Some (export_kont, pos, size, export_acc)
+          | _ -> None)
+        (fun (export_kont, pos, size, export_acc) ->
+          MKExport (export_kont, pos, size, export_acc))
+
+    let mkglobal_case =
+      let global_type =
+        value ["global_type"] Interpreter_encodings.Types.global_type_encoding
+      in
+      let block_kont = scope ["block_kont"] Block.encoding in
+      let pos = value ["pos"] Data_encoding.int31 in
+      let size = scope ["size"] Size.encoding in
+      let global_accumulator =
+        Lazy_vec.raw_encoding Field.global_field_encoding
+      in
+      case
+        "MKGlobal"
+        (tup5 ~flatten:true global_type pos block_kont size global_accumulator)
+        (function
+          | Decode.MKGlobal (global_type, pos, block_kont, size, global_acc) ->
+              Some (global_type, pos, block_kont, size, global_acc)
+          | _ -> None)
+        (fun (global_type, pos, block_kont, size, global_acc) ->
+          MKGlobal (global_type, pos, block_kont, size, global_acc))
+
+    let mkdata_case =
+      let data_kont = scope ["data_kont"] Data.encoding in
+      let pos = value ["pos"] Data_encoding.int31 in
+      let size = scope ["size"] Size.encoding in
+      let data_accumulator = Lazy_vec.raw_encoding Field.data_field_encoding in
+      case
+        "MKData"
+        (tup4 ~flatten:true data_kont pos size data_accumulator)
+        (function
+          | Decode.MKData (data_kont, pos, size, data_acc) ->
+              Some (data_kont, pos, size, data_acc)
+          | _ -> None)
+        (fun (data_kont, pos, size, data_acc) ->
+          MKData (data_kont, pos, size, data_acc))
+
+    let mkelem_case =
+      let elem_kont = scope ["elem_kont"] Elem.encoding in
+      let pos = value ["pos"] Data_encoding.int31 in
+      let size = scope ["size"] Size.encoding in
+      let elem_accumulator = Lazy_vec.raw_encoding Field.elem_field_encoding in
+      case
+        "MKElem"
+        (tup4 ~flatten:true elem_kont pos size elem_accumulator)
+        (function
+          | Decode.MKElem (elem_kont, pos, size, elem_acc) ->
+              Some (elem_kont, pos, size, elem_acc)
+          | _ -> None)
+        (fun (elem_kont, pos, size, elem_acc) ->
+          MKElem (elem_kont, pos, size, elem_acc))
+
+    let mkcode_case =
+      let code_kont = scope ["code_kont"] Code.encoding in
+      let pos = value ["pos"] Data_encoding.int31 in
+      let size = scope ["size"] Size.encoding in
+      let code_accumulator = Lazy_vec.raw_encoding Field.code_field_encoding in
+      case
+        "MKCode"
+        (tup4 ~flatten:true code_kont pos size code_accumulator)
+        (function
+          | Decode.MKCode (code_kont, pos, size, code_acc) ->
+              Some (code_kont, pos, size, code_acc)
+          | _ -> None)
+        (fun (code_kont, pos, size, code_acc) ->
+          MKCode (code_kont, pos, size, code_acc))
+
+    let module_encoding =
+      let open Field in
+      conv
+        (fun ( types,
+               globals,
+               tables,
+               memories,
+               funcs,
+               start,
+               elems,
+               datas,
+               (imports, exports, allocations) ) ->
+          Ast.
+            {
+              types;
+              tables;
+              memories;
+              globals;
+              funcs;
+              imports;
+              exports;
+              elems;
+              datas;
+              start;
+              allocations;
+            })
+        (fun {
+               types;
+               tables;
+               memories;
+               globals;
+               funcs;
+               imports;
+               exports;
+               elems;
+               datas;
+               start;
+               allocations;
+             } ->
+          ( types,
+            globals,
+            tables,
+            memories,
+            funcs,
+            start,
+            elems,
+            datas,
+            (imports, exports, allocations) ))
+        (tup9
+           ~flatten:true
+           type_field_encoding
+           global_field_encoding
+           table_field_encoding
+           memory_field_encoding
+           module_funcs_encoding
+           start_field_encoding
+           elem_field_encoding
+           data_field_encoding
+           (tup3
+              ~flatten:true
+              import_field_encoding
+              export_field_encoding
+              Wasm_encoding.allocations_encoding))
+
+    let mkstop_case =
+      case
+        "MKStop"
+        module_encoding
+        (function Decode.MKStop m -> Some m | _ -> None)
+        (fun m -> MKStop m)
+
+    let encoding =
+      tagged_union
+        (value [] Data_encoding.string)
+        [
+          mkstart_case;
+          mkskipcustom_case;
+          mkfieldstart_case;
+          mkfield_case;
+          mkelaboratefunc_case;
+          mkbuild_case;
+          mkstop_case;
+          mktypes_case;
+          mkimport_case;
+          mkexport_case;
+          mkglobal_case;
+          mkelem_case;
+          mkdata_case;
+          mkelem_case;
+          mkcode_case;
+        ]
+  end
 end
