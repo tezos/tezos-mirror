@@ -27,18 +27,13 @@ open Tezos_webassembly_interpreter
 
 exception Uninitialized_current_module
 
-module Make
-    (Tree_encoding_decoding : Tree_encoding_decoding.S
-                                with type vector_key = int32
-                                 and type 'a vector = 'a Instance.Vector.t
-                                 and type 'a map = 'a Instance.NameMap.t
-                                 and type chunked_byte_vector =
-                                  Chunked_byte_vector.Lwt.t) =
-struct
+module Make (Tree_encoding_decoding : Tree_encoding_decoding.S) = struct
   module V = Instance.Vector
   module M = Instance.NameMap
   module C = Chunked_byte_vector.Lwt
   include Tree_encoding_decoding
+  include Lazy_vector_encoding_decoding.Int32
+  include Lazy_map_encoding_decoding.NameMap
 
   (** Utility function*)
   let string_tag = value [] Data_encoding.string
@@ -51,8 +46,10 @@ struct
        go forward. *)
     conv_lwt V.to_list (fun list -> Lwt.return (V.of_list list)) vector
 
-  let lazy_vector_encoding field_name enc =
-    scope [field_name] (lazy_vector (value [] Data_encoding.int32) enc)
+  let lazy_vector_encoding field_name tree_encoding =
+    scope
+      [field_name]
+      (lazy_vector (value [] Data_encoding.int32) tree_encoding)
 
   let function_type_encoding =
     conv
@@ -603,7 +600,7 @@ struct
     lazy_vector_encoding "refs" (value_ref_encoding ~current_module)
 
   let extern_map_encoding ~current_module =
-    lazy_mapping
+    lazy_map
       (tagged_union
          string_tag
          [

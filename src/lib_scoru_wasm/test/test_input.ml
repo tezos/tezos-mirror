@@ -182,12 +182,7 @@ let test_host_fun () =
   Lwt.return @@ Result.return_unit
 
 module Wasm = Wasm_pvm.Make (Test_encoding.Tree)
-module EncDec =
-  Tree_encoding_decoding.Make
-    (Lazy_map.LwtInt32Map)
-    (Lazy_vector.LwtInt32Vector)
-    (Chunked_byte_vector.Lwt)
-    (Test_encoding.Tree)
+module EncDec = Tree_encoding_decoding.Make (Test_encoding.Tree)
 
 let current_tick_encoding =
   EncDec.value ["wasm"; "current_tick"] Data_encoding.z

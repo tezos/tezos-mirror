@@ -25,6 +25,10 @@
 
 open Tezos_webassembly_interpreter
 
+module type Lwt_vector = Lazy_vector.S with type 'a effect = 'a Lwt.t
+
+module type Lwt_map = Lazy_map.S with type 'a effect = 'a Lwt.t
+
 exception Uninitialized_self_ref
 
 (** A key in the tree is a list of string. *)
@@ -35,18 +39,6 @@ module type S = sig
 
   (** The underlying tree type. *)
   type tree
-
-  (** The map structure used. *)
-  type 'a map
-
-  (** The type of vector keys. *)
-  type vector_key
-
-  (** The vector structure used. *)
-  type 'a vector
-
-  (** The chunked byte vector structure used. *)
-  type chunked_byte_vector
 
   (** Represents a partial encoder for a specific constructor of a sum-type. *)
   type ('tag, 'a) case
@@ -213,19 +205,53 @@ module type S = sig
       branch [key]. *)
   val scope : key -> 'a t -> 'a t
 
-  (** [lazy_mapping enc] produces an encoder for [map]s that uses the given
-      [enc] for encoding values. *)
-  val lazy_mapping : 'a t -> 'a map t
+  module Lazy_map_encoding_decoding : sig
+    module type S = sig
+      type 'a map
 
-  (** [lazy_vector key_enc enc] produces an encoder for [vector]s that uses the
-      given [key_enc] for encoding keys and [enc] for the values. *)
-  val lazy_vector : vector_key t -> 'a t -> 'a vector t
+      val lazy_map : 'a t -> 'a map t
+    end
+
+    (** [Make (YouMap)] creates a module with the [lazy_map]
+        combinator which can be used to decode [YouMap] specifically. *)
+    module Make (Map : Lwt_map) : S with type 'a map := 'a Map.t
+
+    module NameMap : S with type 'a map := 'a Instance.NameMap.t
+  end
+
+  module Lazy_vector_encoding_decoding : sig
+    module type S = sig
+      type key
+
+      type 'a vector
+
+      (** [lazy_vector key_enc enc] produces an encoder for [vector]s that uses
+          the given [key_enc] for encoding the keys and [enc] for values. *)
+      val lazy_vector : key t -> 'a t -> 'a vector t
+    end
+
+    (** [Make (YourVector)] creates a module with the [lazy_vector]
+        combinator which can be used to decode [YourVector] specifically. *)
+    module Make (Vector : Lwt_vector) :
+      S with type key := Vector.key and type 'a vector := 'a Vector.t
+
+    module Int :
+      S with type key := int and type 'a vector := 'a Lazy_vector.LwtIntVector.t
+
+    module Int32 :
+      S
+        with type key := int32
+         and type 'a vector := 'a Lazy_vector.LwtInt32Vector.t
+
+    module Z :
+      S with type key := Z.t and type 'a vector := 'a Lazy_vector.LwtZVector.t
+  end
 
   (** [chunk] is an encoder for the chunks used by [chunked_by_vector]. *)
   val chunk : Chunked_byte_vector.Chunk.t t
 
   (** [chunked_byte_vector] is an encoder for [chunked_byte_vector]. *)
-  val chunked_byte_vector : chunked_byte_vector t
+  val chunked_byte_vector : Chunked_byte_vector.Lwt.t t
 
   (** [case tag enc inj proj] returns a partial encoder that represents a case
       in a sum-type. The encoder hides the (existentially bound) type of the
@@ -265,14 +291,4 @@ end
 
 (** Produces an encoder/decoder module with the provided map, vector and tree
     structures. *)
-module Make
-    (M : Lazy_map.S with type 'a effect = 'a Lwt.t)
-    (V : Lazy_vector.S with type 'a effect = 'a Lwt.t)
-    (C : Chunked_byte_vector.S with type 'a effect = 'a Lwt.t)
-    (T : Tree.S) :
-  S
-    with type tree = T.tree
-     and type 'a map = 'a M.t
-     and type vector_key = V.key
-     and type 'a vector = 'a V.t
-     and type chunked_byte_vector = C.t
+module Make (T : Tree.S) : S with type tree = T.tree
