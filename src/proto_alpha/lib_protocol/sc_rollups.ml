@@ -120,16 +120,8 @@ type wrapped_proof =
 let wrapped_proof_module p =
   match p with
   | Unencodable p -> p
-  | Arith_pvm_with_proof p ->
-      let (module P) = p in
-      (module struct
-        include P
-      end : PVM_with_proof)
-  | Wasm_2_0_0_pvm_with_proof p ->
-      let (module P) = p in
-      (module struct
-        include P
-      end : PVM_with_proof)
+  | Arith_pvm_with_proof (module P) -> (module P)
+  | Wasm_2_0_0_pvm_with_proof (module P) -> (module P)
 
 let wrapped_proof_kind_exn : wrapped_proof -> Kind.t = function
   | Unencodable _ ->
@@ -152,21 +144,14 @@ let wrapped_proof_encoding =
                 "proof"
                 Sc_rollup_arith.Protocol_implementation.proof_encoding))
           (function
-            | Arith_pvm_with_proof pvm ->
-                let (module P : PVM_with_proof
-                      with type proof =
-                        Sc_rollup_arith.Protocol_implementation.proof) =
-                  pvm
-                in
-                Some ((), P.proof)
-            | _ -> None)
+            | Arith_pvm_with_proof (module P) -> Some ((), P.proof) | _ -> None)
           (fun ((), proof) ->
-            let module P = struct
-              include Sc_rollup_arith.Protocol_implementation
+            Arith_pvm_with_proof
+              (module struct
+                include Sc_rollup_arith.Protocol_implementation
 
-              let proof = proof
-            end in
-            Arith_pvm_with_proof (module P));
+                let proof = proof
+              end));
         case
           ~title:"Wasm 2.0.0 PVM with proof"
           (Tag 1)
@@ -176,21 +161,15 @@ let wrapped_proof_encoding =
                 "proof"
                 Sc_rollup_wasm.V2_0_0.Protocol_implementation.proof_encoding))
           (function
-            | Wasm_2_0_0_pvm_with_proof pvm ->
-                let (module P : PVM_with_proof
-                      with type proof =
-                        Sc_rollup_wasm.V2_0_0.Protocol_implementation.proof) =
-                  pvm
-                in
-                Some ((), P.proof)
+            | Wasm_2_0_0_pvm_with_proof (module P) -> Some ((), P.proof)
             | _ -> None)
           (fun ((), proof) ->
-            let module P = struct
-              include Sc_rollup_wasm.V2_0_0.Protocol_implementation
+            Wasm_2_0_0_pvm_with_proof
+              (module struct
+                include Sc_rollup_wasm.V2_0_0.Protocol_implementation
 
-              let proof = proof
-            end in
-            Wasm_2_0_0_pvm_with_proof (module P));
+                let proof = proof
+              end));
         (* The later case is provided solely in order to provide error
            messages in case someone tries to encode an [Unencodable]
            proof. *)
