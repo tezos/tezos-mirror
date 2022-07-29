@@ -41,22 +41,17 @@ module Kate_amortized = struct
 
   type commitment = G1.t
 
-  let commit p (srs1, _) =
-    (* TODO remove these convertions *)
-    let p = Array.of_list p in
-    let commit_kate_amortized srs1 p =
-      if p = [||] then G1.(copy zero)
-      else if Array.(length p > length srs1) then
-        raise
-          (Failure
-             (Printf.sprintf
-                "Kzg.compute_encoded_polynomial : Polynomial degree, %i, \
-                 exceeds srs’ length, %i."
-                (Array.length p)
-                (Array.length srs1)))
-      else G1.pippenger ~start:0 ~len:(Array.length p) srs1 p
-    in
-    commit_kate_amortized srs1 p
+  let commit p srs =
+    if p = [||] then G1.(copy zero)
+    else if Array.(length p > length srs) then
+      raise
+        (Failure
+           (Printf.sprintf
+              "Kzg.compute_encoded_polynomial : Polynomial degree, %i, exceeds \
+               srs’ length, %i."
+              (Array.length p)
+              (Array.length srs)))
+    else G1.pippenger ~start:0 ~len:(Array.length p) srs p
 
   let inverse domain =
     let n = Array.length domain in
@@ -257,7 +252,7 @@ module Kate_amortized = struct
   (* Part 3.2 verifier : verifies that f(w×domain.(i)) = evaluations.(i). *)
   let verify cm_f (srs1, srs2l) domain (w, evaluations) proof =
     let h = interpolation_h_poly w domain evaluations in
-    let cm_h = commit h (srs1, srs2l) in
+    let cm_h = commit h srs1 in
     let l = Domain.length domain in
     let sl_min_yl =
       G2.(add srs2l (negate (mul (copy one) (Scalar.pow w (Z.of_int l)))))
