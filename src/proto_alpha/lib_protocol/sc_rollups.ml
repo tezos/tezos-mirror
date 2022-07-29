@@ -50,26 +50,9 @@ module Kind = struct
   *)
   type t = Example_arith | Wasm_2_0_0
 
-  let example_arith_case =
-    Data_encoding.(
-      case
-        ~title:"Example_arith smart contract rollup kind"
-        (Tag 0)
-        unit
-        (function Example_arith -> Some () | _ -> None)
-        (fun () -> Example_arith))
-
-  let wasm_2_0_0_case =
-    Data_encoding.(
-      case
-        ~title:"Wasm 2.0.0 smart contract rollup kind"
-        (Tag 1)
-        unit
-        (function Wasm_2_0_0 -> Some () | _ -> None)
-        (fun () -> Wasm_2_0_0))
-
   let encoding =
-    Data_encoding.union ~tag_size:`Uint16 [example_arith_case; wasm_2_0_0_case]
+    Data_encoding.string_enum
+      [("arith_pvm_kind", Example_arith); ("wasm_2_0_0_pvm_kind", Wasm_2_0_0)]
 
   let equal x y =
     match (x, y) with
@@ -163,7 +146,11 @@ let wrapped_proof_encoding =
         case
           ~title:"Arithmetic PVM with proof"
           (Tag 0)
-          Sc_rollup_arith.Protocol_implementation.proof_encoding
+          (obj2
+             (req "kind" @@ constant "arith_pvm_kind")
+             (req
+                "proof"
+                Sc_rollup_arith.Protocol_implementation.proof_encoding))
           (function
             | Arith_pvm_with_proof pvm ->
                 let (module P : PVM_with_proof
@@ -171,9 +158,9 @@ let wrapped_proof_encoding =
                         Sc_rollup_arith.Protocol_implementation.proof) =
                   pvm
                 in
-                Some P.proof
+                Some ((), P.proof)
             | _ -> None)
-          (fun proof ->
+          (fun ((), proof) ->
             let module P = struct
               include Sc_rollup_arith.Protocol_implementation
 
@@ -183,7 +170,11 @@ let wrapped_proof_encoding =
         case
           ~title:"Wasm 2.0.0 PVM with proof"
           (Tag 1)
-          Sc_rollup_wasm.V2_0_0.Protocol_implementation.proof_encoding
+          (obj2
+             (req "kind" @@ constant "wasm_2_0_0_pvm_kind")
+             (req
+                "proof"
+                Sc_rollup_wasm.V2_0_0.Protocol_implementation.proof_encoding))
           (function
             | Wasm_2_0_0_pvm_with_proof pvm ->
                 let (module P : PVM_with_proof
@@ -191,15 +182,30 @@ let wrapped_proof_encoding =
                         Sc_rollup_wasm.V2_0_0.Protocol_implementation.proof) =
                   pvm
                 in
-                Some P.proof
+                Some ((), P.proof)
             | _ -> None)
-          (fun proof ->
+          (fun ((), proof) ->
             let module P = struct
               include Sc_rollup_wasm.V2_0_0.Protocol_implementation
 
               let proof = proof
             end in
             Wasm_2_0_0_pvm_with_proof (module P));
+        (* The later case is provided solely in order to provide error
+           messages in case someone tries to encode an [Unencodable]
+           proof. *)
+        case
+          ~title:"Unencodable"
+          (Tag 255)
+          empty
+          (function
+            | Unencodable (module P) ->
+                raise
+                  (Invalid_argument
+                     Format.(
+                       sprintf "cannot encode Unencodable (PVM %s)" P.name))
+            | _ -> None)
+          (fun () -> raise (Invalid_argument "cannot decode Unencodable"));
       ]
   in
   check_size Constants_repr.sc_max_wrapped_proof_binary_size encoding
