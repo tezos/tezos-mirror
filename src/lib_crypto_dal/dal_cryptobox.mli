@@ -49,7 +49,7 @@ type srs
    (aka trusted setup) is required.
 
    It is the responsibility of the shell and the protocol to ensure
-   that both the [Verifier] and the [Builder] as instantiated with the
+   that both the [Verifier] and the [Builder] are instantiated with the
    same parameters and use the same trusted setup. *)
 
 module Verifier : VERIFIER
@@ -69,10 +69,10 @@ end
 
 module IntMap : Tezos_error_monad.TzLwtreslib.Map.S with type key = int
 
-(** A slot is just some data represented as bytes. *)
+(** A slot is a byte sequence corresponding to some data. *)
 type slot = bytes
 
-(** The field used by the polynomial. *)
+(** The finited field used by the polynomial. *)
 type scalar
 
 (** A polynomial is another representation for a slot. One advantage
@@ -95,7 +95,7 @@ val polynomial_evaluate : polynomial -> scalar -> scalar
 
 (** [polynomial_from_slot t slot] returns a polynomial from the a slot [slot].
 
-      Fail with [`Slot_wrong_size] when the slot size is different from
+      Fails with [`Slot_wrong_size] when the slot size is different from
       [CONFIGURATION.slot_size]. *)
 val polynomial_from_slot :
   t -> bytes -> (polynomial, [> `Slot_wrong_size of string]) Result.t
@@ -106,7 +106,7 @@ val polynomial_to_bytes : t -> polynomial -> bytes
 (** [commit polynomial] returns the commitment associated to a
      polynomial [p].
 
-      Fail with [`Degree_exceeds_srs_length] if the degree of [p]
+      Fails with [`Degree_exceeds_srs_length] if the degree of [p]
      exceeds the SRS size. *)
 val commit :
   srs ->
@@ -140,15 +140,15 @@ val polynomial_from_shards :
   share IntMap.t ->
   (polynomial, [> `Invert_zero of string | `Not_enough_shards of string]) result
 
-(** [shards_from_polynomial t polynomial] compute all the shards
+(** [shards_from_polynomial t polynomial] computes all the shards
      encoding the original [polynomial]. *)
 val shards_from_polynomial : t -> polynomial -> share IntMap.t
 
-(** A proof that a shard belong to some commitment. *)
+(** A proof that a shard belongs to some commitment. *)
 type shard_proof
 
 (** [verify_shard t srs commitment shard proof] allows to check
-     whether [shard] is a porition of the data corresopding to the
+     whether [shard] is a portion of the data corresponding to the
      [commitment] using [proof]. The verification time is
      constant. The [srs] should be the same as the one used to produce
      the commitment. *)
@@ -161,8 +161,8 @@ val verify_shard :
   (bool, [> `Degree_exceeds_srs_length of string]) result
 
 (** [prove_commitment srs polynomial] produces a proof that the
-     commitment produced by the function [commit] is indeed a
-     commitment of the polynomial. *)
+     slot represented by [polynomial] has its size bounded by the
+     maximum slot size. *)
 val prove_commitment :
   srs ->
   polynomial ->
