@@ -120,7 +120,7 @@ let dir ?runner ?(perms = 0o755) base_name =
   filename
 
 let rec remove_recursively filename =
-  match (Unix.stat filename).st_kind with
+  match (Unix.lstat filename).st_kind with
   | exception Unix.Unix_error (error, _, _) ->
       Log.warn
         "Failed to read file type for %s: %s"
