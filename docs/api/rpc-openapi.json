@@ -3,7 +3,7 @@
   "info": {
     "title": "Tezos RPC",
     "description": "Tezos client RPC API.",
-    "version": "11.0"
+    "version": "14.0"
   },
   "paths": {
     "/chains/{chain_id}": {
@@ -51,7 +51,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -93,7 +93,7 @@
           {
             "name": "min_date",
             "in": "query",
-            "description": "A date in seconds from epoch When `min_date` is provided, blocks with a timestamp before `min_date` are filtered out",
+            "description": "A date in seconds from epoch When `min_date` is provided, blocks with a timestamp before `min_date` are filtered out. However, if the `length` parameter is also provided, then up to that number of predecessors will be returned regardless of their date.",
             "required": false,
             "schema": {
               "type": "string"
@@ -122,7 +122,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -150,7 +150,12 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Chain_id"
+                  "title": "Network identifier (Base58Check-encoded)",
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/unistring"
+                    }
+                  ]
                 }
               }
             }
@@ -160,7 +165,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -222,7 +227,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -281,7 +286,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -346,7 +351,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -392,7 +397,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -442,7 +447,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -494,7 +499,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -546,7 +551,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -598,7 +603,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -723,6 +728,15 @@
                               }
                             ]
                           }
+                        },
+                        "media-type": {
+                          "description": "The media types supported by the server.",
+                          "type": "string",
+                          "enum": [
+                            "json",
+                            "any",
+                            "binary"
+                          ]
                         }
                       }
                     },
@@ -732,7 +746,7 @@
                       "properties": {
                         "expected-proof-of-work": {
                           "description": "Floating point number between 0 and 256 that represents a difficulty, 24 signifies for example that at least 24 leading zeroes are expected in the hash.",
-                          "type": "integer"
+                          "type": "number"
                         },
                         "bootstrap-peers": {
                           "description": "List of hosts. Tezos can connect to both IPv6 and IPv4 hosts. If the port is not specified, default port 9732 will be assumed.",
@@ -748,6 +762,12 @@
                               "$ref": "#/components/schemas/unistring"
                             }
                           ]
+                        },
+                        "advertised-net-port": {
+                          "description": "Alternative port advertised to other peers to connect to. If the port is not specified, the port from listen-addr will be assumed.",
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 65535
                         },
                         "discovery-addr": {
                           "description": "Host for local peer discovery. If the port is not specified, the default port 10732 will be assumed.",
@@ -869,6 +889,7 @@
                               "maximum": 1073741823
                             },
                             "max_known_points": {
+                              "description": "The max and target size for the known address table.",
                               "type": "array",
                               "items": {
                                 "oneOf": [
@@ -886,7 +907,7 @@
                               }
                             },
                             "max_known_peer_ids": {
-                              "description": "The max and target size for the known address table.",
+                              "description": "The max and target size for the known peers table.",
                               "type": "array",
                               "items": {
                                 "oneOf": [
@@ -946,7 +967,7 @@
                           "type": "boolean"
                         },
                         "enable_testchain": {
-                          "description": "If set to [true], the node will spawn a testchain during the protocol's testing voting period. Default value is [false]. It is disabled to decrease the node storage usage and computation by dropping the validation of the test network blocks.",
+                          "description": "DEPRECATED. If set to [true], the node will spawn a testchain during the protocol's testing voting period. Default value is [false]. It is disabled to decrease the node storage usage and computation by dropping the validation of the test network blocks.",
                           "type": "boolean"
                         },
                         "greylisting_config": {
@@ -955,7 +976,7 @@
                           "properties": {
                             "factor": {
                               "description": "The factor by which the reconnection delay is increased when a peer that was previously disconnected is disconnected again. This value should be set to 1 for a linear back-off and to >1 for an exponential back-off.",
-                              "type": "integer"
+                              "type": "number"
                             },
                             "initial-delay": {
                               "description": "The span of time a peer is disconnected for when it is first disconnected.",
@@ -1029,16 +1050,36 @@
                     },
                     "internal-events": {
                       "description": "Configuration of the structured logging framework",
-                      "type": "object",
-                      "properties": {
-                        "activate": {
-                          "description": "List of URIs to activate/configure sinks.",
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/unistring"
+                      "oneOf": [
+                        {
+                          "title": "Active-Sinks",
+                          "description": "List of sinks to make sure are activated.",
+                          "type": "object",
+                          "properties": {
+                            "active_sinks": {
+                              "description": "List of URIs to activate/configure sinks.",
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/unistring"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "title": "Active-Sinks-Deprecated",
+                          "description": "List of sinks to make sure are activated, deprecated backwards-compatibility encoding.",
+                          "type": "object",
+                          "properties": {
+                            "activate": {
+                              "description": "List of URIs to activate/configure sinks.",
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/unistring"
+                              }
+                            }
                           }
                         }
-                      }
+                      ]
                     },
                     "shell": {
                       "description": "Configuration of network parameters",
@@ -1058,22 +1099,6 @@
                             },
                             "new_head_request_timeout": {
                               "$ref": "#/components/schemas/timespan.system"
-                            },
-                            "worker_backlog_size": {
-                              "type": "integer",
-                              "minimum": 0,
-                              "maximum": 65535
-                            },
-                            "worker_backlog_level": {
-                              "type": "string",
-                              "enum": [
-                                "info",
-                                "debug",
-                                "error",
-                                "fatal",
-                                "warning",
-                                "notice"
-                              ]
                             }
                           }
                         },
@@ -1083,20 +1108,21 @@
                             "protocol_request_timeout": {
                               "$ref": "#/components/schemas/timespan.system"
                             },
-                            "worker_backlog_size": {
-                              "type": "integer",
-                              "minimum": 0,
-                              "maximum": 65535
-                            },
-                            "worker_backlog_level": {
-                              "type": "string",
-                              "enum": [
-                                "info",
-                                "debug",
-                                "error",
-                                "fatal",
-                                "warning",
-                                "notice"
+                            "operation_metadata_size_limit": {
+                              "oneOf": [
+                                {
+                                  "title": "unlimited",
+                                  "type": "string",
+                                  "enum": [
+                                    "unlimited"
+                                  ]
+                                },
+                                {
+                                  "title": "limited",
+                                  "type": "integer",
+                                  "minimum": -1073741824,
+                                  "maximum": 1073741823
+                                }
                               ]
                             }
                           }
@@ -1117,21 +1143,8 @@
                               "minimum": -1073741824,
                               "maximum": 1073741823
                             },
-                            "worker_backlog_size": {
-                              "type": "integer",
-                              "minimum": 0,
-                              "maximum": 65535
-                            },
-                            "worker_backlog_level": {
-                              "type": "string",
-                              "enum": [
-                                "info",
-                                "debug",
-                                "error",
-                                "fatal",
-                                "warning",
-                                "notice"
-                              ]
+                            "disable_precheck": {
+                              "type": "boolean"
                             }
                           }
                         },
@@ -1152,22 +1165,6 @@
                                   "type": "integer",
                                   "minimum": 0,
                                   "maximum": 255
-                                },
-                                "worker_backlog_size": {
-                                  "type": "integer",
-                                  "minimum": 0,
-                                  "maximum": 65535
-                                },
-                                "worker_backlog_level": {
-                                  "type": "string",
-                                  "enum": [
-                                    "info",
-                                    "debug",
-                                    "error",
-                                    "fatal",
-                                    "warning",
-                                    "notice"
-                                  ]
                                 }
                               }
                             },
@@ -1180,22 +1177,6 @@
                                   "type": "integer",
                                   "minimum": 0,
                                   "maximum": 255
-                                },
-                                "worker_backlog_size": {
-                                  "type": "integer",
-                                  "minimum": 0,
-                                  "maximum": 65535
-                                },
-                                "worker_backlog_level": {
-                                  "type": "string",
-                                  "enum": [
-                                    "info",
-                                    "debug",
-                                    "error",
-                                    "fatal",
-                                    "warning",
-                                    "notice"
-                                  ]
                                 }
                               }
                             }
@@ -1224,17 +1205,24 @@
                           ]
                         },
                         {
-                          "title": "granadanet",
-                          "type": "string",
-                          "enum": [
-                            "granadanet"
-                          ]
-                        },
-                        {
                           "title": "hangzhounet",
                           "type": "string",
                           "enum": [
                             "hangzhounet"
+                          ]
+                        },
+                        {
+                          "title": "jakartanet",
+                          "type": "string",
+                          "enum": [
+                            "jakartanet"
+                          ]
+                        },
+                        {
+                          "title": "ghostnet",
+                          "type": "string",
+                          "enum": [
+                            "ghostnet"
                           ]
                         },
                         {
@@ -1305,6 +1293,13 @@
                           ]
                         }
                       ]
+                    },
+                    "metrics_addr": {
+                      "description": "Configuration of the Prometheus metrics endpoint",
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/unistring"
+                      }
                     }
                   }
                 }
@@ -1316,7 +1311,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1351,7 +1346,73 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config/logging": {
+      "put": {
+        "description": "Replace the logging configuration of the node.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "title": "Active-Sinks",
+                    "description": "List of sinks to make sure are activated.",
+                    "type": "object",
+                    "properties": {
+                      "active_sinks": {
+                        "description": "List of URIs to activate/configure sinks.",
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/unistring"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "title": "Active-Sinks-Deprecated",
+                    "description": "List of sinks to make sure are activated, deprecated backwards-compatibility encoding.",
+                    "type": "object",
+                    "properties": {
+                      "activate": {
+                        "description": "List of URIs to activate/configure sinks.",
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/unistring"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1368,7 +1429,24 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/user_activated.protocol_overrides"
+                  "title": "User activated protocol overrides",
+                  "description": "User activated protocol overrides: activate a protocol instead of another.",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "replaced_protocol": {
+                        "$ref": "#/components/schemas/Protocol_hash"
+                      },
+                      "replacement_protocol": {
+                        "$ref": "#/components/schemas/Protocol_hash"
+                      }
+                    },
+                    "required": [
+                      "replaced_protocol",
+                      "replacement_protocol"
+                    ]
+                  }
                 }
               }
             }
@@ -1378,7 +1456,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1395,7 +1473,26 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/user_activated.upgrades"
+                  "title": "User activated upgrades",
+                  "description": "User activated upgrades: at given level, switch to given protocol.",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "level": {
+                        "type": "integer",
+                        "minimum": -2147483648,
+                        "maximum": 2147483647
+                      },
+                      "replacement_protocol": {
+                        "$ref": "#/components/schemas/Protocol_hash"
+                      }
+                    },
+                    "required": [
+                      "level",
+                      "replacement_protocol"
+                    ]
+                  }
                 }
               }
             }
@@ -1405,7 +1502,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1430,7 +1527,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1466,7 +1563,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1538,7 +1635,12 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/block_hash"
+                  "title": "A block identifier (Base58Check-encoded)",
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/unistring"
+                    }
+                  ]
                 }
               }
             }
@@ -1548,7 +1650,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1558,7 +1660,7 @@
     },
     "/injection/operation": {
       "post": {
-        "description": "Inject an operation in node and broadcast it. Returns the ID of the operation. The `signedOperationContents` should be constructed using a contextual RPCs from the latest block and signed by the client. By default, the RPC will wait for the operation to be (pre-)validated before answering. See RPCs under /blocks/prevalidation for more details on the prevalidation context. If ?async is true, the function returns immediately. Otherwise, the operation will be validated before the result is returned. An optional ?chain parameter can be used to specify whether to inject on the test chain or the main chain.",
+        "description": "Inject an operation in node and broadcast it. Returns the ID of the operation. The `signedOperationContents` should be constructed using contextual RPCs from the latest block and signed by the client. The injection of the operation will apply it on the current mempool context. This context may change at each operation injection or operation reception from peers. By default, the RPC will wait for the operation to be (pre-)validated before returning. However, if ?async is true, the function returns immediately. The optional ?chain parameter can be used to specify whether to inject on the test chain or the main chain.",
         "parameters": [
           {
             "name": "async",
@@ -1594,7 +1696,12 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Operation_hash"
+                  "title": "A Tezos operation ID (Base58Check-encoded)",
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/unistring"
+                    }
+                  ]
                 }
               }
             }
@@ -1604,7 +1711,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1629,7 +1736,38 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/protocol"
+                "description": "The environment a protocol relies on and the components a protocol is made of.",
+                "type": "object",
+                "properties": {
+                  "expected_env_version": {
+                    "$ref": "#/components/schemas/protocol.environment_version"
+                  },
+                  "components": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "$ref": "#/components/schemas/unistring"
+                        },
+                        "interface": {
+                          "$ref": "#/components/schemas/unistring"
+                        },
+                        "implementation": {
+                          "$ref": "#/components/schemas/unistring"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "implementation"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "expected_env_version",
+                  "components"
+                ]
               }
             }
           }
@@ -1640,7 +1778,12 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Protocol_hash"
+                  "title": "A Tezos protocol ID (Base58Check-encoded)",
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/unistring"
+                    }
+                  ]
                 }
               }
             }
@@ -1650,7 +1793,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1725,7 +1868,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1764,7 +1907,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1781,7 +1924,29 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/unistring"
+                  "title": "Universal string representation",
+                  "description": "Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid byte sequences.",
+                  "oneOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "invalid_utf8_string": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                          }
+                        }
+                      },
+                      "required": [
+                        "invalid_utf8_string"
+                      ]
+                    }
+                  ]
                 }
               }
             }
@@ -1791,7 +1956,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1891,7 +2056,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -1908,7 +2073,12 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Protocol_hash"
+                  "title": "A Tezos protocol ID (Base58Check-encoded)",
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/unistring"
+                    }
+                  ]
                 }
               }
             }
@@ -1918,7 +2088,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2031,7 +2201,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2123,7 +2293,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2223,7 +2393,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2268,7 +2438,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2296,7 +2466,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2324,7 +2494,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2376,7 +2546,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2406,7 +2576,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2423,7 +2593,520 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/p2p_connection.pool_event"
+                  "description": "An event that may happen during maintenance of and other operations on the p2p connection pool. Typically, it includes connection errors, peer swaps, etc.",
+                  "oneOf": [
+                    {
+                      "title": "Too_few_connections",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "too_few_connections"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "event"
+                      ]
+                    },
+                    {
+                      "title": "Too_many_connections",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "too_many_connections"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "event"
+                      ]
+                    },
+                    {
+                      "title": "New_point",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "new_point"
+                          ]
+                        },
+                        "point": {
+                          "$ref": "#/components/schemas/p2p_point.id"
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "point"
+                      ]
+                    },
+                    {
+                      "title": "New_peer",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "new_peer"
+                          ]
+                        },
+                        "peer_id": {
+                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "peer_id"
+                      ]
+                    },
+                    {
+                      "title": "Incoming_connection",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "incoming_connection"
+                          ]
+                        },
+                        "point": {
+                          "$ref": "#/components/schemas/p2p_point.id"
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "point"
+                      ]
+                    },
+                    {
+                      "title": "Outgoing_connection",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "outgoing_connection"
+                          ]
+                        },
+                        "point": {
+                          "$ref": "#/components/schemas/p2p_point.id"
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "point"
+                      ]
+                    },
+                    {
+                      "title": "Authentication_failed",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "authentication_failed"
+                          ]
+                        },
+                        "point": {
+                          "$ref": "#/components/schemas/p2p_point.id"
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "point"
+                      ]
+                    },
+                    {
+                      "title": "Accepting_request",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "accepting_request"
+                          ]
+                        },
+                        "point": {
+                          "$ref": "#/components/schemas/p2p_point.id"
+                        },
+                        "id_point": {
+                          "$ref": "#/components/schemas/p2p_connection.id"
+                        },
+                        "peer_id": {
+                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "point",
+                        "id_point",
+                        "peer_id"
+                      ]
+                    },
+                    {
+                      "title": "Rejecting_request",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "rejecting_request"
+                          ]
+                        },
+                        "point": {
+                          "$ref": "#/components/schemas/p2p_point.id"
+                        },
+                        "id_point": {
+                          "$ref": "#/components/schemas/p2p_connection.id"
+                        },
+                        "peer_id": {
+                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "point",
+                        "id_point",
+                        "peer_id"
+                      ]
+                    },
+                    {
+                      "title": "Request_rejected",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "request_rejected"
+                          ]
+                        },
+                        "point": {
+                          "$ref": "#/components/schemas/p2p_point.id"
+                        },
+                        "identity": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/p2p_connection.id"
+                              },
+                              {
+                                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "point"
+                      ]
+                    },
+                    {
+                      "title": "Connection_established",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "connection_established"
+                          ]
+                        },
+                        "id_point": {
+                          "$ref": "#/components/schemas/p2p_connection.id"
+                        },
+                        "peer_id": {
+                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "id_point",
+                        "peer_id"
+                      ]
+                    },
+                    {
+                      "title": "Disconnection",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "disconnection"
+                          ]
+                        },
+                        "peer_id": {
+                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "peer_id"
+                      ]
+                    },
+                    {
+                      "title": "External_disconnection",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "external_disconnection"
+                          ]
+                        },
+                        "peer_id": {
+                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "peer_id"
+                      ]
+                    },
+                    {
+                      "title": "Gc_points",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "gc_points"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "event"
+                      ]
+                    },
+                    {
+                      "title": "Gc_peer_ids",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "gc_peer_ids"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "event"
+                      ]
+                    },
+                    {
+                      "title": "Swap_request_received",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "swap_request_received"
+                          ]
+                        },
+                        "source": {
+                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "source"
+                      ]
+                    },
+                    {
+                      "title": "Swap_ack_received",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "swap_ack_received"
+                          ]
+                        },
+                        "source": {
+                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "source"
+                      ]
+                    },
+                    {
+                      "title": "Swap_request_sent",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "swap_request_sent"
+                          ]
+                        },
+                        "source": {
+                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "source"
+                      ]
+                    },
+                    {
+                      "title": "Swap_ack_sent",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "swap_ack_sent"
+                          ]
+                        },
+                        "source": {
+                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "source"
+                      ]
+                    },
+                    {
+                      "title": "Swap_request_ignored",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "swap_request_ignored"
+                          ]
+                        },
+                        "source": {
+                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "source"
+                      ]
+                    },
+                    {
+                      "title": "Swap_success",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "swap_success"
+                          ]
+                        },
+                        "source": {
+                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "source"
+                      ]
+                    },
+                    {
+                      "title": "Swap_failure",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "swap_failure"
+                          ]
+                        },
+                        "source": {
+                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "source"
+                      ]
+                    },
+                    {
+                      "title": "Bootstrap_sent",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "bootstrap_sent"
+                          ]
+                        },
+                        "source": {
+                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "source"
+                      ]
+                    },
+                    {
+                      "title": "Bootstrap_received",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "bootstrap_received"
+                          ]
+                        },
+                        "source": {
+                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "source"
+                      ]
+                    },
+                    {
+                      "title": "Advertise_sent",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "advertise_sent"
+                          ]
+                        },
+                        "source": {
+                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "source"
+                      ]
+                    },
+                    {
+                      "title": "Advertise_received",
+                      "type": "object",
+                      "properties": {
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "advertise_received"
+                          ]
+                        },
+                        "source": {
+                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                        }
+                      },
+                      "required": [
+                        "event",
+                        "source"
+                      ]
+                    }
+                  ]
                 }
               }
             }
@@ -2433,7 +3116,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -2472,7 +3155,7 @@
                           "type": "object",
                           "properties": {
                             "score": {
-                              "type": "integer"
+                              "type": "number"
                             },
                             "trusted": {
                               "type": "boolean"
@@ -3438,7 +4121,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -3469,7 +4152,7 @@
                   "type": "object",
                   "properties": {
                     "score": {
-                      "type": "integer"
+                      "type": "number"
                     },
                     "trusted": {
                       "type": "boolean"
@@ -4431,7 +5114,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -4479,7 +5162,7 @@
                   "type": "object",
                   "properties": {
                     "score": {
-                      "type": "integer"
+                      "type": "number"
                     },
                     "trusted": {
                       "type": "boolean"
@@ -5441,7 +6124,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5480,7 +6163,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5518,7 +6201,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5567,7 +6250,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5606,7 +6289,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5645,7 +6328,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5684,7 +6367,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5734,7 +6417,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5762,7 +6445,87 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/p2p_point.info"
+                  "description": "Information about a peer point. Includes flags, state, and records about past events.",
+                  "type": "object",
+                  "properties": {
+                    "trusted": {
+                      "type": "boolean"
+                    },
+                    "greylisted_until": {
+                      "$ref": "#/components/schemas/timestamp.system"
+                    },
+                    "state": {
+                      "$ref": "#/components/schemas/p2p_point.state"
+                    },
+                    "p2p_peer_id": {
+                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                    },
+                    "last_failed_connection": {
+                      "$ref": "#/components/schemas/timestamp.system"
+                    },
+                    "last_rejected_connection": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                          },
+                          {
+                            "$ref": "#/components/schemas/timestamp.system"
+                          }
+                        ]
+                      }
+                    },
+                    "last_established_connection": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                          },
+                          {
+                            "$ref": "#/components/schemas/timestamp.system"
+                          }
+                        ]
+                      }
+                    },
+                    "last_disconnection": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                          },
+                          {
+                            "$ref": "#/components/schemas/timestamp.system"
+                          }
+                        ]
+                      }
+                    },
+                    "last_seen": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                          },
+                          {
+                            "$ref": "#/components/schemas/timestamp.system"
+                          }
+                        ]
+                      }
+                    },
+                    "last_miss": {
+                      "$ref": "#/components/schemas/timestamp.system"
+                    },
+                    "expected_peer_id": {
+                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                    }
+                  },
+                  "required": [
+                    "trusted",
+                    "state"
+                  ]
                 }
               }
             }
@@ -5772,7 +6535,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5828,7 +6591,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5876,7 +6639,87 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/p2p_point.info"
+                  "description": "Information about a peer point. Includes flags, state, and records about past events.",
+                  "type": "object",
+                  "properties": {
+                    "trusted": {
+                      "type": "boolean"
+                    },
+                    "greylisted_until": {
+                      "$ref": "#/components/schemas/timestamp.system"
+                    },
+                    "state": {
+                      "$ref": "#/components/schemas/p2p_point.state"
+                    },
+                    "p2p_peer_id": {
+                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                    },
+                    "last_failed_connection": {
+                      "$ref": "#/components/schemas/timestamp.system"
+                    },
+                    "last_rejected_connection": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                          },
+                          {
+                            "$ref": "#/components/schemas/timestamp.system"
+                          }
+                        ]
+                      }
+                    },
+                    "last_established_connection": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                          },
+                          {
+                            "$ref": "#/components/schemas/timestamp.system"
+                          }
+                        ]
+                      }
+                    },
+                    "last_disconnection": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                          },
+                          {
+                            "$ref": "#/components/schemas/timestamp.system"
+                          }
+                        ]
+                      }
+                    },
+                    "last_seen": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                          },
+                          {
+                            "$ref": "#/components/schemas/timestamp.system"
+                          }
+                        ]
+                      }
+                    },
+                    "last_miss": {
+                      "$ref": "#/components/schemas/timestamp.system"
+                    },
+                    "expected_peer_id": {
+                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                    }
+                  },
+                  "required": [
+                    "trusted",
+                    "state"
+                  ]
                 }
               }
             }
@@ -5886,7 +6729,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5925,7 +6768,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -5963,7 +6806,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6012,7 +6855,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6051,7 +6894,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6061,7 +6904,7 @@
     },
     "/network/points/{point}/unban": {
       "get": {
-        "description": "DEPRECATED: Remove an address from the blacklist. Use PATCH `/network/point/:peerid` instead.",
+        "description": "DEPRECATED: Remove an address from the blacklist. Use PATCH `/network/point/<point_id>` instead.",
         "parameters": [
           {
             "name": "point",
@@ -6090,7 +6933,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6129,7 +6972,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6146,7 +6989,12 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                  "title": "A Cryptobox public key ID (Base58Check-encoded)",
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/unistring"
+                    }
+                  ]
                 }
               }
             }
@@ -6156,7 +7004,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6173,7 +7021,32 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/p2p_stat"
+                  "description": "Statistics about the p2p network.",
+                  "type": "object",
+                  "properties": {
+                    "total_sent": {
+                      "$ref": "#/components/schemas/int64"
+                    },
+                    "total_recv": {
+                      "$ref": "#/components/schemas/int64"
+                    },
+                    "current_inflow": {
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    },
+                    "current_outflow": {
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    }
+                  },
+                  "required": [
+                    "total_sent",
+                    "total_recv",
+                    "current_inflow",
+                    "current_outflow"
+                  ]
                 }
               }
             }
@@ -6183,7 +7056,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6200,7 +7073,24 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/network_version"
+                  "description": "A version number for the network protocol (includes distributed DB version and p2p version)",
+                  "type": "object",
+                  "properties": {
+                    "chain_name": {
+                      "$ref": "#/components/schemas/distributed_db_version.name"
+                    },
+                    "distributed_db_version": {
+                      "$ref": "#/components/schemas/distributed_db_version"
+                    },
+                    "p2p_version": {
+                      "$ref": "#/components/schemas/p2p_version"
+                    }
+                  },
+                  "required": [
+                    "chain_name",
+                    "distributed_db_version",
+                    "p2p_version"
+                  ]
                 }
               }
             }
@@ -6210,7 +7100,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6240,7 +7130,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6270,7 +7160,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6298,7 +7188,38 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/protocol"
+                  "description": "The environment a protocol relies on and the components a protocol is made of.",
+                  "type": "object",
+                  "properties": {
+                    "expected_env_version": {
+                      "$ref": "#/components/schemas/protocol.environment_version"
+                    },
+                    "components": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "$ref": "#/components/schemas/unistring"
+                          },
+                          "interface": {
+                            "$ref": "#/components/schemas/unistring"
+                          },
+                          "implementation": {
+                            "$ref": "#/components/schemas/unistring"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "implementation"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "expected_env_version",
+                    "components"
+                  ]
                 }
               }
             }
@@ -6308,7 +7229,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6336,7 +7257,9 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/protocol.environment_version"
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
                 }
               }
             }
@@ -6346,7 +7269,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6366,13 +7289,13 @@
                   "type": "object",
                   "properties": {
                     "minor_words": {
-                      "type": "integer"
+                      "type": "number"
                     },
                     "promoted_words": {
-                      "type": "integer"
+                      "type": "number"
                     },
                     "major_words": {
-                      "type": "integer"
+                      "type": "number"
                     },
                     "minor_collections": {
                       "type": "integer",
@@ -6473,7 +7396,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6543,7 +7466,7 @@
                           "maximum": 1073741823
                         },
                         "mem": {
-                          "type": "integer"
+                          "type": "number"
                         },
                         "resident": {
                           "$ref": "#/components/schemas/int64"
@@ -6565,7 +7488,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6675,7 +7598,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -6865,392 +7788,6 @@
                         ]
                       }
                     },
-                    "backlog": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "level": {
-                            "type": "string",
-                            "enum": [
-                              "info",
-                              "debug",
-                              "error",
-                              "fatal",
-                              "warning",
-                              "notice"
-                            ]
-                          },
-                          "events": {
-                            "type": "array",
-                            "items": {
-                              "oneOf": [
-                                {
-                                  "title": "validation_success",
-                                  "type": "object",
-                                  "properties": {
-                                    "successful_validation": {
-                                      "type": "object",
-                                      "properties": {
-                                        "block": {
-                                          "$ref": "#/components/schemas/block_hash"
-                                        },
-                                        "chain_id": {
-                                          "$ref": "#/components/schemas/Chain_id"
-                                        },
-                                        "peer": {
-                                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                        }
-                                      },
-                                      "required": [
-                                        "block",
-                                        "chain_id"
-                                      ]
-                                    },
-                                    "status": {
-                                      "type": "object",
-                                      "properties": {
-                                        "pushed": {
-                                          "$ref": "#/components/schemas/timestamp.system"
-                                        },
-                                        "treated": {
-                                          "$ref": "#/components/schemas/timespan.system"
-                                        },
-                                        "completed": {
-                                          "$ref": "#/components/schemas/timespan.system"
-                                        }
-                                      },
-                                      "required": [
-                                        "pushed",
-                                        "treated",
-                                        "completed"
-                                      ]
-                                    }
-                                  },
-                                  "required": [
-                                    "successful_validation",
-                                    "status"
-                                  ]
-                                },
-                                {
-                                  "title": "validation_failure",
-                                  "type": "object",
-                                  "properties": {
-                                    "failed_validation": {
-                                      "type": "object",
-                                      "properties": {
-                                        "block": {
-                                          "$ref": "#/components/schemas/block_hash"
-                                        },
-                                        "chain_id": {
-                                          "$ref": "#/components/schemas/Chain_id"
-                                        },
-                                        "peer": {
-                                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                        }
-                                      },
-                                      "required": [
-                                        "block",
-                                        "chain_id"
-                                      ]
-                                    },
-                                    "status": {
-                                      "type": "object",
-                                      "properties": {
-                                        "pushed": {
-                                          "$ref": "#/components/schemas/timestamp.system"
-                                        },
-                                        "treated": {
-                                          "$ref": "#/components/schemas/timespan.system"
-                                        },
-                                        "completed": {
-                                          "$ref": "#/components/schemas/timespan.system"
-                                        }
-                                      },
-                                      "required": [
-                                        "pushed",
-                                        "treated",
-                                        "completed"
-                                      ]
-                                    },
-                                    "errors": {
-                                      "$ref": "#/components/schemas/error"
-                                    }
-                                  },
-                                  "required": [
-                                    "failed_validation",
-                                    "status"
-                                  ]
-                                },
-                                {
-                                  "title": "validation_failure_after_precheck",
-                                  "type": "object",
-                                  "properties": {
-                                    "failed_validation_after_precheck": {
-                                      "type": "object",
-                                      "properties": {
-                                        "block": {
-                                          "$ref": "#/components/schemas/block_hash"
-                                        },
-                                        "chain_id": {
-                                          "$ref": "#/components/schemas/Chain_id"
-                                        },
-                                        "peer": {
-                                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                        }
-                                      },
-                                      "required": [
-                                        "block",
-                                        "chain_id"
-                                      ]
-                                    },
-                                    "status": {
-                                      "type": "object",
-                                      "properties": {
-                                        "pushed": {
-                                          "$ref": "#/components/schemas/timestamp.system"
-                                        },
-                                        "treated": {
-                                          "$ref": "#/components/schemas/timespan.system"
-                                        },
-                                        "completed": {
-                                          "$ref": "#/components/schemas/timespan.system"
-                                        }
-                                      },
-                                      "required": [
-                                        "pushed",
-                                        "treated",
-                                        "completed"
-                                      ]
-                                    },
-                                    "errors": {
-                                      "$ref": "#/components/schemas/error"
-                                    }
-                                  },
-                                  "required": [
-                                    "failed_validation_after_precheck",
-                                    "status"
-                                  ]
-                                },
-                                {
-                                  "title": "precheck_failure",
-                                  "type": "object",
-                                  "properties": {
-                                    "failed_precheck": {
-                                      "type": "object",
-                                      "properties": {
-                                        "block": {
-                                          "$ref": "#/components/schemas/block_hash"
-                                        },
-                                        "chain_id": {
-                                          "$ref": "#/components/schemas/Chain_id"
-                                        },
-                                        "peer": {
-                                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                        }
-                                      },
-                                      "required": [
-                                        "block",
-                                        "chain_id"
-                                      ]
-                                    },
-                                    "status": {
-                                      "type": "object",
-                                      "properties": {
-                                        "pushed": {
-                                          "$ref": "#/components/schemas/timestamp.system"
-                                        },
-                                        "treated": {
-                                          "$ref": "#/components/schemas/timespan.system"
-                                        },
-                                        "completed": {
-                                          "$ref": "#/components/schemas/timespan.system"
-                                        }
-                                      },
-                                      "required": [
-                                        "pushed",
-                                        "treated",
-                                        "completed"
-                                      ]
-                                    },
-                                    "errors": {
-                                      "$ref": "#/components/schemas/error"
-                                    }
-                                  },
-                                  "required": [
-                                    "failed_precheck",
-                                    "status"
-                                  ]
-                                },
-                                {
-                                  "title": "could_not_find_context",
-                                  "type": "object",
-                                  "properties": {
-                                    "block": {
-                                      "$ref": "#/components/schemas/block_hash"
-                                    }
-                                  },
-                                  "required": [
-                                    "block"
-                                  ]
-                                },
-                                {
-                                  "title": "previously_validated",
-                                  "type": "object",
-                                  "properties": {
-                                    "block": {
-                                      "$ref": "#/components/schemas/block_hash"
-                                    }
-                                  },
-                                  "required": [
-                                    "block"
-                                  ]
-                                },
-                                {
-                                  "title": "validating_block",
-                                  "type": "object",
-                                  "properties": {
-                                    "block": {
-                                      "$ref": "#/components/schemas/block_hash"
-                                    }
-                                  },
-                                  "required": [
-                                    "block"
-                                  ]
-                                },
-                                {
-                                  "title": "preapplication_success",
-                                  "type": "object",
-                                  "properties": {
-                                    "preapplication_success": {
-                                      "type": "object",
-                                      "properties": {
-                                        "chain_id": {
-                                          "$ref": "#/components/schemas/Chain_id"
-                                        },
-                                        "level": {
-                                          "type": "integer",
-                                          "minimum": -2147483648,
-                                          "maximum": 2147483647
-                                        }
-                                      },
-                                      "required": [
-                                        "chain_id",
-                                        "level"
-                                      ]
-                                    },
-                                    "status": {
-                                      "type": "object",
-                                      "properties": {
-                                        "pushed": {
-                                          "$ref": "#/components/schemas/timestamp.system"
-                                        },
-                                        "treated": {
-                                          "$ref": "#/components/schemas/timespan.system"
-                                        },
-                                        "completed": {
-                                          "$ref": "#/components/schemas/timespan.system"
-                                        }
-                                      },
-                                      "required": [
-                                        "pushed",
-                                        "treated",
-                                        "completed"
-                                      ]
-                                    }
-                                  },
-                                  "required": [
-                                    "preapplication_success",
-                                    "status"
-                                  ]
-                                },
-                                {
-                                  "title": "preapplication_failure",
-                                  "type": "object",
-                                  "properties": {
-                                    "preapplication_failure": {
-                                      "type": "object",
-                                      "properties": {
-                                        "chain_id": {
-                                          "$ref": "#/components/schemas/Chain_id"
-                                        },
-                                        "level": {
-                                          "type": "integer",
-                                          "minimum": -2147483648,
-                                          "maximum": 2147483647
-                                        }
-                                      },
-                                      "required": [
-                                        "chain_id",
-                                        "level"
-                                      ]
-                                    },
-                                    "status": {
-                                      "type": "object",
-                                      "properties": {
-                                        "pushed": {
-                                          "$ref": "#/components/schemas/timestamp.system"
-                                        },
-                                        "treated": {
-                                          "$ref": "#/components/schemas/timespan.system"
-                                        },
-                                        "completed": {
-                                          "$ref": "#/components/schemas/timespan.system"
-                                        }
-                                      },
-                                      "required": [
-                                        "pushed",
-                                        "treated",
-                                        "completed"
-                                      ]
-                                    },
-                                    "errors": {
-                                      "$ref": "#/components/schemas/error"
-                                    }
-                                  },
-                                  "required": [
-                                    "preapplication_failure",
-                                    "status"
-                                  ]
-                                },
-                                {
-                                  "title": "prechecking_block",
-                                  "type": "object",
-                                  "properties": {
-                                    "block": {
-                                      "$ref": "#/components/schemas/block_hash"
-                                    }
-                                  },
-                                  "required": [
-                                    "block"
-                                  ]
-                                },
-                                {
-                                  "title": "prechecked_block",
-                                  "type": "object",
-                                  "properties": {
-                                    "kind": {
-                                      "$ref": "#/components/schemas/unistring"
-                                    },
-                                    "block": {
-                                      "$ref": "#/components/schemas/block_hash"
-                                    }
-                                  },
-                                  "required": [
-                                    "kind",
-                                    "block"
-                                  ]
-                                }
-                              ]
-                            }
-                          }
-                        },
-                        "required": [
-                          "level",
-                          "events"
-                        ]
-                      }
-                    },
                     "current_request": {
                       "type": "object",
                       "properties": {
@@ -7311,8 +7848,7 @@
                   },
                   "required": [
                     "status",
-                    "pending_requests",
-                    "backlog"
+                    "pending_requests"
                   ]
                 }
               }
@@ -7323,7 +7859,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -7619,7 +8155,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -7807,353 +8343,6 @@
                         ]
                       }
                     },
-                    "backlog": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "level": {
-                            "type": "string",
-                            "enum": [
-                              "info",
-                              "debug",
-                              "error",
-                              "fatal",
-                              "warning",
-                              "notice"
-                            ]
-                          },
-                          "events": {
-                            "type": "array",
-                            "items": {
-                              "oneOf": [
-                                {
-                                  "title": "Processed_block",
-                                  "type": "object",
-                                  "properties": {
-                                    "processed_block": {
-                                      "type": "object",
-                                      "properties": {
-                                        "request": {
-                                          "oneOf": [
-                                            {
-                                              "title": "Hash",
-                                              "type": "object",
-                                              "properties": {
-                                                "hash": {
-                                                  "$ref": "#/components/schemas/block_hash"
-                                                }
-                                              },
-                                              "required": [
-                                                "hash"
-                                              ]
-                                            },
-                                            {
-                                              "title": "Peer_id",
-                                              "type": "object",
-                                              "properties": {
-                                                "peer_id": {
-                                                  "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                                }
-                                              },
-                                              "required": [
-                                                "peer_id"
-                                              ]
-                                            }
-                                          ]
-                                        },
-                                        "status": {
-                                          "type": "object",
-                                          "properties": {
-                                            "pushed": {
-                                              "$ref": "#/components/schemas/timestamp.system"
-                                            },
-                                            "treated": {
-                                              "$ref": "#/components/schemas/timespan.system"
-                                            },
-                                            "completed": {
-                                              "$ref": "#/components/schemas/timespan.system"
-                                            }
-                                          },
-                                          "required": [
-                                            "pushed",
-                                            "treated",
-                                            "completed"
-                                          ]
-                                        },
-                                        "outcome": {
-                                          "$ref": "#/components/schemas/chain_update"
-                                        },
-                                        "fitness": {
-                                          "$ref": "#/components/schemas/fitness"
-                                        },
-                                        "level": {
-                                          "type": "integer",
-                                          "minimum": -2147483648,
-                                          "maximum": 2147483647
-                                        },
-                                        "timestamp": {
-                                          "$ref": "#/components/schemas/timestamp.protocol"
-                                        }
-                                      },
-                                      "required": [
-                                        "request",
-                                        "status",
-                                        "outcome",
-                                        "fitness",
-                                        "level",
-                                        "timestamp"
-                                      ]
-                                    }
-                                  },
-                                  "required": [
-                                    "processed_block"
-                                  ]
-                                },
-                                {
-                                  "title": "Could_not_switch_testchain",
-                                  "type": "object",
-                                  "properties": {
-                                    "could_not_switch_testchain": {
-                                      "$ref": "#/components/schemas/error"
-                                    }
-                                  },
-                                  "required": [
-                                    "could_not_switch_testchain"
-                                  ]
-                                },
-                                {
-                                  "title": "Bootstrapped",
-                                  "type": "object",
-                                  "properties": {
-                                    "bootstrapped": {}
-                                  },
-                                  "required": [
-                                    "bootstrapped"
-                                  ]
-                                },
-                                {
-                                  "title": "Sync_status",
-                                  "oneOf": [
-                                    {
-                                      "$ref": "#/components/schemas/chain_status"
-                                    }
-                                  ]
-                                },
-                                {
-                                  "title": "Bootstrap_active_peers",
-                                  "type": "object",
-                                  "properties": {
-                                    "bootstrap_active_peers": {
-                                      "type": "object",
-                                      "properties": {
-                                        "active": {
-                                          "type": "integer",
-                                          "minimum": -1073741824,
-                                          "maximum": 1073741823
-                                        },
-                                        "needed": {
-                                          "type": "integer",
-                                          "minimum": -1073741824,
-                                          "maximum": 1073741823
-                                        }
-                                      },
-                                      "required": [
-                                        "active",
-                                        "needed"
-                                      ]
-                                    }
-                                  },
-                                  "required": [
-                                    "bootstrap_active_peers"
-                                  ]
-                                },
-                                {
-                                  "title": "Bootstrap_active_peers_heads_time",
-                                  "type": "object",
-                                  "properties": {
-                                    "bootstrap_active_peers_head_time": {
-                                      "type": "object",
-                                      "properties": {
-                                        "min_head_time": {
-                                          "$ref": "#/components/schemas/timestamp.protocol"
-                                        },
-                                        "max_head_time": {
-                                          "$ref": "#/components/schemas/timestamp.protocol"
-                                        },
-                                        "most_recent_validation": {
-                                          "$ref": "#/components/schemas/timestamp.protocol"
-                                        }
-                                      },
-                                      "required": [
-                                        "min_head_time",
-                                        "max_head_time",
-                                        "most_recent_validation"
-                                      ]
-                                    }
-                                  },
-                                  "required": [
-                                    "bootstrap_active_peers_head_time"
-                                  ]
-                                },
-                                {
-                                  "title": "notify_branch",
-                                  "type": "object",
-                                  "properties": {
-                                    "notify_branch": {
-                                      "type": "object",
-                                      "properties": {
-                                        "peer_id": {
-                                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                        }
-                                      },
-                                      "required": [
-                                        "peer_id"
-                                      ]
-                                    }
-                                  },
-                                  "required": [
-                                    "notify_branch"
-                                  ]
-                                },
-                                {
-                                  "title": "notify_head",
-                                  "type": "object",
-                                  "properties": {
-                                    "notify_head": {
-                                      "type": "object",
-                                      "properties": {
-                                        "peer_id": {
-                                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                        }
-                                      },
-                                      "required": [
-                                        "peer_id"
-                                      ]
-                                    }
-                                  },
-                                  "required": [
-                                    "notify_head"
-                                  ]
-                                },
-                                {
-                                  "title": "disconnection",
-                                  "type": "object",
-                                  "properties": {
-                                    "disconnection": {
-                                      "type": "object",
-                                      "properties": {
-                                        "kind": {
-                                          "$ref": "#/components/schemas/unistring"
-                                        },
-                                        "peer_id": {
-                                          "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                        }
-                                      },
-                                      "required": [
-                                        "kind",
-                                        "peer_id"
-                                      ]
-                                    }
-                                  },
-                                  "required": [
-                                    "disconnection"
-                                  ]
-                                },
-                                {
-                                  "title": "request_failure",
-                                  "type": "object",
-                                  "properties": {
-                                    "request_failure": {
-                                      "type": "object",
-                                      "properties": {
-                                        "failed_validation": {
-                                          "oneOf": [
-                                            {
-                                              "title": "Hash",
-                                              "type": "object",
-                                              "properties": {
-                                                "hash": {
-                                                  "$ref": "#/components/schemas/block_hash"
-                                                }
-                                              },
-                                              "required": [
-                                                "hash"
-                                              ]
-                                            },
-                                            {
-                                              "title": "Peer_id",
-                                              "type": "object",
-                                              "properties": {
-                                                "peer_id": {
-                                                  "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                                }
-                                              },
-                                              "required": [
-                                                "peer_id"
-                                              ]
-                                            }
-                                          ]
-                                        },
-                                        "status": {
-                                          "type": "object",
-                                          "properties": {
-                                            "pushed": {
-                                              "$ref": "#/components/schemas/timestamp.system"
-                                            },
-                                            "treated": {
-                                              "$ref": "#/components/schemas/timespan.system"
-                                            },
-                                            "completed": {
-                                              "$ref": "#/components/schemas/timespan.system"
-                                            }
-                                          },
-                                          "required": [
-                                            "pushed",
-                                            "treated",
-                                            "completed"
-                                          ]
-                                        },
-                                        "errors": {
-                                          "$ref": "#/components/schemas/error"
-                                        }
-                                      },
-                                      "required": [
-                                        "failed_validation",
-                                        "status"
-                                      ]
-                                    }
-                                  },
-                                  "required": [
-                                    "request_failure"
-                                  ]
-                                },
-                                {
-                                  "title": "connection",
-                                  "type": "object",
-                                  "properties": {
-                                    "kind": {
-                                      "$ref": "#/components/schemas/unistring"
-                                    },
-                                    "peer_id": {
-                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                    }
-                                  },
-                                  "required": [
-                                    "kind",
-                                    "peer_id"
-                                  ]
-                                }
-                              ]
-                            }
-                          }
-                        },
-                        "required": [
-                          "level",
-                          "events"
-                        ]
-                      }
-                    },
                     "current_request": {
                       "type": "object",
                       "properties": {
@@ -8201,8 +8390,7 @@
                   },
                   "required": [
                     "status",
-                    "pending_requests",
-                    "backlog"
+                    "pending_requests"
                   ]
                 }
               }
@@ -8213,7 +8401,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -8339,7 +8527,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -8660,7 +8848,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -8877,468 +9065,6 @@
                         ]
                       }
                     },
-                    "backlog": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "level": {
-                            "type": "string",
-                            "enum": [
-                              "info",
-                              "debug",
-                              "error",
-                              "fatal",
-                              "warning",
-                              "notice"
-                            ]
-                          },
-                          "events": {
-                            "type": "array",
-                            "items": {
-                              "oneOf": [
-                                {
-                                  "title": "Request",
-                                  "type": "object",
-                                  "properties": {
-                                    "request": {
-                                      "oneOf": [
-                                        {
-                                          "title": "New_head",
-                                          "type": "object",
-                                          "properties": {
-                                            "request": {
-                                              "type": "string",
-                                              "enum": [
-                                                "new_head"
-                                              ]
-                                            },
-                                            "block": {
-                                              "$ref": "#/components/schemas/block_hash"
-                                            }
-                                          },
-                                          "required": [
-                                            "request",
-                                            "block"
-                                          ]
-                                        },
-                                        {
-                                          "title": "New_branch",
-                                          "type": "object",
-                                          "properties": {
-                                            "request": {
-                                              "type": "string",
-                                              "enum": [
-                                                "new_branch"
-                                              ]
-                                            },
-                                            "block": {
-                                              "$ref": "#/components/schemas/block_hash"
-                                            },
-                                            "locators": {
-                                              "type": "integer",
-                                              "minimum": -1073741824,
-                                              "maximum": 1073741823
-                                            }
-                                          },
-                                          "required": [
-                                            "request",
-                                            "block",
-                                            "locators"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    "status": {
-                                      "type": "object",
-                                      "properties": {
-                                        "pushed": {
-                                          "$ref": "#/components/schemas/timestamp.system"
-                                        },
-                                        "treated": {
-                                          "$ref": "#/components/schemas/timespan.system"
-                                        },
-                                        "completed": {
-                                          "$ref": "#/components/schemas/timespan.system"
-                                        }
-                                      },
-                                      "required": [
-                                        "pushed",
-                                        "treated",
-                                        "completed"
-                                      ]
-                                    }
-                                  },
-                                  "required": [
-                                    "request",
-                                    "status"
-                                  ]
-                                },
-                                {
-                                  "title": "Failed request",
-                                  "type": "object",
-                                  "properties": {
-                                    "error": {
-                                      "$ref": "#/components/schemas/error"
-                                    },
-                                    "failed_request": {
-                                      "oneOf": [
-                                        {
-                                          "title": "New_head",
-                                          "type": "object",
-                                          "properties": {
-                                            "request": {
-                                              "type": "string",
-                                              "enum": [
-                                                "new_head"
-                                              ]
-                                            },
-                                            "block": {
-                                              "$ref": "#/components/schemas/block_hash"
-                                            }
-                                          },
-                                          "required": [
-                                            "request",
-                                            "block"
-                                          ]
-                                        },
-                                        {
-                                          "title": "New_branch",
-                                          "type": "object",
-                                          "properties": {
-                                            "request": {
-                                              "type": "string",
-                                              "enum": [
-                                                "new_branch"
-                                              ]
-                                            },
-                                            "block": {
-                                              "$ref": "#/components/schemas/block_hash"
-                                            },
-                                            "locators": {
-                                              "type": "integer",
-                                              "minimum": -1073741824,
-                                              "maximum": 1073741823
-                                            }
-                                          },
-                                          "required": [
-                                            "request",
-                                            "block",
-                                            "locators"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    "status": {
-                                      "type": "object",
-                                      "properties": {
-                                        "pushed": {
-                                          "$ref": "#/components/schemas/timestamp.system"
-                                        },
-                                        "treated": {
-                                          "$ref": "#/components/schemas/timespan.system"
-                                        },
-                                        "completed": {
-                                          "$ref": "#/components/schemas/timespan.system"
-                                        }
-                                      },
-                                      "required": [
-                                        "pushed",
-                                        "treated",
-                                        "completed"
-                                      ]
-                                    }
-                                  },
-                                  "required": [
-                                    "error",
-                                    "failed_request",
-                                    "status"
-                                  ]
-                                },
-                                {
-                                  "title": "validating_new_branch",
-                                  "type": "object",
-                                  "properties": {
-                                    "peer": {
-                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                    },
-                                    "nb_blocks": {
-                                      "type": "integer",
-                                      "minimum": -1073741824,
-                                      "maximum": 1073741823
-                                    }
-                                  },
-                                  "required": [
-                                    "peer",
-                                    "nb_blocks"
-                                  ]
-                                },
-                                {
-                                  "title": "new_branch_validated",
-                                  "type": "object",
-                                  "properties": {
-                                    "peer": {
-                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                    },
-                                    "block": {
-                                      "$ref": "#/components/schemas/block_hash"
-                                    }
-                                  },
-                                  "required": [
-                                    "peer",
-                                    "block"
-                                  ]
-                                },
-                                {
-                                  "title": "fetching_operations_for_head",
-                                  "type": "object",
-                                  "properties": {
-                                    "peer": {
-                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                    },
-                                    "block": {
-                                      "$ref": "#/components/schemas/block_hash"
-                                    }
-                                  },
-                                  "required": [
-                                    "peer",
-                                    "block"
-                                  ]
-                                },
-                                {
-                                  "title": "Requesting_new_head_validation",
-                                  "type": "object",
-                                  "properties": {
-                                    "peer": {
-                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                    },
-                                    "block": {
-                                      "$ref": "#/components/schemas/block_hash"
-                                    }
-                                  },
-                                  "required": [
-                                    "peer",
-                                    "block"
-                                  ]
-                                },
-                                {
-                                  "title": "new_head_validation_end",
-                                  "type": "object",
-                                  "properties": {
-                                    "peer": {
-                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                    },
-                                    "block": {
-                                      "$ref": "#/components/schemas/block_hash"
-                                    }
-                                  },
-                                  "required": [
-                                    "peer",
-                                    "block"
-                                  ]
-                                },
-                                {
-                                  "title": "ignoring_head",
-                                  "type": "object",
-                                  "properties": {
-                                    "peer": {
-                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                    },
-                                    "block": {
-                                      "$ref": "#/components/schemas/block_hash"
-                                    }
-                                  },
-                                  "required": [
-                                    "peer",
-                                    "block"
-                                  ]
-                                },
-                                {
-                                  "title": "ignoring_previously_validated_block",
-                                  "type": "object",
-                                  "properties": {
-                                    "peer": {
-                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                    },
-                                    "block": {
-                                      "$ref": "#/components/schemas/block_hash"
-                                    }
-                                  },
-                                  "required": [
-                                    "peer",
-                                    "block"
-                                  ]
-                                },
-                                {
-                                  "title": "ignoring_prechecked_block",
-                                  "type": "object",
-                                  "properties": {
-                                    "peer": {
-                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                    },
-                                    "block": {
-                                      "$ref": "#/components/schemas/block_hash"
-                                    }
-                                  },
-                                  "required": [
-                                    "peer",
-                                    "block"
-                                  ]
-                                },
-                                {
-                                  "title": "ignoring_invalid_block",
-                                  "type": "object",
-                                  "properties": {
-                                    "peer": {
-                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                    },
-                                    "block": {
-                                      "$ref": "#/components/schemas/block_hash"
-                                    }
-                                  },
-                                  "required": [
-                                    "peer",
-                                    "block"
-                                  ]
-                                },
-                                {
-                                  "title": "missing_new_head_predecessor",
-                                  "type": "object",
-                                  "properties": {
-                                    "peer": {
-                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                    },
-                                    "block": {
-                                      "$ref": "#/components/schemas/block_hash"
-                                    }
-                                  },
-                                  "required": [
-                                    "peer",
-                                    "block"
-                                  ]
-                                },
-                                {
-                                  "title": "ignoring_invalid_locator_branch",
-                                  "type": "object",
-                                  "properties": {
-                                    "peer": {
-                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                    },
-                                    "block": {
-                                      "$ref": "#/components/schemas/block_hash"
-                                    }
-                                  },
-                                  "required": [
-                                    "peer",
-                                    "block"
-                                  ]
-                                },
-                                {
-                                  "title": "ignore_branch_without_common_ancestor",
-                                  "type": "object",
-                                  "properties": {
-                                    "peer": {
-                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                    },
-                                    "block": {
-                                      "$ref": "#/components/schemas/block_hash"
-                                    }
-                                  },
-                                  "required": [
-                                    "peer",
-                                    "block"
-                                  ]
-                                },
-                                {
-                                  "title": "no_new_head_from_peer",
-                                  "type": "object",
-                                  "properties": {
-                                    "peer": {
-                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                    },
-                                    "timespan": {
-                                      "type": "integer"
-                                    }
-                                  },
-                                  "required": [
-                                    "peer",
-                                    "timespan"
-                                  ]
-                                },
-                                {
-                                  "title": "processing_new_head",
-                                  "type": "object",
-                                  "properties": {
-                                    "peer": {
-                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                    },
-                                    "block": {
-                                      "$ref": "#/components/schemas/block_hash"
-                                    }
-                                  },
-                                  "required": [
-                                    "peer",
-                                    "block"
-                                  ]
-                                },
-                                {
-                                  "title": "processing_new_branch",
-                                  "type": "object",
-                                  "properties": {
-                                    "peer": {
-                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                    },
-                                    "block": {
-                                      "$ref": "#/components/schemas/block_hash"
-                                    }
-                                  },
-                                  "required": [
-                                    "peer",
-                                    "block"
-                                  ]
-                                },
-                                {
-                                  "title": "terminating_worker",
-                                  "type": "object",
-                                  "properties": {
-                                    "peer": {
-                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                    },
-                                    "reason": {
-                                      "$ref": "#/components/schemas/unistring"
-                                    }
-                                  },
-                                  "required": [
-                                    "peer",
-                                    "reason"
-                                  ]
-                                },
-                                {
-                                  "title": "ignoring_prechecked_invalid_block",
-                                  "type": "object",
-                                  "properties": {
-                                    "peer": {
-                                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                                    },
-                                    "block": {
-                                      "$ref": "#/components/schemas/block_hash"
-                                    }
-                                  },
-                                  "required": [
-                                    "peer",
-                                    "block"
-                                  ]
-                                }
-                              ]
-                            }
-                          }
-                        },
-                        "required": [
-                          "level",
-                          "events"
-                        ]
-                      }
-                    },
                     "current_request": {
                       "type": "object",
                       "properties": {
@@ -9406,8 +9132,7 @@
                   },
                   "required": [
                     "status",
-                    "pending_requests",
-                    "backlog"
+                    "pending_requests"
                   ]
                 }
               }
@@ -9418,7 +9143,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -9714,7 +9439,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -9927,11 +9652,15 @@
                                   },
                                   "operation": {
                                     "$ref": "#/components/schemas/operation"
+                                  },
+                                  "force": {
+                                    "type": "boolean"
                                   }
                                 },
                                 "required": [
                                   "request",
-                                  "operation"
+                                  "operation",
+                                  "force"
                                 ]
                               },
                               {
@@ -10015,33 +9744,6 @@
                         ]
                       }
                     },
-                    "backlog": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "level": {
-                            "type": "string",
-                            "enum": [
-                              "info",
-                              "debug",
-                              "error",
-                              "fatal",
-                              "warning",
-                              "notice"
-                            ]
-                          },
-                          "events": {
-                            "type": "array",
-                            "items": {}
-                          }
-                        },
-                        "required": [
-                          "level",
-                          "events"
-                        ]
-                      }
-                    },
                     "current_request": {
                       "type": "object",
                       "properties": {
@@ -10111,11 +9813,15 @@
                                 },
                                 "operation": {
                                   "$ref": "#/components/schemas/operation"
+                                },
+                                "force": {
+                                  "type": "boolean"
                                 }
                               },
                               "required": [
                                 "request",
-                                "operation"
+                                "operation",
+                                "force"
                               ]
                             },
                             {
@@ -10202,8 +9908,7 @@
                   },
                   "required": [
                     "status",
-                    "pending_requests",
-                    "backlog"
+                    "pending_requests"
                   ]
                 }
               }
@@ -10214,7 +9919,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/error"
+                  "description": "The full list of errors is available with the global RPC `GET errors`"
                 }
               }
             }
@@ -10371,7 +10076,7 @@
         ]
       },
       "error": {
-        "description": "The full list of error is available with the global RPC `GET errors`"
+        "description": "The full list of errors is available with the global RPC `GET errors`"
       },
       "fitness": {
         "title": "Block fitness",
@@ -10549,522 +10254,6 @@
         },
         "required": [
           "addr"
-        ]
-      },
-      "p2p_connection.pool_event": {
-        "description": "An event that may happen during maintenance of and other operations on the p2p connection pool. Typically, it includes connection errors, peer swaps, etc.",
-        "oneOf": [
-          {
-            "title": "Too_few_connections",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "too_few_connections"
-                ]
-              }
-            },
-            "required": [
-              "event"
-            ]
-          },
-          {
-            "title": "Too_many_connections",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "too_many_connections"
-                ]
-              }
-            },
-            "required": [
-              "event"
-            ]
-          },
-          {
-            "title": "New_point",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "new_point"
-                ]
-              },
-              "point": {
-                "$ref": "#/components/schemas/p2p_point.id"
-              }
-            },
-            "required": [
-              "event",
-              "point"
-            ]
-          },
-          {
-            "title": "New_peer",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "new_peer"
-                ]
-              },
-              "peer_id": {
-                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-              }
-            },
-            "required": [
-              "event",
-              "peer_id"
-            ]
-          },
-          {
-            "title": "Incoming_connection",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "incoming_connection"
-                ]
-              },
-              "point": {
-                "$ref": "#/components/schemas/p2p_point.id"
-              }
-            },
-            "required": [
-              "event",
-              "point"
-            ]
-          },
-          {
-            "title": "Outgoing_connection",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "outgoing_connection"
-                ]
-              },
-              "point": {
-                "$ref": "#/components/schemas/p2p_point.id"
-              }
-            },
-            "required": [
-              "event",
-              "point"
-            ]
-          },
-          {
-            "title": "Authentication_failed",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "authentication_failed"
-                ]
-              },
-              "point": {
-                "$ref": "#/components/schemas/p2p_point.id"
-              }
-            },
-            "required": [
-              "event",
-              "point"
-            ]
-          },
-          {
-            "title": "Accepting_request",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "accepting_request"
-                ]
-              },
-              "point": {
-                "$ref": "#/components/schemas/p2p_point.id"
-              },
-              "id_point": {
-                "$ref": "#/components/schemas/p2p_connection.id"
-              },
-              "peer_id": {
-                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-              }
-            },
-            "required": [
-              "event",
-              "point",
-              "id_point",
-              "peer_id"
-            ]
-          },
-          {
-            "title": "Rejecting_request",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "rejecting_request"
-                ]
-              },
-              "point": {
-                "$ref": "#/components/schemas/p2p_point.id"
-              },
-              "id_point": {
-                "$ref": "#/components/schemas/p2p_connection.id"
-              },
-              "peer_id": {
-                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-              }
-            },
-            "required": [
-              "event",
-              "point",
-              "id_point",
-              "peer_id"
-            ]
-          },
-          {
-            "title": "Request_rejected",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "request_rejected"
-                ]
-              },
-              "point": {
-                "$ref": "#/components/schemas/p2p_point.id"
-              },
-              "identity": {
-                "type": "array",
-                "items": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/p2p_connection.id"
-                    },
-                    {
-                      "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-                    }
-                  ]
-                }
-              }
-            },
-            "required": [
-              "event",
-              "point"
-            ]
-          },
-          {
-            "title": "Connection_established",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "connection_established"
-                ]
-              },
-              "id_point": {
-                "$ref": "#/components/schemas/p2p_connection.id"
-              },
-              "peer_id": {
-                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-              }
-            },
-            "required": [
-              "event",
-              "id_point",
-              "peer_id"
-            ]
-          },
-          {
-            "title": "Disconnection",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "disconnection"
-                ]
-              },
-              "peer_id": {
-                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-              }
-            },
-            "required": [
-              "event",
-              "peer_id"
-            ]
-          },
-          {
-            "title": "External_disconnection",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "external_disconnection"
-                ]
-              },
-              "peer_id": {
-                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-              }
-            },
-            "required": [
-              "event",
-              "peer_id"
-            ]
-          },
-          {
-            "title": "Gc_points",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "gc_points"
-                ]
-              }
-            },
-            "required": [
-              "event"
-            ]
-          },
-          {
-            "title": "Gc_peer_ids",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "gc_peer_ids"
-                ]
-              }
-            },
-            "required": [
-              "event"
-            ]
-          },
-          {
-            "title": "Swap_request_received",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "swap_request_received"
-                ]
-              },
-              "source": {
-                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-              }
-            },
-            "required": [
-              "event",
-              "source"
-            ]
-          },
-          {
-            "title": "Swap_ack_received",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "swap_ack_received"
-                ]
-              },
-              "source": {
-                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-              }
-            },
-            "required": [
-              "event",
-              "source"
-            ]
-          },
-          {
-            "title": "Swap_request_sent",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "swap_request_sent"
-                ]
-              },
-              "source": {
-                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-              }
-            },
-            "required": [
-              "event",
-              "source"
-            ]
-          },
-          {
-            "title": "Swap_ack_sent",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "swap_ack_sent"
-                ]
-              },
-              "source": {
-                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-              }
-            },
-            "required": [
-              "event",
-              "source"
-            ]
-          },
-          {
-            "title": "Swap_request_ignored",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "swap_request_ignored"
-                ]
-              },
-              "source": {
-                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-              }
-            },
-            "required": [
-              "event",
-              "source"
-            ]
-          },
-          {
-            "title": "Swap_success",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "swap_success"
-                ]
-              },
-              "source": {
-                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-              }
-            },
-            "required": [
-              "event",
-              "source"
-            ]
-          },
-          {
-            "title": "Swap_failure",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "swap_failure"
-                ]
-              },
-              "source": {
-                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-              }
-            },
-            "required": [
-              "event",
-              "source"
-            ]
-          },
-          {
-            "title": "Bootstrap_sent",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "bootstrap_sent"
-                ]
-              },
-              "source": {
-                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-              }
-            },
-            "required": [
-              "event",
-              "source"
-            ]
-          },
-          {
-            "title": "Bootstrap_received",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "bootstrap_received"
-                ]
-              },
-              "source": {
-                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-              }
-            },
-            "required": [
-              "event",
-              "source"
-            ]
-          },
-          {
-            "title": "Advertise_sent",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "advertise_sent"
-                ]
-              },
-              "source": {
-                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-              }
-            },
-            "required": [
-              "event",
-              "source"
-            ]
-          },
-          {
-            "title": "Advertise_received",
-            "type": "object",
-            "properties": {
-              "event": {
-                "type": "string",
-                "enum": [
-                  "advertise_received"
-                ]
-              },
-              "source": {
-                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
-              }
-            },
-            "required": [
-              "event",
-              "source"
-            ]
-          }
         ]
       },
       "p2p_peer.pool_event": {
@@ -11450,40 +10639,6 @@
         "minimum": 0,
         "maximum": 65535
       },
-      "protocol": {
-        "description": "The environment a protocol relies on and the components a protocol is made of.",
-        "type": "object",
-        "properties": {
-          "expected_env_version": {
-            "$ref": "#/components/schemas/protocol.environment_version"
-          },
-          "components": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "name": {
-                  "$ref": "#/components/schemas/unistring"
-                },
-                "interface": {
-                  "$ref": "#/components/schemas/unistring"
-                },
-                "implementation": {
-                  "$ref": "#/components/schemas/unistring"
-                }
-              },
-              "required": [
-                "name",
-                "implementation"
-              ]
-            }
-          }
-        },
-        "required": [
-          "expected_env_version",
-          "components"
-        ]
-      },
       "protocol.environment_version": {
         "type": "integer",
         "minimum": 0,
@@ -11491,7 +10646,7 @@
       },
       "timespan.system": {
         "description": "A span of time, as seen by the local computer.",
-        "type": "integer"
+        "type": "number"
       },
       "timestamp.protocol": {
         "description": "A timestamp as seen by the protocol: second-level precision, epoch based.",
