@@ -519,6 +519,8 @@ let init_zcash () =
          "Failed to initialize Zcash parameters: %s"
          (Printexc.to_string exn))
 
+let init_dal dal_config = Node_config_file.init_dal dal_config
+
 let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     ?ignore_testchain_warning ~singleprocess ~force_history_mode_switch
     (config : Node_config_file.t) =
@@ -549,6 +551,7 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
         Tezos_version.Current_git_info.abbreviated_commit_hash )
   in
   let*! () = init_zcash () in
+  let* () = init_dal config.dal in
   let*! node =
     init_node
       ?sandbox

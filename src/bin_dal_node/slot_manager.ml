@@ -112,11 +112,11 @@ let save store slot_header shards =
       return metadata)
     shards
 
-let split_and_store cb_constants srs store slot =
+let split_and_store cb_constants store slot =
   let r =
     let open Result_syntax in
     let* polynomial = Cryptobox.polynomial_from_slot cb_constants slot in
-    let* commitment = Cryptobox.commit srs polynomial in
+    let commitment = Cryptobox.commit cb_constants polynomial in
     return (polynomial, commitment)
   in
   let open Lwt_result_syntax in
@@ -129,8 +129,7 @@ let split_and_store cb_constants srs store slot =
           emit stored_slot (Bytes.length slot, Cryptobox.IntMap.cardinal shards))
       in
       Lwt.return_ok commitment
-  | Error (`Degree_exceeds_srs_length msg) | Error (`Slot_wrong_size msg) ->
-      Lwt.return_error [Splitting_failed msg]
+  | Error (`Slot_wrong_size msg) -> Lwt.return_error [Splitting_failed msg]
 
 let get_shard store slot_header shard_id =
   let open Lwt_result_syntax in

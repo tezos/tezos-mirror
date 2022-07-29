@@ -72,11 +72,31 @@ let setup ?commitment_period ?challenge_window ?dal_enable f ~protocol =
         Synchronisation_threshold 0; History_mode (Full None); No_bootstrap_peers;
       ]
   in
-  let* node, client =
-    Client.init_with_protocol ~parameter_file `Client ~protocol ~nodes_args ()
+  let* client = Client.init_mockup ~parameter_file ~protocol () in
+  let* parameters = Rollup.Dal.Parameters.from_client client in
+  let cryptobox = Rollup.Dal.make parameters in
+  let node = Node.create nodes_args in
+  let* () = Node.config_init node [] in
+  Node.Config_file.update node (fun json ->
+      let value =
+        JSON.annotate
+          ~origin:"dal_initialisation"
+          (`O
+            [
+              ("srs_size", `Float (float_of_int parameters.slot_size));
+              ("activated", `Bool true);
+            ])
+      in
+      let json = JSON.put ("dal", value) json in
+      json) ;
+  let* () = Node.run node [] in
+  let* () = Node.wait_for_ready node in
+  let* client = Client.init ~endpoint:(Node node) () in
+  let* () =
+    Client.activate_protocol_and_wait ~parameter_file ~protocol client
   in
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
-  f node client bootstrap1_key
+  f parameters cryptobox node client bootstrap1_key
 
 type test = {variant : string; tags : string list; description : string}
 
@@ -113,7 +133,7 @@ let test_scenario ?commitment_period ?challenge_window ?dal_enable
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       setup ?commitment_period ?challenge_window ~protocol ?dal_enable
-      @@ fun node client ->
+      @@ fun _parameters _cryptobox node client ->
       ( with_fresh_rollup @@ fun sc_rollup_address sc_rollup_node _filename ->
         scenario protocol sc_rollup_node sc_rollup_address node client )
         node
@@ -198,8 +218,6 @@ let test_feature_flag _protocol _sc_rollup_node sc_rollup_address node client =
     Test.fail "Did not expect to find \"dal_slot_availibility\"" ;
   unit
 
-open Tezt_tezos.Rollup.Dal
-
 let publish_slot ~source ?fee ~index ~message parameters cryptobox node client =
   let level = Node.get_level node in
   let header =
@@ -262,12 +280,8 @@ let test_slot_management_logic =
     ~tags:["dal"]
     ~supports:Protocol.(From_protocol (Protocol.number Alpha))
   @@ fun protocol ->
-  let* parameter_file = Parameters.parameter_file protocol in
-  let* node, client =
-    Client.init_with_protocol ~parameter_file `Client ~protocol ()
-  in
-  let* parameters = Rollup.Dal.Parameters.from_client client in
-  let cryptobox = Rollup.Dal.make parameters in
+  setup ~dal_enable:true ~protocol
+  @@ fun parameters cryptobox node client _bootstrap ->
   let* (`OpHash oph1) =
     publish_slot
       ~source:Constant.bootstrap1

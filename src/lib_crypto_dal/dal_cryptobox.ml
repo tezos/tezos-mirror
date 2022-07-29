@@ -27,11 +27,7 @@ open Error_monad
 include Dal_cryptobox_intf
 module Base58 = Tezos_crypto.Base58
 
-type error +=
-  | Failed_to_load_trusted_setup of string
-  | No_trusted_setup of string list
-  | Trusted_setup_too_small of
-      int (* FIXME:  "SRS asked (%d) too big for %s" d srsfile *)
+type error += Failed_to_load_trusted_setup of string
 
 let () =
   register_error_kind
@@ -44,21 +40,67 @@ let () =
     Data_encoding.(obj1 (req "msg" string))
     (function
       | Failed_to_load_trusted_setup parameter -> Some parameter | _ -> None)
-    (fun parameter -> Failed_to_load_trusted_setup parameter) ;
-  register_error_kind
-    `Permanent
-    ~id:"dal.node.trusted_setup_not_found"
-    ~title:"No trusted setup found"
-    ~description:"No trusted setup found in the explored paths"
-    ~pp:(fun ppf locations ->
-      Format.fprintf
-        ppf
-        "@[<v>cannot find Trusted setup in any of:@,%a@]@."
-        (Format.pp_print_list (fun fmt -> Format.fprintf fmt "- %s"))
-        locations)
-    Data_encoding.(obj1 (req "paths" (list string)))
-    (function No_trusted_setup parameter -> Some parameter | _ -> None)
-    (fun parameter -> No_trusted_setup parameter)
+    (fun parameter -> Failed_to_load_trusted_setup parameter)
+
+type initialisation_parameters = {
+  srs_g1 : Bls12_381.G1.t array;
+  srs_g2 : Bls12_381.G2.t array;
+}
+
+(* Initialisation parameters are supposed to be instantiated once. *)
+let initialisation_parameters = ref None
+
+type error += Dal_initialisation_twice
+
+(* This function is expected to be called once. *)
+let load_parameters parameters =
+  let open Result_syntax in
+  match !initialisation_parameters with
+  | None ->
+      initialisation_parameters := Some parameters ;
+      return_unit
+  | Some _ -> fail [Dal_initialisation_twice]
+
+(* FIXME https://gitlab.com/tezos/tezos/-/issues/3400
+
+   An integrity check is run to ensure the validity of the files. *)
+
+let initialisation_parameters_from_files ~g1_path ~g2_path =
+  let open Lwt_result_syntax in
+  (* FIXME https://gitlab.com/tezos/tezos/-/issues/3409
+
+     The `21` constant is the logarithmic size of the file. Can this
+     constant be recomputed? Even though it should be determined by
+     the integrity check. *)
+  let logarithmic_size = 21 in
+  let srs_g1 =
+    Bls12_381_polynomial.Srs.M.(
+      to_array (load_from_file g1_path logarithmic_size))
+  in
+  let g2_size_compressed = Bls12_381.G2.size_in_bytes / 2 in
+  let buf = Bytes.create g2_size_compressed in
+  (* FIXME https://gitlab.com/tezos/tezos/-/issues/3416
+
+     The reading is not in `Lwt`. Hence it can be an issue that this
+     reading is blocking. To make the interface future proof, we
+     already put this function in the [Lwt] monad. *)
+  let read ic =
+    Stdlib.really_input ic buf 0 g2_size_compressed ;
+    Bls12_381.G2.of_compressed_bytes_exn buf
+  in
+  let ic = open_in g2_path in
+  let srs_g2 = Array.init (1 lsl logarithmic_size) (fun _ -> read ic) in
+  close_in ic ;
+  return {srs_g1; srs_g2}
+
+(* The srs is made of the initialisation_parameters and two
+   well-choosen points. Building the srs from the initialisation
+   parameters is almost cost-free. *)
+type srs = {
+  raw : initialisation_parameters;
+  kate_amortized_srs_g2_shards : Bls12_381.G2.t;
+  kate_amortized_srs_g2_segments : Bls12_381.G2.t;
+}
 
 module Inner = struct
   (* Scalars are elements of the prime field Fr from BLS. *)
@@ -98,12 +140,6 @@ module Inner = struct
   type shard = {index : int; share : share}
 
   type shards_proofs_precomputation = Scalar.t array * segment_proof array array
-
-  type trusted_setup_files = {
-    srs_g1_file : string;
-    srs_g2_file : string;
-    logarithm_size : int;
-  }
 
   module Encoding = struct
     open Data_encoding
@@ -239,7 +275,7 @@ module Inner = struct
     (* Length of a shard in terms of scalar elements. *)
     nb_segments : int;
     (* Number of slot segments. *)
-    segment_len : int;
+    segment_length : int;
     remaining_bytes : int;
     evaluations_log : int;
     (* Log of the number of evaluations that constitute an erasure encoded
@@ -247,9 +283,12 @@ module Inner = struct
     evaluations_per_proof_log : int;
     (* Log of the number of evaluations contained in a shard. *)
     proofs_log : int; (* Log of th number of shards proofs. *)
+    srs : srs;
   }
 
-  let check_params t =
+  let ensure_validity t =
+    let open Result_syntax in
+    let srs_size = Array.length t.srs.raw.srs_g1 in
     let is_pow_of_two x =
       let logx = Z.(log2 (of_int x)) in
       1 lsl logx = x
@@ -262,23 +301,47 @@ module Inner = struct
     then
       (* According to the specification the lengths of a slot a slot segment are
          in MiB *)
-      invalid_arg "Wrong slot size: expected MiB"
+      fail (`Fail "Wrong slot size: expected MiB")
     else if not (Z.(log2 (of_int t.n)) <= 32 && is_pow_of_two t.k && t.n > t.k)
     then
       (* n must be at most 2^32, the biggest subgroup of 2^i roots of unity in the
          multiplicative group of Fr, because the FFTs operate on such groups. *)
-      invalid_arg "Wrong computed size for n"
-    else if not (is_pow_of_two t.number_of_shards && t.n > t.number_of_shards)
-    then invalid_arg "Shards not containing at least two elements"
-    else ()
-  (* Shards must contain at least two elements. *)
+      fail (`Fail "Wrong computed size for n")
+    else if t.k > srs_size then
+      fail
+        (`Fail
+          (Format.asprintf
+             "SRS size is too small. Expected more than %d. Got %d"
+             t.k
+             srs_size))
+    else return t
 
+  let slot_as_polynomial_length ~slot_size =
+    1 lsl Z.(log2up (of_int slot_size / of_int scalar_bytes_amount))
+
+  (* Error cases of this functions are not encapsulated into
+     `tzresult` for modularity reasons. *)
   let make ~redundancy_factor ~slot_size ~segment_size ~number_of_shards =
-    let k = 1 lsl Z.(log2up (of_int slot_size / of_int scalar_bytes_amount)) in
+    let open Result_syntax in
+    let k = slot_as_polynomial_length ~slot_size in
     let n = redundancy_factor * k in
     let shard_size = n / number_of_shards in
     let evaluations_log = Z.(log2 (of_int n)) in
     let evaluations_per_proof_log = Z.(log2 (of_int shard_size)) in
+    let segment_length = Int.div segment_size scalar_bytes_amount + 1 in
+    let* srs =
+      match !initialisation_parameters with
+      | None -> fail (`Fail "Dal_cryptobox.make: DAL was not initialisated.")
+      | Some raw ->
+          return
+            {
+              raw;
+              kate_amortized_srs_g2_shards =
+                Array.get raw.srs_g2 (1 lsl evaluations_per_proof_log);
+              kate_amortized_srs_g2_segments =
+                Array.get raw.srs_g2 (1 lsl Z.(log2up (of_int segment_length)));
+            }
+    in
     let t =
       {
         redundancy_factor;
@@ -292,187 +355,15 @@ module Inner = struct
         domain_n = make_domain n;
         shard_size;
         nb_segments = slot_size / segment_size;
-        segment_len = Int.div segment_size scalar_bytes_amount + 1;
+        segment_length;
         remaining_bytes = segment_size mod scalar_bytes_amount;
         evaluations_log;
         evaluations_per_proof_log;
         proofs_log = evaluations_log - evaluations_per_proof_log;
+        srs;
       }
     in
-    check_params t ;
-    t
-
-  (* The srs is an initialisation setup required by many primitives of
-     the cryptobox. For production code, this initialisation setup is
-     provided via files of size ~300MB. Loading those files can be done
-     once by the shell. However, the [srs] value depends on the
-     [slot_size] which is determined by the protocol.
-
-     What we provide here is a mechanism to store at most two different
-     [srs] depending on two different slot sizes. using the [Ringo]
-     library (see {!val:srs_ring}). We also provide a cache mechanism to
-     avoid recomputing the [srs] if it was already computed once. *)
-  type srs = {
-    srs_g1 : Bls12_381.G1.t array;
-    srs_g2 : Bls12_381.G2.t array;
-    kate_amortized_srs_g2_shards : Bls12_381.G2.t;
-    kate_amortized_srs_g2_segments : Bls12_381.G2.t;
-  }
-
-  let srs t : srs =
-    let module Scalar = Bls12_381.Fr in
-    let build_array init next len =
-      let xi = ref init in
-      Array.init len (fun _ ->
-          let i = !xi in
-          xi := next !xi ;
-          i)
-    in
-    let create_srs :
-        type t.
-        (module Bls12_381.CURVE with type t = t) -> int -> Scalar.t -> t array =
-     fun (module G) d x -> build_array G.(copy one) (fun g -> G.(mul g x)) d
-    in
-    let secret =
-      Scalar.of_string
-        "20812168509434597367146703229805575690060615791308155437936410982393987532344"
-    in
-    let srs_g1 = create_srs (module Bls12_381.G1) t.k secret in
-    let srs_g2 = create_srs (module Bls12_381.G2) t.k secret in
-    {
-      srs_g1;
-      srs_g2;
-      kate_amortized_srs_g2_shards =
-        Array.get srs_g2 (1 lsl t.evaluations_per_proof_log);
-      kate_amortized_srs_g2_segments =
-        Array.get srs_g2 (1 lsl Z.(log2up (of_int t.segment_len)));
-    }
-
-  module SRS_ring =
-    (val Ringo.(
-           map_maker ~replacement:FIFO ~overflow:Strong ~accounting:Precise))
-      (struct
-        include Int
-
-        let hash = Hashtbl.hash
-      end)
-
-  (* FIXME https://gitlab.com/tezos/tezos/-/issues/3408
-
-     We use [3] because a priori, we only need to support [2] protocols
-     at the same time. In case of an hard fork, we give one protocol
-     more for security. *)
-  let srs_ring = SRS_ring.create 3
-
-  (* FIXME https://gitlab.com/tezos/tezos/-/issues/3410
-
-     This function should be factored out with the one of sapling. *)
-  let find_trusted_setup ?(getenv_opt = Sys.getenv_opt) ?(getcwd = Sys.getcwd)
-      ?(file_exists = Sys.file_exists) () =
-    let ( // ) = Filename.concat in
-    let env ?split name path =
-      match getenv_opt name with
-      | None -> []
-      | Some value -> (
-          match split with
-          | None -> [Filename.concat value path]
-          | Some char ->
-              List.map
-                (fun dir -> dir // path)
-                (String.split_on_char char value))
-    in
-    let cwd path = try [getcwd () // path] with Sys_error _ -> [] in
-    let candidate_directories =
-      env "XDG_DATA_HOME" ".local/share/dal-trusted-setup"
-      @ env ~split:':' "XDG_DATA_DIRS" "dal-trusted-setup"
-      @ env "OPAM_SWITCH_PREFIX" "share/dal-trusted-setup"
-      @ env "PWD" "_opam/share/dal-trusted-setup"
-      @ cwd "_opam/share/dal-trusted-setup"
-      @ env "HOME" ".dal-trusted-setup"
-      @ env "HOME" ".local/share/dal-trusted-setup"
-      @ env "HOMEBREW_PREFIX" "share/dal-trusted-setup"
-      @ ["/usr/local/share/dal-trusted-setup"; "/usr/share/dal-trusted-setup"]
-    in
-    (* Files we are looking for. *)
-    let srs_g1 = "srs_zcash_g1" in
-    let srs_g2 = "srs_zcash_g2" in
-
-    (* Find the first candidate directory that contains the expected files. *)
-    let contains_trusted_setup_files directory =
-      file_exists (directory // srs_g1) && file_exists (directory // srs_g2)
-    in
-    match List.find_opt contains_trusted_setup_files candidate_directories with
-    | None -> Error [No_trusted_setup candidate_directories]
-    | Some directory ->
-        let srs_g1_file = directory // srs_g1 in
-        let srs_g2_file = directory // srs_g2 in
-        (* FIXME https://gitlab.com/tezos/tezos/-/issues/3409
-
-           An integrity check should ensure that only one SRS file is
-           expected. The `21` constant is the logarithmic size of this
-           file. A refactorisation, should ensure that this constant
-           is not needed or could be computed. *)
-        Ok {srs_g1_file; srs_g2_file; logarithm_size = 21}
-
-  (* FIXME https://gitlab.com/tezos/tezos/-/issues/3400
-
-     An integrity check is run to ensure the validity of the files. *)
-  let build_trusted_setup_instance t ~srs_g1_file ~srs_g2_file ~logarithm_size =
-    assert (t.k < 1 lsl logarithm_size) ;
-    let srs_g1 =
-      Bls12_381_polynomial.Srs.M.(to_array (load_from_file srs_g1_file t.k))
-    in
-    let g2_size_compressed = Bls12_381.G2.size_in_bytes / 2 in
-    let buf = Bytes.create g2_size_compressed in
-    (* FIXME https://gitlab.com/tezos/tezos/-/issues/3416
-
-       The reading is not in `Lwt`. Hence it can be an issue that this
-       reading is blocking. *)
-    let read ic =
-      Stdlib.really_input ic buf 0 g2_size_compressed ;
-      Bls12_381.G2.of_compressed_bytes_exn buf
-    in
-    let ic = open_in srs_g2_file in
-    let file_size = in_channel_length ic in
-    if file_size < t.k * g2_size_compressed then (
-      close_in ic ;
-      Error [Trusted_setup_too_small file_size])
-    else
-      let srs_g2 = Array.init t.k (fun _ -> read ic) in
-      close_in ic ;
-      Ok
-        {
-          srs_g1;
-          srs_g2;
-          kate_amortized_srs_g2_shards =
-            Array.get srs_g2 (1 lsl t.evaluations_per_proof_log);
-          kate_amortized_srs_g2_segments =
-            Array.get srs_g2 (1 lsl Z.(log2up (of_int t.segment_len)));
-        }
-
-  (* FIXME https://gitlab.com/tezos/tezos/-/issues/3399
-
-           The reading of the files should be done beforehand. This
-     would ease the assumptions made by the protocol, and especially
-     avoid the issue that [load_srs] may fail because the file was not
-     found which is the responsibility of the shell. *)
-  let load_srs_from_file t =
-    match find_trusted_setup () with
-    | Ok {srs_g1_file; srs_g2_file; logarithm_size} ->
-        build_trusted_setup_instance t ~srs_g1_file ~srs_g2_file ~logarithm_size
-    | Error err -> Error err
-
-  let load_srs t =
-    match SRS_ring.find_opt srs_ring t.k with
-    | None -> (
-        match load_srs_from_file t with
-        | Ok srs ->
-            SRS_ring.replace srs_ring t.k srs ;
-            Ok srs
-        | Error err -> Error err)
-    | Some k -> Ok k
-
-  let srs = srs
+    ensure_validity t
 
   let polynomial_degree = Polynomials.degree
 
@@ -495,9 +386,9 @@ module Inner = struct
       let offset = ref 0 in
       let res = Array.init t.k (fun _ -> Scalar.(copy zero)) in
       for segment = 0 to t.nb_segments - 1 do
-        for elt = 0 to t.segment_len - 1 do
+        for elt = 0 to t.segment_length - 1 do
           if !offset > t.slot_size then ()
-          else if elt = t.segment_len - 1 then (
+          else if elt = t.segment_length - 1 then (
             let dst = Bytes.create t.remaining_bytes in
             Bytes.blit slot !offset dst 0 t.remaining_bytes ;
             offset := !offset + t.remaining_bytes ;
@@ -517,10 +408,10 @@ module Inner = struct
     Ok (Evaluations.interpolation_fft2 t.domain_k data)
 
   let eval_coset t eval slot offset segment =
-    for elt = 0 to t.segment_len - 1 do
+    for elt = 0 to t.segment_length - 1 do
       let idx = (elt * t.nb_segments) + segment in
       let coeff = Scalar.to_bytes (Array.get eval idx) in
-      if elt = t.segment_len - 1 then (
+      if elt = t.segment_length - 1 then (
         Bytes.blit coeff 0 slot !offset t.remaining_bytes ;
         offset := !offset + t.remaining_bytes)
       else (
@@ -670,26 +561,16 @@ module Inner = struct
 
   let commit' :
       type t.
-      (module Bls12_381.CURVE with type t = t) ->
-      scalar array ->
-      t array ->
-      (t, [> `Degree_exceeds_srs_length of string]) Result.t =
+      (module Bls12_381.CURVE with type t = t) -> scalar array -> t array -> t =
    fun (module G) p srs ->
-    if p = [||] then Ok G.(copy zero)
-    else if Array.(length p > length srs) then
-      Error
-        (`Degree_exceeds_srs_length
-          (Printf.sprintf
-             "polynomial degree, %i, exceeds  srs’ length, %i."
-             (Array.length p)
-             (Array.length srs)))
-    else Ok (G.pippenger ~start:0 ~len:(Array.length p) srs p)
+    if p = [||] then G.(copy zero)
+    else G.pippenger ~start:0 ~len:(Array.length p) srs p
 
-  let commit trusted_setup p =
+  let commit t p =
     commit'
       (module Bls12_381.G1)
       (Polynomials.to_dense_coefficients p)
-      trusted_setup.srs_g1
+      t.srs.raw.srs_g1
 
   (* p(X) of degree n. Max degree that can be committed: d, which is also the
      SRS's length - 1. We take d = k - 1 since we don't want to commit
@@ -702,27 +583,27 @@ module Inner = struct
      using the commitments for p and p X^{d-n}, and computing the commitment for
      X^{d-n} on G_2.*)
 
-  let prove_commitment trusted_setup p =
+  let prove_commitment t p =
     commit'
       (module Bls12_381.G1)
       Polynomials.(
         to_dense_coefficients
           (mul (Polynomials.of_coefficients [(Scalar.(copy one), 0)]) p))
-      trusted_setup.srs_g1
+      t.srs.raw.srs_g1
 
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/3389
 
      Generalize this function to pass the degree in parameter. *)
-  let verify_commitment trusted_setup cm proof =
+  let verify_commitment t cm proof =
     let open Bls12_381 in
     let check =
-      match Array.get trusted_setup.srs_g2 0 with
+      match Array.get t.srs.raw.srs_g2 0 with
       | exception Invalid_argument _ -> false
       | commit_xk ->
           Pairing.pairing_check
             [(cm, commit_xk); (proof, G2.(negate (copy one)))]
     in
-    Ok check
+    check
 
   let inverse domain =
     let n = Array.length domain in
@@ -832,25 +713,22 @@ module Inner = struct
     |> snd
 
   (* Part 3.2 verifier : verifies that f(w×domain.(i)) = evaluations.(i). *)
-  let verify cm_f (srs1, srs2l) domain (w, evaluations) proof =
+  let verify t cm_f srs_point domain (w, evaluations) proof =
     let open Bls12_381 in
-    let open Result_syntax in
     let h = interpolation_h_poly w domain evaluations in
-    let* cm_h = commit' (module G1) h srs1 in
+    let cm_h = commit' (module G1) h t.srs.raw.srs_g1 in
     let l = Domains.length domain in
     let sl_min_yl =
-      G2.(add srs2l (negate (mul (copy one) (Scalar.pow w (Z.of_int l)))))
+      G2.(add srs_point (negate (mul (copy one) (Scalar.pow w (Z.of_int l)))))
     in
     let diff_commits = G1.(add cm_h (negate cm_f)) in
-    Ok
-      (Pairing.pairing_check
-         [(diff_commits, G2.(copy one)); (proof, sl_min_yl)])
+    Pairing.pairing_check [(diff_commits, G2.(copy one)); (proof, sl_min_yl)]
 
-  let precompute_shards_proofs t trusted_setup =
+  let precompute_shards_proofs t =
     preprocess_multi_reveals
       ~chunk_len:t.evaluations_per_proof_log
       ~degree:t.k
-      trusted_setup.srs_g1
+      t.srs.raw.srs_g1
 
   let _save_precompute_shards_proofs (preprocess : shards_proofs_precomputation)
       filename =
@@ -875,8 +753,8 @@ module Inner = struct
     In_channel.close_noerr chan ;
     precomp
 
-  let prove_shards t srs p =
-    let preprocess = precompute_shards_proofs t srs in
+  let prove_shards t p =
+    let preprocess = precompute_shards_proofs t in
     multiple_multi_reveals
       ~chunk_len:t.evaluations_per_proof_log
       ~chunk_count:t.proofs_log
@@ -884,18 +762,18 @@ module Inner = struct
       ~preprocess
       (Polynomials.to_dense_coefficients p)
 
-  let verify_shard t trusted_setup cm
-      {index = shard_index; share = shard_evaluations} proof =
+  let verify_shard t cm {index = shard_index; share = shard_evaluations} proof =
     let d_n = Domains.build ~log:t.evaluations_log in
     let domain = Domains.build ~log:t.evaluations_per_proof_log in
     verify
+      t
       cm
-      (trusted_setup.srs_g1, trusted_setup.kate_amortized_srs_g2_shards)
+      t.srs.kate_amortized_srs_g2_shards
       domain
       (Domains.get d_n shard_index, shard_evaluations)
       proof
 
-  let _prove_single trusted_setup p z =
+  let _prove_single t p z =
     let q, _ =
       Polynomials.(
         division_xn (p - constant (evaluate p z)) 1 (Scalar.negate z))
@@ -903,10 +781,10 @@ module Inner = struct
     commit'
       (module Bls12_381.G1)
       (Polynomials.to_dense_coefficients q)
-      trusted_setup.srs_g1
+      t.srs.raw.srs_g1
 
-  let _verify_single trusted_setup cm ~point ~evaluation proof =
-    let h_secret = Array.get trusted_setup.srs_g2 1 in
+  let _verify_single t cm ~point ~evaluation proof =
+    let h_secret = Array.get t.srs.raw.srs_g2 1 in
     Bls12_381.(
       Pairing.pairing_check
         [
@@ -915,30 +793,30 @@ module Inner = struct
           (proof, G2.(add h_secret (negate (mul (copy one) point))));
         ])
 
-  let prove_segment t trusted_setup p segment_index =
+  let prove_segment t p segment_index =
     if segment_index < 0 || segment_index >= t.nb_segments then
       Error `Segment_index_out_of_range
     else
-      let l = 1 lsl Z.(log2up (of_int t.segment_len)) in
+      let l = 1 lsl Z.(log2up (of_int t.segment_length)) in
       let wi = Domains.get t.domain_k segment_index in
       let quotient, _ =
         Polynomials.(division_xn p l Scalar.(negate (pow wi (Z.of_int l))))
       in
-      commit trusted_setup quotient
+      Ok (commit t quotient)
 
   (* Parses the [slot_segment] to get the evaluations that it contains. The
      evaluation points are given by the [slot_segment_index]. *)
-  let verify_segment t trusted_setup cm
-      {index = slot_segment_index; content = slot_segment} proof =
+  let verify_segment t cm {index = slot_segment_index; content = slot_segment}
+      proof =
     if slot_segment_index < 0 || slot_segment_index >= t.nb_segments then
       Error `Segment_index_out_of_range
     else
-      let domain = Domains.build ~log:Z.(log2up (of_int t.segment_len)) in
+      let domain = Domains.build ~log:Z.(log2up (of_int t.segment_length)) in
       let slot_segment_evaluations =
         Array.init
-          (1 lsl Z.(log2up (of_int t.segment_len)))
+          (1 lsl Z.(log2up (of_int t.segment_length)))
           (function
-            | i when i < t.segment_len - 1 ->
+            | i when i < t.segment_length - 1 ->
                 let dst = Bytes.create scalar_bytes_amount in
                 Bytes.blit
                   slot_segment
@@ -947,7 +825,7 @@ module Inner = struct
                   0
                   scalar_bytes_amount ;
                 Scalar.of_bytes_exn dst
-            | i when i = t.segment_len - 1 ->
+            | i when i = t.segment_length - 1 ->
                 let dst = Bytes.create t.remaining_bytes in
                 Bytes.blit
                   slot_segment
@@ -958,13 +836,42 @@ module Inner = struct
                 Scalar.of_bytes_exn dst
             | _ -> Scalar.(copy zero))
       in
-      verify
-        cm
-        (trusted_setup.srs_g1, trusted_setup.kate_amortized_srs_g2_segments)
-        domain
-        (Domains.get t.domain_k slot_segment_index, slot_segment_evaluations)
-        proof
+      Ok
+        (verify
+           t
+           cm
+           t.srs.kate_amortized_srs_g2_segments
+           domain
+           (Domains.get t.domain_k slot_segment_index, slot_segment_evaluations)
+           proof)
 end
 
 include Inner
 module Verifier = Inner
+
+module Internal_for_tests = struct
+  let initialisation_parameters_from_slot_size ~slot_size =
+    let size = slot_as_polynomial_length ~slot_size in
+    let secret =
+      Bls12_381.Fr.of_string
+        "20812168509434597367146703229805575690060615791308155437936410982393987532344"
+    in
+    let generator () =
+      Seq.unfold (fun (index, mul, g) ->
+          if index >= size then None
+          else
+            let next = mul g secret in
+            Some (g, (index + 1, mul, next)))
+    in
+    let srs_g1 =
+      let open Bls12_381.G1 in
+      generator () (0, mul, one) |> Array.of_seq
+    in
+    let srs_g2 =
+      let open Bls12_381.G2 in
+      generator () (0, mul, one) |> Array.of_seq
+    in
+    {srs_g1; srs_g2}
+
+  let load_parameters parameters = initialisation_parameters := Some parameters
+end

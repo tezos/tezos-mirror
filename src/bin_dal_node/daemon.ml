@@ -23,18 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type ctxt = {
-  config : Configuration.t;
-  srs : Cryptobox.srs;
-  dal_constants : Cryptobox.t;
-}
+type ctxt = {config : Configuration.t; dal_constants : Cryptobox.t}
 
 module RPC_server = struct
   let register_split_slot ctxt store dir =
     RPC_directory.register0
       dir
       (Services.split_slot ())
-      (Services.handle_split_slot ctxt.dal_constants ctxt.srs store)
+      (Services.handle_split_slot ctxt.dal_constants store)
 
   let register_show_slot ctxt store dir =
     RPC_directory.register
@@ -87,9 +83,13 @@ let run ~data_dir ~no_trusted_setup:_ _ctxt =
   let* config = Configuration.load ~data_dir in
   let config = {config with data_dir} in
   let*! store = Store.init config in
-  let dal_constants = Cryptobox.init () in
-  let*? srs = Cryptobox.load_srs dal_constants in
-  let ctxt = {config; srs; dal_constants} in
+  let*? g1_path, g2_path = Tezos_base.Dal_srs.find_trusted_setup_files () in
+  let* initialisation_parameters =
+    Cryptobox.initialisation_parameters_from_files ~g1_path ~g2_path
+  in
+  let*? () = Cryptobox.load_parameters initialisation_parameters in
+  let*? dal_constants = Cryptobox.init () in
+  let ctxt = {config; dal_constants} in
   let* rpc_server = RPC_server.(start config (register ctxt store)) in
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () =

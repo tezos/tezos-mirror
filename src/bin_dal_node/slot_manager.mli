@@ -35,7 +35,6 @@
     [cb_constants] and trusted setup [ts] *)
 val split_and_store :
   Cryptobox.t ->
-  Cryptobox.srs ->
   Store.t ->
   Cryptobox.slot ->
   Cryptobox.slot_header tzresult Lwt.t

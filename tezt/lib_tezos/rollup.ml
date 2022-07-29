@@ -532,20 +532,24 @@ module Dal = struct
   module Cryptobox = Tezos_crypto_dal.Dal_cryptobox
 
   let make
+      ?(on_error =
+        fun msg -> Test.fail "Rollup.Dal.make: Unexpected error: %s" msg)
       Parameters.{redundancy_factor; number_of_shards; slot_size; segment_size}
       =
-    Cryptobox.make ~redundancy_factor ~slot_size ~segment_size ~number_of_shards
-
-  let load_srs ?(unsafe = false) t =
-    if unsafe then Cryptobox.srs t
-    else
-      match Cryptobox.load_srs t with
-      | Ok srs -> srs
-      | Error err ->
-          Test.fail
-            "Rollup.Dal.load_srs failed: %a"
-            Tezos_base.TzPervasives.Error_monad.pp_print_trace
-            err
+    let initialisation_parameters =
+      Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
+        ~slot_size
+    in
+    Cryptobox.Internal_for_tests.load_parameters initialisation_parameters ;
+    match
+      Cryptobox.make
+        ~redundancy_factor
+        ~slot_size
+        ~segment_size
+        ~number_of_shards
+    with
+    | Ok cryptobox -> cryptobox
+    | Error (`Fail msg) -> on_error msg
 
   module Commitment = struct
     let pad n message =
@@ -563,15 +567,8 @@ module Dal = struct
         if padding_length > 0 then pad padding_length message else message
       in
       let slot = String.to_bytes padded_message in
-      (* FIXME
-
-         Use a real srs here. *)
-      let srs = load_srs ~unsafe:true t in
       match Cryptobox.polynomial_from_slot t slot with
-      | Ok r -> (
-          match Cryptobox.commit srs r with
-          | Ok r -> r
-          | Error (`Degree_exceeds_srs_length str) -> on_error str)
+      | Ok r -> Cryptobox.commit t r
       | Error (`Slot_wrong_size str) -> on_error str
   end
 end
