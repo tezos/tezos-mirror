@@ -25,15 +25,11 @@ be documented here either.
 Node
 ----
 
-- Added the built-in network alias for Kathmandunet (``--network kathmandunet``).
-
 Client
 ------
 
 - Simulation returns correct errors on batches of operations where some are
   backtracked, failed and/or skipped.
-
-- Disabled origination of contracts with timelock instructions.
 
 Accuser
 -------
