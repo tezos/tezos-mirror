@@ -44,6 +44,8 @@ let tx_rollup_node = "./tezos-tx-rollup-node"
 
 let tx_rollup_client = "./tezos-tx-rollup-client"
 
+let dal_node = "./tezos-dal-node"
+
 (** Key pair used to activate a protocol from genesis with [--network sandbox].
     The public key is hard-coded in the node. *)
 let activator : Account.key =
