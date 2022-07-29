@@ -92,7 +92,7 @@ module T () = struct
   let {Inference.mapping; weights = _} =
     Inference.solve_problem
       problem
-      (Inference.Lasso {alpha = 1.0; normalize = false; positive = false})
+      (Inference.Lasso {alpha = 1.0; positive = false})
 
   let const =
     List.assoc ~equal:Free_variable.equal fv_const mapping

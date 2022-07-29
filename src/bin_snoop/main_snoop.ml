@@ -266,15 +266,10 @@ and infer_cmd_full_auto model_name workload_data solver
 and solver_of_string (solver : string)
     (infer_opts : Cmdline.infer_parameters_options) =
   match solver with
-  | "ridge" ->
-      Inference.Ridge {alpha = infer_opts.ridge_alpha; normalize = false}
+  | "ridge" -> Inference.Ridge {alpha = infer_opts.ridge_alpha}
   | "lasso" ->
       Inference.Lasso
-        {
-          alpha = infer_opts.lasso_alpha;
-          normalize = false;
-          positive = infer_opts.lasso_positive;
-        }
+        {alpha = infer_opts.lasso_alpha; positive = infer_opts.lasso_positive}
   | "nnls" -> Inference.NNLS
   | _ ->
       Format.eprintf "Unknown solver name.@." ;

@@ -72,9 +72,7 @@ let solution =
         Inference.make_problem ~data:workload_data ~model ~overrides:(fun _ ->
             None)
       in
-      let solver =
-        Inference.Lasso {alpha = 1.0; normalize = false; positive = true}
-      in
+      let solver = Inference.Lasso {alpha = 1.0; positive = true} in
       (* Initialize Python to have access to Scikit's Lasso solver *)
       Pyinit.pyinit () ;
       Inference.solve_problem problem solver
