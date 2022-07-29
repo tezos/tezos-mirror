@@ -29,5 +29,5 @@ val start_vdf_worker :
   Protocol_client_context.full ->
   canceler:Lwt_canceler.t ->
   Constants.t ->
-  Client_baking_blocks.block_info tzresult Lwt_stream.t ->
+  Chain_services.chain ->
   unit tzresult Lwt.t
