@@ -348,6 +348,11 @@ let pp_vector pp out v =
   let _ = Lwt_main.run @@ Lazy_vector.LwtInt32Vector.to_list v in
   Lazy_vector.LwtInt32Vector.pp pp out v
 
+let pp_vector_z pp out v =
+  (* Force evaluation of the vector. *)
+  let _ = Lwt_main.run @@ Lazy_vector.LwtZVector.to_list v in
+  Lazy_vector.LwtZVector.pp pp out v
+
 let pp_resul_type = pp_vector pp_value_type
 
 let pp_func_type out = function
@@ -533,3 +538,111 @@ let pp_module out
     datas
     pp_allocations
     allocations
+
+let pp_frame out frame =
+  let open Eval in
+  let (Module_key key) = frame.inst.key in
+  Format.fprintf
+    out
+    "@[<v 2>{module = %s;@;locals = %a;@;}@]"
+    key
+    (Format.pp_print_list pp_value)
+    (List.map ( ! ) frame.locals)
+
+let rec pp_admin_instr' out instr =
+  let open Eval in
+  match instr with
+  | From_block (block, index) ->
+      Format.fprintf
+        out
+        "From_block @[<hv 2>(%a,@; %li)@]"
+        pp_block_label
+        block
+        index
+  | Plain instr -> Format.fprintf out "Plain @[<hv 2>%a@]" pp_instr' instr
+  | Refer ref_ -> Format.fprintf out "Refer @[<hv 2>%a@]" pp_ref ref_
+  | Invoke func -> Format.fprintf out "Invoke @[<hv 2>%a@]" pp_func func
+  | Trapping msg ->
+      Format.fprintf out "Trapping @[<hv 2>%a@]" Format.pp_print_string msg
+  | Returning values ->
+      Format.fprintf
+        out
+        "Returning @[<hv 2>%a@]"
+        (Format.pp_print_list pp_value)
+        values
+  | Breaking (index, values) ->
+      Format.fprintf
+        out
+        "Breaking @[<hv 2>(%li,@; %a)@]"
+        index
+        (Format.pp_print_list pp_value)
+        values
+  | Label (index, final_instrs, (values, instrs)) ->
+      Format.fprintf
+        out
+        "Label @[<hv 2>(%li,@; %a,@; %a,@; %a)@]"
+        index
+        (Format.pp_print_list pp_instr)
+        final_instrs
+        (Format.pp_print_list pp_value)
+        values
+        (Format.pp_print_list pp_admin_instr)
+        instrs
+  | Frame (index, frame, (values, instrs)) ->
+      Format.fprintf
+        out
+        "Frame @[<hv 2>(%li,@; %a,@; %a,@; %a)@]"
+        index
+        pp_frame
+        frame
+        (Format.pp_print_list pp_value)
+        values
+        (Format.pp_print_list pp_admin_instr)
+        instrs
+
+and pp_admin_instr out instr = pp_admin_instr' out instr.Source.it
+
+let pp_input_message out message =
+  let open Input_buffer in
+  Format.fprintf
+    out
+    "@[<v 2>{rtype = %li;@;\
+     raw_level = %li;@;\
+     message_counter = %s;@;\
+     payload = %a;@;\
+     }@]"
+    message.rtype
+    message.raw_level
+    (Z.to_string message.message_counter)
+    Hex.pp
+    (Hex.of_bytes message.payload)
+
+let pp_input_buffer out input =
+  let open Input_buffer in
+  Format.fprintf
+    out
+    "@[<v 2>{content = %a;@;num_elements = %s;@;}@]"
+    (pp_vector_z pp_input_message)
+    (Lazy_vector.Mutable.LwtZVector.snapshot input.content)
+    (Z.to_string input.num_elements)
+
+let pp_config out config =
+  let open Eval in
+  let values, instrs = config.code in
+  Format.fprintf
+    out
+    "@[<v 2>{frame = %a;@;\
+     input = %a;@;\
+     instructions = %a;@;\
+     values = %a;@;\
+     budget = %i;@;\
+     }@]"
+    pp_frame
+    config.frame
+    pp_input_buffer
+    config.input
+    (Format.pp_print_list pp_admin_instr)
+    instrs
+    (Format.pp_print_list pp_value)
+    values
+    config.budget

@@ -542,6 +542,8 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
           (fun r -> Values.Ref r);
       ]
 
+  let values_encoding ~module_reg = list_encoding (value_encoding ~module_reg)
+
   let memory_encoding =
     conv
       (fun (min, max, chunks) ->
@@ -719,4 +721,155 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
           (scope
              ["modules"]
              (ModuleMap.lazy_map (module_instance_encoding ~module_reg))))
+
+  let frame_encoding ~module_reg =
+    let locals_encoding =
+      list_encoding @@ conv ref ( ! ) @@ value_encoding ~module_reg
+    in
+    conv
+      (fun (inst, locals) -> Eval.{inst; locals})
+      (fun Eval.{inst; locals} -> (inst, locals))
+      (tup2
+         ~flatten:true
+         (scope ["module"] (module_ref_encoding ~module_reg))
+         (scope ["locals"] locals_encoding))
+
+  let rec admin_instr'_encoding ~module_reg =
+    let open Eval in
+    tagged_union
+      string_tag
+      [
+        case
+          "From_block"
+          (tup2
+             ~flatten:false
+             block_label_encoding
+             (value [] Data_encoding.int32))
+          (function
+            | From_block (block, index) -> Some (block, index) | _ -> None)
+          (fun (block, index) -> From_block (block, index));
+        case
+          "Plain"
+          Source.(conv (fun i -> i.it) (at no_region) instruction_encoding)
+          (function Plain x -> Some x | _ -> None)
+          (fun x -> Plain x);
+        case
+          "Refer"
+          (value_ref_encoding ~module_reg)
+          (function Refer x -> Some x | _ -> None)
+          (fun x -> Refer x);
+        case
+          "Invoke"
+          (function_encoding ~module_reg)
+          (function Invoke x -> Some x | _ -> None)
+          (fun x -> Invoke x);
+        case
+          "Trapping"
+          (value [] Data_encoding.string)
+          (function Trapping x -> Some x | _ -> None)
+          (fun x -> Trapping x);
+        case
+          "Returning"
+          (values_encoding ~module_reg)
+          (function Returning x -> Some x | _ -> None)
+          (fun x -> Returning x);
+        case
+          "Breaking"
+          (tup2
+             ~flatten:false
+             (value [] Data_encoding.int32)
+             (values_encoding ~module_reg))
+          (function
+            | Breaking (index, values) -> Some (index, values) | _ -> None)
+          (fun (index, values) -> Breaking (index, values));
+        case
+          "Label"
+          (tup4
+             ~flatten:false
+             (value [] Data_encoding.int32)
+             (list_encoding instruction_encoding)
+             (values_encoding ~module_reg)
+             (list_encoding (admin_instr_encoding ~module_reg)))
+          (function
+            | Label (index, final_instrs, (values, instrs)) ->
+                Some (index, final_instrs, values, instrs)
+            | _ -> None)
+          (fun (index, final_instrs, values, instrs) ->
+            Label (index, final_instrs, (values, instrs)));
+        case
+          "Frame"
+          (tup4
+             ~flatten:false
+             (value [] Data_encoding.int32)
+             (frame_encoding ~module_reg)
+             (values_encoding ~module_reg)
+             (list_encoding (admin_instr_encoding ~module_reg)))
+          (function
+            | Frame (index, frame, (values, instrs)) ->
+                Some (index, frame, values, instrs)
+            | _ -> None)
+          (fun (index, frame, values, instrs) ->
+            Frame (index, frame, (values, instrs)));
+      ]
+
+  and admin_instr_encoding ~module_reg =
+    conv
+      Source.(at no_region)
+      Source.(fun x -> x.it)
+      (delayed @@ fun () -> admin_instr'_encoding ~module_reg)
+
+  let input_buffer_message_encoding =
+    conv_lwt
+      (fun (rtype, raw_level, message_counter, payload) ->
+        let open Lwt.Syntax in
+        let+ payload = C.to_bytes payload in
+        Input_buffer.{rtype; raw_level; message_counter; payload})
+      (fun Input_buffer.{rtype; raw_level; message_counter; payload} ->
+        let payload = C.of_bytes payload in
+        Lwt.return (rtype, raw_level, message_counter, payload))
+      (tup4
+         ~flatten:true
+         (value ["rtype"] Data_encoding.int32)
+         (value ["raw-level"] Data_encoding.int32)
+         (value ["message-counter"] Data_encoding.z)
+         chunked_byte_vector)
+
+  module InputBufferVec = Lazy_vector_encoding.Make (Lazy_vector.LwtZVector)
+
+  let input_buffer_encoding =
+    conv
+      (fun (content, num_elements) ->
+        {
+          Input_buffer.content =
+            Lazy_vector.Mutable.LwtZVector.of_immutable content;
+          num_elements;
+        })
+      (fun buffer ->
+        Input_buffer.
+          ( Lazy_vector.Mutable.LwtZVector.snapshot buffer.content,
+            buffer.num_elements ))
+      (tup2
+         ~flatten:true
+         (scope
+            ["messages"]
+            (InputBufferVec.lazy_vector
+               (value [] Data_encoding.z)
+               input_buffer_message_encoding))
+         (value ["num-messages"] Data_encoding.z))
+
+  let config_encoding ~host_funcs ~module_reg =
+    conv
+      (fun (frame, input, instrs, values, budget) ->
+        Eval.{frame; input; code = (values, instrs); host_funcs; budget})
+      (fun Eval.{frame; input; code = values, instrs; budget; _} ->
+        (frame, input, instrs, values, budget))
+      (tup5
+         ~flatten:true
+         (scope ["frame"] (frame_encoding ~module_reg))
+         (scope ["input"] input_buffer_encoding)
+         (scope
+            ["instructions"]
+            (list_encoding (admin_instr_encoding ~module_reg)))
+         (scope ["values"] (values_encoding ~module_reg))
+         (value ["budget"] Data_encoding.int31))
 end
