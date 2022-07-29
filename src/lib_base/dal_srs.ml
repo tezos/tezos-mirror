@@ -65,6 +65,7 @@ let find_trusted_setup_files ?(getenv_opt = Sys.getenv_opt)
     @ cwd "_opam/share/dal-trusted-setup"
     @ env "HOME" ".dal-trusted-setup"
     @ env "HOME" ".local/share/dal-trusted-setup"
+    @ env "DAL_TRUSTED_SETUP" ""
     @ env "HOMEBREW_PREFIX" "share/dal-trusted-setup"
     @ ["/usr/local/share/dal-trusted-setup"; "/usr/share/dal-trusted-setup"]
   in
