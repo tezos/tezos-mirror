@@ -126,6 +126,7 @@ let register_protocol_agnostic_tests () =
   Stresstest_command.register ~protocols:[Alpha] ;
   Synchronisation_heuristic.register ~protocols:[Alpha] ;
   Tenderbake.register ~protocols:[Alpha] ;
+  Timelock.register ~protocols ;
   Tx_rollup.register ~protocols ;
   Tx_rollup_l2_node.register ~protocols ;
   Views.register [Alpha]
