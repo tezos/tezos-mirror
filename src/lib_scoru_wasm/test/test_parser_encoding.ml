@@ -104,7 +104,7 @@ module Utils = struct
 end
 
 module Byte_vector = struct
-  include Utils
+  open Utils
 
   let gen_buffer =
     let open QCheck2.Gen in
@@ -237,4 +237,39 @@ module LazyVec = struct
     ]
 end
 
-let tests = Byte_vector.tests @ Vec.tests @ LazyVec.tests
+module Names = struct
+  open Utils
+
+  let gen_utf8 = QCheck2.Gen.small_nat
+
+  let gen =
+    let open QCheck2.Gen in
+    let start = return Decode.NKStart in
+    let parse =
+      let* (Decode.LazyVec {vector; _} as buffer) = LazyVec.gen gen_utf8 in
+      let vector_length = Int32.to_int (V.num_elements vector) in
+      let* offset = int_range 0 vector_length in
+      let+ length = int_range vector_length (vector_length * 2) in
+      Decode.NKParse (offset, buffer, length)
+    in
+    let stop =
+      let+ buffer = Vec.gen small_nat in
+      Decode.NKStop buffer
+    in
+    oneof [start; parse; stop]
+
+  let check ns ns' =
+    let open Lwt_result_syntax in
+    let eq_value x y = return (x = y) in
+    match (ns, ns') with
+    | Decode.NKStart, Decode.NKStart -> return true
+    | NKParse (offset, buffer, length), NKParse (offset', buffer', length') ->
+        let+ eq_bs = LazyVec.check eq_value buffer buffer' in
+        eq_bs && offset = offset' && length = length'
+    | NKStop vec, NKStop vec' -> Vec.check eq_value vec vec'
+    | _, _ -> return false
+
+  let tests = [tztest "Names" `Quick (make_test Parser.Name.encoding gen check)]
+end
+
+let tests = Byte_vector.tests @ Vec.tests @ LazyVec.tests @ Names.tests

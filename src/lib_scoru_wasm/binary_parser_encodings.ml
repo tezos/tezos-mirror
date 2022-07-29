@@ -87,4 +87,40 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
     let encoding =
       tagged_union tag_encoding [vkstart_case; vkread_case; vkstop_case]
   end
+
+  module Name = struct
+    let utf8 = value [] Data_encoding.int31
+
+    let nkstart_case =
+      case
+        "NKStart"
+        (value [] Data_encoding.unit)
+        (function Decode.NKStart -> Some () | _ -> None)
+        (fun () -> Decode.NKStart)
+
+    let nkparse_case =
+      let value_enc =
+        let pos = value ["pos"] Data_encoding.int31 in
+        let buffer = scope ["lazy_kont"] (Lazy_vec.encoding utf8) in
+        let length = value ["length"] Data_encoding.int31 in
+        tup3 ~flatten:true pos buffer length
+      in
+      case
+        "NKParse"
+        value_enc
+        (function Decode.NKParse (p, v, l) -> Some (p, v, l) | _ -> None)
+        (fun (p, v, l) -> Decode.NKParse (p, v, l))
+
+    let nkstop_case =
+      case
+        "NKStop"
+        (vector_encoding utf8)
+        (function Decode.NKStop v -> Some v | _ -> None)
+        (fun v -> Decode.NKStop v)
+
+    let tag_encoding = value [] Data_encoding.string
+
+    let encoding =
+      tagged_union tag_encoding [nkstart_case; nkparse_case; nkstop_case]
+  end
 end
