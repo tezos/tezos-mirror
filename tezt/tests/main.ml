@@ -131,6 +131,7 @@ let register_J_plus_tests () =
   Multinode_snapshot.register ~protocols:[Alpha] ;
   Run_script.register ~protocols:[Alpha] ;
   Sapling.register ~protocols:[Alpha] ;
+  Timelock.register ~protocols ;
   Tx_rollup.register ~protocols ;
   Tx_rollup_node.register ~protocols ;
   Views.register [Alpha]

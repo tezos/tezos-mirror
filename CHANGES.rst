@@ -104,6 +104,8 @@ Client
 - Added `--ignore-case` option to the `tezos-client gen vanity keys` command
   to allow case-insensitive search for the given pattern.
 
+- Disabled origination of contracts with timelock instructions.
+
 Accuser
 -------
 
