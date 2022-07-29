@@ -75,6 +75,8 @@ end
 module Parser = Binary_parser_encodings.Make (Tree_encoding)
 
 module Utils = struct
+  include Tree_encoding
+  module V = Lazy_vector.LwtInt32Vector
   module C = Chunked_byte_vector.Lwt
 
   let empty_tree () =
@@ -139,10 +141,100 @@ module Byte_vector = struct
     | _, _ -> Lwt.return_ok false
 
   let tests =
-    tztest
-      "Byte_vector"
-      `Quick
-      (make_test Parser.Byte_vector.encoding gen check)
+    [
+      tztest
+        "Byte_vector"
+        `Quick
+        (make_test Parser.Byte_vector.encoding gen check);
+    ]
 end
 
-let tests = [Byte_vector.tests]
+(* Lazy_vector generators *)
+module Vec = struct
+  open Utils
+
+  let gen gen_values =
+    let open QCheck2.Gen in
+    let* length = int_range 1 100 in
+    let* values = list_repeat length gen_values in
+    let vec =
+      List.fold_left_i
+        (fun index vec value -> V.set (Int32.of_int index) value vec)
+        (V.create (Int32.of_int length))
+        values
+    in
+    return vec
+
+  (* Vectors will always be of same type, but some GADTs usage can
+     make them virtually of different type. See
+     {!Module.check_field_type_value} and it's usage when checking
+     equality of two [MKField] states. *)
+  let check_possibly_different (eq_value : 'a -> 'b -> (bool, _) result Lwt.t)
+      (vector : 'a V.t) (vector' : 'b V.t) =
+    let open Lwt_result_syntax in
+    assert (V.num_elements vector = V.num_elements vector') ;
+    let*! eq_s =
+      List.init_es
+        ~when_negative_length:()
+        (Int32.to_int (V.num_elements vector) - 1)
+        (fun index ->
+          let*! v = V.get (Int32.of_int index) vector in
+          let*! v' = V.get (Int32.of_int index) vector' in
+          eq_value v v')
+    in
+    match eq_s with
+    | Ok b -> return (List.for_all Stdlib.(( = ) true) b)
+    | Error () -> return false
+
+  (* Checks two vectors are equivalent. *)
+  let check (eq_value : 'a -> 'a -> (bool, _) result Lwt.t) (vector : 'a V.t)
+      (vector' : 'a V.t) =
+    check_possibly_different eq_value vector vector'
+
+  let tests =
+    let eq x y = Lwt.return_ok (Int32.equal x y) in
+    [
+      tztest
+        "Vec"
+        `Quick
+        (make_test
+           Parser.(vector_encoding (value [] Data_encoding.int32))
+           (gen QCheck2.Gen.int32)
+           (check eq));
+    ]
+end
+
+(* Generators for Lazy_vec, similar to {!Vec}. *)
+module LazyVec = struct
+  open Utils
+
+  let gen_with_vec gen_vec =
+    let open QCheck2.Gen in
+    let* vector = gen_vec in
+    let* offset =
+      Lib_test.Qcheck2_helpers.int32_range_gen 0l (V.num_elements vector)
+    in
+    return (Decode.LazyVec {vector; offset})
+
+  let gen gen_values = gen_with_vec (Vec.gen gen_values)
+
+  let check eq_value (Decode.LazyVec {vector; offset})
+      (Decode.LazyVec {vector = vector'; offset = offset'}) =
+    let open Lwt_result_syntax in
+    let* eq_lzvecs = Vec.check eq_value vector vector' in
+    return (eq_lzvecs && offset = offset')
+
+  let tests =
+    let eq x y = Lwt.return_ok (Int32.equal x y) in
+    [
+      tztest
+        "LazyVec"
+        `Quick
+        (make_test
+           Parser.Lazy_vec.(encoding (value [] Data_encoding.int32))
+           (gen QCheck2.Gen.int32)
+           (check eq));
+    ]
+end
+
+let tests = Byte_vector.tests @ Vec.tests @ LazyVec.tests
