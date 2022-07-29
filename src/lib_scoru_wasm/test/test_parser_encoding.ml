@@ -448,6 +448,92 @@ module Exports = struct
     [tztest "Exports" `Quick (make_test Parser.Export.encoding gen check)]
 end
 
+module Instr_block = struct
+  open Utils
+
+  let gen =
+    let open QCheck2.Gen in
+    let stop =
+      let+ lbl = Ast_generators.block_label_gen in
+      Decode.IKStop lbl
+    in
+    let next =
+      let+ lbl = Ast_generators.block_label_gen in
+      Decode.IKNext lbl
+    in
+    let block =
+      let* ty = Ast_generators.block_type_gen in
+      let+ pos = small_nat in
+      Decode.IKBlock (ty, pos)
+    in
+    let loop =
+      let* ty = Ast_generators.block_type_gen in
+      let+ pos = small_nat in
+      Decode.IKLoop (ty, pos)
+    in
+    let if1 =
+      let* ty = Ast_generators.block_type_gen in
+      let+ pos = small_nat in
+      Decode.IKIf1 (ty, pos)
+    in
+    let if2 =
+      let* ty = Ast_generators.block_type_gen in
+      let* pos = small_nat in
+      let+ lbl = Ast_generators.block_label_gen in
+      Decode.IKIf2 (ty, pos, lbl)
+    in
+    oneof [stop; next; block; loop; if1; if2]
+
+  let check ik ik' =
+    let open Lwt_result_syntax in
+    match (ik, ik') with
+    | Decode.IKStop l, Decode.IKStop l' | IKNext l, IKNext l' -> return (l = l')
+    | IKBlock (ty, pos), IKBlock (ty', pos')
+    | IKLoop (ty, pos), IKLoop (ty', pos')
+    | IKIf1 (ty, pos), IKIf1 (ty', pos') ->
+        return (ty = ty' && pos = pos')
+    | IKIf2 (ty, pos, l), IKIf2 (ty', pos', l') ->
+        return (ty = ty' && pos = pos' && l = l')
+    | _, _ -> return_false
+
+  let tests =
+    [
+      tztest
+        "Instr_block"
+        `Quick
+        (make_test Parser.Instr_block.encoding gen check);
+    ]
+end
+
+module Block = struct
+  open Utils
+
+  let gen =
+    let open QCheck2.Gen in
+    let start = return Decode.BlockStart in
+    let parse =
+      let+ instr_stack = LazyStack.gen Instr_block.gen in
+      Decode.BlockParse instr_stack
+    in
+    let stop =
+      let+ lbl = Ast_generators.block_label_gen in
+      Decode.BlockStop lbl
+    in
+    oneof [start; parse; stop]
+
+  let check bl bl' =
+    let open Lwt_result_syntax in
+    match (bl, bl') with
+    | Decode.BlockStart, Decode.BlockStart -> return_true
+    | BlockParse is, BlockParse is' -> LazyStack.check Instr_block.check is is'
+    | BlockStop l, BlockStop l' -> return (l = l')
+    | _, _ -> return_false
+
+  let tests =
+    [tztest "Block" `Quick (make_test Parser.Block.encoding gen check)]
+end
+
 let tests =
   Byte_vector.tests @ Vec.tests @ LazyVec.tests @ Names.tests @ Func_type.tests
-  @ Imports.tests @ LazyStack.tests @ Exports.tests
+  @ Imports.tests @ LazyStack.tests @ Exports.tests @ Instr_block.tests
+  @ Block.tests

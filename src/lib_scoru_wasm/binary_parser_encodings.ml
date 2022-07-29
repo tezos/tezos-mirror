@@ -281,4 +281,108 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
     let encoding =
       tagged_union tags_encoding [expkstart_case; expkname_case; expkstop_case]
   end
+  module Instr_block = struct
+    let stop_case =
+      case
+        "IKStop"
+        (value [] Interpreter_encodings.Ast.block_label_encoding)
+        (function Decode.IKStop lbl -> Some lbl | _ -> None)
+        (fun lbl -> IKStop lbl)
+
+    let next_case =
+      case
+        "IKNext"
+        (value [] Interpreter_encodings.Ast.block_label_encoding)
+        (function Decode.IKNext lbl -> Some lbl | _ -> None)
+        (fun lbl -> IKNext lbl)
+
+    let block_case =
+      let encoding =
+        tup2
+          ~flatten:true
+          (value ["type"] Interpreter_encodings.Ast.block_type_encoding)
+          (value ["pos"] Data_encoding.int31)
+      in
+      case
+        "IKBlock"
+        encoding
+        (function Decode.IKBlock (ty, i) -> Some (ty, i) | _ -> None)
+        (fun (ty, i) -> IKBlock (ty, i))
+
+    let loop_case =
+      let encoding =
+        tup2
+          ~flatten:true
+          (value ["type"] Interpreter_encodings.Ast.block_type_encoding)
+          (value ["pos"] Data_encoding.int31)
+      in
+      case
+        "IKLoop"
+        encoding
+        (function Decode.IKLoop (ty, i) -> Some (ty, i) | _ -> None)
+        (fun (ty, i) -> IKLoop (ty, i))
+
+    let if1_case =
+      let encoding =
+        tup2
+          ~flatten:true
+          (value ["type"] Interpreter_encodings.Ast.block_type_encoding)
+          (value ["pos"] Data_encoding.int31)
+      in
+      case
+        "IKIf1"
+        encoding
+        (function Decode.IKIf1 (ty, i) -> Some (ty, i) | _ -> None)
+        (fun (ty, i) -> IKIf1 (ty, i))
+
+    let if2_case =
+      let encoding =
+        tup3
+          ~flatten:true
+          (value ["type"] Interpreter_encodings.Ast.block_type_encoding)
+          (value ["pos"] Data_encoding.int31)
+          (value ["else"] Interpreter_encodings.Ast.block_label_encoding)
+      in
+      case
+        "IKIf2"
+        encoding
+        (function
+          | Decode.IKIf2 (ty, i, else_lbl) -> Some (ty, i, else_lbl) | _ -> None)
+        (fun (ty, i, else_lbl) -> IKIf2 (ty, i, else_lbl))
+
+    let encoding =
+      tagged_union
+        (value [] Data_encoding.string)
+        [stop_case; next_case; block_case; loop_case; if1_case; if2_case]
+  end
+
+  module Block = struct
+    let start_case =
+      let tag = "BlockStart" in
+      case
+        tag
+        (value [] (Data_encoding.constant tag))
+        (function Decode.BlockStart -> Some () | _ -> None)
+        (fun _ -> BlockStart)
+
+    let parse_case =
+      case
+        "BlockParse"
+        (scope [] (Lazy_stack.encoding Instr_block.encoding))
+        (function Decode.BlockParse ik -> Some ik | _ -> None)
+        (fun ik -> BlockParse ik)
+
+    let stop_case =
+      case
+        "BlockStop"
+        (value [] Interpreter_encodings.Ast.block_label_encoding)
+        (function Decode.BlockStop lbl -> Some lbl | _ -> None)
+        (fun lbl -> BlockStop lbl)
+
+    let encoding =
+      tagged_union
+        (value [] Data_encoding.string)
+        [start_case; parse_case; stop_case]
+  end
+
 end
