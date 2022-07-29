@@ -448,6 +448,22 @@ module Exports = struct
     [tztest "Exports" `Quick (make_test Parser.Export.encoding gen check)]
 end
 
+module Size = struct
+  open Utils
+
+  let gen =
+    let open QCheck2.Gen in
+    let* size = small_nat in
+    let+ start = small_nat in
+    Decode.{size; start}
+
+  let check s s' =
+    let open Lwt_result_syntax in
+    return (s.Decode.size = s'.Decode.size && s.start = s'.start)
+
+  let tests = [tztest "Size" `Quick (make_test Parser.Size.encoding gen check)]
+end
+
 module Instr_block = struct
   open Utils
 
@@ -533,7 +549,108 @@ module Block = struct
     [tztest "Block" `Quick (make_test Parser.Block.encoding gen check)]
 end
 
+module Code = struct
+  open Utils
+
+  let func_gen =
+    let open QCheck2.Gen in
+    let* ftype = Ast_generators.var_gen in
+    let* locals = Vec.gen Ast_generators.value_type_gen in
+    let+ body = Ast_generators.block_label_gen in
+    Source.(Ast.{ftype; locals; body} @@ no_region)
+
+  let gen =
+    let open QCheck2.Gen in
+    let start = return Decode.CKStart in
+    let locals_parse =
+      let* left = small_nat in
+      let* size = Size.gen in
+      let* pos = small_nat in
+      let* vec_kont = LazyVec.gen (pair int32 Ast_generators.value_type_gen) in
+      let+ locals_size = int64 in
+      Decode.CKLocalsParse {left; size; pos; vec_kont; locals_size}
+    in
+    let locals_accumulate =
+      let* left = small_nat in
+      let* size = Size.gen in
+      let* pos = small_nat in
+      let* type_vec = LazyVec.gen (pair int32 Ast_generators.value_type_gen) in
+      let* curr_type = opt (pair int32 Ast_generators.value_type_gen) in
+      let+ vec_kont = LazyVec.gen Ast_generators.value_type_gen in
+      Decode.CKLocalsAccumulate {left; size; pos; type_vec; curr_type; vec_kont}
+    in
+    let body =
+      let* left = small_nat in
+      let* size = Size.gen in
+      let* locals = Vec.gen Ast_generators.value_type_gen in
+      let+ const_kont = Block.gen in
+      Decode.CKBody {left; size; locals; const_kont}
+    in
+    let stop =
+      let+ func = func_gen in
+      Decode.CKStop func
+    in
+    oneof [start; locals_parse; locals_accumulate; body; stop]
+
+  let check_func Ast.{ftype; locals; body}
+      Ast.{ftype = ftype'; locals = locals'; body = body'} =
+    let open Lwt_result_syntax in
+    let eq_value_type t t' = return (t = t') in
+    let+ eq_locals = Vec.check eq_value_type locals locals' in
+    ftype = ftype' && body = body' && eq_locals
+
+  let check code code' =
+    let open Lwt_result_syntax in
+    let eq_value_type t t' = return (t = t') in
+    match (code, code') with
+    | Decode.CKStart, Decode.CKStart -> return_true
+    | ( Decode.CKLocalsParse {left; size; pos; vec_kont; locals_size},
+        Decode.CKLocalsParse
+          {
+            left = left';
+            size = size';
+            pos = pos';
+            vec_kont = vec_kont';
+            locals_size = locals_size';
+          } ) ->
+        let+ eq_vec_kont = LazyVec.check eq_value_type vec_kont vec_kont' in
+        eq_vec_kont && left = left' && size = size' && pos = pos'
+        && locals_size = locals_size'
+    | ( Decode.CKLocalsAccumulate
+          {left; size; pos; type_vec; curr_type; vec_kont},
+        Decode.CKLocalsAccumulate
+          {
+            left = left';
+            size = size';
+            pos = pos';
+            type_vec = type_vec';
+            curr_type = curr_type';
+            vec_kont = vec_kont';
+          } ) ->
+        let* eq_type_vec = LazyVec.check eq_value_type type_vec type_vec' in
+        let+ eq_vec_kont = LazyVec.check eq_value_type vec_kont vec_kont' in
+        eq_type_vec && eq_vec_kont && left = left' && size = size' && pos = pos'
+        && curr_type = curr_type'
+    | ( Decode.CKBody {left; size; locals; const_kont},
+        Decode.CKBody
+          {
+            left = left';
+            size = size';
+            locals = locals';
+            const_kont = const_kont';
+          } ) ->
+        let* eq_locals = Vec.check eq_value_type locals locals' in
+        let+ eq_const_kont = Block.check const_kont const_kont' in
+        eq_locals && eq_const_kont && left = left' && size = size'
+    | Decode.CKStop Source.{it = func; _}, Decode.CKStop Source.{it = func'; _}
+      ->
+        check_func func func'
+    | _, _ -> return false
+
+  let tests = [tztest "Code" `Quick (make_test Parser.Code.encoding gen check)]
+end
+
 let tests =
   Byte_vector.tests @ Vec.tests @ LazyVec.tests @ Names.tests @ Func_type.tests
   @ Imports.tests @ LazyStack.tests @ Exports.tests @ Instr_block.tests
-  @ Block.tests
+  @ Block.tests @ Size.tests @ Code.tests

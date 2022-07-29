@@ -281,6 +281,18 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
     let encoding =
       tagged_union tags_encoding [expkstart_case; expkname_case; expkstop_case]
   end
+
+  module Size = struct
+    let encoding =
+      conv
+        (fun (size, start) -> Decode.{size; start})
+        (fun {size; start} -> (size, start))
+        (tup2
+           ~flatten:true
+           (value ["size"] Data_encoding.int31)
+           (value ["start"] Data_encoding.int31))
+  end
+
   module Instr_block = struct
     let stop_case =
       case
@@ -385,4 +397,111 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
         [start_case; parse_case; stop_case]
   end
 
+  module Code = struct
+    let value_type_acc_enc =
+      let occurences = value ["occurences"] Data_encoding.int32 in
+      let value_type =
+        value ["type"] Interpreter_encodings.Types.value_type_encoding
+      in
+      tup2 ~flatten:true occurences value_type
+
+    let ckstart_case =
+      let tag = "CKStart" in
+      case
+        tag
+        (value [] (Data_encoding.constant tag))
+        (function Decode.CKStart -> Some () | _ -> None)
+        (fun () -> CKStart)
+
+    let cklocalsparse_case =
+      let left = value ["left"] Data_encoding.int31 in
+      let size = scope ["size"] Size.encoding in
+      let pos = value ["pos"] Data_encoding.int31 in
+      let vec_kont =
+        scope ["vec_kont"] (Lazy_vec.encoding value_type_acc_enc)
+      in
+      let locals_size = value ["locals_size"] Data_encoding.int64 in
+      case
+        "CKLocalsParse"
+        (tup5 ~flatten:true left size pos vec_kont locals_size)
+        (function
+          | Decode.CKLocalsParse {left; size; pos; vec_kont; locals_size} ->
+              Some (left, size, pos, vec_kont, locals_size)
+          | _ -> None)
+        (fun (left, size, pos, vec_kont, locals_size) ->
+          Decode.CKLocalsParse {left; size; pos; vec_kont; locals_size})
+
+    let cklocalsaccumulate_case =
+      let left = value ["left"] Data_encoding.int31 in
+      let size = scope ["size"] Size.encoding in
+      let pos = value ["pos"] Data_encoding.int31 in
+      let type_vec =
+        scope ["type_vec"] (Lazy_vec.encoding value_type_acc_enc)
+      in
+      let curr_type = scope ["curr_type"] (option value_type_acc_enc) in
+      let vec_kont =
+        scope ["vec_kont"] (Lazy_vec.encoding Func_type.value_type_encoding)
+      in
+
+      case
+        "CKLocalsAccumulate"
+        (tup6 ~flatten:true left size pos type_vec curr_type vec_kont)
+        (function
+          | Decode.CKLocalsAccumulate
+              {left; size; pos; type_vec; curr_type; vec_kont} ->
+              Some (left, size, pos, type_vec, curr_type, vec_kont)
+          | _ -> None)
+        (fun (left, size, pos, type_vec, curr_type, vec_kont) ->
+          Decode.CKLocalsAccumulate
+            {left; size; pos; type_vec; curr_type; vec_kont})
+
+    let ckbody_case =
+      let left = value ["left"] Data_encoding.int31 in
+      let size = scope ["size"] Size.encoding in
+      let locals =
+        scope ["locals"] (vector_encoding Func_type.value_type_encoding)
+      in
+      let const_kont = scope ["const_kont"] Block.encoding in
+      case
+        "CKBody"
+        (tup4 ~flatten:true left size locals const_kont)
+        (function
+          | Decode.CKBody {left; size; locals; const_kont} ->
+              Some (left, size, locals, const_kont)
+          | _ -> None)
+        (fun (left, size, locals, const_kont) ->
+          CKBody {left; size; locals; const_kont})
+
+    let func_encoding =
+      let ftype = value ["ftype"] Interpreter_encodings.Ast.var_encoding in
+      let locals =
+        scope ["locals"] (vector_encoding Func_type.value_type_encoding)
+      in
+      let body =
+        value ["body"] Interpreter_encodings.Ast.block_label_encoding
+      in
+      conv
+        (fun (ftype, locals, body) ->
+          Source.(Ast.{ftype; locals; body} @@ no_region))
+        (fun {it = {ftype; locals; body}; _} -> (ftype, locals, body))
+        (tup3 ~flatten:true ftype locals body)
+
+    let ckstop_case =
+      case
+        "CKStop"
+        func_encoding
+        (function Decode.CKStop func -> Some func | _ -> None)
+        (fun func -> CKStop func)
+
+    let encoding =
+      tagged_union
+        (value [] Data_encoding.string)
+        [
+          ckstart_case;
+          cklocalsparse_case;
+          cklocalsaccumulate_case;
+          ckbody_case;
+          ckstop_case;
+        ]
+  end
 end
