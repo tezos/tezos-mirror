@@ -215,19 +215,26 @@ module type Non_iterable_indexed_carbonated_data_storage = sig
   val keys_unaccounted : context -> key list Lwt.t
 end
 
-module type Non_iterable_indexed_carbonated_data_storage_with_values = sig
+module type Indexed_carbonated_data_storage = sig
   include Non_iterable_indexed_carbonated_data_storage
 
-  (* HACK *)
-  val list_values :
+  (** [list_key_values ?offset ?length storage] lists the key and value pairs of
+      each entry in the given [storage]. The first [offset] values are ignored
+      (if passed). Negative offsets are treated as [0]. There will be no more
+      than [length] values in the result list (if passed). Negative values are
+      treated as [0].
+
+      The returned {!context} takes into account gas consumption of traversing
+      the keys and loading values. *)
+  val list_key_values :
     ?offset:int ->
     ?length:int ->
     t ->
     (Raw_context.t * (key * value) list) tzresult Lwt.t
 end
 
-module type Non_iterable_indexed_carbonated_data_storage_INTERNAL = sig
-  include Non_iterable_indexed_carbonated_data_storage_with_values
+module type Indexed_carbonated_data_storage_INTERNAL = sig
+  include Indexed_carbonated_data_storage
 
   val fold_keys_unaccounted :
     context ->

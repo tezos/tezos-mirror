@@ -237,12 +237,12 @@ module Big_map : sig
          and type value = Script_repr.expr
          and type t := key
 
-    (** HACK *)
-    val list_values :
+    val list_key_values :
       ?offset:int ->
       ?length:int ->
       Raw_context.t * id ->
-      (Raw_context.t * Script_repr.expr list) tzresult Lwt.t
+      (Raw_context.t * (Script_expr_hash.t * Script_repr.expr) list) tzresult
+      Lwt.t
   end
 
   module Total_bytes :

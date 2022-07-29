@@ -28,8 +28,9 @@ open Alpha_context
 
 (** Testing
     -------
-    Component:    Alpha_context 
-    Invocation:   dune exec ./src/proto_alpha/lib_protocol/test/unit/main.exe -- test Alpha_context 
+    Component:    Alpha_context
+    Invocation:   dune exec ./src/proto_alpha/lib_protocol/test/unit/main.exe \
+                    -- test Alpha_context
     Dependencies: helpers/block.ml
     Subject:      To test the modules (including the top-level)
                   in alpha_context.ml as individual units, particularly
@@ -40,6 +41,21 @@ open Alpha_context
 let create () =
   let accounts = Account.generate_accounts 1 in
   Block.alpha_context accounts
+
+let assert_equal_key_values ~loc kvs1 kvs2 =
+  let sort_by_key_hash =
+    List.sort (fun (k1, _) (k2, _) -> Script_expr_hash.compare k1 k2)
+  in
+  Assert.assert_equal_list
+    ~loc
+    (fun (k1, v1) (k2, v2) ->
+      Script_expr_hash.equal k1 k2
+      && String.equal (Expr.to_string v1) (Expr.to_string v2))
+    "Compare key-value list"
+    (fun fmt (k, v) ->
+      Format.fprintf fmt "(%a, %s)" Script_expr_hash.pp k (Expr.to_string v))
+    (sort_by_key_hash kvs1)
+    (sort_by_key_hash kvs2)
 
 module Test_Script = struct
   (** Force serialise of lazy [Big_map.t] in a given [alpha_context] *)
@@ -104,6 +120,139 @@ module Test_Big_map = struct
     | Some _ ->
         failwith "exists should have failed looking for a non-existent big_map"
     | None -> return_unit
+
+  (** Test that [Big_map.list_key_values] retrieves hashed keys and values. *)
+  let test_list_key_values () =
+    let open Lwt_result_syntax in
+    let* block, source = Context.init1 () in
+    let key_values =
+      [
+        ("1", {|"A"|});
+        ("2", {|"B"|});
+        ("3", {|"C"|});
+        ("4", {|"D"|});
+        ("5", {|"E"|});
+      ]
+      |> List.map (fun (k, v) -> (Expr.from_string k, Expr.from_string v))
+    in
+    let* big_map_id, ctxt =
+      Big_map_helpers.make_big_map
+        block
+        ~source
+        ~key_type:"int"
+        ~value_type:"string"
+        key_values
+    in
+    let* _ctxt, retrieved_key_values =
+      Big_map.list_key_values ctxt big_map_id >|= Environment.wrap_tzresult
+    in
+    let expected_key_hash_values =
+      List.map
+        (fun (key, value) ->
+          let bytes =
+            Data_encoding.Binary.to_bytes_exn Script_repr.expr_encoding key
+          in
+          let key_hash = Script_expr_hash.hash_bytes [bytes] in
+          (key_hash, value))
+        key_values
+    in
+    assert_equal_key_values
+      ~loc:__LOC__
+      expected_key_hash_values
+      retrieved_key_values
+
+  (** Test [Big_map.list_key_values] with [length] and [offset] arguments. *)
+  let test_list_key_values_parameters () =
+    let open Lwt_result_syntax in
+    let* block, source = Context.init1 () in
+    let hash_key key =
+      let bytes =
+        Data_encoding.Binary.to_bytes_exn Script_repr.expr_encoding key
+      in
+      Script_expr_hash.hash_bytes [bytes]
+    in
+    let check_key_values ~loc ~num_elements ?offset ?length () =
+      let key_values =
+        WithExceptions.List.init ~loc:__LOC__ num_elements (fun n ->
+            (string_of_int n, Printf.sprintf {|"Value %d"|} n))
+        |> List.map (fun (k, v) -> (Expr.from_string k, Expr.from_string v))
+      in
+      let sorted_key_values =
+        List.sort
+          (fun (k1, _) (k2, _) ->
+            Script_expr_hash.compare (hash_key k1) (hash_key k2))
+          key_values
+      in
+      let* big_map_id, ctxt =
+        Big_map_helpers.make_big_map
+          block
+          ~source
+          ~key_type:"int"
+          ~value_type:"string"
+          key_values
+      in
+      let* _ctxt, retrieved_key_values =
+        Big_map.list_key_values ?offset ?length ctxt big_map_id
+        >|= Environment.wrap_tzresult
+      in
+      let expected_key_hash_values =
+        (* A negative length is interpreted as 0 *)
+        let length =
+          match length with
+          | Some l -> max l 0
+          | None -> List.length sorted_key_values
+        in
+        let offset = match offset with Some o -> max o 0 | None -> 0 in
+        let expected =
+          List.take_n length @@ List.drop_n offset sorted_key_values
+        in
+        List.map
+          (fun (key, value) ->
+            let bytes =
+              Data_encoding.Binary.to_bytes_exn Script_repr.expr_encoding key
+            in
+            let key_hash = Script_expr_hash.hash_bytes [bytes] in
+            (key_hash, value))
+          expected
+      in
+      let* () =
+        assert_equal_key_values
+          ~loc
+          retrieved_key_values
+          expected_key_hash_values
+      in
+      return retrieved_key_values
+    in
+    (* The following combinations should yield the same key-values. *)
+    let* kvs1 = check_key_values ~loc:__LOC__ ~num_elements:10 () in
+    let* kvs2 = check_key_values ~loc:__LOC__ ~num_elements:10 ~offset:0 () in
+    let* kvs3 = check_key_values ~loc:__LOC__ ~num_elements:10 ~length:10 () in
+    let* kvs4 =
+      check_key_values ~loc:__LOC__ ~num_elements:10 ~offset:0 ~length:10 ()
+    in
+    let* () = assert_equal_key_values ~loc:__LOC__ kvs1 kvs2 in
+    let* () = assert_equal_key_values ~loc:__LOC__ kvs2 kvs3 in
+    let* () = assert_equal_key_values ~loc:__LOC__ kvs3 kvs4 in
+    (* Attempt to consume more elements then the length. *)
+    let* kvs1 = check_key_values ~loc:__LOC__ ~num_elements:20 () in
+    let* kvs2 = check_key_values ~loc:__LOC__ ~num_elements:20 ~length:100 () in
+    let* () = assert_equal_key_values ~loc:__LOC__ kvs1 kvs2 in
+    let* _ =
+      check_key_values ~loc:__LOC__ ~num_elements:100 ~offset:100 ~length:1 ()
+    in
+    (* Offset greater than the length. *)
+    let* kvs = check_key_values ~loc:__LOC__ ~num_elements:10 ~offset:100 () in
+    let* () = assert_equal_key_values ~loc:__LOC__ kvs [] in
+    (* Negative length is treated as zero. *)
+    let* kvs = check_key_values ~loc:__LOC__ ~num_elements:10 ~length:(-1) () in
+    let* () = assert_equal_key_values ~loc:__LOC__ kvs [] in
+    (* Negative offset is treated as zero. *)
+    let* kvs1 =
+      check_key_values ~loc:__LOC__ ~num_elements:10 ~offset:(-5) ()
+    in
+    let* kvs2 = check_key_values ~loc:__LOC__ ~num_elements:10 () in
+    let* () = assert_equal_key_values ~loc:__LOC__ kvs1 kvs2 in
+    return_unit
 end
 
 let tests =
@@ -126,4 +275,12 @@ let tests =
       "Big_map.exists: failure case - looking up big_map that doesn't exist"
       `Quick
       Test_Big_map.test_exists;
+    Tztest.tztest
+      "Big_map.list_key_values basic tests"
+      `Quick
+      Test_Big_map.test_list_key_values;
+    Tztest.tztest
+      "Big_map.list_key_values: combinations of parameters"
+      `Quick
+      Test_Big_map.test_list_key_values_parameters;
   ]

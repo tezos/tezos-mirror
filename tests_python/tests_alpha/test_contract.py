@@ -2402,3 +2402,50 @@ class TestCreateRemoveTickets:
             ['--entrypoint', 'add', '--arg', 'Pair 1 "C"', '--burn-cap', '2'],
         )
         utils.bake(client, 'bootstrap5')
+
+
+# This test originates two contracts. One for receiving a big-map with string
+# tickets. Another for creating and sending a big-map with string tickets.
+# Scanning the big-map for tickets uses the function [Big_map.list_key_values]
+# so the regression tests include gas costs associated with calling this
+# function.
+@pytest.mark.incremental
+@pytest.mark.contract
+@pytest.mark.regression
+class TestSendTicketsInBigMap:
+    def test_receive_tickets_in_big_map_originate(
+        self, client_regtest_scrubbed, session
+    ):
+        client = client_regtest_scrubbed
+        path = os.path.join(
+            CONTRACT_PATH, 'mini_scenarios', 'receive_tickets_in_big_map.tz'
+        )
+        originate(client, session, path, '{}', 200)
+        session['receiver_address'] = session['contract']
+
+    def test_send_tickets_in_big_map_originate(
+        self, client_regtest_scrubbed, session
+    ):
+        client = client_regtest_scrubbed
+        path = os.path.join(
+            CONTRACT_PATH, 'mini_scenarios', 'send_tickets_in_big_map.tz'
+        )
+        originate(client, session, path, 'Unit', 200)
+
+    def test_send_tickets_in_big_map(self, client_regtest_scrubbed, session):
+        receiver_address = session['receiver_address']
+        client = client_regtest_scrubbed
+        client.transfer(
+            0,
+            'bootstrap2',
+            'send_tickets_in_big_map',
+            [
+                '--arg',
+                f'"{receiver_address}"',
+                '--burn-cap',
+                '30',
+                '-storage-limit',
+                '1000000',
+            ],
+        )
+        utils.bake(client, 'bootstrap5')

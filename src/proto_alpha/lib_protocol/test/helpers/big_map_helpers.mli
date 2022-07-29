@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,35 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* The model for read accesses is the following:
+open Protocol
 
-   cost(path_length, read_bytes) = 200_000 + 5000 * path_length + 2 * read_bytes
-*)
-let read_access ~path_length ~read_bytes =
-  let open Saturation_repr in
-  let base_cost = safe_int (200_000 + (5000 * path_length)) in
-  Gas_limit_repr.atomic_step_cost
-    (add base_cost (mul (safe_int 2) (safe_int read_bytes)))
+(** [make_big_map block ~source ~key_type ~value_type key_values] constructs a
+    new big-map with the given key-type [key_type] and value type [value_type].
 
-(* The model for write accesses is the following:
-
-   cost(written_bytes) = 200_000 + 4 * written_bytes
-*)
-let write_access ~written_bytes =
-  let open Saturation_repr in
-  Gas_limit_repr.atomic_step_cost
-    (add (safe_int 200_000) (mul (safe_int 4) (safe_int written_bytes)))
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2397
-   Fill in real benchmarked values.
-   Benchmark defined in [Storage_benchmarks].
-*)
-let list_key_values_step_cost = Saturation_repr.safe_int 117
-
-let list_key_values_intercept = Saturation_repr.safe_int 470
-
-let list_key_values_traverse ~size =
-  Saturation_repr.(
-    add
-      list_key_values_intercept
-      (mul (safe_int size) list_key_values_step_cost))
+    The big-map is owned by a new contract that is originated from [source],
+    with script {!Op.dummy_script}, and consists of a list of key-value pairs
+    according to the given [key_values] list of Micheline expressions. *)
+val make_big_map :
+  Block.t ->
+  source:Alpha_context.Contract.t ->
+  key_type:string ->
+  value_type:string ->
+  (Script_repr.expr * Script_repr.expr) list ->
+  (Lazy_storage_kind.Big_map.Id.t * Alpha_context.context) tzresult Lwt.t

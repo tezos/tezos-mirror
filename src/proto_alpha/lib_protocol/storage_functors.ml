@@ -357,7 +357,7 @@ module Make_indexed_carbonated_data_storage_INTERNAL
     (C : Raw_context.T)
     (I : INDEX)
     (V : VALUE) :
-  Non_iterable_indexed_carbonated_data_storage_INTERNAL
+  Indexed_carbonated_data_storage_INTERNAL
     with type t = C.t
      and type key = I.t
      and type value = V.t = struct
@@ -463,18 +463,21 @@ module Make_indexed_carbonated_data_storage_INTERNAL
   let add_or_remove s i v =
     match v with None -> remove s i | Some v -> add s i v
 
-  (** Because big map values are not stored under some common key,
-      we have no choice but to fold over all nodes with a path of length
-      [I.path_length] to retrieve actual keys and then paginate.
-
-      While this is inefficient and will traverse the whole tree ([O(n)]), there
-      currently isn't a better decent alternative.
-
-      Once https://gitlab.com/tezos/tezos/-/merge_requests/2771 which flattens paths is done,
-      {!C.list} could be used instead here. *)
-  let list_values ?(offset = 0) ?(length = max_int) s =
+  (* TODO https://gitlab.com/tezos/tezos/-/issues/3318
+     Switch implementation to use [C.list].
+     Given that MR !2771 which flattens paths is done, we should use
+     [C.list] to avoid having to iterate over all keys when [length] and/or
+     [offset] is passed.
+  *)
+  let list_key_values ?(offset = 0) ?(length = max_int) s =
     let root = [] in
     let depth = `Eq I.path_length in
+    C.length s root >>= fun size ->
+    (* Regardless of the [length] argument, all elements stored in the context
+       are traversed. We therefore pay a gas cost proportional to the number of
+       elements, given by [size], upfront. We also pay gas for decoding elements
+       whenever they are loaded in the body of the fold. *)
+    C.consume_gas s (Storage_costs.list_key_values_traverse ~size) >>?= fun s ->
     C.fold
       s
       root
@@ -496,9 +499,14 @@ module Make_indexed_carbonated_data_storage_INTERNAL
               match I.of_path file with
               | None -> assert false
               | Some key ->
+                  (* This also accounts for gas for loading the element. *)
                   get_unprojected s key >|=? fun (s, value) ->
                   (s, (key, value) :: rev_values, 0, pred length))
-        | _ -> Lwt.return acc)
+        | _ ->
+            (* Even if we run out of gas or fail in some other way, we still
+               traverse the whole tree. In this case there is no context to
+               update. *)
+            Lwt.return acc)
     >|=? fun (s, rev_values, _offset, _length) ->
     (C.project s, List.rev rev_values)
 
@@ -545,7 +553,7 @@ module Make_indexed_carbonated_data_storage : functor
   (I : INDEX)
   (V : VALUE)
   ->
-  Non_iterable_indexed_carbonated_data_storage_with_values
+  Indexed_carbonated_data_storage
     with type t = C.t
      and type key = I.t
      and type value = V.t =

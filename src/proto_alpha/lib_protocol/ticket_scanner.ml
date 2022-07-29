@@ -526,7 +526,7 @@ module Ticket_collection = struct
           (* Accumulate tickets from values of the big-map stored in the context *)
           match id with
           | Some id ->
-              let accum (values, ctxt) exp =
+              let accum (values, ctxt) (_key_hash, exp) =
                 Script_ir_translator.parse_data
                   ~legacy:true
                   ctxt
@@ -535,7 +535,7 @@ module Ticket_collection = struct
                   (Micheline.root exp)
                 >|=? fun (v, ctxt) -> (v :: values, ctxt)
               in
-              Big_map.list_values ctxt id >>=? fun (ctxt, exps) ->
+              Big_map.list_key_values ctxt id >>=? fun (ctxt, exps) ->
               List.fold_left_es accum ([], ctxt) exps >>=? fun (values, ctxt) ->
               (tickets_of_list [@ocaml.tailcall])
                 ~include_lazy:true

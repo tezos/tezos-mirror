@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,35 +23,52 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* The model for read accesses is the following:
+open Protocol
+open Alpha_context
 
-   cost(path_length, read_bytes) = 200_000 + 5000 * path_length + 2 * read_bytes
-*)
-let read_access ~path_length ~read_bytes =
-  let open Saturation_repr in
-  let base_cost = safe_int (200_000 + (5000 * path_length)) in
-  Gas_limit_repr.atomic_step_cost
-    (add base_cost (mul (safe_int 2) (safe_int read_bytes)))
+let wrap m = m >|= Environment.wrap_tzresult
 
-(* The model for write accesses is the following:
-
-   cost(written_bytes) = 200_000 + 4 * written_bytes
-*)
-let write_access ~written_bytes =
-  let open Saturation_repr in
-  Gas_limit_repr.atomic_step_cost
-    (add (safe_int 200_000) (mul (safe_int 4) (safe_int written_bytes)))
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2397
-   Fill in real benchmarked values.
-   Benchmark defined in [Storage_benchmarks].
-*)
-let list_key_values_step_cost = Saturation_repr.safe_int 117
-
-let list_key_values_intercept = Saturation_repr.safe_int 470
-
-let list_key_values_traverse ~size =
-  Saturation_repr.(
-    add
-      list_key_values_intercept
-      (mul (safe_int size) list_key_values_step_cost))
+let make_big_map block ~source ~key_type ~value_type key_values =
+  let open Lwt_result_syntax in
+  let key_type = Expr.from_string key_type in
+  let value_type = Expr.from_string value_type in
+  let* operation, originated =
+    Op.contract_origination (B block) source ~script:Op.dummy_script
+  in
+  let* block = Block.bake ~operation block in
+  let* incr = Incremental.begin_construction block in
+  let ctxt = Incremental.alpha_ctxt incr in
+  let* ctxt, big_map_id = wrap @@ Big_map.fresh ~temporary:false ctxt in
+  let* updates, ctxt =
+    List.fold_left_es
+      (fun (kvs, ctxt) (key, value) ->
+        let key_hash =
+          match
+            Data_encoding.Binary.to_bytes_opt Script_repr.expr_encoding key
+          with
+          | Some bytes -> Script_expr_hash.hash_bytes [bytes]
+          | None -> assert false
+        in
+        return ({Big_map.key; key_hash; value = Some value} :: kvs, ctxt))
+      ([], ctxt)
+      key_values
+  in
+  let* ctxt =
+    wrap
+      (Contract.update_script_storage
+         ctxt
+         originated
+         key_type
+         (Some
+            [
+              Lazy_storage.make
+                Lazy_storage.Kind.Big_map
+                big_map_id
+                (Update
+                   {
+                     init = Lazy_storage.Alloc Big_map.{key_type; value_type};
+                     updates;
+                   });
+            ]))
+  in
+  return (big_map_id, ctxt)

@@ -28,3 +28,7 @@ val read_access : path_length:int -> read_bytes:int -> Gas_limit_repr.cost
 
 (** Cost of performing a single write access, writing [written_bytes] bytes. *)
 val write_access : written_bytes:int -> Gas_limit_repr.cost
+
+(** [list_key_values_traverse ~size] returns the cost of traversing a context
+    with [size] number of elements. *)
+val list_key_values_traverse : size:int -> Gas_limit_repr.cost

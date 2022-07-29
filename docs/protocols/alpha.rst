@@ -71,3 +71,8 @@ Internal
   function from ``Validate_operation.TMP_for_plugin`` and to no longer
   expose ``apply_contents_list`` and ``apply_manager_operations`` in
   ``apply.mli``. (MR :gl:`!5770`)
+
+- Rename the function ``Big_map.list_values`` to ``list_key_values`` and make
+  it return a list of key-value pairs. Also change the name of the signature
+  ``Non_iterable_indexed_carbonated_data_storage_with_values`` to
+  ``Indexed_carbonated_data_storage``. (MR :gl:`!3491`)
