@@ -734,3 +734,17 @@ val drain_delegate :
   delegate:Signature.Public_key_hash.t ->
   destination:Signature.Public_key_hash.t ->
   packed_operation tzresult Lwt.t
+
+(** [zk_rollup_publish ctxt source ~zk_rollup ~op] tries to add an operation
+    to the pending list of a ZK Rollup. *)
+val zk_rollup_publish :
+  ?force_reveal:bool ->
+  ?counter:Z.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:counter ->
+  Context.t ->
+  Contract.t ->
+  zk_rollup:Zk_rollup.t ->
+  ops:(Zk_rollup.Operation.t * Zk_rollup.Ticket.t option) list ->
+  Operation.packed tzresult Lwt.t
