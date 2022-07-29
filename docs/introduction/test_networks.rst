@@ -36,6 +36,21 @@ below, have independent faucets.
 
 See :ref:`using_faucet` for detailed instructions on using a faucet.
 
+Kathmandunet
+============
+
+- Built-in network alias: ``kathmandunet`` (see :ref:`builtin_networks`)
+
+  * Available from version 14.0.
+
+Kathmandunet is a test network which runs the Kathmandu protocol.
+Kathmandunet will run until Kathmandu is refused through the amendment process
+or (accepted and then) replaced by another protocol on Mainnet.
+
+On Kathmandunet, some constants differ from Mainnet.
+This results in a faster chain than Mainnet.
+See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
+
 Jakartanet
 ==========
 

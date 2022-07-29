@@ -25,6 +25,8 @@ be documented here either.
 Node
 ----
 
+- Added the built-in network alias for Kathmandunet (``--network kathmandunet``).
+
 Client
 ------
 
