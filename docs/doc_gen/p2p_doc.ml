@@ -29,8 +29,6 @@ let protocols =
 let main () =
   (* Style : hack *)
   Format.printf "%a@." Rst.pp_raw_html Rst.style ;
-  (* Script : hack *)
-  Format.printf "%a@." Rst.pp_raw_html Rst.script ;
   (* Page title *)
   Format.printf "%a" Rst.pp_h1 "P2P message format" ;
   (* include/copy usage.rst from input  *)
