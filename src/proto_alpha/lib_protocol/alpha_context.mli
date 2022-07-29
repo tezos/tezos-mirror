@@ -3150,7 +3150,7 @@ module Sc_rollup : sig
 
     val reference_initial_state_hash : State_hash.t
 
-    module ProtocolImplementation :
+    module Protocol_implementation :
       PVM.S
         with type context = Context.t
          and type state = Context.tree
@@ -3205,7 +3205,7 @@ module Sc_rollup : sig
         context -> input option -> state -> (proof, error) result Lwt.t
     end
 
-    module ProtocolImplementation :
+    module Protocol_implementation :
       PVM.S
         with type context = Context.t
          and type state = Context.tree
@@ -3279,10 +3279,10 @@ module Sc_rollup : sig
     | Unencodable of (module PVM_with_proof)
     | Arith_pvm_with_proof of
         (module PVM_with_proof
-           with type proof = ArithPVM.ProtocolImplementation.proof)
+           with type proof = ArithPVM.Protocol_implementation.proof)
     | Wasm_2_0_0_pvm_with_proof of
         (module PVM_with_proof
-           with type proof = Wasm_2_0_0PVM.ProtocolImplementation.proof)
+           with type proof = Wasm_2_0_0PVM.Protocol_implementation.proof)
 
   val wrapped_proof_kind_exn : wrapped_proof -> Kind.t
 

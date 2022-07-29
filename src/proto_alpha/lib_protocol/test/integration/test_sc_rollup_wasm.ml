@@ -105,7 +105,7 @@ module WASM_P :
         return None
 end
 
-module Verifier = Alpha_context.Sc_rollup.Wasm_2_0_0PVM.ProtocolImplementation
+module Verifier = Alpha_context.Sc_rollup.Wasm_2_0_0PVM.Protocol_implementation
 
 module Prover = Alpha_context.Sc_rollup.Wasm_2_0_0PVM.Make (WASM_P)
 (* Helpers *)

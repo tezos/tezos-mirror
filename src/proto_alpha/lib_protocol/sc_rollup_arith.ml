@@ -28,7 +28,7 @@ module PS = Sc_rollup_PVM_sem
 
 (*
   This is the state hash of reference that both the prover of the node
-  and the verifier of the protocol {!ProtocolImplementation} have to
+  and the verifier of the protocol {!Protocol_implementation} have to
   agree on (if they do, it means they are using the same tree
   structure).
 
@@ -40,7 +40,7 @@ module PS = Sc_rollup_PVM_sem
 
   Utlimately, the value of this constant is decided by the prover of
   reference (the only need is for it to be compatible with
-  {!ProtocolImplementation}.)
+  {!Protocol_implementation}.)
 
   Its value is the result of the following snippet
 
@@ -1203,7 +1203,7 @@ module Make (Context : P) :
   end
 end
 
-module ProtocolImplementation = Make (struct
+module Protocol_implementation = Make (struct
   module Tree = struct
     include Context.Tree
 
