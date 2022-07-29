@@ -616,9 +616,15 @@ type with_test = Always | Never | Only_on_64_arch
       Typical use cases are runtime dependencies and build dependencies for users
       of the target (but not the target itself).
 
-    - [release]: defines whether this should be released. Note: it is not always the case that
-      public_exes should be released. They are often public because they are needed by other
-      opam packages, such as in tests. Releasable [public_exe] values should be marked explicitly.
+    - [optional]: if [true], do not build this target if some of its dependencies
+      are not available. The dependencies of this target themselves become optional
+      dependencies in the [.opam] file (unless they are required by other targets).
+      Default is [false].
+
+    - [release]: defines whether this should be released.
+      Note: it is not always the case that public_exes should be released.
+      They are often public because they are needed by other opam packages, such as in tests.
+      Releasable [public_exe] values should be marked explicitly.
       Default is [false].
 
     - [static]: whether to incluce [ %{workspace_root}/static-link-flags.sexp ] to the link
@@ -670,6 +676,7 @@ type 'a maker =
   ?opam_doc:string ->
   ?opam_homepage:string ->
   ?opam_with_test:with_test ->
+  ?optional:bool ->
   ?preprocess:preprocessor list ->
   ?preprocessor_deps:preprocessor_dep list ->
   ?private_modules:string list ->
