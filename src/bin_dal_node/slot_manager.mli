@@ -53,16 +53,6 @@ val get_slot :
   Cryptobox.slot_header ->
   Cryptobox.slot tzresult Lwt.t
 
-module Slot_header : sig
-  type t = Cryptobox.commitment
-
-  val to_b58check : t -> string
-
-  val of_b58check_opt : string -> t option
-
-  val rpc_arg : t RPC_arg.t
-end
-
 module Utils : sig
   (** [trim_x00 b] removes trailing '\000' at the end of a [b] and returns a new
       [bytes]. This function in needed to debug the fetching a slot and remove

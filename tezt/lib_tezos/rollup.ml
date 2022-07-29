@@ -506,8 +506,76 @@ end
 
 module Dal = struct
   module Parameters = struct
+    type t = {
+      number_of_shards : int;
+      redundancy_factor : int;
+      slot_size : int;
+      segment_size : int;
+    }
+
     let parameter_file protocol =
       let args = [(["dal_parametric"; "feature_enable"], Some "true")] in
       Protocol.write_parameter_file ~base:(Either.right (protocol, None)) args
+
+    let from_client client =
+      let* json =
+        RPC_legacy.get_constants client
+        |> Lwt.map (fun json -> JSON.(json |-> "dal_parametric"))
+      in
+      let number_of_shards = JSON.(json |-> "number_of_shards" |> as_int) in
+      let redundancy_factor = JSON.(json |-> "redundancy_factor" |> as_int) in
+      let slot_size = JSON.(json |-> "slot_size" |> as_int) in
+      let segment_size = JSON.(json |-> "segment_size" |> as_int) in
+      return {number_of_shards; redundancy_factor; slot_size; segment_size}
+  end
+
+  module Cryptobox = Tezos_crypto_dal.Dal_cryptobox
+
+  let make
+      Parameters.{redundancy_factor; number_of_shards; slot_size; segment_size}
+      =
+    Cryptobox.make
+      ~redundancy_factor
+      ~slot_size
+      ~segment_size
+      ~shards_amount:number_of_shards
+
+  let load_srs ?(unsafe = false) t =
+    if unsafe then Cryptobox.srs t
+    else
+      match Cryptobox.load_srs t with
+      | Ok srs -> srs
+      | Error err ->
+          Test.fail
+            "Rollup.Dal.load_srs failed: %a"
+            Tezos_base.TzPervasives.Error_monad.pp_print_trace
+            err
+
+  module Commitment = struct
+    let pad n message =
+      let prefix = String.make n '\000' in
+      prefix ^ message
+
+    let dummy_commitment
+        ?(on_error =
+          fun str -> Test.fail "Rollup.Dal.dummy_commitment failed: %s" str)
+        parameters t message =
+      let padding_length =
+        parameters.Parameters.slot_size - String.length message
+      in
+      let padded_message =
+        if padding_length > 0 then pad padding_length message else message
+      in
+      let slot = String.to_bytes padded_message in
+      (* FIXME
+
+         Use a real srs here. *)
+      let srs = load_srs ~unsafe:true t in
+      match Cryptobox.polynomial_from_slot t slot with
+      | Ok r -> (
+          match Cryptobox.commit srs r with
+          | Ok r -> r
+          | Error (`Degree_exceeds_srs_length str) -> on_error str)
+      | Error (`Slot_wrong_size str) -> on_error str
   end
 end

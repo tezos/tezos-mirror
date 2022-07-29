@@ -775,6 +775,9 @@ module Constants : sig
       number_of_shards : int;
       endorsement_lag : int;
       availability_threshold : int;
+      slot_size : int;
+      redundancy_factor : int;
+      segment_size : int;
     }
 
     val dal_encoding : dal Data_encoding.t
@@ -2682,11 +2685,9 @@ module Dal : sig
   module Slot : sig
     type header
 
-    type t = private {
-      level : Raw_level.t;
-      index : Slot_index.t;
-      header : header;
-    }
+    type t = {level : Raw_level.t; index : Slot_index.t; header : header}
+
+    val zero : header
 
     val encoding : t Data_encoding.t
 

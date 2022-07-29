@@ -1,25 +1,18 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name test_dal_cryptobox)
+(library
+ (name tezos_crypto_dal)
+ (public_name tezos-crypto-dal)
+ (instrumentation (backend bisect_ppx))
  (libraries
   tezos-stdlib
-  tezos-crypto.dal
   tezos-error-monad
   data-encoding
-  alcotest
-  qcheck-alcotest
+  tezos-crypto
   tezos-bls12-381-polynomial)
  (flags
   (:standard)
   -open Tezos_stdlib
-  -open Tezos_crypto_dal
   -open Tezos_error_monad
   -open Data_encoding))
-
-(rule
- (alias runtest)
- (package tezos-crypto)
- (deps shard_proofs_precomp)
- (action (run %{dep:./test_dal_cryptobox.exe})))

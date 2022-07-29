@@ -823,6 +823,38 @@ let _octez_crypto_tests_unix =
         octez_test_helpers;
       ]
 
+let octez_crypto_dal =
+  public_lib
+    "tezos-crypto-dal"
+    ~path:"src/lib_crypto_dal"
+    ~synopsis:"DAL cryptographic primitives"
+    ~opam:"tezos-crypto-dal"
+    ~deps:
+      [
+        octez_stdlib |> open_;
+        octez_error_monad |> open_;
+        data_encoding |> open_;
+        octez_crypto;
+        bls12_381_polynomial;
+      ]
+
+let _octez_crypto_dal_tests =
+  tests
+    ["test_dal_cryptobox"]
+    ~path:"src/lib_crypto_dal/test"
+    ~opam:"tezos-crypto-dal"
+    ~dep_files:["shard_proofs_precomp"]
+    ~deps:
+      [
+        octez_stdlib |> open_;
+        octez_crypto_dal |> open_;
+        octez_error_monad |> open_;
+        data_encoding |> open_;
+        alcotest;
+        qcheck_alcotest;
+        bls12_381_polynomial;
+      ]
+
 let octez_event_logging =
   public_lib
     "tezos-event-logging"
@@ -1784,6 +1816,7 @@ protocols.|}
         zarith_stubs_js;
         bls12_381;
         plonk;
+        octez_crypto_dal;
         vdf;
         ringo;
         ringo_lwt;
@@ -2841,6 +2874,7 @@ let tezt_tezos =
         tezt_performance_regression |> open_;
         uri;
         hex;
+        octez_crypto_dal;
         octez_base;
         octez_base_unix;
         cohttp_lwt_unix;
@@ -5127,36 +5161,6 @@ let _octez_codec =
          ])
     ~linkall:true
 
-let octez_crypto_dal =
-  public_lib
-    "tezos-crypto.dal"
-    ~path:"src/lib_crypto/dal"
-    ~opam:"tezos-crypto"
-    ~deps:
-      [
-        octez_stdlib |> open_;
-        octez_error_monad |> open_;
-        data_encoding |> open_;
-        bls12_381_polynomial;
-      ]
-
-let _octez_crypto_dal_tests =
-  tests
-    ["test_dal_cryptobox"]
-    ~path:"src/lib_crypto/dal/test"
-    ~opam:"tezos-crypto"
-    ~dep_files:["shard_proofs_precomp"]
-    ~deps:
-      [
-        octez_stdlib |> open_;
-        octez_crypto_dal |> open_;
-        octez_error_monad |> open_;
-        data_encoding |> open_;
-        alcotest;
-        qcheck_alcotest;
-        bls12_381_polynomial;
-      ]
-
 let _octez_proxy_server =
   public_exe
     "tezos-proxy-server"
@@ -5393,6 +5397,7 @@ let () =
         bls12_381;
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         data_encoding;
+        octez_crypto_dal;
         octez_base;
         octez_base_unix;
         octez_stdlib_unix;

@@ -216,6 +216,28 @@ end
 
 module Dal : sig
   module Parameters : sig
+    type t = {
+      number_of_shards : int;
+      redundancy_factor : int;
+      slot_size : int;
+      segment_size : int;
+    }
+
     val parameter_file : Protocol.t -> string Lwt.t
+
+    val from_client : Client.t -> t Lwt.t
+  end
+
+  module Cryptobox = Tezos_crypto_dal.Dal_cryptobox
+
+  val make : Parameters.t -> Cryptobox.t
+
+  module Commitment : sig
+    val dummy_commitment :
+      ?on_error:(string -> Cryptobox.commitment) ->
+      Parameters.t ->
+      Cryptobox.t ->
+      string ->
+      Cryptobox.commitment
   end
 end

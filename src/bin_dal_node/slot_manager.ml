@@ -94,48 +94,6 @@ let wrap_encoding_error =
 
 let encode enc v = Data_encoding.Binary.to_string enc v |> wrap_encoding_error
 
-module Slot_header = struct
-  type t = Cryptobox.commitment
-
-  type Base58.data += Data of t
-
-  let to_string commitment =
-    Cryptobox.commitment_to_bytes commitment |> Bytes.to_string
-
-  let of_string_opt str =
-    Cryptobox.commitment_of_bytes_opt (String.to_bytes str)
-
-  let b58check_encoding =
-    Base58.register_encoding
-      ~prefix:Base58.Prefix.slot_header
-      ~length:Cryptobox.commitment_size
-      ~to_raw:to_string
-      ~of_raw:of_string_opt
-      ~wrap:(fun x -> Data x)
-
-  let name = "slot_header_encoding"
-
-  let to_b58check c = Base58.simple_encode b58check_encoding c
-
-  let of_b58check_opt b = Base58.simple_decode b58check_encoding b
-
-  let rpc_arg =
-    RPC_arg.make
-      ~name
-      ~descr:(Format.asprintf "%s (Base58Check-encoded)" name)
-      ~destruct:(fun s ->
-        match of_b58check_opt s with
-        | None ->
-            Error
-              (Format.asprintf
-                 "failed to decode Base58Check-encoded data (%s): %S"
-                 name
-                 s)
-        | Some v -> Ok v)
-      ~construct:to_b58check
-      ()
-end
-
 let share_path slot_header shard_id = [slot_header; string_of_int shard_id]
 
 let decode_share s =
@@ -145,7 +103,7 @@ let decode_share s =
 
 let save store slot_header shards =
   let open Lwt_result_syntax in
-  let slot_header = Slot_header.to_b58check slot_header in
+  let slot_header = Cryptobox.Commitment.to_b58check slot_header in
   Cryptobox.IntMap.iter_es
     (fun i share ->
       let path = share_path slot_header i in
@@ -197,7 +155,7 @@ let check_shards shards =
 
 let get_slot cb_constants store slot_header =
   let open Lwt_result_syntax in
-  let slot_header = Slot_header.to_b58check slot_header in
+  let slot_header = Cryptobox.Commitment.to_b58check slot_header in
   let*! shards = Store.list store [slot_header] in
   let*? () = check_shards shards in
   let* shards =

@@ -17,7 +17,7 @@
   tezos-rpc-http-client-unix
   tezos-stdlib-unix
   tezos-stdlib
-  tezos-crypto.dal
+  tezos-crypto-dal
   irmin-pack
   irmin-pack.unix
   irmin)

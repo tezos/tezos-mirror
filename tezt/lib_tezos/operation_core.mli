@@ -283,7 +283,11 @@ module Manager : sig
   (** [dal_publish_slot_header ~level ~index ~header] builds an
      operation for the data-availability layer that publishes a
      slot. *)
-  val dal_publish_slot_header : level:int -> index:int -> header:int -> payload
+  val dal_publish_slot_header :
+    level:int ->
+    index:int ->
+    header:Tezos_crypto_dal.Dal_cryptobox.commitment ->
+    payload
 
   (** [sc_rollup_dal_slot_subscribe ~rollup ~slot_index] builds an
      operation for the sc rollup [rollup] to subscribe to the data

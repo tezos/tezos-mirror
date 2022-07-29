@@ -1460,4 +1460,5 @@ struct
 
   module Equality_witness = Environment_context.Equality_witness
   module Plonk = Tezos_protocol_environment_structs.V7.Plonk
+  module Dal = Tezos_crypto_dal.Dal_cryptobox.Verifier
 end

@@ -19,6 +19,7 @@ depends: [
   "tezos-plonk" { >= "0.1.0" }
   "zarith" { >= "1.12" & < "1.13" }
   "zarith_stubs_js"
+  "tezos-crypto-dal"
   "class_group_vdf" { >= "0.0.4" }
   "ringo" { >= "0.9" }
   "ringo-lwt" { >= "0.9" }

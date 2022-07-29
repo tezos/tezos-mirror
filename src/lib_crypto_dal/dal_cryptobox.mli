@@ -29,15 +29,6 @@ open Dal_cryptobox_intf
     by this module. *)
 type t
 
-(** [make] precomputes the set of values needed by cryptographic primitives
-    defined in this module and store them in a value of type [t] *)
-val make :
-  redundancy_factor:int ->
-  slot_size:int ->
-  segment_size:int ->
-  shards_amount:int ->
-  t
-
 (** A trusted setup. *)
 type srs
 
@@ -64,6 +55,17 @@ type srs
 module Verifier : VERIFIER
 
 include VERIFIER with type srs := srs and type t := t
+
+(** FIXME https://gitlab.com/tezos/tezos/-/issues/3390
+
+     This is unsafe but can be used for testing. *)
+val srs : t -> srs
+
+module Commitment : sig
+  include Dal_cryptobox_intf.COMMITMENT with type t = commitment
+
+  val rpc_arg : commitment Resto.Arg.t
+end
 
 module IntMap : Tezos_error_monad.TzLwtreslib.Map.S with type key = int
 

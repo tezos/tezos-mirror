@@ -42,7 +42,7 @@ type slot = bytes
 
 type slot_header = commitment
 
-let slot_header_encoding = commitment_encoding
+let slot_header_encoding = Commitment.encoding
 
 let init () =
   let open Constants in

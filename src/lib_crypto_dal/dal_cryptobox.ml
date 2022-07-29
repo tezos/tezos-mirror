@@ -25,6 +25,7 @@
 
 open Error_monad
 include Dal_cryptobox_intf
+module Base58 = Tezos_crypto.Base58
 
 type error +=
   | Failed_to_load_trusted_setup of string
@@ -120,15 +121,6 @@ module Inner = struct
         Bls12_381.G1.of_compressed_bytes_exn
         bytes
 
-    let commitment_to_bytes = Bls12_381.G1.to_compressed_bytes
-
-    let commitment_of_bytes_opt = Bls12_381.G1.of_compressed_bytes_opt
-
-    (* We divide by two because we use the compressed representation. *)
-    let commitment_size = Bls12_381.G1.size_in_bytes / 2
-
-    let commitment_encoding = g1_encoding
-
     let _proof_shards_encoding = g1_encoding
 
     let commitment_proof_encoding = g1_encoding
@@ -156,6 +148,74 @@ module Inner = struct
   end
 
   include Encoding
+
+  module Commitment = struct
+    type t = commitment
+
+    type Base58.data += Data of t
+
+    let zero = Bls12_381.G1.zero
+
+    let commitment_to_bytes = Bls12_381.G1.to_compressed_bytes
+
+    let commitment_of_bytes_opt = Bls12_381.G1.of_compressed_bytes_opt
+
+    let commitment_of_bytes_exn bytes =
+      match Bls12_381.G1.of_compressed_bytes_opt bytes with
+      | None ->
+          Format.kasprintf Stdlib.failwith "Unexpected data (DAL commitment)"
+      | Some commitment -> commitment
+
+    (* We divide by two because we use the compressed representation. *)
+    let commitment_size = Bls12_381.G1.size_in_bytes / 2
+
+    let to_string commitment = commitment_to_bytes commitment |> Bytes.to_string
+
+    let of_string_opt str = commitment_of_bytes_opt (String.to_bytes str)
+
+    let b58check_encoding =
+      Base58.register_encoding
+        ~prefix:Base58.Prefix.slot_header
+        ~length:commitment_size
+        ~to_raw:to_string
+        ~of_raw:of_string_opt
+        ~wrap:(fun x -> Data x)
+
+    let raw_encoding =
+      let open Data_encoding in
+      conv
+        commitment_to_bytes
+        commitment_of_bytes_exn
+        (Fixed.bytes commitment_size)
+
+    include Tezos_crypto.Helpers.Make (struct
+      type t = commitment
+
+      let name = "DAL_commitment"
+
+      let title = "Commitment representation for the DAL"
+
+      let b58check_encoding = b58check_encoding
+
+      let raw_encoding = raw_encoding
+
+      let compare = compare
+
+      let equal = ( = )
+
+      let hash _ =
+        (* The commitment is not hashed. This is ensured by the
+           function exposed. We only need the Base58 encoding and the
+           rpc_arg. *)
+        assert false
+
+      let seeded_hash _ _ =
+        (* Same argument. *)
+        assert false
+    end)
+  end
+
+  include Commitment
 
   (* Number of bytes fitting in a Scalar.t. Since scalars are integer modulo
      r~2^255, we restrict ourselves to 248-bit integers (31 bytes). *)
