@@ -2425,6 +2425,54 @@ module Zk_rollup : sig
     val encoding : t Data_encoding.t
   end
 
+  module Circuit_public_inputs : sig
+    type pending_op_public_inputs = {
+      old_state : State.t;
+      new_state : State.t;
+      fee : scalar;
+      exit_validity : bool;
+      zk_rollup : t;
+      l2_op : Operation.t;
+    }
+
+    type private_batch_public_inputs = {
+      old_state : State.t;
+      new_state : State.t;
+      fees : scalar;
+      zk_rollup : t;
+    }
+
+    type fee_public_inputs = {
+      old_state : State.t;
+      new_state : State.t;
+      fees : scalar;
+    }
+
+    type t =
+      | Pending_op of pending_op_public_inputs
+      | Private_batch of private_batch_public_inputs
+      | Fee of fee_public_inputs
+
+    val to_scalar_array : t -> scalar array
+  end
+
+  module Update : sig
+    type op_pi = {new_state : State.t; fee : scalar; exit_validity : bool}
+
+    type private_inner_pi = {new_state : State.t; fees : scalar}
+
+    type fee_pi = {new_state : State.t}
+
+    type t = {
+      pending_pis : (string * op_pi) list;
+      private_pis : (string * private_inner_pi) list;
+      fee_pi : fee_pi;
+      proof : Plonk.proof;
+    }
+
+    val encoding : t Data_encoding.t
+  end
+
   type pending_list =
     | Empty of {next_index : int64}
     | Pending of {next_index : int64; length : int}

@@ -92,6 +92,8 @@
         "Zk_rollup_account_repr",
         "Zk_rollup_ticket_repr",
         "Zk_rollup_operation_repr",
+        "Zk_rollup_update_repr",
+        "Zk_rollup_circuit_public_inputs_repr",
 
         "Bond_id_repr",
         "Vote_repr",
