@@ -44,8 +44,12 @@ val mem : Protocol_hash.t -> bool
 
 val seq : unit -> t Seq.t
 
+(** [get hash] searches the protocol of the given hash in the registered protocols.
+    This function also activates the logging facilty of the returned protocol.
+*)
 val get : Protocol_hash.t -> t option
 
+(** Same as [get] but with the result return type. *)
 val get_result : Protocol_hash.t -> t tzresult Lwt.t
 
 val seq_embedded : unit -> Protocol_hash.t Seq.t

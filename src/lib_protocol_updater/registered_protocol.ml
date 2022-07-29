@@ -214,12 +214,20 @@ let mem hash =
   VersionTable.mem versions hash || Tezos_protocol_registerer.mem hash
 
 let get hash =
+  let set_logger proto =
+    let consumer = Protocol_logging.make_log_message_consumer () in
+    let (module Proto : T) = proto in
+    Proto.set_log_message_consumer consumer
+  in
   match VersionTable.find versions hash with
-  | Some proto -> Some proto
+  | Some proto ->
+      set_logger proto ;
+      Some proto
   | None -> (
       match build hash with
       | Some proto ->
           VersionTable.add versions hash proto ;
+          set_logger proto ;
           Some proto
       | None -> None)
 
@@ -244,7 +252,7 @@ let () =
 let get_result hash =
   let open Lwt_result_syntax in
   match get hash with
-  | Some hash -> return hash
+  | Some t -> return t
   | None -> tzfail (Unregistered_protocol hash)
 
 let seq () = VersionTable.to_seq_values versions
