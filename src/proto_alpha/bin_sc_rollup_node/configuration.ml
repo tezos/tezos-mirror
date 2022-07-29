@@ -83,17 +83,12 @@ let default_dal_node_port = 10732
 
 let tez t = Tez.of_mutez_exn Int64.(mul (of_int t) 1_000_000L)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2794
-   the below default values have been copied from
-   `src/proto_alpha/lib_client/client_proto_args.ml`, but
-   we need to check whether these values are sensible for the rollup
-   node.
-*)
-let default_minimal_fees = Tez.of_mutez_exn 100L
+let default_minimal_fees = Mempool.default_minimal_fees
 
-let default_minimal_nanotez_per_gas_unit = Q.of_int 100
+let default_minimal_nanotez_per_gas_unit =
+  Mempool.default_minimal_nanotez_per_gas_unit
 
-let default_minimal_nanotez_per_byte = Q.of_int 1000
+let default_minimal_nanotez_per_byte = Mempool.default_minimal_nanotez_per_byte
 
 let default_force_low_fee = false
 
