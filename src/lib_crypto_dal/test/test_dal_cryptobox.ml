@@ -94,13 +94,15 @@ module Test = struct
           match Dal_cryptobox.IntMap.find 0 enc_shards with
           | None -> Ok ()
           | Some eval ->
-              assert (
+              let* check =
                 Dal_cryptobox.verify_shard
                   t
                   trusted_setup
                   comm
                   {index = 0; share = eval}
-                  shard_proofs.(0)) ;
+                  shard_proofs.(0)
+              in
+              assert check ;
 
               let* pi = Dal_cryptobox.prove_commitment trusted_setup p in
               let* check =

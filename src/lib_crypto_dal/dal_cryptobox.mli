@@ -152,7 +152,13 @@ type shard_proof
      [commitment] using [proof]. The verification time is
      constant. The [srs] should be the same as the one used to produce
      the commitment. *)
-val verify_shard : t -> srs -> commitment -> shard -> shard_proof -> bool
+val verify_shard :
+  t ->
+  srs ->
+  commitment ->
+  shard ->
+  shard_proof ->
+  (bool, [> `Degree_exceeds_srs_length of string]) result
 
 (** [prove_commitment srs polynomial] produces a proof that the
      commitment produced by the function [commit] is indeed a
