@@ -128,6 +128,7 @@ module Zk_rollup = struct
   module State = Zk_rollup_state_repr
   module Account = Zk_rollup_account_repr
   module Operation = Zk_rollup_operation_repr
+  module Ticket = Zk_rollup_ticket_repr
   include Zk_rollup_storage
 end
 

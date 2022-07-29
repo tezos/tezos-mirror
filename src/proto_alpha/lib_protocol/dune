@@ -112,6 +112,7 @@
   Zk_rollup_repr
   Zk_rollup_state_repr
   Zk_rollup_account_repr
+  Zk_rollup_ticket_repr
   Zk_rollup_operation_repr
   Bond_id_repr
   Vote_repr
@@ -373,6 +374,7 @@
   zk_rollup_repr.ml zk_rollup_repr.mli
   zk_rollup_state_repr.ml zk_rollup_state_repr.mli
   zk_rollup_account_repr.ml zk_rollup_account_repr.mli
+  zk_rollup_ticket_repr.ml zk_rollup_ticket_repr.mli
   zk_rollup_operation_repr.ml zk_rollup_operation_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
@@ -615,6 +617,7 @@
   zk_rollup_repr.ml zk_rollup_repr.mli
   zk_rollup_state_repr.ml zk_rollup_state_repr.mli
   zk_rollup_account_repr.ml zk_rollup_account_repr.mli
+  zk_rollup_ticket_repr.ml zk_rollup_ticket_repr.mli
   zk_rollup_operation_repr.ml zk_rollup_operation_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
@@ -862,6 +865,7 @@
   zk_rollup_repr.ml zk_rollup_repr.mli
   zk_rollup_state_repr.ml zk_rollup_state_repr.mli
   zk_rollup_account_repr.ml zk_rollup_account_repr.mli
+  zk_rollup_ticket_repr.ml zk_rollup_ticket_repr.mli
   zk_rollup_operation_repr.ml zk_rollup_operation_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli

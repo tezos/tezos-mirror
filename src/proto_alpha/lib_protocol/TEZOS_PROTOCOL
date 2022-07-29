@@ -85,6 +85,7 @@
         "Zk_rollup_repr",
         "Zk_rollup_state_repr",
         "Zk_rollup_account_repr",
+        "Zk_rollup_ticket_repr",
         "Zk_rollup_operation_repr",
 
         "Bond_id_repr",

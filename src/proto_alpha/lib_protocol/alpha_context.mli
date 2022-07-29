@@ -2373,6 +2373,12 @@ module Zk_rollup : sig
     val to_scalar_array : t -> scalar array
   end
 
+  module Ticket : sig
+    type t = {contents : Script.expr; ty : Script.expr; ticketer : Contract.t}
+
+    val encoding : t Data_encoding.t
+  end
+
   type pending_list =
     | Empty of {next_index : int64}
     | Pending of {next_index : int64; length : int}
