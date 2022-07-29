@@ -29,6 +29,62 @@
     feature flag is enabled.
 *)
 
+(** In the ZK Rollup, L2 operations are validated in two steps:
+    {ol
+      {li The Protocol does the first pass of (light) validation and
+          appends the L2 operation to a pending list.}
+      {li The ZKRU Operator does the second pass of validation for a prefix
+          of the pending list and posts a proof on chain of the validity of
+          each of them.
+          Based on this proof, the Protocol is going to remove the prefix
+          from the pending list, and apply their effect on the ZKRU L2 state
+          and on the L1 balances.}
+    }
+
+    The first step of validation is split into two cases, depending on
+    the type of L2 operation that is being submitted:
+    {ul
+      {li If the application of said L2 operation results in a transfer
+          of a ticket from L1 to L2 (i.e. it is a ZKRU {i deposit}), the
+          L2 operation has to be submitted through a call to the ZKRU
+          [%deposit] entrypoint from a smart contract.
+          This constraint is imposed by the fact that implicit accounts
+          cannot transfer tickets.
+          Then, the validation of these L2 operations will be performed
+          when applying the internal Tezos operation emitted by the call
+          to the ZKRU's deposit entrypoint. This is implemented by the
+          [transaction_to_zk_rollup] function in this module.
+      }
+      {li If its application results in a ticket transfer from L2 to L1
+          (i.e. it is a ZKRU {i withdrawal}) or it has no transfer between
+          layers, the L2 operation has to be submitted through a
+          [Zk_rollup_publish] external Tezos operation.
+          The checks for these L2 operations will be perform upon application
+          of said external Tezos operation, whose logic is implemented by the
+          [publish] function in this module.
+      }
+    }
+
+    Although L2 operations are mostly opaque, they expose a header that is
+    transparent to the Protocol (see {!Zk_rollup_operation_repr.t}).
+    In this header there's a field for the [price] of an L2 operation, which
+    will expose its kind. Concretely, the [price] encodes the net ticket
+    transfer from L1 to L2 caused by an L2 operation. Then, deposits have
+    a positive price, withdrawals a negative one, and pure L2 operations
+    must have a price of zero.
+
+    An L2 operation's price also encodes which ticket is being transferred,
+    by storing the ticket's hash (see {!Ticket_hash_repr}). These hashes are
+    used as token identifiers inside the ZKRU. In both cases, the L2 operations
+    with a non-zero price (i.e. deposits and withdrawals) will be submitted
+    alongside the values describing the ticket being transferred
+    (see {!Zk_rollup_ticket_repr}). These values have to be consistent with
+    the token identifier used in the L2 operation's price.
+
+    NB: if ticket transfers by implicit accounts was supported, these two cases
+    could be unified into the application of the [Zk_rollup_publish] operation.
+*)
+
 open Alpha_context
 
 (** These errors are only to be matched in tests. *)
@@ -71,6 +127,53 @@ val originate :
   nb_ops:int ->
   (t
   * Kind.zk_rollup_origination Apply_results.successful_manager_operation_result
+  * Script_typed_ir.packed_internal_operation list)
+  tzresult
+  Lwt.t
+
+(** [publish ~ctxt_before_op ~ctxt ~zk_rollup ~l2_ops]
+    applies a publish operation to [zk_rollup] by adding [l2_ops] to its
+    pending list.
+
+    All L2 operations in [l2_ops] must claim a non-positive [price]
+    (see {!Zk_rollup_operation_repr}). In other words, no deposit is
+    allowed in this operation, as those must go through an internal
+    transaction.
+
+    This function will first perform a series of validation checks over
+    the L2 operations in [l2_ops]. If all of them are successful, these L2
+    operations will be added to [dst_rollup]'s pending list.
+
+    May fail with:
+    {ul
+      {li [Zk_rollup_feature_disabled] if the ZKRU feature flag is not
+        activated.
+      }
+      {li [Zk_rollup.Errors.Deposit_as_external] if the price of an L2
+        operation from [ops] is positive.
+      }
+      {li [Zk_rollup.Errors.Invalid_deposit_amount] if an L2 operation
+        declares no ticket but has a non-zero price or if it declares
+        a ticket with a price of zero.
+      }
+      {li [Zk_rollup.Errors.Invalid_deposit_ticket] if an L2 operation's
+        ticket identifier (see [Zk_rollup_operation_repr]) is different from
+        the hash of its corresponding ticket and [l1_dst].
+      }
+      {li [Zk_rollup_storage.Zk_rollup_invalid_op_code op_code] if the
+        [op_code] of one of the [operations] is greater or equal
+        to the number of declared operations for this [zk_rollup].
+      }
+    }
+
+*)
+val publish :
+  ctxt_before_op:t ->
+  ctxt:t ->
+  zk_rollup:Zk_rollup.t ->
+  l2_ops:(Zk_rollup.Operation.t * Zk_rollup.Ticket.t option) list ->
+  (t
+  * Kind.zk_rollup_publish Apply_results.successful_manager_operation_result
   * Script_typed_ir.packed_internal_operation list)
   tzresult
   Lwt.t

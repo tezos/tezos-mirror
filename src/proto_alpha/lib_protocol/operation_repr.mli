@@ -50,6 +50,7 @@
       - tx rollup reveal withdrawals
       - smart contract rollup origination
       - zk rollup origination
+      - zk rollup publish
 
     Each of them can be encoded as raw bytes. Operations are distinguished at
     type level using phantom type parameters. [packed_operation] type allows
@@ -155,6 +156,8 @@ module Kind : sig
 
   type zk_rollup_origination = Zk_rollup_origination_kind
 
+  type zk_rollup_publish = Zk_rollup_publish_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -190,6 +193,7 @@ module Kind : sig
     | Sc_rollup_dal_slot_subscribe_manager_kind
         : sc_rollup_dal_slot_subscribe manager
     | Zk_rollup_origination_manager_kind : zk_rollup_origination manager
+    | Zk_rollup_publish_manager_kind : zk_rollup_publish manager
 end
 
 type 'a consensus_operation_type =
@@ -572,6 +576,12 @@ and _ manager_operation =
       nb_ops : int;
     }
       -> Kind.zk_rollup_origination manager_operation
+  | Zk_rollup_publish : {
+      zk_rollup : Zk_rollup_repr.t;
+      ops : (Zk_rollup_operation_repr.t * Zk_rollup_ticket_repr.t option) list;
+          (* See {!Zk_rollup_apply} *)
+    }
+      -> Kind.zk_rollup_publish manager_operation
 
 (** Counters are used as anti-replay protection mechanism in
     manager operations: each manager account stores a counter and
@@ -827,6 +837,8 @@ module Encoding : sig
 
   val zk_rollup_origination_case : Kind.zk_rollup_origination Kind.manager case
 
+  val zk_rollup_publish_case : Kind.zk_rollup_publish Kind.manager case
+
   module Manager_operations : sig
     type 'b case =
       | MCase : {
@@ -899,5 +911,7 @@ module Encoding : sig
       Kind.sc_rollup_dal_slot_subscribe case
 
     val zk_rollup_origination_case : Kind.zk_rollup_origination case
+
+    val zk_rollup_publish_case : Kind.zk_rollup_publish case
   end
 end

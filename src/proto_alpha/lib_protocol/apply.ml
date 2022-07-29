@@ -1431,6 +1431,8 @@ let apply_manager_operation :
         ~circuits_info
         ~init_state
         ~nb_ops
+  | Zk_rollup_publish {zk_rollup; ops} ->
+      Zk_rollup_apply.publish ~ctxt_before_op ~ctxt ~zk_rollup ~l2_ops:ops
 
 type success_or_failure = Success of context | Failure
 
@@ -1664,6 +1666,14 @@ let burn_manager_storage_fees :
         Zk_rollup_origination_result {payload with balance_updates}
       in
       return (ctxt, storage_limit, result)
+  | Zk_rollup_publish_result payload ->
+      let consumed = payload.paid_storage_size_diff in
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+      >|=? fun (ctxt, storage_limit, storage_bus) ->
+      let balance_updates = storage_bus @ payload.balance_updates in
+      ( ctxt,
+        storage_limit,
+        Zk_rollup_publish_result {payload with balance_updates} )
 
 (** [burn_internal_storage_fees ctxt smopr storage_limit payer] burns the
     storage fees associated to an internal operation result [smopr].

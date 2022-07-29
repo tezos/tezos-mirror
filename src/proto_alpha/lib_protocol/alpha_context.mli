@@ -2409,6 +2409,13 @@ module Zk_rollup : sig
 
   val exists : context -> t -> (context * bool) tzresult Lwt.t
 
+  module Errors : sig
+    type error +=
+      | Deposit_as_external
+      | Invalid_deposit_amount
+      | Invalid_deposit_ticket
+  end
+
   module Internal_for_tests : sig
     val originated_zk_rollup : Origination_nonce.Internal_for_tests.t -> t
   end
@@ -4054,6 +4061,8 @@ module Kind : sig
 
   type zk_rollup_origination = Zk_rollup_origination_kind
 
+  type zk_rollup_publish = Zk_rollup_publish_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -4089,6 +4098,7 @@ module Kind : sig
     | Sc_rollup_dal_slot_subscribe_manager_kind
         : sc_rollup_dal_slot_subscribe manager
     | Zk_rollup_origination_manager_kind : zk_rollup_origination manager
+    | Zk_rollup_publish_manager_kind : zk_rollup_publish manager
 end
 
 (** All the definitions below are re-exported from {!Operation_repr}. *)
@@ -4340,6 +4350,11 @@ and _ manager_operation =
       nb_ops : int;
     }
       -> Kind.zk_rollup_origination manager_operation
+  | Zk_rollup_publish : {
+      zk_rollup : Zk_rollup.t;
+      ops : (Zk_rollup.Operation.t * Zk_rollup.Ticket.t option) list;
+    }
+      -> Kind.zk_rollup_publish manager_operation
 
 and counter = Z.t
 
@@ -4540,6 +4555,8 @@ module Operation : sig
     val zk_rollup_origination_case :
       Kind.zk_rollup_origination Kind.manager case
 
+    val zk_rollup_publish_case : Kind.zk_rollup_publish Kind.manager case
+
     module Manager_operations : sig
       type 'b case =
         | MCase : {
@@ -4613,6 +4630,8 @@ module Operation : sig
         Kind.sc_rollup_dal_slot_subscribe case
 
       val zk_rollup_origination_case : Kind.zk_rollup_origination case
+
+      val zk_rollup_publish_case : Kind.zk_rollup_publish case
     end
   end
 

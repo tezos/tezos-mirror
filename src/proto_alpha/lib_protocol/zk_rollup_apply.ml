@@ -81,3 +81,94 @@ let originate ~ctxt_before_op ~ctxt ~public_parameters ~circuits_info
       }
   in
   (ctxt, result, [])
+
+(** [parse_ticket ~ticketer ~contents ~ty ctxt] reconstructs a ticket from
+    individual parts submitted as part of a Zk_rollup_publish operation. *)
+let parse_ticket ~ticketer ~contents ~ty ctxt =
+  Script_ir_translator.parse_comparable_ty ctxt (Micheline.root ty)
+  >>?= fun (Ex_comparable_ty contents_type, ctxt) ->
+  Script_ir_translator.parse_comparable_data
+    ctxt
+    contents_type
+    (Micheline.root contents)
+  >>=? fun (contents, ctxt) ->
+  return @@ (ctxt, Ticket_token.Ex_token {ticketer; contents_type; contents})
+
+let publish ~ctxt_before_op ~ctxt ~zk_rollup ~l2_ops =
+  let open Lwt_result_syntax in
+  let*? () = assert_feature_enabled ctxt in
+
+  let open Zk_rollup.Operation in
+  (* Deposits (i.e. L2 operations with a positive price) cannot be published
+     through an external operation *)
+  let*? () =
+    error_unless
+      (List.for_all
+         (fun (l2_op, _ticket_opt) -> Compare.Z.(l2_op.price.amount <= Z.zero))
+         l2_ops)
+      Zk_rollup.Errors.Deposit_as_external
+  in
+  (* Check that for every operation to publish:
+      1. Their price is zero iff they have no ticket representation
+      2. The "token id" of its price is the correct ticket hash
+     Additionally, for operations with tickets, the hash of the ticket
+     with the l1 destination from the operation's header is computed.
+  *)
+  let* ctxt, l2_ops_with_ticket_hashes =
+    List.fold_left_map_es
+      (fun ctxt (l2_op, ticket_opt) ->
+        match ticket_opt with
+        | None ->
+            let*? () =
+              error_unless
+                Compare.Z.(l2_op.price.amount = Z.zero)
+                Zk_rollup.Errors.Invalid_deposit_amount
+            in
+            return (ctxt, (l2_op, None))
+        | Some Zk_rollup.Ticket.{ticketer; ty; contents} ->
+            let*? () =
+              error_when
+                Compare.Z.(l2_op.price.amount = Z.zero)
+                Zk_rollup.Errors.Invalid_deposit_amount
+            in
+
+            let* ctxt, ticket_token =
+              parse_ticket ~ticketer ~contents ~ty ctxt
+            in
+            (* Compute the ticket hash with L1 address to be able
+               to perform an exit / return token *)
+            let* receiver_ticket_hash, ctxt =
+              Ticket_balance_key.of_ex_token
+                ctxt
+                ~owner:(Contract (Implicit l2_op.l1_dst))
+                ticket_token
+            in
+            (* Compute the ticket with zk rollup as owner, this is the hash
+               that is used as token identifier inside the ZKRU (and this
+               should be price's identifier in this L2 op) *)
+            let* source_ticket_hash, ctxt =
+              Ticket_balance_key.of_ex_token
+                ctxt
+                ~owner:(Zk_rollup zk_rollup)
+                ticket_token
+            in
+            let*? () =
+              error_unless
+                Ticket_hash.(equal l2_op.price.id source_ticket_hash)
+                Zk_rollup.Errors.Invalid_deposit_ticket
+            in
+            return (ctxt, (l2_op, Some receiver_ticket_hash)))
+      ctxt
+      l2_ops
+  in
+  let+ ctxt, paid_storage_size_diff =
+    Zk_rollup.add_to_pending ctxt zk_rollup l2_ops_with_ticket_hashes
+  in
+  (* TODO https://gitlab.com/tezos/tezos/-/issues/3544
+     Carbonate ZKRU operations *)
+  let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
+  let result =
+    Apply_results.Zk_rollup_publish_result
+      {balance_updates = []; consumed_gas; paid_storage_size_diff}
+  in
+  (ctxt, result, [])

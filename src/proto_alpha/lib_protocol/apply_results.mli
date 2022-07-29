@@ -292,6 +292,12 @@ and _ successful_manager_operation_result =
       storage_size : Z.t;
     }
       -> Kind.zk_rollup_origination successful_manager_operation_result
+  | Zk_rollup_publish_result : {
+      balance_updates : Receipt.balance_updates;
+      consumed_gas : Gas.Arith.fp;
+      paid_storage_size_diff : Z.t;
+    }
+      -> Kind.zk_rollup_publish successful_manager_operation_result
 
 and packed_successful_manager_operation_result =
   | Successful_manager_result :
