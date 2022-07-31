@@ -96,14 +96,14 @@ module V2_0_0 : sig
        and type proof = Context.proof proof
 
   (** This PVM is used for verification in the Protocol. [produce_proof] always returns [None]. *)
-  module ProtocolImplementation :
+  module Protocol_implementation :
     S
       with type context = Context.t
        and type state = Context.tree
        and type proof = Context.Proof.tree Context.Proof.t proof
 
   (** This is the state hash of reference that both the prover of the
-      node and the verifier of the protocol {!ProtocolImplementation}
+      node and the verifier of the protocol {!Protocol_implementation}
       have to agree on (if they do, it means they are using the same
       tree structure). *)
   val reference_initial_state_hash : Sc_rollup_repr.State_hash.t

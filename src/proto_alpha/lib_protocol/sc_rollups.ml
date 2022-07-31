@@ -85,10 +85,10 @@ module Kind = struct
     | _ -> None
 
   let example_arith_pvm =
-    (module Sc_rollup_arith.ProtocolImplementation : PVM.S)
+    (module Sc_rollup_arith.Protocol_implementation : PVM.S)
 
   let wasm_2_0_0_pvm =
-    (module Sc_rollup_wasm.V2_0_0.ProtocolImplementation : PVM.S)
+    (module Sc_rollup_wasm.V2_0_0.Protocol_implementation : PVM.S)
 
   let pvm_of = function
     | Example_arith -> example_arith_pvm
@@ -129,10 +129,10 @@ type wrapped_proof =
   | Unencodable of (module PVM_with_proof)
   | Arith_pvm_with_proof of
       (module PVM_with_proof
-         with type proof = Sc_rollup_arith.ProtocolImplementation.proof)
+         with type proof = Sc_rollup_arith.Protocol_implementation.proof)
   | Wasm_2_0_0_pvm_with_proof of
       (module PVM_with_proof
-         with type proof = Sc_rollup_wasm.V2_0_0.ProtocolImplementation.proof)
+         with type proof = Sc_rollup_wasm.V2_0_0.Protocol_implementation.proof)
 
 let wrapped_proof_module p =
   match p with
@@ -163,19 +163,19 @@ let wrapped_proof_encoding =
         case
           ~title:"Arithmetic PVM with proof"
           (Tag 0)
-          Sc_rollup_arith.ProtocolImplementation.proof_encoding
+          Sc_rollup_arith.Protocol_implementation.proof_encoding
           (function
             | Arith_pvm_with_proof pvm ->
                 let (module P : PVM_with_proof
                       with type proof =
-                        Sc_rollup_arith.ProtocolImplementation.proof) =
+                        Sc_rollup_arith.Protocol_implementation.proof) =
                   pvm
                 in
                 Some P.proof
             | _ -> None)
           (fun proof ->
             let module P = struct
-              include Sc_rollup_arith.ProtocolImplementation
+              include Sc_rollup_arith.Protocol_implementation
 
               let proof = proof
             end in
@@ -183,19 +183,19 @@ let wrapped_proof_encoding =
         case
           ~title:"Wasm 2.0.0 PVM with proof"
           (Tag 1)
-          Sc_rollup_wasm.V2_0_0.ProtocolImplementation.proof_encoding
+          Sc_rollup_wasm.V2_0_0.Protocol_implementation.proof_encoding
           (function
             | Wasm_2_0_0_pvm_with_proof pvm ->
                 let (module P : PVM_with_proof
                       with type proof =
-                        Sc_rollup_wasm.V2_0_0.ProtocolImplementation.proof) =
+                        Sc_rollup_wasm.V2_0_0.Protocol_implementation.proof) =
                   pvm
                 in
                 Some P.proof
             | _ -> None)
           (fun proof ->
             let module P = struct
-              include Sc_rollup_wasm.V2_0_0.ProtocolImplementation
+              include Sc_rollup_wasm.V2_0_0.Protocol_implementation
 
               let proof = proof
             end in
@@ -212,7 +212,7 @@ let wrap_proof pvm_with_proof =
       Option.map
         (fun arith_proof ->
           let module P_arith = struct
-            include Sc_rollup_arith.ProtocolImplementation
+            include Sc_rollup_arith.Protocol_implementation
 
             let proof = arith_proof
           end in
@@ -221,13 +221,13 @@ let wrap_proof pvm_with_proof =
            (Data_encoding.Binary.to_bytes_opt P.proof_encoding P.proof)
            (fun bytes ->
              Data_encoding.Binary.of_bytes_opt
-               Sc_rollup_arith.ProtocolImplementation.proof_encoding
+               Sc_rollup_arith.Protocol_implementation.proof_encoding
                bytes))
   | Some Kind.Wasm_2_0_0 ->
       Option.map
         (fun wasm_proof ->
           let module P_wasm2_0_0 = struct
-            include Sc_rollup_wasm.V2_0_0.ProtocolImplementation
+            include Sc_rollup_wasm.V2_0_0.Protocol_implementation
 
             let proof = wasm_proof
           end in
@@ -236,5 +236,5 @@ let wrap_proof pvm_with_proof =
            (Data_encoding.Binary.to_bytes_opt P.proof_encoding P.proof)
            (fun bytes ->
              Data_encoding.Binary.of_bytes_opt
-               Sc_rollup_wasm.V2_0_0.ProtocolImplementation.proof_encoding
+               Sc_rollup_wasm.V2_0_0.Protocol_implementation.proof_encoding
                bytes))

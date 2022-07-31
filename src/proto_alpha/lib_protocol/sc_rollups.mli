@@ -98,10 +98,10 @@ type wrapped_proof =
   | Unencodable of (module PVM_with_proof)
   | Arith_pvm_with_proof of
       (module PVM_with_proof
-         with type proof = Sc_rollup_arith.ProtocolImplementation.proof)
+         with type proof = Sc_rollup_arith.Protocol_implementation.proof)
   | Wasm_2_0_0_pvm_with_proof of
       (module PVM_with_proof
-         with type proof = Sc_rollup_wasm.V2_0_0.ProtocolImplementation.proof)
+         with type proof = Sc_rollup_wasm.V2_0_0.Protocol_implementation.proof)
 
 (** Unwrap a [wrapped_proof] into a first-class module. *)
 val wrapped_proof_module : wrapped_proof -> (module PVM_with_proof)
