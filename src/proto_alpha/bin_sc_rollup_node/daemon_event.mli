@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
+open Alpha_context
+
 (** This module defines functions that emit the events used by the smart
     contract rollup node daemon (see {!Daemon}). *)
 
@@ -50,3 +53,9 @@ val included_operation :
   'kind Protocol.Alpha_context.manager_operation ->
   'kind Protocol.Apply_results.manager_operation_result ->
   unit Lwt.t
+
+(** [wrong_initial_pvm_state_hash actual_hash expected_hash] emits the event
+    that the initial state hash of the PVM [actual_hash] does not agree with
+    [expected_hash]. *)
+val wrong_initial_pvm_state_hash :
+  Sc_rollup.State_hash.t -> Sc_rollup.State_hash.t -> unit Lwt.t
