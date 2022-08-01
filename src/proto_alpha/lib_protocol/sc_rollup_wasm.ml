@@ -146,7 +146,7 @@ module V2_0_0 = struct
 
     let name = "wasm_2_0_0"
 
-    let parse_boot_sector s = Some s
+    let parse_boot_sector s = Hex.to_string @@ `Hex s
 
     let pp_boot_sector fmt s = Format.fprintf fmt "%s" s
 
