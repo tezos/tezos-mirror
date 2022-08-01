@@ -11,6 +11,7 @@ local node = import './node.jsonnet';
 local p2p = import './p2p.jsonnet';
 local node_hardware = import './node_hardware.jsonnet';
 local delegate_hardware = import './delegate_hardware.jsonnet';
+local rpc = import './rpc.jsonnet';
 local workers = import './workers.jsonnet';
 local logs = import './logs.jsonnet';
 
@@ -21,9 +22,10 @@ local boardtitle = 'Tezos full dashboard - branch: ' + std.extVar('branch');
 local node_hardware_y = 47;
 local p2p_y = 72;
 local worker_y = 89;
-local misc_y = 114;
-local delegate_hardware_y = 123;
-local logs_y = 132;
+local rpc_y = 114;
+local misc_y = 131;
+local delegate_hardware_y = 140;
+local logs_y = 149;
 
 //###
 // Grafana main stuffs
@@ -121,6 +123,21 @@ dashboard.new(
     workers.validatorTreatmentRequests { gridPos: { h: 8, w: 12, x: 0, y: worker_y + 16 } },
     workers.validatorCompletionRequests { gridPos: { h: 8, w: 12, x: 12, y: worker_y + 16 } },
     workers.peerValidators { gridPos: { h: 8, w: 12, x: 0, y: worker_y + 24 } },
+
+    //#######
+    row.new(
+      title='RPC',
+      repeat='',
+      showTitle=true,
+    ) + { gridPos: { h: 16, w: 8, x: 0, y: rpc_y } },
+    rpc.calls { gridPos: { h: 8, w: 12, x: 0, y: rpc_y } },
+    rpc.durations { gridPos: { h: 8, w: 12, x: 0, y: rpc_y + 8 } },
+    rpc.totalCalls { gridPos: { h: 8, w: 6, x: 12, y: rpc_y } },
+    rpc.callsRate { gridPos: { h: 8, w: 6, x: 18, y: rpc_y } },
+    rpc.averageDuration { gridPos: { h: 8, w: 3, x: 12, y: rpc_y + 8 } },
+    rpc.maxAverageDuration { gridPos: { h: 8, w: 3, x: 15, y: rpc_y + 8 } },
+    rpc.maxTotalDuration { gridPos: { h: 8, w: 3, x: 18, y: rpc_y + 8 } },
+    rpc.totalDuration { gridPos: { h: 8, w: 3, x: 21, y: rpc_y + 8 } },
 
     //#######
     row.new(
