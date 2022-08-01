@@ -57,7 +57,7 @@ let concat (csv1 : csv) (csv2 : csv) : csv =
 let export ~filename ?(separator = ',') ?(linebreak = '\n') (data : csv) =
   Format.eprintf "Exporting to %s@." filename ;
   let sep_str = String.make 1 separator in
-  let outfile = open_out filename in
+  Out_channel.with_open_text filename @@ fun outfile ->
   let fmtr = Format.formatter_of_out_channel outfile in
   List.iter
     (fun line ->
@@ -66,20 +66,14 @@ let export ~filename ?(separator = ',') ?(linebreak = '\n') (data : csv) =
       | _ ->
           let s = String.concat sep_str line in
           Format.fprintf fmtr "%s%c@?" s linebreak)
-    data ;
-  close_out outfile
+    data
 
-(* shamelessly stolen from
-   https://stackoverflow.com/questions/5774934/how-do-i-read-in-lines-from-a-text-file-in-ocaml *)
 let read_lines name : string list =
-  let ic = open_in name in
-  let try_read () = try Some (input_line ic) with End_of_file -> None in
+  In_channel.with_open_text name @@ fun ic ->
   let rec loop acc =
-    match try_read () with
+    match In_channel.input_line ic with
     | Some s -> loop (s :: acc)
-    | None ->
-        close_in ic ;
-        List.rev acc
+    | None -> List.rev acc
   in
   loop []
 
