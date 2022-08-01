@@ -2393,6 +2393,8 @@ module Zk_rollup : sig
 
   val pending_list_encoding : pending_list Data_encoding.t
 
+  val in_memory_size : t -> Cache_memory_helpers.sint
+
   val originate :
     context ->
     Account.static ->
@@ -2414,6 +2416,8 @@ module Zk_rollup : sig
       | Deposit_as_external
       | Invalid_deposit_amount
       | Invalid_deposit_ticket
+      | Wrong_deposit_parameters
+      | Ticket_payload_size_limit_exceeded of {payload_size : int; limit : int}
   end
 
   module Internal_for_tests : sig

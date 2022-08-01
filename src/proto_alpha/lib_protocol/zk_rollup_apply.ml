@@ -131,7 +131,6 @@ let publish ~ctxt_before_op ~ctxt ~zk_rollup ~l2_ops =
                 Compare.Z.(l2_op.price.amount = Z.zero)
                 Zk_rollup.Errors.Invalid_deposit_amount
             in
-
             let* ctxt, ticket_token =
               parse_ticket ~ticketer ~contents ~ty ctxt
             in
@@ -170,5 +169,70 @@ let publish ~ctxt_before_op ~ctxt ~zk_rollup ~l2_ops =
   let result =
     Apply_results.Zk_rollup_publish_result
       {balance_updates = []; consumed_gas; paid_storage_size_diff}
+  in
+  (ctxt, result, [])
+
+let transaction_to_zk_rollup ~ctxt ~parameters_ty ~parameters ~dst_rollup ~since
+    =
+  let open Lwt_result_syntax in
+  let*? () = assert_feature_enabled ctxt in
+  let*? {ex_ticket; zkru_operation} =
+    Zk_rollup_parameters.get_deposit_parameters parameters_ty parameters
+  in
+  let* ticket_size, ctxt = Ticket_scanner.ex_ticket_size ctxt ex_ticket in
+  let limit = Constants.tx_rollup_max_ticket_payload_size ctxt in
+  let*? () =
+    error_when
+      Compare.Int.(ticket_size > limit)
+      (Zk_rollup.Errors.Ticket_payload_size_limit_exceeded
+         {payload_size = ticket_size; limit})
+  in
+  let ex_token, ticket_amount =
+    Ticket_token.token_and_amount_of_ex_ticket ex_ticket
+  in
+  (* Compute the ticket hash with zk rollup as owner *)
+  let* ticket_hash, ctxt =
+    Ticket_balance_key.of_ex_token ctxt ~owner:(Zk_rollup dst_rollup) ex_token
+  in
+  let ticket_amount = Script_int.(to_zint (ticket_amount :> n num)) in
+  (* Check that the amount and id of the transferred ticket are what
+     the operation's price claims. *)
+  let*? () =
+    error_unless
+      Compare.Z.(ticket_amount = zkru_operation.price.amount)
+      Zk_rollup.Errors.Invalid_deposit_amount
+  in
+  let*? () =
+    error_unless
+      Ticket_hash.(equal ticket_hash zkru_operation.price.id)
+      Zk_rollup.Errors.Invalid_deposit_ticket
+  in
+  (* Compute the ticket hash with L1 address to be able
+     to perform an exit / return token *)
+  let* receiver_ticket_hash, ctxt =
+    Ticket_balance_key.of_ex_token
+      ctxt
+      ~owner:(Contract (Implicit zkru_operation.l1_dst))
+      ex_token
+  in
+  (* Add it to the rollup pending list *)
+  let+ ctxt, paid_storage_size_diff =
+    Zk_rollup.add_to_pending
+      ctxt
+      Zk_rollup.Operation.(zkru_operation.rollup_id)
+      [(zkru_operation, Some receiver_ticket_hash)]
+  in
+  (* TODO https://gitlab.com/tezos/tezos/-/issues/3544
+     Carbonate ZKRU operations *)
+  let result =
+    Apply_internal_results.(
+      ITransaction_result
+        (Transaction_to_zk_rollup_result
+           {
+             balance_updates = [];
+             consumed_gas = Gas.consumed ~since ~until:ctxt;
+             ticket_hash;
+             paid_storage_size_diff;
+           }))
   in
   (ctxt, result, [])

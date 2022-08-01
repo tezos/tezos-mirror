@@ -207,6 +207,21 @@ let tickets_of_operation ctxt
         ~destination:(Destination.Sc_rollup destination)
         ~parameters_ty
         ~parameters
+  | Transaction_to_zk_rollup
+      {
+        destination;
+        unparsed_parameters = _;
+        parameters_ty = Pair_t (Ticket_t (ty, _), Bytes_t, _, _);
+        parameters = ticket, _op;
+      } ->
+      let ex_ticket = Ticket_scanner.Ex_ticket (ty, ticket) in
+      return
+        ( Some
+            {
+              destination = Destination.Zk_rollup destination;
+              tickets = [ex_ticket];
+            },
+          ctxt )
   | Origination
       {
         delegate = _;

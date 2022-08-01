@@ -523,7 +523,7 @@ and iview : type a b c d e f i o. (a, b, c, d, e, f, i, o) iview_type =
   in
   let legacy = Script_ir_translator_config.make ~legacy:true () in
   match addr.destination with
-  | Contract (Implicit _) | Tx_rollup _ | Sc_rollup _ ->
+  | Contract (Implicit _) | Tx_rollup _ | Sc_rollup _ | Zk_rollup _ ->
       (return_none [@ocaml.tailcall]) ctxt
   | Contract (Originated contract_hash as c) -> (
       Contract.get_script ctxt contract_hash >>=? fun (ctxt, script_opt) ->

@@ -592,6 +592,20 @@ let emit_event (type t tc) (ctxt, sc) gas ~(event_type : (t, tc) ty)
   let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
   return (res, ctxt, gas)
 
+let make_transaction_to_zk_rollup (type t) ctxt ~destination ~amount
+    ~(parameters_ty : ((t ticket, bytes) pair, _) ty) ~parameters =
+  error_unless Tez.(amount = zero) Rollup_invalid_transaction_amount
+  >>?= fun () ->
+  unparse_data ctxt Optimized parameters_ty parameters
+  >>=? fun (unparsed_parameters, ctxt) ->
+  Lwt.return
+    ( Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
+    >|? fun ctxt ->
+      let unparsed_parameters = Micheline.strip_locations unparsed_parameters in
+      ( Transaction_to_zk_rollup
+          {destination; parameters_ty; parameters; unparsed_parameters},
+        ctxt ) )
+
 (* [transfer (ctxt, sc) gas tez parameters_ty parameters destination entrypoint]
    creates an operation that transfers an amount of [tez] to a destination and
    an entrypoint instantiated with argument [parameters] of type
@@ -652,6 +666,14 @@ let transfer (type t) (ctxt, sc) gas amount location
         ~destination
         ~amount
         ~entrypoint
+        ~parameters_ty
+        ~parameters
+      >|=? fun (operation, ctxt) -> (operation, None, ctxt)
+  | Typed_zk_rollup {arg_ty = parameters_ty; zk_rollup = destination} ->
+      make_transaction_to_zk_rollup
+        ctxt
+        ~destination
+        ~amount
         ~parameters_ty
         ~parameters
       >|=? fun (operation, ctxt) -> (operation, None, ctxt))

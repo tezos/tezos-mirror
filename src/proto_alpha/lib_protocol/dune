@@ -232,6 +232,7 @@
   Ticket_balance_key
   Ticket_lazy_storage_diff
   Tx_rollup_parameters
+  Zk_rollup_parameters
   Ticket_token_map
   Ticket_operations_diff
   Ticket_accounting
@@ -496,6 +497,7 @@
   ticket_balance_key.ml ticket_balance_key.mli
   ticket_lazy_storage_diff.ml ticket_lazy_storage_diff.mli
   tx_rollup_parameters.ml tx_rollup_parameters.mli
+  zk_rollup_parameters.ml zk_rollup_parameters.mli
   ticket_token_map.ml ticket_token_map.mli
   ticket_operations_diff.ml ticket_operations_diff.mli
   ticket_accounting.ml ticket_accounting.mli
@@ -740,6 +742,7 @@
   ticket_balance_key.ml ticket_balance_key.mli
   ticket_lazy_storage_diff.ml ticket_lazy_storage_diff.mli
   tx_rollup_parameters.ml tx_rollup_parameters.mli
+  zk_rollup_parameters.ml zk_rollup_parameters.mli
   ticket_token_map.ml ticket_token_map.mli
   ticket_operations_diff.ml ticket_operations_diff.mli
   ticket_accounting.ml ticket_accounting.mli
@@ -989,6 +992,7 @@
   ticket_balance_key.ml ticket_balance_key.mli
   ticket_lazy_storage_diff.ml ticket_lazy_storage_diff.mli
   tx_rollup_parameters.ml tx_rollup_parameters.mli
+  zk_rollup_parameters.ml zk_rollup_parameters.mli
   ticket_token_map.ml ticket_token_map.mli
   ticket_operations_diff.ml ticket_operations_diff.mli
   ticket_accounting.ml ticket_accounting.mli

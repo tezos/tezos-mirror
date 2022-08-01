@@ -27,6 +27,8 @@ type error +=
   | Deposit_as_external
   | Invalid_deposit_amount
   | Invalid_deposit_ticket
+  | Wrong_deposit_parameters
+  | Ticket_payload_size_limit_exceeded of {payload_size : int; limit : int}
 
 let () =
   register_error_kind
@@ -58,4 +60,28 @@ let () =
       Format.fprintf ppf "Zk_rollup: attempted a deposit with an invalid ticket")
     Data_encoding.empty
     (function Invalid_deposit_ticket -> Some () | _ -> None)
-    (fun () -> Invalid_deposit_ticket)
+    (fun () -> Invalid_deposit_ticket) ;
+  register_error_kind
+    `Permanent
+    ~id:"operation.zk_rollup_wrong_deposit_parameters"
+    ~title:"Zk_rollup: attempted a deposit with invalid parameters"
+    ~description:"Zk_rollup: attempted a deposit with invalid parameters"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Zk_rollup: attempted a deposit with an invalid parameters")
+    Data_encoding.empty
+    (function Wrong_deposit_parameters -> Some () | _ -> None)
+    (fun () -> Wrong_deposit_parameters) ;
+  register_error_kind
+    `Permanent
+    ~id:"zk_rollup_ticket_payload_size_limit_exceeded"
+    ~title:"The payload of the deposited ticket exceeded the size limit"
+    ~description:"The payload of the deposited ticket exceeded the size limit"
+    Data_encoding.(obj2 (req "payload_size" int31) (req "limit" int31))
+    (function
+      | Ticket_payload_size_limit_exceeded {payload_size; limit} ->
+          Some (payload_size, limit)
+      | _ -> None)
+    (fun (payload_size, limit) ->
+      Ticket_payload_size_limit_exceeded {payload_size; limit})

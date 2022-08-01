@@ -165,7 +165,6 @@ val originate :
         to the number of declared operations for this [zk_rollup].
       }
     }
-
 *)
 val publish :
   ctxt_before_op:t ->
@@ -174,6 +173,63 @@ val publish :
   l2_ops:(Zk_rollup.Operation.t * Zk_rollup.Ticket.t option) list ->
   (t
   * Kind.zk_rollup_publish Apply_results.successful_manager_operation_result
+  * Script_typed_ir.packed_internal_operation list)
+  tzresult
+  Lwt.t
+
+(** [transaction_to_zk_rollup
+      ~ctxt ~parameters_ty ~parameters ~payer ~dst_rollup ~since] applies an
+    internal transaction to a ZK [dst_rollup].
+
+    Internal transactions are used for deposits into ZK rollups, which can
+    be seen as a special case of the publish ZK rollup operation.
+    The [parameters] should include a ticket and a ZKRU L2 operation, as
+    explained in the {!Zk_rollup_parameters} module's documentation.
+
+    This function will first perform a series of validation checks.
+    If successful, the L2 operation from the [parameters] will be added
+    to [dst_rollup]'s pending list, and [payer] will pay for the
+    added storage.
+
+    May fail with:
+    {ul
+      {li [Zk_rollup_feature_disabled] if the ZKRU feature flag is not
+        activated.
+      }
+      {li [Zk_rollup.Errors.Ticket_payload_size_limit_exceeded] if the ticket
+        found in the [parameters] exceeds the maximum ticket size.
+      }
+u      {li [Script_tc_errors.Forbidden_zero_ticket_quantity] if the ticket
+        amount is zero.
+      }
+      {li [Zk_rollup.Errors.Invalid_deposit_amount] if the amount of the ticket
+        transferred to the [dst_rollup] is different from the [price]
+        (see {!Zk_rollup_operation_repr}) claimed by the L2 operation.
+      }
+      {li [Zk_rollup.Errors.Invalid_deposit_ticket] if the L2 operation's
+        ticket identifier (see {!Zk_rollup_operation_repr}) is different to
+        the hash of the transferred ticket and [dst_rollup].
+      }
+      {li [Zk_rollup_storage.Zk_rollup_invalid_op_code op_code] if the
+        [op_code] of the operation from the [parameters] is greater or equal
+        to the number of declared operations for this rollup.
+      }
+      {li [Zk_rollup.Errors.Wrong_deposit_parameters] if the [parameters]
+        are not of the expected type. See {!Zk_rollup_parameters}.
+      }
+    }
+*)
+val transaction_to_zk_rollup :
+  ctxt:t ->
+  parameters_ty:
+    ( ('a Script_typed_ir.ticket, bytes) Script_typed_ir.pair,
+      'b )
+    Script_typed_ir.ty ->
+  parameters:('a Script_typed_ir.ticket, bytes) Script_typed_ir.pair ->
+  dst_rollup:Zk_rollup.t ->
+  since:t ->
+  (t
+  * Kind.transaction Apply_internal_results.successful_internal_operation_result
   * Script_typed_ir.packed_internal_operation list)
   tzresult
   Lwt.t

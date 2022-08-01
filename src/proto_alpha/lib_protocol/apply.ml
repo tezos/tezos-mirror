@@ -661,6 +661,14 @@ let apply_internal_operation_contents :
           IEvent_result
             {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt},
           [] )
+  | Transaction_to_zk_rollup
+      {destination; unparsed_parameters = _; parameters_ty; parameters} ->
+      Zk_rollup_apply.transaction_to_zk_rollup
+        ~ctxt
+        ~parameters_ty
+        ~parameters
+        ~dst_rollup:destination
+        ~since:ctxt_before_op
   | Origination
       {
         delegate;
@@ -1497,6 +1505,15 @@ let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
           storage_limit,
           Transaction_to_tx_rollup_result {payload with balance_updates} )
   | Transaction_to_sc_rollup_result _ -> return (ctxt, storage_limit, trr)
+  | Transaction_to_zk_rollup_result payload ->
+      let consumed = payload.paid_storage_size_diff in
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+      >>=? fun (ctxt, storage_limit, storage_bus) ->
+      let balance_updates = storage_bus @ payload.balance_updates in
+      return
+        ( ctxt,
+          storage_limit,
+          Transaction_to_zk_rollup_result {payload with balance_updates} )
 
 let burn_origination_storage_fees ctxt
     {

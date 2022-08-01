@@ -106,6 +106,14 @@ let internal_operation (type kind)
             parameters = Script.lazy_expr unparsed_parameters;
           }
     | Event {ty; tag; unparsed_data} -> Event {ty; tag; payload = unparsed_data}
+    | Transaction_to_zk_rollup {destination; unparsed_parameters; _} ->
+        Transaction
+          {
+            destination = Zk_rollup destination;
+            amount = Tez.zero;
+            entrypoint = Entrypoint.deposit;
+            parameters = Script.lazy_expr unparsed_parameters;
+          }
     | Origination {delegate; code; unparsed_storage; credit; _} ->
         let script =
           {
@@ -144,6 +152,12 @@ type successful_transaction_result =
   | Transaction_to_sc_rollup_result of {
       consumed_gas : Gas.Arith.fp;
       inbox_after : Sc_rollup.Inbox.t;
+    }
+  | Transaction_to_zk_rollup_result of {
+      ticket_hash : Ticket_hash.t;
+      balance_updates : Receipt.balance_updates;
+      consumed_gas : Gas.Arith.fp;
+      paid_storage_size_diff : Z.t;
     }
 
 type successful_origination_result = {

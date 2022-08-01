@@ -1628,6 +1628,8 @@ let parse_address ctxt : Script.node -> (address * context) tzresult =
         error @@ Tx_rollup_addresses_disabled loc
     | Destination.Sc_rollup _ when not (Constants.sc_rollup_enable ctxt) ->
         error @@ Sc_rollup_disabled loc
+    | Destination.Zk_rollup _ when not (Constants.zk_rollup_enable ctxt) ->
+        error @@ Zk_rollup_disabled loc
     | _ -> Ok ({destination; entrypoint}, ctxt)
   in
   function
@@ -2117,7 +2119,7 @@ let rec parse_data :
         | Some amount -> (
             match destination with
             | Contract ticketer -> return ({ticketer; contents; amount}, ctxt)
-            | Tx_rollup _ | Sc_rollup _ ->
+            | Tx_rollup _ | Sc_rollup _ | Zk_rollup _ ->
                 fail (Unexpected_ticket_owner destination))
         | None -> traced_fail Forbidden_zero_ticket_quantity
       else traced_fail (Unexpected_forged_value (location expr))
@@ -4564,6 +4566,19 @@ and parse_contract :
         | _ ->
             error ctxt (fun loc ->
                 Tx_rollup_bad_deposit_parameter (loc, serialize_ty_for_error arg))
+      else error ctxt (fun _loc -> No_such_entrypoint entrypoint)
+  | Zk_rollup zk_rollup ->
+      Zk_rollup.assert_exist ctxt zk_rollup >|=? fun ctxt ->
+      if Entrypoint.(is_deposit entrypoint) then
+        match arg with
+        | Pair_t (Ticket_t (_, _), Bytes_t, _, _) ->
+            ( ctxt,
+              ok
+              @@ (Typed_zk_rollup {arg_ty = arg; zk_rollup}
+                   : arg typed_contract) )
+        | _ ->
+            error ctxt (fun loc ->
+                Zk_rollup_bad_deposit_parameter (loc, serialize_ty_for_error arg))
       else error ctxt (fun _loc -> No_such_entrypoint entrypoint)
   | Sc_rollup sc_rollup ->
       Sc_rollup.parameters_type ctxt sc_rollup

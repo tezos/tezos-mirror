@@ -1139,6 +1139,11 @@ and 'arg typed_contract =
       entrypoint : Entrypoint.t;
     }
       -> 'arg typed_contract
+  | Typed_zk_rollup : {
+      arg_ty : (('a ticket, bytes) pair, _) ty;
+      zk_rollup : Zk_rollup.t;
+    }
+      -> ('a ticket, bytes) pair typed_contract
 
 and (_, _, _, _) continuation =
   | KNil : ('r, 'f, 'r, 'f) continuation
@@ -1398,6 +1403,13 @@ and 'kind internal_operation_contents =
       unparsed_data : Script.expr;
     }
       -> Kind.event internal_operation_contents
+  | Transaction_to_zk_rollup : {
+      destination : Zk_rollup.t;
+      parameters_ty : (('a ticket, bytes) pair, _) ty;
+      parameters : ('a ticket, bytes) pair;
+      unparsed_parameters : Script.expr;
+    }
+      -> Kind.transaction internal_operation_contents
   | Origination : {
       delegate : Signature.Public_key_hash.t option;
       code : Script.expr;
@@ -1453,6 +1465,7 @@ let manager_kind :
   | Transaction_to_smart_contract _ -> Kind.Transaction_manager_kind
   | Transaction_to_tx_rollup _ -> Kind.Transaction_manager_kind
   | Transaction_to_sc_rollup _ -> Kind.Transaction_manager_kind
+  | Transaction_to_zk_rollup _ -> Kind.Transaction_manager_kind
   | Event _ -> Kind.Event_manager_kind
   | Origination _ -> Kind.Origination_manager_kind
   | Delegation _ -> Kind.Delegation_manager_kind
@@ -2174,18 +2187,21 @@ module Typed_contract = struct
         Destination.Contract (Originated contract_hash)
     | Typed_tx_rollup {tx_rollup; _} -> Destination.Tx_rollup tx_rollup
     | Typed_sc_rollup {sc_rollup; _} -> Destination.Sc_rollup sc_rollup
+    | Typed_zk_rollup {zk_rollup; _} -> Destination.Zk_rollup zk_rollup
 
   let arg_ty : type a. a typed_contract -> a ty_ex_c = function
     | Typed_implicit _ -> (Ty_ex_c Unit_t : a ty_ex_c)
     | Typed_originated {arg_ty; _} -> Ty_ex_c arg_ty
     | Typed_tx_rollup {arg_ty; _} -> Ty_ex_c arg_ty
     | Typed_sc_rollup {arg_ty; _} -> Ty_ex_c arg_ty
+    | Typed_zk_rollup {arg_ty; _} -> Ty_ex_c arg_ty
 
   let entrypoint : type a. a typed_contract -> Entrypoint.t = function
     | Typed_implicit _ -> Entrypoint.default
     | Typed_tx_rollup _ -> Entrypoint.deposit
     | Typed_originated {entrypoint; _} | Typed_sc_rollup {entrypoint; _} ->
         entrypoint
+    | Typed_zk_rollup _ -> Entrypoint.deposit
 
   module Internal_for_tests = struct
     let typed_exn :
@@ -2207,5 +2223,9 @@ module Typed_contract = struct
              tx_rollup_l2_address)"
       | Sc_rollup sc_rollup, _ ->
           Typed_sc_rollup {arg_ty; sc_rollup; entrypoint}
+      | Zk_rollup zk_rollup, Pair_t (Ticket_t _, Bytes_t, _, _) ->
+          (Typed_zk_rollup {arg_ty; zk_rollup} : a typed_contract)
+      | Zk_rollup _, _ ->
+          invalid_arg "ZK rollups expect type (pair (ticket _) bytes)"
   end
 end

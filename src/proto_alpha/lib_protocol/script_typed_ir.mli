@@ -1140,6 +1140,11 @@ and 'arg typed_contract =
       entrypoint : Entrypoint.t;
     }
       -> 'arg typed_contract
+  | Typed_zk_rollup : {
+      arg_ty : (('a ticket, bytes) pair, _) ty;
+      zk_rollup : Zk_rollup.t;
+    }
+      -> ('a ticket, bytes) pair typed_contract
 
 (*
 
@@ -1534,6 +1539,13 @@ and 'kind internal_operation_contents =
       unparsed_data : Script.expr;
     }
       -> Kind.event internal_operation_contents
+  | Transaction_to_zk_rollup : {
+      destination : Zk_rollup.t;
+      parameters_ty : (('a ticket, bytes) pair, _) ty;
+      parameters : ('a ticket, bytes) pair;
+      unparsed_parameters : Script.expr;
+    }
+      -> Kind.transaction internal_operation_contents
   | Origination : {
       delegate : Signature.Public_key_hash.t option;
       code : Script.expr;
