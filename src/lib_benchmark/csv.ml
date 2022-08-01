@@ -37,14 +37,14 @@ let concat (csv1 : csv) (csv2 : csv) : csv =
   if Compare.List_lengths.(csv1 <> csv2) then
     Stdlib.failwith "Csv.concat: CSVs have different length"
   else
-    (* Check that each CSV has the same number of *)
+    (* Check that each line has the same number of columns *)
     let lengths1 = List.map List.length csv1 in
-    let lengths2 = List.map List.length csv1 in
+    let lengths2 = List.map List.length csv2 in
     if not (all_equal lengths1) then
       let msg = "Csv.concat: first argument has uneven # of lines" in
       Stdlib.failwith msg
     else if not (all_equal lengths2) then
-      let msg = "Csv.concat: first argument has uneven # of lines" in
+      let msg = "Csv.concat: second argument has uneven # of lines" in
       Stdlib.failwith msg
     else
       (* see top if condition *)
