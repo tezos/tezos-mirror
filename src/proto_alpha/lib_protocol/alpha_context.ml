@@ -139,12 +139,6 @@ module Zk_rollup = struct
   module Circuit_public_inputs = Zk_rollup_circuit_public_inputs_repr
   module Update = Zk_rollup_update_repr
   include Zk_rollup_storage
-
-  let account = Storage.Zk_rollup.Account.get
-
-  let pending_list = Storage.Zk_rollup.Pending_list.get
-
-  let pending_op ctxt id = Storage.Zk_rollup.Pending_operation.get (ctxt, id)
 end
 
 module Entrypoint = Entrypoint_repr

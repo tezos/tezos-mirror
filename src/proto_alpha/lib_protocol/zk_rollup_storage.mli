@@ -31,6 +31,37 @@ type error +=
   | Zk_rollup_invalid_op_code of int
         (** Emitted when trying to add to the pending list and operation
             with an invalid op code. *)
+  | Zk_rollup_pending_list_too_short
+        (** Emitted when trying to process more public operations than
+            those available in the pending list. *)
+
+(** [account context rollup] fetches the ZK [rollup]'s account from the
+    storage.
+*)
+val account :
+  Raw_context.t ->
+  Zk_rollup_repr.t ->
+  (Raw_context.t * Zk_rollup_account_repr.t) tzresult Lwt.t
+
+(* [pending_list context rollup] fetches the ZK [rollup]'s
+   pending list description from the storage.
+   See {! Zk_rollup_repr.pending_list}. *)
+val pending_list :
+  Raw_context.t ->
+  Zk_rollup_repr.t ->
+  (Raw_context.t * Zk_rollup_repr.pending_list) tzresult Lwt.t
+
+(* [pending_op context rollup i] fetches the [i]th L2 operation from
+   ZK [rollup]'s pending list, alongside an optional ticket hash
+   to perform an exit (see {!Zk_rollup_apply} for more details).
+*)
+val pending_op :
+  Raw_context.t ->
+  Zk_rollup_repr.t ->
+  int64 ->
+  (Raw_context.t * (Zk_rollup_operation_repr.t * Ticket_hash_repr.t option))
+  tzresult
+  Lwt.t
 
 (** [originate context static ~init_state] produces an address [a] for
     a ZK rollup storage using the [origination_nonce] from
@@ -63,6 +94,51 @@ val add_to_pending :
   Zk_rollup_repr.t ->
   (Zk_rollup_operation_repr.t * Ticket_hash_repr.t option) list ->
   (Raw_context.t * Z.t) tzresult Lwt.t
+
+(** [get_pending_length context rollup] returns the length of a
+    ZK [rollup]'s pending list.
+*)
+val get_pending_length :
+  Raw_context.t -> Zk_rollup_repr.t -> (Raw_context.t * int) tzresult Lwt.t
+
+(** [get_prefix context rollup n] returns the prefix of length [n]
+    of the [rollup]'s pending list.
+
+    May fail with:
+    {ul
+      {li [Zk_rollup_pending_list_too_short] if [n] is greater than
+        the length of the pending list.}
+      {li [Zk_rollup_negative_length] if [n] is negative.}
+    }
+*)
+val get_prefix :
+  Raw_context.t ->
+  Zk_rollup_repr.t ->
+  int ->
+  (Raw_context.t
+  * (Zk_rollup_operation_repr.t * Ticket_hash_repr.t option) list)
+  tzresult
+  Lwt.t
+
+(** [update context rollup ~pending_to_drop ~new_account] sets the
+    [rollup]'s account to [new_account]. Additionally, it removes
+    the first [pending_to_drop] entries from the [rollup]'s pending
+    list.
+    Returns the new context.
+
+    May fail with:
+    {ul
+      {li [Zk_rollup_pending_list_too_short] if [pending_to_drop] is
+        greater than the length of the pending list.}
+      {li [Zk_rollup_negative_length] if [pending_to_drop] is negative.}
+    }
+*)
+val update :
+  Raw_context.t ->
+  Zk_rollup_repr.t ->
+  pending_to_drop:int ->
+  new_account:Zk_rollup_account_repr.t ->
+  Raw_context.t tzresult Lwt.t
 
 (** [assert_exist context rollup] asserts that [rollup] has been initialized.
     Returns the new context.

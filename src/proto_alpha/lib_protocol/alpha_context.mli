@@ -2493,6 +2493,32 @@ module Zk_rollup : sig
     (Operation.t * Ticket_hash.t option) list ->
     (context * Z.t) tzresult Lwt.t
 
+  val get_pending_length :
+    context -> Address.t -> (context * int) tzresult Lwt.t
+
+  val get_prefix :
+    context ->
+    Address.t ->
+    int ->
+    (context * (Operation.t * Ticket_hash.t option) list) tzresult Lwt.t
+
+  val update :
+    context ->
+    Address.t ->
+    pending_to_drop:int ->
+    new_account:Account.t ->
+    context tzresult Lwt.t
+
+  val account : context -> t -> (context * Account.t) tzresult Lwt.t
+
+  val pending_list : context -> t -> (context * pending_list) tzresult Lwt.t
+
+  val pending_op :
+    context ->
+    t ->
+    Int64.t ->
+    (context * (Operation.t * Ticket_hash.t option)) tzresult Lwt.t
+
   val assert_exist : context -> t -> context tzresult Lwt.t
 
   val exists : context -> t -> (context * bool) tzresult Lwt.t
