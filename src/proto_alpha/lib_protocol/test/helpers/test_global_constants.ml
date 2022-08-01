@@ -30,7 +30,15 @@ open Michelson_v1_primitives
 
 let create_context () =
   let accounts = Account.generate_accounts 2 in
-  Block.alpha_context accounts
+  let bootstrap_accounts =
+    List.map
+      (fun (Account.{pkh; pk; _}, amount, delegate_to) ->
+        Tezos_protocol_alpha_parameters.Default_parameters
+        .make_bootstrap_account
+          (pkh, pk, amount, delegate_to, None))
+      accounts
+  in
+  Block.alpha_context bootstrap_accounts
 
 let expr_to_hash expr =
   let lexpr = Script_repr.lazy_expr expr in

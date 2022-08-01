@@ -64,7 +64,14 @@ let mk_tx_rollup ?(nonce = nonce_zero) () =
     key hash of the account. *)
 let create_context () =
   let accounts = Account.generate_accounts 1 in
-  Block.alpha_context accounts >>=? fun ctxt ->
+  let bootstrap_accounts =
+    List.map
+      (fun (Account.{pk; pkh; _}, amount, delegate_to) ->
+        Default_parameters.make_bootstrap_account
+          (pkh, pk, amount, delegate_to, None))
+      accounts
+  in
+  Block.alpha_context bootstrap_accounts >>=? fun ctxt ->
   match accounts with
   | [({pkh; _}, _, _)] -> return (ctxt, pkh)
   | _ -> (* Exactly one account has been generated. *) assert false

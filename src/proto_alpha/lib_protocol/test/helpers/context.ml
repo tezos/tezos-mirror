@@ -478,6 +478,14 @@ let init_gen tup ?rng_state ?commitments ?(initial_balances = [])
       (fun (a, _, _) -> Alpha_context.Contract.Implicit Account.(a.pkh))
       accounts
   in
+  let bootstrap_accounts =
+    List.map
+      (fun (Account.{pkh; pk; _}, amount, delegate_to) ->
+        Tezos_protocol_alpha_parameters.Default_parameters
+        .make_bootstrap_account
+          (pkh, pk, amount, delegate_to, None))
+      accounts
+  in
   Block.genesis
     ?commitments
     ?consensus_threshold
@@ -501,7 +509,7 @@ let init_gen tup ?rng_state ?commitments ?(initial_balances = [])
     ?zk_rollup_enable
     ?hard_gas_limit_per_block
     ?nonce_revelation_threshold
-    accounts
+    bootstrap_accounts
   >|=? fun blk -> (blk, tup_get tup contracts)
 
 let init_n n = init_gen (TList n)

@@ -41,7 +41,15 @@ let create () =
     | [(a1, _, _); (a2, _, _)] -> (a1, a2)
     | _ -> assert false
   in
-  let* ctxt = Block.alpha_context accounts in
+  let bootstrap_accounts =
+    List.map
+      (fun (Account.{pkh; pk; _}, balance, delegate_to) ->
+        Tezos_protocol_alpha_parameters.Default_parameters
+        .make_bootstrap_account
+          (pkh, pk, balance, delegate_to, None))
+      accounts
+  in
+  let* ctxt = Block.alpha_context bootstrap_accounts in
   return (Alpha_context.Internal_for_tests.to_raw ctxt, a1, a2)
 
 module Consensus_key = struct
