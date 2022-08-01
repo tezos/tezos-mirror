@@ -3,6 +3,19 @@
 Changelog
 '''''''''
 
+Version 14.0
+============
+
+Node
+----
+
+- Added the built-in network alias for Kathmandunet (``--network kathmandunet``).
+
+Client
+------
+
+- Disabled origination of contracts with timelock instructions.
+
 Version 14.0~rc1
 ================
 
