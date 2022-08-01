@@ -132,6 +132,16 @@ Operation receipts
   concerns transations, originations and delegations, where the word "internal"
   explicitly appears in the case of internal operation receipts. (:gl:`!5149`)
 
+- Successful contract execution attaches to the transaction receipt a list of
+  contract events. See :doc:`Event <../alpha/event>` for more information.
+
+- New operation ``Vdf_revelation`` introduced for VDF revelation. See
+  :doc:`Randomness generation <../kathmandu/randomness_generation>` for more
+  details.
+
+- New operation ``Increase_paid_storage`` introduced to increase the paid
+  storage of a smart contract. (MR :gl:`!5605`)
+
 Bug Fixes
 ---------
 
