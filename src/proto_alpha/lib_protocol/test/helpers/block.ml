@@ -472,8 +472,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
     ?blocks_per_cycle ?cycles_per_voting_period ?tx_rollup_enable
     ?tx_rollup_sunset_level ?tx_rollup_origination_size ?sc_rollup_enable
     ?sc_rollup_max_number_of_messages_per_commitment_period ?dal_enable
-    ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold
-    initial_accounts =
+    ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold () =
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
   let min_proposal_quorum =
@@ -586,21 +585,6 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       nonce_revelation_threshold;
     }
   in
-  (* Check there are at least minimal_stake tokens *)
-  Lwt.catch
-    (fun () ->
-      List.fold_left_es
-        (fun acc (_, amount, _) ->
-          Environment.wrap_tzresult @@ Tez.( +? ) acc amount >>?= fun acc ->
-          if acc >= constants.minimal_stake then raise Exit else return acc)
-        Tez.zero
-        initial_accounts
-      >>=? fun _ ->
-      failwith
-        "Insufficient tokens in initial accounts: the amount should be at \
-         least minimal_stake")
-    (function Exit -> return_unit | exc -> raise exc)
-  >>=? fun () ->
   check_constants_consistency constants >>=? fun () ->
   let hash =
     Block_hash.of_b58check_exn
@@ -622,9 +606,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       ~fitness
       ~operations_hash:Operation_list_list_hash.zero
   in
-  validate_initial_accounts initial_accounts constants.minimal_stake
-  (* Perhaps this could return a new type  signifying its name *)
-  >|=? fun _initial_accounts -> (constants, shell, hash)
+  return (constants, shell, hash)
 
 (* if no parameter file is passed we check in the current directory
    where the test is run *)
@@ -659,8 +641,10 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?zk_rollup_enable
     ?hard_gas_limit_per_block
     ?nonce_revelation_threshold
-    initial_accounts
+    ()
   >>=? fun (constants, shell, hash) ->
+  validate_initial_accounts initial_accounts constants.minimal_stake
+  >>=? fun () ->
   initial_context
     ?commitments
     ?bootstrap_contracts
@@ -686,8 +670,10 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
 let alpha_context ?commitments ?min_proposal_quorum
     (initial_accounts :
       (Account.t * Tez.t * Signature.Public_key_hash.t option) list) =
-  prepare_initial_context_params ?min_proposal_quorum initial_accounts
+  prepare_initial_context_params ?min_proposal_quorum ()
   >>=? fun (constants, shell, _hash) ->
+  validate_initial_accounts initial_accounts constants.minimal_stake
+  >>=? fun () ->
   initial_alpha_context ?commitments constants shell initial_accounts
 
 (********* Baking *************)

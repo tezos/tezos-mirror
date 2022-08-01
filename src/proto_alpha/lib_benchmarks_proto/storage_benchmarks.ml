@@ -46,8 +46,7 @@ let default_raw_context () =
           (pkh, pk, amount, delegate_to, None))
       initial_accounts
   in
-  Block.prepare_initial_context_params initial_accounts
-  >>=? fun (constants, _, _) ->
+  Block.prepare_initial_context_params () >>=? fun (constants, _, _) ->
   let parameters =
     Default_parameters.parameters_of_constants
       ~bootstrap_accounts
