@@ -1,9 +1,7 @@
 exception Type
 
-exception SizeOverflow
-
 exception SizeLimit
 
 exception OutOfMemory
 
-exception Bounds
+include Lazy_containers.Exn

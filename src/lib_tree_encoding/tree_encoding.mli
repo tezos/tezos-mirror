@@ -23,11 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_webassembly_interpreter
+module type TREE = sig
+  type tree
 
-module type Lwt_vector = Lazy_vector.S with type 'a effect = 'a Lwt.t
+  type key := string list
 
-module type Lwt_map = Lazy_map.S with type 'a effect = 'a Lwt.t
+  type value := bytes
+
+  val remove : tree -> key -> tree Lwt.t
+
+  val add : tree -> key -> value -> tree Lwt.t
+
+  val find : tree -> key -> value option Lwt.t
+end
+
+module type Lwt_vector =
+  Lazy_containers.Lazy_vector.S with type 'a effect = 'a Lwt.t
+
+module type Lwt_map = Lazy_containers.Lazy_map.S with type 'a effect = 'a Lwt.t
 
 exception Uninitialized_self_ref
 
@@ -46,12 +59,6 @@ module type S = sig
   (** Represents an encoder and a decoder. *)
   type 'a t
 
-  (** A decoding module with the same tree type. *)
-  module Decoding : Tree_decoding.S with type tree = tree
-
-  (** An encoding module with the same tree type. *)
-  module Encoding : Tree_encoding.S with type tree = tree
-
   (** {2 Functions }*)
 
   (** [encode enc x tree] encodes a value x using the encoder [enc] into the
@@ -61,11 +68,6 @@ module type S = sig
   (** [decode enc x tree] decodes a value using the encoder [enc] from the
       provided [tree]. *)
   val decode : 'a t -> tree -> 'a Lwt.t
-
-  (** [custom enc dec] creates a custom encoder that uses [enc] and [dec]. It's
-      the users responsibility to provide matching encoder and decoder values.
-    **)
-  val custom : 'a Encoding.t -> 'a Decoding.t -> 'a t
 
   (** [conv f g enc] transforms from one encoding to a different one using
       [f] for mapping the results decoded using [enc], and [g] for mapping from
@@ -205,7 +207,7 @@ module type S = sig
       branch [key]. *)
   val scope : key -> 'a t -> 'a t
 
-  module Lazy_map_encoding_decoding : sig
+  module Lazy_map_encoding : sig
     module type S = sig
       type 'a map
 
@@ -215,13 +217,9 @@ module type S = sig
     (** [Make (YouMap)] creates a module with the [lazy_map]
         combinator which can be used to decode [YouMap] specifically. *)
     module Make (Map : Lwt_map) : S with type 'a map := 'a Map.t
-
-    module NameMap : S with type 'a map := 'a Instance.NameMap.t
-
-    module ModuleMap : S with type 'a map := 'a Instance.ModuleMap.Map.t
   end
 
-  module Lazy_vector_encoding_decoding : sig
+  module Lazy_vector_encoding : sig
     module type S = sig
       type key
 
@@ -238,22 +236,26 @@ module type S = sig
       S with type key := Vector.key and type 'a vector := 'a Vector.t
 
     module Int :
-      S with type key := int and type 'a vector := 'a Lazy_vector.LwtIntVector.t
+      S
+        with type key := int
+         and type 'a vector := 'a Lazy_containers.Lazy_vector.LwtIntVector.t
 
     module Int32 :
       S
         with type key := int32
-         and type 'a vector := 'a Lazy_vector.LwtInt32Vector.t
+         and type 'a vector := 'a Lazy_containers.Lazy_vector.LwtInt32Vector.t
 
     module Z :
-      S with type key := Z.t and type 'a vector := 'a Lazy_vector.LwtZVector.t
+      S
+        with type key := Z.t
+         and type 'a vector := 'a Lazy_containers.Lazy_vector.LwtZVector.t
   end
 
   (** [chunk] is an encoder for the chunks used by [chunked_by_vector]. *)
-  val chunk : Chunked_byte_vector.Chunk.t t
+  val chunk : Lazy_containers.Chunked_byte_vector.Chunk.t t
 
   (** [chunked_byte_vector] is an encoder for [chunked_byte_vector]. *)
-  val chunked_byte_vector : Chunked_byte_vector.Lwt.t t
+  val chunked_byte_vector : Lazy_containers.Chunked_byte_vector.Lwt.t t
 
   (** [case tag enc inj proj] returns a partial encoder that represents a case
       in a sum-type. The encoder hides the (existentially bound) type of the
@@ -293,4 +295,4 @@ end
 
 (** Produces an encoder/decoder module with the provided map, vector and tree
     structures. *)
-module Make (T : Tree.S) : S with type tree = T.tree
+module Make (T : TREE) : S with type tree = T.tree

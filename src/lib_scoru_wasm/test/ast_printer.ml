@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Lazy_containers
 open Tezos_webassembly_interpreter
 
 let pp_pos out {Source.file; line; column} =

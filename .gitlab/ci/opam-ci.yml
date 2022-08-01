@@ -35,6 +35,8 @@
 
 # Ignoring package tezt-self-tests, it only contains tests or private targets
 
+# Ignoring package tree-encoding-test, it only contains tests or private targets
+
 .rules_template__trigger_opam_batch_1:
   rules:
     # Run on scheduled builds.
@@ -251,6 +253,13 @@
       when: delayed
       start_in: 7 minutes
     - when: never # default
+
+opam:lazy-containers:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_7
+  variables:
+    package: lazy-containers
 
 opam:tezos-012-Psithaca-test-helpers:
   extends:
@@ -696,7 +705,7 @@ opam:tezos-crypto:
 opam:tezos-crypto-dal:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_6
+    - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-crypto-dal
 
@@ -1630,3 +1639,10 @@ opam:tezt-tezos:
     - .rules_template__trigger_opam_batch_6
   variables:
     package: tezt-tezos
+
+opam:tree-encoding:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_6
+  variables:
+    package: tree-encoding

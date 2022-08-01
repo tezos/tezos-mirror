@@ -25,32 +25,20 @@
 
 (** Testing
     -------
-    Component:    Tree_encoding_decoding
-    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "^Encodings$"
-    Subject:      Encoding tests for the tezos-scoru-wasm library
+    Component:    Tree_encoding
+    Invocation:   dune exec src/lib_tree_encoding/test/test_tree_encoding.exe \
+                  -- test "^Encodings$"
+    Subject:      Encoding tests for the tree-encoding library
 *)
 
 open Tztest
-open Tezos_webassembly_interpreter
-open Tezos_scoru_wasm
+open Lazy_containers
 
 (* Use context-binary for testing. *)
 module Context = Tezos_context_memory.Context_binary
 
-module Tree :
-  Tezos_context_sigs.Context.TREE
-    with type t = Context.t
-     and type tree = Context.tree
-     and type key = string list
-     and type value = bytes = struct
-  type t = Context.t
-
+module Tree : Tree_encoding.TREE with type tree = Context.tree = struct
   type tree = Context.tree
-
-  type key = Context.key
-
-  type value = Context.value
 
   include Context.Tree
 end
@@ -66,10 +54,10 @@ module Map =
       let to_string x = x
     end)
 
-module Merklizer = struct
-  include Tree_encoding_decoding.Make (Tree)
-  include Lazy_vector_encoding_decoding.Int
-  include Lazy_map_encoding_decoding.Make (Map)
+module Tree_encoding = struct
+  include Tree_encoding.Make (Tree)
+  include Lazy_vector_encoding.Int
+  include Lazy_map_encoding.Make (Map)
 end
 
 let empty_tree () =
@@ -81,15 +69,15 @@ let empty_tree () =
 let test_encode_decode enc value f =
   let open Lwt_result_syntax in
   let*! empty_tree = empty_tree () in
-  let*! tree = Merklizer.encode enc value empty_tree in
-  let*! value' = Merklizer.decode enc tree in
+  let*! tree = Tree_encoding.encode enc value empty_tree in
+  let*! value' = Tree_encoding.decode enc tree in
   f value'
 
 let test_decode_encode_decode tree enc f =
   let open Lwt_syntax in
-  let* value = Merklizer.decode enc tree in
-  let* tree = Merklizer.encode enc value tree in
-  let* value' = Merklizer.decode enc tree in
+  let* value = Tree_encoding.decode enc tree in
+  let* tree = Tree_encoding.encode enc value tree in
+  let* value' = Tree_encoding.decode enc tree in
   f value value'
 
 let encode_decode enc value = test_encode_decode enc value Lwt.return
@@ -99,7 +87,7 @@ let decode_encode_decode tree enc =
 
 let assert_value tree enc v =
   let open Lwt_result_syntax in
-  let*! v' = Merklizer.decode enc tree in
+  let*! v' = Tree_encoding.decode enc tree in
   assert (v = v') ;
   return_unit
 
@@ -124,25 +112,26 @@ let assert_decode_round_trip tree enc equal =
   return_unit
 
 let test_string () =
-  let enc = Merklizer.value ["key"] Data_encoding.string in
+  let enc = Tree_encoding.value ["key"] Data_encoding.string in
   assert_round_trip enc "Hello" String.equal
 
 let test_int () =
-  let enc = Merklizer.value ["key"] Data_encoding.int32 in
+  let enc = Tree_encoding.value ["key"] Data_encoding.int32 in
   assert_round_trip enc 42l Int32.equal
 
 let test_tree () =
   let enc =
-    Merklizer.scope ["foo"] @@ Merklizer.value ["key"] Data_encoding.int32
+    Tree_encoding.scope ["foo"]
+    @@ Tree_encoding.value ["key"] Data_encoding.int32
   in
   assert_round_trip enc 42l Int32.equal
 
 let test_raw () =
-  let enc = Merklizer.raw ["key"] in
+  let enc = Tree_encoding.raw ["key"] in
   assert_round_trip enc (Bytes.of_string "CAFEBABE") Bytes.equal
 
 let test_conv () =
-  let open Merklizer in
+  let open Tree_encoding in
   let enc =
     conv int_of_string string_of_int (value ["key"] Data_encoding.string)
   in
@@ -154,7 +143,7 @@ type contact =
   | No_address
 
 let contact_enc ?default () =
-  let open Merklizer in
+  let open Tree_encoding in
   tagged_union
     ?default
     (value [] Data_encoding.string)
@@ -208,7 +197,7 @@ let test_tagged_union_default () =
   return_unit
 
 let test_lazy_mapping () =
-  let open Merklizer in
+  let open Tree_encoding in
   let open Lwt_result_syntax in
   let enc = lazy_map (value ["key"] Data_encoding.string) in
   let map = Map.create () in
@@ -226,7 +215,7 @@ let test_lazy_mapping () =
   return_unit
 
 let test_add_to_decoded_empty_map () =
-  let open Merklizer in
+  let open Tree_encoding in
   let open Lwt_result_syntax in
   let enc = lazy_map (value ["key"] Data_encoding.string) in
   let map = Map.create () in
@@ -238,7 +227,7 @@ let test_add_to_decoded_empty_map () =
   return_unit
 
 let test_lazy_vector () =
-  let open Merklizer in
+  let open Tree_encoding in
   let open Lwt_result_syntax in
   let enc =
     lazy_vector (value [] Data_encoding.int31) (value [] Data_encoding.string)
@@ -258,7 +247,7 @@ let test_lazy_vector () =
   return_unit
 
 let test_chunked_byte_vector () =
-  let open Merklizer in
+  let open Tree_encoding in
   let open Lwt_result_syntax in
   let vector =
     Chunked_byte_vector.Lwt.of_string
@@ -276,7 +265,7 @@ let test_chunked_byte_vector () =
   return_unit
 
 let test_tuples () =
-  let open Merklizer in
+  let open Tree_encoding in
   let open Lwt_result_syntax in
   let int = value ["my_int"] Data_encoding.int31 in
   let* () =
@@ -345,7 +334,7 @@ let test_tuples () =
   return_unit
 
 let test_option () =
-  let open Merklizer in
+  let open Tree_encoding in
   let open Lwt_result_syntax in
   let int = value [] Data_encoding.int31 in
   let enc = option (tup2 ~flatten:false int int) in
@@ -354,7 +343,7 @@ let test_option () =
   return_unit
 
 let test_value_option () =
-  let open Merklizer in
+  let open Tree_encoding in
   let open Lwt_result_syntax in
   let enc = value_option [] Data_encoding.int31 in
   let* () = assert_round_trip enc (Some 1) Stdlib.( = ) in
@@ -362,28 +351,28 @@ let test_value_option () =
   return_unit
 
 let test_value_default () =
-  let open Merklizer in
+  let open Tree_encoding in
   let open Lwt_result_syntax in
   let*! tree = empty_tree () in
   let enc = value ~default:42 [] Data_encoding.int31 in
   assert_value tree enc 42
 
 let test_optional () =
-  let open Merklizer in
+  let open Tree_encoding in
   let open Lwt_result_syntax in
   let key = [] in
   let enc = optional key Data_encoding.int31 in
   let*! tree = empty_tree () in
-  let*! tree = Merklizer.encode enc (Some 0) tree in
+  let*! tree = Tree_encoding.encode enc (Some 0) tree in
   let* () = assert_value tree enc (Some 0) in
-  let*! tree = Merklizer.encode enc None tree in
+  let*! tree = Tree_encoding.encode enc None tree in
   let* () = assert_missing_value tree key in
   return_unit
 
 type cyclic = {name : string; self : unit -> cyclic}
 
 let test_with_self_ref () =
-  let open Merklizer in
+  let open Tree_encoding in
   let open Lwt_result_syntax in
   let enc () =
     with_self_reference (fun cycle ->
@@ -396,9 +385,9 @@ let test_with_self_ref () =
   let rec cycle = {name = "Cycle"; self = (fun () -> cycle)} in
   (* Encode using an encoder and an empty tree. *)
   let*! empty_tree = empty_tree () in
-  let*! tree = Merklizer.encode (enc ()) cycle empty_tree in
+  let*! tree = Tree_encoding.encode (enc ()) cycle empty_tree in
   (* Decode using a new encoder value and the tree from above. *)
-  let*! ({name; self} as cycle) = Merklizer.decode (enc ()) tree in
+  let*! ({name; self} as cycle) = Tree_encoding.decode (enc ()) tree in
   assert (name = "Cycle") ;
   assert (cycle == self ()) ;
   return_unit

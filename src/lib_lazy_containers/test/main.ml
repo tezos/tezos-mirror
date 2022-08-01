@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,10 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Exposes a module type {!S} representing trees. *)
+let tests =
+  [
+    ("Lazy_vector", Lazy_vector_tests.tests);
+    ("Chunked_byte_vector", Chunked_byte_vector_tests.tests);
+  ]
 
-(** An immutable tree API. *)
-module type S =
-  Tezos_context_sigs.Context.TREE
-    with type key = string list
-     and type value = bytes
+let () = Alcotest.run "Lazy structs tests" tests

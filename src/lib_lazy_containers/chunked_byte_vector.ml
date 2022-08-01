@@ -1,5 +1,43 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
 open Bigarray
-open Lib.Bigarray
+
+module Array1_64 = struct
+  let create kind layout n =
+    if n < 0L || n > Int64.of_int max_int then
+      raise (Invalid_argument "Bigarray.Array1_64.create") ;
+    Array1.create kind layout (Int64.to_int n)
+
+  let index_of_int64 i =
+    if i < 0L || i > Int64.of_int max_int then -1 else Int64.to_int i
+
+  let get a i = Array1.get a (index_of_int64 i)
+
+  let set a i x = Array1.set a (index_of_int64 i) x
+end
 
 module Chunk = struct
   type t = (int, int8_unsigned_elt, c_layout) Array1.t
@@ -127,13 +165,13 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
 
   let load_byte vector address =
     let open Effect in
-    if Int64.compare address vector.length >= 0 then raise Memory_exn.Bounds ;
+    if Int64.compare address vector.length >= 0 then raise Exn.Bounds ;
     let+ chunk = Vector.get (Chunk.index address) vector.chunks in
     Array1_64.get chunk (Chunk.offset address)
 
   let store_byte vector address byte =
     let open Effect in
-    if Int64.compare address vector.length >= 0 then raise Memory_exn.Bounds ;
+    if Int64.compare address vector.length >= 0 then raise Exn.Bounds ;
     let+ chunk = Vector.get (Chunk.index address) vector.chunks in
     Array1_64.set chunk (Chunk.offset address) byte
 
@@ -199,8 +237,7 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
   let to_bytes vector =
     let open Effect in
     let chunks_number = Vector.num_elements vector.chunks in
-    if vector.length > Int64.of_int Sys.max_string_length then
-      raise Memory_exn.Bounds ;
+    if vector.length > Int64.of_int Sys.max_string_length then raise Exn.Bounds ;
     (* Once we ensure the vector can be contained in a string, we can safely
        convert everything to int, since the size of the vector is contained in
        a `nativeint`. See {!of_string} comment. *)

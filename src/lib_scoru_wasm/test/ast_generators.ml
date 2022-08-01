@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Tezos_webassembly_interpreter
+open Lazy_containers
 open QCheck2.Gen
 
 let no_region it = Source.{it; at = no_region}

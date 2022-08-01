@@ -579,40 +579,6 @@ let octez_error_monad =
       ]
     ~js_compatible:true
 
-let octez_webassembly_interpreter =
-  public_lib
-    "tezos-webassembly-interpreter"
-    ~path:"src/lib_webassembly"
-    ~license:"Apache License 2.0"
-    ~extra_authors:["WebAssembly Authors"]
-    ~synopsis:"WebAssembly reference interpreter with tweaks for Tezos"
-    ~flags:(Flags.standard ~disable_warnings:[27] ())
-    ~dune:Dune.[[S "include_subdirs"; S "unqualified"]]
-    ~deps:[octez_lwt_result_stdlib; zarith]
-
-let _octez_webassembly_repl =
-  private_exe
-    "main"
-    ~path:"src/lib_webassembly/bin"
-    ~opam:""
-    ~flags:(Flags.standard ~disable_warnings:[27] ())
-    ~dune:Dune.[[S "include"; S "dune.inc"]]
-    ~deps:[octez_webassembly_interpreter |> open_; lwt_unix]
-
-let _octez_webassembly_test =
-  test
-    "main"
-    ~path:"src/lib_webassembly/tests"
-    ~opam:"tezos-webassembly-interpreter"
-    ~dune:Dune.[[S "include_subdirs"; S "no"]]
-    ~deps:
-      [
-        octez_webassembly_interpreter |> open_;
-        qcheck_core;
-        qcheck_alcotest;
-        alcotest;
-      ]
-
 let octez_hacl =
   let js_stubs = ["random.js"; "evercrypt.js"] in
   let js_generated = "runtime-generated.js" in
@@ -1113,6 +1079,71 @@ let octez_base_test_helpers =
     ~linkall:true
     ~bisect_ppx:false
 
+let lazy_containers =
+  public_lib
+    "lazy-containers"
+    ~path:"src/lib_lazy_containers"
+    ~synopsis:
+      "A collection of lazy containers whose contents is fetched from \
+       arbitrary backend on-demand"
+    ~deps:[octez_lwt_result_stdlib; zarith]
+
+let _lazy_containers_tests =
+  test
+    "main"
+    ~path:"src/lib_lazy_containers/test"
+    ~opam:"lazy-containers"
+    ~dune:Dune.[[S "include_subdirs"; S "no"]]
+    ~deps:[lazy_containers |> open_; qcheck_core; qcheck_alcotest; alcotest]
+
+let tree_encoding =
+  public_lib
+    "tree-encoding"
+    ~path:"src/lib_tree_encoding"
+    ~synopsis:
+      "A general-purpose library to encode arbitrary data in Merkle trees"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        lazy_containers;
+        octez_lwt_result_stdlib;
+        data_encoding;
+      ]
+
+let octez_webassembly_interpreter =
+  public_lib
+    "tezos-webassembly-interpreter"
+    ~path:"src/lib_webassembly"
+    ~license:"Apache License 2.0"
+    ~extra_authors:["WebAssembly Authors"]
+    ~synopsis:"WebAssembly reference interpreter with tweaks for Tezos"
+    ~flags:(Flags.standard ~disable_warnings:[27] ())
+    ~dune:Dune.[[S "include_subdirs"; S "unqualified"]]
+    ~deps:[octez_lwt_result_stdlib; zarith; lazy_containers |> open_]
+
+let _octez_webassembly_repl =
+  private_exe
+    "main"
+    ~path:"src/lib_webassembly/bin"
+    ~opam:""
+    ~flags:(Flags.standard ~disable_warnings:[27] ())
+    ~dune:Dune.[[S "include"; S "dune.inc"]]
+    ~deps:
+      [
+        octez_webassembly_interpreter |> open_;
+        lwt_unix;
+        tree_encoding |> open_;
+        lazy_containers |> open_;
+      ]
+
+let _octez_webassembly_test =
+  test
+    "main"
+    ~path:"src/lib_webassembly/tests"
+    ~opam:"tezos-webassembly-interpreter"
+    ~dune:Dune.[[S "include_subdirs"; S "no"]]
+    ~deps:[octez_webassembly_interpreter |> open_; alcotest]
+
 let octez_version_parser =
   public_lib
     "tezos-version.parser"
@@ -1494,6 +1525,8 @@ let octez_scoru_wasm =
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
+        tree_encoding;
+        lazy_containers;
         octez_webassembly_interpreter;
         octez_context_sigs;
         octez_lwt_result_stdlib;
@@ -1573,6 +1606,25 @@ let octez_context_disk =
         octez_context_dump;
       ]
 
+let _tree_encoding_tests =
+  test
+    "test_tree_encoding"
+    ~path:"src/lib_tree_encoding/test"
+    ~opam:"tree-encoding-test"
+    ~synopsis:"Tests for the tree encoding library"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        tree_encoding;
+        octez_base_unix;
+        octez_context_disk;
+        octez_base_test_helpers |> open_;
+        octez_test_helpers;
+        octez_webassembly_interpreter;
+        qcheck_alcotest;
+        alcotest_lwt;
+      ]
+
 let _octez_scoru_wasm_tests =
   test
     "test_scoru_wasm"
@@ -1582,6 +1634,7 @@ let _octez_scoru_wasm_tests =
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
+        tree_encoding;
         octez_base_unix;
         octez_context_disk;
         octez_base_test_helpers |> open_;

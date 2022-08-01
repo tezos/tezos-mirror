@@ -2,6 +2,7 @@
 (formatting (enabled_for ocaml))
 (cram enable)
 (package (name internal-devtools))
+(package (name lazy-containers))
 (package (name tezos-012-Psithaca-test-helpers))
 (package (name tezos-013-PtJakart-test-helpers))
 (package (name tezos-014-PtKathma-test-helpers))
@@ -215,5 +216,7 @@
 (package (name tezt-performance-regression))
 (package (name tezt-self-tests))
 (package (name tezt-tezos))
+(package (name tree-encoding))
+(package (name tree-encoding-test)(allow_empty))
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/manifest.ml instead.

@@ -32,6 +32,7 @@
 *)
 
 open Tztest
+open Lazy_containers
 open Tezos_webassembly_interpreter
 open Tezos_scoru_wasm
 
@@ -140,7 +141,7 @@ let test_host_fun () =
   in
   let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
   let memories =
-    Tezos_webassembly_interpreter.Lazy_vector.LwtInt32Vector.cons
+    Lazy_vector.LwtInt32Vector.cons
       (Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}))
       module_inst.memories
   in
@@ -168,11 +169,7 @@ let test_host_fun () =
       values
   in
   let* module_inst = Instance.resolve_module_ref module_ref in
-  let* memory =
-    Tezos_webassembly_interpreter.Lazy_vector.LwtInt32Vector.get
-      0l
-      module_inst.memories
-  in
+  let* memory = Lazy_vector.LwtInt32Vector.get 0l module_inst.memories in
   assert (Input_buffer.num_elements input = Z.zero) ;
   let* m = Memory.load_bytes memory 0l 1 in
   assert (m = "\001") ;
@@ -185,25 +182,41 @@ let test_host_fun () =
   assert (result = Values.[Num (I32 5l)]) ;
   Lwt.return @@ Result.return_unit
 
-module Wasm = Wasm_pvm.Make (Test_encoding.Tree)
-module EncDec = Tree_encoding_decoding.Make (Test_encoding.Tree)
+(* Use context-binary for testing. *)
+module Context = Tezos_context_memory.Context_binary
+
+let empty_tree () =
+  let open Lwt_syntax in
+  let* index = Context.init "/tmp" in
+  let empty_store = Context.empty index in
+  return @@ Context.Tree.empty empty_store
+
+module Tree : Tree_encoding.TREE with type tree = Context.tree = struct
+  type tree = Context.tree
+
+  include Context.Tree
+end
+
+module Wasm = Wasm_pvm.Make (Tree)
+module Tree_encoding = Tree_encoding.Make (Tree)
 
 let current_tick_encoding =
-  EncDec.value ["wasm"; "current_tick"] Data_encoding.z
+  Tree_encoding.value ["wasm"; "current_tick"] Data_encoding.z
 
-let status_encoding = EncDec.value ["input"; "consuming"] Data_encoding.bool
+let status_encoding =
+  Tree_encoding.value ["input"; "consuming"] Data_encoding.bool
 
 let floppy_encoding =
-  EncDec.value
+  Tree_encoding.value
     ["gather-floppies"; "status"]
     Gather_floppies.internal_status_encoding
 
 let level_encoding =
-  EncDec.value ["input"; "level"] Bounded.Int32.NonNegative.encoding
+  Tree_encoding.value ["input"; "level"] Bounded.Int32.NonNegative.encoding
 
-let id_encoding = EncDec.value ["input"; "id"] Data_encoding.z
+let id_encoding = Tree_encoding.value ["input"; "id"] Data_encoding.z
 
-let inp_encoding = EncDec.value ["input"; "0"; "1"] Data_encoding.string
+let inp_encoding = Tree_encoding.value ["input"; "0"; "1"] Data_encoding.string
 
 let zero =
   WithExceptions.Option.get ~loc:__LOC__ (Bounded.Int32.NonNegative.of_int32 0l)
@@ -215,7 +228,7 @@ let zero =
     [gather_floppies] *)
 let initialise_tree () =
   let open Lwt_syntax in
-  let* empty_tree = Test_encoding.empty_tree () in
+  let* empty_tree = empty_tree () in
   let boot_sector =
     Data_encoding.Binary.to_string_exn
       Gather_floppies.origination_message_encoding
@@ -227,11 +240,14 @@ let initialise_tree () =
       boot_sector
   in
 
-  let* tree = EncDec.encode current_tick_encoding Z.zero tree in
+  let* tree = Tree_encoding.encode current_tick_encoding Z.zero tree in
   let* tree =
-    EncDec.encode floppy_encoding Gather_floppies.Not_gathering_floppies tree
+    Tree_encoding.encode
+      floppy_encoding
+      Gather_floppies.Not_gathering_floppies
+      tree
   in
-  let* tree = EncDec.encode status_encoding true tree in
+  let* tree = Tree_encoding.encode status_encoding true tree in
   Lwt.return tree
 
 (** Artificial initialization of the raw_level and message id. Again, in practice
@@ -239,8 +255,8 @@ let initialise_tree () =
     subsequent read_input steps.*)
 let add_level_id tree =
   let open Lwt_syntax in
-  let* tree = EncDec.encode level_encoding zero tree in
-  let* tree = EncDec.encode id_encoding Z.zero tree in
+  let* tree = Tree_encoding.encode level_encoding zero tree in
+  let* tree = Tree_encoding.encode id_encoding Z.zero tree in
   Lwt.return tree
 
 (** Simple test checking get_info after the initialization. Note that we also
@@ -267,17 +283,17 @@ let test_set_input () =
   let open Lwt_syntax in
   let* tree = initialise_tree () in
   let* tree = add_level_id tree in
-  let* tree = EncDec.encode status_encoding false tree in
-  let* tree = EncDec.encode status_encoding true tree in
+  let* tree = Tree_encoding.encode status_encoding false tree in
+  let* tree = Tree_encoding.encode status_encoding true tree in
   let* tree =
     Wasm.set_input_step
       {inbox_level = zero; message_counter = Z.of_int 1}
       "hello"
       tree
   in
-  let* result_input = EncDec.decode inp_encoding tree in
-  let* waiting_for_input = EncDec.decode status_encoding tree in
-  let* current_tick = EncDec.decode current_tick_encoding tree in
+  let* result_input = Tree_encoding.decode inp_encoding tree in
+  let* waiting_for_input = Tree_encoding.decode status_encoding tree in
+  let* current_tick = Tree_encoding.decode current_tick_encoding tree in
   let expected_info =
     let open Wasm_pvm_sig in
     let last_input_read = Some {inbox_level = zero; message_counter = Z.zero} in

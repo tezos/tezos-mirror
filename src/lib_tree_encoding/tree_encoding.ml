@@ -23,7 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_webassembly_interpreter
+open Lazy_containers
+
+module type TREE = Tree.S
 
 module type Lwt_vector = Lazy_vector.S with type 'a effect = 'a Lwt.t
 
@@ -38,17 +40,11 @@ module type S = sig
 
   type ('tag, 'a) case
 
-  module Decoding : Tree_decoding.S with type tree = tree
-
-  module Encoding : Tree_encoding.S with type tree = tree
-
   type 'a t
 
   val encode : 'a t -> 'a -> tree -> tree Lwt.t
 
   val decode : 'a t -> tree -> 'a Lwt.t
-
-  val custom : 'a Encoding.t -> 'a Decoding.t -> 'a t
 
   val conv : ('a -> 'b) -> ('b -> 'a) -> 'a t -> 'b t
 
@@ -126,7 +122,7 @@ module type S = sig
 
   val scope : key -> 'a t -> 'a t
 
-  module Lazy_map_encoding_decoding : sig
+  module Lazy_map_encoding : sig
     module type S = sig
       type 'a map
 
@@ -134,13 +130,9 @@ module type S = sig
     end
 
     module Make (Map : Lwt_map) : S with type 'a map := 'a Map.t
-
-    module NameMap : S with type 'a map := 'a Instance.NameMap.t
-
-    module ModuleMap : S with type 'a map := 'a Instance.ModuleMap.Map.t
   end
 
-  module Lazy_vector_encoding_decoding : sig
+  module Lazy_vector_encoding : sig
     module type S = sig
       type key
 
@@ -185,8 +177,8 @@ module type S = sig
 end
 
 module Make (T : Tree.S) : S with type tree = T.tree = struct
-  module Encoding = Tree_encoding.Make (T)
-  module Decoding = Tree_decoding.Make (T)
+  module Encoding = Encoding.Make (T)
+  module Decoding = Decoding.Make (T)
   module E = Encoding
   module D = Decoding
 
@@ -197,8 +189,6 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
   type 'a decoding = 'a D.t
 
   type 'a t = {encode : 'a encoding; decode : 'a decoding}
-
-  let custom encode decode = {encode; decode}
 
   let conv d e {encode; decode} =
     {encode = E.contramap e encode; decode = D.map d decode}
@@ -339,7 +329,7 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
 
   let value_option key de = value key (Data_encoding.option de)
 
-  module Lazy_map_encoding_decoding = struct
+  module Lazy_map_encoding = struct
     module type S = sig
       type 'a map
 
@@ -359,12 +349,9 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
         in
         {encode; decode}
     end
-
-    module NameMap = Make (Instance.NameMap)
-    module ModuleMap = Make (Instance.ModuleMap.Map)
   end
 
-  module Lazy_vector_encoding_decoding = struct
+  module Lazy_vector_encoding = struct
     module type S = sig
       type key
 

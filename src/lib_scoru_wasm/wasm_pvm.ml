@@ -30,7 +30,8 @@
 
 *)
 
-module Make (T : Tree.S) : Gather_floppies.S with type tree = T.tree = struct
+module Make (T : Tree_encoding.TREE) :
+  Gather_floppies.S with type tree = T.tree = struct
   include
     Gather_floppies.Make
       (T)
@@ -38,8 +39,8 @@ module Make (T : Tree.S) : Gather_floppies.S with type tree = T.tree = struct
         type tree = T.tree
 
         module Wasm = Tezos_webassembly_interpreter
-        module EncDec = Tree_encoding_decoding.Make (T)
-        module Wasm_encoding = Wasm_encoding.Make (EncDec)
+        module Tree_encoding = Tree_encoding.Make (T)
+        module Wasm_encoding = Wasm_encoding.Make (Tree_encoding)
 
         let compute_step = Lwt.return
 
@@ -57,26 +58,29 @@ module Make (T : Tree.S) : Gather_floppies.S with type tree = T.tree = struct
         *)
 
         let current_tick_encoding =
-          EncDec.value ["wasm"; "current_tick"] Data_encoding.z
+          Tree_encoding.value ["wasm"; "current_tick"] Data_encoding.z
 
         let level_encoding =
-          EncDec.value ["input"; "level"] Bounded.Int32.NonNegative.encoding
+          Tree_encoding.value
+            ["input"; "level"]
+            Bounded.Int32.NonNegative.encoding
 
-        let id_encoding = EncDec.value ["input"; "id"] Data_encoding.z
+        let id_encoding = Tree_encoding.value ["input"; "id"] Data_encoding.z
 
         let last_input_read_encoder =
-          EncDec.tup2 ~flatten:true level_encoding id_encoding
+          Tree_encoding.tup2 ~flatten:true level_encoding id_encoding
 
         let status_encoding =
-          EncDec.value ["input"; "consuming"] Data_encoding.bool
+          Tree_encoding.value ["input"; "consuming"] Data_encoding.bool
 
         let inp_encoding level id =
-          EncDec.value ["input"; level; id] Data_encoding.string
+          Tree_encoding.value ["input"; level; id] Data_encoding.string
 
         let get_info tree =
           let open Lwt_syntax in
           let* waiting =
-            try EncDec.decode status_encoding tree with _ -> Lwt.return false
+            try Tree_encoding.decode status_encoding tree
+            with _ -> Lwt.return false
           in
           let input_request =
             if waiting then Wasm_pvm_sig.Input_required
@@ -84,7 +88,7 @@ module Make (T : Tree.S) : Gather_floppies.S with type tree = T.tree = struct
           in
           let* input =
             try
-              let* t = EncDec.decode last_input_read_encoder tree in
+              let* t = Tree_encoding.decode last_input_read_encoder tree in
               Lwt.return @@ Some t
             with _ -> Lwt.return_none
           in
@@ -96,7 +100,7 @@ module Make (T : Tree.S) : Gather_floppies.S with type tree = T.tree = struct
           in
 
           let* current_tick =
-            try EncDec.decode current_tick_encoding tree
+            try Tree_encoding.decode current_tick_encoding tree
             with _ -> Lwt.return Z.zero
           in
           Lwt.return Wasm_pvm_sig.{current_tick; last_input_read; input_request}
@@ -109,11 +113,14 @@ module Make (T : Tree.S) : Gather_floppies.S with type tree = T.tree = struct
             Int32.to_string @@ Bounded.Int32.NonNegative.to_int32 inbox_level
           in
           let id = Z.to_string message_counter in
-          let* current_tick = EncDec.decode current_tick_encoding tree in
+          let* current_tick = Tree_encoding.decode current_tick_encoding tree in
           let* tree =
-            EncDec.encode current_tick_encoding (Z.succ current_tick) tree
+            Tree_encoding.encode
+              current_tick_encoding
+              (Z.succ current_tick)
+              tree
           in
-          let* tree = EncDec.encode status_encoding false tree in
-          EncDec.encode (inp_encoding level id) message tree
+          let* tree = Tree_encoding.encode status_encoding false tree in
+          Tree_encoding.encode (inp_encoding level id) message tree
       end)
 end

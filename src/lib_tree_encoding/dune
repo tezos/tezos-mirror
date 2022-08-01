@@ -2,15 +2,12 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_scoru_wasm)
- (public_name tezos-scoru-wasm)
+ (name tree_encoding)
+ (public_name tree-encoding)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
-  tree-encoding
   lazy-containers
-  tezos-webassembly-interpreter
-  tezos-context.sigs
   tezos-lwt-result-stdlib
   data-encoding)
  (flags

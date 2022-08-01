@@ -1,3 +1,28 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
 module Effect = struct
   module type S = sig
     include Lazy_map.Effect.S
@@ -145,12 +170,12 @@ module Make (Effect : Effect.S) (Key : KeyS) :
   let invalid_key key map = Key.unsigned_compare key map.num_elements >= 0
 
   let get key map =
-    if invalid_key key map then raise Memory_exn.Bounds ;
+    if invalid_key key map then raise Exn.Bounds ;
     let key = Key.add map.first key in
     Map.get key map.values
 
   let set key value map =
-    if invalid_key key map then raise Memory_exn.Bounds ;
+    if invalid_key key map then raise Exn.Bounds ;
     let key = Key.add map.first key in
     {map with values = Map.set key value map.values}
 
@@ -165,7 +190,7 @@ module Make (Effect : Effect.S) (Key : KeyS) :
   let grow ?produce_value delta map =
     if
       Key.unsigned_compare (Key.add delta map.num_elements) map.num_elements < 0
-    then raise Memory_exn.SizeOverflow ;
+    then raise Exn.SizeOverflow ;
 
     let map_produce_value old_produce_value =
       match produce_value with
