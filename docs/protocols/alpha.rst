@@ -87,6 +87,18 @@ Minor Changes
 - Errors related to consensus operations have been reworked. See
   ``Validate_errors.Consensus``. (MR :gl:`!5927`)
 
+- A delegate can no longer propose the same protocol hash multiple
+  times in Proposals operations. An operation that contains a proposal
+  which has already been proposed by the delegate in the same voting
+  period will now fail (and so will an operation that contains
+  multiple occurrences of the same proposal). This prevents the replay
+  of a Proposals operation.  (MR :gl:`!5828`)
+
+- Change the names and types of errors related to voting operations
+  (Proposals and Ballot), and move them to ``Validate_errors``.
+  (MR :gl:`!5828`)
+
+
 Internal
 --------
 
@@ -126,3 +138,19 @@ Internal
 - Move the checks part of consensus operation to
   ``validate_operation.ml``. The effects part remains in
   ``apply_operation``. (MR :gl:`!5927`)
+
+- Implement ``Validate_operation.validate_operation`` on voting
+  operations (Proposals and Ballot). The checks are now done there,
+  while ``Apply.apply_operation`` only applies the effects.
+  (MR :gl:`!5828`)
+
+- A Testnet Dictator Proposals operation is now mutually exclusive
+  with any other voting operation inside a same block or mempool.
+  (MR :gl:`!5828`)
+
+- Remove redundant ``Delegate_storage.pubkey`` and use directly
+  ``Contract_manager_storage.get_manager_key`` instead. In situations
+  where the later used to fail with ``Unregistered_delegate``, we now
+  get either ``Missing_manager_contract`` or
+  ``Unrevealed_manager_key``, which describe the issue more
+  precisely. (MR :gl:`!5828`)
