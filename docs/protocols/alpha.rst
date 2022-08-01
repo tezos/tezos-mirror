@@ -55,7 +55,21 @@ Bug Fixes
 Minor Changes
 -------------
 
-- Split internal transactions. (MR :gl:`!5585`)	
+- Split internal transactions. (MR :gl:`!5585`)
+
+- Rename error ``Previously_revealed_nonce`` in
+  ``Already_revealed_nonce`` (MR :gl:`!5849`)
+
+- New error ``Conflicting_activation`` (MR :gl:`!5849`)
+
+- New error ``Already_denounced`` replace ``Unrequired_denunciation``
+  (MR :gl:`!5849`)
+
+- New error ``Conflicting_denunciation`` (MR
+  :gl:`!5849`)
+
+- New error ``Conflicting_nonce_revelation`` (MR
+  :gl:`!5849`)
 
 Internal
 --------
@@ -78,3 +92,11 @@ Internal
   it return a list of key-value pairs. Also change the name of the signature
   ``Non_iterable_indexed_carbonated_data_storage_with_values`` to
   ``Indexed_carbonated_data_storage``. (MR :gl:`!3491`)
+
+- Move the checks part of anonymous operation to
+  ``validate_operation.ml``. The effects part remains in
+  ``apply_operation``. (MR :gl:`!5849`)
+
+- split ``check_vdf_and_update_seed`` function from
+  ``seed_storage.ml`` between the checks part, ``check_vdf``, and the
+  application part, ``update_seed``. (MR :gl:`!5849`)
