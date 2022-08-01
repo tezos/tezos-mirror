@@ -2001,8 +2001,6 @@ let octez_protocol_compiler_lib =
                     S "%{targets}";
                   ];
                 S
-                  "%{lib:tezos-protocol-environment.sigs-internals:tezos_protocol_environment_sigs_internals.cmi}";
-                S
                   "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs.cmi}";
                 S
                   "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V0.cmi}";
