@@ -107,10 +107,7 @@ let test_initial_state_hash_wasm_pvm () =
 
 let test_incomplete_kernel_chunk_limit () =
   let open Lwt_result_syntax in
-  let*? accounts = Account.generate_accounts 1 in
-  let operator =
-    match accounts with [account] -> account | _ -> assert false
-  in
+  let operator = Account.new_account () in
   let chunk_size = Tezos_scoru_wasm.Gather_floppies.chunk_size in
   let chunk_too_big = Bytes.make (chunk_size + 10) 'a' in
   let signature = Signature.sign operator.Account.sk chunk_too_big in

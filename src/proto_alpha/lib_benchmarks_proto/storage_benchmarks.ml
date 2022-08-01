@@ -37,16 +37,16 @@ open Protocol
 (** Creates a dummy raw-context value. *)
 let default_raw_context () =
   let open Lwt_result_syntax in
-  let*? initial_accounts = Account.generate_accounts 1 in
-  let bootstrap_accounts =
-    Account.make_bootstrap_accounts
-      ~bootstrap_balances:[100_000_000_000L]
-      initial_accounts
+  let initial_account = Account.new_account () in
+  let bootstrap_account =
+    Account.make_bootstrap_account
+      ~balance:(Alpha_context.Tez.of_mutez_exn 100_000_000_000L)
+      initial_account
   in
   Block.prepare_initial_context_params () >>=? fun (constants, _, _) ->
   let parameters =
     Default_parameters.parameters_of_constants
-      ~bootstrap_accounts
+      ~bootstrap_accounts:[bootstrap_account]
       ~commitments:[]
       constants
   in

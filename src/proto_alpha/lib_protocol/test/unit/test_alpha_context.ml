@@ -39,10 +39,9 @@ open Alpha_context
 
 (** Creates an Alpha_context without creating a full-fledged block *)
 let create () =
-  let open Lwt_result_syntax in
-  let*? accounts = Account.generate_accounts 1 in
-  let bootstrap_accounts = Account.make_bootstrap_accounts accounts in
-  Block.alpha_context bootstrap_accounts
+  let account = Account.new_account () in
+  let bootstrap_account = Account.make_bootstrap_account account in
+  Block.alpha_context [bootstrap_account]
 
 let assert_equal_key_values ~loc kvs1 kvs2 =
   let sort_by_key_hash =
