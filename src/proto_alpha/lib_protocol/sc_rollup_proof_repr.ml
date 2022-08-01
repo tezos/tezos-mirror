@@ -134,7 +134,7 @@ module type PVM_with_context_and_state = sig
 
   module Inbox_with_history : sig
     include
-      Sc_rollup_inbox_repr.MerkelizedOperations
+      Sc_rollup_inbox_repr.Merkelized_operations
         with type inbox_context = context
 
     val inbox : Sc_rollup_inbox_repr.history_proof

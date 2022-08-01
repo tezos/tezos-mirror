@@ -230,7 +230,7 @@ val serialized_proof_encoding : serialized_proof Data_encoding.t
 
 (** The following operations are subject to cross-validation between
     rollup nodes and the layer 1. *)
-module type MerkelizedOperations = sig
+module type Merkelized_operations = sig
   (** The type for the Merkle trees used in this module. *)
   type tree
 
@@ -442,14 +442,14 @@ end
    We provide a functor that takes a {!Context.TREE} module from any
    context, checks that the assumptions made about tree's arity and
    hashing scheme are valid, and returns a standard compliant
-   implementation of the {!MerkelizedOperations}.
+   implementation of the {!Merkelized_operations}.
 
 *)
-module MakeHashingScheme (P : P) :
-  MerkelizedOperations with type tree = P.tree and type inbox_context = P.t
+module Make_hashing_scheme (P : P) :
+  Merkelized_operations with type tree = P.tree and type inbox_context = P.t
 
 include
-  MerkelizedOperations
+  Merkelized_operations
     with type tree = Context.tree
      and type inbox_context = Context.t
 

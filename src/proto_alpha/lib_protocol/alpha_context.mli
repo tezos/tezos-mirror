@@ -2821,7 +2821,7 @@ module Sc_rollup : sig
 
     val serialized_proof_encoding : serialized_proof Data_encoding.t
 
-    module type MerkelizedOperations = sig
+    module type Merkelized_operations = sig
       type tree
 
       type inbox_context
@@ -2904,7 +2904,7 @@ module Sc_rollup : sig
     end
 
     include
-      MerkelizedOperations
+      Merkelized_operations
         with type tree = Context.tree
          and type inbox_context = Context.t
 
@@ -2936,8 +2936,8 @@ module Sc_rollup : sig
         (proof * 'a) option Lwt.t
     end
 
-    module MakeHashingScheme (P : P) :
-      MerkelizedOperations with type tree = P.tree and type inbox_context = P.t
+    module Make_hashing_scheme (P : P) :
+      Merkelized_operations with type tree = P.tree and type inbox_context = P.t
 
     val add_external_messages :
       context -> rollup -> string list -> (t * Z.t * context) tzresult Lwt.t
@@ -3301,7 +3301,7 @@ module Sc_rollup : sig
       val proof_encoding : proof Data_encoding.t
 
       module Inbox_with_history : sig
-        include Inbox.MerkelizedOperations with type inbox_context = context
+        include Inbox.Merkelized_operations with type inbox_context = context
 
         val inbox : Inbox.history_proof
 
