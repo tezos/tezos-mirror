@@ -1,9 +1,11 @@
-open Tezos_protocol_environment_sigs_stdlib_compat.V_all
+open Tezos_protocol_environment_sigs_internals
 
 module type T = sig
   module Pervasives : [%sig "v2/pervasives.mli"]
 
   open Pervasives
+
+  module Seq : [%sig "v2/seq.mli"]
 
   module List : [%sig "v2/list.mli"]
 

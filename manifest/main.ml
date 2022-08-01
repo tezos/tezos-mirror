@@ -1740,18 +1740,17 @@ let _octez_sapling_ctypes_gen =
       ["rustzcash_ctypes_gen"; "rustzcash_ctypes_bindings"; "gen_runtime_js"]
     ~opam_with_test:Never
 
-let tezos_protocol_environment_sigs_stdlib_compat =
+let tezos_protocol_environment_sigs_internals =
   public_lib
-    "tezos-protocol-environment.sigs.stdlib-compat"
-    ~path:"src/lib_protocol_environment/sigs/stdlib_compat"
-    ~modules_without_implementation:["V_all"; "V2"; "V3"; "V4"]
+    "tezos-protocol-environment.sigs-internals"
+    ~path:"src/lib_protocol_environment/sigs-internals"
 
 let tezos_protocol_environment_sigs =
   public_lib
     "tezos-protocol-environment.sigs"
     ~path:"src/lib_protocol_environment/sigs"
     ~ocaml:V.(at_least "4.12")
-    ~deps:[tezos_protocol_environment_sigs_stdlib_compat]
+    ~deps:[tezos_protocol_environment_sigs_internals]
     ~flags:(Flags.standard ~nopervasives:true ~nostdlib:true ())
     ~dune:
       (let gen n =
@@ -1945,15 +1944,7 @@ let octez_protocol_compiler_lib =
                   ];
                 S "%{lib:stdlib:camlinternalFormatBasics.cmi}";
                 S
-                  "%{lib:tezos-protocol-environment.sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat.cmi}";
-                S
-                  "%{lib:tezos-protocol-environment.sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V_all.cmi}";
-                S
-                  "%{lib:tezos-protocol-environment.sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V2.cmi}";
-                S
-                  "%{lib:tezos-protocol-environment.sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V3.cmi}";
-                S
-                  "%{lib:tezos-protocol-environment.sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V4.cmi}";
+                  "%{lib:tezos-protocol-environment.sigs-internals:tezos_protocol_environment_sigs_internals.cmi}";
                 S
                   "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs.cmi}";
                 S
