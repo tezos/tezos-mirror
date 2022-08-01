@@ -254,3 +254,9 @@ Internal
   :gl:`!5113`, :gl:`!5114`, :gl:`!5005`, :gl:`!5188`, :gl:`!5309`, :gl:`!5310`,
   :gl:`!5308`, :gl:`!5312`, :gl:`!5313`, :gl:`!5298`, :gl:`!5374`, :gl:`!5381`,
   :gl:`!5384`, :gl:`!5513`, :gl:`!5494`, :gl:`!5582`, :gl:`!5553`)
+
+Invoice
+-------
+
+@g.b.fefe rewarded 3000 ꜩ for code contributions (testnet dictator key) included in this protocol.
+(MR :gl:`!5838`)
