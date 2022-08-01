@@ -112,7 +112,7 @@ let dawn_of_a_new_cycle ctxt =
   let level = current ctxt in
   if last_of_a_cycle ctxt level then Some level.cycle else None
 
-let may_snapshot_rolls ctxt =
+let may_snapshot_stake_distribution ctxt =
   let level = current ctxt in
   let blocks_per_stake_snapshot =
     Constants_storage.blocks_per_stake_snapshot ctxt

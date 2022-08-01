@@ -26,7 +26,7 @@
 (**
    Amendments and proposals.
 
-   Only delegates with at least one roll take part in the amendment
+   Only delegates having the minimal required stake take part in the amendment
    procedure.  It works as follows:
 
    - Proposal period: delegates can submit protocol amendment

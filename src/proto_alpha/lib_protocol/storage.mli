@@ -356,7 +356,8 @@ module Slashed_deposits :
 
 module Stake : sig
   (** The map of all the staking balances of all delegates, including
-     those with less than one roll. It might be large *)
+     those with less than
+     {!Constants_parametric_repr.minimal_stake}. It might be large *)
   module Staking_balance :
     Indexed_data_snapshotable_storage
       with type key = Signature.Public_key_hash.t
@@ -366,7 +367,7 @@ module Stake : sig
 
   (** This is a set, encoded in a map with value unit. This should be
      fairly small compared to staking balance *)
-  module Active_delegate_with_one_roll :
+  module Active_delegates_with_minimal_stake :
     Indexed_data_snapshotable_storage
       with type key = Signature.Public_key_hash.t
        and type value = unit
@@ -385,7 +386,8 @@ module Stake : sig
        and type t := Raw_context.t
 end
 
-(** Sum of the active stakes of all the delegates with rolls *)
+(** Sum of the active stakes of all the delegates with
+   {!Constants_parametric_repr.minimal_stake} *)
 module Total_active_stake :
   Indexed_data_storage
     with type key = Cycle_repr.t

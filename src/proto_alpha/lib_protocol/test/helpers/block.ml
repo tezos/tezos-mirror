@@ -268,18 +268,18 @@ let check_constants_consistency constants =
   in
   Error_monad.unless (blocks_per_commitment <= blocks_per_cycle) (fun () ->
       failwith
-        "Inconsistent constants : blocks per commitment must be less than \
-         blocks per cycle")
+        "Inconsistent constants : blocks_per_commitment must be less than \
+         blocks_per_cycle")
   >>=? fun () ->
   Error_monad.unless (nonce_revelation_threshold <= blocks_per_cycle) (fun () ->
       failwith
-        "Inconsistent constants : blocks per reveal period must be less than \
-         blocks per cycle")
+        "Inconsistent constants : nonce_revelation_threshold must be less than \
+         blocks_per_cycle")
   >>=? fun () ->
   Error_monad.unless (blocks_per_cycle >= blocks_per_stake_snapshot) (fun () ->
       failwith
-        "Inconsistent constants : blocks per cycle must be superior than \
-         blocks per roll snapshot")
+        "Inconsistent constants : blocks_per_cycle must be superior than \
+         blocks_per_stake_snapshot")
 
 let prepare_main_init_params ?bootstrap_contracts commitments constants
     initial_accounts =
@@ -413,20 +413,22 @@ let genesis_with_parameters parameters =
 let validate_initial_accounts
     (initial_accounts :
       (Account.t * Tez.t * Signature.Public_key_hash.t option) list)
-    tokens_per_roll =
+    minimal_stake =
   if initial_accounts = [] then
-    Stdlib.failwith "Must have one account with a roll to bake" ;
-  (* Check there is at least one roll *)
+    Stdlib.failwith "Must have one account with minimal_stake to bake" ;
+  (* Check there are at least minimal_stake tokens *)
   Lwt.catch
     (fun () ->
       List.fold_left_es
         (fun acc (_, amount, _) ->
           Environment.wrap_tzresult @@ Tez.( +? ) acc amount >>?= fun acc ->
-          if acc >= tokens_per_roll then raise Exit else return acc)
+          if acc >= minimal_stake then raise Exit else return acc)
         Tez.zero
         initial_accounts
       >>=? fun _ ->
-      failwith "Insufficient tokens in initial accounts to create one roll")
+      failwith
+        "Insufficient tokens in initial accounts: the amount should be at \
+         least minimal_stake")
     (function Exit -> return_unit | exc -> raise exc)
 
 let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
@@ -533,17 +535,19 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       nonce_revelation_threshold;
     }
   in
-  (* Check there is at least one roll *)
+  (* Check there are at least minimal_stake tokens *)
   Lwt.catch
     (fun () ->
       List.fold_left_es
         (fun acc (_, amount, _) ->
           Environment.wrap_tzresult @@ Tez.( +? ) acc amount >>?= fun acc ->
-          if acc >= constants.tokens_per_roll then raise Exit else return acc)
+          if acc >= constants.minimal_stake then raise Exit else return acc)
         Tez.zero
         initial_accounts
       >>=? fun _ ->
-      failwith "Insufficient tokens in initial accounts to create one roll")
+      failwith
+        "Insufficient tokens in initial accounts: the amount should be at \
+         least minimal_stake")
     (function Exit -> return_unit | exc -> raise exc)
   >>=? fun () ->
   check_constants_consistency constants >>=? fun () ->
@@ -567,7 +571,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       ~fitness
       ~operations_hash:Operation_list_list_hash.zero
   in
-  validate_initial_accounts initial_accounts constants.tokens_per_roll
+  validate_initial_accounts initial_accounts constants.minimal_stake
   (* Perhaps this could return a new type  signifying its name *)
   >|=? fun _initial_accounts -> (constants, shell, hash)
 

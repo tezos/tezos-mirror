@@ -25,7 +25,7 @@
 
 (** Testing
     -------
-    Component:  Protocol (rolls)
+    Component:  Protocol
     Invocation: dune exec \
                 src/proto_alpha/lib_protocol/test/integration/consensus/main.exe \
                 -- test "^deactivation$"
@@ -44,8 +44,8 @@ let wrap e = Lwt.return (Environment.wrap_tzresult e)
 (** Check that [Delegate.staking_balance] is the same as [Delegate.full_balance]
    (this is not true in general, but in these tests it is because they only deal
    with self-delegation. Also, check that [Delegate.staking_balance] coincides
-   with [Stake_storage.get] when the account is active and it has at least one
-   roll. *)
+   with [Stake_storage.get] when the account is active and it has the minimal
+   required stake. *)
 let check_stake ~loc (b : Block.t) (account : Account.t) =
   Context.Delegate.staking_balance (B b) account.pkh >>=? fun staking_balance ->
   Context.Delegate.full_balance (B b) account.pkh >>=? fun full_balance ->
@@ -67,7 +67,7 @@ let check_stake ~loc (b : Block.t) (account : Account.t) =
    that in case of deactivation [Delegate.staking_balance] does not necessarily
    coincide with [Stake_storage.get] in that [Delegate.staking_balance] may be
    positive (while [Stake_storage.get] returns 0 because the account is no
-   longer in [Active_delegate_with_one_roll] because of deactivation, see
+   longer in [Active_delegate_with_minimal_stake] because of deactivation, see
    [Stake_storage].) *)
 let check_no_stake ~loc (b : Block.t) (account : Account.t) =
   Raw_context.prepare
@@ -296,8 +296,8 @@ let test_deactivation_then_empty_then_self_delegation_then_recredit () =
 
 (** Initialize a block with two contracts/accounts. A third new account is also
    created. The first account is self-delegated. First account sends to third
-   one tokens_per_roll tez (so that, once it is active, it can appear in
-   [Active_delegate_with_one_roll]. The third account has no delegate and is
+   one minimal_stake tez (so that, once it is active, it can appear in
+   [Active_delegate_with_minimal_stake]. The third account has no delegate and is
    consistent for baking rights. Then, it is self-delegated and is supposed to
    be activated. Again, consistency for baking rights are preserved for the
    first and third accounts. *)
@@ -313,8 +313,9 @@ let test_delegation () =
   | None -> assert false
   | Some pkh -> assert (Signature.Public_key_hash.equal pkh m1.pkh)) ;
   let constants = Default_parameters.constants_test in
-  let one_roll = constants.tokens_per_roll in
-  Op.transaction ~force_reveal:true (B b) a1 a3 one_roll >>=? fun transact ->
+  let minimal_stake = constants.minimal_stake in
+  Op.transaction ~force_reveal:true (B b) a1 a3 minimal_stake
+  >>=? fun transact ->
   Block.bake ~policy:(By_account m2.pkh) b ~operation:transact >>=? fun b ->
   Context.Contract.delegate_opt (B b) a3 >>=? fun delegate ->
   (match delegate with None -> () | Some _ -> assert false) ;

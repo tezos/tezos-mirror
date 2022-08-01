@@ -52,7 +52,7 @@ val hard_storage_limit_per_operation : Raw_context.t -> Z.t
 
 val proof_of_work_threshold : Raw_context.t -> int64
 
-val tokens_per_roll : Raw_context.t -> Tez_repr.t
+val minimal_stake : Raw_context.t -> Tez_repr.t
 
 val vdf_difficulty : Raw_context.t -> int64
 

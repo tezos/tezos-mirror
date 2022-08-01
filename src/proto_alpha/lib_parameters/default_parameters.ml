@@ -96,7 +96,7 @@ let constants_mainnet =
     hard_gas_limit_per_operation = Gas.Arith.(integral_of_int_exn 1_040_000);
     hard_gas_limit_per_block = Gas.Arith.(integral_of_int_exn 5_200_000);
     proof_of_work_threshold = Int64.(sub (shift_left 1L 46) 1L);
-    tokens_per_roll = Tez.(mul_exn one 6_000);
+    minimal_stake = Tez.(mul_exn one 6_000);
     (* VDF's difficulty must be a multiple of `nonce_revelation_threshold` times
        the block time. At the moment it is equal to 8B = 8000 * 5 * .2M with
           - 8000 ~= 256 * 30 that is nonce_revelation_threshold * block time

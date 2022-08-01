@@ -1048,10 +1048,12 @@ module Stake = struct
       (Public_key_hash_index)
       (Tez_repr)
 
-  module Active_delegate_with_one_roll =
+  module Active_delegates_with_minimal_stake =
     Make_indexed_data_snapshotable_storage
       (Make_subcontext (Registered) (Raw_context)
          (struct
+           (* This name is for historical reasons, when the stake was
+              expressed in rolls (that is, pre-Ithaca). *)
            let name = ["active_delegate_with_one_roll"]
          end))
          (Int31_index)
@@ -1065,21 +1067,23 @@ module Stake = struct
   module Selected_distribution_for_cycle = Cycle.Selected_stake_distribution
 
   (* This is an index that is set to 0 by calls to
-     {!val:Stake_storage.selected_new_distribution_at_cycle_end} and incremented
-     (by 1) by calls to {!val:Stake_storage.snapshot}.
+     {!val:Stake_storage.selected_new_distribution_at_cycle_end} and
+     incremented (by 1) by calls to {!val:Stake_storage.snapshot}.
 
      {!val:Stake_storage.snapshot} is called in relation with constant
-     [blocks_per_stake_snapshot] in {!val:Level_storage.may_snapshot_rolls}.
+     [blocks_per_stake_snapshot] in
+     {!val:Level_storage.may_snapshot_stake_distribution}.
 
-     That is, the increment is done every [blocks_per_stake_snaphot] blocks and
-     reset at the end of cycles. So, it goes up to [blocks_per_cycle /
-     blocks_per_stake_snaphot], which is currently 16 (= 8192/512 -- the
-     concrete values can be found in
-     {!val:Default_parameters.constants_mainnet}), then comes back to 0, so that
-     a UInt16 is big enough.
+     That is, the increment is done every [blocks_per_stake_snaphot]
+     blocks and reset at the end of cycles. So, it goes up to
+     [blocks_per_cycle / blocks_per_stake_snaphot], which is currently
+     16 (= 8192/512 -- the concrete values can be found in
+     {!val:Default_parameters.constants_mainnet}), then comes back to
+     0, so that a UInt16 is big enough.
 
-     The ratio [blocks_per_cycle / blocks_per_stake_snapshot] above is checked
-     in {!val:Constants_repr.check_constants} to fit in a UInt16. *)
+     The ratio [blocks_per_cycle / blocks_per_stake_snapshot] above is
+     checked in {!val:Constants_repr.check_constants} to fit in a
+     UInt16. *)
   module Last_snapshot =
     Make_single_data_storage (Registered) (Raw_context)
       (struct

@@ -348,19 +348,19 @@ let register () =
       | {active = true; inactive = true; _} ->
           return delegates)
       >>=? fun delegates ->
-      let tokens_per_roll = Constants.tokens_per_roll ctxt in
+      let minimal_stake = Constants.minimal_stake ctxt in
       match q with
       | {with_minimal_stake = true; without_minimal_stake = false; _} ->
           List.filter_es
             (fun pkh ->
               Delegate.staking_balance ctxt pkh >|=? fun staking_balance ->
-              Tez.(staking_balance >= tokens_per_roll))
+              Tez.(staking_balance >= minimal_stake))
             delegates
       | {with_minimal_stake = false; without_minimal_stake = true; _} ->
           List.filter_es
             (fun pkh ->
               Delegate.staking_balance ctxt pkh >|=? fun staking_balance ->
-              Tez.(staking_balance < tokens_per_roll))
+              Tez.(staking_balance < minimal_stake))
             delegates
       | {with_minimal_stake = true; without_minimal_stake = true; _}
       | {with_minimal_stake = false; without_minimal_stake = false; _} ->

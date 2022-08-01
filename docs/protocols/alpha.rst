@@ -35,6 +35,8 @@ Distribution of rollup operations data off-chain. (MRs :gl:`!5711`)
 Breaking Changes
 ----------------
 
+- Rename the parameter ``tokens_per_roll`` to ``minimal_stake``. (MR :gl:`!5897`)
+
 RPC Changes
 -----------
 
@@ -53,7 +55,7 @@ Bug Fixes
 Minor Changes
 -------------
 
-- Split internal transactions. (MR :gl:`!5585`)
+- Split internal transactions. (MR :gl:`!5585`)	
 
 Internal
 --------
