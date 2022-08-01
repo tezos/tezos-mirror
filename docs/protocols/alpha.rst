@@ -17,6 +17,7 @@ New Environment Version (V7)
 
 This protocol requires a different protocol environment than Kathmandu.
 It requires protocol environment V7, compared to V6 for Kathmandu.
+(MR :gl:`!5906`)
 
 Smart Contract Optimistic Rollups (ongoing)
 -------------------------------------------
@@ -25,12 +26,17 @@ Rollups supporting execution of smart contracts. (MRs :gl:`!5603`, :gl:`!5606`,
 :gl:`!5447`, :gl:`!5655`, :gl:`!5660`, :gl:`!5680`, :gl:`!5598`, :gl:`!5677`,
 :gl:`!5646`, :gl:`!5686`, :gl:`!5693`, :gl:`!5623`, :gl:`!5687`, :gl:`!5714`,
 :gl:`!5689`, :gl:`!5708`, :gl:`!5565`, :gl:`!5561`, :gl:`!5567`, :gl:`!5332`,
-:gl:`!5628`, :gl:`!5754`, :gl:`!5736`, :gl:`!5784`)
+:gl:`!5628`, :gl:`!5754`, :gl:`!5736`, :gl:`!5784`, :gl:`!5539`, :gl:`!5764`,
+:gl:`!5690`, :gl:`!5826`, :gl:`!5812`, :gl:`!5814`, :gl:`!5829`, :gl:`!5813`,
+:gl:`!5846`, :gl:`!5654`, :gl:`!5761`, :gl:`!5688`, :gl:`!5889`, :gl:`!5859`,
+:gl:`!5882`, :gl:`!5811`, :gl:`!5898`, :gl:`!5925`, :gl:`!5909`, :gl:`!5902`,
+:gl:`!5888`, :gl:`!5893`, :gl:`!5884`, :gl:`!5955`, :gl:`!5692`, :gl:`!5887`,
+:gl:`!5900`, :gl:`!6014`)
 
 Data Availability Layer (ongoing)
 ---------------------------------
 
-Distribution of rollup operations data off-chain. (MRs :gl:`!5711`)
+Distribution of rollup operations data off-chain. (MRs :gl:`!5711`, :gl:`!5938`)
 
 Breaking Changes
 ----------------
@@ -45,6 +51,9 @@ RPC Changes
   give inconsistent results on such operations, which was not
   documented. It now returns on error when called on a consensus
   operation. (MR :gl:`!5707`)
+
+- New RPC ``/chains/<chain_id>/blocks/<block>/context/constants/parametric``
+  returning the value of the parametric constants. (MR :gl:`!5867`)
 
 Operation receipts
 ------------------
@@ -71,8 +80,12 @@ Minor Changes
 - New error ``Conflicting_nonce_revelation`` (MR
   :gl:`!5849`)
 
+- Patch smart contracts containing deprecated annotations. (MR :gl:`!5752`)
+
 Internal
 --------
+
+- Update migration for Kathmandu. (MR :gl:`!5837`)
 
 - Get rid of unparsing_mode. (MR :gl:`!5738`)
 
@@ -81,7 +94,11 @@ Internal
 - Remove Coq attributes. (MR :gl:`!5735`)
 
 - Internal refactorings in Michelson typechecker and interpreter. (MRs
-  :gl:`!5586`, :gl:`!5587`)
+  :gl:`!5586`, :gl:`!5587`, :gl:`!5803`, :gl:`!5804`, :gl:`!5809`, :gl:`!5942`)
+
+- Ensure payer is an implicit account. (MR :gl:`!5850`)
+
+- Derive LB subsidy amount from other constants. (MR :gl:`!5875`)
 
 - Refactor the ``run_operation`` RPC. This allowed us to remove a
   function from ``Validate_operation.TMP_for_plugin`` and to no longer
