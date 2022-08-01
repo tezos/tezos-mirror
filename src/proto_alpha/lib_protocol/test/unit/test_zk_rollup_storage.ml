@@ -134,6 +134,83 @@ module Raw_context_tests = struct
     let** _ctx, pending = Storage.Zk_rollup.Pending_list.get ctx rollup in
     assert (Helpers.is_empty pending) ;
     return_unit
+
+  (* Check that appending an L2 operation with the [add_to_pending] helper
+     correctly updates both the pending list descriptor and the actual
+     operations under the [pending_operations] directory. *)
+  let pending_list_append () =
+    let open Lwt_result_syntax in
+    let* ctx, rollup, _contract = originate_ctx () in
+    let pkh, _, _ = Signature.generate_key () in
+    let op =
+      no_ticket
+        Zk_rollup_operation_repr.
+          {
+            op_code = 0;
+            price = {id = Ticket_hash_repr.zero; amount = Z.zero};
+            l1_dst = pkh;
+            rollup_id = rollup;
+            payload = [||];
+          }
+    in
+    (* Append first operation *)
+    let** ctx, _size = Zk_rollup_storage.add_to_pending ctx rollup [op] in
+    let** ctx, pending = Storage.Zk_rollup.Pending_list.get ctx rollup in
+    assert (Helpers.pending_length pending = 1) ;
+    let* ctx, ops = Helpers.get_pending_list ctx rollup pending in
+    assert (List.length ops = 1) ;
+    (* Append second operation *)
+    let** ctx, _size = Zk_rollup_storage.add_to_pending ctx rollup [op] in
+    let** ctx, pending = Storage.Zk_rollup.Pending_list.get ctx rollup in
+    let* _ctx, ops = Helpers.get_pending_list ctx rollup pending in
+    assert (Helpers.pending_length pending = 2) ;
+    assert (List.length ops = 2) ;
+    return_unit
+
+  let pending_list_append_errors () =
+    let open Lwt_result_syntax in
+    let* ctx, rollup, _contract = originate_ctx () in
+    let pkh, _, _ = Signature.generate_key () in
+    let op =
+      no_ticket
+        Zk_rollup_operation_repr.
+          {
+            op_code = 0;
+            price = {id = Ticket_hash_repr.zero; amount = Z.zero};
+            l1_dst = pkh;
+            rollup_id = rollup;
+            payload = [||];
+          }
+    in
+    (* Append first operation *)
+    let** ctx, _size = Zk_rollup_storage.add_to_pending ctx rollup [op] in
+    let** ctx, pending = Storage.Zk_rollup.Pending_list.get ctx rollup in
+    assert (Helpers.pending_length pending = 1) ;
+    let* ctx, ops = Helpers.get_pending_list ctx rollup pending in
+    assert (List.length ops = 1) ;
+    (* Invalid op code *)
+    let wrong_op =
+      no_ticket
+        Zk_rollup_operation_repr.
+          {
+            op_code = 1;
+            price = {id = Ticket_hash_repr.zero; amount = Z.zero};
+            l1_dst = pkh;
+            rollup_id = rollup;
+            payload = [||];
+          }
+    in
+    let*! e = Zk_rollup_storage.add_to_pending ctx rollup [wrong_op] >>= wrap in
+    let* () =
+      Assert.proto_error_with_info ~loc:__LOC__ e "Invalid op code in append"
+    in
+    (* Invalid rollup address *)
+    let* _ctx, nonce = Raw_context.increment_origination_nonce ctx |> wrap in
+    let* address =
+      Zk_rollup_repr.Address.from_nonce (Origination_nonce.incr nonce) |> wrap
+    in
+    let*! _e = Zk_rollup_storage.add_to_pending ctx address [op] >>= wrap in
+    return_unit
 end
 
 let tests =
@@ -142,4 +219,12 @@ let tests =
       "origination_pending_is_empty"
       `Quick
       Raw_context_tests.pending_list_origination_is_empty;
+    Tztest.tztest
+      "pending_list_append"
+      `Quick
+      Raw_context_tests.pending_list_append;
+    Tztest.tztest
+      "pending_list_append errors"
+      `Quick
+      Raw_context_tests.pending_list_append_errors;
   ]
