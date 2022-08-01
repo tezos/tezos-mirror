@@ -31,8 +31,18 @@ let all_equal (l : int list) =
   in
   match l with [] -> true | hd :: tl -> loop tl hd
 
+module String_set = Set.Make (String)
+
+let disjoint_headers (csv1 : csv) (csv2 : csv) =
+  match (csv1, csv2) with
+  | [], _ | _, [] -> true
+  | header1 :: _, header2 :: _ ->
+      let header1 = String_set.of_list header1 in
+      let header2 = String_set.of_list header2 in
+      String_set.disjoint header1 header2
+
 (* Horizontally concat CSVs *)
-let concat (csv1 : csv) (csv2 : csv) : csv =
+let concat ?(check_disjoint_headers = true) (csv1 : csv) (csv2 : csv) : csv =
   (* Check that both CSVs have the same number of lines. *)
   if Compare.List_lengths.(csv1 <> csv2) then
     Stdlib.failwith "Csv.concat: CSVs have different length"
@@ -45,6 +55,9 @@ let concat (csv1 : csv) (csv2 : csv) : csv =
       Stdlib.failwith msg
     else if not (all_equal lengths2) then
       let msg = "Csv.concat: second argument has uneven # of lines" in
+      Stdlib.failwith msg
+    else if check_disjoint_headers && not (disjoint_headers csv1 csv2) then
+      let msg = "Csv.concat: headers are not disjoint" in
       Stdlib.failwith msg
     else
       (* see top if condition *)
