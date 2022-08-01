@@ -86,40 +86,15 @@ local prometheus = grafana.prometheus;
     ),
 
   storage:
-    local total = 'Total';
-    local context = 'Context store';
-    local context_index = 'Context index';
-    local store = 'Store';
     graphPanel.new(
       title='Storage',
       datasource='Prometheus',
       linewidth=1,
-      format='mbytes',
-      aliasColors={
-        [total]: 'light-green',
-        [context]: 'light-orange',
-        [context_index]: 'light-yellow',
-        [store]: 'light-blue',
-      },
+      format='bytes',
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_storage_total',
-        legendFormat=total,
-      )
-    ).addTarget(
-      prometheus.target(
-        'tezos_metrics_storage_context',
-        legendFormat=context,
-      )
-    ).addTarget(
-      prometheus.target(
-        'tezos_metrics_storage_index',
-        legendFormat=context_index,
-      )
-    ).addTarget(
-      prometheus.target(
-        'tezos_metrics_storage_store',
-        legendFormat=store,
+        'netdata_filecheck_dir_size_bytes_average',
+        legendFormat='{{dimension}}',
       )
     ),
 
