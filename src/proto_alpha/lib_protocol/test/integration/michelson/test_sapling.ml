@@ -648,12 +648,12 @@ module Interpreter_tests = struct
         list_addr
     in
     (let pkh = Context.Contract.pkh src1 in
-     (* dummy context used only for pack_data *)
-     Block.alpha_context
-       [(Account.activator_account, Tez.of_mutez_exn 100_000_000_000L, None)]
-     >>=? fun ctx ->
-     Script_ir_translator.pack_data ctx Script_typed_ir.key_hash_t pkh >>= wrap)
-    >>=? fun (bound_data, _) ->
+     Incremental.begin_construction b3 >>=? fun incr ->
+     let alpha_ctxt = Incremental.alpha_ctxt incr in
+     Script_ir_translator.pack_data alpha_ctxt Script_typed_ir.key_hash_t pkh
+     >>= wrap
+     >>=? fun (bound_data, _alpha_ctxt) -> return bound_data)
+    >>=? fun bound_data ->
     let hex_transac =
       to_hex
         (Tezos_sapling.Forge.forge_transaction
