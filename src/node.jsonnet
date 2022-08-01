@@ -611,7 +611,7 @@ local node_instance = '{' + std.extVar('node_instance_label') + '="$node_instanc
       },
     ).addTarget(
       prometheus.target(
-        'ocaml_gc_heap_words' + node_instance,
+        'ocaml_gc_heap_words' + node_instance + '* 8',
         legendFormat=major,
       )
     ),
