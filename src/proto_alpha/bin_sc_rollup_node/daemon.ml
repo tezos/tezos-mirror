@@ -313,8 +313,32 @@ module Make (PVM : Pvm.S) = struct
     let* () = Event.shutdown_node exit_status in
     Tezos_base_unix.Internal_event_unix.close ()
 
+  let check_initial_state_hash {Node_context.cctxt; rollup_address; _} store =
+    let open Lwt_result_syntax in
+    let* l1_reference_initial_state_hash =
+      RPC.Sc_rollup.initial_pvm_state_hash
+        cctxt
+        (cctxt#chain, cctxt#block)
+        rollup_address
+    in
+    let*! s = PVM.initial_state store in
+    let*! l2_initial_state_hash = PVM.state_hash s in
+    if
+      not
+        Sc_rollup.State_hash.(
+          l1_reference_initial_state_hash = l2_initial_state_hash)
+    then
+      let*! () =
+        Daemon_event.wrong_initial_pvm_state_hash
+          l2_initial_state_hash
+          l1_reference_initial_state_hash
+      in
+      Lwt_exit.exit_and_raise 1
+    else return_unit
+
   let run node_ctxt configuration store =
     let open Lwt_result_syntax in
+    let* () = check_initial_state_hash node_ctxt store in
     let start () =
       let* rpc_server =
         Components.RPC_server.start node_ctxt store configuration
