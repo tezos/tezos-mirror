@@ -3143,7 +3143,7 @@ module Sc_rollup : sig
 
       val get_tick : state -> Tick.t Lwt.t
 
-      type status = Halted | WaitingForInputMessage | Parsing | Evaluating
+      type status = Halted | Waiting_for_input_message | Parsing | Evaluating
 
       val get_status : state -> status Lwt.t
     end
@@ -3197,7 +3197,7 @@ module Sc_rollup : sig
 
       val get_tick : state -> Tick.t Lwt.t
 
-      type status = Computing | WaitingForInputMessage
+      type status = Computing | Waiting_for_input_message
 
       val get_status : state -> status Lwt.t
 

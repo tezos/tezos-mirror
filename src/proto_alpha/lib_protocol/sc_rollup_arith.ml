@@ -88,7 +88,7 @@ module type S = sig
 
   val get_tick : state -> Sc_rollup_tick_repr.t Lwt.t
 
-  type status = Halted | WaitingForInputMessage | Parsing | Evaluating
+  type status = Halted | Waiting_for_input_message | Parsing | Evaluating
 
   val get_status : state -> status Lwt.t
 
@@ -166,7 +166,7 @@ module Make (Context : P) :
 
   type tree = Tree.tree
 
-  type status = Halted | WaitingForInputMessage | Parsing | Evaluating
+  type status = Halted | Waiting_for_input_message | Parsing | Evaluating
 
   type instruction =
     | IPush : int -> instruction
@@ -552,7 +552,7 @@ module Make (Context : P) :
         Data_encoding.string_enum
           [
             ("Halted", Halted);
-            ("WaitingForInput", WaitingForInputMessage);
+            ("Waiting_for_input_message", Waiting_for_input_message);
             ("Parsing", Parsing);
             ("Evaluating", Evaluating);
           ]
@@ -561,7 +561,7 @@ module Make (Context : P) :
 
       let string_of_status = function
         | Halted -> "Halted"
-        | WaitingForInputMessage -> "WaitingForInputMessage"
+        | Waiting_for_input_message -> "Waiting for input message"
         | Parsing -> "Parsing"
         | Evaluating -> "Evaluating"
 
@@ -794,7 +794,7 @@ module Make (Context : P) :
     let open Monad.Syntax in
     let* () = Status.create in
     let* () = NextMessage.create in
-    let* () = Status.set WaitingForInputMessage in
+    let* () = Status.set Waiting_for_input_message in
     return ()
 
   let result_of ~default m state =
@@ -813,7 +813,7 @@ module Make (Context : P) :
     let open Monad.Syntax in
     let* status = Status.get in
     match status with
-    | WaitingForInputMessage -> (
+    | Waiting_for_input_message -> (
         let* level = CurrentLevel.get in
         let* counter = MessageCounter.get in
         match counter with
@@ -824,7 +824,7 @@ module Make (Context : P) :
   let is_input_state =
     result_of ~default:PS.No_input_required @@ is_input_state_monadic
 
-  let get_status = result_of ~default:WaitingForInputMessage @@ Status.get
+  let get_status = result_of ~default:Waiting_for_input_message @@ Status.get
 
   let get_code = result_of ~default:[] @@ Code.to_list
 
@@ -870,7 +870,7 @@ module Make (Context : P) :
     | None ->
         let* () = CurrentLevel.set inbox_level in
         let* () = MessageCounter.set (Some message_counter) in
-        let* () = Status.set WaitingForInputMessage in
+        let* () = Status.set Waiting_for_input_message in
         return ()
 
   let set_input input = state_of @@ set_input_monadic input
@@ -932,7 +932,7 @@ module Make (Context : P) :
   let stop_evaluating outcome =
     let open Monad.Syntax in
     let* () = EvaluationResult.set (Some outcome) in
-    Status.set WaitingForInputMessage
+    Status.set Waiting_for_input_message
 
   let parse : unit t =
     let open Monad.Syntax in
@@ -1048,7 +1048,7 @@ module Make (Context : P) :
 
   let reboot =
     let open Monad.Syntax in
-    let* () = Status.set WaitingForInputMessage in
+    let* () = Status.set Waiting_for_input_message in
     let* () = Stack.clear in
     let* () = Code.clear in
     return ()
@@ -1062,7 +1062,7 @@ module Make (Context : P) :
         let* status = Status.get in
         match status with
         | Halted -> boot
-        | WaitingForInputMessage -> (
+        | Waiting_for_input_message -> (
             let* msg = NextMessage.get in
             match msg with
             | None ->

@@ -89,7 +89,7 @@ module V2_0_0 = struct
     val get_tick : state -> Sc_rollup_tick_repr.t Lwt.t
 
     (** PVM status *)
-    type status = Computing | WaitingForInputMessage
+    type status = Computing | Waiting_for_input_message
 
     (** [get_status state] gives you the current execution status for the PVM. *)
     val get_status : state -> status Lwt.t
@@ -152,7 +152,7 @@ module V2_0_0 = struct
 
     type tree = Tree.tree
 
-    type status = Computing | WaitingForInputMessage
+    type status = Computing | Waiting_for_input_message
 
     module State = struct
       type state = tree
@@ -249,7 +249,7 @@ module V2_0_0 = struct
       @@
       match info.input_request with
       | No_input_required -> Computing
-      | Input_required -> WaitingForInputMessage
+      | Input_required -> Waiting_for_input_message
 
     let get_last_message_read : _ Monad.t =
       let open Monad.Syntax in
@@ -267,7 +267,7 @@ module V2_0_0 = struct
       let open Monad.Syntax in
       let* status = get_status in
       match status with
-      | WaitingForInputMessage -> (
+      | Waiting_for_input_message -> (
           let* last_read = get_last_message_read in
           match last_read with
           | Some (level, n) -> return (PS.First_after (level, n))

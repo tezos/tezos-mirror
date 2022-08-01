@@ -98,7 +98,7 @@ module Impl : Pvm.S = struct
   let string_of_status status =
     match status with
     | Halted -> "Halted"
-    | WaitingForInputMessage -> "WaitingForInputMessage"
+    | Waiting_for_input_message -> "Waiting for input message"
     | Parsing -> "Parsing"
     | Evaluating -> "Evaluating"
 end
