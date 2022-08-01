@@ -779,3 +779,17 @@ val zk_rollup_publish :
   zk_rollup:Zk_rollup.t ->
   ops:(Zk_rollup.Operation.t * Zk_rollup.Ticket.t option) list ->
   Operation.packed tzresult Lwt.t
+
+(** [zk_rollup_update ctxt source ~zk_rollup ~update] tries to apply an update
+    to a ZK Rollup. *)
+val zk_rollup_update :
+  ?force_reveal:bool ->
+  ?counter:Manager_counter.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  zk_rollup:Zk_rollup.t ->
+  update:Zk_rollup.Update.t ->
+  Operation.packed tzresult Lwt.t
