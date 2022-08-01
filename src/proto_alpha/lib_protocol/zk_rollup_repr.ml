@@ -140,6 +140,10 @@ module Index = struct
   let compare = Address.compare
 end
 
+let in_memory_size (_ : t) =
+  let open Cache_memory_helpers in
+  h1w +! string_size_gen Address.size
+
 module Internal_for_tests = struct
   let originated_zk_rollup nonce =
     let data =

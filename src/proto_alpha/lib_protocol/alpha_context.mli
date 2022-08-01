@@ -3752,6 +3752,7 @@ module Destination : sig
     | Contract of Contract.t
     | Tx_rollup of Tx_rollup.t
     | Sc_rollup of Sc_rollup.t
+    | Zk_rollup of Zk_rollup.t
 
   val encoding : t Data_encoding.t
 

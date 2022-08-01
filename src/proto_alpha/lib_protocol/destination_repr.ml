@@ -29,6 +29,8 @@ type t =
   | Contract of Contract_repr.t
   | Tx_rollup of Tx_rollup_repr.t
   | Sc_rollup of Sc_rollup_repr.t
+  | Zk_rollup of Zk_rollup_repr.t
+
 (* If you add more cases to this type, please update the
    [test_compare_destination] test in
    [test/unit/test_destination_repr.ml] to ensure that the compare
@@ -43,6 +45,7 @@ include Compare.Make (struct
     | Contract k1, Contract k2 -> Contract_repr.compare k1 k2
     | Tx_rollup k1, Tx_rollup k2 -> Tx_rollup_repr.compare k1 k2
     | Sc_rollup k1, Sc_rollup k2 -> Sc_rollup_repr.Address.compare k1 k2
+    | Zk_rollup k1, Zk_rollup k2 -> Zk_rollup_repr.Address.compare k1 k2
     (* This function is used by the Michelson interpreter to compare
        addresses. It is of significant importance to remember that in
        Michelson, address comparison is used to distinguish between
@@ -54,12 +57,15 @@ include Compare.Make (struct
     | _, Contract _ -> 1
     | Tx_rollup _, _ -> -1
     | _, Tx_rollup _ -> 1
+    | Sc_rollup _, _ -> -1
+    | _, Sc_rollup _ -> 1
 end)
 
 let to_b58check = function
   | Contract k -> Contract_repr.to_b58check k
   | Tx_rollup k -> Tx_rollup_repr.to_b58check k
   | Sc_rollup k -> Sc_rollup_repr.Address.to_b58check k
+  | Zk_rollup k -> Zk_rollup_repr.Address.to_b58check k
 
 type error += Invalid_destination_b58check of string
 
@@ -76,14 +82,15 @@ let () =
     (fun x -> Invalid_destination_b58check x)
 
 let of_b58data data =
-  match Contract_repr.of_b58data data with
-  | Some c -> Some (Contract c)
-  | None -> (
-      match Tx_rollup_repr.of_b58data data with
-      | Some tx_rollup -> Some (Tx_rollup tx_rollup)
-      | None ->
-          Sc_rollup_repr.Address.of_b58data data
-          |> Option.map (fun sc_rollup -> Sc_rollup sc_rollup))
+  let decode_on_none decode wrap = function
+    | Some x -> Some x
+    | None -> Option.map wrap @@ decode data
+  in
+  None
+  |> decode_on_none Contract_repr.of_b58data (fun c -> Contract c)
+  |> decode_on_none Tx_rollup_repr.of_b58data (fun t -> Tx_rollup t)
+  |> decode_on_none Sc_rollup_repr.Address.of_b58data (fun s -> Sc_rollup s)
+  |> decode_on_none Zk_rollup_repr.Address.of_b58data (fun z -> Zk_rollup z)
 
 let of_b58check_opt s = Option.bind (Base58.decode s) of_b58data
 
@@ -122,6 +129,12 @@ let encoding =
                   ~title:"Sc_rollup"
                   (function Sc_rollup k -> Some k | _ -> None)
                   (fun k -> Sc_rollup k);
+                case
+                  (Tag 4)
+                  (Fixed.add_padding Zk_rollup_repr.Address.encoding 1)
+                  ~title:"Zk_rollup"
+                  (function Zk_rollup k -> Some k | _ -> None)
+                  (fun k -> Zk_rollup k);
               ]))
        ~json:
          (conv
@@ -139,6 +152,7 @@ let pp : Format.formatter -> t -> unit =
   | Contract k -> Contract_repr.pp fmt k
   | Tx_rollup k -> Tx_rollup_repr.pp fmt k
   | Sc_rollup k -> Sc_rollup_repr.pp fmt k
+  | Zk_rollup k -> Zk_rollup_repr.Address.pp fmt k
 
 let in_memory_size =
   let open Cache_memory_helpers in
@@ -146,3 +160,4 @@ let in_memory_size =
   | Contract k -> h1w +! Contract_repr.in_memory_size k
   | Tx_rollup k -> h1w +! Tx_rollup_repr.in_memory_size k
   | Sc_rollup k -> h1w +! Sc_rollup_repr.in_memory_size k
+  | Zk_rollup k -> h1w +! Zk_rollup_repr.in_memory_size k
