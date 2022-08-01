@@ -32,7 +32,7 @@ let initial_balance = 4_000_000_000_000L
 let context_init_memory ~rng_state =
   Context.init_n
     ~rng_state
-    ~initial_balances:
+    ~bootstrap_balances:
       [
         initial_balance;
         initial_balance;

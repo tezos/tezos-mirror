@@ -43,7 +43,7 @@ let lift k = Lwt.map Environment.wrap_tzresult k
     credited with 100 000 tez. *)
 let new_context_with_stakers nb_stakers =
   let initial_balance = Int64.of_string "100_000_000_000" in
-  let*? initial_balances =
+  let*? bootstrap_balances =
     List.init ~when_negative_length:[] nb_stakers (fun _ -> initial_balance)
   in
   let sc_rollup_max_number_of_messages_per_commitment_period =
@@ -52,7 +52,7 @@ let new_context_with_stakers nb_stakers =
   in
   let* b, contracts =
     Context.init_n
-      ~initial_balances
+      ~bootstrap_balances
       nb_stakers
       ~sc_rollup_max_number_of_messages_per_commitment_period
       ()

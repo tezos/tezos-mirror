@@ -41,17 +41,12 @@ let wrap e = e >|= Environment.wrap_tzresult
 (** Creates a context with a single account. Returns the context and the public
     key hash of the account. *)
 let create_context () =
-  let accounts = Account.generate_accounts 1 in
-  let bootstrap_accounts =
-    List.map
-      (fun (Account.{pk; pkh; _}, amount, delegate_to) ->
-        Default_parameters.make_bootstrap_account
-          (pkh, pk, amount, delegate_to, None))
-      accounts
-  in
-  Block.alpha_context bootstrap_accounts >>=? fun ctxt ->
+  let open Lwt_result_syntax in
+  let*? accounts = Account.generate_accounts 1 in
+  let bootstrap_accounts = Account.make_bootstrap_accounts accounts in
+  let* ctxt = Block.alpha_context bootstrap_accounts in
   match accounts with
-  | [({pkh; _}, _, _)] -> return (ctxt, pkh)
+  | [{pkh; _}] -> return (ctxt, pkh)
   | _ -> (* Exactly one account has been generated. *) assert false
 
 let random_amount () =

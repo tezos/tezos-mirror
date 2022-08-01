@@ -39,15 +39,9 @@ open Alpha_context
 
 (** Creates an Alpha_context without creating a full-fledged block *)
 let create () =
-  let accounts = Account.generate_accounts 1 in
-  let bootstrap_accounts =
-    List.map
-      (fun (Account.{pk; pkh; _}, amount, delegate_to) ->
-        Tezos_protocol_alpha_parameters.Default_parameters
-        .make_bootstrap_account
-          (pkh, pk, amount, delegate_to, None))
-      accounts
-  in
+  let open Lwt_result_syntax in
+  let*? accounts = Account.generate_accounts 1 in
+  let bootstrap_accounts = Account.make_bootstrap_accounts accounts in
   Block.alpha_context bootstrap_accounts
 
 let assert_equal_key_values ~loc kvs1 kvs2 =

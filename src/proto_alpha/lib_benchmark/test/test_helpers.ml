@@ -43,7 +43,7 @@ let typecheck_by_tezos =
   let context_init_memory ~rng_state =
     Context.init_n
       ~rng_state
-      ~initial_balances:
+      ~bootstrap_balances:
         [
           4_000_000_000_000L;
           4_000_000_000_000L;

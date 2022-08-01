@@ -304,32 +304,28 @@ let undelegated_originated_bootstrap_contract () =
   | Some _ -> failwith "Bootstrap contract should be undelegated (%s)" __LOC__
 
 let delegated_implicit_bootstrap_contract () =
-  (* These values are fixed because we use a fixed RNG seed. *)
-  let from_pkh =
-    Signature.Public_key_hash.of_b58check_exn
-      "tz1TDZG4vFoA2xutZMYauUnS4HVucnAGQSpZ"
+  Account.generate_accounts 2 >>?= fun accounts ->
+  let to_pkh, from_pkh =
+    match accounts with
+    | [account1; account2] -> (account1.pkh, account2.pkh)
+    | _ -> assert false
   in
-  let to_pkh =
-    Signature.Public_key_hash.of_b58check_exn
-      "tz1MBWU1WkszFfkEER2pgn4ATKXE9ng7x1sR"
+  let bootstrap_delegations = [None; Some to_pkh] in
+  let bootstrap_accounts =
+    Account.make_bootstrap_accounts ~bootstrap_delegations accounts
   in
-  let bootstrap_delegations = [(from_pkh, to_pkh)] in
-  let rng_state = Random.State.make [|0|] in
-  Context.init2 ~rng_state ~bootstrap_delegations ()
-  >>=? fun (b, (contract1, _contract2)) ->
-  Block.bake b >>=? fun b ->
-  Context.Contract.delegate_opt (B b) contract1 >>=? fun delegate0 ->
-  (match delegate0 with
-  | Some contract when contract = to_pkh -> return_unit
-  | Some _ | None ->
-      failwith "Bootstrap contract should be delegated (%s)" __LOC__)
+  Block.genesis bootstrap_accounts >>=? fun b ->
+  (Context.Contract.delegate_opt (B b) (Implicit from_pkh) >>=? function
+   | Some pkh when pkh = to_pkh -> return_unit
+   | Some _ | None ->
+       failwith "Bootstrap contract should be delegated (%s)." __LOC__)
   >>=? fun () ->
   (* Test delegation amount *)
   Incremental.begin_construction b >>=? fun i ->
   let ctxt = Incremental.alpha_ctxt i in
-  Delegate.delegated_balance ctxt to_pkh >>= fun result ->
-  Lwt.return @@ Environment.wrap_tzresult result >>=? fun amount ->
-  Assert.equal_tez ~loc:__LOC__ amount (Tez.of_mutez_exn 4000000000000L)
+  Delegate.delegated_balance ctxt to_pkh >|= Environment.wrap_tzresult
+  >>=? fun amount ->
+  Assert.equal_tez ~loc:__LOC__ amount (Tez.of_mutez_exn 4_000_000_000_000L)
 
 let tests_bootstrap_contracts =
   [

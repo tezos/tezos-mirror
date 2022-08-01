@@ -200,9 +200,9 @@ let check_chunks_count tree expected =
   else failwith "wrong chunks counter, expected %d, got %d" expected count
 
 let operator () =
-  match Account.generate_accounts 1 with
-  | [(account, _, _)] -> account
-  | _ -> assert false
+  let open Result_syntax in
+  let* accounts = Account.generate_accounts 1 in
+  match accounts with [operator] -> return operator | _ -> assert false
 
 let should_boot_complete_boot_sector boot_sector () =
   let open Tezos_scoru_wasm.Gather_floppies in
@@ -258,7 +258,7 @@ let floppy_input i operator chunk =
 
 let should_interpret_empty_chunk () =
   let open Lwt_result_syntax in
-  let op = operator () in
+  let*? op = operator () in
   let chunk_size = Tezos_scoru_wasm.Gather_floppies.chunk_size in
   let origination_message =
     Data_encoding.Binary.to_string_exn
@@ -286,8 +286,8 @@ let should_interpret_empty_chunk () =
 
 let should_refuse_chunks_with_incorrect_signature () =
   let open Lwt_result_syntax in
-  let good_op = operator () in
-  let bad_op = operator () in
+  let*? good_op = operator () in
+  let*? bad_op = operator () in
   let chunk_size = Tezos_scoru_wasm.Gather_floppies.chunk_size in
   let origination_message =
     Data_encoding.Binary.to_string_exn
@@ -321,7 +321,7 @@ let should_refuse_chunks_with_incorrect_signature () =
 
 let should_boot_incomplete_boot_sector kernel () =
   let open Lwt_result_syntax in
-  let operator = operator () in
+  let*? operator = operator () in
   let chunk_size = Tezos_scoru_wasm.Gather_floppies.chunk_size in
   let initial_chunk, rem_chunks =
     let split_chunk s =
@@ -448,13 +448,14 @@ let should_boot_computation_kernel () =
   return_unit
 
 let tests =
+  let open Lwt_result_syntax in
   [
     Tztest.tztest "should boot a complete boot sector" `Quick
     @@ should_boot_complete_boot_sector
          (complete_boot_sector (Bytes.of_string @@ computation_kernel ()));
     ( Tztest.tztest "should boot an incomplete but too small boot sector" `Quick
     @@ fun () ->
-      let operator = operator () in
+      let*? operator = operator () in
       should_boot_complete_boot_sector
         (incomplete_boot_sector "\x00asm\x01\x00\x00\x00" operator)
         () );
