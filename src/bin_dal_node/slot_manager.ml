@@ -149,7 +149,8 @@ let get_shard store slot_header shard_id =
 let check_shards shards =
   let open Result_syntax in
   if shards = [] then fail [Slot_not_found]
-  else if Compare.List_length_with.(shards = Cryptobox.Constants.shards_amount)
+  else if
+    Compare.List_length_with.(shards = Cryptobox.Constants.number_of_shards)
   then Ok ()
   else fail [Missing_shards]
 

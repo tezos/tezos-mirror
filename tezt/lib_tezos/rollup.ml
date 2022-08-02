@@ -534,11 +534,7 @@ module Dal = struct
   let make
       Parameters.{redundancy_factor; number_of_shards; slot_size; segment_size}
       =
-    Cryptobox.make
-      ~redundancy_factor
-      ~slot_size
-      ~segment_size
-      ~shards_amount:number_of_shards
+    Cryptobox.make ~redundancy_factor ~slot_size ~segment_size ~number_of_shards
 
   let load_srs ?(unsafe = false) t =
     if unsafe then Cryptobox.srs t
