@@ -88,20 +88,43 @@ let rec convert_element (element : Json_schema.element) : Openapi.Schema.t =
     | Combine (combinator, elements) ->
         assert (element.enum = None) ;
         assert (combinator = One_of) ;
-        let null =
-          List.exists
-            (function
-              | e -> (
-                  match e.Json_schema.kind with Null -> true | _ -> false))
-            elements
+        (* Null elements in a [Combine] kind can either be represented with [Null] kind,
+           or with the following [Object]:
+           { /* None */
+             "none": null }
+           Function [is_null] catches both those cases.
+
+           FIXME: #3484
+           Remove this encoding of [null] from Octez
+        *)
+        let is_null e =
+          let open Json_schema in
+          match e with
+          | {kind = Null; _}
+          | {
+              kind =
+                Object
+                  {
+                    properties = [("none", {kind = Null; _}, true, None)];
+                    pattern_properties = [];
+                    additional_properties = None;
+                    min_properties = 0;
+                    max_properties = None;
+                    schema_dependencies = [];
+                    property_dependencies = [];
+                  };
+              title = Some "None";
+              description = None;
+              default = None;
+              format = None;
+              enum = None;
+              id = None;
+            } ->
+              true
+          | _ -> false
         in
-        let elements =
-          List.filter
-            (function
-              | e -> (
-                  match e.Json_schema.kind with Null -> false | _ -> true))
-            elements
-        in
+        let null = List.exists is_null elements in
+        let elements = List.filter (fun e -> not @@ is_null e) elements in
         fun ?title ?description ?(nullable = false) () ->
           Openapi.Schema.one_of
             ?title
