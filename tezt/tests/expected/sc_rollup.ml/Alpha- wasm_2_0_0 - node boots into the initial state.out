@@ -32,3 +32,13 @@ This sequence of operations was run:
         [PUBLIC_KEY_HASH] ... -ꜩ2.67175
         storage fees ........................... +ꜩ2.67175
 
+
+./tezos-client rpc get '/chains/main/blocks/head/context/sc_rollup/[SC_ROLLUP_HASH]/genesis_info'
+{ "level": 2,
+  "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
+
+./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
+"0"
+
+./tezos-sc-rollup-client-alpha rpc get /global/status
+"Computing"
