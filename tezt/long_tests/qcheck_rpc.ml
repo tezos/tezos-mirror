@@ -91,6 +91,8 @@ type rpc_input =
   | Object : property list -> rpc_input
   | One_of : rpc_input list -> rpc_input
   | Mich_exp : rpc_input
+  | Tree_encoding : rpc_input
+  | Inode_tree : rpc_input
 
 (* A JSON object field *)
 and property = {name : string; required : bool; payload : rpc_input}
@@ -175,9 +177,11 @@ module RPC_Index = struct
   let rec parse_input env schema : (rpc_input, string) result =
     let open Schema in
     match schema with
-    (* These first two references are circular. *)
+    (* These first four references are circular. *)
     | Ref "bignum" -> Ok Z
     | Ref "micheline.alpha.michelson_v1.expression" -> Ok Mich_exp
+    | Ref "tree_encoding" -> Ok Tree_encoding
+    | Ref "inode_tree" -> Ok Inode_tree
     | Ref str -> parse_input env @@ String_map.find str env
     | Other {kind = Boolean; _} -> Ok Boolean
     | Other {kind = Integer {minimum; maximum; enum = None}; _} ->
@@ -365,6 +369,15 @@ module Gen = struct
     in
     micheline_node_gen >|= Data_encoding.Json.construct node_encoding
 
+  (* TODO: Those trivial implementations are here to prevent the parsing
+     of "tree_encoding" and "inode_tree" references from generating stack
+     overflows (these references are circular) and crashing tests.
+     We ought to make proper implementations if we want the tests
+     to be significant. *)
+  let tree_encoding_gen = QCheck2.Gen.return `Null
+
+  let inode_tree_gen = QCheck2.Gen.return `Null
+
   (* Random path generation *)
   (* ---------------------- *)
 
@@ -422,6 +435,8 @@ module Gen = struct
         |> QCheck2.Gen.flatten_l
         |> QCheck2.Gen.map (fun inputs -> `O (List.combine names inputs))
     | Mich_exp -> micheline_exp_gen
+    | Tree_encoding -> tree_encoding_gen
+    | Inode_tree -> inode_tree_gen
 
   let input_gen opt_rpc_input : Ezjsonm.value option t =
     Option.map known_input_gen opt_rpc_input |> QCheck2.Gen.flatten_opt
