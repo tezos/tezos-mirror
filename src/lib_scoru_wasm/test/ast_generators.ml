@@ -295,7 +295,7 @@ let func_gen current_module =
   let ast_func () =
     let* func_type = func_type_gen in
     let* func = func_gen in
-    return @@ Func.AstFunc (func_type, current_module (), func)
+    return @@ Func.AstFunc (func_type, current_module, func)
   in
   oneof
     [
@@ -397,19 +397,22 @@ let allocations_gen =
   let+ datas = datas_table_gen in
   Ast.{blocks; datas}
 
-let module_gen () =
-  let current_module = ref None in
-  let get_current_module () =
-    match !current_module with
-    | Some c -> c
-    | None -> Stdlib.failwith "Current module not initialized"
+let module_gen ?module_reg () =
+  let module_reg =
+    match module_reg with
+    | None -> Instance.ModuleMap.create ()
+    | Some module_reg -> module_reg
+  in
+  let* module_name = string_printable in
+  let module_ref =
+    Instance.(alloc_module_ref (Module_key module_name) module_reg)
   in
   let* types = vector_gen func_type_gen in
-  let* funcs = vector_gen @@ func_gen get_current_module in
+  let* funcs = vector_gen @@ func_gen module_ref in
   let* tables = vector_gen table_gen in
   let* memories = vector_gen memory_gen in
   let* globals = vector_gen global_gen in
-  let* exports = map_gen (extern_gen get_current_module) in
+  let* exports = map_gen (extern_gen module_ref) in
   let* elems = vector_gen elems_gen in
   let* datas = vector_gen datas_gen in
   let* allocations = allocations_gen in
@@ -426,5 +429,5 @@ let module_gen () =
       allocations;
     }
   in
-  current_module := Some (ref module_) ;
+  Instance.update_module_ref module_ref module_ ;
   return module_

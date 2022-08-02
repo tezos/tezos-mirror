@@ -1,4 +1,14 @@
 open Types
+
+module ModuleMap =
+  Lazy_map.Mutable.Make
+    (Lazy_map.Effect.Lwt)
+    (struct
+      include String
+
+      let to_string = Fun.id
+    end)
+
 module Vector = Lazy_vector.LwtInt32Vector
 
 module NameMap =
@@ -12,6 +22,8 @@ module NameMap =
       let to_string = Utf8.encode_list
     end)
 
+type module_key = Module_key of string
+
 type module_inst = {
   types : func_type Vector.t;
   funcs : func_inst Vector.t;
@@ -24,7 +36,7 @@ type module_inst = {
   allocations : Ast.allocations;
 }
 
-and func_inst = module_inst ref Func.t
+and func_inst = module_ref Func.t
 
 and table_inst = Table.t
 
@@ -45,6 +57,10 @@ and extern =
   | ExternTable of table_inst
   | ExternMemory of memory_inst
   | ExternGlobal of global_inst
+
+and module_reg = module_inst ModuleMap.t
+
+and module_ref = {registry : module_reg; key : module_key}
 
 (* Reference types *)
 
@@ -82,6 +98,23 @@ let empty_module_inst =
     datas = Vector.create 0l;
     allocations = Ast.empty_allocations ();
   }
+
+let empty_module_ref () =
+  let registry = ModuleMap.create () in
+  let key = "empty" in
+  ModuleMap.set key empty_module_inst registry ;
+  {registry; key = Module_key key}
+
+let alloc_module_ref (Module_key mkey as key) ?(module_inst = empty_module_inst)
+    registry =
+  ModuleMap.set mkey module_inst registry ;
+  {registry; key}
+
+let update_module_ref {registry; key = Module_key key} module_inst =
+  ModuleMap.set key module_inst registry
+
+let resolve_module_ref {registry; key = Module_key key} =
+  ModuleMap.get key registry
 
 let extern_type_of = function
   | ExternFunc func -> ExternFuncType (Func.type_of func)

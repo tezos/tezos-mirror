@@ -34,8 +34,7 @@ let abort =
       exit (-1))
 
 let exit =
-  Host_funcs.Host_func
-    (fun _input (_mod_inst : module_inst ref) vs -> exit (int (single vs)))
+  Host_funcs.Host_func (fun _input _mod_inst vs -> exit (int (single vs)))
 
 let register_host_funcs registry =
   Host_funcs.register ~global_name:"abort" abort registry ;

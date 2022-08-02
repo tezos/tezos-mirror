@@ -217,6 +217,8 @@ module type S = sig
     module Make (Map : Lwt_map) : S with type 'a map := 'a Map.t
 
     module NameMap : S with type 'a map := 'a Instance.NameMap.t
+
+    module ModuleMap : S with type 'a map := 'a Instance.ModuleMap.Map.t
   end
 
   module Lazy_vector_encoding_decoding : sig

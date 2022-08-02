@@ -37,50 +37,46 @@ module Make (M : Tree_encoding_decoding.S) : sig
   val instruction_encoding : Ast.instr t
 
   val function_encoding :
-    current_module:Instance.module_inst ref Lazy.t -> Instance.func_inst t
+    module_reg:Instance.module_reg Lazy.t -> Instance.func_inst t
 
   val value_ref_encoding :
-    current_module:Instance.module_inst ref Lazy.t -> Values.ref_ t
+    module_reg:Instance.module_reg Lazy.t -> Values.ref_ t
 
-  val value_encoding :
-    current_module:Instance.module_inst ref Lazy.t -> Values.value t
+  val value_encoding : module_reg:Instance.module_reg Lazy.t -> Values.value t
 
   val memory_encoding : Partial_memory.memory t
 
   val table_encoding :
-    current_module:Instance.module_inst ref Lazy.t -> Partial_table.table t
+    module_reg:Instance.module_reg Lazy.t -> Partial_table.table t
 
-  val global_encoding :
-    current_module:Instance.module_inst ref Lazy.t -> Global.global t
+  val global_encoding : module_reg:Instance.module_reg Lazy.t -> Global.global t
 
   val memory_instance_encoding : Partial_memory.memory Instance.Vector.t t
 
   val table_vector_encoding :
-    current_module:Instance.module_inst ref Lazy.t ->
+    module_reg:Instance.module_reg Lazy.t ->
     Partial_table.table Instance.Vector.t t
 
   val global_vector_encoding :
-    current_module:Instance.module_inst ref Lazy.t ->
-    Global.global Instance.Vector.t t
+    module_reg:Instance.module_reg Lazy.t -> Global.global Instance.Vector.t t
 
   val data_label_ref_encoding : Ast.data_label ref t
 
   val function_vector_encoding :
-    current_module:Instance.module_inst ref Lazy.t ->
+    module_reg:Instance.module_reg Lazy.t ->
     Instance.func_inst Instance.Vector.t t
 
   val function_type_vector_encoding : Types.func_type Instance.Vector.t t
 
   val value_ref_vector_encoding :
-    current_module:Instance.module_inst ref Lazy.t ->
-    Values.ref_ Instance.Vector.t t
+    module_reg:Instance.module_reg Lazy.t -> Values.ref_ Instance.Vector.t t
 
   val extern_map_encoding :
-    current_module:Instance.module_inst ref Lazy.t ->
+    module_reg:Instance.module_reg Lazy.t ->
     Instance.extern Instance.NameMap.t t
 
   val value_ref_vector_vector_encoding :
-    current_module:Instance.module_inst ref Lazy.t ->
+    module_reg:Instance.module_reg Lazy.t ->
     Values.ref_ Instance.Vector.t ref Instance.Vector.t t
 
   val block_table_encoding : Ast.block_table t
@@ -89,5 +85,8 @@ module Make (M : Tree_encoding_decoding.S) : sig
 
   val allocations_encoding : Ast.allocations t
 
-  val module_instance_encoding : Instance.module_inst t
+  val module_instance_encoding :
+    module_reg:Instance.module_reg Lazy.t -> Instance.module_inst t
+
+  val module_instances_encoding : Instance.module_reg t
 end
