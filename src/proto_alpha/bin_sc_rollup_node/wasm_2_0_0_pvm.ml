@@ -81,10 +81,9 @@ module Impl : Pvm.S = struct
     include Wasm_2_0_0_proof_format
   end)
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3093
-     Print a more informative status.
-  *)
-  let string_of_status _status = "<wasm PVM status>"
+  let string_of_status : status -> string = function
+    | WaitingForInputMessage -> "WaitingForInputMessage"
+    | Computing -> "Computing"
 end
 
 include Impl
