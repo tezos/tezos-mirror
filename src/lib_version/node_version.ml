@@ -64,6 +64,12 @@ let additional_info_encoding =
         (constant "release")
         (function Release -> Some () | _ -> None)
         (fun () -> Release);
+      case
+        (Tag 3)
+        ~title:"RC_dev"
+        (obj1 (req "rc_dev" int31))
+        (function RC_dev n -> Some n | _ -> None)
+        (fun n -> RC_dev n);
     ]
 
 (* The encoding is defined here to keep [Version] "Data_encoding free"*)
