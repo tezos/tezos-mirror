@@ -320,7 +320,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
     | Environment.Ecoproto_error
-        Validate_operation.Manager.Gas_quota_exceeded_init_deserialize
+        Validate_errors.Manager.Gas_quota_exceeded_init_deserialize
       :: rest ->
         Format.fprintf
           ppf

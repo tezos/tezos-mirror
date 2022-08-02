@@ -121,14 +121,14 @@ let negative_validated_two_ops_of_same_manager =
   let expect_failure = function
     | [
         Environment.Ecoproto_error
-          (Validate_operation.Manager.Manager_restriction _);
+          (Validate_errors.Manager.Manager_restriction _);
       ] ->
         return_unit
     | err ->
         failwith
           "Error trace:@,\
           \ %a does not match the \
-           [Validate_operation.Manager.Manager_restriction] error"
+           [Validate_errors.Manager.Manager_restriction] error"
           Error_monad.pp_print_trace
           err
   in

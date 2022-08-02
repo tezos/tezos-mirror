@@ -70,19 +70,6 @@ val init_info_and_state :
     function in {!TMP_for_plugin}). *)
 type stamp
 
-(** Errors that may arise while validating a manager operation. *)
-module Manager : sig
-  type error +=
-    | Manager_restriction of Signature.Public_key_hash.t * Operation_hash.t
-    | Inconsistent_sources
-    | Inconsistent_counters
-    | Incorrect_reveal_position
-    | Insufficient_gas_for_manager
-    | Gas_quota_exceeded_init_deserialize
-    | Tx_rollup_feature_disabled
-    | Sc_rollup_feature_disabled
-end
-
 (** Check the validity of the given operation; return an updated
     {!validate_operation_state}, and a {!stamp} attesting that the
     operation has been validated.

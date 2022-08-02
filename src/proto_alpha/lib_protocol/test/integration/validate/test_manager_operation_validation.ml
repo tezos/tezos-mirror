@@ -126,7 +126,7 @@ let low_gas_limit_diagnostic (infos : infos) op =
     match errs with
     | [
      Environment.Ecoproto_error
-       Validate_operation.Manager.Gas_quota_exceeded_init_deserialize;
+       Validate_errors.Manager.Gas_quota_exceeded_init_deserialize;
      Environment.Ecoproto_error Raw_context.Operation_quota_exceeded;
     ] ->
         return_unit
@@ -671,14 +671,12 @@ let generate_tests_validate () =
 let flag_expect_failure flags errs =
   match errs with
   | [
-   Environment.Ecoproto_error
-     Validate_operation.Manager.Sc_rollup_feature_disabled;
+   Environment.Ecoproto_error Validate_errors.Manager.Sc_rollup_feature_disabled;
   ]
     when flags.scoru = false ->
       return_unit
   | [
-   Environment.Ecoproto_error
-     Validate_operation.Manager.Tx_rollup_feature_disabled;
+   Environment.Ecoproto_error Validate_errors.Manager.Tx_rollup_feature_disabled;
   ]
     when flags.toru = false ->
       return_unit

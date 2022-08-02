@@ -290,7 +290,7 @@ let test_wrong_signature_in_the_middle () =
   >>=? fun operation ->
   let expect_failure = function
     | Environment.Ecoproto_error
-        (Validate_operation.Manager.Inconsistent_sources as err)
+        (Validate_errors.Manager.Inconsistent_sources as err)
       :: _ ->
         Assert.test_error_encodings err ;
         return_unit
@@ -308,7 +308,7 @@ let expect_inconsistent_counters list =
     List.exists
       (function
         | Environment.Ecoproto_error
-            Validate_operation.Manager.Inconsistent_counters ->
+            Validate_errors.Manager.Inconsistent_counters ->
             true
         | _ -> false)
       list
