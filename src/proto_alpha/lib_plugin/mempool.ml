@@ -168,71 +168,74 @@ let config_encoding : config Data_encoding.t =
           int31
           default_config.max_prechecked_manager_operations))
 
-(* For each Prechecked manager operation (batched or not), we associate the
-   following information to its source:
-   - the operation's hash, needed in case the operation is replaced
-     afterwards,
-   - the total fee and gas_limit, needed to compare operations of the same
-     manager to decide which one has more fees w.r.t. announced gas limit
-     (modulo replace_by_fee_factor)
-*)
+(** An Alpha_context manager operation, packed so that the type is not
+    parametrized by ['kind]. *)
+type manager_op = Manager_op : 'kind Kind.manager operation -> manager_op
+
+(** Information stored for each prechecked manager operation.
+
+    Note that this record does not include the operation hash because
+    it is instead used as key in the map that stores this information
+    in the [state] below. *)
 type manager_op_info = {
-  operation_hash : Operation_hash.t;
-  gas_limit : Gas.Arith.fp;
+  manager_op : manager_op;
+      (** Used when we want to remove the operation with
+          {!Validate_operation.remove_manager_operation}. *)
   fee : Tez.t;
+  gas_limit : Fixed_point_repr.integral_tag Gas.Arith.t;
+      (** Both [fee] and [gas_limit] are used to determine whether a new
+          operation from the same manager should replace this one. *)
   weight : Q.t;
+      (** Used to update [ops_prechecked] and [min_prechecked_op_weight]
+          in [state] when appropriate. *)
 }
 
 type manager_op_weight = {operation_hash : Operation_hash.t; weight : Q.t}
 
-let op_weight_of_info (info : manager_op_info) : manager_op_weight =
-  {operation_hash = info.operation_hash; weight = info.weight}
+(** Build a {!manager_op_weight} from operation hash and {!manager_op_info}. *)
+let mk_op_weight oph (info : manager_op_info) =
+  {operation_hash = oph; weight = info.weight}
+
+let compare_manager_op_weight op1 op2 =
+  let c = Q.compare op1.weight op2.weight in
+  if c <> 0 then c
+  else Operation_hash.compare op1.operation_hash op2.operation_hash
 
 module ManagerOpWeightSet = Set.Make (struct
   type t = manager_op_weight
 
   (* Sort by weight *)
-  let compare op1 op2 =
-    let c = Q.compare op1.weight op2.weight in
-    if c <> 0 then c
-    else Operation_hash.compare op1.operation_hash op2.operation_hash
+  let compare = compare_manager_op_weight
 end)
 
 type state = {
   grandparent_level_start : Timestamp.t option;
   round_zero_duration : Period.t option;
-  op_prechecked_managers : manager_op_info Signature.Public_key_hash.Map.t;
-      (** All managers that are the source of manager operations
-            prechecked in the mempool. Each manager in the map is associated to
-            a record of type [manager_op_info] (See for record details above).
-            Each manager in the map should be accessible
-            with an operation hash in [operation_hash_to_manager]. *)
-  operation_hash_to_manager : Signature.Public_key_hash.t Operation_hash.Map.t;
-      (** Map of operation hash to manager used to remove a manager from
-            [op_prechecked_managers] with an operation hash. Each manager in the
-            map should also be in [op_prechecked_managers]. *)
-  prechecked_operations_count : int;
+  prechecked_manager_op_count : int;
       (** Number of prechecked manager operations.
-            Invariants:
-            - [Operation_hash.Map.cardinal operation_hash_to_manager =
-               prechecked_operations_count]
-            - [prechecked_operations_count <= max_prechecked_manager_operations] *)
-  ops_prechecked : ManagerOpWeightSet.t;
+          Invariants:
+          - [prechecked_manager_op_count
+               = Operation_hash.Map.cardinal prechecked_manager_ops
+               = ManagerOpWeightSet.cardinal prechecked_op_weights]
+          - [prechecked_manager_op_count <= max_prechecked_manager_operations] *)
+  prechecked_manager_ops : manager_op_info Operation_hash.Map.t;
+      (** All prechecked manager operations. See {!manager_op_info}. *)
+  prechecked_op_weights : ManagerOpWeightSet.t;
+      (** The {!manager_op_weight} of all prechecked manager operations. *)
   min_prechecked_op_weight : manager_op_weight option;
       (** The prechecked operation in [op_prechecked_managers], if any, with
             the minimal weight.
             Invariant:
-            - [min_prechecked_op_weight = min { x | x \in ops_prechecked }] *)
+            - [min_prechecked_op_weight = min { x | x \in prechecked_op_weights }] *)
 }
 
 let empty : state =
   {
     grandparent_level_start = None;
     round_zero_duration = None;
-    op_prechecked_managers = Signature.Public_key_hash.Map.empty;
-    operation_hash_to_manager = Operation_hash.Map.empty;
-    prechecked_operations_count = 0;
-    ops_prechecked = ManagerOpWeightSet.empty;
+    prechecked_manager_op_count = 0;
+    prechecked_manager_ops = Operation_hash.Map.empty;
+    prechecked_op_weights = ManagerOpWeightSet.empty;
     min_prechecked_op_weight = None;
   }
 
@@ -283,63 +286,6 @@ let on_flush config filter_state ?(validation_state : validation_state option)
     ~predecessor () =
   ignore filter_state ;
   init config ?validation_state ~predecessor ()
-
-let remove ~(filter_state : state) oph =
-  let removed_oph_source = ref None in
-  let operation_hash_to_manager =
-    Operation_hash.Map.update
-      oph
-      (function
-        | None -> None
-        | Some source ->
-            removed_oph_source := Some source ;
-            None)
-      filter_state.operation_hash_to_manager
-  in
-  match !removed_oph_source with
-  | None ->
-      (* Not present anywhere in the filter state, because of invariants.
-         See {!state} *)
-      filter_state
-  | Some source ->
-      let prechecked_operations_count =
-        filter_state.prechecked_operations_count - 1
-      in
-      let removed_op = ref None in
-      let op_prechecked_managers =
-        Signature.Public_key_hash.Map.update
-          source
-          (function
-            | None -> None
-            | Some op ->
-                removed_op := Some op ;
-                None)
-          filter_state.op_prechecked_managers
-      in
-      let ops_prechecked =
-        match !removed_op with
-        | None -> filter_state.ops_prechecked
-        | Some op ->
-            ManagerOpWeightSet.remove
-              (op_weight_of_info op)
-              filter_state.ops_prechecked
-      in
-      let min_prechecked_op_weight =
-        match filter_state.min_prechecked_op_weight with
-        | None -> None
-        | Some op ->
-            if Operation_hash.equal op.operation_hash oph then
-              ManagerOpWeightSet.min_elt ops_prechecked
-            else Some op
-      in
-      {
-        filter_state with
-        op_prechecked_managers;
-        operation_hash_to_manager;
-        ops_prechecked;
-        prechecked_operations_count;
-        min_prechecked_op_weight;
-      }
 
 let get_manager_operation_gas_and_fee contents =
   let open Operation in
@@ -489,38 +435,6 @@ let better_fees_and_ratio =
     Q.compare new_ratio (bump config old_ratio) >= 0
     && Q.compare new_fee (bump config old_fee) >= 0
 
-let check_manager_restriction config filter_state source ~fee ~gas_limit =
-  match
-    Signature.Public_key_hash.Map.find
-      source
-      filter_state.op_prechecked_managers
-  with
-  | None -> `Fresh
-  | Some
-      {
-        operation_hash = old_hash;
-        gas_limit = old_gas;
-        fee = old_fee;
-        weight = _;
-      } ->
-      (* Manager already seen: one manager per block limitation triggered.
-         Can replace old operation if new operation's fees are better *)
-      if
-        better_fees_and_ratio
-          config
-          (Gas.Arith.floor old_gas)
-          old_fee
-          gas_limit
-          fee
-      then `Replace old_hash
-      else
-        `Fail
-          (`Branch_delayed
-            [
-              Environment.wrap_tzerror
-                (Manager_restriction {oph = old_hash; fee = old_fee});
-            ])
-
 let size_of_operation op =
   (WithExceptions.Option.get ~loc:__LOC__
   @@ Data_encoding.Binary.fixed_length
@@ -579,7 +493,7 @@ let check_minimal_weight ?validation_state config filter_state ~fee ~gas_limit
           op
       in
       if
-        filter_state.prechecked_operations_count
+        filter_state.prechecked_manager_op_count
         < config.max_prechecked_manager_operations
       then
         (* The precheck mempool is not full yet *)
@@ -612,7 +526,6 @@ let pre_filter_manager :
     config ->
     state ->
     validation_state_before:validation_state option ->
-    public_key_hash ->
     Operation.packed_protocol_data ->
     t Kind.manager contents_list ->
     [ `Passed_prefilter of Q.t list
@@ -620,7 +533,7 @@ let pre_filter_manager :
     | `Branch_delayed of tztrace
     | `Refused of tztrace
     | `Outdated of tztrace ] =
- fun config filter_state ~validation_state_before source packed_op op ->
+ fun config filter_state ~validation_state_before packed_op op ->
   let size = size_of_operation packed_op in
   let check_gas_and_fee fee gas_limit =
     let fees_in_nanotez =
@@ -652,25 +565,20 @@ let pre_filter_manager :
   match get_manager_operation_gas_and_fee op with
   | Error err -> `Refused (Environment.wrap_tztrace err)
   | Ok (fee, gas_limit) -> (
-      match
-        check_manager_restriction config filter_state source ~fee ~gas_limit
-      with
-      | `Fail errs -> errs
-      | `Fresh | `Replace _ -> (
-          match check_gas_and_fee fee gas_limit with
-          | `Refused _ as err -> err
-          | `Fees_ok -> (
-              match
-                check_minimal_weight
-                  ?validation_state:validation_state_before
-                  config
-                  filter_state
-                  ~fee
-                  ~gas_limit
-                  packed_op
-              with
-              | `Fail errs -> errs
-              | `Weight_ok (_, weight) -> `Passed_prefilter weight)))
+      match check_gas_and_fee fee gas_limit with
+      | `Refused _ as err -> err
+      | `Fees_ok -> (
+          match
+            check_minimal_weight
+              ?validation_state:validation_state_before
+              config
+              filter_state
+              ~fee
+              ~gas_limit
+              packed_op
+          with
+          | `Fail errs -> errs
+          | `Weight_ok (_, weight) -> `Passed_prefilter weight))
 
 type Environment.Error_monad.error += Outdated_endorsement
 
@@ -906,7 +814,7 @@ let pre_filter_far_future_consensus_ops config
 let pre_filter config ~(filter_state : state) ?validation_state_before
     ({shell = _; protocol_data = Operation_data {contents; _} as op} :
       Main.operation) =
-  let prefilter_manager_op source manager_op =
+  let prefilter_manager_op manager_op =
     Lwt.return
     @@
     match
@@ -914,7 +822,6 @@ let pre_filter config ~(filter_state : state) ?validation_state_before
         config
         filter_state
         ~validation_state_before
-        source
         op
         manager_op
     with
@@ -949,70 +856,133 @@ let pre_filter config ~(filter_state : state) ?validation_state_before
   | Single (Vdf_revelation _)
   | Single (Ballot _) ->
       Lwt.return @@ `Passed_prefilter other_prio
-  | Single (Manager_operation {source; _}) as op ->
-      prefilter_manager_op source op
-  | Cons (Manager_operation {source; _}, _) as op ->
-      prefilter_manager_op source op
+  | Single (Manager_operation _) as op -> prefilter_manager_op op
+  | Cons (Manager_operation _, _) as op -> prefilter_manager_op op
 
-let precheck_manager :
-    type t.
-    config ->
-    state ->
-    validation_state ->
-    Operation_hash.t ->
-    Tezos_base.Operation.shell_header ->
-    t Kind.manager protocol_data ->
-    nb_successful_prechecks:int ->
-    fee:Tez.t ->
-    gas_limit:Gas.Arith.fp ->
-    public_key_hash ->
-    [> `Prechecked_manager of
-       [`No_replace | `Replace of Operation_hash.t * error_classification]
-    | error_classification ]
-    Lwt.t =
- fun config
-     filter_state
-     validation_state
-     oph
-     shell
-     ({contents; _} as protocol_data : t Kind.manager protocol_data)
-     ~nb_successful_prechecks
-     ~fee
-     ~gas_limit
-     source ->
-  let precheck_manager_and_check_signature ~on_success =
-    let should_check_signature =
-      if Compare.Int.(nb_successful_prechecks > 0) then
-        (* Signature successfully checked at least once. *)
-        Validate_operation.TMP_for_plugin.Skip_signature_check
-      else
-        (* Signature probably never checked. *)
-        Validate_operation.TMP_for_plugin.Check_signature {shell; protocol_data}
-    in
-    Main.precheck_manager validation_state contents should_check_signature
-    >|= function
-    | Ok (_ : Validate_operation.stamp) -> on_success
-    | Error err -> (
-        let err = Environment.wrap_tztrace err in
+(** Call the protocol's {!Validate_operation.validate_operation} and
+    return either:
+
+    - the updated {!validation_state} when the validation is
+      successful, or
+
+    - the protocol error trace converted to an [error trace], together
+      with the corresponding {!error_classification}.
+
+    The signature check is skipped when the operation has previously
+    been validated successfully, ie. [nb_successful_prechecks > 0]. *)
+let proto_validate_operation validation_state oph ~nb_successful_prechecks
+    (operation : 'kind operation) :
+    (validation_state, error trace * error_classification) result Lwt.t =
+  let open Lwt_result_syntax in
+  let*! res =
+    Validate_operation.validate_operation
+      validation_state.validate_operation_info
+      validation_state.validate_operation_state
+      ~should_check_signature:(nb_successful_prechecks <= 0)
+      oph
+      operation
+  in
+  match res with
+  | Ok (validate_operation_state, (_ : Validate_operation.stamp)) ->
+      return {validation_state with validate_operation_state}
+  | Error tztrace ->
+      let err = Environment.wrap_tztrace tztrace in
+      let error_classification =
         match classify_trace err with
         | Branch -> `Branch_refused err
         | Permanent -> `Refused err
         | Temporary -> `Branch_delayed err
-        | Outdated -> `Outdated err)
-  in
-  let gas_limit = Gas.Arith.floor gas_limit in
-  match
-    check_manager_restriction config filter_state source ~fee ~gas_limit
-  with
-  | `Fail err -> Lwt.return err
-  | `Replace old_oph ->
-      let err =
-        Environment.wrap_tzerror
-        @@ Manager_operation_replaced {old_hash = old_oph; new_hash = oph}
+        | Outdated -> `Outdated err
       in
-      precheck_manager_and_check_signature
-        ~on_success:(`Prechecked_manager (`Replace (old_oph, `Outdated [err])))
-  | `Fresh -> (
+      fail (err, error_classification)
+
+(** Call the protocol's {!Validate_operation.validate_operation} on a
+    manager operation and return:
+
+    - [`Success] containing the updated [validation_state] when the
+      validation is successful;
+
+    - [`Conflict] containing the hash of the conflicting operation,
+      and the {!error_classification} corresponding to the protocol error
+      trace, when the validation fails because of the
+      one-manager-operation-per-manager-per-block restriction;
+
+    - an error containing the relevant {!error_classification} when
+      the validation fails with any other protocol error.
+
+    The signature check is skipped when the operation has previously
+    been validated successfully, ie. [nb_successful_prechecks > 0]. *)
+let proto_validate_manager_operation validation_state oph
+    ~nb_successful_prechecks
+    (operation : 'a Kind.manager Alpha_context.operation) :
+    ( [> `Success of validation_state
+      | `Conflict of Operation_hash.t * error_classification ],
+      error_classification )
+    result
+    Lwt.t =
+  let open Lwt_result_syntax in
+  let*! res =
+    proto_validate_operation
+      validation_state
+      oph
+      ~nb_successful_prechecks
+      operation
+  in
+  match res with
+  | Ok validation_state -> return (`Success validation_state)
+  | Error (err, error_classification) -> (
+      match err with
+      | Environment.Ecoproto_error
+          (Validate_errors.Manager.Manager_restriction
+            (_manager, conflicting_oph))
+        :: _ ->
+          return (`Conflict (conflicting_oph, error_classification))
+      | _ -> fail error_classification)
+
+(** Remove a manager operation from the protocol's [validation_state]. *)
+let remove_from_validation_state validation_state (Manager_op op) =
+  let validate_operation_state =
+    Validate_operation.remove_manager_operation
+      validation_state.validate_operation_info
+      validation_state.validate_operation_state
+      op
+  in
+  {validation_state with validate_operation_state}
+
+(** Call the protocol validation on a manager operation and handle
+    potential conflicts: if either the 1M restriction is triggered or
+    the mempool exceeds the maximal number of prechecked operations,
+    then this function is responsible for either discarding the new
+    operation, or removing an old operation to free up space for the
+    new operation.
+
+    Return the updated protocol [validation_state] and, when
+    applicable, the replaced operation accompanied by its new
+    classification.
+
+    Note that this function does not handle the update of the
+    [filter_state]. *)
+let validate_manager_operation_and_handle_conflicts config filter_state
+    validation_state oph ~nb_successful_prechecks fee gas_limit
+    (operation : 'manager_kind Kind.manager operation) :
+    ( validation_state
+      * [`No_replace | `Replace of Operation_hash.t * error_classification],
+      error_classification )
+    result
+    Lwt.t =
+  let open Lwt_result_syntax in
+  let* proto_validation_outcome =
+    proto_validate_manager_operation
+      validation_state
+      oph
+      ~nb_successful_prechecks
+      operation
+  in
+  match proto_validation_outcome with
+  | `Success validation_state -> (
+      (* The operation has been successfully validated and there is no
+         1M conflict. We now need to ensure that the mempool does not
+         exceed its maximal number of prechecked manager operations. *)
       match
         check_minimal_weight
           ~validation_state
@@ -1020,63 +990,230 @@ let precheck_manager :
           filter_state
           ~fee
           ~gas_limit
-          (Operation_data protocol_data)
+          (Operation_data operation.protocol_data)
       with
-      | `Fail err -> Lwt.return err
-      | `Weight_ok (replacement, _weight) ->
-          let on_success =
-            match replacement with
-            | `No_replace -> `Prechecked_manager `No_replace
-            | `Replace oph ->
-                (* The operation with the lowest fees ratio, is reclassified as
-                   branch_delayed. *)
-                (* TODO: https://gitlab.com/tezos/tezos/-/issues/2347 The
-                   branch_delayed ring is bounded to 1000, so we may loose
-                   operations. We can probably do better. *)
-                `Prechecked_manager
-                  (`Replace
-                    ( oph,
-                      `Branch_delayed
-                        [
-                          Environment.wrap_tzerror
-                            Removed_fees_too_low_for_mempool;
-                        ] ))
+      | `Weight_ok (`No_replace, _weight) ->
+          (* The mempool is not full: no need to replace any operation. *)
+          return (validation_state, `No_replace)
+      | `Weight_ok (`Replace min_weight_oph, _weight) ->
+          (* The mempool is full yet the new operation has enough weight
+             to be included: the old operation with the lowest weight is
+             reclassified as [Branch_delayed]. *)
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/2347 The
+             branch_delayed ring is bounded to 1000, so we may loose
+             operations. We can probably do better. *)
+          let validation_state =
+            match
+              Operation_hash.Map.find
+                min_weight_oph
+                filter_state.prechecked_manager_ops
+            with
+            | None -> assert false
+            | Some {manager_op; _} ->
+                remove_from_validation_state validation_state manager_op
           in
-          precheck_manager_and_check_signature ~on_success)
+          let replace_err =
+            Environment.wrap_tzerror Removed_fees_too_low_for_mempool
+          in
+          let replacement =
+            `Replace (min_weight_oph, `Branch_delayed [replace_err])
+          in
+          return (validation_state, replacement)
+      | `Fail err ->
+          (* The mempool is full and the weight of the new operation is
+             too low: raise the error returned by {!check_minimal_weight}. *)
+          fail err)
+  | `Conflict (old_oph, _proto_error) ->
+      (* The protocol [validation_state] already contains an operation
+         from the same manager. We look at the fees and gas limits of
+         both operations to decide whether to replace the old one. *)
+      let old_info =
+        match
+          Operation_hash.Map.find old_oph filter_state.prechecked_manager_ops
+        with
+        | None -> assert false
+        | Some info -> info
+      in
+      if
+        better_fees_and_ratio
+          config
+          old_info.gas_limit
+          old_info.fee
+          gas_limit
+          fee
+      then
+        (* The new operation is better and replaces the old one from
+           the same manager. Note that there is no need to check the
+           number of prechecked operations in the mempool
+           here. Indeed, the removal of the old operation frees up a
+           spot in the mempool anyway. *)
+        let validation_state =
+          remove_from_validation_state validation_state old_info.manager_op
+        in
+        let* proto_validation_outcome2 =
+          proto_validate_manager_operation
+            validation_state
+            oph
+            ~nb_successful_prechecks
+            operation
+        in
+        match proto_validation_outcome2 with
+        | `Success validation_state ->
+            let replace_err =
+              Environment.wrap_tzerror
+                (Manager_operation_replaced {old_hash = old_oph; new_hash = oph})
+            in
+            let replacement = `Replace (old_oph, `Outdated [replace_err]) in
+            return (validation_state, replacement)
+        | `Conflict (_oph, conflict_proto_error) ->
+            (* This should not happen: a manager operation should not
+               conflict with multiple operations. *)
+            fail conflict_proto_error
+      else
+        (* The new operation is not interesting enough so it is rejected. *)
+        let err = Manager_restriction {oph = old_oph; fee = old_info.fee} in
+        fail (`Branch_delayed [Environment.wrap_tzerror err])
 
-let add_manager_restriction filter_state oph info source replacement =
+(** Remove a manager operation hash from the filter state.
+    Do nothing if the operation was not in the state. *)
+let remove ~filter_state oph =
+  match Operation_hash.Map.find oph filter_state.prechecked_manager_ops with
+  | None ->
+      (* Not present in the filter_state: nothing to do. *)
+      filter_state
+  | Some info ->
+      let prechecked_manager_ops =
+        Operation_hash.Map.remove oph filter_state.prechecked_manager_ops
+      in
+      let prechecked_manager_op_count =
+        filter_state.prechecked_manager_op_count - 1
+      in
+      let prechecked_op_weights =
+        ManagerOpWeightSet.remove
+          (mk_op_weight oph info)
+          filter_state.prechecked_op_weights
+      in
+      let min_prechecked_op_weight =
+        match filter_state.min_prechecked_op_weight with
+        | None -> None
+        | Some min_op_weight ->
+            if Operation_hash.equal min_op_weight.operation_hash oph then
+              ManagerOpWeightSet.min_elt prechecked_op_weights
+            else Some min_op_weight
+      in
+      {
+        filter_state with
+        prechecked_manager_op_count;
+        prechecked_manager_ops;
+        prechecked_op_weights;
+        min_prechecked_op_weight;
+      }
+
+(** Add a manager operation hash and information to the filter state.
+    Do nothing if the operation is already present in the state. *)
+let add_manager_op filter_state oph info replacement =
   let filter_state =
     match replacement with
     | `No_replace -> filter_state
-    | `Replace (oph, _class) -> remove ~filter_state oph
+    | `Replace (oph, _classification) -> remove ~filter_state oph
   in
-  let prechecked_operations_count =
-    if Operation_hash.Map.mem oph filter_state.operation_hash_to_manager then
-      filter_state.prechecked_operations_count
-    else filter_state.prechecked_operations_count + 1
+  if Operation_hash.Map.mem oph filter_state.prechecked_manager_ops then
+    (* Already present in the filter_state: nothing to do. *)
+    filter_state
+  else
+    let prechecked_manager_op_count =
+      filter_state.prechecked_manager_op_count + 1
+    in
+    let prechecked_manager_ops =
+      Operation_hash.Map.add oph info filter_state.prechecked_manager_ops
+    in
+    let op_weight = mk_op_weight oph info in
+    let prechecked_op_weights =
+      ManagerOpWeightSet.add op_weight filter_state.prechecked_op_weights
+    in
+    let min_prechecked_op_weight =
+      match filter_state.min_prechecked_op_weight with
+      | Some old_min when compare_manager_op_weight old_min op_weight <= 0 ->
+          Some old_min
+      | _ -> Some op_weight
+    in
+    {
+      filter_state with
+      prechecked_manager_op_count;
+      prechecked_manager_ops;
+      prechecked_op_weights;
+      min_prechecked_op_weight;
+    }
+
+(** Call {!validate_manager_operation_and_handle_conflicts} then
+    update the [filter_state] by adding the newly validated operation,
+    and removing the replaced one one when applicable.
+
+    Return either the updated [filter_state], updated
+    [validation_state], and operation replacement, or an error
+    containing the appropriate classification. *)
+let precheck_manager_result config filter_state validation_state oph
+    ~nb_successful_prechecks (operation : 'manager_kind Kind.manager operation)
+    :
+    ( state
+      * validation_state
+      * [`No_replace | `Replace of Operation_hash.t * error_classification],
+      error_classification )
+    result
+    Lwt.t =
+  let open Lwt_result_syntax in
+  let*? fee, gas_limit =
+    Result.map_error
+      (fun err -> `Refused (Environment.wrap_tztrace err))
+      (get_manager_operation_gas_and_fee operation.protocol_data.contents)
   in
-  let op_weight = op_weight_of_info info in
-  let min_prechecked_op_weight =
-    match filter_state.min_prechecked_op_weight with
-    | Some mini when Q.(mini.weight < info.weight) -> Some mini
-    | Some _ | None -> Some op_weight
+  let* validation_state, replacement =
+    validate_manager_operation_and_handle_conflicts
+      config
+      filter_state
+      validation_state
+      oph
+      ~nb_successful_prechecks
+      fee
+      gas_limit
+      operation
   in
-  {
-    filter_state with
-    op_prechecked_managers =
-      (* Manager not seen yet, record it for next ops *)
-      Signature.Public_key_hash.Map.add
-        source
-        info
-        filter_state.op_prechecked_managers;
-    operation_hash_to_manager =
-      Operation_hash.Map.add oph source filter_state.operation_hash_to_manager
-      (* Record which manager is used for the operation hash. *);
-    ops_prechecked =
-      ManagerOpWeightSet.add op_weight filter_state.ops_prechecked;
-    prechecked_operations_count;
-    min_prechecked_op_weight;
-  }
+  let weight =
+    weight_manager_operation
+      ~validation_state
+      ~fee
+      ~gas:gas_limit
+      (Operation_data operation.protocol_data)
+  in
+  let info = {manager_op = Manager_op operation; gas_limit; fee; weight} in
+  let filter_state = add_manager_op filter_state oph info replacement in
+  return (filter_state, validation_state, replacement)
+
+(** Call {!precheck_manager_result} then convert its error monad
+    result into the appropriate return type for [precheck]. *)
+let precheck_manager config filter_state validation_state oph
+    ~nb_successful_prechecks operation :
+    [> `Passed_precheck of
+       state
+       * validation_state
+       * [`No_replace | `Replace of Operation_hash.t * error_classification]
+    | error_classification ]
+    Lwt.t =
+  precheck_manager_result
+    config
+    filter_state
+    validation_state
+    oph
+    ~nb_successful_prechecks
+    operation
+  >>= function
+  | Ok (filter_state, validation_state, replacement) ->
+      Lwt.return
+        (`Passed_precheck (filter_state, validation_state, replacement))
+  | Error
+      ((`Refused _ | `Branch_delayed _ | `Branch_refused _ | `Outdated _) as
+      err) ->
+      Lwt.return err
 
 let precheck :
     config ->
@@ -1086,9 +1223,11 @@ let precheck :
     Main.operation ->
     nb_successful_prechecks:int ->
     [ `Passed_precheck of
-      state * [`No_replace | `Replace of Operation_hash.t * error_classification]
-    | error_classification
-    | `Undecided ]
+      state
+      * validation_state
+      * [`No_replace | `Replace of Operation_hash.t * error_classification]
+    | `Undecided
+    | error_classification ]
     Lwt.t =
  fun config
      ~filter_state
@@ -1096,45 +1235,18 @@ let precheck :
      oph
      {shell = shell_header; protocol_data = Operation_data protocol_data}
      ~nb_successful_prechecks ->
-  let precheck_manager protocol_data source op =
-    match get_manager_operation_gas_and_fee op with
-    | Error err -> Lwt.return (`Refused (Environment.wrap_tztrace err))
-    | Ok (fee, gas_limit) -> (
-        let weight =
-          weight_manager_operation
-            ~validation_state
-            ~fee
-            ~gas:gas_limit
-            (Operation_data protocol_data)
-        in
-        let gas_limit = Gas.Arith.fp gas_limit in
-        let info = {operation_hash = oph; gas_limit; fee; weight} in
-        precheck_manager
-          config
-          filter_state
-          validation_state
-          oph
-          shell_header
-          protocol_data
-          source
-          ~nb_successful_prechecks
-          ~fee
-          ~gas_limit
-        >|= function
-        | `Prechecked_manager replacement ->
-            let filter_state =
-              add_manager_restriction filter_state oph info source replacement
-            in
-            `Passed_precheck (filter_state, replacement)
-        | (`Refused _ | `Branch_delayed _ | `Branch_refused _ | `Outdated _) as
-          errs ->
-            errs)
+  let call_precheck_manager (protocol_data : _ Kind.manager protocol_data) =
+    precheck_manager
+      config
+      filter_state
+      validation_state
+      oph
+      ~nb_successful_prechecks
+      {shell = shell_header; protocol_data}
   in
   match protocol_data.contents with
-  | Single (Manager_operation {source; _}) as op ->
-      precheck_manager protocol_data source op
-  | Cons (Manager_operation {source; _}, _) as op ->
-      precheck_manager protocol_data source op
+  | Single (Manager_operation _) -> call_precheck_manager protocol_data
+  | Cons (Manager_operation _, _) -> call_precheck_manager protocol_data
   | Single _ -> Lwt.return `Undecided
 
 open Apply_results

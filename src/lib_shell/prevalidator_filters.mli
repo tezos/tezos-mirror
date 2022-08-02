@@ -76,8 +76,9 @@ module type FILTER = sig
         replaced operation. If the function returns [`Undecided] it means that
         [apply_operation] should be called.
 
-        This function takes a [state] as parameter and returns it updated if the
-        operation has been [prechecked]. It also takes an under-approximation
+        This function takes a filter [state] and a [Proto.validation_state]
+        as parameters, and returns them updated if the operation has been
+        successfully [prechecked]. It also takes an under-approximation
         [nb_successful_prechecks] of the number of times the given operation
         has been successfully prechecked. *)
     val precheck :
@@ -89,6 +90,7 @@ module type FILTER = sig
       nb_successful_prechecks:int ->
       [ `Passed_precheck of
         state
+        * Proto.validation_state
         * [ `No_replace
           | `Replace of
             Operation_hash.t * Prevalidator_classification.error_classification

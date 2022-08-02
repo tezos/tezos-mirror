@@ -61,6 +61,7 @@ module type FILTER = sig
       nb_successful_prechecks:int ->
       [ `Passed_precheck of
         state
+        * Proto.validation_state
         * [ `No_replace
           | `Replace of
             Operation_hash.t * Prevalidator_classification.error_classification

@@ -116,6 +116,10 @@ module type T = sig
       to the type {!validation_state} of the protocol. *)
   val validation_state : t -> validation_state
 
+  (** Updates the subset of [t] corresponding to the type
+      {!validation_state} of the protocol. *)
+  val set_validation_state : t -> validation_state -> t
+
   val pp_result : Format.formatter -> result -> unit
 
   module Internal_for_tests : sig

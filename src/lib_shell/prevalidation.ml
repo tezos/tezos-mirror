@@ -96,6 +96,8 @@ module type T = sig
 
   val validation_state : t -> validation_state
 
+  val set_validation_state : t -> validation_state -> t
+
   val pp_result : Format.formatter -> result -> unit
 
   module Internal_for_tests : sig
@@ -260,6 +262,8 @@ module MakeAbstract
           | Outdated -> Outdated trace)
 
   let validation_state {state; _} = state
+
+  let set_validation_state t state = {t with state}
 
   let pp_result ppf =
     let open Format in
