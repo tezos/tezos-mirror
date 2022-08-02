@@ -926,8 +926,7 @@ type stresstest_contract_parameters = {
     corresponding optional argument is not provided to the function,
     then a new random seed is generated.
 
-    Optional parameters (provided only if the function is called with
-    the corresponding optional argument):
+    Optional parameters:
     - [seed] is the seed used for the random number generator
     - [fee] is the custom fee to pay instead of the default one
     - [gas_limit] is the custom gas limit
@@ -978,9 +977,17 @@ val spawn_stresstest :
 
     [nb_keys] contains the number of new keys to be generated.
 
+    Optional parameters:
+    - alias_prefix: allows to use a dedicated alias prefix for
+      generated keys (default: bootstrap<key_index>),
+
     [endpoint]: cf {!create}*)
 val stresstest_gen_keys :
-  ?endpoint:endpoint -> int -> t -> Account.key list Lwt.t
+  ?endpoint:endpoint ->
+  ?alias_prefix:string ->
+  int ->
+  t ->
+  Account.key list Lwt.t
 
 (** Costs of every kind of transaction used in the stress test. *)
 type stresstest_gas_estimation = {
