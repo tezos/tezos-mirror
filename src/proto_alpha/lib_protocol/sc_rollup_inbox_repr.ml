@@ -206,7 +206,7 @@ module V1 = struct
    [old_levels_messages] and empties [current_level]. It then
    initialises a new level tree for the new messages---note that any
    intermediate levels are simply skipped. See
-   {!MakeHashingScheme.archive_if_needed} for details.
+   {!Make_hashing_scheme.archive_if_needed} for details.
 
   *)
   type t = {
@@ -379,7 +379,7 @@ type serialized_proof = bytes
 
 let serialized_proof_encoding = Data_encoding.bytes
 
-module type MerkelizedOperations = sig
+module type Merkelized_operations = sig
   type inbox_context
 
   type tree
@@ -485,8 +485,8 @@ module type P = sig
     Tree.t -> tree -> (tree -> (tree * 'a) Lwt.t) -> (proof * 'a) option Lwt.t
 end
 
-module MakeHashingScheme (P : P) :
-  MerkelizedOperations with type tree = P.tree and type inbox_context = P.t =
+module Make_hashing_scheme (P : P) :
+  Merkelized_operations with type tree = P.tree and type inbox_context = P.t =
 struct
   module Tree = P.Tree
 
@@ -1253,7 +1253,7 @@ struct
 end
 
 include (
-  MakeHashingScheme (struct
+  Make_hashing_scheme (struct
     module Tree = struct
       include Context.Tree
 
@@ -1293,7 +1293,7 @@ include (
       (* We cannot produce a proof without full inbox_context *)
       Lwt.return None
   end) :
-    MerkelizedOperations
+    Merkelized_operations
       with type tree = Context.tree
        and type inbox_context = Context.t)
 

@@ -208,7 +208,7 @@ module IStoreProof =
 module Inbox = struct
   include Sc_rollup.Inbox
 
-  include Sc_rollup.Inbox.MakeHashingScheme (struct
+  include Sc_rollup.Inbox.Make_hashing_scheme (struct
     module Tree = IStoreTree
 
     type t = IStore.t

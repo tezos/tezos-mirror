@@ -244,7 +244,7 @@ end
 
     It is intended to resemble (at least well enough for these tests)
     the rollup node's inbox instance. *)
-module Node = MakeHashingScheme (Tree)
+module Node = Make_hashing_scheme (Tree)
 
 (** In the tests below we use the {!Node} inbox above to generate proofs,
     but we need to test that they can be interpreted and validated by

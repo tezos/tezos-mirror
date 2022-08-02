@@ -82,7 +82,7 @@ module Impl : Pvm.S = struct
   end)
 
   let string_of_status : status -> string = function
-    | WaitingForInputMessage -> "WaitingForInputMessage"
+    | Waiting_for_input_message -> "Waiting for input message"
     | Computing -> "Computing"
 end
 

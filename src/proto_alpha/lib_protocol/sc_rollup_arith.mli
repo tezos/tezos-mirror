@@ -80,7 +80,7 @@ module type S = sig
   val get_tick : state -> Sc_rollup_tick_repr.t Lwt.t
 
   (** The machine has three possible statuses: *)
-  type status = Halted | WaitingForInputMessage | Parsing | Evaluating
+  type status = Halted | Waiting_for_input_message | Parsing | Evaluating
 
   (** [get_status state] returns the machine status in [state]. *)
   val get_status : state -> status Lwt.t

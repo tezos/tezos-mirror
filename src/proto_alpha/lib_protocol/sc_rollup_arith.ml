@@ -88,7 +88,7 @@ module type S = sig
 
   val get_tick : state -> Sc_rollup_tick_repr.t Lwt.t
 
-  type status = Halted | WaitingForInputMessage | Parsing | Evaluating
+  type status = Halted | Waiting_for_input_message | Parsing | Evaluating
 
   val get_status : state -> status Lwt.t
 
@@ -166,7 +166,7 @@ module Make (Context : P) :
 
   type tree = Tree.tree
 
-  type status = Halted | WaitingForInputMessage | Parsing | Evaluating
+  type status = Halted | Waiting_for_input_message | Parsing | Evaluating
 
   type instruction =
     | IPush : int -> instruction
@@ -323,7 +323,7 @@ module Make (Context : P) :
 
     open Monad
 
-    module MakeVar (P : sig
+    module Make_var (P : sig
       type t
 
       val name : string
@@ -356,7 +356,7 @@ module Make (Context : P) :
         return @@ fun fmt () -> Format.fprintf fmt "@[%s : %a@]" P.name P.pp v
     end
 
-    module MakeDict (P : sig
+    module Make_dict (P : sig
       type t
 
       val name : string
@@ -388,7 +388,7 @@ module Make (Context : P) :
         return @@ fun fmt () -> Format.pp_print_list pp_elem fmt l
     end
 
-    module MakeDeque (P : sig
+    module Make_deque (P : sig
       type t
 
       val name : string
@@ -477,13 +477,13 @@ module Make (Context : P) :
       let clear = remove [P.name]
     end
 
-    module CurrentTick = MakeVar (struct
+    module Current_tick = Make_var (struct
       include Sc_rollup_tick_repr
 
       let name = "tick"
     end)
 
-    module Vars = MakeDict (struct
+    module Vars = Make_dict (struct
       type t = int
 
       let name = "vars"
@@ -493,7 +493,7 @@ module Make (Context : P) :
       let pp fmt x = Format.fprintf fmt "%d" x
     end)
 
-    module Stack = MakeDeque (struct
+    module Stack = Make_deque (struct
       type t = int
 
       let name = "stack"
@@ -501,7 +501,7 @@ module Make (Context : P) :
       let encoding = Data_encoding.int31
     end)
 
-    module Code = MakeDeque (struct
+    module Code = Make_deque (struct
       type t = instruction
 
       let name = "code"
@@ -531,7 +531,7 @@ module Make (Context : P) :
             ])
     end)
 
-    module Boot_sector = MakeVar (struct
+    module Boot_sector = Make_var (struct
       type t = string
 
       let name = "boot_sector"
@@ -543,7 +543,7 @@ module Make (Context : P) :
       let pp fmt s = Format.fprintf fmt "%s" s
     end)
 
-    module Status = MakeVar (struct
+    module Status = Make_var (struct
       type t = status
 
       let initial = Halted
@@ -552,7 +552,7 @@ module Make (Context : P) :
         Data_encoding.string_enum
           [
             ("Halted", Halted);
-            ("WaitingForInput", WaitingForInputMessage);
+            ("Waiting_for_input_message", Waiting_for_input_message);
             ("Parsing", Parsing);
             ("Evaluating", Evaluating);
           ]
@@ -561,14 +561,14 @@ module Make (Context : P) :
 
       let string_of_status = function
         | Halted -> "Halted"
-        | WaitingForInputMessage -> "WaitingForInputMessage"
+        | Waiting_for_input_message -> "Waiting for input message"
         | Parsing -> "Parsing"
         | Evaluating -> "Evaluating"
 
       let pp fmt status = Format.fprintf fmt "%s" (string_of_status status)
     end)
 
-    module CurrentLevel = MakeVar (struct
+    module Current_level = Make_var (struct
       type t = Raw_level_repr.t
 
       let initial = Raw_level_repr.root
@@ -580,7 +580,7 @@ module Make (Context : P) :
       let pp = Raw_level_repr.pp
     end)
 
-    module MessageCounter = MakeVar (struct
+    module Message_counter = Make_var (struct
       type t = Z.t option
 
       let initial = None
@@ -594,7 +594,7 @@ module Make (Context : P) :
         | Some c -> Format.fprintf fmt "Some %a" Z.pp_print c
     end)
 
-    module NextMessage = MakeVar (struct
+    module Next_message = Make_var (struct
       type t = string option
 
       let initial = None
@@ -610,7 +610,7 @@ module Make (Context : P) :
 
     type parser_state = ParseInt | ParseVar | SkipLayout
 
-    module LexerState = MakeVar (struct
+    module Lexer_state = Make_var (struct
       type t = int * int
 
       let name = "lexer_buffer"
@@ -623,7 +623,7 @@ module Make (Context : P) :
         Format.fprintf fmt "lexer.(start = %d, len = %d)" start len
     end)
 
-    module ParserState = MakeVar (struct
+    module Parser_state = Make_var (struct
       type t = parser_state
 
       let name = "parser_state"
@@ -644,7 +644,7 @@ module Make (Context : P) :
         | SkipLayout -> Format.fprintf fmt "Skipping layout"
     end)
 
-    module ParsingResult = MakeVar (struct
+    module Parsing_result = Make_var (struct
       type t = bool option
 
       let name = "parsing_result"
@@ -659,7 +659,7 @@ module Make (Context : P) :
         | Some false -> Format.fprintf fmt "parsing fails"
     end)
 
-    module EvaluationResult = MakeVar (struct
+    module Evaluation_result = Make_var (struct
       type t = bool option
 
       let name = "evaluation_result"
@@ -674,7 +674,7 @@ module Make (Context : P) :
         | Some false -> Format.fprintf fmt "evaluation fails"
     end)
 
-    module OutputCounter = MakeVar (struct
+    module Output_counter = Make_var (struct
       type t = Z.t
 
       let initial = Z.zero
@@ -686,7 +686,7 @@ module Make (Context : P) :
       let pp = Z.pp_print
     end)
 
-    module Output = MakeDict (struct
+    module Output = Make_dict (struct
       type t = Sc_rollup_PVM_sem.output
 
       let name = "output"
@@ -699,16 +699,16 @@ module Make (Context : P) :
     let pp =
       let open Monad.Syntax in
       let* status_pp = Status.pp in
-      let* message_counter_pp = MessageCounter.pp in
-      let* next_message_pp = NextMessage.pp in
-      let* parsing_result_pp = ParsingResult.pp in
-      let* parser_state_pp = ParserState.pp in
-      let* lexer_state_pp = LexerState.pp in
-      let* evaluation_result_pp = EvaluationResult.pp in
+      let* message_counter_pp = Message_counter.pp in
+      let* next_message_pp = Next_message.pp in
+      let* parsing_result_pp = Parsing_result.pp in
+      let* parser_state_pp = Parser_state.pp in
+      let* lexer_state_pp = Lexer_state.pp in
+      let* evaluation_result_pp = Evaluation_result.pp in
       let* vars_pp = Vars.pp in
       let* output_pp = Output.pp in
       let* stack = Stack.to_list in
-      let* current_tick_pp = CurrentTick.pp in
+      let* current_tick_pp = Current_tick.pp in
       return @@ fun fmt () ->
       Format.fprintf
         fmt
@@ -793,8 +793,8 @@ module Make (Context : P) :
   let boot =
     let open Monad.Syntax in
     let* () = Status.create in
-    let* () = NextMessage.create in
-    let* () = Status.set WaitingForInputMessage in
+    let* () = Next_message.create in
+    let* () = Status.set Waiting_for_input_message in
     return ()
 
   let result_of ~default m state =
@@ -807,15 +807,15 @@ module Make (Context : P) :
     let* s, _ = run m state in
     return s
 
-  let get_tick = result_of ~default:Sc_rollup_tick_repr.initial CurrentTick.get
+  let get_tick = result_of ~default:Sc_rollup_tick_repr.initial Current_tick.get
 
   let is_input_state_monadic =
     let open Monad.Syntax in
     let* status = Status.get in
     match status with
-    | WaitingForInputMessage -> (
-        let* level = CurrentLevel.get in
-        let* counter = MessageCounter.get in
+    | Waiting_for_input_message -> (
+        let* level = Current_level.get in
+        let* counter = Message_counter.get in
         match counter with
         | Some n -> return (PS.First_after (level, n))
         | None -> return PS.Initial)
@@ -824,26 +824,26 @@ module Make (Context : P) :
   let is_input_state =
     result_of ~default:PS.No_input_required @@ is_input_state_monadic
 
-  let get_status = result_of ~default:WaitingForInputMessage @@ Status.get
+  let get_status = result_of ~default:Waiting_for_input_message @@ Status.get
 
   let get_code = result_of ~default:[] @@ Code.to_list
 
-  let get_parsing_result = result_of ~default:None @@ ParsingResult.get
+  let get_parsing_result = result_of ~default:None @@ Parsing_result.get
 
   let get_stack = result_of ~default:[] @@ Stack.to_list
 
   let get_var state k = (result_of ~default:None @@ Vars.get k) state
 
-  let get_evaluation_result = result_of ~default:None @@ EvaluationResult.get
+  let get_evaluation_result = result_of ~default:None @@ Evaluation_result.get
 
   let get_is_stuck = result_of ~default:None @@ is_stuck
 
   let start_parsing : unit t =
     let open Monad.Syntax in
     let* () = Status.set Parsing in
-    let* () = ParsingResult.set None in
-    let* () = ParserState.set SkipLayout in
-    let* () = LexerState.set (0, 0) in
+    let* () = Parsing_result.set None in
+    let* () = Parser_state.set SkipLayout in
+    let* () = Lexer_state.set (0, 0) in
     let* () = Code.clear in
     return ()
 
@@ -862,22 +862,22 @@ module Make (Context : P) :
     | Some payload ->
         let* boot_sector = Boot_sector.get in
         let msg = boot_sector ^ payload in
-        let* () = CurrentLevel.set inbox_level in
-        let* () = MessageCounter.set (Some message_counter) in
-        let* () = NextMessage.set (Some msg) in
+        let* () = Current_level.set inbox_level in
+        let* () = Message_counter.set (Some message_counter) in
+        let* () = Next_message.set (Some msg) in
         let* () = start_parsing in
         return ()
     | None ->
-        let* () = CurrentLevel.set inbox_level in
-        let* () = MessageCounter.set (Some message_counter) in
-        let* () = Status.set WaitingForInputMessage in
+        let* () = Current_level.set inbox_level in
+        let* () = Message_counter.set (Some message_counter) in
+        let* () = Status.set Waiting_for_input_message in
         return ()
 
   let set_input input = state_of @@ set_input_monadic input
 
   let next_char =
     let open Monad.Syntax in
-    LexerState.(
+    Lexer_state.(
       let* start, len = get in
       set (start, len + 1))
 
@@ -886,8 +886,8 @@ module Make (Context : P) :
 
   let current_char =
     let open Monad.Syntax in
-    let* start, len = LexerState.get in
-    let* msg = NextMessage.get in
+    let* start, len = Lexer_state.get in
+    let* msg = Next_message.get in
     match msg with
     | None -> no_message_to_lex ()
     | Some s ->
@@ -897,12 +897,12 @@ module Make (Context : P) :
 
   let lexeme =
     let open Monad.Syntax in
-    let* start, len = LexerState.get in
-    let* msg = NextMessage.get in
+    let* start, len = Lexer_state.get in
+    let* msg = Next_message.get in
     match msg with
     | None -> no_message_to_lex ()
     | Some s ->
-        let* () = LexerState.set (start + len, 0) in
+        let* () = Lexer_state.set (start + len, 0) in
         return (String.sub s start len)
 
   let push_int_literal =
@@ -920,19 +920,19 @@ module Make (Context : P) :
   let start_evaluating : unit t =
     let open Monad.Syntax in
     let* () = Status.set Evaluating in
-    let* () = EvaluationResult.set None in
+    let* () = Evaluation_result.set None in
     let* () = Stack.clear in
     return ()
 
   let stop_parsing outcome =
     let open Monad.Syntax in
-    let* () = ParsingResult.set (Some outcome) in
+    let* () = Parsing_result.set (Some outcome) in
     start_evaluating
 
   let stop_evaluating outcome =
     let open Monad.Syntax in
-    let* () = EvaluationResult.set (Some outcome) in
-    Status.set WaitingForInputMessage
+    let* () = Evaluation_result.set (Some outcome) in
+    Status.set Waiting_for_input_message
 
   let parse : unit t =
     let open Monad.Syntax in
@@ -944,17 +944,17 @@ module Make (Context : P) :
     in
     let produce_int =
       let* () = push_int_literal in
-      let* () = ParserState.set SkipLayout in
+      let* () = Parser_state.set SkipLayout in
       return ()
     in
     let produce_var =
       let* () = push_var in
-      let* () = ParserState.set SkipLayout in
+      let* () = Parser_state.set SkipLayout in
       return ()
     in
     let is_digit d = Compare.Char.(d >= '0' && d <= '9') in
     let is_letter d = Compare.Char.(d >= 'a' && d <= 'z') in
-    let* parser_state = ParserState.get in
+    let* parser_state = Parser_state.get in
     match parser_state with
     | ParseInt -> (
         let* char = current_char in
@@ -996,12 +996,12 @@ module Make (Context : P) :
         | Some d when is_digit d ->
             let* _ = lexeme in
             let* () = next_char in
-            let* () = ParserState.set ParseInt in
+            let* () = Parser_state.set ParseInt in
             return ()
         | Some d when is_letter d ->
             let* _ = lexeme in
             let* () = next_char in
-            let* () = ParserState.set ParseVar in
+            let* () = Parser_state.set ParseVar in
             return ()
         | None -> stop_parsing true
         | _ -> stop_parsing false)
@@ -1009,8 +1009,8 @@ module Make (Context : P) :
   let output v =
     let open Monad.Syntax in
     let open Sc_rollup_outbox_message_repr in
-    let* counter = OutputCounter.get in
-    let* () = OutputCounter.set (Z.succ counter) in
+    let* counter = Output_counter.get in
+    let* () = Output_counter.set (Z.succ counter) in
     let unparsed_parameters =
       Micheline.(Int ((), Z.of_int v) |> strip_locations)
     in
@@ -1018,7 +1018,7 @@ module Make (Context : P) :
     let entrypoint = Entrypoint_repr.default in
     let transaction = {unparsed_parameters; destination; entrypoint} in
     let message = Atomic_transaction_batch {transactions = [transaction]} in
-    let* outbox_level = CurrentLevel.get in
+    let* outbox_level = Current_level.get in
     let output =
       Sc_rollup_PVM_sem.{outbox_level; message_index = counter; message}
     in
@@ -1048,7 +1048,7 @@ module Make (Context : P) :
 
   let reboot =
     let open Monad.Syntax in
-    let* () = Status.set WaitingForInputMessage in
+    let* () = Status.set Waiting_for_input_message in
     let* () = Stack.clear in
     let* () = Code.clear in
     return ()
@@ -1062,8 +1062,8 @@ module Make (Context : P) :
         let* status = Status.get in
         match status with
         | Halted -> boot
-        | WaitingForInputMessage -> (
-            let* msg = NextMessage.get in
+        | Waiting_for_input_message -> (
+            let* msg = Next_message.get in
             match msg with
             | None ->
                 internal_error
@@ -1074,8 +1074,8 @@ module Make (Context : P) :
 
   let ticked m =
     let open Monad.Syntax in
-    let* tick = CurrentTick.get in
-    let* () = CurrentTick.set (Sc_rollup_tick_repr.next tick) in
+    let* tick = Current_tick.get in
+    let* () = Current_tick.set (Sc_rollup_tick_repr.next tick) in
     m
 
   let eval state = state_of (ticked eval_step) state

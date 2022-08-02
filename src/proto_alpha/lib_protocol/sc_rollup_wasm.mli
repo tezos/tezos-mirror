@@ -53,7 +53,7 @@ module V2_0_0 : sig
     val get_tick : state -> Sc_rollup_tick_repr.t Lwt.t
 
     (** PVM status *)
-    type status = Computing | WaitingForInputMessage
+    type status = Computing | Waiting_for_input_message
 
     (** [get_status state] gives you the current execution status for the PVM. *)
     val get_status : state -> status Lwt.t

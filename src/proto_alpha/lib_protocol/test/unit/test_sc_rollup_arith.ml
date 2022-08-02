@@ -250,7 +250,7 @@ let test_evaluation_message ~valid
   in
   set_input input state >>= fun state ->
   eval state >>= fun state ->
-  go ~max_steps:10000 WaitingForInputMessage state >>=? fun state ->
+  go ~max_steps:10000 Waiting_for_input_message state >>=? fun state ->
   if valid then
     get_stack state >>= fun stack ->
     Assert.equal
@@ -325,7 +325,7 @@ let test_output_messages_proofs ~valid ~inbox_level (source, expected_outputs) =
   in
   let*! state = set_input input state in
   let*! state = eval state in
-  let* state = go ~max_steps:10000 WaitingForInputMessage state in
+  let* state = go ~max_steps:10000 Waiting_for_input_message state in
   let check_output output =
     let*! result = produce_output_proof ctxt state output in
     if valid then
