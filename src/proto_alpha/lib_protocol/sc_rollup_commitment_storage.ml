@@ -107,3 +107,23 @@ let hash ctxt commitment =
     Raw_context.consume_gas ctxt (Sc_rollup_costs.cost_hash_bytes ~bytes_len)
   in
   return (ctxt, Sc_rollup_commitment_repr.Hash.hash_bytes [commitment_bytes])
+
+module Internal_for_tests = struct
+  let get_cemented_commitments_with_levels ctxt rollup =
+    let open Lwt_tzresult_syntax in
+    let rec aux ctxt commitments_with_levels commitment_hash =
+      let* commitment_opt, ctxt =
+        get_commitment_opt_unsafe ctxt rollup commitment_hash
+      in
+      match commitment_opt with
+      | None -> return (commitments_with_levels, ctxt)
+      | Some {predecessor; inbox_level; _} ->
+          (aux [@ocaml.tailcall])
+            ctxt
+            ((commitment_hash, inbox_level) :: commitments_with_levels)
+            predecessor
+    in
+    let* lcc_hash, ctxt = last_cemented_commitment ctxt rollup in
+    let+ commitments_with_levels, ctxt = aux ctxt [] lcc_hash in
+    (commitments_with_levels, ctxt)
+end

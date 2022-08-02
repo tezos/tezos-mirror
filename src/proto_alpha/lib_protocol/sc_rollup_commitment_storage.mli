@@ -224,3 +224,19 @@ val get_predecessor_unsafe :
 (** Hash a commitment and account for gas spent. *)
 val hash :
   Raw_context.t -> Commitment.t -> (Raw_context.t * Commitment_hash.t) tzresult
+
+module Internal_for_tests : sig
+  (** [get_cemented_commitments_with_levels ctxt rollup] returns a list of all
+    cemented commitment hashes and corresponding inbox levels that are present
+    in the storage, ordered by inbox level.
+
+    May fail with:
+    {ul
+      {li [Sc_rollup_does_not_exist] if [rollup] does not exist}
+    }
+*)
+  val get_cemented_commitments_with_levels :
+    Raw_context.t ->
+    Sc_rollup_repr.t ->
+    ((Commitment_hash.t * Raw_level_repr.t) list * Raw_context.t) tzresult Lwt.t
+end
