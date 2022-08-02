@@ -29,9 +29,14 @@ module Store = Storage.Sc_rollup
 module Commitment = Sc_rollup_commitment_repr
 module Commitment_hash = Commitment.Hash
 
+let get_commitment_opt_unsafe ctxt rollup commitment =
+  let open Lwt_result_syntax in
+  let* ctxt, res = Store.Commitments.find (ctxt, rollup) commitment in
+  return (res, ctxt)
+
 let get_commitment_unsafe ctxt rollup commitment =
   let open Lwt_tzresult_syntax in
-  let* ctxt, res = Store.Commitments.find (ctxt, rollup) commitment in
+  let* res, ctxt = get_commitment_opt_unsafe ctxt rollup commitment in
   match res with
   | None -> fail (Sc_rollup_unknown_commitment commitment)
   | Some commitment -> return (commitment, ctxt)
@@ -69,6 +74,11 @@ let set_commitment_added ctxt rollup node new_value =
         Store.Commitment_added.add (ctxt, rollup) node new_value
       in
       return (size_diff, new_value, ctxt)
+
+let get_predecessor_opt_unsafe ctxt rollup node =
+  let open Lwt_result_syntax in
+  let* commitment, ctxt = get_commitment_opt_unsafe ctxt rollup node in
+  return (Option.map (fun (c : Commitment.t) -> c.predecessor) commitment, ctxt)
 
 let get_predecessor_unsafe ctxt rollup node =
   let open Lwt_tzresult_syntax in

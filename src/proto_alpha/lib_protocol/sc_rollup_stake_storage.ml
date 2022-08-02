@@ -216,13 +216,19 @@ let modify_commitment_stake_count ctxt rollup node f =
   in
   return (new_count, size_diff, ctxt)
 
-let deallocate ctxt rollup node =
+let deallocate_commitment ctxt rollup node =
   let open Lwt_tzresult_syntax in
   if Commitment_hash.(node = zero) then return ctxt
   else
     let* ctxt, _size_freed =
       Store.Commitments.remove_existing (ctxt, rollup) node
     in
+    return ctxt
+
+let deallocate_commitment_metadata ctxt rollup node =
+  let open Lwt_tzresult_syntax in
+  if Commitment_hash.(node = zero) then return ctxt
+  else
     let* ctxt, _size_freed =
       Store.Commitment_added.remove_existing (ctxt, rollup) node
     in
@@ -230,6 +236,29 @@ let deallocate ctxt rollup node =
       Store.Commitment_stake_count.remove_existing (ctxt, rollup) node
     in
     return ctxt
+
+let deallocate ctxt rollup node =
+  let open Lwt_tzresult_syntax in
+  let* ctxt = deallocate_commitment_metadata ctxt rollup node in
+  deallocate_commitment ctxt rollup node
+
+let find_commitment_to_deallocate ctxt rollup commitment_hash
+    ~num_commitments_to_keep =
+  let open Lwt_result_syntax in
+  let rec aux ctxt commitment_hash n =
+    if Compare.Int.(n = 0) then return (Some commitment_hash, ctxt)
+    else
+      let* pred_hash, ctxt =
+        Commitment_storage.get_predecessor_opt_unsafe
+          ctxt
+          rollup
+          commitment_hash
+      in
+      match pred_hash with
+      | None -> return (None, ctxt)
+      | Some pred_hash -> (aux [@ocaml.tailcall]) ctxt pred_hash (n - 1)
+  in
+  aux ctxt commitment_hash num_commitments_to_keep
 
 let decrease_commitment_stake_count ctxt rollup node =
   let open Lwt_tzresult_syntax in
@@ -368,12 +397,32 @@ let cement_commitment ctxt rollup new_lcc =
     Store.Last_cemented_commitment.update ctxt rollup new_lcc
   in
   assert (Compare.Int.(lcc_size_diff = 0)) ;
-  (* At this point we know all stakers are implicitly staked
-     on the new LCC, and no one is directly staked on the old LCC. We
-     can safely deallocate the old LCC.
+  (* At this point we know that all stakers are implicitly staked on the new
+     LCC, and no one is directly staked on the old LCC. Therefore we can safely
+     deallocate the metadata ([Commitment_added] and [Commitment_stake_count])
+     of the old LCC.
+     However, we must not remove the commitment itself as we need it to allow
+     executing outbox messages for a limited period. The maximum number of
+     active cemented commitments available for execution is specified in
+     [ctxt.sc_rollup.max_number_of_stored_cemented_commitments].
+     Instead, we remove the oldest cemented commitment that would exceed
+     [max_number_of_cemented_commitments], if such exist.
   *)
-  let+ ctxt = deallocate ctxt rollup old_lcc in
-  (ctxt, new_lcc_commitment)
+  let* ctxt = deallocate_commitment_metadata ctxt rollup old_lcc in
+  (* Decrease max_number_of_stored_cemented_commitments by one because
+     we start counting commitments from old_lcc, rather than from new_lcc. *)
+  let num_commitments_to_keep =
+    (Raw_context.constants ctxt).sc_rollup
+      .max_number_of_stored_cemented_commitments - 1
+  in
+  let* commitment_to_deallocate, ctxt =
+    find_commitment_to_deallocate ~num_commitments_to_keep ctxt rollup old_lcc
+  in
+  match commitment_to_deallocate with
+  | None -> return (ctxt, new_lcc_commitment)
+  | Some old_lcc ->
+      let+ ctxt = deallocate_commitment ctxt rollup old_lcc in
+      (ctxt, new_lcc_commitment)
 
 let remove_staker ctxt rollup staker =
   let open Lwt_tzresult_syntax in

@@ -158,6 +158,20 @@ val get_commitment :
   Commitment_hash.t ->
   (Commitment.t * Raw_context.t) tzresult Lwt.t
 
+(** [get_commitment_opt_unsafe context rollup commitment_hash] returns an
+    [Option.t] which is either a defined value containing the commitment with
+    the given hash, or `None` if such a commitment does not exist. This
+    function *must* be called only after they have checked for the existence
+    of the rollup, and therefore it is not necessary for it to check for the
+    existence of the rollup again. Otherwise, use the safe function
+    {!get_commitment}.
+*)
+val get_commitment_opt_unsafe :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  Commitment_hash.t ->
+  (Commitment.t Option.t * Raw_context.t) tzresult Lwt.t
+
 (** [get_commitment_unsafe context rollup commitment_hash] returns the commitment
     with the given hash.
     This function *must* be called only after they have checked for the existence
@@ -186,6 +200,16 @@ val set_commitment_added :
   Commitment_hash.t ->
   Raw_level_repr.t ->
   (int * Raw_level_repr.t * Raw_context.t) tzresult Lwt.t
+
+(** [get_predecessor_opt_unsafe ctxt rollup commitment_hash] returns an
+    [Option.t] value containing the [rollup] commitment predecessor of
+    [commitment_hash] in the [ctxt], if any. It does not check for the
+    existence of the [rollup]. *)
+val get_predecessor_opt_unsafe :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  Commitment_hash.t ->
+  (Commitment_hash.t Option.t * Raw_context.t) tzresult Lwt.t
 
 (** [get_predecessor_unsafe ctxt rollup commitment_hash] returns the [rollup]
     commitment predecessor of [commitment_hash] in the [ctxt]. It is unsafe
