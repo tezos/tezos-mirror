@@ -321,6 +321,13 @@ let check_constants constants =
       constants.dal.number_of_slots > 0 && constants.dal.number_of_slots <= 256)
     (Invalid_protocol_constants
        "The number of data availability slot must be between 1 and 256")
+  >>? fun () ->
+  error_unless
+    Compare.Int.(
+      constants.sc_rollup.max_number_of_stored_cemented_commitments > 0)
+    (Invalid_protocol_constants
+       "The number of maximum stored cemented commitments must be strictly \
+        positive")
   >>? fun () -> Result.return_unit
 
 module Generated = struct

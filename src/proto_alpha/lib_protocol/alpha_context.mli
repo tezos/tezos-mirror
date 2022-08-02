@@ -814,6 +814,7 @@ module Constants : sig
       max_outbox_messages_per_level : int;
       number_of_sections_in_dissection : int;
       timeout_period_in_blocks : int;
+      max_number_of_stored_cemented_commitments : int;
     }
 
     type t = {
@@ -1000,6 +1001,8 @@ module Constants : sig
   val sc_rollup_max_outbox_messages_per_level : context -> int
 
   val sc_rollup_number_of_sections_in_dissection : context -> int
+
+  val max_number_of_stored_cemented_commitments : context -> int
 
   (** All constants: fixed and parametric *)
   type t = private {fixed : fixed; parametric : Parametric.t}

@@ -270,6 +270,10 @@ let sc_rollup_timeout_period_in_blocks c =
   let sc_rollup = Raw_context.sc_rollup c in
   sc_rollup.timeout_period_in_blocks
 
+let max_number_of_stored_cemented_commitments c =
+  let sc_rollup = Raw_context.sc_rollup c in
+  sc_rollup.max_number_of_stored_cemented_commitments
+
 let dal_number_of_slots c =
   let constants = Raw_context.constants c in
   constants.dal.number_of_slots

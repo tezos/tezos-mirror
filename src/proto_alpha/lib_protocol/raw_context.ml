@@ -961,6 +961,24 @@ let prepare_first_block ~level ~timestamp ctxt =
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/2902
                This constant needs to be refined. *)
             timeout_period_in_blocks = 20_160;
+            (* We store multiple cemented commitments because we want to
+               allow the execution of outbox messages against cemented
+               commitments that are older than the last cemented commitment.
+               The execution of an outbox message is a manager operation,
+               and manager operations are kept in the mempool for one
+               hour. Hence we only need to ensure that an outbox message
+               can be validated against a cemented commitment produced in the
+               last hour. If we assume that the rollup is operating without
+               issues, that is no commitments are being refuted and commitments
+               are published and cemented regularly by one rollup node, we can
+               expect commitments to be cemented approximately every 15
+               minutes, or equivalently we can expect 5 commitments to be
+               published in one hour (at minutes 0, 15, 30, 45 and 60).
+               Therefore, we need to keep 5 cemented commitments to guarantee
+               that the execution of an outbox operation can always be
+               validated against a cemented commitment while it is in the
+               mempool. *)
+            max_number_of_stored_cemented_commitments = 5;
           }
       in
       let constants =

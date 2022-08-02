@@ -122,6 +122,8 @@ type sc_rollup = {
      (Int32.max_int) + 2 = 33]. See {!Sc_rollup_game_repr.check_dissection} for
      more information on the dissection logic. *)
   timeout_period_in_blocks : int;
+  (* The maximum number of cemented commitments stored for a sc rollup. *)
+  max_number_of_stored_cemented_commitments : int;
 }
 
 type t = {
