@@ -58,6 +58,13 @@ type sc_rollup_constants = {
   max_outbox_messages_per_level : int;
 }
 
+(** [boot_sector_of k] returns a valid boot sector for a PVM of
+    kind [kind]. *)
+let boot_sector_of = function
+  | "arith" -> ""
+  | "wasm_2_0_0" -> Constant.wasm_incomplete_kernel_boot_sector
+  | kind -> raise (Invalid_argument kind)
+
 let get_sc_rollup_constants client =
   let* json = RPC.get_constants client in
   let open JSON in
@@ -151,7 +158,7 @@ type test = {variant : string; tags : string list; description : string}
     originated rollup *)
 let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))
     ?(src = "bootstrap1") ?(kind = "arith") ?(parameters_ty = "string")
-    ?(boot_sector = "") client =
+    ?(boot_sector = boot_sector_of kind) client =
   let* sc_rollup =
     Client.Sc_rollup.(
       originate ~hooks ~burn_cap ~src ~kind ~parameters_ty ~boot_sector client)
@@ -164,9 +171,9 @@ let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))
 
    A rollup node has a configuration file that must be initialized.
 *)
-let with_fresh_rollup ?boot_sector f tezos_node tezos_client operator =
+let with_fresh_rollup ?kind ?boot_sector f tezos_node tezos_client operator =
   let* sc_rollup =
-    originate_sc_rollup ?boot_sector ~src:operator tezos_client
+    originate_sc_rollup ?kind ?boot_sector ~src:operator tezos_client
   in
   let sc_rollup_node =
     Sc_rollup_node.create
@@ -180,31 +187,20 @@ let with_fresh_rollup ?boot_sector f tezos_node tezos_client operator =
   in
   f sc_rollup sc_rollup_node configuration_filename
 
-let with_fresh_rollups n f node client operator =
-  let rec go n addrs k =
-    if n < 1 then k addrs
-    else
-      with_fresh_rollup
-        (fun addr _ _ -> go (n - 1) (String_set.add addr addrs) k)
-        node
-        client
-        operator
-  in
-  go n String_set.empty f
-
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2933
    Many tests can be refactored using test_scenario. *)
-let test_scenario ?commitment_period ?challenge_window ?timeout
-    {variant; tags; description} scenario =
-  let tags = tags @ [variant] in
+let test_scenario ~kind ?boot_sector ?commitment_period ?challenge_window
+    ?timeout {variant; tags; description} scenario =
+  let tags = tags @ [kind; variant] in
   regression_test
     ~__FILE__
     ~tags
-    (Printf.sprintf "%s (%s)" description variant)
+    (Printf.sprintf "%s - %s (%s)" kind description variant)
     (fun protocol ->
-      setup ?commitment_period ?challenge_window ?timeout ~protocol
+      setup ?commitment_period ?challenge_window ~protocol ?timeout
       @@ fun node client ->
-      ( with_fresh_rollup @@ fun sc_rollup sc_rollup_node _filename ->
+      ( with_fresh_rollup ~kind ?boot_sector
+      @@ fun sc_rollup sc_rollup_node _filename ->
         scenario protocol sc_rollup_node sc_rollup node client )
         node
         client)
@@ -284,21 +280,23 @@ let publish_commitment ?(src = Constant.bootstrap1.public_key_hash) ~commitment
 
    - Rollup addresses are fully determined by operation hashes and origination nonce.
 *)
-let test_origination =
+let test_origination ~kind =
   regression_test
+    ~tags:["sc_rollup"; kind]
     ~__FILE__
-    "origination of a SCORU executes without error"
+    (Format.asprintf "%s - origination of a SCORU executes without error" kind)
     (fun protocol ->
       setup ~protocol @@ fun _node client bootstrap1_key ->
-      let* _sc_rollup = originate_sc_rollup ~src:bootstrap1_key client in
+      let* _sc_rollup = originate_sc_rollup ~kind ~src:bootstrap1_key client in
       unit)
 
-let test_rollup_node_configuration =
+let test_rollup_node_configuration ~kind =
   regression_test
     ~__FILE__
+    ~tags:["sc_rollup"]
     "configuration of a smart contract optimistic rollup node"
     (fun protocol ->
-      setup ~protocol @@ with_fresh_rollup
+      setup ~protocol @@ with_fresh_rollup ~kind
       @@ fun _sc_rollup _sc_rollup_node filename ->
       let read_configuration =
         let open Ezjsonm in
@@ -323,13 +321,13 @@ let test_rollup_node_configuration =
    A running rollup node can be asked the address of the rollup it is
    interacting with.
 *)
-let test_rollup_node_running =
+let test_rollup_node_running ~kind =
   test
     ~__FILE__
-    ~tags:["run"]
-    "running a smart contract rollup node"
+    ~tags:["sc_rollup"; "run"; kind]
+    (Format.asprintf "%s - running a smart contract rollup node" kind)
     (fun protocol ->
-      setup ~protocol @@ with_fresh_rollup
+      setup ~protocol @@ with_fresh_rollup ~kind
       @@ fun sc_rollup sc_rollup_node _filename ->
       let* () = Sc_rollup_node.run sc_rollup_node in
       let* sc_rollup_from_rpc =
@@ -356,13 +354,13 @@ let test_rollup_node_running =
    When a rollup node is running, a rollup client can ask this
    node its rollup address.
 *)
-let test_rollup_client_gets_address =
+let test_rollup_client_gets_address ~kind =
   regression_test
     ~__FILE__
-    ~tags:["run"; "client"]
+    ~tags:["sc_rollup"; "run"; "client"]
     "getting a smart-contract rollup address through the client"
     (fun protocol ->
-      setup ~protocol @@ with_fresh_rollup
+      setup ~protocol @@ with_fresh_rollup ~kind
       @@ fun sc_rollup sc_rollup_node _filename ->
       let* () = Sc_rollup_node.run sc_rollup_node in
       let sc_client = Sc_rollup_client.create sc_rollup_node in
@@ -384,15 +382,15 @@ let test_rollup_client_gets_address =
    We can fetch the level when a smart contract rollup was
    originated from the context.
 *)
-let test_rollup_get_genesis_info =
+let test_rollup_get_genesis_info ~kind =
   regression_test
     ~__FILE__
-    ~tags:["genesis_info"]
-    "get genesis info of a sc rollup"
+    ~tags:["sc_rollup"; "genesis_info"; kind]
+    (Format.asprintf "%s - get genesis info of a sc rollup" kind)
     (fun protocol ->
       setup ~protocol @@ fun node client bootstrap ->
       let* current_level = RPC.get_current_level client in
-      ( with_fresh_rollup @@ fun sc_rollup _sc_rollup_node _filename ->
+      ( with_fresh_rollup ~kind @@ fun sc_rollup _sc_rollup_node _filename ->
         (* Bake 10 blocks to be sure that the initial level of rollup is different
            from the current level. *)
         let* _ = repeat 10 (fun () -> Client.bake_for_and_wait client) in
@@ -422,14 +420,16 @@ let test_rollup_get_genesis_info =
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2944
    Revisit this test once the rollup node can cement commitments. *)
 let test_rollup_get_chain_block_context_sc_rollup_last_cemented_commitment_hash_with_level
-    =
+    ~kind =
   regression_test
     ~__FILE__
-    ~tags:["lcc_hash_with_level"]
-    "get last cemented commitment hash and inbox level of a sc rollup"
+    ~tags:["sc_rollup"; "lcc_hash_with_level"; kind]
+    (Format.asprintf
+       "%s - get last cemented commitment hash and inbox level of a sc rollup"
+       kind)
     (fun protocol ->
       setup ~protocol @@ fun node client bootstrap ->
-      ( with_fresh_rollup @@ fun sc_rollup _sc_rollup_node _filename ->
+      ( with_fresh_rollup ~kind @@ fun sc_rollup _sc_rollup_node _filename ->
         let* origination_level = RPC.get_current_level client in
 
         (* Bake 10 blocks to be sure that the origination_level of rollup is different
@@ -523,14 +523,16 @@ let get_inbox_from_sc_rollup_node sc_rollup_node =
   | None -> failwith "Unable to retrieve inbox from sc rollup node"
   | Some inbox -> parse_inbox inbox
 
-let test_rollup_inbox_size =
+let test_rollup_inbox_size ~kind =
   regression_test
     ~__FILE__
-    ~tags:["inbox"]
-    "pushing messages in the inbox - check inbox size"
+    ~tags:["sc_rollup"; "inbox"; kind]
+    (Format.asprintf
+       "%s - pushing messages in the inbox - check inbox size"
+       kind)
     (fun protocol ->
       setup ~protocol @@ fun node client ->
-      ( with_fresh_rollup @@ fun sc_rollup _sc_rollup_node _filename ->
+      ( with_fresh_rollup ~kind @@ fun sc_rollup _sc_rollup_node _filename ->
         let n = 10 in
         let* () = send_messages n sc_rollup client in
         let* _, inbox_msg_during_commitment_period =
@@ -619,14 +621,16 @@ let fetch_messages_from_block sc_rollup client =
   in
   return messages
 
-let test_rollup_inbox_current_messages_hash =
+let test_rollup_inbox_current_messages_hash ~kind =
   regression_test
     ~__FILE__
-    ~tags:["inbox"]
-    "pushing messages in the inbox - current messages hash"
+    ~tags:["sc_rollup"; "inbox"; kind]
+    (Format.asprintf
+       "%s - pushing messages in the inbox - current messages hash"
+       kind)
     (fun protocol ->
       setup ~protocol @@ fun node client ->
-      ( with_fresh_rollup @@ fun sc_rollup _sc_rollup_node _filename ->
+      ( with_fresh_rollup ~kind @@ fun sc_rollup _sc_rollup_node _filename ->
         let gen_message_batch from until =
           List.map
             (fun x ->
@@ -719,16 +723,17 @@ let test_rollup_inbox_current_messages_hash =
    tree which must have the same root hash as the one stored by the
    protocol in the context.
 *)
-let test_rollup_inbox_of_rollup_node variant scenario =
+let test_rollup_inbox_of_rollup_node variant scenario ~kind =
   regression_test
     ~__FILE__
-    ~tags:["inbox"; "node"; variant]
+    ~tags:["sc_rollup"; "inbox"; "node"; variant; kind]
     (Printf.sprintf
-       "observing the correct maintenance of inbox in the rollup node (%s)"
+       "%s - maintenance of inbox in the rollup node (%s)"
+       kind
        variant)
     (fun protocol ->
       setup ~protocol @@ fun node client ->
-      ( with_fresh_rollup @@ fun sc_rollup sc_rollup_node _filename ->
+      ( with_fresh_rollup ~kind @@ fun sc_rollup sc_rollup_node _filename ->
         let* () = scenario protocol sc_rollup_node sc_rollup node client in
         let* inbox_from_sc_rollup_node =
           get_inbox_from_sc_rollup_node sc_rollup_node
@@ -825,7 +830,20 @@ let sc_rollup_node_handles_chain_reorg protocol sc_rollup_node sc_rollup node
 (* One can retrieve the list of originated SCORUs.
    -----------------------------------------------
 *)
-let test_rollup_list =
+let with_fresh_rollups ~kind n f node client operator =
+  let rec go n addrs k =
+    if n < 1 then k addrs
+    else
+      with_fresh_rollup
+        ~kind
+        (fun addr _ _ -> go (n - 1) (String_set.add addr addrs) k)
+        node
+        client
+        operator
+  in
+  go n String_set.empty f
+
+let test_rollup_list ~kind =
   let open Lwt.Syntax in
   let go node client bootstrap1 =
     let* rollups =
@@ -840,6 +858,7 @@ let test_rollup_list =
     in
 
     with_fresh_rollups
+      ~kind
       10
       (fun scoru_addresses ->
         let* () = Client.bake_for_and_wait client in
@@ -860,7 +879,7 @@ let test_rollup_list =
 
   regression_test
     ~__FILE__
-    ~tags:["list"]
+    ~tags:["sc_rollup"; "list"]
     "list originated rollups"
     (fun protocol -> setup ~protocol go)
 
@@ -870,7 +889,7 @@ let test_rollup_list =
    When a rollup node starts, we want to make sure that in the absence of
    messages it will boot into the initial state.
 *)
-let test_rollup_node_boots_into_initial_state =
+let test_rollup_node_boots_into_initial_state ~kind =
   let go client sc_rollup sc_rollup_node =
     let* genesis_info =
       RPC.Client.call ~hooks client
@@ -892,7 +911,13 @@ let test_rollup_node_boots_into_initial_state =
       ~error_msg:"Unexpected initial tick count (%L = %R)" ;
 
     let* status = Sc_rollup_client.status ~hooks sc_rollup_client in
-    Check.(status = "Halted")
+    let expected_status =
+      match kind with
+      | "arith" -> "Halted"
+      | "wasm_2_0_0" -> "Computing"
+      | _ -> raise (Invalid_argument kind)
+    in
+    Check.(status = expected_status)
       Check.string
       ~error_msg:"Unexpected PVM status (%L = %R)" ;
 
@@ -901,11 +926,12 @@ let test_rollup_node_boots_into_initial_state =
 
   regression_test
     ~__FILE__
-    ~tags:["run"; "node"]
-    "node boots into the initial state"
+    ~tags:["sc_rollup"; "run"; "node"; kind]
+    (Format.asprintf "%s - node boots into the initial state" kind)
     (fun protocol ->
       setup ~protocol @@ fun node client ->
       with_fresh_rollup
+        ~kind
         (fun sc_rollup sc_rollup_node _filename ->
           go client sc_rollup sc_rollup_node)
         node
@@ -917,7 +943,7 @@ let test_rollup_node_boots_into_initial_state =
    When the rollup node receives messages, we like to see evidence that the PVM
    has advanced.
 *)
-let test_rollup_node_advances_pvm_state protocols =
+let test_rollup_node_advances_pvm_state protocols ~kind =
   let go ~internal client sc_rollup sc_rollup_node =
     let* genesis_info =
       RPC.Client.call ~hooks client
@@ -976,23 +1002,36 @@ let test_rollup_node_advances_pvm_state protocols =
             Client.bake_for_and_wait client
       in
       let* _ = Sc_rollup_node.wait_for_level sc_rollup_node (level + i) in
-      let* encoded_value =
-        Sc_rollup_client.state_value ~hooks sc_rollup_client ~key:"vars/value"
+
+      (* specific per kind PVM checks *)
+      let* () =
+        match kind with
+        | "arith" ->
+            let* encoded_value =
+              Sc_rollup_client.state_value
+                ~hooks
+                sc_rollup_client
+                ~key:"vars/value"
+            in
+            let value =
+              match Data_encoding.(Binary.of_bytes int31) @@ encoded_value with
+              | Error error ->
+                  failwith
+                    (Format.asprintf
+                       "The arithmetic PVM has an unexpected state: %a"
+                       Data_encoding.Binary.pp_read_error
+                       error)
+              | Ok x -> x
+            in
+            Check.(
+              (value = i + ((i + 2) * 2))
+                int
+                ~error_msg:"Invalid value in rollup state (%L <> %R)") ;
+            return ()
+        | "wasm_2_0_0" -> return ()
+        | _otherwise -> raise (Invalid_argument kind)
       in
-      let value =
-        match Data_encoding.(Binary.of_bytes int31) @@ encoded_value with
-        | Error error ->
-            failwith
-              (Format.asprintf
-                 "The arithmetic PVM has an unexpected state: %a"
-                 Data_encoding.Binary.pp_read_error
-                 error)
-        | Ok x -> x
-      in
-      Check.(
-        (value = i + ((i + 2) * 2))
-          int
-          ~error_msg:"Invalid value in rollup state (%L <> %R)") ;
+
       let* state_hash = Sc_rollup_client.state_hash ~hooks sc_rollup_client in
       Check.(state_hash <> prev_state_hash)
         Check.string
@@ -1011,11 +1050,12 @@ let test_rollup_node_advances_pvm_state protocols =
 
   regression_test
     ~__FILE__
-    ~tags:["run"; "node"]
-    "node advances PVM state with messages"
+    ~tags:["sc_rollup"; "run"; "node"; kind]
+    (Format.asprintf "%s - node advances PVM state with messages" kind)
     (fun protocol ->
       setup ~protocol @@ fun node client ->
       with_fresh_rollup
+        ~kind
         (fun sc_rollup_address sc_rollup_node _filename ->
           go ~internal:false client sc_rollup_address sc_rollup_node)
         node
@@ -1024,11 +1064,12 @@ let test_rollup_node_advances_pvm_state protocols =
 
   regression_test
     ~__FILE__
-    ~tags:["run"; "node"; "internal"]
-    "node advances PVM state with internal messages"
+    ~tags:["sc_rollup"; "run"; "node"; "internal"; kind]
+    (Format.asprintf "%s - node advances PVM state with internal messages" kind)
     (fun protocol ->
       setup ~protocol @@ fun node client ->
       with_fresh_rollup
+        ~kind
         (fun sc_rollup_address sc_rollup_node _filename ->
           go ~internal:true client sc_rollup_address sc_rollup_node)
         node
@@ -1128,8 +1169,7 @@ let test_commitment_scenario ?commitment_period ?challenge_window
     {
       tags = ["commitment"; "node"] @ extra_tags;
       variant;
-      description =
-        "observing the correct handling of commitments in the rollup node";
+      description = "rollup node - correct handling of commitments";
     }
 
 let commitment_stored _protocol sc_rollup_node sc_rollup _node client =
@@ -1903,7 +1943,7 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup node
 
    Originate a rollup with a custom boot sector and check if the RPC returns it.
 *)
-let test_rollup_origination_boot_sector =
+let test_rollup_arith_origination_boot_sector =
   let boot_sector = "10 10 10 + +" in
 
   let go client sc_rollup =
@@ -1920,11 +1960,12 @@ let test_rollup_origination_boot_sector =
 
   regression_test
     ~__FILE__
-    ~tags:["run"]
-    "originate with boot sector"
+    ~tags:["sc_rollup"; "run"]
+    (Format.asprintf "originate arith with boot sector")
     (fun protocol ->
       setup ~protocol @@ fun node client ->
       with_fresh_rollup
+        ~kind:"arith"
         ~boot_sector
         (fun sc_rollup _sc_rollup_node _filename -> go client sc_rollup)
         node
@@ -1936,7 +1977,7 @@ let test_rollup_origination_boot_sector =
    Originate 2 rollups with different boot sectors to check if the are
    actually different.
 *)
-let test_rollup_node_uses_boot_sector =
+let test_rollup_node_uses_arith_boot_sector =
   let go_boot client sc_rollup sc_rollup_node =
     let* genesis_info =
       RPC.Client.call ~hooks client
@@ -1957,6 +1998,7 @@ let test_rollup_node_uses_boot_sector =
 
   let with_booted ~boot_sector node client =
     with_fresh_rollup
+      ~kind:"arith"
       ~boot_sector
       (fun sc_rollup sc_rollup_node _filename ->
         go_boot client sc_rollup sc_rollup_node)
@@ -1966,8 +2008,8 @@ let test_rollup_node_uses_boot_sector =
 
   regression_test
     ~__FILE__
-    ~tags:["run"; "node"]
-    "ensure boot sector is used"
+    ~tags:["sc_rollup"; "run"; "node"]
+    (Format.asprintf "ensure arith boot sector is used")
     (fun protocol ->
       setup ~protocol @@ fun node client x ->
       let* state_hash1 =
@@ -1982,8 +2024,8 @@ let test_rollup_node_uses_boot_sector =
 
 (* Initializes a client with an existing account being
    [Constants.tz4_account]. *)
-let client_with_initial_keys ~protocol =
-  setup ~protocol @@ with_fresh_rollup
+let client_with_initial_keys ~protocol ~kind =
+  setup ~protocol @@ with_fresh_rollup ~kind
   @@ fun _sc_rollup sc_rollup_node _filename ->
   let sc_client = Sc_rollup_client.create sc_rollup_node in
   let account = Constant.tz4_account in
@@ -1993,13 +2035,13 @@ let client_with_initial_keys ~protocol =
 (* Check that the client can show the address of a registered account.
    -------------------------------------------------------------------
 *)
-let test_rollup_client_show_address =
+let test_rollup_client_show_address ~kind =
   test
     ~__FILE__
     ~tags:["run"; "client"]
     "Shows the address of a registered account"
     (fun protocol ->
-      let* sc_client, account = client_with_initial_keys ~protocol in
+      let* sc_client, account = client_with_initial_keys ~protocol ~kind in
       let* shown_account =
         Sc_rollup_client.show_address
           ~alias:account.Account.aggregate_alias
@@ -2035,13 +2077,13 @@ let test_rollup_client_show_address =
 (* Check that the client can generate keys.
    ----------------------------------------
 *)
-let test_rollup_client_generate_keys =
+let test_rollup_client_generate_keys ~kind =
   test
     ~__FILE__
     ~tags:["run"; "client"]
     "Generates new tz4 keys"
     (fun protocol ->
-      setup ~protocol @@ with_fresh_rollup
+      setup ~protocol @@ with_fresh_rollup ~kind
       @@ fun _sc_rollup sc_rollup_node _filename ->
       let sc_client = Sc_rollup_client.create sc_rollup_node in
       let alias = "test_key" in
@@ -2052,13 +2094,13 @@ let test_rollup_client_generate_keys =
 (* Check that the client can list keys.
    ------------------------------------
 *)
-let test_rollup_client_list_keys =
+let test_rollup_client_list_keys ~kind =
   test
     ~__FILE__
     ~tags:["run"; "client"]
     "Lists known aliases in the client"
     (fun protocol ->
-      let* sc_client, account = client_with_initial_keys ~protocol in
+      let* sc_client, account = client_with_initial_keys ~kind ~protocol in
       let* maybe_keys = Sc_rollup_client.list_keys sc_client in
       let expected_keys =
         [(account.aggregate_alias, account.aggregate_public_key_hash)]
@@ -2093,15 +2135,15 @@ let publish_dummy_commitment ?(number_of_ticks = 1) ~inbox_level ~predecessor
   let*! () = publish_commitment ~src ~commitment client sc_rollup in
   Client.bake_for_and_wait client
 
-let test_consecutive_commitments =
+let test_consecutive_commitments ~kind =
   regression_test
     ~__FILE__
-    ~tags:["l1"; "commitment"]
-    "consecutive commitments"
+    ~tags:["sc_rollup"; "l1"; "commitment"; kind]
+    (Format.asprintf "%s - consecutive commitments" kind)
     (fun protocol ->
       setup ~protocol @@ fun _node client bootstrap1_key ->
       let* inbox_level = Client.level client in
-      let* sc_rollup = originate_sc_rollup ~src:bootstrap1_key client in
+      let* sc_rollup = originate_sc_rollup ~kind ~src:bootstrap1_key client in
       let operator = Constant.bootstrap1.public_key_hash in
       let* {commitment_period_in_blocks; _} = get_sc_rollup_constants client in
       (* As we did no publish any commitment yet, this is supposed to fail. *)
@@ -2154,16 +2196,17 @@ let test_consecutive_commitments =
    its deposit while the honest one has not.
 
 *)
-let test_refutation_scenario ?commitment_period ?challenge_window variant
+let test_refutation_scenario ?commitment_period ?challenge_window variant ~kind
     (loser_mode, inputs, final_level, empty_levels, stop_loser_at) =
   test_scenario
     ?commitment_period
+    ~kind
     ~timeout:10
     ?challenge_window
     {
       tags = ["refutation"; "node"];
       variant;
-      description = "observing the winning strategy of refutation games";
+      description = "refutation games winning strategies";
     }
   @@ fun _protocol sc_rollup_node sc_rollup_address node client ->
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
@@ -2236,7 +2279,7 @@ let inputs_for n =
   List.init n @@ fun i ->
   [swap i ["3 3 +"; "1"; "1 1 x"; "3 7 8 + * y"; "2 2 out"]]
 
-let test_refutation protocols =
+let test_refutation protocols ~kind =
   let challenge_window = 10 in
   [
     ("inbox_proof_at_genesis", ("3 0 0", inputs_for 10, 80, [], []));
@@ -2252,82 +2295,120 @@ let test_refutation protocols =
     ("timeout", ("5 0 1", inputs_for 10, 80, [], [35]));
   ]
   |> List.iter (fun (variant, inputs) ->
-         test_refutation_scenario ~challenge_window variant inputs protocols)
+         test_refutation_scenario
+           ~kind
+           ~challenge_window
+           variant
+           inputs
+           protocols)
 
-let register ~protocols =
-  test_origination protocols ;
-  test_rollup_node_configuration protocols ;
-  test_rollup_node_running protocols ;
-  test_rollup_client_gets_address protocols ;
-  test_rollup_list protocols ;
-  test_rollup_get_genesis_info protocols ;
+let register ~kind ~protocols =
+  test_origination ~kind protocols ;
+  test_rollup_node_running ~kind protocols ;
+  test_rollup_get_genesis_info ~kind protocols ;
   test_rollup_get_chain_block_context_sc_rollup_last_cemented_commitment_hash_with_level
+    ~kind
     protocols ;
-  test_rollup_inbox_size protocols ;
-  test_rollup_inbox_current_messages_hash protocols ;
-  test_rollup_inbox_of_rollup_node "basic" basic_scenario protocols ;
+  test_rollup_inbox_size ~kind protocols ;
+  test_rollup_inbox_current_messages_hash ~kind protocols ;
+  test_rollup_inbox_of_rollup_node ~kind "basic" basic_scenario protocols ;
   test_rollup_inbox_of_rollup_node
+    ~kind
     "stops"
     sc_rollup_node_stops_scenario
     protocols ;
   test_rollup_inbox_of_rollup_node
+    ~kind
     "handles_chain_reorg"
     sc_rollup_node_handles_chain_reorg
     protocols ;
-  test_rollup_node_boots_into_initial_state protocols ;
-  test_rollup_node_advances_pvm_state protocols ;
-  test_commitment_scenario "commitment_is_stored" commitment_stored protocols ;
+  test_rollup_node_boots_into_initial_state protocols ~kind ;
+  test_rollup_node_advances_pvm_state protocols ~kind ;
+  test_commitment_scenario
+    "commitment_is_stored"
+    commitment_stored
+    protocols
+    ~kind ;
   test_commitment_scenario
     "robust_to_failures"
     commitment_stored_robust_to_failures
-    protocols ;
+    protocols
+    ~kind ;
   test_commitment_scenario
     ~extra_tags:["modes"; "observer"]
     "observer_does_not_publish"
     (mode_publish Observer false)
-    protocols ;
+    protocols
+    ~kind ;
   test_commitment_scenario
     ~extra_tags:["modes"; "maintenance"]
     "maintenance_publishes"
     (mode_publish Maintenance true)
-    protocols ;
+    protocols
+    ~kind ;
   test_commitment_scenario
     ~extra_tags:["modes"; "batcher"]
     "batcher_does_not_publish"
     (mode_publish Batcher false)
-    protocols ;
+    protocols
+    ~kind ;
   test_commitment_scenario
     ~extra_tags:["modes"; "operator"]
     "operator_publishes"
     (mode_publish Operator true)
-    protocols ;
+    protocols
+    ~kind ;
   test_commitment_scenario
     ~commitment_period:15
     ~challenge_window:10080
     "node_use_proto_param"
     commitment_stored
-    protocols ;
+    protocols
+    ~kind ;
   test_commitment_scenario
     "non_final_level"
     commitment_not_stored_if_non_final
-    protocols ;
-  test_commitment_scenario "messages_reset" commitments_messages_reset protocols ;
-  test_commitment_scenario "handles_chain_reorgs" commitments_reorgs protocols ;
+    protocols
+    ~kind ;
+  test_commitment_scenario
+    "messages_reset"
+    commitments_messages_reset
+    protocols
+    ~kind ;
+  test_commitment_scenario
+    "handles_chain_reorgs"
+    commitments_reorgs
+    protocols
+    ~kind ;
   test_commitment_scenario
     ~challenge_window:1
     "no_commitment_publish_before_lcc"
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/2976
        change tests so that we do not need to repeat custom parameters. *)
     commitment_before_lcc_not_published
-    protocols ;
+    protocols
+    ~kind ;
   test_commitment_scenario
     "first_published_at_level_global"
     first_published_level_is_global
-    protocols ;
-  test_consecutive_commitments protocols ;
-  test_rollup_origination_boot_sector protocols ;
-  test_rollup_node_uses_boot_sector protocols ;
-  test_rollup_client_show_address protocols ;
-  test_rollup_client_generate_keys protocols ;
-  test_rollup_client_list_keys protocols ;
-  test_refutation protocols
+    protocols
+    ~kind ;
+  test_consecutive_commitments protocols ~kind ;
+  test_refutation protocols ~kind
+
+let register ~protocols =
+  (* PVM-independent tests. We still need to specify a PVM kind
+     because the tezt will need to originate a rollup. However,
+     the tezt will not test for PVM kind specific featued. *)
+  test_rollup_client_gets_address protocols ~kind:"wasm_2_0_0" ;
+  test_rollup_node_configuration protocols ~kind:"wasm_2_0_0" ;
+  test_rollup_list protocols ~kind:"wasm_2_0_0" ;
+  test_rollup_client_show_address protocols ~kind:"wasm_2_0_0" ;
+  test_rollup_client_generate_keys protocols ~kind:"wasm_2_0_0" ;
+  test_rollup_client_list_keys protocols ~kind:"wasm_2_0_0" ;
+  (* Specific Arith PVM tezts *)
+  test_rollup_arith_origination_boot_sector protocols ;
+  test_rollup_node_uses_arith_boot_sector protocols ;
+  (* Shared tezts - will be executed for both PVMs. *)
+  register ~kind:"wasm_2_0_0" ~protocols ;
+  register ~kind:"arith" ~protocols
