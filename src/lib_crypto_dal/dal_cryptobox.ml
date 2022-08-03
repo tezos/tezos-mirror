@@ -547,14 +547,13 @@ module Inner = struct
     let codeword = encode t p in
     let len_shard = t.n / t.number_of_shards in
     let rec loop i map =
-      match i with
-      | i when i = t.number_of_shards -> map
-      | _ ->
-          let shard = Array.init len_shard (fun _ -> Scalar.(copy zero)) in
-          for j = 0 to len_shard - 1 do
-            shard.(j) <- codeword.((t.number_of_shards * j) + i)
-          done ;
-          loop (i + 1) (IntMap.add i shard map)
+      if i = t.number_of_shards then map
+      else
+        let shard = Array.init len_shard (fun _ -> Scalar.(copy zero)) in
+        for j = 0 to len_shard - 1 do
+          shard.(j) <- codeword.((t.number_of_shards * j) + i)
+        done ;
+        loop (i + 1) (IntMap.add i shard map)
     in
     loop 0 IntMap.empty
 
