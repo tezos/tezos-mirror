@@ -129,14 +129,16 @@ open Sc_rollup_repr
     represent the first and second player in the pair respectively. *)
 type player = Alice | Bob
 
-(** A dissection chunk is made of a state hash (that could be [None], see
-    invariants below), and a tick count. *)
-type dissection_chunk = {
-  state_hash : State_hash.t option;
-  tick : Sc_rollup_tick_repr.t;
-}
-
 module V1 : sig
+  (** A dissection chunk is made of a state hash (that could be [None], see
+    invariants below), and a tick count. *)
+  type dissection_chunk = {
+    state_hash : State_hash.t option;
+    tick : Sc_rollup_tick_repr.t;
+  }
+
+  val pp_dissection_chunk : Format.formatter -> dissection_chunk -> unit
+
   (** A game state is characterized by:
 
     - [turn], the player that must provide the next move.
@@ -202,7 +204,10 @@ end
 (** Versioning, see {!Sc_rollup_data_version_sig.S} for more information. *)
 include Sc_rollup_data_version_sig.S with type t = V1.t
 
-include module type of V1 with type t = V1.t
+include
+  module type of V1
+    with type dissection_chunk = V1.dissection_chunk
+     and type t = V1.t
 
 module Index : sig
   type t = private {alice : Staker.t; bob : Staker.t}
@@ -312,7 +317,7 @@ type invalid_move =
   | Dissection_invalid_successive_states_shape
       (** A dissection cannot have a section with no state hash after another
           section with some state hash. *)
-  | Proof_unpexpected_section_size of Z.t
+  | Proof_unexpected_section_size of Z.t
       (** Invalid proof step because there is more than one tick. *)
   | Proof_start_state_hash_mismatch of {
       start_state_hash : State_hash.t option;

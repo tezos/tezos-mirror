@@ -44,6 +44,10 @@ let qcheck_make_result ?count ?print ?pp_error ?check ~name
   in
   QCheck2.Test.make ~name ?print ?count gen (fun x -> f x |> check)
 
+let qcheck_make_lwt ?count ?print ~extract ~name ~(gen : 'a QCheck2.Gen.t)
+    (f : 'a -> bool Lwt.t) =
+  QCheck2.Test.make ~name ?print ?count gen (fun x -> extract (f x))
+
 let qcheck_eq ?pp ?cmp ?eq expected actual =
   let pass =
     match (eq, cmp) with

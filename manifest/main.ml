@@ -3211,7 +3211,7 @@ end = struct
     type t = {main : target; embedded : target}
 
     let make_tests ?test_helpers ?parameters ?plugin ?client ?benchmark
-        ?benchmark_type_inference ~main ~name () =
+        ?benchmark_type_inference ?sc_rollup ~main ~name () =
       let name_dash = Name.name_dash name in
       let number = Name.number name in
       let path = Name.base_path name in
@@ -3369,6 +3369,7 @@ end = struct
               octez_benchmark;
               benchmark |> if_some |> open_;
               benchmark_type_inference |> if_some |> open_;
+              sc_rollup |> if_some |> if_ N.(number >= 015) |> open_;
             ]
       in
       let _unit =
@@ -4623,6 +4624,7 @@ module Protocol = Protocol
           ?client
           ?benchmark:(Option.bind benchmark Fun.id)
           ?benchmark_type_inference
+          ?sc_rollup
           ~main
           ~name
           ()

@@ -46,6 +46,19 @@ val qcheck_make_result :
   ('a -> (bool, 'b) result) ->
   QCheck2.Test.t
 
+(** [qcheck_make_lwt ?print ?count ~extract ~name ~gen f] is a wrapper
+    around {!QCheck2.Test.make} where [f] returns a [bool Lwt.t].
+    [extract] needs to be provided to extract the [bool] from [Lwt], e.g.
+    [Lwt_main.run]. *)
+val qcheck_make_lwt :
+  ?count:int ->
+  ?print:'a QCheck2.Print.t ->
+  extract:(bool Lwt.t -> bool) ->
+  name:string ->
+  gen:'a QCheck2.Gen.t ->
+  ('a -> bool Lwt.t) ->
+  QCheck2.Test.t
+
 (** [qcheck_eq_tests ~eq ~gen ~eq_name] returns
     three tests of [eq]: reflexivity, symmetry, and transitivity.
 
