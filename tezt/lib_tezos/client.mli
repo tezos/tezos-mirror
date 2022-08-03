@@ -974,6 +974,14 @@ val spawn_stresstest :
   t ->
   Process.t
 
+(** Run [tezos-client stresstest gen keys <nb_keys>].
+
+    [nb_keys] contains the number of new keys to be generated.
+
+    [endpoint]: cf {!create}*)
+val stresstest_gen_keys :
+  ?endpoint:endpoint -> int -> t -> Account.key list Lwt.t
+
 (** Costs of every kind of transaction used in the stress test. *)
 type stresstest_gas_estimation = {
   regular : int;  (** Cost of a regular transaction. *)
