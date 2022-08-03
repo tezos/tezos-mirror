@@ -2341,6 +2341,93 @@ let bake_operation_via_rpc client op =
   let* () = Client.bake_for_and_wait client in
   check_op_included ~oph client
 
+(** This helper function constructs the following commitment tree by baking and
+    publishing commitments (but without cementing them):
+    ---- c1 ---- c2 ---- c31 ---- c311
+                  \
+                   \---- c32 ---- c321
+
+   Commits c1, c2, c31 and c311 are published by [operator1]. The forking
+   branch c32 -- c321 is published by [operator2].
+*)
+let mk_forking_commitments node client ~sc_rollup ~operator1 ~operator2 =
+  let* {commitment_period_in_blocks; _} = get_sc_rollup_constants client in
+  (* This is the starting level on top of wich we'll construct the tree. *)
+  let starting_level = Node.get_level node in
+  let mk_commit ~src ~ticks ~depth ~pred =
+    (* Compute the inbox level for which we'd like to commit *)
+    let inbox_level = starting_level + (commitment_period_in_blocks * depth) in
+    (* d is the delta between the target inbox level and the current level *)
+    let d = inbox_level - Node.get_level node in
+    (* Bake sufficiently many blocks to be able to commit for the desired inbox
+       level. We may actually bake no blocks if d <= 0 *)
+    let* () = repeat d (fun () -> Client.bake_for_and_wait client) in
+    publish_dummy_commitment
+      ~inbox_level
+      ~predecessor:pred
+      ~sc_rollup
+      ~number_of_ticks:ticks
+      ~src
+      client
+  in
+  (* Retrieve the latest commitment *)
+  let* c0, _ = last_cemented_commitment_hash_with_level ~sc_rollup client in
+  (* Construct the tree of commitments. Fork c32 and c321 is published by
+     operator2. We vary ticks to have different hashes when commiting on top of
+     the same predecessor. *)
+  let* c1 = mk_commit ~ticks:1 ~depth:1 ~pred:c0 ~src:operator1 in
+  let* c2 = mk_commit ~ticks:2 ~depth:2 ~pred:c1 ~src:operator1 in
+  let* c31 = mk_commit ~ticks:31 ~depth:3 ~pred:c2 ~src:operator1 in
+  let* c32 = mk_commit ~ticks:32 ~depth:3 ~pred:c2 ~src:operator2 in
+  let* c311 = mk_commit ~ticks:311 ~depth:4 ~pred:c31 ~src:operator1 in
+  let* c321 = mk_commit ~ticks:321 ~depth:4 ~pred:c32 ~src:operator2 in
+  return (c1, c2, c31, c32, c311, c321)
+
+(** This helper initializes a rollup and builds a commitment tree of the form:
+    ---- c1 ---- c2 ---- c31 ---- c311
+                  \
+                   \---- c32 ---- c321
+    Then, it calls the given scenario on it.
+*)
+let test_forking_scenario ~title ~scenario protocols =
+  regression_test
+    ~__FILE__
+    ~tags:["l1"; "commitment"; "cement"; "fork"; "dispute"]
+    title
+    (fun protocol ->
+      (* Choosing challenge_windows to be quite longer than commitment_period
+         to avoid being in a situation where the first commitment in the result
+         of [mk_forking_commitments] is cementable without further bakes. *)
+      let commitment_period = 3 in
+      let challenge_window = commitment_period * 7 in
+      setup ~commitment_period ~challenge_window ~protocol
+      @@ fun node client _bootstrap1_key ->
+      (* Originate a Sc rollup. *)
+      let* sc_rollup = originate_sc_rollup client ~parameters_ty:"unit" in
+      (* Building a forking commitments tree. *)
+      let operator1 = Constant.bootstrap1 in
+      let operator2 = Constant.bootstrap2 in
+      let level0 = Node.get_level node in
+      let* commits =
+        mk_forking_commitments
+          node
+          client
+          ~sc_rollup
+          ~operator1:operator1.public_key_hash
+          ~operator2:operator2.public_key_hash
+      in
+      let level1 = Node.get_level node in
+      scenario
+        client
+        node
+        ~sc_rollup
+        ~operator1
+        ~operator2
+        commits
+        level0
+        level1)
+    protocols
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
