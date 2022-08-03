@@ -241,7 +241,7 @@
   Baking
   Validate_errors
   Amendment
-  Validate_operation
+  Validate
   Apply
   Services_registration
   Constants_services
@@ -500,7 +500,7 @@
   baking.ml baking.mli
   validate_errors.ml validate_errors.mli
   amendment.ml amendment.mli
-  validate_operation.ml validate_operation.mli
+  validate.ml validate.mli
   apply.ml apply.mli
   services_registration.ml services_registration.mli
   constants_services.ml constants_services.mli
@@ -739,7 +739,7 @@
   baking.ml baking.mli
   validate_errors.ml validate_errors.mli
   amendment.ml amendment.mli
-  validate_operation.ml validate_operation.mli
+  validate.ml validate.mli
   apply.ml apply.mli
   services_registration.ml services_registration.mli
   constants_services.ml constants_services.mli
@@ -983,7 +983,7 @@
   baking.ml baking.mli
   validate_errors.ml validate_errors.mli
   amendment.ml amendment.mli
-  validate_operation.ml validate_operation.mli
+  validate.ml validate.mli
   apply.ml apply.mli
   services_registration.ml services_registration.mli
   constants_services.ml constants_services.mli

@@ -25,7 +25,7 @@
 
 open Alpha_context
 
-(** {2 Definition and initialization of [validate_operation_info] and
+(** {2 Definition and initialization of [validate_info] and
     [validate_operation_state]}
 
     These live in memory during the validation of a block, or until a
@@ -261,7 +261,10 @@ let init_manager_state ctxt =
     the size of the map {!recfield:managers_seen}. *)
 type mode = Block | Mempool
 
-type validate_operation_info = {
+(** {2 Definition and initialization of [validate_info] and
+    [validate_state]} *)
+
+type validate_info = {
   ctxt : t;  (** The context at the beginning of the block or mempool. *)
   mode : mode;
   chain_id : Chain_id.t;  (** Needed for signature checks. *)
@@ -270,15 +273,15 @@ type validate_operation_info = {
   manager_info : manager_info;
 }
 
-type validate_operation_state = {
+type validate_state = {
   consensus_state : consensus_state;
   voting_state : voting_state;
   anonymous_state : anonymous_state;
   manager_state : manager_state;
 }
 
-let init_validate_operation_info ctxt mode chain_id
-    all_expected_consensus_characteritics =
+let init_validate_info ctxt mode chain_id all_expected_consensus_characteritics
+    =
   {
     ctxt;
     mode;
@@ -289,7 +292,11 @@ let init_validate_operation_info ctxt mode chain_id
     manager_info = init_manager_info ctxt;
   }
 
-let init_validate_operation_state ctxt =
+let init_validate_info ctxt mode chain_id all_expected_consensus_characteritics
+    =
+  init_validate_info ctxt mode chain_id all_expected_consensus_characteritics
+
+let init_validate_state ctxt =
   {
     consensus_state = empty_consensus_state;
     voting_state = empty_voting_state;
@@ -298,7 +305,7 @@ let init_validate_operation_state ctxt =
   }
 
 (* See mli file. *)
-type stamp = Operation_validated_stamp
+type operation_stamp = Operation_validated_stamp
 
 (** Validation of consensus operations (validation pass [0]):
     preendorsement, endorsement, and dal_slot_availability. *)
@@ -1839,7 +1846,7 @@ module Manager = struct
       contents_list] if [contents_list] were an ordinary [list]. *)
   let rec validate_contents_list :
       type kind.
-      validate_operation_info ->
+      validate_info ->
       batch_state ->
       kind Kind.manager contents_list ->
       batch_state tzresult Lwt.t =
@@ -1959,13 +1966,9 @@ end
 
 let init_info_and_state ctxt mode chain_id all_expected_consensus_features =
   let vi =
-    init_validate_operation_info
-      ctxt
-      mode
-      chain_id
-      all_expected_consensus_features
+    init_validate_info ctxt mode chain_id all_expected_consensus_features
   in
-  let vs = init_validate_operation_state ctxt in
+  let vs = init_validate_state ctxt in
   (vi, vs)
 
 let begin_block_validation ctxt chain_id ~predecessor_level ~predecessor_round
@@ -2016,9 +2019,9 @@ let begin_no_predecessor_info ctxt chain_id =
   in
   init_info_and_state ctxt Mempool chain_id all_expected_consensus_features
 
-let validate_operation (vi : validate_operation_info)
-    (vs : validate_operation_state) ?(should_check_signature = true) oph
-    (type kind) (operation : kind operation) =
+let validate_operation (vi : validate_info) (vs : validate_state)
+    ?(should_check_signature = true) oph (type kind)
+    (operation : kind operation) =
   let open Lwt_tzresult_syntax in
   let* vs =
     match operation.protocol_data.contents with

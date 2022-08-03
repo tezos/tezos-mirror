@@ -851,9 +851,9 @@ module Scripts = struct
     let operation : _ operation = {shell; protocol_data} in
     let oph = Operation.hash operation in
     let validate_operation_info, validate_operation_state =
-      Validate_operation.begin_no_predecessor_info ctxt chain_id
+      Validate.begin_no_predecessor_info ctxt chain_id
     in
-    Validate_operation.validate_operation
+    Validate.validate_operation
       validate_operation_info
       validate_operation_state
       ~should_check_signature:false

@@ -101,8 +101,8 @@ type apply_mode =
     with the operation's semantic (or return an error if the operation
     is not applicable).
 
-    The {!type:Validate_operation.stamp} argument enforces that an
-    operation needs to be validated by {!Validate_operation} before it
+    The {!type:Validate.operatin_stamp} argument enforces that an
+    operation needs to be validated by {!Validate} before it
     can be applied.
 
     For non-manager operations, the application of a validated
@@ -118,8 +118,8 @@ type apply_mode =
     - decrease of the available block gas by operation's [gas_limit].
 
     These updates are mandatory. In particular, taking the fees is
-    critically important. The {!Validate_operation} module (from which
-    we get the {!Validate_opoeration.stamp} as explained above) is
+    critically important. The {!Validate} module (from which
+    we get the {!Validate.operation_stamp} as explained above) is
     responsible for ensuring that the operation is solvable, i.e. that
     fees can be taken, i.e. that the first stage of manager operation
     application cannot fail. If this stage fails nevertheless, the
@@ -139,7 +139,7 @@ val apply_operation :
   Chain_id.t ->
   apply_mode ->
   payload_producer:public_key_hash ->
-  Validate_operation.stamp ->
+  Validate.operation_stamp ->
   Operation_hash.t ->
   'a operation ->
   (context * 'a operation_metadata) tzresult Lwt.t

@@ -180,7 +180,7 @@ type manager_op = Manager_op : 'kind Kind.manager operation -> manager_op
 type manager_op_info = {
   manager_op : manager_op;
       (** Used when we want to remove the operation with
-          {!Validate_operation.remove_manager_operation}. *)
+          {!Validate.remove_manager_operation}. *)
   fee : Tez.t;
   gas_limit : Fixed_point_repr.integral_tag Gas.Arith.t;
       (** Both [fee] and [gas_limit] are used to determine whether a new
@@ -859,7 +859,7 @@ let pre_filter config ~(filter_state : state) ?validation_state_before
   | Single (Manager_operation _) as op -> prefilter_manager_op op
   | Cons (Manager_operation _, _) as op -> prefilter_manager_op op
 
-(** Call the protocol's {!Validate_operation.validate_operation} and
+(** Call the protocol's {!Validate.validate_operation} and
     return either:
 
     - the updated {!validation_state} when the validation is
@@ -875,16 +875,16 @@ let proto_validate_operation validation_state oph ~nb_successful_prechecks
     (validation_state, error trace * error_classification) result Lwt.t =
   let open Lwt_result_syntax in
   let*! res =
-    Validate_operation.validate_operation
-      validation_state.validate_operation_info
-      validation_state.validate_operation_state
+    Validate.validate_operation
+      validation_state.validate_info
+      validation_state.validate_state
       ~should_check_signature:(nb_successful_prechecks <= 0)
       oph
       operation
   in
   match res with
-  | Ok (validate_operation_state, (_ : Validate_operation.stamp)) ->
-      return {validation_state with validate_operation_state}
+  | Ok (validate_state, (_ : Validate.operation_stamp)) ->
+      return {validation_state with validate_state}
   | Error tztrace ->
       let err = Environment.wrap_tztrace tztrace in
       let error_classification =
@@ -896,7 +896,7 @@ let proto_validate_operation validation_state oph ~nb_successful_prechecks
       in
       fail (err, error_classification)
 
-(** Call the protocol's {!Validate_operation.validate_operation} on a
+(** Call the protocol's {!Validate.validate_operation} on a
     manager operation and return:
 
     - [`Success] containing the updated [validation_state] when the
@@ -941,13 +941,13 @@ let proto_validate_manager_operation validation_state oph
 
 (** Remove a manager operation from the protocol's [validation_state]. *)
 let remove_from_validation_state validation_state (Manager_op op) =
-  let validate_operation_state =
-    Validate_operation.remove_manager_operation
-      validation_state.validate_operation_info
-      validation_state.validate_operation_state
+  let validate_state =
+    Validate.remove_manager_operation
+      validation_state.validate_info
+      validation_state.validate_state
       op
   in
-  {validation_state with validate_operation_state}
+  {validation_state with validate_state}
 
 (** Call the protocol validation on a manager operation and handle
     potential conflicts: if either the 1M restriction is triggered or
@@ -1215,7 +1215,7 @@ let precheck_manager config filter_state validation_state oph
       err) ->
       Lwt.return err
 
-(** Call the protocol's {!Validate_operation.validate_operation}. If
+(** Call the protocol's {!Validate.validate_operation}. If
     successful, return the updated [validation_state], the unchanged
     [filter_state], and no operation replacement. Otherwise, return the
     classification associated with the protocol error. Note that when
@@ -1239,13 +1239,13 @@ let precheck_non_manager filter_state validation_state oph
         error_classification) ) ->
       Lwt.return error_classification
 
-(* Now that [precheck] uses {!Validate_operation.validate_operation}
+(* Now that [precheck] uses {!Validate.validate_operation}
    for every kind of operation, it must never return
    [`Undecided]. Indeed, this would cause the prevalidator to call
    {!Apply.apply_operation}, which relies on updates to the alpha
    context to detect incompatible operations, whereas
    [validate_operation] only updates the
-   {!Validate_operation.validate_operation_state}. Therefore, it would
+   {!Validate.validate_operation_state}. Therefore, it would
    be possible for the mempool to accept conflicting operations. *)
 let precheck :
     config ->

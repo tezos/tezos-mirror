@@ -1770,12 +1770,12 @@ let rec mark_skipped :
     - consumption of each operation's [gas_limit] from the available
       block gas.
 
-    The {!type:Validate_operation.stamp} argument enforces that the
+    The {!type:Validate.operation_stamp} argument enforces that the
     operation has already been validated by {!Validate_operation}. The
     latter is responsible for ensuring that the operation is solvable,
     i.e. its fees can be taken, i.e. [take_fees] cannot return an
     error. *)
-let take_fees ctxt (_ : Validate_operation.stamp) contents_list =
+let take_fees ctxt (_ : Validate.operation_stamp) contents_list =
   let open Lwt_tzresult_syntax in
   let rec take_fees_rec :
       type kind.
@@ -1917,7 +1917,7 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
       record_non_consensus_operation_hash ctxt hash
 
 let record_preendorsement ctxt (apply_mode : apply_mode)
-    (_ : Validate_operation.stamp) (content : consensus_content) :
+    (_ : Validate.operation_stamp) (content : consensus_content) :
     (context * Kind.preendorsement contents_result_list) tzresult =
   let open Tzresult_syntax in
   let ctxt =
@@ -1953,7 +1953,7 @@ let is_grandparent_endorsement apply_mode content =
   | _ -> false
 
 let record_endorsement ctxt (apply_mode : apply_mode)
-    (_ : Validate_operation.stamp) (content : consensus_content) :
+    (_ : Validate.operation_stamp) (content : consensus_content) :
     (context * Kind.endorsement contents_result_list) tzresult Lwt.t =
   let open Lwt_tzresult_syntax in
   let mk_endorsement_result delegate endorsement_power =
