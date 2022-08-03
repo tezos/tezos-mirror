@@ -29,33 +29,9 @@
 
 open Alpha_context
 
-type denunciation_kind = Preendorsement | Endorsement | Block
-
-let denunciation_kind_encoding =
-  let open Data_encoding in
-  string_enum
-    [
-      ("preendorsement", Preendorsement);
-      ("endorsement", Endorsement);
-      ("block", Block);
-    ]
-
-let pp_denunciation_kind fmt : denunciation_kind -> unit = function
-  | Preendorsement -> Format.fprintf fmt "preendorsement"
-  | Endorsement -> Format.fprintf fmt "endorsement"
-  | Block -> Format.fprintf fmt "baking"
-
 type error +=
   | Not_enough_endorsements of {required : int; provided : int}
   | Wrong_consensus_operation_branch of Block_hash.t * Block_hash.t
-  | Invalid_double_baking_evidence of {
-      hash1 : Block_hash.t;
-      level1 : Raw_level.t;
-      round1 : Round.t;
-      hash2 : Block_hash.t;
-      level2 : Raw_level.t;
-      round2 : Round.t;
-    }
   | Wrong_level_for_consensus_operation of {
       expected : Raw_level.t;
       provided : Raw_level.t;
@@ -103,24 +79,6 @@ type error +=
   | Wrong_voting_period of {expected : int32; provided : int32}
   | Internal_operation_replay of
       Apply_internal_results.packed_internal_operation
-  | Invalid_denunciation of denunciation_kind
-  | Inconsistent_denunciation of {
-      kind : denunciation_kind;
-      delegate1 : Signature.Public_key_hash.t;
-      delegate2 : Signature.Public_key_hash.t;
-    }
-  | Unrequired_denunciation
-  | Too_early_denunciation of {
-      kind : denunciation_kind;
-      level : Raw_level.t;
-      current : Raw_level.t;
-    }
-  | Outdated_denunciation of {
-      kind : denunciation_kind;
-      level : Raw_level.t;
-      last_cycle : Cycle.t;
-    }
-  | Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
   | Multiple_revelation
   | Failing_noop_error
   | Zero_frozen_deposits of Signature.Public_key_hash.t
@@ -179,41 +137,6 @@ let () =
     (function
       | Wrong_consensus_operation_branch (e, p) -> Some (e, p) | _ -> None)
     (fun (e, p) -> Wrong_consensus_operation_branch (e, p)) ;
-  register_error_kind
-    `Permanent
-    ~id:"block.invalid_double_baking_evidence"
-    ~title:"Invalid double baking evidence"
-    ~description:
-      "A double-baking evidence is inconsistent  (two distinct level)"
-    ~pp:(fun ppf (hash1, level1, round1, hash2, level2, round2) ->
-      Format.fprintf
-        ppf
-        "Invalid double-baking evidence (hash: %a and %a, levels/rounds: \
-         (%ld,%ld) and (%ld,%ld))"
-        Block_hash.pp
-        hash1
-        Block_hash.pp
-        hash2
-        (Raw_level.to_int32 level1)
-        (Round.to_int32 round1)
-        (Raw_level.to_int32 level2)
-        (Round.to_int32 round2))
-    Data_encoding.(
-      obj6
-        (req "hash1" Block_hash.encoding)
-        (req "level1" Raw_level.encoding)
-        (req "round1" Round.encoding)
-        (req "hash2" Block_hash.encoding)
-        (req "level2" Raw_level.encoding)
-        (req "round2" Round.encoding))
-    (function
-      | Invalid_double_baking_evidence
-          {hash1; level1; round1; hash2; level2; round2} ->
-          Some (hash1, level1, round1, hash2, level2, round2)
-      | _ -> None)
-    (fun (hash1, level1, round1, hash2, level2, round2) ->
-      Invalid_double_baking_evidence
-        {hash1; level1; round1; hash2; level2; round2}) ;
   register_error_kind
     `Permanent
     ~id:"wrong_level_for_consensus_operation"
@@ -578,129 +501,6 @@ let () =
     Apply_internal_results.internal_operation_encoding
     (function Internal_operation_replay op -> Some op | _ -> None)
     (fun op -> Internal_operation_replay op) ;
-  register_error_kind
-    `Permanent
-    ~id:"block.invalid_denunciation"
-    ~title:"Invalid denunciation"
-    ~description:"A denunciation is malformed"
-    ~pp:(fun ppf kind ->
-      Format.fprintf
-        ppf
-        "Malformed double-%a evidence"
-        pp_denunciation_kind
-        kind)
-    Data_encoding.(obj1 (req "kind" denunciation_kind_encoding))
-    (function Invalid_denunciation kind -> Some kind | _ -> None)
-    (fun kind -> Invalid_denunciation kind) ;
-  register_error_kind
-    `Permanent
-    ~id:"block.inconsistent_denunciation"
-    ~title:"Inconsistent denunciation"
-    ~description:
-      "A denunciation operation is inconsistent (two distinct delegates)"
-    ~pp:(fun ppf (kind, delegate1, delegate2) ->
-      Format.fprintf
-        ppf
-        "Inconsistent double-%a evidence (distinct delegate: %a and %a)"
-        pp_denunciation_kind
-        kind
-        Signature.Public_key_hash.pp_short
-        delegate1
-        Signature.Public_key_hash.pp_short
-        delegate2)
-    Data_encoding.(
-      obj3
-        (req "kind" denunciation_kind_encoding)
-        (req "delegate1" Signature.Public_key_hash.encoding)
-        (req "delegate2" Signature.Public_key_hash.encoding))
-    (function
-      | Inconsistent_denunciation {kind; delegate1; delegate2} ->
-          Some (kind, delegate1, delegate2)
-      | _ -> None)
-    (fun (kind, delegate1, delegate2) ->
-      Inconsistent_denunciation {kind; delegate1; delegate2}) ;
-  register_error_kind
-    `Branch
-    ~id:"block.unrequired_denunciation"
-    ~title:"Unrequired denunciation"
-    ~description:"A denunciation is unrequired"
-    ~pp:(fun ppf _ ->
-      Format.fprintf
-        ppf
-        "A valid denunciation cannot be applied: the associated delegate has \
-         already been denounced for this level.")
-    Data_encoding.unit
-    (function Unrequired_denunciation -> Some () | _ -> None)
-    (fun () -> Unrequired_denunciation) ;
-  register_error_kind
-    `Temporary
-    ~id:"block.too_early_denunciation"
-    ~title:"Too early denunciation"
-    ~description:"A denunciation is too far in the future"
-    ~pp:(fun ppf (kind, level, current) ->
-      Format.fprintf
-        ppf
-        "A double-%a denunciation is too far in the future (current level: %a, \
-         given level: %a)"
-        pp_denunciation_kind
-        kind
-        Raw_level.pp
-        current
-        Raw_level.pp
-        level)
-    Data_encoding.(
-      obj3
-        (req "kind" denunciation_kind_encoding)
-        (req "level" Raw_level.encoding)
-        (req "current" Raw_level.encoding))
-    (function
-      | Too_early_denunciation {kind; level; current} ->
-          Some (kind, level, current)
-      | _ -> None)
-    (fun (kind, level, current) ->
-      Too_early_denunciation {kind; level; current}) ;
-  register_error_kind
-    `Permanent
-    ~id:"block.outdated_denunciation"
-    ~title:"Outdated denunciation"
-    ~description:"A denunciation is outdated."
-    ~pp:(fun ppf (kind, level, last_cycle) ->
-      Format.fprintf
-        ppf
-        "A double-%a is outdated (last acceptable cycle: %a, given level: %a)"
-        pp_denunciation_kind
-        kind
-        Cycle.pp
-        last_cycle
-        Raw_level.pp
-        level)
-    Data_encoding.(
-      obj3
-        (req "kind" denunciation_kind_encoding)
-        (req "level" Raw_level.encoding)
-        (req "last" Cycle.encoding))
-    (function
-      | Outdated_denunciation {kind; level; last_cycle} ->
-          Some (kind, level, last_cycle)
-      | _ -> None)
-    (fun (kind, level, last_cycle) ->
-      Outdated_denunciation {kind; level; last_cycle}) ;
-  register_error_kind
-    `Permanent
-    ~id:"operation.invalid_activation"
-    ~title:"Invalid activation"
-    ~description:
-      "The given key and secret do not correspond to any existing preallocated \
-       contract"
-    ~pp:(fun ppf pkh ->
-      Format.fprintf
-        ppf
-        "Invalid activation. The public key %a does not match any commitment."
-        Ed25519.Public_key_hash.pp
-        pkh)
-    Data_encoding.(obj1 (req "pkh" Ed25519.Public_key_hash.encoding))
-    (function Invalid_activation {pkh} -> Some pkh | _ -> None)
-    (fun pkh -> Invalid_activation {pkh}) ;
   register_error_kind
     `Permanent
     ~id:"block.multiple_revelation"
@@ -2675,33 +2475,12 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
   in
   return (ctxt, contents_result_list)
 
-let check_denunciation_age ctxt kind given_level =
-  let max_slashing_period = Constants.max_slashing_period ctxt in
-  let current_cycle = (Level.current ctxt).cycle in
-  let given_cycle = (Level.from_raw ctxt given_level).cycle in
-  let last_slashable_cycle = Cycle.add given_cycle max_slashing_period in
-  fail_when
-    Cycle.(given_cycle > current_cycle)
-    (Too_early_denunciation
-       {kind; level = given_level; current = (Level.current ctxt).level})
-  >>=? fun () ->
-  fail_unless
-    Cycle.(last_slashable_cycle > current_cycle)
-    (Outdated_denunciation
-       {kind; level = given_level; last_cycle = last_slashable_cycle})
-
 let punish_delegate ctxt delegate level mistake mk_result ~payload_producer =
-  let already_slashed, punish =
+  let punish =
     match mistake with
-    | `Double_baking ->
-        ( Delegate.already_slashed_for_double_baking,
-          Delegate.punish_double_baking )
-    | `Double_endorsing ->
-        ( Delegate.already_slashed_for_double_endorsing,
-          Delegate.punish_double_endorsing )
+    | `Double_baking -> Delegate.punish_double_baking
+    | `Double_endorsing -> Delegate.punish_double_endorsing
   in
-  already_slashed ctxt delegate level >>=? fun slashed ->
-  fail_when slashed Unrequired_denunciation >>=? fun () ->
   punish ctxt delegate level >>=? fun (ctxt, burned, punish_balance_updates) ->
   (match Tez.(burned /? 2L) with
   | Ok reward ->
@@ -2715,9 +2494,8 @@ let punish_delegate ctxt delegate level mistake mk_result ~payload_producer =
   let balance_updates = reward_balance_updates @ punish_balance_updates in
   (ctxt, Single_result (mk_result balance_updates))
 
-let punish_double_endorsement_or_preendorsement (type kind) ctxt ~chain_id
-    ~preendorsement ~(op1 : kind Kind.consensus Operation.t)
-    ~(op2 : kind Kind.consensus Operation.t) ~payload_producer :
+let punish_double_endorsement_or_preendorsement (type kind) ctxt
+    ~(op1 : kind Kind.consensus Operation.t) ~payload_producer :
     (context
     * kind Kind.double_consensus_operation_evidence contents_result_list)
     tzresult
@@ -2730,38 +2508,11 @@ let punish_double_endorsement_or_preendorsement (type kind) ctxt ~chain_id
     | Single (Endorsement _) ->
         Double_endorsement_evidence_result balance_updates
   in
-  match (op1.protocol_data.contents, op2.protocol_data.contents) with
-  | Single (Preendorsement e1), Single (Preendorsement e2)
-  | Single (Endorsement e1), Single (Endorsement e2) ->
-      let kind = if preendorsement then Preendorsement else Endorsement in
-      let op1_hash = Operation.hash op1 in
-      let op2_hash = Operation.hash op2 in
-      fail_unless
-        (Raw_level.(e1.level = e2.level)
-        && Round.(e1.round = e2.round)
-        && (not
-              (Block_payload_hash.equal
-                 e1.block_payload_hash
-                 e2.block_payload_hash))
-        && (* we require an order on hashes to avoid the existence of
-              equivalent evidences *)
-        Operation_hash.(op1_hash < op2_hash))
-        (Invalid_denunciation kind)
-      >>=? fun () ->
-      (* Disambiguate: levels are equal *)
+  match op1.protocol_data.contents with
+  | Single (Preendorsement e1) | Single (Endorsement e1) ->
       let level = Level.from_raw ctxt e1.level in
-      check_denunciation_age ctxt kind level.level >>=? fun () ->
       Stake_distribution.slot_owner ctxt level e1.slot
-      >>=? fun (ctxt, (delegate1_pk, delegate1)) ->
-      Stake_distribution.slot_owner ctxt level e2.slot
-      >>=? fun (ctxt, (_delegate2_pk, delegate2)) ->
-      fail_unless
-        (Signature.Public_key_hash.equal delegate1 delegate2)
-        (Inconsistent_denunciation {kind; delegate1; delegate2})
-      >>=? fun () ->
-      let delegate_pk, delegate = (delegate1_pk, delegate1) in
-      Operation.check_signature delegate_pk chain_id op1 >>?= fun () ->
-      Operation.check_signature delegate_pk chain_id op2 >>?= fun () ->
+      >>=? fun (ctxt, (_delegate_pk, delegate)) ->
       punish_delegate
         ctxt
         delegate
@@ -2770,41 +2521,15 @@ let punish_double_endorsement_or_preendorsement (type kind) ctxt ~chain_id
         mk_result
         ~payload_producer
 
-let punish_double_baking ctxt chain_id bh1 bh2 ~payload_producer =
-  let hash1 = Block_header.hash bh1 in
-  let hash2 = Block_header.hash bh2 in
+let punish_double_baking ctxt (bh1 : Block_header.t) ~payload_producer =
   Fitness.from_raw bh1.shell.fitness >>?= fun bh1_fitness ->
   let round1 = Fitness.round bh1_fitness in
-  Fitness.from_raw bh2.shell.fitness >>?= fun bh2_fitness ->
-  let round2 = Fitness.round bh2_fitness in
-  ( Raw_level.of_int32 bh1.shell.level >>?= fun level1 ->
-    Raw_level.of_int32 bh2.shell.level >>?= fun level2 ->
-    fail_unless
-      (Compare.Int32.(bh1.shell.level = bh2.shell.level)
-      && Round.(round1 = round2)
-      && (* we require an order on hashes to avoid the existence of
-            equivalent evidences *)
-      Block_hash.(hash1 < hash2))
-      (Invalid_double_baking_evidence
-         {hash1; level1; round1; hash2; level2; round2}) )
-  >>=? fun () ->
   Raw_level.of_int32 bh1.shell.level >>?= fun raw_level ->
-  check_denunciation_age ctxt Block raw_level >>=? fun () ->
   let level = Level.from_raw ctxt raw_level in
   let committee_size = Constants.consensus_committee_size ctxt in
   Round.to_slot round1 ~committee_size >>?= fun slot1 ->
   Stake_distribution.slot_owner ctxt level slot1
-  >>=? fun (ctxt, (delegate1_pk, delegate1)) ->
-  Round.to_slot round2 ~committee_size >>?= fun slot2 ->
-  Stake_distribution.slot_owner ctxt level slot2
-  >>=? fun (ctxt, (_delegate2_pk, delegate2)) ->
-  fail_unless
-    Signature.Public_key_hash.(delegate1 = delegate2)
-    (Inconsistent_denunciation {kind = Block; delegate1; delegate2})
-  >>=? fun () ->
-  let delegate_pk, delegate = (delegate1_pk, delegate1) in
-  Block_header.check_signature bh1 chain_id delegate_pk >>?= fun () ->
-  Block_header.check_signature bh2 chain_id delegate_pk >>?= fun () ->
+  >>=? fun (ctxt, (_delegate_pk, delegate)) ->
   punish_delegate
     ctxt
     delegate
@@ -2942,37 +2667,23 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
       >|=? fun (ctxt, balance_updates) ->
       (ctxt, Single_result (Seed_nonce_revelation_result balance_updates))
   | Single (Vdf_revelation {solution}) ->
-      Seed.check_vdf_and_update_seed ctxt solution >>=? fun ctxt ->
+      Seed.update_seed ctxt solution >>=? fun ctxt ->
       let tip = Constants.seed_nonce_revelation_tip ctxt in
       let contract = Contract.Implicit payload_producer in
       Token.transfer ctxt `Revelation_rewards (`Contract contract) tip
       >|=? fun (ctxt, balance_updates) ->
       (ctxt, Single_result (Vdf_revelation_result balance_updates))
-  | Single (Double_preendorsement_evidence {op1; op2}) ->
-      punish_double_endorsement_or_preendorsement
-        ctxt
-        ~preendorsement:true
-        ~chain_id
-        ~op1
-        ~op2
-        ~payload_producer
-  | Single (Double_endorsement_evidence {op1; op2}) ->
-      punish_double_endorsement_or_preendorsement
-        ctxt
-        ~preendorsement:false
-        ~chain_id
-        ~op1
-        ~op2
-        ~payload_producer
-  | Single (Double_baking_evidence {bh1; bh2}) ->
-      punish_double_baking ctxt chain_id bh1 bh2 ~payload_producer
+  | Single (Double_preendorsement_evidence {op1; op2 = _}) ->
+      punish_double_endorsement_or_preendorsement ctxt ~op1 ~payload_producer
+  | Single (Double_endorsement_evidence {op1; op2 = _}) ->
+      punish_double_endorsement_or_preendorsement ctxt ~op1 ~payload_producer
+  | Single (Double_baking_evidence {bh1; bh2 = _}) ->
+      punish_double_baking ctxt bh1 ~payload_producer
   | Single (Activate_account {id = pkh; activation_code}) ->
       let blinded_pkh =
         Blinded_public_key_hash.of_ed25519_pkh activation_code pkh
       in
       let src = `Collected_commitments blinded_pkh in
-      Token.allocated ctxt src >>=? fun (ctxt, src_exists) ->
-      fail_unless src_exists (Invalid_activation {pkh}) >>=? fun () ->
       let contract = Contract.Implicit (Signature.Ed25519 pkh) in
       Token.balance ctxt src >>=? fun (ctxt, amount) ->
       Token.transfer ctxt src (`Contract contract) amount

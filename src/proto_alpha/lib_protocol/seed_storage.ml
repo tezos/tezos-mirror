@@ -168,7 +168,7 @@ let get_seed_computation_status ctxt =
         return (Vdf_revelation_stage {seed_discriminant; seed_challenge})
     | VDF_seed -> return Computation_finished
 
-let check_vdf_and_update_seed ctxt vdf_solution =
+let check_vdf ctxt vdf_solution =
   let* r = get_seed_computation_status ctxt in
   let*? seed_discriminant, seed_challenge =
     match r with
@@ -190,8 +190,6 @@ let check_vdf_and_update_seed ctxt vdf_solution =
         return (ctxt, setup)
     | Some setup -> return (ctxt, setup)
   in
-  (* If VDF is valid, compute and update seed and change seed status from
-   * RANDAO to VDF *)
   let*? () =
     error_unless
       (Option.value
@@ -202,10 +200,17 @@ let check_vdf_and_update_seed ctxt vdf_solution =
             vdf_solution))
       Unverified_vdf
   in
-  let new_seed = Seed_repr.vdf_to_seed seed_challenge vdf_solution in
+  return ()
+
+let update_seed ctxt vdf_solution =
+  let open Lwt_result_syntax in
+  (* compute and update seed and change seed status from RANDAO to
+     VDF *)
   let current_cycle = (Level_storage.current ctxt).cycle in
   let preserved = Constants_storage.preserved_cycles ctxt in
   let cycle_computed = Cycle_repr.add current_cycle (preserved + 1) in
+  let* seed_challenge = Storage.Seed.For_cycle.get ctxt cycle_computed in
+  let new_seed = Seed_repr.vdf_to_seed seed_challenge vdf_solution in
   Storage.Seed.For_cycle.update ctxt cycle_computed new_seed Seed_repr.VDF_seed
 
 let for_cycle ctxt cycle =

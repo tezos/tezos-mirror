@@ -29,6 +29,8 @@ type raw_level = t
 
 include (Compare.Int32 : Compare.S with type t := t)
 
+module Set = Set.Make (Compare.Int32)
+
 let pp ppf level = Format.fprintf ppf "%ld" level
 
 let rpc_arg =

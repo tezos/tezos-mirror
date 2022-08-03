@@ -236,6 +236,8 @@ module Raw_level : sig
   val of_int32 : int32 -> raw_level tzresult
 
   val of_int32_exn : int32 -> raw_level
+
+  module Set : Set.S with type elt = raw_level
 end
 
 (** This module re-exports definitions from {!Cycle_repr}. *)
@@ -1286,6 +1288,9 @@ module Nonce : sig
 
   val record_hash : context -> unrevealed -> context tzresult Lwt.t
 
+  (** See {!Nonce_storage.check_unrevealed}. *)
+  val check_unrevealed : context -> Level.t -> nonce -> unit tzresult Lwt.t
+
   val reveal : context -> Level.t -> nonce -> context tzresult Lwt.t
 
   type status = Unrevealed of unrevealed | Revealed of nonce
@@ -1322,8 +1327,11 @@ module Seed : sig
   val generate_vdf_setup :
     seed_discriminant:seed -> seed_challenge:seed -> vdf_setup
 
-  val check_vdf_and_update_seed :
-    context -> vdf_solution -> context tzresult Lwt.t
+  (** See {!Seed_storage.check_vdf}. *)
+  val check_vdf : context -> vdf_solution -> unit tzresult Lwt.t
+
+  (** See {!Seed_storage.update_seed}. *)
+  val update_seed : context -> vdf_solution -> context tzresult Lwt.t
 
   val compute_randao : context -> context tzresult Lwt.t
 
@@ -4335,6 +4343,9 @@ module Commitment : sig
     blinded_public_key_hash : Blinded_public_key_hash.t;
     amount : Tez.tez;
   }
+
+  (** See {!Commitment_storage.exists}. *)
+  val exists : context -> Blinded_public_key_hash.t -> bool Lwt.t
 
   val encoding : t Data_encoding.t
 end

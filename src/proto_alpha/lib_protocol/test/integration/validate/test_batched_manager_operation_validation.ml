@@ -45,7 +45,7 @@ let batch_reveal_in_the_middle_diagnostic (infos : infos) op =
     match errs with
     | [
      Environment.Ecoproto_error
-       Validate_operation.Manager.Incorrect_reveal_position;
+       Validate_errors.Manager.Incorrect_reveal_position;
     ] ->
         return_unit
     | err ->
@@ -115,7 +115,7 @@ let batch_two_reveals_diagnostic (infos : infos) op =
     match errs with
     | [
      Environment.Ecoproto_error
-       Validate_operation.Manager.Incorrect_reveal_position;
+       Validate_errors.Manager.Incorrect_reveal_position;
     ] ->
         return_unit
     | err ->
@@ -183,9 +183,8 @@ let generate_tests_batches_two_reveals () =
 let batch_two_sources_diagnostic (infos : infos) op =
   let expect_failure errs =
     match errs with
-    | [
-     Environment.Ecoproto_error Validate_operation.Manager.Inconsistent_sources;
-    ] ->
+    | [Environment.Ecoproto_error Validate_errors.Manager.Inconsistent_sources]
+      ->
         return_unit
     | err ->
         failwith
@@ -311,9 +310,8 @@ let test_batch_inconsistent_counters kind1 kind2 () =
   in
   let expect_failure errs =
     match errs with
-    | [
-     Environment.Ecoproto_error Validate_operation.Manager.Inconsistent_counters;
-    ] ->
+    | [Environment.Ecoproto_error Validate_errors.Manager.Inconsistent_counters]
+      ->
         return_unit
     | err ->
         failwith

@@ -227,6 +227,7 @@
   Dal_apply
   Baking
   Amendment
+  Validate_errors
   Validate_operation
   Apply
   Services_registration
@@ -471,6 +472,7 @@
   dal_apply.ml dal_apply.mli
   baking.ml baking.mli
   amendment.ml amendment.mli
+  validate_errors.ml validate_errors.mli
   validate_operation.ml validate_operation.mli
   apply.ml apply.mli
   services_registration.ml services_registration.mli
@@ -695,6 +697,7 @@
   dal_apply.ml dal_apply.mli
   baking.ml baking.mli
   amendment.ml amendment.mli
+  validate_errors.ml validate_errors.mli
   validate_operation.ml validate_operation.mli
   apply.ml apply.mli
   services_registration.ml services_registration.mli
@@ -924,6 +927,7 @@
   dal_apply.ml dal_apply.mli
   baking.ml baking.mli
   amendment.ml amendment.mli
+  validate_errors.ml validate_errors.mli
   validate_operation.ml validate_operation.mli
   apply.ml apply.mli
   services_registration.ml services_registration.mli

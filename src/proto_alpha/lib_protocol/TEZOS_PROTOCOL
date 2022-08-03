@@ -216,6 +216,7 @@
 
         "Baking",
         "Amendment",
+        "Validate_errors",
         "Validate_operation",
         "Apply",
 

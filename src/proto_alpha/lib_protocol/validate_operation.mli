@@ -70,19 +70,6 @@ val init_info_and_state :
     function in {!TMP_for_plugin}). *)
 type stamp
 
-(** Errors that may arise while validating a manager operation. *)
-module Manager : sig
-  type error +=
-    | Manager_restriction of Signature.Public_key_hash.t * Operation_hash.t
-    | Inconsistent_sources
-    | Inconsistent_counters
-    | Incorrect_reveal_position
-    | Insufficient_gas_for_manager
-    | Gas_quota_exceeded_init_deserialize
-    | Tx_rollup_feature_disabled
-    | Sc_rollup_feature_disabled
-end
-
 (** Check the validity of the given operation; return an updated
     {!validate_operation_state}, and a {!stamp} attesting that the
     operation has been validated.
@@ -146,11 +133,12 @@ end
 
     TODO: https://gitlab.com/tezos/tezos/-/issues/2603
 
-    This function currently does nothing for non-manager operations
-    (instead, the validity of a non-manager operation is decided by
-    calling {!Apply.apply_operation} to check whether it returns an
-    error). We should specify and implement the validation of every
-    kind of operation. *)
+    This function currently does nothing for operations other than
+    anonymous or manager operation. (instead, the validity of a
+    consensus or voting operation is decided by calling
+    {!Apply.apply_operation} to check whether it returns an error).
+    We should specify and implement the validation of every kind of
+    operation. *)
 val validate_operation :
   validate_operation_info ->
   validate_operation_state ->

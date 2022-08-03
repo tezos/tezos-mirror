@@ -444,7 +444,7 @@ let test_no_reveal_when_gas_exhausted () =
   let expect_failure = function
     | [
         Environment.Ecoproto_error
-          Validate_operation.Manager.Insufficient_gas_for_manager;
+          Validate_errors.Manager.Insufficient_gas_for_manager;
         Environment.Ecoproto_error Raw_context.Operation_quota_exceeded;
       ] ->
         return_unit
@@ -509,7 +509,7 @@ let test_reveal_incorrect_position_in_batch () =
   let expect_failure = function
     | [
         Environment.Ecoproto_error
-          Validate_operation.Manager.Incorrect_reveal_position;
+          Validate_errors.Manager.Incorrect_reveal_position;
       ] ->
         return_unit
     | _ -> assert false
@@ -548,7 +548,7 @@ let test_duplicate_valid_reveals () =
   let expect_failure = function
     | [
         Environment.Ecoproto_error
-          Validate_operation.Manager.Incorrect_reveal_position;
+          Validate_errors.Manager.Incorrect_reveal_position;
       ] ->
         return_unit
     | _ -> assert false
@@ -591,7 +591,7 @@ let test_valid_reveal_after_gas_exhausted_one () =
   let expect_failure = function
     | [
         Environment.Ecoproto_error
-          Validate_operation.Manager.Incorrect_reveal_position;
+          Validate_errors.Manager.Incorrect_reveal_position;
       ] ->
         return_unit
     | _ -> assert false
@@ -638,7 +638,7 @@ let test_valid_reveal_after_insolvent_one () =
   let expect_failure = function
     | [
         Environment.Ecoproto_error
-          Validate_operation.Manager.Incorrect_reveal_position;
+          Validate_errors.Manager.Incorrect_reveal_position;
       ] ->
         return_unit
     | _ -> assert false
@@ -681,7 +681,7 @@ let test_valid_reveal_after_emptying_balance () =
   let expect_failure = function
     | [
         Environment.Ecoproto_error
-          Validate_operation.Manager.Incorrect_reveal_position;
+          Validate_errors.Manager.Incorrect_reveal_position;
       ] ->
         return_unit
     | _ -> assert false

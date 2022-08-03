@@ -162,7 +162,9 @@ let test_revelation_early_wrong_right_twice () =
   in
   let*! e = Block.bake ~policy ~operation b in
   let* () =
-    Assert.proto_error_with_info ~loc:__LOC__ e "Too early nonce revelation"
+    Assert.proto_error ~loc:__LOC__ e (function
+        | Nonce_storage.Too_early_revelation -> true
+        | _ -> false)
   in
   (* finish the cycle excluding the committing baker, id *)
   let* b = Block.bake_until_cycle_end ~policy b in
@@ -176,7 +178,11 @@ let test_revelation_early_wrong_right_twice () =
       (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get wrong_hash)
   in
   let*! e = Block.bake ~operation b in
-  let* () = Assert.proto_error_with_info ~loc:__LOC__ e "Inconsistent nonce" in
+  let* () =
+    Assert.proto_error ~loc:__LOC__ e (function
+        | Nonce_storage.Inconsistent_nonce -> true
+        | _ -> false)
+  in
   (* reveals correctly *)
   let operation =
     Op.seed_nonce_revelation
@@ -187,6 +193,18 @@ let test_revelation_early_wrong_right_twice () =
   let* baker_pkh, _, _ = Block.get_next_baker ~policy b in
   let baker = Alpha_context.Contract.Implicit baker_pkh in
   let* baker_bal = Context.Contract.balance (B b) baker in
+  (* test that revealing twice in a block produces an error *)
+  let*! e =
+    Block.bake
+      ~policy:(Block.By_account baker_pkh)
+      ~operations:[operation; operation]
+      b
+  in
+  let* () =
+    Assert.proto_error ~loc:__LOC__ e (function
+        | Validate_errors.Anonymous.Conflicting_nonce_revelation -> true
+        | _ -> false)
+  in
   let* b = Block.bake ~policy:(Block.By_account baker_pkh) ~operation b in
   (* test that the baker gets the tip reward plus the baking reward*)
   let* () =
@@ -205,7 +223,9 @@ let test_revelation_early_wrong_right_twice () =
       (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get wrong_hash)
   in
   let*! e = Block.bake ~operation ~policy b in
-  Assert.proto_error_with_info ~loc:__LOC__ e "Previously revealed nonce"
+  Assert.proto_error ~loc:__LOC__ e (function
+      | Nonce_storage.Already_revealed_nonce -> true
+      | _ -> false)
 
 (** Test that revealing too late produces an error. Note that a
     committer who doesn't reveal at cycle 1 is not punished.*)
@@ -240,7 +260,9 @@ let test_revelation_missing_and_late () =
   in
   let*! e = Block.bake ~operation ~policy b in
   let* () =
-    Assert.proto_error_with_info ~loc:__LOC__ e "Too late nonce revelation"
+    Assert.proto_error ~loc:__LOC__ e (function
+        | Nonce_storage.Too_late_revelation -> true
+        | _ -> false)
   in
   (* finish cycle 1 excluding the committing baker [id] *)
   let* b = Block.bake_until_cycle_end ~policy b in
@@ -252,7 +274,9 @@ let test_revelation_missing_and_late () =
       (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get committed_hash)
   in
   let*! e = Block.bake ~operation b in
-  Assert.proto_error_with_info ~loc:__LOC__ e "Too late nonce revelation"
+  Assert.proto_error ~loc:__LOC__ e (function
+      | Nonce_storage.Too_late_revelation -> true
+      | _ -> false)
 
 let wrap e = e >|= Environment.wrap_tzresult
 
@@ -409,14 +433,20 @@ let test_early_incorrect_unverified_correct_already_vdf () =
   let operation = Op.vdf_revelation (B b) dummy_solution in
   let*! e = Block.bake ~operation b in
   let* () =
-    Assert.proto_error_with_info ~loc:__LOC__ e "Too early VDF revelation"
+    Assert.proto_error ~loc:__LOC__ e (function
+        | Seed_storage.Too_early_revelation -> true
+        | _ -> false)
   in
   (* bake until nonce reveal period finishes *)
   let* b = Block.bake_n ~policy nonce_revelation_threshold b in
   (* test that revealing non group elements produces an error *)
   let operation = Op.vdf_revelation (B b) dummy_solution in
   let*! e = Block.bake ~operation b in
-  let* () = Assert.proto_error_with_info ~loc:__LOC__ e "Unverified VDF" in
+  let* () =
+    Assert.proto_error ~loc:__LOC__ e (function
+        | Seed_storage.Unverified_vdf -> true
+        | _ -> false)
+  in
   let* seed_status = Context.get_seed_computation (B b) in
   match seed_status with
   | Nonce_revelation_stage -> assert false
@@ -438,7 +468,11 @@ let test_early_incorrect_unverified_correct_already_vdf () =
       in
       let operation = Op.vdf_revelation (B b) wrong_solution in
       let*! e = Block.bake ~operation b in
-      let* () = Assert.proto_error_with_info ~loc:__LOC__ e "Unverified VDF" in
+      let* () =
+        Assert.proto_error ~loc:__LOC__ e (function
+            | Seed_storage.Unverified_vdf -> true
+            | _ -> false)
+      in
       (* test with correct input *)
       (* compute the VDF solution (the result and the proof ) *)
       let solution =
@@ -450,6 +484,17 @@ let test_early_incorrect_unverified_correct_already_vdf () =
       in
       let* baker_bal = Context.Contract.balance (B b) baker in
       let operation = Op.vdf_revelation (B b) solution in
+      let*! e =
+        Block.bake
+          ~policy:(Block.By_account baker_pkh)
+          ~operations:[operation; operation]
+          b
+      in
+      let* () =
+        Assert.proto_error ~loc:__LOC__ e (function
+            | Seed_storage.Already_accepted -> true
+            | _ -> false)
+      in
       (* verify the balance was credited following operation inclusion *)
       let* b = Block.bake ~policy:(Block.By_account baker_pkh) ~operation b in
       let* () =
@@ -470,10 +515,9 @@ let test_early_incorrect_unverified_correct_already_vdf () =
           let operation = Op.vdf_revelation (B b) solution in
           let*! e = Block.bake ~operation b in
           let* () =
-            Assert.proto_error_with_info
-              ~loc:__LOC__
-              e
-              "Previously revealed VDF"
+            Assert.proto_error ~loc:__LOC__ e (function
+                | Seed_storage.Already_accepted -> true
+                | _ -> false)
           in
           (* verify the stored seed has the expected value *)
           let open Data_encoding.Binary in

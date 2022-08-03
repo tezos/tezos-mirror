@@ -291,7 +291,9 @@ let test_same_blocks () =
   Block.bake b >>=? fun ba ->
   double_baking (B ba) ba.header ba.header |> fun operation ->
   Block.bake ~operation ba >>= fun res ->
-  Assert.proto_error_with_info ~loc:__LOC__ res "Invalid double baking evidence"
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Validate_errors.Anonymous.Invalid_double_baking_evidence _ -> true
+      | _ -> false)
 
 (** Check that an double baking operation that is invalid due to
    incorrect ordering of the block headers fails. *)
@@ -301,7 +303,9 @@ let test_incorrect_order () =
   double_baking (B genesis) ~correct_order:false blk_a.header blk_b.header
   |> fun operation ->
   Block.bake ~operation genesis >>= fun res ->
-  Assert.proto_error_with_info ~loc:__LOC__ res "Invalid double baking evidence"
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Validate_errors.Anonymous.Invalid_double_baking_evidence _ -> true
+      | _ -> false)
 
 (** Check that a double baking operation exposing two blocks with
     different levels fails. *)
@@ -311,7 +315,9 @@ let test_different_levels () =
   Block.bake blk_b >>=? fun blk_b_2 ->
   double_baking (B blk_a) blk_a.header blk_b_2.header |> fun operation ->
   Block.bake ~operation blk_a >>= fun res ->
-  Assert.proto_error_with_info ~loc:__LOC__ res "Invalid double baking evidence"
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Validate_errors.Anonymous.Invalid_double_baking_evidence _ -> true
+      | _ -> false)
 
 (** Check that a double baking operation exposing two yet-to-be-baked
     blocks fails. *)
@@ -321,7 +327,11 @@ let test_too_early_double_baking_evidence () =
   block_fork ~policy:(By_round 0) contracts b >>=? fun (blk_a, blk_b) ->
   double_baking (B b) blk_a.header blk_b.header |> fun operation ->
   Block.bake ~operation genesis >>= fun res ->
-  Assert.proto_error_with_info ~loc:__LOC__ res "Too early denunciation"
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Validate_errors.Anonymous.Too_early_denunciation {kind; _}
+        when kind = Validate_errors.Anonymous.Block ->
+          true
+      | _ -> false)
 
 (** Check that after [max_slashing_period * blocks_per_cycle + 1] blocks -- corresponding to 2 cycles
    --, it is not possible to create a double baking operation anymore. *)
@@ -333,7 +343,11 @@ let test_too_late_double_baking_evidence () =
   Block.bake_until_n_cycle_end max_slashing_period blk_a >>=? fun blk ->
   double_baking (B blk) blk_a.header blk_b.header |> fun operation ->
   Block.bake ~operation blk >>= fun res ->
-  Assert.proto_error_with_info ~loc:__LOC__ res "Outdated denunciation"
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Validate_errors.Anonymous.Outdated_denunciation {kind; _}
+        when kind = Validate_errors.Anonymous.Block ->
+          true
+      | _ -> false)
 
 (** Check that before [max_slashing_period * blocks_per_cycle] blocks
    -- corresponding to 2 cycles --, it is still possible to create a
@@ -359,7 +373,9 @@ let test_different_delegates () =
   Block.bake ~policy:(By_account baker_2) b >>=? fun blk_b ->
   double_baking (B blk_a) blk_a.header blk_b.header |> fun operation ->
   Block.bake ~operation blk_a >>= fun e ->
-  Assert.proto_error_with_info ~loc:__LOC__ e "Invalid double baking evidence"
+  Assert.proto_error ~loc:__LOC__ e (function
+      | Validate_errors.Anonymous.Invalid_double_baking_evidence _ -> true
+      | _ -> false)
 
 (** This test is supposed to mimic that a block cannot be baked by one baker and
     signed by another. The way it tries to show this is by using a
@@ -401,10 +417,19 @@ let test_double_evidence () =
   block_fork (c1, c2) blk >>=? fun (blk_a, blk_b) ->
   Block.bake_until_cycle_end blk_a >>=? fun blk ->
   double_baking (B blk) blk_a.header blk_b.header |> fun evidence ->
+  Block.bake ~operations:[evidence; evidence] blk >>= fun e ->
+  Assert.proto_error ~loc:__LOC__ e (function
+      | Validate_errors.Anonymous.Conflicting_denunciation {kind; _}
+        when kind = Validate_errors.Anonymous.Block ->
+          true
+      | _ -> false)
+  >>=? fun () ->
   Block.bake ~operation:evidence blk >>=? fun blk ->
   double_baking (B blk) blk_b.header blk_a.header |> fun evidence ->
   Block.bake ~operation:evidence blk >>= fun e ->
-  Assert.proto_error_with_info ~loc:__LOC__ e "Unrequired denunciation"
+  Assert.proto_error ~loc:__LOC__ e (function
+      | Validate_errors.Anonymous.Already_denounced _ -> true
+      | _ -> false)
 
 let tests =
   [

@@ -86,7 +86,7 @@ let test_disable_feature_flag () =
   Op.tx_rollup_origination (I i) contract >>=? fun (op, _tx_rollup) ->
   Incremental.add_operation
     ~expect_failure:
-      (check_proto_error Validate_operation.Manager.Tx_rollup_feature_disabled)
+      (check_proto_error Validate_errors.Manager.Tx_rollup_feature_disabled)
     i
     op
   >>=? fun _i -> return_unit
@@ -109,7 +109,7 @@ let test_sunset () =
   Op.tx_rollup_origination (I i) contract >>=? fun (op, _tx_rollup) ->
   Incremental.add_operation
     ~expect_failure:
-      (check_proto_error Validate_operation.Manager.Tx_rollup_feature_disabled)
+      (check_proto_error Validate_errors.Manager.Tx_rollup_feature_disabled)
     i
     op
   >>=? fun _i -> return_unit

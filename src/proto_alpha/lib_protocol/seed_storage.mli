@@ -48,9 +48,20 @@ type error +=
 val init :
   ?initial_seed:State_hash.t -> Raw_context.t -> Raw_context.t tzresult Lwt.t
 
-(** Verifies if a VDF (result, proof) is valid, if so updates the seed with a
-   function of the VDF result. *)
-val check_vdf_and_update_seed :
+(** Verifies if a VDF (result, proof) is valid.
+
+    @return [Error Too_early_revelation] if the nonce revelation
+    threshold is greater than the current level cycle position.
+
+    @return [Error Already_accepted] if a VDF seed has already been
+    recorded.
+
+    @return [Error Unverified_vdf] if the {!Seed_repr.vdf_solution} is
+    not verified. *)
+val check_vdf : Raw_context.t -> Seed_repr.vdf_solution -> unit tzresult Lwt.t
+
+(** Updates the seed with a function of the VDF result. *)
+val update_seed :
   Raw_context.t -> Seed_repr.vdf_solution -> Raw_context.t tzresult Lwt.t
 
 val for_cycle : Raw_context.t -> Cycle_repr.t -> Seed_repr.seed tzresult Lwt.t

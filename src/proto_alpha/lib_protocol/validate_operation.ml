@@ -32,6 +32,43 @@ open Alpha_context
     change of head block in mempool mode; they are never put in the
     storage. *)
 
+module Double_evidence = Map.Make (struct
+  type t = Signature.Public_key_hash.t * Level.t
+
+  let compare (d1, l1) (d2, l2) =
+    let res = Signature.Public_key_hash.compare d1 d2 in
+    if Compare.Int.equal res 0 then Level.compare l1 l2 else res
+end)
+
+(** State used and modified when validating anonymous operations.
+    These fields are used to enforce that we do not validate the same
+    operation multiple times.
+
+    Note that as part of {!validate_operation_state}, these maps live
+    in memory. They are not explicitly bounded here, however:
+
+    - In block validation mode, they are bounded by the number of
+    anonymous operations allowed in the block.
+
+    - In mempool mode, bounding the number of operations in this map
+    is the responsability of the prevalidator on the shell side. *)
+type anonymous_state = {
+  blinded_pkhs_seen : Operation_hash.t Blinded_public_key_hash.Map.t;
+  double_baking_evidences_seen : Operation_hash.t Double_evidence.t;
+  double_consensus_evidences_seen : Operation_hash.t Double_evidence.t;
+  seed_nonce_levels_seen : Raw_level.Set.t;
+  vdf_solution_seen : bool;
+}
+
+let empty_anonymous_state =
+  {
+    blinded_pkhs_seen = Blinded_public_key_hash.Map.empty;
+    double_baking_evidences_seen = Double_evidence.empty;
+    double_consensus_evidences_seen = Double_evidence.empty;
+    seed_nonce_levels_seen = Raw_level.Set.empty;
+    vdf_solution_seen = false;
+  }
+
 (** Static information used to validate manager operations. *)
 type manager_info = {
   hard_storage_limit_per_operation : Z.t;
@@ -83,7 +120,10 @@ type validate_operation_info = {
   manager_info : manager_info;
 }
 
-type validate_operation_state = {manager_state : manager_state}
+type validate_operation_state = {
+  anonymous_state : anonymous_state;
+  manager_state : manager_state;
+}
 
 let init_validate_operation_info ctxt mode chain_id =
   {
@@ -95,7 +135,10 @@ let init_validate_operation_info ctxt mode chain_id =
   }
 
 let init_validate_operation_state ctxt =
-  {manager_state = init_manager_state ctxt}
+  {
+    anonymous_state = empty_anonymous_state;
+    manager_state = init_manager_state ctxt;
+  }
 
 let init_info_and_state ctxt mode chain_id =
   let vi = init_validate_operation_info ctxt mode chain_id in
@@ -105,133 +148,255 @@ let init_info_and_state ctxt mode chain_id =
 (* See mli file. *)
 type stamp = Operation_validated_stamp
 
-module Manager = struct
-  type error +=
-    | Manager_restriction of Signature.Public_key_hash.t * Operation_hash.t
-    | Inconsistent_sources
-    | Inconsistent_counters
-    | Incorrect_reveal_position
-    | Insufficient_gas_for_manager
-    | Gas_quota_exceeded_init_deserialize
-    | Tx_rollup_feature_disabled
-    | Sc_rollup_feature_disabled
+module Anonymous = struct
+  open Validate_errors.Anonymous
 
-  let () =
-    register_error_kind
-      `Temporary
-      ~id:"validate_operation.manager_restriction"
-      ~title:"Manager restriction"
-      ~description:
-        "An operation with the same manager has already been validated in the \
-         current block."
-      ~pp:(fun ppf (d, hash) ->
-        Format.fprintf
-          ppf
-          "Manager %a already has the operation %a in the current block."
-          Signature.Public_key_hash.pp
-          d
-          Operation_hash.pp
-          hash)
-      Data_encoding.(
-        obj2
-          (req "manager" Signature.Public_key_hash.encoding)
-          (req "hash" Operation_hash.encoding))
-      (function
-        | Manager_restriction (manager, hash) -> Some (manager, hash)
-        | _ -> None)
-      (fun (manager, hash) -> Manager_restriction (manager, hash)) ;
-    let inconsistent_sources_description =
-      "The operation batch includes operations from different sources."
+  let validate_activate_account vi vs oph
+      (Activate_account {id = edpkh; activation_code}) =
+    let open Lwt_result_syntax in
+    let blinded_pkh =
+      Blinded_public_key_hash.of_ed25519_pkh activation_code edpkh
     in
-    register_error_kind
-      `Permanent
-      ~id:"validate_operation.inconsistent_sources"
-      ~title:"Inconsistent sources in operation batch"
-      ~description:inconsistent_sources_description
-      ~pp:(fun ppf () ->
-        Format.fprintf ppf "%s" inconsistent_sources_description)
-      Data_encoding.empty
-      (function Inconsistent_sources -> Some () | _ -> None)
-      (fun () -> Inconsistent_sources) ;
-    let inconsistent_counters_description =
-      "Inconsistent counters in operation. Counters of an operation must be \
-       successive."
+    let*? () =
+      match
+        Blinded_public_key_hash.Map.find
+          blinded_pkh
+          vs.anonymous_state.blinded_pkhs_seen
+      with
+      | None -> ok ()
+      | Some oph' -> error (Conflicting_activation (edpkh, oph'))
     in
-    register_error_kind
-      `Permanent
-      ~id:"validate_operation.inconsistent_counters"
-      ~title:"Inconsistent counters in operation"
-      ~description:inconsistent_counters_description
-      ~pp:(fun ppf () ->
-        Format.fprintf ppf "%s" inconsistent_counters_description)
-      Data_encoding.empty
-      (function Inconsistent_counters -> Some () | _ -> None)
-      (fun () -> Inconsistent_counters) ;
-    let incorrect_reveal_description =
-      "Incorrect reveal operation position in batch: only allowed in first \
-       position."
+    let*! exists = Commitment.exists vi.ctxt blinded_pkh in
+    let*? () = error_unless exists (Invalid_activation {pkh = edpkh}) in
+    let blinded_pkhs_seen =
+      Blinded_public_key_hash.Map.add
+        blinded_pkh
+        oph
+        vs.anonymous_state.blinded_pkhs_seen
     in
-    register_error_kind
-      `Permanent
-      ~id:"validate_operation.incorrect_reveal_position"
-      ~title:"Incorrect reveal position"
-      ~description:incorrect_reveal_description
-      ~pp:(fun ppf () -> Format.fprintf ppf "%s" incorrect_reveal_description)
-      Data_encoding.empty
-      (function Incorrect_reveal_position -> Some () | _ -> None)
-      (fun () -> Incorrect_reveal_position) ;
-    register_error_kind
-      `Permanent
-      ~id:"validate_operation.insufficient_gas_for_manager"
-      ~title:"Not enough gas for initial manager cost"
-      ~description:
-        (Format.asprintf
-           "Gas limit is too low to cover the initial cost of manager \
-            operations: at least %a gas required."
-           Gas.pp_cost
-           Michelson_v1_gas.Cost_of.manager_operation)
-      Data_encoding.empty
-      (function Insufficient_gas_for_manager -> Some () | _ -> None)
-      (fun () -> Insufficient_gas_for_manager) ;
-    let gas_deserialize_description =
-      "Gas limit was not high enough to deserialize the transaction parameters \
-       or origination script code or initial storage etc., making the \
-       operation impossible to parse within the provided gas bounds."
+    return
+      {vs with anonymous_state = {vs.anonymous_state with blinded_pkhs_seen}}
+
+  let check_denunciation_age vi kind given_level =
+    let open Result_syntax in
+    let current_cycle = vi.current_level.cycle in
+    let given_cycle = (Level.from_raw vi.ctxt given_level).cycle in
+    let max_slashing_period = Constants.max_slashing_period vi.ctxt in
+    let last_slashable_cycle = Cycle.add given_cycle max_slashing_period in
+    let* () =
+      error_unless
+        Cycle.(given_cycle <= current_cycle)
+        (Too_early_denunciation
+           {kind; level = given_level; current = vi.current_level.level})
     in
-    register_error_kind
-      `Permanent
-      ~id:"validate_operation.gas_quota_exceeded_init_deserialize"
-      ~title:"Not enough gas for initial deserialization of script expressions"
-      ~description:gas_deserialize_description
-      ~pp:(fun ppf () -> Format.fprintf ppf "%s" gas_deserialize_description)
-      Data_encoding.empty
-      (function Gas_quota_exceeded_init_deserialize -> Some () | _ -> None)
-      (fun () -> Gas_quota_exceeded_init_deserialize) ;
-    register_error_kind
-      `Permanent
-      ~id:"validate_operation.tx_rollup_is_disabled"
-      ~title:"Tx rollup is disabled"
-      ~description:"Cannot originate a tx rollup as it is disabled."
-      ~pp:(fun ppf () ->
-        Format.fprintf
-          ppf
-          "Cannot apply a tx rollup operation as it is disabled. This feature \
-           will be enabled in a future proposal")
-      Data_encoding.unit
-      (function Tx_rollup_feature_disabled -> Some () | _ -> None)
-      (fun () -> Tx_rollup_feature_disabled) ;
-    let scoru_disabled_description =
-      "Smart contract rollups will be enabled in a future proposal."
+    error_unless
+      Cycle.(last_slashable_cycle > current_cycle)
+      (Outdated_denunciation
+         {kind; level = given_level; last_cycle = last_slashable_cycle})
+
+  let validate_double_consensus (type kind)
+      ~consensus_operation:denunciation_kind vi vs oph
+      (op1 : kind Kind.consensus Operation.t)
+      (op2 : kind Kind.consensus Operation.t) =
+    let open Lwt_result_syntax in
+    match (op1.protocol_data.contents, op2.protocol_data.contents) with
+    | Single (Preendorsement e1), Single (Preendorsement e2)
+    | Single (Endorsement e1), Single (Endorsement e2) ->
+        let op1_hash = Operation.hash op1 in
+        let op2_hash = Operation.hash op2 in
+        let*? () =
+          error_unless
+            (Raw_level.(e1.level = e2.level)
+            && Round.(e1.round = e2.round)
+            && (not
+                  (Block_payload_hash.equal
+                     e1.block_payload_hash
+                     e2.block_payload_hash))
+            && (* we require an order on hashes to avoid the existence of
+                  equivalent evidences *)
+            Operation_hash.(op1_hash < op2_hash))
+            (Invalid_denunciation denunciation_kind)
+        in
+        (* Disambiguate: levels are equal *)
+        let level = Level.from_raw vi.ctxt e1.level in
+        let*? () = check_denunciation_age vi denunciation_kind level.level in
+        let* ctxt, (delegate1_pk, delegate1) =
+          Stake_distribution.slot_owner vi.ctxt level e1.slot
+        in
+        let* ctxt, (_delegate2_pk, delegate2) =
+          Stake_distribution.slot_owner ctxt level e2.slot
+        in
+        let*? () =
+          error_unless
+            (Signature.Public_key_hash.equal delegate1 delegate2)
+            (Inconsistent_denunciation
+               {kind = denunciation_kind; delegate1; delegate2})
+        in
+        let delegate_pk, delegate = (delegate1_pk, delegate1) in
+        let*? () =
+          match
+            Double_evidence.find
+              (delegate, level)
+              vs.anonymous_state.double_consensus_evidences_seen
+          with
+          | None -> ok ()
+          | Some oph' ->
+              error
+                (Conflicting_denunciation
+                   {kind = denunciation_kind; delegate; level; hash = oph'})
+        in
+        let* already_slashed =
+          Delegate.already_slashed_for_double_endorsing ctxt delegate level
+        in
+        let*? () =
+          error_unless
+            (not already_slashed)
+            (Already_denounced {kind = denunciation_kind; delegate; level})
+        in
+        let*? () = Operation.check_signature delegate_pk vi.chain_id op1 in
+        let*? () = Operation.check_signature delegate_pk vi.chain_id op2 in
+        let double_consensus_evidences_seen =
+          Double_evidence.add
+            (delegate, level)
+            oph
+            vs.anonymous_state.double_consensus_evidences_seen
+        in
+        return
+          {
+            vs with
+            anonymous_state =
+              {vs.anonymous_state with double_consensus_evidences_seen};
+          }
+
+  let validate_double_preendorsement_evidence vi vs oph
+      (Double_preendorsement_evidence {op1; op2}) =
+    validate_double_consensus
+      ~consensus_operation:Preendorsement
+      vi
+      vs
+      oph
+      op1
+      op2
+
+  let validate_double_endorsement_evidence vi vs oph
+      (Double_endorsement_evidence {op1; op2}) =
+    validate_double_consensus ~consensus_operation:Endorsement vi vs oph op1 op2
+
+  let validate_double_baking_evidence vi vs oph
+      (Double_baking_evidence {bh1; bh2}) =
+    let open Lwt_result_syntax in
+    let hash1 = Block_header.hash bh1 in
+    let hash2 = Block_header.hash bh2 in
+    let*? bh1_fitness = Fitness.from_raw bh1.shell.fitness in
+    let round1 = Fitness.round bh1_fitness in
+    let*? bh2_fitness = Fitness.from_raw bh2.shell.fitness in
+    let round2 = Fitness.round bh2_fitness in
+    let*? level1 = Raw_level.of_int32 bh1.shell.level in
+    let*? level2 = Raw_level.of_int32 bh2.shell.level in
+    let*? () =
+      error_unless
+        (Raw_level.(level1 = level2)
+        && Round.(round1 = round2)
+        && (* we require an order on hashes to avoid the existence of
+              equivalent evidences *)
+        Block_hash.(hash1 < hash2))
+        (Invalid_double_baking_evidence
+           {hash1; level1; round1; hash2; level2; round2})
     in
-    register_error_kind
-      `Permanent
-      ~id:"validate_operation.sc_rollup_disabled"
-      ~title:"Smart contract rollups are disabled"
-      ~description:scoru_disabled_description
-      ~pp:(fun ppf () -> Format.fprintf ppf "%s" scoru_disabled_description)
-      Data_encoding.unit
-      (function Sc_rollup_feature_disabled -> Some () | _ -> None)
-      (fun () -> Sc_rollup_feature_disabled)
+    let*? () = check_denunciation_age vi Block level1 in
+    let level = Level.from_raw vi.ctxt level1 in
+    let committee_size = Constants.consensus_committee_size vi.ctxt in
+    let*? slot1 = Round.to_slot round1 ~committee_size in
+    let* ctxt, (delegate1_pk, delegate1) =
+      Stake_distribution.slot_owner vi.ctxt level slot1
+    in
+    let*? slot2 = Round.to_slot round2 ~committee_size in
+    let* ctxt, (_delegate2_pk, delegate2) =
+      Stake_distribution.slot_owner ctxt level slot2
+    in
+    let*? () =
+      error_unless
+        Signature.Public_key_hash.(delegate1 = delegate2)
+        (Inconsistent_denunciation {kind = Block; delegate1; delegate2})
+    in
+    let delegate_pk, delegate = (delegate1_pk, delegate1) in
+    let*? () =
+      match
+        Double_evidence.find
+          (delegate, level)
+          vs.anonymous_state.double_baking_evidences_seen
+      with
+      | None -> ok ()
+      | Some oph' ->
+          error
+            (Conflicting_denunciation
+               {kind = Block; delegate; level; hash = oph'})
+    in
+    let* already_slashed =
+      Delegate.already_slashed_for_double_baking ctxt delegate level
+    in
+    let*? () =
+      error_unless
+        (not already_slashed)
+        (Already_denounced {kind = Block; delegate; level})
+    in
+    let*? () = Block_header.check_signature bh1 vi.chain_id delegate_pk in
+    let*? () = Block_header.check_signature bh2 vi.chain_id delegate_pk in
+    let double_baking_evidences_seen =
+      Double_evidence.add
+        (delegate, level)
+        oph
+        vs.anonymous_state.double_baking_evidences_seen
+    in
+    return
+      {
+        vs with
+        anonymous_state = {vs.anonymous_state with double_baking_evidences_seen};
+      }
+
+  let validate_seed_nonce_revelation vi vs
+      (Seed_nonce_revelation {level = commitment_raw_level; nonce}) =
+    let open Lwt_result_syntax in
+    let commitment_level = Level.from_raw vi.ctxt commitment_raw_level in
+    let*? () =
+      error_unless
+        (not
+           (Raw_level.Set.mem
+              commitment_raw_level
+              vs.anonymous_state.seed_nonce_levels_seen))
+        Conflicting_nonce_revelation
+    in
+    let* () = Nonce.check_unrevealed vi.ctxt commitment_level nonce in
+    let seed_nonce_levels_seen =
+      Raw_level.Set.add
+        commitment_raw_level
+        vs.anonymous_state.seed_nonce_levels_seen
+    in
+    let new_vs =
+      {
+        vs with
+        anonymous_state = {vs.anonymous_state with seed_nonce_levels_seen};
+      }
+    in
+    return new_vs
+
+  let validate_vdf_revelation vi vs (Vdf_revelation {solution}) =
+    let open Lwt_result_syntax in
+    let*? () =
+      error_unless
+        (not vs.anonymous_state.vdf_solution_seen)
+        Seed_storage.Already_accepted
+    in
+    let* () = Seed.check_vdf vi.ctxt solution in
+    return
+      {
+        vs with
+        anonymous_state = {vs.anonymous_state with vdf_solution_seen = true};
+      }
+end
+
+module Manager = struct
+  open Validate_errors.Manager
 
   (** State that simulates changes from individual operations that have
       an effect on future operations inside the same batch. *)
@@ -680,7 +845,7 @@ module Manager = struct
     let remaining_block_gas =
       maybe_update_remaining_block_gas vi vs batch_state
     in
-    return {manager_state = {managers_seen; remaining_block_gas}}
+    return {vs with manager_state = {managers_seen; remaining_block_gas}}
 end
 
 let validate_operation (vi : validate_operation_info)
@@ -689,6 +854,18 @@ let validate_operation (vi : validate_operation_info)
   let open Lwt_result_syntax in
   let* vs =
     match operation.protocol_data.contents with
+    | Single (Activate_account _ as contents) ->
+        Anonymous.validate_activate_account vi vs oph contents
+    | Single (Double_preendorsement_evidence _ as contents) ->
+        Anonymous.validate_double_preendorsement_evidence vi vs oph contents
+    | Single (Double_endorsement_evidence _ as contents) ->
+        Anonymous.validate_double_endorsement_evidence vi vs oph contents
+    | Single (Double_baking_evidence _ as contents) ->
+        Anonymous.validate_double_baking_evidence vi vs oph contents
+    | Single (Seed_nonce_revelation _ as contents) ->
+        Anonymous.validate_seed_nonce_revelation vi vs contents
+    | Single (Vdf_revelation _ as contents) ->
+        Anonymous.validate_vdf_revelation vi vs contents
     | Single (Manager_operation {source; _}) ->
         Manager.validate_manager_operation
           vi
@@ -708,14 +885,8 @@ let validate_operation (vi : validate_operation_info)
     | Single (Preendorsement _)
     | Single (Endorsement _)
     | Single (Dal_slot_availability _)
-    | Single (Seed_nonce_revelation _)
-    | Single (Vdf_revelation _)
     | Single (Proposals _)
     | Single (Ballot _)
-    | Single (Activate_account _)
-    | Single (Double_preendorsement_evidence _)
-    | Single (Double_endorsement_evidence _)
-    | Single (Double_baking_evidence _)
     | Single (Failing_noop _) ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/2603
 
