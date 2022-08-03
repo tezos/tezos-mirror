@@ -61,8 +61,6 @@ let () =
     (fun parameter -> No_trusted_setup parameter)
 
 module Inner = struct
-  open Kate_amortized
-
   (* Scalars are elements of the prime field Fr from BLS. *)
   module Scalar = Bls12_381.Fr
   module Polynomial = Bls12_381_polynomial.Polynomial
@@ -81,9 +79,9 @@ module Inner = struct
 
   type polynomial = Polynomials.t
 
-  type commitment = Kate_amortized.commitment
+  type commitment = Bls12_381.G1.t
 
-  type shard_proof = Kate_amortized.proof
+  type shard_proof = Bls12_381.G1.t
 
   type commitment_proof = Bls12_381.G1.t
 
@@ -224,9 +222,6 @@ module Inner = struct
   (* Builds group of nth roots of unity, a valid domain for the FFT. *)
   let make_domain n = Domains.build ~log:Z.(log2up (of_int n))
 
-  (* Memoize intermediate domains for the FFTs. *)
-  let intermediate_domains : Evaluations.domain IntMap.t ref = ref IntMap.empty
-
   type t = {
     redundancy_factor : int;
     slot_size : int;
@@ -342,8 +337,8 @@ module Inner = struct
       Scalar.of_string
         "20812168509434597367146703229805575690060615791308155437936410982393987532344"
     in
-    let srs_g1 = create_srs (module Bls12_381.G1) t.slot_size secret in
-    let srs_g2 = create_srs (module Bls12_381.G2) t.slot_size secret in
+    let srs_g1 = create_srs (module Bls12_381.G1) t.k secret in
+    let srs_g2 = create_srs (module Bls12_381.G2) t.k secret in
     {
       srs_g1;
       srs_g2;
@@ -488,36 +483,6 @@ module Inner = struct
     let evaluations = List.map (evaluation_fft d) ps in
     interpolation_fft d (mul_c ~evaluations ())
 
-  (* Divide & conquer polynomial multiplication with FFTs, assuming leaves are
-     polynomials of equal length. For n the degree of the returned polynomial,
-     k = |ps|, runs in time O(n log n log k). *)
-  let poly_mul t ps =
-    let split = List.fold_left (fun (l, r) x -> (x :: r, l)) ([], []) in
-    let rec poly_mul_aux ps =
-      match ps with
-      | [x] -> x
-      | _ ->
-          let a, b = split ps in
-          let a = poly_mul_aux a in
-          let b = poly_mul_aux b in
-          let deg = Polynomials.degree a + 1 (* deg a = deg b in our case. *) in
-          (* Computes adequate domain for the FFTs. *)
-          let d =
-            match IntMap.find deg !intermediate_domains with
-            | Some d -> d
-            | None ->
-                let d =
-                  Domains.subgroup
-                    ~log:(Z.log2up (Z.of_int (2 * deg)))
-                    t.domain_n
-                in
-                intermediate_domains := IntMap.add deg d !intermediate_domains ;
-                d
-          in
-          fft_mul d [a; b]
-    in
-    poly_mul_aux ps
-
   (* We encode by segments of [segment_size] bytes each.  The segments
      are arranged in cosets to evaluate in batch with Kate
      amortized. *)
@@ -551,18 +516,6 @@ module Inner = struct
     let* data = polynomial_from_bytes' t slot in
     Ok (Evaluations.interpolation_fft2 t.domain_k data)
 
-  let eval_coset_array t eval segment =
-    let coset =
-      Array.init
-        (1 lsl Z.(log2up (of_int t.segment_len)))
-        (fun _ -> Scalar.(copy zero))
-    in
-    for elt = 0 to t.segment_len - 1 do
-      let idx = (elt * t.nb_segments) + segment in
-      coset.(elt) <- Array.get eval idx
-    done ;
-    coset
-
   let eval_coset t eval slot offset segment =
     for elt = 0 to t.segment_len - 1 do
       let idx = (elt * t.nb_segments) + segment in
@@ -594,14 +547,13 @@ module Inner = struct
     let codeword = encode t p in
     let len_shard = t.n / t.number_of_shards in
     let rec loop i map =
-      match i with
-      | i when i = t.number_of_shards -> map
-      | _ ->
-          let shard = Array.init len_shard (fun _ -> Scalar.(copy zero)) in
-          for j = 0 to len_shard - 1 do
-            shard.(j) <- codeword.((t.number_of_shards * j) + i)
-          done ;
-          loop (i + 1) (IntMap.add i shard map)
+      if i = t.number_of_shards then map
+      else
+        let shard = Array.init len_shard (fun _ -> Scalar.(copy zero)) in
+        for j = 0 to len_shard - 1 do
+          shard.(j) <- codeword.((t.number_of_shards * j) + i)
+        done ;
+        loop (i + 1) (IntMap.add i shard map)
     in
     loop 0 IntMap.empty
 
@@ -639,6 +591,7 @@ module Inner = struct
     Ok n_poly
 
   let polynomial_from_shards t shards =
+    let open Result_syntax in
     if t.k > IntMap.cardinal shards * t.shard_size then
       Error
         (`Not_enough_shards
@@ -669,18 +622,31 @@ module Inner = struct
          This also reduces the depth of the recursion tree of the poly_mul
          function from log(k) to log(number_of_shards), so that the decoding time
          reduces from O(k*log^2(k) + n*log(n)) to O(n*log(n)). *)
-      let factors =
+      let split = List.fold_left (fun (l, r) x -> (x :: r, l)) ([], []) in
+      let f1, f2 =
         IntMap.bindings shards
         (* We always consider the first k codeword vector components. *)
         |> Tezos_stdlib.TzList.take_n (t.k / t.shard_size)
-        |> List.rev_map (fun (i, _) ->
-               Polynomials.of_coefficients
-                 [
-                   (Scalar.negate (Domains.get t.domain_n (i * t.shard_size)), 0);
-                   (Scalar.(copy one), t.shard_size);
-                 ])
+        |> split
       in
-      let a_poly = poly_mul t factors in
+      let f11, f12 = split f1 in
+      let f21, f22 = split f2 in
+
+      let prod =
+        List.fold_left
+          (fun acc (i, _) ->
+            Polynomials.mul_xn
+              acc
+              t.shard_size
+              (Scalar.negate (Domains.get t.domain_n (i * t.shard_size))))
+          Polynomials.one
+      in
+      let p11 = prod f11 in
+      let p12 = prod f12 in
+      let p21 = prod f21 in
+      let p22 = prod f22 in
+
+      let a_poly = fft_mul t.domain_2k [p11; p12; p21; p22] in
 
       (* 2. Computing formal derivative of A(x). *)
       let a' = Polynomials.derivative a_poly in
@@ -689,7 +655,6 @@ module Inner = struct
       let eval_a' = Evaluations.evaluation_fft t.domain_n a' in
 
       (* 4. Computing N(x). *)
-      let open Result_syntax in
       let* n_poly = compute_n t eval_a' shards in
 
       (* 5. Computing B(x). *)
@@ -706,11 +671,10 @@ module Inner = struct
   let commit' :
       type t.
       (module Bls12_381.CURVE with type t = t) ->
-      polynomial ->
+      scalar array ->
       t array ->
       (t, [> `Degree_exceeds_srs_length of string]) Result.t =
    fun (module G) p srs ->
-    let p = Polynomials.to_dense_coefficients p in
     if p = [||] then Ok G.(copy zero)
     else if Array.(length p > length srs) then
       Error
@@ -722,7 +686,10 @@ module Inner = struct
     else Ok (G.pippenger ~start:0 ~len:(Array.length p) srs p)
 
   let commit trusted_setup p =
-    commit' (module Bls12_381.G1) p trusted_setup.srs_g1
+    commit'
+      (module Bls12_381.G1)
+      (Polynomials.to_dense_coefficients p)
+      trusted_setup.srs_g1
 
   (* p(X) of degree n. Max degree that can be committed: d, which is also the
      SRS's length - 1. We take d = k - 1 since we don't want to commit
@@ -738,34 +705,152 @@ module Inner = struct
   let prove_commitment trusted_setup p =
     commit'
       (module Bls12_381.G1)
-      (Polynomials.mul (Polynomials.of_coefficients [(Scalar.(copy one), 0)]) p)
+      Polynomials.(
+        to_dense_coefficients
+          (mul (Polynomials.of_coefficients [(Scalar.(copy one), 0)]) p))
       trusted_setup.srs_g1
 
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/3389
 
      Generalize this function to pass the degree in parameter. *)
   let verify_commitment trusted_setup cm proof =
-    let open Result_syntax in
     let open Bls12_381 in
-    let* commit_xk =
-      commit'
-        (module G2)
-        (Polynomials.of_coefficients [(Scalar.(copy one), 0)])
-        trusted_setup.srs_g2
+    let check =
+      match Array.get trusted_setup.srs_g2 0 with
+      | exception Invalid_argument _ -> false
+      | commit_xk ->
+          Pairing.pairing_check
+            [(cm, commit_xk); (proof, G2.(negate (copy one)))]
     in
-    Ok
-      (Pairing.pairing_check [(cm, commit_xk); (proof, G2.(negate (copy one)))])
+    Ok check
 
-  let eval_to_array e = Array.init (Domains.length e) (Domains.get e)
+  let inverse domain =
+    let n = Array.length domain in
+    Array.init n (fun i ->
+        if i = 0 then Bls12_381.Fr.(copy one) else Array.get domain (n - i))
+
+  let diff_next_power_of_two x =
+    let logx = Z.log2 (Z.of_int x) in
+    if 1 lsl logx = x then 0 else (1 lsl (logx + 1)) - x
+
+  let is_pow_of_two x =
+    let logx = Z.log2 (Z.of_int x) in
+    1 lsl logx = x
+
+  (* Implementation of fast amortized Kate proofs
+     https://github.com/khovratovich/Kate/blob/master/Kate_amortized.pdf). *)
+
+  (* Precompute first part of Toeplitz trick, which doesn't depends on the
+     polynomial’s coefficients. *)
+  let preprocess_multi_reveals ~chunk_len ~degree srs1 =
+    let open Bls12_381 in
+    let l = 1 lsl chunk_len in
+    let k =
+      let ratio = degree / l in
+      let log_inf = Z.log2 (Z.of_int ratio) in
+      if 1 lsl log_inf < ratio then log_inf else log_inf + 1
+    in
+    let domain = Domains.build ~log:k |> Domains.inverse |> inverse in
+    let precompute_srsj j =
+      let quotient = (degree - j) / l in
+      let padding = diff_next_power_of_two (2 * quotient) in
+      let points =
+        Array.init
+          ((2 * quotient) + padding)
+          (fun i ->
+            if i < quotient then G1.copy srs1.(degree - j - ((i + 1) * l))
+            else G1.(copy zero))
+      in
+      G1.fft_inplace ~domain ~points ;
+      points
+    in
+    (domain, Array.init l precompute_srsj)
+
+  (** Generate proofs of part 3.2.
+  n, r are powers of two, m = 2^(log2(n)-1)
+  coefs are f polynomial’s coefficients [f₀, f₁, f₂, …, fm-1]
+  domain2m is the set of 2m-th roots of unity, used for Toeplitz computation
+  (domain2m, precomputed_srs_part) = preprocess_multi_reveals r n m srs1
+   *)
+  let multiple_multi_reveals ~chunk_len ~chunk_count ~degree
+      ~preprocess:(domain2m, precomputed_srs_part) coefs =
+    let open Bls12_381 in
+    let n = chunk_len + chunk_count in
+    assert (2 <= chunk_len) ;
+    assert (chunk_len < n) ;
+    assert (is_pow_of_two degree) ;
+    assert (1 lsl chunk_len < degree) ;
+    assert (degree <= 1 lsl n) ;
+    let l = 1 lsl chunk_len in
+    (* We don’t need the first coefficient f₀. *)
+    let compute_h_j j =
+      let rest = (degree - j) mod l in
+      let quotient = (degree - j) / l in
+      (* Padding in case quotient is not a power of 2 to get proper fft in
+         Toeplitz matrix part. *)
+      let padding = diff_next_power_of_two (2 * quotient) in
+      (* fm, 0, …, 0, f₁, f₂, …, fm-1 *)
+      let points =
+        Array.init
+          ((2 * quotient) + padding)
+          (fun i ->
+            if i <= quotient + (padding / 2) then Scalar.(copy zero)
+            else Scalar.copy coefs.(rest + ((i - (quotient + padding)) * l)))
+      in
+      if j <> 0 then points.(0) <- Scalar.copy coefs.(degree - j) ;
+      Scalar.fft_inplace ~domain:domain2m ~points ;
+      Array.map2 G1.mul precomputed_srs_part.(j) points
+    in
+    let sum = compute_h_j 0 in
+    let rec sum_hj j =
+      if j = l then ()
+      else
+        let hj = compute_h_j j in
+        (* sum.(i) <- sum.(i) + hj.(i) *)
+        Array.iteri (fun i hij -> sum.(i) <- G1.add sum.(i) hij) hj ;
+        sum_hj (j + 1)
+    in
+    sum_hj 1 ;
+
+    (* Toeplitz matrix-vector multiplication *)
+    G1.ifft_inplace ~domain:(inverse domain2m) ~points:sum ;
+    let hl = Array.sub sum 0 (Array.length domain2m / 2) in
+
+    let phidomain = Domains.build ~log:chunk_count in
+    let phidomain = inverse (Domains.inverse phidomain) in
+    (* Kate amortized FFT *)
+    G1.fft ~domain:phidomain ~points:hl
+
+  (* h = polynomial such that h(y×domain[i]) = zi. *)
+  let interpolation_h_poly y domain z_list =
+    Scalar.ifft_inplace ~domain:(Domains.inverse domain) ~points:z_list ;
+    let inv_y = Scalar.inverse_exn y in
+    Array.fold_left_map
+      (fun inv_yi h -> Scalar.(mul inv_yi inv_y, mul h inv_yi))
+      Scalar.(copy one)
+      z_list
+    |> snd
+
+  (* Part 3.2 verifier : verifies that f(w×domain.(i)) = evaluations.(i). *)
+  let verify cm_f (srs1, srs2l) domain (w, evaluations) proof =
+    let open Bls12_381 in
+    let open Result_syntax in
+    let h = interpolation_h_poly w domain evaluations in
+    let* cm_h = commit' (module G1) h srs1 in
+    let l = Domains.length domain in
+    let sl_min_yl =
+      G2.(add srs2l (negate (mul (copy one) (Scalar.pow w (Z.of_int l)))))
+    in
+    let diff_commits = G1.(add cm_h (negate cm_f)) in
+    Ok
+      (Pairing.pairing_check
+         [(diff_commits, G2.(copy one)); (proof, sl_min_yl)])
 
   let precompute_shards_proofs t trusted_setup =
-    let eval, m =
-      Kate_amortized.preprocess_multi_reveals
-        ~chunk_len:t.evaluations_per_proof_log
-        ~degree:t.k
-        (trusted_setup.srs_g1, trusted_setup.kate_amortized_srs_g2_shards)
-    in
-    (eval_to_array eval, m)
+    preprocess_multi_reveals
+      ~chunk_len:t.evaluations_per_proof_log
+      ~degree:t.k
+      trusted_setup.srs_g1
 
   let _save_precompute_shards_proofs (preprocess : shards_proofs_precomputation)
       filename =
@@ -792,31 +877,33 @@ module Inner = struct
 
   let prove_shards t srs p =
     let preprocess = precompute_shards_proofs t srs in
-    Kate_amortized.multiple_multi_reveals
+    multiple_multi_reveals
       ~chunk_len:t.evaluations_per_proof_log
       ~chunk_count:t.proofs_log
       ~degree:t.k
       ~preprocess
-      (Polynomials.to_dense_coefficients p |> Array.to_list)
+      (Polynomials.to_dense_coefficients p)
 
   let verify_shard t trusted_setup cm
       {index = shard_index; share = shard_evaluations} proof =
-    let d_n = Kate_amortized.Domain.build ~log:t.evaluations_log in
-    let domain = Kate_amortized.Domain.build ~log:t.evaluations_per_proof_log in
-    Kate_amortized.verify
+    let d_n = Domains.build ~log:t.evaluations_log in
+    let domain = Domains.build ~log:t.evaluations_per_proof_log in
+    verify
       cm
       (trusted_setup.srs_g1, trusted_setup.kate_amortized_srs_g2_shards)
       domain
-      (Kate_amortized.Domain.get d_n shard_index, shard_evaluations)
+      (Domains.get d_n shard_index, shard_evaluations)
       proof
 
   let _prove_single trusted_setup p z =
-    let q =
-      fst
-      @@ Polynomials.(
-           division_xn (p - constant (evaluate p z)) 1 (Scalar.negate z))
+    let q, _ =
+      Polynomials.(
+        division_xn (p - constant (evaluate p z)) 1 (Scalar.negate z))
     in
-    commit' (module Bls12_381.G1) q trusted_setup.srs_g1
+    commit'
+      (module Bls12_381.G1)
+      (Polynomials.to_dense_coefficients q)
+      trusted_setup.srs_g1
 
   let _verify_single trusted_setup cm ~point ~evaluation proof =
     let h_secret = Array.get trusted_setup.srs_g2 1 in
@@ -828,43 +915,14 @@ module Inner = struct
           (proof, G2.(add h_secret (negate (mul (copy one) point))));
         ])
 
-  (* Assumptions:
-      - Polynomial.degree p = k
-      - (x^l - z) | p(x)
-     Computes the quotient of the division of p(x) by (x^l - z). *)
-  let compute_quotient t p l z =
-    let div = Array.init (t.k - l + 1) (fun _ -> Scalar.(copy zero)) in
-    let i = ref 0 in
-    (* Computes 1/(x^l - z) mod x^{k - l + 1}
-       = \sum_{i=0}^{+\infty} -z^{-1}^{i+1} X^{i\times l} mod x^{k - l + 1}. *)
-    while !i * l < t.k - l + 1 do
-      div.(!i * l) <-
-        Scalar.negate (Scalar.inverse_exn (Scalar.pow z (Z.of_int (!i + 1)))) ;
-      i := !i + 1
-    done ;
-    let div = Polynomials.of_dense div in
-    (* p(x) * 1/(x^l - z) mod x^{k - l + 1} = q(x) since deg q <= k - l. *)
-    fft_mul t.domain_2k [p; div] |> Polynomials.copy ~len:(t.k - l + 1)
-
   let prove_segment t trusted_setup p segment_index =
     if segment_index < 0 || segment_index >= t.nb_segments then
       Error `Segment_index_out_of_range
     else
       let l = 1 lsl Z.(log2up (of_int t.segment_len)) in
       let wi = Domains.get t.domain_k segment_index in
-      let domain = Domains.build ~log:Z.(log2up (of_int t.segment_len)) in
-      let eval_p = Evaluations.(evaluation_fft t.domain_k p |> to_array) in
-      let eval_coset = eval_coset_array t eval_p segment_index in
-      let remainder =
-        Kate_amortized.interpolation_h_poly wi domain eval_coset
-        |> Array.of_list |> Polynomials.of_dense
-      in
-      let quotient =
-        compute_quotient
-          t
-          (Polynomials.sub p remainder)
-          l
-          (Scalar.pow wi (Z.of_int l))
+      let quotient, _ =
+        Polynomials.(division_xn p l Scalar.(negate (pow wi (Z.of_int l))))
       in
       commit trusted_setup quotient
 
@@ -873,11 +931,9 @@ module Inner = struct
   let verify_segment t trusted_setup cm
       {index = slot_segment_index; content = slot_segment} proof =
     if slot_segment_index < 0 || slot_segment_index >= t.nb_segments then
-      Error `Slot_segment_index_out_of_range
+      Error `Segment_index_out_of_range
     else
-      let domain =
-        Kate_amortized.Domain.build ~log:Z.(log2up (of_int t.segment_len))
-      in
+      let domain = Domains.build ~log:Z.(log2up (of_int t.segment_len)) in
       let slot_segment_evaluations =
         Array.init
           (1 lsl Z.(log2up (of_int t.segment_len)))
@@ -902,13 +958,12 @@ module Inner = struct
                 Scalar.of_bytes_exn dst
             | _ -> Scalar.(copy zero))
       in
-      Ok
-        (Kate_amortized.verify
-           cm
-           (trusted_setup.srs_g1, trusted_setup.kate_amortized_srs_g2_segments)
-           domain
-           (Domains.get t.domain_k slot_segment_index, slot_segment_evaluations)
-           proof)
+      verify
+        cm
+        (trusted_setup.srs_g1, trusted_setup.kate_amortized_srs_g2_segments)
+        domain
+        (Domains.get t.domain_k slot_segment_index, slot_segment_evaluations)
+        proof
 end
 
 include Inner

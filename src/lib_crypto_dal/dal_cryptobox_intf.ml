@@ -48,8 +48,8 @@ module type VERIFIER = sig
   (** A precomputed set of constants *)
   type t
 
-  (** [make] precomputes the set of values needed by cryptographic primitives
-    defined in this module and store them in a value of type [t] *)
+  (** [make] precomputes the set of values needed by the cryptographic
+    primitives defined in this module and stores them in a value of type [t] *)
   val make :
     redundancy_factor:int ->
     slot_size:int ->
@@ -60,17 +60,18 @@ module type VERIFIER = sig
   (** A trusted setup. Namely Structured Reference String.
 
       Those are data necessary to make the cryptographic primitives
-     secured. In particular, to prevent an attacker to forge two
+     secured. In particular, to prevent an attacker from forging two
      polynomials with the same commitment. *)
   type srs
 
   (** [load_srs ()] loads a trusted [srs]. If the [srs] is already
      loaded, it is given directly. Otherwise, the trusted [srs] is
      read from two dedicated files. The function assumes those files
-     are located in some predetermined directories
-     UNIX-compatible. The [srs] depends on the [slot_size]
-     parameters. Loading the first time an srs is consequently costly
-     while the other times would be cheap.
+     are located in some predetermined UNIX-compatible directories.
+     
+      The [srs] depends on the [slot_size] parameters. Loading the
+     first time an srs is consequently costly while the other times
+     would be cheap.
 
       We assume the [srs] won't change many times. The shell ensures
      that a bounded and small number of [srs] can be loaded at the
@@ -90,8 +91,8 @@ module type VERIFIER = sig
   val commitment_proof_encoding : commitment_proof Data_encoding.t
 
   (** [verify_commitment srs commitment proof] checks whether
-     [commitment] is a valid [commitment]. In particular, it check
-     that the size of the data committed via [commitment] do not
+     [commitment] is valid. In particular, it checks
+     that the size of the data committed via [commitment] does not
      exceed [C.slot_size]. The verification time is constant. *)
   val verify_commitment :
     srs ->
@@ -111,10 +112,10 @@ module type VERIFIER = sig
   (** An encoding for the proof of a segment. *)
   val segment_proof_encoding : segment_proof Data_encoding.t
 
-  (** [verify_segment t commitment segment segment_proof] returns [Ok
+  (** [verify_segment t srs commitment segment segment_proof] returns [Ok
      true] if the [proof] certifies that the [slot_segment] is indeed
      included in the slot committed with commitment
-     [comitment]. Returns [Ok false] otherwise.
+     [commitment]. Returns [Ok false] otherwise.
 
       Fails if the index of the segment is out of range. *)
   val verify_segment :
@@ -123,5 +124,7 @@ module type VERIFIER = sig
     commitment ->
     segment ->
     segment_proof ->
-    (bool, [> `Slot_segment_index_out_of_range]) Result.t
+    ( bool,
+      [> `Degree_exceeds_srs_length of string | `Segment_index_out_of_range] )
+    Result.t
 end

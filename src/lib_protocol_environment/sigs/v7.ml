@@ -11392,7 +11392,9 @@ val verify_segment :
   commitment ->
   segment ->
   segment_proof ->
-  (bool, [> `Slot_segment_index_out_of_range]) Result.t
+  ( bool,
+    [> `Degree_exceeds_srs_length of string | `Segment_index_out_of_range] )
+  Result.t
 end
 # 134 "v7.in.ml"
 
