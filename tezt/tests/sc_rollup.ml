@@ -2302,6 +2302,49 @@ let test_refutation protocols ~kind =
            inputs
            protocols)
 
+(** Helper to check that the operation whose hash is given is successfully
+    included (applied) in the current head block. *)
+let check_op_included =
+  let get_op_status op =
+    JSON.(op |-> "metadata" |-> "operation_result" |-> "status" |> as_string)
+  in
+  fun ~oph client ->
+    let* head = RPC.Client.call client @@ RPC.get_chain_block () in
+    (* Operations in a block are encoded as a list of lists of operations
+       [ consensus; votes; anonymous; manager ]. Manager operations are
+       at index 3 in the list. *)
+    let ops = JSON.(head |-> "operations" |=> 3 |> as_list) in
+    let op_contents =
+      match
+        List.find_opt (fun op -> oph = JSON.(op |-> "hash" |> as_string)) ops
+      with
+      | None -> []
+      | Some op -> JSON.(op |-> "contents" |> as_list)
+    in
+    match op_contents with
+    | [op] ->
+        let status = get_op_status op in
+        if String.equal status "applied" then unit
+        else
+          Test.fail
+            ~__LOC__
+            "Unexpected operation %s status: got %S instead of 'applied'."
+            oph
+            status
+    | _ ->
+        Test.fail
+          "Expected to have one operation with hash %s, but got %d"
+          oph
+          (List.length op_contents)
+
+(** Helper function that allows to inject the given operation in a node, bake a
+    block, and check that the operation is successfully applied in the baked
+    block. *)
+let bake_operation_via_rpc client op =
+  let* (`OpHash oph) = Operation.Manager.inject [op] client in
+  let* () = Client.bake_for_and_wait client in
+  check_op_included ~oph client
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
