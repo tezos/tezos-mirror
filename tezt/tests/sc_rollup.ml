@@ -103,6 +103,17 @@ let get_sc_rollup_constants client =
       max_outbox_messages_per_level;
     }
 
+(* List of scoru errors messages used in tests below. *)
+
+let commit_too_recent =
+  "Attempted to cement a commitment before its refutation deadline"
+
+let parent_not_lcc = "Parent is not the last cemented commitment"
+
+let disputed_commit = "Attempted to cement a disputed commitment"
+
+let commit_doesnt_exit = "Commitment scc\\w+\\sdoes not exist"
+
 let make_parameter name value =
   Option.map (fun v -> ([name], Option.some @@ Int.to_string v)) value
   |> Option.to_list
@@ -2428,6 +2439,82 @@ let test_forking_scenario ~title ~scenario protocols =
         level1)
     protocols
 
+(** Given a commitment tree constructed by {test_forking_scenario}, this function:
+    - tests different (failing and non-failing) cementation of commitments
+      and checks the returned error for each situation (in case of failure);
+    - resolves the dispute on top of c2, and checks that the defeated branch
+      is removed, while the alive one can be cemented.
+*)
+let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit protocols =
+  test_forking_scenario
+    ~title:
+      "commitments: publish, and try to cement not on top of LCC or disputed"
+    ~scenario:
+      (fun client _node ~sc_rollup ~operator1 ~operator2 commits level0 level1 ->
+      let c1, c2, c31, c32, c311, c321 = commits in
+      let* constants = get_sc_rollup_constants client in
+      let challenge_window = constants.challenge_window_in_blocks in
+
+      (* More convenient Wrapper around cement_commitment for the tests below *)
+      let cement ?fail l =
+        Lwt_list.iter_s
+          (fun hash -> cement_commitment client ~sc_rollup ~hash ?fail)
+          l
+      in
+      let missing_blocks_to_cement = level0 + challenge_window - level1 in
+      let* () =
+        if missing_blocks_to_cement <= 0 then unit (* We can already cement *)
+        else
+          let* () =
+            repeat (missing_blocks_to_cement - 1) (fun () ->
+                Client.bake_for_and_wait client)
+          in
+          (* We cannot cement yet! *)
+          let* () = cement [c1] ~fail:commit_too_recent in
+          (* After these blocks, we should be able to cement all commitments
+             (modulo cementation ordering & disputes resolution) *)
+          repeat challenge_window (fun () -> Client.bake_for_and_wait client)
+      in
+      (* We cannot cement any of the commitments before cementing c1 *)
+      let* () = cement [c2; c31; c32; c311; c321] ~fail:parent_not_lcc in
+      (* But, we can cement c1 and then c2, in this order *)
+      let* () = cement [c1; c2] in
+      (* We cannot cement c31 or c32 on top of c2 because they are disputed *)
+      let* () = cement [c31; c32] ~fail:disputed_commit in
+      (* Of course, we cannot cement c311 or c321 because their parents are not
+         cemented. *)
+      let* () = cement ~fail:parent_not_lcc [c311; c321] in
+
+      (* +++ dispute resolution +++
+         Let's resolve the dispute between operator1 and operator2 on the fork
+         c31 vs c32. [operator1] will make a bad initial dissection, so it
+         loses the dispute, and the branch c32 --- c321 dies. *)
+
+      (* [operator1] starts a dispute. *)
+      let module M = Operation.Manager in
+      let* () =
+        bake_operation_via_rpc client
+        @@ M.make ~source:operator2
+        @@ M.sc_rollup_refute ~sc_rollup ~opponent:operator1.public_key_hash ()
+      in
+      (* [operator1] makes a dissection. it will lose here because the dissection
+         is ill-formed. *)
+      let refutation = M.{choice_tick = 0; refutation_step = Dissection []} in
+      let* () =
+        bake_operation_via_rpc client
+        @@ M.make ~source:operator2
+        @@ M.sc_rollup_refute
+             ~sc_rollup
+             ~opponent:operator1.public_key_hash
+             ~refutation
+             ()
+      in
+      (* Attempting to cement defeated branch will fail. *)
+      let* () = cement ~fail:commit_doesnt_exit [c32; c321] in
+      (* Now, we can cement c31 on top of c2 and c311 on top of c31. *)
+      cement [c31; c311])
+    protocols
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -2537,4 +2624,5 @@ let register ~protocols =
   test_rollup_node_uses_arith_boot_sector protocols ;
   (* Shared tezts - will be executed for both PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
-  register ~kind:"arith" ~protocols
+  register ~kind:"arith" ~protocols ;
+  test_no_cementation_if_parent_not_lcc_or_if_disputed_commit protocols
