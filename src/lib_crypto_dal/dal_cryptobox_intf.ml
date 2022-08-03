@@ -55,28 +55,7 @@ module type VERIFIER = sig
     slot_size:int ->
     segment_size:int ->
     number_of_shards:int ->
-    t
-
-  (** A trusted setup. Namely Structured Reference String.
-
-      Those are data necessary to make the cryptographic primitives
-     secured. In particular, to prevent an attacker from forging two
-     polynomials with the same commitment. *)
-  type srs
-
-  (** [load_srs ()] loads a trusted [srs]. If the [srs] is already
-     loaded, it is given directly. Otherwise, the trusted [srs] is
-     read from two dedicated files. The function assumes those files
-     are located in some predetermined UNIX-compatible directories.
-     
-      The [srs] depends on the [slot_size] parameters. Loading the
-     first time an srs is consequently costly while the other times
-     would be cheap.
-
-      We assume the [srs] won't change many times. The shell ensures
-     that a bounded and small number of [srs] can be loaded at the
-     same time. *)
-  val load_srs : t -> srs Error_monad.tzresult
+    (t, [> `Fail of string]) result
 
   (** Commitment to a polynomial. *)
   type commitment
@@ -94,11 +73,7 @@ module type VERIFIER = sig
      [commitment] is valid. In particular, it checks
      that the size of the data committed via [commitment] does not
      exceed [C.slot_size]. The verification time is constant. *)
-  val verify_commitment :
-    srs ->
-    commitment ->
-    commitment_proof ->
-    (bool, [> `Degree_exceeds_srs_length of string]) Result.t
+  val verify_commitment : t -> commitment -> commitment_proof -> bool
 
   (** The original slot can be split into a list of segments of size
      [segment_size]. A segment is consequently encoded as a pair of an
@@ -120,11 +95,8 @@ module type VERIFIER = sig
       Fails if the index of the segment is out of range. *)
   val verify_segment :
     t ->
-    srs ->
     commitment ->
     segment ->
     segment_proof ->
-    ( bool,
-      [> `Degree_exceeds_srs_length of string | `Segment_index_out_of_range] )
-    Result.t
+    (bool, [> `Segment_index_out_of_range]) Result.t
 end

@@ -27,32 +27,13 @@
 type t
 
 (** [make] precomputes the set of values needed by cryptographic primitives
-    defined in this module and store them in a value of type [t] *)
+  defined in this module and store them in a value of type [t] *)
 val make :
   redundancy_factor:int ->
   slot_size:int ->
   segment_size:int ->
   number_of_shards:int ->
-  t
-
-(** A trusted setup. Namely Structured Reference String.
-
-      Those are data necessary to make the cryptographic primitives
-     secured. In particular, to prevent an attacker to forge two
-     polynomials with the same commitment. *)
-type srs
-
-(** [load_srs ()] loads a trusted [srs]. If the [srs] is already
-   loaded, it is given directly. Otherwise, the trusted [srs] is read
-   from two dedicated files. The function assumes those files are
-   located in some predetermined directories UNIX-compatible. The
-   [srs] depends on the [slot_size] parameters. Loading the first time
-   an srs is consequently costly while the other times would be cheap.
-
-      We assume the [srs] won't change many times. The shell ensures
-   that a bounded and small number of [srs] can be loaded at the same
-   time. *)
-val load_srs : t -> srs Error_monad.shell_tzresult
+  (t, [> `Fail of string]) result
 
 (** Commitment to a polynomial. *)
 type commitment
@@ -86,11 +67,7 @@ val commitment_proof_encoding : commitment_proof Data_encoding.t
      [commitment] is a valid [commitment]. In particular, it check
      that the size of the data committed via [commitment] do not
      exceed [C.slot_size]. The verification time is constant. *)
-val verify_commitment :
-  srs ->
-  commitment ->
-  commitment_proof ->
-  (bool, [> `Degree_exceeds_srs_length of string]) Result.t
+val verify_commitment : t -> commitment -> commitment_proof -> bool
 
 (** The original slot can be split into a list of segments of size
      [segment_size]. A segment is consequently encoded as a pair of an
@@ -112,7 +89,6 @@ val segment_proof_encoding : segment_proof Data_encoding.t
       Fails if the index of the segment is out of range. *)
 val verify_segment :
   t ->
-  srs ->
   commitment ->
   segment ->
   segment_proof ->

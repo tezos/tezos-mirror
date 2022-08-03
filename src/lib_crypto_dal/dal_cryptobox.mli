@@ -29,9 +29,6 @@ open Dal_cryptobox_intf
     by this module. *)
 type t
 
-(** A trusted setup. *)
-type srs
-
 (** Because of the shell/protocol separation, cryptographic primitives
    need to be splitted. An interface, called the {!module:Verifier}
    aims to be provided for the economic protocol. The other interface,
@@ -54,12 +51,27 @@ type srs
 
 module Verifier : VERIFIER
 
-include VERIFIER with type srs := srs and type t := t
+include VERIFIER with type t := t
 
-(** FIXME https://gitlab.com/tezos/tezos/-/issues/3390
+(** The primitives exposed in this modules require some
+   preprocessing. This preprocessing generates data from an unknown
+   secret. For the security of those primtives, it is important that
+   the secret is unknown. *)
+type initialisation_parameters
 
-     This is unsafe but can be used for testing. *)
-val srs : t -> srs
+(** [initialisation_parameters_from_files ~g1_path ~g2_path] allows to
+   load initialisation_parameters from files [g1_path] and
+   [g2_path]. It is important that every time those primitives are
+   used, they are used with the very same initialisation
+   parameters. To ensure this property, an integrity check is run.
+
+   This function can take several seconds to run. *)
+val initialisation_parameters_from_files :
+  g1_path:string ->
+  g2_path:string ->
+  initialisation_parameters Error_monad.tzresult Lwt.t
+
+val load_parameters : initialisation_parameters -> unit Error_monad.tzresult
 
 module Commitment : sig
   include Dal_cryptobox_intf.COMMITMENT with type t = commitment
@@ -108,10 +120,7 @@ val polynomial_to_bytes : t -> polynomial -> bytes
 
       Fails with [`Degree_exceeds_srs_length] if the degree of [p]
      exceeds the SRS size. *)
-val commit :
-  srs ->
-  polynomial ->
-  (commitment, [> `Degree_exceeds_srs_length of string]) Result.t
+val commit : t -> polynomial -> commitment
 
 (** A portion of the data represented by a polynomial. *)
 type share
@@ -147,41 +156,46 @@ val shards_from_polynomial : t -> polynomial -> share IntMap.t
 (** A proof that a shard belongs to some commitment. *)
 type shard_proof
 
-(** [verify_shard t srs commitment shard proof] allows to check
+(** [verify_shard t commitment shard proof] allows to check
      whether [shard] is a portion of the data corresponding to the
      [commitment] using [proof]. The verification time is
      constant. The [srs] should be the same as the one used to produce
      the commitment. *)
-val verify_shard :
-  t ->
-  srs ->
-  commitment ->
-  shard ->
-  shard_proof ->
-  (bool, [> `Degree_exceeds_srs_length of string]) result
+val verify_shard : t -> commitment -> shard -> shard_proof -> bool
 
-(** [prove_commitment srs polynomial] produces a proof that the
+(** [prove_commitment polynomial] produces a proof that the
      slot represented by [polynomial] has its size bounded by the
      maximum slot size. *)
-val prove_commitment :
-  srs ->
-  polynomial ->
-  (commitment_proof, [> `Degree_exceeds_srs_length of string]) result
+val prove_commitment : t -> polynomial -> commitment_proof
 
 (** [prove_segment] produces a proof that the [n]th segment computed
      is part of a commitment. This segment corresponds to the original
      data and are split into [C.segment_size]. *)
 val prove_segment :
   t ->
-  srs ->
   polynomial ->
   int ->
-  ( segment_proof,
-    [> `Degree_exceeds_srs_length of string | `Segment_index_out_of_range] )
-  result
+  (segment_proof, [> `Segment_index_out_of_range]) result
 
 (** [prove_shards] computes the proofs for all the [shards] that
      each [shard] is a valid piece of data associated to a polynomial
      and its commitment. Only the commitment is needed to check the
      proof. *)
-val prove_shards : t -> srs -> polynomial -> shard_proof array
+val prove_shards : t -> polynomial -> shard_proof array
+
+module Internal_for_tests : sig
+  (** The initialisation parameters can be too large for testing
+     purposes. This function creates an unsafe initialisation
+     parameters using some specified length (expected to be
+     positive). The running time of this function is linear with
+     respect to the size given. Order of magnitude can be around 1
+     minute for a size of 1MiB. *)
+  val initialisation_parameters_from_slot_size :
+    slot_size:int -> initialisation_parameters
+
+  (** Same as {!val:load_parameters} except it erase parameters if
+     they were already loaded. This is used to circumvent limitation
+     from test frameworks where tests with various parameters could be
+     run using the same binary. *)
+  val load_parameters : initialisation_parameters -> unit
+end

@@ -22,48 +22,13 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-open Tezos_crypto_dal
 
-module Constants = struct
-  let redundancy_factor = 2
-
-  let segment_size = 4096
-
-  let slot_size = 1048576 (* 1Mb *)
-
-  let number_of_shards = 2048
-
-  let trusted_setup_logarithm_size = 21
-end
-
-include Dal_cryptobox
-
-type slot = bytes
-
-type slot_header = commitment
-
-let slot_header_encoding = Commitment.encoding
-
-type error += Cryptobox_initialisation_failed of string
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"dal.node.cryptobox.initialisation_failed"
-    ~title:"Cryptobox initialisation failed"
-    ~description:"Unable to initialise the cryptobox parameters"
-    ~pp:(fun ppf msg ->
-      Format.fprintf
-        ppf
-        "Unable to initialise the cryptobox parameters. Reason: %s"
-        msg)
-    Data_encoding.(obj1 (req "error" string))
-    (function Cryptobox_initialisation_failed str -> Some str | _ -> None)
-    (fun str -> Cryptobox_initialisation_failed str)
-
-let init () =
-  let open Constants in
-  let open Result_syntax in
-  match make ~redundancy_factor ~segment_size ~slot_size ~number_of_shards with
-  | Ok cryptobox -> return cryptobox
-  | Error (`Fail msg) -> fail [Cryptobox_initialisation_failed msg]
+(** [find_trusted_setup_files] returns the path of the two files
+   necessary to initialize cryptographic primitives used by the
+   DAL. See {!module:Tezos-crypto_dal.Dal_cryptobox}. *)
+val find_trusted_setup_files :
+  ?getenv_opt:(string -> string option) ->
+  ?getcwd:(unit -> string) ->
+  ?file_exists:(string -> bool) ->
+  unit ->
+  (string * string) Error_monad.tzresult

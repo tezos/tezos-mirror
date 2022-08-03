@@ -230,7 +230,7 @@ module Dal : sig
 
   module Cryptobox = Tezos_crypto_dal.Dal_cryptobox
 
-  val make : Parameters.t -> Cryptobox.t
+  val make : ?on_error:(string -> Cryptobox.t) -> Parameters.t -> Cryptobox.t
 
   module Commitment : sig
     val dummy_commitment :

@@ -24,6 +24,7 @@ module Test = struct
 
   (* Encoding and decoding of Reed-Solomon codes on the erasure channel. *)
   let bench_DAL_crypto_params () =
+    let open Tezos_error_monad.Error_monad.Result_syntax in
     (* We take mainnet parameters we divide by [16] to speed up the test. *)
     let number_of_shards = 2048 / 16 in
     let slot_size = 1048576 / 16 in
@@ -33,97 +34,79 @@ module Test = struct
     for i = 0 to (msg_size / 8) - 1 do
       Bytes.set_int64_le msg (i * 8) (Random.int64 Int64.max_int)
     done ;
-    let open Tezos_error_monad.Error_monad.Result_syntax in
-    List.iter
+    let parameters =
+      Dal_cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
+        ~slot_size
+    in
+    let () = Dal_cryptobox.Internal_for_tests.load_parameters parameters in
+    Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_e
       (fun redundancy_factor ->
-        let t =
+        let* t =
           Dal_cryptobox.make
             ~redundancy_factor
             ~slot_size
             ~segment_size
             ~number_of_shards
         in
-        let trusted_setup =
-          Dal_cryptobox.srs t
-          (*(`Files {srs_g1_file; srs_g2_file; logarithm_size = 21})*)
+        let* p = Dal_cryptobox.polynomial_from_slot t msg in
+        let cm = Dal_cryptobox.commit t p in
+        let* pi = Dal_cryptobox.prove_segment t p 1 in
+        let segment = Bytes.sub msg segment_size segment_size in
+        let* check =
+          Dal_cryptobox.verify_segment t cm {index = 1; content = segment} pi
         in
 
-        match
-          let* p = Dal_cryptobox.polynomial_from_slot t msg in
-          let* cm = Dal_cryptobox.commit trusted_setup p in
-          let* pi = Dal_cryptobox.prove_segment t trusted_setup p 1 in
-          let segment = Bytes.sub msg segment_size segment_size in
-          let* check =
-            Dal_cryptobox.verify_segment
-              t
-              trusted_setup
-              cm
-              {index = 1; content = segment}
-              pi
-          in
-          assert check ;
-          let enc_shards = Dal_cryptobox.shards_from_polynomial t p in
-
-          (* Only take half of the buckets *)
-          let c_indices =
-            random_indices
-              (number_of_shards - 1)
-              (number_of_shards / redundancy_factor)
-            |> Array.of_list
-          in
-
-          let c =
-            Dal_cryptobox.IntMap.filter
-              (fun i _ -> Array.mem i c_indices)
-              enc_shards
-          in
-
-          let* dec = Dal_cryptobox.polynomial_from_shards t c in
-          assert (
-            Bytes.compare
-              msg
-              (Bytes.sub
-                 (Dal_cryptobox.polynomial_to_bytes t dec)
-                 0
-                 (min slot_size msg_size))
-            = 0) ;
-
-          let* comm = Dal_cryptobox.commit trusted_setup p in
-
-          let shard_proofs = Dal_cryptobox.prove_shards t trusted_setup p in
-          match Dal_cryptobox.IntMap.find 0 enc_shards with
-          | None -> Ok ()
-          | Some eval ->
-              let* check =
-                Dal_cryptobox.verify_shard
-                  t
-                  trusted_setup
-                  comm
-                  {index = 0; share = eval}
-                  shard_proofs.(0)
-              in
-              assert check ;
-
-              let* pi = Dal_cryptobox.prove_commitment trusted_setup p in
-              let* check =
-                Dal_cryptobox.verify_commitment trusted_setup comm pi
-              in
-              assert check ;
-              Ok ()
-          (* let point = Scalar.random () in *)
-          (* let+ pi_slot = Dal_cryptobox.prove_single trusted_setup p point in
-           *
-           * assert (
-           *   Dal_cryptobox.verify_single
-           *     trusted_setup
-           *     comm
-           *     ~point
-           *     ~evaluation:(Dal_cryptobox.polynomial_evaluate p point)
-           *     pi_slot) *)
-        with
-        | Ok () -> ()
-        | Error _ -> assert false)
+        assert check ;
+        let enc_shards = Dal_cryptobox.shards_from_polynomial t p in
+        let c_indices =
+          random_indices
+            (number_of_shards - 1)
+            (number_of_shards / redundancy_factor)
+          |> Array.of_list
+        in
+        let c =
+          Dal_cryptobox.IntMap.filter
+            (fun i _ -> Array.mem i c_indices)
+            enc_shards
+        in
+        let* dec = Dal_cryptobox.polynomial_from_shards t c in
+        assert (
+          Bytes.compare
+            msg
+            (Bytes.sub
+               (Dal_cryptobox.polynomial_to_bytes t dec)
+               0
+               (min slot_size msg_size))
+          = 0) ;
+        let comm = Dal_cryptobox.commit t p in
+        let shard_proofs = Dal_cryptobox.prove_shards t p in
+        match Dal_cryptobox.IntMap.find 0 enc_shards with
+        | None -> Ok ()
+        | Some eval ->
+            let check =
+              Dal_cryptobox.verify_shard
+                t
+                comm
+                {index = 0; share = eval}
+                shard_proofs.(0)
+            in
+            assert check ;
+            let pi = Dal_cryptobox.prove_commitment t p in
+            let check = Dal_cryptobox.verify_commitment t comm pi in
+            assert check ;
+            Ok ()
+        (* let point = Scalar.random () in *)
+        (* let+ pi_slot = Dal_cryptobox.prove_single trusted_setup p point in
+         *
+         * assert (
+         *   Dal_cryptobox.verify_single
+         *     trusted_setup
+         *     comm
+         *     ~point
+         *     ~evaluation:(Dal_cryptobox.polynomial_evaluate p point)
+         *     pi_slot) *))
       [2]
+    |> fun x -> match x with Ok () -> () | Error _ -> assert false
 end
 
 let test =

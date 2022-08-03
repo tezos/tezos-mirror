@@ -25,6 +25,10 @@ be documented here either.
 Node
 ----
 
+- Add a field ``dal`` in the node's configuration file. This field is
+  for a feature which is being developed and should not be
+  modified. It should be used only for testing.
+
 Client
 ------
 
