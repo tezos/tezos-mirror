@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,7 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type S =
-  Tezos_context_sigs.Context.TREE
-    with type key = string list
-     and type value = bytes
+(* This module is included as-is in a module of the WASM interpreter
+   ('Tezos_webassembly_interpreter.Memory_exn'). *)
+
+exception Bounds
+
+exception SizeOverflow

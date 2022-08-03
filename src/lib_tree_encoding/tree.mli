@@ -23,55 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Raised when [compute_step] was called when the floppy gathering module
-    expected input. *)
-exception Compute_step_expected_input
+(** Exposes a module type {!S} representing trees. *)
 
-(** Raised when the floppy gathering module wasn't expecting input, but input
-    was given using [set_input_step]. A [compute_step] is needed right after
-    origination. *)
-exception Set_input_step_expected_compute_step
-
-(** Generic internal error. Some data in storage had errornous encoding. *)
-exception Encoding_error of Data_encoding.Binary.write_error
-
-(** The instrumented PVM is either in a pre-boot state
-    ([Gathering_floppies]), or in its regular functioning state
-    ([Not_gathering_floppies]). *)
-type internal_status =
-  | Gathering_floppies of Tezos_crypto.Signature.Public_key.t
-  | Not_gathering_floppies
-
-val internal_status_encoding : internal_status Data_encoding.t
-
-type chunk = bytes
-
-val chunk_size : int
-
-val chunk_encoding : chunk Data_encoding.t
-
-type floppy = {chunk : chunk; signature : Tezos_crypto.Signature.t}
-
-val floppy_encoding : floppy Data_encoding.t
-
-type origination_message =
-  | Complete_kernel of bytes
-  | Incomplete_kernel of chunk * Tezos_crypto.Signature.Public_key.t
-
-val origination_message_encoding : origination_message Data_encoding.t
-
+(** An immutable tree API. *)
 module type S = sig
-  include Wasm_pvm_sig.S
+  type tree
 
-  module Internal_for_tests : sig
-    val initial_tree_from_boot_sector : empty_tree:tree -> string -> tree Lwt.t
-  end
+  type key := string list
+
+  type value := bytes
+
+  val remove : tree -> key -> tree Lwt.t
+
+  val add : tree -> key -> value -> tree Lwt.t
+
+  val find : tree -> key -> value option Lwt.t
 end
-
-(** [Make] encapsulates a WASM PVM to give it the ability to load a kernel
-    image as either a complete kernel in the origination message or a kernel
-    image divided into chunks and provided via both origination- and inbox-
-    messages. *)
-module Make
-    (T : Tree_encoding.TREE)
-    (Wasm : Wasm_pvm_sig.S with type tree = T.tree) : S with type tree = T.tree

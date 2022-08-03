@@ -24,16 +24,18 @@
 (*****************************************************************************)
 
 open Tezos_webassembly_interpreter
+open Lazy_containers
 
 exception Uninitialized_current_module
 
-module Make (Tree_encoding_decoding : Tree_encoding_decoding.S) = struct
+module Make (Tree_encoding : Tree_encoding.S) = struct
   module V = Instance.Vector
   module M = Instance.NameMap
   module C = Chunked_byte_vector.Lwt
-  include Tree_encoding_decoding
-  include Lazy_vector_encoding_decoding.Int32
-  include Lazy_map_encoding_decoding.NameMap
+  include Tree_encoding
+  include Lazy_vector_encoding.Int32
+  module NameMap = Lazy_map_encoding.Make (Instance.NameMap)
+  module ModuleMap = Lazy_map_encoding.Make (Instance.ModuleMap.Map)
 
   (** Utility function*)
   let string_tag = value [] Data_encoding.string
@@ -604,7 +606,7 @@ module Make (Tree_encoding_decoding : Tree_encoding_decoding.S) = struct
     lazy_vector_encoding "refs" (value_ref_encoding ~module_reg)
 
   let extern_map_encoding ~module_reg =
-    lazy_map
+    NameMap.lazy_map
       (tagged_union
          string_tag
          [
@@ -716,6 +718,5 @@ module Make (Tree_encoding_decoding : Tree_encoding_decoding.S) = struct
           Instance.ModuleMap.snapshot
           (scope
              ["modules"]
-             (Lazy_map_encoding_decoding.ModuleMap.lazy_map
-                (module_instance_encoding ~module_reg))))
+             (ModuleMap.lazy_map (module_instance_encoding ~module_reg))))
 end

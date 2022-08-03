@@ -1,0 +1,10 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name lazy_containers)
+ (public_name lazy-containers)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-lwt-result-stdlib
+  zarith))

@@ -10,10 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "tezos-base"
-  "tree-encoding"
   "lazy-containers"
-  "tezos-webassembly-interpreter"
-  "tezos-context"
   "tezos-lwt-result-stdlib"
   "data-encoding" { >= "0.6" & < "0.7" }
 ]
@@ -22,4 +19,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Protocol environment dependency providing WASM functionality for SCORU"
+synopsis: "A general-purpose library to encode arbitrary data in Merkle trees"

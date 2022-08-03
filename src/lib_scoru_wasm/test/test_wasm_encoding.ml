@@ -25,7 +25,7 @@
 
 (** Testing
     -------
-    Component:    Tree_encoding_decoding
+    Component:    Tree_encoding
     Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
                     -- test "WASM Encodings"
     Subject:      Encoding tests for the tezos-scoru-wasm library
@@ -59,8 +59,8 @@ module Tree = struct
   include Context.Tree
 end
 
-module Merklizer = Tree_encoding_decoding.Make (Tree)
-module Wasm_encoding = Wasm_encoding.Make (Merklizer)
+module Tree_encoding = Tree_encoding.Make (Tree)
+module Wasm_encoding = Wasm_encoding.Make (Tree_encoding)
 
 let empty_tree () =
   let open Lwt_syntax in
@@ -71,8 +71,8 @@ let empty_tree () =
 let encode_decode enc value =
   let open Lwt_syntax in
   let* empty_tree = empty_tree () in
-  let* tree = Merklizer.encode enc value empty_tree in
-  Merklizer.decode enc tree
+  let* tree = Tree_encoding.encode enc value empty_tree in
+  Tree_encoding.decode enc tree
 
 (** Test serialize/deserialize instructions. *)
 let test_instr_roundtrip () =
@@ -139,14 +139,14 @@ let test_module_tree () =
       (* We need to print here in order to force lazy bindings to be evaluated. *)
       let _ = print module1 in
       let*! tree1 =
-        Merklizer.encode
+        Tree_encoding.encode
           (Wasm_encoding.module_instance_encoding
              ~module_reg:lazy_dummy_module_reg)
           module1
           empty_tree
       in
       let*! module2 =
-        Merklizer.decode
+        Tree_encoding.decode
           (Wasm_encoding.module_instance_encoding
              ~module_reg:lazy_dummy_module_reg)
           tree1
@@ -154,7 +154,7 @@ let test_module_tree () =
       (* We need to print here in order to force lazy bindings to be evaluated. *)
       let _ = print module2 in
       let*! tree2 =
-        Merklizer.encode
+        Tree_encoding.encode
           (Wasm_encoding.module_instance_encoding
              ~module_reg:lazy_dummy_module_reg)
           module2

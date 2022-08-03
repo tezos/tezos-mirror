@@ -27,7 +27,7 @@ open Tezos_webassembly_interpreter
 
 exception Uninitialized_current_module
 
-module Make (M : Tree_encoding_decoding.S) : sig
+module Make (M : Tree_encoding.S) : sig
   type tree = M.tree
 
   type 'a t = 'a M.t

@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (executable
- (name test_scoru_wasm)
+ (name test_tree_encoding)
  (libraries
   tezos-base
   tree-encoding
@@ -10,7 +10,7 @@
   tezos-context.disk
   tezos-base-test-helpers
   tezos-test-helpers
-  tezos-scoru-wasm
+  tezos-webassembly-interpreter
   qcheck-alcotest
   alcotest-lwt)
  (flags
@@ -20,5 +20,5 @@
 
 (rule
  (alias runtest)
- (package tezos-scoru-wasm-test)
- (action (run %{dep:./test_scoru_wasm.exe})))
+ (package tree-encoding-test)
+ (action (run %{dep:./test_tree_encoding.exe})))

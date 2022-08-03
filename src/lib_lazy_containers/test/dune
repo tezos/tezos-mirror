@@ -4,15 +4,17 @@
 (executable
  (name main)
  (libraries
-  tezos-webassembly-interpreter
+  lazy-containers
+  qcheck-core
+  qcheck-alcotest
   alcotest)
  (flags
   (:standard)
-  -open Tezos_webassembly_interpreter))
+  -open Lazy_containers))
 
 (rule
  (alias runtest)
- (package tezos-webassembly-interpreter)
+ (package lazy-containers)
  (action (run %{dep:./main.exe})))
 
 (include_subdirs no)
