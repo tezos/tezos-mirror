@@ -1003,6 +1003,28 @@ val stresstest_estimate_gas :
 val stresstest_originate_smart_contracts :
   ?endpoint:endpoint -> Account.key -> t -> unit Lwt.t
 
+(** Run [octez-client stresstest fund accounts from <source_key_pkh>].
+
+    [source_key_pkh] is the address from which the funds will be withdraw.
+
+    Optional parameters:
+    - batch_size: maximum number of operations that can be put into a
+      single batch,
+    - batches_per_block: maximum number of batches that can be put
+      into a single block,
+    - initial_amount: number of token, in μtz, that will be funded on
+      each of the accounts to fund.
+
+     [endpoint]: cf {!create} *)
+val stresstest_fund_accounts_from_source :
+  ?endpoint:endpoint ->
+  source_key_pkh:string ->
+  ?batch_size:int ->
+  ?batches_per_block:int ->
+  ?initial_amount:Tez.t ->
+  t ->
+  unit Lwt.t
+
 (** Run [octez-client run script .. on storage .. and input ..].
 
     Returns the new storage as a string.
