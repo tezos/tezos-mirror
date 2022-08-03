@@ -931,7 +931,7 @@ module Inner = struct
   let verify_segment t trusted_setup cm
       {index = slot_segment_index; content = slot_segment} proof =
     if slot_segment_index < 0 || slot_segment_index >= t.nb_segments then
-      Error `Slot_segment_index_out_of_range
+      Error `Segment_index_out_of_range
     else
       let domain = Domains.build ~log:Z.(log2up (of_int t.segment_len)) in
       let slot_segment_evaluations =

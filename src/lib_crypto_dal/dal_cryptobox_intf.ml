@@ -125,7 +125,6 @@ module type VERIFIER = sig
     segment ->
     segment_proof ->
     ( bool,
-      [> `Degree_exceeds_srs_length of string | `Slot_segment_index_out_of_range]
-    )
+      [> `Degree_exceeds_srs_length of string | `Segment_index_out_of_range] )
     Result.t
 end
