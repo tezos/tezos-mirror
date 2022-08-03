@@ -56,6 +56,7 @@ type sc_rollup_constants = {
   max_lookahead_in_blocks : int32;
   max_active_outbox_levels : int32;
   max_outbox_messages_per_level : int;
+  number_of_sections_in_dissection : int;
 }
 
 (** [boot_sector_of k] returns a valid boot sector for a PVM of
@@ -91,6 +92,9 @@ let get_sc_rollup_constants client =
   let max_outbox_messages_per_level =
     json |-> "sc_rollup_max_outbox_messages_per_level" |> as_int
   in
+  let number_of_sections_in_dissection =
+    json |-> "sc_rollup_number_of_sections_in_dissection" |> as_int
+  in
   return
     {
       origination_size;
@@ -101,6 +105,7 @@ let get_sc_rollup_constants client =
       max_lookahead_in_blocks;
       max_active_outbox_levels;
       max_outbox_messages_per_level;
+      number_of_sections_in_dissection;
     }
 
 (* List of scoru errors messages used in tests below. *)
@@ -2515,6 +2520,73 @@ let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit protocols =
       cement [c31; c311])
     protocols
 
+(** Given a commitment tree constructed by {test_forking_scenario}, this test
+    starts a dispute and makes a first valid dissection move.
+*)
+let test_valid_dispute_dissection protocols =
+  test_forking_scenario
+    ~title:"valid dispute dissection"
+    ~scenario:
+      (fun client _node ~sc_rollup ~operator1 ~operator2 commits _level0 _level1 ->
+      let c1, c2, c31, c32, _c311, _c321 = commits in
+      (* More convenient wrapper around cement_commitment for the tests below *)
+      let cement ?fail l =
+        Lwt_list.iter_s
+          (fun hash -> cement_commitment client ~sc_rollup ~hash ?fail)
+          l
+      in
+      let* constants = get_sc_rollup_constants client in
+      let challenge_window = constants.challenge_window_in_blocks in
+      let commitment_period = constants.commitment_period_in_blocks in
+      let number_of_sections_in_dissection =
+        constants.number_of_sections_in_dissection
+      in
+      let* () =
+        (* Be able to cement both c1 and c2 *)
+        repeat (challenge_window + commitment_period) (fun () ->
+            Client.bake_for_and_wait client)
+      in
+      let* () = cement [c1; c2] in
+      let module M = Operation.Manager in
+      (* The source initialises a dispute. *)
+      let source = operator2 in
+      let opponent = operator1.public_key_hash in
+      let* () =
+        bake_operation_via_rpc client
+        @@ M.make ~source
+        @@ M.sc_rollup_refute ~sc_rollup ~opponent ()
+      in
+      (* Construct a valid dissection with valid initial hash of size
+         [sc_rollup.number_of_sections_in_dissection]. The state hash below is
+         the hash of the state computed after submitting the first commitment c1
+         (which is also equal to states's hashes of subsequent commitments, as we
+         didn't add any message in inboxes). If this hash needs to be recomputed,
+         run this test with --verbose and grep for 'compressed_state' in the
+         produced logs. *)
+      let state_hash =
+        "scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf"
+      in
+
+      let rec aux i acc =
+        if i = number_of_sections_in_dissection - 1 then
+          List.rev ({M.state_hash = None; tick = i} :: acc)
+        else aux (i + 1) ({M.state_hash = Some state_hash; tick = i} :: acc)
+      in
+      (* Inject a valid dissection move *)
+      let refutation =
+        M.{choice_tick = 0; refutation_step = Dissection (aux 0 [])}
+      in
+
+      let* () =
+        bake_operation_via_rpc client
+        @@ M.make ~source
+        @@ M.sc_rollup_refute ~sc_rollup ~opponent ~refutation ()
+      in
+      (* We cannot cement neither c31, nor c32 because refutation game hasn't
+         ended. *)
+      cement [c31; c32] ~fail:"Attempted to cement a disputed commitment")
+    protocols
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -2625,4 +2697,5 @@ let register ~protocols =
   (* Shared tezts - will be executed for both PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols ;
-  test_no_cementation_if_parent_not_lcc_or_if_disputed_commit protocols
+  test_no_cementation_if_parent_not_lcc_or_if_disputed_commit protocols ;
+  test_valid_dispute_dissection protocols
