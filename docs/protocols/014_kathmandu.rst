@@ -53,6 +53,14 @@ Data Availability Layer (ongoing)
 Distribution of rollup operations data off-chain.  (MRs :gl:`!5371`,
 :gl:`!5501`, :gl:`!5508`, :gl:`!5527`, :gl:`!5423`)
 
+Updated randomness generation
+-----------------------------
+
+Introduce a new randomness generation protocol based on Verifiable Delay
+Functions (VDFs). See :doc:`Randomness generation <../kathmandu/randomness_generation>`
+for an explanation of how this protocol works.
+(MRs :gl:`!5064`, :gl:`!5848`)
+
 Contract Event Logging
 ----------------------
 
@@ -90,7 +98,9 @@ Breaking Changes
   block containing more than one operation from the same manager will
   now fail. (MR :gl:`!5557`)
 
-- VDF phase added after RANDAO in randomness generation. (MR :gl:`!5064`)
+- VDF phase added after RANDAO in randomness generation. Nonces for generating
+  the random seed must now be revealed in the first 256 blocks of a cycle
+  instead of anytime in a cycle. (MRs :gl:`!5064`, :gl:`!5848`)
 
 RPC Changes
 -----------
@@ -121,6 +131,16 @@ Operation receipts
   by Michelson scripts now have different names for receipt encodings. This
   concerns transations, originations and delegations, where the word "internal"
   explicitly appears in the case of internal operation receipts. (:gl:`!5149`)
+
+- Successful contract execution attaches to the transaction receipt a list of
+  contract events. See :doc:`Event <../alpha/event>` for more information.
+
+- New operation ``Vdf_revelation`` introduced for VDF revelation. See
+  :doc:`Randomness generation <../kathmandu/randomness_generation>` for more
+  details.
+
+- New operation ``Increase_paid_storage`` introduced to increase the paid
+  storage of a smart contract. (MR :gl:`!5605`)
 
 Bug Fixes
 ---------
@@ -244,3 +264,9 @@ Internal
   :gl:`!5113`, :gl:`!5114`, :gl:`!5005`, :gl:`!5188`, :gl:`!5309`, :gl:`!5310`,
   :gl:`!5308`, :gl:`!5312`, :gl:`!5313`, :gl:`!5298`, :gl:`!5374`, :gl:`!5381`,
   :gl:`!5384`, :gl:`!5513`, :gl:`!5494`, :gl:`!5582`, :gl:`!5553`)
+
+Invoice
+-------
+
+@g.b.fefe rewarded 3000 ꜩ for code contributions (testnet dictator key) included in this protocol.
+(MR :gl:`!5838`)
