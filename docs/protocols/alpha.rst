@@ -82,6 +82,9 @@ Minor Changes
 
 - Patch smart contracts containing deprecated annotations. (MR :gl:`!5752`)
 
+- Errors related to consensus operations have been reworked. See
+  ``Validate_errors.Consensus``. (MR :gl:`!5927`)
+
 Internal
 --------
 
@@ -117,3 +120,7 @@ Internal
 - split ``check_vdf_and_update_seed`` function from
   ``seed_storage.ml`` between the checks part, ``check_vdf``, and the
   application part, ``update_seed``. (MR :gl:`!5849`)
+
+- Move the checks part of consensus operation to
+  ``validate_operation.ml``. The effects part remains in
+  ``apply_operation``. (MR :gl:`!5927`)
