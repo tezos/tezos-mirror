@@ -26,6 +26,8 @@
 open Error_monad
 include Dal_cryptobox_intf
 module Base58 = Tezos_crypto.Base58
+module Srs_g1 = Bls12_381_polynomial.Polynomial.Srs_g1
+module Srs_g2 = Bls12_381_polynomial.Polynomial.Srs_g2
 
 type error += Failed_to_load_trusted_setup of string
 
@@ -42,10 +44,7 @@ let () =
       | Failed_to_load_trusted_setup parameter -> Some parameter | _ -> None)
     (fun parameter -> Failed_to_load_trusted_setup parameter)
 
-type initialisation_parameters = {
-  srs_g1 : Bls12_381.G1.t array;
-  srs_g2 : Bls12_381.G2.t array;
-}
+type initialisation_parameters = {srs_g1 : Srs_g1.t; srs_g2 : Srs_g2.t}
 
 (* Initialisation parameters are supposed to be instantiated once. *)
 let initialisation_parameters = ref None
@@ -73,25 +72,32 @@ let initialisation_parameters_from_files ~g1_path ~g2_path =
      constant be recomputed? Even though it should be determined by
      the integrity check. *)
   let logarithmic_size = 21 in
-  let srs_g1 =
-    Bls12_381_polynomial.Srs.M.(
-      to_array (load_from_file g1_path logarithmic_size))
+  let to_bigstring path =
+    let open Lwt_syntax in
+    let* fd = Lwt_unix.openfile path [Unix.O_RDONLY] 0o440 in
+    Lwt.finalize
+      (fun () ->
+        return
+          (Lwt_bytes.map_file
+             ~fd:(Lwt_unix.unix_file_descr fd)
+             ~shared:false
+             ~size:(1 lsl logarithmic_size)
+             ()))
+      (fun () -> Lwt_unix.close fd)
   in
-  let g2_size_compressed = Bls12_381.G2.size_in_bytes / 2 in
-  let buf = Bytes.create g2_size_compressed in
-  (* FIXME https://gitlab.com/tezos/tezos/-/issues/3416
-
-     The reading is not in `Lwt`. Hence it can be an issue that this
-     reading is blocking. To make the interface future proof, we
-     already put this function in the [Lwt] monad. *)
-  let read ic =
-    Stdlib.really_input ic buf 0 g2_size_compressed ;
-    Bls12_381.G2.of_compressed_bytes_exn buf
-  in
-  let ic = open_in g2_path in
-  let srs_g2 = Array.init (1 lsl logarithmic_size) (fun _ -> read ic) in
-  close_in ic ;
-  return {srs_g1; srs_g2}
+  let*! srs_g1_bigstring = to_bigstring g1_path in
+  let*! srs_g2_bigstring = to_bigstring g2_path in
+  match
+    let open Result_syntax in
+    let* srs_g1 = Srs_g1.of_bigstring srs_g1_bigstring in
+    let* srs_g2 = Srs_g2.of_bigstring srs_g2_bigstring in
+    return (srs_g1, srs_g2)
+  with
+  | Error (`End_of_file s) -> tzfail (Failed_to_load_trusted_setup s)
+  | Error (`Invalid_point p) ->
+      tzfail
+        (Failed_to_load_trusted_setup (Printf.sprintf "Invalid point %i" p))
+  | Ok (srs_g1, srs_g2) -> return {srs_g1; srs_g2}
 
 (* The srs is made of the initialisation_parameters and two
    well-choosen points. Building the srs from the initialisation
@@ -288,7 +294,7 @@ module Inner = struct
 
   let ensure_validity t =
     let open Result_syntax in
-    let srs_size = Array.length t.srs.raw.srs_g1 in
+    let srs_size = Srs_g1.size t.srs.raw.srs_g1 in
     let is_pow_of_two x =
       let logx = Z.(log2 (of_int x)) in
       1 lsl logx = x
@@ -337,9 +343,9 @@ module Inner = struct
             {
               raw;
               kate_amortized_srs_g2_shards =
-                Array.get raw.srs_g2 (1 lsl evaluations_per_proof_log);
+                Srs_g2.get raw.srs_g2 (1 lsl evaluations_per_proof_log);
               kate_amortized_srs_g2_segments =
-                Array.get raw.srs_g2 (1 lsl Z.(log2up (of_int segment_length)));
+                Srs_g2.get raw.srs_g2 (1 lsl Z.(log2up (of_int segment_length)));
             }
     in
     let t =
@@ -559,18 +565,7 @@ module Inner = struct
       Polynomials.opposite_inplace p ;
       Ok p
 
-  let commit' :
-      type t.
-      (module Bls12_381.CURVE with type t = t) -> scalar array -> t array -> t =
-   fun (module G) p srs ->
-    if p = [||] then G.(copy zero)
-    else G.pippenger ~start:0 ~len:(Array.length p) srs p
-
-  let commit t p =
-    commit'
-      (module Bls12_381.G1)
-      (Polynomials.to_dense_coefficients p)
-      t.srs.raw.srs_g1
+  let commit t p = Srs_g1.pippenger t.srs.raw.srs_g1 p
 
   (* p(X) of degree n. Max degree that can be committed: d, which is also the
      SRS's length - 1. We take d = k - 1 since we don't want to commit
@@ -584,12 +579,7 @@ module Inner = struct
      X^{d-n} on G_2.*)
 
   let prove_commitment t p =
-    commit'
-      (module Bls12_381.G1)
-      Polynomials.(
-        to_dense_coefficients
-          (mul (Polynomials.of_coefficients [(Scalar.(copy one), 0)]) p))
-      t.srs.raw.srs_g1
+    commit t Polynomials.(mul (of_coefficients [(Scalar.(copy one), 0)]) p)
 
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/3389
 
@@ -597,7 +587,7 @@ module Inner = struct
   let verify_commitment t cm proof =
     let open Bls12_381 in
     let check =
-      match Array.get t.srs.raw.srs_g2 0 with
+      match Srs_g2.get t.srs.raw.srs_g2 0 with
       | exception Invalid_argument _ -> false
       | commit_xk ->
           Pairing.pairing_check
@@ -623,7 +613,7 @@ module Inner = struct
 
   (* Precompute first part of Toeplitz trick, which doesn't depends on the
      polynomial’s coefficients. *)
-  let preprocess_multi_reveals ~chunk_len ~degree srs1 =
+  let preprocess_multi_reveals ~chunk_len ~degree srs =
     let open Bls12_381 in
     let l = 1 lsl chunk_len in
     let k =
@@ -639,7 +629,8 @@ module Inner = struct
         Array.init
           ((2 * quotient) + padding)
           (fun i ->
-            if i < quotient then G1.copy srs1.(degree - j - ((i + 1) * l))
+            if i < quotient then
+              G1.copy (Srs_g1.get srs (degree - j - ((i + 1) * l)))
             else G1.(copy zero))
       in
       G1.fft_inplace ~domain ~points ;
@@ -710,13 +701,13 @@ module Inner = struct
       (fun inv_yi h -> Scalar.(mul inv_yi inv_y, mul h inv_yi))
       Scalar.(copy one)
       z_list
-    |> snd
+    |> snd |> Polynomials.of_dense
 
   (* Part 3.2 verifier : verifies that f(w×domain.(i)) = evaluations.(i). *)
   let verify t cm_f srs_point domain (w, evaluations) proof =
     let open Bls12_381 in
     let h = interpolation_h_poly w domain evaluations in
-    let cm_h = commit' (module G1) h t.srs.raw.srs_g1 in
+    let cm_h = commit t h in
     let l = Domains.length domain in
     let sl_min_yl =
       G2.(add srs_point (negate (mul (copy one) (Scalar.pow w (Z.of_int l)))))
@@ -778,13 +769,10 @@ module Inner = struct
       Polynomials.(
         division_xn (p - constant (evaluate p z)) 1 (Scalar.negate z))
     in
-    commit'
-      (module Bls12_381.G1)
-      (Polynomials.to_dense_coefficients q)
-      t.srs.raw.srs_g1
+    commit t q
 
   let _verify_single t cm ~point ~evaluation proof =
-    let h_secret = Array.get t.srs.raw.srs_g2 1 in
+    let h_secret = Srs_g2.get t.srs.raw.srs_g2 1 in
     Bls12_381.(
       Pairing.pairing_check
         [
@@ -856,21 +844,8 @@ module Internal_for_tests = struct
       Bls12_381.Fr.of_string
         "20812168509434597367146703229805575690060615791308155437936410982393987532344"
     in
-    let generator () =
-      Seq.unfold (fun (index, mul, g) ->
-          if index >= size then None
-          else
-            let next = mul g secret in
-            Some (g, (index + 1, mul, next)))
-    in
-    let srs_g1 =
-      let open Bls12_381.G1 in
-      generator () (0, mul, one) |> Array.of_seq
-    in
-    let srs_g2 =
-      let open Bls12_381.G2 in
-      generator () (0, mul, one) |> Array.of_seq
-    in
+    let srs_g1 = Srs_g1.generate_insecure size secret in
+    let srs_g2 = Srs_g2.generate_insecure size secret in
     {srs_g1; srs_g2}
 
   let load_parameters parameters = initialisation_parameters := Some parameters
