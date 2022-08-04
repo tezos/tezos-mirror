@@ -46,6 +46,8 @@ module type S = sig
 
   val decode : 'a t -> tree -> 'a Lwt.t
 
+  val return : 'a -> 'a t
+
   val conv : ('a -> 'b) -> ('b -> 'a) -> 'a t -> 'b t
 
   val conv_lwt : ('a -> 'b Lwt.t) -> ('b -> 'a Lwt.t) -> 'a t -> 'b t
@@ -191,6 +193,8 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
   type 'a decoding = 'a D.t
 
   type 'a t = {encode : 'a encoding; decode : 'a decoding}
+
+  let return x = {encode = E.ignore; decode = D.Syntax.return x}
 
   let conv d e {encode; decode} =
     {encode = E.contramap e encode; decode = D.map d decode}
@@ -460,7 +464,7 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
         case "Some" enc Fun.id Option.some;
         case
           "None"
-          (value [] Data_encoding.unit)
+          (return ())
           (function None -> Some () | _ -> None)
           (fun () -> None);
       ]

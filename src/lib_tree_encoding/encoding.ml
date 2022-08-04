@@ -38,6 +38,8 @@ module type S = sig
 
   val contramap_lwt : ('a -> 'b Lwt.t) -> 'b t -> 'a t
 
+  val ignore : 'a t
+
   val run : 'a t -> 'a -> tree -> tree Lwt.t
 
   val raw : key -> bytes t
@@ -76,6 +78,8 @@ module Make (T : Tree.S) = struct
   type prefix_key = key -> key
 
   type -'a t = 'a -> prefix_key -> tree -> tree Lwt.t
+
+  let ignore _val _key tree = Lwt.return tree
 
   let run enc value tree = enc value Fun.id tree
 

@@ -51,6 +51,9 @@ module type S = sig
       an Lwt effect. *)
   val contramap_lwt : ('a -> 'b Lwt.t) -> 'b t -> 'a t
 
+  (** [ignore] is an encoder that ignores its value. *)
+  val ignore : 'a t
+
   (** [run enc x tree] encodes the given value [x] using the encoder [enc] and
       writes it to the tree [tree]. May raise a [Key_not_found] or a
       [No_tag_matched] exception. *)
