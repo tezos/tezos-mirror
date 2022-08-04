@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -313,6 +313,30 @@ module P2p_connect_handler = struct
       ("addr", P2p_addr.encoding)
       ("port", Data_encoding.option Data_encoding.int16)
       ("peer", P2p_peer.Id.encoding)
+
+  let trigger_maintenance_too_many_connections =
+    declare_2
+      ~section
+      ~name:"trigger_maintenance_too_many_connections"
+      ~msg:
+        "Too many connections : trigger maintenance \
+         (active_connections={active_connections} / \
+         max_connections={max_connections})"
+      ~level:Debug
+      ("active_connections", Data_encoding.int16)
+      ("max_connections", Data_encoding.int16)
+
+  let trigger_maintenance_too_few_connections =
+    declare_2
+      ~section
+      ~name:"trigger_maintenance_too_few_connections"
+      ~msg:
+        "Too few connections : trigger maintenance \
+         (active_connections={active_connections} / \
+         min_connections={min_connections})"
+      ~level:Debug
+      ("active_connections", Data_encoding.int16)
+      ("min_connections", Data_encoding.int16)
 end
 
 module P2p_conn = struct

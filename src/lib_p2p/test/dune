@@ -10,7 +10,8 @@
   test_p2p_buffer_reader
   test_p2p_banned_peers
   test_p2p_node
-  test_p2p_connect_handler)
+  test_p2p_connect_handler
+  test_p2p_maintenance)
  (libraries
   tezos-base
   tezos-base.unix
@@ -106,6 +107,10 @@
   (setenv BISECT_SIGTERM yes (run %{exe:test_p2p_connect_handler.exe}))))
 
 (rule
+ (alias runtest_p2p_maintenance)
+ (action (setenv BISECT_SIGTERM yes (run %{exe:test_p2p_maintenance.exe}))))
+
+(rule
  (alias runtest)
  (package tezos-p2p)
  (deps
@@ -116,5 +121,6 @@
   (alias runtest_p2p_buffer_reader)
   (alias runtest_p2p_banned_peers)
   (alias runtest_p2p_node)
-  (alias runtest_p2p_connect_handler))
+  (alias runtest_p2p_connect_handler)
+  (alias runtest_p2p_maintenance))
  (action (progn)))

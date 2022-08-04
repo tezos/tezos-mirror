@@ -29,6 +29,9 @@ Node
   for a feature which is being developed and should not be
   modified. It should be used only for testing.
 
+- Fixed a bug in the p2p layer that prevented a fast regulation of the
+  number of connections (when having too few or too many connections)
+
 Client
 ------
 
