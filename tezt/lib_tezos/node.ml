@@ -708,3 +708,9 @@ let send_raw_data node ~data =
   let uaddr = Lwt_unix.ADDR_INET (Unix.inet_addr_loopback, net_port node) in
   let* () = Lwt_unix.connect socket uaddr in
   write_string socket data
+
+let upgrade_storage node =
+  spawn_command
+    node
+    ["upgrade"; "storage"; "--data-dir"; node.persistent_state.data_dir]
+  |> Process.check

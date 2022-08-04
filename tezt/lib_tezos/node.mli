@@ -451,3 +451,6 @@ val init :
 (** [send_raw_data node ~data] writes [~data] using an IP socket on the net
     port of [node]. *)
 val send_raw_data : t -> data:string -> unit Lwt.t
+
+(** [upgrade_storage node] upprades the given [node] storage. *)
+val upgrade_storage : t -> unit Lwt.t
