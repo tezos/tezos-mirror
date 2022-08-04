@@ -56,57 +56,8 @@
     will first uncompress the archive before running the benchmarks. *)
 
 let apply_or_raise lazy_res f () =
-  match Lazy.force lazy_res with Ok v -> f v | Error e -> failwith e
-
-(** Provides an access to the set of data that will be used
-    as input by this benchmarks. Providing the same data for several
-    executions is mandatory to get reliable and consistent results. *)
-module Fixture = struct
-  (** The name of the datadir folder that must be found on the filesystem. *)
-  let datadir_name = "mainnet-1479022-hist-10000-datadir"
-
-  let untar src dst =
-    let error msg =
-      Error
-        (Format.sprintf
-           "Couldn't untar the source archive %s in the destination %s: %s"
-           src
-           dst
-           msg)
-    in
-    try
-      Log.debug
-        "Running tar -xzf %s -C %s\n\
-         Please, wait. This could take a few minutes..."
-        src
-        dst ;
-      let status = Sys.command @@ Format.sprintf "tar -xzf %s -C %s" src dst in
-      if status = 0 then Ok ()
-      else
-        error
-          ("Process execution failed with status code " ^ string_of_int status)
-    with Sys_error msg -> error msg
-
-  (** Localises the datadir on the file system, uncompress it if needed and
-      then, evaluates in a result of either the path of the datadir or
-      the cause of the error if the datadir could not be found or uncompressed. *)
-  let datadir () =
-    let dst = Long_test.test_data_path () in
-    let output = dst // datadir_name in
-    let src = output ^ ".tar.gz" in
-    try
-      if Sys.file_exists output then (
-        Log.debug "Found file %s. No need to untar." output ;
-        Ok output)
-      else Result.map (fun () -> output) (untar src dst)
-    with Sys_error msg ->
-      Error
-        (Format.sprintf
-           "Couldn't untar the source archive %s in the destination %s: %s"
-           src
-           dst
-           msg)
-end
+  let* x = Lazy.force lazy_res in
+  match x with Ok v -> f v | Error e -> failwith e
 
 (** Extends the Tezos_time_measurement_runtime.Measurement
     module to add some helpers for measurement exploitation. *)
@@ -396,6 +347,59 @@ module Benchmark = struct
       Validation.run_and_measure_subparts_duration blocks datadir
     in
     Measurement.register_map_as_datapoints influxDB_measurement measurements
+end
+
+(** Provides an access to the set of data that will be used
+    as input by this benchmarks. Providing the same data for several
+    executions is mandatory to get reliable and consistent results. *)
+module Fixture = struct
+  (** The name of the datadir folder that must be found on the filesystem. *)
+  let datadir_name = "mainnet-1479022-hist-10000-datadir"
+
+  let error src dst msg =
+    Error
+      (Format.sprintf
+         "Couldn't untar the source archive %s in the destination %s: %s"
+         src
+         dst
+         msg)
+
+  let untar src dst =
+    let error = error src dst in
+    try
+      Log.debug
+        "Running tar -xzf %s -C %s\n\
+         Please, wait. This could take a few minutes..."
+        src
+        dst ;
+      let status = Sys.command @@ Format.sprintf "tar -xzf %s -C %s" src dst in
+      if status = 0 then Ok ()
+      else
+        error
+          ("Process execution failed with status code " ^ string_of_int status)
+    with Sys_error msg -> error msg
+
+  (** Localises the datadir on the file system, uncompress it if needed and
+      ensures it is up to date with last version of the store.
+      Then, evaluates in a result of either the path of the datadir or
+      the cause of the error if the datadir could not be found or uncompressed. *)
+  let datadir () =
+    let ( let*! ) = Lwt_result.bind in
+    let dst = Long_test.test_data_path () in
+    let output = dst // datadir_name in
+    let src = output ^ ".tar.gz" in
+    let*! file_exist =
+      try Lwt_result.return @@ Sys.file_exists output
+      with Sys_error msg -> Lwt.return @@ error src dst msg
+    in
+    let*! () =
+      if file_exist then
+        Lwt_result.return @@ Log.debug "Found file %s. No need to untar." output
+      else Lwt.return @@ untar src dst
+    in
+    let node = Node.create output in
+    let* () = Tezt_tezos.Node.upgrade_storage node in
+    Lwt_result.return output
 end
 
 let grafana_panels =
