@@ -340,6 +340,10 @@ let test_option () =
   let enc = option (tup2 ~flatten:false int int) in
   let* () = assert_round_trip enc (Some (1, 2)) Stdlib.( = ) in
   let* () = assert_round_trip enc None Stdlib.( = ) in
+  (* Check that we can decode a [None] value from an empty tree. *)
+  let*! empty_tree = empty_tree () in
+  let*! opt = decode enc empty_tree in
+  assert (Option.is_none opt) ;
   return_unit
 
 let test_value_default () =
@@ -384,6 +388,41 @@ let test_with_self_ref () =
   assert (cycle == self ()) ;
   return_unit
 
+let test_delayed () =
+  let open Tree_encoding in
+  let open Lwt_result_syntax in
+  let count = ref 0 in
+  let enc =
+    delayed @@ fun () ->
+    incr count ;
+    value ~default:"Default" [] Data_encoding.string
+  in
+  (* Make sure that the function has not been evaluated. *)
+  assert (!count = 0) ;
+  (* Make sure that decoding works without encoding. *)
+  let*! empty_tree = empty_tree () in
+  let*! v = decode enc empty_tree in
+  assert (v = "Default") ;
+  (* Test round-trip. *)
+  let*! v = encode_decode enc "Hello" in
+  assert (v = "Hello") ;
+  (* Make sure the the enc function was only evaluated once. *)
+  assert (!count = 1) ;
+  return_unit
+
+let test_return () =
+  let open Tree_encoding in
+  let open Lwt_result_syntax in
+  let enc = Tree_encoding.return "K" in
+  (* Make sure we can decode from an empty tree. *)
+  let*! empty_tree = empty_tree () in
+  let*! v = decode enc empty_tree in
+  assert (v = "K") ;
+  (* Make sure that round trip ignores the value. *)
+  let*! v = encode_decode enc "Ignored value" in
+  assert (v = "K") ;
+  return_unit
+
 let tests =
   [
     tztest "String" `Quick test_string;
@@ -405,4 +444,6 @@ let tests =
     tztest "Value ~default" `Quick test_value_default;
     tztest "Value-option" `Quick test_value_option;
     tztest "Self ref" `Quick test_with_self_ref;
+    tztest "Delayed" `Quick test_delayed;
+    tztest "Return" `Quick test_return;
   ]
