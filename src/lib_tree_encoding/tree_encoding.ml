@@ -174,6 +174,8 @@ module type S = sig
   val option : 'a t -> 'a option t
 
   val with_self_reference : ('a Lazy.t -> 'a t) -> 'a t
+
+  val delayed : (unit -> 'a t) -> 'a t
 end
 
 module Make (T : Tree.S) : S with type tree = T.tree = struct
@@ -482,4 +484,18 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
     (* Intercepts the encoding and decoding steps to update the reference to the
        current module. *)
     conv set_current set_current (f (lazy (get_current ())))
+
+  let delayed f =
+    let enc = lazy (f ()) in
+    let encode =
+      E.delayed (fun () ->
+          let {encode; _} = Lazy.force enc in
+          encode)
+    in
+    let decode =
+      D.delayed (fun () ->
+          let {decode; _} = Lazy.force enc in
+          decode)
+    in
+    {encode; decode}
 end

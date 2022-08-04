@@ -44,6 +44,9 @@ module Make (M : Tree_encoding.S) : sig
 
   val value_encoding : module_reg:Instance.module_reg Lazy.t -> Values.value t
 
+  val values_encoding :
+    module_reg:Instance.module_reg Lazy.t -> Values.value list t
+
   val memory_encoding : Partial_memory.memory t
 
   val table_encoding :
@@ -89,4 +92,16 @@ module Make (M : Tree_encoding.S) : sig
     module_reg:Instance.module_reg Lazy.t -> Instance.module_inst t
 
   val module_instances_encoding : Instance.module_reg t
+
+  val input_buffer_encoding : Input_buffer.t t
+
+  val admin_instr_encoding :
+    module_reg:Instance.module_reg Lazy.t -> Eval.admin_instr t
+
+  val frame_encoding : module_reg:Instance.module_reg Lazy.t -> Eval.frame t
+
+  val config_encoding :
+    host_funcs:Host_funcs.registry ->
+    module_reg:Instance.module_reg Lazy.t ->
+    Eval.config t
 end

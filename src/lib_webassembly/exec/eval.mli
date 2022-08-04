@@ -23,3 +23,28 @@ val invoke :
   func_inst ->
   value list ->
   value list Lwt.t (* raises Trap *)
+
+type frame = {inst : module_ref; locals : value ref list}
+
+type code = value list * admin_instr list
+
+and admin_instr = admin_instr' Source.phrase
+
+and admin_instr' =
+  | From_block of Ast.block_label * int32
+  | Plain of Ast.instr'
+  | Refer of ref_
+  | Invoke of func_inst
+  | Trapping of string
+  | Returning of value list
+  | Breaking of int32 * value list
+  | Label of int32 * Ast.instr list * code
+  | Frame of int32 * frame * code
+
+type config = {
+  frame : frame;
+  input : input_inst;
+  code : code;
+  host_funcs : Host_funcs.registry;
+  budget : int; (* to model stack overflow *)
+}

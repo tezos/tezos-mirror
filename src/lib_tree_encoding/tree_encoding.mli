@@ -291,6 +291,11 @@ module type S = sig
       data-structures. Here, [f] is a function that takes the (lazy)
       self-reference as an argument and constructs an encoder. *)
   val with_self_reference : ('a Lazy.t -> 'a t) -> 'a t
+
+  (** [delayed f] produces a tree encoder/decoder that delays evaluation of
+      [f ()] until the encoder or decoder is actually needed. This is required
+      to allow for directly recursive encoders/decoders. *)
+  val delayed : (unit -> 'a t) -> 'a t
 end
 
 (** Produces an encoder/decoder module with the provided map, vector and tree

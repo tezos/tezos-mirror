@@ -276,6 +276,16 @@ let vector_gen gen =
          Lwt.return @@ generate1 ~rand gen)
        (Int32.of_int len))
 
+let vector_z_gen gen =
+  let* len = int_range 0 10 in
+  let* seeds = small_list int in
+  return
+    (Lazy_vector.LwtZVector.create
+       ~produce_value:(fun ix ->
+         let rand = Random.State.make @@ Array.of_list (Z.to_int ix :: seeds) in
+         Lwt.return @@ generate1 ~rand gen)
+       (Z.of_int len))
+
 let result_type_gen = vector_gen value_type_gen
 
 let func_type_gen =
@@ -350,15 +360,19 @@ let value_num_gen nt =
   | Types.I64Type -> map (fun x -> Values.I64 x) int64
   | _ -> Stdlib.failwith "Float type not supported"
 
-let global_value_gen ty =
+let typed_value_gen ty =
   match ty with
   | Types.NumType nt -> map (fun n -> Values.Num n) (value_num_gen nt)
   | Types.RefType rt -> return @@ Values.Ref (Values.NullRef rt)
   | Types.VecType _ -> map (fun v -> Values.Vec v.Source.it) vec_gen
 
+let value_gen =
+  let* value_type = value_type_gen in
+  typed_value_gen value_type
+
 let global_gen =
   let* value_type = value_type_gen in
-  let* value = global_value_gen value_type in
+  let* value = typed_value_gen value_type in
   let* mt = oneofl [Types.Immutable; Types.Mutable] in
   let ty = Types.GlobalType (value_type, mt) in
   return @@ Global.alloc ty value
@@ -398,7 +412,7 @@ let allocations_gen =
   let+ datas = datas_table_gen in
   Ast.{blocks; datas}
 
-let module_gen ?module_reg () =
+let module_ref_and_instance_gen ?module_reg () =
   let module_reg =
     match module_reg with
     | None -> Instance.ModuleMap.create ()
@@ -431,4 +445,101 @@ let module_gen ?module_reg () =
     }
   in
   Instance.update_module_ref module_ref module_ ;
-  return module_
+  return (module_ref, module_)
+
+let module_gen ?module_reg () =
+  map snd (module_ref_and_instance_gen ?module_reg ())
+
+let frame_gen ~module_reg =
+  let* inst, _ = module_ref_and_instance_gen ~module_reg () in
+  let+ locals = small_list (map ref value_gen) in
+  Eval.{inst; locals}
+
+let rec admin_instr'_gen ~module_reg depth =
+  let open Eval in
+  let from_block_gen =
+    let* block = block_label_gen in
+    let+ index = int32 in
+    From_block (block, index)
+  in
+  let plain_gen =
+    let+ instr = instr_gen in
+    Plain instr.it
+  in
+  let refer_gen =
+    let+ ref_ = ref_gen in
+    Refer ref_
+  in
+  let invoke_gen =
+    let* inst, _ = module_ref_and_instance_gen ~module_reg () in
+    let+ func = func_gen inst in
+    Invoke func
+  in
+  let trapping_gen =
+    let+ msg = string_printable in
+    Trapping msg
+  in
+  let returning_gen =
+    let+ values = small_list value_gen in
+    Returning values
+  in
+  let breaking_gen =
+    let* index = int32 in
+    let+ values = small_list value_gen in
+    Breaking (index, values)
+  in
+  let label_gen =
+    let* index = int32 in
+    let* final_instrs = small_list instr_gen in
+    let* values = small_list value_gen in
+    let+ instrs = small_list (admin_instr_gen ~module_reg (depth - 1)) in
+    Label (index, final_instrs, (values, instrs))
+  in
+  let frame_gen' =
+    let* index = int32 in
+    let* frame = frame_gen ~module_reg in
+    let* values = small_list value_gen in
+    let+ instrs = small_list (admin_instr_gen ~module_reg (depth - 1)) in
+    Frame (index, frame, (values, instrs))
+  in
+  oneof
+    ([
+       from_block_gen;
+       plain_gen;
+       refer_gen;
+       invoke_gen;
+       trapping_gen;
+       returning_gen;
+       breaking_gen;
+     ]
+    @ if depth > 0 then [label_gen; frame_gen'] else [])
+
+and admin_instr_gen ~module_reg depth =
+  map Source.(at no_region) (admin_instr'_gen ~module_reg depth)
+
+let admin_instr_gen ~module_reg =
+  let gen = admin_instr_gen ~module_reg in
+  sized_size (int_bound 3) gen
+
+let input_buffer_gen =
+  let gen_message =
+    let* rtype = int32 in
+    let* raw_level = int32 in
+    let* message_counter = map Z.of_int small_nat in
+    let+ payload = map Bytes.of_string (small_string ~gen:char) in
+    Input_buffer.{rtype; raw_level; message_counter; payload}
+  in
+  let* messages = vector_z_gen gen_message in
+  let+ num_elements = small_nat in
+  {
+    Input_buffer.content = Lazy_vector.Mutable.LwtZVector.of_immutable messages;
+    num_elements = Z.of_int num_elements;
+  }
+
+let config_gen ~host_funcs ~module_reg =
+  let* frame = frame_gen ~module_reg in
+  let* input = input_buffer_gen in
+  let* instrs = small_list (admin_instr_gen ~module_reg) in
+  let* values = small_list value_gen in
+  let+ budget = small_int in
+  Eval.{frame; input; code = (values, instrs); host_funcs; budget}

@@ -32,6 +32,8 @@ module type S = sig
 
   type -'a t
 
+  val delayed : (unit -> 'a t) -> 'a t
+
   val contramap : ('a -> 'b) -> 'b t -> 'a t
 
   val contramap_lwt : ('a -> 'b Lwt.t) -> 'b t -> 'a t
@@ -81,6 +83,8 @@ module Make (T : Tree.S) = struct
     let open Lwt_syntax in
     let* v = value in
     enc v prefix tree
+
+  let delayed f x key tree = f () x key tree
 
   let contramap f enc value = enc (f value)
 

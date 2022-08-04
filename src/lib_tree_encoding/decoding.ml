@@ -50,6 +50,8 @@ module type S = sig
 
   val lazy_mapping : ('i -> key) -> 'a t -> ('i -> 'a Lwt.t) t
 
+  val delayed : (unit -> 'a t) -> 'a t
+
   val of_lwt : 'a Lwt.t -> 'a t
 
   val map : ('a -> 'b) -> 'a t -> 'b t
@@ -105,6 +107,8 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
         decode : 'b t;
       }
         -> ('tag, 'a) case
+
+  let delayed f tree key = (f ()) tree key
 
   let of_lwt lwt _tree _prefix = lwt
 

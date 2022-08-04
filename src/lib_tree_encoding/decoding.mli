@@ -91,6 +91,11 @@ module type S = sig
       function to [Lazy_map.create]. *)
   val lazy_mapping : ('i -> key) -> 'a t -> ('i -> 'a Lwt.t) t
 
+  (** [delayed f] produces a tree decoder that delays evaluation of [f ()] until
+      the decoder is actually needed. This is required to allow for directly
+      recursive decoders. *)
+  val delayed : (unit -> 'a t) -> 'a t
+
   (** [of_lwt p] lifts the promise [p] into a decoding value. *)
   val of_lwt : 'a Lwt.t -> 'a t
 
