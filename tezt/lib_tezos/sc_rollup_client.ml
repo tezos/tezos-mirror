@@ -145,7 +145,9 @@ let last_published_commitment ?hooks sc_client =
 
 let dal_slot_subscriptions ?hooks sc_client =
   let open Lwt.Syntax in
-  let+ json = rpc_get ?hooks sc_client ["global"; "dal"; "slots"] in
+  let+ json =
+    rpc_get ?hooks sc_client ["global"; "dal"; "slot_subscriptions"]
+  in
   JSON.as_list json |> List.map JSON.as_int
 
 let spawn_generate_keys ?hooks ?(force = false) ~alias sc_client =

@@ -136,6 +136,13 @@ module Global = struct
       ~description:"Current data availability layer slot subscriptions"
       ~query:RPC_query.empty
       ~output:(Data_encoding.list Dal.Slot_index.encoding)
+      (prefix / "dal" / "slot_subscriptions")
+
+  let dal_slots () =
+    RPC_service.get_service
+      ~description:"Data availability slots for a given block hash"
+      ~query:RPC_query.empty
+      ~output:(Data_encoding.list Dal.Slot.encoding)
       (prefix / "dal" / "slots")
 end
 

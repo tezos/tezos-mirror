@@ -46,6 +46,12 @@ let get_dal_slot_subscriptions_exn store =
   | None -> failwith "No slot subscriptions"
   | Some slot_subscriptions -> return slot_subscriptions
 
+let get_dal_slots_exn store =
+  let open Lwt_result_syntax in
+  let* head = get_head_exn store in
+  let*! slot_headers = Store.Dal_slots.list_values store ~primary_key:head in
+  return slot_headers
+
 let commitment_with_hash commitment =
   ( Protocol.Alpha_context.Sc_rollup.Commitment.hash_uncarbonated commitment,
     commitment )
@@ -230,6 +236,12 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       (Sc_rollup_services.Global.dal_slot_subscriptions ())
       (fun () () -> get_dal_slot_subscriptions_exn store)
 
+  let register_dal_slots store dir =
+    RPC_directory.register0
+      dir
+      (Sc_rollup_services.Global.dal_slots ())
+      (fun () () -> get_dal_slots_exn store)
+
   let register (node_ctxt : Node_context.t) configuration =
     RPC_directory.empty
     |> register_sc_rollup_address configuration
@@ -244,6 +256,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     |> register_last_stored_commitment node_ctxt.store
     |> register_last_published_commitment node_ctxt.store
     |> register_dal_slot_subscriptions node_ctxt.store
+    |> register_dal_slots node_ctxt.store
 
   let start node_ctxt configuration =
     Common.start configuration (register node_ctxt configuration)
