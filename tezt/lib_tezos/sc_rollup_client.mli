@@ -33,6 +33,8 @@ type commitment = {
   number_of_ticks : int;
 }
 
+type slot_metadata = {level : int; header : string; index : int}
+
 (** [create ?name ?path ?base_dir ?path node] returns a fresh client
    identified by a specified [name], logging in [color], executing the
    program at [path], storing local information in [base_dir], and
@@ -89,6 +91,10 @@ val last_published_commitment :
 
 (** [dal_slot_subscriptions client] gets the slots to which the rollup node is subscribed to *)
 val dal_slot_subscriptions : ?hooks:Process.hooks -> t -> int list Lwt.t
+
+(** [dal_slots_metadata client] returns the dal slots metadata of the last tezos
+    head seen by the rollup node. *)
+val dal_slots_metadata : ?hooks:Process.hooks -> t -> slot_metadata list Lwt.t
 
 (** [generate_keys ~alias client] generates new unencrypted keys for [alias]. *)
 val generate_keys :
