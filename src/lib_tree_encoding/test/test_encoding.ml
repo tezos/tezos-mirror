@@ -342,14 +342,6 @@ let test_option () =
   let* () = assert_round_trip enc None Stdlib.( = ) in
   return_unit
 
-let test_value_option () =
-  let open Tree_encoding in
-  let open Lwt_result_syntax in
-  let enc = value_option [] Data_encoding.int31 in
-  let* () = assert_round_trip enc (Some 1) Stdlib.( = ) in
-  let* () = assert_round_trip enc None Stdlib.( = ) in
-  return_unit
-
 let test_value_default () =
   let open Tree_encoding in
   let open Lwt_result_syntax in
@@ -410,7 +402,6 @@ let tests =
     tztest "Chunked byte vector" `Quick test_chunked_byte_vector;
     tztest "Tuples" `Quick test_tuples;
     tztest "Option" `Quick test_option;
-    tztest "Value Option" `Quick test_value_option;
     tztest "Value ~default" `Quick test_value_default;
     tztest "Optional" `Quick test_optional;
     tztest "Self ref" `Quick test_with_self_ref;

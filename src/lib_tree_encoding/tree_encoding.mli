@@ -201,12 +201,6 @@ module type S = sig
       decoding in case the [key] is absent from the tree. *)
   val value : ?default:'a -> key -> 'a Data_encoding.t -> 'a t
 
-  (** [value_option key enc] creates an encoder for optional values under the
-      given [key] using the provided data-encoding [enc]. Note that the value is
-      encoded as an option at the leaf level, in contrast to the {!option}
-      combinator that encodes the value under a new key (Some/None). *)
-  val value_option : key -> 'a Data_encoding.t -> 'a option t
-
   (** [scope key enc] moves the given encoder [enc] to encode values under a
       branch [key]. *)
   val scope : key -> 'a t -> 'a t

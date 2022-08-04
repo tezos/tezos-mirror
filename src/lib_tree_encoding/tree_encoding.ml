@@ -120,8 +120,6 @@ module type S = sig
 
   val value : ?default:'a -> key -> 'a Data_encoding.t -> 'a t
 
-  val value_option : key -> 'a Data_encoding.t -> 'a option t
-
   val scope : key -> 'a t -> 'a t
 
   module Lazy_map_encoding : sig
@@ -332,8 +330,6 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
 
   let value ?default key de =
     {encode = E.value key de; decode = D.value ?default key de}
-
-  let value_option key de = value key (Data_encoding.option de)
 
   module Lazy_map_encoding = struct
     module type S = sig

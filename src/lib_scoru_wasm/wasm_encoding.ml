@@ -555,7 +555,7 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
       (tup3
          ~flatten:false
          (value ["min"] Data_encoding.int32)
-         (value_option ["max"] Data_encoding.int32)
+         (optional ["max"] Data_encoding.int32)
          (scope ["chunks"] chunked_byte_vector))
 
   let table_encoding ~module_reg =
@@ -569,7 +569,7 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
       (tup4
          ~flatten:false
          (value ["min"] Data_encoding.int32)
-         (value_option ["max"] Data_encoding.int32)
+         (optional ["max"] Data_encoding.int32)
          (lazy_vector_encoding "refs" (value_ref_encoding ~module_reg))
          (value ["ref-type"] Interpreter_encodings.Types.ref_type_encoding))
 
