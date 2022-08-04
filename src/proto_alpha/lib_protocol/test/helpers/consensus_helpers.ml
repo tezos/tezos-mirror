@@ -67,12 +67,14 @@ let delegate_of_first_slot b =
   | {V.delegate; slots = s :: _ as slots; _} :: _ -> ((delegate, slots), s)
   | _ -> assert false
 
-let delegate_of_slot slot b =
+let delegate_of_slot ?(different_slot = false) slot b =
   let module V = Plugin.RPC.Validators in
   Context.get_endorsers b >|=? fun endorsers ->
   List.find_map
     (function
-      | {V.delegate; slots = s :: _ as slots; _} when Slot.equal s slot ->
+      | {V.delegate; slots = s :: _ as slots; _}
+        when if different_slot then not (Slot.equal s slot)
+             else Slot.equal s slot ->
           Some (delegate, slots)
       | _ -> None)
     endorsers
@@ -97,7 +99,7 @@ let test_consensus_op_for_next ~genesis ~kind ~next =
   delegate_of_first_slot (B b1) >>=? fun (delegate, slot) ->
   dorsement ~endorsed_block:b1 ~delegate (B genesis) >>=? fun operation ->
   Incremental.add_operation inc operation >>=? fun inc ->
-  delegate_of_slot slot (B b2) >>=? fun delegate ->
+  delegate_of_slot ~different_slot:true slot (B b2) >>=? fun delegate ->
   dorsement ~endorsed_block:b2 ~delegate (B b1) >>=? fun operation ->
   Incremental.add_operation inc operation >>= fun res ->
   let error_title =
