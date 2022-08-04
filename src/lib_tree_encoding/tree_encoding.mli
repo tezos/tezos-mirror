@@ -190,10 +190,10 @@ module type S = sig
   (** [raw key] is an encoder for bytes under the given [key]. *)
   val raw : key -> bytes t
 
-  (** [optional key encoding] returns an encoder that uses [encoding]
+  (** [value_option key encoding] returns an encoder that uses [encoding]
       for encoding values, but does not fail if the [key] is
       absent. *)
-  val optional : key -> 'a Data_encoding.t -> 'a option t
+  val value_option : key -> 'a Data_encoding.t -> 'a option t
 
   (** [value ?default key enc] creates an encoder under the given
       [key] using the provided data-encoding [enc] for

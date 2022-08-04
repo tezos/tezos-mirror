@@ -44,7 +44,7 @@ module type S = sig
 
   val raw : key -> bytes t
 
-  val optional : key -> 'a Data_encoding.t -> 'a option t
+  val value_option : key -> 'a Data_encoding.t -> 'a option t
 
   val value : key -> 'a Data_encoding.t -> 'a t
 
@@ -113,7 +113,7 @@ module Make (T : Tree.S) = struct
   let value suffix enc =
     contramap (Data_encoding.Binary.to_bytes_exn enc) (raw suffix)
 
-  let optional key encoding v prefix tree =
+  let value_option key encoding v prefix tree =
     match v with
     | Some v -> value key encoding v prefix tree
     | None -> T.remove tree (prefix key)

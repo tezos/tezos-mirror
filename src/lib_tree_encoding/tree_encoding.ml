@@ -116,7 +116,7 @@ module type S = sig
 
   val raw : key -> bytes t
 
-  val optional : key -> 'a Data_encoding.t -> 'a option t
+  val value_option : key -> 'a Data_encoding.t -> 'a option t
 
   val value : ?default:'a -> key -> 'a Data_encoding.t -> 'a t
 
@@ -448,9 +448,9 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
     in
     {encode; decode}
 
-  let optional key encoding =
-    let encode = E.optional key encoding in
-    let decode = D.optional key encoding in
+  let value_option key encoding =
+    let encode = E.value_option key encoding in
+    let decode = D.value_option key encoding in
     {encode; decode}
 
   let option enc =

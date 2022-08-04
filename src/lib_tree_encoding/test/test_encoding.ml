@@ -349,11 +349,11 @@ let test_value_default () =
   let enc = value ~default:42 [] Data_encoding.int31 in
   assert_value tree enc 42
 
-let test_optional () =
+let test_value_option () =
   let open Tree_encoding in
   let open Lwt_result_syntax in
   let key = [] in
-  let enc = optional key Data_encoding.int31 in
+  let enc = value_option key Data_encoding.int31 in
   let*! tree = empty_tree () in
   let*! tree = Tree_encoding.encode enc (Some 0) tree in
   let* () = assert_value tree enc (Some 0) in
@@ -403,6 +403,6 @@ let tests =
     tztest "Tuples" `Quick test_tuples;
     tztest "Option" `Quick test_option;
     tztest "Value ~default" `Quick test_value_default;
-    tztest "Optional" `Quick test_optional;
+    tztest "Value-option" `Quick test_value_option;
     tztest "Self ref" `Quick test_with_self_ref;
   ]
