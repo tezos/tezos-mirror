@@ -145,7 +145,7 @@ let register_ops =
              Format.fprintf
                f
                "(%d,x'%a',%a,x'%044x')"
-               (Db.bool_to_int (kind = Consensus_ops.Endorsement))
+               (Sql_requests.bool_to_int (kind = Consensus_ops.Endorsement))
                Hex.pp
                (Signature.Public_key_hash.to_hex delegate)
                (Format.pp_print_option
@@ -204,7 +204,7 @@ let register_ops =
                   ~none:(fun f () -> Format.pp_print_string f "NULL")
                   (fun f x -> Format.fprintf f "%li" x))
                round
-               (Db.bool_to_int (kind = Consensus_ops.Endorsement))))
+               (Sql_requests.bool_to_int (kind = Consensus_ops.Endorsement))))
         received_ops
         source
         level
@@ -246,7 +246,7 @@ let register_ops_inclusion db level data =
                 ~none:(fun f () -> Format.pp_print_string f "NULL")
                 (fun f x -> Format.fprintf f "%li" x))
              round
-             (Db.bool_to_int (kind = Consensus_ops.Endorsement))))
+             (Sql_requests.bool_to_int (kind = Consensus_ops.Endorsement))))
       included_ops
       level
   in
@@ -254,7 +254,7 @@ let register_ops_inclusion db level data =
 
 let main source prefix db_file =
   let db = Sqlite3.db_open db_file in
-  Db.exec db Db.schema ;
+  Db.exec db Sql_requests.db_schema ;
   Db.ensure_source_is_there db source ;
   let*! () =
     Array.fold_left

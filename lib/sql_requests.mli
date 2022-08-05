@@ -23,19 +23,38 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let exec db ?cb q =
-  match Sqlite3.exec db ?cb q with
-  | Sqlite3.Rc.OK -> ()
-  | _ -> Format.eprintf "Failed to exec \'%s\': %s@." q (Sqlite3.errmsg db)
+val bool_to_int : bool -> int
 
-let set_pragma_use_foreign_keys db =
-  let cmd = "PRAGMA foreign_keys = TRUE" in
-  exec db cmd
+val db_schema : string
 
-let create_db path =
-  let db = Sqlite3.db_open path in
-  exec db Sql_requests.db_schema ;
-  assert (Sqlite3.db_close db)
+val maybe_insert_source : string -> string
 
-let ensure_source_is_there db source =
-  exec db (Sql_requests.maybe_insert_source source)
+val maybe_insert_delegates_from_rights : Consensus_ops.rights -> string
+
+val maybe_insert_endorsing_rights :
+  level:Int32.t -> Consensus_ops.rights -> string
+
+val maybe_insert_operations_from_block :
+  level:int32 -> Consensus_ops.block_op list -> string
+
+val maybe_insert_operations_from_received :
+  level:int32 -> Consensus_ops.delegate_ops -> string
+
+val insert_block :
+  Block_hash.t ->
+  level:int32 ->
+  round:int32 ->
+  Time.Protocol.t ->
+  Signature.public_key_hash ->
+  string
+
+val insert_received_operations :
+  source:string ->
+  level:int32 ->
+  ('a * Consensus_ops.received_operation list) list ->
+  string
+
+val insert_included_operations :
+  Block_hash.t -> level:int32 -> Consensus_ops.block_op trace -> string
+
+val insert_received_block : source:string -> Block_hash.t -> Ptime.t -> string

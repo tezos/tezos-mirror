@@ -50,170 +50,21 @@ let register_rights db level rights aliases =
       rights
   in
   exec db query ;
-  let query =
-    Format.asprintf
-      "INSERT OR IGNORE INTO endorsing_rights (level, delegate, first_slot, \
-       endorsing_power) SELECT column1, delegates.id, column3, column4 FROM \
-       delegates JOIN (VALUES %a) ON delegates.address = column2;"
-      (Format.pp_print_list
-         ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-         (fun f Consensus_ops.{address; first_slot; power} ->
-           Format.fprintf
-             f
-             "(%ld, x'%a', %d, %d)"
-             level
-             Hex.pp
-             (Signature.Public_key_hash.to_hex address)
-             first_slot
-             power))
-      rights
-  in
-  exec db query
+  exec db (Sql_requests.maybe_insert_endorsing_rights ~level rights)
 
 let register_included_operations db block_hash level operations =
-  let query =
-    Format.asprintf
-      "INSERT INTO operations (hash, endorsement, endorser, level, round) \
-       SELECT column1, column2, delegates.id, %ld, column3 FROM delegates JOIN \
-       (VALUES %a) ON delegates.address = column4 WHERE column1 NOT IN (SELECT \
-       hash FROM operations WHERE level = %ld);"
-      level
-      (Format.pp_print_list
-         ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-         (fun f (op : Consensus_ops.block_op) ->
-           Format.fprintf
-             f
-             "(x'%a', %d, %ld, x'%a')"
-             Hex.pp
-             (Operation_hash.to_hex op.op.hash)
-             (bool_to_int (op.op.kind = Consensus_ops.Endorsement))
-             (Stdlib.Option.get op.Consensus_ops.op.round)
-             Hex.pp
-             (Signature.Public_key_hash.to_hex op.delegate)))
-      operations
-      level
-  in
-  exec db query ;
-  let query =
-    Format.asprintf
-      "INSERT INTO operations_inclusion (block, operation) SELECT blocks.id, \
-       operations.id FROM operations, blocks, (VALUES %a) ON operations.hash = \
-       column1 AND blocks.hash = x'%a' WHERE operations.level = %ld;"
-      (Format.pp_print_list
-         ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-         (fun f (op : Consensus_ops.block_op) ->
-           Format.fprintf
-             f
-             "(x'%a')"
-             Hex.pp
-             (Operation_hash.to_hex op.Consensus_ops.op.hash)))
-      operations
-      Hex.pp
-      (Block_hash.to_hex block_hash)
-      level
-  in
-  exec db query
+  exec db (Sql_requests.maybe_insert_operations_from_block ~level operations) ;
+  exec db (Sql_requests.insert_included_operations block_hash ~level operations)
 
 let register_received_operations db level
     (operations : Consensus_ops.delegate_ops) source =
-  (* flatten the operations, that is, do not group by delegate *)
-  let received_ops =
-    List.fold_left
-      (fun acc (delegate, delegate_ops) ->
-        let aux = List.map (fun op -> (delegate, op)) delegate_ops in
-        aux @ acc)
-      []
-      operations
-  in
-  let query =
-    Format.asprintf
-      "INSERT INTO operations (hash, endorsement, endorser, level, round) \
-       SELECT column1, column2, delegates.id, %ld, column4 FROM delegates JOIN \
-       (VALUES %a) ON delegates.address = column3 WHERE column1 NOT IN (SELECT \
-       hash FROM operations WHERE level = %ld);"
-      level
-      (Format.pp_print_list
-         ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-         (fun f (delegate, (op : Consensus_ops.received_operation)) ->
-           Format.fprintf
-             f
-             "(x'%a', %d, x'%a', %a)"
-             Hex.pp
-             (Operation_hash.to_hex op.op.hash)
-             (bool_to_int (op.op.kind = Consensus_ops.Endorsement))
-             Hex.pp
-             (Signature.Public_key_hash.to_hex delegate)
-             (Format.pp_print_option
-                ~none:(fun f () -> Format.pp_print_string f "NULL")
-                (fun f x -> Format.fprintf f "%li" x))
-             op.op.round))
-      received_ops
-      level
-  in
-  exec db query ;
-  let query =
-    Format.asprintf
-      "INSERT INTO operations_reception (timestamp, operation, source, errors) \
-       SELECT column1, operations.id, nodes.id, column2 FROM operations, \
-       nodes, (VALUES %a) ON operations.hash = column3 AND nodes.name = '%s' \
-       WHERE operations.level = %ld;"
-      (Format.pp_print_list
-         ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-         (fun f (_delegate, (op : Consensus_ops.received_operation)) ->
-           Format.fprintf
-             f
-             "('%a', %a, x'%a')"
-             Time.System.pp_hum
-             op.reception_time
-             (Format.pp_print_option
-                ~none:(fun f () -> Format.pp_print_string f "NULL")
-                (fun f errors ->
-                  Format.fprintf
-                    f
-                    "x'%a'"
-                    Hex.pp
-                    (Hex.of_bytes
-                       (Data_encoding.Binary.to_bytes_exn
-                          (Data_encoding.list Error_monad.error_encoding)
-                          errors))))
-             op.errors
-             Hex.pp
-             (Operation_hash.to_hex op.op.hash)))
-      received_ops
-      source
-      level
-  in
-  exec db query
+  exec db (Sql_requests.maybe_insert_operations_from_received ~level operations) ;
+  exec db (Sql_requests.insert_received_operations ~source ~level operations)
 
 let register_block ~db hash ~level ~round timestamp reception_time delegate
     block_ops source =
-  let query =
-    Format.asprintf
-      "INSERT INTO blocks (timestamp, hash, level, round, baker) SELECT \
-       column1, column2, %ld, column4, delegates.id FROM delegates JOIN \
-       (VALUES ('%a', x'%a', x'%a', %ld)) ON delegates.address = column3;"
-      level
-      Time.Protocol.pp
-      timestamp
-      Hex.pp
-      (Block_hash.to_hex hash)
-      Hex.pp
-      (Signature.Public_key_hash.to_hex delegate)
-      round
-  in
-  exec db query ;
-  let query =
-    Format.asprintf
-      "INSERT INTO blocks_reception (timestamp, block, source) SELECT column1, \
-       blocks.id, nodes.id FROM blocks JOIN (VALUES ('%a', x'%a')) ON \
-       blocks.hash = column2 JOIN nodes ON nodes.name = '%s';"
-      Time.System.pp_hum
-      reception_time
-      Hex.pp
-      (Block_hash.to_hex hash)
-      source
-  in
-  exec db query ;
+  exec db (Sql_requests.insert_block hash ~level ~round timestamp delegate) ;
+  exec db (Sql_requests.insert_received_block ~source hash reception_time) ;
 
   (*** insert into operations and operations_inclusion *)
   register_included_operations db hash (Int32.pred level) block_ops
