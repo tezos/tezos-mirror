@@ -64,11 +64,13 @@ type unsigned_integer = [`Uint30 | `Uint16 | `Uint8] [@@deriving hash]
 
 type integer = [signed_integer | unsigned_integer] [@@deriving hash]
 
+type length = [`N | unsigned_integer] [@@deriving hash]
+
 val integer_to_size : [< integer] -> int
 
-val min_int : [< integer] -> int
+val min_int : [< integer | `N] -> int
 
-val max_int : [< integer] -> int
+val max_int : [< integer | `N] -> int
 
 val range_to_size : minimum:int -> maximum:int -> integer
 

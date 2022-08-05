@@ -143,6 +143,36 @@ module Atom = struct
       read_z (Buffer.create 100) first_value 7 state
     else Z.of_int first_value
 
+  let uint30_like_n state =
+    let old_allowed_bytes = state.allowed_bytes in
+    let limit = 5 (* at most 5 bytes to represent uint30-like-n *) in
+    let limit =
+      match state.allowed_bytes with
+      | None -> limit
+      | Some current_limit -> min current_limit limit
+    in
+    state.allowed_bytes <- Some limit ;
+    let v = n state in
+    if Z.compare v (Z.of_int (Binary_size.max_int `N)) > 0 then
+      let min = 0 and max = Binary_size.max_int `N in
+      let v = Binary_size.max_int `Uint30 in
+      raise_read_error (Invalid_int {min; v; max})
+    else
+      let allowed_bytes =
+        match old_allowed_bytes with
+        | None -> None
+        | Some old_limit ->
+            let remaining =
+              match state.allowed_bytes with
+              | None -> assert false
+              | Some remaining -> remaining
+            in
+            let read = limit - remaining in
+            Some (old_limit - read)
+      in
+      state.allowed_bytes <- allowed_bytes ;
+      Z.to_int v
+
   let z state =
     let first = uint8 state in
     let first_value = first land 0x3F in
@@ -304,7 +334,11 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
         let e = read_rec encoding state in
         inj e
   | Dynamic_size {kind; encoding = e} ->
-      let sz = Atom.int kind state in
+      let sz =
+        match kind with
+        | `N -> Atom.uint30_like_n state
+        | #Binary_size.unsigned_integer as kind -> Atom.int kind state
+      in
       let remaining = check_remaining_bytes state sz in
       state.remaining_bytes <- sz ;
       ignore (check_allowed_bytes state sz : int option) ;

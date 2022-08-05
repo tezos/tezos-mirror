@@ -75,7 +75,7 @@ module Encoding = struct
         ~binary:
           (let kind = Binary_size.unsigned_range_to_size length in
            check_size (length + Binary_size.integer_to_size kind)
-           @@ dynamic_size ~kind Variable.string)
+           @@ dynamic_size ~kind:(kind :> Binary_size.length) Variable.string)
         ~json:
           (let open Json_encoding in
           conv
@@ -96,7 +96,7 @@ module Encoding = struct
         ~binary:
           (let kind = Binary_size.unsigned_range_to_size length in
            check_size (length + Binary_size.integer_to_size kind)
-           @@ dynamic_size ~kind Variable.bytes)
+           @@ dynamic_size ~kind:(kind :> Binary_size.length) Variable.bytes)
         ~json:
           (let open Json_encoding in
           conv

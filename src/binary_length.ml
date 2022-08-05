@@ -139,11 +139,14 @@ let rec length : type x. x Encoding.t -> x -> int =
   | Conv {encoding = e; proj; _} -> length e (proj value)
   | Describe {encoding = e; _} -> length e value
   | Splitted {encoding = e; _} -> length e value
-  | Dynamic_size {kind; encoding = e} ->
+  | Dynamic_size {kind; encoding = e} -> (
       let length = length e value in
       if length > Binary_size.max_int kind then
         raise (Write_error Size_limit_exceeded) ;
-      Binary_size.integer_to_size kind + length
+      match kind with
+      | `N -> n_length (Z.of_int length) + length
+      | #Binary_size.unsigned_integer as kind ->
+          Binary_size.integer_to_size kind + length)
   | Check_size {limit; encoding = e} ->
       let length = length e value in
       if length > limit then raise (Write_error Size_limit_exceeded) ;
@@ -273,7 +276,13 @@ let rec maximum_length : type a. a Encoding.t -> int option =
            256. *)
         min inner_maximum_length (Binary_size.max_int kind)
       in
-      Some (Binary_size.integer_to_size kind + inner_maximum_length)
+      let size_maximum_length =
+        match kind with
+        | `N -> n_length (Z.of_int inner_maximum_length)
+        | #Binary_size.unsigned_integer as kind ->
+            Binary_size.integer_to_size kind
+      in
+      Some (size_maximum_length + inner_maximum_length)
   | Check_size {limit; encoding = e} -> (
       (* NOTE: it is possible that the statically-provable maximum size exceeds
          the dynamically checked limit. But the difference might be explained by

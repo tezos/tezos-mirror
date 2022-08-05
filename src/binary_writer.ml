@@ -322,17 +322,33 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
       let (Matched (tag, e, value)) = wrap_user_function match_case value in
       Atom.tag tag_size state tag ;
       write_rec e state value
-  | Dynamic_size {kind; encoding = e} ->
+  | Dynamic_size {kind; encoding = e} -> (
       let initial_offset = state.offset in
-      (* place holder for [size] *)
-      Atom.int kind state 0 ;
-      write_with_limit (Binary_size.max_int kind) e state value ;
-      (* patch the written [size] *)
-      Atom.set_int
-        kind
-        state.buffer
-        initial_offset
-        (state.offset - initial_offset - Binary_size.integer_to_size kind)
+      match kind with
+      | `N ->
+          let size =
+            (* we limit e in size to trigger size-overflows early *)
+            Binary_length.length
+              (Encoding.check_size (Binary_size.max_int `N) e)
+              value
+          in
+          write_with_limit
+            (Binary_length.n_length
+               (Z.of_int (Binary_size.max_int `N)))
+            n
+            state
+            (Z.of_int size) ;
+          write_with_limit (Binary_size.max_int `N) e state value
+      | #Binary_size.unsigned_integer as kind ->
+          (* place holder for [size] *)
+          Atom.int kind state 0 ;
+          write_with_limit (Binary_size.max_int kind) e state value ;
+          (* patch the written [size] *)
+          Atom.set_int
+            kind
+            state.buffer
+            initial_offset
+            (state.offset - initial_offset - Binary_size.integer_to_size kind))
   | Check_size {limit; encoding = e} -> write_with_limit limit e state value
   | Describe {encoding = e; _} -> write_rec e state value
   | Splitted {encoding = e; _} -> write_rec e state value

@@ -170,11 +170,7 @@ type 'a desc =
       is_tup : bool;
     }
       -> 'a desc
-  | Dynamic_size : {
-      kind : Binary_size.unsigned_integer;
-      encoding : 'a t;
-    }
-      -> 'a desc
+  | Dynamic_size : {kind : Binary_size.length; encoding : 'a t} -> 'a desc
   | Check_size : {limit : int; encoding : 'a t} -> 'a desc
   | Delayed : (unit -> 'a t) -> 'a desc
 

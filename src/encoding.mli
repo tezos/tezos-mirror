@@ -148,11 +148,7 @@ type 'a desc =
     }
       -> 'a desc
       (** Used when the binary and JSON encodings are structurally different. *)
-  | Dynamic_size : {
-      kind : Binary_size.unsigned_integer;
-      encoding : 'a t;
-    }
-      -> 'a desc
+  | Dynamic_size : {kind : Binary_size.length; encoding : 'a t} -> 'a desc
       (** [kind] indicates how many bytes in the size field.
           [encoding] is a (generally variable) encoding *)
   | Check_size : {limit : int; encoding : 'a t} -> 'a desc
@@ -294,8 +290,7 @@ module Variable : sig
   val list : ?max_length:int -> 'a encoding -> 'a list encoding
 end
 
-val dynamic_size :
-  ?kind:Binary_size.unsigned_integer -> 'a encoding -> 'a encoding
+val dynamic_size : ?kind:Binary_size.length -> 'a encoding -> 'a encoding
 
 val check_size : int -> 'a encoding -> 'a encoding
 

@@ -59,6 +59,8 @@ type unsigned_integer = [`Uint30 | `Uint16 | `Uint8] [@@deriving hash]
 
 type integer = [signed_integer | unsigned_integer] [@@deriving hash]
 
+type length = [`N | unsigned_integer] [@@deriving hash]
+
 let signed_range_to_size min max : [> signed_integer] =
   if min >= ~-128 && max <= 127 then `Int8
   else if min >= ~-32_768 && max <= 32_767 then `Int16
@@ -78,14 +80,14 @@ let integer_to_size = function
   | `Uint8 -> uint8
 
 let max_int = function
-  | `Uint30 | `Int31 -> (1 lsl 30) - 1
+  | `N | `Uint30 | `Int31 -> (1 lsl 30) - 1
   | `Int16 -> (1 lsl 15) - 1
   | `Int8 -> (1 lsl 7) - 1
   | `Uint16 -> (1 lsl 16) - 1
   | `Uint8 -> (1 lsl 8) - 1
 
 let min_int = function
-  | `Uint8 | `Uint16 | `Uint30 -> 0
+  | `Uint8 | `Uint16 | `Uint30 | `N -> 0
   | `Int31 -> -(1 lsl 30)
   | `Int16 -> -(1 lsl 15)
   | `Int8 -> -(1 lsl 7)

@@ -38,7 +38,7 @@ type integer_extended = [Binary_size.integer | `Int32 | `Int64]
 type field_descr =
   | Named_field of string * Kind.t * layout
   | Anonymous_field of Kind.t * layout
-  | Dynamic_size_field of string option * int * Binary_size.unsigned_integer
+  | Dynamic_size_field of string option * int * Binary_size.length
   | Optional_field of string
 
 and layout =
@@ -166,7 +166,29 @@ module Printer_ast = struct
     function
     | Named_field (name, kind, desc) ->
         Some [name; Format.asprintf "%a" pp_size kind; string_of_layout desc]
-    | Dynamic_size_field (Some name, 1, size) ->
+    | Dynamic_size_field (Some name, 1, `N) ->
+        Some
+          [
+            Format.asprintf "# bytes in field \"%s\"" name;
+            Format.asprintf "%a" pp_size `Dynamic;
+            string_of_layout (Ref "N.t");
+          ]
+    | Dynamic_size_field (None, 1, `N) ->
+        Some
+          [
+            Format.asprintf "# bytes in next field";
+            Format.asprintf "%a" pp_size `Dynamic;
+            string_of_layout (Ref "N.t");
+          ]
+    | Dynamic_size_field (_, i, `N) ->
+        Some
+          [
+            Format.asprintf "# bytes in next %d fields" i;
+            Format.asprintf "%a" pp_size `Dynamic;
+            string_of_layout (Ref "N.t");
+          ]
+    | Dynamic_size_field (Some name, 1, (#Binary_size.unsigned_integer as size))
+      ->
         Some
           [
             Format.asprintf "# bytes in field \"%s\"" name;
@@ -176,7 +198,7 @@ module Printer_ast = struct
               (`Fixed (Binary_size.integer_to_size size));
             string_of_layout (Int (size :> integer_extended));
           ]
-    | Dynamic_size_field (None, 1, size) ->
+    | Dynamic_size_field (None, 1, (#Binary_size.unsigned_integer as size)) ->
         Some
           [
             Format.asprintf "# bytes in next field";
@@ -186,7 +208,7 @@ module Printer_ast = struct
               (`Fixed (Binary_size.integer_to_size size));
             string_of_layout (Int (size :> integer_extended));
           ]
-    | Dynamic_size_field (_, i, size) ->
+    | Dynamic_size_field (_, i, (#Binary_size.unsigned_integer as size)) ->
         Some
           [
             Format.asprintf "# bytes in next %d fields" i;
