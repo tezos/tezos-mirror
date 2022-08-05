@@ -42,7 +42,28 @@ type received_operation = {
   errors : error list option;
 }
 
+let received_operation_encoding =
+  let open Data_encoding in
+  conv
+    (fun {hash; kind; round; reception_time; errors} ->
+      (hash, kind, round, reception_time, errors))
+    (fun (hash, kind, round, reception_time, errors) ->
+      {hash; kind; round; reception_time; errors})
+    (obj5
+       (req "hash" Operation_hash.encoding)
+       (req "kind" operation_kind_encoding)
+       (opt "round" int32)
+       (req "reception_time" Time.System.encoding)
+       (dft "errors" RPC_error.opt_encoding None))
+
 type delegate_ops = (Signature.Public_key_hash.t * received_operation list) list
+
+let delegate_ops_encoding =
+  Data_encoding.(
+    list
+      (tup2
+         Signature.Public_key_hash.encoding
+         (list received_operation_encoding)))
 
 type block_op = {hash : Operation_hash.t; delegate : Signature.public_key_hash}
 
@@ -60,4 +81,19 @@ type right = {
   power : int;
 }
 
+let right_encoding =
+  let open Data_encoding in
+  conv
+    (fun {level; address; first_slot; power} ->
+      (level, address, first_slot, power))
+    (fun (level, address, first_slot, power) ->
+      {level; address; first_slot; power})
+    (obj4
+       (req "level" int32)
+       (req "address" Signature.Public_key_hash.encoding)
+       (req "first_slot" int31)
+       (req "power" int16))
+
 type rights = right list
+
+let rights_encoding = Data_encoding.list right_encoding
