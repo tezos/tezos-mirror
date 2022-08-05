@@ -544,4 +544,4 @@ let add_block ~level block_hash ~round timestamp reception_time baker block_info
             block_info )))
 
 (* only used by the db archiver *)
-let add_rights _rights _aliases = ()
+let add_rights ~level:_ _rights _aliases = ()

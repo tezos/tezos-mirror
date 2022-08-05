@@ -56,9 +56,6 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                     {delegate; first_slot; endorsing_power} ->
                Consensus_ops.
                  {
-                   level =
-                     Protocol.Alpha_context.Raw_level.to_int32
-                       answer.Plugin.RPC.Endorsing_rights.level;
                    address = delegate;
                    first_slot = slot_to_int first_slot;
                    power = endorsing_power;

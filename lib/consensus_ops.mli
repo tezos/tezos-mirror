@@ -51,7 +51,6 @@ type block_info = {
 }
 
 type right = {
-  level : Int32.t;
   address : Signature.Public_key_hash.t;
   first_slot : int;
   power : int;

@@ -30,7 +30,7 @@ type t = Sqlite3.db
 
 (* TODO: use prepared statements instead of exec (and thus also use Sql.Data) *)
 
-let register_rights db rights aliases =
+let register_rights db level rights aliases =
   let query =
     Format.asprintf
       "INSERT OR IGNORE INTO delegates (address, alias) VALUES %a;"
@@ -57,15 +57,15 @@ let register_rights db rights aliases =
        delegates JOIN (VALUES %a) ON delegates.address = column2;"
       (Format.pp_print_list
          ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-         (fun f r ->
+         (fun f Consensus_ops.{address; first_slot; power} ->
            Format.fprintf
              f
              "(%ld, x'%a', %d, %d)"
-             r.Consensus_ops.level
+             level
              Hex.pp
-             (Signature.Public_key_hash.to_hex r.address)
-             r.first_slot
-             r.power))
+             (Signature.Public_key_hash.to_hex address)
+             first_slot
+             power))
       rights
   in
   exec db query
@@ -245,7 +245,7 @@ type chunk =
       * Signature.Public_key_hash.t
       * Consensus_ops.block_info
   | Mempool of bool option * Int32.t (* level *) * Consensus_ops.delegate_ops
-  | Rights of (Consensus_ops.rights * Wallet.t)
+  | Rights of (Int32.t (* level *) * Consensus_ops.rights * Wallet.t)
 
 let (chunk_stream, chunk_feeder) = Lwt_stream.create ()
 
@@ -277,7 +277,8 @@ let launch db source =
          | Mempool (_unaccurate, level, ops) ->
              ensure_source_is_there db source ;
              register_received_operations db level ops source
-         | Rights (rights, aliases) -> register_rights db rights aliases) ;
+         | Rights (level, rights, aliases) ->
+             register_rights db level rights aliases) ;
          exec db "END TRANSACTION"
        with
       | Sql.InternalError str -> prerr_endline str
@@ -307,4 +308,5 @@ let add_block ~level block_hash ~round timestamp reception_time baker block_info
             baker,
             block_info )))
 
-let add_rights rights aliases = chunk_feeder (Some (Rights (rights, aliases)))
+let add_rights ~level rights aliases =
+  chunk_feeder (Some (Rights (level, rights, aliases)))

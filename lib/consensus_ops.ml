@@ -75,7 +75,6 @@ type block_info = {
 }
 
 type right = {
-  level : Int32.t;
   address : Signature.Public_key_hash.t;
   first_slot : int;
   power : int;
@@ -84,12 +83,9 @@ type right = {
 let right_encoding =
   let open Data_encoding in
   conv
-    (fun {level; address; first_slot; power} ->
-      (level, address, first_slot, power))
-    (fun (level, address, first_slot, power) ->
-      {level; address; first_slot; power})
-    (obj4
-       (req "level" int32)
+    (fun {address; first_slot; power} -> (address, first_slot, power))
+    (fun (address, first_slot, power) -> {address; first_slot; power})
+    (obj3
        (req "address" Signature.Public_key_hash.encoding)
        (req "first_slot" int31)
        (req "power" int16))

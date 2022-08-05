@@ -52,5 +52,5 @@ module type S = sig
     Consensus_ops.block_info ->
     unit
 
-  val add_rights : Consensus_ops.rights -> Wallet.t -> unit
+  val add_rights : level:Int32.t -> Consensus_ops.rights -> Wallet.t -> unit
 end

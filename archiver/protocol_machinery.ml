@@ -98,7 +98,7 @@ module Make_main_loops
     let cctxt' = Protocol_services.wrap_full cctxt in
     let* rights = Protocol_services.endorsing_rights cctxt' level in
     let* aliases = aliases cctxt in
-    Archiver.add_rights rights aliases ;
+    Archiver.add_rights ~level rights aliases ;
     (* We could slightly optimize the db-archiver by not coupling ops
        to rights. In this case we'd need two versions of
        [Archiver.add_received] (one for the json-archiver, and one for

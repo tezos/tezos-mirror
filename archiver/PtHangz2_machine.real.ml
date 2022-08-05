@@ -44,10 +44,9 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     in
     return
     @@ List.map
-         (fun Plugin.RPC.Endorsing_rights.{level; delegate; slots; _} ->
+         (fun Plugin.RPC.Endorsing_rights.{delegate; slots; _} ->
            Consensus_ops.
              {
-               level = Protocol.Alpha_context.Raw_level.to_int32 level;
                address = delegate;
                first_slot = Stdlib.List.hd (List.sort compare slots);
                power = List.length slots;
