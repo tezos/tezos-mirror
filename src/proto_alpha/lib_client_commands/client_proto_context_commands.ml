@@ -3000,6 +3000,84 @@ let commands_rw () =
         return_unit);
     command
       ~group
+      ~desc:"Timeout a staker from dispute on a smart-contract rollup."
+      (args7
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         storage_limit_arg
+         counter_arg
+         fee_parameter_args)
+      (prefixes ["timeout"; "dispute"; "on"; "sc"; "rollup"]
+      @@ param
+           ~name:"sc_rollup"
+           ~desc:
+             "The address of the smart-contract rollup where the staker of the \
+              dispute has timed-out."
+           Sc_rollup_params.sc_rollup_address_parameter
+      @@ prefixes ["with"]
+      @@ Client_keys.Public_key_hash.source_param
+           ~name:"staker"
+           ~desc:"One of the players involved in the dispute."
+      @@ prefixes ["from"]
+      @@ Client_keys.Public_key_hash.source_param
+           ~name:"src"
+           ~desc:"Name of the source contract."
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             storage_limit,
+             counter,
+             fee_parameter )
+           rollup
+           staker
+           source
+           cctxt ->
+        let open Lwt_result_syntax in
+        let* game_info =
+          Plugin.RPC.Sc_rollup.ongoing_refutation_game
+            cctxt
+            (cctxt#chain, cctxt#block)
+            rollup
+            staker
+            ()
+        in
+        let* alice, bob =
+          match game_info with
+          | None ->
+              cctxt#error
+                "Couldn't find an ongoing dispute for this staker on this \
+                 rollup."
+          | Some (_, alice, bob) -> return (alice, bob)
+        in
+        let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
+        let* _res =
+          sc_rollup_timeout
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~dry_run
+            ~verbose_signing
+            ?fee
+            ?storage_limit
+            ?counter
+            ?confirmations:cctxt#confirmations
+            ~simulation
+            ~source
+            ~rollup
+            ~alice
+            ~bob
+            ~src_pk
+            ~src_sk
+            ~fee_parameter
+            ()
+        in
+        return_unit);
+    command
+      ~group
       ~desc:"List originated smart-contract rollups."
       no_options
       (prefixes ["list"; "sc"; "rollups"] @@ stop)
