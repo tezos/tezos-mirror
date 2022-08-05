@@ -187,6 +187,12 @@ let encoding =
 
 let empty = {blocks = []; delegate_operations = []; unaccurate = true}
 
+let block_data_encoding =
+  let open Data_encoding in
+  merge_objs
+    Block.encoding
+    (obj1 (req "operations" (list Consensus_ops.block_op_encoding)))
+
 module Anomaly = struct
   (* only anomalies related to endorsements are considered for now *)
   type problem = Missed | Forgotten | Sequestered | Incorrect

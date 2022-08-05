@@ -1,0 +1,4 @@
+(executable
+ (name main)
+ (public_name teztale_server)
+ (libraries cohttp-lwt-unix caqti-lwt caqti-driver-sqlite3 teztale.lib))
