@@ -56,6 +56,7 @@ type sc_rollup_constants = {
   max_lookahead_in_blocks : int32;
   max_active_outbox_levels : int32;
   max_outbox_messages_per_level : int;
+  number_of_sections_in_dissection : int;
 }
 
 (** [boot_sector_of k] returns a valid boot sector for a PVM of
@@ -91,6 +92,9 @@ let get_sc_rollup_constants client =
   let max_outbox_messages_per_level =
     json |-> "sc_rollup_max_outbox_messages_per_level" |> as_int
   in
+  let number_of_sections_in_dissection =
+    json |-> "sc_rollup_number_of_sections_in_dissection" |> as_int
+  in
   return
     {
       origination_size;
@@ -101,7 +105,19 @@ let get_sc_rollup_constants client =
       max_lookahead_in_blocks;
       max_active_outbox_levels;
       max_outbox_messages_per_level;
+      number_of_sections_in_dissection;
     }
+
+(* List of scoru errors messages used in tests below. *)
+
+let commit_too_recent =
+  "Attempted to cement a commitment before its refutation deadline"
+
+let parent_not_lcc = "Parent is not the last cemented commitment"
+
+let disputed_commit = "Attempted to cement a disputed commitment"
+
+let commit_doesnt_exit = "Commitment scc\\w+\\sdoes not exist"
 
 let make_parameter name value =
   Option.map (fun v -> ([name], Option.some @@ Int.to_string v)) value
@@ -2133,7 +2149,8 @@ let publish_dummy_commitment ?(number_of_ticks = 1) ~inbox_level ~predecessor
     }
   in
   let*! () = publish_commitment ~src ~commitment client sc_rollup in
-  Client.bake_for_and_wait client
+  let* () = Client.bake_for_and_wait client in
+  get_staked_on_commitment ~sc_rollup ~staker:src client
 
 let test_consecutive_commitments ~kind =
   regression_test
@@ -2157,7 +2174,7 @@ let test_consecutive_commitments ~kind =
       let* predecessor, _ =
         last_cemented_commitment_hash_with_level ~sc_rollup client
       in
-      let* () =
+      let* commit_hash =
         publish_dummy_commitment
           ~inbox_level:(inbox_level + commitment_period_in_blocks + 1)
           ~predecessor
@@ -2165,15 +2182,10 @@ let test_consecutive_commitments ~kind =
           ~src:operator
           client
       in
-      (* We get the predecessor's hash by getting the commitment on which
-         the operator just staked on. *)
-      let* predecessor =
-        get_staked_on_commitment ~sc_rollup ~staker:operator client
-      in
-      let* () =
+      let* _commit_hash =
         publish_dummy_commitment
           ~inbox_level:(inbox_level + (2 * commitment_period_in_blocks) + 1)
-          ~predecessor
+          ~predecessor:commit_hash
           ~sc_rollup
           ~src:operator
           client
@@ -2302,6 +2314,279 @@ let test_refutation protocols ~kind =
            inputs
            protocols)
 
+(** Helper to check that the operation whose hash is given is successfully
+    included (applied) in the current head block. *)
+let check_op_included =
+  let get_op_status op =
+    JSON.(op |-> "metadata" |-> "operation_result" |-> "status" |> as_string)
+  in
+  fun ~oph client ->
+    let* head = RPC.Client.call client @@ RPC.get_chain_block () in
+    (* Operations in a block are encoded as a list of lists of operations
+       [ consensus; votes; anonymous; manager ]. Manager operations are
+       at index 3 in the list. *)
+    let ops = JSON.(head |-> "operations" |=> 3 |> as_list) in
+    let op_contents =
+      match
+        List.find_opt (fun op -> oph = JSON.(op |-> "hash" |> as_string)) ops
+      with
+      | None -> []
+      | Some op -> JSON.(op |-> "contents" |> as_list)
+    in
+    match op_contents with
+    | [op] ->
+        let status = get_op_status op in
+        if String.equal status "applied" then unit
+        else
+          Test.fail
+            ~__LOC__
+            "Unexpected operation %s status: got %S instead of 'applied'."
+            oph
+            status
+    | _ ->
+        Test.fail
+          "Expected to have one operation with hash %s, but got %d"
+          oph
+          (List.length op_contents)
+
+(** Helper function that allows to inject the given operation in a node, bake a
+    block, and check that the operation is successfully applied in the baked
+    block. *)
+let bake_operation_via_rpc client op =
+  let* (`OpHash oph) = Operation.Manager.inject [op] client in
+  let* () = Client.bake_for_and_wait client in
+  check_op_included ~oph client
+
+(** This helper function constructs the following commitment tree by baking and
+    publishing commitments (but without cementing them):
+    ---- c1 ---- c2 ---- c31 ---- c311
+                  \
+                   \---- c32 ---- c321
+
+   Commits c1, c2, c31 and c311 are published by [operator1]. The forking
+   branch c32 -- c321 is published by [operator2].
+*)
+let mk_forking_commitments node client ~sc_rollup ~operator1 ~operator2 =
+  let* {commitment_period_in_blocks; _} = get_sc_rollup_constants client in
+  (* This is the starting level on top of wich we'll construct the tree. *)
+  let starting_level = Node.get_level node in
+  let mk_commit ~src ~ticks ~depth ~pred =
+    (* Compute the inbox level for which we'd like to commit *)
+    let inbox_level = starting_level + (commitment_period_in_blocks * depth) in
+    (* d is the delta between the target inbox level and the current level *)
+    let d = inbox_level - Node.get_level node in
+    (* Bake sufficiently many blocks to be able to commit for the desired inbox
+       level. We may actually bake no blocks if d <= 0 *)
+    let* () = repeat d (fun () -> Client.bake_for_and_wait client) in
+    publish_dummy_commitment
+      ~inbox_level
+      ~predecessor:pred
+      ~sc_rollup
+      ~number_of_ticks:ticks
+      ~src
+      client
+  in
+  (* Retrieve the latest commitment *)
+  let* c0, _ = last_cemented_commitment_hash_with_level ~sc_rollup client in
+  (* Construct the tree of commitments. Fork c32 and c321 is published by
+     operator2. We vary ticks to have different hashes when commiting on top of
+     the same predecessor. *)
+  let* c1 = mk_commit ~ticks:1 ~depth:1 ~pred:c0 ~src:operator1 in
+  let* c2 = mk_commit ~ticks:2 ~depth:2 ~pred:c1 ~src:operator1 in
+  let* c31 = mk_commit ~ticks:31 ~depth:3 ~pred:c2 ~src:operator1 in
+  let* c32 = mk_commit ~ticks:32 ~depth:3 ~pred:c2 ~src:operator2 in
+  let* c311 = mk_commit ~ticks:311 ~depth:4 ~pred:c31 ~src:operator1 in
+  let* c321 = mk_commit ~ticks:321 ~depth:4 ~pred:c32 ~src:operator2 in
+  return (c1, c2, c31, c32, c311, c321)
+
+(** This helper initializes a rollup and builds a commitment tree of the form:
+    ---- c1 ---- c2 ---- c31 ---- c311
+                  \
+                   \---- c32 ---- c321
+    Then, it calls the given scenario on it.
+*)
+let test_forking_scenario ~title ~scenario protocols =
+  regression_test
+    ~__FILE__
+    ~tags:["l1"; "commitment"; "cement"; "fork"; "dispute"]
+    title
+    (fun protocol ->
+      (* Choosing challenge_windows to be quite longer than commitment_period
+         to avoid being in a situation where the first commitment in the result
+         of [mk_forking_commitments] is cementable without further bakes. *)
+      let commitment_period = 3 in
+      let challenge_window = commitment_period * 7 in
+      setup ~commitment_period ~challenge_window ~protocol
+      @@ fun node client _bootstrap1_key ->
+      (* Originate a Sc rollup. *)
+      let* sc_rollup = originate_sc_rollup client ~parameters_ty:"unit" in
+      (* Building a forking commitments tree. *)
+      let operator1 = Constant.bootstrap1 in
+      let operator2 = Constant.bootstrap2 in
+      let level0 = Node.get_level node in
+      let* commits =
+        mk_forking_commitments
+          node
+          client
+          ~sc_rollup
+          ~operator1:operator1.public_key_hash
+          ~operator2:operator2.public_key_hash
+      in
+      let level1 = Node.get_level node in
+      scenario
+        client
+        node
+        ~sc_rollup
+        ~operator1
+        ~operator2
+        commits
+        level0
+        level1)
+    protocols
+
+(** Given a commitment tree constructed by {test_forking_scenario}, this function:
+    - tests different (failing and non-failing) cementation of commitments
+      and checks the returned error for each situation (in case of failure);
+    - resolves the dispute on top of c2, and checks that the defeated branch
+      is removed, while the alive one can be cemented.
+*)
+let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit protocols =
+  test_forking_scenario
+    ~title:
+      "commitments: publish, and try to cement not on top of LCC or disputed"
+    ~scenario:
+      (fun client _node ~sc_rollup ~operator1 ~operator2 commits level0 level1 ->
+      let c1, c2, c31, c32, c311, c321 = commits in
+      let* constants = get_sc_rollup_constants client in
+      let challenge_window = constants.challenge_window_in_blocks in
+
+      (* More convenient Wrapper around cement_commitment for the tests below *)
+      let cement ?fail l =
+        Lwt_list.iter_s
+          (fun hash -> cement_commitment client ~sc_rollup ~hash ?fail)
+          l
+      in
+      let missing_blocks_to_cement = level0 + challenge_window - level1 in
+      let* () =
+        if missing_blocks_to_cement <= 0 then unit (* We can already cement *)
+        else
+          let* () =
+            repeat (missing_blocks_to_cement - 1) (fun () ->
+                Client.bake_for_and_wait client)
+          in
+          (* We cannot cement yet! *)
+          let* () = cement [c1] ~fail:commit_too_recent in
+          (* After these blocks, we should be able to cement all commitments
+             (modulo cementation ordering & disputes resolution) *)
+          repeat challenge_window (fun () -> Client.bake_for_and_wait client)
+      in
+      (* We cannot cement any of the commitments before cementing c1 *)
+      let* () = cement [c2; c31; c32; c311; c321] ~fail:parent_not_lcc in
+      (* But, we can cement c1 and then c2, in this order *)
+      let* () = cement [c1; c2] in
+      (* We cannot cement c31 or c32 on top of c2 because they are disputed *)
+      let* () = cement [c31; c32] ~fail:disputed_commit in
+      (* Of course, we cannot cement c311 or c321 because their parents are not
+         cemented. *)
+      let* () = cement ~fail:parent_not_lcc [c311; c321] in
+
+      (* +++ dispute resolution +++
+         Let's resolve the dispute between operator1 and operator2 on the fork
+         c31 vs c32. [operator1] will make a bad initial dissection, so it
+         loses the dispute, and the branch c32 --- c321 dies. *)
+
+      (* [operator1] starts a dispute. *)
+      let module M = Operation.Manager in
+      let* () =
+        bake_operation_via_rpc client
+        @@ M.make ~source:operator2
+        @@ M.sc_rollup_refute ~sc_rollup ~opponent:operator1.public_key_hash ()
+      in
+      (* [operator1] makes a dissection. it will lose here because the dissection
+         is ill-formed. *)
+      let refutation = M.{choice_tick = 0; refutation_step = Dissection []} in
+      let* () =
+        bake_operation_via_rpc client
+        @@ M.make ~source:operator2
+        @@ M.sc_rollup_refute
+             ~sc_rollup
+             ~opponent:operator1.public_key_hash
+             ~refutation
+             ()
+      in
+      (* Attempting to cement defeated branch will fail. *)
+      let* () = cement ~fail:commit_doesnt_exit [c32; c321] in
+      (* Now, we can cement c31 on top of c2 and c311 on top of c31. *)
+      cement [c31; c311])
+    protocols
+
+(** Given a commitment tree constructed by {test_forking_scenario}, this test
+    starts a dispute and makes a first valid dissection move.
+*)
+let test_valid_dispute_dissection protocols =
+  test_forking_scenario
+    ~title:"valid dispute dissection"
+    ~scenario:
+      (fun client _node ~sc_rollup ~operator1 ~operator2 commits _level0 _level1 ->
+      let c1, c2, c31, c32, _c311, _c321 = commits in
+      (* More convenient wrapper around cement_commitment for the tests below *)
+      let cement ?fail l =
+        Lwt_list.iter_s
+          (fun hash -> cement_commitment client ~sc_rollup ~hash ?fail)
+          l
+      in
+      let* constants = get_sc_rollup_constants client in
+      let challenge_window = constants.challenge_window_in_blocks in
+      let commitment_period = constants.commitment_period_in_blocks in
+      let number_of_sections_in_dissection =
+        constants.number_of_sections_in_dissection
+      in
+      let* () =
+        (* Be able to cement both c1 and c2 *)
+        repeat (challenge_window + commitment_period) (fun () ->
+            Client.bake_for_and_wait client)
+      in
+      let* () = cement [c1; c2] in
+      let module M = Operation.Manager in
+      (* The source initialises a dispute. *)
+      let source = operator2 in
+      let opponent = operator1.public_key_hash in
+      let* () =
+        bake_operation_via_rpc client
+        @@ M.make ~source
+        @@ M.sc_rollup_refute ~sc_rollup ~opponent ()
+      in
+      (* Construct a valid dissection with valid initial hash of size
+         [sc_rollup.number_of_sections_in_dissection]. The state hash below is
+         the hash of the state computed after submitting the first commitment c1
+         (which is also equal to states's hashes of subsequent commitments, as we
+         didn't add any message in inboxes). If this hash needs to be recomputed,
+         run this test with --verbose and grep for 'compressed_state' in the
+         produced logs. *)
+      let state_hash =
+        "scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf"
+      in
+
+      let rec aux i acc =
+        if i = number_of_sections_in_dissection - 1 then
+          List.rev ({M.state_hash = None; tick = i} :: acc)
+        else aux (i + 1) ({M.state_hash = Some state_hash; tick = i} :: acc)
+      in
+      (* Inject a valid dissection move *)
+      let refutation =
+        M.{choice_tick = 0; refutation_step = Dissection (aux 0 [])}
+      in
+
+      let* () =
+        bake_operation_via_rpc client
+        @@ M.make ~source
+        @@ M.sc_rollup_refute ~sc_rollup ~opponent ~refutation ()
+      in
+      (* We cannot cement neither c31, nor c32 because refutation game hasn't
+         ended. *)
+      cement [c31; c32] ~fail:"Attempted to cement a disputed commitment")
+    protocols
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -2411,4 +2696,6 @@ let register ~protocols =
   test_rollup_node_uses_arith_boot_sector protocols ;
   (* Shared tezts - will be executed for both PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
-  register ~kind:"arith" ~protocols
+  register ~kind:"arith" ~protocols ;
+  test_no_cementation_if_parent_not_lcc_or_if_disputed_commit protocols ;
+  test_valid_dispute_dissection protocols
