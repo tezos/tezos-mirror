@@ -932,14 +932,22 @@ class TestTickets:
         )
 
         # Alice --0A--> Bob
-        transfer(
-            builder="A",
-            source_wallet="Alice",
-            destination_wallet="Bob",
-            amount=0,
-        )
+        # This fails because we are not allowed to keep a ticket
+        # with zero amount in big maps.
+        # In the last transfer, Alice's wallet contract has depleted all
+        # A-tokens.
+        # Therefore, this contract call fails on A-token look-up.
+        with assert_run_failure(r'script reached FAILWITH instruction'):
+            transfer(
+                builder="A",
+                source_wallet="Alice",
+                destination_wallet="Bob",
+                amount=0,
+            )
 
         # Fail: Alice --1A--> Bob
+        # Similarly, this contract call fails because there is no
+        # big map entry for A-tokens in Alice's wallet contract.
         with assert_run_failure(r'script reached FAILWITH instruction'):
             transfer(
                 builder="A",
@@ -969,7 +977,12 @@ class TestTickets:
         burn(builder="A", wallet="Bob", amount=100)
 
         # Bob --0A-->
-        burn(builder="A", wallet="Bob", amount=0)
+        # The last `burn` call depletes all A-tokens in Bob's wallet.
+        # Since no ticket of amount zero is allowed in big map,
+        # this call fails because there is no A-token entry in Bob's
+        # wallet contract.
+        with assert_run_failure(r'script reached FAILWITH instruction'):
+            burn(builder="A", wallet="Bob", amount=0)
 
         # Fail: Bob --1A-->
         with assert_run_failure(r'script reached FAILWITH instruction'):
