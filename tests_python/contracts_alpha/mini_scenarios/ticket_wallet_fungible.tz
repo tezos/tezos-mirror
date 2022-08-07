@@ -61,18 +61,33 @@ code
         READ_TICKET;
         GET @total_amount 4;
         DUP @amount 5;
-        SWAP; SUB; ISNAT; ASSERT_SOME @remaining_amount;
+        SWAP; SUB;
+        DUP; EQ;
+        IF
+          {
+            # Drop @remaining_amount because it is zero
+            DROP;
+            # Drop @amount because this is now irrelevant
+            DIG 3; DROP;
+            # Drop @ticketer because we are not storing any ticket in this wallet
+            DIG 3; DROP;
+            # Bring the big map to the stack top since the ticket entry is already striked out
+            DUG 3
+          }
+          {
+            ISNAT; ASSERT_SOME @remaining_amount;
 
-        # Split the ticket
-        DIG 4; PAIR; SWAP; SPLIT_TICKET;
-        ASSERT_SOME; UNPAIR @to_send @to_keep;
+            # Split the ticket
+            DIG 4; PAIR; SWAP; SPLIT_TICKET;
+            ASSERT_SOME; UNPAIR @to_send @to_keep;
 
-        # Store the ticket to keep
-        DUG 5;
-        SOME;
-        DIG 3;
-        GET_AND_UPDATE;
-        ASSERT_NONE;
+            # Store the ticket to keep
+            DUG 5;
+            SOME;
+            DIG 3;
+            GET_AND_UPDATE;
+            ASSERT_NONE;
+          };
         DIG 2; PAIR;
 
         # Send the ticket
