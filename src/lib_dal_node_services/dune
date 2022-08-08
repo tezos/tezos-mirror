@@ -1,0 +1,17 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_dal_node_services)
+ (package tezos-dal-node-services)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-rpc
+  tezos-crypto-dal)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base
+  -open Tezos_rpc))

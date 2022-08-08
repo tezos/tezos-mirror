@@ -22,6 +22,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+open Tezos_crypto_dal
 
 let split_query =
   let open RPC_query in
@@ -49,36 +50,14 @@ let slot () =
     ~description:"Show content of a slot"
     ~query:slot_query
     ~output:Data_encoding.string
-    RPC_path.(open_root / "slot" / "content" /: Cryptobox.Commitment.rpc_arg)
+    RPC_path.(
+      open_root / "slot" / "content" /: Dal_cryptobox.Commitment.rpc_arg)
 
 let shard () =
   let shard_arg = RPC_arg.int in
   RPC_service.get_service
     ~description:"Fetch shard as bytes"
     ~query:RPC_query.empty
-    ~output:Cryptobox.shard_encoding
-    RPC_path.(open_root / "shard" /: Cryptobox.Commitment.rpc_arg /: shard_arg)
-
-let handle_split_slot dal_parameters dal_constants store fill slot =
-  let open Lwt_result_syntax in
-  let slot = String.to_bytes slot in
-  let slot =
-    if fill then
-      Slot_manager.Utils.fill_x00 dal_parameters.Cryptobox.slot_size slot
-    else slot
-  in
-  let+ commitment = Slot_manager.split_and_store dal_constants store slot in
-  Cryptobox.Commitment.to_b58check commitment
-
-let handle_slot initial_constants dal_constants store (_, commitment) trim () =
-  let open Lwt_result_syntax in
-  let* slot =
-    Slot_manager.get_slot initial_constants dal_constants store commitment
-  in
-  let slot = if trim then Slot_manager.Utils.trim_x00 slot else slot in
-  return (String.of_bytes slot)
-
-let handle_shard store ((_, commitment), shard) () () =
-  let open Lwt_result_syntax in
-  let* shard = Slot_manager.get_shard store commitment shard in
-  return shard
+    ~output:Dal_cryptobox.shard_encoding
+    RPC_path.(
+      open_root / "shard" /: Dal_cryptobox.Commitment.rpc_arg /: shard_arg)

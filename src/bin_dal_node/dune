@@ -19,6 +19,7 @@
   tezos-stdlib-unix
   tezos-stdlib
   tezos_dal_node_lib
+  tezos_dal_node_services
   tezos-crypto-dal
   irmin-pack
   irmin-pack.unix
@@ -36,11 +37,9 @@
   -open Tezos_client_base_unix
   -open Tezos_client_commands
   -open Tezos_rpc_http
-  -open Tezos_rpc_http_server
-  -open Tezos_protocol_updater
-  -open Tezos_rpc_http_client_unix
   -open Tezos_stdlib_unix
   -open Tezos_stdlib
-  -open Tezos_dal_node_lib))
+  -open Tezos_dal_node_lib
+  -open Tezos_dal_node_services))
 
 (rule (action (progn (write-file void_for_linking-tezos-dal-alpha.empty ""))))

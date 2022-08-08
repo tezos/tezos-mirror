@@ -3001,6 +3001,20 @@ let _octez_embedded_protocol_packer =
     ~linkall:true
     ~modules:["Main_embedded_packer"]
 
+let octez_dal_node_services =
+  private_lib
+    "tezos_dal_node_services"
+    ~path:"src/lib_dal_node_services"
+    ~opam:"tezos-dal-node-services"
+    ~synopsis:"Tezos: `tezos-dal-node` RPC services"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_rpc |> open_;
+        octez_crypto_dal;
+      ]
+    ~linkall:true
+
 let octez_dal_node_lib =
   private_lib
     "tezos_dal_node_lib"
@@ -5432,12 +5446,13 @@ let _octez_dal_node =
          octez_client_base_unix |> open_;
          octez_client_commands |> open_;
          octez_rpc_http |> open_;
-         octez_rpc_http_server |> open_;
-         octez_protocol_updater |> open_;
-         octez_rpc_http_client_unix |> open_;
+         octez_rpc_http_server;
+         octez_protocol_updater;
+         octez_rpc_http_client_unix;
          octez_stdlib_unix |> open_;
          octez_stdlib |> open_;
          octez_dal_node_lib |> open_;
+         octez_dal_node_services |> open_;
          octez_crypto_dal;
          irmin_pack;
          irmin_pack_unix;
