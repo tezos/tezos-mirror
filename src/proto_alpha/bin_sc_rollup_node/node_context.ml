@@ -28,6 +28,7 @@ open Alpha_context
 
 type t = {
   cctxt : Protocol_client_context.full;
+  dal_cctxt : Dal_node_client.cctxt;
   l1_ctxt : Layer1.t;
   rollup_address : Sc_rollup.t;
   operators : Configuration.operators;
@@ -53,12 +54,13 @@ let get_operator node_ctxt purpose =
 let retrieve_constants cctxt =
   Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
 
-let init (cctxt : Protocol_client_context.full) l1_ctxt rollup_address kind
-    operators fee_parameter ~loser_mode store context =
+let init (cctxt : Protocol_client_context.full) dal_cctxt l1_ctxt rollup_address
+    kind operators fee_parameter ~loser_mode store context =
   let open Lwt_result_syntax in
   let+ protocol_constants = retrieve_constants cctxt in
   {
     cctxt;
+    dal_cctxt;
     l1_ctxt;
     rollup_address;
     operators;
