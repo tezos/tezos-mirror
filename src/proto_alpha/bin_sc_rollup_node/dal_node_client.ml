@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_dal_node_services
+
 class type cctxt =
   object
     inherit RPC_context.generic
@@ -45,3 +47,11 @@ let make_unix_cctxt {Configuration.dal_node_addr; dal_node_port; _} =
     {Tezos_rpc_http_client_unix.RPC_client_unix.default_config with endpoint}
   in
   new unix_cctxt ~rpc_config
+
+let call (cctxt : #cctxt) = cctxt#call_service
+
+let get_slot cctxt ?(trim_slot = false) header =
+  call cctxt (Services.slot ()) ((), header) trim_slot ()
+
+let get_shard cctxt header shard_index =
+  call cctxt (Services.shard ()) (((), header), shard_index) () ()

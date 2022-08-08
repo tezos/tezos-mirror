@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
+open Alpha_context
+open Tezos_crypto_dal
+
 (** Instance of [Tezos_client_base.Client_context] that only handles IOs and
     RPCs. Can be used for keys and RPCs related commands. *)
 class type cctxt =
@@ -35,6 +39,12 @@ class type cctxt =
 class unix_cctxt :
   rpc_config:Tezos_rpc_http_client_unix.RPC_client_unix.config -> cctxt
 
-(** [make_unix_client_context config] generates a unix_sc_client_context from
+(** [make_unix_client_context config] generates a cctxt from
     the client configuration. *)
 val make_unix_cctxt : Configuration.t -> cctxt
+
+val get_slot :
+  #cctxt -> ?trim_slot:bool -> Dal.Slot.header -> string tzresult Lwt.t
+
+val get_shard :
+  #cctxt -> Dal.Slot.header -> int -> Cryptobox.shard tzresult Lwt.t
