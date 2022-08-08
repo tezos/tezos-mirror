@@ -331,58 +331,41 @@ let store_block block_store block =
             predecessors
             block))
 
-let check_blocks_consistency blocks =
-  let rec loop = function
-    | [] | [_] -> true
-    | pred :: (curr :: _ as r) ->
-        let is_consistent =
-          Block_hash.equal (predecessor curr) pred.hash
-          && Compare.Int32.(level curr = Int32.succ (level pred))
-        in
-        is_consistent && loop r
-  in
-  loop blocks
-
-let cement_blocks ?(check_consistency = true) ~write_metadata block_store blocks
-    =
+let cement_blocks ?(check_consistency = true) ~write_metadata block_store
+    chunk_iterator =
   (* No need to lock *)
   let open Lwt_result_syntax in
   let*! () = Store_events.(emit start_cementing_blocks) () in
   let {cemented_store; _} = block_store in
-  let are_blocks_consistent = check_blocks_consistency blocks in
-  let* () = fail_unless are_blocks_consistent Invalid_blocks_to_cement in
   Cemented_block_store.cement_blocks
     ~check_consistency
     cemented_store
     ~write_metadata
-    blocks
+    chunk_iterator
 
-(* [try_retrieve_n_predecessors stores block n] retrieves, at most,
-   the [n] [block]'s predecessors (including [block]) from the
-   floating stores. The resulting block list may be smaller than
-   [n] and contains the oldest blocks first. *)
-let try_retrieve_n_predecessors floating_stores block n =
+(* [try_retrieve_n_predecessors stores block_hash n] retrieves, at
+   most, the [n] [block_hash]'s predecessors (including [block_hash])
+   from the floating stores. The resulting block list may be smaller
+   than [n] and contains the oldest blocks first. *)
+let try_retrieve_n_predecessors floating_stores block_hash n =
   let open Lwt_syntax in
-  let rec loop acc predecessor_hash n =
-    if n = 0 then Lwt.return acc
+  let rec loop acc current_hash n =
+    if n = 0 then return acc
     else
       let* o =
         List.find_map_s
           (fun floating_store ->
-            Floating_block_store.read_block_and_predecessors
-              floating_store
-              predecessor_hash)
+            Floating_block_store.find_predecessors floating_store current_hash)
           floating_stores
       in
       match o with
-      | None ->
+      | None | Some [] ->
           (* The remaining blocks are not present, skip them. *)
-          Lwt.return acc
-      | Some ((block, _) as elt) ->
-          let predecessor_hash = Block_repr.predecessor block in
-          loop (elt :: acc) predecessor_hash (pred n)
+          return acc
+      | Some (direct_predecessor_hash :: _ancestors) ->
+          loop (current_hash :: acc) direct_predecessor_hash (pred n)
   in
-  loop [] block n
+  loop [] block_hash n
 
 let read_predecessor_block_by_level_opt block_store ?(read_metadata = false)
     ~head level =
@@ -407,25 +390,27 @@ let read_predecessor_block_by_level block_store ?(read_metadata = false) ~head
       else tzfail (Block_not_found {hash = head_hash; distance})
   | Some b -> return b
 
-(* TODO optimize this by reading chunks of contiguous data and
-   filtering it afterwards? *)
-let read_block_range_in_floating_stores block_store ~ro_store ~rw_store ~head
-    (low, high) =
+let read_iterator_block_range_in_floating_stores block_store ~ro_store ~rw_store
+    ~head (low, high) =
   let open Lwt_result_syntax in
   let* high_block = read_predecessor_block_by_level block_store ~head high in
   let nb_blocks =
     Int32.(add one (sub high low) |> to_int)
     (* +1, it's a size *)
   in
-  let*! blocks =
+  let*! block_hashes =
     try_retrieve_n_predecessors
       [ro_store; rw_store]
       (Block_repr.hash high_block)
       nb_blocks
   in
-  let blocks = List.map fst blocks in
-  assert (Compare.List_length_with.(blocks = nb_blocks)) ;
-  return blocks
+  let chunk_length = List.length block_hashes (* effective size *) in
+  let reading_sequence =
+    Floating_block_store.raw_retrieve_blocks_seq
+      ~src_floating_stores:[ro_store; rw_store]
+      ~block_hashes
+  in
+  return {Cemented_block_store.chunk_length; reading_sequence}
 
 (* [expected_savepoint block_store target_offset] computes the
    expected savepoint based on the [target_offset]. When the
@@ -826,9 +811,7 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
   in
   let final_hash, final_level = Block_repr.descriptor lafl_block in
   (* 1. Append to the new RO [new_store] blocks between
-     [lowest_bound_to_preserve_in_floating] and [lafl_block].
-     N.B. size in memory proportional to max_op_ttl of the lafl block
-  *)
+     [lowest_bound_to_preserve_in_floating] and [lafl_block]. *)
   let max_nb_blocks_to_retrieve =
     Compare.Int.(
       max
@@ -838,29 +821,40 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
           |> to_int))
   in
   let*! () = Store_events.(emit start_retreiving_predecessors) () in
+  let floating_stores =
+    (* Iterate over the store with RO first for the lookup. *)
+    [ro_store; rw_store]
+  in
   let*! lafl_predecessors =
     try_retrieve_n_predecessors
-      (* Reverse the stores so that the oldest RO is first in the lookup. *)
-      [ro_store; rw_store]
+      floating_stores
       final_hash
       max_nb_blocks_to_retrieve
   in
   (* [min_level_to_preserve] is the lowest block that we want to keep
      in the floating stores. *)
-  let min_level_to_preserve =
-    if lafl_predecessors <> [] then
-      Block_repr.level
-        (fst
-           (List.hd lafl_predecessors |> WithExceptions.Option.get ~loc:__LOC__))
-    else new_head_lafl
+  let*! min_level_to_preserve =
+    match lafl_predecessors with
+    | [] -> Lwt.return new_head_lafl
+    | oldest_predecessor :: _ -> (
+        let*! o =
+          List.find_map_s
+            (fun floating_store ->
+              Floating_block_store.read_block floating_store oldest_predecessor)
+            floating_stores
+        in
+        match o with
+        | None -> Lwt.return new_head_lafl
+        | Some x -> Lwt.return (Block_repr.level x))
   in
   (* As blocks from [lafl_predecessors] contains older blocks first,
-     the resulting [new_store] will contains newer blocks first. *)
+     the resulting [new_store] will be correct and will contain older
+     blocks before more recent ones. *)
   let* () =
-    List.iter_es
-      (fun (block, predecessors) ->
-        Floating_block_store.append_block new_store predecessors block)
-      lafl_predecessors
+    Floating_block_store.raw_copy_all
+      ~src_floating_stores:floating_stores
+      ~block_hashes:lafl_predecessors
+      ~dst_floating_store:new_store
   in
   (* 2. Retrieve ALL cycles (potentially more than one) *)
   (* 2.1. We write back to the new store all the blocks from
@@ -877,31 +871,45 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
   let* () =
     List.iter_es
       (fun store ->
-        Floating_block_store.iter_with_pred_s
-          (fun (block, predecessors) ->
+        Floating_block_store.raw_iterate
+          (fun (block_bytes, total_block_length) ->
+            let block_level = Block_repr_unix.raw_get_block_level block_bytes in
             (* Ignore blocks that are below the cementing highwatermark *)
-            if Compare.Int32.(Block_repr.level block <= cementing_highwatermark)
-            then return_unit
-            else (
+            if Compare.Int32.(block_level <= cementing_highwatermark) then
+              return_unit
+            else
+              let block_lafl_opt =
+                Block_repr_unix.raw_get_last_allowed_fork_level
+                  block_bytes
+                  total_block_length
+              in
               (* Start by updating the set of cycles *)
               Option.iter
-                (fun metadata ->
-                  let block_lafl =
-                    Block_repr.last_allowed_fork_level metadata
-                  in
+                (fun block_lafl ->
                   if
                     Compare.Int32.(
                       cementing_highwatermark < block_lafl
                       && block_lafl <= new_head_lafl)
                   then blocks_lafl := BlocksLAFL.add block_lafl !blocks_lafl)
-                (Block_repr.metadata block) ;
+                block_lafl_opt ;
               (* Append block if its predecessor was visited and update
                  the visited set. *)
-              if Block_hash.Set.mem (Block_repr.predecessor block) !visited then (
-                let hash = Block_repr.hash block in
-                visited := Block_hash.Set.add hash !visited ;
-                Floating_block_store.append_block new_store predecessors block)
-              else return_unit))
+              let block_predecessor =
+                Block_repr_unix.raw_get_block_predecessor block_bytes
+              in
+              let block_hash = Block_repr_unix.raw_get_block_hash block_bytes in
+              if Block_hash.Set.mem block_predecessor !visited then (
+                visited := Block_hash.Set.add block_hash !visited ;
+                let*! predecessors =
+                  let*! pred_opt =
+                    Floating_block_store.find_predecessors store block_hash
+                  in
+                  Lwt.return (WithExceptions.Option.get ~loc:__LOC__ pred_opt)
+                in
+                Floating_block_store.raw_append
+                  new_store
+                  (block_hash, block_bytes, total_block_length, predecessors))
+              else return_unit)
           store)
       [ro_store; rw_store]
   in
@@ -1124,7 +1132,7 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
             ~cementing_highwatermark
         in
         let cycle_reader =
-          read_block_range_in_floating_stores
+          read_iterator_block_range_in_floating_stores
             block_store
             ~ro_store:old_ro_store
             ~rw_store:old_rw_store
@@ -1135,9 +1143,9 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
           | History_mode.Archive ->
               List.iter_es
                 (fun cycle_range ->
-                  let* cycle = cycle_reader cycle_range in
+                  let* chunk_iterator = cycle_reader cycle_range in
                   (* In archive, we store the metadatas *)
-                  cement_blocks ~write_metadata:true block_store cycle)
+                  cement_blocks ~write_metadata:true block_store chunk_iterator)
                 cycles_interval_to_cement
           | Rolling offset ->
               let offset =
@@ -1156,8 +1164,11 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
                 let* () =
                   List.iter_es
                     (fun cycle_range ->
-                      let* cycle = cycle_reader cycle_range in
-                      cement_blocks ~write_metadata:true block_store cycle)
+                      let* chunk_iterator = cycle_reader cycle_range in
+                      cement_blocks
+                        ~write_metadata:true
+                        block_store
+                        chunk_iterator)
                     cycles_interval_to_cement
                 in
                 (* Clean-up the files that are below the offset *)
@@ -1182,8 +1193,11 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
                 let* () =
                   List.iter_es
                     (fun cycle_range ->
-                      let* cycle = cycle_reader cycle_range in
-                      cement_blocks ~write_metadata:true block_store cycle)
+                      let* chunk_iterator = cycle_reader cycle_range in
+                      cement_blocks
+                        ~write_metadata:true
+                        block_store
+                        chunk_iterator)
                     cycles_interval_to_cement
                 in
                 (* Clean-up the files that are below the offset *)
@@ -1196,9 +1210,12 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
               else
                 List.iter_es
                   (fun cycle_range ->
-                    let* cycle = cycle_reader cycle_range in
+                    let* chunk_iterator = cycle_reader cycle_range in
                     (* In full 0, we do not store the metadata *)
-                    cement_blocks ~write_metadata:false block_store cycle)
+                    cement_blocks
+                      ~write_metadata:false
+                      block_store
+                      chunk_iterator)
                   cycles_interval_to_cement
         in
         return (new_savepoint, new_caboose))

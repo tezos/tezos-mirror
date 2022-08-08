@@ -230,15 +230,27 @@ val get_cemented_block_by_hash :
   Block_hash.t ->
   Block_repr.block option tzresult Lwt.t
 
-(** [cemented_blocks ?check_consistency cemented_store ~write_metadata
-    chunk] stores the [chunk] of blocks and write their metadata if
-    the flag [write_metadata] is set. [check_consistency] (default is
-    true) ensures that the blocks in the given [chunk] are contiguous. *)
+(** The type used to describe reading sequences used to perform
+    buffered block cementing. *)
+type chunk_iterator = {
+  chunk_length : int;
+  reading_sequence : (Block_hash.t * int * bytes) tzresult Lwt.t Seq.t;
+}
+
+(** [make_chunk_iterator bl] is an utility function that transforms a
+    [Block_repr.block list] into a [chunk_iterator] *)
+val make_chunk_iterator : Block_repr.block list -> chunk_iterator
+
+(** [cement_blocks ?check_consistency cemented_store ~write_metadata
+    chunk_iterator] iterates from the lazy-bufferized [chunk_iterator]
+    to cement blocks and to write their metadata if the flag
+    [write_metadata] is set. [check_consistency] (default is true)
+    ensures that the cycles are contiguous. *)
 val cement_blocks :
   ?check_consistency:bool ->
   t ->
   write_metadata:bool ->
-  Block_repr.t list ->
+  chunk_iterator ->
   unit tzresult Lwt.t
 
 (** [trigger_gc cemented_store history_mode] garbage collects metadata

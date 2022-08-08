@@ -465,11 +465,12 @@ let store_chunk cemented_store chunk =
       (* Overwrite the existing cycle to restore the blocks and
          operations metadata hash and store the associated
          metadata. *)
-      Cemented_block_store.cement_blocks
-        ~check_consistency:false
-        cemented_store
-        ~write_metadata:true
-        block_chunk
+      Cemented_block_store.(
+        cement_blocks
+          ~check_consistency:false
+          cemented_store
+          ~write_metadata:true
+          (make_chunk_iterator block_chunk))
 
 let gather_available_metadata chain_store ~start_level ~end_level =
   let open Lwt_result_syntax in
