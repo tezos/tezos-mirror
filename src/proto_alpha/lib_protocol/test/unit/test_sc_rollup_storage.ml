@@ -266,6 +266,26 @@ let assert_commitment_equal ~loc x y =
     x
     y
 
+let assert_commitments_with_levels_equal ~loc cs1 cs2 =
+  let commitment_with_level_pp ppf (hash, level) =
+    Format.fprintf
+      ppf
+      "(%a, %a)"
+      Sc_rollup_commitment_repr.Hash.pp
+      hash
+      Raw_level_repr.pp
+      level
+  in
+  Assert.assert_equal_list
+    ~loc
+    (fun (commitment1, level1) (commitment2, level2) ->
+      Sc_rollup_commitment_repr.Hash.(commitment1 = commitment2)
+      && Raw_level_repr.(level1 = level2))
+    "Unexpected list of cemented commitments"
+    commitment_with_level_pp
+    cs1
+    cs2
+
 let assert_kinds_are_equal ~loc x y =
   Assert.equal
     ~loc
@@ -456,6 +476,40 @@ let valid_inbox_level ctxt =
   fun i ->
     Raw_level_repr.of_int32_exn
       (Int32.add root_level (Int32.mul (Int32.of_int commitment_freq) i))
+
+let produce_and_refine ctxt ~number_of_commitments ?(start_at_level = 1l)
+    ~predecessor staker rollup =
+  let rec aux ctxt n l predecessor result =
+    if n = 0 then return @@ (List.rev result, ctxt)
+    else
+      let commitment =
+        Commitment_repr.
+          {
+            predecessor;
+            inbox_level = valid_inbox_level ctxt l;
+            number_of_ticks = number_of_ticks_exn 1232909l;
+            compressed_state = Sc_rollup_repr.State_hash.zero;
+          }
+      in
+      let* c, _level, ctxt =
+        Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+          ctxt
+          rollup
+          staker
+          commitment
+      in
+      aux ctxt (n - 1) (Int32.succ l) c (c :: result)
+  in
+  aux ctxt number_of_commitments start_at_level predecessor []
+
+let rec cement_commitments ctxt commitments rollup =
+  match commitments with
+  | [] -> return ctxt
+  | c :: commitments ->
+      let* ctxt, _commitment =
+        Sc_rollup_stake_storage.cement_commitment ctxt rollup c
+      in
+      cement_commitments ctxt commitments rollup
 
 let test_deposit_then_refine () =
   let* ctxt = new_context () in
@@ -2822,6 +2876,78 @@ let test_subscribed_slots_of_missing_rollup () =
         rollup
         (Raw_context.current_level ctxt).level)
 
+let test_get_cemented_commitments_with_levels_of_missing_rollup () =
+  assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->
+      Sc_rollup_commitment_storage.Internal_for_tests
+      .get_cemented_commitments_with_levels
+        ctxt
+        rollup)
+
+let test_get_cemented_commitments_with_levels () =
+  let* ctxt, rollup, c0, staker =
+    originate_rollup_and_deposit_with_one_staker ()
+  in
+  let level = valid_inbox_level ctxt in
+  let challenge_window =
+    Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
+  in
+  (* Produce and stake on n commitments, each on top of the other. *)
+  (* Fetch number of stored commitments in context. *)
+  let max_num_stored_cemented_commitments =
+    (Raw_context.constants ctxt).sc_rollup
+      .max_number_of_stored_cemented_commitments
+  in
+  (* Produce and stake more commitments than the number of cemented
+     commitments that can be stored. *)
+  let number_of_commitments = max_num_stored_cemented_commitments + 5 in
+  let* commitments, ctxt =
+    lift
+    @@ produce_and_refine
+         ~number_of_commitments
+         ~predecessor:c0
+         ctxt
+         staker
+         rollup
+  in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
+  (* Cement all commitments that have been produced. *)
+  let* ctxt = lift @@ cement_commitments ctxt commitments rollup in
+  (* Add genesis commitment to list of produced commitments. *)
+  let commitments = c0 :: commitments in
+  let number_of_cemented_commitments = List.length commitments in
+  (* Fetch cemented commitments that are kept in context. *)
+  let* cemented_commitments_with_levels, _ctxt =
+    lift
+    @@ Sc_rollup_commitment_storage.Internal_for_tests
+       .get_cemented_commitments_with_levels
+         ctxt
+         rollup
+  in
+  (* Check that only ctxt.sc_rollup.max_number_of_stored_cemented_commitments
+     are kept in context. *)
+  let* () =
+    Assert.equal_int
+      ~loc:__LOC__
+      (List.length cemented_commitments_with_levels)
+      max_num_stored_cemented_commitments
+  in
+  (* Check that the commitments that are kept in context are the
+     last [ctxt.sc_rollup.max_number_of_stored_cemented_commitments].
+     commitments that have been cemented. *)
+  let dropped_commitments =
+    number_of_cemented_commitments - max_num_stored_cemented_commitments
+  in
+  let expected_commitments_with_levels =
+    commitments
+    |> List.drop_n dropped_commitments
+    |> List.mapi (fun i c ->
+           (c, level @@ Int32.of_int (i + dropped_commitments)))
+  in
+  assert_commitments_with_levels_equal
+    ~loc:__LOC__
+    cemented_commitments_with_levels
+    expected_commitments_with_levels
+
 let tests =
   [
     Tztest.tztest
@@ -3115,6 +3241,14 @@ let tests =
       "Originating a rollup creates a genesis commitment"
       `Quick
       test_last_cemented_commitment_hash_with_level_when_genesis;
+    Tztest.tztest
+      "Getting cemented commitments with levels of missing rollups fails"
+      `Quick
+      test_get_cemented_commitments_with_levels_of_missing_rollup;
+    Tztest.tztest
+      "Getting cemented commitments returns multiple cemented commitments"
+      `Quick
+      test_get_cemented_commitments_with_levels;
   ]
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2460

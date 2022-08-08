@@ -113,7 +113,8 @@ This sequence of operations was run:
   "sc_rollup_max_active_outbox_levels": 20160,
   "sc_rollup_max_outbox_messages_per_level": 100,
   "sc_rollup_number_of_sections_in_dissection": 32,
-  "sc_rollup_timeout_period_in_blocks": 20160 }
+  "sc_rollup_timeout_period_in_blocks": 20160,
+  "sc_rollup_max_number_of_cemented_commitments": 5 }
 
 ./tezos-client --wait none recover bond of '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' --fee 1
 Node is bootstrapped.
@@ -137,7 +138,7 @@ Error:
 
 ./tezos-client --wait none cement commitment '[SC_ROLLUP_COMMITMENT_HASH]' from bootstrap1 for sc rollup '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
-Estimated gas: 3625.362 units (will add 100 for safety)
+Estimated gas: 4115.508 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -148,18 +149,18 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.00067
+    Fee to the baker: ꜩ0.000719
     Expected counter: 3
-    Gas limit: 3726
+    Gas limit: 4216
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.00067
-      payload fees(the block proposer) ....... +ꜩ0.00067
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000719
+      payload fees(the block proposer) ....... +ꜩ0.000719
     Smart contract rollup commitment cementing:
       Address: [SC_ROLLUP_HASH]
       Commitment: [SC_ROLLUP_COMMITMENT_HASH]
       This smart contract rollup commitment cementing was successfully applied
-      Consumed gas: 3625.362
+      Consumed gas: 4115.508
       Inbox level: 32
 
 
@@ -221,7 +222,8 @@ This sequence of operations was run:
   "sc_rollup_max_active_outbox_levels": 20160,
   "sc_rollup_max_outbox_messages_per_level": 100,
   "sc_rollup_number_of_sections_in_dissection": 32,
-  "sc_rollup_timeout_period_in_blocks": 20160 }
+  "sc_rollup_timeout_period_in_blocks": 20160,
+  "sc_rollup_max_number_of_cemented_commitments": 5 }
 
 ./tezos-client --wait none recover bond of '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' --fee 1
 Node is bootstrapped.

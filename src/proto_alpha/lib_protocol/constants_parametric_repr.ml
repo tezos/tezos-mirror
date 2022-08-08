@@ -124,6 +124,7 @@ type sc_rollup = {
   max_outbox_messages_per_level : int;
   number_of_sections_in_dissection : int;
   timeout_period_in_blocks : int;
+  max_number_of_stored_cemented_commitments : int;
 }
 
 type t = {
@@ -257,7 +258,8 @@ let sc_rollup_encoding =
           c.max_active_outbox_levels,
           c.max_outbox_messages_per_level,
           c.number_of_sections_in_dissection ),
-        c.timeout_period_in_blocks ))
+        (c.timeout_period_in_blocks, c.max_number_of_stored_cemented_commitments)
+      ))
     (fun ( ( sc_rollup_enable,
              sc_rollup_origination_size,
              sc_rollup_challenge_window_in_blocks,
@@ -268,7 +270,8 @@ let sc_rollup_encoding =
              sc_rollup_max_active_outbox_levels,
              sc_rollup_max_outbox_messages_per_level,
              sc_rollup_number_of_sections_in_dissection ),
-           sc_rollup_timeout_period_in_blocks ) ->
+           ( sc_rollup_timeout_period_in_blocks,
+             sc_rollup_max_number_of_cemented_commitments ) ) ->
       {
         enable = sc_rollup_enable;
         origination_size = sc_rollup_origination_size;
@@ -283,6 +286,8 @@ let sc_rollup_encoding =
         number_of_sections_in_dissection =
           sc_rollup_number_of_sections_in_dissection;
         timeout_period_in_blocks = sc_rollup_timeout_period_in_blocks;
+        max_number_of_stored_cemented_commitments =
+          sc_rollup_max_number_of_cemented_commitments;
       })
     (merge_objs
        (obj10
@@ -296,7 +301,9 @@ let sc_rollup_encoding =
           (req "sc_rollup_max_active_outbox_levels" int32)
           (req "sc_rollup_max_outbox_messages_per_level" int31)
           (req "sc_rollup_number_of_sections_in_dissection" uint8))
-       (obj1 (req "sc_rollup_timeout_period_in_blocks" int31)))
+       (obj2
+          (req "sc_rollup_timeout_period_in_blocks" int31)
+          (req "sc_rollup_max_number_of_cemented_commitments" int31)))
 
 let encoding =
   let open Data_encoding in

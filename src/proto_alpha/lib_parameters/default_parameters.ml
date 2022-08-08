@@ -224,6 +224,7 @@ let constants_mainnet =
         max_outbox_messages_per_level = sc_rollup_max_outbox_messages_per_level;
         number_of_sections_in_dissection = 32;
         timeout_period_in_blocks = sc_rollup_timeout_period_in_blocks;
+        max_number_of_stored_cemented_commitments = 5;
       };
   }
 
