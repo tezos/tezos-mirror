@@ -1455,11 +1455,6 @@ let gen_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
   let origination_level =
     Raw_level.to_int32 genesis_info.level |> Int32.to_int
   in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3509
-
-     If there are inputs in the originated levels, the inbox is somehow badly
-     constructed. There would be "dangling hash" in the Irmin tree when trying
-     to produce a proof. I have not yet found the solution. *)
   let level_min = origination_level + 1 in
   let level_max = origination_level + commitment_period - 1 in
   let* levels_and_inputs =

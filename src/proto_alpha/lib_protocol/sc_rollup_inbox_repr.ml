@@ -1263,7 +1263,7 @@ struct
         nb_messages_in_commitment_period = 0L;
         starting_level_of_current_commitment_period = level;
         current_level_hash = (fun () -> initial_hash);
-        old_levels_messages = Skip_list.genesis (Hash.hash_bytes []);
+        old_levels_messages = Skip_list.genesis initial_hash;
       }
 end
 
