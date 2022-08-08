@@ -116,7 +116,7 @@ let layer1_node_tracking_started =
 let protocol_plugin_resolved =
   declare_1
     ~section
-    ~name:"dal_node_pluging_resolved"
+    ~name:"dal_node_plugin_resolved"
     ~msg:"Resolved plugin on protocol {proto_hash}"
     ~level:Notice
     ("proto_hash", Data_encoding.string)
