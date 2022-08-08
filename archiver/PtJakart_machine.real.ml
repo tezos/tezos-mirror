@@ -179,14 +179,16 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     match protocol_data with
     | Protocol.Alpha_context.Operation_data {contents; _} -> (
         match contents with
-        | Single (Endorsement {round; _}) -> round
+        | Single (Endorsement {round; _}) ->
+            Protocol.Alpha_context.Round.to_int32 round
         | _ -> assert false)
 
   let get_preendorsement_round protocol_data =
     match protocol_data with
     | Protocol.Alpha_context.Operation_data {contents; _} -> (
         match contents with
-        | Single (Preendorsement {round; _}) -> round
+        | Single (Preendorsement {round; _}) ->
+            Protocol.Alpha_context.Round.to_int32 round
         | _ -> assert false)
 
   let consensus_ops_info_of_block cctxt hash =
@@ -197,50 +199,49 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         ~block:(`Hash (hash, 0))
         0
     in
-    let preendorsements_round = ref None in
-    let endorsements_round = ref None in
-    let (preendorsements, endorsements) =
-      List.fold_left
-        (fun (preendorsements, endorsements)
-             Block_services.{hash; receipt; protocol_data; _} ->
-          match receipt with
-          | Receipt
-              (Protocol.Apply_results.Operation_metadata
-                {
-                  contents =
-                    Single_result
-                      (Protocol.Apply_results.Preendorsement_result
-                        {delegate; _});
-                }) ->
-              preendorsements_round :=
-                Some (get_preendorsement_round protocol_data) ;
-              (Consensus_ops.{hash; delegate} :: preendorsements, endorsements)
-          | Receipt
-              (Protocol.Apply_results.Operation_metadata
-                {
-                  contents =
-                    Single_result
-                      (Protocol.Apply_results.Endorsement_result {delegate; _});
-                }) ->
-              endorsements_round := Some (get_endorsement_round protocol_data) ;
-              (preendorsements, Consensus_ops.{hash; delegate} :: endorsements)
-          | _ -> (preendorsements, endorsements))
-        ([], [])
-        ops
-    in
-    return
-      Consensus_ops.
-        {
-          endorsements;
-          preendorsements =
-            (if preendorsements = [] then None else Some preendorsements);
-          endorsements_round =
-            Option.map Protocol.Alpha_context.Round.to_int32 !endorsements_round;
-          preendorsements_round =
-            Option.map
-              Protocol.Alpha_context.Round.to_int32
-              !preendorsements_round;
-        }
+    List.fold_left
+      (fun acc Block_services.{hash; receipt; protocol_data; _} ->
+        match receipt with
+        | Receipt
+            (Protocol.Apply_results.Operation_metadata
+              {
+                contents =
+                  Single_result
+                    (Protocol.Apply_results.Preendorsement_result {delegate; _});
+              }) ->
+            Consensus_ops.
+              {
+                op =
+                  {
+                    hash;
+                    round = Some (get_preendorsement_round protocol_data);
+                    kind = Consensus_ops.Preendorsement;
+                  };
+                delegate;
+              }
+            :: acc
+        | Receipt
+            (Protocol.Apply_results.Operation_metadata
+              {
+                contents =
+                  Single_result
+                    (Protocol.Apply_results.Endorsement_result {delegate; _});
+              }) ->
+            Consensus_ops.
+              {
+                op =
+                  {
+                    hash;
+                    round = Some (get_endorsement_round protocol_data);
+                    kind = Consensus_ops.Endorsement;
+                  };
+                delegate;
+              }
+            :: acc
+        | _ -> acc)
+      []
+      ops
+    |> return
 end
 
 module Json_loops =

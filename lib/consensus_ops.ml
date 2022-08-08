@@ -34,10 +34,24 @@ let pp_operation_kind ppf kind =
   | Endorsement -> Format.fprintf ppf "Endorsement"
   | Preendorsement -> Format.fprintf ppf "Preendorsement"
 
-type received_operation = {
+type operation = {
   hash : Operation_hash.t;
   kind : operation_kind;
   round : Int32.t option;
+}
+
+let operation_encoding =
+  let open Data_encoding in
+  conv
+    (fun {hash; kind; round} -> (hash, kind, round))
+    (fun (hash, kind, round) -> {hash; kind; round})
+    (obj3
+       (req "hash" Operation_hash.encoding)
+       (req "kind" operation_kind_encoding)
+       (opt "round" int32))
+
+type received_operation = {
+  op : operation;
   reception_time : Time.System.t;
   errors : error list option;
 }
@@ -45,18 +59,15 @@ type received_operation = {
 let received_operation_encoding =
   let open Data_encoding in
   conv
-    (fun {hash; kind; round; reception_time; errors} ->
-      (hash, kind, round, reception_time, errors))
-    (fun (hash, kind, round, reception_time, errors) ->
-      {hash; kind; round; reception_time; errors})
-    (obj5
-       (req "hash" Operation_hash.encoding)
-       (req "kind" operation_kind_encoding)
-       (opt "round" int32)
-       (req "reception_time" Time.System.encoding)
-       (dft "errors" RPC_error.opt_encoding None))
+    (fun {op; reception_time; errors} -> (op, (reception_time, errors)))
+    (fun (op, (reception_time, errors)) -> {op; reception_time; errors})
+    (merge_objs
+       operation_encoding
+       (obj2
+          (req "reception_time" Time.System.encoding)
+          (dft "errors" RPC_error.opt_encoding None)))
 
-type delegate_ops = (Signature.Public_key_hash.t * received_operation list) list
+type delegate_ops = (Signature.public_key_hash * received_operation list) list
 
 let delegate_ops_encoding =
   Data_encoding.(
@@ -65,14 +76,7 @@ let delegate_ops_encoding =
          Signature.Public_key_hash.encoding
          (list received_operation_encoding)))
 
-type block_op = {hash : Operation_hash.t; delegate : Signature.public_key_hash}
-
-type block_info = {
-  endorsements : block_op list;
-  endorsements_round : Int32.t option;
-  preendorsements : block_op list option;
-  preendorsements_round : Int32.t option;
-}
+type block_op = {op : operation; delegate : Signature.public_key_hash}
 
 type right = {
   address : Signature.Public_key_hash.t;

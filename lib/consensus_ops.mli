@@ -29,10 +29,16 @@ val operation_kind_encoding : operation_kind Data_encoding.encoding
 
 val pp_operation_kind : Format.formatter -> operation_kind -> unit
 
-type received_operation = {
+type operation = {
   hash : Operation_hash.t;
   kind : operation_kind;
   round : Int32.t option;
+}
+
+val operation_encoding : operation Data_encoding.encoding
+
+type received_operation = {
+  op : operation;
   reception_time : Time.System.t;
   errors : error list option;
 }
@@ -41,14 +47,7 @@ type delegate_ops = (Signature.Public_key_hash.t * received_operation list) list
 
 val delegate_ops_encoding : delegate_ops Data_encoding.t
 
-type block_op = {hash : Operation_hash.t; delegate : Signature.public_key_hash}
-
-type block_info = {
-  endorsements : block_op list;
-  endorsements_round : Int32.t option;
-  preendorsements : block_op list option;
-  preendorsements_round : Int32.t option;
-}
+type block_op = {op : operation; delegate : Signature.public_key_hash}
 
 type right = {
   address : Signature.Public_key_hash.t;

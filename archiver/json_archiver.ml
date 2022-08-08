@@ -219,8 +219,7 @@ let add_to_operations block_hash ops_kind ?ops_round operations =
 
 (* [validators] are those delegates whose operations (either preendorsements or
    endorsements) have been included in the given block.*)
-let add_inclusion_in_block aliases block_hash ops_kind ops_round validators
-    delegate_operations =
+let add_inclusion_in_block aliases block_hash validators delegate_operations =
   let (updated_known, unknown) =
     List.fold_left
       (fun (acc, missing)
@@ -232,14 +231,18 @@ let add_inclusion_in_block aliases block_hash ops_kind ops_round validators
               Signature.Public_key_hash.equal op.Consensus_ops.delegate delegate)
             missing
         with
-        | (_ :: other_ops_by_same_delegate, missing') ->
+        | (op :: other_ops_by_same_delegate, missing') ->
             assert (other_ops_by_same_delegate = []) ;
             ( Data.Delegate_operations.
                 {
                   delegate;
                   delegate_alias;
                   operations =
-                    add_to_operations block_hash ops_kind ?ops_round operations;
+                    add_to_operations
+                      block_hash
+                      op.op.kind
+                      ?ops_round:op.op.round
+                      operations;
                 }
               :: acc,
               missing' )
@@ -260,8 +263,8 @@ let add_inclusion_in_block aliases block_hash ops_kind ops_round validators
               operations =
                 [
                   {
-                    kind = ops_kind;
-                    round = ops_round;
+                    kind = op.op.kind;
+                    round = op.op.round;
                     errors = None;
                     reception_time = None;
                     block_inclusion = [block_hash];
@@ -273,7 +276,7 @@ let add_inclusion_in_block aliases block_hash ops_kind ops_round validators
         unknown
 
 let dump_included_in_block cctxt path block_level block_hash block_round
-    timestamp reception_time baker consensus_ops_info =
+    timestamp reception_time baker consensus_ops =
   let open Lwt.Infix in
   Wallet.of_context cctxt >>= fun aliases_opt ->
   let aliases =
@@ -292,9 +295,7 @@ let dump_included_in_block cctxt path block_level block_hash block_round
          add_inclusion_in_block
            aliases
            block_hash
-           Consensus_ops.Endorsement
-           consensus_ops_info.Consensus_ops.endorsements_round
-           consensus_ops_info.endorsements
+           consensus_ops
            infos.Data.delegate_operations
        in
        let out_infos =
@@ -326,18 +327,7 @@ let dump_included_in_block cctxt path block_level block_hash block_round
   let mutex = get_file_mutex filename in
   Lwt_mutex.with_lock mutex (fun () ->
       let* infos = load filename Data.encoding Data.empty in
-      let delegate_operations =
-        match consensus_ops_info.Consensus_ops.preendorsements with
-        | Some validators ->
-            add_inclusion_in_block
-              aliases
-              block_hash
-              Consensus_ops.Preendorsement
-              consensus_ops_info.preendorsements_round
-              validators
-              infos.Data.delegate_operations
-        | None -> infos.Data.delegate_operations
-      in
+      let delegate_operations = infos.Data.delegate_operations in
       let blocks =
         Data.Block.
           {
@@ -373,7 +363,10 @@ let dump_included_in_block cctxt path block_level block_hash block_round
    first reception time. *)
 let merge_operations =
   List.fold_left
-    (fun acc Consensus_ops.{hash = _; kind; round; errors; reception_time} ->
+    (fun
+      acc
+      Consensus_ops.{op = {hash = _; kind; round}; errors; reception_time}
+    ->
       match
         List.partition
           (fun Data.Delegate_operations.{round = r; kind = k; _} ->
@@ -449,9 +442,7 @@ let dump_received cctxt path ?unaccurate level received_ops =
                            List.rev_map
                              (fun Consensus_ops.
                                     {
-                                      hash = _;
-                                      kind;
-                                      round;
+                                      op = {hash = _; kind; round};
                                       errors;
                                       reception_time;
                                     } ->
@@ -495,7 +486,7 @@ type chunk =
       * Time.Protocol.t
       * Time.System.t
       * Signature.Public_key_hash.t
-      * Consensus_ops.block_info
+      * Consensus_ops.block_op list
   | Mempool of bool option * Int32.t (* level *) * Consensus_ops.delegate_ops
 
 let (chunk_stream, chunk_feeder) = Lwt_stream.create ()

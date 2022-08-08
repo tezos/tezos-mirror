@@ -49,7 +49,7 @@ module type S = sig
     Time.Protocol.t ->
     Time.System.t ->
     Signature.Public_key_hash.t ->
-    Consensus_ops.block_info ->
+    Consensus_ops.block_op list ->
     unit
 
   val add_rights : level:Int32.t -> Consensus_ops.rights -> Wallet.t -> unit

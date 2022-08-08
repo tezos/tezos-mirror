@@ -171,18 +171,16 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                         (Tezos_raw_protocol_011_PtHangz2.Apply_results
                          .Endorsement_result {delegate; _}));
                 }) ->
-              Some Consensus_ops.{hash; delegate}
+              Some
+                Consensus_ops.
+                  {
+                    op = {hash; round = None; kind = Consensus_ops.Endorsement};
+                    delegate;
+                  }
           | _ -> None)
         ops
     in
-    return
-      Consensus_ops.
-        {
-          endorsements;
-          endorsements_round = None;
-          preendorsements = None;
-          preendorsements_round = None;
-        }
+    return endorsements
 end
 
 module Json_loops =

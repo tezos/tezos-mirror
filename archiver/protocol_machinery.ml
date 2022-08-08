@@ -64,7 +64,7 @@ module type PROTOCOL_SERVICES = sig
   val block_round : Block_header.t -> int tzresult
 
   val consensus_ops_info_of_block :
-    wrap_full -> Block_hash.t -> Consensus_ops.block_info tzresult Lwt.t
+    wrap_full -> Block_hash.t -> Consensus_ops.block_op list tzresult Lwt.t
 end
 
 module type MAIN_LOOPS = sig
@@ -128,7 +128,9 @@ module Make_main_loops
       Lwt_stream.fold
         (fun ((hash, ((block, level, kind, round), slot)), errors) acc ->
           let reception_time = Time.System.now () in
-          let op = Consensus_ops.{hash; kind; round; errors; reception_time} in
+          let op =
+            Consensus_ops.{op = {hash; kind; round}; errors; reception_time}
+          in
           Protocol_services.BlockIdMap.update
             block
             (function

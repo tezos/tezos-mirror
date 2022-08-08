@@ -70,25 +70,24 @@ let register_rights db level rights aliases =
   in
   exec db query
 
-let register_included_operations db block_hash level round ~endorsements
-    operations =
+let register_included_operations db block_hash level operations =
   let query =
     Format.asprintf
       "INSERT INTO operations (hash, endorsement, endorser, level, round) \
-       SELECT column1, %d, delegates.id, %ld, %ld FROM delegates JOIN (VALUES \
-       %a) ON delegates.address = column2 WHERE column1 NOT IN (SELECT hash \
-       FROM operations WHERE level = %ld);"
-      (bool_to_int endorsements)
+       SELECT column1, column2, delegates.id, %ld, column3 FROM delegates JOIN \
+       (VALUES %a) ON delegates.address = column4 WHERE column1 NOT IN (SELECT \
+       hash FROM operations WHERE level = %ld);"
       level
-      round
       (Format.pp_print_list
          ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
          (fun f (op : Consensus_ops.block_op) ->
            Format.fprintf
              f
-             "(x'%a', x'%a')"
+             "(x'%a', %d, %ld, x'%a')"
              Hex.pp
-             (Operation_hash.to_hex op.hash)
+             (Operation_hash.to_hex op.op.hash)
+             (bool_to_int (op.op.kind = Consensus_ops.Endorsement))
+             (Stdlib.Option.get op.Consensus_ops.op.round)
              Hex.pp
              (Signature.Public_key_hash.to_hex op.delegate)))
       operations
@@ -107,7 +106,7 @@ let register_included_operations db block_hash level round ~endorsements
              f
              "(x'%a')"
              Hex.pp
-             (Operation_hash.to_hex op.Consensus_ops.hash)))
+             (Operation_hash.to_hex op.Consensus_ops.op.hash)))
       operations
       Hex.pp
       (Block_hash.to_hex block_hash)
@@ -140,14 +139,14 @@ let register_received_operations db level
              f
              "(x'%a', %d, x'%a', %a)"
              Hex.pp
-             (Operation_hash.to_hex op.hash)
-             (bool_to_int (op.kind = Consensus_ops.Endorsement))
+             (Operation_hash.to_hex op.op.hash)
+             (bool_to_int (op.op.kind = Consensus_ops.Endorsement))
              Hex.pp
              (Signature.Public_key_hash.to_hex delegate)
              (Format.pp_print_option
                 ~none:(fun f () -> Format.pp_print_string f "NULL")
                 (fun f x -> Format.fprintf f "%li" x))
-             op.round))
+             op.op.round))
       received_ops
       level
   in
@@ -179,7 +178,7 @@ let register_received_operations db level
                           errors))))
              op.errors
              Hex.pp
-             (Operation_hash.to_hex op.hash)))
+             (Operation_hash.to_hex op.op.hash)))
       received_ops
       source
       level
@@ -187,7 +186,7 @@ let register_received_operations db level
   exec db query
 
 let register_block ~db hash ~level ~round timestamp reception_time delegate
-    block_info source =
+    block_ops source =
   let query =
     Format.asprintf
       "INSERT INTO blocks (timestamp, hash, level, round, baker) SELECT \
@@ -217,23 +216,7 @@ let register_block ~db hash ~level ~round timestamp reception_time delegate
   exec db query ;
 
   (*** insert into operations and operations_inclusion *)
-  (match block_info.Consensus_ops.preendorsements with
-  | Some preendorsements ->
-      register_included_operations
-        db
-        hash
-        level
-        (Stdlib.Option.get block_info.preendorsements_round)
-        ~endorsements:false
-        preendorsements
-  | None -> ()) ;
-  register_included_operations
-    db
-    hash
-    (Int32.pred level)
-    (Stdlib.Option.get block_info.endorsements_round)
-    ~endorsements:true
-    block_info.endorsements
+  register_included_operations db hash (Int32.pred level) block_ops
 
 type chunk =
   | Block of
@@ -243,7 +226,7 @@ type chunk =
       * Time.Protocol.t
       * Time.System.t
       * Signature.Public_key_hash.t
-      * Consensus_ops.block_info
+      * Consensus_ops.block_op list
   | Mempool of bool option * Int32.t (* level *) * Consensus_ops.delegate_ops
   | Rights of (Int32.t (* level *) * Consensus_ops.rights * Wallet.t)
 
