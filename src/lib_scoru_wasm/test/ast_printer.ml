@@ -626,9 +626,8 @@ let pp_input_buffer out input =
     (Lazy_vector.Mutable.LwtZVector.snapshot input.content)
     (Z.to_string input.num_elements)
 
-let pp_config out config =
-  let open Eval in
-  let values, instrs = config.code in
+let pp_config out
+    Eval.{frame; input; code = values, instrs; host_funcs = _; budget} =
   Format.fprintf
     out
     "@[<v 2>{frame = %a;@;\
@@ -638,11 +637,11 @@ let pp_config out config =
      budget = %i;@;\
      }@]"
     pp_frame
-    config.frame
+    frame
     pp_input_buffer
-    config.input
+    input
     (Format.pp_print_list pp_admin_instr)
     instrs
     (Format.pp_print_list pp_value)
     values
-    config.budget
+    budget

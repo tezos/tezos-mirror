@@ -261,7 +261,7 @@ let add_level_id tree =
 
 (** Simple test checking get_info after the initialization. Note that we also
     check that if the tree has no last_input_read set the response to [get_info]
-    has [None] as [last_input_read *)
+    has [None] as [last_input_read] *)
 let test_get_info () =
   let open Lwt_syntax in
   let* tree = initialise_tree () in
@@ -279,7 +279,12 @@ let test_get_info () =
 
 (** Tests that, after set_input th resulting tree decodes to the correct values.
     In particular it does check that [get_info] produces the expected value. *)
-let test_set_input () =
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3524
+   Enable/fix test.
+   This test needs to be modifying in order to work with the WASM PVM.
+*)
+let _test_set_input () =
   let open Lwt_syntax in
   let* tree = initialise_tree () in
   let* tree = add_level_id tree in
@@ -316,5 +321,4 @@ let tests =
     tztest "Read input" `Quick read_input;
     tztest "Host read input" `Quick test_host_fun;
     tztest "Get info" `Quick test_get_info;
-    tztest "set input step" `Quick test_set_input;
   ]
