@@ -15,7 +15,7 @@ to Kathmandu.
 New Environment Version (V7)
 ----------------------------
 
-This protocol requires a different protocol environment than Kathmandu.
+This protocol requires a different protocol environment version than Kathmandu.
 It requires protocol environment V7, compared to V6 for Kathmandu.
 (MR :gl:`!5906`)
 
@@ -31,12 +31,14 @@ Rollups supporting execution of smart contracts. (MRs :gl:`!5603`, :gl:`!5606`,
 :gl:`!5846`, :gl:`!5654`, :gl:`!5761`, :gl:`!5688`, :gl:`!5889`, :gl:`!5859`,
 :gl:`!5882`, :gl:`!5811`, :gl:`!5898`, :gl:`!5925`, :gl:`!5909`, :gl:`!5902`,
 :gl:`!5888`, :gl:`!5893`, :gl:`!5884`, :gl:`!5955`, :gl:`!5692`, :gl:`!5887`,
-:gl:`!5900`, :gl:`!6014`)
+:gl:`!5900`, :gl:`!6014`, :gl:`!6009`, :gl:`!6015`, :gl:`!6019`, :gl:`!6012`,
+:gl:`!5851`, :gl:`!5985`)
 
 Data Availability Layer (ongoing)
 ---------------------------------
 
-Distribution of rollup operations data off-chain. (MRs :gl:`!5711`, :gl:`!5938`)
+Distribution of rollup operations data off-chain. (MRs :gl:`!5711`, :gl:`!5938`,
+:gl:`!6024`, :gl:`!5959`)
 
 Breaking Changes
 ----------------
@@ -53,7 +55,7 @@ RPC Changes
   operation. (MR :gl:`!5707`)
 
 - New RPC ``/chains/<chain_id>/blocks/<block>/context/constants/parametric``
-  returning the value of the parametric constants. (MR :gl:`!5867`)
+  returning the value of parametric economic protocol constants. (MR :gl:`!5867`)
 
 Operation receipts
 ------------------
