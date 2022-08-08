@@ -50,6 +50,8 @@ type t = {
   fee_parameter : Injection.fee_parameter;
   mode : mode;
   loser_mode : Loser_mode.t;
+  dal_node_addr : string;
+  dal_node_port : int;
 }
 
 let default_data_dir =
@@ -72,6 +74,10 @@ let default_rpc_addr = "127.0.0.1"
 let default_rpc_port = 8932
 
 let default_reconnection_delay = 2.0 (* seconds *)
+
+let default_dal_node_addr = "127.0.0.1"
+
+let default_dal_node_port = 10732
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2794
    the below default values have been copied from
@@ -309,25 +315,29 @@ let encoding : t Data_encoding.t =
            fee_parameter;
            mode;
            loser_mode;
+           dal_node_addr;
+           dal_node_port;
          } ->
-      ( data_dir,
-        sc_rollup_address,
-        sc_rollup_node_operators,
-        rpc_addr,
-        rpc_port,
-        reconnection_delay,
-        fee_parameter,
-        mode,
-        loser_mode ))
-    (fun ( data_dir,
-           sc_rollup_address,
-           sc_rollup_node_operators,
-           rpc_addr,
-           rpc_port,
-           reconnection_delay,
-           fee_parameter,
-           mode,
-           loser_mode ) ->
+      ( ( data_dir,
+          sc_rollup_address,
+          sc_rollup_node_operators,
+          rpc_addr,
+          rpc_port,
+          reconnection_delay,
+          fee_parameter,
+          mode,
+          loser_mode ),
+        (dal_node_addr, dal_node_port) ))
+    (fun ( ( data_dir,
+             sc_rollup_address,
+             sc_rollup_node_operators,
+             rpc_addr,
+             rpc_port,
+             reconnection_delay,
+             fee_parameter,
+             mode,
+             loser_mode ),
+           (dal_node_addr, dal_node_port) ) ->
       {
         data_dir;
         sc_rollup_address;
@@ -338,43 +348,54 @@ let encoding : t Data_encoding.t =
         fee_parameter;
         mode;
         loser_mode;
+        dal_node_addr;
+        dal_node_port;
       })
-    (obj9
-       (dft
-          "data-dir"
-          ~description:"Location of the data dir"
-          string
-          default_data_dir)
-       (req
-          "sc-rollup-address"
-          ~description:"Smart contract rollup address"
-          Protocol.Alpha_context.Sc_rollup.Address.encoding)
-       (req
-          "sc-rollup-node-operator"
-          ~description:
-            "Operators that sign operations of the smart contract rollup, by \
-             purpose"
-          operators_encoding)
-       (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
-       (dft "rpc-port" ~description:"RPC port" int16 default_rpc_port)
-       (dft
-          ~description:"The reconnection (to the tezos node) delay in seconds"
-          "reconnection_delay"
-          float
-          default_reconnection_delay)
-       (dft
-          "fee-parameter"
-          ~description:"The fee parameter used when injecting operations in L1"
-          fee_parameter_encoding
-          default_fee_parameter)
-       (req ~description:"The mode for this rollup node" "mode" mode_encoding)
-       (dft
-          "loser-mode"
-          ~description:
-            "If enabled, the rollup node will issue wrong commitments (for \
-             test only!)"
-          Loser_mode.encoding
-          Loser_mode.no_failures))
+    (merge_objs
+       (obj9
+          (dft
+             "data-dir"
+             ~description:"Location of the data dir"
+             string
+             default_data_dir)
+          (req
+             "sc-rollup-address"
+             ~description:"Smart contract rollup address"
+             Protocol.Alpha_context.Sc_rollup.Address.encoding)
+          (req
+             "sc-rollup-node-operator"
+             ~description:
+               "Operators that sign operations of the smart contract rollup, \
+                by purpose"
+             operators_encoding)
+          (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
+          (dft "rpc-port" ~description:"RPC port" int16 default_rpc_port)
+          (dft
+             ~description:
+               "The reconnection (to the tezos node) delay in seconds"
+             "reconnection_delay"
+             float
+             default_reconnection_delay)
+          (dft
+             "fee-parameter"
+             ~description:
+               "The fee parameter used when injecting operations in L1"
+             fee_parameter_encoding
+             default_fee_parameter)
+          (req
+             ~description:"The mode for this rollup node"
+             "mode"
+             mode_encoding)
+          (dft
+             "loser-mode"
+             ~description:
+               "If enabled, the rollup node will issue wrong commitments (for \
+                test only!)"
+             Loser_mode.encoding
+             Loser_mode.no_failures))
+       (obj2
+          (dft "DAL node address" string default_dal_node_addr)
+          (dft "DAL node port" int16 default_dal_node_port)))
 
 let check_mode config =
   let open Result_syntax in

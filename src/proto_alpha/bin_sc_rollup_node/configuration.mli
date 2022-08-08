@@ -51,6 +51,12 @@ type t = {
   fee_parameter : Injection.fee_parameter;
   mode : mode;
   loser_mode : Loser_mode.t;
+  (*DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3718
+    Decide whether we want to handle connections to multiple
+    Dal nodes for different slot indexes.
+  *)
+  dal_node_addr : string;
+  dal_node_port : int;
 }
 
 (** [make_purpose_map ~default purposes] constructs a purpose map from a list of
@@ -89,6 +95,12 @@ val default_reconnection_delay : float
 
 (** [default_fee_parameter] is the default value for [fee_parameter] *)
 val default_fee_parameter : Injection.fee_parameter
+
+(** [default_dal_node_addr] is the default value for [dal_node_addr]. *)
+val default_dal_node_addr : string
+
+(** [default_dal_node_port] is the default value for [dal_node_port]. *)
+val default_dal_node_port : int
 
 (** This is the list of available modes. *)
 val modes : mode list
