@@ -21,6 +21,7 @@
   tezos-rpc
   tezos-rpc-http
   tezos-rpc-http-server
+  tezos_dal_node_services
   tezos-shell-services
   tezos-sc-rollup-014-PtKathma
   data-encoding
