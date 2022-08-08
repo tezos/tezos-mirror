@@ -38,11 +38,13 @@ module type S = sig
 
   val contramap_lwt : ('a -> 'b Lwt.t) -> 'b t -> 'a t
 
+  val ignore : 'a t
+
   val run : 'a t -> 'a -> tree -> tree Lwt.t
 
   val raw : key -> bytes t
 
-  val optional : key -> 'a Data_encoding.t -> 'a option t
+  val value_option : key -> 'a Data_encoding.t -> 'a option t
 
   val value : key -> 'a Data_encoding.t -> 'a t
 
@@ -77,6 +79,8 @@ module Make (T : Tree.S) = struct
 
   type -'a t = 'a -> prefix_key -> tree -> tree Lwt.t
 
+  let ignore _val _key tree = Lwt.return tree
+
   let run enc value tree = enc value Fun.id tree
 
   let lwt enc value prefix tree =
@@ -109,7 +113,7 @@ module Make (T : Tree.S) = struct
   let value suffix enc =
     contramap (Data_encoding.Binary.to_bytes_exn enc) (raw suffix)
 
-  let optional key encoding v prefix tree =
+  let value_option key encoding v prefix tree =
     match v with
     | Some v -> value key encoding v prefix tree
     | None -> T.remove tree (prefix key)

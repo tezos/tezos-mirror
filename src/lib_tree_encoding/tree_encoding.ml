@@ -46,6 +46,8 @@ module type S = sig
 
   val decode : 'a t -> tree -> 'a Lwt.t
 
+  val return : 'a -> 'a t
+
   val conv : ('a -> 'b) -> ('b -> 'a) -> 'a t -> 'b t
 
   val conv_lwt : ('a -> 'b Lwt.t) -> ('b -> 'a Lwt.t) -> 'a t -> 'b t
@@ -114,11 +116,9 @@ module type S = sig
 
   val raw : key -> bytes t
 
-  val optional : key -> 'a Data_encoding.t -> 'a option t
+  val value_option : key -> 'a Data_encoding.t -> 'a option t
 
   val value : ?default:'a -> key -> 'a Data_encoding.t -> 'a t
-
-  val value_option : key -> 'a Data_encoding.t -> 'a option t
 
   val scope : key -> 'a t -> 'a t
 
@@ -191,6 +191,8 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
   type 'a decoding = 'a D.t
 
   type 'a t = {encode : 'a encoding; decode : 'a decoding}
+
+  let return x = {encode = E.ignore; decode = D.Syntax.return x}
 
   let conv d e {encode; decode} =
     {encode = E.contramap e encode; decode = D.map d decode}
@@ -329,8 +331,6 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
   let value ?default key de =
     {encode = E.value key de; decode = D.value ?default key de}
 
-  let value_option key de = value key (Data_encoding.option de)
-
   module Lazy_map_encoding = struct
     module type S = sig
       type 'a map
@@ -448,19 +448,20 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
     in
     {encode; decode}
 
-  let optional key encoding =
-    let encode = E.optional key encoding in
-    let decode = D.optional key encoding in
+  let value_option key encoding =
+    let encode = E.value_option key encoding in
+    let decode = D.value_option key encoding in
     {encode; decode}
 
   let option enc =
     tagged_union
+      ~default:None
       (value [] Data_encoding.string)
       [
         case "Some" enc Fun.id Option.some;
         case
           "None"
-          (value [] Data_encoding.unit)
+          (return ())
           (function None -> Some () | _ -> None)
           (fun () -> None);
       ]

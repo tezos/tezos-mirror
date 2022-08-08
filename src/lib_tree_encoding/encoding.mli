@@ -51,6 +51,9 @@ module type S = sig
       an Lwt effect. *)
   val contramap_lwt : ('a -> 'b Lwt.t) -> 'b t -> 'a t
 
+  (** [ignore] is an encoder that ignores its value. *)
+  val ignore : 'a t
+
   (** [run enc x tree] encodes the given value [x] using the encoder [enc] and
       writes it to the tree [tree]. May raise a [Key_not_found] or a
       [No_tag_matched] exception. *)
@@ -59,10 +62,10 @@ module type S = sig
   (** [raw key] returns an encoder that encodes raw bytes at the given key. *)
   val raw : key -> bytes t
 
-  (** [optional key enc] encodes the value at a given [key] using the
+  (** [value_option key enc] encodes the value at a given [key] using the
       provided [enc] encoder for the value, or remove any previous
       value stored at [key] if [None] is provided. *)
-  val optional : key -> 'a Data_encoding.t -> 'a option t
+  val value_option : key -> 'a Data_encoding.t -> 'a option t
 
   (** [value key enc] encodes the value at a given [key] using the provided
       [enc] encoder for the value. *)

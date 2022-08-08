@@ -54,13 +54,13 @@ module type S = sig
   *)
   val raw : key -> bytes t
 
-  (** [optional key data_encoding] tries to retrieve the value at a
+  (** [value_option key data_encoding] tries to retrieve the value at a
       given [key] by decoding its raw value using the provided
       [data_encoding], or return [None] if [key] is missing.
 
       @raises Decode_error when decoding of the value fails
   *)
-  val optional : key -> 'a Data_encoding.t -> 'a option t
+  val value_option : key -> 'a Data_encoding.t -> 'a option t
 
   (** [value ?default key data_encoding] retrieves the value at a
       given [key] by decoding its raw value using the provided

@@ -69,6 +69,10 @@ module type S = sig
       provided [tree]. *)
   val decode : 'a t -> tree -> 'a Lwt.t
 
+  (** [return x] is an encoder that does nothing on encoding. On decoding it
+      ignores the tree and returns [x]. *)
+  val return : 'a -> 'a t
+
   (** [conv f g enc] transforms from one encoding to a different one using
       [f] for mapping the results decoded using [enc], and [g] for mapping from
       the input. *)
@@ -186,22 +190,16 @@ module type S = sig
   (** [raw key] is an encoder for bytes under the given [key]. *)
   val raw : key -> bytes t
 
-  (** [optional key encoding] returns an encoder that uses [encoding]
+  (** [value_option key encoding] returns an encoder that uses [encoding]
       for encoding values, but does not fail if the [key] is
       absent. *)
-  val optional : key -> 'a Data_encoding.t -> 'a option t
+  val value_option : key -> 'a Data_encoding.t -> 'a option t
 
   (** [value ?default key enc] creates an encoder under the given
       [key] using the provided data-encoding [enc] for
       encoding/decoding values, and using [default] as a fallback when
       decoding in case the [key] is absent from the tree. *)
   val value : ?default:'a -> key -> 'a Data_encoding.t -> 'a t
-
-  (** [value_option key enc] creates an encoder for optional values under the
-      given [key] using the provided data-encoding [enc]. Note that the value is
-      encoded as an option at the leaf level, in contrast to the {!option}
-      combinator that encodes the value under a new key (Some/None). *)
-  val value_option : key -> 'a Data_encoding.t -> 'a option t
 
   (** [scope key enc] moves the given encoder [enc] to encode values under a
       branch [key]. *)
