@@ -2868,6 +2868,10 @@ type +'a t
     There is one exception to this: most promises can be {e canceled} by calling
     {!Lwt.cancel}, without going through a resolver. *)
 
+(** We omit [u], [wait], [wakeup*] and so on because these are only useful to
+    define new synchronization primitives which the protocol doesn't need: it
+    gets its synchronization primitives from the environment. *)
+
 val return : 'a -> 'a t
 (** [Lwt.return v] creates a new {{: #TYPEt} promise} that is {e already
     fulfilled} with value [v].
@@ -2891,6 +2895,9 @@ let%lwt line = Lwt_io.(read_line stdin) in
 Lwt.return (line ^ ".")
 ]} *)
 
+(** We omit [fail] as well as [catch] and such because we discourage the use of
+    exceptions in the environment. The Error Monad provides sufficient
+    primitives. *)
 
 (** {3 Callbacks} *)
 
@@ -3000,6 +3007,15 @@ let () =
 
 
 
+(** We omit [dont_wait] and other such functions because we it is only useful in
+    mutation-heavy loosely-synchronised code which the protocol shouldn't be. *)
+
+(** We omit many synchronisation primitives such as [choose] because it
+    introduce non-determinism. *)
+
+(** We omit cancelation-related primitives because we discourage Cancelation in
+    the protocol. *)
+
 (** {2 Convenience} *)
 
 (** {3 Callback helpers} *)
@@ -3067,6 +3083,11 @@ let read_int : unit -> int Lwt.t = fun () ->
     - If [f v] returns another value [v'], [p_3] is fulfilled with [v'].
     - If [f v] raises exception [exn], [p_3] is rejected with [exn]. *)
 
+(** We omit explicit callback registration ([on_termination] and such) because
+    it is only useful for mutation-heavy code *)
+
+(** We omit syntax helpers because they are available through the dedicated
+    syntax modules of the Error Monad. *)
 
 (** {3 Pre-allocated promises} *)
 
@@ -3101,6 +3122,25 @@ val return_true : bool t
 val return_false : bool t
 (** [Lwt.return_false] is like {!Lwt.return_unit}, but for
     {!Lwt.return}[ false]. *)
+
+(** We omit state introspection because it is discouraged when not defining new
+    synchronisation primitives which the protocol doesn't do. *)
+
+val return_some : 'a -> ('a option) t
+(** Counterpart to {!Lwt.return_none}. However, unlike {!Lwt.return_none}, this
+    function performs no {{: #VALreturn_unit} optimization}. This is because it
+    takes an argument, so it cannot be evaluated at initialization time, at
+    which time the argument is not yet available. *)
+
+val return_ok : 'a -> (('a, _) result) t
+(** Like {!Lwt.return_some}, this function performs no optimization.
+
+    @since Lwt 2.6.0 *)
+
+val return_error : 'e -> ((_, 'e) result) t
+(** Like {!Lwt.return_some}, this function performs no optimization.
+
+    @since Lwt 2.6.0 *)
 end
 # 30 "v7.in.ml"
 
@@ -5498,6 +5538,30 @@ module Lwt_syntax : sig
   val both : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
 end
 
+module Option_syntax : sig
+  val return : 'a -> 'a option
+
+  val fail : 'a option
+
+  val return_unit : unit option
+
+  val return_nil : 'a list option
+
+  val return_true : bool option
+
+  val return_false : bool option
+
+  val ( let* ) : 'a option -> ('a -> 'b option) -> 'b option
+
+  val ( and* ) : 'a option -> 'b option -> ('a * 'b) option
+
+  val ( let+ ) : 'a option -> ('a -> 'b) -> 'b option
+
+  val ( and+ ) : 'a option -> 'b option -> ('a * 'b) option
+
+  val both : 'a option -> 'b option -> ('a * 'b) option
+end
+
 module Result_syntax : sig
   val return : 'a -> ('a, 'e) result
 
@@ -5566,6 +5630,34 @@ module Lwt_result_syntax : sig
     ('a, 'e) result Lwt.t ->
     ('b, 'e) result Lwt.t ->
     ('a * 'b, 'e list) result Lwt.t
+end
+
+module Lwt_option_syntax : sig
+  val return : 'a -> 'a option Lwt.t
+
+  val return_unit : unit option Lwt.t
+
+  val return_nil : 'a list option Lwt.t
+
+  val return_true : bool option Lwt.t
+
+  val return_false : bool option Lwt.t
+
+  val fail : 'a option Lwt.t
+
+  val ( let* ) : 'a option Lwt.t -> ('a -> 'b option Lwt.t) -> 'b option Lwt.t
+
+  val ( and* ) : 'a option Lwt.t -> 'b option Lwt.t -> ('a * 'b) option Lwt.t
+
+  val ( let+ ) : 'a option Lwt.t -> ('a -> 'b) -> 'b option Lwt.t
+
+  val ( and+ ) : 'a option Lwt.t -> 'b option Lwt.t -> ('a * 'b) option Lwt.t
+
+  val ( let*! ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
+
+  val ( let*? ) : 'a option -> ('a -> 'b option Lwt.t) -> 'b option Lwt.t
+
+  val both : 'a option Lwt.t -> 'b option Lwt.t -> ('a * 'b) option Lwt.t
 end
 
 module Tzresult_syntax : sig
