@@ -60,6 +60,8 @@ module Make (M : Tree_encoding.S) : sig
 
   val function_vector_encoding : Instance.func_inst Instance.Vector.t t
 
+  val func_type_encoding : Types.func_type t
+
   val function_type_vector_encoding : Types.func_type Instance.Vector.t t
 
   val value_ref_vector_encoding : Values.ref_ Instance.Vector.t t

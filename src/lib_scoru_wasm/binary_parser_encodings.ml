@@ -33,6 +33,10 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
   module Wasm_encoding = Wasm_encoding.Make (Tree_encoding)
   include Tree_encoding
 
+  (* TODO: keep region? *)
+  let no_region_encoding enc =
+    conv (fun s -> Source.(s @@ no_region)) (fun {it; _} -> it) enc
+
   let vector_encoding value_enc =
     Lazy_vector_encoding.Int32.lazy_vector
       (value [] Data_encoding.int32)
@@ -745,10 +749,6 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
   end
 
   module Field = struct
-    (* TODO: keep region? *)
-    let no_region_encoding enc =
-      conv (fun s -> Source.(s @@ no_region)) (fun {it; _} -> it) enc
-
     let type_field_encoding =
       scope
         ["module"; "types"]
@@ -1347,7 +1347,7 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
     let mkstop_case =
       case
         "MKStop"
-        module_encoding
+        (no_region_encoding module_encoding)
         (function Decode.MKStop m -> Some m | _ -> None)
         (fun m -> MKStop m)
 
@@ -1371,5 +1371,154 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
           mkelem_case;
           mkcode_case;
         ]
+  end
+
+  module Building_state = struct
+    let types_encoding =
+      vector_encoding (no_region_encoding Wasm_encoding.func_type_encoding)
+
+    let imports_encoding =
+      vector_encoding (no_region_encoding Import.import_encoding)
+
+    let vars_encoding =
+      vector_encoding (value [] Interpreter_encodings.Ast.var_encoding)
+
+    let tables_encoding =
+      vector_encoding (value [] Interpreter_encodings.Ast.table_encoding)
+
+    let memories_encoding =
+      vector_encoding (value [] Interpreter_encodings.Ast.memory_encoding)
+
+    let globals_encoding =
+      vector_encoding (value [] Interpreter_encodings.Ast.global_encoding)
+
+    let exports_encoding =
+      vector_encoding (no_region_encoding Export.export_encoding)
+
+    let start_encoding =
+      value_option [] Interpreter_encodings.Ast.start_encoding
+
+    let elems_encoding = vector_encoding (no_region_encoding Elem.elem_encoding)
+
+    let func_encoding' =
+      conv
+        (fun (ftype, locals, body) -> Ast.{ftype; locals; body})
+        (fun {ftype; locals; body} -> (ftype, locals, body))
+      @@ tup3
+           ~flatten:false
+           (value ["ftype"] Interpreter_encodings.Ast.var_encoding)
+           (scope
+              ["locals"]
+              (vector_encoding
+                 (value [] Interpreter_encodings.Types.value_type_encoding)))
+           (value ["body"] Interpreter_encodings.Ast.block_label_encoding)
+
+    let code_encoding = vector_encoding (no_region_encoding func_encoding')
+
+    let datas_encoding =
+      vector_encoding (no_region_encoding Data.data_segment_encoding)
+
+    let encoding =
+      conv
+        (fun ( types,
+               imports,
+               vars,
+               tables,
+               memories,
+               globals,
+               exports,
+               start,
+               (elems, data_count, code, datas) ) ->
+          Decode.
+            {
+              types;
+              imports;
+              vars;
+              tables;
+              memories;
+              globals;
+              exports;
+              start;
+              elems;
+              data_count;
+              code;
+              datas;
+            })
+        (fun {
+               types;
+               imports;
+               vars;
+               tables;
+               memories;
+               globals;
+               exports;
+               start;
+               elems;
+               data_count;
+               code;
+               datas;
+             } ->
+          ( types,
+            imports,
+            vars,
+            tables,
+            memories,
+            globals,
+            exports,
+            start,
+            (elems, data_count, code, datas) ))
+        (tup9
+           ~flatten:true
+           (scope ["types"] types_encoding)
+           (scope ["imports"] imports_encoding)
+           (scope ["vars"] vars_encoding)
+           (scope ["tables"] tables_encoding)
+           (scope ["memories"] memories_encoding)
+           (scope ["globals"] globals_encoding)
+           (scope ["exports"] exports_encoding)
+           (scope ["start"] start_encoding)
+           (tup4
+              ~flatten:true
+              (scope ["elems"] elems_encoding)
+              (scope ["data_count"] (value_option [] Data_encoding.int32))
+              (scope ["code"] code_encoding)
+              (scope ["datas"] datas_encoding)))
+  end
+
+  module Decode = struct
+    let encoding =
+      conv
+        (fun ( building_state,
+               module_kont,
+               allocation_state,
+               stream_pos,
+               stream_name ) ->
+          Decode.
+            {
+              building_state;
+              module_kont;
+              allocation_state;
+              stream_pos;
+              stream_name;
+            })
+        (fun {
+               building_state;
+               module_kont;
+               allocation_state;
+               stream_pos;
+               stream_name;
+             } ->
+          ( building_state,
+            module_kont,
+            allocation_state,
+            stream_pos,
+            stream_name ))
+      @@ tup5
+           ~flatten:true
+           (scope ["building_state"] Building_state.encoding)
+           (scope ["module_kont"] Module.encoding)
+           (scope ["allocation_state"] Wasm_encoding.allocations_encoding)
+           (value ["stream_pos"] Data_encoding.int31)
+           (value ["stream_name"] Data_encoding.string)
   end
 end

@@ -1931,7 +1931,7 @@ type module_kont =
   | MKBuild of func Vector.t option * bool
       (** Accumulating the parsed sections vectors into a module and checking
       invariants. *)
-  | MKStop of module_'  (** Final step of the parsing, cannot reduce. *)
+  | MKStop of module_  (** Final step of the parsing, cannot reduce. *)
     (* TODO (https://gitlab.com/tezos/tezos/-/issues/3120): actually, should be module_ *)
   | MKTypes of func_type_kont * pos * size * type_ lazy_vec_kont
       (** Function types section parsing. *)
@@ -2294,50 +2294,47 @@ let module_step bytes state =
         s
         (len s)
         "data count section required" ;
-      {
-        state with
-        module_kont =
-          MKStop
-            {
-              types;
-              tables;
-              memories;
-              globals;
-              funcs;
-              imports;
-              exports;
-              elems;
-              datas;
-              start;
-              allocations = state.allocation_state;
-            };
-      }
-      |> Lwt.return
+      let m =
+        Source.(
+          {
+            types;
+            tables;
+            memories;
+            globals;
+            funcs;
+            imports;
+            exports;
+            elems;
+            datas;
+            start;
+            allocations = state.allocation_state;
+          }
+          @@ region_ state.stream_name 0 state.stream_pos)
+      in
+      {state with module_kont = MKStop m} |> Lwt.return
   | MKStop _ (* Stop cannot reduce. *) -> assert false
+
+let initial_decode_kont ~name =
+  let allocation_state = Ast.empty_allocations () in
+  {
+    building_state = empty_building_state;
+    module_kont = MKStart;
+    allocation_state;
+    stream_pos = 0;
+    stream_name = name;
+  }
 
 let module_ name bytes =
   let open Lwt.Syntax in
   let rec loop = function
-    | {module_kont = MKStop m; stream_pos; _} -> Lwt.return (m, stream_pos)
+    | {module_kont = MKStop m; stream_pos; _} -> Lwt.return m
     | k ->
         let* next_state = module_step bytes k in
         loop next_state
   in
-  let allocation_state = Ast.empty_allocations () in
-  loop
-    {
-      building_state = empty_building_state;
-      module_kont = MKStart;
-      allocation_state;
-      stream_pos = 0;
-      stream_name = name;
-    }
+  loop @@ initial_decode_kont ~name
 
-let decode ~name ~bytes =
-  let open Lwt.Syntax in
-  let left = 0 in
-  let+ m, right = module_ name bytes in
-  Source.(m @@ region_ name left right)
+let decode ~name ~bytes = module_ name bytes
 
 let all_custom tag s =
   let open Lwt.Syntax in

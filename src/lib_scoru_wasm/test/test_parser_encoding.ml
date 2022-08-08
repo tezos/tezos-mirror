@@ -1151,7 +1151,7 @@ module Module = struct
     in
     let stop =
       let+ modl = module_gen in
-      Decode.MKStop modl
+      Decode.MKStop Source.(modl @@ no_region)
     in
     let types =
       let* func_type_kont = Func_type.gen in
@@ -1236,33 +1236,43 @@ module Module = struct
     eq_blocks && eq_datas
 
   let check_module
-      Ast.
+      Source.
         {
-          types;
-          globals;
-          tables;
-          memories;
-          funcs;
-          start;
-          elems;
-          datas;
-          imports;
-          exports;
-          allocations;
+          it =
+            Ast.
+              {
+                types;
+                globals;
+                tables;
+                memories;
+                funcs;
+                start;
+                elems;
+                datas;
+                imports;
+                exports;
+                allocations;
+              };
+          _;
         }
-      Ast.
+      Source.
         {
-          types = types';
-          globals = globals';
-          tables = tables';
-          memories = memories';
-          funcs = funcs';
-          start = start';
-          elems = elems';
-          datas = datas';
-          imports = imports';
-          exports = exports';
-          allocations = allocations';
+          it =
+            Ast.
+              {
+                types = types';
+                globals = globals';
+                tables = tables';
+                memories = memories';
+                funcs = funcs';
+                start = start';
+                elems = elems';
+                datas = datas';
+                imports = imports';
+                exports = exports';
+                allocations = allocations';
+              };
+          _;
         } =
     let open Lwt_result_syntax in
     let check_no_region check v v' = check v.Source.it v'.Source.it in
