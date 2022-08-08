@@ -23,19 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 open Tezos_crypto_dal
-
-module Constants = struct
-  let redundancy_factor = 2
-
-  let segment_size = 4096
-
-  let slot_size = 1048576 (* 1Mb *)
-
-  let number_of_shards = 2048
-
-  let trusted_setup_logarithm_size = 21
-end
-
 include Dal_cryptobox
 
 type slot = bytes
@@ -43,6 +30,13 @@ type slot = bytes
 type slot_header = commitment
 
 let slot_header_encoding = Commitment.encoding
+
+type parameters = {
+  redundancy_factor : int;
+  segment_size : int;
+  slot_size : int;
+  number_of_shards : int;
+}
 
 type error += Cryptobox_initialisation_failed of string
 
@@ -61,9 +55,19 @@ let () =
     (function Cryptobox_initialisation_failed str -> Some str | _ -> None)
     (fun str -> Cryptobox_initialisation_failed str)
 
-let init () =
-  let open Constants in
-  let open Result_syntax in
-  match make ~redundancy_factor ~segment_size ~slot_size ~number_of_shards with
-  | Ok cryptobox -> return cryptobox
-  | Error (`Fail msg) -> fail [Cryptobox_initialisation_failed msg]
+let init cctxt (module Plugin : Dal_constants_plugin.T) =
+  let open Lwt_result_syntax in
+  let* Plugin.{redundancy_factor; segment_size; slot_size; number_of_shards} =
+    Plugin.get_constants cctxt#chain cctxt#block cctxt
+  in
+  let parameters =
+    {redundancy_factor; segment_size; slot_size; number_of_shards}
+  in
+  let* dal_constants =
+    match
+      make ~redundancy_factor ~segment_size ~slot_size ~number_of_shards
+    with
+    | Ok cryptobox -> return cryptobox
+    | Error (`Fail msg) -> fail [Cryptobox_initialisation_failed msg]
+  in
+  return @@ (dal_constants, parameters)

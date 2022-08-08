@@ -23,20 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type ctxt = {config : Configuration.t; dal_constants : Cryptobox.t}
+type ctxt = {
+  config : Configuration.t;
+  dal_constants : Cryptobox.t;
+  dal_parameters : Cryptobox.parameters;
+}
 
 module RPC_server = struct
   let register_split_slot ctxt store dir =
     RPC_directory.register0
       dir
       (Services.split_slot ())
-      (Services.handle_split_slot ctxt.dal_constants store)
+      (Services.handle_split_slot ctxt.dal_parameters ctxt.dal_constants store)
 
   let register_show_slot ctxt store dir =
     RPC_directory.register
       dir
       (Services.slot ())
-      (Services.handle_slot ctxt.dal_constants store)
+      (Services.handle_slot ctxt.dal_parameters ctxt.dal_constants store)
 
   let register_shard store dir =
     RPC_directory.register dir (Services.shard ()) (Services.handle_shard store)
@@ -77,7 +81,19 @@ module RPC_server = struct
     Tezos_base_unix.Internal_event_unix.close ()
 end
 
-let run ~data_dir ~no_trusted_setup:_ _ctxt =
+let daemonize cctxt handle = Lwt.no_cancel @@ Layer1.iter_events cctxt handle
+
+let resolve_plugin cctxt =
+  let open Lwt_result_syntax in
+  let* protocols =
+    Tezos_shell_services.Chain_services.Blocks.protocols cctxt ()
+  in
+  return
+  @@ Option.either
+       (Dal_constants_plugin.get protocols.current_protocol)
+       (Dal_constants_plugin.get protocols.next_protocol)
+
+let run ~data_dir ~no_trusted_setup:_ cctxt =
   let open Lwt_result_syntax in
   let*! () = Event.(emit starting_node) () in
   let* config = Configuration.load ~data_dir in
@@ -88,12 +104,29 @@ let run ~data_dir ~no_trusted_setup:_ _ctxt =
     Cryptobox.initialisation_parameters_from_files ~g1_path ~g2_path
   in
   let*? () = Cryptobox.load_parameters initialisation_parameters in
-  let*? dal_constants = Cryptobox.init () in
-  let ctxt = {config; dal_constants} in
-  let* rpc_server = RPC_server.(start config (register ctxt store)) in
-  let _ = RPC_server.install_finalizer rpc_server in
-  let*! () =
-    Event.(emit rpc_server_is_ready (config.rpc_addr, config.rpc_port))
-  in
-  let*! () = Event.(emit node_is_ready ()) in
-  Lwt_utils.never_ending ()
+  let ready = ref false in
+  let*! () = Event.(emit layer1_node_tracking_started ()) in
+  daemonize cctxt @@ fun (_hash, (_block_header : Tezos_base.Block_header.t)) ->
+  if not !ready then
+    let* plugin = resolve_plugin cctxt in
+    match plugin with
+    | Some plugin ->
+        let (module Plugin : Dal_constants_plugin.T) = plugin in
+        let*! () =
+          Event.(
+            emit
+              protocol_plugin_resolved
+              (Format.asprintf "%a" Protocol_hash.pp_short Plugin.Proto.hash))
+        in
+        let* dal_constants, dal_parameters = Cryptobox.init cctxt plugin in
+        let ctxt = {config; dal_constants; dal_parameters} in
+        let* rpc_server = RPC_server.(start config (register ctxt store)) in
+        let _ = RPC_server.install_finalizer rpc_server in
+        let*! () =
+          Event.(emit rpc_server_is_ready (config.rpc_addr, config.rpc_port))
+        in
+        let*! () = Event.(emit node_is_ready ()) in
+        ready := true ;
+        return_unit
+    | None -> return_unit
+  else return_unit

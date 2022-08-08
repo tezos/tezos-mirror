@@ -59,16 +59,22 @@ let shard () =
     ~output:Cryptobox.shard_encoding
     RPC_path.(open_root / "shard" /: Cryptobox.Commitment.rpc_arg /: shard_arg)
 
-let handle_split_slot dal_constants store fill slot =
+let handle_split_slot dal_parameters dal_constants store fill slot =
   let open Lwt_result_syntax in
   let slot = String.to_bytes slot in
-  let slot = if fill then Slot_manager.Utils.fill_x00 slot else slot in
+  let slot =
+    if fill then
+      Slot_manager.Utils.fill_x00 dal_parameters.Cryptobox.slot_size slot
+    else slot
+  in
   let+ commitment = Slot_manager.split_and_store dal_constants store slot in
   Cryptobox.Commitment.to_b58check commitment
 
-let handle_slot dal_constants store (_, commitment) trim () =
+let handle_slot initial_constants dal_constants store (_, commitment) trim () =
   let open Lwt_result_syntax in
-  let* slot = Slot_manager.get_slot dal_constants store commitment in
+  let* slot =
+    Slot_manager.get_slot initial_constants dal_constants store commitment
+  in
   let slot = if trim then Slot_manager.Utils.trim_x00 slot else slot in
   return (String.of_bytes slot)
 

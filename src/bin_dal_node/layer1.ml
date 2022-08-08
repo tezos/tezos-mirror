@@ -23,43 +23,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(**
-   Functions to manage slots storage.
+(** FIXME: https://gitlab.com/tezos/tezos/-/issues/3517
 
-   - writing a slot means splitting it in shards and store them on disk
-   - reading a slot means rebuild it from the shards
-   *)
+    If the layer1 node reboots, the rpc stream breaks.
+*)
+let chain_events cctxt =
+  let open Lwt_result_syntax in
+  let* heads, _ = Tezos_shell_services.Monitor_services.heads cctxt `Main in
+  return heads
 
-(** [split_and_store dal_constants ts store slot] splits [slot] in shards, stores
-    it onto the disk and returns the corresponding [slot_header], using
-    [dal_constants] and trusted setup [ts] *)
-val split_and_store :
-  Cryptobox.t ->
-  Store.t ->
-  Cryptobox.slot ->
-  Cryptobox.slot_header tzresult Lwt.t
+let handle_event (hash, (block_header : Tezos_base.Block_header.t)) =
+  let open Lwt_result_syntax in
+  let level = block_header.shell.level in
+  let*! () = Event.(emit layer1_node_new_head (hash, level)) in
+  return_true
 
-(** [get_shard store slot_header shard_id] gets the shard associated to
-    [slot_header] at the range [shard_id] *)
-val get_shard :
-  Store.t -> Cryptobox.slot_header -> int -> Cryptobox.shard tzresult Lwt.t
-
-(** [get_slot dal_parameters dal_constants store slot_header] fetches from
-    disk the shards associated to [slot_header], gathers them, rebuilds and
-    returns the [slot]. *)
-val get_slot :
-  Cryptobox.parameters ->
-  Cryptobox.t ->
-  Store.t ->
-  Cryptobox.slot_header ->
-  Cryptobox.slot tzresult Lwt.t
-
-module Utils : sig
-  (** [trim_x00 b] removes trailing '\000' at the end of a [b] and returns a new
-      [bytes]. This function in needed to debug the fetching a slot and remove
-      spurious uneeded data form it. *)
-  val trim_x00 : bytes -> bytes
-
-  (** [fill_x00 slot_size b] fills a bytes with '\000' to match [slot_size] *)
-  val fill_x00 : int -> bytes -> bytes
-end
+let iter_events cctxt handle =
+  let open Lwt_result_syntax in
+  let* stream = chain_events cctxt in
+  let rec go () =
+    Lwt.bind (Lwt_stream.get stream) @@ fun tok ->
+    match tok with
+    | None -> return_unit
+    | Some element ->
+        let* () = handle element in
+        go ()
+  in
+  go ()
