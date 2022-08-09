@@ -270,14 +270,14 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
 
   let predecessor_is_published cctxt rollup_address commitment_hash =
     let open Lwt_result_syntax in
-    let*! _commitment_res =
+    let*! commitment_res =
       Plugin.RPC.Sc_rollup.commitment
         cctxt
         (cctxt#chain, cctxt#block)
         rollup_address
         commitment_hash
     in
-    match _commitment_res with
+    match commitment_res with
     | Ok _commitment -> return_true
     | Error _errors -> return_false
 
