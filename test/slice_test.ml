@@ -28,11 +28,29 @@ let list_enc =
   let open Data_encoding in
   def "list_enc" (list (tup2 string int31))
 
+let list_n_enc =
+  let open Data_encoding in
+  def "list_n_enc" (list_with_length `N (tup2 string int31))
+
 let list_example = [("bonjour", 4); ("au revoir", 2)]
 
 let list_result =
   [
     "32";
+    (* list length*)
+    "7";
+    (* string length*)
+    "\"bonjour\"";
+    "4";
+    "9";
+    (* string length*)
+    "\"au revoir\"";
+    "2";
+  ]
+
+let list_n_result =
+  [
+    "2";
     (* list length*)
     "7";
     (* string length*)
@@ -195,6 +213,7 @@ let qualified_result = ["5"]
 
 let () =
   Data_encoding.Registration.register list_enc ;
+  Data_encoding.Registration.register list_n_enc ;
   Data_encoding.Registration.register record_enc ;
   Data_encoding.Registration.register union_enc ;
   Data_encoding.Registration.register option_enc ;
@@ -203,6 +222,8 @@ let () =
   Data_encoding.Registration.register qualified_enc
 
 let bin_list = Data_encoding.Binary.to_string_exn list_enc list_example
+
+let bin_list_n = Data_encoding.Binary.to_string_exn list_n_enc list_example
 
 let bin_record = Data_encoding.Binary.to_string_exn record_enc record_example
 
@@ -249,6 +270,9 @@ let slice_test id result expected () =
 let tests =
   [
     ("slice-test-list", `Quick, slice_test "list_enc" bin_list list_result);
+    ( "slice-test-list-n",
+      `Quick,
+      slice_test "list_n_enc" bin_list_n list_n_result );
     ( "slice-test-record",
       `Quick,
       slice_test "record_enc" bin_record record_result );

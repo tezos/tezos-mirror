@@ -322,6 +322,39 @@ let tests =
   @ all "list" Alcotest.(list int) (list int31) [1; 2; 3; 4; 5]
   @ all "array.empty" Alcotest.(array int) (array int31) [||]
   @ all "array" Alcotest.(array int) (array int31) [|1; 2; 3; 4; 5|]
+  @ all "list_n.empty" Alcotest.(list int) (list_with_length `N int31) []
+  @ all "list_n" Alcotest.(list int) (list_with_length `N int31) [1; 2; 3; 4; 5]
+  @ all "array_n.empty" Alcotest.(array int) (array_with_length `N int31) [||]
+  @ all
+      "array_n"
+      Alcotest.(array int)
+      (array_with_length `N int31)
+      [|1; 2; 3; 4; 5|]
+  @ all
+      "array_n_list_n"
+      Alcotest.(array (list int))
+      (array_with_length `N ~max_length:2 (list_with_length `N uint8))
+      [|List.init 64 (fun j -> j mod 256); List.init 128 (fun j -> j mod 256)|]
+  @ all
+      "list_with_length.empty"
+      Alcotest.(list int)
+      (list_with_length `Uint8 int31)
+      []
+  @ all
+      "list_with_length_n"
+      Alcotest.(list int)
+      (list_with_length `Uint8 int31)
+      [1; 2; 3; 4; 5]
+  @ all
+      "array_with_length.empty"
+      Alcotest.(array int)
+      (array_with_length `Uint16 int31)
+      [||]
+  @ all
+      "array_with_length"
+      Alcotest.(array int)
+      (array_with_length `Uint8 int31)
+      [|1; 2; 3; 4; 5|]
   @ all "mu_list.empty" Alcotest.(list int) (mu_list_enc int31) []
   @ all "mu_list" Alcotest.(list int) (mu_list_enc int31) [1; 2; 3; 4; 5]
   @ test_bounded_string_list

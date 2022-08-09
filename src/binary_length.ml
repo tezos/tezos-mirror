@@ -78,7 +78,7 @@ let rec length : type x. x Encoding.t -> x -> int =
   | Ignore -> 0
   | Bytes (`Variable, _) -> Bytes.length value
   | String (`Variable, _) -> String.length value
-  | Array {length_limit; elts} -> (
+  | Array {length_limit; length_encoding; elts} ->
       (match length_limit with
       | No_limit -> ()
       | At_most max_length ->
@@ -87,10 +87,18 @@ let rec length : type x. x Encoding.t -> x -> int =
       | Exactly exact_length ->
           if Array.length value <> exact_length then
             raise (Write_error Array_invalid_length)) ;
-      match fixed_length elts with
-      | Some s -> Array.length value * s
-      | None -> Array.fold_left (fun acc v -> length elts v + acc) 0 value)
-  | List {length_limit; elts} -> (
+      let length_size =
+        match length_encoding with
+        | Some le -> length le (Array.length value)
+        | None -> 0
+      in
+      let value_size =
+        match fixed_length elts with
+        | Some s -> Array.length value * s
+        | None -> Array.fold_left (fun acc v -> length elts v + acc) 0 value
+      in
+      length_size + value_size
+  | List {length_limit; length_encoding; elts} ->
       (match length_limit with
       | No_limit -> ()
       | At_most max_length ->
@@ -99,9 +107,17 @@ let rec length : type x. x Encoding.t -> x -> int =
       | Exactly exact_length ->
           if List.compare_length_with value exact_length <> 0 then
             raise (Write_error List_invalid_length)) ;
-      match fixed_length elts with
-      | Some s -> List.length value * s
-      | None -> List.fold_left (fun acc v -> length elts v + acc) 0 value)
+      let length_size =
+        match length_encoding with
+        | Some le -> length le (List.length value)
+        | None -> 0
+      in
+      let value_size =
+        match fixed_length elts with
+        | Some s -> List.length value * s
+        | None -> List.fold_left (fun acc v -> length elts v + acc) 0 value
+      in
+      length_size + value_size
   | Objs {kind = `Variable; left; right} ->
       let v1, v2 = value in
       length left v1 + length right v2
@@ -183,24 +199,34 @@ let rec maximum_length : type a. a Encoding.t -> int option =
   | Ignore -> Some 0
   | Bytes (`Variable, _) -> None
   | String (`Variable, _) -> None
-  | Array {length_limit; elts = e} -> (
-      match length_limit with
-      | No_limit -> None
-      | At_most max_length ->
-          let* s = maximum_length e in
-          Some (s * max_length)
-      | Exactly exact_length ->
-          let* s = maximum_length e in
-          Some (s * exact_length))
-  | List {length_limit; elts = e} -> (
-      match length_limit with
-      | No_limit -> None
-      | At_most max_length ->
-          let* s = maximum_length e in
-          Some (s * max_length)
-      | Exactly exact_length ->
-          let* s = maximum_length e in
-          Some (s * exact_length))
+  | Array {length_limit; length_encoding; elts = e} ->
+      let* es =
+        match length_limit with
+        | No_limit -> None
+        | At_most max_length | Exactly max_length ->
+            let* s = maximum_length e in
+            Some (s * max_length)
+      in
+      let* ls =
+        match length_encoding with
+        | Some le -> maximum_length le
+        | None -> Some 0
+      in
+      Some (ls + es)
+  | List {length_limit; length_encoding; elts = e} ->
+      let* es =
+        match length_limit with
+        | No_limit -> None
+        | At_most max_length | Exactly max_length ->
+            let* s = maximum_length e in
+            Some (s * max_length)
+      in
+      let* ls =
+        match length_encoding with
+        | Some le -> maximum_length le
+        | None -> Some 0
+      in
+      Some (ls + es)
   | Obj (Opt {kind = `Variable; encoding = e; _}) -> maximum_length e
   (* Variable or Dynamic we don't care for those constructors *)
   | Union {kind = `Dynamic | `Variable; tag_size; cases; _} ->

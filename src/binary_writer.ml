@@ -25,6 +25,14 @@
 
 open Binary_error_types
 
+let guarded_length ~upto xs =
+  let rec loop n = function
+    | _ :: xs -> if n >= upto then None else loop (n + 1) xs
+    | [] -> Some n
+  in
+  assert (upto >= 0) ;
+  loop 0 xs
+
 let wrap_user_function f a =
   try f a with
   | (Out_of_memory | Stack_overflow) as exc -> raise exc
@@ -248,7 +256,16 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
   | RangedFloat {minimum; maximum} ->
       Atom.ranged_float ~minimum ~maximum state value
   | String_enum (tbl, arr) -> Atom.string_enum tbl arr state value
-  | Array {length_limit; elts} -> (
+  | Array {length_limit = At_most max_length; length_encoding = Some le; elts}
+    ->
+      if Array.length value > max_length then raise Array_invalid_length ;
+      write_rec le state (Array.length value) ;
+      Array.iter (write_rec elts state) value
+  | Array
+      {length_limit = Exactly _ | No_limit; length_encoding = Some _; elts = _}
+    ->
+      assert false
+  | Array {length_limit; length_encoding = None; elts} -> (
       match length_limit with
       | No_limit -> Array.iter (write_rec elts state) value
       | At_most max_length ->
@@ -257,7 +274,18 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
       | Exactly exact_length ->
           if Array.length value <> exact_length then raise Array_invalid_length ;
           Array.iter (write_rec elts state) value)
-  | List {length_limit; elts} -> (
+  | List {length_limit = At_most max_length; length_encoding = Some le; elts}
+    -> (
+      match guarded_length ~upto:max_length value with
+      | None -> raise List_invalid_length
+      | Some l ->
+          write_rec le state l ;
+          List.iter (write_rec elts state) value)
+  | List
+      {length_limit = Exactly _ | No_limit; length_encoding = Some _; elts = _}
+    ->
+      assert false
+  | List {length_limit; length_encoding = None; elts} -> (
       match length_limit with
       | No_limit -> List.iter (write_rec elts state) value
       | At_most max_length ->

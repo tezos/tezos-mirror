@@ -113,8 +113,22 @@ type 'a desc =
   | String : Kind.length * string_json_repr -> string desc
   | Padded : 'a t * int -> 'a desc
   | String_enum : ('a, string * int) Hashtbl.t * 'a array -> 'a desc
-  | Array : {length_limit : limit; elts : 'a t} -> 'a array desc
-  | List : {length_limit : limit; elts : 'a t} -> 'a list desc
+  | Array : {
+      length_limit : limit;
+      length_encoding : int t option;
+      elts : 'a t;
+    }
+      -> (* invariant: the field [length_encoding] is never set if [length_limit]
+            is [No_limit] or [Exactly]. *)
+      'a array desc
+  | List : {
+      length_limit : limit;
+      length_encoding : int t option;
+      elts : 'a t;
+    }
+      -> (* invariant: the field [length_encoding] is never set if [length_limit]
+            is [No_limit] or [Exactly]. *)
+      'a list desc
   | Obj : 'a field -> 'a desc
   | Objs : {kind : Kind.t; left : 'a t; right : 'b t} -> ('a * 'b) desc
   | Tup : 'a t -> 'a desc
@@ -249,13 +263,31 @@ and classify_desc : type a. a desc -> Kind.t =
   | Mu {kind; _} -> (kind :> Kind.t)
   (* Variable *)
   | Ignore -> `Fixed 0
-  | Array {length_limit = Exactly l; elts} -> (
+  | Array {length_limit; length_encoding = Some _; elts} ->
+      (* when [length_encoding] is set the encoding can only be dynamic, we
+         still perform assertion checks. *)
+      assert (match length_limit with At_most _ -> true | _ -> false) ;
+      assert (
+        match classify_desc elts.encoding with
+        | `Fixed _ | `Dynamic -> true
+        | `Variable -> assert false) ;
+      `Dynamic
+  | Array {length_limit = Exactly l; length_encoding = None; elts} -> (
       match classify_desc elts.encoding with
       | `Fixed e -> `Fixed (l * e)
       | `Dynamic -> `Dynamic
       | `Variable -> assert false)
   | Array _ -> `Variable
-  | List {length_limit = Exactly l; elts} -> (
+  | List {length_limit; length_encoding = Some _; elts} ->
+      (* when [length_encoding] is set the encoding can only be dynamic, we
+         still perform assertion checks. *)
+      assert (match length_limit with At_most _ -> true | _ -> false) ;
+      assert (
+        match classify_desc elts.encoding with
+        | `Fixed _ | `Dynamic -> true
+        | `Variable -> assert false) ;
+      `Dynamic
+  | List {length_limit = Exactly l; length_encoding = None; elts} -> (
       match classify_desc elts.encoding with
       | `Fixed e -> `Fixed (l * e)
       | `Dynamic -> `Dynamic
@@ -341,16 +373,30 @@ let rec is_zeroable : type t. Mu_visited.t -> t encoding -> bool =
   | Padded _ -> false
   | String_enum _ -> false
   (* true in some cases, but in practice always protected by Dynamic *)
-  | Array {length_limit = Exactly l; elts = _} ->
+  | Array {length_limit; length_encoding = Some le; elts = _} ->
+      assert (match length_limit with At_most _ -> true | _ -> false) ;
+      (* length-encoding is n, uint8, uint16, or uint30 none of which are
+         zeroable *)
+      assert (not (is_zeroable visited le)) ;
+      false
+  | Array {length_limit = Exactly l; length_encoding = None; elts = _} ->
       assert (l > 0) ;
       false
-  | Array {length_limit = No_limit | At_most _; elts = _} ->
-      true (* 0-element array *)
-  | List {length_limit = Exactly l; elts = _} ->
+  | Array
+      {length_limit = No_limit | At_most _; length_encoding = None; elts = _} ->
+      true (* 0-element array, no length prefix *)
+  | List {length_limit; length_encoding = Some le; elts = _} ->
+      assert (match length_limit with At_most _ -> true | _ -> false) ;
+      (* length-encoding is n, uint8, uint16, or uint30 none of which are
+         zeroable *)
+      assert (not (is_zeroable visited le)) ;
+      false
+  | List {length_limit = Exactly l; length_encoding = None; elts = _} ->
       assert (l > 0) ;
       false
-  | List {length_limit = No_limit | At_most _; elts = _} ->
-      true (* 0-element list *)
+  | List {length_limit = No_limit | At_most _; length_encoding = None; elts = _}
+    ->
+      true (* 0-element array, no length prefix *)
   (* represented as whatever is inside: truth mostly propagates *)
   | Obj (Req {encoding = e; _}) -> is_zeroable visited e (* represented as-is *)
   | Obj (Opt {kind = `Variable; _}) -> true (* optional field omitted *)
@@ -419,7 +465,7 @@ module Fixed = struct
         "Cannot create a list encoding of negative or null fixed length." ;
     check_not_variable "a fixed-length list" e ;
     check_not_zeroable "a fixed-length list" e ;
-    make @@ List {length_limit = Exactly n; elts = e}
+    make @@ List {length_limit = Exactly n; length_encoding = None; elts = e}
 
   let array n e =
     if n <= 0 then
@@ -427,7 +473,7 @@ module Fixed = struct
         "Cannot create an array encoding of negative or null fixed length." ;
     check_not_variable "a fixed-length array" e ;
     check_not_zeroable "a fixed-length array" e ;
-    make @@ Array {length_limit = Exactly n; elts = e}
+    make @@ Array {length_limit = Exactly n; length_encoding = None; elts = e}
 end
 
 module Variable = struct
@@ -445,7 +491,9 @@ module Variable = struct
     let length_limit =
       match max_length with None -> No_limit | Some l -> At_most l
     in
-    let encoding = make @@ Array {length_limit; elts = e} in
+    let encoding =
+      make @@ Array {length_limit; length_encoding = None; elts = e}
+    in
     match (classify e, max_length) with
     | `Fixed n, Some max_length ->
         let limit = n * max_length in
@@ -460,7 +508,9 @@ module Variable = struct
     let length_limit =
       match max_length with None -> No_limit | Some l -> At_most l
     in
-    let encoding = make @@ List {length_limit; elts = e} in
+    let encoding =
+      make @@ List {length_limit; length_encoding = None; elts = e}
+    in
     match (classify e, max_length) with
     | `Fixed n, Some max_length ->
         let limit = n * max_length in
@@ -1110,3 +1160,61 @@ let result ok_enc error_enc =
         (function Ok _ -> None | Error x -> Some x)
         (fun x -> Error x);
     ]
+
+let length_encoding_of_length_encoding_parameter max_length = function
+  | `N -> uint_like_n ~max_value:max_length
+  | `Uint8 -> uint8
+  | `Uint16 -> uint16
+  | `Uint30 -> int31
+
+let array_with_length ?max_length length_encoding e =
+  let effective_max_length =
+    match length_encoding with
+    | `N | `Uint30 -> Binary_size.max_int `Uint30
+    | `Uint16 -> Binary_size.max_int `Uint16
+    | `Uint8 -> Binary_size.max_int `Uint8
+  in
+  let max_length =
+    match max_length with
+    | None -> effective_max_length
+    | Some l ->
+        if l > effective_max_length then
+          raise
+            (Invalid_argument
+               "Data_encoding.array_with_length: explicit max_length higher \
+                than effective length range") ;
+        l
+  in
+  let length_encoding =
+    length_encoding_of_length_encoding_parameter max_length length_encoding
+  in
+  let length_limit = At_most max_length in
+  check_not_variable "an array" e ;
+  check_not_zeroable "an array" e ;
+  make @@ Array {length_limit; length_encoding = Some length_encoding; elts = e}
+
+let list_with_length ?max_length length_encoding e =
+  let effective_max_length =
+    match length_encoding with
+    | `N | `Uint30 -> Binary_size.max_int `Uint30
+    | `Uint16 -> Binary_size.max_int `Uint16
+    | `Uint8 -> Binary_size.max_int `Uint8
+  in
+  let max_length =
+    match max_length with
+    | None -> effective_max_length
+    | Some l ->
+        if l > effective_max_length then
+          raise
+            (Invalid_argument
+               "Data_encoding.list_with_length: explicit max_length higher \
+                than effective length range") ;
+        l
+  in
+  let length_encoding =
+    length_encoding_of_length_encoding_parameter max_length length_encoding
+  in
+  let length_limit = At_most max_length in
+  check_not_variable "a list" e ;
+  check_not_zeroable "a list" e ;
+  make @@ List {length_limit; length_encoding = Some length_encoding; elts = e}

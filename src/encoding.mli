@@ -92,8 +92,18 @@ type 'a desc =
       (** The [int] indicates how many null bytes should be added on the right
           of the value. *)
   | String_enum : ('a, string * int) Hashtbl.t * 'a array -> 'a desc
-  | Array : {length_limit : limit; elts : 'a t} -> 'a array desc
-  | List : {length_limit : limit; elts : 'a t} -> 'a list desc
+  | Array : {
+      length_limit : limit;
+      length_encoding : int t option;
+      elts : 'a t;
+    }
+      -> 'a array desc
+  | List : {
+      length_limit : limit;
+      length_encoding : int t option;
+      elts : 'a t;
+    }
+      -> 'a list desc
   | Obj : 'a field -> 'a desc  (** An object with one field *)
   | Objs : {kind : Kind.t; left : 'a t; right : 'b t} -> ('a * 'b) desc
       (** Two objects merged *)
@@ -475,7 +485,19 @@ val merge_tups : 'a1 encoding -> 'a2 encoding -> ('a1 * 'a2) encoding
 
 val array : ?max_length:int -> 'a encoding -> 'a array encoding
 
+val array_with_length :
+  ?max_length:int ->
+  [`N | `Uint8 | `Uint16 | `Uint30] ->
+  'a encoding ->
+  'a array encoding
+
 val list : ?max_length:int -> 'a encoding -> 'a list encoding
+
+val list_with_length :
+  ?max_length:int ->
+  [`N | `Uint8 | `Uint16 | `Uint30] ->
+  'a encoding ->
+  'a list encoding
 
 val case :
   title:string ->

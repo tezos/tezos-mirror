@@ -207,7 +207,7 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
   | RangedInt {minimum; maximum} -> Atom.ranged_int ~minimum ~maximum state
   | RangedFloat {minimum; maximum} -> Atom.ranged_float ~minimum ~maximum state
   | String_enum (_, arr) -> Atom.string_enum arr state
-  | Array {length_limit; elts = e} ->
+  | Array {length_limit; length_encoding = None; elts = e} ->
       let l =
         match length_limit with
         | No_limit -> read_list Array_too_long max_int e state
@@ -215,11 +215,50 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
         | Exactly exact_length -> read_fixed_list exact_length e state
       in
       Array.of_list l
-  | List {length_limit; elts = e} -> (
+  | Array
+      {
+        length_limit = At_most max_length;
+        length_encoding = Some length_encoding;
+        elts = e;
+      } ->
+      let len =
+        try read_rec length_encoding state
+        with
+        (* translating uint_like_n overflow *)
+        | Binary_error_types.Read_error (Invalid_int _) ->
+          raise_read_error Array_too_long
+      in
+      if len > max_length then raise_read_error Array_too_long ;
+      let l = read_fixed_list len e state in
+      Array.of_list l
+  | Array
+      {length_limit = Exactly _ | No_limit; length_encoding = Some _; elts = _}
+    ->
+      assert false
+  | List {length_limit; length_encoding = None; elts = e} -> (
       match length_limit with
       | No_limit -> read_list List_too_long max_int e state
       | At_most max_length -> read_list List_too_long max_length e state
       | Exactly exact_length -> read_fixed_list exact_length e state)
+  | List
+      {
+        length_limit = At_most max_length;
+        length_encoding = Some length_encoding;
+        elts = e;
+      } ->
+      let len =
+        try read_rec length_encoding state
+        with
+        (* translating uint_like_n overflow *)
+        | Binary_error_types.Read_error (Invalid_int _) ->
+          raise_read_error List_too_long
+      in
+      if len > max_length then raise_read_error List_too_long ;
+      read_fixed_list len e state
+  | List
+      {length_limit = Exactly _ | No_limit; length_encoding = Some _; elts = _}
+    ->
+      assert false
   | Obj (Req {encoding = e; _}) -> read_rec e state
   | Obj (Dft {encoding = e; _}) -> read_rec e state
   | Obj (Opt {kind = `Dynamic; encoding = e; _}) ->
