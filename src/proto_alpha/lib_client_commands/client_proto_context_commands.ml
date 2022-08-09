@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2019-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -841,6 +841,10 @@ let commands_network network () =
             >>=? fun _res -> return_unit);
       ]
 
+let implicit_account action = function
+  | Contract.Originated _ -> failwith "Only implicit accounts can %s." action
+  | Contract.Implicit account -> return account
+
 let commands_rw () =
   let open Client_proto_programs in
   let open Tezos_micheline in
@@ -1011,11 +1015,7 @@ let commands_rw () =
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program)
         >>=? fun {expanded = code; _} ->
-        match source with
-        | Originated _ ->
-            failwith
-              "only implicit accounts can be the source of an origination"
-        | Implicit source -> (
+        implicit_account "originate contracts" source >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             originate_contract
               cctxt
@@ -1046,9 +1046,7 @@ let commands_rw () =
             | None -> return_unit
             | Some (_res, contract) ->
                 if dry_run then return_unit
-                else
-                  save_contract ~force cctxt alias_name contract >>=? fun () ->
-                  return_unit));
+                else save_contract ~force cctxt alias_name contract);
     command
       ~group
       ~desc:
@@ -1297,10 +1295,7 @@ let commands_rw () =
            global_constant_str
            source
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith "Only implicit accounts can register global constants"
-        | Implicit source ->
+        implicit_account "register global constants" source >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             register_global_constant
               cctxt
@@ -1400,9 +1395,7 @@ let commands_rw () =
            ~desc:"name of the source contract"
       @@ stop)
       (fun (fee, dry_run, verbose_signing, fee_parameter) source cctxt ->
-        match source with
-        | Originated _ -> failwith "only implicit accounts can be revealed"
-        | Implicit source ->
+       implicit_account "be revealed" source >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             reveal
               cctxt
@@ -1518,9 +1511,7 @@ let commands_rw () =
            source
            proposals
            (cctxt : Protocol_client_context.full) ->
-        match source with
-        | Originated _ -> failwith "only implicit accounts can submit proposals"
-        | Implicit src_pkh -> (
+        implicit_account "submit proposals" source >>=? fun src_pkh ->
             Client_keys.get_key cctxt src_pkh
             >>=? fun (src_name, _src_pk, src_sk) ->
             get_period_info
@@ -1659,7 +1650,7 @@ let commands_rw () =
                       |> String.concat " "
                       |> String.map (function '\n' | '\t' -> ' ' | c -> c))
                 | el -> cctxt#message "Error:@ %a" pp_print_trace el)
-                >>= fun () -> failwith "Failed to submit proposals"));
+                >>= fun () -> failwith "Failed to submit proposals");
     command
       ~group
       ~desc:"Submit a ballot"
@@ -1701,9 +1692,7 @@ let commands_rw () =
            proposal
            ballot
            (cctxt : Protocol_client_context.full) ->
-        match source with
-        | Originated _ -> failwith "only implicit accounts can submit ballot"
-        | Implicit src_pkh ->
+        implicit_account "submit ballot" source >>=? fun src_pkh ->
             Client_keys.get_key cctxt src_pkh
             >>=? fun (src_name, _src_pk, src_sk) ->
             get_period_info
@@ -1927,10 +1916,8 @@ let commands_rw () =
            alias
            source
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith "Only implicit accounts can originate transaction rollups"
-        | Implicit source ->
+        implicit_account "originate transaction rollups" source
+        >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             originate_tx_rollup
               cctxt
@@ -2001,11 +1988,8 @@ let commands_rw () =
            tx_rollup
            source
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith
-              "Only implicit accounts can submit transaction rollup batches"
-        | Implicit source ->
+        implicit_account "submit transaction rollup batches" source
+         >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             submit_tx_rollup_batch
               cctxt
@@ -2076,11 +2060,8 @@ let commands_rw () =
            inbox_merkle_root
            messages
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith
-              "Only implicit accounts can submit transaction rollup commitments"
-        | Implicit source ->
+        implicit_account "submit transaction rollup commitments" source
+        >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             submit_tx_rollup_commitment
               cctxt
@@ -2133,10 +2114,7 @@ let commands_rw () =
            tx_rollup
            source
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith "Only implicit accounts can finalize commitments"
-        | Implicit source ->
+        implicit_account "finalize commitments" source >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             submit_tx_rollup_finalize_commitment
               cctxt
@@ -2184,10 +2162,7 @@ let commands_rw () =
            source
            tx_rollup
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith "Only implicit accounts can deposit/recover bonds"
-        | Implicit source ->
+        implicit_account "deposit/recover bonds" source >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             submit_tx_rollup_return_bond
               cctxt
@@ -2236,10 +2211,7 @@ let commands_rw () =
            tx_rollup
            source
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith "Only implicit accounts can remove commitments."
-        | Implicit source ->
+        implicit_account "remove commitments" source >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             submit_tx_rollup_remove_commitment
               cctxt
@@ -2342,12 +2314,8 @@ let commands_rw () =
            proof
            source
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith
-              "Only implicit accounts can reject transaction rollup \
-               commitments."
-        | Implicit source ->
+        implicit_account "reject transaction rollup commitments" source
+        >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             submit_tx_rollup_rejection
               cctxt
@@ -2440,12 +2408,8 @@ let commands_rw () =
            message_result_path
            tickets_info
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith
-              "Only implicit account can dispatch tickets for a transaction \
-               rollup."
-        | Implicit source ->
+        implicit_account "dispatch tickets for a transaction rollup" source
+        >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             tx_rollup_dispatch_tickets
               cctxt
@@ -2526,10 +2490,7 @@ let commands_rw () =
            ty
            ticketer
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith "Only implicit accounts can transfer tickets."
-        | Implicit source ->
+        implicit_account "transfer tickets" source >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             transfer_ticket
               cctxt
@@ -2599,11 +2560,8 @@ let commands_rw () =
            parameters_ty
            boot_sector
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith
-              "Only implicit accounts can originate smart-contract rollups"
-        | Implicit source ->
+        implicit_account "originate smart-contract rollups" source
+        >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let (module R : Alpha_context.Sc_rollup.PVM.S) = pvm in
             let Michelson_v1_parser.{expanded; _} = parameters_ty in
@@ -2669,11 +2627,7 @@ let commands_rw () =
            source
            rollup
            cctxt ->
-        (match source with
-        | Originated _ ->
-            failwith "Only implicit accounts can send messages to rollups"
-        | Implicit source -> return source)
-        >>=? fun source ->
+        implicit_account "send messages to rollups" source >>=? fun source ->
         (match messages with
         | `Bin message -> return [message]
         | `Json messages -> (
@@ -2761,11 +2715,7 @@ let commands_rw () =
            predecessor
            number_of_ticks
            cctxt ->
-        (match source with
-        | Originated _ ->
-            failwith "Only implicit accounts can publish commitments"
-        | Implicit source -> return source)
-        >>=? fun source ->
+        implicit_account "publish commitments" source >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         let commitment : Alpha_context.Sc_rollup.Commitment.t =
           {compressed_state; inbox_level; predecessor; number_of_ticks}
@@ -2828,11 +2778,7 @@ let commands_rw () =
            source
            rollup
            cctxt ->
-        (match source with
-        | Originated _ ->
-            failwith "Only implicit accounts can cement commitments"
-        | Implicit source -> return source)
-        >>=? fun source ->
+        implicit_account "cement commitments" source >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         sc_rollup_cement
           cctxt
@@ -2913,12 +2859,7 @@ let commands_rw () =
            cemented_commitment
            output_proof
            cctxt ->
-        (match source with
-        | Originated _ ->
-            failwith
-              "Only implicit accounts can execute an sc rollup batch of \
-               transactions"
-        | Implicit source -> return source)
+        implicit_account "execute an sc rollup batch of transactions" source
         >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         sc_rollup_execute_outbox_message
@@ -2972,10 +2913,7 @@ let commands_rw () =
            source
            sc_rollup
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith "Only implicit accounts can deposit/recover bonds"
-        | Implicit source ->
+        implicit_account "deposit/recover bonds" source >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             sc_rollup_recover_bond
               cctxt
