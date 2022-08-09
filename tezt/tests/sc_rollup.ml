@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -57,6 +57,7 @@ type sc_rollup_constants = {
   max_active_outbox_levels : int32;
   max_outbox_messages_per_level : int;
   number_of_sections_in_dissection : int;
+  timeout_period_in_blocks : int;
 }
 
 (** [boot_sector_of k] returns a valid boot sector for a PVM of
@@ -95,6 +96,9 @@ let get_sc_rollup_constants client =
   let number_of_sections_in_dissection =
     json |-> "sc_rollup_number_of_sections_in_dissection" |> as_int
   in
+  let timeout_period_in_blocks =
+    json |-> "sc_rollup_timeout_period_in_blocks" |> as_int
+  in
   return
     {
       origination_size;
@@ -106,6 +110,7 @@ let get_sc_rollup_constants client =
       max_active_outbox_levels;
       max_outbox_messages_per_level;
       number_of_sections_in_dissection;
+      timeout_period_in_blocks;
     }
 
 (* List of scoru errors messages used in tests below. *)
@@ -2511,7 +2516,10 @@ let test_forking_scenario ~title ~scenario protocols =
          of [mk_forking_commitments] is cementable without further bakes. *)
       let commitment_period = 3 in
       let challenge_window = commitment_period * 7 in
-      setup ~commitment_period ~challenge_window ~protocol
+      (* Completely arbitrary as we decide when to trigger timeouts in tests.
+         Making it a lot smaller than the default value to speed up tests. *)
+      let timeout = 10 in
+      setup ~commitment_period ~challenge_window ~timeout ~protocol
       @@ fun node client _bootstrap1_key ->
       (* Originate a Sc rollup. *)
       let* sc_rollup = originate_sc_rollup client ~parameters_ty:"unit" in
