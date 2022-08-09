@@ -2716,6 +2716,54 @@ let timeout ?expect_failure ~sc_rollup ~staker client =
   in
   Client.bake_for_and_wait client
 
+(* Testing the timeout to record gas consumption in a regression trace and
+   detect when the value changes.
+   For functional tests on timing-out a dispute, see unit tests in
+   [lib_protocol].
+
+   For this test, we rely on [test_forking_scenario] to create a tree structure
+   of commitments and we start a dispute.
+   The first player is not even going to play, we'll simply bake enough blocks
+   to get to the point where we can timeout. *)
+let test_timeout protocols =
+  test_forking_scenario
+    ~title:"refutation game timeout"
+    ~scenario:
+      (fun client _node ~sc_rollup ~operator1 ~operator2 commits level0 level1 ->
+      (* These are the commitments on the rollup. See [test_forking_scenario] to
+         visualize the tree structure. *)
+      let c1, c2, _c31, _c32, _c311, _c321 = commits in
+      (* A helper function to cement a sequence of commitments. *)
+      let cement = cement_commitments client sc_rollup in
+      let* constants = get_sc_rollup_constants client in
+      let challenge_window = constants.challenge_window_in_blocks in
+      let timeout_period = constants.timeout_period_in_blocks in
+
+      (* Bake enough blocks to cement the commitments up to the divergence. *)
+      let* () =
+        repeat
+          (* There are [level0 - level1 - 1] blocks between [level1] and
+             [level0], plus the challenge window for [c1] and the one for [c2].
+          *)
+          (level0 - level1 - 1 + (2 * challenge_window))
+          (fun () -> Client.bake_for_and_wait client)
+      in
+      let* () = cement [c1; c2] in
+
+      let module M = Operation.Manager in
+      (* [operator2] starts a dispute. Its opponent, [operator1], won't play. *)
+      let* () =
+        bake_operation_via_rpc client
+        @@ M.make ~source:operator2
+        @@ M.sc_rollup_refute ~sc_rollup ~opponent:operator1.public_key_hash ()
+      in
+      (* Get exactly to the block where we are able to timeout. *)
+      let* () =
+        repeat (timeout_period + 1) (fun () -> Client.bake_for_and_wait client)
+      in
+      timeout ~sc_rollup ~staker:operator2.public_key_hash client)
+    protocols
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -2836,4 +2884,5 @@ let register ~protocols =
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols ;
   test_no_cementation_if_parent_not_lcc_or_if_disputed_commit protocols ;
-  test_valid_dispute_dissection protocols
+  test_valid_dispute_dissection protocols ;
+  test_timeout protocols
