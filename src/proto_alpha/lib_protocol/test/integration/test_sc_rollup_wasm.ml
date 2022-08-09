@@ -268,7 +268,7 @@ let should_interpret_empty_chunk () =
   let*! () = check_status s (Some (Gathering_floppies op.pk)) in
   let* () = check_chunks_count s chunk_size in
   (* Try to interpret the empty input (correctly signed) *)
-  let* s = checked_set_input ~loc:__LOC__ context correct_input s in
+  let*! s = Prover.set_input correct_input s in
   let*! () = check_status s (Some Not_gathering_floppies) in
   (* We still have 1 chunk. *)
   let* () = check_chunks_count s chunk_size in
@@ -405,7 +405,7 @@ let tests =
     @@ fun () ->
       let operator = operator () in
       should_boot_complete_boot_sector
-        (incomplete_boot_sector "a nice boot sector" operator)
+        (incomplete_boot_sector "\x00asm\x01\x00\x00\x00" operator)
         () );
     Tztest.tztest
       "should boot an incomplete boot sector with floppies"

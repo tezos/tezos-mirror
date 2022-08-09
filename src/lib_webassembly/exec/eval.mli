@@ -48,3 +48,13 @@ type config = {
   host_funcs : Host_funcs.registry;
   budget : int; (* to model stack overflow *)
 }
+
+val step : config -> config Lwt.t
+
+val config :
+  ?input:input_inst ->
+  Host_funcs.registry ->
+  module_ref ->
+  value list ->
+  admin_instr list ->
+  config
