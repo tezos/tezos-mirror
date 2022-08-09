@@ -1,9 +1,11 @@
 (* This file was automatically generated, do not edit.*)
 (* Edit file v4.in.ml instead. *)
 # 1 "v4.in.ml"
-open Tezos_protocol_environment_sigs_internals
-
 module type T = sig
+  module CamlinternalFormatBasics : module type of struct
+    include Tezos_protocol_environment_sigs_internals.CamlinternalFormatBasics
+  end
+
   module Pervasives : sig
 # 1 "v4/pervasives.mli"
 (**************************************************************************)
@@ -489,7 +491,7 @@ val ( ^^ ) :
   Right-associative operator, see {!Ocaml_operators} for more information.
 *)
 end
-# 4 "v4.in.ml"
+# 6 "v4.in.ml"
 
 
   open Pervasives
@@ -739,7 +741,7 @@ val split_on_char: char -> string -> string list
     @since 4.04.0
 *)
 end
-# 8 "v4.in.ml"
+# 10 "v4.in.ml"
 
 
   module Char : sig
@@ -799,7 +801,7 @@ val equal: t -> t -> bool
 (** The equal function for chars.
     @since 4.03.0 *)
 end
-# 10 "v4.in.ml"
+# 12 "v4.in.ml"
 
 
   module Bytes : sig
@@ -1065,7 +1067,7 @@ val equal: t -> t -> bool
 (** The equality function for byte sequences.
     @since 4.03.0 *)
 end
-# 12 "v4.in.ml"
+# 14 "v4.in.ml"
 
 
   module Int32 : sig
@@ -1215,7 +1217,7 @@ val equal: t -> t -> bool
 (** The equal function for int32s.
     @since 4.03.0 *)
 end
-# 14 "v4.in.ml"
+# 16 "v4.in.ml"
 
 
   module Int64 : sig
@@ -1373,7 +1375,7 @@ val equal: t -> t -> bool
 (** The equal function for int64s.
     @since 4.03.0 *)
 end
-# 16 "v4.in.ml"
+# 18 "v4.in.ml"
 
 
   module Format : sig
@@ -2126,7 +2128,7 @@ val kasprintf : (string -> 'a) -> ('b, formatter, unit, 'a) format4 -> 'b
   @since 4.03
 *)
 end
-# 18 "v4.in.ml"
+# 20 "v4.in.ml"
 
 
   module Logging : sig
@@ -2176,7 +2178,7 @@ val log : level -> ('a, Format.formatter, unit, unit) format4 -> 'a
 (** Same as [log] but more efficient with a simpler interface. *)
 val log_string : level -> string -> unit
 end
-# 20 "v4.in.ml"
+# 22 "v4.in.ml"
 
 
   module Hex : sig
@@ -2264,7 +2266,7 @@ val show : t -> string
 (** [show t] will return a human-readable hex representation of [t] as
     a string. *)
 end
-# 22 "v4.in.ml"
+# 24 "v4.in.ml"
 
 
   module Z : sig
@@ -2738,7 +2740,7 @@ external of_bits: string -> t = "ml_z_of_bits"
     trailing zeros in s.
  *)
 end
-# 24 "v4.in.ml"
+# 26 "v4.in.ml"
 
 
   module Lwt : sig
@@ -3009,7 +3011,7 @@ val return_false : bool t
 (** [Lwt.return_false] is like {!Lwt.return_unit}, but for
     {!Lwt.return}[ false]. *)
 end
-# 26 "v4.in.ml"
+# 28 "v4.in.ml"
 
 
   module Data_encoding : sig
@@ -3460,7 +3462,7 @@ end
     the JSON encoding. *)
 val check_size : int -> 'a encoding -> 'a encoding
 end
-# 28 "v4.in.ml"
+# 30 "v4.in.ml"
 
 
   module Raw_hashes : sig
@@ -3502,7 +3504,7 @@ val sha3_256 : bytes -> bytes
 
 val sha3_512 : bytes -> bytes
 end
-# 30 "v4.in.ml"
+# 32 "v4.in.ml"
 
 
   module Compare : sig
@@ -3624,7 +3626,7 @@ module List_lengths : sig
   val equal : 'a list -> 'b list -> bool
 end
 end
-# 32 "v4.in.ml"
+# 34 "v4.in.ml"
 
 
   module Time : sig
@@ -3678,7 +3680,7 @@ val rfc_encoding : t Data_encoding.t
 
 val pp_hum : Format.formatter -> t -> unit
 end
-# 34 "v4.in.ml"
+# 36 "v4.in.ml"
 
 
   module TzEndian : sig
@@ -3744,7 +3746,7 @@ val get_uint16_string : string -> int -> int
 
 val set_uint16 : bytes -> int -> int -> unit
 end
-# 36 "v4.in.ml"
+# 38 "v4.in.ml"
 
 
   module Bits : sig
@@ -3779,7 +3781,7 @@ end
    <= x < 2^k] if [x > 0] and [0] otherwise. *)
 val numbits : int -> int
 end
-# 38 "v4.in.ml"
+# 40 "v4.in.ml"
 
 
   module Equality_witness : sig
@@ -3847,7 +3849,7 @@ val eq : 'a t -> 'b t -> ('a, 'b) eq option
 (** [hash id] returns a hash for [id]. *)
 val hash : 'a t -> int
 end
-# 40 "v4.in.ml"
+# 42 "v4.in.ml"
 
 
   module FallbackArray : sig
@@ -3923,7 +3925,7 @@ val map : ('a -> 'b) -> 'a t -> 'b t
    [init] on the first iteration. *)
 val fold : ('b -> 'a -> 'b) -> 'a t -> 'b -> 'b
 end
-# 42 "v4.in.ml"
+# 44 "v4.in.ml"
 
 
   module Error_monad : sig
@@ -4153,7 +4155,7 @@ type shell_tztrace
 
 type 'a shell_tzresult = ('a, shell_tztrace) result
 end
-# 44 "v4.in.ml"
+# 46 "v4.in.ml"
 
 
   open Error_monad
@@ -4280,7 +4282,7 @@ val iter_ep :
     them is. *)
 val iter_p : ('a -> unit Lwt.t) -> 'a t -> unit Lwt.t
 end
-# 48 "v4.in.ml"
+# 50 "v4.in.ml"
 
 
   module List : sig
@@ -5224,7 +5226,7 @@ val exists_ep :
   'a list ->
   (bool, 'error Error_monad.trace) result Lwt.t
 end
-# 50 "v4.in.ml"
+# 52 "v4.in.ml"
 
 
   module Set : sig
@@ -5357,7 +5359,7 @@ end
 
 module Make (Ord : Compare.COMPARABLE) : S with type elt = Ord.t
 end
-# 52 "v4.in.ml"
+# 54 "v4.in.ml"
 
 
   module Map : sig
@@ -5511,7 +5513,7 @@ end
 
 module Make (Ord : Compare.COMPARABLE) : S with type key = Ord.t
 end
-# 54 "v4.in.ml"
+# 56 "v4.in.ml"
 
 
   module Option : sig
@@ -5659,7 +5661,7 @@ val catch : ?catch_only:(exn -> bool) -> (unit -> 'a) -> 'a option
 val catch_s :
   ?catch_only:(exn -> bool) -> (unit -> 'a Lwt.t) -> 'a option Lwt.t
 end
-# 56 "v4.in.ml"
+# 58 "v4.in.ml"
 
 
   module Result : sig
@@ -5825,7 +5827,7 @@ val catch_f :
 val catch_s :
   ?catch_only:(exn -> bool) -> (unit -> 'a Lwt.t) -> ('a, exn) result Lwt.t
 end
-# 58 "v4.in.ml"
+# 60 "v4.in.ml"
 
 
   module RPC_arg : sig
@@ -5895,7 +5897,7 @@ type ('a, 'b) eq = Eq : ('a, 'a) eq
 
 val eq : 'a arg -> 'b arg -> ('a, 'b) eq option
 end
-# 60 "v4.in.ml"
+# 62 "v4.in.ml"
 
 
   module RPC_path : sig
@@ -5951,7 +5953,7 @@ val add_final_args :
 val ( /:* ) :
   ('prefix, 'params) path -> 'a RPC_arg.t -> ('prefix, 'params * 'a list) path
 end
-# 62 "v4.in.ml"
+# 64 "v4.in.ml"
 
 
   module RPC_query : sig
@@ -6023,7 +6025,7 @@ exception Invalid of string
 
 val parse : 'a query -> untyped -> 'a
 end
-# 64 "v4.in.ml"
+# 66 "v4.in.ml"
 
 
   module RPC_service : sig
@@ -6100,7 +6102,7 @@ val put_service :
   ('prefix, 'params) RPC_path.t ->
   ([`PUT], 'prefix, 'params, 'query, 'input, 'output) service
 end
-# 66 "v4.in.ml"
+# 68 "v4.in.ml"
 
 
   module RPC_answer : sig
@@ -6161,7 +6163,7 @@ val not_found : 'o t Lwt.t
 
 val fail : error list -> 'a t Lwt.t
 end
-# 68 "v4.in.ml"
+# 70 "v4.in.ml"
 
 
   module RPC_directory : sig
@@ -6426,7 +6428,7 @@ val register_dynamic_directory :
   ('a -> 'a directory Lwt.t) ->
   'prefix directory
 end
-# 70 "v4.in.ml"
+# 72 "v4.in.ml"
 
 
   module Base58 : sig
@@ -6476,7 +6478,7 @@ val check_encoded_prefix : 'a encoding -> string -> int -> unit
 
 val decode : string -> data option
 end
-# 72 "v4.in.ml"
+# 74 "v4.in.ml"
 
 
   module S : sig
@@ -6888,7 +6890,7 @@ module type PVSS = sig
   val reconstruct : Clear_share.t list -> int list -> Public_key.t
 end
 end
-# 74 "v4.in.ml"
+# 76 "v4.in.ml"
 
 
   module Blake2B : sig
@@ -6952,7 +6954,7 @@ end
 
 module Make (Register : Register) (Name : PrefixedName) : S.HASH
 end
-# 76 "v4.in.ml"
+# 78 "v4.in.ml"
 
 
   module Bls12_381 : sig
@@ -6990,7 +6992,7 @@ module G2 : S.CURVE with type Scalar.t = Fr.t
 
 val pairing_check : (G1.t * G2.t) list -> bool
 end
-# 78 "v4.in.ml"
+# 80 "v4.in.ml"
 
 
   module Bls_signature : sig
@@ -7058,7 +7060,7 @@ val verify : pk -> Bytes.t -> signature -> bool
 
 val aggregate_verify : (pk * Bytes.t) list -> signature -> bool
 end
-# 80 "v4.in.ml"
+# 82 "v4.in.ml"
 
 
   module Ed25519 : sig
@@ -7092,7 +7094,7 @@ end
 
 include S.SIGNATURE with type watermark := bytes
 end
-# 82 "v4.in.ml"
+# 84 "v4.in.ml"
 
 
   module Secp256k1 : sig
@@ -7126,7 +7128,7 @@ end
 
 include S.SIGNATURE with type watermark := bytes
 end
-# 84 "v4.in.ml"
+# 86 "v4.in.ml"
 
 
   module P256 : sig
@@ -7160,7 +7162,7 @@ end
 
 include S.SIGNATURE with type watermark := bytes
 end
-# 86 "v4.in.ml"
+# 88 "v4.in.ml"
 
 
   module Chain_id : sig
@@ -7192,7 +7194,7 @@ end
 
 include S.HASH
 end
-# 88 "v4.in.ml"
+# 90 "v4.in.ml"
 
 
   module Signature : sig
@@ -7244,7 +7246,7 @@ include
      and type Public_key.t = public_key
      and type watermark := watermark
 end
-# 90 "v4.in.ml"
+# 92 "v4.in.ml"
 
 
   module Block_hash : sig
@@ -7277,7 +7279,7 @@ end
 (** Blocks hashes / IDs. *)
 include S.HASH
 end
-# 92 "v4.in.ml"
+# 94 "v4.in.ml"
 
 
   module Operation_hash : sig
@@ -7310,7 +7312,7 @@ end
 (** Operations hashes / IDs. *)
 include S.HASH
 end
-# 94 "v4.in.ml"
+# 96 "v4.in.ml"
 
 
   module Operation_list_hash : sig
@@ -7343,7 +7345,7 @@ end
 (** Blocks hashes / IDs. *)
 include S.MERKLE_TREE with type elt = Operation_hash.t
 end
-# 96 "v4.in.ml"
+# 98 "v4.in.ml"
 
 
   module Operation_list_list_hash : sig
@@ -7376,7 +7378,7 @@ end
 (** Blocks hashes / IDs. *)
 include S.MERKLE_TREE with type elt = Operation_list_hash.t
 end
-# 98 "v4.in.ml"
+# 100 "v4.in.ml"
 
 
   module Protocol_hash : sig
@@ -7409,7 +7411,7 @@ end
 (** Protocol hashes / IDs. *)
 include S.HASH
 end
-# 100 "v4.in.ml"
+# 102 "v4.in.ml"
 
 
   module Context_hash : sig
@@ -7462,7 +7464,7 @@ end
 
 type version = Version.t
 end
-# 102 "v4.in.ml"
+# 104 "v4.in.ml"
 
 
   module Pvss_secp256k1 : sig
@@ -7496,7 +7498,7 @@ end
 
 include S.PVSS
 end
-# 104 "v4.in.ml"
+# 106 "v4.in.ml"
 
 
   module Sapling : sig
@@ -7627,7 +7629,7 @@ module Verification : sig
   val final_check : t -> UTXO.transaction -> string -> bool
 end
 end
-# 106 "v4.in.ml"
+# 108 "v4.in.ml"
 
 
   module Timelock : sig
@@ -7686,7 +7688,7 @@ val open_chest : chest -> chest_key -> time:int -> opening_result
     Used for gas accounting*)
 val get_plaintext_size : chest -> int
 end
-# 108 "v4.in.ml"
+# 110 "v4.in.ml"
 
 
   module Micheline : sig
@@ -7746,7 +7748,7 @@ val annotations : ('l, 'p) node -> string list
 
 val strip_locations : (_, 'p) node -> 'p canonical
 end
-# 110 "v4.in.ml"
+# 112 "v4.in.ml"
 
 
   module Block_header : sig
@@ -7797,7 +7799,7 @@ type t = {shell : shell_header; protocol_data : bytes}
 
 include S.HASHABLE with type t := t and type hash := Block_hash.t
 end
-# 112 "v4.in.ml"
+# 114 "v4.in.ml"
 
 
   module Fitness : sig
@@ -7831,7 +7833,7 @@ end
     compared in a lexicographical order (longer list are greater). *)
 include S.T with type t = bytes list
 end
-# 114 "v4.in.ml"
+# 116 "v4.in.ml"
 
 
   module Operation : sig
@@ -7875,7 +7877,7 @@ type t = {shell : shell_header; proto : bytes}
 
 include S.HASHABLE with type t := t and type hash := Operation_hash.t
 end
-# 116 "v4.in.ml"
+# 118 "v4.in.ml"
 
 
   module Context : sig
@@ -8205,7 +8207,7 @@ module Cache :
      and type key = cache_key
      and type value = cache_value
 end
-# 118 "v4.in.ml"
+# 120 "v4.in.ml"
 
 
   module Updater : sig
@@ -8506,7 +8508,7 @@ end
    not complete until [init] in invoked. *)
 val activate : Context.t -> Protocol_hash.t -> Context.t Lwt.t
 end
-# 120 "v4.in.ml"
+# 122 "v4.in.ml"
 
 
   module RPC_context : sig
@@ -8661,6 +8663,6 @@ val make_opt_call3 :
   'i ->
   'o option shell_tzresult Lwt.t
 end
-# 122 "v4.in.ml"
+# 124 "v4.in.ml"
 
 end

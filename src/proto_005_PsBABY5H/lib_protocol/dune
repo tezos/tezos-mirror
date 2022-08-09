@@ -15,7 +15,7 @@
  (action
   (write-file
    %{targets}
-   "module Name = struct let name = \"005-PsBABY5H\" end\ninclude Tezos_protocol_environment.V0.Make(Name)()\nmodule CamlinternalFormatBasics = struct include CamlinternalFormatBasics end\n")))
+   "module Name = struct let name = \"005-PsBABY5H\" end\ninclude Tezos_protocol_environment.V0.Make(Name)()\n")))
 
 (library
  (name tezos_raw_protocol_005_PsBABY5H)

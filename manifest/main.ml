@@ -2000,9 +2000,6 @@ let octez_protocol_compiler_lib =
                     S "-o";
                     S "%{targets}";
                   ];
-                S "%{lib:stdlib:camlinternalFormatBasics.cmi}";
-                S
-                  "%{lib:tezos-protocol-environment.sigs-internals:tezos_protocol_environment_sigs_internals.cmi}";
                 S
                   "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs.cmi}";
                 S
@@ -3592,7 +3589,6 @@ end = struct
                         (sf
                            {|module Name = struct let name = "%s" end
 include Tezos_protocol_environment.V%d.Make(Name)()
-module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
 |}
                            name_dash
                            tezos_protocol.expected_env_version);
