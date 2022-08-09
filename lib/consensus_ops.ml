@@ -78,6 +78,15 @@ let delegate_ops_encoding =
 
 type block_op = {op : operation; delegate : Signature.public_key_hash}
 
+let block_op_encoding =
+  let open Data_encoding in
+  conv
+    (fun {op; delegate} -> (op, delegate))
+    (fun (op, delegate) -> {op; delegate})
+    (obj2
+       (req "operation" operation_encoding)
+       (req "delegate" Signature.Public_key_hash.encoding))
+
 type right = {
   address : Signature.Public_key_hash.t;
   first_slot : int;
