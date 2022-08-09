@@ -178,51 +178,6 @@ let run ?env node =
     node
     ["run"; "--data-dir"; node.persistent_state.data_dir]
 
-(* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3480
-
-   This is a temporary way of querying the node without
-   dal_client. This aims to be replaced as soon as possible by
-   the dedicated client's RPC. *)
-let raw_get_rpc dal_node ~url =
-  let* rpc = RPC.Curl.get () in
-  match rpc with
-  | None -> assert false
-  | Some curl ->
-      let url =
-        Printf.sprintf
-          "%s/%s"
-          (rpc_host dal_node ^ ":" ^ Int.to_string (rpc_port dal_node))
-          url
-      in
-      curl ~url
-
-let raw_post_rpc dal_node ~url data =
-  let* rpc = RPC.Curl.post () in
-  match rpc with
-  | None -> assert false
-  | Some curl ->
-      let url =
-        Printf.sprintf
-          "%s/%s"
-          (rpc_host dal_node ^ ":" ^ Int.to_string (rpc_port dal_node))
-          url
-      in
-      curl ~url data
-
-let split_slot_rpc dal_node slot =
-  let slot =
-    JSON.parse ~origin:"dal_node_split_slot_rpc" (Format.sprintf "\"%s\"" slot)
-  in
-  let* wrapped_result = raw_post_rpc dal_node ~url:"slot/split?fill" slot in
-  return (JSON.as_string wrapped_result)
-
-let slot_content_rpc dal_node slot_header =
-  let* wrapped_result =
-    let url = Format.sprintf "slot/content/%s/?trim" slot_header in
-    raw_get_rpc dal_node ~url
-  in
-  return (JSON.as_string wrapped_result)
-
 let run ?(wait_ready = true) ?env node =
   let* () = run ?env node in
   let* () = if wait_ready then wait_for_ready node else Lwt.return_unit in

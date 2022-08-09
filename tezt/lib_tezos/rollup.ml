@@ -529,6 +529,36 @@ module Dal = struct
       return {number_of_shards; redundancy_factor; slot_size; segment_size}
   end
 
+  module RPC = struct
+    let make ?data ?query_string =
+      RPC.make
+        ?data
+        ?query_string
+        ~get_host:Dal_node.rpc_host
+        ~get_port:Dal_node.rpc_port
+
+    let split_slot slot =
+      let slot =
+        JSON.parse
+          ~origin:"dal_node_split_slot_rpc"
+          (Format.sprintf "\"%s\"" slot)
+      in
+      let data = JSON.unannotate slot in
+      make
+        ~data
+        POST
+        ["slot"; "split"]
+        ~query_string:[("fill", "")]
+        JSON.as_string
+
+    let slot_content slot_header =
+      make
+        GET
+        ["slot"; "content"; slot_header]
+        ~query_string:[("trim", "")]
+        JSON.as_string
+  end
+
   module Cryptobox = Tezos_crypto_dal.Cryptobox
 
   let make
