@@ -188,6 +188,7 @@ struct
   module Either = Either
   module Seq = Tezos_error_monad.TzLwtreslib.Seq
   module List = Tezos_error_monad.TzLwtreslib.List
+  module Array = Tezos_protocol_environment_structs.V7.Array
   module Char = Char
   module Bytes = Bytes
   module Hex = Tezos_stdlib.Hex

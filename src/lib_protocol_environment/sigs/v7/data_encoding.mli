@@ -170,18 +170,6 @@ val option : 'a encoding -> 'a option encoding
     encodings do not collide). *)
 val result : 'a encoding -> 'b encoding -> ('a, 'b) result encoding
 
-(** Array combinator.
-    - encoded as an array in JSON
-    - encoded as the concatenation of all the element in binary
-     prefixed its length in bytes
-
-    @param [max_length]
-    If [max_length] is passed and the encoding of elements has fixed
-    size, a {!check_size} is automatically added for earlier rejection.
-
-    @raise Invalid_argument if the inner encoding is variable. *)
-val array : ?max_length:int -> 'a encoding -> 'a array encoding
-
 (** List combinator.
     - encoded as an array in JSON
     - encoded as the concatenation of all the element in binary

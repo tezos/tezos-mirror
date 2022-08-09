@@ -3319,18 +3319,6 @@ val option : 'a encoding -> 'a option encoding
     encodings do not collide). *)
 val result : 'a encoding -> 'b encoding -> ('a, 'b) result encoding
 
-(** Array combinator.
-    - encoded as an array in JSON
-    - encoded as the concatenation of all the element in binary
-     prefixed its length in bytes
-
-    @param [max_length]
-    If [max_length] is passed and the encoding of elements has fixed
-    size, a {!check_size} is automatically added for earlier rejection.
-
-    @raise Invalid_argument if the inner encoding is variable. *)
-val array : ?max_length:int -> 'a encoding -> 'a array encoding
-
 (** List combinator.
     - encoded as an array in JSON
     - encoded as the concatenation of all the element in binary
@@ -7210,6 +7198,116 @@ end
 # 54 "v7.in.ml"
 
 
+  module Array : sig
+# 1 "v7/array.mli"
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(** This module is a very restricted subset of OCaml's Stdlib Array module.
+    There is just enough exposed that you can pass arrays around to some
+    functions and such, but not enough that you can easily shoot yourself in the
+    foot. (See details below.)
+
+    If you need Arrays with more features, you should check the [FallbackArray]
+    module. *)
+
+(** The type of native OCaml arrays. You can construct them with the literal
+    syntax ([[|"like"; "so"|]]) or obtain them by deserialising data. *)
+type 'a t = 'a array
+
+val concat : 'a t list -> 'a t
+
+val length : 'a t -> int
+
+val to_list : 'a t -> 'a list
+
+(**/**)
+
+(* This Array module is the thinest shim we can get away with for use with Plonk.
+   To avoid any issues with arrays — notably to avoid exceptions when getting
+   out of bounds and to avoid any issues with mutability — we shadow [get] and
+   [set] as well as a few other functions.
+
+   Note that we do not shadow every other function. E.g., [of_list]. This is
+   because those functions might be added later. We only shadow functions which
+   may cause serious issues. *)
+
+val get : [`You_cannot_access_array_content_in_the_protocol]
+
+val unsafe_get : [`You_cannot_access_array_content_in_the_protocol]
+
+val set : [`You_cannot_modify_array_content_in_the_protocol]
+
+val unsafe_set : [`You_cannot_modify_array_content_in_the_protocol]
+
+(* The [to_list] conversion above is supported, but [to_seq] can be an issue
+   because different indexes could be read at different times and the array
+   could have been modified in the mean time (not by the protocol but by an
+   underlying function. *)
+val to_seq : [`You_cannot_traverse_arrays_lazily_in_the_protocol]
+
+val to_seqi : [`You_cannot_traverse_arrays_lazily_in_the_protocol]
+
+(* Make can create sharing which is error prone *)
+val make : [`You_cannot_build_arrays_with_implicit_sharing_in_the_protocol]
+
+val create : [`You_cannot_build_arrays_with_implicit_sharing_in_the_protocol]
+
+val make_matrix :
+  [`You_cannot_build_arrays_with_implicit_sharing_in_the_protocol]
+
+val create_float : [`You_cannot_use_floats_in_the_protocol]
+
+val make_float : [`You_cannot_use_floats_in_the_protocol]
+
+(* These functions use indexes which can raise exceptions *)
+val sub : [`You_cannot_cut_arrays_in_the_protocol]
+
+val fill : [`You_cannot_fill_arrays_in_the_protocol]
+
+val blit : [`You_cannot_blit_arrays_in_the_protocol]
+
+(* *2 functions can raise exceptions *)
+val iter2 : [`You_cannot_traverse_2_arrays_at_once_in_the_protocol]
+
+val map2 : [`You_cannot_traverse_2_arrays_at_once_in_the_protocol]
+
+val combine : [`You_cannot_traverse_2_arrays_at_once_in_the_protocol]
+
+(* side-effects *)
+val sort : [`You_cannot_sort_arrays_in_the_protocol]
+
+val stable_sort : [`You_cannot_sort_arrays_in_the_protocol]
+
+val fast_sort : [`You_cannot_sort_arrays_in_the_protocol]
+
+module Floatarray : sig end
+end
+# 56 "v7.in.ml"
+
+
   module Set : sig
 # 1 "v7/set.mli"
 (*****************************************************************************)
@@ -7356,7 +7454,7 @@ end
 
 module Make (Ord : Compare.COMPARABLE) : S with type elt = Ord.t
 end
-# 56 "v7.in.ml"
+# 58 "v7.in.ml"
 
 
   module Map : sig
@@ -7525,7 +7623,7 @@ end
 
 module Make (Ord : Compare.COMPARABLE) : S with type key = Ord.t
 end
-# 58 "v7.in.ml"
+# 60 "v7.in.ml"
 
 
   module Option : sig
@@ -7673,7 +7771,7 @@ val catch : ?catch_only:(exn -> bool) -> (unit -> 'a) -> 'a option
 val catch_s :
   ?catch_only:(exn -> bool) -> (unit -> 'a Lwt.t) -> 'a option Lwt.t
 end
-# 60 "v7.in.ml"
+# 62 "v7.in.ml"
 
 
   module Result : sig
@@ -7839,7 +7937,7 @@ val catch_f :
 val catch_s :
   ?catch_only:(exn -> bool) -> (unit -> 'a Lwt.t) -> ('a, exn) result Lwt.t
 end
-# 62 "v7.in.ml"
+# 64 "v7.in.ml"
 
 
   module RPC_arg : sig
@@ -7909,7 +8007,7 @@ type ('a, 'b) eq = Eq : ('a, 'a) eq
 
 val eq : 'a arg -> 'b arg -> ('a, 'b) eq option
 end
-# 64 "v7.in.ml"
+# 66 "v7.in.ml"
 
 
   module RPC_path : sig
@@ -7965,7 +8063,7 @@ val add_final_args :
 val ( /:* ) :
   ('prefix, 'params) path -> 'a RPC_arg.t -> ('prefix, 'params * 'a list) path
 end
-# 66 "v7.in.ml"
+# 68 "v7.in.ml"
 
 
   module RPC_query : sig
@@ -8037,7 +8135,7 @@ exception Invalid of string
 
 val parse : 'a query -> untyped -> 'a
 end
-# 68 "v7.in.ml"
+# 70 "v7.in.ml"
 
 
   module RPC_service : sig
@@ -8114,7 +8212,7 @@ val put_service :
   ('prefix, 'params) RPC_path.t ->
   ([`PUT], 'prefix, 'params, 'query, 'input, 'output) service
 end
-# 70 "v7.in.ml"
+# 72 "v7.in.ml"
 
 
   module RPC_answer : sig
@@ -8175,7 +8273,7 @@ val not_found : 'o t Lwt.t
 
 val fail : error list -> 'a t Lwt.t
 end
-# 72 "v7.in.ml"
+# 74 "v7.in.ml"
 
 
   module RPC_directory : sig
@@ -8440,7 +8538,7 @@ val register_dynamic_directory :
   ('a -> 'a directory Lwt.t) ->
   'prefix directory
 end
-# 74 "v7.in.ml"
+# 76 "v7.in.ml"
 
 
   module Base58 : sig
@@ -8505,7 +8603,7 @@ val check_encoded_prefix : 'a encoding -> string -> int -> unit
     not start with a registered prefix. *)
 val decode : string -> data option
 end
-# 76 "v7.in.ml"
+# 78 "v7.in.ml"
 
 
   module S : sig
@@ -8923,7 +9021,7 @@ module type PVSS = sig
   val reconstruct : Clear_share.t list -> int list -> Public_key.t
 end
 end
-# 78 "v7.in.ml"
+# 80 "v7.in.ml"
 
 
   module Blake2B : sig
@@ -8988,7 +9086,7 @@ end
 
 module Make (Register : Register) (Name : PrefixedName) : S.HASH
 end
-# 80 "v7.in.ml"
+# 82 "v7.in.ml"
 
 
   module Bls12_381 : sig
@@ -9026,7 +9124,7 @@ module G2 : S.CURVE with type Scalar.t = Fr.t
 
 val pairing_check : (G1.t * G2.t) list -> bool
 end
-# 82 "v7.in.ml"
+# 84 "v7.in.ml"
 
 
   module Bls_signature : sig
@@ -9122,7 +9220,7 @@ val verify : pk -> Bytes.t -> signature -> bool
 
 val aggregate_verify : (pk * Bytes.t) list -> signature -> bool
 end
-# 84 "v7.in.ml"
+# 86 "v7.in.ml"
 
 
   module Ed25519 : sig
@@ -9156,7 +9254,7 @@ end
 
 include S.SIGNATURE with type watermark := bytes
 end
-# 86 "v7.in.ml"
+# 88 "v7.in.ml"
 
 
   module Secp256k1 : sig
@@ -9190,7 +9288,7 @@ end
 
 include S.SIGNATURE with type watermark := bytes
 end
-# 88 "v7.in.ml"
+# 90 "v7.in.ml"
 
 
   module P256 : sig
@@ -9224,7 +9322,7 @@ end
 
 include S.SIGNATURE with type watermark := bytes
 end
-# 90 "v7.in.ml"
+# 92 "v7.in.ml"
 
 
   module Chain_id : sig
@@ -9256,7 +9354,7 @@ end
 
 include S.HASH
 end
-# 92 "v7.in.ml"
+# 94 "v7.in.ml"
 
 
   module Signature : sig
@@ -9308,7 +9406,7 @@ include
      and type Public_key.t = public_key
      and type watermark := watermark
 end
-# 94 "v7.in.ml"
+# 96 "v7.in.ml"
 
 
   module Block_hash : sig
@@ -9341,7 +9439,7 @@ end
 (** Blocks hashes / IDs. *)
 include S.HASH
 end
-# 96 "v7.in.ml"
+# 98 "v7.in.ml"
 
 
   module Operation_hash : sig
@@ -9374,7 +9472,7 @@ end
 (** Operations hashes / IDs. *)
 include S.HASH
 end
-# 98 "v7.in.ml"
+# 100 "v7.in.ml"
 
 
   module Operation_list_hash : sig
@@ -9407,7 +9505,7 @@ end
 (** Blocks hashes / IDs. *)
 include S.MERKLE_TREE with type elt = Operation_hash.t
 end
-# 100 "v7.in.ml"
+# 102 "v7.in.ml"
 
 
   module Operation_list_list_hash : sig
@@ -9440,7 +9538,7 @@ end
 (** Blocks hashes / IDs. *)
 include S.MERKLE_TREE with type elt = Operation_list_hash.t
 end
-# 102 "v7.in.ml"
+# 104 "v7.in.ml"
 
 
   module Protocol_hash : sig
@@ -9473,7 +9571,7 @@ end
 (** Protocol hashes / IDs. *)
 include S.HASH
 end
-# 104 "v7.in.ml"
+# 106 "v7.in.ml"
 
 
   module Context_hash : sig
@@ -9526,7 +9624,7 @@ end
 
 type version = Version.t
 end
-# 106 "v7.in.ml"
+# 108 "v7.in.ml"
 
 
   module Pvss_secp256k1 : sig
@@ -9560,7 +9658,7 @@ end
 
 include S.PVSS
 end
-# 108 "v7.in.ml"
+# 110 "v7.in.ml"
 
 
   module Sapling : sig
@@ -9708,7 +9806,7 @@ module Verification : sig
   val final_check : t -> UTXO.transaction -> string -> bool
 end
 end
-# 110 "v7.in.ml"
+# 112 "v7.in.ml"
 
 
   module Timelock : sig
@@ -9767,7 +9865,7 @@ val open_chest : chest -> chest_key -> time:int -> opening_result
     Used for gas accounting*)
 val get_plaintext_size : chest -> int
 end
-# 112 "v7.in.ml"
+# 114 "v7.in.ml"
 
 
   module Vdf : sig
@@ -9855,7 +9953,7 @@ val prove : discriminant -> challenge -> difficulty -> result * proof
     @raise Invalid_argument when inputs are invalid *)
 val verify : discriminant -> challenge -> difficulty -> result -> proof -> bool
 end
-# 114 "v7.in.ml"
+# 116 "v7.in.ml"
 
 
   module Micheline : sig
@@ -9915,7 +10013,7 @@ val annotations : ('l, 'p) node -> string list
 
 val strip_locations : (_, 'p) node -> 'p canonical
 end
-# 116 "v7.in.ml"
+# 118 "v7.in.ml"
 
 
   module Block_header : sig
@@ -9972,7 +10070,7 @@ type t = {shell : shell_header; protocol_data : bytes}
 
 include S.HASHABLE with type t := t and type hash := Block_hash.t
 end
-# 118 "v7.in.ml"
+# 120 "v7.in.ml"
 
 
   module Bounded : sig
@@ -10050,7 +10148,7 @@ module Int32 : sig
   module NonNegative : S
 end
 end
-# 120 "v7.in.ml"
+# 122 "v7.in.ml"
 
 
   module Fitness : sig
@@ -10084,7 +10182,7 @@ end
     compared in a lexicographical order (longer list are greater). *)
 include S.T with type t = bytes list
 end
-# 122 "v7.in.ml"
+# 124 "v7.in.ml"
 
 
   module Operation : sig
@@ -10128,7 +10226,7 @@ type t = {shell : shell_header; proto : bytes}
 
 include S.HASHABLE with type t := t and type hash := Operation_hash.t
 end
-# 124 "v7.in.ml"
+# 126 "v7.in.ml"
 
 
   module Context : sig
@@ -10765,7 +10863,7 @@ module Cache :
      and type key = cache_key
      and type value = cache_value
 end
-# 126 "v7.in.ml"
+# 128 "v7.in.ml"
 
 
   module Updater : sig
@@ -11070,7 +11168,7 @@ end
    not complete until [init] in invoked. *)
 val activate : Context.t -> Protocol_hash.t -> Context.t Lwt.t
 end
-# 128 "v7.in.ml"
+# 130 "v7.in.ml"
 
 
   module RPC_context : sig
@@ -11225,7 +11323,7 @@ val make_opt_call3 :
   'i ->
   'o option shell_tzresult Lwt.t
 end
-# 130 "v7.in.ml"
+# 132 "v7.in.ml"
 
 
   module Wasm_2_0_0 : sig
@@ -11278,7 +11376,7 @@ module Make
   val get_info : Tree.tree -> info Lwt.t
 end
 end
-# 132 "v7.in.ml"
+# 134 "v7.in.ml"
 
 
   module Plonk : sig
@@ -11310,14 +11408,6 @@ end
 
 type scalar := Bls12_381.Fr.t
 
-module Array : sig
-  val concat : 'a array list -> 'a array
-
-  val length : 'a array -> int
-
-  val to_list : 'a array -> 'a list
-end
-
 type public_parameters
 
 type proof
@@ -11327,6 +11417,8 @@ val public_parameters_encoding : public_parameters Data_encoding.t
 val proof_encoding : proof Data_encoding.t
 
 val scalar_encoding : scalar Data_encoding.t
+
+val scalar_array_encoding : scalar array Data_encoding.t
 
 (** Verifier function: checks proof
    Inputs:
@@ -11352,7 +11444,7 @@ val verify_multi_circuits :
   proof ->
   bool
 end
-# 134 "v7.in.ml"
+# 136 "v7.in.ml"
 
 
   module Dal : sig
@@ -11455,6 +11547,6 @@ val verify_segment :
     [> `Degree_exceeds_srs_length of string | `Segment_index_out_of_range] )
   Result.t
 end
-# 136 "v7.in.ml"
+# 138 "v7.in.ml"
 
 end

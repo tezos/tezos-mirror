@@ -53,6 +53,8 @@ module type T = sig
 
   module List : [%sig "v7/list.mli"]
 
+  module Array : [%sig "v7/array.mli"]
+
   module Set : [%sig "v7/set.mli"]
 
   module Map : [%sig "v7/map.mli"]

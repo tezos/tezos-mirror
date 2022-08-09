@@ -23,40 +23,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type scalar := Bls12_381.Fr.t
+include Stdlib.Array
 
-type public_parameters
+let get = `You_cannot_access_array_content_in_the_protocol
 
-type proof
+let unsafe_get = `You_cannot_access_array_content_in_the_protocol
 
-val public_parameters_encoding : public_parameters Data_encoding.t
+let set = `You_cannot_modify_array_content_in_the_protocol
 
-val proof_encoding : proof Data_encoding.t
+let unsafe_set = `You_cannot_modify_array_content_in_the_protocol
 
-val scalar_encoding : scalar Data_encoding.t
+let to_seq = `You_cannot_traverse_arrays_lazily_in_the_protocol
 
-val scalar_array_encoding : scalar array Data_encoding.t
+let to_seqi = `You_cannot_traverse_arrays_lazily_in_the_protocol
 
-(** Verifier function: checks proof
-   Inputs:
-   - public_parameters: output of setup
-   - public_inputs (scalar array): the first values of private_inputs that are public
-   - proof: output of prove
-   Outputs:
-   - bool
-*)
-val verify : public_parameters -> public_inputs:scalar array -> proof -> bool
+let make = `You_cannot_build_arrays_with_implicit_sharing_in_the_protocol
 
-(**  Verifier function: checks a bunch of proofs for several circuits
-   Inputs:
-   - public_parameters: output of setup_multi_circuits for the circuits being checked
-   - public_inputs: StringMap where the lists of public inputs are binded with the circuit to which they correspond
-   - proof: the unique proof that correspond to all inputs
-   Outputs:
-   - bool
-*)
-val verify_multi_circuits :
-  public_parameters ->
-  public_inputs:(string * scalar array list) list ->
-  proof ->
-  bool
+let create = `You_cannot_build_arrays_with_implicit_sharing_in_the_protocol
+
+let make_matrix = `You_cannot_build_arrays_with_implicit_sharing_in_the_protocol
+
+let create_float = `You_cannot_use_floats_in_the_protocol
+
+let make_float = `You_cannot_use_floats_in_the_protocol
+
+let sub = `You_cannot_cut_arrays_in_the_protocol
+
+let fill = `You_cannot_fill_arrays_in_the_protocol
+
+let blit = `You_cannot_blit_arrays_in_the_protocol
+
+let iter2 = `You_cannot_traverse_2_arrays_at_once_in_the_protocol
+
+let map2 = `You_cannot_traverse_2_arrays_at_once_in_the_protocol
+
+let combine = `You_cannot_traverse_2_arrays_at_once_in_the_protocol
+
+let sort = `You_cannot_sort_arrays_in_the_protocol
+
+let stable_sort = `You_cannot_sort_arrays_in_the_protocol
+
+let fast_sort = `You_cannot_sort_arrays_in_the_protocol
+
+module Floatarray = struct end

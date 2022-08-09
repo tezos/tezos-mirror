@@ -30,13 +30,7 @@ type public_parameters = verifier_public_parameters * transcript
 let public_parameters_encoding =
   Data_encoding.tup2 verifier_public_parameters_encoding transcript_encoding
 
-module Array = struct
-  let concat = Stdlib.Array.concat
-
-  let length = Stdlib.Array.length
-
-  let to_list = Stdlib.Array.to_list
-end
+let scalar_array_encoding = Data_encoding.array scalar_encoding
 
 let verify pp ~public_inputs proof =
   Result.value ~default:false
