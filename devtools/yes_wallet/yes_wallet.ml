@@ -151,6 +151,8 @@ let usage () =
      if %s is used the deactivated bakers are filtered out@,\
      if %s <NUM> is used, the first largest bakers that have an accumulated \
      stake of at least <NUM> percent of the total stake are kept@]@]@,\
+     @[<v>@[<v 4>> dump staking balances from <base_dir> in <csv_file>@,\
+     saves the staking balances of all delegates in the target csv file@]@]@,\
      @[<v>if %s is used existing files will be overwritten@]@."
     active_bakers_only_opt_name
     staking_share_opt_name
@@ -224,6 +226,8 @@ let () =
           base_dir
           active_bakers_only
           staking_share_opt
+        (* get rid of stake *)
+        |> List.map (fun (alias, pkh, pk, _stake) -> (alias, pkh, pk))
       in
       Format.printf
         "@[<h>Number of keys to export:@;<3 0>%d@]@."
@@ -245,6 +249,23 @@ let () =
           "I refuse to rewrite files in %s without confirmation or --force \
            flag@."
           base_dir
+  | [_; "dump"; "staking"; "balances"; "from"; base_dir; "in"; csv_file] ->
+      let alias_pkh_pk_list =
+        Yes_wallet_lib.load_mainnet_bakers_public_keys
+          base_dir
+          active_bakers_only
+          staking_share_opt
+      in
+      let flags =
+        if !force then [Open_wronly; Open_creat; Open_trunc; Open_text]
+        else [Open_wronly; Open_creat; Open_excl; Open_text]
+      in
+      Out_channel.with_open_gen flags 0o666 csv_file (fun oc ->
+          let fmtr = Format.formatter_of_out_channel oc in
+          List.iter
+            (fun (_alias, pkh, _pk, stake) ->
+              Format.fprintf fmtr "%s, %Ld\n" pkh stake)
+            alias_pkh_pk_list)
   | _ ->
       Format.eprintf "Invalid command. Usage:@." ;
       usage () ;
