@@ -295,6 +295,10 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       let* predecessor_published =
         predecessor_is_published cctxt rollup_address commitment.predecessor
       in
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3528
+         The injector should make this test redundant. Therefore, we should
+         remove this test when the injector is merged.
+      *)
       when_ predecessor_published @@ fun () ->
       let* () =
         if check_lcc_hash then
