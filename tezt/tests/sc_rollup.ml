@@ -2710,6 +2710,18 @@ let test_late_rollup_node =
   let* _status = Sc_rollup_node.wait_for_level ~timeout:2. sc_rollup_node 95 in
   return ()
 
+let timeout ?expect_failure ~sc_rollup ~staker client =
+  let*! () =
+    Client.Sc_rollup.timeout
+      ~hooks
+      ~dst:sc_rollup
+      ~src:"bootstrap1"
+      ~staker
+      client
+      ?expect_failure
+  in
+  Client.bake_for_and_wait client
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
