@@ -26,6 +26,11 @@
 include RPC_core
 include RPC_legacy
 
+type 'a t = (Node.t, 'a) RPC_core.t
+
+let make ?data ?query_string =
+  make ?data ?query_string ~get_host:Node.rpc_host ~get_port:Node.rpc_port
+
 let get_config = make GET ["config"] Fun.id
 
 let get_network_connections =
@@ -393,3 +398,5 @@ let get_chain_block_context_sc_rollup_staker_staked_on_commitment
       "staked_on_commitment";
     ]
     Fun.id
+
+let make = RPC_core.make

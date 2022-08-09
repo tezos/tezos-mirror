@@ -41,16 +41,18 @@ let cohttp_of_verb : verb -> Cohttp.Code.meth = function
   | PATCH -> `PATCH
   | DELETE -> `DELETE
 
-type 'a t = {
+type ('endpoint, 'result) t = {
   verb : verb;
   path : string list;
   query_string : (string * string) list;
   data : JSON.u option;
-  decode : JSON.t -> 'a;
+  decode : JSON.t -> 'result;
+  get_host : 'endpoint -> string;
+  get_port : 'endpoint -> int;
 }
 
-let make ?data ?(query_string = []) verb path decode =
-  {verb; path; query_string; data; decode}
+let make ?data ?(query_string = []) ~get_host ~get_port verb path decode =
+  {verb; path; query_string; data; decode; get_host; get_port}
 
 let decode_raw ?(origin = "RPC response") rpc raw =
   rpc.decode (JSON.parse ~origin raw)
@@ -59,11 +61,11 @@ let decode rpc json = rpc.decode json
 
 type 'a response = {body : 'a; code : int}
 
-let make_uri node rpc =
+let make_uri endpoint rpc =
   Uri.make
     ~scheme:"http"
-    ~host:(Node.rpc_host node)
-    ~port:(Node.rpc_port node)
+    ~host:(rpc.get_host endpoint)
+    ~port:(rpc.get_port endpoint)
     ~path:(String.concat "/" rpc.path)
     ~query:(List.map (fun (k, v) -> (k, [v])) rpc.query_string)
     ()
@@ -131,9 +133,11 @@ let call ?log_request ?log_response_status ?log_response_body node rpc =
   return (rpc.decode response.body)
 
 module Client = struct
+  type nonrec 'a t = (Node.t, 'a) t
+
   let call_raw ?log_command ?log_status_on_exit ?log_output ?better_errors
-      ?endpoint ?hooks ?env client {verb; path; query_string; data; decode = _}
-      =
+      ?endpoint ?hooks ?env client
+      {verb; path; query_string; data; decode = _; _} =
     (* No need to log here, the [Process] module already logs. *)
     Client.spawn_rpc
       ?log_command
@@ -183,8 +187,8 @@ module Client = struct
     return (rpc.decode json)
 
   let spawn ?log_command ?log_status_on_exit ?log_output ?better_errors
-      ?endpoint ?hooks ?env client {verb; path; query_string; data; decode = _}
-      =
+      ?endpoint ?hooks ?env client
+      {verb; path; query_string; data; decode = _; _} =
     Client.Spawn.rpc
       ?log_command
       ?log_status_on_exit
