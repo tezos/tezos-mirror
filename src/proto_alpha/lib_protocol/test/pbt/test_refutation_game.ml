@@ -41,12 +41,48 @@ open Lib_test.Qcheck2_helpers
 
 let qcheck_make_lwt = qcheck_make_lwt ~extract:Lwt_main.run
 
+let qcheck_make_lwt_res ?print ?count ~name ~gen f =
+  qcheck_make_result
+    ~pp_error:Error_monad.pp_print_trace
+    ?print
+    ?count
+    ~name
+    ~gen
+    (fun a -> Lwt_main.run (f a))
+
+(** Lift a computation using environment errors to use shell errors. *)
+let lift k = Lwt.map Environment.wrap_tzresult k
 
 let tick_to_int_exn ?(__LOC__ = __LOC__) t =
   WithExceptions.Option.get ~loc:__LOC__ (Tick.to_int t)
 
 let tick_of_int_exn ?(__LOC__ = __LOC__) n =
   WithExceptions.Option.get ~loc:__LOC__ (Tick.of_int n)
+
+let number_of_ticks_of_int32_exn ?(__LOC__ = __LOC__) n =
+  WithExceptions.Option.get ~loc:__LOC__ (Number_of_ticks.of_int32 n)
+
+let make_external_inbox_message str =
+  WithExceptions.Result.get_ok
+    ~loc:__LOC__
+    Inbox.Message.(External str |> serialize)
+
+let game_status_of_refute_op_result = function
+  | [
+      Apply_results.Operation_metadata
+        {
+          contents =
+            Single_result
+              (Manager_operation_result
+                {
+                  operation_result =
+                    Applied (Sc_rollup_refute_result {game_status; _});
+                  _;
+                });
+        };
+    ] ->
+      game_status
+  | _ -> assert false
 
 let list_assoc (key : Tick.t) list = List.assoc ~equal:( = ) key list
 
@@ -169,6 +205,45 @@ let build_dissection ~number_of_sections ~start_chunk ~stop_chunk ~our_states =
      in
      Lwt.return @@ WithExceptions.Result.get_ok ~loc:__LOC__ r
 
+let originate_rollup originator messager ~first_inputs block =
+  let open Lwt_result_syntax in
+  let* origination_operation, sc_rollup =
+    Op.sc_rollup_origination
+      (B block)
+      originator
+      Kind.Example_arith
+      ~boot_sector:""
+      ~parameters_ty:(Script.lazy_expr @@ Expr.from_string "unit")
+  in
+  let* add_message_operation =
+    Op.sc_rollup_add_messages (B block) messager sc_rollup first_inputs
+  in
+  let* block =
+    Block.bake ~operations:[origination_operation; add_message_operation] block
+  in
+  let+ genesis_info = Context.Sc_rollup.genesis_info (B block) sc_rollup in
+  (block, sc_rollup, genesis_info)
+
+(** [create_ctxt account1 account2] creates a context where
+    an arith rollup was originated, and both [account1] and [account2] owns
+    enough tez to stake on a commitment. *)
+let create_ctxt ~first_inputs =
+  WithExceptions.Result.get_ok ~loc:__LOC__
+  @@ Lwt_main.run
+  @@
+  let open Lwt_result_syntax in
+  let* block, (account1, account2, account3) =
+    Context.init3
+      ~sc_rollup_enable:true
+      ~consensus_threshold:0
+      ~initial_balances:[100_000_000_000L; 100_000_000_000L; 100_000_000_000L]
+      ()
+  in
+  let* block, sc_rollup, genesis_info =
+    originate_rollup account3 account1 ~first_inputs block
+  in
+  return (block, sc_rollup, genesis_info, (account1, account2, account3))
+
 (** {2 Context free generators} *)
 
 (** Generate a {!State_hash.t}.
@@ -205,6 +280,70 @@ let gen_tick ?(lower_bound = 0) ?(upper_bound = 10_000) () =
   let open QCheck2.Gen in
   let+ tick = lower_bound -- upper_bound in
   tick_of_int_exn ~__LOC__ tick
+
+(** [gen_arith_pvm_inputs ~gen_size] is a `correct list` generator.
+    It generates a list of strings that are either integers or `+` to be
+    consumed by the arithmetic PVM.
+    If a `+` is found then the previous two element of the stack are poped
+    then added and the result is pushed to the stack. In particular,
+    lists like `[1 +]` are incorrect. *)
+let gen_arith_pvm_inputs ~gen_size =
+  let open QCheck2.Gen in
+  (* To preserve the correctness invariant, genlist is a recursive generator
+     that produce a pair `(stack_size, state_list)` where  state_list is a
+     correct list of integers and `+` and consuming it will produce a `stack`
+     of length `stack_size`.
+     For example a result can be `(3, [1; 2; +; 3; +; 2; 2; +; 1;]).
+     Consuming the list will produce the stack`[6; 4; 1]` which has length 3. *)
+  let produce_inputs self fuel =
+    match fuel with
+    | 0 -> map (fun x -> (1, [string_of_int x])) small_nat
+    | n ->
+        (* The generator has two branches.
+           1. with frequency 1 adds integers to state_list and increases the
+              corresponding stack_size.
+           2. With frequency 2, at each step, it looks at the inductive result
+              [(self (n - 1)) = (stack_size, state_list)].
+
+           If the stack_size is smaller than 2 then it adds an integer to the
+           state_list and increases the stack_size. Otherwise, it adds a plus
+           to the state_list and decreases the stack_size. *)
+        frequency
+          [
+            ( 2,
+              map2
+                (fun x (stack_size, state_list) ->
+                  if stack_size >= 2 then (stack_size - 1, "+" :: state_list)
+                  else (stack_size + 1, string_of_int x :: state_list))
+                small_nat
+                (self (n / 2)) );
+            ( 1,
+              map2
+                (fun x (i, y) -> (i + 1, string_of_int x :: y))
+                small_nat
+                (self (n / 2)) );
+          ]
+  in
+  let+ inputs = sized_size gen_size @@ fix produce_inputs in
+  snd inputs |> List.rev |> String.concat " "
+
+(** Generate a list of arith pvm inputs for a level *)
+let gen_arith_pvm_inputs_for_level ?(level_min = 0) ?(level_max = 1_000) () =
+  let open QCheck2.Gen in
+  let* level = level_min -- level_max in
+  let* input = gen_arith_pvm_inputs ~gen_size:(pure 0) in
+  let* inputs = small_list (gen_arith_pvm_inputs ~gen_size:(pure 0)) in
+  return (level, input :: inputs)
+
+(** Generate a list of level and associated arith pvm inputs. *)
+let gen_arith_pvm_inputs_for_levels ?level_min ?level_max () =
+  let open QCheck2.Gen in
+  let+ inputs_per_level =
+    small_list (gen_arith_pvm_inputs_for_level ?level_min ?level_max ())
+  in
+  List.sort_uniq
+    (fun (l, _) (l', _) -> Compare.Int.compare l l')
+    inputs_per_level
 
 (** Dissection helpers and tests *)
 module Dissection = struct
@@ -678,6 +817,763 @@ module Dissection = struct
         ] )
 end
 
-let tests = Dissection.tests :: Test_refutation_game_legacy.tests
+(** {2. ArithPVM utils} *)
+
+module ArithPVM = Sc_rollup_helpers.Arith_pvm
+
+module Tree_inbox = struct
+  open Inbox
+  module Store = Tezos_context_memory.Context
+
+  module Tree = struct
+    include Store.Tree
+
+    type tree = Store.tree
+
+    type t = Store.t
+
+    type key = string list
+
+    type value = bytes
+  end
+
+  type t = Store.t
+
+  type tree = Tree.tree
+
+  let commit_tree store key tree =
+    let open Lwt_syntax in
+    let* store = Store.add_tree store key tree in
+    let* _ = Store.commit ~time:Time.Protocol.epoch store in
+    return ()
+
+  let lookup_tree store hash =
+    let open Lwt_syntax in
+    let index = Store.index store in
+    let* _, tree =
+      Store.produce_tree_proof
+        index
+        (`Node (Hash.to_context_hash hash))
+        (fun x -> Lwt.return (x, x))
+    in
+    return (Some tree)
+
+  type proof = Store.Proof.tree Store.Proof.t
+
+  let verify_proof proof f =
+    Lwt.map Result.to_option (Store.verify_tree_proof proof f)
+
+  let produce_proof store tree f =
+    let open Lwt_syntax in
+    let index = Store.index store in
+    let* proof = Store.produce_tree_proof index (`Node (Tree.hash tree)) f in
+    return (Some proof)
+
+  let kinded_hash_to_inbox_hash = function
+    | `Value hash | `Node hash -> Hash.of_context_hash hash
+
+  let proof_before proof = kinded_hash_to_inbox_hash proof.Store.Proof.before
+
+  let proof_encoding =
+    Tezos_context_helpers.Merkle_proof_encoding.V1.Tree32.tree_proof_encoding
+end
+
+module Store_inbox = struct
+  include Inbox.Make_hashing_scheme (Tree_inbox)
+end
+
+module Arith_test_pvm = struct
+  include ArithPVM
+
+  let init_context () = Tezos_context_memory.make_empty_context ()
+
+  let initial_state ctxt =
+    let open Lwt_syntax in
+    let* state = initial_state ctxt in
+    let* state = install_boot_sector state "" in
+    return state
+
+  let initial_hash =
+    let open Lwt_syntax in
+    let* state = initial_state (init_context ()) in
+    state_hash state
+
+  let mk_input level message_counter msg =
+    let payload = make_external_inbox_message msg in
+    let level = Int32.of_int level in
+    {payload; message_counter; inbox_level = Raw_level.of_int32_exn level}
+
+  let consume_fuel = Option.map pred
+
+  let continue_with_fuel ~our_states ~(tick : int) fuel state f =
+    let open Lwt_syntax in
+    match fuel with
+    | Some 0 -> return (state, fuel, tick, our_states)
+    | _ -> f tick our_states (consume_fuel fuel) state
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3498
+
+     the following is almost the same code as in the rollup node, expect that it
+     creates the association list (tick, state_hash). *)
+  let eval_until_input ~fuel ~our_states start_tick state =
+    let open Lwt_syntax in
+    let eval_tick _tick state = eval state in
+    let rec go ~our_states fuel (tick : int) state =
+      let* input_request = is_input_state state in
+      match fuel with
+      | Some 0 -> return (state, fuel, tick, our_states)
+      | None | Some _ -> (
+          match input_request with
+          | No_input_required ->
+              let* state = eval_tick tick state in
+              let* state_hash = state_hash state in
+              let our_states = (tick, state_hash) :: our_states in
+              go ~our_states (consume_fuel fuel) (tick + 1) state
+          | _ -> return (state, fuel, tick, our_states))
+    in
+    go ~our_states fuel start_tick state
+
+  let feed_input ~fuel ~our_states ~tick state input =
+    let open Lwt_syntax in
+    let* state, fuel, tick, our_states =
+      eval_until_input ~fuel ~our_states tick state
+    in
+    continue_with_fuel ~our_states ~tick fuel state
+    @@ fun tick our_states fuel state ->
+    let* state = set_input input state in
+    let* state_hash = state_hash state in
+    let our_states = (tick, state_hash) :: our_states in
+    let tick = tick + 1 in
+    let* state, fuel, tick, our_states =
+      eval_until_input ~fuel ~our_states tick state
+    in
+    return (state, fuel, tick, our_states)
+
+  let eval_inbox ?fuel ~level ~inputs ~tick state =
+    let open Lwt_result_syntax in
+    List.fold_left_i_es
+      (fun message_counter (state, fuel, tick, our_states) input ->
+        let input = mk_input level (Z.of_int message_counter) input in
+        let*! state, fuel, tick, our_states =
+          feed_input ~fuel ~our_states ~tick state input
+        in
+        return (state, fuel, tick, our_states))
+      (state, fuel, tick, [])
+      inputs
+
+  let eval_levels_and_inputs ?fuel ctxt levels_and_inputs =
+    let open Lwt_result_syntax in
+    let*! state = initial_state ctxt in
+    let*! state_hash = state_hash state in
+    let our_states = [(0, state_hash)] in
+    let*! state, fuel, tick, our_states =
+      eval_until_input ~fuel ~our_states 1 state
+    in
+    let* state, _fuel, tick, our_states =
+      List.fold_left_es
+        (fun (state, fuel, tick, our_states) (level, inputs) ->
+          let* state, fuel, tick, our_states' =
+            eval_inbox ?fuel ~level ~inputs ~tick state
+          in
+          return (state, fuel, tick, our_states @ our_states'))
+        (state, fuel, tick, our_states)
+        levels_and_inputs
+    in
+    let our_states =
+      List.sort (fun (x, _) (y, _) -> Compare.Int.compare x y) our_states
+    in
+    let our_states =
+      List.map
+        (fun (tick_int, state) -> (tick_of_int_exn tick_int, state))
+        our_states
+    in
+    let tick = tick_of_int_exn tick in
+    return (state, tick, our_states)
+end
+
+(** Construct the inbox for the protocol side. *)
+let construct_inbox_proto block rollup levels_and_inputs contract =
+  let open Lwt_result_syntax in
+  List.fold_left_es
+    (fun block (level, payloads) ->
+      let*? current_level = Context.get_level (B block) in
+      let diff_with_level =
+        Raw_level.(diff (of_int32_exn (Int32.of_int level)) current_level)
+        |> Int32.to_int
+      in
+      let* block = Block.bake_n (diff_with_level - 1) block in
+      let* operation_add_message =
+        Op.sc_rollup_add_messages (B block) contract rollup payloads
+      in
+      Block.bake ~operation:operation_add_message block)
+    block
+    levels_and_inputs
+
+(** Kind of strategy a player can play
+
+    The cheaters will have their own version of inputs. This way, they
+    can produce valid proofs regarding their inboxes, but discarded by
+    the protocol.
+*)
+type strategy =
+  | Random  (** A random player will execute its own random vision of inputs. *)
+  | Perfect
+      (** A perfect player, never lies, always win.
+          GSW 73-9 2014-2015 mindset. *)
+
+let pp_strategy fmt = function
+  | Random -> Format.pp_print_string fmt "Random"
+  | Perfect -> Format.pp_print_string fmt "Perfect"
+
+type player = {
+  pkh : Signature.Public_key_hash.t;
+  contract : Contract.t;
+  strategy : strategy;
+  game_player : Game.player;
+}
+
+let pp_player ppf {pkh; contract = _; strategy; game_player} =
+  Format.fprintf
+    ppf
+    "pkh: %a@,strategy: %a@,game_player: %s"
+    Signature.Public_key_hash.pp_short
+    pkh
+    pp_strategy
+    strategy
+    (if Game.player_equal game_player Alice then "Alice" else "Bob")
+
+type player_client = {
+  player : player;
+  states : (Tick.t * State_hash.t) list;
+  final_tick : Tick.t;
+  inbox :
+    Store_inbox.inbox_context
+    * Store_inbox.tree option
+    * Inbox.history
+    * Inbox.t;
+  levels_and_inputs : (int * string list) list;
+}
+
+let pp_levels_and_inputs ppf levels_and_inputs =
+  Format.(
+    (pp_print_list
+       (fun ppf (level, inputs) ->
+         fprintf
+           ppf
+           "level %d, inputs %a"
+           level
+           (pp_print_list pp_print_string)
+           inputs)
+       ppf)
+      levels_and_inputs)
+
+let pp_player_client ppf
+    {player; states; final_tick; inbox = _; levels_and_inputs} =
+  Format.fprintf
+    ppf
+    "@[<v 2>player:@,\
+     %a@]@,\
+     @[<v 2>states:@,\
+     %a@]@,\
+     final tick: %a@,\
+     @[<v 2>levels and inputs:@,\
+     %a@]@,"
+    pp_player
+    player
+    (Format.pp_print_list (fun ppf (tick, hash) ->
+         Format.fprintf
+           ppf
+           "tick %a, state hash %a"
+           Tick.pp
+           tick
+           State_hash.pp_short
+           hash))
+    states
+    Tick.pp
+    final_tick
+    (* inbox *)
+    pp_levels_and_inputs
+    levels_and_inputs
+
+module Player_client = struct
+  (** Transform inputs to payloads. *)
+  let levels_and_payloads levels_and_inputs =
+    List.map
+      (fun (level, inputs) ->
+        (level, List.map make_external_inbox_message inputs))
+      levels_and_inputs
+
+  let empty_memory_ctxt id =
+    let open Lwt_syntax in
+    Lwt_main.run
+    @@ let+ index = Tezos_context_memory.Context.init id in
+       Tezos_context_memory.Context.empty index
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3529
+
+     Factor code for the unit test.
+     this and {!Store_inbox} is highly copy-pasted from
+     test/unit/test_sc_rollup_inbox. The main difference is: we use
+     [Alpha_context.Sc_rollup.Inbox] instead of [Sc_rollup_repr_inbox] in the
+     former. *)
+  let construct_inbox ctxt levels_and_payloads ~rollup ~origination_level =
+    let open Lwt_syntax in
+    let open Store_inbox in
+    let* inbox = empty ctxt rollup origination_level in
+    let history = history_at_genesis ~capacity:10000L in
+    let rec aux history inbox level_tree = function
+      | [] -> return (ctxt, level_tree, history, inbox)
+      | (level, payloads) :: rst ->
+          let level = Int32.of_int level |> Raw_level.of_int32_exn in
+          let () = assert (Raw_level.(origination_level <= level)) in
+          let* res =
+            lift @@ add_messages ctxt history inbox level payloads level_tree
+          in
+          let level_tree, history, inbox =
+            WithExceptions.Result.get_ok ~loc:__LOC__ res
+          in
+          aux history inbox (Some level_tree) rst
+    in
+    aux history inbox None levels_and_payloads
+
+  (** Construct an inbox based on [levels_and_inputs] in the player context. *)
+  let construct_inbox ~origination_level ctxt rollup levels_and_inputs =
+    Lwt_main.run
+    @@ construct_inbox
+         ~origination_level
+         ctxt
+         ~rollup
+         (levels_and_payloads levels_and_inputs)
+
+  (** Generate [our_states] for [levels_and_inputs] based on the strategy.
+      It needs [level_min] and [level_max] in case it will need to generate
+      new inputs. *)
+  let gen_our_states ctxt strategy ?level_min ?level_max levels_and_inputs =
+    let open QCheck2.Gen in
+    let eval_inputs levels_and_inputs =
+      Lwt_main.run
+      @@
+      let open Lwt_result_syntax in
+      let*! r = Arith_test_pvm.eval_levels_and_inputs ctxt levels_and_inputs in
+      Lwt.return @@ WithExceptions.Result.get_ok ~loc:__LOC__ r
+    in
+    match strategy with
+    | Perfect ->
+        (* The perfect player does not lie, evaluates correctly the inputs. *)
+        let _state, tick, our_states = eval_inputs levels_and_inputs in
+        return (tick, our_states, levels_and_inputs)
+    | Random ->
+        (* Random player generates its own list of inputs. *)
+        let* new_levels_and_inputs =
+          gen_arith_pvm_inputs_for_levels ?level_min ?level_max ()
+        in
+        let _state, tick, our_states = eval_inputs new_levels_and_inputs in
+        return (tick, our_states, new_levels_and_inputs)
+
+  (** [gen ~rollup ~level_min ~level_max player levels_and_inputs] generates
+      a {!player_client} based on {!player.strategy}. *)
+  let gen ~rollup ~origination_level ~level_min ~level_max player
+      levels_and_inputs =
+    let open QCheck2.Gen in
+    let ctxt = empty_memory_ctxt "foo" in
+    let* tick, our_states, levels_and_inputs =
+      gen_our_states
+        ctxt
+        player.strategy
+        ~level_min
+        ~level_max
+        levels_and_inputs
+    in
+    let inbox =
+      construct_inbox ~origination_level ctxt rollup levels_and_inputs
+    in
+    return
+      {player; final_tick = tick; states = our_states; inbox; levels_and_inputs}
+end
+
+(** [create_commitment ~predecessor ~inbox_level ~our_states] creates
+    a commitment using [our_states] as the vision of ticks. *)
+let create_commitment ~predecessor ~inbox_level ~our_states =
+  let open Lwt_syntax in
+  let inbox_level = Int32.of_int inbox_level |> Raw_level.of_int32_exn in
+  let+ compressed_state =
+    match List.last_opt our_states with
+    | None ->
+        (* No tick evaluated. *)
+        Arith_test_pvm.initial_hash
+    | Some (_, state) -> return state
+  in
+
+  let number_of_ticks =
+    match our_states with
+    | [] -> Number_of_ticks.zero
+    | _ ->
+        List.length our_states - 1
+        |> Int32.of_int |> number_of_ticks_of_int32_exn
+  in
+  Commitment.{compressed_state; inbox_level; predecessor; number_of_ticks}
+
+(** [operation_publish_commitment block rollup lcc inbox_level p1_client]
+    creates a commitment and stake on it. *)
+let operation_publish_commitment ctxt rollup predecessor inbox_level
+    player_client =
+  let open Lwt_result_syntax in
+  let*! commitment =
+    create_commitment ~predecessor ~inbox_level ~our_states:player_client.states
+  in
+  Op.sc_rollup_publish ctxt player_client.player.contract rollup commitment
+
+(** [build_proof ~player_client start_tick game] builds a valid proof
+    regarding the vision [player_client] has. The proof refutes the
+    [start_tick]. *)
+let build_proof ~player_client start_tick (game : Game.t) =
+  let open Lwt_result_syntax in
+  let inbox_context, messages_tree, history, inbox = player_client.inbox in
+  let*! history, history_proof =
+    Store_inbox.form_history_proof inbox_context history inbox messages_tree
+  in
+  (* We start a game on a commitment that starts at [Tick.initial], the fuel
+     is necessarily [start_tick]. *)
+  let fuel = tick_to_int_exn start_tick in
+  let*! r =
+    Arith_test_pvm.eval_levels_and_inputs
+      ~fuel
+      (Arith_test_pvm.init_context ())
+      player_client.levels_and_inputs
+  in
+  let state, _, _ = WithExceptions.Result.get_ok ~loc:__LOC__ r in
+  let module P = struct
+    include Arith_test_pvm
+
+    let context = inbox_context
+
+    let state = state
+
+    module Inbox_with_history = struct
+      include Store_inbox
+
+      let history = history
+
+      let inbox = history_proof
+    end
+  end in
+  let*! proof = Sc_rollup.Proof.produce (module P) game.level in
+  Lwt.return (WithExceptions.Result.get_ok ~loc:__LOC__ proof)
+
+(** [next_move ~number_of_sections ~player_client game] produces
+    the next move in the refutation game.
+
+    If there is a disputed section where the distance is one tick, it
+    produces a proof. Otherwise, provides another dissection.
+*)
+let next_move ~number_of_sections ~player_client (game : Game.t) =
+  let open Lwt_syntax in
+  let disputed_sections =
+    disputed_sections ~our_states:player_client.states game.dissection
+  in
+  assert (Compare.List_length_with.(disputed_sections > 0)) ;
+  let single_tick_disputed_sections =
+    single_tick_disputed_sections disputed_sections
+  in
+  match single_tick_disputed_sections with
+  | (start_chunk, _stop_chunk) :: _ ->
+      let tick = start_chunk.tick in
+      let+ proof = build_proof ~player_client tick game in
+      Game.{choice = tick; step = Proof proof}
+  | [] ->
+      (* If we reach this case, there is necessarily a disputed section. *)
+      let start_chunk, stop_chunk = Stdlib.List.hd disputed_sections in
+      let dissection =
+        build_dissection
+          ~number_of_sections
+          ~start_chunk
+          ~stop_chunk
+          ~our_states:player_client.states
+      in
+      return Game.{choice = start_chunk.tick; step = Dissection dissection}
+
+type outcome_for_tests = Defender_wins | Refuter_wins
+
+(** Play until there is an {!outcome_for_tests}.
+
+    An outcome can happen if:
+    - A valid refutation was provided to the protocol and it succeeded to
+      win the game.
+    - A player played an invalid refutation and was rejected by the
+      protocol.
+*)
+let play_until_outcome ~number_of_sections ~refuter_client ~defender_client
+    ~rollup block =
+  let rec play ~player_turn ~opponent block =
+    let open Lwt_result_syntax in
+    let* game_opt =
+      Context.Sc_rollup.ongoing_game_for_staker
+        (B block)
+        rollup
+        player_turn.player.pkh
+    in
+    let game, _, _ = WithExceptions.Option.get ~loc:__LOC__ game_opt in
+    let*! refutation =
+      next_move ~number_of_sections ~player_client:player_turn game
+    in
+    let* incr = Incremental.begin_construction block in
+    let* operation_refutation =
+      Op.sc_rollup_refute
+        (I incr)
+        player_turn.player.contract
+        rollup
+        opponent.player.pkh
+        (Some refutation)
+    in
+    let* incr = Incremental.add_operation incr operation_refutation in
+    match game_status_of_refute_op_result (Incremental.rev_tickets incr) with
+    | Ongoing ->
+        let* block = Incremental.finalize_block incr in
+        play ~player_turn:opponent ~opponent:player_turn block
+    | Ended (_reason, loser) as outcome ->
+        let () =
+          Format.printf
+            "@,ending outcome: %a@,"
+            Sc_rollup.Game.pp_status
+            outcome
+        in
+        if loser = Account.pkh_of_contract_exn refuter_client.player.contract
+        then return Defender_wins
+        else return Refuter_wins
+  in
+  play ~player_turn:refuter_client ~opponent:defender_client block
+
+(** Generate two {!player}s with a given strategy. *)
+let make_players ~p1_strategy ~contract1 ~p2_strategy ~contract2 =
+  let pkh1 = Account.pkh_of_contract_exn contract1 in
+  let pkh2 = Account.pkh_of_contract_exn contract2 in
+  let ({alice; bob = _} : Game.Index.t) = Game.Index.make pkh1 pkh2 in
+  let player1, player2 =
+    if Signature.Public_key_hash.equal alice pkh1 then Game.(Alice, Bob)
+    else Game.(Bob, Alice)
+  in
+  ( {
+      pkh = pkh1;
+      contract = contract1;
+      strategy = p1_strategy;
+      game_player = player1;
+    },
+    {
+      pkh = pkh2;
+      contract = contract2;
+      strategy = p2_strategy;
+      game_player = player2;
+    } )
+
+(** [gen_game ~p1_strategy ~p2_strategy] generates a context where a rollup
+    was originated.
+    It generates inputs for the rollup, and creates the players' interpretation
+    of these inputs in a {!player_client} for [p1_strategy] and [p2_strategy].
+*)
+let gen_game ~p1_strategy ~p2_strategy =
+  let open QCheck2.Gen in
+  (* If there is no good player, we do not care about the outcome. *)
+  assert (p1_strategy = Perfect || p2_strategy = Perfect) ;
+  let* first_inputs =
+    let* input = gen_arith_pvm_inputs ~gen_size:(pure 0) in
+    let* inputs = small_list (gen_arith_pvm_inputs ~gen_size:(pure 0)) in
+    return (input :: inputs)
+  in
+  let block, rollup, genesis_info, (contract1, contract2, contract3) =
+    create_ctxt ~first_inputs
+  in
+  let p1, p2 = make_players ~p1_strategy ~contract1 ~p2_strategy ~contract2 in
+
+  (* Create a context with a rollup originated. *)
+  let commitment_period =
+    Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet
+      .sc_rollup
+      .commitment_period_in_blocks
+  in
+  let origination_level =
+    Raw_level.to_int32 genesis_info.level |> Int32.to_int
+  in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3509
+
+     If there are inputs in the originated levels, the inbox is somehow badly
+     constructed. There would be "dangling hash" in the Irmin tree when trying
+     to produce a proof. I have not yet found the solution. *)
+  let level_min = origination_level + 1 in
+  let level_max = origination_level + commitment_period - 1 in
+  let* levels_and_inputs =
+    gen_arith_pvm_inputs_for_levels ~level_min ~level_max ()
+  in
+  let* p1_client =
+    Player_client.gen
+      ~origination_level:genesis_info.level
+      ~level_min
+      ~level_max
+      ~rollup
+      p1
+      ((origination_level, first_inputs) :: levels_and_inputs)
+  in
+  let* p2_client =
+    Player_client.gen
+      ~origination_level:genesis_info.level
+      ~level_min
+      ~level_max
+      ~rollup
+      p2
+      ((origination_level, first_inputs) :: levels_and_inputs)
+  in
+  let* p1_start = bool in
+  let commitment_level = origination_level + commitment_period in
+  return
+    ( block,
+      rollup,
+      commitment_level,
+      genesis_info.commitment_hash,
+      p1_client,
+      p2_client,
+      contract3,
+      p1_start,
+      levels_and_inputs )
+
+(** [prepare_game block lcc originated_level p1_client p2_client
+    inputs_and_levels] prepares a context where [p1_client] and [p2_client]
+    are in conflict for one commitment.
+    It creates the protocol inbox using [inputs_and_levels]. *)
+let prepare_game block rollup lcc commitment_level p1_client p2_client contract
+    levels_and_inputs =
+  let open Lwt_result_syntax in
+  let* block = construct_inbox_proto block rollup levels_and_inputs contract in
+  let* operation_publish_commitment_p1 =
+    operation_publish_commitment (B block) rollup lcc commitment_level p1_client
+  in
+  let* operation_publish_commitment_p2 =
+    operation_publish_commitment (B block) rollup lcc commitment_level p2_client
+  in
+  Block.bake
+    ~operations:
+      [operation_publish_commitment_p1; operation_publish_commitment_p2]
+    block
+
+(** Create a test of [p1_strategy] against [p2_strategy]. One of them
+    must be a {!Perfect} player, otherwise, we do not care about which
+    cheater wins. *)
+let test_game ~p1_strategy ~p2_strategy =
+  let name =
+    Format.asprintf
+      "%a against %a"
+      pp_strategy
+      p1_strategy
+      pp_strategy
+      p2_strategy
+  in
+  qcheck_make_lwt_res
+    ~print:
+      (fun ( block,
+             rollup,
+             commitment_level,
+             lcc,
+             p1_client,
+             p2_client,
+             _contract3,
+             p1_start,
+             levels_and_inputs ) ->
+      let level =
+        WithExceptions.Result.get_ok ~loc:__LOC__ @@ Context.get_level (B block)
+      in
+      Format.asprintf
+        "@[<v>@,\
+         current level: %a@,\
+         rollup: %a@,\
+         commitment_level: %d@,\
+         last cemented commitment: %a@,\
+         @[<v 2>p1:@,\
+         %a@]@,\
+         @[<v 2>p2:@,\
+         %a@]@,\
+         who start: %s@,\
+         @[<v 2>levels and inputs:@,\
+         %a@]@,\
+         @]"
+        Raw_level.pp
+        level
+        Sc_rollup.Address.pp_short
+        rollup
+        commitment_level
+        Sc_rollup.Commitment.Hash.pp_short
+        lcc
+        pp_player_client
+        p1_client
+        pp_player_client
+        p2_client
+        (if p1_start then "p1" else "p2")
+        pp_levels_and_inputs
+        levels_and_inputs)
+    ~count:1_000
+    ~name
+    ~gen:(gen_game ~p1_strategy ~p2_strategy)
+    (fun ( block,
+           rollup,
+           commitment_level,
+           lcc,
+           p1_client,
+           p2_client,
+           contract3,
+           p1_start,
+           levels_and_inputs ) ->
+      let open Lwt_result_syntax in
+      (* Otherwise, there is no conflict. *)
+      QCheck2.assume (not (p1_client.states = p2_client.states)) ;
+      let* block =
+        prepare_game
+          block
+          rollup
+          lcc
+          commitment_level
+          p1_client
+          p2_client
+          contract3
+          levels_and_inputs
+      in
+      let refuter, defender =
+        if p1_start then (p1_client, p2_client) else (p2_client, p1_client)
+      in
+      let* operation_start_game =
+        Op.sc_rollup_refute
+          (B block)
+          refuter.player.contract
+          rollup
+          defender.player.pkh
+          None
+      in
+      let* block = Block.bake ~operation:operation_start_game block in
+      let number_of_sections =
+        Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet
+          .sc_rollup
+          .number_of_sections_in_dissection
+      in
+      let* outcome =
+        play_until_outcome
+          ~rollup
+          ~number_of_sections
+          ~refuter_client:refuter
+          ~defender_client:defender
+          block
+      in
+      match outcome with
+      | Defender_wins -> return (defender.player.strategy = Perfect)
+      | Refuter_wins -> return (refuter.player.strategy = Perfect))
+
+let test_perfect_against_random =
+  test_game ~p1_strategy:Perfect ~p2_strategy:Random
+
+let test_random_against_perfect =
+  test_game ~p1_strategy:Random ~p2_strategy:Perfect
+
+let tests =
+  ( "Refutation",
+    qcheck_wrap [test_perfect_against_random; test_random_against_perfect] )
+
+(** {2 Entry point} *)
+
+let tests = tests :: Dissection.tests :: Test_refutation_game_legacy.tests
 
 let () = Alcotest.run "Refutation_game" tests
