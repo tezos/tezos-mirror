@@ -10,27 +10,12 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "tezos-base"
-  "tezos-client-base"
-  "tezos-client-base-unix"
-  "tezos-client-commands"
-  "tezos-rpc-http"
-  "tezos-rpc-http-server"
-  "tezos-protocol-updater"
-  "tezos-rpc-http-client-unix"
-  "tezos-stdlib-unix"
-  "tezos-stdlib"
-  "tezos-dal-node-lib"
-  "tezos-dal-node-services"
+  "tezos-rpc"
   "tezos-crypto-dal"
-  "irmin-pack" { >= "3.3.1" & < "3.4.0" }
-  "irmin" { >= "3.3.2" & < "3.4.0" }
-]
-depopts: [
-  "tezos-dal-alpha"
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: `tezos-dal-node` binary"
+synopsis: "Tezos: `tezos-dal-node` RPC services"

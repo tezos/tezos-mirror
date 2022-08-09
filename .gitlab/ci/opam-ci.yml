@@ -9,6 +9,8 @@
 
 # Ignoring package tezos-dal-node-lib, it only contains tests or private targets
 
+# Ignoring package tezos-dal-node-services, it only contains tests or private targets
+
 # Ignoring package tezos-protocol-012-Psithaca-tests, it only contains tests or private targets
 
 # Ignoring package tezos-protocol-013-PtJakart-tests, it only contains tests or private targets
