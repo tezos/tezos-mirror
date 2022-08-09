@@ -287,28 +287,61 @@ module Make (PVM : Pvm.S) = struct
     let*! () = Layer1.processed chain_event in
     return_unit
 
+  let is_connection_error trace =
+    TzTrace.fold
+      (fun yes error ->
+        yes
+        ||
+        match error with
+        | Tezos_rpc_http.RPC_client_errors.(
+            Request_failed {error = Connection_failed _; _}) ->
+            true
+        | _ -> false)
+      false
+      trace
+
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2895
      Use Lwt_stream.fold_es once it is exposed. *)
-  let iter_stream stream handle =
-    let rec go () =
-      Lwt.bind (Lwt_stream.get stream) @@ fun tok ->
-      match tok with
-      | None -> return_unit
-      | Some element -> Lwt_result.bind (handle element) go
+  let daemonize configuration node_ctxt store =
+    let open Lwt_result_syntax in
+    let rec loop (l1_ctxt : Layer1.t) =
+      let*! () =
+        Lwt_stream.iter_s
+          (fun event ->
+            let open Lwt_syntax in
+            let* res = on_layer_1_chain_event node_ctxt store event in
+            match res with
+            | Ok () -> return_unit
+            | Error trace when is_connection_error trace ->
+                Format.eprintf
+                  "@[<v 2>Connection error:@ %a@]@."
+                  pp_print_trace
+                  trace ;
+                l1_ctxt.stopper () ;
+                return_unit
+            | Error e ->
+                Format.eprintf "%a@.Exiting.@." pp_print_trace e ;
+                let* _ = Lwt_exit.exit_and_wait 1 in
+                return_unit)
+          l1_ctxt.events
+      in
+      let*! () = Event.connection_lost () in
+      let* l1_ctxt = Layer1.reconnect configuration l1_ctxt store in
+      loop l1_ctxt
     in
-    go ()
-
-  let daemonize node_ctxt store (l1_ctxt : Layer1.t) =
-    Lwt.no_cancel @@ iter_stream l1_ctxt.events
-    @@ on_layer_1_chain_event node_ctxt store
+    protect @@ fun () -> Lwt.no_cancel @@ loop node_ctxt.l1_ctxt
 
   let install_finalizer store rpc_server (l1_ctxt : Layer1.t) =
     let open Lwt_syntax in
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
+    let message = l1_ctxt.cctxt#message in
+    let* () = message "Stopping L1 monitor@." in
     l1_ctxt.stopper () ;
-    let* () = Lwt_stream.closed l1_ctxt.events in
+    let* () = message "Shutting down L1@." in
     let* () = Layer1.shutdown store in
+    let* () = message "Shutting down RPC server@." in
     let* () = Components.RPC_server.shutdown rpc_server in
+    let* () = message "Closing store@." in
     let* () = Store.close store in
     let* () = Event.shutdown_node exit_status in
     Tezos_base_unix.Internal_event_unix.close ()
@@ -343,22 +376,25 @@ module Make (PVM : Pvm.S) = struct
       let* rpc_server =
         Components.RPC_server.start node_ctxt store configuration
       in
+      let (_ : Lwt_exit.clean_up_callback_id) =
+        install_finalizer store rpc_server node_ctxt.l1_ctxt
+      in
       let*! () = Inbox.start () in
       let*! () = Components.Commitment.start () in
 
-      let _ = install_finalizer store rpc_server node_ctxt.l1_ctxt in
       let*! () =
         Event.node_is_ready
           ~rpc_addr:configuration.rpc_addr
           ~rpc_port:configuration.rpc_port
       in
-      daemonize node_ctxt store node_ctxt.l1_ctxt
+      daemonize configuration node_ctxt store
     in
     start ()
 end
 
 let run ~data_dir (cctxt : Protocol_client_context.full) =
   let open Lwt_result_syntax in
+  Random.self_init () (* Initialize random state (for reconnection delays) *) ;
   let*! () = Event.starting_node () in
   let* configuration = Configuration.load ~data_dir in
   let open Configuration in
@@ -371,13 +407,12 @@ let run ~data_dir (cctxt : Protocol_client_context.full) =
       configuration.sc_rollup_node_operators
   in
   let*! store = Store.load configuration in
-  let* l1_ctxt, genesis_info, kind = Layer1.start configuration cctxt store in
+  let* l1_ctxt, kind = Layer1.start configuration cctxt store in
   let* node_ctxt =
     Node_context.init
       cctxt
       l1_ctxt
       configuration.sc_rollup_address
-      genesis_info
       kind
       configuration.sc_rollup_node_operators
       configuration.fee_parameter

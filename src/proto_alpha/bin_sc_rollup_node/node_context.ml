@@ -56,8 +56,8 @@ let get_operator_keys node_ctxt purpose =
 let retrieve_constants cctxt =
   Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
 
-let init (cctxt : Protocol_client_context.full) l1_ctxt rollup_address
-    genesis_info kind operators fee_parameter ~loser_mode =
+let init (cctxt : Protocol_client_context.full) l1_ctxt rollup_address kind
+    operators fee_parameter ~loser_mode =
   let open Lwt_result_syntax in
   let+ protocol_constants = retrieve_constants cctxt in
   {
@@ -65,7 +65,7 @@ let init (cctxt : Protocol_client_context.full) l1_ctxt rollup_address
     l1_ctxt;
     rollup_address;
     operators;
-    genesis_info;
+    genesis_info = l1_ctxt.Layer1.genesis_info;
     kind;
     block_finality_time = 2;
     fee_parameter;

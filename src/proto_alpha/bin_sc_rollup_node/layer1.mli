@@ -54,6 +54,7 @@ type t = private {
   events : chain_event Lwt_stream.t;
   cctxt : Protocol_client_context.full;
   stopper : RPC_context.stopper;
+  genesis_info : Protocol.Alpha_context.Sc_rollup.Commitment.genesis_info;
 }
 
 val chain_event_head_hash : chain_event -> Block_hash.t
@@ -69,11 +70,12 @@ val start :
   Configuration.t ->
   Protocol_client_context.full ->
   Store.t ->
-  (t
-  * Protocol.Alpha_context.Sc_rollup.Commitment.genesis_info
-  * Protocol.Alpha_context.Sc_rollup.Kind.t)
-  tzresult
-  Lwt.t
+  (t * Protocol.Alpha_context.Sc_rollup.Kind.t) tzresult Lwt.t
+
+(** [reconnect cfg l1_ctxt store] reconnects (and retries with delay) to the
+    Tezos node. The delay for each reconnection is increased with a randomized
+    exponential backoff (capped to 1.5h) . *)
+val reconnect : Configuration.t -> t -> Store.t -> t tzresult Lwt.t
 
 (** [current_head_hash store] is the current hash of the head of the
    Tezos chain as far as the smart-contract rollup node knows from the

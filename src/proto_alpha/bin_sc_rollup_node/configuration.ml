@@ -46,6 +46,7 @@ type t = {
   sc_rollup_node_operators : operators;
   rpc_addr : string;
   rpc_port : int;
+  reconnection_delay : float;
   fee_parameter : Injection.fee_parameter;
   mode : mode;
   loser_mode : Loser_mode.t;
@@ -65,6 +66,8 @@ let filename config = relative_filename config.data_dir
 let default_rpc_addr = "127.0.0.1"
 
 let default_rpc_port = 8932
+
+let default_reconnection_delay = 2.0 (* seconds *)
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2794
    the below default values have been copied from
@@ -280,6 +283,7 @@ let encoding : t Data_encoding.t =
            sc_rollup_node_operators;
            rpc_addr;
            rpc_port;
+           reconnection_delay;
            fee_parameter;
            mode;
            loser_mode;
@@ -289,6 +293,7 @@ let encoding : t Data_encoding.t =
         sc_rollup_node_operators,
         rpc_addr,
         rpc_port,
+        reconnection_delay,
         fee_parameter,
         mode,
         loser_mode ))
@@ -297,6 +302,7 @@ let encoding : t Data_encoding.t =
            sc_rollup_node_operators,
            rpc_addr,
            rpc_port,
+           reconnection_delay,
            fee_parameter,
            mode,
            loser_mode ) ->
@@ -306,11 +312,12 @@ let encoding : t Data_encoding.t =
         sc_rollup_node_operators;
         rpc_addr;
         rpc_port;
+        reconnection_delay;
         fee_parameter;
         mode;
         loser_mode;
       })
-    (obj8
+    (obj9
        (dft
           "data-dir"
           ~description:"Location of the data dir"
@@ -328,6 +335,11 @@ let encoding : t Data_encoding.t =
           operators_encoding)
        (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
        (dft "rpc-port" ~description:"RPC port" int16 default_rpc_port)
+       (dft
+          ~description:"The reconnection (to the tezos node) delay in seconds"
+          "reconnection_delay"
+          float
+          default_reconnection_delay)
        (dft
           "fee-parameter"
           ~description:"The fee parameter used when injecting operations in L1"

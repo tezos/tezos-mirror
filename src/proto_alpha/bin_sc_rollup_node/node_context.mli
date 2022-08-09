@@ -70,7 +70,6 @@ val init :
   Protocol_client_context.full ->
   Layer1.t ->
   Sc_rollup.t ->
-  Protocol.Alpha_context.Sc_rollup.Commitment.genesis_info ->
   Protocol.Alpha_context.Sc_rollup.Kind.t ->
   Configuration.operators ->
   Injection.fee_parameter ->

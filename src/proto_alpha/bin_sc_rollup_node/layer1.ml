@@ -223,6 +223,7 @@ type t = {
   events : chain_event Lwt_stream.t;
   cctxt : Protocol_client_context.full;
   stopper : RPC_context.stopper;
+  genesis_info : Sc_rollup.Commitment.genesis_info;
 }
 
 (**
@@ -409,6 +410,33 @@ let discard_pre_origination_blocks
   in
   Lwt_stream.filter_map at_or_after_origination chain_events
 
+let rec connect ?(count = 0) ~delay cctxt genesis_info store =
+  let open Lwt_syntax in
+  let* () =
+    if count = 0 then return_unit
+    else
+      let fcount = float_of_int (count - 1) in
+      (* Randomized exponential backoff capped to 1.5h: 1.5^count * delay ± 50% *)
+      let delay = delay *. (1.5 ** fcount) in
+      let delay = min delay 3600. in
+      let randomization_factor = 0.5 (* 50% *) in
+      let delay =
+        delay
+        +. Random.float (delay *. 2. *. randomization_factor)
+        -. (delay *. randomization_factor)
+      in
+      let* () = Event.wait_reconnect delay in
+      Lwt_unix.sleep delay
+  in
+  let* res = chain_events cctxt store `Main in
+  match res with
+  | Ok (event_stream, stopper) ->
+      let events = discard_pre_origination_blocks genesis_info event_stream in
+      return_ok (events, stopper)
+  | Error e ->
+      let* () = Event.cannot_connect ~count e in
+      connect ~delay ~count:(count + 1) cctxt genesis_info store
+
 let start configuration (cctxt : Protocol_client_context.full) store =
   let open Lwt_result_syntax in
   let*! () = Layer1_event.starting () in
@@ -426,11 +454,29 @@ let start configuration (cctxt : Protocol_client_context.full) store =
       (cctxt#chain, cctxt#block)
       configuration.sc_rollup_address
   in
-  let+ event_stream, stopper = chain_events cctxt store `Main in
-  let events = discard_pre_origination_blocks genesis_info event_stream in
-  ( {cctxt; events; blocks_cache = State.Blocks_cache.create 32; stopper},
-    genesis_info,
+  let+ events, stopper =
+    connect ~delay:configuration.reconnection_delay cctxt genesis_info store
+  in
+  ( {
+      cctxt;
+      events;
+      blocks_cache = State.Blocks_cache.create 32;
+      stopper;
+      genesis_info;
+    },
     kind )
+
+let reconnect configuration l1_ctxt store =
+  let open Lwt_result_syntax in
+  let* events, stopper =
+    connect
+      ~count:1
+      ~delay:configuration.reconnection_delay
+      l1_ctxt.cctxt
+      l1_ctxt.genesis_info
+      store
+  in
+  return {l1_ctxt with events; stopper}
 
 let current_head_hash store =
   let open Lwt_syntax in
