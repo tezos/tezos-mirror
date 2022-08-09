@@ -144,6 +144,17 @@ let one_level_json =
   Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str ".json"]
   |> Re.whole_string |> Re.compile
 
+let anomalies_range =
+  Re.seq
+    [
+      Re.str "/";
+      Re.group (Re.rep1 Re.digit);
+      Re.str "-";
+      Re.group (Re.rep1 Re.digit);
+      Re.str "/anomalies.json";
+    ]
+  |> Re.whole_string |> Re.compile
+
 let level_rights =
   Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/rights"]
   |> Re.whole_string |> Re.compile
@@ -373,32 +384,78 @@ let callback rights db_pool _connection request body =
                     (operations_callback db_pool g source))
           | None -> (
               match Re.exec_opt one_level_json path with
-              | Some _g -> (
+              | Some g -> (
                   let methods = [`GET; `OPTIONS] in
                   match meth with
                   | `GET ->
-                      Cohttp_lwt_unix.Server.respond_string
-                        ~headers:
-                          (Cohttp.Header.init_with
-                             "content-type"
-                             "text/plain; charset=UTF-8")
-                        ~status:`OK
-                        ~body:"Soit"
-                        ()
+                      let level = Int32.of_string (Re.Group.get g 1) in
+                      with_caqti_error
+                        (Exporter.data_at_level db_pool level)
+                        (fun data ->
+                          let body =
+                            Ezjsonm.value_to_string
+                              (Data_encoding.Json.construct
+                                 Teztale_lib.Data.encoding
+                                 data)
+                          in
+                          Cohttp_lwt_unix.Server.respond_string
+                            ~headers:
+                              (Cohttp.Header.init_with
+                                 "content-type"
+                                 "application/json; charset=UTF-8")
+                            ~status:`OK
+                            ~body
+                            ())
                   | `OPTIONS -> options_respond methods
                   | _ -> method_not_allowed_respond methods)
-              | None ->
-                  if path = "/" then
-                    with_caqti_error (get_summary db_pool) (fun body ->
-                        Cohttp_lwt_unix.Server.respond_string
-                          ~headers:
-                            (Cohttp.Header.init_with
-                               "content-type"
-                               "text/html; charset=UTF-8")
-                          ~status:`OK
-                          ~body
-                          ())
-                  else Cohttp_lwt_unix.Server.respond_not_found ~uri ())))
+              | None -> (
+                  match Re.exec_opt anomalies_range path with
+                  | Some g -> (
+                      let methods = [`GET; `OPTIONS] in
+                      match meth with
+                      | `GET ->
+                          let first_level = int_of_string (Re.Group.get g 1) in
+                          let last_level = int_of_string (Re.Group.get g 2) in
+                          with_caqti_error
+                            (let levels =
+                               Stdlib.List.init
+                                 (last_level - first_level + 1)
+                                 (fun i -> Int32.of_int (first_level + i))
+                             in
+                             Tezos_lwt_result_stdlib.Lwtreslib.Bare.List
+                             .concat_map_es
+                               (Exporter.anomalies_at_level db_pool)
+                               levels)
+                            (fun data ->
+                              let body =
+                                Ezjsonm.value_to_string
+                                  (Data_encoding.Json.construct
+                                     (Data_encoding.list
+                                        Teztale_lib.Data.Anomaly.encoding)
+                                     data)
+                              in
+                              Cohttp_lwt_unix.Server.respond_string
+                                ~headers:
+                                  (Cohttp.Header.init_with
+                                     "content-type"
+                                     "application/json; charset=UTF-8")
+                                ~status:`OK
+                                ~body
+                                ())
+                      | `OPTIONS -> options_respond methods
+                      | _ -> method_not_allowed_respond methods)
+                  | None ->
+                      if path = "/" then
+                        with_caqti_error (get_summary db_pool) (fun body ->
+                            Cohttp_lwt_unix.Server.respond_string
+                              ~headers:
+                                (Cohttp.Header.init_with
+                                   "content-type"
+                                   "text/html; charset=UTF-8")
+                              ~status:`OK
+                              ~body
+                              ())
+                      else Cohttp_lwt_unix.Server.respond_not_found ~uri ()))))
 
 (* Must exists somewhere but where ! *)
 let print_location f ((fl, fc), (tl, tc)) =
