@@ -777,7 +777,9 @@ let basic_scenario _protocol sc_rollup_node sc_rollup _node client =
   let* () = send_messages num_messages sc_rollup client in
   let* level = Client.level client in
   Log.info "level: %d\n" level ;
-  let* _ = Sc_rollup_node.wait_for_level sc_rollup_node expected_level in
+  let* _ =
+    Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node expected_level
+  in
   return ()
 
 let sc_rollup_node_stops_scenario _protocol sc_rollup_node sc_rollup _node
@@ -793,7 +795,9 @@ let sc_rollup_node_stops_scenario _protocol sc_rollup_node sc_rollup _node
   let* () = Sc_rollup_node.terminate sc_rollup_node in
   let* () = send_messages num_messages sc_rollup client in
   let* () = Sc_rollup_node.run sc_rollup_node in
-  let* _ = Sc_rollup_node.wait_for_level sc_rollup_node expected_level in
+  let* _ =
+    Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node expected_level
+  in
   return ()
 
 let sc_rollup_node_disconnects_scenario _protocol sc_rollup_node sc_rollup node
@@ -834,7 +838,7 @@ let sc_rollup_node_handles_chain_reorg protocol sc_rollup_node sc_rollup node
      observe level 3. *)
   let* _ = Node.wait_for_level node 3 in
   let* _ = Node.wait_for_level node' 3 in
-  let* _ = Sc_rollup_node.wait_for_level sc_rollup_node 3 in
+  let* _ = Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node 3 in
   Log.info "Nodes are synchronized." ;
 
   let divergence () =
@@ -863,7 +867,7 @@ let sc_rollup_node_handles_chain_reorg protocol sc_rollup_node sc_rollup node
   let* () = trigger_reorg () in
   (* After bringing [node'] back, our SCORU node should see that there is a more attractive head at
      level 5. *)
-  let* _ = Sc_rollup_node.wait_for_level sc_rollup_node 5 in
+  let* _ = Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node 5 in
   return ()
 
 (* One can retrieve the list of originated SCORUs.
@@ -939,7 +943,9 @@ let test_rollup_node_boots_into_initial_state ~kind =
     let* () = Sc_rollup_node.run sc_rollup_node in
     let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
 
-    let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
+    let* level =
+      Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
+    in
     Check.(level = init_level)
       Check.int
       ~error_msg:"Current level has moved past origination level (%L = %R)" ;
@@ -993,7 +999,9 @@ let test_rollup_node_advances_pvm_state protocols ~kind =
     let* () = Sc_rollup_node.run sc_rollup_node in
     let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
 
-    let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
+    let* level =
+      Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
+    in
     Check.(level = init_level)
       Check.int
       ~error_msg:"Current level has moved past origination level (%L = %R)" ;
@@ -1040,7 +1048,9 @@ let test_rollup_node_advances_pvm_state protocols ~kind =
             in
             Client.bake_for_and_wait client
       in
-      let* _ = Sc_rollup_node.wait_for_level sc_rollup_node (level + i) in
+      let* _ =
+        Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node (level + i)
+      in
 
       (* specific per kind PVM checks *)
       let* () =
@@ -1235,7 +1245,9 @@ let commitment_stored _protocol sc_rollup_node sc_rollup _node client =
   in
   let* () = Sc_rollup_node.run sc_rollup_node in
   let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
-  let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
+  let* level =
+    Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
+  in
   Check.(level = init_level)
     Check.int
     ~error_msg:"Current level has moved past origination level (%L = %R)" ;
@@ -1248,6 +1260,7 @@ let commitment_stored _protocol sc_rollup_node sc_rollup _node client =
   in
   let* _ =
     Sc_rollup_node.wait_for_level
+      ~timeout:3.
       sc_rollup_node
       (init_level + levels_to_commitment)
   in
@@ -1256,7 +1269,10 @@ let commitment_stored _protocol sc_rollup_node sc_rollup _node client =
      processed by the rollup node as finalized. *)
   let* () = bake_levels block_finality_time client in
   let* _ =
-    Sc_rollup_node.wait_for_level sc_rollup_node store_commitment_level
+    Sc_rollup_node.wait_for_level
+      ~timeout:3.
+      sc_rollup_node
+      store_commitment_level
   in
   let* stored_commitment =
     Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client
@@ -1367,17 +1383,23 @@ let commitment_not_stored_if_non_final _protocol sc_rollup_node sc_rollup _node
   let store_commitment_level = init_level + levels_to_commitment in
   let* () = Sc_rollup_node.run sc_rollup_node in
   let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
-  let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
+  let* level =
+    Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
+  in
   Check.(level = init_level)
     Check.int
     ~error_msg:"Current level has moved past origination level (%L = %R)" ;
   let* () = send_messages levels_to_commitment sc_rollup client in
   let* _ =
-    Sc_rollup_node.wait_for_level sc_rollup_node store_commitment_level
+    Sc_rollup_node.wait_for_level
+      ~timeout:3.
+      sc_rollup_node
+      store_commitment_level
   in
   let* () = bake_levels levels_to_finalize client in
   let* _ =
     Sc_rollup_node.wait_for_level
+      ~timeout:3.
       sc_rollup_node
       (store_commitment_level + levels_to_finalize)
   in
@@ -1423,7 +1445,9 @@ let commitments_messages_reset _protocol sc_rollup_node sc_rollup _node client =
   in
   let* () = Sc_rollup_node.run sc_rollup_node in
   let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
-  let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
+  let* level =
+    Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
+  in
   Check.(level = init_level)
     Check.int
     ~error_msg:"Current level has moved past origination level (%L = %R)" ;
@@ -1444,6 +1468,7 @@ let commitments_messages_reset _protocol sc_rollup_node sc_rollup _node client =
   let* () = bake_levels (levels_to_commitment + block_finality_time) client in
   let* _ =
     Sc_rollup_node.wait_for_level
+      ~timeout:3.
       sc_rollup_node
       (init_level + (2 * levels_to_commitment) + block_finality_time)
   in
@@ -1498,7 +1523,9 @@ let commitment_stored_robust_to_failures _protocol sc_rollup_node sc_rollup node
   let sc_rollup_client' = Sc_rollup_client.create sc_rollup_node' in
   let* () = Sc_rollup_node.run sc_rollup_node in
   let* () = Sc_rollup_node.run sc_rollup_node' in
-  let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
+  let* level =
+    Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
+  in
   Check.(level = init_level)
     Check.int
     ~error_msg:"Current level has moved past origination level (%L = %R)" ;
@@ -1514,11 +1541,13 @@ let commitment_stored_robust_to_failures _protocol sc_rollup_node sc_rollup node
   let* () = bake_levels (block_finality_time - 1) client in
   let* level_before_storing_commitment =
     Sc_rollup_node.wait_for_level
+      ~timeout:3.
       sc_rollup_node
       (init_level + levels_to_commitment + block_finality_time - 1)
   in
   let* _ =
     Sc_rollup_node.wait_for_level
+      ~timeout:3.
       sc_rollup_node'
       level_before_storing_commitment
   in
@@ -1530,11 +1559,15 @@ let commitment_stored_robust_to_failures _protocol sc_rollup_node sc_rollup node
   let* () = Sc_rollup_node.run sc_rollup_node' in
   let* level_commitment_is_stored =
     Sc_rollup_node.wait_for_level
+      ~timeout:3.
       sc_rollup_node
       (level_before_storing_commitment + 1)
   in
   let* _ =
-    Sc_rollup_node.wait_for_level sc_rollup_node' level_commitment_is_stored
+    Sc_rollup_node.wait_for_level
+      ~timeout:3.
+      sc_rollup_node'
+      level_commitment_is_stored
   in
   let* stored_commitment =
     Sc_rollup_client.last_stored_commitment ~hooks sc_rollup_client
@@ -1585,6 +1618,7 @@ let commitments_reorgs protocol sc_rollup_node sc_rollup node client =
   let* _ = Node.wait_for_level node' (init_level + levels_to_commitment - 1) in
   let* _ =
     Sc_rollup_node.wait_for_level
+      ~timeout:3.
       sc_rollup_node
       (init_level + levels_to_commitment - 1)
   in
@@ -1631,6 +1665,7 @@ let commitments_reorgs protocol sc_rollup_node sc_rollup node client =
   *)
   let* _ =
     Sc_rollup_node.wait_for_level
+      ~timeout:3.
       sc_rollup_node
       (init_level + levels_to_commitment - 1 + num_empty_blocks)
   in
@@ -1638,6 +1673,7 @@ let commitments_reorgs protocol sc_rollup_node sc_rollup node client =
   let* () = bake_levels (block_finality_time - num_empty_blocks + 1) client in
   let* _ =
     Sc_rollup_node.wait_for_level
+      ~timeout:3.
       sc_rollup_node
       (init_level + levels_to_commitment + block_finality_time)
   in
@@ -1731,13 +1767,18 @@ let commitment_before_lcc_not_published _protocol sc_rollup_node sc_rollup node
 
   let* () = Sc_rollup_node.run sc_rollup_node in
   let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
-  let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
+  let* level =
+    Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
+  in
   Check.(level = init_level)
     Check.int
     ~error_msg:"Current level has moved past origination level (%L = %R)" ;
   let* () = bake_levels commitment_period client in
   let* commitment_inbox_level =
-    Sc_rollup_node.wait_for_level sc_rollup_node (init_level + commitment_period)
+    Sc_rollup_node.wait_for_level
+      ~timeout:3.
+      sc_rollup_node
+      (init_level + commitment_period)
   in
   (* Bake `block_finality_time` additional level to ensure that block number
      `init_level + sc_rollup_commitment_period_in_blocks` is processed by
@@ -1745,6 +1786,7 @@ let commitment_before_lcc_not_published _protocol sc_rollup_node sc_rollup node
   let* () = bake_levels block_finality_time client in
   let* commitment_finalized_level =
     Sc_rollup_node.wait_for_level
+      ~timeout:3.
       sc_rollup_node
       (commitment_inbox_level + block_finality_time)
   in
@@ -1777,6 +1819,7 @@ let commitment_before_lcc_not_published _protocol sc_rollup_node sc_rollup node
   let* () = bake_levels levels_to_cementation client in
   let* cemented_commitment_level =
     Sc_rollup_node.wait_for_level
+      ~timeout:3.
       sc_rollup_node
       (commitment_finalized_level + levels_to_cementation)
   in
@@ -1795,7 +1838,10 @@ let commitment_before_lcc_not_published _protocol sc_rollup_node sc_rollup node
     cement_commitment client ~sc_rollup ~hash:cemented_commitment_hash
   in
   let* level_after_cementation =
-    Sc_rollup_node.wait_for_level sc_rollup_node (cemented_commitment_level + 1)
+    Sc_rollup_node.wait_for_level
+      ~timeout:3.
+      sc_rollup_node
+      (cemented_commitment_level + 1)
   in
 
   (* Withdraw stake after cementing should succeed *)
@@ -1815,7 +1861,10 @@ let commitment_before_lcc_not_published _protocol sc_rollup_node sc_rollup node
   let* () = Sc_rollup_node.run sc_rollup_node' in
 
   let* rollup_node2_catchup_level =
-    Sc_rollup_node.wait_for_level sc_rollup_node' level_after_cementation
+    Sc_rollup_node.wait_for_level
+      ~timeout:3.
+      sc_rollup_node'
+      level_after_cementation
   in
   Check.(rollup_node2_catchup_level = level_after_cementation)
     Check.int
@@ -1854,6 +1903,7 @@ let commitment_before_lcc_not_published _protocol sc_rollup_node sc_rollup node
   let commitment_inbox_level = commitment_inbox_level + commitment_period in
   let* _ =
     Sc_rollup_node.wait_for_level
+      ~timeout:3.
       sc_rollup_node'
       (level_after_cementation + commitment_period)
   in
@@ -1896,13 +1946,18 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup node
   let* commitment_period = get_sc_rollup_commitment_period_in_blocks client in
   let* () = Sc_rollup_node.run sc_rollup_node in
   let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
-  let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
+  let* level =
+    Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
+  in
   Check.(level = init_level)
     Check.int
     ~error_msg:"Current level has moved past origination level (%L = %R)" ;
   let* () = bake_levels commitment_period client in
   let* commitment_inbox_level =
-    Sc_rollup_node.wait_for_level sc_rollup_node (init_level + commitment_period)
+    Sc_rollup_node.wait_for_level
+      ~timeout:3.
+      sc_rollup_node
+      (init_level + commitment_period)
   in
   (* Bake `block_finality_time` additional level to ensure that block number
      `init_level + sc_rollup_commitment_period_in_blocks` is processed by
@@ -1910,6 +1965,7 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup node
   let* () = bake_levels block_finality_time client in
   let* commitment_finalized_level =
     Sc_rollup_node.wait_for_level
+      ~timeout:3.
       sc_rollup_node
       (commitment_inbox_level + block_finality_time)
   in
@@ -1952,7 +2008,10 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup node
   let* () = Sc_rollup_node.run sc_rollup_node' in
 
   let* rollup_node2_catchup_level =
-    Sc_rollup_node.wait_for_level sc_rollup_node' commitment_finalized_level
+    Sc_rollup_node.wait_for_level
+      ~timeout:3.
+      sc_rollup_node'
+      commitment_finalized_level
   in
   Check.(rollup_node2_catchup_level = commitment_finalized_level)
     Check.int
@@ -2027,10 +2086,14 @@ let test_rollup_node_uses_arith_boot_sector =
     let* () = Sc_rollup_node.run sc_rollup_node in
 
     let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
-    let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
+    let* level =
+      Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
+    in
 
     let* () = send_text_messages client sc_rollup ["10 +"] in
-    let* _ = Sc_rollup_node.wait_for_level sc_rollup_node (level + 1) in
+    let* _ =
+      Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node (level + 1)
+    in
 
     Sc_rollup_client.state_hash ~hooks sc_rollup_client
   in

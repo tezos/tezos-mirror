@@ -2826,7 +2826,12 @@ module Sc_rollup : sig
 
     val encoding : t Data_encoding.t
 
+    val equal : t -> t -> bool
+
     val inbox_level : t -> Raw_level.t
+
+    val refresh_commitment_period :
+      commitment_period:int32 -> level:Raw_level.t -> t -> t
 
     type history_proof
 

@@ -196,13 +196,12 @@ module V1 : sig
     the current commitment period. *)
   val number_of_messages_during_commitment_period : t -> int64
 
-  (** [start_new_commitment_period inbox level] marks the beginning of a
-    new commitment period at some [level]. *)
-  val start_new_commitment_period : t -> Raw_level_repr.t -> t
-
-  (** [starting_level_of_current_commitment_period inbox] returns the
-    level at the beginning of a current commitment period. *)
-  val starting_level_of_current_commitment_period : t -> Raw_level_repr.t
+  (** [refresh_commitment_period ~commitment_period ~level inbox] updates
+      [inbox] to take into account the commitment_period: this resets a
+      counter for the number of messages in a given commitment period
+      (which is limited). *)
+  val refresh_commitment_period :
+    commitment_period:int32 -> level:Raw_level_repr.t -> t -> t
 end
 
 (** Versioning, see {!Sc_rollup_data_version_sig.S} for more information. *)
