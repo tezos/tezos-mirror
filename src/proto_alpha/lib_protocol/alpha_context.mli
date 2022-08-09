@@ -2605,6 +2605,8 @@ module Vote : sig
 
   val equal_ballot : ballot -> ballot -> bool
 
+  val pp_ballot : Format.formatter -> ballot -> unit
+
   type delegate_info = {
     voting_power : Int64.t option;
     current_ballot : ballot option;
@@ -2633,7 +2635,17 @@ module Vote : sig
 
   type ballots = {yay : int64; nay : int64; pass : int64}
 
+  (** See {!Vote_storage.ballots_zero}. *)
+  val ballots_zero : ballots
+
+  (** See {!Vote_storage.ballots_encoding} *)
   val ballots_encoding : ballots Data_encoding.t
+
+  (** See {!Vote_storage.equal_ballots}. *)
+  val equal_ballots : ballots -> ballots -> bool
+
+  (** See {!Vote_storage.pp_ballots}. *)
+  val pp_ballots : Format.formatter -> ballots -> unit
 
   val has_recorded_ballot : context -> public_key_hash -> bool Lwt.t
 

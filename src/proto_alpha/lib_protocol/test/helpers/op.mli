@@ -29,6 +29,21 @@ open Alpha_context
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/3181
    Improve documentation of the operation helpers *)
 
+(** Assemble the given signature and [contents_list] into a
+    [packed_operation].
+
+    The context argument is used to retrieve the branch.
+
+    If the [signature option] argument is [None], then the resulting
+    operation is unsigned.
+
+    This function is mainly useful to craft an operation with a
+    missing or invalid signatue. Otherwise, it is often better to use
+    one of the helpers below: they handle the signature internally to
+    directly return well-signed operations. *)
+val pack_operation :
+  Context.t -> signature option -> 'a contents_list -> packed_operation
+
 val endorsement :
   ?delegate:public_key_hash * Slot.t list ->
   ?slot:Slot.t ->
@@ -284,17 +299,56 @@ val seed_nonce_revelation :
 (** Reveals a VDF with a proof of correctness *)
 val vdf_revelation : Context.t -> Seed.vdf_solution -> Operation.packed
 
-(** Propose a list of protocol hashes during the approval voting *)
+(** Craft the [contents_list] for a Proposals operation.
+
+    Invocation: [proposals_contents ctxt source ?period proposals].
+
+    @param period defaults to the index of the current voting period
+    in [ctxt]. *)
+val proposals_contents :
+  Context.t ->
+  Contract.t ->
+  ?period:int32 ->
+  Protocol_hash.t list ->
+  Kind.proposals contents_list tzresult Lwt.t
+
+(** Craft a Proposals operation.
+
+    Invocation: [proposals ctxt source ?period proposals].
+
+    @param period defaults to the index of the current voting period
+    in [ctxt]. *)
 val proposals :
   Context.t ->
   Contract.t ->
+  ?period:int32 ->
   Protocol_hash.t list ->
   Operation.packed tzresult Lwt.t
 
-(** Cast a vote yay, nay or pass *)
+(** Craft the [contents_list] for a Ballot operation.
+
+    Invocation: [ballot_contents ctxt source ?period proposal ballot].
+
+    @param period defaults to the index of the current voting period
+    in [ctxt]. *)
+val ballot_contents :
+  Context.t ->
+  Contract.t ->
+  ?period:int32 ->
+  Protocol_hash.t ->
+  Vote.ballot ->
+  Kind.ballot contents_list tzresult Lwt.t
+
+(** Craft a Ballot operation.
+
+    Invocation: [ballot ctxt source ?period proposal ballot].
+
+    @param period defaults to the index of the current voting period
+    in [ctxt]. *)
 val ballot :
   Context.t ->
   Contract.t ->
+  ?period:int32 ->
   Protocol_hash.t ->
   Vote.ballot ->
   Operation.packed tzresult Lwt.t

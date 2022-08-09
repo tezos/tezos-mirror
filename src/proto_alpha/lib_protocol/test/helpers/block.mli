@@ -39,6 +39,9 @@ type block = t
 
 val rpc_ctxt : t Environment.RPC_context.simple
 
+(** Build an alpha context using {!Alpha_context.prepare}. *)
+val to_alpha_ctxt : t -> Alpha_context.t tzresult Lwt.t
+
 (** Policies to select the next baker:
     - [By_round r] selects the baker at round [r]
     - [By_account pkh] selects the first slot for baker [pkh]

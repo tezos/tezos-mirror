@@ -34,6 +34,10 @@ val branch : t -> Block_hash.t
 
 val get_level : t -> Raw_level.t tzresult
 
+(** Either retrieve the alpha context (in the [Incremental] case) or
+    build one (in the [Block] case). *)
+val to_alpha_ctxt : t -> Alpha_context.t tzresult Lwt.t
+
 val get_endorsers : t -> Plugin.RPC.Validators.t list tzresult Lwt.t
 
 val get_first_different_endorsers :
@@ -119,6 +123,13 @@ module Vote : sig
     current_proposals : Protocol_hash.t list;
     remaining_proposals : int;
   }
+
+  (** See {!Vote_storage.recorded_proposal_count_for_delegate}.
+
+      Note that unlike most functions in the current module, this one
+      does not call an RPC. *)
+  val recorded_proposal_count_for_delegate :
+    t -> public_key_hash -> int tzresult Lwt.t
 end
 
 module Contract : sig
@@ -267,6 +278,12 @@ type 'accounts init :=
   ?nonce_revelation_threshold:int32 ->
   unit ->
   (Block.t * 'accounts) tzresult Lwt.t
+
+(** Returns an initial block and the implicit contracts corresponding
+    to its bootstrap accounts. The number of bootstrap accounts, and
+    the structure of the returned contracts, are specified by the [tup]
+    argument. *)
+val init_gen : (Alpha_context.Contract.t, 'accounts) tup -> 'accounts init
 
 (** [init_n n] : returns an initial block with [n] initialized accounts
     and the associated implicit contracts *)

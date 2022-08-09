@@ -51,6 +51,15 @@ let rpc_ctxt =
     rpc_context
     Plugin.RPC.rpc_services
 
+let to_alpha_ctxt b =
+  Alpha_context.prepare
+    b.context
+    ~level:b.header.shell.level
+    ~predecessor_timestamp:b.header.shell.timestamp
+    ~timestamp:b.header.shell.timestamp
+  >|= Environment.wrap_tzresult
+  >>=? fun (ctxt, _balance_updates, _migration_results) -> return ctxt
+
 (******** Policies ***********)
 
 (* Policies are functions that take a block and return a tuple

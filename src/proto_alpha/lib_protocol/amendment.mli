@@ -86,6 +86,10 @@ val record_proposals :
 
 type error +=
   | Invalid_proposal
+  | Unexpected_proposal
+  | Unauthorized_proposal
+  | Too_many_proposals
+  | Empty_proposal
   | Unexpected_ballot
   | Unauthorized_ballot
   | Duplicate_ballot

@@ -44,7 +44,17 @@ val clear_proposals : Raw_context.t -> Raw_context.t Lwt.t
 (** Counts of the votes *)
 type ballots = {yay : int64; nay : int64; pass : int64}
 
+(** All vote counts set to zero. *)
+val ballots_zero : ballots
+
+(** Encoding for {!ballots}. *)
 val ballots_encoding : ballots Data_encoding.t
+
+(** Equality check for {!ballots}. *)
+val equal_ballots : ballots -> ballots -> bool
+
+(** Pretty printer for {!ballots}. *)
+val pp_ballots : Format.formatter -> ballots -> unit
 
 val has_recorded_ballot :
   Raw_context.t -> Signature.Public_key_hash.t -> bool Lwt.t
