@@ -39,8 +39,8 @@ open Lib_test.Qcheck2_helpers
 
 (** {2 Utils} *)
 
-let qcheck_make_lwt =
-  Lib_test.Qcheck2_helpers.qcheck_make_lwt ~extract:Lwt_main.run
+let qcheck_make_lwt = qcheck_make_lwt ~extract:Lwt_main.run
+
 
 let tick_to_int_exn ?(__LOC__ = __LOC__) t =
   WithExceptions.Option.get ~loc:__LOC__ (Tick.to_int t)
@@ -48,11 +48,7 @@ let tick_to_int_exn ?(__LOC__ = __LOC__) t =
 let tick_of_int_exn ?(__LOC__ = __LOC__) n =
   WithExceptions.Option.get ~loc:__LOC__ (Tick.of_int n)
 
-let list_assoc ?(__LOC__ = __LOC__) key list =
-  match List.assoc ~equal:( = ) key list with
-  | Some value -> value
-  | None ->
-      QCheck2.Test.fail_reportf "list_assoc failed when called at %s" __LOC__
+let list_assoc (key : Tick.t) list = List.assoc ~equal:( = ) key list
 
 let print_dissection_chunk = Format.asprintf "%a" Game.pp_dissection_chunk
 
@@ -111,9 +107,8 @@ let valid_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
     compare opponent's claims against our point of view. *)
 let disputed_sections ~our_states dissection =
   let open Game in
-  let agree_on_state start_tick their_state =
-    let idx = tick_to_int_exn start_tick in
-    let our_state = list_assoc ~__LOC__ idx our_states in
+  let agree_on_state tick their_state =
+    let our_state = list_assoc tick our_states in
     Option.equal State_hash.equal our_state their_state
   in
   let rec traverse acc = function
@@ -136,32 +131,28 @@ let disputed_sections ~our_states dissection =
 let pick_disputed_sections disputed_sections =
   QCheck2.Gen.oneofl disputed_sections
 
+let single_tick_disputed_sections disputed_sections =
+  List.filter_map
+    (fun disputed_section ->
+      let Game.({tick = a_tick; _}, {tick = b_tick; _}) = disputed_section in
+      let distance = Tick.distance a_tick b_tick in
+      if Z.Compare.(distance = Z.one) then Some disputed_section else None)
+    disputed_sections
+
 let final_dissection ~our_states dissection =
   let disputed_sections = disputed_sections ~our_states dissection in
-  let single_disputed_sections =
-    List.filter_map
-      (fun disputed_section ->
-        let Game.({tick = a_tick; _}, {tick = b_tick; _}) = disputed_section in
-        let distance = Tick.distance a_tick b_tick in
-        if Z.Compare.(distance = Z.one) then Some disputed_section else None)
-      disputed_sections
+  let single_tick_disputed_sections =
+    single_tick_disputed_sections disputed_sections
   in
-  Compare.List_length_with.(single_disputed_sections > 0)
+  Compare.List_length_with.(single_tick_disputed_sections > 0)
 
 (** Build a non-random dissection from [start_chunk] to [stop_chunk] using
     [our_states] as the state hashes for each tick. *)
 let build_dissection ~number_of_sections ~start_chunk ~stop_chunk ~our_states =
   let open Lwt_result_syntax in
-  let state_hash_from_tick tick =
-    return @@ list_assoc ~__LOC__ (tick_to_int_exn tick) our_states
-  in
+  let state_hash_from_tick tick = return @@ list_assoc tick our_states in
   let our_stop_chunk =
-    Game.
-      {
-        stop_chunk with
-        state_hash =
-          list_assoc ~__LOC__ (tick_to_int_exn stop_chunk.tick) our_states;
-      }
+    Game.{stop_chunk with state_hash = list_assoc stop_chunk.tick our_states}
   in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3491
 
@@ -269,18 +260,22 @@ module Dissection = struct
       Having [our_states] provide the state hashes you believe to
       be true. You can then generate a dissection from another one when
       you disagree with some sections. *)
-  let gen_our_states dissection ticks =
+  let gen_our_states start_chunk ticks =
     let open QCheck2.Gen in
     let Game.{tick = initial_tick; state_hash = initial_state_hash} =
-      initial_of_dissection dissection
+      start_chunk
     in
-    let initial_tick = tick_to_int_exn initial_tick in
+    let initial_state_hash =
+      WithExceptions.Option.get ~loc:__LOC__ initial_state_hash
+    in
+    let initial_tick_int = tick_to_int_exn initial_tick in
     let rec aux acc i =
       if i < 0 then return acc
       else if i = 0 then return ((initial_tick, initial_state_hash) :: acc)
       else
         let* state_hash = gen_random_hash in
-        aux ((i + initial_tick, Some state_hash) :: acc) (i - 1)
+        let tick = tick_of_int_exn (i + initial_tick_int) in
+        aux ((tick, state_hash) :: acc) (i - 1)
     in
     aux [] ticks
 
@@ -299,7 +294,9 @@ module Dissection = struct
       let* number_of_sections = gen_num_sections in
       let* ticks = gen_initial_dissection_ticks in
       let* dissection = gen_initial_dissection ~ticks () in
-      let* our_states = gen_our_states dissection (succ ticks) in
+      let* our_states =
+        gen_our_states (initial_of_dissection dissection) (succ ticks)
+      in
       if final_dissection ~our_states dissection then
         (* The initial dissection could not be dissected. *)
         return (dissection, None, number_of_sections, our_states)
@@ -383,7 +380,9 @@ module Dissection = struct
         let* number_of_sections = gen_num_sections in
         let* ticks = 3 -- (number_of_sections - 1) in
         let* dissection = gen_initial_dissection ~ticks () in
-        let* our_states = gen_our_states dissection (succ ticks) in
+        let* our_states =
+          gen_our_states (initial_of_dissection dissection) (succ ticks)
+        in
         let* new_dissection, start_hash, stop_hash =
           gen_dissection ~number_of_sections ~our_states dissection
         in
@@ -414,7 +413,9 @@ module Dissection = struct
         let* number_of_sections = gen_num_sections in
         let* ticks = number_of_sections -- 1_000 in
         let* dissection = gen_initial_dissection ~ticks () in
-        let* our_states = gen_our_states dissection (succ ticks) in
+        let* our_states =
+          gen_our_states (initial_of_dissection dissection) (succ ticks)
+        in
         let* new_dissection, start_chunk, stop_chunk =
           gen_dissection ~number_of_sections ~our_states dissection
         in
@@ -439,7 +440,9 @@ module Dissection = struct
         let* number_of_sections = gen_num_sections in
         let* ticks = gen_nonfinal_initial_dissection_ticks in
         let* dissection = gen_initial_dissection ~ticks () in
-        let* our_states = gen_our_states dissection (succ ticks) in
+        let* our_states =
+          gen_our_states (initial_of_dissection dissection) (succ ticks)
+        in
         let* new_dissection, start_chunk, stop_chunk =
           gen_dissection ~number_of_sections ~our_states dissection
         in
@@ -487,7 +490,9 @@ module Dissection = struct
         let* number_of_sections = gen_num_sections in
         let* ticks = gen_nonfinal_initial_dissection_ticks in
         let* dissection = gen_initial_dissection ~ticks () in
-        let* our_states = gen_our_states dissection (succ ticks) in
+        let* our_states =
+          gen_our_states (initial_of_dissection dissection) (succ ticks)
+        in
         let* new_dissection, start_chunk, stop_chunk =
           gen_dissection ~number_of_sections ~our_states dissection
         in
@@ -537,7 +542,9 @@ module Dissection = struct
         let* number_of_sections = gen_num_sections in
         let* ticks = gen_nonfinal_initial_dissection_ticks in
         let* dissection = gen_initial_dissection ~ticks () in
-        let* our_states = gen_our_states dissection (succ ticks) in
+        let* our_states =
+          gen_our_states (initial_of_dissection dissection) (succ ticks)
+        in
         let* new_dissection, start_chunk, stop_chunk =
           gen_dissection ~number_of_sections ~our_states dissection
         in
@@ -598,7 +605,9 @@ module Dissection = struct
         let* picked_section = 0 -- (number_of_sections - 2) in
         let* ticks = 100 -- 1_000 in
         let* dissection = gen_initial_dissection ~ticks () in
-        let* our_states = gen_our_states dissection (succ ticks) in
+        let* our_states =
+          gen_our_states (initial_of_dissection dissection) (succ ticks)
+        in
         let* new_dissection, start_chunk, stop_chunk =
           gen_dissection ~number_of_sections ~our_states dissection
         in
