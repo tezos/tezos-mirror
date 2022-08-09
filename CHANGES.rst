@@ -39,6 +39,8 @@ Node
   a merge and shouldn't impact normal node operations as much as it
   previously did; especially on light architectures.
 
+-  Added support for ``level..level`` range parameters in the replay command.
+
 Client
 ------
 
