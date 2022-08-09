@@ -24,253 +24,153 @@
 (*****************************************************************************)
 open Lwt_result_syntax
 
-let ensure_delegates_are_there db data =
-  let addresses =
+let fake_hash level round delegate kind =
+  Operation_hash.hash_string
+    [
+      level;
+      Int32.to_string (Option.value round ~default:0l);
+      Signature.Public_key_hash.to_string delegate;
+      (if kind = Consensus_ops.Endorsement then "" else "P");
+    ]
+
+let to_received_ops ctx endpoint auth level data =
+  (*fake operation hash*)
+  let received_ops =
     List.map
-      (fun block ->
-        (block.Data.Block.delegate, block.Data.Block.delegate_alias))
-      data.Data.blocks
-    @ List.map
-        (fun ops ->
-          ( ops.Data.Delegate_operations.delegate,
-            ops.Data.Delegate_operations.delegate_alias ))
-        data.Data.delegate_operations
-  in
-  let query =
-    Format.asprintf
-      "INSERT OR IGNORE INTO delegates (address,alias) VALUES %a;"
-      (Format.pp_print_list
-         ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-         (fun f (add, al) ->
-           Format.fprintf
-             f
-             "(x'%a',%a)"
-             Hex.pp
-             (Signature.Public_key_hash.to_hex add)
-             (Format.pp_print_option
-                ~none:(fun f () -> Format.pp_print_string f "NULL")
-                (fun f x -> Format.fprintf f "'%s'" x))
-             al))
-      addresses
-  in
-  Db.exec db query
-
-let register_rights db level data =
-  (*fake first_slot,fake endorsing_power*)
-  let query =
-    Format.asprintf
-      "INSERT INTO endorsing_rights \
-       (level,delegate,first_slot,endorsing_power) SELECT %s,delegates.id,1,1 \
-       FROM delegates JOIN (VALUES %a) ON delegates.address = column1;"
-      level
-      (Format.pp_print_list
-         ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-         (fun f ops ->
-           Format.fprintf
-             f
-             "(x'%a')"
-             Hex.pp
-             (Signature.Public_key_hash.to_hex
-                ops.Data.Delegate_operations.delegate)))
-      data.Data.delegate_operations
-  in
-  Db.exec db query
-
-let register_block db level data source =
-  let query =
-    Format.asprintf
-      "INSERT OR IGNORE INTO blocks (timestamp,hash,level,round,baker) SELECT \
-       column1,column2,%s,column4,delegates.id FROM delegates JOIN (VALUES %a) \
-       ON delegates.address = column3;"
-      level
-      (Format.pp_print_list
-         ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-         (fun f block ->
-           Format.fprintf
-             f
-             "('%a',x'%a',x'%a',%li)"
-             Time.Protocol.pp
-             block.Data.Block.timestamp
-             Hex.pp
-             (Block_hash.to_hex block.Data.Block.hash)
-             Hex.pp
-             (Signature.Public_key_hash.to_hex block.Data.Block.delegate)
-             block.Data.Block.round))
-      data.Data.blocks
-  in
-  Db.exec db query ;
-  let query =
-    Format.asprintf
-      "INSERT INTO blocks_reception (timestamp,block,source) SELECT \
-       column1,blocks.id,nodes.id FROM blocks JOIN (VALUES %a) ON blocks.hash \
-       = column2 JOIN nodes ON nodes.name = '%s';"
-      (Format.pp_print_list
-         ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-         (fun f block ->
-           Format.pp_print_option
-             (fun f reception_time ->
-               Format.fprintf
-                 f
-                 "('%a',x'%a')"
-                 Time.System.pp_hum
-                 reception_time
-                 Hex.pp
-                 (Block_hash.to_hex block.Data.Block.hash))
-             f
-             block.Data.Block.reception_time))
-      data.Data.blocks
-      source
-  in
-  Db.exec db query
-
-let register_ops =
-  (* fake hash *)
-  let fake_hash = ref 0 in
-  fun db level data source ->
-    let known_ops =
-      List.rev_concat_map
-        (fun del ->
-          List.rev_map
-            (fun op ->
-              Data.Delegate_operations.(op.kind, del.delegate, op.round))
-            del.Data.Delegate_operations.operations)
-        data.Data.delegate_operations
-    in
-    let query =
-      Format.asprintf
-        "INSERT INTO operations (endorsement,level,round,endorser,hash) SELECT \
-         column1,%s,column3,delegates.id,column4 FROM delegates JOIN (VALUES \
-         %a) ON delegates.address = column2;"
-        level
-        (Format.pp_print_list
-           ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-           (fun f (kind, delegate, round) ->
-             incr fake_hash ;
-             Format.fprintf
-               f
-               "(%d,x'%a',%a,x'%044x')"
-               (Sql_requests.bool_to_int (kind = Consensus_ops.Endorsement))
-               Hex.pp
-               (Signature.Public_key_hash.to_hex delegate)
-               (Format.pp_print_option
-                  ~none:(fun f () -> Format.pp_print_string f "NULL")
-                  (fun f x -> Format.fprintf f "%li" x))
-               round
-               !fake_hash))
-        known_ops
-    in
-    Db.exec db query ;
-    let received_ops =
-      List.rev_concat_map
-        (fun del ->
-          List.rev_filter_map
-            (fun op ->
+      (fun Data.Delegate_operations.{delegate; delegate_alias = _; operations} ->
+        ( delegate,
+          List.filter_map
+            (fun Data.Delegate_operations.
+                   {kind; round; reception_time; errors; block_inclusion = _} ->
               Option.map
-                (fun reception ->
-                  Data.Delegate_operations.
-                    (reception, op.errors, del.delegate, op.round, op.kind))
-                op.Data.Delegate_operations.reception_time)
-            del.Data.Delegate_operations.operations)
-        data.Data.delegate_operations
-    in
-    let query =
-      Format.asprintf
-        "INSERT INTO operations_reception (timestamp,operation,source,errors) \
-         SELECT column1,operations.id,nodes.id,column2 FROM operations JOIN \
-         delegates ON operations.endorser = delegates.id JOIN (VALUES %a) ON \
-         delegates.address = column3 AND ((operations.round IS NULL AND \
-         column4 IS NULL) OR operations.round = column4) AND \
-         operations.endorsement = column5 JOIN nodes ON nodes.name = '%s' \
-         WHERE operations.level = %s;"
-        (Format.pp_print_list
-           ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-           (fun f (timestamp, errors, delegate, round, kind) ->
-             Format.fprintf
-               f
-               "('%a',%a,x'%a',%a,%d)"
-               Time.System.pp_hum
-               timestamp
-               (Format.pp_print_option
-                  ~none:(fun f () -> Format.pp_print_string f "NULL")
-                  (fun f x ->
-                    Format.fprintf
-                      f
-                      "x'%a'"
-                      Hex.pp
-                      (Hex.of_bytes
-                         (Data_encoding.Binary.to_bytes_exn
-                            (Data_encoding.list Error_monad.error_encoding)
-                            x))))
-               errors
-               Hex.pp
-               (Signature.Public_key_hash.to_hex delegate)
-               (Format.pp_print_option
-                  ~none:(fun f () -> Format.pp_print_string f "NULL")
-                  (fun f x -> Format.fprintf f "%li" x))
-               round
-               (Sql_requests.bool_to_int (kind = Consensus_ops.Endorsement))))
-        received_ops
-        source
-        level
-    in
-    Db.exec db query
-
-let register_ops_inclusion db level data =
-  let included_ops =
-    List.rev_concat_map
-      (fun del ->
-        List.rev_concat_map
-          (fun op ->
-            List.map
-              (fun block ->
-                Data.Delegate_operations.(block, del.delegate, op.round, op.kind))
-              op.Data.Delegate_operations.block_inclusion)
-          del.Data.Delegate_operations.operations)
+                (fun reception_time ->
+                  let fake_hash = fake_hash level round delegate kind in
+                  Consensus_ops.
+                    {
+                      op = {kind; round; hash = fake_hash};
+                      errors;
+                      reception_time;
+                    })
+                reception_time)
+            operations ))
       data.Data.delegate_operations
   in
-  let query =
-    Format.asprintf
-      "INSERT INTO operations_inclusion (block,operation) SELECT \
-       blocks.id,operations.id FROM operations JOIN delegates ON \
-       operations.endorser = delegates.id JOIN blocks JOIN (VALUES %a) ON \
-       delegates.address = column2 AND ((operations.round IS NULL AND column3 \
-       IS NULL) OR operations.round = column3) AND operations.endorsement = \
-       column4 AND blocks.hash = column1 WHERE operations.level = %s;"
-      (Format.pp_print_list
-         ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-         (fun f (block, delegate, round, kind) ->
-           Format.fprintf
-             f
-             "(x'%a',x'%a',%a,%d)"
-             Hex.pp
-             (Block_hash.to_hex block)
-             Hex.pp
-             (Signature.Public_key_hash.to_hex delegate)
-             (Format.pp_print_option
-                ~none:(fun f () -> Format.pp_print_string f "NULL")
-                (fun f x -> Format.fprintf f "%li" x))
-             round
-             (Sql_requests.bool_to_int (kind = Consensus_ops.Endorsement))))
-      included_ops
-      level
+  let body =
+    `String
+      (Ezjsonm.value_to_string
+         (Data_encoding.Json.construct
+            Consensus_ops.delegate_ops_encoding
+            received_ops))
   in
-  Db.exec db query
+  let headers =
+    Cohttp.Header.init_with "content-type" "application/json; charset=UTF-8"
+  in
+  let headers = Cohttp.Header.add_authorization headers (`Basic auth) in
+  let*! (resp, out) =
+    Cohttp_lwt_unix.Client.post
+      ~ctx
+      ~body
+      ~headers
+      (Uri.with_path endpoint (Uri.path endpoint ^ "/" ^ level ^ "/mempool"))
+  in
+  let*! out = Cohttp_lwt.Body.to_string out in
+  Lwt_io.printlf
+    "%s: %s: %s"
+    level
+    (Cohttp.Code.string_of_status resp.status)
+    out
 
-let main source prefix db_file =
-  let db = Sqlite3.db_open db_file in
-  Db.exec db Sql_requests.db_schema ;
-  Db.ensure_source_is_there db source ;
-  let*! () =
+let block_map_append x e m =
+  let out = Option.value (Block_hash.Map.find x m) ~default:[] in
+  Block_hash.Map.add x (e :: out) m
+
+let included_ops_map level data =
+  List.fold_left
+    (fun acc Data.Delegate_operations.{delegate; delegate_alias = _; operations} ->
+      List.fold_left
+        (fun acc
+             Data.Delegate_operations.
+               {kind; round; reception_time = _; errors = _; block_inclusion} ->
+          List.fold_left
+            (fun acc block ->
+              let fake_hash = fake_hash level round delegate kind in
+              block_map_append
+                block
+                Consensus_ops.{op = {kind; round; hash = fake_hash}; delegate}
+                acc)
+            acc
+            block_inclusion)
+        acc
+        operations)
+    Block_hash.Map.empty
+    data.Data.delegate_operations
+
+let to_blocks ctx endpoint auth level pred_ops_map ops_map data =
+  let bodies =
+    List.map
+      (fun (Data.Block.{hash; _} as block) ->
+        let v =
+          ( block,
+            ( Option.value (Block_hash.Map.find hash pred_ops_map) ~default:[],
+              Option.value (Block_hash.Map.find hash ops_map) ~default:[] ) )
+        in
+        `String
+          (Ezjsonm.value_to_string
+             (Data_encoding.Json.construct Data.block_data_encoding v)))
+      data.Data.blocks
+  in
+  let headers =
+    Cohttp.Header.init_with "content-type" "application/json; charset=UTF-8"
+  in
+  let headers = Cohttp.Header.add_authorization headers (`Basic auth) in
+  Lwt.join
+    (List.map
+       (fun body ->
+         let*! (resp, out) =
+           Cohttp_lwt_unix.Client.post
+             ~ctx
+             ~body
+             ~headers
+             (Uri.with_path
+                endpoint
+                (Uri.path endpoint ^ "/" ^ level ^ "/block"))
+         in
+         let*! out = Cohttp_lwt.Body.to_string out in
+         Lwt_io.printlf
+           "%s: %s: %s"
+           level
+           (Cohttp.Code.string_of_status resp.status)
+           out)
+       bodies)
+
+let poor_man_lexical_sort x y =
+  if String.length x = String.length y then String.compare x y
+  else Int.compare (String.length x) (String.length y)
+
+let main source password endpoint prefix =
+  let*! ctx =
+    match X509.Authenticator.of_string "none" with
+    | Error _ -> Conduit_lwt_unix.init ()
+    | Ok f ->
+        let tls_authenticator = f (fun () -> Some (Time.System.now ())) in
+        Conduit_lwt_unix.init ~tls_authenticator ()
+  in
+  let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
+  let subdirs = Sys.readdir prefix in
+  let () = Array.sort poor_man_lexical_sort subdirs in
+  let*! _ =
     Array.fold_left
       (fun acc subdir ->
         let subdir = Filename.concat prefix subdir in
         if Sys.is_directory subdir then
+          let filenames = Sys.readdir subdir in
+          let () = Array.sort poor_man_lexical_sort filenames in
           Array.fold_left
             (fun acc filename ->
               if Filename.check_suffix filename "json" then
                 let level = Filename.chop_extension filename in
                 let filename = Filename.concat subdir filename in
-                let*! () = acc in
+                let*! previous_block_ops_map = acc in
                 let*! data =
                   let* json = Lwt_utils_unix.Json.read_file filename in
                   try return (Data_encoding.Json.destruct Data.encoding json)
@@ -278,25 +178,43 @@ let main source prefix db_file =
                 in
                 match data with
                 | Ok data ->
-                    if not data.Data.unaccurate then (
-                      ensure_delegates_are_there db data ;
-                      register_rights db level data ;
-                      register_block db level data source ;
-                      register_ops db level data source ;
-                      register_ops_inclusion db level data) ;
-                    Lwt.return_unit
+                    let out = included_ops_map level data in
+                    if not data.Data.unaccurate then
+                      let*! _ =
+                        to_received_ops
+                          ctx
+                          endpoint
+                          (source, password)
+                          level
+                          data
+                      in
+                      let*! _ =
+                        to_blocks
+                          ctx
+                          endpoint
+                          (source, password)
+                          level
+                          previous_block_ops_map
+                          out
+                          data
+                      in
+                      Lwt.return out
+                    else Lwt.return out
                 | Error err ->
-                    Lwt_io.printl
-                      (Format.asprintf
-                         "@[File %s does not parse :@ @[%a@]@]"
-                         filename
-                         Error_monad.pp_print_trace
-                         err)
-              else Lwt.return_unit)
+                    let*! () =
+                      Lwt_io.printl
+                        (Format.asprintf
+                           "@[File %s does not parse :@ @[%a@]@]"
+                           filename
+                           Error_monad.pp_print_trace
+                           err)
+                    in
+                    acc
+              else acc)
             acc
-            (Sys.readdir subdir)
-        else Lwt.return_unit)
-      Lwt.return_unit
-      (Sys.readdir prefix)
+            filenames
+        else acc)
+      (Lwt.return Block_hash.Map.empty)
+      subdirs
   in
   return_unit

@@ -53,21 +53,32 @@ let select_commands ctxt Client_config.{protocol; chain; block; _} =
     ([
        Clic.command
          ~group
-         ~desc:"convert a file hierarchy into a db"
-         Clic.no_options
+         ~desc:"upload a file hierarchy to a server"
+         (Clic.args2
+            (Clic.default_arg
+               ~doc:"Name of the feeder"
+               ~short:'u'
+               ~long:"user"
+               ~placeholder:"name"
+               ~default:"archiver"
+               (Clic.parameter (fun _ p -> return p)))
+            (Clic.default_arg
+               ~doc:"Name of the feeder"
+               ~short:'p'
+               ~long:"password"
+               ~placeholder:"secret"
+               ~default:""
+               (Clic.parameter (fun _ p -> return p))))
          (Clic.prefixes ["convert"; "from"]
-         @@ Clic.param
-              ~name:"archive_path"
-              ~desc:"folder where files are"
-              (Clic.parameter (fun _ p -> return p))
+         @@ Clic.string ~name:"archive_path" ~desc:"folder where files are"
          @@ Clic.prefix "to"
          @@ Clic.param
-              ~name:"db_path"
-              ~desc:"database file to create"
-              (Clic.parameter (fun _ p -> return p))
+              ~name:"server_endpoint"
+              ~desc:"Teztale server to feed"
+              (Clic.parameter (fun _ p -> return (Uri.of_string p)))
          @@ Clic.stop)
-         (fun () prefix db_file _cctxt ->
-           Teztale_archiver.Converter.main "Pirbo_sniffer" prefix db_file);
+         (fun (source, pass) prefix endpoint _cctxt ->
+           Teztale_archiver.Converter.main source pass endpoint prefix);
      ]
     @ proto_commands)
 
