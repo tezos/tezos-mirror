@@ -265,6 +265,30 @@ module Lwt_syntax : sig
   val both : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
 end
 
+module Option_syntax : sig
+  val return : 'a -> 'a option
+
+  val fail : 'a option
+
+  val return_unit : unit option
+
+  val return_nil : 'a list option
+
+  val return_true : bool option
+
+  val return_false : bool option
+
+  val ( let* ) : 'a option -> ('a -> 'b option) -> 'b option
+
+  val ( and* ) : 'a option -> 'b option -> ('a * 'b) option
+
+  val ( let+ ) : 'a option -> ('a -> 'b) -> 'b option
+
+  val ( and+ ) : 'a option -> 'b option -> ('a * 'b) option
+
+  val both : 'a option -> 'b option -> ('a * 'b) option
+end
+
 module Result_syntax : sig
   val return : 'a -> ('a, 'e) result
 
@@ -333,6 +357,34 @@ module Lwt_result_syntax : sig
     ('a, 'e) result Lwt.t ->
     ('b, 'e) result Lwt.t ->
     ('a * 'b, 'e list) result Lwt.t
+end
+
+module Lwt_option_syntax : sig
+  val return : 'a -> 'a option Lwt.t
+
+  val return_unit : unit option Lwt.t
+
+  val return_nil : 'a list option Lwt.t
+
+  val return_true : bool option Lwt.t
+
+  val return_false : bool option Lwt.t
+
+  val fail : 'a option Lwt.t
+
+  val ( let* ) : 'a option Lwt.t -> ('a -> 'b option Lwt.t) -> 'b option Lwt.t
+
+  val ( and* ) : 'a option Lwt.t -> 'b option Lwt.t -> ('a * 'b) option Lwt.t
+
+  val ( let+ ) : 'a option Lwt.t -> ('a -> 'b) -> 'b option Lwt.t
+
+  val ( and+ ) : 'a option Lwt.t -> 'b option Lwt.t -> ('a * 'b) option Lwt.t
+
+  val ( let*! ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
+
+  val ( let*? ) : 'a option -> ('a -> 'b option Lwt.t) -> 'b option Lwt.t
+
+  val both : 'a option Lwt.t -> 'b option Lwt.t -> ('a * 'b) option Lwt.t
 end
 
 module Tzresult_syntax : sig
