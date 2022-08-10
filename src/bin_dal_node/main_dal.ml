@@ -23,8 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let group =
-  {Clic.name = "dal-daemon"; title = "Commands related to the DAL daemon"}
+let group = {Clic.name = "dal-node"; title = "Commands related to the DAL node"}
 
 let data_dir_arg =
   let default = Configuration.default_data_dir in
@@ -33,7 +32,7 @@ let data_dir_arg =
     ~placeholder:"data-dir"
     ~doc:
       (Format.sprintf
-         "The path to the DAL daemon data directory. Default value is %s"
+         "The path to the DAL node data directory. Default value is %s"
          default)
     ~default
     (Client_config.string_parameter ())
@@ -45,8 +44,7 @@ let rpc_addr_arg =
     ~placeholder:"rpc-address|ip"
     ~doc:
       (Format.sprintf
-         "The address the smart-contract rollup node listens to. Default value \
-          is %s"
+         "The address the DAL node listens to. Default value is %s"
          default)
     ~default
     (Client_config.string_parameter ())
@@ -63,8 +61,7 @@ let rpc_port_arg =
     ~placeholder:"rpc-port"
     ~doc:
       (Format.sprintf
-         "The port the smart-contract rollup node listens to. Default value is \
-          %s"
+         "The port the DAL node listens to. Default value is %s"
          default)
     ~default
     int_parameter
@@ -98,7 +95,7 @@ let run_command =
   let open Clic in
   command
     ~group
-    ~desc:"Run the DAL daemon."
+    ~desc:"Run the DAL node."
     (args1 data_dir_arg)
     (prefixes ["run"] @@ stop)
     (fun data_dir cctxt -> Daemon.run ~data_dir cctxt)
