@@ -130,16 +130,16 @@ let check_proof_size ~loc context input_opt s =
 (* Like [eval] but also checks the proof size. *)
 let checked_eval ~loc context s =
   let open Lwt_result_syntax in
+  let* () = check_proof_size ~loc context None s in
   let*! s = Prover.eval s in
-  let+ () = check_proof_size ~loc context None s in
-  s
+  return s
 
 (* Like [set_input] but also checks the proof size. *)
 let checked_set_input ~loc context input s =
   let open Lwt_result_syntax in
+  let* () = check_proof_size ~loc context (Some input) s in
   let*! s = Prover.set_input input s in
-  let+ () = check_proof_size ~loc context (Some input) s in
-  s
+  return s
 
 let complete_boot_sector sector :
     Tezos_scoru_wasm.Gather_floppies.origination_message =
