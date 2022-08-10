@@ -1093,6 +1093,24 @@ let pp_contents_and_result :
         proposal
         Data_encoding.Json.pp
         (Data_encoding.Json.construct Vote.ballot_encoding ballot)
+  | ( Drain_delegate {consensus_key; delegate; destination},
+      Drain_delegate_result {balance_updates; allocated_destination_contract} )
+    ->
+      Format.fprintf
+        ppf
+        "@[<v 2>Drain delegate:@,\
+         Consensus key hash: %a@,\
+         Delegate: %a@,\
+         Destination: %a%s%a@]"
+        Signature.Public_key_hash.pp
+        consensus_key
+        Signature.Public_key_hash.pp
+        delegate
+        Signature.Public_key_hash.pp
+        destination
+        (if allocated_destination_contract then " (allocated)" else "")
+        pp_balance_updates
+        balance_updates
   | Failing_noop _arbitrary, _ ->
       (* the Failing_noop operation always fails and can't have result *)
       .

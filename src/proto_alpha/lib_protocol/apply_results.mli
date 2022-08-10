@@ -96,6 +96,11 @@ and 'kind contents_result =
       -> Kind.activate_account contents_result
   | Proposals_result : Kind.proposals contents_result
   | Ballot_result : Kind.ballot contents_result
+  | Drain_delegate_result : {
+      balance_updates : Receipt.balance_updates;
+      allocated_destination_contract : bool;
+    }
+      -> Kind.drain_delegate contents_result
   | Manager_operation_result : {
       balance_updates : Receipt.balance_updates;
       operation_result : 'kind manager_operation_result;

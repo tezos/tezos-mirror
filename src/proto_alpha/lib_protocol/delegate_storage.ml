@@ -247,3 +247,34 @@ let delegated_balance ctxt delegate =
   staking_balance ctxt delegate >>=? fun staking_balance ->
   full_balance ctxt delegate >>=? fun self_staking_balance ->
   Lwt.return Tez_repr.(staking_balance -? self_staking_balance)
+
+let drain ctxt ~delegate ~destination =
+  let open Lwt_tzresult_syntax in
+  let*! is_destination_allocated =
+    Contract_storage.allocated ctxt (Contract_repr.Implicit destination)
+  in
+  let delegate_contract = Contract_repr.Implicit delegate in
+  let* ctxt, _, balance_updates1 =
+    if not is_destination_allocated then
+      Fees_storage.burn_origination_fees
+        ctxt
+        ~storage_limit:(Z.of_int (Constants_storage.origination_size ctxt))
+        ~payer:(`Contract delegate_contract)
+    else return (ctxt, Z.zero, [])
+  in
+  let* manager_balance = spendable_balance ctxt delegate in
+  let*? one_percent = Tez_repr.(manager_balance /? 100L) in
+  let fees = Tez_repr.(max one one_percent) in
+  let*? transfered = Tez_repr.(manager_balance -? fees) in
+  let* ctxt, balance_updates2 =
+    Token.transfer
+      ctxt
+      (`Contract delegate_contract)
+      (`Contract (Contract_repr.Implicit destination))
+      transfered
+  in
+  return
+    ( ctxt,
+      not is_destination_allocated,
+      fees,
+      balance_updates1 @ balance_updates2 )

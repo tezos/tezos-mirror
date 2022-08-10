@@ -2478,6 +2478,12 @@ module Delegate : sig
 
   val list : context -> public_key_hash list Lwt.t
 
+  val drain :
+    context ->
+    delegate:public_key_hash ->
+    destination:public_key_hash ->
+    (context * bool * Tez.t * Receipt.balance_updates) tzresult Lwt.t
+
   type participation_info = {
     expected_cycle_activity : int;
     minimal_cycle_activity : int;
@@ -3894,6 +3900,8 @@ module Kind : sig
 
   type update_consensus_key = Update_consensus_key_kind
 
+  type drain_delegate = Drain_delegate_kind
+
   type failing_noop = Failing_noop_kind
 
   type register_global_constant = Register_global_constant_kind
@@ -4063,6 +4071,12 @@ and _ contents =
       ballot : Vote.ballot;
     }
       -> Kind.ballot contents
+  | Drain_delegate : {
+      consensus_key : Signature.Public_key_hash.t;
+      delegate : Signature.Public_key_hash.t;
+      destination : Signature.Public_key_hash.t;
+    }
+      -> Kind.drain_delegate contents
   | Failing_noop : string -> Kind.failing_noop contents
   | Manager_operation : {
       source : public_key_hash;
@@ -4344,6 +4358,8 @@ module Operation : sig
     val proposals_case : Kind.proposals case
 
     val ballot_case : Kind.ballot case
+
+    val drain_delegate_case : Kind.drain_delegate case
 
     val failing_noop_case : Kind.failing_noop case
 

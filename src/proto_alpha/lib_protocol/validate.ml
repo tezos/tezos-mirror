@@ -1461,6 +1461,83 @@ module Anonymous = struct
         anonymous_state = {vs.anonymous_state with double_baking_evidences_seen};
       }
 
+  let validate_drain_delegate vi vs ~should_check_signature oph
+      (operation : Kind.drain_delegate Operation.t) =
+    let open Lwt_tzresult_syntax in
+    let (Single (Drain_delegate {delegate; destination; consensus_key})) =
+      operation.protocol_data.contents
+    in
+    let*! is_registered = Delegate.registered vi.ctxt delegate in
+    let* () =
+      fail_unless
+        is_registered
+        (Drain_delegate_on_unregistered_delegate delegate)
+    in
+    let* active_pk = Delegate.Consensus_key.active_pubkey vi.ctxt delegate in
+    let* () =
+      if
+        not
+          (Signature.Public_key_hash.equal
+             active_pk.consensus_pkh
+             consensus_key)
+      then
+        fail
+          (Invalid_drain_delegate_inactive_key
+             {
+               delegate;
+               consensus_key;
+               active_consensus_key = active_pk.consensus_pkh;
+             })
+      else if Signature.Public_key_hash.equal active_pk.consensus_pkh delegate
+      then fail (Invalid_drain_delegate_no_consensus_key delegate)
+      else if Signature.Public_key_hash.equal destination delegate then
+        fail (Invalid_drain_delegate_noop delegate)
+      else return_unit
+    in
+    let*! is_destination_allocated =
+      Contract.allocated vi.ctxt (Contract.Implicit destination)
+    in
+    let* balance = Contract.get_balance vi.ctxt (Contract.Implicit delegate) in
+    let*? origination_burn =
+      if is_destination_allocated then ok Tez.zero
+      else
+        let cost_per_byte = Constants.cost_per_byte vi.ctxt in
+        let origination_size = Constants.origination_size vi.ctxt in
+        Tez.(cost_per_byte *? Int64.of_int origination_size)
+    in
+    let* drain_fees =
+      let*? one_percent = Tez.(balance /? 100L) in
+      return Tez.(max one one_percent)
+    in
+    let*? min_amount = Tez.(origination_burn +? drain_fees) in
+    let* () =
+      fail_when
+        Tez.(balance < min_amount)
+        (Invalid_drain_delegate_insufficient_funds_for_burn_or_fees
+           {delegate; destination; min_amount})
+    in
+    let*? () =
+      if should_check_signature then
+        Operation.check_signature active_pk.consensus_pk vi.chain_id operation
+      else ok ()
+    in
+    let*? () =
+      match
+        Signature.Public_key_hash.Map.find
+          delegate
+          vs.manager_state.managers_seen
+      with
+      | None -> ok ()
+      | Some _ -> error (Conflicting_drain {delegate})
+    in
+    let managers_seen =
+      Signature.Public_key_hash.Map.add
+        delegate
+        oph
+        vs.manager_state.managers_seen
+    in
+    return {vs with manager_state = {vs.manager_state with managers_seen}}
+
   let validate_seed_nonce_revelation vi vs
       (Seed_nonce_revelation {level = commitment_raw_level; nonce}) =
     let open Lwt_result_syntax in
@@ -2289,6 +2366,13 @@ let validate_operation {info; state} ?(should_check_signature = true) oph
               contents
         | Single (Double_baking_evidence _ as contents) ->
             Anonymous.validate_double_baking_evidence info state oph contents
+        | Single (Drain_delegate _) ->
+            Anonymous.validate_drain_delegate
+              info
+              state
+              ~should_check_signature
+              oph
+              operation
         | Single (Seed_nonce_revelation _ as contents) ->
             Anonymous.validate_seed_nonce_revelation info state contents
         | Single (Vdf_revelation _ as contents) ->

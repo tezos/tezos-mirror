@@ -854,6 +854,7 @@ let pre_filter config ~(filter_state : state) ?validation_state_before
   | Single (Activate_account _)
   | Single (Proposals _)
   | Single (Vdf_revelation _)
+  | Single (Drain_delegate _)
   | Single (Ballot _) ->
       Lwt.return @@ `Passed_prefilter other_prio
   | Single (Manager_operation _) as op -> prefilter_manager_op op
@@ -993,84 +994,91 @@ let validate_manager_operation_and_handle_conflicts config filter_state
       | `Weight_ok (`No_replace, _weight) ->
           (* The mempool is not full: no need to replace any operation. *)
           return (validation_state, `No_replace)
-      | `Weight_ok (`Replace min_weight_oph, _weight) ->
+      | `Weight_ok (`Replace min_weight_oph, _weight) -> (
           (* The mempool is full yet the new operation has enough weight
              to be included: the old operation with the lowest weight is
              reclassified as [Branch_delayed]. *)
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/2347 The
              branch_delayed ring is bounded to 1000, so we may loose
              operations. We can probably do better. *)
-          let validation_state =
-            match
-              Operation_hash.Map.find
-                min_weight_oph
-                filter_state.prechecked_manager_ops
-            with
-            | None -> assert false
-            | Some {manager_op; _} ->
+          match
+            Operation_hash.Map.find
+              min_weight_oph
+              filter_state.prechecked_manager_ops
+          with
+          | None ->
+              (* This only occurs for a [Drain_delegate]
+                 operation: it has a higher priority than a manager
+                 therefore we keep the drain delegate *)
+              return (validation_state, `No_replace)
+          | Some {manager_op; _} ->
+              let validation_state =
                 remove_from_validation_state validation_state manager_op
-          in
-          let replace_err =
-            Environment.wrap_tzerror Removed_fees_too_low_for_mempool
-          in
-          let replacement =
-            `Replace (min_weight_oph, `Branch_delayed [replace_err])
-          in
-          return (validation_state, replacement)
+              in
+              let replace_err =
+                Environment.wrap_tzerror Removed_fees_too_low_for_mempool
+              in
+              let replacement =
+                `Replace (min_weight_oph, `Branch_delayed [replace_err])
+              in
+              return (validation_state, replacement))
       | `Fail err ->
           (* The mempool is full and the weight of the new operation is
              too low: raise the error returned by {!check_minimal_weight}. *)
           fail err)
-  | `Conflict (old_oph, _proto_error) ->
+  | `Conflict (old_oph, _proto_error) -> (
       (* The protocol [validation_state] already contains an operation
          from the same manager. We look at the fees and gas limits of
          both operations to decide whether to replace the old one. *)
-      let old_info =
-        match
-          Operation_hash.Map.find old_oph filter_state.prechecked_manager_ops
-        with
-        | None -> assert false
-        | Some info -> info
-      in
-      if
-        better_fees_and_ratio
-          config
-          old_info.gas_limit
-          old_info.fee
-          gas_limit
-          fee
-      then
-        (* The new operation is better and replaces the old one from
-           the same manager. Note that there is no need to check the
-           number of prechecked operations in the mempool
-           here. Indeed, the removal of the old operation frees up a
-           spot in the mempool anyway. *)
-        let validation_state =
-          remove_from_validation_state validation_state old_info.manager_op
-        in
-        let* proto_validation_outcome2 =
-          proto_validate_manager_operation
-            validation_state
-            oph
-            ~nb_successful_prechecks
-            operation
-        in
-        match proto_validation_outcome2 with
-        | `Success validation_state ->
-            let replace_err =
-              Environment.wrap_tzerror
-                (Manager_operation_replaced {old_hash = old_oph; new_hash = oph})
+      match
+        Operation_hash.Map.find old_oph filter_state.prechecked_manager_ops
+      with
+      | None ->
+          (* This only occurs for a [Drain_delegate] operation: it has
+             a higher priority than a manager therefore we keep the
+             drain delegate *)
+          return (validation_state, `No_replace)
+      | Some old_info ->
+          if
+            better_fees_and_ratio
+              config
+              old_info.gas_limit
+              old_info.fee
+              gas_limit
+              fee
+          then
+            (* The new operation is better and replaces the old one from
+               the same manager. Note that there is no need to check the
+               number of prechecked operations in the mempool
+               here. Indeed, the removal of the old operation frees up a
+               spot in the mempool anyway. *)
+            let validation_state =
+              remove_from_validation_state validation_state old_info.manager_op
             in
-            let replacement = `Replace (old_oph, `Outdated [replace_err]) in
-            return (validation_state, replacement)
-        | `Conflict (_oph, conflict_proto_error) ->
-            (* This should not happen: a manager operation should not
-               conflict with multiple operations. *)
-            fail conflict_proto_error
-      else
-        (* The new operation is not interesting enough so it is rejected. *)
-        let err = Manager_restriction {oph = old_oph; fee = old_info.fee} in
-        fail (`Branch_delayed [Environment.wrap_tzerror err])
+            let* proto_validation_outcome2 =
+              proto_validate_manager_operation
+                validation_state
+                oph
+                ~nb_successful_prechecks
+                operation
+            in
+            match proto_validation_outcome2 with
+            | `Success validation_state ->
+                let replace_err =
+                  Environment.wrap_tzerror
+                    (Manager_operation_replaced
+                       {old_hash = old_oph; new_hash = oph})
+                in
+                let replacement = `Replace (old_oph, `Outdated [replace_err]) in
+                return (validation_state, replacement)
+            | `Conflict (_oph, conflict_proto_error) ->
+                (* This should not happen: a manager operation should not
+                   conflict with multiple operations. *)
+                fail conflict_proto_error
+          else
+            (* The new operation is not interesting enough so it is rejected. *)
+            let err = Manager_restriction {oph = old_oph; fee = old_info.fee} in
+            fail (`Branch_delayed [Environment.wrap_tzerror err]))
 
 (** Remove a manager operation hash from the filter state.
     Do nothing if the operation was not in the state. *)
@@ -1374,6 +1382,7 @@ let post_filter config ~(filter_state : state) ~validation_state_before:_
       | Single_result (Activate_account_result _)
       | Single_result Proposals_result
       | Single_result (Vdf_revelation_result _)
+      | Single_result (Drain_delegate_result _)
       | Single_result Ballot_result ->
           Lwt.return (`Passed_postfilter filter_state)
       | Single_result (Manager_operation_result _) as result ->

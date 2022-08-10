@@ -1075,6 +1075,11 @@ type 'kind contents_result =
       -> Kind.activate_account contents_result
   | Proposals_result : Kind.proposals contents_result
   | Ballot_result : Kind.ballot contents_result
+  | Drain_delegate_result : {
+      balance_updates : Receipt.balance_updates;
+      allocated_destination_contract : bool;
+    }
+      -> Kind.drain_delegate contents_result
   | Manager_operation_result : {
       balance_updates : Receipt.balance_updates;
       operation_result : 'kind manager_operation_result;
@@ -1444,6 +1449,34 @@ module Encoding = struct
         inj = (fun () -> Ballot_result);
       }
 
+  let drain_delegate_case =
+    Case
+      {
+        op_case = Operation.Encoding.drain_delegate_case;
+        encoding =
+          Data_encoding.(
+            obj2
+              (dft "balance_updates" Receipt.balance_updates_encoding [])
+              (dft "allocated_destination_contract" bool false));
+        select =
+          (function
+          | Contents_result (Drain_delegate_result _ as op) -> Some op
+          | _ -> None);
+        mselect =
+          (function
+          | Contents_and_result ((Drain_delegate _ as op), res) -> Some (op, res)
+          | _ -> None);
+        proj =
+          (function
+          | Drain_delegate_result
+              {balance_updates; allocated_destination_contract} ->
+              (balance_updates, allocated_destination_contract));
+        inj =
+          (fun (balance_updates, allocated_destination_contract) ->
+            Drain_delegate_result
+              {balance_updates; allocated_destination_contract});
+      }
+
   let make_manager_case (type kind)
       (Operation.Encoding.Case op_case :
         kind Kind.manager Operation.Encoding.case)
@@ -1507,6 +1540,7 @@ module Encoding = struct
           | Contents_result (Double_preendorsement_evidence_result _) -> None
           | Contents_result (Double_baking_evidence_result _) -> None
           | Contents_result (Activate_account_result _) -> None
+          | Contents_result (Drain_delegate_result _) -> None
           | Contents_result Proposals_result -> None);
         mselect;
         proj =
@@ -1869,6 +1903,7 @@ let contents_result_encoding =
          make activate_account_case;
          make proposals_case;
          make ballot_case;
+         make drain_delegate_case;
          make reveal_case;
          make transaction_case;
          make origination_case;
@@ -1942,6 +1977,7 @@ let contents_and_result_encoding =
          make set_deposits_limit_case;
          make increase_paid_storage_case;
          make update_consensus_key_case;
+         make drain_delegate_case;
          make tx_rollup_origination_case;
          make tx_rollup_submit_batch_case;
          make tx_rollup_commit_case;
@@ -2092,6 +2128,8 @@ let kind_equal :
   | Proposals _, _ -> None
   | Ballot _, Ballot_result -> Some Eq
   | Ballot _, _ -> None
+  | Drain_delegate _, Drain_delegate_result _ -> Some Eq
+  | Drain_delegate _, _ -> None
   | Failing_noop _, _ ->
       (* the Failing_noop operation always fails and can't have result *)
       None

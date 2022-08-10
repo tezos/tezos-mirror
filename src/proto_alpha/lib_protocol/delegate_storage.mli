@@ -143,3 +143,10 @@ val full_balance :
 (** Only use this function for RPCs: this is expensive. *)
 val delegated_balance :
   Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
+
+val drain :
+  Raw_context.t ->
+  delegate:Signature.Public_key_hash.t ->
+  destination:Signature.Public_key_hash.t ->
+  (Raw_context.t * bool * Tez_repr.t * Receipt_repr.balance_updates) tzresult
+  Lwt.t

@@ -1971,7 +1971,7 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
       ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
       | Vdf_revelation _ | Double_endorsement_evidence _
       | Double_preendorsement_evidence _ | Double_baking_evidence _
-      | Activate_account _ | Manager_operation _ )
+      | Activate_account _ | Drain_delegate _ | Manager_operation _ )
   | Cons (Manager_operation _, _) ->
       record_non_consensus_operation_hash ctxt hash
 
@@ -2205,6 +2205,24 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
   | Single (Proposals _ as contents) ->
       Amendment.apply_proposals ctxt chain_id contents
   | Single (Ballot _ as contents) -> Amendment.apply_ballot ctxt contents
+  | Single (Drain_delegate {delegate; destination; consensus_key = _}) ->
+      Delegate.drain ctxt ~delegate ~destination
+      >>=? fun ( ctxt,
+                 allocated_destination_contract,
+                 fees,
+                 drain_balance_updates ) ->
+      Token.transfer
+        ctxt
+        (`Contract (Contract.Implicit delegate))
+        (`Contract (Contract.Implicit payload_producer.Consensus_key.delegate))
+        fees
+      >>=? fun (ctxt, fees_balance_updates) ->
+      let balance_updates = drain_balance_updates @ fees_balance_updates in
+      return
+        ( ctxt,
+          Single_result
+            (Drain_delegate_result
+               {balance_updates; allocated_destination_contract}) )
   | Single (Failing_noop _) ->
       (* This operation always fails. It should already have been
          rejected by {!Validate_operation.validate_operation}. *)

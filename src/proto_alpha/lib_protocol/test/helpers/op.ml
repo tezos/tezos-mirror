@@ -998,3 +998,10 @@ let update_consensus_key ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
   >>=? fun to_sign_op ->
   Context.Contract.manager ctxt src >|=? fun account ->
   sign account.sk ctxt to_sign_op
+
+let drain_delegate ctxt ~consensus_key ~delegate ~destination =
+  let contents =
+    Single (Drain_delegate {consensus_key; delegate; destination})
+  in
+  Context.Contract.manager ctxt (Contract.Implicit consensus_key)
+  >|=? fun account -> sign account.sk ctxt (Contents_list contents)

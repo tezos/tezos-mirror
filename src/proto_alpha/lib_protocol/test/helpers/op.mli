@@ -727,3 +727,10 @@ val update_consensus_key :
   Contract.t ->
   public_key ->
   (packed_operation, tztrace) result Lwt.t
+
+val drain_delegate :
+  Context.t ->
+  consensus_key:Signature.Public_key_hash.t ->
+  delegate:Signature.Public_key_hash.t ->
+  destination:Signature.Public_key_hash.t ->
+  packed_operation tzresult Lwt.t
