@@ -431,6 +431,45 @@ let test_return () =
   assert (v = "K") ;
   return_unit
 
+let test_swap_vectors () =
+  let open Tree_encoding in
+  let open Lwt_result_syntax in
+  let int_vec_enc =
+    lazy_vector (value [] Data_encoding.int31) (value [] Data_encoding.int31)
+  in
+  let enc = tup2 ~flatten:false int_vec_enc int_vec_enc in
+  let*! tree = empty_tree () in
+  let assert_value_at_index ~ix vec expected =
+    let*! value = Lazy_containers.Lazy_vector.LwtIntVector.get ix vec in
+    assert (value = expected) ;
+    return_unit
+  in
+  (* Create a pair of vectors. *)
+  let vec_pair =
+    ( Lazy_containers.Lazy_vector.LwtIntVector.create
+        ~produce_value:(fun ix -> Lwt.return ix)
+        10,
+      Lazy_containers.Lazy_vector.LwtIntVector.create
+        ~produce_value:(fun ix -> Lwt.return (100 + ix))
+        10 )
+  in
+  (* Check elements/force evaluation of one element from each vector. *)
+  let* () = assert_value_at_index ~ix:1 (fst vec_pair) 1 in
+  let* () = assert_value_at_index ~ix:2 (snd vec_pair) 102 in
+  (* Encode the lazy vector to the tree. *)
+  let*! tree = encode enc vec_pair tree in
+  (* Decode the vector. *)
+  let*! vec_pair = decode enc tree in
+  (* Encode a new pair where the elements have been swapped. *)
+  let swapped_vec_pair = (snd vec_pair, fst vec_pair) in
+  let*! tree = encode enc swapped_vec_pair tree in
+  (* Decode the swapped version. *)
+  let*! swapped_vec_pair = decode enc tree in
+  (* Check that it's possible to access the elements of both vectors. *)
+  let* () = assert_value_at_index ~ix:1 (snd swapped_vec_pair) 1 in
+  let* () = assert_value_at_index ~ix:2 (fst swapped_vec_pair) 102 in
+  return_unit
+
 let tests =
   [
     tztest "String" `Quick test_string;
@@ -454,4 +493,5 @@ let tests =
     tztest "Self ref" `Quick test_with_self_ref;
     tztest "Delayed" `Quick test_delayed;
     tztest "Return" `Quick test_return;
+    tztest "Swap vectors" `Quick test_swap_vectors;
   ]
