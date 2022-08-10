@@ -300,6 +300,15 @@ let operations_callback db_pool g source operations =
                 (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
                    ~oneshot:true
                    (Teztale_lib.Sql_requests
+                    .maybe_insert_delegates_from_received
+                      operations))
+                ()
+            in
+            let* () =
+              Db.exec
+                (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
+                   ~oneshot:true
+                   (Teztale_lib.Sql_requests
                     .maybe_insert_operations_from_received
                       ~level
                       operations))

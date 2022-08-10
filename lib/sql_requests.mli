@@ -33,6 +33,8 @@ val maybe_insert_source : string -> string
 
 val maybe_insert_delegates_from_rights : Consensus_ops.rights -> string
 
+val maybe_insert_delegates_from_received : Consensus_ops.delegate_ops -> string
+
 val maybe_insert_endorsing_rights :
   level:Int32.t -> Consensus_ops.rights -> string
 

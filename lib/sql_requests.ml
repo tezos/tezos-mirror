@@ -214,6 +214,19 @@ let maybe_insert_operations_from_received ~level operations =
     (fun (op : Consensus_ops.received_operation) -> op.op)
     operations
 
+let maybe_insert_delegates_from_received operations =
+  Format.asprintf
+    "INSERT OR IGNORE INTO delegates (address) VALUES %a"
+    (Format.pp_print_list
+       ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
+       (fun f (address, _) ->
+         Format.fprintf
+           f
+           "(x'%a')"
+           Hex.pp
+           (Signature.Public_key_hash.to_hex address)))
+    operations
+
 let maybe_insert_block hash ~level ~round timestamp delegate =
   Format.asprintf
     "INSERT OR IGNORE INTO blocks (timestamp, hash, level, round, baker) \
