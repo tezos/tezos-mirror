@@ -35,17 +35,12 @@ let resolve_plugin cctxt =
        (Dal_constants_plugin.get protocols.current_protocol)
        (Dal_constants_plugin.get protocols.next_protocol)
 
-let run ~data_dir ~no_trusted_setup:_ cctxt =
+let run ~data_dir cctxt =
   let open Lwt_result_syntax in
   let*! () = Event.(emit starting_node) () in
   let* config = Configuration.load ~data_dir in
   let config = {config with data_dir} in
   let*! store = Store.init config in
-  let*? g1_path, g2_path = Tezos_base.Dal_srs.find_trusted_setup_files () in
-  let* initialisation_parameters =
-    Cryptobox.initialisation_parameters_from_files ~g1_path ~g2_path
-  in
-  let*? () = Cryptobox.load_parameters initialisation_parameters in
   let ready = ref false in
   let*! () = Event.(emit layer1_node_tracking_started ()) in
   daemonize cctxt @@ fun (_hash, (_block_header : Tezos_base.Block_header.t)) ->
@@ -60,7 +55,9 @@ let run ~data_dir ~no_trusted_setup:_ cctxt =
               protocol_plugin_resolved
               (Format.asprintf "%a" Protocol_hash.pp_short Plugin.Proto.hash))
         in
-        let* dal_constants, dal_parameters = Cryptobox.init cctxt plugin in
+        let* dal_constants, dal_parameters =
+          Cryptobox.init config.unsafe_srs cctxt plugin
+        in
         let ctxt = Node_context.make config dal_constants dal_parameters in
         let* rpc_server = RPC_server.(start config (register ctxt store)) in
         let _ = RPC_server.install_finalizer rpc_server in
