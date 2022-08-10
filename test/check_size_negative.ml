@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,27 +23,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  Random.self_init () ;
-  Alcotest.run
-    "tezos-data-encoding"
-    [
-      ("success", Success.tests);
-      ("invalid_encoding", Invalid_encoding.tests);
-      ("read_failure", Read_failure.tests);
-      ("write_failure", Write_failure.tests);
-      ("randomized", Randomized.tests);
-      ("versioned", Versioned.tests);
-      ("registration", Registrationed.tests);
-      ("mu", Mu.tests);
-      ("slice", Slice_test.tests);
-      ("conv_with_guard", Guarded_conv.tests);
-      ("with_decoding_guard", Guarded_decode.tests);
-      ("int31_int32", Int31_int32.tests);
-      ("inline_phantom", Reference_check.Inline_phantom.tests);
-      ("mu_phantom", Reference_check.Mu_phantom.tests);
-      ("fixed_list", Fixed_list.tests);
-      ("fixed_array", Fixed_array.tests);
-      ("compact", Compact.tests);
-      ("check-size", Check_size_negative.tests);
-    ]
+open Data_encoding
+
+let test1 () =
+  match check_size (-1) string with
+  | exception Invalid_argument _ -> ()
+  | e -> (
+      let v = "12345" in
+      match Binary.to_string e v with
+      | Error Size_limit_exceeded -> ()
+      | Error _ -> failwith "different error than expected"
+      | Ok _ -> failwith "unexcepted success")
+
+let test2 () =
+  let v = "12345" in
+  let s = Binary.to_string_exn string v in
+  match check_size (-1) string with
+  | exception Invalid_argument _ -> ()
+  | e -> (
+      match Binary.of_string e s with
+      | Error Size_limit_exceeded -> ()
+      | Error _ -> failwith "different error than expected"
+      | Ok _ -> failwith "unexcepted success")
+
+let tests = [("write fails", `Quick, test1); ("read fails", `Quick, test2)]
