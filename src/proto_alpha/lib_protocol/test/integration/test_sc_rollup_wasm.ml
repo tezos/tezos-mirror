@@ -223,28 +223,27 @@ let should_boot_complete_boot_sector boot_sector () =
   let* () = check_chunks_count s boot_sector_len in
   return_unit
 
-let floppy_input i operator chunk =
-  let open Lwt_result_syntax in
-  let signature = Signature.sign operator.Account.sk chunk in
-  let floppy = Tezos_scoru_wasm.Gather_floppies.{chunk; signature} in
-  match
-    Sc_rollup.Inbox.Message.serialize
-      (External
-         (Data_encoding.Binary.to_string_exn
-            Tezos_scoru_wasm.Gather_floppies.floppy_encoding
-            floppy))
-  with
+let arbitrary_input i payload =
+  match Sc_rollup.Inbox.Message.serialize (External payload) with
   | Ok payload ->
-      return
-        Sc_rollup.
-          {
-            inbox_level = Raw_level.of_int32_exn 0l;
-            message_counter = Z.of_int i;
-            payload;
-          }
+      Sc_rollup.
+        {
+          inbox_level = Raw_level.of_int32_exn 0l;
+          message_counter = Z.of_int i;
+          payload;
+        }
   | Error err ->
       Format.printf "%a@," Environment.Error_monad.pp_trace err ;
       assert false
+
+let floppy_input i operator chunk =
+  let signature = Signature.sign operator.Account.sk chunk in
+  let floppy = Tezos_scoru_wasm.Gather_floppies.{chunk; signature} in
+  arbitrary_input
+    i
+    (Data_encoding.Binary.to_string_exn
+       Tezos_scoru_wasm.Gather_floppies.floppy_encoding
+       floppy)
 
 let should_interpret_empty_chunk () =
   let open Lwt_result_syntax in
@@ -256,7 +255,7 @@ let should_interpret_empty_chunk () =
     @@ incomplete_boot_sector (String.make chunk_size 'a') op
   in
   let chunk = Bytes.empty in
-  let* correct_input = floppy_input 0 op chunk in
+  let correct_input = floppy_input 0 op chunk in
 
   (* Init the PVM *)
   let*! index = Context_binary.init "/tmp" in
@@ -285,8 +284,8 @@ let should_refuse_chunks_with_incorrect_signature () =
     @@ incomplete_boot_sector (String.make chunk_size 'a') good_op
   in
   let chunk = Bytes.make chunk_size 'b' in
-  let* incorrect_input = floppy_input 0 bad_op chunk in
-  let* correct_input = floppy_input 0 good_op chunk in
+  let incorrect_input = floppy_input 0 bad_op chunk in
+  let correct_input = floppy_input 0 good_op chunk in
 
   (* Init the PVM *)
   let*! index = Context_binary.init "/tmp" in
@@ -365,7 +364,7 @@ let should_boot_incomplete_boot_sector kernel () =
       (fun i s chunk ->
         (* We are installing the [i+2]th chunk ([i] starts at 0, and
            the first chunk is not part of the list). *)
-        let* input = floppy_input i operator chunk in
+        let input = floppy_input i operator chunk in
         let* s = checked_set_input ~loc:__LOC__ context input s in
         (* We have [i+2] chunks. *)
         let* () = check_chunks_count s ((i + 2) * chunk_size) in
@@ -375,7 +374,7 @@ let should_boot_incomplete_boot_sector kernel () =
   in
   (* Up until the very last one, where the status of the PVM change. *)
   let len = List.length chunks in
-  let* input = floppy_input len operator final_chunk in
+  let input = floppy_input len operator final_chunk in
   let* s = checked_set_input ~loc:__LOC__ context input s in
   let*! () = check_status s (Some Not_gathering_floppies) in
   let* () =
@@ -395,6 +394,39 @@ let read_kernel name =
 (* Kernel with allocation & simple computation only.
    9863 bytes long - will be split into 3 chunks. *)
 let computation_kernel () = read_kernel "computation"
+
+let rec eval_until_set_input context s =
+  let open Lwt_result_syntax in
+  let*! info = Prover.get_status s in
+  match info with
+  | Computing ->
+      let* s = checked_eval ~loc:__LOC__ context s in
+      eval_until_set_input context s
+  | Waiting_for_input_message -> return s
+
+let should_boot_computation_kernel () =
+  let open Lwt_result_syntax in
+  let boot_sector =
+    Data_encoding.Binary.to_string_exn
+      Tezos_scoru_wasm.Gather_floppies.origination_message_encoding
+      (complete_boot_sector (String.to_bytes (computation_kernel ())))
+  in
+  let*! index = Context_binary.init "/tmp" in
+  let context = Context_binary.empty index in
+  let*! s = Prover.initial_state context in
+  let*! s = Prover.install_boot_sector s boot_sector in
+  (* installing the boot kernel *)
+  let* s = checked_eval ~loc:__LOC__ context s in
+  (* make the first tick of the WASM PVM, to switch it to “waiting for
+     input” mode *)
+  let* s = checked_eval ~loc:__LOC__ context s in
+  (* Feeding it with one input *)
+  let* s =
+    checked_set_input ~loc:__LOC__ context (arbitrary_input 0 "test") s
+  in
+  (* running until waiting for input *)
+  let* _s = eval_until_set_input context s in
+  return_unit
 
 let tests =
   [
@@ -419,4 +451,8 @@ let tests =
       "should refuse chunks with an incorrect signature"
       `Quick
       should_refuse_chunks_with_incorrect_signature;
+    Tztest.tztest
+      "should boot a valid kernel until reading inputs"
+      `Quick
+      should_boot_computation_kernel;
   ]
