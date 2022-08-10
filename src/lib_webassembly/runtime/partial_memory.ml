@@ -24,7 +24,7 @@ module Chunked = struct
 
   let length_from_pages pages = Int64.(mul (of_int32 pages) page_size)
 
-  let create pages = Backend.create (length_from_pages pages)
+  let create pages = Backend.allocate (length_from_pages pages)
 
   let grow delta_pages pages =
     Backend.grow pages (length_from_pages delta_pages)

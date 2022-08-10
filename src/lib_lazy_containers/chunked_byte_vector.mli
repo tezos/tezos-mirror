@@ -60,8 +60,25 @@ module type S = sig
   type t
 
   (** [create length] creates a chunked byte vector that has capacity for [length]
-      bytes. *)
-  val create : ?get_chunk:(int64 -> Chunk.t effect) -> int64 -> t
+      bytes.
+
+      {b Note:} This function is expected to be use only by the
+      tree-encoding library. To create a brand new chunked byte
+      vector, use {!allocate}.  *)
+  val create :
+    ?origin:Lazy_map.tree -> ?get_chunk:(int64 -> Chunk.t effect) -> int64 -> t
+
+  (** [origin vec] returns the tree of origin of the vector, if it exists.
+
+      {b Note:} The sole consumer of this function is expected to be
+      the tree-encoding library. *)
+  val origin : t -> Lazy_map.tree option
+
+  (** [allocate len] creates a new zeroed chunked byte vector.
+
+      {b Note:} This function may be dangerous to use in a tick if
+      [len] is too large. *)
+  val allocate : int64 -> t
 
   (** [of_string str] creates a chunked byte vector from the given [str]. *)
   val of_string : string -> t
@@ -79,7 +96,10 @@ module type S = sig
   val to_bytes : t -> bytes effect
 
   (** [grow vector length_delta] increases the byte vector length by
-      [length_delta]. *)
+      [length_delta] and initializes the memory with empty chunks.
+
+      {b Note:} This function may be dangerous to use in a tick if
+      [length_delta] is too large. *)
   val grow : t -> int64 -> unit
 
   (** [length vector] returns the length of [vector] in bytes. *)

@@ -37,10 +37,18 @@ open Lazy_containers
 (* Use context-binary for testing. *)
 module Context = Tezos_context_memory.Context_binary
 
+type Lazy_containers.Lazy_map.tree += Tree of Context.tree
+
 module Tree : Tree_encoding.TREE with type tree = Context.tree = struct
   type tree = Context.tree
 
   include Context.Tree
+
+  let select = function
+    | Tree t -> t
+    | _ -> raise Tree_encoding.Incorrect_tree_type
+
+  let wrap t = Tree t
 end
 
 module Map =

@@ -53,7 +53,7 @@ let grow tab delta r =
   else
     let lim' = {lim with min = new_size} in
     if not (valid_limits lim') then raise SizeLimit
-    else Vector.grow delta ~produce_value:(fun _ -> Lwt.return r) tab.content ;
+    else Vector.grow delta ~default:(fun () -> r) tab.content ;
     tab.ty <- TableType (lim', t) ;
     ()
 

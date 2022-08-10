@@ -450,7 +450,7 @@ let add_to_block allocs (Block_label b) instr =
 
 let alloc_data (allocs : allocations) len =
   let datas, d =
-    Vector.append (Chunked_byte_vector.Lwt.create len) allocs.datas
+    Vector.append (Chunked_byte_vector.Lwt.allocate len) allocs.datas
   in
   allocs.datas <- datas ;
   Data_label d

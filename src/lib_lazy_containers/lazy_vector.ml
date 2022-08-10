@@ -84,8 +84,11 @@ module type S = sig
     ?first_key:key ->
     ?values:'a Map.Map.t ->
     ?produce_value:'a producer ->
+    ?origin:Lazy_map.tree ->
     key ->
     'a t
+
+  val origin : 'a t -> Lazy_map.tree option
 
   val empty : unit -> 'a t
 
@@ -99,11 +102,13 @@ module type S = sig
 
   val cons : 'a -> 'a t -> 'a t
 
-  val grow : ?produce_value:'a producer -> key -> 'a t -> 'a t
+  val grow : ?default:(unit -> 'a) -> key -> 'a t -> 'a t
 
   val append : 'a -> 'a t -> 'a t * key
 
-  val concat : 'a t -> 'a t -> 'a t
+  val concat : 'a t -> 'a t -> 'a t effect
+
+  val unsafe_concat : 'a t -> 'a t -> 'a t
 
   val to_list : 'a t -> 'a list effect
 
@@ -154,9 +159,12 @@ module Make (Effect : Effect.S) (Key : KeyS) :
 
   let num_elements map = map.num_elements
 
-  let create ?(first_key = Key.zero) ?values ?produce_value num_elements =
-    let values = Map.create ?values ?produce_value () in
+  let create ?(first_key = Key.zero) ?values ?produce_value ?origin num_elements
+      =
+    let values = Map.create ?values ?produce_value ?origin () in
     {first = first_key; num_elements; values}
+
+  let origin {values; _} = Map.origin values
 
   let empty () = create Key.zero
 
@@ -187,50 +195,21 @@ module Make (Effect : Effect.S) (Key : KeyS) :
     let num_elements = Key.succ map.num_elements in
     {first; values; num_elements}
 
-  let grow ?produce_value delta map =
-    if
-      Key.unsigned_compare (Key.add delta map.num_elements) map.num_elements < 0
-    then raise Exn.SizeOverflow ;
-
-    let map_produce_value old_produce_value =
-      match produce_value with
-      | Some produce_new_value ->
-          let boundary = Key.add map.num_elements map.first in
-          fun key ->
-            if Key.compare key boundary >= 0 then
-              (* Normalize the key so that it is relative to the boundary.
-                  The first new value will be produced with
-                  [produce_value Key.zero]. *)
-              let key = Key.sub key boundary in
-              produce_new_value key
-            else old_produce_value key
-      | None -> old_produce_value
+  let append_opt elt map =
+    let num_elements = map.num_elements in
+    let map = {map with num_elements = Key.succ num_elements} in
+    let map =
+      match elt with Some elt -> set num_elements elt map | None -> map
     in
-    let values = Map.with_producer map_produce_value map.values in
-    let num_elements = Key.add map.num_elements delta in
-    {map with values; num_elements}
+    (map, num_elements)
 
-  let append elt map =
-    let i = num_elements map in
-    (map |> grow Key.(succ zero) |> set i elt, i)
+  let append elt map = append_opt (Some elt) map
 
-  let concat lhs rhs =
-    let boundary = Key.add lhs.first lhs.num_elements in
-    let choose_producer rhs_produce_value lhs_produce_value key =
-      if Key.compare key boundary >= 0 then
-        rhs_produce_value (Key.sub key boundary |> Key.add rhs.first)
-      else lhs_produce_value key
-    in
-    let num_elements = Key.add lhs.num_elements rhs.num_elements in
-    let rhs_offset = Key.sub boundary rhs.first in
-    let values =
-      Map.merge_into
-        ~choose_producer
-        ~map_key:(Key.add rhs_offset)
-        rhs.values
-        lhs.values
-    in
-    {lhs with num_elements; values}
+  let rec grow ?default delta map =
+    if Key.(delta <= zero) then map
+    else
+      let map, _ = append_opt (Option.map (fun f -> f ()) default) map in
+      grow ?default Key.(pred delta) map
 
   let to_list map =
     let open Effect in
@@ -248,7 +227,18 @@ module Make (Effect : Effect.S) (Key : KeyS) :
     if map.num_elements = Key.zero then return []
     else (unroll [@ocaml.tailcall]) [] (Key.pred map.num_elements)
 
+  let concat lhs rhs =
+    let open Effect in
+    let* lhs = to_list lhs in
+    let+ rhs = to_list rhs in
+    of_list (lhs @ rhs)
+
   let loaded_bindings m = Map.loaded_bindings m.values
+
+  let unsafe_concat lhs rhs =
+    let lhs = loaded_bindings lhs |> List.map snd in
+    let rhs = loaded_bindings rhs |> List.map snd in
+    of_list (lhs @ rhs)
 
   let first_key vector = vector.first
 end
@@ -286,14 +276,17 @@ module Mutable = struct
     val create :
       ?values:'a Vector.Map.Map.t ->
       ?produce_value:'a Vector.producer ->
+      ?origin:Lazy_map.tree ->
       key ->
       'a t
+
+    val origin : 'a t -> Lazy_map.tree option
 
     val get : key -> 'a t -> 'a Vector.effect
 
     val set : key -> 'a -> 'a t -> unit
 
-    val grow : ?produce_value:'a Vector.producer -> key -> 'a t -> unit
+    val grow : ?default:(unit -> 'a) -> key -> 'a t -> unit
 
     val append : 'a -> 'a t -> key
 
@@ -319,15 +312,17 @@ module Mutable = struct
 
     let of_immutable = ref
 
-    let create ?values ?produce_value num_elements =
-      of_immutable (Vector.create ?values ?produce_value num_elements)
+    let create ?values ?produce_value ?origin num_elements =
+      of_immutable (Vector.create ?values ?produce_value ?origin num_elements)
+
+    let origin vector = Vector.origin !vector
 
     let get key map_ref = Vector.get key !map_ref
 
     let set key value map_ref = map_ref := Vector.set key value !map_ref
 
-    let grow ?produce_value delta map_ref =
-      map_ref := Vector.grow ?produce_value delta !map_ref
+    let grow ?default delta map_ref =
+      map_ref := Vector.grow ?default delta !map_ref
 
     let append elt map_ref =
       let new_map, i = Vector.append elt !map_ref in

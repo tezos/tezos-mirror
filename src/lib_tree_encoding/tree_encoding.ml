@@ -24,8 +24,9 @@
 (*****************************************************************************)
 
 open Lazy_containers
+include Tree
 
-module type TREE = Tree.S
+module type TREE = S
 
 module type Lwt_vector = Lazy_vector.S with type 'a effect = 'a Lwt.t
 
@@ -342,7 +343,11 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
       let lazy_map value =
         let to_key k = [Map.string_of_key k] in
         let encode =
-          E.contramap Map.loaded_bindings (E.lazy_mapping to_key value.encode)
+          E.with_subtree
+            Map.origin
+            (E.contramap
+               Map.loaded_bindings
+               (E.lazy_mapping to_key value.encode))
         in
         let decode =
           D.map
@@ -367,23 +372,25 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
         let open Vector in
         let to_key k = [string_of_key k] in
         let encode =
-          E.contramap
-            (fun vector ->
-              (loaded_bindings vector, num_elements vector, first_key vector))
-            (E.tup3
-               (E.lazy_mapping to_key value.encode)
-               (E.scope ["length"] with_key.encode)
-               (E.scope ["head"] with_key.encode))
+          E.with_subtree Vector.origin
+          @@ E.contramap
+               (fun vector ->
+                 (loaded_bindings vector, num_elements vector, first_key vector))
+               (E.tup3
+                  (E.lazy_mapping to_key value.encode)
+                  (E.scope ["length"] with_key.encode)
+                  (E.scope ["head"] with_key.encode))
         in
         let decode =
           D.map
-            (fun (produce_value, len, head) ->
-              create ~produce_value ~first_key:head len)
+            (fun (origin, produce_value, len, head) ->
+              create ~produce_value ~first_key:head ?origin len)
             (let open D.Syntax in
-            let+ x = D.lazy_mapping to_key value.decode
+            let+ origin = D.subtree
+            and+ x = D.lazy_mapping to_key value.decode
             and+ y = D.scope ["length"] with_key.decode
             and+ z = D.scope ["head"] with_key.decode in
-            (x, y, z))
+            (origin, x, y, z))
         in
         {encode; decode}
     end
@@ -401,19 +408,21 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
     let open Chunked_byte_vector.Lwt in
     let to_key k = [Int64.to_string k] in
     let encode =
-      E.contramap
-        (fun vector -> (loaded_chunks vector, length vector))
-        (E.tup2
-           (E.lazy_mapping to_key chunk.encode)
-           (E.value ["length"] Data_encoding.int64))
+      E.with_subtree Chunked_byte_vector.Lwt.origin
+      @@ E.contramap
+           (fun vector -> (loaded_chunks vector, length vector))
+           (E.tup2
+              (E.lazy_mapping to_key chunk.encode)
+              (E.value ["length"] Data_encoding.int64))
     in
     let decode =
       D.map
-        (fun (get_chunk, len) -> create ~get_chunk len)
+        (fun (origin, get_chunk, len) -> create ?origin ~get_chunk len)
         (let open D.Syntax in
-        let+ x = D.lazy_mapping to_key chunk.decode
+        let+ origin = D.subtree
+        and+ x = D.lazy_mapping to_key chunk.decode
         and+ y = D.value ["length"] Data_encoding.int64 in
-        (x, y))
+        (origin, x, y))
     in
     {encode; decode}
 

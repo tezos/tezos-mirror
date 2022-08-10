@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** An extensible type to record the type of trees used as backend for
+    the lazy map.
+
+    {b Note:} If you use the 'tree-encoding' library, then its functor
+    takes care of adding a new constructor for the expected tree. *)
+type tree = ..
+
 (**
   A lazy map is a key-value association where each value is created dynamically.
 *)
@@ -64,6 +71,12 @@ module type S = sig
 
   type 'a t
 
+  (** [origin map] returns the tree of origin of the map, if it exists.
+
+      {b Note:} The sole consumer of this function is expected to be
+      the tree-encoding library. *)
+  val origin : 'a t -> tree option
+
   (** [string_of_key key] turns the given [key] into a string. *)
   val string_of_key : key -> string
 
@@ -76,10 +89,21 @@ module type S = sig
       mutation. *)
   val to_string : ('a -> string) -> 'a t -> string
 
-  (** [create ?values num_elements produce_value] produces a lazy map with
-      [num_elements] entries where each is created using [produce_value].
-      [values] may be provided to supply an initial set of entries. *)
-  val create : ?values:'a Map.t -> ?produce_value:'a producer -> unit -> 'a t
+  (** [create ?values ?produce_value ?origin num_elements] produces a
+      lazy map with [num_elements] entries where each is created using
+      [produce_value]. [values] may be provided to supply an initial
+      set of entries.
+
+      {b Note:} This function is intended to be used [produce_value]
+      should only be used by the tree-encoding library. If you want to
+      fill a newly created map with some value, use [values] or
+      [set] on the empty map. *)
+  val create :
+    ?values:'a Map.t ->
+    ?produce_value:'a producer ->
+    ?origin:tree ->
+    unit ->
+    'a t
 
   (** [get key map] retrieves the element at [key].
 
@@ -90,28 +114,6 @@ module type S = sig
 
       @raises Exn.Bounds when trying to set an invalid key *)
   val set : key -> 'a -> 'a t -> 'a t
-
-  (** [merge_into ?choose_producer ?map_key source dest] produces a new lazy map
-      by merging [source] into [dest].
-
-      The keys of [source] can be transformed using [map_key] prior to merging.
-      By default no keys will be transformed.
-
-      If a [key] was instantiated in [dest] it will also be present in the
-      resulting lazy map.
-
-      [choose_producer source_producer dest_producer] will be
-      used to determine the new producer function - by default the [dest]
-      producer is chosen. *)
-  val merge_into :
-    ?map_key:(key -> key) ->
-    ?choose_producer:('a producer -> 'a producer -> 'a producer) ->
-    'a t ->
-    'a t ->
-    'a t
-
-  (** [with_producer morph] lifts a morphism for a [producer] to one on [t]. *)
-  val with_producer : ('a producer -> 'a producer) -> 'a t -> 'a t
 
   (** [loaded_bindings map] returns the [(key * 'a) list] representation of the
       map [map] containing only the loaded values, in order of increasing keys.
@@ -153,7 +155,11 @@ module Mutable : sig
     val of_immutable : 'a Map.t -> 'a t
 
     val create :
-      ?values:'a Map.Map.t -> ?produce_value:'a Map.producer -> unit -> 'a t
+      ?values:'a Map.Map.t ->
+      ?produce_value:'a Map.producer ->
+      ?origin:tree ->
+      unit ->
+      'a t
 
     val get : key -> 'a t -> 'a Map.effect
 

@@ -624,7 +624,7 @@ let check_func (c : context) (f : func) =
   let c' =
     {
       c with
-      locals = Lazy_vector.LwtInt32Vector.concat ts1 locals |> vec_to_list;
+      locals = vec_to_list ts1 @ vec_to_list locals;
       results = vec_to_list ts2;
       labels = [ts2];
     }

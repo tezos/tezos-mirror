@@ -108,7 +108,12 @@ module type S = sig
 
   type t
 
-  val create : ?get_chunk:(int64 -> Chunk.t effect) -> int64 -> t
+  val create :
+    ?origin:Lazy_map.tree -> ?get_chunk:(int64 -> Chunk.t effect) -> int64 -> t
+
+  val origin : t -> Lazy_map.tree option
+
+  val allocate : int64 -> t
 
   val of_string : string -> t
 
@@ -140,11 +145,13 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
 
   let def_get_chunk _ = Effect.return (Chunk.alloc ())
 
-  let create ?(get_chunk = def_get_chunk) length =
+  let create ?origin ?(get_chunk = def_get_chunk) length =
     let chunks =
-      Vector.create ~produce_value:get_chunk (Chunk.num_needed length)
+      Vector.create ?origin ~produce_value:get_chunk (Chunk.num_needed length)
     in
     {length; chunks}
+
+  let origin vector = Vector.origin vector.chunks
 
   let grow vector size_delta =
     if 0L < size_delta then (
@@ -158,8 +165,16 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
            error in case of absent value (which is the case when
            growing the chunked byte vector requires to allocate new
            chunks). *)
-        Vector.grow ~produce_value:def_get_chunk chunk_count_delta vector.chunks ;
+        Vector.grow
+          ~default:(fun () -> Chunk.alloc ())
+          chunk_count_delta
+          vector.chunks ;
       vector.length <- new_size)
+
+  let allocate length =
+    let res = create 0L in
+    grow res length ;
+    res
 
   let length vector = vector.length
 

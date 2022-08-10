@@ -59,6 +59,12 @@ module type S = sig
       [No_tag_matched] exception. *)
   val run : 'a t -> 'a -> tree -> tree Lwt.t
 
+  (** [with_subtree get_subtree enc] will use [get_subtree] to fetch
+      the tree of origin of a value to be encoded with [enc], to place
+      it in the targeted tree before using [enc]. *)
+  val with_subtree :
+    ('a -> Lazy_containers.Lazy_map.tree option) -> 'a t -> 'a t
+
   (** [raw key] returns an encoder that encodes raw bytes at the given key. *)
   val raw : key -> bytes t
 
