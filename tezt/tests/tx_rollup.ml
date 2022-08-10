@@ -835,6 +835,8 @@ let test_submit_batches_in_several_blocks =
   let*! _state = Rollup.get_state ~hooks ~rollup client in
   unit
 
+(* This test may make more sense as a unit test; consider removing it.
+   See issue https://gitlab.com/tezos/tezos/-/issues/3546. *)
 let test_submit_from_originated_source =
   let open Tezt_tezos in
   Protocol.register_test
@@ -876,12 +878,13 @@ let test_submit_from_originated_source =
       ~src:originated_contract
       client
   in
-  let* () =
-    Process.check_error
-      ~exit_code:1
-      ~msg:(rex "Only implicit accounts can submit transaction rollup batches")
-      process
+  let msg =
+    match protocol with
+    | Alpha -> rex "Erroneous command line argument"
+    | Jakarta | Kathmandu ->
+        rex "Only implicit accounts can submit transaction rollup batches"
   in
+  let* () = Process.check_error ~exit_code:1 ~msg process in
   unit
 
 let test_rollup_with_two_commitments =
