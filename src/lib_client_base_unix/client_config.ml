@@ -100,7 +100,8 @@ let () =
     ~pp:(fun ppf (args, by) ->
       Format.fprintf
         ppf
-        (if List.length args == 1 then "Option %s is in conflict with %s"
+        (if List.compare_length_with args 1 = 0 then
+         "Option %s is in conflict with %s"
         else "Options %s are in conflict with %s")
         (String.concat " and " args)
         by)

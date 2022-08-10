@@ -446,7 +446,7 @@ let commands () =
       (fun (check, display_names, scriptable)
            expr_strings
            (cctxt : Protocol_client_context.full) ->
-        if List.length expr_strings == 0 then
+        if List.compare_length_with expr_strings 0 = 0 then
           cctxt#warning "No scripts were specified on the command line" >|= ok
         else
           List.mapi_ep
