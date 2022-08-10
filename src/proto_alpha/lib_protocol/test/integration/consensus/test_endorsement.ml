@@ -117,7 +117,12 @@ let test_non_normalized_slot () =
       >>=? fun op ->
       let policy = Block.Excluding [delegate] in
       Block.bake ~policy ~operations:[Operation.pack op] b >>= fun res ->
-      Assert.proto_error_with_info ~loc:__LOC__ res "Wrong slot"
+      Assert.proto_error ~loc:__LOC__ res (function
+          | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation
+              {kind}
+            when kind = Validate_errors.Consensus.Endorsement ->
+              true
+          | _ -> false)
 
 (** Wrong endorsement predecessor : apply an endorsement with an
     incorrect block predecessor. *)
@@ -127,10 +132,11 @@ let test_wrong_endorsement_predecessor () =
   >>=? fun operation ->
   let operation = Operation.pack operation in
   Block.bake ~operation b >>= fun res ->
-  Assert.proto_error_with_info
-    ~loc:__LOC__
-    res
-    "Wrong consensus operation branch"
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Validate_errors.Consensus.Wrong_consensus_operation_branch {kind; _}
+        when kind = Validate_errors.Consensus.Endorsement ->
+          true
+      | _ -> false)
 
 (** Invalid_endorsement_level: apply an endorsement with an incorrect
     level (i.e. the predecessor level). *)
@@ -140,10 +146,11 @@ let test_invalid_endorsement_level () =
   Op.endorsement ~level:genesis_level ~endorsed_block:b (B genesis) ()
   >>=? fun op ->
   Block.bake ~operations:[Operation.pack op] b >>= fun res ->
-  Assert.proto_error_with_info
-    ~loc:__LOC__
-    res
-    "Wrong level for consensus operation"
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
+        when kind = Validate_errors.Consensus.Endorsement ->
+          true
+      | _ -> false)
 
 (** Duplicate endorsement : apply an endorsement that has already been applied. *)
 let test_duplicate_endorsement () =
@@ -155,10 +162,11 @@ let test_duplicate_endorsement () =
   Op.endorsement ~endorsed_block:b (B genesis) () >>=? fun operation ->
   let operation = Operation.pack operation in
   Incremental.add_operation inc operation >>= fun res ->
-  Assert.proto_error_with_info
-    ~loc:__LOC__
-    res
-    "Double inclusion of consensus operation"
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Validate_errors.Consensus.Conflicting_consensus_operation {kind; _}
+        when kind = Validate_errors.Consensus.Endorsement ->
+          true
+      | _ -> false)
 
 (** Consensus operation for future level : apply an endorsement with a level in the future *)
 let test_consensus_operation_endorsement_for_future_level () =
@@ -170,7 +178,11 @@ let test_consensus_operation_endorsement_for_future_level () =
     ~is_preendorsement:false
     ~endorsed_block:pred
     ~level
-    ~error_title:"Consensus operation for future level"
+    ~error:(function
+      | Validate_errors.Consensus.Consensus_operation_for_future_level {kind; _}
+        when kind = Validate_errors.Consensus.Endorsement ->
+          true
+      | _ -> false)
     ~context:(Context.B genesis)
     ~construction_mode:(pred, None)
     ()
@@ -185,7 +197,11 @@ let test_consensus_operation_endorsement_for_predecessor_level () =
     ~is_preendorsement:false
     ~endorsed_block:pred
     ~level
-    ~error_title:"Endorsement for previous level"
+    ~error:(function
+      | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
+        when kind = Validate_errors.Consensus.Endorsement ->
+          true
+      | _ -> false)
     ~context:(Context.B genesis)
     ~construction_mode:(pred, None)
     ()
@@ -201,7 +217,11 @@ let test_consensus_operation_endorsement_for_old_level () =
     ~is_preendorsement:false
     ~endorsed_block:pred
     ~level
-    ~error_title:"Consensus operation for old level"
+    ~error:(function
+      | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
+        when kind = Validate_errors.Consensus.Endorsement ->
+          true
+      | _ -> false)
     ~context:(Context.B next_block)
     ~construction_mode:(pred, None)
     ()
@@ -215,7 +235,11 @@ let test_consensus_operation_endorsement_for_future_round () =
     ~is_preendorsement:false
     ~endorsed_block:pred
     ~round
-    ~error_title:"Consensus operation for future round"
+    ~error:(function
+      | Validate_errors.Consensus.Consensus_operation_for_future_round {kind; _}
+        when kind = Validate_errors.Consensus.Endorsement ->
+          true
+      | _ -> false)
     ~context:(Context.B genesis)
     ~construction_mode:(pred, None)
     ()
@@ -229,7 +253,11 @@ let test_consensus_operation_endorsement_for_old_round () =
     ~is_preendorsement:false
     ~endorsed_block:pred
     ~round
-    ~error_title:"Consensus operation for old round"
+    ~error:(function
+      | Validate_errors.Consensus.Consensus_operation_for_old_round {kind; _}
+        when kind = Validate_errors.Consensus.Endorsement ->
+          true
+      | _ -> false)
     ~context:(Context.B genesis)
     ~construction_mode:(pred, None)
     ()
@@ -242,7 +270,12 @@ let test_consensus_operation_endorsement_on_competing_proposal () =
     ~is_preendorsement:false
     ~endorsed_block:pred
     ~block_payload_hash:Block_payload_hash.zero
-    ~error_title:"Consensus operation on competing proposal"
+    ~error:(function
+      | Validate_errors.Consensus.Wrong_payload_hash_for_consensus_operation
+          {kind; _}
+        when kind = Validate_errors.Consensus.Endorsement ->
+          true
+      | _ -> false)
     ~context:(Context.B genesis)
     ~construction_mode:(pred, None)
     ()
@@ -256,7 +289,11 @@ let test_wrong_round () =
     ~is_preendorsement:false
     ~endorsed_block:b
     ~round
-    ~error_title:"Wrong round for consensus operation"
+    ~error:(function
+      | Validate_errors.Consensus.Consensus_operation_for_future_round {kind; _}
+        when kind = Validate_errors.Consensus.Endorsement ->
+          true
+      | _ -> false)
     ~context:(Context.B genesis)
     ()
 
@@ -271,7 +308,11 @@ let test_wrong_level () =
     ~is_preendorsement:false
     ~endorsed_block:b
     ~level
-    ~error_title:"Wrong level for consensus operation"
+    ~error:(function
+      | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
+        when kind = Validate_errors.Consensus.Endorsement ->
+          true
+      | _ -> false)
     ~context
     ()
 
@@ -283,7 +324,12 @@ let test_wrong_payload_hash () =
     ~is_preendorsement:false
     ~endorsed_block:b
     ~block_payload_hash:Block_payload_hash.zero
-    ~error_title:"Wrong payload hash for consensus operation"
+    ~error:(function
+      | Validate_errors.Consensus.Wrong_payload_hash_for_consensus_operation
+          {kind; _}
+        when kind = Validate_errors.Consensus.Endorsement ->
+          true
+      | _ -> false)
     ~context:(Context.B genesis)
     ()
 
@@ -299,7 +345,12 @@ let test_wrong_slot_used () =
     ~is_preendorsement:false
     ~endorsed_block:b
     ~slot
-    ~error_title:"Wrong slot"
+    ~error:(function
+      | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation
+          {kind; _}
+        when kind = Validate_errors.Consensus.Endorsement ->
+          true
+      | _ -> false)
     ~context:(Context.B genesis)
     ()
 
@@ -389,7 +440,11 @@ let test_wrong_endorsement_slot_in_mempool_mode () =
   let endo = Operation.pack endo in
   Incremental.begin_construction ~mempool_mode:true b1 >>=? fun i ->
   Incremental.add_operation i endo >>= fun res ->
-  Assert.proto_error_with_info ~loc:__LOC__ res "Wrong slot"
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation {kind}
+        when kind = Validate_errors.Consensus.Endorsement ->
+          true
+      | _ -> false)
 
 (** Endorsement for next level *)
 let test_endorsement_for_next_level () =
@@ -471,10 +526,11 @@ let test_endorsement_grandparent_application () =
   Block.bake b_gp >>=? fun b ->
   Op.endorsement ~endorsed_block:b_gp (B genesis) () >>=? fun op ->
   Block.bake ~operations:[Operation.pack op] b >>= fun res ->
-  Assert.proto_error_with_info
-    ~loc:__LOC__
-    res
-    "Wrong level for consensus operation"
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
+        when kind = Validate_errors.Consensus.Endorsement ->
+          true
+      | _ -> false)
 
 (** Endorsement of grandparent in full construction mode should be rejected *)
 let test_endorsement_grandparent_full_construction () =
@@ -486,10 +542,11 @@ let test_endorsement_grandparent_full_construction () =
   Op.endorsement ~endorsed_block:b_gp (B genesis) () >>=? fun op1 ->
   let op1 = Alpha_context.Operation.pack op1 in
   Incremental.add_operation i op1 >>= fun res ->
-  Assert.proto_error_with_info
-    ~loc:__LOC__
-    res
-    "Wrong level for consensus operation"
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Validate_errors.Consensus.Consensus_operation_for_old_level {kind; _}
+        when kind = Validate_errors.Consensus.Endorsement ->
+          true
+      | _ -> false)
 
 let tests =
   [

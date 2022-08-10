@@ -23,6 +23,62 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Errors that may arise while validating a consensus operation. *)
+module Consensus : sig
+  type consensus_operation_kind =
+    | Preendorsement
+    | Endorsement
+    | Grandparent_endorsement
+
+  (** Errors for preendorsements and endorsements. *)
+  type error +=
+    | Zero_frozen_deposits of Signature.Public_key_hash.t
+    | Consensus_operation_not_allowed
+    | Consensus_operation_for_old_level of {
+        kind : consensus_operation_kind;
+        expected : Alpha_context.Raw_level.t;
+        provided : Alpha_context.Raw_level.t;
+      }
+    | Consensus_operation_for_future_level of {
+        kind : consensus_operation_kind;
+        expected : Alpha_context.Raw_level.t;
+        provided : Alpha_context.Raw_level.t;
+      }
+    | Consensus_operation_for_old_round of {
+        kind : consensus_operation_kind;
+        expected : Alpha_context.Round.t;
+        provided : Alpha_context.Round.t;
+      }
+    | Consensus_operation_for_future_round of {
+        kind : consensus_operation_kind;
+        expected : Alpha_context.Round.t;
+        provided : Alpha_context.Round.t;
+      }
+    | Wrong_consensus_operation_branch of {
+        kind : consensus_operation_kind;
+        expected : Block_hash.t;
+        provided : Block_hash.t;
+      }
+    | Wrong_payload_hash_for_consensus_operation of {
+        kind : consensus_operation_kind;
+        expected : Block_payload_hash.t;
+        provided : Block_payload_hash.t;
+      }
+    | Unexpected_preendorsement_in_block
+    | Unexpected_endorsement_in_block
+    | Preendorsement_round_too_high of {
+        block_round : Alpha_context.Round.t;
+        provided : Alpha_context.Round.t;
+      }
+    | Wrong_slot_used_for_consensus_operation of {
+        kind : consensus_operation_kind;
+      }
+    | Conflicting_consensus_operation of {kind : consensus_operation_kind}
+    | Conflicting_dal_slot_availability of {
+        endorser : Signature.Public_key_hash.t;
+      }
+end
+
 (** Errors that may arise while validating an anonymous operation. *)
 module Anonymous : sig
   type denunciation_kind = Preendorsement | Endorsement | Block

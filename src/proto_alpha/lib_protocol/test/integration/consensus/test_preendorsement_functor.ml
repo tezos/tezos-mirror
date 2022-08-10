@@ -83,8 +83,7 @@ end = struct
     >>= fun res ->
     match (res, post_process) with
     | Ok ok, Ok success_fun -> success_fun ok
-    | Error _, Error (error_title, _error_category) ->
-        Assert.proto_error_with_info ~loc res error_title
+    | Error _, Error error -> Assert.proto_error ~loc res error
     | Ok _, Error _ -> Assert.error ~loc res (fun _ -> false)
     | Error _, Ok _ -> Assert.error ~loc res (fun _ -> false)
 
@@ -105,7 +104,14 @@ end = struct
     (* preendorsement should be on branch _pred to be valid *)
       ~preend_branch:(fun predpred _pred _curr -> predpred)
       ~loc:__LOC__
-      ~post_process:(Error ("Wrong consensus operation branch", `Temporary))
+      ~post_process:
+        (Error
+           (function
+           | Validate_errors.Consensus.Wrong_consensus_operation_branch
+               {kind; _}
+             when kind = Validate_errors.Consensus.Preendorsement ->
+               true
+           | _ -> false))
       ()
 
   (** KO: The same preendorsement injected twice in the PQC *)
@@ -113,7 +119,13 @@ end = struct
     aux_simple_preendorsement_inclusion (* inject the op twice *)
       ~mk_ops:(fun op -> [op; op])
       ~loc:__LOC__
-      ~post_process:(Error ("Double inclusion of consensus operation", `Branch))
+      ~post_process:
+        (Error
+           (function
+           | Validate_errors.Consensus.Conflicting_consensus_operation {kind; _}
+             when kind = Validate_errors.Consensus.Preendorsement ->
+               true
+           | _ -> false))
       ()
 
   (** KO: locked round declared in the block is not smaller than
@@ -123,7 +135,11 @@ end = struct
     (* default locked_round = 0 < block_round = 1 for this aux function *)
       ~block_round:0
       ~loc:__LOC__
-      ~post_process:(Error ("Locked round not smaller than round", `Permanent))
+      ~post_process:
+        (Error
+           (function
+           | Fitness_repr.Locked_round_not_less_than_round _ -> true
+           | _ -> false))
       ()
 
   (** KO: because we announce a locked_round, but we don't provide the
@@ -135,7 +151,7 @@ end = struct
     *)
     let post_process =
       if Mode.baking_mode == Block.Application then
-        Error ("Wrong fitness", `Permanent)
+        Error (function Fitness_repr.Wrong_fitness -> true | _ -> false)
       else Ok (fun _ -> return_unit)
     in
     aux_simple_preendorsement_inclusion
@@ -151,7 +167,14 @@ end = struct
     (* preendorsement should be for _curr block to be valid *)
       ~preendorsed_block:(fun _predpred pred _curr -> pred)
       ~loc:__LOC__
-      ~post_process:(Error ("Wrong level for consensus operation", `Permanent))
+      ~post_process:
+        (Error
+           (function
+           | Validate_errors.Consensus.Consensus_operation_for_old_level
+               {kind; _}
+             when kind = Validate_errors.Consensus.Preendorsement ->
+               true
+           | _ -> false))
       ()
 
   (** OK: explicit the correct endorser and preendorsing slot in the test *)
@@ -179,7 +202,14 @@ end = struct
         | _ -> assert false
         (* there is at least one endorser with a slot *))
       ~loc:__LOC__
-      ~post_process:(Error ("Wrong slot", `Permanent))
+      ~post_process:
+        (Error
+           (function
+           | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation
+               {kind; _}
+             when kind = Validate_errors.Consensus.Preendorsement ->
+               true
+           | _ -> false))
       ()
 
   (** KO: the delegate tries to injects with a canonical slot of another delegate *)
@@ -194,7 +224,9 @@ end = struct
         | _ -> assert false
         (* there is at least one endorser with a slot *))
       ~loc:__LOC__
-      ~post_process:(Error ("Invalid operation signature", `Permanent))
+      ~post_process:
+        (Error
+           (function Operation_repr.Invalid_signature -> true | _ -> false))
       ()
 
   (** KO: cannot have a locked_round higher than attached PQC's round *)
@@ -205,7 +237,13 @@ end = struct
     *)
     let post_process =
       if Mode.baking_mode == Application then
-        Error ("Wrong round for consensus operation", `Permanent)
+        Error
+          (function
+          | Validate_errors.Consensus.Consensus_operation_for_old_round
+              {kind; _}
+            when kind = Validate_errors.Consensus.Preendorsement ->
+              true
+          | _ -> false)
       else Ok (fun _ -> return_unit)
     in
     aux_simple_preendorsement_inclusion

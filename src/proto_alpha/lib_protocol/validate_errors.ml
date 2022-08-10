@@ -25,6 +25,361 @@
 
 open Alpha_context
 
+module Consensus = struct
+  type error += Zero_frozen_deposits of Signature.Public_key_hash.t
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"validate.zero_frozen_deposits"
+      ~title:"Zero frozen deposits"
+      ~description:"The delegate has zero frozen deposits."
+      ~pp:(fun ppf delegate ->
+        Format.fprintf
+          ppf
+          "Delegate %a has zero frozen deposits; it is not allowed to \
+           bake/preendorse/endorse."
+          Signature.Public_key_hash.pp
+          delegate)
+      Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+      (function Zero_frozen_deposits delegate -> Some delegate | _ -> None)
+      (fun delegate -> Zero_frozen_deposits delegate)
+
+  (** This type is only used in consensus operation errors to make
+      them more informative. *)
+  type consensus_operation_kind =
+    | Preendorsement
+    | Endorsement
+    | Grandparent_endorsement
+
+  let consensus_operation_kind_encoding =
+    Data_encoding.string_enum
+      [
+        ("Preendorsement", Preendorsement);
+        ("Endorsement", Endorsement);
+        ("Grandparent_endorsement", Grandparent_endorsement);
+      ]
+
+  let consensus_operation_kind_pp fmt = function
+    | Preendorsement -> Format.fprintf fmt "Preendorsement"
+    | Endorsement -> Format.fprintf fmt "Endorsement"
+    | Grandparent_endorsement -> Format.fprintf fmt "Grandparent endorsement"
+
+  (** Errors for preendorsements and endorsements. *)
+  type error +=
+    | Consensus_operation_for_old_level of {
+        kind : consensus_operation_kind;
+        expected : Raw_level.t;
+        provided : Raw_level.t;
+      }
+    | Consensus_operation_for_future_level of {
+        kind : consensus_operation_kind;
+        expected : Raw_level.t;
+        provided : Raw_level.t;
+      }
+    | Consensus_operation_for_old_round of {
+        kind : consensus_operation_kind;
+        expected : Round.t;
+        provided : Round.t;
+      }
+    | Consensus_operation_for_future_round of {
+        kind : consensus_operation_kind;
+        expected : Round.t;
+        provided : Round.t;
+      }
+    | Wrong_consensus_operation_branch of {
+        kind : consensus_operation_kind;
+        expected : Block_hash.t;
+        provided : Block_hash.t;
+      }
+    | Wrong_payload_hash_for_consensus_operation of {
+        kind : consensus_operation_kind;
+        expected : Block_payload_hash.t;
+        provided : Block_payload_hash.t;
+      }
+    | Unexpected_preendorsement_in_block
+    | Unexpected_endorsement_in_block
+    | Preendorsement_round_too_high of {
+        block_round : Round.t;
+        provided : Round.t;
+      }
+    | Wrong_slot_used_for_consensus_operation of {
+        kind : consensus_operation_kind;
+      }
+    | Conflicting_consensus_operation of {kind : consensus_operation_kind}
+    | Consensus_operation_not_allowed
+
+  let () =
+    register_error_kind
+      `Outdated
+      ~id:"validate.consensus_operation_for_old_level"
+      ~title:"Consensus operation for old level"
+      ~description:"Consensus operation for old level."
+      ~pp:(fun ppf (kind, expected, provided) ->
+        Format.fprintf
+          ppf
+          "%a for old level (expected: %a, provided: %a)."
+          consensus_operation_kind_pp
+          kind
+          Raw_level.pp
+          expected
+          Raw_level.pp
+          provided)
+      Data_encoding.(
+        obj3
+          (req "kind" consensus_operation_kind_encoding)
+          (req "expected" Raw_level.encoding)
+          (req "provided" Raw_level.encoding))
+      (function
+        | Consensus_operation_for_old_level {kind; expected; provided} ->
+            Some (kind, expected, provided)
+        | _ -> None)
+      (fun (kind, expected, provided) ->
+        Consensus_operation_for_old_level {kind; expected; provided}) ;
+    register_error_kind
+      `Temporary
+      ~id:"validate.consensus_operation_for_future_level"
+      ~title:"Consensus operation for future level"
+      ~description:"Consensus operation for future level."
+      ~pp:(fun ppf (kind, expected, provided) ->
+        Format.fprintf
+          ppf
+          "%a for future level (expected: %a, provided: %a)."
+          consensus_operation_kind_pp
+          kind
+          Raw_level.pp
+          expected
+          Raw_level.pp
+          provided)
+      Data_encoding.(
+        obj3
+          (req "kind" consensus_operation_kind_encoding)
+          (req "expected" Raw_level.encoding)
+          (req "provided" Raw_level.encoding))
+      (function
+        | Consensus_operation_for_future_level {kind; expected; provided} ->
+            Some (kind, expected, provided)
+        | _ -> None)
+      (fun (kind, expected, provided) ->
+        Consensus_operation_for_future_level {kind; expected; provided}) ;
+    register_error_kind
+      `Branch
+      ~id:"validate.consensus_operation_for_old_round"
+      ~title:"Consensus operation for old round"
+      ~description:"Consensus operation for old round."
+      ~pp:(fun ppf (kind, expected, provided) ->
+        Format.fprintf
+          ppf
+          "%a for old round (expected_min: %a, provided: %a)."
+          consensus_operation_kind_pp
+          kind
+          Round.pp
+          expected
+          Round.pp
+          provided)
+      Data_encoding.(
+        obj3
+          (req "kind" consensus_operation_kind_encoding)
+          (req "expected_min" Round.encoding)
+          (req "provided" Round.encoding))
+      (function
+        | Consensus_operation_for_old_round {kind; expected; provided} ->
+            Some (kind, expected, provided)
+        | _ -> None)
+      (fun (kind, expected, provided) ->
+        Consensus_operation_for_old_round {kind; expected; provided}) ;
+    register_error_kind
+      `Temporary
+      ~id:"validate.consensus_operation_for_future_round"
+      ~title:"Consensus operation for future round"
+      ~description:"Consensus operation for future round."
+      ~pp:(fun ppf (kind, expected, provided) ->
+        Format.fprintf
+          ppf
+          "%a for future round (expected: %a, provided: %a)."
+          consensus_operation_kind_pp
+          kind
+          Round.pp
+          expected
+          Round.pp
+          provided)
+      Data_encoding.(
+        obj3
+          (req "kind" consensus_operation_kind_encoding)
+          (req "expected_max" Round.encoding)
+          (req "provided" Round.encoding))
+      (function
+        | Consensus_operation_for_future_round {kind; expected; provided} ->
+            Some (kind, expected, provided)
+        | _ -> None)
+      (fun (kind, expected, provided) ->
+        Consensus_operation_for_future_round {kind; expected; provided}) ;
+    register_error_kind
+      `Temporary
+      ~id:"validate.wrong_consensus_operation_branch"
+      ~title:"Wrong consensus operation branch"
+      ~description:
+        "Trying to include an endorsement or preendorsement which points to \
+         the wrong block. It should be the predecessor for preendorsements and \
+         the grandfather for endorsements."
+      ~pp:(fun ppf (kind, expected, provided) ->
+        Format.fprintf
+          ppf
+          "%a with wrong branch (expected: %a, provided: %a)."
+          consensus_operation_kind_pp
+          kind
+          Block_hash.pp
+          expected
+          Block_hash.pp
+          provided)
+      Data_encoding.(
+        obj3
+          (req "kind" consensus_operation_kind_encoding)
+          (req "expected" Block_hash.encoding)
+          (req "provided" Block_hash.encoding))
+      (function
+        | Wrong_consensus_operation_branch {kind; expected; provided} ->
+            Some (kind, expected, provided)
+        | _ -> None)
+      (fun (kind, expected, provided) ->
+        Wrong_consensus_operation_branch {kind; expected; provided}) ;
+    register_error_kind
+      (* Note: in Mempool mode this used to be
+         Consensus_operation_on_competing_proposal (which was
+         [`Branch] so we kept this classification). *)
+      `Branch
+      ~id:"validate.wrong_payload_hash_for_consensus_operation"
+      ~title:"Wrong payload hash for consensus operation"
+      ~description:"Wrong payload hash for consensus operation."
+      ~pp:(fun ppf (kind, expected, provided) ->
+        Format.fprintf
+          ppf
+          "%a with wrong payload hash (expected: %a, provided: %a)."
+          consensus_operation_kind_pp
+          kind
+          Block_payload_hash.pp_short
+          expected
+          Block_payload_hash.pp_short
+          provided)
+      Data_encoding.(
+        obj3
+          (req "kind" consensus_operation_kind_encoding)
+          (req "expected" Block_payload_hash.encoding)
+          (req "provided" Block_payload_hash.encoding))
+      (function
+        | Wrong_payload_hash_for_consensus_operation {kind; expected; provided}
+          ->
+            Some (kind, expected, provided)
+        | _ -> None)
+      (fun (kind, expected, provided) ->
+        Wrong_payload_hash_for_consensus_operation {kind; expected; provided}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.unexpected_preendorsement_in_block"
+      ~title:"Unexpected preendorsement in block"
+      ~description:"Unexpected preendorsement in block."
+      ~pp:(fun ppf () ->
+        Format.fprintf ppf "Unexpected preendorsement in block.")
+      Data_encoding.empty
+      (function Unexpected_preendorsement_in_block -> Some () | _ -> None)
+      (fun () -> Unexpected_preendorsement_in_block) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.unexpected_endorsement_in_block"
+      ~title:"Unexpected endorsement in block"
+      ~description:"Unexpected endorsement in block."
+      ~pp:(fun ppf () -> Format.fprintf ppf "Unexpected endorsement in block.")
+      Data_encoding.empty
+      (function Unexpected_endorsement_in_block -> Some () | _ -> None)
+      (fun () -> Unexpected_endorsement_in_block) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.preendorsement_round_too_high"
+      ~title:"Preendorsement round too high"
+      ~description:"Preendorsement round too high."
+      ~pp:(fun ppf (block_round, provided) ->
+        Format.fprintf
+          ppf
+          "Preendorsement round too high (block_round: %a, provided: %a)."
+          Round.pp
+          block_round
+          Round.pp
+          provided)
+      Data_encoding.(
+        obj2 (req "block_round" Round.encoding) (req "provided" Round.encoding))
+      (function
+        | Preendorsement_round_too_high {block_round; provided} ->
+            Some (block_round, provided)
+        | _ -> None)
+      (fun (block_round, provided) ->
+        Preendorsement_round_too_high {block_round; provided}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.wrong_slot_for_consensus_operation"
+      ~title:"Wrong slot for consensus operation"
+      ~description:"Wrong slot used for a preendorsement or endorsement."
+      ~pp:(fun ppf kind ->
+        Format.fprintf
+          ppf
+          "Wrong slot used for a %a."
+          consensus_operation_kind_pp
+          kind)
+      Data_encoding.(obj1 (req "kind" consensus_operation_kind_encoding))
+      (function
+        | Wrong_slot_used_for_consensus_operation {kind} -> Some kind
+        | _ -> None)
+      (fun kind -> Wrong_slot_used_for_consensus_operation {kind}) ;
+    register_error_kind
+      `Branch
+      ~id:"validate.double_inclusion_of_consensus_operation"
+      ~title:"Double inclusion of consensus operation"
+      ~description:"Double inclusion of consensus operation."
+      ~pp:(fun ppf kind ->
+        Format.fprintf
+          ppf
+          "Double inclusion of %a operation"
+          consensus_operation_kind_pp
+          kind)
+      Data_encoding.(obj1 (req "kind" consensus_operation_kind_encoding))
+      (function
+        | Conflicting_consensus_operation {kind} -> Some kind | _ -> None)
+      (fun kind -> Conflicting_consensus_operation {kind}) ;
+    register_error_kind
+      `Branch
+      ~id:"validate.consensus_operation_not_allowed"
+      ~title:"Consensus operation not allowed"
+      ~description:"Consensus operation not allowed."
+      ~pp:(fun ppf () ->
+        Format.fprintf ppf "Validation of consensus operation if forbidden ")
+      Data_encoding.empty
+      (function Consensus_operation_not_allowed -> Some () | _ -> None)
+      (fun () -> Consensus_operation_not_allowed)
+
+  type error +=
+    | Conflicting_dal_slot_availability of {
+        endorser : Signature.Public_key_hash.t;
+      }
+
+  let () =
+    register_error_kind
+      `Temporary
+      ~id:"validate.conflicting_dal_slot_availability"
+      ~title:"Conflicting Dal slot availability"
+      ~description:"Conflicting Dal slot availability."
+      ~pp:(fun ppf endorser ->
+        Format.fprintf
+          ppf
+          "Dal slot availability for %a has already been validated for the \
+           current validation state."
+          Signature.Public_key_hash.pp
+          endorser)
+      Data_encoding.(obj1 (req "endorser" Signature.Public_key_hash.encoding))
+      (function
+        | Conflicting_dal_slot_availability {endorser} -> Some endorser
+        | _ -> None)
+      (fun endorser -> Conflicting_dal_slot_availability {endorser})
+end
+
 module Anonymous = struct
   type error +=
     | Invalid_activation of {pkh : Ed25519.Public_key_hash.t}

@@ -31,43 +31,7 @@ open Alpha_context
 
 type error +=
   | Not_enough_endorsements of {required : int; provided : int}
-  | Wrong_consensus_operation_branch of Block_hash.t * Block_hash.t
-  | Wrong_level_for_consensus_operation of {
-      expected : Raw_level.t;
-      provided : Raw_level.t;
-    }
-  | Wrong_round_for_consensus_operation of {
-      expected : Round.t;
-      provided : Round.t;
-    }
-  | Preendorsement_round_too_high of {block_round : Round.t; provided : Round.t}
-  | Unexpected_endorsement_in_block
-  | Unexpected_preendorsement_in_block
-  | Wrong_payload_hash_for_consensus_operation of {
-      expected : Block_payload_hash.t;
-      provided : Block_payload_hash.t;
-    }
-  | Wrong_slot_used_for_consensus_operation
-  | Consensus_operation_for_future_level of {
-      expected : Raw_level.t;
-      provided : Raw_level.t;
-    }
-  | Consensus_operation_for_future_round of {
-      expected : Round.t;
-      provided : Round.t;
-    }
-  | Consensus_operation_for_old_level of {
-      expected : Raw_level.t;
-      provided : Raw_level.t;
-    }
-  | Consensus_operation_for_old_round of {
-      expected : Round.t;
-      provided : Round.t;
-    }
-  | Consensus_operation_on_competing_proposal of {
-      expected : Block_payload_hash.t;
-      provided : Block_payload_hash.t;
-    }
+  | Faulty_validation_wrong_slot
   | Set_deposits_limit_on_unregistered_delegate of Signature.Public_key_hash.t
   | Set_deposits_limit_too_high of {limit : Tez.t; max_limit : Tez.t}
   | Error_while_taking_fees
@@ -83,18 +47,8 @@ type error +=
   | Failing_noop_error
   | Zero_frozen_deposits of Signature.Public_key_hash.t
   | Invalid_transfer_to_sc_rollup_from_implicit_account
-  | Mode_forbids_consensus_operations
 
 let () =
-  register_error_kind
-    `Permanent
-    ~id:"operations.wrong_slot"
-    ~title:"Wrong slot"
-    ~description:"wrong slot"
-    ~pp:(fun ppf () -> Format.fprintf ppf "wrong slot")
-    Data_encoding.empty
-    (function Wrong_slot_used_for_consensus_operation -> Some () | _ -> None)
-    (fun () -> Wrong_slot_used_for_consensus_operation) ;
   register_error_kind
     `Permanent
     ~id:"operation.not_enough_endorsements"
@@ -113,250 +67,19 @@ let () =
       | Not_enough_endorsements {required; provided} -> Some (required, provided)
       | _ -> None)
     (fun (required, provided) -> Not_enough_endorsements {required; provided}) ;
-  register_error_kind
-    `Temporary
-    ~id:"operation.wrong_consensus_operation_branch"
-    ~title:"Wrong consensus operation branch"
-    ~description:
-      "Trying to include an endorsement or preendorsement which points to the \
-       wrong block.\n\
-      \       It should be the predecessor for preendorsements and the \
-       grandfather for endorsements."
-    ~pp:(fun ppf (e, p) ->
-      Format.fprintf
-        ppf
-        "Wrong branch %a, expected %a"
-        Block_hash.pp
-        p
-        Block_hash.pp
-        e)
-    Data_encoding.(
-      obj2
-        (req "expected" Block_hash.encoding)
-        (req "provided" Block_hash.encoding))
-    (function
-      | Wrong_consensus_operation_branch (e, p) -> Some (e, p) | _ -> None)
-    (fun (e, p) -> Wrong_consensus_operation_branch (e, p)) ;
+  let description =
+    "The consensus operation uses an invalid slot. This error should not \
+     happen: the operation validation should have failed earlier."
+  in
   register_error_kind
     `Permanent
-    ~id:"wrong_level_for_consensus_operation"
-    ~title:"Wrong level for consensus operation"
-    ~description:"Wrong level for consensus operation."
-    ~pp:(fun ppf (expected, provided) ->
-      Format.fprintf
-        ppf
-        "Wrong level for consensus operation (expected: %a, provided: %a)."
-        Raw_level.pp
-        expected
-        Raw_level.pp
-        provided)
-    Data_encoding.(
-      obj2
-        (req "expected" Raw_level.encoding)
-        (req "provided" Raw_level.encoding))
-    (function
-      | Wrong_level_for_consensus_operation {expected; provided} ->
-          Some (expected, provided)
-      | _ -> None)
-    (fun (expected, provided) ->
-      Wrong_level_for_consensus_operation {expected; provided}) ;
-  register_error_kind
-    `Permanent
-    ~id:"wrong_round_for_consensus_operation"
-    ~title:"Wrong round for consensus operation"
-    ~description:"Wrong round for consensus operation."
-    ~pp:(fun ppf (expected, provided) ->
-      Format.fprintf
-        ppf
-        "Wrong round for consensus operation (expected: %a, provided: %a)."
-        Round.pp
-        expected
-        Round.pp
-        provided)
-    Data_encoding.(
-      obj2 (req "expected" Round.encoding) (req "provided" Round.encoding))
-    (function
-      | Wrong_round_for_consensus_operation {expected; provided} ->
-          Some (expected, provided)
-      | _ -> None)
-    (fun (expected, provided) ->
-      Wrong_round_for_consensus_operation {expected; provided}) ;
-  register_error_kind
-    `Permanent
-    ~id:"preendorsement_round_too_high"
-    ~title:"Preendorsement round too high"
-    ~description:"Preendorsement round too high."
-    ~pp:(fun ppf (block_round, provided) ->
-      Format.fprintf
-        ppf
-        "Preendorsement round too high (block_round: %a, provided: %a)."
-        Round.pp
-        block_round
-        Round.pp
-        provided)
-    Data_encoding.(
-      obj2 (req "block_round" Round.encoding) (req "provided" Round.encoding))
-    (function
-      | Preendorsement_round_too_high {block_round; provided} ->
-          Some (block_round, provided)
-      | _ -> None)
-    (fun (block_round, provided) ->
-      Preendorsement_round_too_high {block_round; provided}) ;
-  register_error_kind
-    `Permanent
-    ~id:"wrong_payload_hash_for_consensus_operation"
-    ~title:"Wrong payload hash for consensus operation"
-    ~description:"Wrong payload hash for consensus operation."
-    ~pp:(fun ppf (expected, provided) ->
-      Format.fprintf
-        ppf
-        "Wrong payload hash for consensus operation (expected: %a, provided: \
-         %a)."
-        Block_payload_hash.pp_short
-        expected
-        Block_payload_hash.pp_short
-        provided)
-    Data_encoding.(
-      obj2
-        (req "expected" Block_payload_hash.encoding)
-        (req "provided" Block_payload_hash.encoding))
-    (function
-      | Wrong_payload_hash_for_consensus_operation {expected; provided} ->
-          Some (expected, provided)
-      | _ -> None)
-    (fun (expected, provided) ->
-      Wrong_payload_hash_for_consensus_operation {expected; provided}) ;
-  register_error_kind
-    `Permanent
-    ~id:"unexpected_endorsement_in_block"
-    ~title:"Unexpected endorsement in block"
-    ~description:"Unexpected endorsement in block."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Unexpected endorsement in block.")
+    ~id:"operation.faulty_validation_wrong_slot"
+    ~title:"Faulty validation (wrong slot for consensus operation)"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     Data_encoding.empty
-    (function Unexpected_endorsement_in_block -> Some () | _ -> None)
-    (fun () -> Unexpected_endorsement_in_block) ;
-  register_error_kind
-    `Permanent
-    ~id:"unexpected_preendorsement_in_block"
-    ~title:"Unexpected preendorsement in block"
-    ~description:"Unexpected preendorsement in block."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Unexpected preendorsement in block.")
-    Data_encoding.empty
-    (function Unexpected_preendorsement_in_block -> Some () | _ -> None)
-    (fun () -> Unexpected_preendorsement_in_block) ;
-  register_error_kind
-    `Temporary
-    ~id:"consensus_operation_for_future_level"
-    ~title:"Consensus operation for future level"
-    ~description:"Consensus operation for future level."
-    ~pp:(fun ppf (expected, provided) ->
-      Format.fprintf
-        ppf
-        "Consensus operation for future level\n\
-        \                            (expected: %a, provided: %a)."
-        Raw_level.pp
-        expected
-        Raw_level.pp
-        provided)
-    Data_encoding.(
-      obj2
-        (req "expected" Raw_level.encoding)
-        (req "provided" Raw_level.encoding))
-    (function
-      | Consensus_operation_for_future_level {expected; provided} ->
-          Some (expected, provided)
-      | _ -> None)
-    (fun (expected, provided) ->
-      Consensus_operation_for_future_level {expected; provided}) ;
-  register_error_kind
-    `Temporary
-    ~id:"consensus_operation_for_future_round"
-    ~title:"Consensus operation for future round"
-    ~description:"Consensus operation for future round."
-    ~pp:(fun ppf (expected, provided) ->
-      Format.fprintf
-        ppf
-        "Consensus operation for future round (expected: %a, provided: %a)."
-        Round.pp
-        expected
-        Round.pp
-        provided)
-    Data_encoding.(
-      obj2 (req "expected_max" Round.encoding) (req "provided" Round.encoding))
-    (function
-      | Consensus_operation_for_future_round {expected; provided} ->
-          Some (expected, provided)
-      | _ -> None)
-    (fun (expected, provided) ->
-      Consensus_operation_for_future_round {expected; provided}) ;
-  register_error_kind
-    `Outdated
-    ~id:"consensus_operation_for_old_level"
-    ~title:"Consensus operation for old level"
-    ~description:"Consensus operation for old level."
-    ~pp:(fun ppf (expected, provided) ->
-      Format.fprintf
-        ppf
-        "Consensus operation for old level (expected: %a, provided: %a)."
-        Raw_level.pp
-        expected
-        Raw_level.pp
-        provided)
-    Data_encoding.(
-      obj2
-        (req "expected" Raw_level.encoding)
-        (req "provided" Raw_level.encoding))
-    (function
-      | Consensus_operation_for_old_level {expected; provided} ->
-          Some (expected, provided)
-      | _ -> None)
-    (fun (expected, provided) ->
-      Consensus_operation_for_old_level {expected; provided}) ;
-  register_error_kind
-    `Branch
-    ~id:"consensus_operation_for_old_round"
-    ~title:"Consensus operation for old round"
-    ~description:"Consensus operation for old round."
-    ~pp:(fun ppf (expected, provided) ->
-      Format.fprintf
-        ppf
-        "Consensus operation for old round (expected_min: %a, provided: %a)."
-        Round.pp
-        expected
-        Round.pp
-        provided)
-    Data_encoding.(
-      obj2 (req "expected_min" Round.encoding) (req "provided" Round.encoding))
-    (function
-      | Consensus_operation_for_old_round {expected; provided} ->
-          Some (expected, provided)
-      | _ -> None)
-    (fun (expected, provided) ->
-      Consensus_operation_for_old_round {expected; provided}) ;
-  register_error_kind
-    `Branch
-    ~id:"consensus_operation_on_competing_proposal"
-    ~title:"Consensus operation on competing proposal"
-    ~description:"Consensus operation on competing proposal."
-    ~pp:(fun ppf (expected, provided) ->
-      Format.fprintf
-        ppf
-        "Consensus operation on competing proposal (expected: %a, provided: \
-         %a)."
-        Block_payload_hash.pp_short
-        expected
-        Block_payload_hash.pp_short
-        provided)
-    Data_encoding.(
-      obj2
-        (req "expected" Block_payload_hash.encoding)
-        (req "provided" Block_payload_hash.encoding))
-    (function
-      | Consensus_operation_on_competing_proposal {expected; provided} ->
-          Some (expected, provided)
-      | _ -> None)
-    (fun (expected, provided) ->
-      Consensus_operation_on_competing_proposal {expected; provided}) ;
+    (function Faulty_validation_wrong_slot -> Some () | _ -> None)
+    (fun () -> Faulty_validation_wrong_slot) ;
   register_error_kind
     `Temporary
     ~id:"operation.set_deposits_limit_on_unregistered_delegate"
@@ -557,19 +280,7 @@ let () =
     (function
       | Invalid_transfer_to_sc_rollup_from_implicit_account -> Some ()
       | _ -> None)
-    (fun () -> Invalid_transfer_to_sc_rollup_from_implicit_account) ;
-  let mode_forbids_consens_description =
-    "The application mode does not support consensus operations."
-  in
-  register_error_kind
-    `Permanent
-    ~id:"mode_forbids_consensus_operations"
-    ~title:"Mode forbids consensus operations"
-    ~description:mode_forbids_consens_description
-    ~pp:(fun ppf () -> Format.fprintf ppf "%s" mode_forbids_consens_description)
-    Data_encoding.empty
-    (function Mode_forbids_consensus_operations -> Some () | _ -> None)
-    (fun () -> Mode_forbids_consensus_operations)
+    (fun () -> Invalid_transfer_to_sc_rollup_from_implicit_account)
 
 open Apply_results
 open Apply_operation_result
@@ -2071,7 +1782,7 @@ let rec mark_skipped :
     i.e. its fees can be taken, i.e. [take_fees] cannot return an
     error. *)
 let take_fees ctxt (_ : Validate_operation.stamp) contents_list =
-  let open Lwt_result_syntax in
+  let open Lwt_tzresult_syntax in
   let rec take_fees_rec :
       type kind.
       context ->
@@ -2187,35 +1898,15 @@ let mark_backtracked results =
   traverse_apply_results results
 
 type apply_mode =
-  | Application of {
-      predecessor_block : Block_hash.t;
-      payload_hash : Block_payload_hash.t;
-      locked_round : Round.t option;
-      predecessor_level : Level.t;
-      predecessor_round : Round.t;
-      round : Round.t;
-    }
-    (* Both partial and normal *)
-  | Full_construction of {
-      predecessor_block : Block_hash.t;
-      payload_hash : Block_payload_hash.t;
-      predecessor_level : Level.t;
-      predecessor_round : Round.t;
-      round : Round.t;
-    }
-  | Partial_construction of {
-      predecessor_level : Level.t;
-      predecessor_round : Round.t;
-      grand_parent_round : Round.t;
-    }
-  | Mempool_no_consensus_op
-
-let get_predecessor_level = function
-  | Application {predecessor_level; _}
-  | Full_construction {predecessor_level; _}
-  | Partial_construction {predecessor_level; _} ->
-      ok predecessor_level
-  | Mempool_no_consensus_op -> error Mode_forbids_consensus_operations
+  | Application  (** Both partial and normal *)
+  | Full_construction
+  | Partial_construction of {predecessor_level : Level.t option}
+      (** This mode is intended to be used by a mempool. In this case,
+          [predecessor_level] has a value and is used to identify
+          grandparent endorsements (see [record_endorsement]
+          below). However, the [option] allows this mode to be hijacked in
+          other situations with no access to the predecessor level,
+          e.g. during an RPC call. *)
 
 let record_operation (type kind) ctxt hash (operation : kind operation) :
     context =
@@ -2231,220 +1922,67 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
   | Cons (Manager_operation _, _) ->
       record_non_consensus_operation_hash ctxt hash
 
-type 'consensus_op_kind expected_consensus_content = {
-  payload_hash : Block_payload_hash.t;
-  branch : Block_hash.t;
-  level : Level.t;
-  round : Round.t;
-}
-
-(* The [Alpha_context] is modified only in [Full_construction] mode
-   when we check a preendorsement if the [preendorsement_quorum_round]
-   was not set. *)
-let compute_expected_consensus_content (type consensus_op_kind)
-    ~(current_level : Level.t) ~(proposal_level : Level.t) (ctxt : context)
-    (application_mode : apply_mode)
-    (operation_kind : consensus_op_kind consensus_operation_type)
-    (operation_round : Round.t) (operation_level : Raw_level.t) :
-    (context * consensus_op_kind expected_consensus_content) tzresult Lwt.t =
-  match operation_kind with
-  | Endorsement -> (
-      match Consensus.endorsement_branch ctxt with
-      | None -> (
-          match application_mode with
-          | Application _ | Full_construction _ ->
-              fail Unexpected_endorsement_in_block
-          | Partial_construction _ ->
-              fail
-                (Consensus_operation_for_future_level
-                   {expected = proposal_level.level; provided = operation_level})
-          | Mempool_no_consensus_op -> fail Mode_forbids_consensus_operations)
-      | Some (branch, payload_hash) -> (
-          match application_mode with
-          | Application {predecessor_round; _}
-          | Full_construction {predecessor_round; _}
-          | Partial_construction {predecessor_round; _} ->
-              return
-                ( ctxt,
-                  {
-                    payload_hash;
-                    branch;
-                    level = proposal_level;
-                    round = predecessor_round;
-                  } )
-          | Mempool_no_consensus_op -> fail Mode_forbids_consensus_operations))
-  | Preendorsement -> (
-      match application_mode with
-      | Application {locked_round = None; _} ->
-          fail Unexpected_preendorsement_in_block
-      | Application
-          {
-            payload_hash;
-            predecessor_block = branch;
-            locked_round = Some locked_round;
-            _;
-          } ->
-          return
-            ( ctxt,
-              {
-                payload_hash;
-                branch;
-                level = current_level;
-                round = locked_round;
-              } )
-      | Partial_construction {predecessor_round; _} -> (
-          match Consensus.endorsement_branch ctxt with
-          | None ->
-              fail
-                (Consensus_operation_for_future_level
-                   {expected = proposal_level.level; provided = operation_level})
-          | Some (branch, payload_hash) ->
-              return
-                ( ctxt,
-                  {
-                    payload_hash;
-                    branch;
-                    level = proposal_level;
-                    round = predecessor_round;
-                  } ))
-      | Full_construction {payload_hash; predecessor_block = branch; _} ->
-          let ctxt', round =
-            match Consensus.get_preendorsements_quorum_round ctxt with
-            | None ->
-                ( Consensus.set_preendorsements_quorum_round ctxt operation_round,
-                  operation_round )
-            | Some round -> (ctxt, round)
-          in
-          return (ctxt', {payload_hash; branch; level = current_level; round})
-      | Mempool_no_consensus_op -> fail Mode_forbids_consensus_operations)
-
-let check_level (apply_mode : apply_mode) ~expected ~provided =
-  match apply_mode with
-  | Application _ | Full_construction _ ->
-      error_unless
-        (Raw_level.equal expected provided)
-        (Wrong_level_for_consensus_operation {expected; provided})
-  | Partial_construction _ ->
-      (* Valid grand parent's endorsements were treated by
-         [validate_grand_parent_endorsement]. *)
-      error_when
-        Raw_level.(expected > provided)
-        (Consensus_operation_for_old_level {expected; provided})
-      >>? fun () ->
-      error_when
-        Raw_level.(expected < provided)
-        (Consensus_operation_for_future_level {expected; provided})
-  | Mempool_no_consensus_op -> error Mode_forbids_consensus_operations
-
-let check_payload_hash (apply_mode : apply_mode) ~expected ~provided =
-  match apply_mode with
-  | Application _ | Full_construction _ ->
-      error_unless
-        (Block_payload_hash.equal expected provided)
-        (Wrong_payload_hash_for_consensus_operation {expected; provided})
-  | Partial_construction _ ->
-      error_unless
-        (Block_payload_hash.equal expected provided)
-        (Consensus_operation_on_competing_proposal {expected; provided})
-  | Mempool_no_consensus_op -> error Mode_forbids_consensus_operations
-
-let check_operation_branch ~expected ~provided =
-  error_unless
-    (Block_hash.equal expected provided)
-    (Wrong_consensus_operation_branch (expected, provided))
-
-let check_round (type kind) (operation_kind : kind consensus_operation_type)
-    (apply_mode : apply_mode) ~(expected : Round.t) ~(provided : Round.t) :
-    unit tzresult =
-  match apply_mode with
-  | Partial_construction _ ->
-      error_when
-        Round.(expected > provided)
-        (Consensus_operation_for_old_round {expected; provided})
-      >>? fun () ->
-      error_when
-        Round.(expected < provided)
-        (Consensus_operation_for_future_round {expected; provided})
-  | Full_construction {round; _} | Application {round; _} ->
-      (match operation_kind with
-      | Preendorsement ->
-          error_when
-            Round.(round <= provided)
-            (Preendorsement_round_too_high {block_round = round; provided})
-      | Endorsement -> Result.return_unit)
-      >>? fun () ->
-      error_unless
-        (Round.equal expected provided)
-        (Wrong_round_for_consensus_operation {expected; provided})
-  | Mempool_no_consensus_op -> error Mode_forbids_consensus_operations
-
-let check_consensus_content (type kind) (apply_mode : apply_mode)
-    (content : consensus_content) (operation_branch : Block_hash.t)
-    (operation_kind : kind consensus_operation_type)
-    (expected_content : kind expected_consensus_content) : unit tzresult =
-  let expected_level = expected_content.level.level in
-  let provided_level = content.level in
-  let expected_round = expected_content.round in
-  let provided_round = content.round in
-  check_level apply_mode ~expected:expected_level ~provided:provided_level
-  >>? fun () ->
-  check_round
-    operation_kind
-    apply_mode
-    ~expected:expected_round
-    ~provided:provided_round
-  >>? fun () ->
-  check_operation_branch
-    ~expected:expected_content.branch
-    ~provided:operation_branch
-  >>? fun () ->
-  check_payload_hash
-    apply_mode
-    ~expected:expected_content.payload_hash
-    ~provided:content.block_payload_hash
-
-(* Validate the 'operation.shell.branch' field of the operation. It MUST point
-   to the grandfather: the block hash used in the payload_hash. Otherwise we could produce
-   a preendorsement pointing to the direct proposal. This preendorsement wouldn't be able to
-   propagate for a subsequent proposal using it as a locked_round evidence. *)
-let validate_consensus_contents (type kind) ctxt chain_id
-    (operation_kind : kind consensus_operation_type)
-    (operation : kind operation) (apply_mode : apply_mode)
-    (content : consensus_content) :
-    (context * public_key_hash * int) tzresult Lwt.t =
-  let current_level = Level.current ctxt in
-  get_predecessor_level apply_mode >>?= fun proposal_level ->
-  let slot_map =
-    match operation_kind with
-    | Preendorsement -> Consensus.allowed_preendorsements ctxt
-    | Endorsement -> Consensus.allowed_endorsements ctxt
+let record_preendorsement ctxt (apply_mode : apply_mode)
+    (_ : Validate_operation.stamp) (content : consensus_content) :
+    (context * Kind.preendorsement contents_result_list) tzresult =
+  let open Tzresult_syntax in
+  let ctxt =
+    match apply_mode with
+    | Full_construction -> (
+        match Consensus.get_preendorsements_quorum_round ctxt with
+        | None -> Consensus.set_preendorsements_quorum_round ctxt content.round
+        | Some _ -> ctxt)
+    | Application | Partial_construction _ -> ctxt
   in
-  compute_expected_consensus_content
-    ~current_level
-    ~proposal_level
-    ctxt
-    apply_mode
-    operation_kind
-    content.round
-    content.level
-  >>=? fun (ctxt, expected_content) ->
-  check_consensus_content
-    apply_mode
-    content
-    operation.shell.branch
-    operation_kind
-    expected_content
-  >>?= fun () ->
-  match Slot.Map.find content.slot slot_map with
-  | None -> fail Wrong_slot_used_for_consensus_operation
-  | Some (delegate_pk, delegate_pkh, voting_power) ->
-      Delegate.frozen_deposits ctxt delegate_pkh >>=? fun frozen_deposits ->
-      fail_unless
-        Tez.(frozen_deposits.current_amount > zero)
-        (Zero_frozen_deposits delegate_pkh)
-      >>=? fun () ->
-      Operation.check_signature delegate_pk chain_id operation >>?= fun () ->
-      return (ctxt, delegate_pkh, voting_power)
+  match Slot.Map.find content.slot (Consensus.allowed_preendorsements ctxt) with
+  | None ->
+      (* This should not happen: operation validation should have failed. *)
+      error Faulty_validation_wrong_slot
+  | Some (_delegate_pk, delegate, preendorsement_power) ->
+      let* ctxt =
+        Consensus.record_preendorsement
+          ctxt
+          ~initial_slot:content.slot
+          ~power:preendorsement_power
+          content.round
+      in
+      return
+        ( ctxt,
+          Single_result
+            (Preendorsement_result
+               {balance_updates = []; delegate; preendorsement_power}) )
+
+let is_grandparent_endorsement apply_mode content =
+  match apply_mode with
+  | Partial_construction {predecessor_level = Some predecessor_level} ->
+      Raw_level.(succ content.level = predecessor_level.Level.level)
+  | _ -> false
+
+let record_endorsement ctxt (apply_mode : apply_mode)
+    (_ : Validate_operation.stamp) (content : consensus_content) :
+    (context * Kind.endorsement contents_result_list) tzresult Lwt.t =
+  let open Lwt_tzresult_syntax in
+  let mk_endorsement_result delegate endorsement_power =
+    Single_result
+      (Endorsement_result {balance_updates = []; delegate; endorsement_power})
+  in
+  if is_grandparent_endorsement apply_mode content then
+    let level = Level.from_raw ctxt content.level in
+    let* ctxt, (_delegate_pk, delegate) =
+      Stake_distribution.slot_owner ctxt level content.slot
+    in
+    let*? ctxt = Consensus.record_grand_parent_endorsement ctxt delegate in
+    return (ctxt, mk_endorsement_result delegate 0)
+  else
+    match Slot.Map.find content.slot (Consensus.allowed_endorsements ctxt) with
+    | None ->
+        (* This should not happen: operation validation should have failed. *)
+        fail Faulty_validation_wrong_slot
+    | Some (_delegate_pk, delegate, power) ->
+        let*? ctxt =
+          Consensus.record_endorsement ctxt ~initial_slot:content.slot ~power
+        in
+        return (ctxt, mk_endorsement_result delegate power)
 
 let apply_manager_contents_list ctxt ~payload_producer chain_id
     fees_updated_contents_list =
@@ -2461,7 +1999,7 @@ let apply_manager_contents_list ctxt ~payload_producer chain_id
 
 let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
     op_validated_stamp contents_list =
-  let open Lwt_result_syntax in
+  let open Lwt_tzresult_syntax in
   let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
   let* ctxt, fees_updated_contents_list =
     take_fees ctxt op_validated_stamp contents_list
@@ -2538,109 +2076,21 @@ let punish_double_baking ctxt (bh1 : Block_header.t) ~payload_producer =
     ~payload_producer
     (fun balance_updates -> Double_baking_evidence_result balance_updates)
 
-let is_parent_endorsement ctxt ~proposal_level ~grand_parent_round
-    (operation : 'a operation) (operation_content : consensus_content) =
-  match Consensus.grand_parent_branch ctxt with
-  | None -> false
-  | Some (great_grand_parent_hash, grand_parent_payload_hash) ->
-      (* Check level *)
-      Raw_level.(proposal_level.Level.level = succ operation_content.level)
-      (* Check round *)
-      && Round.(grand_parent_round = operation_content.round)
-      (* Check payload *)
-      && Block_payload_hash.(
-           grand_parent_payload_hash = operation_content.block_payload_hash)
-      && (* Check branch *)
-      Block_hash.(great_grand_parent_hash = operation.shell.branch)
-
-let validate_grand_parent_endorsement ctxt chain_id
-    (op : Kind.endorsement operation) =
-  match op.protocol_data.contents with
-  | Single (Endorsement e) ->
-      let level = Level.from_raw ctxt e.level in
-      Stake_distribution.slot_owner ctxt level e.slot
-      >>=? fun (ctxt, (delegate_pk, pkh)) ->
-      Operation.check_signature delegate_pk chain_id op >>?= fun () ->
-      Consensus.record_grand_parent_endorsement ctxt pkh >>?= fun ctxt ->
-      return
-        ( ctxt,
-          Single_result
-            (Endorsement_result
-               {
-                 balance_updates = [];
-                 delegate = pkh;
-                 endorsement_power =
-                   0 (* dummy endorsement power: this will never be used *);
-               }) )
-
 let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
     ~payload_producer op_validated_stamp (operation : kind operation)
     (contents_list : kind contents_list) :
     (context * kind contents_result_list) tzresult Lwt.t =
   let mempool_mode =
     match apply_mode with
-    | Partial_construction _ | Mempool_no_consensus_op -> true
-    | Full_construction _ | Application _ -> false
+    | Partial_construction _ -> true
+    | Full_construction | Application -> false
   in
   match contents_list with
   | Single (Preendorsement consensus_content) ->
-      validate_consensus_contents
-        ctxt
-        chain_id
-        Preendorsement
-        operation
-        apply_mode
-        consensus_content
-      >>=? fun (ctxt, delegate, voting_power) ->
-      Consensus.record_preendorsement
-        ctxt
-        ~initial_slot:consensus_content.slot
-        ~power:voting_power
-        consensus_content.round
-      >>?= fun ctxt ->
-      return
-        ( ctxt,
-          Single_result
-            (Preendorsement_result
-               {
-                 balance_updates = [];
-                 delegate;
-                 preendorsement_power = voting_power;
-               }) )
-  | Single (Endorsement consensus_content) -> (
-      get_predecessor_level apply_mode >>?= fun proposal_level ->
-      match apply_mode with
-      | Partial_construction {grand_parent_round; _}
-        when is_parent_endorsement
-               ctxt
-               ~proposal_level
-               ~grand_parent_round
-               operation
-               consensus_content ->
-          validate_grand_parent_endorsement ctxt chain_id operation
-      | _ ->
-          validate_consensus_contents
-            ctxt
-            chain_id
-            Endorsement
-            operation
-            apply_mode
-            consensus_content
-          >>=? fun (ctxt, delegate, voting_power) ->
-          Consensus.record_endorsement
-            ctxt
-            ~initial_slot:consensus_content.slot
-            ~power:voting_power
-          >>?= fun ctxt ->
-          return
-            ( ctxt,
-              Single_result
-                (Endorsement_result
-                   {
-                     balance_updates = [];
-                     delegate;
-                     endorsement_power = voting_power;
-                   }) ))
+      record_preendorsement ctxt apply_mode op_validated_stamp consensus_content
+      |> Lwt.return
+  | Single (Endorsement consensus_content) ->
+      record_endorsement ctxt apply_mode op_validated_stamp consensus_content
   | Single (Dal_slot_availability (endorser, slot_availability)) ->
       (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
 
@@ -2652,7 +2102,6 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
          endorsement encoding. However, once the DAL will be ready, this
          operation should be merged with an endorsement or at least
          refined. *)
-      Dal_apply.validate_data_availability ctxt slot_availability >>?= fun () ->
       Dal_apply.apply_data_availability ctxt slot_availability ~endorser
       >>=? fun ctxt ->
       return

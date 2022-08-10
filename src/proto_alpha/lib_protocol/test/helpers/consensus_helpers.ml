@@ -27,7 +27,7 @@ open Protocol
 open Alpha_context
 
 let test_consensus_operation ?construction_mode ?level ?block_payload_hash ?slot
-    ?round ~endorsed_block ~error_title ~is_preendorsement ~context ~loc () =
+    ?round ~endorsed_block ~error ~is_preendorsement ~context ~loc () =
   (if is_preendorsement then
    Op.preendorsement
      ~endorsed_block
@@ -49,17 +49,16 @@ let test_consensus_operation ?construction_mode ?level ?block_payload_hash ?slot
       ()
     >|=? fun op -> Operation.pack op)
   >>=? fun op ->
+  let assert_error res = Assert.proto_error ~loc res error in
   match construction_mode with
   | None ->
       (* meaning Application mode *)
-      Block.bake ~operations:[op] endorsed_block >>= fun res ->
-      Assert.proto_error_with_info ~loc res error_title
+      Block.bake ~operations:[op] endorsed_block >>= assert_error
   | Some (pred, protocol_data) ->
       (* meaning partial construction or full construction mode, depending on
          [protocol_data] *)
       Block.get_construction_vstate ~protocol_data pred >>=? fun vstate ->
-      apply_operation vstate op >|= Environment.wrap_tzresult >>= fun res ->
-      Assert.proto_error_with_info ~loc res error_title
+      apply_operation vstate op >|= Environment.wrap_tzresult >>= assert_error
 
 let delegate_of_first_slot b =
   let module V = Plugin.RPC.Validators in
@@ -67,12 +66,14 @@ let delegate_of_first_slot b =
   | {V.delegate; slots = s :: _ as slots; _} :: _ -> ((delegate, slots), s)
   | _ -> assert false
 
-let delegate_of_slot slot b =
+let delegate_of_slot ?(different_slot = false) slot b =
   let module V = Plugin.RPC.Validators in
   Context.get_endorsers b >|=? fun endorsers ->
   List.find_map
     (function
-      | {V.delegate; slots = s :: _ as slots; _} when Slot.equal s slot ->
+      | {V.delegate; slots = s :: _ as slots; _}
+        when if different_slot then not (Slot.equal s slot)
+             else Slot.equal s slot ->
           Some (delegate, slots)
       | _ -> None)
     endorsers
@@ -97,7 +98,7 @@ let test_consensus_op_for_next ~genesis ~kind ~next =
   delegate_of_first_slot (B b1) >>=? fun (delegate, slot) ->
   dorsement ~endorsed_block:b1 ~delegate (B genesis) >>=? fun operation ->
   Incremental.add_operation inc operation >>=? fun inc ->
-  delegate_of_slot slot (B b2) >>=? fun delegate ->
+  delegate_of_slot ~different_slot:true slot (B b2) >>=? fun delegate ->
   dorsement ~endorsed_block:b2 ~delegate (B b1) >>=? fun operation ->
   Incremental.add_operation inc operation >>= fun res ->
   let error_title =

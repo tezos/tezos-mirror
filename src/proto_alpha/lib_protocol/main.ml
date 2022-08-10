@@ -180,7 +180,14 @@ let begin_partial_application ~chain_id ~ancestor_context:ctxt
       }
   in
   let validate_operation_info, validate_operation_state =
-    Validate_operation.init_info_and_state ctxt Block chain_id
+    Validate_operation.begin_block_validation
+      ctxt
+      chain_id
+      ~predecessor_level
+      ~predecessor_round
+      ~predecessor_hash:block_header.shell.predecessor
+      fitness
+      block_header.protocol_data.contents.payload_hash
   in
   return
     {
@@ -241,7 +248,14 @@ let begin_application ~chain_id ~predecessor_context:ctxt ~predecessor_timestamp
       }
   in
   let validate_operation_info, validate_operation_state =
-    Validate_operation.init_info_and_state ctxt Block chain_id
+    Validate_operation.begin_block_validation
+      ctxt
+      chain_id
+      ~predecessor_level
+      ~predecessor_round
+      ~predecessor_hash:block_header.shell.predecessor
+      fitness
+      block_header.protocol_data.contents.payload_hash
   in
   return
     {
@@ -288,8 +302,16 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
             predecessor_round;
           }
       in
+      Alpha_context.Fitness.predecessor_round_from_raw predecessor_fitness
+      >>?= fun grandparent_round ->
       let validate_operation_info, validate_operation_state =
-        Validate_operation.init_info_and_state ctxt Mempool chain_id
+        Validate_operation.begin_mempool
+          ctxt
+          chain_id
+          ~predecessor_level
+          ~predecessor_round
+          ~predecessor_hash:predecessor
+          ~grandparent_round
       in
       return
         ( mode,
@@ -341,7 +363,14 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
           }
       in
       let validate_operation_info, validate_operation_state =
-        Validate_operation.init_info_and_state ctxt Block chain_id
+        Validate_operation.begin_block_construction
+          ctxt
+          chain_id
+          ~predecessor_level
+          ~predecessor_round
+          ~predecessor_hash:predecessor
+          round
+          proto_header.contents.payload_hash
       in
       return
         ( mode,
@@ -405,98 +434,36 @@ let apply_operation ({mode; chain_id; ctxt; op_count; _} as data)
       (* Multipass validation only considers operations in pass 0. *)
       let op_count = op_count + 1 in
       return ({data with ctxt; op_count}, No_operation_metadata)
-  | Partial_application
-      {
-        block_header =
-          {
-            shell = {predecessor; _};
-            protocol_data = {contents = {payload_hash; _}; _};
-          };
-        fitness;
-        payload_producer;
-        predecessor_round;
-        predecessor_level;
-        _;
-      } ->
-      let locked_round = Alpha_context.Fitness.locked_round fitness in
+  | Partial_application {payload_producer; _} ->
       apply_operation_with_mode
-        (Apply.Application
-           {
-             payload_hash;
-             predecessor_block = predecessor;
-             predecessor_round;
-             predecessor_level;
-             locked_round;
-             round = Alpha_context.Fitness.round fitness;
-           })
+        Apply.Application
         ctxt
         chain_id
         data
         op_count
         operation
         ~payload_producer
-  | Application
-      {
-        block_header =
-          {
-            shell = {predecessor; _};
-            protocol_data = {contents = {payload_hash; _}; _};
-          };
-        fitness;
-        payload_producer;
-        predecessor_round;
-        predecessor_level;
-        _;
-      } ->
-      let locked_round = Alpha_context.Fitness.locked_round fitness in
+  | Application {payload_producer; _} ->
       apply_operation_with_mode
-        (Apply.Application
-           {
-             payload_hash;
-             predecessor_block = predecessor;
-             predecessor_round;
-             predecessor_level;
-             locked_round;
-             round = Alpha_context.Fitness.round fitness;
-           })
+        Apply.Application
         ctxt
         chain_id
         data
         op_count
         operation
         ~payload_producer
-  | Partial_construction
-      {predecessor_level; predecessor_round; predecessor_fitness; _} ->
-      Alpha_context.Fitness.predecessor_round_from_raw predecessor_fitness
-      >>?= fun grand_parent_round ->
+  | Partial_construction {predecessor_level; _} ->
       apply_operation_with_mode
-        (Apply.Partial_construction
-           {predecessor_round; predecessor_level; grand_parent_round})
+        (Apply.Partial_construction {predecessor_level = Some predecessor_level})
         ctxt
         chain_id
         data
         op_count
         operation
         ~payload_producer:Signature.Public_key_hash.zero
-  | Full_construction
-      {
-        payload_producer;
-        predecessor;
-        predecessor_round;
-        predecessor_level;
-        protocol_data_contents = {payload_hash; _};
-        round;
-        _;
-      } ->
+  | Full_construction {payload_producer; _} ->
       apply_operation_with_mode
-        (Apply.Full_construction
-           {
-             payload_hash;
-             predecessor_block = predecessor;
-             predecessor_level;
-             predecessor_round;
-             round;
-           })
+        Apply.Full_construction
         ctxt
         chain_id
         data
