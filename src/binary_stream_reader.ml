@@ -451,11 +451,13 @@ and read_fixed_list :
   let rec loop state acc exact_length =
     if exact_length = 0 then k (List.rev acc, state)
     else
-      let size = remaining_bytes state in
-      if size = 0 then raise_read_error Not_enough_data
-      else
-        read_rec false e state @@ fun (v, state) ->
-        loop state (v :: acc) (exact_length - 1)
+      let () =
+        match state.remaining_bytes with
+        | Some size -> if size = 0 then raise_read_error Not_enough_data
+        | None -> ()
+      in
+      read_rec false e state @@ fun (v, state) ->
+      loop state (v :: acc) (exact_length - 1)
   in
   loop state [] exact_length
 
