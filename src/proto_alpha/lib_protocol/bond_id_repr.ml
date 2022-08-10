@@ -63,40 +63,46 @@ let pp ppf = function
   | Tx_rollup_bond_id id -> Tx_rollup_repr.pp ppf id
   | Sc_rollup_bond_id id -> Sc_rollup_repr.pp ppf id
 
-let rpc_arg =
-  let construct = function
-    | Tx_rollup_bond_id id -> Tx_rollup_repr.to_b58check id
-    | Sc_rollup_bond_id id -> Sc_rollup_repr.Address.to_b58check id
-  in
-  let destruct id =
-    (* String.starts_with from the stdlib 4.14, with [unsafe_get] replaced by
-       [get], comparators replaced by theirs versions in [Compare.*]. *)
-    let starts_with ~prefix s =
-      let open String in
-      let len_s = length s and len_pre = length prefix in
-      let rec aux i =
-        if Compare.Int.(i = len_pre) then true
-        else if Compare.Char.(get s i <> get prefix i) then false
-        else aux (i + 1)
-      in
-      Compare.Int.(len_s >= len_pre) && aux 0
+let destruct id =
+  (* String.starts_with from the stdlib 4.14, with [unsafe_get] replaced by
+     [get], comparators replaced by their versions in [Compare.*]. *)
+  let starts_with ~prefix s =
+    let open String in
+    let len_s = length s and len_pre = length prefix in
+    let rec aux i =
+      if Compare.Int.(i = len_pre) then true
+      else if Compare.Char.(get s i <> get prefix i) then false
+      else aux (i + 1)
     in
-    if starts_with ~prefix:Tx_rollup_repr.Hash.rollup_hash id then
-      match Tx_rollup_repr.of_b58check_opt id with
-      | Some id -> Result.ok (Tx_rollup_bond_id id)
-      | None -> Result.error "Cannot parse transaction rollup id"
-    else if starts_with ~prefix:Sc_rollup_repr.Address.prefix id then
-      match Sc_rollup_repr.Address.of_b58check_opt id with
-      | Some id -> Result.ok (Sc_rollup_bond_id id)
-      | None -> Result.error "Cannot parse smart contract rollup id"
-    else Result.error "Cannot parse rollup id"
+    Compare.Int.(len_s >= len_pre) && aux 0
   in
+  if starts_with ~prefix:Tx_rollup_prefixes.rollup_address.prefix id then
+    match Tx_rollup_repr.of_b58check_opt id with
+    | Some id -> Result.ok (Tx_rollup_bond_id id)
+    | None -> Result.error "Cannot parse transaction rollup id"
+  else if starts_with ~prefix:Sc_rollup_repr.Address.prefix id then
+    match Sc_rollup_repr.Address.of_b58check_opt id with
+    | Some id -> Result.ok (Sc_rollup_bond_id id)
+    | None -> Result.error "Cannot parse smart contract rollup id"
+  else Result.error "Cannot parse rollup id"
+
+let construct = function
+  | Tx_rollup_bond_id id -> Tx_rollup_repr.to_b58check id
+  | Sc_rollup_bond_id id -> Sc_rollup_repr.Address.to_b58check id
+
+let rpc_arg =
   RPC_arg.make
     ~descr:"A bond identifier."
     ~name:"bond_id"
     ~construct
     ~destruct
     ()
+
+module Internal_for_test = struct
+  let destruct = destruct
+
+  let construct = construct
+end
 
 module Index = struct
   type nonrec t = t
