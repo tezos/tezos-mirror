@@ -36,6 +36,16 @@ let test1 () =
       | Ok _ -> failwith "unexcepted success")
 
 let test2 () =
+  match check_size (-2) string with
+  | exception Invalid_argument _ -> ()
+  | e -> (
+      let v = "12345" in
+      match Binary.to_string e v with
+      | Error Size_limit_exceeded -> ()
+      | Error _ -> failwith "different error than expected"
+      | Ok _ -> failwith "unexcepted success")
+
+let test3 () =
   let v = "12345" in
   let s = Binary.to_string_exn string v in
   match check_size (-1) string with
@@ -46,4 +56,9 @@ let test2 () =
       | Error _ -> failwith "different error than expected"
       | Ok _ -> failwith "unexcepted success")
 
-let tests = [("write fails", `Quick, test1); ("read fails", `Quick, test2)]
+let tests =
+  [
+    ("write fails", `Quick, test1);
+    ("write fails (with -2)", `Quick, test2);
+    ("read fails", `Quick, test3);
+  ]
