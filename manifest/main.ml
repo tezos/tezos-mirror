@@ -319,13 +319,11 @@ let resto_cohttp_server = external_lib "resto-cohttp-server" resto_version
 let resto_directory =
   external_lib ~js_compatible:true "resto-directory" resto_version
 
-let ringo =
-  external_lib
-    ~js_compatible:true
-    "ringo"
-    V.(at_least "0.9" && less_than "1.0.0")
+let ringo = external_lib ~js_compatible:true "ringo" V.(at_least "1.0.0")
 
-let ringo_lwt = external_lib "ringo-lwt" V.(at_least "0.9")
+let aches = external_lib ~js_compatible:true "aches" V.(at_least "1.0.0")
+
+let aches_lwt = external_lib "aches-lwt" V.(at_least "1.0.0")
 
 let secp256k1_internal =
   let version = V.(at_least "0.3.0") in
@@ -436,7 +434,7 @@ let octez_stdlib =
     "tezos-stdlib"
     ~path:"src/lib_stdlib"
     ~synopsis:"Tezos: yet-another local-extension of the OCaml standard library"
-    ~deps:[hex; zarith; zarith_stubs_js; lwt; ringo]
+    ~deps:[hex; zarith; zarith_stubs_js; lwt; aches]
     ~ocaml:V.(at_least "4.14")
     ~js_compatible:true
     ~js_of_ocaml:
@@ -814,7 +812,7 @@ let octez_crypto =
         secp256k1_internal;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         octez_rpc;
-        ringo;
+        aches;
         zarith;
         zarith_stubs_js;
         bls12_381;
@@ -1320,7 +1318,6 @@ let octez_workers =
       [
         octez_base |> open_ ~m:"TzPervasives" |> open_;
         octez_stdlib_unix |> open_;
-        ringo;
       ]
 
 let _octez_workers_tests =
@@ -1449,6 +1446,7 @@ let octez_p2p =
         lwt_watcher;
         lwt_canceler;
         ringo;
+        aches;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix |> open_;
         octez_stdlib_unix |> open_;
@@ -1978,8 +1976,8 @@ protocols.|}
         plonk;
         octez_crypto_dal;
         vdf;
-        ringo;
-        ringo_lwt;
+        aches;
+        aches_lwt;
         octez_base |> open_ ~m:"TzPervasives";
         octez_sapling;
         tezos_protocol_environment_sigs;
@@ -2228,7 +2226,8 @@ let octez_store_shared =
       [
         octez_base |> open_ |> open_ ~m:"TzPervasives";
         octez_shell_services |> open_;
-        ringo_lwt;
+        aches;
+        aches_lwt;
         octez_validation |> open_;
       ]
     ~modules:
@@ -2262,7 +2261,8 @@ let octez_store_unix =
         octez_stdlib_unix |> open_;
         octez_stdlib |> open_;
         lwt_watcher;
-        ringo_lwt;
+        aches;
+        aches_lwt;
         camlzip;
         tar;
         tar_unix;
@@ -2779,7 +2779,8 @@ let octez_proxy =
     ~synopsis:"Tezos: proxy"
     ~deps:
       [
-        ringo_lwt;
+        aches;
+        aches_lwt;
         octez_base |> open_ ~m:"TzPervasives";
         octez_clic;
         octez_client_base;
@@ -4850,8 +4851,8 @@ module Protocol = Protocol
             irmin_pack;
             irmin_pack_unix;
             irmin;
-            ringo;
-            ringo_lwt;
+            aches;
+            aches_lwt;
             injector |> if_some |> open_;
             octez_scoru_wasm_fast;
             octez_crypto_dal |> if_ N.(number >= 016) |> open_;

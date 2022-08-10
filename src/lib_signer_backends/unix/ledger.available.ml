@@ -589,8 +589,7 @@ module Filter = struct
 end
 
 module Request_cache =
-  (val Ringo.(map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
-    (Ledger_id)
+  Aches.Vache.Map (Aches.Vache.LRU_Precise) (Aches.Vache.Strong) (Ledger_id)
 
 type request_info = {
   version : Ledgerwallet_tezos.Version.t;

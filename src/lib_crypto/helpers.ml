@@ -156,12 +156,6 @@ struct
       ()
 end
 
-module Weak_FIFO_Cache_Maker : Ringo.MAP_MAKER = (val Ringo.map_maker
-                                                        ~replacement:FIFO
-                                                        ~overflow:Weak
-                                                        ~accounting:Sloppy
-                                                    : Ringo.MAP_MAKER)
-
 module MakeIterator (H : sig
   type t
 
@@ -248,7 +242,7 @@ struct
   module WeakRingTable = struct
     let h_encoding = H.encoding
 
-    include Weak_FIFO_Cache_Maker (H)
+    include Aches.Vache.Map (Aches.Vache.FIFO_Sloppy) (Aches.Vache.Weak) (H)
 
     let encoding arg_encoding =
       let open Data_encoding in

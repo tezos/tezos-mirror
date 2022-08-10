@@ -11,7 +11,8 @@ depends: [
   "dune" { >= "3.0" }
   "tezos-base"
   "tezos-shell-services"
-  "ringo-lwt" { >= "0.9" }
+  "aches" { >= "1.0.0" }
+  "aches-lwt" { >= "1.0.0" }
   "tezos-validation"
   "tezos-version"
   "index" { >= "1.6.0" & < "1.7.0" }

@@ -58,7 +58,7 @@ type block_info := Alpha_block_services.block_info
     given a block hash. Looks for the block using [find_in_cache] first, and
     fetches it from the L1 node otherwise. Returns [None] if no such block hash
     exists. [find_in_cache] should be from an instance of
-    {!Ringo_lwt.Sigs.CACHE_MAP_RESULT}. *)
+    {!Aches_lwt.Lache.MAP_RESULT}. *)
 val fetch_tezos_block :
   find_in_cache:
     (Tezos_crypto.Block_hash.t ->
