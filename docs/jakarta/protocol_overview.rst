@@ -72,7 +72,7 @@ Shell-protocol interaction
 - The shell does not accept a branch whose fork point is in a cycle more than ``PRESERVED_CYCLES`` in the past. More precisely, if ``n`` is the current cycle, :ref:`the last allowed fork point<lafl>` is the first level of cycle ``n-PRESERVED_CYCLES``. The parameter ``PRESERVED_CYCLES`` therefore plays a central role in Tezos: any block before the last allowed fork level is immutable.
 - The shell changes the head of the chain to this new block only if the block is :doc:`valid<../shell/validation>` and has a higher fitness than the current head; a block is valid if the operations it includes are valid.
 
-The support provided by the protocol for validating blocks can be modulated by different `validation modes <https://tezos.gitlab.io/api/odoc/_html/tezos-protocol-alpha/Tezos_protocol_alpha/Protocol/index.html#type-validation_mode>`__.
+The support provided by the protocol for validating blocks can be modulated by different :package-api:`validation modes <tezos-protocol-alpha/Tezos_protocol_alpha/Protocol/index.html#type-validation_mode>`.
 They allow using this same support for quite different use cases, as follows:
 
 - being able to validate a block, typically used in the :doc:`validator <../shell/validation>`;
