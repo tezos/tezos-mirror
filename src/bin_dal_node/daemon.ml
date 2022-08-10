@@ -35,6 +35,45 @@ let resolve_plugin cctxt =
        (Dal_constants_plugin.get protocols.current_protocol)
        (Dal_constants_plugin.get protocols.next_protocol)
 
+open Dal_cryptobox
+
+type error += Cryptobox_initialisation_failed of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.cryptobox.initialisation_failed"
+    ~title:"Cryptobox initialisation failed"
+    ~description:"Unable to initialise the cryptobox parameters"
+    ~pp:(fun ppf msg ->
+      Format.fprintf
+        ppf
+        "Unable to initialise the cryptobox parameters. Reason: %s"
+        msg)
+    Data_encoding.(obj1 (req "error" string))
+    (function Cryptobox_initialisation_failed str -> Some str | _ -> None)
+    (fun str -> Cryptobox_initialisation_failed str)
+
+let init_cryptobox unsafe_srs cctxt (module Plugin : Dal_constants_plugin.T) =
+  let open Lwt_result_syntax in
+  let* parameters = Plugin.get_constants cctxt#chain cctxt#block cctxt in
+  let* initialisation_parameters =
+    if unsafe_srs then
+      return
+      @@ Internal_for_tests.initialisation_parameters_from_slot_size
+           ~slot_size:parameters.slot_size
+    else
+      let*? g1_path, g2_path = Tezos_base.Dal_srs.find_trusted_setup_files () in
+      initialisation_parameters_from_files ~g1_path ~g2_path
+  in
+  let*? () = load_parameters initialisation_parameters in
+  let* dal_constants =
+    match make parameters with
+    | Ok cryptobox -> return cryptobox
+    | Error (`Fail msg) -> fail [Cryptobox_initialisation_failed msg]
+  in
+  return @@ (dal_constants, parameters)
+
 let run ~data_dir cctxt =
   let open Lwt_result_syntax in
   let*! () = Event.(emit starting_node) () in
@@ -56,7 +95,7 @@ let run ~data_dir cctxt =
               (Format.asprintf "%a" Protocol_hash.pp_short Plugin.Proto.hash))
         in
         let* dal_constants, dal_parameters =
-          Cryptobox.init config.unsafe_srs cctxt plugin
+          init_cryptobox config.unsafe_srs cctxt plugin
         in
         let ctxt = Node_context.make config dal_constants dal_parameters in
         let* rpc_server = RPC_server.(start config (register ctxt store)) in

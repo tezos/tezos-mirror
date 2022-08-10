@@ -34,11 +34,11 @@ let handle_split_slot dal_parameters dal_constants store fill slot =
   let slot = String.to_bytes slot in
   let slot =
     if fill then
-      Slot_manager.Utils.fill_x00 dal_parameters.Cryptobox.slot_size slot
+      Slot_manager.Utils.fill_x00 dal_parameters.Dal_cryptobox.slot_size slot
     else slot
   in
   let+ commitment = Slot_manager.split_and_store dal_constants store slot in
-  Cryptobox.Commitment.to_b58check commitment
+  Dal_cryptobox.Commitment.to_b58check commitment
 
 let handle_slot initial_constants dal_constants store (_, commitment) trim () =
   let open Lwt_result_syntax in

@@ -104,6 +104,8 @@ module type T = sig
        and type Plonk.public_parameters =
         Plonk.Main_protocol.verifier_public_parameters
         * Plonk.Main_protocol.transcript
+       and type Dal.parameters =
+        Tezos_crypto_dal.Dal_cryptobox.Verifier.parameters
 
   type error += Ecoproto_error of Error_monad.error
 

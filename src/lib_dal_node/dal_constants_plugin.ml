@@ -26,22 +26,11 @@
 module type T = sig
   module Proto : Registered_protocol.T
 
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3497
-
-     Move those constants into lib_crypto_dal and environment ? *)
-
-  type constants = {
-    redundancy_factor : int;
-    segment_size : int;
-    slot_size : int;
-    number_of_shards : int;
-  }
-
   val get_constants :
     Tezos_shell_services.Chain_services.chain ->
     Tezos_shell_services.Block_services.block ->
     Client_context.full ->
-    constants tzresult Lwt.t
+    Tezos_crypto_dal.Dal_cryptobox.Verifier.parameters tzresult Lwt.t
 end
 
 let table : (module T) Protocol_hash.Table.t = Protocol_hash.Table.create 5

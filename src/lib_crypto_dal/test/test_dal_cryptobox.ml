@@ -43,10 +43,7 @@ module Test = struct
       (fun redundancy_factor ->
         let* t =
           Dal_cryptobox.make
-            ~redundancy_factor
-            ~slot_size
-            ~segment_size
-            ~number_of_shards
+            {redundancy_factor; slot_size; segment_size; number_of_shards}
         in
         let* p = Dal_cryptobox.polynomial_from_slot t msg in
         let cm = Dal_cryptobox.commit t p in

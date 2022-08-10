@@ -26,13 +26,6 @@
 module Plugin = struct
   module Proto = Registerer.Registered
 
-  type constants = {
-    redundancy_factor : int;
-    segment_size : int;
-    slot_size : int;
-    number_of_shards : int;
-  }
-
   let get_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_full ctxt in
     let open Lwt_result_syntax in
@@ -41,7 +34,9 @@ module Plugin = struct
           {redundancy_factor; segment_size; slot_size; number_of_shards; _} =
       constants.parametric.dal
     in
-    return {redundancy_factor; segment_size; slot_size; number_of_shards}
+    return
+      Environment.Dal.
+        {redundancy_factor; segment_size; slot_size; number_of_shards}
 end
 
 let () = Dal_constants_plugin.register (module Plugin)

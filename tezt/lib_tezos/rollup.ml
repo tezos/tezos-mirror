@@ -543,10 +543,7 @@ module Dal = struct
     Cryptobox.Internal_for_tests.load_parameters initialisation_parameters ;
     match
       Cryptobox.make
-        ~redundancy_factor
-        ~slot_size
-        ~segment_size
-        ~number_of_shards
+        {redundancy_factor; slot_size; segment_size; number_of_shards}
     with
     | Ok cryptobox -> cryptobox
     | Error (`Fail msg) -> on_error msg

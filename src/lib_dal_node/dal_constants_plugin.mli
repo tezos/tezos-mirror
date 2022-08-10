@@ -26,18 +26,11 @@
 module type T = sig
   module Proto : Registered_protocol.T
 
-  type constants = {
-    redundancy_factor : int;
-    segment_size : int;
-    slot_size : int;
-    number_of_shards : int;
-  }
-
   val get_constants :
     Tezos_shell_services.Chain_services.chain ->
     Tezos_shell_services.Block_services.block ->
     Client_context.full ->
-    constants tzresult Lwt.t
+    Tezos_crypto_dal.Dal_cryptobox.Verifier.parameters tzresult Lwt.t
 end
 
 val register : (module T) -> unit
