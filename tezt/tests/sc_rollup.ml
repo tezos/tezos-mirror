@@ -2547,6 +2547,10 @@ let test_forking_scenario ~title ~scenario protocols =
         level1)
     protocols
 
+(* A more convenient wrapper around [cement_commitment]. *)
+let cement_commitments client sc_rollup ?fail =
+  Lwt_list.iter_s (fun hash -> cement_commitment client ~sc_rollup ~hash ?fail)
+
 (** Given a commitment tree constructed by {test_forking_scenario}, this function:
     - tests different (failing and non-failing) cementation of commitments
       and checks the returned error for each situation (in case of failure);
@@ -2563,12 +2567,7 @@ let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit protocols =
       let* constants = get_sc_rollup_constants client in
       let challenge_window = constants.challenge_window_in_blocks in
 
-      (* More convenient Wrapper around cement_commitment for the tests below *)
-      let cement ?fail l =
-        Lwt_list.iter_s
-          (fun hash -> cement_commitment client ~sc_rollup ~hash ?fail)
-          l
-      in
+      let cement = cement_commitments client sc_rollup in
       let missing_blocks_to_cement = level0 + challenge_window - level1 in
       let* () =
         if missing_blocks_to_cement <= 0 then unit (* We can already cement *)
@@ -2632,12 +2631,7 @@ let test_valid_dispute_dissection protocols =
     ~scenario:
       (fun client _node ~sc_rollup ~operator1 ~operator2 commits _level0 _level1 ->
       let c1, c2, c31, c32, _c311, _c321 = commits in
-      (* More convenient wrapper around cement_commitment for the tests below *)
-      let cement ?fail l =
-        Lwt_list.iter_s
-          (fun hash -> cement_commitment client ~sc_rollup ~hash ?fail)
-          l
-      in
+      let cement = cement_commitments client sc_rollup in
       let* constants = get_sc_rollup_constants client in
       let challenge_window = constants.challenge_window_in_blocks in
       let commitment_period = constants.commitment_period_in_blocks in
