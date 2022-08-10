@@ -436,6 +436,71 @@ let rollup_node_subscribes_to_dal_slots _protocol sc_rollup_node
     ~error_msg:"Unexpected list of slot subscriptions (%L = %R)" ;
   return ()
 
+let test_dal_node_slot_management =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"dal node slot management"
+    ~tags:["dal"; "dal_node"]
+    ~supports:Protocol.(From_protocol (Protocol.number Alpha))
+  @@ fun protocol ->
+  let* node, _client =
+    let nodes_args = Node.[Synchronisation_threshold 0] in
+    Client.init_with_protocol `Client ~protocol ~nodes_args ()
+  in
+  let dal_node = Dal_node.create ~node () in
+  let* _dir = Dal_node.init_config dal_node in
+  let* () = Dal_node.run dal_node in
+  let slot_content = "test" in
+  let* slot_header = Dal_node.split_slot_rpc dal_node slot_content in
+  let* received_slot_content = Dal_node.slot_content_rpc dal_node slot_header in
+  assert (slot_content = received_slot_content) ;
+  return ()
+
+let test_dal_node_startup =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"dal node startup"
+    ~tags:["dal"; "dal_node"]
+    ~supports:Protocol.(From_protocol (Protocol.number Alpha))
+  @@ fun protocol ->
+  let run_dal = Dal_node.run ~wait_ready:false in
+  let nodes_args = Node.[Synchronisation_threshold 0] in
+  let previous_protocol =
+    match Protocol.previous_protocol protocol with
+    | Some p -> p
+    | None -> assert false
+  in
+  let* node, client =
+    Client.init_with_protocol `Client ~protocol:previous_protocol ~nodes_args ()
+  in
+  let dal_node = Dal_node.create ~node () in
+  let* _dir = Dal_node.init_config dal_node in
+  let* () = run_dal dal_node in
+  let* () =
+    Dal_node.wait_for dal_node "dal_node_layer_1_start_tracking.v0" (fun _ ->
+        Some ())
+  in
+  assert (Dal_node.is_running_not_ready dal_node) ;
+  let* () = Dal_node.terminate dal_node in
+  let* () = Node.terminate node in
+  Node.Config_file.update
+    node
+    (Node.Config_file.set_sandbox_network_with_user_activated_overrides
+       [(Protocol.hash previous_protocol, Protocol.hash Alpha)]) ;
+  let* () = Node.run node nodes_args in
+  let* () = Node.wait_for_ready node in
+  let* () = run_dal dal_node in
+  let* () =
+    Lwt.join
+      [
+        Dal_node.wait_for dal_node "dal_node_plugin_resolved.v0" (fun _ ->
+            Some ());
+        Client.bake_for_and_wait client;
+      ]
+  in
+  let* () = Dal_node.terminate dal_node in
+  return ()
+
 let register ~protocols =
   test_dal_scenario "feature_flag_is_disabled" test_feature_flag protocols ;
   test_dal_scenario
@@ -443,4 +508,6 @@ let register ~protocols =
     "rollup_node_dal_subscriptions"
     rollup_node_subscribes_to_dal_slots
     protocols ;
-  test_slot_management_logic protocols
+  test_slot_management_logic protocols ;
+  test_dal_node_slot_management protocols ;
+  test_dal_node_startup protocols

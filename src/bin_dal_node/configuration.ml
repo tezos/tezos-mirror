@@ -23,7 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {data_dir : string; rpc_addr : string; rpc_port : int}
+type t = {
+  unsafe_srs : bool;
+  data_dir : string;
+  rpc_addr : string;
+  rpc_port : int;
+}
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
 
@@ -40,9 +45,12 @@ let default_rpc_port = 10732
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {data_dir; rpc_addr; rpc_port} -> (data_dir, rpc_addr, rpc_port))
-    (fun (data_dir, rpc_addr, rpc_port) -> {data_dir; rpc_addr; rpc_port})
-    (obj3
+    (fun {unsafe_srs; data_dir; rpc_addr; rpc_port} ->
+      (unsafe_srs, data_dir, rpc_addr, rpc_port))
+    (fun (unsafe_srs, data_dir, rpc_addr, rpc_port) ->
+      {unsafe_srs; data_dir; rpc_addr; rpc_port})
+    (obj4
+       (dft "unsafe_srs" ~description:"use unsafe srs for tests" bool false)
        (dft
           "data-dir"
           ~description:"Location of the data dir"

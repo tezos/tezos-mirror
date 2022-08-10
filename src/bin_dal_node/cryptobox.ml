@@ -55,7 +55,7 @@ let () =
     (function Cryptobox_initialisation_failed str -> Some str | _ -> None)
     (fun str -> Cryptobox_initialisation_failed str)
 
-let init cctxt (module Plugin : Dal_constants_plugin.T) =
+let init unsafe_srs cctxt (module Plugin : Dal_constants_plugin.T) =
   let open Lwt_result_syntax in
   let* Plugin.{redundancy_factor; segment_size; slot_size; number_of_shards} =
     Plugin.get_constants cctxt#chain cctxt#block cctxt
@@ -63,6 +63,15 @@ let init cctxt (module Plugin : Dal_constants_plugin.T) =
   let parameters =
     {redundancy_factor; segment_size; slot_size; number_of_shards}
   in
+  let* initialisation_parameters =
+    if unsafe_srs then
+      return
+      @@ Internal_for_tests.initialisation_parameters_from_slot_size ~slot_size
+    else
+      let*? g1_path, g2_path = Tezos_base.Dal_srs.find_trusted_setup_files () in
+      initialisation_parameters_from_files ~g1_path ~g2_path
+  in
+  let*? () = load_parameters initialisation_parameters in
   let* dal_constants =
     match
       make ~redundancy_factor ~segment_size ~slot_size ~number_of_shards
