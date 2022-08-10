@@ -49,8 +49,9 @@ let store_load_byte_works =
 let grow_works =
   Test.make
     ~name:"grow works"
-    Gen.(pair string ui64)
+    Gen.(pair string small_int)
     (fun (init_str, grow_len) ->
+      let grow_len = Int64.of_int grow_len in
       let vector = of_string init_str in
       let check_contents () =
         List.init (String.length init_str) (fun i ->

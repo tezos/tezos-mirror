@@ -1090,38 +1090,32 @@ let init ~self host_funcs (m : module_) (exts : extern list) : module_inst Lwt.t
   update_module_ref self inst0 ;
 
   let* fs = TzStdLib.List.map_s (create_func self) funcs in
-  let inst1 =
-    {
-      inst0 with
-      (* TODO: #3076
-         [fs]/[funcs] should be a lazy structure so we can avoid traversing it
-         completely. *)
-      funcs = Vector.concat inst0.funcs (Vector.of_list fs);
-    }
-  in
+  (* TODO: #3076
+     [fs]/[funcs] should be a lazy structure so we can avoid traversing it
+     completely. *)
+  let* funcs = Vector.concat inst0.funcs (Vector.of_list fs) in
+  let inst1 = {inst0 with funcs} in
   update_module_ref self inst1 ;
 
   let* new_globals = TzStdLib.List.map_s (create_global self) globals in
-  let inst2 =
-    {
-      inst1 with
-      tables =
-        (* TODO: #3076
-           [tables] should be a lazy structure. *)
-        List.map (create_table inst1) tables
-        |> Vector.of_list |> Vector.concat inst1.tables;
-      memories =
-        (* TODO: #3076
-           [memories] should be a lazy structure. *)
-        List.map (create_memory inst1) memories
-        |> Vector.of_list
-        |> Vector.concat inst1.memories;
-      globals =
-        (* TODO: #3076
-           [new_globals]/[globals] should be lazy structures. *)
-        Vector.concat inst1.globals (Vector.of_list new_globals);
-    }
+  (* TODO: #3076
+     [tables] should be a lazy structure. *)
+  let* tables =
+    Vector.concat
+      inst1.tables
+      (Vector.of_list (List.map (create_table inst1) tables))
   in
+  (* TODO: #3076
+     [memories] should be a lazy structure. *)
+  let* memories =
+    Vector.concat
+      inst1.memories
+      (Vector.of_list (List.map (create_memory inst1) memories))
+  in
+  (* TODO: #3076
+     [new_globals]/[globals] should be lazy structures. *)
+  let* globals = Vector.concat inst1.globals (Vector.of_list new_globals) in
+  let inst2 = {inst1 with tables; memories; globals} in
   update_module_ref self inst2 ;
 
   let* new_exports = TzStdLib.List.map_s (create_export inst2) exports in

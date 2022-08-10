@@ -62,6 +62,10 @@ module type S = sig
   *)
   val value_option : key -> 'a Data_encoding.t -> 'a option t
 
+  (** [subtree] returns the subtree located at the prefix tree under
+      which it is called. *)
+  val subtree : Lazy_containers.Lazy_map.tree option t
+
   (** [value ?default key data_encoding] retrieves the value at a
       given [key] by decoding its raw value using the provided
       [data_encoding].

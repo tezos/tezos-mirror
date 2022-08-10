@@ -42,6 +42,9 @@ module type S = sig
 
   val run : 'a t -> 'a -> tree -> tree Lwt.t
 
+  val with_subtree :
+    ('a -> Lazy_containers.Lazy_map.tree option) -> 'a t -> 'a t
+
   val raw : key -> bytes t
 
   val value_option : key -> 'a Data_encoding.t -> 'a option t
@@ -83,6 +86,15 @@ module Make (T : Tree.S) = struct
 
   let run enc value tree = enc value Fun.id tree
 
+  let with_subtree get_subtree enc value prefix input_tree =
+    let open Lwt.Syntax in
+    match get_subtree value with
+    | Some tree ->
+        let* input_tree = T.remove input_tree (prefix []) in
+        let* input_tree = T.add_tree input_tree (prefix []) (T.select tree) in
+        enc value prefix input_tree
+    | None -> enc value prefix input_tree
+
   let lwt enc value prefix tree =
     let open Lwt_syntax in
     let* v = value in
@@ -110,8 +122,8 @@ module Make (T : Tree.S) = struct
 
   let raw suffix bytes prefix tree = T.add tree (prefix suffix) bytes
 
-  let value suffix enc =
-    contramap (Data_encoding.Binary.to_bytes_exn enc) (raw suffix)
+  let value suffix enc v prefix tree =
+    contramap (Data_encoding.Binary.to_bytes_exn enc) (raw suffix) v prefix tree
 
   let value_option key encoding v prefix tree =
     match v with

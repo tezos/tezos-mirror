@@ -44,6 +44,8 @@ module type S = sig
 
   val value_option : key -> 'a Data_encoding.t -> 'a option t
 
+  val subtree : Lazy_containers.Lazy_map.tree option t
+
   val value : ?default:'a -> key -> 'a Data_encoding.t -> 'a t
 
   val scope : key -> 'a t -> 'a t
@@ -159,6 +161,11 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
     | Some value, _ -> return value
     | None, Some default -> return default
     | None, None -> raise (Key_not_found (prefix key))
+
+  let subtree tree prefix =
+    let open Lwt_syntax in
+    let+ tree = T.find_tree tree (prefix []) in
+    Option.map T.wrap tree
 
   let scope key dec tree prefix = dec tree (append_key prefix key)
 

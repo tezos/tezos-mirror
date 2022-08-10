@@ -94,17 +94,29 @@ module type S = sig
       vector. *)
   val num_elements : 'a t -> key
 
-  (** [create ?first_key ?values ?produce_value num_elements] produces a lazy
-      vector with [num_elements] entries where each is created using
-      [produce_value]. [values] may be provided to supply an initial set of
-      entries. [first_key] specifies the first index of the vector if given and
-      defaults to zero. *)
+  (** [create ?first_key ?values ?produce_value ?origin num_elements]
+      produces a lazy vector with [num_elements] entries where each is
+      created using [produce_value]. [values] may be provided to
+      supply an initial set of entries. [first_key] specifies the
+      first index of the vector if given and defaults to zero.
+
+      {b Note:} The [produce_value] and [origin] arguments are
+      expected to be used by the 'tree-encoding' library. If you want
+      to pre-fill your vector, creates an empty vector and use [grow]
+      or [set]. *)
   val create :
     ?first_key:key ->
     ?values:'a Map.Map.t ->
     ?produce_value:'a producer ->
+    ?origin:Lazy_map.tree ->
     key ->
     'a t
+
+  (** [origin vec] returns the tree of origin of the vector, if it exists.
+
+      {b Note:} The sole consumer of this function is expected to be
+      the tree-encoding library. *)
+  val origin : 'a t -> Lazy_map.tree option
 
   (** [empty ()] creates a vector of size zero. This is used in conjunction with
       {!cons} to model list-like structure. *)
@@ -115,7 +127,10 @@ module type S = sig
 
   (** [of_list values] creates a vector where each association is the index in
       the list to its value. The first item's key is [zero], the second is
-      [succ zero] and so on. *)
+      [succ zero] and so on.
+
+      {b Note:} This function may be dangerous to use in a tick, if
+      the size of [of_list] is unbounded. *)
   val of_list : 'a list -> 'a t
 
   (** [get key vector] retrieves the element at [key].
@@ -129,16 +144,18 @@ module type S = sig
   val set : key -> 'a -> 'a t -> 'a t
 
   (** [cons value vector] prepends a value to the front and grows the vector by
-      one. That value can then be accessed using the [zero] key.
-
-      Time complexity: O(log(instantiated_elements_in_vector)) *)
+      one. That value can then be accessed using the [zero] key. *)
   val cons : 'a -> 'a t -> 'a t
 
-  (** [grow delta ?produce_value vector] creates a new lazy vector that has
+  (** [grow delta ?default vector] creates a new lazy vector that has
       [delta] more items than [vector]. This also retains all values that have
-      previously been created. New values will be created with [produce_values]
-      if provided, starting with [Key.zero] for the new values. *)
-  val grow : ?produce_value:'a producer -> key -> 'a t -> 'a t
+      previously been created. New values will be created with [default]
+      if provided.
+
+      {b Note:} This function may be dangerous to use in a tick, if
+      [delta] is unbounded, or if the result of [default] is
+      large. *)
+  val grow : ?default:(unit -> 'a) -> key -> 'a t -> 'a t
 
   (** [append elt vector] creates a new lazy vector that has one
       more item than [vector] whose value is [elt]. This is a shortcut
@@ -146,11 +163,22 @@ module type S = sig
       Also returns the key of the added element. *)
   val append : 'a -> 'a t -> 'a t * key
 
-  (** [concat lhs rhs] Concatenates two lazy vectors. *)
-  val concat : 'a t -> 'a t -> 'a t
+  (** [concat lhs rhs] concatenates two lazy vectors.
+
+      {b Note: This function maybe dangerous to use in a tick because
+      {i every} entries of both [lhs] and [rhs] will be loaded in
+      memory. *)
+  val concat : 'a t -> 'a t -> 'a t effect
+
+  (** [unsafe_concat] concatenates two lazy vectors, {b assuming every
+      entries of both vectors are already loaded in memory}. *)
+  val unsafe_concat : 'a t -> 'a t -> 'a t
 
   (** [to_list vector] extracts all values of the given [vector] and
-      collects them in a list.  *)
+      collects them in a list.
+
+      {b Note:} This function may be dangerous to use in a tick
+      because all entries of the vector are loaded in memory. *)
   val to_list : 'a t -> 'a list effect
 
   (** [loaded_bindings vector] returns the [(key * 'a) list] representation of
@@ -200,14 +228,17 @@ module Mutable : sig
     val create :
       ?values:'a Vector.Map.Map.t ->
       ?produce_value:'a Vector.producer ->
+      ?origin:Lazy_map.tree ->
       key ->
       'a t
+
+    val origin : 'a t -> Lazy_map.tree option
 
     val get : key -> 'a t -> 'a Vector.effect
 
     val set : key -> 'a -> 'a t -> unit
 
-    val grow : ?produce_value:'a Vector.producer -> key -> 'a t -> unit
+    val grow : ?default:(unit -> 'a) -> key -> 'a t -> unit
 
     val append : 'a -> 'a t -> key
 

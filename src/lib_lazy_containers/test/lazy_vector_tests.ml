@@ -73,7 +73,7 @@ let grow_works =
     ~name:"grow works"
     Gen.(pair (gen int) nat)
     (fun (map, len) ->
-      let map2 = IntVector.grow ~produce_value:(fun x -> x * 2) len map in
+      let map2 = IntVector.grow ~default:(fun () -> 2) len map in
       let check1 =
         List.init (IntVector.num_elements map) (fun i ->
             IntVector.get i map2 = IntVector.get i map)
@@ -82,7 +82,7 @@ let grow_works =
       let check2 =
         List.init len (fun i ->
             let key = i + IntVector.num_elements map in
-            IntVector.get key map2 = i * 2)
+            IntVector.get key map2 = 2)
         |> List.for_all Fun.id
       in
       let check3 =

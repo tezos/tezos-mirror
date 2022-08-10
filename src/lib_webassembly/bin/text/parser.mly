@@ -429,7 +429,7 @@ func_type :
   | func_type_result
     { FuncType (Vector.empty (), $1) }
   | LPAR PARAM value_type_vector RPAR func_type
-    { let FuncType (ins, out) = $5 in FuncType (Vector.concat $3 ins, out) }
+    { let FuncType (ins, out) = $5 in FuncType (Vector.unsafe_concat $3 ins, out) }
   | LPAR PARAM bind_var value_type RPAR func_type  /* Sugar */
     { let FuncType (ins, out) = $6 in FuncType (Vector.cons
  $4 ins, out) }
@@ -438,7 +438,7 @@ func_type_result :
   | /* empty */
     { Vector.empty () }
   | LPAR RESULT value_type_vector RPAR func_type_result
-    { Vector.concat $3 $5 }
+    { Vector.unsafe_concat $3 $5 }
 
 table_type :
   | limits ref_type { TableType ($1, $2) }
@@ -629,13 +629,13 @@ call_instr_type :
 call_instr_params :
   | LPAR PARAM value_type_vector RPAR call_instr_params
     { fun c -> let FuncType (ts1, ts2) = $5 c in
-               FuncType (Vector.concat $3 ts1, ts2) }
+               FuncType (Vector.unsafe_concat $3 ts1, ts2) }
   | call_instr_results
     { fun c -> FuncType (Vector.empty (), $1 c) }
 
 call_instr_results :
   | LPAR RESULT value_type_vector RPAR call_instr_results
-    { fun c -> Vector.concat $3 ($5 c) }
+    { fun c -> Vector.unsafe_concat $3 ($5 c) }
   | /* empty */
     { fun c -> Vector.empty () }
 
@@ -662,13 +662,13 @@ call_instr_type_instr :
 call_instr_params_instr :
   | LPAR PARAM value_type_vector RPAR call_instr_params_instr
     { fun c ->
-      let FuncType (ts1, ts2), es = $5 c in FuncType (Vector.concat $3 ts1, ts2), es }
+      let FuncType (ts1, ts2), es = $5 c in FuncType (Vector.unsafe_concat $3 ts1, ts2), es }
   | call_instr_results_instr
     { fun c -> let ts, es = $1 c in FuncType (Vector.empty (), ts), es }
 
 call_instr_results_instr :
   | LPAR RESULT value_type_vector RPAR call_instr_results_instr
-    { fun c -> let ts, es = $5 c in Vector.concat $3 ts, es }
+    { fun c -> let ts, es = $5 c in Vector.unsafe_concat $3 ts, es }
   | instr
     { fun c -> Vector.empty (), $1 c }
 
@@ -708,13 +708,13 @@ block_param_body :
   | block_result_body { $1 }
   | LPAR PARAM value_type_vector RPAR block_param_body
     { let FuncType (ins, out) = fst $5 in
-      FuncType (Vector.concat $3 ins, out), snd $5 }
+      FuncType (Vector.unsafe_concat $3 ins, out), snd $5 }
 
 block_result_body :
   | instr_list { FuncType (Vector.empty (), Vector.empty ()), $1 }
   | LPAR RESULT value_type_vector RPAR block_result_body
     { let FuncType (ins, out) = fst $5 in
-      FuncType (ins, Vector.concat $3 out), snd $5 }
+      FuncType (ins, Vector.unsafe_concat $3 out), snd $5 }
 
 
 expr :  /* Sugar */
@@ -759,13 +759,13 @@ call_expr_params :
   | LPAR PARAM value_type_vector RPAR call_expr_params
     { fun c ->
       let FuncType (ts1, ts2), es = $5 c in
-      FuncType (Vector.concat $3 ts1, ts2), es }
+      FuncType (Vector.unsafe_concat $3 ts1, ts2), es }
   | call_expr_results
     { fun c -> let ts, es = $1 c in FuncType (Vector.empty (), ts), es }
 
 call_expr_results :
   | LPAR RESULT value_type_vector RPAR call_expr_results
-    { fun c -> let ts, es = $5 c in Vector.concat $3 ts, es }
+    { fun c -> let ts, es = $5 c in Vector.unsafe_concat $3 ts, es }
   | expr_list
     { fun c -> Vector.empty (), $1 c }
 
@@ -794,13 +794,13 @@ if_block_param_body :
   | if_block_result_body { $1 }
   | LPAR PARAM value_type_vector RPAR if_block_param_body
     { let FuncType (ins, out) = fst $5 in
-      FuncType (Vector.concat $3 ins, out), snd $5 }
+      FuncType (Vector.unsafe_concat $3 ins, out), snd $5 }
 
 if_block_result_body :
   | if_ { FuncType (Vector.empty (), Vector.empty ()), $1 }
   | LPAR RESULT value_type_vector RPAR if_block_result_body
     { let FuncType (ins, out) = fst $5 in
-      FuncType (ins, Vector.concat $3 out), snd $5 }
+      FuncType (ins, Vector.unsafe_concat $3 out), snd $5 }
 
 if_ :
   | expr if_
@@ -862,7 +862,7 @@ func_fields :
 func_fields_import :  /* Sugar */
   | func_fields_import_result { $1 }
   | LPAR PARAM value_type_vector RPAR func_fields_import
-    { let FuncType (ins, out) = $5 in FuncType (Vector.concat $3 ins, out) }
+    { let FuncType (ins, out) = $5 in FuncType (Vector.unsafe_concat $3 ins, out) }
   | LPAR PARAM bind_var value_type RPAR func_fields_import  /* Sugar */
     { let FuncType (ins, out) = $6 in FuncType (Vector.cons
  $4 ins, out) }
@@ -870,13 +870,13 @@ func_fields_import :  /* Sugar */
 func_fields_import_result :  /* Sugar */
   | /* empty */ { FuncType (Vector.empty (), Vector.empty ()) }
   | LPAR RESULT value_type_vector RPAR func_fields_import_result
-    { let FuncType (ins, out) = $5 in FuncType (ins, Vector.concat $3 out) }
+    { let FuncType (ins, out) = $5 in FuncType (ins, Vector.unsafe_concat $3 out) }
 
 func_fields_body :
   | func_result_body { $1 }
   | LPAR PARAM value_type_vector RPAR func_fields_body
     { let FuncType (ins, out) = fst $5 in
-      FuncType (Vector.concat $3 ins, out),
+      FuncType (Vector.unsafe_concat $3 ins, out),
       fun c -> anon_locals c (lazy (vec_to_list $3)); snd $5 c }
   | LPAR PARAM bind_var value_type RPAR func_fields_body  /* Sugar */
     { let FuncType (ins, out) = fst $6 in
@@ -888,7 +888,7 @@ func_result_body :
   | func_body { FuncType (Vector.empty (), Vector.empty ()), $1 }
   | LPAR RESULT value_type_vector RPAR func_result_body
     { let FuncType (ins, out) = fst $5 in
-      FuncType (ins, Vector.concat $3 out), snd $5 }
+      FuncType (ins, Vector.unsafe_concat $3 out), snd $5 }
 
 func_body :
   | instr_list
@@ -896,7 +896,7 @@ func_body :
       {ftype = -1l @@ at(); locals = Vector.empty (); body = alloc_block c ($1 c')} }
   | LPAR LOCAL value_type_vector RPAR func_body
     { fun c -> anon_locals_vector c (lazy $3); let f = $5 c in
-      {f with locals = Vector.concat $3 f.locals} }
+      {f with locals = Vector.unsafe_concat $3 f.locals} }
   | LPAR LOCAL bind_var value_type RPAR func_body  /* Sugar */
     { fun c -> ignore (bind_local c $3); let f = $6 c in
       {f with locals = Vector.cons $4 f.locals} }

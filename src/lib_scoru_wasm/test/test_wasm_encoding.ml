@@ -47,6 +47,8 @@ let qcheck ?count ?print gen f =
 (* Use context-binary for testing. *)
 module Context = Tezos_context_memory.Context_binary
 
+type Lazy_containers.Lazy_map.tree += Tree of Context.tree
+
 module Tree = struct
   type t = Context.t
 
@@ -57,6 +59,12 @@ module Tree = struct
   type value = Context.value
 
   include Context.Tree
+
+  let select = function
+    | Tree t -> t
+    | _ -> raise Tree_encoding.Incorrect_tree_type
+
+  let wrap t = Tree t
 end
 
 module Tree_encoding = Tree_encoding.Make (Tree)

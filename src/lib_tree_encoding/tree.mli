@@ -25,6 +25,8 @@
 
 (** Exposes a module type {!S} representing trees. *)
 
+exception Incorrect_tree_type
+
 (** An immutable tree API. *)
 module type S = sig
   type tree
@@ -33,9 +35,18 @@ module type S = sig
 
   type value := bytes
 
+  (** @raise Incorrect_tree_type *)
+  val select : Lazy_containers.Lazy_map.tree -> tree
+
+  val wrap : tree -> Lazy_containers.Lazy_map.tree
+
   val remove : tree -> key -> tree Lwt.t
 
   val add : tree -> key -> value -> tree Lwt.t
 
+  val add_tree : tree -> key -> tree -> tree Lwt.t
+
   val find : tree -> key -> value option Lwt.t
+
+  val find_tree : tree -> key -> tree option Lwt.t
 end

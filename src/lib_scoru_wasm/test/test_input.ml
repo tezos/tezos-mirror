@@ -191,10 +191,18 @@ let empty_tree () =
   let empty_store = Context.empty index in
   return @@ Context.Tree.empty empty_store
 
+type Lazy_containers.Lazy_map.tree += Tree of Context.tree
+
 module Tree : Tree_encoding.TREE with type tree = Context.tree = struct
   type tree = Context.tree
 
   include Context.Tree
+
+  let select = function
+    | Tree t -> t
+    | _ -> raise Tree_encoding.Incorrect_tree_type
+
+  let wrap t = Tree t
 end
 
 module Wasm = Wasm_pvm.Make (Tree)
