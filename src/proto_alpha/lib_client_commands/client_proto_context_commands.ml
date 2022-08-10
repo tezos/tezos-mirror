@@ -841,10 +841,6 @@ let commands_network network () =
             >>=? fun _res -> return_unit);
       ]
 
-let implicit_account action = function
-  | Contract.Originated _ -> failwith "Only implicit accounts can %s." action
-  | Contract.Implicit account -> return account
-
 let commands_rw () =
   let open Client_proto_programs in
   let open Tezos_micheline in
@@ -987,7 +983,7 @@ let commands_rw () =
       @@ prefix "transferring"
       @@ tez_param ~name:"qty" ~desc:"amount taken from source"
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"name of the source contract"
       @@ prefix "running"
@@ -1015,7 +1011,6 @@ let commands_rw () =
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program)
         >>=? fun {expanded = code; _} ->
-        implicit_account "originate contracts" source >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         originate_contract
           cctxt
@@ -1281,7 +1276,7 @@ let commands_rw () =
              "Michelson expression to register. Note the value is not \
               typechecked before registration."
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"name of the account registering the global constant"
       @@ stop)
@@ -1295,7 +1290,6 @@ let commands_rw () =
            global_constant_str
            source
            cctxt ->
-        implicit_account "register global constants" source >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         register_global_constant
           cctxt
@@ -1390,12 +1384,11 @@ let commands_rw () =
       ~desc:"Reveal the public key of the contract manager."
       (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
       (prefixes ["reveal"; "key"; "for"]
-      @@ ContractAlias.alias_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"name of the source contract"
       @@ stop)
       (fun (fee, dry_run, verbose_signing, fee_parameter) source cctxt ->
-        implicit_account "be revealed" source >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         reveal
           cctxt
@@ -1495,7 +1488,7 @@ let commands_rw () =
             ~long:"force"
             ()))
       (prefixes ["submit"; "proposals"; "for"]
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"delegate"
            ~desc:"the delegate who makes the proposal"
       @@ seq_of_param
@@ -1508,10 +1501,9 @@ let commands_rw () =
                        Error_monad.failwith "Invalid proposal hash: '%s'" x
                    | Some hash -> return hash))))
       (fun (dry_run, verbose_signing, force)
-           source
+           src_pkh
            proposals
            (cctxt : Protocol_client_context.full) ->
-        implicit_account "submit proposals" source >>=? fun src_pkh ->
         Client_keys.get_key cctxt src_pkh
         >>=? fun (src_name, _src_pk, src_sk) ->
         get_period_info
@@ -1658,7 +1650,7 @@ let commands_rw () =
             ~long:"force"
             ()))
       (prefixes ["submit"; "ballot"; "for"]
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"delegate"
            ~desc:"the delegate who votes"
       @@ param
@@ -1682,11 +1674,10 @@ let commands_rw () =
                 | s -> failwith "Invalid ballot: '%s'" s))
       @@ stop)
       (fun (verbose_signing, dry_run, force)
-           source
+           src_pkh
            proposal
            ballot
            (cctxt : Protocol_client_context.full) ->
-        implicit_account "submit ballot" source >>=? fun src_pkh ->
         Client_keys.get_key cctxt src_pkh
         >>=? fun (src_name, _src_pk, src_sk) ->
         get_period_info
@@ -1892,7 +1883,7 @@ let commands_rw () =
            ~name:"tx_rollup"
            ~desc:"Fresh name for a transaction rollup"
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Account originating the transaction rollup."
       @@ stop)
@@ -1907,8 +1898,6 @@ let commands_rw () =
            alias
            source
            cctxt ->
-        implicit_account "originate transaction rollups" source
-        >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         originate_tx_rollup
           cctxt
@@ -1964,7 +1953,7 @@ let commands_rw () =
       @@ Tx_rollup.tx_rollup_address_param
            ~usage:"Tx rollup receiving the batch."
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Account submitting the transaction rollup batches."
       @@ stop)
@@ -1979,8 +1968,6 @@ let commands_rw () =
            tx_rollup
            source
            cctxt ->
-        implicit_account "submit transaction rollup batches" source
-        >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         submit_tx_rollup_batch
           cctxt
@@ -2024,7 +2011,7 @@ let commands_rw () =
       @@ Tx_rollup.tx_rollup_address_param
            ~usage:"Transaction rollup address committed to."
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Account committing to the transaction rollup."
       @@ prefixes ["for"; "level"]
@@ -2051,8 +2038,6 @@ let commands_rw () =
            inbox_merkle_root
            messages
            cctxt ->
-        implicit_account "submit transaction rollup commitments" source
-        >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         submit_tx_rollup_commitment
           cctxt
@@ -2091,7 +2076,7 @@ let commands_rw () =
       @@ Tx_rollup.tx_rollup_address_param
            ~usage:"Tx rollup that have its commitment finalized."
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Account finalizing the commitment."
       @@ stop)
@@ -2105,7 +2090,6 @@ let commands_rw () =
            tx_rollup
            source
            cctxt ->
-        implicit_account "finalize commitments" source >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         submit_tx_rollup_finalize_commitment
           cctxt
@@ -2137,7 +2121,7 @@ let commands_rw () =
          storage_limit_arg
          counter_arg)
       (prefixes ["recover"; "bond"; "of"]
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Account that owns the bond."
       @@ prefixes ["for"; "tx"; "rollup"]
@@ -2153,7 +2137,6 @@ let commands_rw () =
            source
            tx_rollup
            cctxt ->
-        implicit_account "deposit/recover bonds" source >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         submit_tx_rollup_return_bond
           cctxt
@@ -2188,7 +2171,7 @@ let commands_rw () =
       @@ Tx_rollup.tx_rollup_address_param
            ~usage:"Tx rollup that have its commitment removed."
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"name of the account removing the commitment."
       @@ stop)
@@ -2202,7 +2185,6 @@ let commands_rw () =
            tx_rollup
            source
            cctxt ->
-        implicit_account "remove commitments" source >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         submit_tx_rollup_remove_commitment
           cctxt
@@ -2281,7 +2263,7 @@ let commands_rw () =
            ~usage:
              "Proof that the disputed message result provided is incorrect."
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Account rejecting the commitment."
       @@ stop)
@@ -2305,8 +2287,6 @@ let commands_rw () =
            proof
            source
            cctxt ->
-        implicit_account "reject transaction rollup commitments" source
-        >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         submit_tx_rollup_rejection
           cctxt
@@ -2358,7 +2338,7 @@ let commands_rw () =
       @@ Tx_rollup.tx_rollup_address_param
            ~usage:"Tx rollup which have some tickets dispatched."
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"source"
            ~desc:"Account used to dispatch tickets."
       @@ prefixes ["at"; "level"]
@@ -2399,8 +2379,6 @@ let commands_rw () =
            message_result_path
            tickets_info
            cctxt ->
-        implicit_account "dispatch tickets for a transaction rollup" source
-        >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         tx_rollup_dispatch_tickets
           cctxt
@@ -2439,7 +2417,7 @@ let commands_rw () =
       (prefix "transfer"
       @@ non_negative_z_param ~name:"qty" ~desc:"Amount of tickets to transfer."
       @@ prefixes ["tickets"; "from"]
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"tickets owner"
            ~desc:"Implicit account owning the tickets."
       @@ prefix "to"
@@ -2481,7 +2459,6 @@ let commands_rw () =
            ty
            ticketer
            cctxt ->
-        implicit_account "transfer tickets" source >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         transfer_ticket
           cctxt
@@ -2518,7 +2495,7 @@ let commands_rw () =
          storage_limit_arg
          counter_arg)
       (prefixes ["originate"; "sc"; "rollup"; "from"]
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the account originating the smart-contract rollup."
       @@ prefixes ["of"; "kind"]
@@ -2551,8 +2528,6 @@ let commands_rw () =
            parameters_ty
            boot_sector
            cctxt ->
-        implicit_account "originate smart-contract rollups" source
-        >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         let (module R : Alpha_context.Sc_rollup.PVM.S) = pvm in
         let Michelson_v1_parser.{expanded; _} = parameters_ty in
@@ -2598,7 +2573,7 @@ let commands_rw () =
               messages>|file:<json_file>)."
            Sc_rollup_params.messages_parameter
       @@ prefixes ["from"]
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the source contract."
       @@ prefixes ["to"]
@@ -2618,7 +2593,6 @@ let commands_rw () =
            source
            rollup
            cctxt ->
-        implicit_account "send messages to rollups" source >>=? fun source ->
         (match messages with
         | `Bin message -> return [message]
         | `Json messages -> (
@@ -2661,7 +2635,7 @@ let commands_rw () =
          fee_parameter_args)
       (prefixes ["publish"; "commitment"]
       @@ prefixes ["from"]
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the source contract."
       @@ prefixes ["for"; "sc"; "rollup"]
@@ -2706,7 +2680,6 @@ let commands_rw () =
            predecessor
            number_of_ticks
            cctxt ->
-        implicit_account "publish commitments" source >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         let commitment : Alpha_context.Sc_rollup.Commitment.t =
           {compressed_state; inbox_level; predecessor; number_of_ticks}
@@ -2747,7 +2720,7 @@ let commands_rw () =
            ~desc:"The hash of the commitment to be cemented for a sc rollup."
            Sc_rollup_params.commitment_hash_parameter
       @@ prefixes ["from"]
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the source contract."
       @@ prefixes ["for"; "sc"; "rollup"]
@@ -2769,7 +2742,6 @@ let commands_rw () =
            source
            rollup
            cctxt ->
-        implicit_account "cement commitments" source >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         sc_rollup_cement
           cctxt
@@ -2823,7 +2795,7 @@ let commands_rw () =
               resides."
            Sc_rollup_params.sc_rollup_address_parameter
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"source"
            ~desc:"The account used for executing the outbox message."
       @@ prefixes ["for"; "commitment"; "hash"]
@@ -2850,8 +2822,6 @@ let commands_rw () =
            cemented_commitment
            output_proof
            cctxt ->
-        implicit_account "execute an sc rollup batch of transactions" source
-        >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         sc_rollup_execute_outbox_message
           cctxt
@@ -2885,7 +2855,7 @@ let commands_rw () =
          storage_limit_arg
          counter_arg)
       (prefixes ["recover"; "bond"; "of"]
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"The implicit account that owns the frozen bond."
       @@ prefixes ["for"; "sc"; "rollup"]
@@ -2904,7 +2874,6 @@ let commands_rw () =
            source
            sc_rollup
            cctxt ->
-        implicit_account "deposit/recover bonds" source >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         sc_rollup_recover_bond
           cctxt
