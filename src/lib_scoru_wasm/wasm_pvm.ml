@@ -189,11 +189,10 @@ module Make (T : Tree_encoding.TREE) :
       let* tree = Tree_encoding.encode module_reg_encoding module_reg tree in
       let want_more_input =
         match state.tick with
-        | Eval {input; code = _, []; _} ->
+        | Eval {code = _, []; _} ->
             (* Ask for more input if the kernel has yielded (empty admin
-               instructions) and there are no element in the input buffer any
-               more. *)
-            Z.(lt (Wasm.Input_buffer.num_elements input) one)
+               instructions). *)
+            true
         | _ -> false
       in
       let* tree = Tree_encoding.encode status_encoding want_more_input tree in
