@@ -67,7 +67,7 @@ val originate :
   context ->
   kind:Sc_rollup.Kind.t ->
   boot_sector:string ->
-  origination_proof:Sc_rollup.wrapped_proof ->
+  origination_proof:string ->
   parameters_ty:Script_repr.lazy_expr ->
   (origination_result * context) tzresult Lwt.t
 

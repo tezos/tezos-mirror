@@ -4162,7 +4162,7 @@ and _ manager_operation =
   | Sc_rollup_originate : {
       kind : Sc_rollup.Kind.t;
       boot_sector : string;
-      origination_proof : Sc_rollup.wrapped_proof;
+      origination_proof : string;
       parameters_ty : Script.lazy_expr;
     }
       -> Kind.sc_rollup_originate manager_operation

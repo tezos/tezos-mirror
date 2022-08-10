@@ -123,7 +123,7 @@ struct
   let hash_tree tree = Hash.of_context_hash (Tree.hash tree)
 
   let proof_encoding =
-    Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V1.Tree32
+    Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree32
     .tree_proof_encoding
 
   let proof_before proof =

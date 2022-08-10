@@ -815,6 +815,10 @@ let sc_rollup_origination ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
   | None -> Sc_rollup_helpers.origination_proof ~boot_sector kind
   | Some origination_proof -> Lwt.return origination_proof)
   >>= fun origination_proof ->
+  let (module PVM) = Sc_rollup.wrapped_proof_module origination_proof in
+  let origination_proof =
+    Data_encoding.Binary.to_string_exn PVM.proof_encoding PVM.proof
+  in
   manager_operation
     ?force_reveal
     ?counter

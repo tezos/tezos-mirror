@@ -415,7 +415,7 @@ and _ manager_operation =
   | Sc_rollup_originate : {
       kind : Sc_rollups.Kind.t;
       boot_sector : string;
-      origination_proof : Sc_rollups.wrapped_proof;
+      origination_proof : string;
       parameters_ty : Script_repr.lazy_expr;
     }
       -> Kind.sc_rollup_originate manager_operation
@@ -1060,7 +1060,7 @@ module Encoding = struct
             obj4
               (req "kind" Sc_rollups.Kind.encoding)
               (req "boot_sector" Data_encoding.string)
-              (req "origination_proof" Sc_rollups.wrapped_proof_encoding)
+              (req "origination_proof" Data_encoding.string)
               (req "parameters_ty" Script_repr.lazy_expr_encoding);
           select =
             (function
