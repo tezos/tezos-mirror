@@ -72,6 +72,8 @@ let select_commands ctxt Client_config.{protocol; chain; block; _} =
     @ proto_commands)
 
 let () =
+  let () = Teztale_archiver.PtCJ7pwo_machine.register_json_commands () in
+  let () = Teztale_archiver.PsYLVpVv_machine.register_json_commands () in
   let () = Teztale_archiver.PsddFKi3_machine.register_json_commands () in
   let () = Teztale_archiver.Pt24m4xi_machine.register_json_commands () in
   let () = Teztale_archiver.PsBabyM1_machine.register_json_commands () in
@@ -84,6 +86,8 @@ let () =
   let () = Teztale_archiver.Psithaca_machine.register_json_commands () in
   let () = Teztale_archiver.PtJakart_machine.register_json_commands () in
   let () = Teztale_archiver.PtKathma_machine.register_json_commands () in
+  let () = Teztale_archiver.PtCJ7pwo_machine.register_db_commands () in
+  let () = Teztale_archiver.PsYLVpVv_machine.register_db_commands () in
   let () = Teztale_archiver.PsddFKi3_machine.register_db_commands () in
   let () = Teztale_archiver.Pt24m4xi_machine.register_db_commands () in
   let () = Teztale_archiver.PsBabyM1_machine.register_db_commands () in

@@ -7,6 +7,14 @@
   tezos-client-base
   teztale.lib
   (select
+   PtCJ7pwo_machine.ml
+   from
+   (tezos-client-001-PtCJ7pwo -> PtCJ7pwo_machine.real.ml))
+  (select
+   PsYLVpVv_machine.ml
+   from
+   (tezos-client-002-PsYLVpVv -> PsYLVpVv_machine.real.ml))
+  (select
    PsddFKi3_machine.ml
    from
    (tezos-client-003-PsddFKi3 -> PsddFKi3_machine.real.ml))
