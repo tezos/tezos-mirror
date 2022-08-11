@@ -348,8 +348,8 @@ let commands_ro () =
                 let {Michelson_v1_parser.source; _} =
                   Michelson_v1_printer.unparse_toplevel code
                 in
-                let*! a = cctxt#answer "%s" source in
-                return a));
+                let*! () = cctxt#answer "%s" source in
+                return_unit));
     command
       ~group
       ~desc:"Get the `BLAKE2B` script hash of a contract."
@@ -368,8 +368,8 @@ let commands_ro () =
         | Error errs -> cctxt#error "%a" pp_print_trace errs
         | Ok None -> cctxt#error "This is not a smart contract."
         | Ok (Some hash) ->
-            let* a = cctxt#answer "%a" Script_expr_hash.pp hash in
-            return_ok a);
+            let* () = cctxt#answer "%a" Script_expr_hash.pp hash in
+            return_ok_unit);
     command
       ~group
       ~desc:"Get the type of an entrypoint of a contract."
@@ -500,15 +500,11 @@ let commands_ro () =
                 | Some hash -> Lwt_result_syntax.return hash))
       @@ stop)
       (fun predecessors operation_hash (ctxt : Protocol_client_context.full) ->
-        let open Lwt_result_syntax in
-        let* _ =
-          display_receipt_for_operation
-            ctxt
-            ~chain:ctxt#chain
-            ~predecessors
-            operation_hash
-        in
-        return_unit);
+        display_receipt_for_operation
+          ctxt
+          ~chain:ctxt#chain
+          ~predecessors
+          operation_hash);
     command
       ~group
       ~desc:"Summarize the current voting period"
@@ -833,14 +829,14 @@ let transfer_command amount (source : Contract.t) destination
           ~successor_level
           ()
   in
-  let*! o =
+  let*! _ =
     report_michelson_errors
       ~no_print_source
       ~msg:"transfer simulation failed"
       cctxt
       r
   in
-  match o with None -> return_unit | Some (_res, _contracts) -> return_unit
+  return_unit
 
 let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
     ?entrypoint (source : Contract.t) index batch =
@@ -1276,18 +1272,13 @@ let commands_rw () =
         with
         | [] -> failwith "Empty operation list"
         | operations ->
-            let* source, src_pk, src_sk =
+            let* source =
               match source with
               | Originated contract ->
-                  let* source =
-                    Managed_contract.get_contract_manager cctxt contract
-                  in
-                  let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
-                  return (source, src_pk, src_sk)
-              | Implicit source ->
-                  let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
-                  return (source, src_pk, src_sk)
+                  Managed_contract.get_contract_manager cctxt contract
+              | Implicit source -> return source
             in
+            let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
             let* contents = List.mapi_ep prepare operations in
             let (Manager_list contents) =
               Annotated_manager_operation.manager_of_list contents
@@ -2106,7 +2097,7 @@ let commands_rw () =
            cctxt ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
-        let* res =
+        let* _, _, res =
           originate_tx_rollup
             cctxt
             ~chain:cctxt#chain
@@ -2124,22 +2115,20 @@ let commands_rw () =
             ~fee_parameter
             ()
         in
-        let* alias_name = TxRollupAlias.of_fresh cctxt force alias in
         let*? res =
           match res with
-          | ( _,
-              _,
-              Apply_results.Manager_operation_result
-                {
-                  operation_result =
-                    Apply_operation_result.Applied
-                      (Apply_results.Tx_rollup_origination_result
-                        {originated_tx_rollup; _});
-                  _;
-                } ) ->
+          | Apply_results.Manager_operation_result
+              {
+                operation_result =
+                  Apply_operation_result.Applied
+                    (Apply_results.Tx_rollup_origination_result
+                      {originated_tx_rollup; _});
+                _;
+              } ->
               Ok originated_tx_rollup
           | _ -> error_with "transaction rollup was not correctly originated"
         in
+        let* alias_name = TxRollupAlias.of_fresh cctxt force alias in
         save_tx_rollup ~force cctxt alias_name res);
     command
       ~group
