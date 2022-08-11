@@ -27,26 +27,6 @@
 open Lwt.Infix
 module ConnectionMap = Map.Make (Cohttp.Connection)
 
-(** A callback passed to [Cohttp_lwt_unix.Server.make_response_action],
-     which can be transformed by a [middleware].
-  *)
-type callback =
-  Cohttp_lwt_unix.Server.conn ->
-  Cohttp.Request.t ->
-  Cohttp_lwt.Body.t ->
-  Cohttp_lwt_unix.Server.response_action Lwt.t
-
-(** A middleware that wraps the operation of a [Cohttp] server.
-
-    We implement this idea as a transformer for the request -> response callback,
-    which lets the middleware modify the arguments passed to the callback, run it,
-    and then postprocess the response.
-
-    Middleware can be passed to [Make.launch] as an optional argument. For most
-    use-cases, this functionality will not be required.
-    *)
-type middleware = {transform_callback : callback -> callback}
-
 let ( >>? ) v f = match v with Ok x -> f x | Error err -> Lwt.return_error err
 
 let lwt_return_ok_response r = Lwt.return_ok (`Response r)
@@ -331,11 +311,35 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     mutable streams : (unit -> unit) ConnectionMap.t;
     cors : Cors.t;
     medias : Media.medias;
+    stop : unit Lwt.t;
     stopper : unit Lwt.u;
     mutable acl : Acl.t;
     agent : string;
     mutable worker : unit Lwt.t;
   }
+
+  type callback =
+    Cohttp_lwt_unix.Server.conn ->
+    Cohttp.Request.t ->
+    Cohttp_lwt.Body.t ->
+    Cohttp_lwt_unix.Server.response_action Lwt.t
+
+  let init_server ?(cors = Cors.default) ?(agent = Agent.default_agent)
+      ?(acl = Acl.Allow_all {except = []}) ~media_types root =
+    let default_media_type = Media.default_media_type media_types in
+    let stop, stopper = Lwt.wait () in
+    let medias : Media.medias = {media_types; default_media_type} in
+    {
+      root;
+      streams = ConnectionMap.empty;
+      cors;
+      medias;
+      stop;
+      stopper;
+      acl;
+      agent;
+      worker = Lwt.return_unit;
+    }
 
   let create_stream server con to_string s =
     let con_string = Connection.to_string con in
@@ -354,7 +358,8 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
     server.streams <- ConnectionMap.add con shutdown server.streams ;
     stream
 
-  let callback server ((_io, con) : Cohttp_lwt_unix.Server.conn) req body =
+  let resto_callback server ((_io, con) : Cohttp_lwt_unix.Server.conn) req body
+      =
     let con_string = Connection.to_string con in
     let uri = Request.uri req in
     let path_and_query = Uri.path_and_query uri in
@@ -483,24 +488,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
 
   (* Promise a running RPC server. *)
 
-  let launch ?(host = "::") ?(cors = Cors.default)
-      ?(agent = Agent.default_agent) ?(acl = Acl.Allow_all {except = []})
-      ?middleware ~media_types mode root =
-    let default_media_type = Media.default_media_type media_types in
-    let stop, stopper = Lwt.wait () in
-    let medias : Media.medias = {media_types; default_media_type} in
-    let server =
-      {
-        root;
-        streams = ConnectionMap.empty;
-        cors;
-        medias;
-        stopper;
-        acl;
-        agent;
-        worker = Lwt.return_unit;
-      }
-    in
+  let launch ?(host = "::") server ?(callback = resto_callback server) mode =
     Conduit_lwt_unix.init ~src:host () >>= fun ctx ->
     let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
     server.worker <-
@@ -522,7 +510,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
                (Printexc.get_backtrace ())
        and callback (io, con) req body =
          Lwt.catch
-           (fun () -> callback server (io, con) req body)
+           (fun () -> callback (io, con) req body)
            (function
              | Not_found ->
                  let status = `Not_found in
@@ -539,22 +527,19 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
                  in
                  lwt_return_response (Response.make ~status ~headers (), body))
        in
-       let modified_callback =
-         match middleware with
-         | None -> callback
-         | Some {transform_callback} -> transform_callback callback
-       in
        Cohttp_lwt_unix.Server.create
-         ~stop
+         ~stop:server.stop
          ~ctx
          ~mode
          ~on_exn
-         (Cohttp_lwt_unix.Server.make_response_action
-            ~callback:modified_callback
-            ~conn_closed
-            ())) ;
-    Log.lwt_log_info "Server started (agent: %s)" server.agent >>= fun () ->
-    Lwt.return server
+         (Cohttp_lwt_unix.Server.make_response_action ~callback ~conn_closed ())) ;
+    Log.lwt_log_info "Server started (agent: %s)" server.agent
+
+  let init_and_launch ?(host = "::") ?(cors = Cors.default)
+      ?(agent = Agent.default_agent) ?(acl = Acl.Allow_all {except = []})
+      ~media_types root mode =
+    let server = init_server ~cors ~agent ~acl ~media_types root in
+    launch ~host server mode
 
   let shutdown server =
     Lwt.wakeup_later server.stopper () ;

@@ -26,27 +26,6 @@
 
 (** Serving a directory of registered services. *)
 
-(** A callback passed to [Cohttp_lwt_unix.Server.make_response_action].
-    This type is used to define the {!middleware} type.
-  *)
-type callback =
-  Cohttp_lwt_unix.Server.conn ->
-  Cohttp.Request.t ->
-  Cohttp_lwt.Body.t ->
-  Cohttp_lwt_unix.Server.response_action Lwt.t
-
-(** A middleware function that wraps the operation of the [Cohttp] server that
-    Resto builds, adding pieces of extra functionality on top of it at a low
-    level when they cannot be implemented within the public Resto API.
-
-    We define a middleware as a transformer for the request -> response {!callback},
-    which lets the middleware modify the arguments passed to the callback, run it,
-    and then postprocess the response.
-
-    To use a middleware function, pass it to [Make.launch].
-  *)
-type middleware = {transform_callback : callback -> callback}
-
 module type LOGGING = sig
   val debug : ('a, Format.formatter, unit, unit) format4 -> 'a
 
@@ -81,19 +60,82 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
   (** A handle on the server worker. *)
   type server
 
-  (** Promise a running RPC server.*)
+  (** A callback passed to [Cohttp_lwt_unix.Server.make_response_action].
+      Callbacks are exposed in order to give users a way to modify the
+      arguments of the callback used to launch the server, or add some
+      behaviour. *)
+  type callback =
+    Cohttp_lwt_unix.Server.conn ->
+    Cohttp.Request.t ->
+    Cohttp_lwt.Body.t ->
+    Cohttp_lwt_unix.Server.response_action Lwt.t
+
+  (** Initializes the server *)
+  val init_server :
+    ?cors:Cors.t ->
+    ?agent:string ->
+    ?acl:Acl.t ->
+    media_types:Media_type.t list ->
+    unit Directory.t ->
+    server
+
+  (** [resto_callback server] is the default callback for resto.
+      It can be used as is so the server simply handles requests.
+      For example:
+
+     {[
+       let server = Server.init_server ~media_types directory in
+       let callback = Server.resto_callback server in
+       Server.launch server ~callback (`TCP (`Port port))
+     ]}
+
+     Which, as [resto_callback] is the default, is equivalent to:
+
+     {[
+       let server = Server.init_server ~media_types directory in
+       Server.launch server (`TCP (`Port port))
+     ]}
+
+      Optionally, it can be transformed in order to provide additional
+      functionalities. For example:
+
+     {[
+       let server = Server.init_server ~media_types directory in
+       let callback = Server.resto_callback server in
+       let auth_callback conn req bod =
+         if check_auth req bod then
+           callback con req bod
+         else Lwt.return @@ `Response ... (* some form of response with 401 or 403 *)
+       in
+       Server.launch server ~callback:auth_callback (`TCP (`Port port)) >>= fun () ->
+       ...
+     ]} *)
+  val resto_callback : server -> callback
+
+  (** [launch server callback listening_protocol] starts the given resto
+      [server] initiating the listening loop using the [listening_protocol].
+      Each query will be treated using the given [callback] http handler.*)
   val launch :
+    ?host:string ->
+    server ->
+    ?callback:callback ->
+    Conduit_lwt_unix.server ->
+    unit Lwt.t
+
+  (** Initializes the server using the given arguments and starts it using
+      [resto_callback] http handler. This is a condensed form of [init_server],
+      [resto_callback], and [launch]. *)
+  val init_and_launch :
     ?host:string ->
     ?cors:Cors.t ->
     ?agent:string ->
     ?acl:Acl.t ->
-    ?middleware:middleware ->
     media_types:Media_type.t list ->
-    Conduit_lwt_unix.server ->
     unit Directory.t ->
-    server Lwt.t
+    Conduit_lwt_unix.server ->
+    unit Lwt.t
 
-  (* configure the access list for this server *)
+  (** configure the access list for this server *)
   val set_acl : server -> Acl.t -> unit
 
   (** Kill an RPC server. *)

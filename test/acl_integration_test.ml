@@ -161,7 +161,8 @@ module Server = Resto_cohttp_server.Server.Make (Encoding) (Logger)
 let main () =
   (* set up and start the server *)
   let open Lwt.Infix in
-  Server.launch ~media_types (`TCP (`Port port)) directory >>= fun server ->
+  let server = Server.init_server ~media_types directory in
+  Server.launch server (`TCP (`Port port)) >>= fun () ->
   (* first test *)
   Server.set_acl server
   @@ Resto_acl.Acl.Allow_all

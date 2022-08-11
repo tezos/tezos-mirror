@@ -187,8 +187,8 @@ module Server = Resto_cohttp_server.Server.Make (Encoding) (Logger)
 
 let parent pid chunk_size =
   let media_types = media_types chunk_size in
-  Server.launch ~media_types (`TCP (`Port port)) directory >>= fun server ->
-  ignore server ;
+  Server.init_and_launch ~media_types directory (`TCP (`Port port))
+  >>= fun () ->
   Lwt_unix.waitpid [] pid >>= function
   | _, WEXITED 0 -> Lwt.return ()
   | _ -> assert false
