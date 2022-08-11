@@ -41,6 +41,30 @@ let hooks = Tezos_regression.hooks
 
 *)
 
+let hex_encode (input : string) : string =
+  match Hex.of_string input with `Hex s -> s
+
+(* [read_kernel filename] reads binary encoded WebAssembly module (e.g. `foo.wasm`)
+   and returns a hex-encoded Wasm PVM boot sector, suitable for passing to
+   [originate_sc_rollup] or [with_fresh_rollup].
+
+   See also [wasm_incomplete_kernel_boot_sector].
+
+   Note that this uses [Tezos_scoru_wasm.Gather_floppies.Complete_kernel], so
+   the kernel must fit into a single Tezos operation.
+*)
+let read_kernel name : string =
+  let module G = Tezos_scoru_wasm.Gather_floppies in
+  let open Tezt.Base in
+  let kernel_file =
+    project_root // Filename.dirname __FILE__
+    // "../../src/proto_alpha/lib_protocol/test/integration/wasm_kernel"
+    // (name ^ ".wasm")
+  in
+  hex_encode
+  @@ Data_encoding.Binary.to_string_exn G.origination_message_encoding
+  @@ G.Complete_kernel (Bytes.of_string @@ read_file kernel_file)
+
 (* Number of levels needed to process a head as finalized. This value should
    be the same as `node_context.block_finality_time`, where `node_context` is
    the `Node_context.t` used by the rollup node. For Tenderbake, the
@@ -295,8 +319,8 @@ let publish_commitment ?(src = Constant.bootstrap1.public_key_hash) ~commitment
 
 *)
 
-(* Originate a new SCORU of the arithmetic kind
-   --------------------------------------------
+(* Originate a new SCORU
+   ---------------------
 
    - Rollup addresses are fully determined by operation hashes and origination nonce.
 *)
@@ -310,6 +334,11 @@ let test_origination ~kind =
       let* _sc_rollup = originate_sc_rollup ~kind ~src:bootstrap1_key client in
       unit)
 
+(* Initialize configuration
+   ------------------------
+
+   Can use CLI to initialize the rollup node config file
+*)
 let test_rollup_node_configuration ~kind =
   regression_test
     ~__FILE__
@@ -994,13 +1023,8 @@ let test_rollup_node_boots_into_initial_state ~kind =
         node
         client)
 
-(* Ensure the PVM is transitioning upon incoming messages.
-   -------------------------------------------------------
-
-   When the rollup node receives messages, we like to see evidence that the PVM
-   has advanced.
-*)
-let test_rollup_node_advances_pvm_state protocols ~kind =
+let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
+    ~internal ~kind =
   let go ~internal client sc_rollup sc_rollup_node =
     let* genesis_info =
       RPC.Client.call ~hooks client
@@ -1037,6 +1061,7 @@ let test_rollup_node_advances_pvm_state protocols ~kind =
           contract_id ;
         return (level + 1, Some contract_id)
     in
+    (* Called with monotonically increasing [i] *)
     let test_message i =
       let* prev_state_hash =
         Sc_rollup_client.state_hash ~hooks sc_rollup_client
@@ -1061,7 +1086,7 @@ let test_rollup_node_advances_pvm_state protocols ~kind =
             Client.bake_for_and_wait client
       in
       let* _ =
-        Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node (level + i)
+        Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node (level + i)
       in
 
       (* specific per kind PVM checks *)
@@ -1089,7 +1114,16 @@ let test_rollup_node_advances_pvm_state protocols ~kind =
                 int
                 ~error_msg:"Invalid value in rollup state (%L <> %R)") ;
             return ()
-        | "wasm_2_0_0" -> return ()
+        | "wasm_2_0_0" ->
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/3729
+
+                Add an appropriate check for various test kernels
+
+                computation.wasm               - Gets into eval state
+                no_parse_random.wasm           - Stuck state due to parse error
+                no_parse_bad_fingerprint.wasm  - Stuck state due to parse error
+            *)
+            return ()
         | _otherwise -> raise (Invalid_argument kind)
       in
 
@@ -1102,6 +1136,7 @@ let test_rollup_node_advances_pvm_state protocols ~kind =
       Check.(ticks >= prev_ticks)
         Check.int
         ~error_msg:"Tick counter did not advance (%L >= %R)" ;
+
       Lwt.return_unit
     in
     let* () = Lwt_list.iter_s test_message (range 1 10) in
@@ -1109,33 +1144,70 @@ let test_rollup_node_advances_pvm_state protocols ~kind =
     Lwt.return_unit
   in
 
-  regression_test
-    ~__FILE__
-    ~tags:["sc_rollup"; "run"; "node"; kind]
-    (Format.asprintf "%s - node advances PVM state with messages" kind)
-    (fun protocol ->
-      setup ~protocol @@ fun node client ->
-      with_fresh_rollup
-        ~kind
-        (fun sc_rollup_address sc_rollup_node _filename ->
-          go ~internal:false client sc_rollup_address sc_rollup_node)
-        node
-        client)
-    protocols ;
+  if not internal then
+    regression_test
+      ~__FILE__
+      ~tags:["sc_rollup"; "run"; "node"; kind]
+      test_name
+      (fun protocol ->
+        setup ~protocol @@ fun node client ->
+        with_fresh_rollup
+          ~kind
+          ?boot_sector
+          (fun sc_rollup_address sc_rollup_node _filename ->
+            go ~internal:false client sc_rollup_address sc_rollup_node)
+          node
+          client)
+      protocols
+  else
+    regression_test
+      ~__FILE__
+      ~tags:["sc_rollup"; "run"; "node"; "internal"; kind]
+      test_name
+      (fun protocol ->
+        setup ~protocol @@ fun node client ->
+        with_fresh_rollup
+          ~kind
+          ?boot_sector
+          (fun sc_rollup_address sc_rollup_node _filename ->
+            go ~internal:true client sc_rollup_address sc_rollup_node)
+          node
+          client)
+      protocols
 
-  regression_test
-    ~__FILE__
-    ~tags:["sc_rollup"; "run"; "node"; "internal"; kind]
-    (Format.asprintf "%s - node advances PVM state with internal messages" kind)
-    (fun protocol ->
-      setup ~protocol @@ fun node client ->
-      with_fresh_rollup
-        ~kind
-        (fun sc_rollup_address sc_rollup_node _filename ->
-          go ~internal:true client sc_rollup_address sc_rollup_node)
-        node
-        client)
+let test_rollup_node_run_with_kernel protocols ~kind ~kernel_name ~internal =
+  test_rollup_node_advances_pvm_state
     protocols
+    ~test_name:(Format.asprintf "%s - runs with kernel - %s" kind kernel_name)
+    ~boot_sector:(Some (read_kernel kernel_name))
+    ~internal
+    ~kind
+
+(* Ensure the PVM is transitioning upon incoming messages.
+      -------------------------------------------------------
+
+      When the rollup node receives messages, we like to see evidence that the PVM
+      has advanced.
+
+      Specifically [test_rollup_node_advances_pvm_state ?boot_sector protocols ~kind]
+
+      * Originates a SCORU of [kind]
+      * Originates a L1 contract to send internal messages from
+      * Sends internal or external messages to the rollup
+
+   After each a PVM kind-specific test is run, asserting the validity of the new state.
+*)
+let test_rollup_node_advances_pvm_state protocols ~kind ~boot_sector ~internal =
+  test_rollup_node_advances_pvm_state
+    protocols
+    ~test_name:
+      (Format.asprintf
+         "%s - node advances PVM state with %smessages"
+         kind
+         (if internal then "internal " else ""))
+    ~boot_sector
+    ~internal
+    ~kind
 
 (* Ensure that commitments are stored and published properly.
    ----------------------------------------------------------
@@ -2921,7 +2993,16 @@ let register ~kind ~protocols =
     sc_rollup_node_handles_chain_reorg
     protocols ;
   test_rollup_node_boots_into_initial_state protocols ~kind ;
-  test_rollup_node_advances_pvm_state protocols ~kind ;
+  test_rollup_node_advances_pvm_state
+    protocols
+    ~kind
+    ~boot_sector:None
+    ~internal:false ;
+  test_rollup_node_advances_pvm_state
+    protocols
+    ~kind
+    ~boot_sector:None
+    ~internal:true ;
   test_commitment_scenario
     "commitment_is_stored"
     commitment_stored
@@ -3008,6 +3089,22 @@ let register ~protocols =
   (* Specific Arith PVM tezts *)
   test_rollup_arith_origination_boot_sector protocols ;
   test_rollup_node_uses_arith_boot_sector protocols ;
+  (* Specific Wasm PVM tezts *)
+  test_rollup_node_run_with_kernel
+    protocols
+    ~kind:"wasm_2_0_0"
+    ~kernel_name:"computation"
+    ~internal:false ;
+  test_rollup_node_run_with_kernel
+    protocols
+    ~kind:"wasm_2_0_0"
+    ~kernel_name:"no_parse_random"
+    ~internal:false ;
+  test_rollup_node_run_with_kernel
+    protocols
+    ~kind:"wasm_2_0_0"
+    ~kernel_name:"no_parse_bad_fingerprint"
+    ~internal:false ;
   (* Shared tezts - will be executed for both PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols ;
