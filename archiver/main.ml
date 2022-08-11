@@ -27,6 +27,39 @@ open Lwt_result_syntax
 let group =
   {Clic.name = "generic"; Clic.title = "Protocol agnostic teztale command"}
 
+let user_arg =
+  Clic.default_arg
+    ~doc:"Name of the feeder"
+    ~short:'u'
+    ~long:"user"
+    ~placeholder:"name"
+    ~default:"archiver"
+    (Clic.parameter (fun _ p -> return p))
+
+let password_arg =
+  Clic.default_arg
+    ~doc:"Authentification to the endpoint"
+    ~short:'p'
+    ~long:"password"
+    ~placeholder:"secret"
+    ~default:""
+    (Clic.parameter (fun _ p -> return p))
+
+let starting_block_arg =
+  Clic.default_arg
+    ~doc:"Starting block"
+    ~short:'b'
+    ~long:"block"
+    ~placeholder:"int"
+    ~default:"1"
+    (Clic.parameter (fun _ p -> return (Int32.of_string p)))
+
+let endpoint_param =
+  Clic.param
+    ~name:"server_endpoint"
+    ~desc:"Teztale server to feed"
+    (Clic.parameter (fun _ p -> return (Uri.of_string p)))
+
 let select_commands ctxt Client_config.{protocol; chain; block; _} =
   let* proto_commands =
     match protocol with
@@ -79,6 +112,78 @@ let select_commands ctxt Client_config.{protocol; chain; block; _} =
          @@ Clic.stop)
          (fun (source, pass) prefix endpoint _cctxt ->
            Converter.main source pass endpoint prefix);
+       Clic.command
+         ~group
+         ~desc:"inject endorsing rights in a teztale_server"
+         (Clic.args3 user_arg password_arg starting_block_arg)
+         (Clic.prefixes ["insert"; "rights"; "in"]
+         @@ endpoint_param @@ Clic.stop)
+         (fun (source, pass, starting) endpoint cctxt ->
+           let*! ctx =
+             match X509.Authenticator.of_string "none" with
+             | Error _ -> Conduit_lwt_unix.init ()
+             | Ok f ->
+                 let tls_authenticator =
+                   f (fun () -> Some (Time.System.now ()))
+                 in
+                 Conduit_lwt_unix.init ~tls_authenticator ()
+           in
+           let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
+           Server_archiver.rights
+             ctx
+             (source, pass)
+             endpoint
+             chain
+             starting
+             cctxt);
+       Clic.command
+         ~group
+         ~desc:"inject past blocks in a teztale_server"
+         (Clic.args3 user_arg password_arg starting_block_arg)
+         (Clic.prefixes ["insert"; "blocks"; "in"]
+         @@ endpoint_param @@ Clic.stop)
+         (fun (source, pass, starting) endpoint cctxt ->
+           let*! ctx =
+             match X509.Authenticator.of_string "none" with
+             | Error _ -> Conduit_lwt_unix.init ()
+             | Ok f ->
+                 let tls_authenticator =
+                   f (fun () -> Some (Time.System.now ()))
+                 in
+                 Conduit_lwt_unix.init ~tls_authenticator ()
+           in
+           let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
+           Server_archiver.blocks
+             ctx
+             (source, pass)
+             endpoint
+             chain
+             starting
+             cctxt);
+       Clic.command
+         ~group
+         ~desc:"run the archiver and feed an aggregator"
+         (Clic.args2 user_arg password_arg)
+         (Clic.prefixes ["feed"] @@ endpoint_param @@ Clic.stop)
+         (fun auth endpoint cctxt ->
+           let*! ctx =
+             match X509.Authenticator.of_string "none" with
+             | Error _ -> Conduit_lwt_unix.init ()
+             | Ok f ->
+                 let tls_authenticator =
+                   f (fun () -> Some (Time.System.now ()))
+                 in
+                 Conduit_lwt_unix.init ~tls_authenticator ()
+           in
+           let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
+           let*! () =
+             Lwt.join
+               [
+                 Server_archiver.endorsements_loop ctx auth endpoint cctxt;
+                 Server_archiver.blocks_loop ctx auth endpoint cctxt;
+               ]
+           in
+           return_unit);
      ]
     @ proto_commands)
 

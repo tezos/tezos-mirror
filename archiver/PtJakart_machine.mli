@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Services : Protocol_machinery.PROTOCOL_SERVICES
+
 include Protocol_machinery.JSON_COMMANDS
 
 include Protocol_machinery.DB_COMMANDS
