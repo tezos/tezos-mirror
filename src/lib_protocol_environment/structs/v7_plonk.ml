@@ -25,6 +25,11 @@
 
 include Plonk.Main_protocol
 
+type public_parameters = verifier_public_parameters * transcript
+
+let public_parameters_encoding =
+  Data_encoding.tup2 verifier_public_parameters_encoding transcript_encoding
+
 module Array = struct
   let concat = Stdlib.Array.concat
 

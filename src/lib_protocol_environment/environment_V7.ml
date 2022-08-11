@@ -100,10 +100,10 @@ module type T = sig
        and type Bls_signature.signature = Bls12_381.Signature.MinPk.signature
        and type ('a, 'b) Either.t = ('a, 'b) Stdlib.Either.t
        and type Bls12_381.Fr.t = Bls12_381.Fr.t
-       and type Plonk.transcript = Plonk.Main_protocol.transcript
        and type Plonk.proof = Plonk.Main_protocol.proof
-       and type Plonk.verifier_public_parameters =
+       and type Plonk.public_parameters =
         Plonk.Main_protocol.verifier_public_parameters
+        * Plonk.Main_protocol.transcript
 
   type error += Ecoproto_error of Error_monad.error
 
