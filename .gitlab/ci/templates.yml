@@ -2,7 +2,7 @@ variables:
   # /!\ CI_REGISTRY is overriden to use a private Docker registry mirror in AWS ECR
   # in GitLab namespaces `nomadic-labs` and `tezos`
   ## This value MUST be the same as `opam_repository_tag` in `scripts/version.sh`
-  build_deps_image_version: d19f422fc819da8d82d2214e1105ca3867f0e1eb
+  build_deps_image_version: b89e606dfe9bafa902dee842e60e3c1634ee139b
   build_deps_image_name: "${CI_REGISTRY}/tezos/opam-repository"
   GIT_STRATEGY: fetch
   GIT_DEPTH: "1"
@@ -80,7 +80,7 @@ variables:
     - if: '$CI_COMMIT_REF_NAME == "test-latest-release" && $CI_PROJECT_NAMESPACE == "nomadic-labs"'
       when: always
     - when: manual # default
-    
+
 # Rule to add to all jobs which need to be run only if (manual) trigger job is completed
 .needs_template__wait_for_trigger_job:
   needs: [trigger]

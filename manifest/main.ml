@@ -802,6 +802,7 @@ let octez_crypto_dal =
         data_encoding |> open_;
         octez_crypto;
         bls12_381_polynomial;
+        lwt_unix;
       ]
 
 let _octez_crypto_dal_tests =
