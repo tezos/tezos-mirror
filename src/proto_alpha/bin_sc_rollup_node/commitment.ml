@@ -268,7 +268,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     in
     return_unit
 
-  let predecessor_is_published cctxt rollup_address commitment_hash =
+  let commitment_is_published cctxt rollup_address commitment_hash =
     let open Lwt_result_syntax in
     let*! commitment_res =
       Plugin.RPC.Sc_rollup.commitment
@@ -293,7 +293,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
         Store.Commitments.get store next_level_to_publish
       in
       let* predecessor_published =
-        predecessor_is_published cctxt rollup_address commitment.predecessor
+        commitment_is_published cctxt rollup_address commitment.predecessor
       in
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3528
          The injector should make this test redundant. Therefore, we should
