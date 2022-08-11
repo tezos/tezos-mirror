@@ -417,9 +417,10 @@ let should_boot_computation_kernel () =
   let*! s = Prover.install_boot_sector s boot_sector in
   (* installing the boot kernel *)
   let* s = checked_eval ~loc:__LOC__ context s in
-  (* make the first tick of the WASM PVM, to switch it to “waiting for
-     input” mode *)
-  let* s = checked_eval ~loc:__LOC__ context s in
+  (* Make the first ticks of the WASM PVM (parsing of origination
+     message, parsing and init of the kernel), to switch it to
+     “waiting for input” mode. *)
+  let* s = eval_until_set_input context s in
   (* Feeding it with one input *)
   let* s =
     checked_set_input ~loc:__LOC__ context (arbitrary_input 0 "test") s

@@ -23,9 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* The name by which the module is registered. This can be anything as long
+   as we use the same name to lookup from the registry. *)
+let wasm_main_module_name = "main"
+
+(* This is the name of the main function of the module. We require the
+   kernel to expose a function named [kernel_next]. *)
+let wasm_entrypoint = "kernel_next"
+
 module Wasm = Tezos_webassembly_interpreter
 
-type tick_state = Decode | Eval of Wasm.Eval.config
+type tick_state =
+  | Decode of Tezos_webassembly_interpreter.Decode.decode_kont
+  | Eval of Wasm.Eval.config
 
 type pvm_state = {
   kernel : Lazy_containers.Chunked_byte_vector.Lwt.t;
@@ -41,7 +51,16 @@ module Make (T : Tree_encoding.TREE) :
     type tree = T.tree
 
     module Tree_encoding = Tree_encoding.Make (T)
+
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3568
+       The [Wasm_encoding] functor is already used in
+       [Binary_parser_encodings].
+       Ideally, we would make [Binary_parser_encodings.Make] reexpose
+       the [Wasm_encoding] module it computes. However, since we have
+       a short-term solution to remove the functor layer of
+       [Tree_encoding], we leave the code as-is. *)
     module Wasm_encoding = Wasm_encoding.Make (Tree_encoding)
+    module Parsing = Binary_parser_encodings.Make (Tree_encoding)
 
     let host_funcs =
       let registry = Wasm.Host_funcs.empty () in
@@ -51,14 +70,17 @@ module Make (T : Tree_encoding.TREE) :
     let tick_state_encoding =
       let open Tree_encoding in
       tagged_union
-        ~default:Decode
+        ~default:
+          (Decode
+             (Tezos_webassembly_interpreter.Decode.initial_decode_kont
+                ~name:wasm_main_module_name))
         (value [] Data_encoding.string)
         [
           case
             "decode"
-            (value [] Data_encoding.unit)
-            (function Decode -> Some () | _ -> None)
-            (fun () -> Decode);
+            Parsing.Decode.encoding
+            (function Decode m -> Some m | _ -> None)
+            (fun m -> Decode m);
           case
             "eval"
             (Wasm_encoding.config_encoding ~host_funcs)
@@ -84,21 +106,10 @@ module Make (T : Tree_encoding.TREE) :
     let status_encoding =
       Tree_encoding.value ["input"; "consuming"] Data_encoding.bool
 
-    (* The name by which the module is registered. This can be anything as long
-       as we use the same name to lookup from the registry. *)
-    let wasm_main_module_name = "main"
-
-    (* This is the name of the main function of the module. We require the
-       kernel to expose a function named [kernel_next]. *)
-    let wasm_entrypoint = "kernel_next"
-
     let next_state state =
       let open Lwt_syntax in
       match state.tick with
-      | Decode ->
-          let* ast_module =
-            Wasm.Decode.decode ~name:wasm_main_module_name ~bytes:state.kernel
-          in
+      | Decode {module_kont = MKStop ast_module; _} ->
           let self = Wasm.Instance.Module_key wasm_main_module_name in
           (* The module instance is registered in [self] that contains the
              module registry, why we can ignore the result here. *)
@@ -112,6 +123,11 @@ module Make (T : Tree_encoding.TREE) :
           in
           let eval_config = Wasm.Eval.config host_funcs self [] [] in
           Lwt.return {state with tick = Eval eval_config}
+      | Decode m ->
+          let+ m =
+            Tezos_webassembly_interpreter.Decode.module_step state.kernel m
+          in
+          {state with tick = Decode m}
       | Eval ({Wasm.Eval.frame; code; _} as eval_config) -> (
           match code with
           | _values, [] ->
