@@ -233,38 +233,40 @@ let replay_one_block strict main_chain_store validator_process block =
     in
     let now = Time.System.now () in
     let*! () = Event.(emit block_validation_end) (Ptime.diff now start_time) in
-    let*! () =
-      if
-        not
-          (Context_hash.equal
-             expected_context_hash
-             result.validation_store.context_hash)
-      then
-        Event.(strict_emit ~strict inconsistent_context_hash)
-          (expected_context_hash, result.validation_store.context_hash)
-      else Lwt.return_unit
+    let* () =
+      when_
+        (not
+           (Context_hash.equal
+              expected_context_hash
+              result.validation_store.context_hash))
+        (fun () ->
+          let*! () =
+            Event.(strict_emit ~strict inconsistent_context_hash)
+              (expected_context_hash, result.validation_store.context_hash)
+          in
+          return_unit)
     in
     let block_metadata_bytes = fst result.block_metadata in
     let* () =
       (* Check that the block metadata bytes are equal.
          If not, decode and print them as Json to ease debugging. *)
-      if not (Bytes.equal expected_block_receipt_bytes block_metadata_bytes)
-      then
-        let* protocol = Store.Block.protocol_hash main_chain_store block in
-        let* (module Proto) = Registered_protocol.get_result protocol in
-        let to_json block =
-          Data_encoding.Json.construct Proto.block_header_metadata_encoding
-          @@ Data_encoding.Binary.of_bytes_exn
-               Proto.block_header_metadata_encoding
-               block
-        in
-        let exp = to_json expected_block_receipt_bytes in
-        let got = to_json block_metadata_bytes in
-        let*! () =
-          Event.(strict_emit ~strict inconsistent_block_receipt) (exp, got)
-        in
-        return_unit
-      else return_unit
+      when_
+        (not (Bytes.equal expected_block_receipt_bytes block_metadata_bytes))
+        (fun () ->
+          let* protocol = Store.Block.protocol_hash main_chain_store block in
+          let* (module Proto) = Registered_protocol.get_result protocol in
+          let to_json block =
+            Data_encoding.Json.construct Proto.block_header_metadata_encoding
+            @@ Data_encoding.Binary.of_bytes_exn
+                 Proto.block_header_metadata_encoding
+                 block
+          in
+          let exp = to_json expected_block_receipt_bytes in
+          let got = to_json block_metadata_bytes in
+          let*! () =
+            Event.(strict_emit ~strict inconsistent_block_receipt) (exp, got)
+          in
+          return_unit)
     in
     (* Check that the operations metadata are equal.
        If not, decode and print them as Json to ease debugging. *)
@@ -301,41 +303,41 @@ let replay_one_block strict main_chain_store validator_process block =
               | _ -> false
             in
             (* Check that the operations metadata bytes are equal.
-               If not, decode and print them as Json to ease
-               debugging. *)
-            if not (equal exp got) then
-              let* protocol =
-                Store.Block.protocol_hash main_chain_store block
-              in
-              let* (module Proto) = Registered_protocol.get_result protocol in
-              let op =
-                operations
-                |> (fun l -> List.nth_opt l i)
-                |> WithExceptions.Option.get ~loc:__LOC__
-                |> (fun l -> List.nth_opt l j)
-                |> WithExceptions.Option.get ~loc:__LOC__
-                |> fun {proto; _} -> proto
-              in
-              let to_json receipt =
-                let receipt =
-                  match receipt with
-                  | Block_validation.Metadata receipt -> receipt
-                  | Too_large_metadata -> Bytes.empty
+               If not, decode and print them as Json to ease debugging. *)
+            when_
+              (not (equal exp got))
+              (fun () ->
+                let* protocol =
+                  Store.Block.protocol_hash main_chain_store block
                 in
-                Data_encoding.Json.construct
-                  Proto.operation_data_and_receipt_encoding
-                  Data_encoding.Binary.
-                    ( of_bytes_exn Proto.operation_data_encoding op,
-                      of_bytes_exn Proto.operation_receipt_encoding receipt )
-              in
-              let exp = to_json exp in
-              let got = to_json got in
-              let*! () =
-                Event.(strict_emit ~strict inconsistent_operation_receipt)
-                  ((i, j), exp, got)
-              in
-              return_unit
-            else return_unit
+                let* (module Proto) = Registered_protocol.get_result protocol in
+                let op =
+                  operations
+                  |> (fun l -> List.nth_opt l i)
+                  |> WithExceptions.Option.get ~loc:__LOC__
+                  |> (fun l -> List.nth_opt l j)
+                  |> WithExceptions.Option.get ~loc:__LOC__
+                  |> fun {proto; _} -> proto
+                in
+                let to_json receipt =
+                  let receipt =
+                    match receipt with
+                    | Block_validation.Metadata receipt -> receipt
+                    | Too_large_metadata -> Bytes.empty
+                  in
+                  Data_encoding.Json.construct
+                    Proto.operation_data_and_receipt_encoding
+                    Data_encoding.Binary.
+                      ( of_bytes_exn Proto.operation_data_encoding op,
+                        of_bytes_exn Proto.operation_receipt_encoding receipt )
+                in
+                let exp = to_json exp in
+                let got = to_json got in
+                let*! () =
+                  Event.(strict_emit ~strict inconsistent_operation_receipt)
+                    ((i, j), exp, got)
+                in
+                return_unit)
           in
           check_receipts i (succ j) (exps :: expss) (gots :: gotss)
     in
