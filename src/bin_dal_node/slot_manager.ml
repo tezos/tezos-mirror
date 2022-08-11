@@ -195,7 +195,7 @@ let get_slot initial_constants dal_constants store slot_header =
   in
   return slot
 
-(* FIXME https://gitlab.com/tezos/tezos/-/issues/3405
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3405
 
    This can work only if a slot never ends with a `\000`. But I am not
    sure in general such thing is required. *)

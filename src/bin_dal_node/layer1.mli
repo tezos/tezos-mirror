@@ -23,20 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3517
-    If the layer1 node reboots, the rpc stream breaks.
+(** [on_new_head cctxt handler] opens a [Monitor_services.heads] stream on the
+    targeted layer 1 node and calls [handler] each time a new head is received.
+
+    It returns a couple [(p, stopper)] where [p] is a promise resolving when the
+    stream closes and [stopper] a function closing the stream.
 *)
-let on_new_head cctxt handle =
-  let open Lwt_result_syntax in
-  let* stream, stopper =
-    Tezos_shell_services.Monitor_services.heads cctxt `Main
-  in
-  let rec go () =
-    Lwt.bind (Lwt_stream.get stream) @@ fun tok ->
-    match tok with
-    | None -> return_unit
-    | Some element ->
-        let* () = handle element in
-        go ()
-  in
-  return (go (), stopper)
+val on_new_head :
+  #RPC_context.streamed ->
+  (Block_hash.t * Block_header.t -> unit tzresult Lwt.t) ->
+  (unit tzresult Lwt.t * (unit -> unit)) tzresult Lwt.t

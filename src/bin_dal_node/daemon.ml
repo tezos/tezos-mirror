@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let daemonize cctxt handle = Lwt.no_cancel @@ Layer1.iter_events cctxt handle
-
 let resolve_plugin cctxt =
   let open Lwt_result_syntax in
   let* protocols =
@@ -60,19 +58,32 @@ let init_cryptobox unsafe_srs cctxt (module Plugin : Dal_constants_plugin.T) =
   let* initialisation_parameters =
     if unsafe_srs then
       return
-      @@ Internal_for_tests.initialisation_parameters_from_slot_size
+      @@ Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
            ~slot_size:parameters.slot_size
     else
       let*? g1_path, g2_path = Tezos_base.Dal_srs.find_trusted_setup_files () in
-      initialisation_parameters_from_files ~g1_path ~g2_path
+      Cryptobox.initialisation_parameters_from_files ~g1_path ~g2_path
   in
-  let*? () = load_parameters initialisation_parameters in
+  let*? () = Cryptobox.load_parameters initialisation_parameters in
   let* dal_constants =
-    match make parameters with
+    match Cryptobox.make parameters with
     | Ok cryptobox -> return cryptobox
     | Error (`Fail msg) -> fail [Cryptobox_initialisation_failed msg]
   in
   return @@ (dal_constants, parameters)
+
+let daemonize cctxt handle =
+  let open Lwt_result_syntax in
+  let* t, stopper = Layer1.on_new_head cctxt handle in
+  let (_ : Lwt_exit.clean_up_callback_id) =
+    Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _exit_status ->
+        stopper () ;
+        Lwt.return_unit)
+  in
+  (* The no_cancel might not be necessary. Lwt_exit cancels the
+     main promise upon receiving a signal or other form of interruption. The
+     no_cancel renders this cancelation into a no-op.*)
+  Lwt.no_cancel t
 
 let run ~data_dir cctxt =
   let open Lwt_result_syntax in
@@ -82,29 +93,30 @@ let run ~data_dir cctxt =
   let*! store = Store.init config in
   let ready = ref false in
   let*! () = Event.(emit layer1_node_tracking_started ()) in
-  daemonize cctxt @@ fun (_hash, (_block_header : Tezos_base.Block_header.t)) ->
-  if not !ready then
-    let* plugin = resolve_plugin cctxt in
-    match plugin with
-    | Some plugin ->
-        let (module Plugin : Dal_constants_plugin.T) = plugin in
-        let*! () =
-          Event.(
-            emit
-              protocol_plugin_resolved
-              (Format.asprintf "%a" Protocol_hash.pp_short Plugin.Proto.hash))
-        in
-        let* dal_constants, dal_parameters =
-          init_cryptobox config.unsafe_srs cctxt plugin
-        in
-        let ctxt = Node_context.make config dal_constants dal_parameters in
-        let* rpc_server = RPC_server.(start config (register ctxt store)) in
-        let _ = RPC_server.install_finalizer rpc_server in
-        let*! () =
-          Event.(emit rpc_server_is_ready (config.rpc_addr, config.rpc_port))
-        in
-        let*! () = Event.(emit node_is_ready ()) in
-        ready := true ;
-        return_unit
-    | None -> return_unit
-  else return_unit
+  daemonize cctxt (fun (_hash, (_block_header : Tezos_base.Block_header.t)) ->
+      (* Try to resolve the protocol plugin corresponding to the protocol of the
+         targeted node *)
+      if not !ready then
+        let* plugin = resolve_plugin cctxt in
+        match plugin with
+        | Some plugin ->
+            let (module Plugin : Dal_constants_plugin.T) = plugin in
+            let*! () = Event.emit_protocol_plugin_resolved Plugin.Proto.hash in
+            let* dal_constants, dal_parameters =
+              init_cryptobox config.unsafe_srs cctxt plugin
+            in
+            let ctxt = Node_context.make config dal_constants dal_parameters in
+            let* rpc_server = RPC_server.(start config (register ctxt store)) in
+            let _ = RPC_server.install_finalizer rpc_server in
+            let*! () =
+              Event.(
+                emit rpc_server_is_ready (config.rpc_addr, config.rpc_port))
+            in
+            let*! () = Event.(emit node_is_ready ()) in
+            ready := true ;
+            return_unit
+        | None -> return_unit
+      else
+        (* If rpc and plugin are ready, there is nothing else to do.
+           Future work will update this part of the code *)
+        return_unit)
