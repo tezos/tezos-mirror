@@ -99,7 +99,7 @@ endif
 		$(foreach b, $(OCTEZ_BIN), _build/install/default/bin/${b}) \
 		@copy-parameters
 	@cp -f $(foreach b, $(OCTEZ_BIN), _build/install/default/bin/${b}) ./
-	@$(foreach b, $(RAW_BIN), if [ ! -f ./tezos-${b} ]; then ln -s octez-${b} tezos-${b}; fi;)
+	@$(foreach b, $(RAW_BIN), if [ -f ./tezos-${b} ]; then rm -f ./tezos-${b}; ln -s octez-${b} tezos-${b}; fi;)
 
 # List protocols, i.e. directories proto_* in src with a TEZOS_PROTOCOL file.
 TEZOS_PROTOCOL_FILES=$(wildcard src/proto_*/lib_protocol/TEZOS_PROTOCOL)
