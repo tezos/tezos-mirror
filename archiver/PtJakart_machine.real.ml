@@ -165,15 +165,18 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         assert (round = r) ;
         return (delegate, timestamp)
 
-  let block_round (header : Block_header.t) =
+  let raw_block_round shell_header =
     let wrap = Environment.wrap_tzresult in
     let open Result_syntax in
     let* round =
       wrap
       @@ Protocol.Alpha_context.Fitness.round_from_raw
-           header.Block_header.shell.fitness
+           shell_header.Block_header.fitness
     in
     wrap @@ Protocol.Alpha_context.Round.to_int round
+
+  let block_round (header : Block_header.t) =
+    raw_block_round header.Block_header.shell
 
   let get_endorsement_round protocol_data =
     match protocol_data with
@@ -242,6 +245,20 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
       []
       ops
     |> return
+
+  let get_block_info cctxt level =
+    let* info =
+      Block_services.info ~chain:cctxt#chain ~block:(`Level level) cctxt ()
+    in
+    let metadata =
+      Option.value_f ~default:(fun () -> assert false) info.metadata
+    in
+    let*? round = raw_block_round info.header.shell in
+    return
+      ( metadata.protocol_data.baker,
+        info.header.shell.timestamp,
+        round,
+        info.hash )
 end
 
 module Json_loops =

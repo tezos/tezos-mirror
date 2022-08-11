@@ -70,6 +70,12 @@ module type PROTOCOL_SERVICES = sig
 
   val consensus_ops_info_of_block :
     wrap_full -> Block_hash.t -> Consensus_ops.block_op list tzresult Lwt.t
+
+  val get_block_info :
+    wrap_full ->
+    Int32.t ->
+    (Signature.public_key_hash * Time.Protocol.t * int * Block_hash.t) tzresult
+    Lwt.t
 end
 
 module type MAIN_LOOPS = sig
