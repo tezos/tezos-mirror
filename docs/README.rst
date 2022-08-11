@@ -82,9 +82,6 @@ Sphinx extensions
 
 Some ad-hoc reference kinds are supported.
 
-- ``:package-src:`name``` or ``:package-src:`text<name>``` points
-  to the gitlab source tree viewer where the `.opam` for the package
-  is located
 - ``:package:`name``` or ``:package:`text<name>``` points
   to the ``odoc`` page of the package, checking that the page exists
 - ``:package-name:`name``` or ``:package-name:`text<name>``` just
