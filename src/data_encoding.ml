@@ -198,6 +198,8 @@ module Encoding = struct
     | Bytes bytes -> fun_bytes bytes
     | Both (bytes, value) -> fun_combine (fun_value value) (fun_bytes bytes)
 
+  module With_field_name_duplicate_checks = SaferEncoding
+  module With_JSON_discriminant = SaferEncoding
   module Compact = Compact
 
   type 'a compact = 'a Compact.t

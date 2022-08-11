@@ -48,4 +48,5 @@ let () =
       ("check-size", Check_size_negative.tests);
       ("uint-like-n", Uint_like_n.tests);
       ("int-like-z", Int_like_z.tests);
+      ("safer-encoding", Test_safer_encoding.tests);
     ]

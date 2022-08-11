@@ -561,3 +561,14 @@ val is_zeroable : 'a encoding -> bool
 val z_length : Z.t -> int
 
 val n_length : Z.t -> int
+
+module Mu_visited : sig
+  type t
+
+  val empty : t
+
+  val mem : _ desc -> t -> bool
+
+  (* Raise an exception if called with a node different than [Mu]. *)
+  val add : _ desc -> t -> t
+end

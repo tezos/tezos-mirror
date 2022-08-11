@@ -1191,6 +1191,25 @@ better to use [merge_objs (obj7 …) (obj7 …)] than
 [merge_objs (obj10 …) (obj4 …)]. This is mostly important in places where
 performance matters, but even then, it is not vitally important.
 
+Note that by default, there are no checks for duplicate field names in objects.
+E.g., [obj2 (req "foo" int) (req "foo" int)] is accepted by the library and will
+produce JSON object [{ "foo":…, "foo":… }]. This is a valid form of JSON
+although it is not recommended.
+
+If you want to avoid duplicate names, you can open the
+[With_field_name_duplicate_checks] module. Opening this module shadows the
+[obj*] and [merge_objs] combinators mentioned above. The shadowing versions
+raise exceptions when they would produce an encoding with duplicate field names.
+
+{[
+let e =
+  let open Data_encoding in
+  let open With_field_name_duplicate_checks in
+  obj2 (req "foo" int) (req "foo" int) (* raises [Invalid_argument] *)
+]}
+
+In addition to records, data-encoding supports encodings for tuples.
+
 [tup1: 'a encoding -> 'a encoding] is a combinator for representing data as a
 one-tuple. The JSON representation of [tup1 e] is as an array literal containing
 exactly one element representing [e]. The Binary representation of [tup1 e] is
@@ -1309,11 +1328,19 @@ represented as [{ "failure": _ }].
 {b It is your responsibility to ensure serialisation and deserialisation
 correctly mirror each other.}
 
-You can use the [Json_only] tag to indicate that a case is only to be tried in
-the JSON backend. This can be useful to create different representations of the
-same type for the different backends, to delegate JSON
-serialisation/deserialisation to a separate routine, or to interfere in some other
-ways with the deserialisation process.
+{b As an alternative,} you can open the [With_JSON_discriminant] module. Opening
+this module shadows the [case] and [union] combinators (as well as [matched] and
+[matching], see below) to include JSON discriminant fields in the objects of the
+union.
+
+When using this shadowing module, you pass a [string] tag in addition to the
+[int] tag. The [string] tag is inserted in a field named ["kind"] inside the
+object encoding of the case. For this purpose, the [union] (and [matching])
+combinator will raise the [Invalid_argument] exception if:
+{ul {- the cases have non-object encodings, or
+}{- the case encodings already have a ["kind"] field, or
+}{- several of the cases have equal string tags.
+}}
 
 [matching] is a combinator similar to [union] but it takes an additional
 matching-function parameter. This matching-function avoids the linear
@@ -1532,8 +1559,39 @@ JSON. Indeed, remember that in JSON, the serialisation process picks the first
 case where the projection function matches the value, and the deserialisation
 process picks the first case where the encoding matches the JSON. Thus, you need
 to ensure that the JSON serialised by a given case is matched by that same case.
-There are two common approach to ensure this.
 
+The best way to ensure this error is to open the [With_JSON_discriminant]
+module. When you do so, the union/case and matching/matched functions will take
+additional parameters and perform some checks for you. The parameters are
+transformed into discriminants in JSON.
+
+Note that in the [With_JSON_discriminant], the combinators make assumption about
+the encodings of the cases that you must abide to — or get an exception in
+return. Specifically you must:
+{ul {- provide object encodings for all the cases,
+}{- not name any of the fields of the case encodings ["kind"] (the name is
+reserved for the discriminant), and
+}{- not use the same discriminant twice.
+}}
+
+E.g.,
+
+{[
+let unambiguous_option v =
+  let open With_JSON_discriminant in
+  union [
+    case ~title:"Some"
+      (Tag (0, "some"))
+      (obj1 (req "v" v))
+      (function Some v -> Some v | _ -> None) (fun v -> Some v);
+    case ~title:"None"
+      (Tag (1, "none"))
+      empty (* empty is an object with zero fields *)
+      (function None -> Some () | _ -> None) (fun () -> None);
+  ]
+]}
+
+As an alternative, you can enforce the discriminant discipline manually.
 One way is for you to include a "kind" field carrying the name of the variant in
 the cases' payload encoding. E.g.,
 
@@ -1573,6 +1631,9 @@ let unambiguous_option v =
 Both approaches are valid. There are minor trade-offs in term of boilerplate code
 depending on the payloads of the cases. You can choose based on personal
 preference or to ease integration with a more opinionated system.
+
+Still, the simplest is to trust the library and open the
+[With_JSON_discriminant] module.
 
 {b Making sure de/serialisation are {e not}(!) inverse of each other}
 

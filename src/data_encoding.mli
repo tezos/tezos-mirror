@@ -518,6 +518,104 @@ module Encoding : sig
       tuples contains a variable field.. *)
   val merge_objs : 'o1 encoding -> 'o2 encoding -> ('o1 * 'o2) encoding
 
+  (** [With_field_name_duplicate_checks] is a subset of [Encoding] where all the
+      constructed objects are checked for duplicates.
+
+      Note that the analysis can include false positives: it might fail on
+      encodings which will never serialise a value with duplicate fields.
+      Still, these false positives are uncommon and we recommend you use these
+      combinators when relevant.
+
+      {[
+      let e =
+        let open Data_encoding in
+        let open Data_encoding.With_field_name_duplicate_checks in
+        …
+      ]}
+      *)
+  module With_field_name_duplicate_checks : sig
+    val obj1 : 'f1 field -> 'f1 encoding
+
+    val obj2 : 'f1 field -> 'f2 field -> ('f1 * 'f2) encoding
+
+    val obj3 : 'f1 field -> 'f2 field -> 'f3 field -> ('f1 * 'f2 * 'f3) encoding
+
+    val obj4 :
+      'f1 field ->
+      'f2 field ->
+      'f3 field ->
+      'f4 field ->
+      ('f1 * 'f2 * 'f3 * 'f4) encoding
+
+    val obj5 :
+      'f1 field ->
+      'f2 field ->
+      'f3 field ->
+      'f4 field ->
+      'f5 field ->
+      ('f1 * 'f2 * 'f3 * 'f4 * 'f5) encoding
+
+    val obj6 :
+      'f1 field ->
+      'f2 field ->
+      'f3 field ->
+      'f4 field ->
+      'f5 field ->
+      'f6 field ->
+      ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6) encoding
+
+    val obj7 :
+      'f1 field ->
+      'f2 field ->
+      'f3 field ->
+      'f4 field ->
+      'f5 field ->
+      'f6 field ->
+      'f7 field ->
+      ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7) encoding
+
+    val obj8 :
+      'f1 field ->
+      'f2 field ->
+      'f3 field ->
+      'f4 field ->
+      'f5 field ->
+      'f6 field ->
+      'f7 field ->
+      'f8 field ->
+      ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8) encoding
+
+    val obj9 :
+      'f1 field ->
+      'f2 field ->
+      'f3 field ->
+      'f4 field ->
+      'f5 field ->
+      'f6 field ->
+      'f7 field ->
+      'f8 field ->
+      'f9 field ->
+      ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8 * 'f9) encoding
+
+    val obj10 :
+      'f1 field ->
+      'f2 field ->
+      'f3 field ->
+      'f4 field ->
+      'f5 field ->
+      'f6 field ->
+      'f7 field ->
+      'f8 field ->
+      'f9 field ->
+      'f10 field ->
+      ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8 * 'f9 * 'f10) encoding
+
+    (** Create a larger object from the encodings of two smaller ones.
+      @raise Invalid_argument if both arguments are not objects  or if both
+      tuples contains a variable field.. *)
+    val merge_objs : 'o1 encoding -> 'o2 encoding -> ('o1 * 'o2) encoding
+  end
+
   (** {4 Constructors for tuples with N fields} *)
 
   (** These are serialized to binary by converting each internal
@@ -762,6 +860,85 @@ let encoding_t =
      @raise [Invalid_argument] if there are more cases in the [case list] than
      can fit in the [tag_size] *)
   val union : ?tag_size:[`Uint8 | `Uint16] -> 't case list -> 't encoding
+
+  (** [With_JSON_discriminant] is a subset of [Encoding] where the
+      union/matching combinators (and associated functions) add discriminant for
+      the JSON backend.
+
+      The following restrictions apply:
+      - The case encodings must be objects.
+      - The case encoding objects must not include a "kind" field.
+      - The case encoding objects must not have duplicate field names.
+      - The JSON discriminants must all be distinct.
+
+      {[
+      let e =
+        let open Data_encoding in
+        let open Data_encoding.With_JSON_discriminant in
+        …
+      ]} *)
+  module With_JSON_discriminant : sig
+    (** [case_tag]'s only variant [Tag] includes both a numeric tag for the binary
+      encoding and a string tag for the JSON encoding. *)
+    type case_tag = Tag of (int * string)
+
+    type 't case
+
+    (** [case] is similar to [Encoding.case] but it takes a
+      [SaferEncoding.case_tag] parameter. This includes both a numeric tag and a
+      string tag.
+
+      In Binary:
+      This has no impact. The [case_tag] argument of [Encoding] already has a
+      numeric tag.
+
+      In JSON:
+      The [SaferEncoding] adds a field for discriminating the different cases,
+      making these encodings less likely to include accidental bugs. More
+      specifically, when you use [case (Tag (_, s)) e _ _] then the underlying
+      union uses an encoding based on [e] and [s]. Specifically, if [e] is an
+      object encoding, then it adds the field [(req "kind" (constant s))] to
+      [e].
+
+      @raise Invalid_argument if [e] is not an object.
+
+      @raise Invalid_argument if [e] is an object with a ["kind"] field (this
+      field name is reserved for the discriminating field added by [case]). *)
+    val case :
+      title:string ->
+      ?description:string ->
+      case_tag ->
+      'a encoding ->
+      ('t -> 'a option) ->
+      ('a -> 't) ->
+      't case
+
+    (** [union] and [matching] now check that there are no duplicate ["kind"]
+      discriminating values. If there is, they raises [Invalid_argument]. *)
+
+    (** Similarly to [case_tag], [matched] also takes an additional [string]
+      parameter. This parameter is used in the same way as [case] (to add a ["kind"] field
+      to the JSON encoding) and it fails in the same way as [case].
+
+      @raise Invalid_argument if the encoding is not an object.
+
+      @raise Invalid_argument if the encoding is an object with a ["kind"]
+      field. *)
+    val matched :
+      ?tag_size:[`Uint8 | `Uint16] ->
+      int * string ->
+      'a encoding ->
+      'a ->
+      match_result
+
+    val matching :
+      ?tag_size:[`Uint8 | `Uint16] ->
+      't matching_function ->
+      't case list ->
+      't encoding
+
+    val union : ?tag_size:[`Uint8 | `Uint16] -> 't case list -> 't encoding
+  end
 
   (** {3 Predicates over descriptors} *)
 
