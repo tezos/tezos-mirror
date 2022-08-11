@@ -181,6 +181,24 @@ let () =
     (function Cannot_replay_below_savepoint -> Some () | _ -> None)
     (fun () -> Cannot_replay_below_savepoint)
 
+(* Iterator over receipts, that are, list of lists of bytes. The index
+   given to [f] corresponds to the dimension [x][y] of the list being
+   inspected. *)
+let receipts_iteri_2 ~when_different_lengths l r f =
+  let open Lwt_result_syntax in
+  let rec aux l r ri fi =
+    match (l, r) with
+    | [], [] -> return_unit
+    | [], _ :: _ | _ :: _, [] -> when_different_lengths l r
+    | [] :: exps, [] :: gots -> aux exps gots (succ ri) 0
+    | (_ :: _) :: _, [] :: _ | [] :: _, (_ :: _) :: _ ->
+        when_different_lengths l r
+    | (exp :: exps) :: expss, (got :: gots) :: gotss ->
+        let* () = f exp got ri fi in
+        aux (exps :: expss) (gots :: gotss) ri (succ fi)
+  in
+  aux l r 0 0
+
 let replay_one_block strict main_chain_store validator_process block =
   let open Lwt_result_syntax in
   let* block_alias =
@@ -270,84 +288,64 @@ let replay_one_block strict main_chain_store validator_process block =
     in
     (* Check that the operations metadata are equal.
        If not, decode and print them as Json to ease debugging. *)
-    let rec check_receipts i j
-        (exp : Block_validation.operation_metadata list list)
-        (got : Block_validation.operation_metadata list list) =
-      (* As a coarse grain check, we first ensure that the lists have
-         the same layout. *)
-      match (exp, got) with
-      | [], [] -> return_unit
-      | [], _ :: _ | _ :: _, [] ->
-          let*! () =
-            Event.(strict_emit ~strict unexpected_receipts_layout)
-              ( Store.Block.hash block,
-                List.(map length exp),
-                List.(map length got) )
+    let check_receipt exp got i j =
+      let equal a b =
+        match (a, b) with
+        | Block_validation.(Metadata a, Metadata b) -> Bytes.equal a b
+        | Too_large_metadata, Too_large_metadata -> true
+        | Metadata _, Too_large_metadata | Too_large_metadata, Metadata _ ->
+            false
+      in
+      (* Check that the operations metadata bytes are equal.
+         If not, decode and print them as Json to ease debugging. *)
+      when_
+        (not (equal exp got))
+        (fun () ->
+          let* protocol = Store.Block.protocol_hash main_chain_store block in
+          let* (module Proto) = Registered_protocol.get_result protocol in
+          let op =
+            operations
+            |> (fun l -> List.nth_opt l i)
+            |> WithExceptions.Option.get ~loc:__LOC__
+            |> (fun l -> List.nth_opt l j)
+            |> WithExceptions.Option.get ~loc:__LOC__
+            |> fun {proto; _} -> proto
           in
-          return_unit
-      | [] :: exps, [] :: gots -> check_receipts (succ i) 0 exps gots
-      | (_ :: _) :: _, [] :: _ | [] :: _, (_ :: _) :: _ ->
-          let*! () =
-            Event.(strict_emit ~strict unexpected_receipts_layout)
-              ( Store.Block.hash block,
-                List.(map length exp),
-                List.(map length got) )
-          in
-          return_unit
-      | (exp :: exps) :: expss, (got :: gots) :: gotss ->
-          let* () =
-            let equal a b =
-              match (a, b) with
-              | Block_validation.(Metadata a, Metadata b) -> Bytes.equal a b
-              | Too_large_metadata, Too_large_metadata -> true
-              | _ -> false
+          let to_json receipt =
+            let receipt =
+              match receipt with
+              | Block_validation.Metadata receipt -> receipt
+              | Too_large_metadata -> Bytes.empty
             in
-            (* Check that the operations metadata bytes are equal.
-               If not, decode and print them as Json to ease debugging. *)
-            when_
-              (not (equal exp got))
-              (fun () ->
-                let* protocol =
-                  Store.Block.protocol_hash main_chain_store block
-                in
-                let* (module Proto) = Registered_protocol.get_result protocol in
-                let op =
-                  operations
-                  |> (fun l -> List.nth_opt l i)
-                  |> WithExceptions.Option.get ~loc:__LOC__
-                  |> (fun l -> List.nth_opt l j)
-                  |> WithExceptions.Option.get ~loc:__LOC__
-                  |> fun {proto; _} -> proto
-                in
-                let to_json receipt =
-                  let receipt =
-                    match receipt with
-                    | Block_validation.Metadata receipt -> receipt
-                    | Too_large_metadata -> Bytes.empty
-                  in
-                  Data_encoding.Json.construct
-                    Proto.operation_data_and_receipt_encoding
-                    Data_encoding.Binary.
-                      ( of_bytes_exn Proto.operation_data_encoding op,
-                        of_bytes_exn Proto.operation_receipt_encoding receipt )
-                in
-                let exp = to_json exp in
-                let got = to_json got in
-                let*! () =
-                  Event.(strict_emit ~strict inconsistent_operation_receipt)
-                    ((i, j), exp, got)
-                in
-                return_unit)
+            Data_encoding.Json.construct
+              Proto.operation_data_and_receipt_encoding
+              Data_encoding.Binary.
+                ( of_bytes_exn Proto.operation_data_encoding op,
+                  of_bytes_exn Proto.operation_receipt_encoding receipt )
           in
-          check_receipts i (succ j) (exps :: expss) (gots :: gotss)
+          let exp = to_json exp in
+          let got = to_json got in
+          let*! () =
+            Event.(strict_emit ~strict inconsistent_operation_receipt)
+              ((i, j), exp, got)
+          in
+          return_unit)
     in
-    let actual_receipts =
-      match result.ops_metadata with
+    receipts_iteri_2
+      ~when_different_lengths:(fun exp got ->
+        let*! () =
+          Event.(strict_emit ~strict unexpected_receipts_layout)
+            ( Store.Block.hash block,
+              List.(map length exp),
+              List.(map length got) )
+        in
+        return_unit)
+      expected_operation_receipts
+      (match result.ops_metadata with
       | Block_validation.No_metadata_hash ops_metadata -> ops_metadata
       | Block_validation.Metadata_hash ops_metadata ->
-          List.map (List.map fst) ops_metadata
-    in
-    check_receipts 0 0 expected_operation_receipts actual_receipts
+          List.map (List.map fst) ops_metadata)
+      check_receipt
 
 let replay ~singleprocess ~strict (config : Node_config_file.t) blocks =
   let open Lwt_result_syntax in
