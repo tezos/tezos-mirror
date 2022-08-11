@@ -7,6 +7,10 @@
   tezos-client-base
   teztale.lib
   (select
+   PsCARTHA_machine.ml
+   from
+   (tezos-client-006-PsCARTHA -> PsCARTHA_machine.real.ml))
+  (select
    PsDELPH1_machine.ml
    from
    (tezos-client-007-PsDELPH1 -> PsDELPH1_machine.real.ml))
