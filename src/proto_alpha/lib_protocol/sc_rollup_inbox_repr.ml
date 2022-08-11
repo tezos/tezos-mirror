@@ -1150,17 +1150,15 @@ struct
     let history = remember cell_ptr inbox history in
     let deref ptr = Hash.Map.find_opt ptr history.events in
     let compare hash =
-      (* TODO: #3321 replace with Lwt_option_syntax when that's in the
-         environment V6 *)
-      let ( let* ) x f =
-        Lwt.(x >>= function None -> return None | Some y -> f y)
-      in
-      let result =
-        let* tree = P.lookup_tree ctxt hash in
-        let* level = find_level tree in
-        Lwt.return (Some (Raw_level_repr.compare level l))
-      in
-      Lwt.map (fun x -> Option.value x ~default:(-1)) result
+      let*! tree = P.lookup_tree ctxt hash in
+      match tree with
+      | None -> Lwt.return (-1)
+      | Some tree -> (
+          let open Lwt_syntax in
+          let+ level = find_level tree in
+          match level with
+          | None -> -1
+          | Some level -> Raw_level_repr.compare level l)
     in
     let* path =
       option_to_result
