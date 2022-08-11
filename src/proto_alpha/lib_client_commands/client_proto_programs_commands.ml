@@ -48,7 +48,7 @@ let safe_decode_json (cctxt : Protocol_client_context.full) encoding json =
   | exception ((Stack_overflow | Out_of_memory) as exc) -> raise exc
   | exception exc ->
       cctxt#error "could not decode json (%s)" (Printexc.to_string exc)
-  | expr -> return expr
+  | expr -> Lwt_result_syntax.return expr
 
 let commands () =
   let open Clic in
@@ -109,10 +109,13 @@ let commands () =
   in
   let now_arg = Client_proto_args.now_arg in
   let level_arg = Client_proto_args.level_arg in
-  let resolve_max_gas cctxt block = function
+  let resolve_max_gas cctxt block =
+    let open Lwt_result_syntax in
+    function
     | None ->
-        Alpha_services.Constants.all cctxt (cctxt#chain, block)
-        >>=? fun {parametric = {hard_gas_limit_per_operation; _}; _} ->
+        let* {parametric = {hard_gas_limit_per_operation; _}; _} =
+          Alpha_services.Constants.all cctxt (cctxt#chain, block)
+        in
         return hard_gas_limit_per_operation
     | Some gas -> return gas
   in
@@ -134,10 +137,11 @@ let commands () =
   let signature_parameter =
     parameter (fun _cctxt s ->
         match Signature.of_b58check_opt s with
-        | Some s -> return s
+        | Some s -> Lwt_result_syntax.return s
         | None -> failwith "Not given a valid signature")
   in
   let convert_input_format_param =
+    let open Lwt_result_syntax in
     param
       ~name:"input_format"
       ~desc:"format of the input for conversion"
@@ -154,6 +158,7 @@ let commands () =
                   \"json\" or \"binary\"."))
   in
   let convert_output_format_param =
+    let open Lwt_result_syntax in
     param
       ~name:"output_format"
       ~desc:"format of the conversion output"
@@ -176,33 +181,40 @@ let commands () =
       ~name:"source"
       ~desc:"literal or a path to a file"
       (parameter (fun cctxt s ->
-           cctxt#read_file s >>= function
+           let open Lwt_result_syntax in
+           let*! r = cctxt#read_file s in
+           match r with
            | Ok v -> return (Some s, v)
            | Error _ -> return (None, s)))
   in
   let handle_parsing_error label (cctxt : Protocol_client_context.full)
       (emacs_mode, no_print_source) program body =
+    let open Lwt_result_syntax in
     match program with
     | program, [] -> body program
     | res_with_errors when emacs_mode ->
-        cctxt#message
-          "(@[<v 0>(%s . ())@ (errors . %a)@])"
-          label
-          Michelson_v1_emacs.report_errors
-          res_with_errors
-        >>= fun () -> return_unit
+        let*! () =
+          cctxt#message
+            "(@[<v 0>(%s . ())@ (errors . %a)@])"
+            label
+            Michelson_v1_emacs.report_errors
+            res_with_errors
+        in
+        return_unit
     | parsed, errors ->
-        cctxt#message
-          "%a"
-          (fun ppf () ->
-            Michelson_v1_error_reporter.report_errors
-              ~details:(not no_print_source)
-              ~parsed
-              ~show_source:(not no_print_source)
-              ppf
-              errors)
-          ()
-        >>= fun () -> cctxt#error "syntax error in program"
+        let*! () =
+          cctxt#message
+            "%a"
+            (fun ppf () ->
+              Michelson_v1_error_reporter.report_errors
+                ~details:(not no_print_source)
+                ~parsed
+                ~show_source:(not no_print_source)
+                ppf
+                errors)
+            ()
+        in
+        cctxt#error "syntax error in program"
   in
   [
     command
@@ -211,8 +223,9 @@ let commands () =
       no_options
       (fixed ["list"; "known"; "scripts"])
       (fun () (cctxt : Protocol_client_context.full) ->
-        Program.load cctxt >>=? fun list ->
-        List.iter_s (fun (n, _) -> cctxt#message "%s" n) list >>= fun () ->
+        let open Lwt_result_syntax in
+        let* list = Program.load cctxt in
+        let*! () = List.iter_s (fun (n, _) -> cctxt#message "%s" n) list in
         return_unit);
     command
       ~group
@@ -221,7 +234,8 @@ let commands () =
       (prefixes ["remember"; "script"]
       @@ Program.fresh_alias_param @@ Program.source_param @@ stop)
       (fun force name hash cctxt ->
-        Program.of_fresh cctxt force name >>=? fun name ->
+        let open Lwt_result_syntax in
+        let* name = Program.of_fresh cctxt force name in
         Program.add ~force cctxt name hash);
     command
       ~group
@@ -235,8 +249,10 @@ let commands () =
       no_options
       (prefixes ["show"; "known"; "script"] @@ Program.alias_param @@ stop)
       (fun () (_, program) (cctxt : Protocol_client_context.full) ->
-        Program.to_source program >>=? fun source ->
-        cctxt#message "%s\n" source >>= fun () -> return_unit);
+        let open Lwt_result_syntax in
+        let* source = Program.to_source program in
+        let*! () = cctxt#message "%s\n" source in
+        return_unit);
     command
       ~group
       ~desc:"Ask the node to run a script."
@@ -276,42 +292,45 @@ let commands () =
            storage
            input
            cctxt ->
-        Lwt.return @@ Micheline_parser.no_parsing_error program
-        >>=? fun program ->
+        let open Lwt_result_syntax in
+        let*? program = Micheline_parser.no_parsing_error program in
         let show_source = not no_print_source in
         if trace_exec then
-          trace
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            {
-              amount = Some amount;
-              balance;
-              program;
-              storage;
-              shared_params =
-                {input; unparsing_mode; now; level; source; payer; gas};
-              entrypoint;
-              self;
-            }
-          >>= fun res ->
+          let*! res =
+            trace
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              {
+                amount = Some amount;
+                balance;
+                program;
+                storage;
+                shared_params =
+                  {input; unparsing_mode; now; level; source; payer; gas};
+                entrypoint;
+                self;
+              }
+          in
           print_trace_result cctxt ~show_source ~parsed:program res
         else
-          run
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            {
-              amount = Some amount;
-              balance;
-              program;
-              storage;
-              shared_params =
-                {input; unparsing_mode; now; level; source; payer; gas};
-              entrypoint;
-              self;
-            }
-          >>= fun res -> print_run_result cctxt ~show_source ~parsed:program res);
+          let*! res =
+            run
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              {
+                amount = Some amount;
+                balance;
+                program;
+                storage;
+                shared_params =
+                  {input; unparsing_mode; now; level; source; payer; gas};
+                entrypoint;
+                self;
+              }
+          in
+          print_run_result cctxt ~show_source ~parsed:program res);
     command
       ~group
       ~desc:"Ask the node to compute the size of a script."
@@ -329,20 +348,23 @@ let commands () =
            program
            storage
            cctxt ->
+        let open Lwt_result_syntax in
         let setup = (emacs_mode, no_print_source) in
-        resolve_max_gas cctxt cctxt#block original_gas >>=? fun original_gas ->
+        let* original_gas = resolve_max_gas cctxt cctxt#block original_gas in
         handle_parsing_error "size" cctxt setup program @@ fun program ->
-        script_size
-          cctxt
-          ~chain:cctxt#chain
-          ~block:cctxt#block
-          ~gas:original_gas
-          ~legacy
-          ~program
-          ~storage
-          ()
-        >>=? fun code_size ->
-        cctxt#message "%d" code_size >>= fun _ -> return ());
+        let* code_size =
+          script_size
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~gas:original_gas
+            ~legacy
+            ~program
+            ~storage
+            ()
+        in
+        let*! _ = cctxt#message "%d" code_size in
+        return_unit);
     command
       ~group
       ~desc:"Ask the node to typecheck a script."
@@ -356,18 +378,20 @@ let commands () =
       (fun (show_types, emacs_mode, no_print_source, original_gas, legacy)
            program
            cctxt ->
+        let open Lwt_result_syntax in
         let setup = (emacs_mode, no_print_source) in
         handle_parsing_error "types" cctxt setup program @@ fun program ->
-        resolve_max_gas cctxt cctxt#block original_gas >>=? fun original_gas ->
-        typecheck_program
-          cctxt
-          ~chain:cctxt#chain
-          ~block:cctxt#block
-          ~gas:original_gas
-          ~legacy
-          ~show_types
-          program
-        >>= fun res ->
+        let* original_gas = resolve_max_gas cctxt cctxt#block original_gas in
+        let*! res =
+          typecheck_program
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~gas:original_gas
+            ~legacy
+            ~show_types
+            program
+        in
         print_typecheck_result
           ~emacs:emacs_mode
           ~show_types
@@ -385,32 +409,39 @@ let commands () =
       @@ param ~name:"type" ~desc:"the expected type" data_parameter
       @@ stop)
       (fun (no_print_source, custom_gas, legacy) data ty cctxt ->
-        resolve_max_gas cctxt cctxt#block custom_gas >>=? fun original_gas ->
-        Client_proto_programs.typecheck_data
-          cctxt
-          ~chain:cctxt#chain
-          ~block:cctxt#block
-          ~gas:original_gas
-          ~legacy
-          ~data
-          ~ty
-          ()
-        >>= function
+        let open Lwt_result_syntax in
+        let* original_gas = resolve_max_gas cctxt cctxt#block custom_gas in
+        let*! r =
+          Client_proto_programs.typecheck_data
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ~gas:original_gas
+            ~legacy
+            ~data
+            ~ty
+            ()
+        in
+        match r with
         | Ok gas ->
-            cctxt#message
-              "@[<v 0>Well typed@,Gas remaining: %a@]"
-              Alpha_context.Gas.pp
-              gas
-            >>= fun () -> return_unit
+            let*! () =
+              cctxt#message
+                "@[<v 0>Well typed@,Gas remaining: %a@]"
+                Alpha_context.Gas.pp
+                gas
+            in
+            return_unit
         | Error errs ->
-            cctxt#warning
-              "%a"
-              (Michelson_v1_error_reporter.report_errors
-                 ~details:false
-                 ~show_source:(not no_print_source)
-                 ?parsed:None)
-              errs
-            >>= fun () -> cctxt#error "ill-typed data");
+            let*! () =
+              cctxt#warning
+                "%a"
+                (Michelson_v1_error_reporter.report_errors
+                   ~details:false
+                   ~show_source:(not no_print_source)
+                   ?parsed:None)
+                errs
+            in
+            cctxt#error "ill-typed data");
     command
       ~group
       ~desc:
@@ -426,14 +457,17 @@ let commands () =
       @@ param ~name:"type" ~desc:"type of the data" data_parameter
       @@ stop)
       (fun (custom_gas, scriptable) data typ cctxt ->
-        resolve_max_gas cctxt cctxt#block custom_gas >>=? fun original_gas ->
-        Plugin.RPC.Scripts.pack_data
-          cctxt
-          (cctxt#chain, cctxt#block)
-          ~gas:original_gas
-          ~data:data.expanded
-          ~ty:typ.expanded
-        >>= function
+        let open Lwt_result_syntax in
+        let* original_gas = resolve_max_gas cctxt cctxt#block custom_gas in
+        let*! r =
+          Plugin.RPC.Scripts.pack_data
+            cctxt
+            (cctxt#chain, cctxt#block)
+            ~gas:original_gas
+            ~data:data.expanded
+            ~ty:typ.expanded
+        in
+        match r with
         | Ok (bytes, remaining_gas) ->
             let hash = Script_expr_hash.hash_bytes [bytes] in
             let name_value_rows =
@@ -468,21 +502,25 @@ let commands () =
             Tezos_clic_unix.Scriptable.output
               scriptable
               ~for_human:(fun () ->
-                List.iter_s
-                  (fun (name, value) -> cctxt#message "%s: %s" name value)
-                  name_value_rows
-                >|= ok)
+                let*! () =
+                  List.iter_s
+                    (fun (name, value) -> cctxt#message "%s: %s" name value)
+                    name_value_rows
+                in
+                return_unit)
               ~for_script:(fun () ->
                 name_value_rows |> List.map (fun (name, value) -> [name; value]))
         | Error errs ->
-            cctxt#warning
-              "%a"
-              (Michelson_v1_error_reporter.report_errors
-                 ~details:false
-                 ~show_source:false
-                 ?parsed:None)
-              errs
-            >>= fun () -> cctxt#error "ill-formed data");
+            let*! () =
+              cctxt#warning
+                "%a"
+                (Michelson_v1_error_reporter.report_errors
+                   ~details:false
+                   ~show_source:false
+                   ?parsed:None)
+                errs
+            in
+            cctxt#error "ill-formed data");
     command
       ~group
       ~desc:"Ask the node to hash a Michelson script with `BLAKE2B`."
@@ -494,44 +532,51 @@ let commands () =
       (fun (check, display_names, scriptable)
            expr_strings
            (cctxt : Protocol_client_context.full) ->
+        let open Lwt_result_syntax in
         if List.compare_length_with expr_strings 0 = 0 then
-          cctxt#warning "No scripts were specified on the command line" >|= ok
+          let*! () =
+            cctxt#warning "No scripts were specified on the command line"
+          in
+          return_unit
         else
-          List.mapi_ep
-            (fun i (src, expr_string) ->
-              let program =
-                Michelson_v1_parser.parse_toplevel ~check expr_string
-              in
-              Micheline_parser.no_parsing_error program >>?= fun program ->
-              let code = program.expanded in
-              let bytes =
-                Data_encoding.Binary.to_bytes_exn
-                  Alpha_context.Script.expr_encoding
-                  code
-              in
-              let hash =
-                Format.asprintf
-                  "%a"
-                  Script_expr_hash.pp
-                  (Script_expr_hash.hash_bytes [bytes])
-              in
-              let name =
-                Option.value
-                  src
-                  ~default:("Literal script " ^ string_of_int (i + 1))
-              in
-              return (hash, name))
-            expr_strings
-          >>=? fun hash_name_rows ->
+          let* hash_name_rows =
+            List.mapi_ep
+              (fun i (src, expr_string) ->
+                let program =
+                  Michelson_v1_parser.parse_toplevel ~check expr_string
+                in
+                let*? program = Micheline_parser.no_parsing_error program in
+                let code = program.expanded in
+                let bytes =
+                  Data_encoding.Binary.to_bytes_exn
+                    Alpha_context.Script.expr_encoding
+                    code
+                in
+                let hash =
+                  Format.asprintf
+                    "%a"
+                    Script_expr_hash.pp
+                    (Script_expr_hash.hash_bytes [bytes])
+                in
+                let name =
+                  Option.value
+                    src
+                    ~default:("Literal script " ^ string_of_int (i + 1))
+                in
+                return (hash, name))
+              expr_strings
+          in
           Tezos_clic_unix.Scriptable.output
             scriptable
             ~for_human:(fun () ->
-              List.iter_s
-                (fun (hash, name) ->
-                  if display_names then cctxt#answer "%s\t%s" hash name
-                  else cctxt#answer "%s" hash)
-                hash_name_rows
-              >|= ok)
+              let*! () =
+                List.iter_s
+                  (fun (hash, name) ->
+                    if display_names then cctxt#answer "%s\t%s" hash name
+                    else cctxt#answer "%s" hash)
+                  hash_name_rows
+              in
+              return_unit)
             ~for_script:(fun () ->
               List.map
                 (fun (hash, name) ->
@@ -547,11 +592,13 @@ let commands () =
       @@ bytes_parameter ~name:"bytes" ~desc:"the packed data to parse"
       @@ stop)
       (fun () bytes cctxt ->
-        (if Bytes.get bytes 0 != '\005' then
-         failwith
-           "Not a piece of packed Michelson data (must start with `0x05`)"
-        else return_unit)
-        >>=? fun () ->
+        let open Lwt_result_syntax in
+        let* () =
+          if Bytes.get bytes 0 != '\005' then
+            failwith
+              "Not a piece of packed Michelson data (must start with `0x05`)"
+          else return_unit
+        in
         (* Remove first byte *)
         let bytes = Bytes.sub bytes 1 (Bytes.length bytes - 1) in
         match
@@ -561,38 +608,46 @@ let commands () =
         with
         | None -> failwith "Could not decode bytes"
         | Some expr ->
-            cctxt#message "%a" Michelson_v1_printer.print_expr_unwrapped expr
-            >>= fun () -> return_unit);
+            let*! () =
+              cctxt#message "%a" Michelson_v1_printer.print_expr_unwrapped expr
+            in
+            return_unit);
     command
       ~group
       ~desc:"Ask the node to normalize a script."
       (args1 (unparsing_mode_arg ~default:"Readable"))
       (prefixes ["normalize"; "script"] @@ Program.source_param @@ stop)
       (fun unparsing_mode program cctxt ->
-        Lwt.return @@ Micheline_parser.no_parsing_error program
-        >>=? fun program ->
-        Plugin.RPC.Scripts.normalize_script
-          cctxt
-          (cctxt#chain, cctxt#block)
-          ~script:program.expanded
-          ~unparsing_mode
-        >>= function
+        let open Lwt_result_syntax in
+        let*? program = Micheline_parser.no_parsing_error program in
+        let*! r =
+          Plugin.RPC.Scripts.normalize_script
+            cctxt
+            (cctxt#chain, cctxt#block)
+            ~script:program.expanded
+            ~unparsing_mode
+        in
+        match r with
         | Ok program ->
-            cctxt#message
-              "%a"
-              (fun ppf () : unit ->
-                Michelson_v1_printer.print_expr_unwrapped ppf program)
-              ()
-            >>= fun () -> return_unit
+            let*! () =
+              cctxt#message
+                "%a"
+                (fun ppf () : unit ->
+                  Michelson_v1_printer.print_expr_unwrapped ppf program)
+                ()
+            in
+            return_unit
         | Error errs ->
-            cctxt#warning
-              "%a"
-              (Michelson_v1_error_reporter.report_errors
-                 ~details:false
-                 ~show_source:false
-                 ?parsed:None)
-              errs
-            >>= fun () -> cctxt#error "ill-typed script");
+            let*! () =
+              cctxt#warning
+                "%a"
+                (Michelson_v1_error_reporter.report_errors
+                   ~details:false
+                   ~show_source:false
+                   ?parsed:None)
+                errs
+            in
+            cctxt#error "ill-typed script");
     command
       ~group
       ~desc:"Ask the node to normalize a data expression."
@@ -606,26 +661,33 @@ let commands () =
       @@ param ~name:"type" ~desc:"type of the data expression" data_parameter
       @@ stop)
       (fun (unparsing_mode, legacy) data typ cctxt ->
-        Plugin.RPC.Scripts.normalize_data
-          cctxt
-          (cctxt#chain, cctxt#block)
-          ~legacy
-          ~data:data.expanded
-          ~ty:typ.expanded
-          ~unparsing_mode
-        >>= function
+        let open Lwt_result_syntax in
+        let*! r =
+          Plugin.RPC.Scripts.normalize_data
+            cctxt
+            (cctxt#chain, cctxt#block)
+            ~legacy
+            ~data:data.expanded
+            ~ty:typ.expanded
+            ~unparsing_mode
+        in
+        match r with
         | Ok expr ->
-            cctxt#message "%a" Michelson_v1_printer.print_expr_unwrapped expr
-            >>= fun () -> return_unit
+            let*! () =
+              cctxt#message "%a" Michelson_v1_printer.print_expr_unwrapped expr
+            in
+            return_unit
         | Error errs ->
-            cctxt#warning
-              "%a"
-              (Michelson_v1_error_reporter.report_errors
-                 ~details:false
-                 ~show_source:false
-                 ?parsed:None)
-              errs
-            >>= fun () -> cctxt#error "ill-typed data expression");
+            let*! () =
+              cctxt#warning
+                "%a"
+                (Michelson_v1_error_reporter.report_errors
+                   ~details:false
+                   ~show_source:false
+                   ?parsed:None)
+                errs
+            in
+            cctxt#error "ill-typed data expression");
     command
       ~group
       ~desc:"Ask the node to normalize a type."
@@ -637,23 +699,30 @@ let commands () =
            data_parameter
       @@ stop)
       (fun () typ cctxt ->
-        Plugin.RPC.Scripts.normalize_type
-          cctxt
-          (cctxt#chain, cctxt#block)
-          ~ty:typ.expanded
-        >>= function
+        let open Lwt_result_syntax in
+        let*! r =
+          Plugin.RPC.Scripts.normalize_type
+            cctxt
+            (cctxt#chain, cctxt#block)
+            ~ty:typ.expanded
+        in
+        match r with
         | Ok expr ->
-            cctxt#message "%a" Michelson_v1_printer.print_expr_unwrapped expr
-            >>= fun () -> return_unit
+            let*! () =
+              cctxt#message "%a" Michelson_v1_printer.print_expr_unwrapped expr
+            in
+            return_unit
         | Error errs ->
-            cctxt#warning
-              "%a"
-              (Michelson_v1_error_reporter.report_errors
-                 ~details:false
-                 ~show_source:false
-                 ?parsed:None)
-              errs
-            >>= fun () -> cctxt#error "ill-formed type");
+            let*! () =
+              cctxt#warning
+                "%a"
+                (Michelson_v1_error_reporter.report_errors
+                   ~details:false
+                   ~show_source:false
+                   ?parsed:None)
+                errs
+            in
+            cctxt#error "ill-formed type");
     command
       ~group
       ~desc:
@@ -664,8 +733,9 @@ let commands () =
       @@ bytes_parameter ~name:"data" ~desc:"the raw data to sign"
       @@ prefixes ["for"] @@ Client_keys.Secret_key.source_param @@ stop)
       (fun () bytes sk cctxt ->
-        Client_keys.sign cctxt sk bytes >>=? fun signature ->
-        cctxt#message "Signature: %a" Signature.pp signature >>= fun () ->
+        let open Lwt_result_syntax in
+        let* signature = Client_keys.sign cctxt sk bytes in
+        let*! () = cctxt#message "Signature: %a" Signature.pp signature in
         return_unit);
     command
       ~group
@@ -688,13 +758,14 @@ let commands () =
            (_, (key_locator, _))
            signature
            (cctxt : #Protocol_client_context.full) ->
-        Client_keys.check key_locator signature bytes >>=? function
-        | false -> cctxt#error "invalid signature"
-        | true ->
-            if quiet then return_unit
-            else
-              cctxt#message "Signature check successful." >>= fun () ->
-              return_unit);
+        let open Lwt_result_syntax in
+        let* check = Client_keys.check key_locator signature bytes in
+        if check then
+          if quiet then return_unit
+          else
+            let*! () = cctxt#message "Signature check successful." in
+            return_unit
+        else cctxt#error "invalid signature");
     command
       ~group
       ~desc:"Ask the type of an entrypoint of a script."
@@ -706,14 +777,16 @@ let commands () =
            entrypoint_parameter
       @@ prefixes ["for"] @@ Program.source_param @@ stop)
       (fun ((emacs_mode, no_print_source) as setup) entrypoint program cctxt ->
+        let open Lwt_syntax in
         handle_parsing_error "entrypoint" cctxt setup program @@ fun program ->
-        entrypoint_type
-          cctxt
-          ~chain:cctxt#chain
-          ~block:cctxt#block
-          program
-          ~entrypoint
-        >>= fun entrypoint_type ->
+        let* entrypoint_type =
+          entrypoint_type
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            program
+            ~entrypoint
+        in
         print_entrypoint_type
           ~emacs:emacs_mode
           ~show_source:(not no_print_source)
@@ -728,9 +801,11 @@ let commands () =
       (prefixes ["get"; "script"; "entrypoints"; "for"]
       @@ Program.source_param @@ stop)
       (fun ((emacs_mode, no_print_source) as setup) program cctxt ->
+        let open Lwt_syntax in
         handle_parsing_error "entrypoints" cctxt setup program @@ fun program ->
-        list_entrypoints cctxt ~chain:cctxt#chain ~block:cctxt#block program
-        >>= fun entrypoints ->
+        let* entrypoints =
+          list_entrypoints cctxt ~chain:cctxt#chain ~block:cctxt#block program
+        in
         print_entrypoints_list
           ~emacs:emacs_mode
           ~show_source:(not no_print_source)
@@ -746,9 +821,11 @@ let commands () =
       (prefixes ["get"; "script"; "unreachable"; "paths"; "for"]
       @@ Program.source_param @@ stop)
       (fun ((emacs_mode, no_print_source) as setup) program cctxt ->
+        let open Lwt_syntax in
         handle_parsing_error "entrypoints" cctxt setup program @@ fun program ->
-        list_unreachables cctxt ~chain:cctxt#chain ~block:cctxt#block program
-        >>= fun entrypoints ->
+        let* entrypoints =
+          list_unreachables cctxt ~chain:cctxt#chain ~block:cctxt#block program
+        in
         print_unreachables
           ~emacs:emacs_mode
           ~show_source:(not no_print_source)
@@ -761,14 +838,16 @@ let commands () =
       no_options
       (prefixes ["expand"; "macros"; "in"] @@ Program.source_param @@ stop)
       (fun () program (cctxt : Protocol_client_context.full) ->
-        Lwt.return @@ Micheline_parser.no_parsing_error program
-        >>=? fun program ->
-        cctxt#message
-          "%a"
-          (fun ppf () : unit ->
-            Michelson_v1_printer.print_expr_unwrapped ppf program.expanded)
-          ()
-        >>= fun () -> return_unit);
+        let open Lwt_result_syntax in
+        let*? program = Micheline_parser.no_parsing_error program in
+        let*! () =
+          cctxt#message
+            "%a"
+            (fun ppf () : unit ->
+              Michelson_v1_printer.print_expr_unwrapped ppf program.expanded)
+            ()
+        in
+        return_unit);
     command
       ~desc:
         "Conversion of Michelson script from Micheline, JSON or binary to \
@@ -782,46 +861,52 @@ let commands () =
            from_format
            to_format
            (cctxt : Protocol_client_context.full) ->
-        (match from_format with
-        | `Michelson ->
-            let program =
-              Michelson_v1_parser.parse_toplevel ~check expr_string
-            in
-            Lwt.return @@ Micheline_parser.no_parsing_error program
-            >>=? fun program ->
-            (typecheck_program
-               cctxt
-               ~chain:cctxt#chain
-               ~block:cctxt#block
-               ~legacy
-               ~show_types:true
-               program
-             >>= function
-             | Error _ as res ->
-                 print_typecheck_result
-                   ~emacs:false
-                   ~show_types:true
-                   ~print_source_on_error:true
-                   program
-                   res
-                   cctxt
-             | Ok _ -> return_unit)
-            >>=? fun () -> return program.expanded
-        | `JSON -> (
-            match Data_encoding.Json.from_string expr_string with
-            | Error err -> cctxt#error "%s" err
-            | Ok json ->
-                safe_decode_json cctxt Alpha_context.Script.expr_encoding json)
-        | `Binary -> (
-            bytes_of_prefixed_string expr_string >>=? fun bytes ->
-            match
-              Data_encoding.Binary.of_bytes_opt
-                Alpha_context.Script.expr_encoding
-                bytes
-            with
-            | None -> failwith "Could not decode bytes"
-            | Some expr -> return expr))
-        >>=? fun (expression : Alpha_context.Script.expr) ->
+        let open Lwt_result_syntax in
+        let* (expression : Alpha_context.Script.expr) =
+          match from_format with
+          | `Michelson ->
+              let program =
+                Michelson_v1_parser.parse_toplevel ~check expr_string
+              in
+              let*? program = Micheline_parser.no_parsing_error program in
+              let* () =
+                let*! r =
+                  typecheck_program
+                    cctxt
+                    ~chain:cctxt#chain
+                    ~block:cctxt#block
+                    ~legacy
+                    ~show_types:true
+                    program
+                in
+                match r with
+                | Error _ as res ->
+                    print_typecheck_result
+                      ~emacs:false
+                      ~show_types:true
+                      ~print_source_on_error:true
+                      program
+                      res
+                      cctxt
+                | Ok _ -> return_unit
+              in
+              return program.expanded
+          | `JSON -> (
+              match Data_encoding.Json.from_string expr_string with
+              | Error err -> cctxt#error "%s" err
+              | Ok json ->
+                  safe_decode_json cctxt Alpha_context.Script.expr_encoding json
+              )
+          | `Binary -> (
+              let* bytes = bytes_of_prefixed_string expr_string in
+              match
+                Data_encoding.Binary.of_bytes_opt
+                  Alpha_context.Script.expr_encoding
+                  bytes
+              with
+              | None -> failwith "Could not decode bytes"
+              | Some expr -> return expr)
+        in
         let output =
           match to_format with
           | `Michelson ->
@@ -844,7 +929,8 @@ let commands () =
                 ~zero_loc
                 expression
         in
-        cctxt#message "%s" output >>= fun () -> return_unit);
+        let*! () = cctxt#message "%s" output in
+        return_unit);
     command
       ~desc:
         "Conversion of Micheline expression from Micheline, JSON or binary to \
@@ -858,6 +944,7 @@ let commands () =
            from_format
            to_format
            (cctxt : Protocol_client_context.full) ->
+        let open Lwt_result_syntax in
         let micheline_of_expr expr =
           Micheline_printer.printable
             Michelson_v1_primitives.string_of_prim
@@ -865,14 +952,16 @@ let commands () =
           |> Format.asprintf "%a" Micheline_printer.print_expr
         in
         let typecheck_parsed ~data ~ty =
-          Client_proto_programs.typecheck_data
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~data
-            ~ty
-            ()
-          >>= function
+          let*! r =
+            Client_proto_programs.typecheck_data
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ~data
+              ~ty
+              ()
+          in
+          match r with
           | Error errs ->
               failwith
                 "%a"
@@ -885,36 +974,42 @@ let commands () =
         in
         let typecheck_expr ~expr ~ty =
           let data_string = micheline_of_expr expr in
-          parse_expr data_string >>=? fun data -> typecheck_parsed ~data ~ty
+          let* data = parse_expr data_string in
+          typecheck_parsed ~data ~ty
         in
-        (match from_format with
-        | `Michelson -> (
-            parse_expr data_string >>=? fun data ->
-            match data_ty with
-            | Some ty -> typecheck_parsed ~data ~ty
-            | None -> return data.expanded)
-        | `JSON -> (
-            match Data_encoding.Json.from_string data_string with
-            | Error err -> cctxt#error "%s" err
-            | Ok json -> (
-                safe_decode_json cctxt Alpha_context.Script.expr_encoding json
-                >>=? fun expr ->
-                match data_ty with
-                | None -> return expr
-                | Some ty -> typecheck_expr ~expr ~ty))
-        | `Binary -> (
-            bytes_of_prefixed_string data_string >>=? fun bytes ->
-            match
-              Data_encoding.Binary.of_bytes_opt
-                Alpha_context.Script.expr_encoding
-                bytes
-            with
-            | None -> failwith "Could not decode bytes"
-            | Some expr -> (
-                match data_ty with
-                | None -> return expr
-                | Some ty -> typecheck_expr ~expr ~ty)))
-        >>=? fun (expression : Alpha_context.Script.expr) ->
+        let* (expression : Alpha_context.Script.expr) =
+          match from_format with
+          | `Michelson -> (
+              let* data = parse_expr data_string in
+              match data_ty with
+              | Some ty -> typecheck_parsed ~data ~ty
+              | None -> return data.expanded)
+          | `JSON -> (
+              match Data_encoding.Json.from_string data_string with
+              | Error err -> cctxt#error "%s" err
+              | Ok json -> (
+                  let* expr =
+                    safe_decode_json
+                      cctxt
+                      Alpha_context.Script.expr_encoding
+                      json
+                  in
+                  match data_ty with
+                  | None -> return expr
+                  | Some ty -> typecheck_expr ~expr ~ty))
+          | `Binary -> (
+              let* bytes = bytes_of_prefixed_string data_string in
+              match
+                Data_encoding.Binary.of_bytes_opt
+                  Alpha_context.Script.expr_encoding
+                  bytes
+              with
+              | None -> failwith "Could not decode bytes"
+              | Some expr -> (
+                  match data_ty with
+                  | None -> return expr
+                  | Some ty -> typecheck_expr ~expr ~ty))
+        in
         let output =
           match to_format with
           | `Michelson -> micheline_of_expr expression
@@ -933,7 +1028,8 @@ let commands () =
                 ~zero_loc
                 expression
         in
-        cctxt#message "%s" output >>= fun () -> return_unit);
+        let*! () = cctxt#message "%s" output in
+        return_unit);
     command
       ~group
       ~desc:"Ask the node to run a TZIP-4 view."
@@ -961,17 +1057,20 @@ let commands () =
            contract
            input
            cctxt ->
-        Client_proto_programs.run_view
-          cctxt
-          ~chain:cctxt#chain
-          ~block:cctxt#block
-          {
-            shared_params =
-              {input; unparsing_mode; now; level; source; payer; gas};
-            contract;
-            entrypoint;
-          }
-        >>= fun res -> print_view_result cctxt res);
+        let open Lwt_syntax in
+        let* res =
+          Client_proto_programs.run_view
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            {
+              shared_params =
+                {input; unparsing_mode; now; level; source; payer; gas};
+              contract;
+              entrypoint;
+            }
+        in
+        print_view_result cctxt res);
     command
       ~group
       ~desc:"Ask the node to run a Michelson view with Unit as input."
@@ -994,21 +1093,25 @@ let commands () =
            view
            contract
            cctxt ->
-        Micheline_parser.no_parsing_error
-        @@ Michelson_v1_parser.parse_expression "Unit"
-        >>?= fun input ->
-        Client_proto_programs.run_script_view
-          cctxt
-          ~chain:cctxt#chain
-          ~block:cctxt#block
-          {
-            shared_params =
-              {input; unparsing_mode; now; level; source; payer; gas};
-            contract;
-            view;
-            unlimited_gas;
-          }
-        >>= fun res -> print_view_result cctxt res);
+        let open Lwt_result_syntax in
+        let*? input =
+          Micheline_parser.no_parsing_error
+          @@ Michelson_v1_parser.parse_expression "Unit"
+        in
+        let*! res =
+          Client_proto_programs.run_script_view
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            {
+              shared_params =
+                {input; unparsing_mode; now; level; source; payer; gas};
+              contract;
+              view;
+              unlimited_gas;
+            }
+        in
+        print_view_result cctxt res);
     command
       ~group
       ~desc:"Ask the node to run a Michelson view."
@@ -1037,16 +1140,19 @@ let commands () =
            contract
            input
            cctxt ->
-        Client_proto_programs.run_script_view
-          cctxt
-          ~chain:cctxt#chain
-          ~block:cctxt#block
-          {
-            shared_params =
-              {input; unparsing_mode; now; level; source; payer; gas};
-            contract;
-            view;
-            unlimited_gas;
-          }
-        >>= fun res -> print_view_result cctxt res);
+        let open Lwt_syntax in
+        let* res =
+          Client_proto_programs.run_script_view
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            {
+              shared_params =
+                {input; unparsing_mode; now; level; source; payer; gas};
+              contract;
+              view;
+              unlimited_gas;
+            }
+        in
+        print_view_result cctxt res);
   ]

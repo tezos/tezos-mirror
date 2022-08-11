@@ -30,7 +30,7 @@ let protocol_constants_arg =
     ~doc:"a JSON file that contains protocol constants to set."
     ~long:"protocol-constants"
     ~placeholder:"path"
-    (Clic.parameter (fun _ x -> return x))
+    (Clic.parameter (fun _ x -> Lwt_result_syntax.return x))
 
 let bootstrap_accounts_arg =
   Clic.arg
@@ -38,7 +38,7 @@ let bootstrap_accounts_arg =
       "a JSON file that contains definitions of bootstrap accounts to create."
     ~long:"bootstrap-accounts"
     ~placeholder:"path"
-    (Clic.parameter (fun _ x -> return x))
+    (Clic.parameter (fun _ x -> Lwt_result_syntax.return x))
 
 let asynchronous_flag =
   Clic.switch
@@ -47,26 +47,29 @@ let asynchronous_flag =
     ()
 
 let load_json_file (cctxt : Protocol_client_context.full) json_file =
+  let open Lwt_result_syntax in
   match json_file with
   | None -> return None
   | Some filename ->
-      cctxt#read_file filename >>=? fun json_string ->
+      let* json_string = cctxt#read_file filename in
       return (Some (Ezjsonm.from_string json_string :> Data_encoding.json))
 
 let create_mockup_command_handler
     (constants_overrides_file, bootstrap_accounts_file, asynchronous)
     (cctxt : Protocol_client_context.full) =
-  load_json_file cctxt constants_overrides_file
-  >>=? fun constants_overrides_json ->
-  load_json_file cctxt bootstrap_accounts_file
-  >>=? fun bootstrap_accounts_json ->
-  Tezos_mockup.Persistence.create_mockup
-    ~cctxt:(cctxt :> Tezos_client_base.Client_context.full)
-    ~protocol_hash:Protocol.hash
-    ~constants_overrides_json
-    ~bootstrap_accounts_json
-    ~asynchronous
-  >>=? fun () ->
+  let open Lwt_result_syntax in
+  let* constants_overrides_json =
+    load_json_file cctxt constants_overrides_file
+  in
+  let* bootstrap_accounts_json = load_json_file cctxt bootstrap_accounts_file in
+  let* () =
+    Tezos_mockup.Persistence.create_mockup
+      ~cctxt:(cctxt :> Tezos_client_base.Client_context.full)
+      ~protocol_hash:Protocol.hash
+      ~constants_overrides_json
+      ~bootstrap_accounts_json
+      ~asynchronous
+  in
   Tezos_mockup_commands.Mockup_wallet.populate cctxt bootstrap_accounts_file
 
 let create_mockup_command : Protocol_client_context.full Clic.command =

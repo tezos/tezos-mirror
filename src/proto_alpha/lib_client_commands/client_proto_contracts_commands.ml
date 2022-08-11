@@ -44,7 +44,8 @@ let commands () =
       @@ RawContractAlias.fresh_alias_param @@ RawContractAlias.source_param
       @@ stop)
       (fun force name hash cctxt ->
-        RawContractAlias.of_fresh cctxt force name >>=? fun name ->
+        let open Lwt_result_syntax in
+        let* name = RawContractAlias.of_fresh cctxt force name in
         RawContractAlias.add ~force cctxt name hash);
     command
       ~group
@@ -58,24 +59,32 @@ let commands () =
       no_options
       (fixed ["list"; "known"; "contracts"])
       (fun () (cctxt : Protocol_client_context.full) ->
-        list_contracts cctxt >>=? fun contracts ->
-        List.iter_es
-          (fun (prefix, alias, contract) ->
-            cctxt#message
-              "%s%s: %s"
-              prefix
-              alias
-              (Contract.to_b58check contract)
-            >>= return)
-          contracts);
+        let open Lwt_result_syntax in
+        let* contracts = list_contracts cctxt in
+        let*! () =
+          List.iter_s
+            (fun (prefix, alias, contract) ->
+              cctxt#message
+                "%s%s: %s"
+                prefix
+                alias
+                (Contract.to_b58check contract))
+            contracts
+        in
+        return_unit);
     command
       ~group
       ~desc:"Forget the entire wallet of known contracts."
       (args1 (RawContractAlias.force_switch ()))
       (fixed ["forget"; "all"; "contracts"])
       (fun force cctxt ->
-        fail_unless force (error_of_fmt "this can only used with option -force")
-        >>=? fun () -> RawContractAlias.set cctxt []);
+        let open Lwt_result_syntax in
+        let* () =
+          fail_unless
+            force
+            (error_of_fmt "this can only used with option -force")
+        in
+        RawContractAlias.set cctxt []);
     command
       ~group
       ~desc:"Display a contract from the wallet."
@@ -83,5 +92,7 @@ let commands () =
       (prefixes ["show"; "known"; "contract"]
       @@ RawContractAlias.alias_param @@ stop)
       (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
-        cctxt#message "%a\n%!" Contract.pp contract >>= fun () -> return_unit);
+        let open Lwt_result_syntax in
+        let*! () = cctxt#message "%a\n%!" Contract.pp contract in
+        return_unit);
   ]

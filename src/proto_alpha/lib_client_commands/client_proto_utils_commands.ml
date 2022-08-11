@@ -33,6 +33,7 @@ let unsigned_block_header_param =
     ~name:"unsigned block header"
     ~desc:"A hex or JSON encoded unsigned block header"
   @@ parameter (fun _ s ->
+         let open Lwt_result_syntax in
          let bytes_opt = `Hex s |> Hex.to_bytes in
          let enc = Protocol.Alpha_context.Block_header.unsigned_encoding in
          Option.bind bytes_opt (Data_encoding.Binary.of_bytes_opt enc)
@@ -47,9 +48,9 @@ let unsigned_block_header_param =
              in
              let open Data_encoding.Json in
              from_string s |> function
-             | Error _ -> fail error
+             | Error _ -> tzfail error
              | Ok json -> (
-                 try destruct enc json |> return with _ -> fail error)))
+                 try destruct enc json |> return with _ -> tzfail error)))
 
 let commands () =
   let open Clic in
@@ -85,10 +86,16 @@ let commands () =
            ~desc:"name of the signer contract"
       @@ stop)
       (fun block_head message src_sk cctxt ->
-        Shell_services.Blocks.hash cctxt ~chain:cctxt#chain ~block:block_head ()
-        >>=? fun block ->
-        sign_message cctxt ~src_sk ~block ~message >>=? fun signature ->
-        cctxt#message "Signature: %a" Signature.pp signature >>= fun () ->
+        let open Lwt_result_syntax in
+        let* block =
+          Shell_services.Blocks.hash
+            cctxt
+            ~chain:cctxt#chain
+            ~block:block_head
+            ()
+        in
+        let* signature = sign_message cctxt ~src_sk ~block ~message in
+        let*! () = cctxt#message "Signature: %a" Signature.pp signature in
         return_unit);
     command
       ~group
@@ -116,16 +123,23 @@ let commands () =
            (_, (key_locator, _))
            signature
            (cctxt : #Protocol_client_context.full) ->
-        Shell_services.Blocks.hash cctxt ~chain:cctxt#chain ~block:block_head ()
-        >>=? fun block ->
-        check_message cctxt ~key_locator ~block ~quiet ~message ~signature
-        >>=? function
-        | false -> cctxt#error "invalid signature"
-        | true ->
-            if quiet then return_unit
-            else
-              cctxt#message "Signature check successful" >>= fun () ->
-              return_unit);
+        let open Lwt_result_syntax in
+        let* block =
+          Shell_services.Blocks.hash
+            cctxt
+            ~chain:cctxt#chain
+            ~block:block_head
+            ()
+        in
+        let* check =
+          check_message cctxt ~key_locator ~block ~quiet ~message ~signature
+        in
+        if check then
+          if quiet then return_unit
+          else
+            let*! () = cctxt#message "Signature check successful" in
+            return_unit
+        else cctxt#error "invalid signature");
     command
       ~group
       ~desc:
@@ -142,20 +156,25 @@ let commands () =
            unsigned_block_header
            delegate
            (cctxt : #Protocol_client_context.full) ->
+        let open Lwt_result_syntax in
         let unsigned_header =
           Data_encoding.Binary.to_bytes_exn
             Protocol.Alpha_context.Block_header.unsigned_encoding
             unsigned_block_header
         in
-        Shell_services.Chain.chain_id cctxt ~chain:cctxt#chain ()
-        >>=? fun chain_id ->
-        Client_keys.get_key cctxt delegate >>=? fun (_, _, sk) ->
-        Client_keys.sign
-          cctxt
-          ~watermark:
-            (Protocol.Alpha_context.Block_header.to_watermark
-               (Block_header chain_id))
-          sk
-          unsigned_header
-        >>=? fun s -> cctxt#message "%a" Hex.pp (Signature.to_hex s) >>= return);
+        let* chain_id =
+          Shell_services.Chain.chain_id cctxt ~chain:cctxt#chain ()
+        in
+        let* _, _, sk = Client_keys.get_key cctxt delegate in
+        let* s =
+          Client_keys.sign
+            cctxt
+            ~watermark:
+              (Protocol.Alpha_context.Block_header.to_watermark
+                 (Block_header chain_id))
+            sk
+            unsigned_header
+        in
+        let*! () = cctxt#message "%a" Hex.pp (Signature.to_hex s) in
+        return_unit);
   ]

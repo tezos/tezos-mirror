@@ -114,23 +114,28 @@ let all_contracts = [hic_et_nunc]
 let init (cctxt : Protocol_client_context.full)
     (contract_parameters : (string * contract_parameters) list) :
     t tzresult Lwt.t =
+  let open Lwt_result_syntax in
   let sum_of_probabilities =
     List.fold_left
       (fun acc (_, {probability; _}) -> acc +. probability)
       0.0
       contract_parameters
   in
-  (if sum_of_probabilities > 1.0 then
-   failwith "sum of smart contract call probabilities is greater than 1.0!"
-  else return_unit)
-  >>=? fun () ->
+  let* () =
+    if sum_of_probabilities > 1.0 then
+      failwith "sum of smart contract call probabilities is greater than 1.0!"
+    else return_unit
+  in
   let init_one (alias, params) =
-    Client_proto_contracts.ContractAlias.get_contract cctxt alias
-    >>=? fun contract ->
-    (match List.find (fun x -> String.equal alias x.alias) all_contracts with
-    | None -> failwith "unknown smart contract alias: %s" alias
-    | Some x -> return x)
-    >>=? fun smart_contract -> return (params, contract, smart_contract)
+    let* contract =
+      Client_proto_contracts.ContractAlias.get_contract cctxt alias
+    in
+    let* smart_contract =
+      match List.find (fun x -> String.equal alias x.alias) all_contracts with
+      | None -> failwith "unknown smart contract alias: %s" alias
+      | Some x -> return x
+    in
+    return (params, contract, smart_contract)
   in
   List.map_es init_one contract_parameters
 
@@ -175,11 +180,12 @@ let originate_command =
          ~desc:"name of the source contract"
     @@ stop)
     (fun () source (cctxt : Protocol_client_context.full) ->
+      let open Lwt_result_syntax in
       match source with
       | Originated _ ->
           failwith "only implicit accounts can be the source of an origination"
       | Implicit source ->
-          Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+          let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
           let originate_one (scontract : smart_contract) =
             let fee_parameter =
               {
@@ -191,26 +197,29 @@ let originate_command =
                 burn_cap = scontract.origination_burn_cap;
               }
             in
-            originate_contract
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ~delegate:None
-              ~initial_storage:scontract.initial_storage
-              ~balance:Tez.zero (* initial balance *)
-              ~source
-              ~src_pk
-              ~src_sk
-              ~code:scontract.code
-              ~fee_parameter
-              ()
-            >>= fun errors ->
-            report_michelson_errors
-              ~no_print_source:true
-              ~msg:"origination simulation failed"
-              cctxt
-              errors
-            >>= function
+            let*! errors =
+              originate_contract
+                cctxt
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                ~delegate:None
+                ~initial_storage:scontract.initial_storage
+                ~balance:Tez.zero (* initial balance *)
+                ~source
+                ~src_pk
+                ~src_sk
+                ~code:scontract.code
+                ~fee_parameter
+                ()
+            in
+            let*! r =
+              report_michelson_errors
+                ~no_print_source:true
+                ~msg:"origination simulation failed"
+                cctxt
+                errors
+            in
+            match r with
             | None -> return_unit
             | Some (_res, contract) ->
                 save_contract ~force:false cctxt scontract.alias contract
@@ -218,6 +227,7 @@ let originate_command =
           List.iter_es originate_one all_contracts)
 
 let with_every_known_smart_contract cctxt callback =
+  let open Lwt_result_syntax in
   let items =
     List.map
       (fun x ->
@@ -230,19 +240,21 @@ let with_every_known_smart_contract cctxt callback =
           } ))
       all_contracts
   in
-  init cctxt items >>=? fun smart_contracts ->
+  let* smart_contracts = init cctxt items in
   let rec go xs0 =
     match xs0 with
     | [] -> return []
     | (contract_parameters, contract, smart_contract) :: xs1 ->
-        callback
-          [
-            ( {contract_parameters with probability = 1.0},
-              contract,
-              smart_contract );
-          ]
-        >>=? fun r ->
-        go xs1 >>=? fun rs -> return ((smart_contract.alias, r) :: rs)
+        let* r =
+          callback
+            [
+              ( {contract_parameters with probability = 1.0},
+                contract,
+                smart_contract );
+            ]
+        in
+        let* rs = go xs1 in
+        return ((smart_contract.alias, r) :: rs)
   in
   go smart_contracts
 
