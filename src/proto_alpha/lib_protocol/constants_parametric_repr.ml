@@ -127,7 +127,7 @@ type sc_rollup = {
   max_number_of_stored_cemented_commitments : int;
 }
 
-type zk_rollup = {enable : bool}
+type zk_rollup = {enable : bool; min_pending_to_process : int}
 
 type t = {
   preserved_cycles : int;
@@ -311,9 +311,16 @@ let sc_rollup_encoding =
 let zk_rollup_encoding =
   let open Data_encoding in
   conv
-    (fun (c : zk_rollup) -> c.enable)
-    (fun zk_rollup_enable -> {enable = zk_rollup_enable})
-    (obj1 (req "zk_rollup_enable" bool))
+    (fun ({enable; min_pending_to_process} : zk_rollup) ->
+      (enable, min_pending_to_process))
+    (fun (zk_rollup_enable, zk_rollup_min_pending_to_process) ->
+      {
+        enable = zk_rollup_enable;
+        min_pending_to_process = zk_rollup_min_pending_to_process;
+      })
+    (obj2
+       (req "zk_rollup_enable" bool)
+       (req "zk_rollup_min_pending_to_process" int31))
 
 let encoding =
   let open Data_encoding in

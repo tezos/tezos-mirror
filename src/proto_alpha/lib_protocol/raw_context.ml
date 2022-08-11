@@ -992,7 +992,9 @@ let prepare_first_block ~level ~timestamp ctxt =
             max_number_of_stored_cemented_commitments = 5;
           }
       in
-      let zk_rollup = Constants_parametric_repr.{enable = false} in
+      let zk_rollup =
+        Constants_parametric_repr.{enable = false; min_pending_to_process = 10}
+      in
       let constants =
         Constants_parametric_repr.
           {

@@ -819,7 +819,7 @@ module Constants : sig
       max_number_of_stored_cemented_commitments : int;
     }
 
-    type zk_rollup = {enable : bool}
+    type zk_rollup = {enable : bool; min_pending_to_process : int}
 
     type t = {
       preserved_cycles : int;
@@ -1010,6 +1010,8 @@ module Constants : sig
   val max_number_of_stored_cemented_commitments : context -> int
 
   val zk_rollup_enable : context -> bool
+
+  val zk_rollup_min_pending_to_process : context -> int
 
   (** All constants: fixed and parametric *)
   type t = private {fixed : fixed; parametric : Parametric.t}

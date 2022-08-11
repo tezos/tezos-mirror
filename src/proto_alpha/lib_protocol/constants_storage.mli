@@ -165,3 +165,5 @@ val dal_number_of_slots : Raw_context.t -> int
 val dal_enable : Raw_context.t -> bool
 
 val zk_rollup_enable : Raw_context.t -> bool
+
+val zk_rollup_min_pending_to_process : Raw_context.t -> int
