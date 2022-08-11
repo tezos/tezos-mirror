@@ -249,7 +249,7 @@ module Make_tree (Conf : Conf) (Store : DB) = struct
         | exn -> raise exn)
 end
 
-module Proof_encoding = Merkle_proof_encoding
+module Proof_encoding = Tezos_context_merkle_proof_encoding
 
 module Make_proof
     (Store : DB)

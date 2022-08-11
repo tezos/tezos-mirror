@@ -14,6 +14,7 @@
   tezos-micheline
   tezos-client-012-Psithaca
   tezos-protocol-012-Psithaca
+  tezos-context.merkle_proof_encoding
   tezos-test-helpers
   tezos-012-Psithaca-test-helpers
   alcotest

@@ -883,7 +883,8 @@ module Tree_inbox = struct
   let proof_before proof = kinded_hash_to_inbox_hash proof.Store.Proof.before
 
   let proof_encoding =
-    Tezos_context_helpers.Merkle_proof_encoding.V1.Tree32.tree_proof_encoding
+    Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V1.Tree32
+    .tree_proof_encoding
 end
 
 module Store_inbox = struct

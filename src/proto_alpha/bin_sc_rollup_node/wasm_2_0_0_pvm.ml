@@ -68,7 +68,8 @@ module Wasm_2_0_0_proof_format = struct
     kinded_hash_to_state_hash proof.IStoreProof.Proof.after
 
   let proof_encoding =
-    Tezos_context_helpers.Merkle_proof_encoding.V1.Tree32.tree_proof_encoding
+    Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V1.Tree32
+    .tree_proof_encoding
 end
 
 module Impl : Pvm.S = struct

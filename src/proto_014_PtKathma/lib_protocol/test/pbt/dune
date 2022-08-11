@@ -20,6 +20,7 @@
   tezos-micheline
   tezos-client-014-PtKathma
   tezos-protocol-014-PtKathma
+  tezos-context.merkle_proof_encoding
   tezos-test-helpers
   tezos-014-PtKathma-test-helpers
   alcotest

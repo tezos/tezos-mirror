@@ -235,7 +235,8 @@ module Tree = struct
   let proof_before proof = kinded_hash_to_inbox_hash proof.Proof.before
 
   let proof_encoding =
-    Tezos_context_helpers.Context.Proof_encoding.V1.Tree32.tree_proof_encoding
+    Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V1.Tree32
+    .tree_proof_encoding
 end
 
 (** This is a second instance of the inbox module. It uses the {!Tree}

@@ -482,7 +482,8 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
 end
 
 module Proof32_V1 = struct
-  include Proof32 (Tezos_context_helpers.Merkle_proof_encoding.V1.Tree32)
+  include
+    Proof32 (Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V1.Tree32)
 
   let expected_encoding_size :
       tree Tezos_context_sigs.Context.Proof_types.t -> int =
@@ -569,11 +570,11 @@ end
 
 let () =
   let module Proof2_V1 =
-    Proof2 (Tezos_context_helpers.Merkle_proof_encoding.V1.Tree2) in
+    Proof2 (Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V1.Tree2) in
   let module Proof32_V2 =
-    Proof32 (Tezos_context_helpers.Merkle_proof_encoding.V2.Tree32) in
+    Proof32 (Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree32) in
   let module Proof2_V2 =
-    Proof2 (Tezos_context_helpers.Merkle_proof_encoding.V2.Tree2) in
+    Proof2 (Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree2) in
   Alcotest.run
     "test_merkle_proof"
     [

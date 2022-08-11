@@ -67,7 +67,7 @@ module Make_tree (Conf : Conf) (DB : DB) : sig
   exception Context_dangling_hash of string
 end
 
-module Proof_encoding = Merkle_proof_encoding
+module Proof_encoding = Tezos_context_merkle_proof_encoding
 
 module Make_proof (DB : DB) (Store_conf : Tezos_context_encoding.Context.Conf) : sig
   module Proof : Tezos_context_sigs.Context.PROOF
