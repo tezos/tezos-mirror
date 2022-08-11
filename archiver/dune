@@ -7,6 +7,10 @@
   tezos-client-base
   teztale.lib
   (select
+   Pt24m4xi_machine.ml
+   from
+   (tezos-client-004-Pt24m4xi -> Pt24m4xi_machine.real.ml))
+  (select
    PsBabyM1_machine.ml
    from
    (tezos-client-005-PsBabyM1 -> PsBabyM1_machine.real.ml))
