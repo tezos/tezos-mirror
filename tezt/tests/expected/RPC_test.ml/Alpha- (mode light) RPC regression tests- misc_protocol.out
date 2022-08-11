@@ -50,7 +50,7 @@
       "redundancy_factor": 4, "segment_size": 4096 },
   "sc_rollup_enable": false, "sc_rollup_origination_size": 6314,
   "sc_rollup_challenge_window_in_blocks": 20160,
-  "sc_rollup_max_number_of_messages_per_commitment_period": 32765,
+  "sc_rollup_max_number_of_messages_per_commitment_period": 300000000,
   "sc_rollup_stake_amount": "10000000000",
   "sc_rollup_commitment_period_in_blocks": 30,
   "sc_rollup_max_lookahead_in_blocks": 30000,
