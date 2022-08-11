@@ -169,6 +169,22 @@ val validate_operation :
   'kind operation ->
   (validate_operation_state * stamp) tzresult Lwt.t
 
+(** Remove a manager operation from the {!validate_operation_state}.
+
+    This function is intended for a mempool: when an operation A has
+    already been validated, but another operation B conflicts with A
+    (e.g. they have the same manager) and is more desirable than A
+    (e.g. better fees/gas ratio), then the mempool may remove A in
+    order to validate B instead.
+
+    This function will be replaced with a generic function
+    [remove_operation] in the future. *)
+val remove_manager_operation :
+  validate_operation_info ->
+  validate_operation_state ->
+  'a Kind.manager operation ->
+  validate_operation_state
+
 (** Functions for the plugin.
 
     These functions are temporary.
