@@ -7,6 +7,10 @@
   tezos-client-base
   teztale.lib
   (select
+   PsFLoren_machine.ml
+   from
+   (tezos-client-009-PsFLoren -> PsFLoren_machine.real.ml))
+  (select
    PtGRANAD_machine.ml
    from
    (tezos-client-010-PtGRANAD -> PtGRANAD_machine.real.ml))
