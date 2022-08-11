@@ -76,8 +76,10 @@ let () =
   let () = Teztale_archiver.PtHangz2_machine.register_json_commands () in
   let () = Teztale_archiver.Psithaca_machine.register_json_commands () in
   let () = Teztale_archiver.PtJakart_machine.register_json_commands () in
+  let () = Teztale_archiver.PtKathma_machine.register_json_commands () in
   let () = Teztale_archiver.PtGRANAD_machine.register_db_commands () in
   let () = Teztale_archiver.PtHangz2_machine.register_db_commands () in
   let () = Teztale_archiver.Psithaca_machine.register_db_commands () in
   let () = Teztale_archiver.PtJakart_machine.register_db_commands () in
+  let () = Teztale_archiver.PtKathma_machine.register_db_commands () in
   Client_main_run.run (module Client_config) ~select_commands

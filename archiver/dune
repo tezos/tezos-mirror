@@ -21,7 +21,11 @@
   (select
    PtJakart_machine.ml
    from
-   (tezos-client-013-PtJakart -> PtJakart_machine.real.ml)))
+   (tezos-client-013-PtJakart -> PtJakart_machine.real.ml))
+  (select
+   PtKathma_machine.ml
+   from
+   (tezos-client-014-PtKathma -> PtKathma_machine.real.ml)))
  (modules_without_implementation archiver)
  (flags
   (:standard
