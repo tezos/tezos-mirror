@@ -32,6 +32,12 @@ command=${1:-tezos-node}
 shift 1
 
 case $command in
+    tezos-*)
+        >&2 echo "Warning: The executable with name $command has been renamed to $(echo "$command" | sed 's/^tezos-/octez-/'). The name $command is now deprecated, and it will be removed in a future release. Please update your scripts to use the new name."
+        ;;
+esac
+
+case $command in
     tezos-node)
         launch_node "$@"
         ;;
