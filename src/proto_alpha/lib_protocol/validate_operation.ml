@@ -2057,24 +2057,3 @@ let validate_operation (vi : validate_operation_info)
 (* This function will be replaced with a generic remove_operation in
    the future. *)
 let remove_manager_operation = Manager.remove_manager_operation
-
-module TMP_for_plugin = struct
-  type 'a should_check_signature =
-    | Check_signature of 'a operation
-    | Skip_signature_check
-
-  let precheck_manager vi vs contents_list should_check_signature =
-    let open Lwt_result_syntax in
-    let open Manager in
-    let* batch_state, source_pk =
-      check_sanity_and_find_public_key vi vs contents_list
-    in
-    let* _batch_state = validate_contents_list vi batch_state contents_list in
-    let*? () =
-      match should_check_signature with
-      | Check_signature operation ->
-          Operation.check_signature source_pk vi.chain_id operation
-      | Skip_signature_check -> ok ()
-    in
-    return Operation_validated_stamp
-end

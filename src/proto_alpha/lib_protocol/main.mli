@@ -118,14 +118,6 @@ type operation = Alpha_context.packed_operation = {
   protocol_data : operation_data;
 }
 
-(** See {!Validate_operation.precheck_manager}. *)
-val precheck_manager :
-  validation_state ->
-  'a Alpha_context.Kind.manager Alpha_context.contents_list ->
-  'a Alpha_context.Kind.manager
-  Validate_operation.TMP_for_plugin.should_check_signature ->
-  Validate_operation.stamp tzresult Lwt.t
-
 include
   Updater.PROTOCOL
     with type block_header_data = Alpha_context.Block_header.protocol_data
