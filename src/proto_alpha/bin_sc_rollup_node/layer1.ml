@@ -526,7 +526,7 @@ let get_heads_not_finalized = State.get_heads_not_finalized
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3205
 
-   More generally, The rollup node should be able to restart properly
+   More generally, the rollup node should be able to restart properly
    after an abnormal interruption at every point of its process.
    Currently, the state is not persistent enough and the processing is
    not idempotent enough to achieve that property. *)
