@@ -84,11 +84,13 @@ build-parameters:
 $(OCTEZ_BIN):
 	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	cp -f _build/install/default/bin/$@ ./
+	name=$$(echo "$@" | sed 's/^octez-//'); rm -f "tezos-$$name"; ln -s octez-$$name tezos-$$name
 
 .PHONY: $(UNRELEASED_OCTEZ_BIN)
 $(UNRELEASED_OCTEZ_BIN):
 	@dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	@cp -f _build/install/default/bin/$@ ./
+	@name=$$(echo "$@" | sed 's/^octez-//'); rm -f "tezos-$$name"; ln -s octez-$$name tezos-$$name
 
 .PHONY: build
 build:
@@ -99,7 +101,7 @@ endif
 		$(foreach b, $(OCTEZ_BIN), _build/install/default/bin/${b}) \
 		@copy-parameters
 	@cp -f $(foreach b, $(OCTEZ_BIN), _build/install/default/bin/${b}) ./
-	@$(foreach b, $(RAW_BIN), if [ -f ./tezos-${b} ]; then rm -f ./tezos-${b}; ln -s octez-${b} tezos-${b}; fi;)
+	@$(foreach b, $(RAW_BIN), rm -f ./tezos-${b}; ln -s octez-${b} tezos-${b};)
 
 # List protocols, i.e. directories proto_* in src with a TEZOS_PROTOCOL file.
 TEZOS_PROTOCOL_FILES=$(wildcard src/proto_*/lib_protocol/TEZOS_PROTOCOL)
