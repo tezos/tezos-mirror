@@ -227,8 +227,8 @@
   Sc_rollup_operations
   Dal_apply
   Baking
-  Amendment
   Validate_errors
+  Amendment
   Validate_operation
   Apply
   Services_registration
@@ -473,8 +473,8 @@
   sc_rollup_operations.ml sc_rollup_operations.mli
   dal_apply.ml dal_apply.mli
   baking.ml baking.mli
-  amendment.ml amendment.mli
   validate_errors.ml validate_errors.mli
+  amendment.ml amendment.mli
   validate_operation.ml validate_operation.mli
   apply.ml apply.mli
   services_registration.ml services_registration.mli
@@ -699,8 +699,8 @@
   sc_rollup_operations.ml sc_rollup_operations.mli
   dal_apply.ml dal_apply.mli
   baking.ml baking.mli
-  amendment.ml amendment.mli
   validate_errors.ml validate_errors.mli
+  amendment.ml amendment.mli
   validate_operation.ml validate_operation.mli
   apply.ml apply.mli
   services_registration.ml services_registration.mli
@@ -930,8 +930,8 @@
   sc_rollup_operations.ml sc_rollup_operations.mli
   dal_apply.ml dal_apply.mli
   baking.ml baking.mli
-  amendment.ml amendment.mli
   validate_errors.ml validate_errors.mli
+  amendment.ml amendment.mli
   validate_operation.ml validate_operation.mli
   apply.ml apply.mli
   services_registration.ml services_registration.mli
