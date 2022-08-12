@@ -243,7 +243,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
           | Originated _ ->
               failwith
                 "only implicit accounts can be the source of an origination"
-          | Implicit source -> (
+          | Implicit source ->
               let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
               let* keys =
                 List.map_es
@@ -278,19 +278,16 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                   cctxt
                   errors
               in
-              match o with
-              | None -> return_unit
-              | Some (_res, contract) ->
-                  if dry_run then return_unit
-                  else
-                    let* () =
-                      Client_proto_context.save_contract
-                        ~force
-                        cctxt
-                        alias_name
-                        contract
-                    in
-                    return_unit));
+              if dry_run then return_unit
+              else
+                Option.iter_es
+                  (fun (_res, contract) ->
+                    Client_proto_context.save_contract
+                      ~force
+                      cctxt
+                      alias_name
+                      contract)
+                  o);
       command
         ~group
         ~desc:"Sign a transaction for a multisig contract."
@@ -526,7 +523,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
           | Originated _ ->
               failwith
                 "only implicit accounts can be the source of a contract call"
-          | Implicit source -> (
+          | Implicit source ->
               let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
               let*! errors =
                 Client_proto_multisig.call_multisig
@@ -558,16 +555,14 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                   ?counter
                   ()
               in
-              let*! o =
+              let*! _ =
                 Client_proto_context_commands.report_michelson_errors
                   ~no_print_source
                   ~msg:"transfer simulation failed"
                   cctxt
                   errors
               in
-              match o with
-              | None -> return_unit
-              | Some (_res, _contracts) -> return_unit));
+              return_unit);
       command
         ~group
         ~desc:"Run a lambda on a generic multisig contract."
@@ -602,7 +597,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
           | Originated _ ->
               failwith
                 "only implicit accounts can be the source of a contract call"
-          | Implicit source -> (
+          | Implicit source ->
               let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
               let*? {expanded = lambda; _} =
                 Micheline_parser.no_parsing_error
@@ -630,16 +625,14 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                   ?counter
                   ()
               in
-              let*! o =
+              let*! _ =
                 Client_proto_context_commands.report_michelson_errors
                   ~no_print_source
                   ~msg:"transfer simulation failed"
                   cctxt
                   errors
               in
-              match o with
-              | None -> return_unit
-              | Some (_res, _contracts) -> return_unit));
+              return_unit);
       command
         ~group
         ~desc:"Change the delegate of a multisig contract."
@@ -676,7 +669,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
           | Originated _ ->
               failwith
                 "only implicit accounts can be the source of a contract call"
-          | Implicit source -> (
+          | Implicit source ->
               let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
               let*! errors =
                 Client_proto_multisig.call_multisig
@@ -701,16 +694,14 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                   ?counter
                   ()
               in
-              let*! o =
+              let*! _ =
                 Client_proto_context_commands.report_michelson_errors
                   ~no_print_source
                   ~msg:"transfer simulation failed"
                   cctxt
                   errors
               in
-              match o with
-              | None -> return_unit
-              | Some (_res, _contracts) -> return_unit));
+              return_unit);
       command
         ~group
         ~desc:"Withdraw the delegate of a multisig contract."
@@ -742,7 +733,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
           | Originated _ ->
               failwith
                 "only implicit accounts can be the source of a contract call"
-          | Implicit source -> (
+          | Implicit source ->
               let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
               let*! errors =
                 Client_proto_multisig.call_multisig
@@ -766,16 +757,14 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                   ?counter
                   ()
               in
-              let*! o =
+              let*! _ =
                 Client_proto_context_commands.report_michelson_errors
                   ~no_print_source
                   ~msg:"transfer simulation failed"
                   cctxt
                   errors
               in
-              match o with
-              | None -> return_unit
-              | Some (_res, _contracts) -> return_unit));
+              return_unit);
       command
         ~group
         ~desc:"Change public keys and threshold for a multisig contract."
@@ -811,7 +800,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
           | Originated _ ->
               failwith
                 "only implicit accounts can be the source of a contract call"
-          | Implicit source -> (
+          | Implicit source ->
               let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
               let* keys =
                 List.map_es
@@ -842,16 +831,14 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                   ?counter
                   ()
               in
-              let*! o =
+              let*! _ =
                 Client_proto_context_commands.report_michelson_errors
                   ~no_print_source
                   ~msg:"transfer simulation failed"
                   cctxt
                   errors
               in
-              match o with
-              | None -> return_unit
-              | Some (_res, _contracts) -> return_unit));
+              return_unit);
       (* This command is no longer necessary as Clic now supports non terminal
          lists of parameters, however, it is kept for compatibility. *)
       command
@@ -895,7 +882,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
           | Originated _ ->
               failwith
                 "only implicit accounts can be the source of a contract call"
-          | Implicit source -> (
+          | Implicit source ->
               let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
               let*! errors =
                 Client_proto_multisig.call_multisig_on_bytes
@@ -919,16 +906,14 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                   ?counter
                   ()
               in
-              let*! o =
+              let*! _ =
                 Client_proto_context_commands.report_michelson_errors
                   ~no_print_source
                   ~msg:"transfer simulation failed"
                   cctxt
                   errors
               in
-              match o with
-              | None -> return_unit
-              | Some (_res, _contracts) -> return_unit));
+              return_unit);
       command
         ~group
         ~desc:

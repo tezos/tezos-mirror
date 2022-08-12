@@ -363,7 +363,7 @@ let commands () =
             ~storage
             ()
         in
-        let*! _ = cctxt#message "%d" code_size in
+        let*! () = cctxt#message "%d" code_size in
         return_unit);
     command
       ~group

@@ -104,12 +104,7 @@ let tez_of_string_exn index field s =
         s
 
 let tez_of_opt_string_exn index field s =
-  let open Lwt_result_syntax in
-  match s with
-  | None -> return_none
-  | Some s ->
-      let* s = tez_of_string_exn index field s in
-      return_some s
+  Option.map_es (tez_of_string_exn index field) s
 
 let commands_ro () =
   let open Clic in
@@ -545,8 +540,8 @@ let commands_ro () =
         | Proposal ->
             (* the current proposals are cleared on the last block of the
                proposal period *)
-            if info.remaining <> 0l then
-              let*! () =
+            let*! () =
+              if info.remaining <> 0l then
                 cctxt#answer
                   "Current proposals:%t"
                   Format.(
@@ -569,13 +564,9 @@ let commands_ro () =
                             else "not "))
                         ranks ;
                       pp_close_box ppf ())
-              in
-              return_unit
-            else
-              let*! () =
-                cctxt#message "The proposals have already been cleared."
-              in
-              return_unit
+              else cctxt#message "The proposals have already been cleared."
+            in
+            return_unit
         | Exploration | Promotion ->
             let*! () = print_proposal info.current_proposal in
             (* the ballots are cleared on the last block of these periods *)
