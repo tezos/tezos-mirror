@@ -54,6 +54,8 @@ let info_encoding =
        (opt "script" Script.encoding)
        (opt "counter" n)
 
+let legacy = Script_ir_translator_config.make ~legacy:true ()
+
 module S = struct
   open Data_encoding
 
@@ -252,7 +254,7 @@ module S = struct
           let ctxt = Gas.set_unlimited ctxt in
           Script_ir_translator.parse_script
             ctxt
-            ~legacy:true
+            ~elab_conf:legacy
             ~allow_forged_in_storage:true
             script
           >|= fun tzresult ->
@@ -349,7 +351,7 @@ let register () =
         | Some value ->
             parse_data
               ctxt
-              ~legacy:true
+              ~elab_conf:legacy
               ~allow_forged:true
               value_type
               (Micheline.root value)
@@ -373,7 +375,7 @@ let register () =
             acc >>?= fun (ctxt, rev_values) ->
             parse_data
               ctxt
-              ~legacy:true
+              ~elab_conf:legacy
               ~allow_forged:true
               value_type
               (Micheline.root value)
@@ -414,7 +416,11 @@ let register () =
       | Some script ->
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
-          parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
+          parse_script
+            ctxt
+            ~elab_conf:legacy
+            ~allow_forged_in_storage:true
+            script
           >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt) ->
           unparse_data ctxt Readable storage_type storage
           >|=? fun (storage, _ctxt) -> Some (Micheline.strip_locations storage)) ;
@@ -528,7 +534,7 @@ let register () =
               let open Script_ir_translator in
               parse_script
                 ctxt
-                ~legacy:true
+                ~elab_conf:legacy
                 ~allow_forged_in_storage:true
                 script
               >>=? fun (Ex_script (Script script), ctxt) ->

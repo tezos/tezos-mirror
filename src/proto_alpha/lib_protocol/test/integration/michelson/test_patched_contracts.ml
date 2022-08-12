@@ -168,7 +168,7 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
     let* _ =
       Lwt.map Environment.wrap_tzresult
       @@ Script_ir_translator.parse_code
-           ~legacy:false
+           ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())
            ~code:(Script_repr.lazy_expr code)
            ctxt
     in

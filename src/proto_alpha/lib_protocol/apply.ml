@@ -957,13 +957,17 @@ let apply_manager_operation :
       >>?= fun (unparsed_code, ctxt) ->
       Script_ir_translator.parse_script
         ctxt
-        ~legacy:false
+        ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())
         ~allow_forged_in_storage:false
         script
       >>=? fun (Ex_script parsed_script, ctxt) ->
       let (Script {storage_type; views; storage; _}) = parsed_script in
       let views_result =
-        Script_ir_translator.parse_views ctxt ~legacy:false storage_type views
+        Script_ir_translator.parse_views
+          ctxt
+          ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())
+          storage_type
+          views
       in
       trace
         (Script_tc_errors.Ill_typed_contract (unparsed_code, []))

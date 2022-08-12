@@ -8,36 +8,36 @@ big_map diff
   New map(4) of type (big_map nat nat)
   Set map(4)[0] to 1
 trace
-  - location: 12 (remaining gas: 1039989.101 units remaining)
+  - location: 12 (remaining gas: 1039989.146 units remaining)
     [ (Pair 1 { Elt 0 1 } None) ]
-  - location: 12 (remaining gas: 1039989.091 units remaining)
+  - location: 12 (remaining gas: 1039989.136 units remaining)
     [ 1
       (Pair { Elt 0 1 } None) ]
-  - location: 13 (remaining gas: 1039989.091 units remaining)
+  - location: 13 (remaining gas: 1039989.136 units remaining)
     [ (Pair { Elt 0 1 } None) ]
-  - location: 15 (remaining gas: 1039989.081 units remaining)
+  - location: 15 (remaining gas: 1039989.126 units remaining)
     [ { Elt 0 1 } ]
-  - location: 16 (remaining gas: 1039989.071 units remaining)
+  - location: 16 (remaining gas: 1039989.116 units remaining)
     [ { Elt 0 1 }
       { Elt 0 1 } ]
-  - location: 13 (remaining gas: 1039989.051 units remaining)
+  - location: 13 (remaining gas: 1039989.096 units remaining)
     [ 1
       { Elt 0 1 }
       { Elt 0 1 } ]
-  - location: 17 (remaining gas: 1039988.343 units remaining)
+  - location: 17 (remaining gas: 1039988.388 units remaining)
     [ False
       { Elt 0 1 } ]
-  - location: 18 (remaining gas: 1039988.333 units remaining)
+  - location: 18 (remaining gas: 1039988.378 units remaining)
     [ (Some False)
       { Elt 0 1 } ]
-  - location: 19 (remaining gas: 1039988.323 units remaining)
+  - location: 19 (remaining gas: 1039988.368 units remaining)
     [ { Elt 0 1 }
       (Some False) ]
-  - location: 20 (remaining gas: 1039988.313 units remaining)
+  - location: 20 (remaining gas: 1039988.358 units remaining)
     [ (Pair { Elt 0 1 } (Some False)) ]
-  - location: 21 (remaining gas: 1039988.303 units remaining)
+  - location: 21 (remaining gas: 1039988.348 units remaining)
     [ {}
       (Pair { Elt 0 1 } (Some False)) ]
-  - location: 23 (remaining gas: 1039988.293 units remaining)
+  - location: 23 (remaining gas: 1039988.338 units remaining)
     [ (Pair {} { Elt 0 1 } (Some False)) ]
 

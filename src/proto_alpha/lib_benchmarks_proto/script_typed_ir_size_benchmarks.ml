@@ -31,6 +31,8 @@ open Protocol
 
 let model_name = "ir_size_model"
 
+let strict = Script_ir_translator_config.make ~legacy:false ()
+
 module Size_benchmarks_shared_config = struct
   include Translator_benchmarks.Config
 
@@ -84,7 +86,7 @@ end = struct
               Lwt_main.run
                 (Script_ir_translator.parse_data
                    ctxt
-                   ~legacy:false
+                   ~elab_conf:strict
                    ~allow_forged:false
                    ty
                    (Micheline.root node))
@@ -200,7 +202,7 @@ end = struct
             (Script_ir_translator.parse_instr
                Script_tc_context.data
                ctxt
-               ~legacy:false
+               ~elab_conf:strict
                node
                bef)
         with

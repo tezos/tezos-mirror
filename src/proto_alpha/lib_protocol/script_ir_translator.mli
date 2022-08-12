@@ -160,12 +160,6 @@ val close_descr :
 (* ---- Lists, Sets and Maps ----------------------------------------------- *)
 
 (** {2 High-level Michelson Data Types} *)
-type type_logger =
-  Script.location ->
-  stack_ty_before:Script.expr list ->
-  stack_ty_after:Script.expr list ->
-  unit
-
 val ty_eq :
   error_details:(Script.location, 'error_trace) error_details ->
   ('a, 'ac) Script_typed_ir.ty ->
@@ -176,7 +170,7 @@ val ty_eq :
 
 (** {3 Parsing and Typechecking Michelson} *)
 val parse_comparable_data :
-  ?type_logger:type_logger ->
+  ?type_logger:Script_ir_translator_config.type_logger ->
   context ->
   'a Script_typed_ir.comparable_ty ->
   Script.node ->
@@ -184,9 +178,8 @@ val parse_comparable_data :
 
 (* Parsing a Micheline node data into an IR-typed data. *)
 val parse_data :
-  ?type_logger:type_logger ->
+  elab_conf:Script_ir_translator_config.elab_config ->
   context ->
-  legacy:bool ->
   allow_forged:bool ->
   ('a, _) Script_typed_ir.ty ->
   Script.node ->
@@ -207,10 +200,9 @@ val unparse_code :
   (Script.node * context) tzresult Lwt.t
 
 val parse_instr :
-  ?type_logger:type_logger ->
+  elab_conf:Script_ir_translator_config.elab_config ->
   tc_context ->
   context ->
-  legacy:bool ->
   Script.node ->
   ('a, 's) Script_typed_ir.stack_ty ->
   (('a, 's) judgement * context) tzresult Lwt.t
@@ -252,17 +244,15 @@ val parse_view_output_ty :
   (ex_ty * context) tzresult
 
 val parse_view :
-  ?type_logger:type_logger ->
+  elab_conf:Script_ir_translator_config.elab_config ->
   context ->
-  legacy:bool ->
   ('storage, _) Script_typed_ir.ty ->
   Script_typed_ir.view ->
   ('storage typed_view * context) tzresult Lwt.t
 
 val parse_views :
-  ?type_logger:type_logger ->
+  elab_conf:Script_ir_translator_config.elab_config ->
   context ->
-  legacy:bool ->
   ('storage, _) Script_typed_ir.ty ->
   Script_typed_ir.view_map ->
   ('storage typed_view_map * context) tzresult Lwt.t
@@ -302,16 +292,14 @@ val typecheck_code :
   (type_map * context) tzresult Lwt.t
 
 val parse_code :
-  ?type_logger:type_logger ->
+  elab_conf:Script_ir_translator_config.elab_config ->
   context ->
-  legacy:bool ->
   code:Script.lazy_expr ->
   (ex_code * context) tzresult Lwt.t
 
 val parse_storage :
-  ?type_logger:type_logger ->
+  elab_conf:Script_ir_translator_config.elab_config ->
   context ->
-  legacy:bool ->
   allow_forged:bool ->
   ('storage, _) Script_typed_ir.ty ->
   storage:Script.lazy_expr ->
@@ -319,9 +307,8 @@ val parse_storage :
 
 (** Combines [parse_code] and [parse_storage] *)
 val parse_script :
-  ?type_logger:type_logger ->
+  elab_conf:Script_ir_translator_config.elab_config ->
   context ->
-  legacy:bool ->
   allow_forged_in_storage:bool ->
   Script.t ->
   (ex_script * context) tzresult Lwt.t

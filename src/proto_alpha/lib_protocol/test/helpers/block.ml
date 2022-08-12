@@ -340,7 +340,7 @@ let initial_alpha_context ?(commitments = []) constants
     in
     Script_ir_translator.parse_script
       ctxt
-      ~legacy:true
+      ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
       ~allow_forged_in_storage
       script
     >>=? fun (Ex_script (Script parsed_script), ctxt) ->

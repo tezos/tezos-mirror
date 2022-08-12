@@ -102,7 +102,6 @@ module type PROTOCOL = sig
 
     val parse_ty :
       context ->
-      legacy:bool ->
       allow_lazy_storage:bool ->
       allow_operation:bool ->
       allow_contract:bool ->
@@ -112,11 +111,9 @@ module type PROTOCOL = sig
 
     val unparse_ty : context -> ex_ty -> Script.node tzresult
 
-    val parse_toplevel :
-      context -> legacy:bool -> Script.expr -> toplevel tzresult Lwt.t
+    val parse_toplevel : context -> Script.expr -> toplevel tzresult Lwt.t
 
-    val parse_code :
-      context -> legacy:bool -> Script.lazy_expr -> ex_code tzresult Lwt.t
+    val parse_code : context -> Script.lazy_expr -> ex_code tzresult Lwt.t
   end
 
   module Storage : sig

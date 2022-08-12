@@ -76,14 +76,14 @@ module Proto = struct
     let actual_code_size Script_ir_translator.(Ex_code (Code {code; _})) =
       8 * Obj.(reachable_words @@ repr code)
 
-    let parse_ty (ctxt : Raw_context.t) ~legacy ~allow_lazy_storage
-        ~allow_operation ~allow_contract ~allow_ticket script =
+    let parse_ty (ctxt : Raw_context.t) ~allow_lazy_storage ~allow_operation
+        ~allow_contract ~allow_ticket script =
       let open Result_syntax in
       let+ ty, _ =
         wrap_tzresult
         @@ Script_ir_translator.parse_ty
              (Obj.magic ctxt)
-             ~legacy
+             ~legacy:true
              ~allow_lazy_storage
              ~allow_operation
              ~allow_contract
@@ -92,15 +92,14 @@ module Proto = struct
       in
       ty
 
-    let parse_data ?type_logger (ctxt : Raw_context.t) ~legacy ~allow_forged ty
-        expr =
+    let parse_data ?type_logger (ctxt : Raw_context.t) ~allow_forged ty expr =
       let open Lwt_result_syntax in
       let+ data, _ =
         Lwt.map wrap_tzresult
         @@ Script_ir_translator.parse_data
              ?type_logger
              (Obj.magic ctxt)
-             ~legacy
+             ~legacy:true
              ~allow_forged
              ty
              expr
@@ -115,19 +114,22 @@ module Proto = struct
       in
       expr
 
-    let parse_toplevel (ctxt : Raw_context.t) ~legacy expr =
+    let parse_toplevel (ctxt : Raw_context.t) expr =
       let open Lwt_result_syntax in
       let+ toplevel, _ =
         Lwt.map wrap_tzresult
-        @@ Script_ir_translator.parse_toplevel (Obj.magic ctxt) ~legacy expr
+        @@ Script_ir_translator.parse_toplevel
+             (Obj.magic ctxt)
+             ~legacy:true
+             expr
       in
       toplevel
 
-    let parse_code ctxt ~legacy code =
+    let parse_code ctxt code =
       let open Lwt_result_syntax in
       let+ parsed_code, _ =
         Lwt.map wrap_tzresult
-        @@ Script_ir_translator.parse_code (Obj.magic ctxt) ~legacy ~code
+        @@ Script_ir_translator.parse_code (Obj.magic ctxt) ~legacy:true ~code
       in
       parsed_code
   end
@@ -217,7 +219,7 @@ module Proto = struct
         (Ex_ty_lambdas (ty, getters)) =
       let open Lwt_syntax in
       let+ parse_result =
-        Translator.parse_data ctxt ~legacy:true ~allow_forged:true ty expr
+        Translator.parse_data ctxt ~allow_forged:true ty expr
       in
       match parse_result with
       | Error _ -> acc

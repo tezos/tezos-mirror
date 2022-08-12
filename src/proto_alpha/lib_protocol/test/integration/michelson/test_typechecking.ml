@@ -368,19 +368,19 @@ let test_unparse_comb_comparable_type () =
   >>?= fun _ -> return_unit
 
 let test_parse_data ?(equal = Stdlib.( = )) loc ctxt ty node expected =
-  let legacy = false in
+  let elab_conf = Script_ir_translator_config.make ~legacy:false () in
   let allow_forged = true in
   wrap_error_lwt
-    ( Script_ir_translator.parse_data ctxt ~legacy ~allow_forged ty node
+    ( Script_ir_translator.parse_data ctxt ~elab_conf ~allow_forged ty node
     >>=? fun (actual, ctxt) ->
       if equal actual expected then return ctxt
       else Alcotest.failf "Unexpected error: %s" loc )
 
 let test_parse_data_fails loc ctxt ty node =
-  let legacy = false in
+  let elab_conf = Script_ir_translator_config.make ~legacy:false () in
   let allow_forged = false in
   wrap_error_lwt
-    (Script_ir_translator.parse_data ctxt ~legacy ~allow_forged ty node
+    (Script_ir_translator.parse_data ctxt ~elab_conf ~allow_forged ty node
      >>= function
      | Ok _ -> Alcotest.failf "Unexpected typechecking success: %s" loc
      | Error trace ->
@@ -719,6 +719,7 @@ let test_optimal_comb () =
    behind this restriction.
 *)
 let test_contract_not_packable () =
+  let elab_conf = Script_ir_translator_config.make ~legacy:false () in
   let contract_unit =
     Prim (0, Script.T_contract, [Prim (0, T_unit, [], [])], [])
   in
@@ -742,7 +743,7 @@ let test_contract_not_packable () =
   (Script_ir_translator.parse_instr
      Script_tc_context.data
      ctxt
-     ~legacy:false
+     ~elab_conf
      (Prim (0, I_UNPACK, [Prim (0, T_unit, [], [])], []))
      (Item_t (Script_typed_ir.bytes_t, Bot_t))
    >>= function
@@ -753,7 +754,7 @@ let test_contract_not_packable () =
   Script_ir_translator.parse_instr
     Script_tc_context.data
     ctxt
-    ~legacy:false
+    ~elab_conf
     (Prim (0, I_UNPACK, [contract_unit], []))
     (Item_t (Script_typed_ir.bytes_t, Bot_t))
   >>= function

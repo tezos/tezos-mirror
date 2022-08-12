@@ -265,7 +265,7 @@ let origination_operation block ~src ~baker ~script ~storage ~forges_tickets =
     wrap
     @@ Script_ir_translator.parse_script
          ctxt
-         ~legacy:true
+         ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
          ~allow_forged_in_storage:true
          script
   in

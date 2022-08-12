@@ -959,7 +959,7 @@ module Interpreter_tests = struct
       let ctx_without_gas_2 = Alpha_context.Gas.set_unlimited ctx_2 in
       Script_ir_translator.parse_script
         ctx_without_gas_2
-        ~legacy:true
+        ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
         ~allow_forged_in_storage:true
         script
       >>= wrap
@@ -1092,7 +1092,7 @@ module Interpreter_tests = struct
     >>??= fun (Ty_ex_c tytype) ->
     Script_ir_translator.parse_storage
       ctx_without_gas
-      ~legacy:true
+      ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
       ~allow_forged:true
       tytype
       ~storage:storage_lazy_expr

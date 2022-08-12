@@ -58,7 +58,7 @@ let get_by_hash ctxt key (Big_map {id; diff; value_type; _}) =
       | ctxt, Some value ->
           parse_data
             ctxt
-            ~legacy:true
+            ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
             ~allow_forged:true
             value_type
             (Micheline.root value)

@@ -179,6 +179,8 @@ let bad_code benchmark_name micheline expected_stack_type phase =
 (* ----------------------------------------------------------------------- *)
 (* Typechecking data (Micheline data -> typed data) *)
 
+let strict = Script_ir_translator_config.make ~legacy:false ()
+
 module Typechecking_data : Benchmark.S = struct
   include Config
   include Default_boilerplate
@@ -212,7 +214,7 @@ module Typechecking_data : Benchmark.S = struct
                 Lwt_main.run
                   (Script_ir_translator.parse_data
                      ctxt
-                     ~legacy:false
+                     ~elab_conf:strict
                      ~allow_forged:false
                      ty
                      (Micheline.root node))
@@ -281,7 +283,7 @@ module Unparsing_data : Benchmark.S = struct
         | Script_typed_ir.Ex_ty ty ->
             Script_ir_translator.parse_data
               ctxt
-              ~legacy:false
+              ~elab_conf:strict
               ~allow_forged:false
               ty
               (Micheline.root node)
@@ -364,7 +366,7 @@ module Typechecking_code : Benchmark.S = struct
               (Script_ir_translator.parse_instr
                  Script_tc_context.data
                  ctxt
-                 ~legacy:false
+                 ~elab_conf:strict
                  (Micheline.root node)
                  bef)
           in
@@ -438,7 +440,7 @@ module Unparsing_code : Benchmark.S = struct
         Script_ir_translator.parse_instr
           Script_tc_context.data
           ctxt
-          ~legacy:false
+          ~elab_conf:strict
           (Micheline.root node)
           bef
         >|= Environment.wrap_tzresult
