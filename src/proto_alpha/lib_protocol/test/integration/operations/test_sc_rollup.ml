@@ -81,7 +81,15 @@ let assert_equal_z ~loc x y =
   [sc_rollup_enable] constant is set to true. It returns the created
   context and contracts. *)
 let context_init ?(sc_rollup_challenge_window_in_blocks = 10)
+    ?sc_rollup_max_number_of_messages_per_commitment_period
     ?(timeout_period_in_blocks = 10) tup =
+  let max_number_of_messages_per_commitment_period =
+    match sc_rollup_max_number_of_messages_per_commitment_period with
+    | None ->
+        Context.default_test_constants.sc_rollup
+          .max_number_of_messages_per_commitment_period
+    | Some v -> v
+  in
   Context.init_with_constants_gen
     tup
     {
@@ -92,6 +100,7 @@ let context_init ?(sc_rollup_challenge_window_in_blocks = 10)
           Context.default_test_constants.sc_rollup with
           enable = true;
           challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
+          max_number_of_messages_per_commitment_period;
           timeout_period_in_blocks;
         };
     }
@@ -1393,7 +1402,25 @@ let test_insufficient_ticket_balances () =
        output)
 
 let test_inbox_max_number_of_messages_per_commitment_period () =
-  let* block, (account1, account2) = context_init Context.T2 in
+  let sc_rollup_max_number_of_messages_per_commitment_period =
+    (*
+
+       We set this parameter constant with a low value for this test
+       because the default value is too high to be tested.
+
+       This limit exists to implement a (theoretical) defensive
+       programming scheme against large inbox refutations proofs. It
+       is theoretical because the lenght of these proofs is
+       logarithmic in the number of messages.
+
+    *)
+    1000
+  in
+  let* block, (account1, account2) =
+    context_init
+      ~sc_rollup_max_number_of_messages_per_commitment_period
+      Context.T2
+  in
   let* block, rollup = sc_originate block account1 "unit" in
   let* constants = Context.get_constants (B block) in
   let Constants.Parametric.{max_number_of_messages_per_commitment_period; _} =

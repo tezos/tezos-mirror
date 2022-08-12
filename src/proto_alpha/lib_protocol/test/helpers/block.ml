@@ -445,8 +445,8 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
     ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
     ?blocks_per_cycle ?cycles_per_voting_period ?tx_rollup_enable
     ?tx_rollup_sunset_level ?tx_rollup_origination_size ?sc_rollup_enable
-    ?dal_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold
-    initial_accounts =
+    ?sc_rollup_max_number_of_messages_per_commitment_period ?dal_enable
+    ?hard_gas_limit_per_block ?nonce_revelation_threshold initial_accounts =
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
   let min_proposal_quorum =
@@ -505,6 +505,11 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
   let sc_rollup_enable =
     Option.value ~default:constants.sc_rollup.enable sc_rollup_enable
   in
+  let sc_rollup_max_number_of_messages_per_commitment_period =
+    Option.value
+      ~default:constants.sc_rollup.max_number_of_messages_per_commitment_period
+      sc_rollup_max_number_of_messages_per_commitment_period
+  in
   let dal_enable =
     Option.value ~default:constants.dal.feature_enable dal_enable
   in
@@ -538,7 +543,13 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
           sunset_level = tx_rollup_sunset_level;
           origination_size = tx_rollup_origination_size;
         };
-      sc_rollup = {constants.sc_rollup with enable = sc_rollup_enable};
+      sc_rollup =
+        {
+          constants.sc_rollup with
+          enable = sc_rollup_enable;
+          max_number_of_messages_per_commitment_period =
+            sc_rollup_max_number_of_messages_per_commitment_period;
+        };
       dal = {constants.dal with feature_enable = dal_enable};
       hard_gas_limit_per_block;
       nonce_revelation_threshold;
@@ -591,7 +602,8 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?endorsing_reward_per_slot ?baking_reward_bonus_per_slot
     ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
     ?cycles_per_voting_period ?tx_rollup_enable ?tx_rollup_sunset_level
-    ?tx_rollup_origination_size ?sc_rollup_enable ?dal_enable
+    ?tx_rollup_origination_size ?sc_rollup_enable
+    ?sc_rollup_max_number_of_messages_per_commitment_period ?dal_enable
     ?hard_gas_limit_per_block ?nonce_revelation_threshold
     (initial_accounts :
       (Account.t * Tez.t * Signature.Public_key_hash.t option) list) =
@@ -611,6 +623,7 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?tx_rollup_sunset_level
     ?tx_rollup_origination_size
     ?sc_rollup_enable
+    ?sc_rollup_max_number_of_messages_per_commitment_period
     ?dal_enable
     ?hard_gas_limit_per_block
     ?nonce_revelation_threshold

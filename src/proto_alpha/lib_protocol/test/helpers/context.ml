@@ -449,7 +449,8 @@ let init_gen tup ?rng_state ?commitments ?(initial_balances = [])
     ?endorsing_reward_per_slot ?baking_reward_bonus_per_slot
     ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
     ?cycles_per_voting_period ?tx_rollup_enable ?tx_rollup_sunset_level
-    ?tx_rollup_origination_size ?sc_rollup_enable ?dal_enable
+    ?tx_rollup_origination_size ?sc_rollup_enable
+    ?sc_rollup_max_number_of_messages_per_commitment_period ?dal_enable
     ?hard_gas_limit_per_block ?nonce_revelation_threshold () =
   let n = tup_n tup in
   let accounts =
@@ -482,6 +483,7 @@ let init_gen tup ?rng_state ?commitments ?(initial_balances = [])
     ?tx_rollup_sunset_level
     ?tx_rollup_origination_size
     ?sc_rollup_enable
+    ?sc_rollup_max_number_of_messages_per_commitment_period
     ?dal_enable
     ?hard_gas_limit_per_block
     ?nonce_revelation_threshold
