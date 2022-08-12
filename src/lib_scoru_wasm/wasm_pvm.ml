@@ -162,21 +162,11 @@ module Make (T : Tree_encoding.TREE) :
               let* eval_config = Wasm.Eval.step state.module_reg eval_config in
               Lwt.return {state with tick = Eval eval_config})
 
-    let module_reg_encoding =
-      Tree_encoding.scope
-        ["module-registry"]
-        Wasm_encoding.module_instances_encoding
-
     let compute_step tree =
       let open Lwt_syntax in
       let* state = Tree_encoding.decode pvm_state_encoding tree in
       let* state = next_state state in
       let state = {state with current_tick = Z.succ state.current_tick} in
-      (* Write the module registry to the tree in case it did not exist
-         before. *)
-      let* tree =
-        Tree_encoding.encode module_reg_encoding state.module_reg tree
-      in
       let want_more_input =
         match state.tick with
         | Eval {code = _, []; _} ->
