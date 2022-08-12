@@ -53,7 +53,7 @@ let amount_param () =
          try
            let v = Z.of_string s in
            assert (Compare.Z.(v >= Z.zero)) ;
-           return v
+           Lwt_result_syntax.return v
          with _ -> failwith "invalid amount (must be a non-negative number)"))
 
 let tez_amount_arg =
@@ -112,11 +112,12 @@ let view_options =
 let dummy_callback = Contract.Implicit Signature.Public_key_hash.zero
 
 let get_contract_caller_keys cctxt (caller : Contract.t) =
+  let open Lwt_result_syntax in
   match caller with
   | Originated _ ->
       failwith "only implicit accounts can be the source of a contract call"
   | Implicit source ->
-      Client_keys.get_key cctxt source >>=? fun (_, caller_pk, caller_sk) ->
+      let* _, caller_pk, caller_sk = Client_keys.get_key cctxt source in
       return (source, caller_pk, caller_sk)
 
 let commands_ro () : #Protocol_client_context.full Clic.command list =
@@ -131,13 +132,15 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
         @@ prefixes ["implements"; "fa1.2"]
         @@ stop)
         (fun () contract (cctxt : #Protocol_client_context.full) ->
-          Client_proto_fa12.contract_has_fa12_interface
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~contract
-            ()
-          >>=? fun _ ->
+          let open Lwt_result_syntax in
+          let* _ =
+            Client_proto_fa12.contract_has_fa12_interface
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ~contract
+              ()
+          in
           Format.printf
             "Contract %a has an FA1.2 interface.\n%!"
             Contract_hash.pp
@@ -160,21 +163,24 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
              contract
              addr
              (cctxt : #Protocol_client_context.full) ->
+          let open Lwt_syntax in
           let action =
             Client_proto_fa12.Get_balance (addr, (dummy_callback, None))
           in
-          Client_proto_fa12.run_view_action
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~contract
-            ~action
-            ~source:addr
-            ?gas
-            ?payer
-            ~unparsing_mode
-            ()
-          >>= fun res -> Client_proto_programs.print_view_result cctxt res);
+          let* res =
+            Client_proto_fa12.run_view_action
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ~contract
+              ~action
+              ~source:addr
+              ?gas
+              ?payer
+              ~unparsing_mode
+              ()
+          in
+          Client_proto_programs.print_view_result cctxt res);
       command
         ~group
         ~desc:"Ask for an address's allowance offchain"
@@ -195,22 +201,25 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
              source
              destination
              (cctxt : #Protocol_client_context.full) ->
+          let open Lwt_syntax in
           let action =
             Client_proto_fa12.Get_allowance
               (source, destination, (dummy_callback, None))
           in
-          Client_proto_fa12.run_view_action
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~contract
-            ~action
-            ~source
-            ?gas
-            ?payer
-            ~unparsing_mode
-            ()
-          >>= fun res -> Client_proto_programs.print_view_result cctxt res);
+          let* res =
+            Client_proto_fa12.run_view_action
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ~contract
+              ~action
+              ~source
+              ?gas
+              ?payer
+              ~unparsing_mode
+              ()
+          in
+          Client_proto_programs.print_view_result cctxt res);
       command
         ~group
         ~desc:"Ask for the contract's total token supply offchain"
@@ -222,20 +231,23 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
         (fun (gas, payer, unparsing_mode)
              contract
              (cctxt : #Protocol_client_context.full) ->
+          let open Lwt_syntax in
           let action =
             Client_proto_fa12.Get_total_supply (dummy_callback, None)
           in
-          Client_proto_fa12.run_view_action
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~contract
-            ~action
-            ?gas
-            ?payer
-            ~unparsing_mode
-            ()
-          >>= fun res -> Client_proto_programs.print_view_result cctxt res);
+          let* res =
+            Client_proto_fa12.run_view_action
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ~contract
+              ~action
+              ?gas
+              ?payer
+              ~unparsing_mode
+              ()
+          in
+          Client_proto_programs.print_view_result cctxt res);
       command
         ~group
         ~desc:"Ask for an address's balance using a callback contract"
@@ -267,35 +279,40 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
              addr
              callback
              (cctxt : #Protocol_client_context.full) ->
-          get_contract_caller_keys cctxt addr
-          >>=? fun (source, src_pk, src_sk) ->
+          let open Lwt_result_syntax in
+          let* source, src_pk, src_sk = get_contract_caller_keys cctxt addr in
           let action =
             Client_proto_fa12.Get_balance (addr, (callback, callback_entrypoint))
           in
-          Client_proto_fa12.call_contract
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~contract
-            ~action
-            ?confirmations:cctxt#confirmations
-            ~dry_run
-            ~verbose_signing
-            ?fee
-            ~source
-            ~src_pk
-            ~src_sk
-            ~tez_amount
-            ?gas_limit
-            ?storage_limit
-            ?counter
-            ~fee_parameter
-            ()
-          >>= Client_proto_context_commands.report_michelson_errors
-                ~no_print_source
-                ~msg:"transfer simulation failed"
-                cctxt
-          >>= fun _ -> return_unit);
+          let*! errors =
+            Client_proto_fa12.call_contract
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ~contract
+              ~action
+              ?confirmations:cctxt#confirmations
+              ~dry_run
+              ~verbose_signing
+              ?fee
+              ~source
+              ~src_pk
+              ~src_sk
+              ~tez_amount
+              ?gas_limit
+              ?storage_limit
+              ?counter
+              ~fee_parameter
+              ()
+          in
+          let*! _ =
+            Client_proto_context_commands.report_michelson_errors
+              ~no_print_source
+              ~msg:"transfer simulation failed"
+              cctxt
+              errors
+          in
+          return_unit);
       command
         ~group
         ~desc:"Ask for an address's allowance using a callback contract"
@@ -330,36 +347,41 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
              dst
              callback
              (cctxt : #Protocol_client_context.full) ->
-          get_contract_caller_keys cctxt src
-          >>=? fun (source, src_pk, src_sk) ->
+          let open Lwt_result_syntax in
+          let* source, src_pk, src_sk = get_contract_caller_keys cctxt src in
           let action =
             Client_proto_fa12.Get_allowance
               (src, dst, (callback, callback_entrypoint))
           in
-          Client_proto_fa12.call_contract
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~contract
-            ~action
-            ?confirmations:cctxt#confirmations
-            ~dry_run
-            ~verbose_signing
-            ?fee
-            ~source
-            ~src_pk
-            ~src_sk
-            ~tez_amount
-            ?gas_limit
-            ?storage_limit
-            ?counter
-            ~fee_parameter
-            ()
-          >>= Client_proto_context_commands.report_michelson_errors
-                ~no_print_source
-                ~msg:"transfer simulation failed"
-                cctxt
-          >>= fun _ -> return_unit);
+          let*! errors =
+            Client_proto_fa12.call_contract
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ~contract
+              ~action
+              ?confirmations:cctxt#confirmations
+              ~dry_run
+              ~verbose_signing
+              ?fee
+              ~source
+              ~src_pk
+              ~src_sk
+              ~tez_amount
+              ?gas_limit
+              ?storage_limit
+              ?counter
+              ~fee_parameter
+              ()
+          in
+          let*! _ =
+            Client_proto_context_commands.report_michelson_errors
+              ~no_print_source
+              ~msg:"transfer simulation failed"
+              cctxt
+              errors
+          in
+          return_unit);
       command
         ~group
         ~desc:
@@ -390,35 +412,40 @@ let commands_ro () : #Protocol_client_context.full Clic.command list =
              addr
              callback
              (cctxt : #Protocol_client_context.full) ->
-          get_contract_caller_keys cctxt addr
-          >>=? fun (source, src_pk, src_sk) ->
+          let open Lwt_result_syntax in
+          let* source, src_pk, src_sk = get_contract_caller_keys cctxt addr in
           let action =
             Client_proto_fa12.Get_total_supply (callback, callback_entrypoint)
           in
-          Client_proto_fa12.call_contract
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~contract
-            ~action
-            ?confirmations:cctxt#confirmations
-            ~dry_run
-            ~verbose_signing
-            ?fee
-            ~source
-            ~src_pk
-            ~src_sk
-            ~tez_amount
-            ?gas_limit
-            ?storage_limit
-            ?counter
-            ~fee_parameter
-            ()
-          >>= Client_proto_context_commands.report_michelson_errors
-                ~no_print_source
-                ~msg:"transfer simulation failed"
-                cctxt
-          >>= fun _ -> return_unit);
+          let*! errors =
+            Client_proto_fa12.call_contract
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ~contract
+              ~action
+              ?confirmations:cctxt#confirmations
+              ~dry_run
+              ~verbose_signing
+              ?fee
+              ~source
+              ~src_pk
+              ~src_sk
+              ~tez_amount
+              ?gas_limit
+              ?storage_limit
+              ?counter
+              ~fee_parameter
+              ()
+          in
+          let*! _ =
+            Client_proto_context_commands.report_michelson_errors
+              ~no_print_source
+              ~msg:"transfer simulation failed"
+              cctxt
+              errors
+          in
+          return_unit);
     ]
 
 let commands_rw () : #Protocol_client_context.full Clic.command list =
@@ -458,34 +485,41 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              src
              dst
              (cctxt : #Protocol_client_context.full) ->
+          let open Lwt_result_syntax in
           let caller = Option.value ~default:src as_address in
-          get_contract_caller_keys cctxt caller
-          >>=? fun (source, caller_pk, caller_sk) ->
+          let* source, caller_pk, caller_sk =
+            get_contract_caller_keys cctxt caller
+          in
           let action = Client_proto_fa12.Transfer (src, dst, amount) in
-          Client_proto_fa12.call_contract
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~contract
-            ~action
-            ?confirmations:cctxt#confirmations
-            ~dry_run
-            ~verbose_signing
-            ?fee
-            ~source
-            ~src_pk:caller_pk
-            ~src_sk:caller_sk
-            ~tez_amount
-            ?gas_limit
-            ?storage_limit
-            ?counter
-            ~fee_parameter
-            ()
-          >>= Client_proto_context_commands.report_michelson_errors
-                ~no_print_source
-                ~msg:"transfer simulation failed"
-                cctxt
-          >>= fun _ -> return_unit);
+          let*! errors =
+            Client_proto_fa12.call_contract
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ~contract
+              ~action
+              ?confirmations:cctxt#confirmations
+              ~dry_run
+              ~verbose_signing
+              ?fee
+              ~source
+              ~src_pk:caller_pk
+              ~src_sk:caller_sk
+              ~tez_amount
+              ?gas_limit
+              ?storage_limit
+              ?counter
+              ~fee_parameter
+              ()
+          in
+          let*! _ =
+            Client_proto_context_commands.report_michelson_errors
+              ~no_print_source
+              ~msg:"transfer simulation failed"
+              cctxt
+              errors
+          in
+          return_unit);
       command
         ~group
         ~desc:"Allow account to transfer an amount of token"
@@ -512,33 +546,38 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              amount
              dst
              (cctxt : #Protocol_client_context.full) ->
-          get_contract_caller_keys cctxt source
-          >>=? fun (source, src_pk, src_sk) ->
+          let open Lwt_result_syntax in
+          let* source, src_pk, src_sk = get_contract_caller_keys cctxt source in
           let action = Client_proto_fa12.Approve (dst, amount) in
-          Client_proto_fa12.call_contract
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~contract
-            ~action
-            ?confirmations:cctxt#confirmations
-            ~dry_run
-            ~verbose_signing
-            ?fee
-            ~source
-            ~src_pk
-            ~src_sk
-            ~tez_amount
-            ?gas_limit
-            ?storage_limit
-            ?counter
-            ~fee_parameter
-            ()
-          >>= Client_proto_context_commands.report_michelson_errors
-                ~no_print_source
-                ~msg:"transfer simulation failed"
-                cctxt
-          >>= fun _ -> return_unit);
+          let*! errors =
+            Client_proto_fa12.call_contract
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ~contract
+              ~action
+              ?confirmations:cctxt#confirmations
+              ~dry_run
+              ~verbose_signing
+              ?fee
+              ~source
+              ~src_pk
+              ~src_sk
+              ~tez_amount
+              ?gas_limit
+              ?storage_limit
+              ?counter
+              ~fee_parameter
+              ()
+          in
+          let*! _ =
+            Client_proto_context_commands.report_michelson_errors
+              ~no_print_source
+              ~msg:"transfer simulation failed"
+              cctxt
+              errors
+          in
+          return_unit);
       command
         ~group
         ~desc:
@@ -587,6 +626,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              src
              operations_json
              cctxt ->
+          let open Lwt_result_syntax in
           let caller = Option.value ~default:src as_address in
           match
             Data_encoding.Json.destruct
@@ -595,31 +635,37 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
           with
           | [] -> failwith "Empty operation list"
           | operations ->
-              get_contract_caller_keys cctxt caller
-              >>=? fun (source, src_pk, src_sk) ->
-              Client_proto_fa12.inject_token_transfer_batch
-                cctxt
-                ~chain:cctxt#chain
-                ~block:cctxt#block
-                ?confirmations:cctxt#confirmations
-                ~dry_run
-                ~verbose_signing
-                ~sender:src
-                ~source
-                ~src_pk
-                ~src_sk
-                ~token_transfers:operations
-                ~fee_parameter
-                ?counter
-                ?default_fee:fee
-                ?default_gas_limit:gas_limit
-                ?default_storage_limit:storage_limit
-                ()
-              >>= Client_proto_context_commands.report_michelson_errors
-                    ~no_print_source
-                    ~msg:"multiple transfers simulation failed"
-                    cctxt
-              >>= fun _ -> return_unit
+              let* source, src_pk, src_sk =
+                get_contract_caller_keys cctxt caller
+              in
+              let*! errors =
+                Client_proto_fa12.inject_token_transfer_batch
+                  cctxt
+                  ~chain:cctxt#chain
+                  ~block:cctxt#block
+                  ?confirmations:cctxt#confirmations
+                  ~dry_run
+                  ~verbose_signing
+                  ~sender:src
+                  ~source
+                  ~src_pk
+                  ~src_sk
+                  ~token_transfers:operations
+                  ~fee_parameter
+                  ?counter
+                  ?default_fee:fee
+                  ?default_gas_limit:gas_limit
+                  ?default_storage_limit:storage_limit
+                  ()
+              in
+              let*! _ =
+                Client_proto_context_commands.report_michelson_errors
+                  ~no_print_source
+                  ~msg:"multiple transfers simulation failed"
+                  cctxt
+                  errors
+              in
+              return_unit
           | exception (Data_encoding.Json.Cannot_destruct (path, exn2) as exn)
             -> (
               match (path, operations_json) with

@@ -4074,8 +4074,11 @@ module Protocol = Protocol
         ~path:(path // "lib_client_commands")
         ~deps:
           [
-            octez_base |> open_ ~m:"TzPervasives"
+            octez_base
+            |> if_ N.(number <= 14)
+            |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            octez_base |> if_ N.(number >= 15) |> open_ ~m:"TzPervasives";
             main |> open_;
             parameters |> if_some |> if_ N.(number >= 013) |> open_;
             octez_stdlib_unix |> open_;
@@ -4126,8 +4129,11 @@ module Protocol = Protocol
         ~opam:(sf "tezos-client-%s" name_dash)
         ~deps:
           [
-            octez_base |> open_ ~m:"TzPervasives"
+            octez_base
+            |> if_ N.(number <= 14)
+            |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            octez_base |> if_ N.(number >= 15) |> open_ ~m:"TzPervasives";
             main |> open_;
             parameters |> if_some |> if_ N.(number >= 013) |> open_;
             octez_protocol_environment;
