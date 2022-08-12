@@ -453,14 +453,13 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
             "type_result"
             (value [] Interpreter_encodings.Types.value_type_encoding)))
 
-  let module_ref_encoding ~module_reg =
+  let module_ref_encoding =
     conv
-      (fun key ->
-        Instance.{key = Module_key key; registry = Lazy.force module_reg})
-      (fun Instance.{key = Module_key key; _} -> key)
+      (fun key -> Instance.Module_key key)
+      (fun (Instance.Module_key key) -> key)
       (value [] Data_encoding.string)
 
-  let function_encoding ~module_reg =
+  let function_encoding =
     tagged_union
       string_tag
       [
@@ -479,7 +478,7 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
           (tup5
              ~flatten:false
              function_type_encoding
-             (scope ["module"] (module_ref_encoding ~module_reg))
+             (scope ["module"] module_ref_encoding)
              (value ["ftype"] Interpreter_encodings.Ast.var_encoding)
              (lazy_vector_encoding
                 "locals"
@@ -497,13 +496,13 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
             Func.AstFunc (type_, module_, func));
       ]
 
-  let value_ref_encoding ~module_reg =
+  let value_ref_encoding =
     tagged_union
       string_tag
       [
         case
           "FuncRef"
-          (function_encoding ~module_reg)
+          function_encoding
           (fun val_ref ->
             match val_ref with
             | Instance.FuncRef func_inst -> Some func_inst
@@ -521,7 +520,7 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
           (fun v -> Values.NullRef v);
       ]
 
-  let value_encoding ~module_reg =
+  let value_encoding =
     tagged_union
       string_tag
       [
@@ -537,12 +536,12 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
           (fun v -> Values.Vec v);
         case
           "RefType"
-          (value_ref_encoding ~module_reg)
+          value_ref_encoding
           (function Values.Ref r -> Some r | _ -> None)
           (fun r -> Values.Ref r);
       ]
 
-  let values_encoding ~module_reg = list_encoding (value_encoding ~module_reg)
+  let values_encoding = list_encoding value_encoding
 
   let memory_encoding =
     conv
@@ -558,7 +557,7 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
          (value_option ["max"] Data_encoding.int32)
          (scope ["chunks"] chunked_byte_vector))
 
-  let table_encoding ~module_reg =
+  let table_encoding =
     conv
       (fun (min, max, vector, ref_type) ->
         let table_type = Types.TableType ({min; max}, ref_type) in
@@ -570,10 +569,10 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
          ~flatten:false
          (value ["min"] Data_encoding.int32)
          (value_option ["max"] Data_encoding.int32)
-         (lazy_vector_encoding "refs" (value_ref_encoding ~module_reg))
+         (lazy_vector_encoding "refs" value_ref_encoding)
          (value ["ref-type"] Interpreter_encodings.Types.ref_type_encoding))
 
-  let global_encoding ~module_reg =
+  let global_encoding =
     conv
       (fun (type_, value) ->
         let ty = Types.GlobalType (Values.type_of_value value, type_) in
@@ -585,41 +584,38 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
       (tup2
          ~flatten:false
          (value ["type"] Interpreter_encodings.Types.mutability_encoding)
-         (scope ["value"] (value_encoding ~module_reg)))
+         (scope ["value"] value_encoding))
 
   let memory_instance_encoding = lazy_vector_encoding "memories" memory_encoding
 
-  let table_vector_encoding ~module_reg =
-    lazy_vector_encoding "tables" (table_encoding ~module_reg)
+  let table_vector_encoding = lazy_vector_encoding "tables" table_encoding
 
-  let global_vector_encoding ~module_reg =
-    lazy_vector_encoding "globals" (global_encoding ~module_reg)
+  let global_vector_encoding = lazy_vector_encoding "globals" global_encoding
 
   let data_label_ref_encoding =
     conv (fun x -> ref x) (fun r -> !r) data_label_encoding
 
-  let function_vector_encoding ~module_reg =
-    lazy_vector_encoding "functions" (function_encoding ~module_reg)
+  let function_vector_encoding =
+    lazy_vector_encoding "functions" function_encoding
 
   let function_type_vector_encoding =
     lazy_vector_encoding "types" function_type_encoding
 
-  let value_ref_vector_encoding ~module_reg =
-    lazy_vector_encoding "refs" (value_ref_encoding ~module_reg)
+  let value_ref_vector_encoding = lazy_vector_encoding "refs" value_ref_encoding
 
-  let extern_map_encoding ~module_reg =
+  let extern_map_encoding =
     NameMap.lazy_map
       (tagged_union
          string_tag
          [
            case
              "ExternFunc"
-             (function_encoding ~module_reg)
+             function_encoding
              (function Instance.ExternFunc x -> Some x | _ -> None)
              (fun x -> Instance.ExternFunc x);
            case
              "ExternTable"
-             (table_encoding ~module_reg)
+             table_encoding
              (function Instance.ExternTable x -> Some x | _ -> None)
              (fun x -> Instance.ExternTable x);
            case
@@ -629,18 +625,15 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
              (fun x -> Instance.ExternMemory x);
            case
              "ExternGlobal"
-             (global_encoding ~module_reg)
+             global_encoding
              (function Instance.ExternGlobal x -> Some x | _ -> None)
              (fun x -> Instance.ExternGlobal x);
          ])
 
-  let value_ref_vector_vector_encoding ~module_reg =
+  let value_ref_vector_vector_encoding =
     lazy_vector_encoding
       "elements"
-      (conv
-         (fun x -> ref x)
-         (fun r -> !r)
-         (value_ref_vector_encoding ~module_reg))
+      (conv (fun x -> ref x) (fun r -> !r) value_ref_vector_encoding)
 
   let data_instance_encoding =
     lazy_vector_encoding "datas" data_label_ref_encoding
@@ -659,7 +652,7 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
       (fun {blocks; datas} -> (blocks, datas))
       (tup2 ~flatten:false block_table_encoding datas_table_encoding)
 
-  let module_instance_encoding ~module_reg =
+  let module_instance_encoding =
     conv
       (fun ( types,
              funcs,
@@ -704,37 +697,32 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
       (tup9
          ~flatten:false
          function_type_vector_encoding
-         (function_vector_encoding ~module_reg)
-         (table_vector_encoding ~module_reg)
+         function_vector_encoding
+         table_vector_encoding
          memory_instance_encoding
-         (global_vector_encoding ~module_reg)
-         (extern_map_encoding ~module_reg)
-         (value_ref_vector_vector_encoding ~module_reg)
+         global_vector_encoding
+         extern_map_encoding
+         value_ref_vector_vector_encoding
          data_instance_encoding
          allocations_encoding)
 
   let module_instances_encoding =
-    with_self_reference (fun module_reg ->
-        conv
-          Instance.ModuleMap.of_immutable
-          Instance.ModuleMap.snapshot
-          (scope
-             ["modules"]
-             (ModuleMap.lazy_map (module_instance_encoding ~module_reg))))
+    conv
+      Instance.ModuleMap.of_immutable
+      Instance.ModuleMap.snapshot
+      (scope ["modules"] (ModuleMap.lazy_map module_instance_encoding))
 
-  let frame_encoding ~module_reg =
-    let locals_encoding =
-      list_encoding @@ conv ref ( ! ) @@ value_encoding ~module_reg
-    in
+  let frame_encoding =
+    let locals_encoding = list_encoding @@ conv ref ( ! ) @@ value_encoding in
     conv
       (fun (inst, locals) -> Eval.{inst; locals})
       (fun Eval.{inst; locals} -> (inst, locals))
       (tup2
          ~flatten:true
-         (scope ["module"] (module_ref_encoding ~module_reg))
+         (scope ["module"] module_ref_encoding)
          (scope ["locals"] locals_encoding))
 
-  let rec admin_instr'_encoding ~module_reg =
+  let rec admin_instr'_encoding () =
     let open Eval in
     tagged_union
       string_tag
@@ -755,12 +743,12 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
           (fun x -> Plain x);
         case
           "Refer"
-          (value_ref_encoding ~module_reg)
+          value_ref_encoding
           (function Refer x -> Some x | _ -> None)
           (fun x -> Refer x);
         case
           "Invoke"
-          (function_encoding ~module_reg)
+          function_encoding
           (function Invoke x -> Some x | _ -> None)
           (fun x -> Invoke x);
         case
@@ -770,15 +758,12 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
           (fun x -> Trapping x);
         case
           "Returning"
-          (values_encoding ~module_reg)
+          values_encoding
           (function Returning x -> Some x | _ -> None)
           (fun x -> Returning x);
         case
           "Breaking"
-          (tup2
-             ~flatten:false
-             (value [] Data_encoding.int32)
-             (values_encoding ~module_reg))
+          (tup2 ~flatten:false (value [] Data_encoding.int32) values_encoding)
           (function
             | Breaking (index, values) -> Some (index, values) | _ -> None)
           (fun (index, values) -> Breaking (index, values));
@@ -788,8 +773,8 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
              ~flatten:false
              (value [] Data_encoding.int32)
              (list_encoding instruction_encoding)
-             (values_encoding ~module_reg)
-             (list_encoding (admin_instr_encoding ~module_reg)))
+             values_encoding
+             (list_encoding (admin_instr_encoding ())))
           (function
             | Label (index, final_instrs, (values, instrs)) ->
                 Some (index, final_instrs, values, instrs)
@@ -801,9 +786,9 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
           (tup4
              ~flatten:false
              (value [] Data_encoding.int32)
-             (frame_encoding ~module_reg)
-             (values_encoding ~module_reg)
-             (list_encoding (admin_instr_encoding ~module_reg)))
+             frame_encoding
+             values_encoding
+             (list_encoding (admin_instr_encoding ())))
           (function
             | Frame (index, frame, (values, instrs)) ->
                 Some (index, frame, values, instrs)
@@ -812,11 +797,13 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
             Frame (index, frame, (values, instrs)));
       ]
 
-  and admin_instr_encoding ~module_reg =
+  and admin_instr_encoding () =
     conv
       Source.(at no_region)
       Source.(fun x -> x.it)
-      (delayed @@ fun () -> admin_instr'_encoding ~module_reg)
+      (delayed admin_instr'_encoding)
+
+  let admin_instr_encoding = admin_instr_encoding ()
 
   let input_buffer_message_encoding =
     conv_lwt
@@ -857,7 +844,7 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
                input_buffer_message_encoding))
          (value ["num-messages"] Data_encoding.z))
 
-  let config_encoding ~host_funcs ~module_reg =
+  let config_encoding ~host_funcs =
     conv
       (fun (frame, input, instrs, values, budget) ->
         Eval.{frame; input; code = (values, instrs); host_funcs; budget})
@@ -865,11 +852,9 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
         (frame, input, instrs, values, budget))
       (tup5
          ~flatten:true
-         (scope ["frame"] (frame_encoding ~module_reg))
+         (scope ["frame"] frame_encoding)
          (scope ["input"] input_buffer_encoding)
-         (scope
-            ["instructions"]
-            (list_encoding (admin_instr_encoding ~module_reg)))
-         (scope ["values"] (values_encoding ~module_reg))
+         (scope ["instructions"] (list_encoding admin_instr_encoding))
+         (scope ["values"] values_encoding)
          (value ["budget"] Data_encoding.int31))
 end

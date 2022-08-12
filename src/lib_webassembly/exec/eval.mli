@@ -10,21 +10,23 @@ exception Crash of Source.region * string
 exception Exhaustion of Source.region * string
 
 val init :
-  self:module_ref ->
+  module_reg:module_reg ->
+  self:module_key ->
   Host_funcs.registry ->
   Ast.module_ ->
   extern list ->
   module_inst Lwt.t (* raises Link, Trap *)
 
 val invoke :
-  ?caller:module_ref ->
+  module_reg:module_reg ->
+  caller:module_key ->
   ?input:Input_buffer.t ->
   Host_funcs.registry ->
   func_inst ->
   value list ->
   value list Lwt.t (* raises Trap *)
 
-type frame = {inst : module_ref; locals : value ref list}
+type frame = {inst : module_key; locals : value ref list}
 
 type code = value list * admin_instr list
 
@@ -49,12 +51,12 @@ type config = {
   budget : int; (* to model stack overflow *)
 }
 
-val step : config -> config Lwt.t
+val step : module_reg -> config -> config Lwt.t
 
 val config :
   ?input:input_inst ->
   Host_funcs.registry ->
-  module_ref ->
+  module_key ->
   value list ->
   admin_instr list ->
   config

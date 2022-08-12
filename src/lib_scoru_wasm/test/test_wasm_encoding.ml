@@ -103,7 +103,6 @@ let test_module_roundtrip () =
        is not important when encoding or decoding. *)
     Instance.ModuleMap.create ()
   in
-  let lazy_dummy_module_reg = Lazy.from_val dummy_module_reg in
 
   qcheck
     ~print
@@ -112,17 +111,11 @@ let test_module_roundtrip () =
       (* We need to print here in order to force lazy bindings to be evaluated. *)
       let module1_str = print module1 in
       let*! module2 =
-        encode_decode
-          (Wasm_encoding.module_instance_encoding
-             ~module_reg:lazy_dummy_module_reg)
-          module1
+        encode_decode Wasm_encoding.module_instance_encoding module1
       in
       let module2_str = print module2 in
       let*! module3 =
-        encode_decode
-          (Wasm_encoding.module_instance_encoding
-             ~module_reg:lazy_dummy_module_reg)
-          module2
+        encode_decode Wasm_encoding.module_instance_encoding module2
       in
       let module3_str = print module3 in
       (* Check that modules match. *)
@@ -142,30 +135,19 @@ let test_generic_tree ~pp ~gen ~encoding =
        is not important when encoding or decoding. *)
     Instance.ModuleMap.create ()
   in
-  let lazy_dummy_module_reg = Lazy.from_val dummy_module_reg in
   let host_funcs = Host_funcs.empty () in
   qcheck ~print (gen ~host_funcs ~module_reg:dummy_module_reg) (fun value1 ->
       let*! empty_tree = empty_tree () in
       (* We need to print here in order to force lazy bindings to be evaluated. *)
       let _ = print value1 in
       let*! tree1 =
-        Tree_encoding.encode
-          (encoding ~host_funcs ~module_reg:lazy_dummy_module_reg)
-          value1
-          empty_tree
+        Tree_encoding.encode (encoding ~host_funcs) value1 empty_tree
       in
-      let*! value2 =
-        Tree_encoding.decode
-          (encoding ~host_funcs ~module_reg:lazy_dummy_module_reg)
-          tree1
-      in
+      let*! value2 = Tree_encoding.decode (encoding ~host_funcs) tree1 in
       (* We need to print here in order to force lazy bindings to be evaluated. *)
       let _ = print value2 in
       let*! tree2 =
-        Tree_encoding.encode
-          (encoding ~host_funcs ~module_reg:lazy_dummy_module_reg)
-          value2
-          empty_tree
+        Tree_encoding.encode (encoding ~host_funcs) value2 empty_tree
       in
       assert (Tree.equal tree1 tree2) ;
       return_unit)
@@ -190,8 +172,7 @@ let test_input_buffer_tree () =
   test_generic_tree
     ~pp:Ast_printer.pp_input_buffer
     ~gen:(fun ~host_funcs:_ ~module_reg:_ -> Ast_generators.input_buffer_gen)
-    ~encoding:(fun ~host_funcs:_ ~module_reg:_ ->
-      Wasm_encoding.input_buffer_encoding)
+    ~encoding:(fun ~host_funcs:_ -> Wasm_encoding.input_buffer_encoding)
 
 (** Test serialize/deserialize values and compare trees. *)
 let test_values_tree () =
@@ -199,8 +180,7 @@ let test_values_tree () =
     ~pp:(Format.pp_print_list Ast_printer.pp_value)
     ~gen:(fun ~host_funcs:_ ~module_reg:_ ->
       QCheck2.Gen.list Ast_generators.value_gen)
-    ~encoding:(fun ~host_funcs:_ ~module_reg ->
-      Wasm_encoding.(values_encoding ~module_reg))
+    ~encoding:(fun ~host_funcs:_ -> Wasm_encoding.values_encoding)
 
 (** Test serialize/deserialize administrative instructions and compare trees. *)
 let test_admin_instr_tree () =

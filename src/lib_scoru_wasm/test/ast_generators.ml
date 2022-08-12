@@ -412,22 +412,20 @@ let allocations_gen =
   let+ datas = datas_table_gen in
   Ast.{blocks; datas}
 
-let module_ref_and_instance_gen ?module_reg () =
+let module_key_and_instance_gen ?module_reg () =
   let module_reg =
     match module_reg with
     | None -> Instance.ModuleMap.create ()
     | Some module_reg -> module_reg
   in
   let* module_name = string_printable in
-  let module_ref =
-    Instance.(alloc_module_ref (Module_key module_name) module_reg)
-  in
+  let module_key = Instance.Module_key module_name in
   let* types = vector_gen func_type_gen in
-  let* funcs = vector_gen @@ func_gen module_ref in
+  let* funcs = vector_gen @@ func_gen module_key in
   let* tables = vector_gen table_gen in
   let* memories = vector_gen memory_gen in
   let* globals = vector_gen global_gen in
-  let* exports = map_gen (extern_gen module_ref) in
+  let* exports = map_gen (extern_gen module_key) in
   let* elems = vector_gen elems_gen in
   let* datas = vector_gen datas_gen in
   let* allocations = allocations_gen in
@@ -444,14 +442,14 @@ let module_ref_and_instance_gen ?module_reg () =
       allocations;
     }
   in
-  Instance.update_module_ref module_ref module_ ;
-  return (module_ref, module_)
+  Instance.update_module_ref module_reg module_key module_ ;
+  return (module_key, module_)
 
 let module_gen ?module_reg () =
-  map snd (module_ref_and_instance_gen ?module_reg ())
+  map snd (module_key_and_instance_gen ?module_reg ())
 
 let frame_gen ~module_reg =
-  let* inst, _ = module_ref_and_instance_gen ~module_reg () in
+  let* inst, _ = module_key_and_instance_gen ~module_reg () in
   let+ locals = small_list (map ref value_gen) in
   Eval.{inst; locals}
 
@@ -471,7 +469,7 @@ let rec admin_instr'_gen ~module_reg depth =
     Refer ref_
   in
   let invoke_gen =
-    let* inst, _ = module_ref_and_instance_gen ~module_reg () in
+    let* inst, _ = module_key_and_instance_gen ~module_reg () in
     let+ func = func_gen inst in
     Invoke func
   in

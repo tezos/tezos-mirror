@@ -541,7 +541,7 @@ let pp_module out
 
 let pp_frame out frame =
   let open Eval in
-  let (Module_key key) = frame.inst.key in
+  let (Module_key key) = frame.inst in
   Format.fprintf
     out
     "@[<v 2>{module = %s;@;locals = %a;@;}@]"

@@ -156,19 +156,19 @@ let test_host_fun () =
   Host_funcs.register_host_funcs host_funcs_registry ;
 
   let module_reg = Instance.ModuleMap.create () in
-  let module_ref =
-    Instance.(alloc_module_ref (Module_key "test") ~module_inst module_reg)
-  in
+  let module_key = Instance.Module_key "test" in
+  Instance.update_module_ref module_reg module_key module_inst ;
 
   let* result =
     Eval.invoke
-      ~caller:module_ref
+      ~module_reg
+      ~caller:module_key
       host_funcs_registry
       ~input
       Host_funcs.Internal_for_tests.read_input
       values
   in
-  let* module_inst = Instance.resolve_module_ref module_ref in
+  let* module_inst = Instance.resolve_module_ref module_reg module_key in
   let* memory = Lazy_vector.LwtInt32Vector.get 0l module_inst.memories in
   assert (Input_buffer.num_elements input = Z.zero) ;
   let* m = Memory.load_bytes memory 0l 1 in

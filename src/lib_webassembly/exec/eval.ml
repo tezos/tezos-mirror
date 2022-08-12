@@ -55,7 +55,7 @@ let numeric_error at = function
 
 type 'a stack = 'a list
 
-type frame = {inst : module_ref; locals : value ref list}
+type frame = {inst : module_key; locals : value ref list}
 
 type code = value stack * admin_instr list
 
@@ -166,40 +166,40 @@ let drop n (vs : 'a stack) at =
  *   c : config
  *)
 
-let mem_oob frame x i n =
-  let* inst = resolve_module_ref frame.inst in
+let mem_oob module_reg frame x i n =
+  let* inst = resolve_module_ref module_reg frame.inst in
   let+ mem = memory inst x in
   I64.gt_u
     (I64.add (I64_convert.extend_i32_u i) (I64_convert.extend_i32_u n))
     (Memory.bound mem)
 
-let data_oob frame x i n =
-  let* inst = resolve_module_ref frame.inst in
+let data_oob module_reg frame x i n =
+  let* inst = resolve_module_ref module_reg frame.inst in
   let* data_label = data inst x in
   let+ data = Ast.get_data !data_label inst.allocations.datas in
   I64.gt_u
     (I64.add (I64_convert.extend_i32_u i) (I64_convert.extend_i32_u n))
     (Chunked_byte_vector.Lwt.length data)
 
-let table_oob frame x i n =
-  let* inst = resolve_module_ref frame.inst in
+let table_oob module_reg frame x i n =
+  let* inst = resolve_module_ref module_reg frame.inst in
   let+ tbl = table inst x in
   I64.gt_u
     (I64.add (I64_convert.extend_i32_u i) (I64_convert.extend_i32_u n))
     (I64_convert.extend_i32_u (Table.size tbl))
 
-let elem_oob frame x i n =
-  let* inst = resolve_module_ref frame.inst in
+let elem_oob module_reg frame x i n =
+  let* inst = resolve_module_ref module_reg frame.inst in
   let+ elem = elem inst x in
   I64.gt_u
     (I64.add (I64_convert.extend_i32_u i) (I64_convert.extend_i32_u n))
     (Int64.of_int32 (Instance.Vector.num_elements !elem))
 
-let rec step (c : config) : config Lwt.t =
+let rec step (module_reg : module_reg) (c : config) : config Lwt.t =
   let {frame; code = vs, es; _} = c in
   match es with
   | {it = From_block (Block_label b, i); at} :: es ->
-      let* inst = resolve_module_ref frame.inst in
+      let* inst = resolve_module_ref module_reg frame.inst in
       let* block = Vector.get b inst.allocations.blocks in
       let length = Vector.num_elements block in
       if i = length then Lwt.return {c with code = (vs, es)}
@@ -210,11 +210,11 @@ let rec step (c : config) : config Lwt.t =
             ( Plain instr.it @@ instr.at,
               {it = From_block (Block_label b, Int32.succ i); at} :: es )
         in
-        step_resolved c frame vs e es
-  | e :: es -> step_resolved c frame vs e es
+        step_resolved module_reg c frame vs e es
+  | e :: es -> step_resolved module_reg c frame vs e es
   | [] -> Lwt.return c
 
-and step_resolved (c : config) frame vs e es : config Lwt.t =
+and step_resolved module_reg (c : config) frame vs e es : config Lwt.t =
   let+ vs', es' =
     match (e.it, vs) with
     | From_block _, _ -> assert false (* resolved by [step] *)
@@ -224,7 +224,7 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
             Lwt.return (vs, [Trapping "unreachable executed" @@ e.at])
         | Nop, vs -> Lwt.return (vs, [])
         | Block (bt, es'), vs ->
-            let* inst = resolve_module_ref frame.inst in
+            let* inst = resolve_module_ref module_reg frame.inst in
             let+ (FuncType (ts1, ts2)) = block_type inst bt in
             let n1 = Lazy_vector.LwtInt32Vector.num_elements ts1 in
             let n2 = Lazy_vector.LwtInt32Vector.num_elements ts2 in
@@ -233,7 +233,7 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
               [Label (n2, [], (args, [From_block (es', 0l) @@ e.at])) @@ e.at]
             )
         | Loop (bt, es'), vs ->
-            let* inst = resolve_module_ref frame.inst in
+            let* inst = resolve_module_ref module_reg frame.inst in
             let+ (FuncType (ts1, ts2)) = block_type inst bt in
             let n1 = Lazy_vector.LwtInt32Vector.num_elements ts1 in
             let args, vs' = (take n1 vs e.at, drop n1 vs e.at) in
@@ -257,11 +257,11 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
               else (vs', [Plain (Br (Lib.List32.nth xs i)) @@ e.at]))
         | Return, vs -> Lwt.return ([], [Returning vs @@ e.at])
         | Call x, vs ->
-            let* inst = resolve_module_ref frame.inst in
+            let* inst = resolve_module_ref module_reg frame.inst in
             let+ func = func inst x in
             (vs, [Invoke func @@ e.at])
         | CallIndirect (x, y), Num (I32 i) :: vs ->
-            let* inst = resolve_module_ref frame.inst in
+            let* inst = resolve_module_ref module_reg frame.inst in
             let* func = func_ref inst x i e.at and* type_ = type_ inst y in
             let+ check_eq = Types.func_types_equal type_ (Func.type_of func) in
             if not check_eq then
@@ -280,14 +280,14 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
               (local frame x := v ;
                (v :: vs', []))
         | GlobalGet x, vs ->
-            let* inst = resolve_module_ref frame.inst in
+            let* inst = resolve_module_ref module_reg frame.inst in
             let+ glob = global inst x in
             let value = Global.load glob in
             (value :: vs, [])
         | GlobalSet x, v :: vs' ->
             Lwt.catch
               (fun () ->
-                let* inst = resolve_module_ref frame.inst in
+                let* inst = resolve_module_ref module_reg frame.inst in
                 let+ glob = global inst x in
                 Global.store glob v ;
                 (vs', []))
@@ -300,7 +300,7 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
         | TableGet x, Num (I32 i) :: vs' ->
             Lwt.catch
               (fun () ->
-                let* inst = resolve_module_ref frame.inst in
+                let* inst = resolve_module_ref module_reg frame.inst in
                 let* tbl = table inst x in
                 let+ value = Table.load tbl i in
                 (Ref value :: vs', []))
@@ -309,18 +309,18 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
         | TableSet x, Ref r :: Num (I32 i) :: vs' ->
             Lwt.catch
               (fun () ->
-                let* inst = resolve_module_ref frame.inst in
+                let* inst = resolve_module_ref module_reg frame.inst in
                 let+ tbl = table inst x in
                 Table.store tbl i r ;
                 (vs', []))
               (fun exn ->
                 Lwt.return (vs', [Trapping (table_error e.at exn) @@ e.at]))
         | TableSize x, vs ->
-            let* inst = resolve_module_ref frame.inst in
+            let* inst = resolve_module_ref module_reg frame.inst in
             let+ tbl = table inst x in
             (Num (I32 (Table.size tbl)) :: vs, [])
         | TableGrow x, Num (I32 delta) :: Ref r :: vs' ->
-            let* inst = resolve_module_ref frame.inst in
+            let* inst = resolve_module_ref module_reg frame.inst in
             let+ tab = table inst x in
             let old_size = Table.size tab in
             let result =
@@ -332,7 +332,7 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
             in
             (Num (I32 result) :: vs', [])
         | TableFill x, Num (I32 n) :: Ref r :: Num (I32 i) :: vs' ->
-            let+ oob = table_oob frame x i n in
+            let+ oob = table_oob module_reg frame x i n in
             if oob then (vs', [Trapping (table_error e.at Table.Bounds) @@ e.at])
             else if n = 0l then (vs', [])
             else
@@ -350,8 +350,8 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
                     Plain (TableFill x);
                   ] )
         | TableCopy (x, y), Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' ->
-            let+ oob_d = table_oob frame x d n
-            and+ oob_s = table_oob frame y s n in
+            let+ oob_d = table_oob module_reg frame x d n
+            and+ oob_s = table_oob module_reg frame y s n in
             if oob_d || oob_s then
               (vs', [Trapping (table_error e.at Table.Bounds) @@ e.at])
             else if n = 0l then (vs', [])
@@ -385,14 +385,14 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
                     Plain (TableSet x);
                   ] )
         | TableInit (x, y), Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' ->
-            let* oob_d = table_oob frame x d n in
-            let* oob_s = elem_oob frame y s n in
+            let* oob_d = table_oob module_reg frame x d n in
+            let* oob_s = elem_oob module_reg frame y s n in
             if oob_d || oob_s then
               Lwt.return
                 (vs', [Trapping (table_error e.at Table.Bounds) @@ e.at])
             else if n = 0l then Lwt.return (vs', [])
             else
-              let* inst = resolve_module_ref frame.inst in
+              let* inst = resolve_module_ref module_reg frame.inst in
               let* seg = elem inst y in
               let+ value = Instance.Vector.get s !seg in
               ( vs',
@@ -412,12 +412,12 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
                     Plain (TableInit (x, y));
                   ] )
         | ElemDrop x, vs ->
-            let* inst = resolve_module_ref frame.inst in
+            let* inst = resolve_module_ref module_reg frame.inst in
             let+ seg = elem inst x in
             seg := Instance.Vector.create 0l ;
             (vs, [])
         | Load {offset; ty; pack; _}, Num (I32 i) :: vs' ->
-            let* inst = resolve_module_ref frame.inst in
+            let* inst = resolve_module_ref module_reg frame.inst in
             let* mem = memory inst (0l @@ e.at) in
             Lwt.catch
               (fun () ->
@@ -431,7 +431,7 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
               (fun exn ->
                 Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
         | Store {offset; pack; _}, Num n :: Num (I32 i) :: vs' ->
-            let* inst = resolve_module_ref frame.inst in
+            let* inst = resolve_module_ref module_reg frame.inst in
             let* mem = memory inst (0l @@ e.at) in
             Lwt.catch
               (fun () ->
@@ -444,7 +444,7 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
               (fun exn ->
                 Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
         | VecLoad {offset; ty; pack; _}, Num (I32 i) :: vs' ->
-            let* inst = resolve_module_ref frame.inst in
+            let* inst = resolve_module_ref module_reg frame.inst in
             let* mem = memory inst (0l @@ e.at) in
             Lwt.catch
               (fun () ->
@@ -458,7 +458,7 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
               (fun exn ->
                 Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
         | VecStore {offset; _}, Vec v :: Num (I32 i) :: vs' ->
-            let* inst = resolve_module_ref frame.inst in
+            let* inst = resolve_module_ref module_reg frame.inst in
             let* mem = memory inst (0l @@ e.at) in
             Lwt.catch
               (fun () ->
@@ -468,7 +468,7 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
                 Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
         | ( VecLoadLane ({offset; ty; pack; _}, j),
             Vec (V128 v) :: Num (I32 i) :: vs' ) ->
-            let* inst = resolve_module_ref frame.inst in
+            let* inst = resolve_module_ref module_reg frame.inst in
             let* mem = memory inst (0l @@ e.at) in
             Lwt.catch
               (fun () ->
@@ -496,7 +496,7 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
                 Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
         | ( VecStoreLane ({offset; ty; pack; _}, j),
             Vec (V128 v) :: Num (I32 i) :: vs' ) ->
-            let* inst = resolve_module_ref frame.inst in
+            let* inst = resolve_module_ref module_reg frame.inst in
             let* mem = memory inst (0l @@ e.at) in
             Lwt.catch
               (fun () ->
@@ -533,11 +533,11 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
               (fun exn ->
                 Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
         | MemorySize, vs ->
-            let* inst = resolve_module_ref frame.inst in
+            let* inst = resolve_module_ref module_reg frame.inst in
             let+ mem = memory inst (0l @@ e.at) in
             (Num (I32 (Memory.size mem)) :: vs, [])
         | MemoryGrow, Num (I32 delta) :: vs' ->
-            let* inst = resolve_module_ref frame.inst in
+            let* inst = resolve_module_ref module_reg frame.inst in
             let+ mem = memory inst (0l @@ e.at) in
             let old_size = Memory.size mem in
             let result =
@@ -550,7 +550,7 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
             in
             (Num (I32 result) :: vs', [])
         | MemoryFill, Num (I32 n) :: Num k :: Num (I32 i) :: vs' ->
-            let+ oob = mem_oob frame (0l @@ e.at) i n in
+            let+ oob = mem_oob module_reg frame (0l @@ e.at) i n in
             if oob then
               (vs', [Trapping (memory_error e.at Memory.Bounds) @@ e.at])
             else if n = 0l then (vs', [])
@@ -575,8 +575,8 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
                     Plain MemoryFill;
                   ] )
         | MemoryCopy, Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' ->
-            let+ oob_s = mem_oob frame (0l @@ e.at) s n
-            and+ oob_d = mem_oob frame (0l @@ e.at) d n in
+            let+ oob_s = mem_oob module_reg frame (0l @@ e.at) s n
+            and+ oob_d = mem_oob module_reg frame (0l @@ e.at) d n in
             if oob_s || oob_d then
               (vs', [Trapping (memory_error e.at Memory.Bounds) @@ e.at])
             else if n = 0l then (vs', [])
@@ -638,14 +638,14 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
                          });
                   ] )
         | MemoryInit x, Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' ->
-            let* mem_oob = mem_oob frame (0l @@ e.at) d n in
-            let* data_oob = data_oob frame x s n in
+            let* mem_oob = mem_oob module_reg frame (0l @@ e.at) d n in
+            let* data_oob = data_oob module_reg frame x s n in
             if mem_oob || data_oob then
               Lwt.return
                 (vs', [Trapping (memory_error e.at Memory.Bounds) @@ e.at])
             else if n = 0l then Lwt.return (vs', [])
             else
-              let* inst = resolve_module_ref frame.inst in
+              let* inst = resolve_module_ref module_reg frame.inst in
               let* seg = data inst x in
               let* seg = Ast.get_data !seg inst.allocations.datas in
               let+ b =
@@ -672,7 +672,7 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
                     Plain (MemoryInit x);
                   ] )
         | DataDrop x, vs ->
-            let* inst = resolve_module_ref frame.inst in
+            let* inst = resolve_module_ref module_reg frame.inst in
             let+ seg = data inst x in
             seg := Data_label 0l ;
             (vs, [])
@@ -683,7 +683,7 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
               | NullRef _ -> (Num (I32 1l) :: vs', [])
               | _ -> (Num (I32 0l) :: vs', []))
         | RefFunc x, vs' ->
-            let* inst = resolve_module_ref frame.inst in
+            let* inst = resolve_module_ref module_reg frame.inst in
             let+ f = func inst x in
             (Ref (FuncRef f) :: vs', [])
         | Const n, vs -> Lwt.return (Num n.it :: vs, [])
@@ -787,7 +787,7 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
     | Label (n, es0, (vs', {it = Breaking (k, vs0); at} :: es')), vs ->
         Lwt.return (vs, [Breaking (Int32.sub k 1l, vs0) @@ at])
     | Label (n, es0, code'), vs ->
-        let+ c' = step {c with code = code'} in
+        let+ c' = step module_reg {c with code = code'} in
         (vs, [Label (n, es0, c'.code) @@ e.at])
     | Frame (n, frame', (vs', [])), vs -> Lwt.return (vs' @ vs, [])
     | Frame (n, frame', (vs', {it = Trapping msg; at} :: es')), vs ->
@@ -797,6 +797,7 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
     | Frame (n, frame', code'), vs ->
         let+ c' =
           step
+            module_reg
             {
               frame = frame';
               code = code';
@@ -837,7 +838,7 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
                 let (Host_funcs.Host_func f) =
                   Host_funcs.lookup ~global_name c.host_funcs
                 in
-                let* inst = resolve_module_ref frame.inst in
+                let* inst = resolve_module_ref module_reg frame.inst in
                 let+ res = f c.input inst (List.rev args) in
                 (List.rev res @ vs', []))
               (function
@@ -845,17 +846,17 @@ and step_resolved (c : config) frame vs e es : config Lwt.t =
   in
   {c with code = (vs', es' @ es)}
 
-let rec eval (c : config) : value stack Lwt.t =
+let rec eval module_reg (c : config) : value stack Lwt.t =
   match c.code with
   | vs, [] -> Lwt.return vs
   | vs, {it = Trapping msg; at} :: _ -> Trap.error at msg
   | vs, es ->
-      let* c = step c in
-      eval c
+      let* c = step module_reg c in
+      eval module_reg c
 
 (* Functions & Constants *)
 
-let invoke ?caller ?(input = Input_buffer.alloc ()) host_funcs
+let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ()) host_funcs
     (func : func_inst) (vs : value list) : value list Lwt.t =
   let at = match func with Func.AstFunc (_, _, f) -> f.at | _ -> no_region in
   let (FuncType (ins, out)) = Func.type_of func in
@@ -870,34 +871,31 @@ let invoke ?caller ?(input = Input_buffer.alloc ()) host_funcs
   let inst =
     match func with
     | Func.AstFunc (_, inst, _) -> inst
-    | Func.HostFunc (_, _) -> (
-        (* We create a fresh module reference to an empty module. [invoke] is
-           called at the top-level where we are not in a module context, yet.
-           Hence we need to create one for this call. *)
-        match caller with None -> empty_module_ref () | Some inst -> inst)
+    | Func.HostFunc (_, _) -> caller
   in
   let c = config ~input host_funcs inst (List.rev vs) [Invoke func @@ at] in
   Lwt.catch
     (fun () ->
-      let+ values = eval c in
+      let+ values = eval module_reg c in
       List.rev values)
     (function
       | Stack_overflow -> Exhaustion.error at "call stack exhausted"
       | exn -> Lwt.fail exn)
 
-let eval_const (inst : module_ref) (const : const) : value Lwt.t =
+let eval_const module_reg (inst : module_key) (const : const) : value Lwt.t =
   let c =
     config (Host_funcs.empty ()) inst [] [From_block (const.it, 0l) @@ const.at]
   in
-  let+ vs = eval c in
+  let+ vs = eval module_reg c in
   match vs with
   | [v] -> v
   | vs -> Crash.error const.at "wrong number of results on stack"
 
 (* Modules *)
 
-let create_func (inst_ref : module_ref) (f : func) : func_inst Lwt.t =
-  let* inst = resolve_module_ref inst_ref in
+let create_func module_reg (inst_ref : module_key) (f : func) : func_inst Lwt.t
+    =
+  let* inst = resolve_module_ref module_reg inst_ref in
   let+ type_ = type_ inst f.it.ftype in
   Func.alloc type_ inst_ref f
 
@@ -910,9 +908,10 @@ let create_memory (inst : module_inst) (mem : memory) : memory_inst =
   let {mtype} = mem.it in
   Memory.alloc mtype
 
-let create_global (inst : module_ref) (glob : global) : global_inst Lwt.t =
+let create_global module_reg (inst : module_key) (glob : global) :
+    global_inst Lwt.t =
   let {gtype; ginit} = glob.it in
-  let+ v = eval_const inst ginit in
+  let+ v = eval_const module_reg inst ginit in
   Global.alloc gtype v
 
 let create_export (inst : module_inst) (ex : export) : export_inst Lwt.t =
@@ -934,7 +933,8 @@ let create_export (inst : module_inst) (ex : export) : export_inst Lwt.t =
   in
   (name, ext)
 
-let create_elem (inst : module_ref) (seg : elem_segment) : elem_inst Lwt.t =
+let create_elem module_reg (inst : module_key) (seg : elem_segment) :
+    elem_inst Lwt.t =
   let {etype; einit; _} = seg.it in
   (* TODO: #3076
      [einit] should be changed to a lazy structure. We want to avoid traversing
@@ -943,7 +943,7 @@ let create_elem (inst : module_ref) (seg : elem_segment) : elem_inst Lwt.t =
   let+ init =
     TzStdLib.List.map_s
       (fun v ->
-        let+ r = eval_const inst v in
+        let+ r = eval_const module_reg inst v in
         as_ref r)
       einit
   in
@@ -1022,8 +1022,8 @@ let run_data (inst : module_inst) i data =
 
 let run_start start = List.map plain [Call start.it.sfunc @@ start.at]
 
-let init ~self host_funcs (m : module_) (exts : extern list) : module_inst Lwt.t
-    =
+let init ~module_reg ~self host_funcs (m : module_) (exts : extern list) :
+    module_inst Lwt.t =
   let open Lwt.Syntax in
   let {
     imports;
@@ -1042,7 +1042,7 @@ let init ~self host_funcs (m : module_) (exts : extern list) : module_inst Lwt.t
   in
 
   (* Initialize as empty module. *)
-  update_module_ref self empty_module_inst ;
+  update_module_ref module_reg self empty_module_inst ;
 
   (* TODO: #3076
 
@@ -1074,7 +1074,7 @@ let init ~self host_funcs (m : module_) (exts : extern list) : module_inst Lwt.t
     | Error () ->
         Link.error m.at "wrong number of imports provided for initialisation"
   in
-  update_module_ref self init_inst0 ;
+  update_module_ref module_reg self init_inst0 ;
 
   let inst0 =
     {
@@ -1087,17 +1087,19 @@ let init ~self host_funcs (m : module_) (exts : extern list) : module_inst Lwt.t
       allocations;
     }
   in
-  update_module_ref self inst0 ;
+  update_module_ref module_reg self inst0 ;
 
-  let* fs = TzStdLib.List.map_s (create_func self) funcs in
+  let* fs = TzStdLib.List.map_s (create_func module_reg self) funcs in
   (* TODO: #3076
      [fs]/[funcs] should be a lazy structure so we can avoid traversing it
      completely. *)
   let* funcs = Vector.concat inst0.funcs (Vector.of_list fs) in
   let inst1 = {inst0 with funcs} in
-  update_module_ref self inst1 ;
+  update_module_ref module_reg self inst1 ;
 
-  let* new_globals = TzStdLib.List.map_s (create_global self) globals in
+  let* new_globals =
+    TzStdLib.List.map_s (create_global module_reg self) globals
+  in
   (* TODO: #3076
      [tables] should be a lazy structure. *)
   let* tables =
@@ -1116,10 +1118,10 @@ let init ~self host_funcs (m : module_) (exts : extern list) : module_inst Lwt.t
      [new_globals]/[globals] should be lazy structures. *)
   let* globals = Vector.concat inst1.globals (Vector.of_list new_globals) in
   let inst2 = {inst1 with tables; memories; globals} in
-  update_module_ref self inst2 ;
+  update_module_ref module_reg self inst2 ;
 
   let* new_exports = TzStdLib.List.map_s (create_export inst2) exports in
-  let* new_elems = TzStdLib.List.map_s (create_elem self) elems in
+  let* new_elems = TzStdLib.List.map_s (create_elem module_reg self) elems in
   let new_datas = List.map (create_data inst2) datas in
   let* exports =
     (* TODO: #3076
@@ -1145,14 +1147,14 @@ let init ~self host_funcs (m : module_) (exts : extern list) : module_inst Lwt.t
         Vector.of_list new_datas;
     }
   in
-  update_module_ref self inst ;
+  update_module_ref module_reg self inst ;
 
   let es_elem = List.concat (Lib.List32.mapi (run_elem inst) elems) in
   let* datas = Lib.List32.mapi_s (run_data inst) datas in
   let es_data = TzStdLib.List.concat datas in
   let es_start = Lib.Option.get (Lib.Option.map run_start start) [] in
   let+ (_ : Values.value stack) =
-    eval (config host_funcs self [] (es_elem @ es_data @ es_start))
+    eval module_reg (config host_funcs self [] (es_elem @ es_data @ es_start))
   in
 
   inst

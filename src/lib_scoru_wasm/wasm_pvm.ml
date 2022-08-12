@@ -31,6 +31,7 @@ type pvm_state = {
   kernel : Lazy_containers.Chunked_byte_vector.Lwt.t;
   current_tick : Z.t;
   last_input_info : Wasm_pvm_sig.input_info option;
+  module_reg : Wasm.Instance.module_reg;
   tick : tick_state;
 }
 
@@ -47,7 +48,7 @@ module Make (T : Tree_encoding.TREE) :
       Host_funcs.register_host_funcs registry ;
       registry
 
-    let tick_state_encoding ~module_reg =
+    let tick_state_encoding =
       let open Tree_encoding in
       tagged_union
         ~default:Decode
@@ -60,26 +61,25 @@ module Make (T : Tree_encoding.TREE) :
             (fun () -> Decode);
           case
             "eval"
-            (Wasm_encoding.config_encoding
-               ~host_funcs
-               ~module_reg:(Lazy.from_val module_reg))
+            (Wasm_encoding.config_encoding ~host_funcs)
             (function Eval eval_config -> Some eval_config | _ -> None)
             (fun eval_config -> Eval eval_config);
         ]
 
-    let pvm_state_encoding ~module_reg =
+    let pvm_state_encoding =
       let open Tree_encoding in
       conv
-        (fun (current_tick, kernel, last_input_info, tick) ->
-          {current_tick; kernel; last_input_info; tick})
-        (fun {current_tick; kernel; last_input_info; tick} ->
-          (current_tick, kernel, last_input_info, tick))
-        (tup4
+        (fun (current_tick, kernel, last_input_info, tick, module_reg) ->
+          {current_tick; kernel; last_input_info; tick; module_reg})
+        (fun {current_tick; kernel; last_input_info; tick; module_reg} ->
+          (current_tick, kernel, last_input_info, tick, module_reg))
+        (tup5
            ~flatten:true
            (value ~default:Z.zero ["wasm"; "current_tick"] Data_encoding.n)
            (scope ["durable"; "kernel"; "boot.wasm"] chunked_byte_vector)
            (value_option ["wasm"; "input"] Wasm_pvm_sig.input_info_encoding)
-           (scope ["wasm"] (tick_state_encoding ~module_reg)))
+           (scope ["wasm"] tick_state_encoding)
+           (scope ["modules"] Wasm_encoding.module_instances_encoding))
 
     let status_encoding =
       Tree_encoding.value ["input"; "consuming"] Data_encoding.bool
@@ -92,21 +92,24 @@ module Make (T : Tree_encoding.TREE) :
        kernel to expose a function named [kernel_next]. *)
     let wasm_entrypoint = "kernel_next"
 
-    let next_state ~module_reg state =
+    let next_state state =
       let open Lwt_syntax in
       match state.tick with
       | Decode ->
           let* ast_module =
             Wasm.Decode.decode ~name:wasm_main_module_name ~bytes:state.kernel
           in
-          let self =
-            Wasm.Instance.alloc_module_ref
-              (Wasm.Instance.Module_key wasm_main_module_name)
-              module_reg
-          in
+          let self = Wasm.Instance.Module_key wasm_main_module_name in
           (* The module instance is registered in [self] that contains the
              module registry, why we can ignore the result here. *)
-          let* _module_inst = Wasm.Eval.init ~self host_funcs ast_module [] in
+          let* _module_inst =
+            Wasm.Eval.init
+              ~module_reg:state.module_reg
+              ~self
+              host_funcs
+              ast_module
+              []
+          in
           let eval_config = Wasm.Eval.config host_funcs self [] [] in
           Lwt.return {state with tick = Eval eval_config}
       | Eval ({Wasm.Eval.frame; code; _} as eval_config) -> (
@@ -115,7 +118,9 @@ module Make (T : Tree_encoding.TREE) :
               (* We have an empty set of admin instructions so we create one
                  that invokes the main function. *)
               let* module_inst =
-                Wasm.Instance.ModuleMap.get wasm_main_module_name module_reg
+                Wasm.Instance.ModuleMap.get
+                  wasm_main_module_name
+                  state.module_reg
               in
               let* main_name =
                 Wasm.Instance.Vector.to_list @@ Wasm.Utf8.decode wasm_entrypoint
@@ -154,7 +159,7 @@ module Make (T : Tree_encoding.TREE) :
               Lwt.return {state with tick = Eval eval_config}
           | _ ->
               (* Continue execution. *)
-              let* eval_config = Wasm.Eval.step eval_config in
+              let* eval_config = Wasm.Eval.step state.module_reg eval_config in
               Lwt.return {state with tick = Eval eval_config})
 
     let module_reg_encoding =
@@ -162,31 +167,16 @@ module Make (T : Tree_encoding.TREE) :
         ["module-registry"]
         Wasm_encoding.module_instances_encoding
 
-    let module_reg_from_tree tree =
-      let open Lwt_syntax in
-      try
-        let* module_reg = Tree_encoding.decode module_reg_encoding tree in
-        return (Some module_reg)
-      with _ -> return None
-
-    let decode_state tree =
-      let open Lwt_syntax in
-      (* Try to decode the module registry. *)
-      let* module_reg_opt = module_reg_from_tree tree in
-      let module_reg =
-        Option.value_f ~default:Wasm.Instance.ModuleMap.create module_reg_opt
-      in
-      let+ state = Tree_encoding.decode (pvm_state_encoding ~module_reg) tree in
-      (state, module_reg)
-
     let compute_step tree =
       let open Lwt_syntax in
-      let* state, module_reg = decode_state tree in
-      let* state = next_state state ~module_reg in
+      let* state = Tree_encoding.decode pvm_state_encoding tree in
+      let* state = next_state state in
       let state = {state with current_tick = Z.succ state.current_tick} in
       (* Write the module registry to the tree in case it did not exist
          before. *)
-      let* tree = Tree_encoding.encode module_reg_encoding module_reg tree in
+      let* tree =
+        Tree_encoding.encode module_reg_encoding state.module_reg tree
+      in
       let want_more_input =
         match state.tick with
         | Eval {code = _, []; _} ->
@@ -196,7 +186,7 @@ module Make (T : Tree_encoding.TREE) :
         | _ -> false
       in
       let* tree = Tree_encoding.encode status_encoding want_more_input tree in
-      Tree_encoding.encode (pvm_state_encoding ~module_reg) state tree
+      Tree_encoding.encode pvm_state_encoding state tree
 
     let get_output _ _ = Lwt.return ""
 
@@ -259,7 +249,7 @@ module Make (T : Tree_encoding.TREE) :
       let level = Int32.to_string raw_level in
       let id = Z.to_string message_counter in
       let* current_tick = Tree_encoding.decode current_tick_encoding tree in
-      let* state, module_reg = decode_state tree in
+      let* state = Tree_encoding.decode pvm_state_encoding tree in
       let* () =
         match state.tick with
         | Eval config ->
@@ -281,9 +271,7 @@ module Make (T : Tree_encoding.TREE) :
             *)
             assert false
       in
-      let* tree =
-        Tree_encoding.encode (pvm_state_encoding ~module_reg) state tree
-      in
+      let* tree = Tree_encoding.encode pvm_state_encoding state tree in
       let* tree =
         Tree_encoding.encode current_tick_encoding (Z.succ current_tick) tree
       in
