@@ -44,6 +44,9 @@ type mode = Batcher | Custom | Maintenance | Observer | Operator
     Default [data_dir] is a temporary directory
     which is always the same for each [name].
 
+    [dal_node] is a node node from the data availability layer the rollup should
+    be connected to.
+
     Default [event_pipe] is a temporary file
     whose name is derived from [name]. It will be created
     as a named pipe so that sc node events can be received.
@@ -66,6 +69,7 @@ val create :
   ?rpc_port:int ->
   ?operators:(string * string) list ->
   ?default_operator:string ->
+  ?dal_node:Dal_node.t ->
   mode ->
   Node.t ->
   Client.t ->

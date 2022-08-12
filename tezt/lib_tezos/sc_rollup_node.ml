@@ -35,6 +35,7 @@ module Parameters = struct
     rpc_host : string;
     rpc_port : int;
     mode : mode;
+    dal_node : Dal_node.t option;
     client : Client.t;
     node : Node.t;
     mutable pending_ready : unit option Lwt.u list;
@@ -129,7 +130,17 @@ let spawn_config_init sc_node ?loser_mode rollup_address =
       "--rpc-port";
       string_of_int @@ rpc_port sc_node;
     ]
-  @ match loser_mode with None -> [] | Some mode -> ["--loser-mode"; mode]
+  @ (match loser_mode with None -> [] | Some mode -> ["--loser-mode"; mode])
+  @
+  match sc_node.persistent_state.dal_node with
+  | None -> []
+  | Some dal_node ->
+      [
+        "--dal-node-addr";
+        Dal_node.rpc_host dal_node;
+        "--dal-node-port";
+        Int.to_string @@ Dal_node.rpc_port dal_node;
+      ]
 
 let config_init sc_node ?loser_mode rollup_address =
   let process = spawn_config_init sc_node ?loser_mode rollup_address in
@@ -234,8 +245,8 @@ let handle_event sc_node {name; value} =
   | _ -> ()
 
 let create ?(path = Constant.sc_rollup_node) ?name ?color ?data_dir ?event_pipe
-    ?(rpc_host = "127.0.0.1") ?rpc_port ?(operators = []) ?default_operator mode
-    (node : Node.t) (client : Client.t) =
+    ?(rpc_host = "127.0.0.1") ?rpc_port ?(operators = []) ?default_operator
+    ?(dal_node : Dal_node.t option) mode (node : Node.t) (client : Client.t) =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -258,6 +269,7 @@ let create ?(path = Constant.sc_rollup_node) ?name ?color ?data_dir ?event_pipe
         mode;
         node;
         client;
+        dal_node;
         pending_ready = [];
         pending_level = [];
       }
@@ -266,12 +278,14 @@ let create ?(path = Constant.sc_rollup_node) ?name ?color ?data_dir ?event_pipe
   sc_node
 
 let make_arguments node =
-  [
-    "--endpoint";
-    Printf.sprintf "http://%s:%d" (layer1_addr node) (layer1_port node);
-    "--base-dir";
-    base_dir node;
-  ]
+  List.filter_map Fun.id
+  @@ [
+       Some "--endpoint";
+       Some
+         (Printf.sprintf "http://%s:%d" (layer1_addr node) (layer1_port node));
+       Some "--base-dir";
+       Some (base_dir node);
+     ]
 
 let do_runlike_command node arguments =
   if node.status <> Not_running then
