@@ -453,7 +453,7 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
             "type_result"
             (value [] Interpreter_encodings.Types.value_type_encoding)))
 
-  let module_ref_encoding =
+  let module_key_encoding =
     conv
       (fun key -> Instance.Module_key key)
       (fun (Instance.Module_key key) -> key)
@@ -478,7 +478,7 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
           (tup5
              ~flatten:false
              function_type_encoding
-             (scope ["module"] module_ref_encoding)
+             (scope ["module"] module_key_encoding)
              (value ["ftype"] Interpreter_encodings.Ast.var_encoding)
              (lazy_vector_encoding
                 "locals"
@@ -719,7 +719,7 @@ module Make (Tree_encoding : Tree_encoding.S) = struct
       (fun Eval.{inst; locals} -> (inst, locals))
       (tup2
          ~flatten:true
-         (scope ["module"] module_ref_encoding)
+         (scope ["module"] module_key_encoding)
          (scope ["locals"] locals_encoding))
 
   let rec admin_instr'_encoding () =
