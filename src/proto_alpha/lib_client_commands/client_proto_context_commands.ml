@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2019-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -983,7 +983,7 @@ let commands_rw () =
       @@ prefix "transferring"
       @@ tez_param ~name:"qty" ~desc:"amount taken from source"
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"name of the source contract"
       @@ prefix "running"
@@ -1011,44 +1011,37 @@ let commands_rw () =
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program)
         >>=? fun {expanded = code; _} ->
-        match source with
-        | Originated _ ->
-            failwith
-              "only implicit accounts can be the source of an origination"
-        | Implicit source -> (
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            originate_contract
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ?confirmations:cctxt#confirmations
-              ~dry_run
-              ~verbose_signing
-              ?fee
-              ?gas_limit
-              ?storage_limit
-              ~delegate
-              ~initial_storage
-              ~balance
-              ~source
-              ~src_pk
-              ~src_sk
-              ~code
-              ~fee_parameter
-              ()
-            >>= fun errors ->
-            report_michelson_errors
-              ~no_print_source
-              ~msg:"origination simulation failed"
-              cctxt
-              errors
-            >>= function
-            | None -> return_unit
-            | Some (_res, contract) ->
-                if dry_run then return_unit
-                else
-                  save_contract ~force cctxt alias_name contract >>=? fun () ->
-                  return_unit));
+        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        originate_contract
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ?confirmations:cctxt#confirmations
+          ~dry_run
+          ~verbose_signing
+          ?fee
+          ?gas_limit
+          ?storage_limit
+          ~delegate
+          ~initial_storage
+          ~balance
+          ~source
+          ~src_pk
+          ~src_sk
+          ~code
+          ~fee_parameter
+          ()
+        >>= fun errors ->
+        report_michelson_errors
+          ~no_print_source
+          ~msg:"origination simulation failed"
+          cctxt
+          errors
+        >>= function
+        | None -> return_unit
+        | Some (_res, contract) ->
+            if dry_run then return_unit
+            else save_contract ~force cctxt alias_name contract);
     command
       ~group
       ~desc:
@@ -1283,7 +1276,7 @@ let commands_rw () =
              "Michelson expression to register. Note the value is not \
               typechecked before registration."
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"name of the account registering the global constant"
       @@ stop)
@@ -1297,35 +1290,31 @@ let commands_rw () =
            global_constant_str
            source
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith "Only implicit accounts can register global constants"
-        | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            register_global_constant
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ~dry_run
-              ~verbose_signing
-              ?fee
-              ?storage_limit
-              ?counter
-              ?confirmations:cctxt#confirmations
-              ~simulation
-              ~source
-              ~src_pk
-              ~src_sk
-              ~fee_parameter
-              ~constant:global_constant_str
-              ()
-            >>= fun errors ->
-            report_michelson_errors
-              ~no_print_source:false
-              ~msg:"register global constant simulation failed"
-              cctxt
-              errors
-            >>= fun _ -> return_unit);
+        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        register_global_constant
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~dry_run
+          ~verbose_signing
+          ?fee
+          ?storage_limit
+          ?counter
+          ?confirmations:cctxt#confirmations
+          ~simulation
+          ~source
+          ~src_pk
+          ~src_sk
+          ~fee_parameter
+          ~constant:global_constant_str
+          ()
+        >>= fun errors ->
+        report_michelson_errors
+          ~no_print_source:false
+          ~msg:"register global constant simulation failed"
+          cctxt
+          errors
+        >>= fun _ -> return_unit);
     command
       ~group
       ~desc:"Call a smart contract (same as 'transfer 0')."
@@ -1395,29 +1384,26 @@ let commands_rw () =
       ~desc:"Reveal the public key of the contract manager."
       (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
       (prefixes ["reveal"; "key"; "for"]
-      @@ ContractAlias.alias_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"name of the source contract"
       @@ stop)
       (fun (fee, dry_run, verbose_signing, fee_parameter) source cctxt ->
-        match source with
-        | Originated _ -> failwith "only implicit accounts can be revealed"
-        | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            reveal
-              cctxt
-              ~dry_run
-              ~verbose_signing
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ?confirmations:cctxt#confirmations
-              ~source
-              ?fee
-              ~src_pk
-              ~src_sk
-              ~fee_parameter
-              ()
-            >>=? fun _res -> return_unit);
+        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        reveal
+          cctxt
+          ~dry_run
+          ~verbose_signing
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ?confirmations:cctxt#confirmations
+          ~source
+          ?fee
+          ~src_pk
+          ~src_sk
+          ~fee_parameter
+          ()
+        >>=? fun _res -> return_unit);
     command
       ~group
       ~desc:"Register the public key hash as a delegate."
@@ -1502,7 +1488,7 @@ let commands_rw () =
             ~long:"force"
             ()))
       (prefixes ["submit"; "proposals"; "for"]
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"delegate"
            ~desc:"the delegate who makes the proposal"
       @@ seq_of_param
@@ -1515,151 +1501,142 @@ let commands_rw () =
                        Error_monad.failwith "Invalid proposal hash: '%s'" x
                    | Some hash -> return hash))))
       (fun (dry_run, verbose_signing, force)
-           source
+           src_pkh
            proposals
            (cctxt : Protocol_client_context.full) ->
-        match source with
-        | Originated _ -> failwith "only implicit accounts can submit proposals"
-        | Implicit src_pkh -> (
-            Client_keys.get_key cctxt src_pkh
-            >>=? fun (src_name, _src_pk, src_sk) ->
-            get_period_info
-            (* Find period info of the successor, because the operation will
-               be injected on the next block at the earliest *)
-              ~successor:true
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              cctxt
-            >>=? fun info ->
-            (match info.current_period_kind with
-            | Proposal -> Lwt.return_unit
-            | _ ->
-                (if force then cctxt#warning else cctxt#error)
-                  "Not in a proposal period")
-            >>= fun () ->
-            Shell_services.Protocol.list cctxt >>=? fun known_protos ->
-            get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt
-            >>=? fun known_proposals ->
-            (Alpha_services.Delegate.voting_power
-               cctxt
-               (cctxt#chain, cctxt#block)
-               src_pkh
-             >>= function
-             | Ok voting_power -> return (voting_power <> 0L)
-             | Error
-                 (Environment.Ecoproto_error (Delegate_storage.Not_registered _)
-                 :: _) ->
-                 return false
-             | Error _ as err -> Lwt.return err)
-            >>=? fun has_voting_power ->
-            (* for a proposal to be valid it must either a protocol that was already
-               proposed by somebody else or a protocol known by the node, because
-               the user is the first proposer and just injected it with
-               tezos-admin-client *)
-            let check_proposals proposals : bool tzresult Lwt.t =
-              let errors = ref [] in
-              let error ppf =
-                Format.kasprintf (fun s -> errors := s :: !errors) ppf
-              in
-              if proposals = [] then error "Empty proposal list." ;
+        Client_keys.get_key cctxt src_pkh
+        >>=? fun (src_name, _src_pk, src_sk) ->
+        get_period_info
+        (* Find period info of the successor, because the operation will
+           be injected on the next block at the earliest *)
+          ~successor:true
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          cctxt
+        >>=? fun info ->
+        (match info.current_period_kind with
+        | Proposal -> Lwt.return_unit
+        | _ ->
+            (if force then cctxt#warning else cctxt#error)
+              "Not in a proposal period")
+        >>= fun () ->
+        Shell_services.Protocol.list cctxt >>=? fun known_protos ->
+        get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt
+        >>=? fun known_proposals ->
+        (Alpha_services.Delegate.voting_power
+           cctxt
+           (cctxt#chain, cctxt#block)
+           src_pkh
+         >>= function
+         | Ok voting_power -> return (voting_power <> 0L)
+         | Error
+             (Environment.Ecoproto_error (Delegate_storage.Not_registered _)
+             :: _) ->
+             return false
+         | Error _ as err -> Lwt.return err)
+        >>=? fun has_voting_power ->
+        (* for a proposal to be valid it must either a protocol that was already
+           proposed by somebody else or a protocol known by the node, because
+           the user is the first proposer and just injected it with
+           tezos-admin-client *)
+        let check_proposals proposals : bool tzresult Lwt.t =
+          let errors = ref [] in
+          let error ppf =
+            Format.kasprintf (fun s -> errors := s :: !errors) ppf
+          in
+          if proposals = [] then error "Empty proposal list." ;
+          if
+            Compare.List_length_with.(
+              proposals > Constants.max_proposals_per_delegate)
+          then
+            error
+              "Too many proposals: %d > %d."
+              (List.length proposals)
+              Constants.max_proposals_per_delegate ;
+          (match
+             Base.List.find_all_dups ~compare:Protocol_hash.compare proposals
+           with
+          | [] -> ()
+          | dups ->
+              error
+                "There %s: %a."
+                (if Compare.List_length_with.(dups = 1) then
+                 "is a duplicate proposal"
+                else "are duplicate proposals")
+                Format.(
+                  pp_print_list
+                    ~pp_sep:(fun ppf () -> pp_print_string ppf ", ")
+                    Protocol_hash.pp)
+                dups) ;
+          List.iter
+            (fun (p : Protocol_hash.t) ->
               if
-                Compare.List_length_with.(
-                  proposals > Constants.max_proposals_per_delegate)
-              then
-                error
-                  "Too many proposals: %d > %d."
-                  (List.length proposals)
-                  Constants.max_proposals_per_delegate ;
-              (match
-                 Base.List.find_all_dups
-                   ~compare:Protocol_hash.compare
-                   proposals
-               with
-              | [] -> ()
-              | dups ->
-                  error
-                    "There %s: %a."
-                    (if Compare.List_length_with.(dups = 1) then
-                     "is a duplicate proposal"
-                    else "are duplicate proposals")
-                    Format.(
-                      pp_print_list
-                        ~pp_sep:(fun ppf () -> pp_print_string ppf ", ")
-                        Protocol_hash.pp)
-                    dups) ;
-              List.iter
-                (fun (p : Protocol_hash.t) ->
-                  if
-                    List.mem ~equal:Protocol_hash.equal p known_protos
-                    || Environment.Protocol_hash.Map.mem p known_proposals
-                  then ()
-                  else
-                    error
-                      "Protocol %a is not a known proposal."
-                      Protocol_hash.pp
-                      p)
-                proposals ;
-              if not has_voting_power then
-                error
-                  "Public-key-hash `%a` from account `%s` does not appear to \
-                   have voting rights."
-                  Signature.Public_key_hash.pp
-                  src_pkh
-                  src_name ;
-              if !errors <> [] then
-                cctxt#message
-                  "There %s with the submission:%t"
-                  (if Compare.List_length_with.(!errors = 1) then "is an issue"
-                  else "are issues")
-                  Format.(
-                    fun ppf ->
-                      pp_print_cut ppf () ;
-                      pp_open_vbox ppf 0 ;
-                      List.iter
-                        (fun msg ->
-                          pp_open_hovbox ppf 2 ;
-                          pp_print_string ppf "* " ;
-                          pp_print_text ppf msg ;
-                          pp_close_box ppf () ;
-                          pp_print_cut ppf ())
-                        !errors ;
-                      pp_close_box ppf ())
-                >>= fun () -> return_false
-              else return_true
-            in
-            check_proposals proposals >>=? fun all_valid ->
-            (if all_valid then cctxt#message "All proposals are valid."
-            else if force then
-              cctxt#message
-                "Some proposals are not valid, but `--force` was used."
-            else cctxt#error "Submission failed because of invalid proposals.")
-            >>= fun () ->
-            submit_proposals
-              ~dry_run
-              ~verbose_signing
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ~src_sk
+                List.mem ~equal:Protocol_hash.equal p known_protos
+                || Environment.Protocol_hash.Map.mem p known_proposals
+              then ()
+              else
+                error "Protocol %a is not a known proposal." Protocol_hash.pp p)
+            proposals ;
+          if not has_voting_power then
+            error
+              "Public-key-hash `%a` from account `%s` does not appear to have \
+               voting rights."
+              Signature.Public_key_hash.pp
               src_pkh
-              proposals
-            >>= function
-            | Ok _res -> return_unit
-            | Error errs ->
-                (match errs with
-                | [
-                 Unregistered_error
-                   (`O [("kind", `String "generic"); ("error", `String msg)]);
-                ] ->
-                    cctxt#message
-                      "Error:@[<hov>@.%a@]"
-                      Format.pp_print_text
-                      (String.split_on_char ' ' msg
-                      |> List.filter (function "" | "\n" -> false | _ -> true)
-                      |> String.concat " "
-                      |> String.map (function '\n' | '\t' -> ' ' | c -> c))
-                | el -> cctxt#message "Error:@ %a" pp_print_trace el)
-                >>= fun () -> failwith "Failed to submit proposals"));
+              src_name ;
+          if !errors <> [] then
+            cctxt#message
+              "There %s with the submission:%t"
+              (if Compare.List_length_with.(!errors = 1) then "is an issue"
+              else "are issues")
+              Format.(
+                fun ppf ->
+                  pp_print_cut ppf () ;
+                  pp_open_vbox ppf 0 ;
+                  List.iter
+                    (fun msg ->
+                      pp_open_hovbox ppf 2 ;
+                      pp_print_string ppf "* " ;
+                      pp_print_text ppf msg ;
+                      pp_close_box ppf () ;
+                      pp_print_cut ppf ())
+                    !errors ;
+                  pp_close_box ppf ())
+            >>= fun () -> return_false
+          else return_true
+        in
+        check_proposals proposals >>=? fun all_valid ->
+        (if all_valid then cctxt#message "All proposals are valid."
+        else if force then
+          cctxt#message "Some proposals are not valid, but `--force` was used."
+        else cctxt#error "Submission failed because of invalid proposals.")
+        >>= fun () ->
+        submit_proposals
+          ~dry_run
+          ~verbose_signing
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~src_sk
+          src_pkh
+          proposals
+        >>= function
+        | Ok _res -> return_unit
+        | Error errs ->
+            (match errs with
+            | [
+             Unregistered_error
+               (`O [("kind", `String "generic"); ("error", `String msg)]);
+            ] ->
+                cctxt#message
+                  "Error:@[<hov>@.%a@]"
+                  Format.pp_print_text
+                  (String.split_on_char ' ' msg
+                  |> List.filter (function "" | "\n" -> false | _ -> true)
+                  |> String.concat " "
+                  |> String.map (function '\n' | '\t' -> ' ' | c -> c))
+            | el -> cctxt#message "Error:@ %a" pp_print_trace el)
+            >>= fun () -> failwith "Failed to submit proposals");
     command
       ~group
       ~desc:"Submit a ballot"
@@ -1673,7 +1650,7 @@ let commands_rw () =
             ~long:"force"
             ()))
       (prefixes ["submit"; "ballot"; "for"]
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"delegate"
            ~desc:"the delegate who votes"
       @@ param
@@ -1697,74 +1674,68 @@ let commands_rw () =
                 | s -> failwith "Invalid ballot: '%s'" s))
       @@ stop)
       (fun (verbose_signing, dry_run, force)
-           source
+           src_pkh
            proposal
            ballot
            (cctxt : Protocol_client_context.full) ->
-        match source with
-        | Originated _ -> failwith "only implicit accounts can submit ballot"
-        | Implicit src_pkh ->
-            Client_keys.get_key cctxt src_pkh
-            >>=? fun (src_name, _src_pk, src_sk) ->
-            get_period_info
-            (* Find period info of the successor, because the operation will
-               be injected on the next block at the earliest *)
-              ~successor:true
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              cctxt
-            >>=? fun info ->
-            Alpha_services.Voting.current_proposal
-              cctxt
-              (cctxt#chain, cctxt#block)
-            >>=? fun current_proposal ->
-            (match (info.current_period_kind, current_proposal) with
-            | (Exploration | Promotion), Some current_proposal ->
-                if Protocol_hash.equal proposal current_proposal then
-                  return_unit
-                else
-                  (if force then cctxt#warning else cctxt#error)
-                    "Unexpected proposal, expected: %a"
-                    Protocol_hash.pp
-                    current_proposal
-                  >>= fun () -> return_unit
-            | _ ->
-                (if force then cctxt#warning else cctxt#error)
-                  "Not in Exploration or Promotion period"
-                >>= fun () -> return_unit)
-            >>=? fun () ->
-            (Alpha_services.Delegate.voting_power
-               cctxt
-               (cctxt#chain, cctxt#block)
-               src_pkh
-             >>= function
-             | Ok voting_power -> return (voting_power <> 0L)
-             | Error
-                 (Environment.Ecoproto_error (Delegate_storage.Not_registered _)
-                 :: _) ->
-                 return false
-             | Error _ as err -> Lwt.return err)
-            >>=? fun has_voting_power ->
-            (if has_voting_power then Lwt.return_unit
+        Client_keys.get_key cctxt src_pkh
+        >>=? fun (src_name, _src_pk, src_sk) ->
+        get_period_info
+        (* Find period info of the successor, because the operation will
+           be injected on the next block at the earliest *)
+          ~successor:true
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          cctxt
+        >>=? fun info ->
+        Alpha_services.Voting.current_proposal cctxt (cctxt#chain, cctxt#block)
+        >>=? fun current_proposal ->
+        (match (info.current_period_kind, current_proposal) with
+        | (Exploration | Promotion), Some current_proposal ->
+            if Protocol_hash.equal proposal current_proposal then return_unit
             else
               (if force then cctxt#warning else cctxt#error)
-                "Public-key-hash `%a` from account `%s` does not appear to \
-                 have voting rights."
-                Signature.Public_key_hash.pp
-                src_pkh
-                src_name)
-            >>= fun () ->
-            submit_ballot
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ~src_sk
-              src_pkh
-              ~verbose_signing
-              ~dry_run
-              proposal
-              ballot
-            >>=? fun _res -> return_unit);
+                "Unexpected proposal, expected: %a"
+                Protocol_hash.pp
+                current_proposal
+              >>= fun () -> return_unit
+        | _ ->
+            (if force then cctxt#warning else cctxt#error)
+              "Not in Exploration or Promotion period"
+            >>= fun () -> return_unit)
+        >>=? fun () ->
+        (Alpha_services.Delegate.voting_power
+           cctxt
+           (cctxt#chain, cctxt#block)
+           src_pkh
+         >>= function
+         | Ok voting_power -> return (voting_power <> 0L)
+         | Error
+             (Environment.Ecoproto_error (Delegate_storage.Not_registered _)
+             :: _) ->
+             return false
+         | Error _ as err -> Lwt.return err)
+        >>=? fun has_voting_power ->
+        (if has_voting_power then Lwt.return_unit
+        else
+          (if force then cctxt#warning else cctxt#error)
+            "Public-key-hash `%a` from account `%s` does not appear to have \
+             voting rights."
+            Signature.Public_key_hash.pp
+            src_pkh
+            src_name)
+        >>= fun () ->
+        submit_ballot
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~src_sk
+          src_pkh
+          ~verbose_signing
+          ~dry_run
+          proposal
+          ballot
+        >>=? fun _res -> return_unit);
     command
       ~group
       ~desc:"Set the deposits limit of a registered delegate."
@@ -1912,7 +1883,7 @@ let commands_rw () =
            ~name:"tx_rollup"
            ~desc:"Fresh name for a transaction rollup"
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Account originating the transaction rollup."
       @@ stop)
@@ -1927,43 +1898,39 @@ let commands_rw () =
            alias
            source
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith "Only implicit accounts can originate transaction rollups"
-        | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            originate_tx_rollup
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ~dry_run
-              ~verbose_signing
-              ?fee
-              ?storage_limit
-              ?counter
-              ?confirmations:cctxt#confirmations
-              ~simulation
-              ~source
-              ~src_pk
-              ~src_sk
-              ~fee_parameter
-              ()
-            >>=? fun res ->
-            TxRollupAlias.of_fresh cctxt force alias >>=? fun alias_name ->
-            (match res with
-            | ( _,
-                _,
-                Apply_results.Manager_operation_result
-                  {
-                    operation_result =
-                      Apply_operation_result.Applied
-                        (Apply_results.Tx_rollup_origination_result
-                          {originated_tx_rollup; _});
-                    _;
-                  } ) ->
-                ok originated_tx_rollup
-            | _ -> error_with "transaction rollup was not correctly originated")
-            >>?= fun res -> save_tx_rollup ~force cctxt alias_name res);
+        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        originate_tx_rollup
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~dry_run
+          ~verbose_signing
+          ?fee
+          ?storage_limit
+          ?counter
+          ?confirmations:cctxt#confirmations
+          ~simulation
+          ~source
+          ~src_pk
+          ~src_sk
+          ~fee_parameter
+          ()
+        >>=? fun res ->
+        TxRollupAlias.of_fresh cctxt force alias >>=? fun alias_name ->
+        (match res with
+        | ( _,
+            _,
+            Apply_results.Manager_operation_result
+              {
+                operation_result =
+                  Apply_operation_result.Applied
+                    (Apply_results.Tx_rollup_origination_result
+                      {originated_tx_rollup; _});
+                _;
+              } ) ->
+            ok originated_tx_rollup
+        | _ -> error_with "transaction rollup was not correctly originated")
+        >>?= fun res -> save_tx_rollup ~force cctxt alias_name res);
     command
       ~group
       ~desc:"Submit a batch of transaction rollup operations."
@@ -1986,7 +1953,7 @@ let commands_rw () =
       @@ Tx_rollup.tx_rollup_address_param
            ~usage:"Tx rollup receiving the batch."
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Account submitting the transaction rollup batches."
       @@ stop)
@@ -2001,31 +1968,26 @@ let commands_rw () =
            tx_rollup
            source
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith
-              "Only implicit accounts can submit transaction rollup batches"
-        | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            submit_tx_rollup_batch
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ~dry_run
-              ~verbose_signing
-              ?fee
-              ?storage_limit
-              ?counter
-              ?confirmations:cctxt#confirmations
-              ~simulation
-              ~source
-              ~src_pk
-              ~src_sk
-              ~fee_parameter
-              ~tx_rollup
-              ~content:(Bytes.to_string content)
-              ()
-            >>=? fun _res -> return_unit);
+        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        submit_tx_rollup_batch
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~dry_run
+          ~verbose_signing
+          ?fee
+          ?storage_limit
+          ?counter
+          ?confirmations:cctxt#confirmations
+          ~simulation
+          ~source
+          ~src_pk
+          ~src_sk
+          ~fee_parameter
+          ~tx_rollup
+          ~content:(Bytes.to_string content)
+          ()
+        >>=? fun _res -> return_unit);
     command
       ~group
       ~desc:
@@ -2049,7 +2011,7 @@ let commands_rw () =
       @@ Tx_rollup.tx_rollup_address_param
            ~usage:"Transaction rollup address committed to."
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Account committing to the transaction rollup."
       @@ prefixes ["for"; "level"]
@@ -2076,34 +2038,29 @@ let commands_rw () =
            inbox_merkle_root
            messages
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith
-              "Only implicit accounts can submit transaction rollup commitments"
-        | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            submit_tx_rollup_commitment
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ~dry_run
-              ~verbose_signing
-              ?fee
-              ?storage_limit
-              ?counter
-              ?confirmations:cctxt#confirmations
-              ~simulation
-              ~source
-              ~src_pk
-              ~src_sk
-              ~fee_parameter
-              ~tx_rollup
-              ~level
-              ~inbox_merkle_root
-              ~messages
-              ~predecessor
-              ()
-            >>=? fun _res -> return_unit);
+        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        submit_tx_rollup_commitment
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~dry_run
+          ~verbose_signing
+          ?fee
+          ?storage_limit
+          ?counter
+          ?confirmations:cctxt#confirmations
+          ~simulation
+          ~source
+          ~src_pk
+          ~src_sk
+          ~fee_parameter
+          ~tx_rollup
+          ~level
+          ~inbox_merkle_root
+          ~messages
+          ~predecessor
+          ()
+        >>=? fun _res -> return_unit);
     command
       ~group
       ~desc:"Finalize a commitment of a transaction rollup."
@@ -2119,7 +2076,7 @@ let commands_rw () =
       @@ Tx_rollup.tx_rollup_address_param
            ~usage:"Tx rollup that have its commitment finalized."
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Account finalizing the commitment."
       @@ stop)
@@ -2133,29 +2090,25 @@ let commands_rw () =
            tx_rollup
            source
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith "Only implicit accounts can finalize commitments"
-        | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            submit_tx_rollup_finalize_commitment
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ~dry_run
-              ~verbose_signing
-              ?fee
-              ?storage_limit
-              ?counter
-              ?confirmations:cctxt#confirmations
-              ~simulation
-              ~source
-              ~src_pk
-              ~src_sk
-              ~fee_parameter
-              ~tx_rollup
-              ()
-            >>=? fun _res -> return_unit);
+        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        submit_tx_rollup_finalize_commitment
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~dry_run
+          ~verbose_signing
+          ?fee
+          ?storage_limit
+          ?counter
+          ?confirmations:cctxt#confirmations
+          ~simulation
+          ~source
+          ~src_pk
+          ~src_sk
+          ~fee_parameter
+          ~tx_rollup
+          ()
+        >>=? fun _res -> return_unit);
     command
       ~group
       ~desc:"Recover commitment bond from a transaction rollup."
@@ -2168,7 +2121,7 @@ let commands_rw () =
          storage_limit_arg
          counter_arg)
       (prefixes ["recover"; "bond"; "of"]
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Account that owns the bond."
       @@ prefixes ["for"; "tx"; "rollup"]
@@ -2184,29 +2137,25 @@ let commands_rw () =
            source
            tx_rollup
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith "Only implicit accounts can deposit/recover bonds"
-        | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            submit_tx_rollup_return_bond
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ~dry_run
-              ~verbose_signing
-              ?fee
-              ?storage_limit
-              ?counter
-              ?confirmations:cctxt#confirmations
-              ~simulation
-              ~source
-              ~src_pk
-              ~src_sk
-              ~fee_parameter
-              ~tx_rollup
-              ()
-            >>=? fun _res -> return_unit);
+        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        submit_tx_rollup_return_bond
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~dry_run
+          ~verbose_signing
+          ?fee
+          ?storage_limit
+          ?counter
+          ?confirmations:cctxt#confirmations
+          ~simulation
+          ~source
+          ~src_pk
+          ~src_sk
+          ~fee_parameter
+          ~tx_rollup
+          ()
+        >>=? fun _res -> return_unit);
     command
       ~group
       ~desc:"Remove a commitment from a transaction rollup."
@@ -2222,7 +2171,7 @@ let commands_rw () =
       @@ Tx_rollup.tx_rollup_address_param
            ~usage:"Tx rollup that have its commitment removed."
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"name of the account removing the commitment."
       @@ stop)
@@ -2236,29 +2185,25 @@ let commands_rw () =
            tx_rollup
            source
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith "Only implicit accounts can remove commitments."
-        | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            submit_tx_rollup_remove_commitment
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ~dry_run
-              ~verbose_signing
-              ?fee
-              ?storage_limit
-              ?counter
-              ?confirmations:cctxt#confirmations
-              ~simulation
-              ~source
-              ~src_pk
-              ~src_sk
-              ~fee_parameter
-              ~tx_rollup
-              ()
-            >>=? fun _res -> return_unit);
+        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        submit_tx_rollup_remove_commitment
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~dry_run
+          ~verbose_signing
+          ?fee
+          ?storage_limit
+          ?counter
+          ?confirmations:cctxt#confirmations
+          ~simulation
+          ~source
+          ~src_pk
+          ~src_sk
+          ~fee_parameter
+          ~tx_rollup
+          ()
+        >>=? fun _res -> return_unit);
     command
       ~group
       ~desc:"Reject a commitment of a transaction rollup."
@@ -2318,7 +2263,7 @@ let commands_rw () =
            ~usage:
              "Proof that the disputed message result provided is incorrect."
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Account rejecting the commitment."
       @@ stop)
@@ -2342,41 +2287,35 @@ let commands_rw () =
            proof
            source
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith
-              "Only implicit accounts can reject transaction rollup \
-               commitments."
-        | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            submit_tx_rollup_rejection
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ~dry_run
-              ~verbose_signing
-              ?fee
-              ?storage_limit
-              ?counter
-              ?confirmations:cctxt#confirmations
-              ~simulation
-              ~source
-              ~src_pk
-              ~src_sk
-              ~fee_parameter
-              ~tx_rollup
-              ~level
-              ~message:conflicting_message
-              ~message_position:conflicting_message_position
-              ~message_path:conflicting_message_path
-              ~message_result_hash:rejected_message_result_hash
-              ~message_result_path:rejected_message_result_path
-              ~proof
-              ~previous_context_hash
-              ~previous_withdraw_list_hash
-              ~previous_message_result_path
-              ()
-            >>=? fun _res -> return_unit);
+        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        submit_tx_rollup_rejection
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~dry_run
+          ~verbose_signing
+          ?fee
+          ?storage_limit
+          ?counter
+          ?confirmations:cctxt#confirmations
+          ~simulation
+          ~source
+          ~src_pk
+          ~src_sk
+          ~fee_parameter
+          ~tx_rollup
+          ~level
+          ~message:conflicting_message
+          ~message_position:conflicting_message_position
+          ~message_path:conflicting_message_path
+          ~message_result_hash:rejected_message_result_hash
+          ~message_result_path:rejected_message_result_path
+          ~proof
+          ~previous_context_hash
+          ~previous_withdraw_list_hash
+          ~previous_message_result_path
+          ()
+        >>=? fun _res -> return_unit);
     command
       ~group
       ~desc:
@@ -2399,7 +2338,7 @@ let commands_rw () =
       @@ Tx_rollup.tx_rollup_address_param
            ~usage:"Tx rollup which have some tickets dispatched."
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"source"
            ~desc:"Account used to dispatch tickets."
       @@ prefixes ["at"; "level"]
@@ -2440,36 +2379,30 @@ let commands_rw () =
            message_result_path
            tickets_info
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith
-              "Only implicit account can dispatch tickets for a transaction \
-               rollup."
-        | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            tx_rollup_dispatch_tickets
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ~dry_run
-              ~verbose_signing
-              ?fee
-              ?storage_limit
-              ?counter
-              ?confirmations:cctxt#confirmations
-              ~simulation
-              ~source
-              ~src_pk
-              ~src_sk
-              ~fee_parameter
-              ~level
-              ~context_hash
-              ~message_position
-              ~message_result_path
-              ~tickets_info
-              ~tx_rollup
-              ()
-            >>=? fun _res -> return_unit);
+        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        tx_rollup_dispatch_tickets
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~dry_run
+          ~verbose_signing
+          ?fee
+          ?storage_limit
+          ?counter
+          ?confirmations:cctxt#confirmations
+          ~simulation
+          ~source
+          ~src_pk
+          ~src_sk
+          ~fee_parameter
+          ~level
+          ~context_hash
+          ~message_position
+          ~message_result_path
+          ~tickets_info
+          ~tx_rollup
+          ()
+        >>=? fun _res -> return_unit);
     command
       ~group
       ~desc:"Transfer tickets from an implicit account to a contract."
@@ -2484,7 +2417,7 @@ let commands_rw () =
       (prefix "transfer"
       @@ non_negative_z_param ~name:"qty" ~desc:"Amount of tickets to transfer."
       @@ prefixes ["tickets"; "from"]
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"tickets owner"
            ~desc:"Implicit account owning the tickets."
       @@ prefix "to"
@@ -2526,34 +2459,30 @@ let commands_rw () =
            ty
            ticketer
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith "Only implicit accounts can transfer tickets."
-        | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            transfer_ticket
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ~dry_run
-              ~verbose_signing
-              ?fee
-              ?storage_limit
-              ?counter
-              ?confirmations:cctxt#confirmations
-              ~simulation
-              ~source
-              ~src_pk
-              ~src_sk
-              ~fee_parameter
-              ~contents
-              ~ty
-              ~ticketer
-              ~amount
-              ~destination
-              ~entrypoint
-              ()
-            >>=? fun _res -> return_unit);
+        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        transfer_ticket
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~dry_run
+          ~verbose_signing
+          ?fee
+          ?storage_limit
+          ?counter
+          ?confirmations:cctxt#confirmations
+          ~simulation
+          ~source
+          ~src_pk
+          ~src_sk
+          ~fee_parameter
+          ~contents
+          ~ty
+          ~ticketer
+          ~amount
+          ~destination
+          ~entrypoint
+          ()
+        >>=? fun _res -> return_unit);
     command
       ~group
       ~desc:"Originate a new smart-contract rollup."
@@ -2566,7 +2495,7 @@ let commands_rw () =
          storage_limit_arg
          counter_arg)
       (prefixes ["originate"; "sc"; "rollup"; "from"]
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the account originating the smart-contract rollup."
       @@ prefixes ["of"; "kind"]
@@ -2599,36 +2528,31 @@ let commands_rw () =
            parameters_ty
            boot_sector
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith
-              "Only implicit accounts can originate smart-contract rollups"
-        | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            let (module R : Alpha_context.Sc_rollup.PVM.S) = pvm in
-            let Michelson_v1_parser.{expanded; _} = parameters_ty in
-            let parameters_ty = Script.lazy_expr expanded in
-            boot_sector pvm >>=? fun boot_sector ->
-            sc_rollup_originate
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ~dry_run
-              ~verbose_signing
-              ?fee
-              ?storage_limit
-              ?counter
-              ?confirmations:cctxt#confirmations
-              ~simulation
-              ~source
-              ~src_pk
-              ~src_sk
-              ~fee_parameter
-              ~kind:(Sc_rollup.Kind.of_pvm pvm)
-              ~boot_sector
-              ~parameters_ty
-              ()
-            >>=? fun _res -> return_unit);
+        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        let (module R : Alpha_context.Sc_rollup.PVM.S) = pvm in
+        let Michelson_v1_parser.{expanded; _} = parameters_ty in
+        let parameters_ty = Script.lazy_expr expanded in
+        boot_sector pvm >>=? fun boot_sector ->
+        sc_rollup_originate
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~dry_run
+          ~verbose_signing
+          ?fee
+          ?storage_limit
+          ?counter
+          ?confirmations:cctxt#confirmations
+          ~simulation
+          ~source
+          ~src_pk
+          ~src_sk
+          ~fee_parameter
+          ~kind:(Sc_rollup.Kind.of_pvm pvm)
+          ~boot_sector
+          ~parameters_ty
+          ()
+        >>=? fun _res -> return_unit);
     command
       ~group
       ~desc:"Send one or more messages to a smart-contract rollup."
@@ -2649,7 +2573,7 @@ let commands_rw () =
               messages>|file:<json_file>)."
            Sc_rollup_params.messages_parameter
       @@ prefixes ["from"]
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the source contract."
       @@ prefixes ["to"]
@@ -2669,11 +2593,6 @@ let commands_rw () =
            source
            rollup
            cctxt ->
-        (match source with
-        | Originated _ ->
-            failwith "Only implicit accounts can send messages to rollups"
-        | Implicit source -> return source)
-        >>=? fun source ->
         (match messages with
         | `Bin message -> return [message]
         | `Json messages -> (
@@ -2716,7 +2635,7 @@ let commands_rw () =
          fee_parameter_args)
       (prefixes ["publish"; "commitment"]
       @@ prefixes ["from"]
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the source contract."
       @@ prefixes ["for"; "sc"; "rollup"]
@@ -2761,11 +2680,6 @@ let commands_rw () =
            predecessor
            number_of_ticks
            cctxt ->
-        (match source with
-        | Originated _ ->
-            failwith "Only implicit accounts can publish commitments"
-        | Implicit source -> return source)
-        >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         let commitment : Alpha_context.Sc_rollup.Commitment.t =
           {compressed_state; inbox_level; predecessor; number_of_ticks}
@@ -2806,7 +2720,7 @@ let commands_rw () =
            ~desc:"The hash of the commitment to be cemented for a sc rollup."
            Sc_rollup_params.commitment_hash_parameter
       @@ prefixes ["from"]
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the source contract."
       @@ prefixes ["for"; "sc"; "rollup"]
@@ -2828,11 +2742,6 @@ let commands_rw () =
            source
            rollup
            cctxt ->
-        (match source with
-        | Originated _ ->
-            failwith "Only implicit accounts can cement commitments"
-        | Implicit source -> return source)
-        >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         sc_rollup_cement
           cctxt
@@ -2886,7 +2795,7 @@ let commands_rw () =
               resides."
            Sc_rollup_params.sc_rollup_address_parameter
       @@ prefix "from"
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"source"
            ~desc:"The account used for executing the outbox message."
       @@ prefixes ["for"; "commitment"; "hash"]
@@ -2913,13 +2822,6 @@ let commands_rw () =
            cemented_commitment
            output_proof
            cctxt ->
-        (match source with
-        | Originated _ ->
-            failwith
-              "Only implicit accounts can execute an sc rollup batch of \
-               transactions"
-        | Implicit source -> return source)
-        >>=? fun source ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         sc_rollup_execute_outbox_message
           cctxt
@@ -2953,7 +2855,7 @@ let commands_rw () =
          storage_limit_arg
          counter_arg)
       (prefixes ["recover"; "bond"; "of"]
-      @@ ContractAlias.destination_param
+      @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"The implicit account that owns the frozen bond."
       @@ prefixes ["for"; "sc"; "rollup"]
@@ -2972,29 +2874,25 @@ let commands_rw () =
            source
            sc_rollup
            cctxt ->
-        match source with
-        | Originated _ ->
-            failwith "Only implicit accounts can deposit/recover bonds"
-        | Implicit source ->
-            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-            sc_rollup_recover_bond
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ~dry_run
-              ~verbose_signing
-              ?fee
-              ?storage_limit
-              ?counter
-              ?confirmations:cctxt#confirmations
-              ~simulation
-              ~source
-              ~src_pk
-              ~src_sk
-              ~fee_parameter
-              ~sc_rollup
-              ()
-            >>=? fun _res -> return_unit);
+        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        sc_rollup_recover_bond
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ~dry_run
+          ~verbose_signing
+          ?fee
+          ?storage_limit
+          ?counter
+          ?confirmations:cctxt#confirmations
+          ~simulation
+          ~source
+          ~src_pk
+          ~src_sk
+          ~fee_parameter
+          ~sc_rollup
+          ()
+        >>=? fun _res -> return_unit);
   ]
 
 let commands network () =
