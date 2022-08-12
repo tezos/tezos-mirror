@@ -1215,6 +1215,38 @@ let precheck_manager config filter_state validation_state oph
       err) ->
       Lwt.return err
 
+(** Call the protocol's {!Validate_operation.validate_operation}. If
+    successful, return the updated [validation_state], the unchanged
+    [filter_state], and no operation replacement. Otherwise, return the
+    classification associated with the protocol error. Note that when
+    there is a conflict with a previously validated operation, the new
+    operation is always discarded. As it does not allow for any fee
+    market, this function is designed for non-manager operations. *)
+let precheck_non_manager filter_state validation_state oph
+    ~nb_successful_prechecks operation =
+  proto_validate_operation
+    validation_state
+    oph
+    ~nb_successful_prechecks
+    operation
+  >>= function
+  | Ok validation_state ->
+      Lwt.return
+        (`Passed_precheck (filter_state, validation_state, `No_replace))
+  | Error
+      ( _err,
+        ((`Refused _ | `Branch_delayed _ | `Branch_refused _ | `Outdated _) as
+        error_classification) ) ->
+      Lwt.return error_classification
+
+(* Now that [precheck] uses {!Validate_operation.validate_operation}
+   for every kind of operation, it must never return
+   [`Undecided]. Indeed, this would cause the prevalidator to call
+   {!Apply.apply_operation}, which relies on updates to the alpha
+   context to detect incompatible operations, whereas
+   [validate_operation] only updates the
+   {!Validate_operation.validate_operation_state}. Therefore, it would
+   be possible for the mempool to accept conflicting operations. *)
 let precheck :
     config ->
     filter_state:state ->
@@ -1247,7 +1279,13 @@ let precheck :
   match protocol_data.contents with
   | Single (Manager_operation _) -> call_precheck_manager protocol_data
   | Cons (Manager_operation _, _) -> call_precheck_manager protocol_data
-  | Single _ -> Lwt.return `Undecided
+  | Single _ ->
+      precheck_non_manager
+        filter_state
+        validation_state
+        oph
+        ~nb_successful_prechecks
+        {shell = shell_header; protocol_data}
 
 open Apply_results
 
