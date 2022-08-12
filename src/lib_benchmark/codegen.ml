@@ -45,6 +45,8 @@ module Codegen_helpers = struct
     Exp.(apply (ident (loc f)) args)
 
   let string_of_fv fv = Format.asprintf "%a" Free_variable.pp fv
+
+  let let_open_in x expr = Exp.open_ (Opn.mk (Mod.ident (loc_ident x))) expr
 end
 
 module Codegen : Costlang.S with type 'a repr = Parsetree.expression = struct
@@ -59,10 +61,12 @@ module Codegen : Costlang.S with type 'a repr = Parsetree.expression = struct
 
   let false_ = Exp.construct (loc_ident "false") None
 
-  let int i = Exp.constant (Const.int i)
+  let int i = call ["S.safe_int"] [Exp.constant (Const.int i)]
 
   let float f =
-    call ["int_of_float"] [Exp.constant @@ Const.float (string_of_float f)]
+    call
+      ["S.safe_int"]
+      [call ["int_of_float"] [Exp.constant @@ Const.float (string_of_float f)]]
 
   let ( + ) x y = call ["+"] [x; y]
 
@@ -72,9 +76,9 @@ module Codegen : Costlang.S with type 'a repr = Parsetree.expression = struct
 
   let ( / ) x y = call ["/"] [x; y]
 
-  let max x y = call ["max"] [x; y]
+  let max x y = call ["S.max"] [x; y]
 
-  let min x y = call ["min"] [x; y]
+  let min x y = call ["S.min"] [x; y]
 
   let log2 x = call ["log2"] [x]
 
@@ -86,14 +90,17 @@ module Codegen : Costlang.S with type 'a repr = Parsetree.expression = struct
 
   let eq x y = call ["="] [x; y]
 
-  let shift_left i bits = call ["lsl"] [i; int bits]
+  let shift_left i bits = call ["lsl"] [i; Exp.constant (Const.int bits)]
 
-  let shift_right i bits = call ["lsr"] [i; int bits]
+  let shift_right i bits = call ["lsr"] [i; Exp.constant (Const.int bits)]
 
   let lam ~name f =
     let patt = pvar name in
     let var = ident name in
-    Exp.fun_ Nolabel None patt (f var)
+    let body =
+      Exp.let_ Nonrecursive [Vb.mk patt (call ["S.safe_int"] [var])] (f var)
+    in
+    Exp.fun_ Nolabel None patt body
 
   let app x y = Exp.apply x [(Nolabel, y)]
 
@@ -163,6 +170,7 @@ let codegen (Model.For_codegen model) (sol : solution)
       let module M = (val model) in
       let module M = M.Def (Subst_impl) in
       let expr = Lift_then_print.prj @@ Impl.prj @@ Subst_impl.prj M.model in
+      let expr = Codegen_helpers.let_open_in "S_syntax" expr in
       Some expr
 
 let codegen_module models sol transform =
