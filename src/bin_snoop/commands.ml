@@ -570,6 +570,7 @@ module Codegen_cmd = struct
         "%a@."
         Data_encoding.Json.pp
         (Data_encoding.Json.construct
+           ~include_default_fields:`Always
            Fixed_point_transform.options_encoding
            Fixed_point_transform.default_options) ;
       exit 1

@@ -129,11 +129,11 @@ let options_encoding =
     (fun (precision, max_relative_error, cast_mode, inverse_scaling, resolution) ->
       {precision; max_relative_error; cast_mode; inverse_scaling; resolution})
     (obj5
-       (req "precision" int31)
-       (req "max_relative_error" float)
-       (req "cast_mode" cast_mode_encoding)
-       (req "inverse_scaling" int31)
-       (req "resolution" int31))
+       (dft "precision" int31 default_options.precision)
+       (dft "max_relative_error" float default_options.max_relative_error)
+       (dft "cast_mode" cast_mode_encoding default_options.cast_mode)
+       (dft "inverse_scaling" int31 default_options.inverse_scaling)
+       (dft "resolution" int31 default_options.resolution))
 
 (* ------------------------------------------------------------------------- *)
 (* Error registration *)
