@@ -199,33 +199,46 @@ let constants_mainnet =
            (minus overhead), since we need to limit our proofs to those
            that can fit in an operation. *)
         rejection_max_proof_size = 30000;
-        (* This is the first block of cycle 618, which is expected to be
-           about one year after the activation of protocol J.
-           See https://tzstats.com/cycle/618 *)
+        (* This is the first block of cycle 618, which is expected to
+           be about one year after the activation of protocol J.  See
+           https://tzstats.com/cycle/618 *)
         sunset_level = 3_473_409l;
       };
     dal = default_dal;
     sc_rollup =
-      {
-        enable = false;
-        (* The following value is chosen to prevent spam. *)
-        origination_size = 6_314;
-        challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
-        (* The following value is chosen to limit the length of inbox refutation proofs. *)
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/2373
-           check this is reasonable. *)
-        max_number_of_messages_per_commitment_period = 32_765;
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
-           The following constants need to be refined. *)
-        stake_amount = Tez.of_mutez_exn 10_000_000_000L;
-        commitment_period_in_blocks = 30;
-        max_lookahead_in_blocks = 30_000l;
-        max_active_outbox_levels = sc_rollup_max_active_outbox_levels;
-        max_outbox_messages_per_level = sc_rollup_max_outbox_messages_per_level;
-        number_of_sections_in_dissection = 32;
-        timeout_period_in_blocks = sc_rollup_timeout_period_in_blocks;
-        max_number_of_stored_cemented_commitments = 5;
-      };
+      (let commitment_period_in_blocks = 30 in
+       {
+         enable = false;
+         (* The following value is chosen to prevent spam. *)
+         origination_size = 6_314;
+         challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
+         commitment_period_in_blocks;
+         (*
+
+            The following value is chosen to limit the length of inbox
+            refutation proofs. In the worst case, the length of inbox
+            refutation proofs are logarithmic (in basis 2) in the
+            number of messages in the inboxes during the commitment
+            period.
+
+            With the following value, an inbox refutation proof is
+            made of at most 35 hashes, hence a payload bounded by
+            35 * 48 bytes, which far below than the 32kb of a Tezos
+            operations.
+
+         *)
+         max_number_of_messages_per_commitment_period =
+           commitment_period_in_blocks * 10_000_000;
+         (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
+            The following constants need to be refined. *)
+         stake_amount = Tez.of_mutez_exn 10_000_000_000L;
+         max_lookahead_in_blocks = 30_000l;
+         max_active_outbox_levels = sc_rollup_max_active_outbox_levels;
+         max_outbox_messages_per_level = sc_rollup_max_outbox_messages_per_level;
+         number_of_sections_in_dissection = 32;
+         timeout_period_in_blocks = sc_rollup_timeout_period_in_blocks;
+         max_number_of_stored_cemented_commitments = 5;
+       });
   }
 
 let default_dal_sandbox =

@@ -46,7 +46,17 @@ let new_context_with_stakers nb_stakers =
   let*? initial_balances =
     List.init ~when_negative_length:[] nb_stakers (fun _ -> initial_balance)
   in
-  let* b, contracts = Context.init_n ~initial_balances nb_stakers () in
+  let sc_rollup_max_number_of_messages_per_commitment_period =
+    (* The default value is too large for testing. *)
+    1000
+  in
+  let* b, contracts =
+    Context.init_n
+      ~initial_balances
+      nb_stakers
+      ~sc_rollup_max_number_of_messages_per_commitment_period
+      ()
+  in
   let+ inc = Incremental.begin_construction b in
   let state = Incremental.validation_state inc in
   let ctxt = state.ctxt in
