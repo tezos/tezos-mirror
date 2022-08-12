@@ -174,8 +174,6 @@ module type S = sig
 
   val option : 'a t -> 'a option t
 
-  val with_self_reference : ('a Lazy.t -> 'a t) -> 'a t
-
   val delayed : (unit -> 'a t) -> 'a t
 end
 
@@ -474,26 +472,6 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
           (function None -> Some () | _ -> None)
           (fun () -> None);
       ]
-
-  let with_self_reference f =
-    (* Mutable reference to the current value. *)
-    let current = ref None in
-    (* Sets the current value. *)
-    let set_current value =
-      current := Some value ;
-      value
-    in
-    (* Gets the current value from the ref. This should only be called once
-       the  encoding/decoding steps have already constructed a value and the ref
-       has been updated. *)
-    let get_current () =
-      match !current with
-      | Some value -> value
-      | None -> raise Uninitialized_self_ref
-    in
-    (* Intercepts the encoding and decoding steps to update the reference to the
-       current module. *)
-    conv set_current set_current (f (lazy (get_current ())))
 
   let delayed f =
     let enc = lazy (f ()) in

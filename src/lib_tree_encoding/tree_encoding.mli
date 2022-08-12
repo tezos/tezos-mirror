@@ -295,12 +295,6 @@ module type S = sig
       optional values. *)
   val option : 'a t -> 'a option t
 
-  (** [with_self_reference f] creates an encoder that allows accessing the
-      encoded/decoded value itself. It's useful for encoding cyclic
-      data-structures. Here, [f] is a function that takes the (lazy)
-      self-reference as an argument and constructs an encoder. *)
-  val with_self_reference : ('a Lazy.t -> 'a t) -> 'a t
-
   (** [delayed f] produces a tree encoder/decoder that delays evaluation of
       [f ()] until the encoder or decoder is actually needed. This is required
       to allow for directly recursive encoders/decoders. *)
