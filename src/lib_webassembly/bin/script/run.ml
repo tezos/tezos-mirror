@@ -333,10 +333,10 @@ let modules : Ast.module_ Map.t ref = ref Map.empty
 (* NOTE: See [instantiate_module] below on why this exists. *)
 let unnamed_instance_counter = ref 0
 
-(* NOTE: See [instantiate_module] below on why this exists. *)
-let unnamed_instances : Instance.module_reg = Instance.ModuleMap.create ()
-
-let instances : Instance.module_reg = Instance.ModuleMap.create ()
+let instances : Instance.module_reg =
+  let module_reg = Instance.ModuleMap.create () in
+  Instance.ModuleMap.set "__empty" Instance.empty_module_inst module_reg ;
+  module_reg
 
 let registry : Instance.module_inst Map.t ref = ref Map.empty
 
@@ -358,11 +358,10 @@ let instantiate_module x_opt m imports =
         *)
         let index = !unnamed_instance_counter in
         unnamed_instance_counter := !unnamed_instance_counter + 1 ;
-        Instance.
-          {registry = unnamed_instances; key = Module_key (Int.to_string index)}
-    | Some name -> Instance.{registry = instances; key = Module_key name.it}
+        Instance.Module_key (Printf.sprintf "__unnamed_%i" index)
+    | Some name -> Instance.Module_key name.it
   in
-  Eval.init ~self host_funcs_registry m imports
+  Eval.init ~module_reg:instances ~self host_funcs_registry m imports
 
 let bind_lazy module_reg name instance =
   Option.iter
@@ -440,7 +439,12 @@ let run_action act : Values.value list Lwt.t =
             vs
             ins_l ;
           let+ result =
-            Eval.invoke host_funcs_registry f (List.map (fun v -> v.it) vs)
+            Eval.invoke
+              ~module_reg:instances
+              ~caller:(Module_key "__empty")
+              host_funcs_registry
+              f
+              (List.map (fun v -> v.it) vs)
           in
           result
       | Some _ -> Assert.error act.at "export is not a function"
