@@ -19,6 +19,12 @@ This protocol requires a different protocol environment version than Kathmandu.
 It requires protocol environment V7, compared to V6 for Kathmandu.
 (MR :gl:`!5906`)
 
+- Simplify the protocol-environment build process by including
+  camlInternalFormatBasic — which is not intended for use by developers.
+  (MR :gl:`!5910`)
+
+- Add option monad syntaxes and Update Lwt. (MR :gl:`!6040`)
+
 Smart Contract Optimistic Rollups (ongoing)
 -------------------------------------------
 
@@ -32,7 +38,8 @@ Rollups supporting execution of smart contracts. (MRs :gl:`!5603`, :gl:`!5606`,
 :gl:`!5882`, :gl:`!5811`, :gl:`!5898`, :gl:`!5925`, :gl:`!5909`, :gl:`!5902`,
 :gl:`!5888`, :gl:`!5893`, :gl:`!5884`, :gl:`!5955`, :gl:`!5692`, :gl:`!5887`,
 :gl:`!5900`, :gl:`!6014`, :gl:`!6009`, :gl:`!6015`, :gl:`!6019`, :gl:`!6012`,
-:gl:`!5851`, :gl:`!5985`)
+:gl:`!5851`, :gl:`!5985`, :gl:`!5984`, :gl:`!6037`, :gl:`!5987`, :gl:`!5878`,
+:gl:`!6050`, :gl:`!6030`, :gl:`!6060`)
 
 Data Availability Layer (ongoing)
 ---------------------------------
@@ -82,6 +89,8 @@ Minor Changes
 - New error ``Conflicting_nonce_revelation`` (MR
   :gl:`!5849`)
 
+- New errors in voting operations. (MR :gl:`!6046`)
+
 - Patch smart contracts containing deprecated annotations. (MR :gl:`!5752`)
 
 - Errors related to consensus operations have been reworked. See
@@ -111,7 +120,8 @@ Internal
 - Remove Coq attributes. (MR :gl:`!5735`)
 
 - Internal refactorings in Michelson typechecker and interpreter. (MRs
-  :gl:`!5586`, :gl:`!5587`, :gl:`!5803`, :gl:`!5804`, :gl:`!5809`, :gl:`!5942`)
+  :gl:`!5586`, :gl:`!5587`, :gl:`!5803`, :gl:`!5804`, :gl:`!5809`, :gl:`!5942`,
+  :gl:`!5625`)
 
 - Ensure payer is an implicit account. (MR :gl:`!5850`)
 
