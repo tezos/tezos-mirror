@@ -590,6 +590,7 @@ val transfer :
   ?gas_limit:int ->
   ?storage_limit:int ->
   ?counter:int ->
+  ?entrypoint:string ->
   ?arg:string ->
   ?simulation:bool ->
   ?force:bool ->
@@ -611,6 +612,7 @@ val spawn_transfer :
   ?gas_limit:int ->
   ?storage_limit:int ->
   ?counter:int ->
+  ?entrypoint:string ->
   ?arg:string ->
   ?simulation:bool ->
   ?force:bool ->
