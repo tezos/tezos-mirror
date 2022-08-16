@@ -141,10 +141,7 @@ let setup ?commitment_period ?challenge_window ?timeout f ~protocol =
   let base = Either.right (protocol, None) in
   let* parameter_file = Protocol.write_parameter_file ~base parameters in
   let nodes_args =
-    Node.
-      [
-        Synchronisation_threshold 0; History_mode (Full None); No_bootstrap_peers;
-      ]
+    Node.[Synchronisation_threshold 0; History_mode Archive; No_bootstrap_peers]
   in
   let* node, client =
     Client.init_with_protocol ~parameter_file `Client ~protocol ~nodes_args ()
@@ -782,7 +779,15 @@ let basic_scenario _protocol sc_rollup_node sc_rollup _node client =
   in
   return ()
 
-let sc_rollup_node_stops_scenario _protocol sc_rollup_node sc_rollup _node
+(* Reactivate when the following TODO is fixed:
+
+   FIXME: https://gitlab.com/tezos/tezos/-/issues/3205
+
+   The rollup node should be able to restart properly after an
+   abnormal interruption at every point of its process.  Currently,
+   the state is not persistent enough and the processing is not
+   idempotent enough to achieve that property. *)
+let _sc_rollup_node_stops_scenario _protocol sc_rollup_node sc_rollup _node
     client =
   let num_messages = 2 in
   let expected_level =
@@ -2673,6 +2678,26 @@ let test_valid_dispute_dissection protocols =
       cement [c31; c32] ~fail:"Attempted to cement a disputed commitment")
     protocols
 
+(* Testing rollup node catch up mechanism
+   --------------------------------------
+
+   The rollup node must be able to catch up from the genesis
+   of the rollup when paired with a node in archive mode.
+*)
+let test_late_rollup_node =
+  test_scenario
+    {
+      tags = ["node"];
+      variant = "late";
+      description = "a late rollup should catch up";
+    }
+  @@ fun _protocol sc_rollup_node _sc_rollup_address _node client ->
+  let* () = bake_levels 65 client in
+  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* () = bake_levels 30 client in
+  let* _status = Sc_rollup_node.wait_for_level ~timeout:2. sc_rollup_node 95 in
+  return ()
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -2683,11 +2708,14 @@ let register ~kind ~protocols =
   test_rollup_inbox_size ~kind protocols ;
   test_rollup_inbox_current_messages_hash ~kind protocols ;
   test_rollup_inbox_of_rollup_node ~kind "basic" basic_scenario protocols ;
-  test_rollup_inbox_of_rollup_node
-    ~kind
-    "stops"
-    sc_rollup_node_stops_scenario
-    protocols ;
+  (* See above at definition of sc_rollup_node_stops_scenario:
+
+     test_rollup_inbox_of_rollup_node
+      ~kind
+      "stops"
+      sc_rollup_node_stops_scenario
+      protocols ;
+  *)
   test_rollup_inbox_of_rollup_node
     ~kind
     "disconnects"
@@ -2770,7 +2798,8 @@ let register ~kind ~protocols =
     protocols
     ~kind ;
   test_consecutive_commitments protocols ~kind ;
-  test_refutation protocols ~kind
+  test_refutation protocols ~kind ;
+  test_late_rollup_node protocols ~kind
 
 let register ~protocols =
   (* PVM-independent tests. We still need to specify a PVM kind

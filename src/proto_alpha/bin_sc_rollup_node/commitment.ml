@@ -152,7 +152,7 @@ let update_last_stored_commitment store (commitment : Sc_rollup.Commitment.t) =
     Store.Commitments.add store inbox_level (commitment, commitment_hash)
   in
   let* () = Store.Last_stored_commitment_level.set store inbox_level in
-  let* () = Commitment_event.commitment_stored commitment in
+  let* () = Commitment_event.commitment_stored commitment_hash commitment in
   if commitment.inbox_level <= lcc_level then
     Commitment_event.commitment_will_not_be_published lcc_level commitment
   else return ()
@@ -268,6 +268,19 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     in
     return_unit
 
+  let commitment_is_published cctxt rollup_address commitment_hash =
+    let open Lwt_result_syntax in
+    let*! commitment_res =
+      Plugin.RPC.Sc_rollup.commitment
+        cctxt
+        (cctxt#chain, cctxt#block)
+        rollup_address
+        commitment_hash
+    in
+    match commitment_res with
+    | Ok _commitment -> return_true
+    | Error _errors -> return_false
+
   let get_commitment_and_publish ~check_lcc_hash
       ({cctxt; rollup_address; _} as node_ctxt : Node_context.t)
       next_level_to_publish store =
@@ -276,9 +289,17 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       Store.Commitments.mem store next_level_to_publish
     in
     if is_commitment_available then
-      let*! commitment, _commitment_hash =
+      let*! commitment, commitment_hash =
         Store.Commitments.get store next_level_to_publish
       in
+      let* predecessor_published =
+        commitment_is_published cctxt rollup_address commitment.predecessor
+      in
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3528
+         The injector should make this test redundant. Therefore, we should
+         remove this test when the injector is merged.
+      *)
+      when_ predecessor_published @@ fun () ->
       let* () =
         if check_lcc_hash then
           let open Lwt_result_syntax in
@@ -321,7 +342,11 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
               store
               commitment.inbox_level
           in
-          let*! () = Commitment_event.publish_commitment_injected commitment in
+          let*! () =
+            Commitment_event.publish_commitment_injected
+              commitment_hash
+              commitment
+          in
           return_unit
     else return_unit
 
@@ -411,7 +436,9 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
             ~fee_parameter:Configuration.default_fee_parameter
             ()
         in
-        let*! () = Commitment_event.cement_commitment_injected commitment in
+        let*! () =
+          Commitment_event.cement_commitment_injected commitment_hash commitment
+        in
         return_unit
 
   (* TODO:  https://gitlab.com/tezos/tezos/-/issues/3008

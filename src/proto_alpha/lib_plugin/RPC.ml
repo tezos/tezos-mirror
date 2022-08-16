@@ -2174,6 +2174,16 @@ module Sc_rollup = struct
       ()
       ()
 
+  let commitment ctxt block sc_rollup_address commitment_hash =
+    RPC_context.make_call2
+      S.commitment
+      ctxt
+      block
+      sc_rollup_address
+      commitment_hash
+      ()
+      ()
+
   let dal_slot_subscriptions ctxt block sc_rollup_address level =
     RPC_context.make_call2
       S.dal_slot_subscriptions

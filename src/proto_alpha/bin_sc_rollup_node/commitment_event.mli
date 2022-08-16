@@ -35,13 +35,16 @@ val stopping : unit -> unit Lwt.t
 (** The functions below emit commitment events depending on whether they are
     being published or cemented. *)
 
-val publish_commitment_injected : Sc_rollup.Commitment.t -> unit Lwt.t
+val publish_commitment_injected :
+  Sc_rollup.Commitment.Hash.t -> Sc_rollup.Commitment.t -> unit Lwt.t
 
-val cement_commitment_injected : Sc_rollup.Commitment.t -> unit Lwt.t
+val cement_commitment_injected :
+  Sc_rollup.Commitment.Hash.t -> Sc_rollup.Commitment.t -> unit Lwt.t
 
-(** [commitment_stored commitment] emits the event that the [commitment] was
-    stored. *)
-val commitment_stored : Sc_rollup.Commitment.t -> unit Lwt.t
+(** [commitment_stored commitment_hash commitment] emits the event
+   that the [commitment] was stored. *)
+val commitment_stored :
+  Sc_rollup.Commitment.Hash.t -> Sc_rollup.Commitment.t -> unit Lwt.t
 
 (** [commitment_will_not_be_published level commitment] emits the event that
     [commitment] will not be published: its inbox level is less or equal than
