@@ -76,12 +76,22 @@ let transaction_encoding =
 
 let encoding =
   let open Data_encoding in
+  (* We use a union encoding in order to guarantee backwards compatibility
+     when outbox messages are extended with more constructors.
+
+     Each new constructor must be added with an increased tag number.
+  *)
   check_size
     Constants_repr.sc_rollup_message_size_limit
-    (conv
-       (fun (Atomic_transaction_batch {transactions}) -> transactions)
-       (fun transactions -> Atomic_transaction_batch {transactions})
-       (obj1 (req "transactions" (list transaction_encoding))))
+    (union
+       [
+         case
+           (Tag 0)
+           ~title:"Atomic_transaction_batch"
+           (obj1 (req "transactions" (list transaction_encoding)))
+           (fun (Atomic_transaction_batch {transactions}) -> Some transactions)
+           (fun transactions -> Atomic_transaction_batch {transactions});
+       ])
 
 let pp_transaction fmt {destination; entrypoint; unparsed_parameters} =
   let json =
