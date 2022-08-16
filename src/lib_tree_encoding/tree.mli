@@ -25,15 +25,15 @@
 
 (** Exposes a module type {!S} representing trees. *)
 
+type key = string list
+
+type value = bytes
+
 exception Incorrect_tree_type
 
 (** An immutable tree API. *)
 module type S = sig
   type tree
-
-  type key := string list
-
-  type value := bytes
 
   (** @raise Incorrect_tree_type *)
   val select : Lazy_containers.Lazy_map.tree -> tree
@@ -50,3 +50,19 @@ module type S = sig
 
   val find_tree : tree -> key -> tree option Lwt.t
 end
+
+type 'tree backend = (module S with type tree = 'tree)
+
+val select : 'tree backend -> Lazy_containers.Lazy_map.tree -> 'tree
+
+val wrap : 'tree backend -> 'tree -> Lazy_containers.Lazy_map.tree
+
+val remove : 'tree backend -> 'tree -> key -> 'tree Lwt.t
+
+val add : 'tree backend -> 'tree -> key -> value -> 'tree Lwt.t
+
+val add_tree : 'tree backend -> 'tree -> key -> 'tree -> 'tree Lwt.t
+
+val find : 'tree backend -> 'tree -> key -> value option Lwt.t
+
+val find_tree : 'tree backend -> 'tree -> key -> 'tree option Lwt.t

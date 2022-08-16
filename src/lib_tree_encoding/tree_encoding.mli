@@ -76,8 +76,8 @@ module type S = sig
       provided [tree]. *)
   val encode : 'a t -> 'a -> tree -> tree Lwt.t
 
-  (** [decode enc x tree] decodes a value using the encoder [enc] from the
-      provided [tree]. *)
+  (** [decode enc x tree] decodes a value using the encoder [enc] from
+      the provided [tree]. *)
   val decode : 'a t -> tree -> 'a Lwt.t
 
   (** [return x] is an encoder that does nothing on encoding. On decoding it

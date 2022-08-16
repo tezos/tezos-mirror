@@ -39,36 +39,22 @@ open Tezos_scoru_wasm
 (* Use context-binary for testing. *)
 module Context = Tezos_context_memory.Context_binary
 
-module Tree :
-  Tezos_context_sigs.Context.TREE
-    with type t = Context.t
-     and type tree = Context.tree
-     and type key = string list
-     and type value = bytes = struct
-  type t = Context.t
+type Lazy_containers.Lazy_map.tree += Tree of Context.tree
 
+module Tree : Tree_encoding.TREE with type tree = Context.tree = struct
   type tree = Context.tree
 
-  type key = Context.key
-
-  type value = Context.value
-
   include Context.Tree
+
+  let select = function
+    | Tree t -> t
+    | _ -> raise Tree_encoding.Incorrect_tree_type
+
+  let wrap t = Tree t
 end
 
-type Lazy_containers.Lazy_map.tree += Tree of Tree.tree
-
 module Tree_encoding = struct
-  include Tree_encoding.Make (struct
-    include Tree
-
-    let select = function
-      | Tree t -> t
-      | _ -> raise Tree_encoding.Incorrect_tree_type
-
-    let wrap t = Tree t
-  end)
-
+  include Tree_encoding.Make (Tree)
   include Lazy_map_encoding.Make (Instance.NameMap)
 end
 

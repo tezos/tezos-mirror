@@ -179,7 +179,6 @@ end
 
 module Make (T : Tree.S) : S with type tree = T.tree = struct
   module Encoding = Encoding.Make (T)
-  module Decoding = Decoding.Make (T)
   module E = Encoding
   module D = Decoding
 
@@ -323,7 +322,7 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
 
   let encode {encode; _} value tree = E.run encode value tree
 
-  let decode {decode; _} tree = D.run decode tree
+  let decode {decode; _} tree = D.run (module T) decode tree
 
   let raw key = {encode = E.raw key; decode = D.raw key}
 
