@@ -32,6 +32,14 @@ let string_enum cases =
   | [(title, value)] -> conv (fun _ -> ()) (fun () -> value) (constant title)
   | cases -> string_enum cases
 
+module Source = struct
+  open Source
+
+  let phrase_encoding encoding =
+    let open Data_encoding in
+    conv (fun x -> x.it) (fun v -> v @@ no_region) encoding
+end
+
 module Types = struct
   open Types
 
@@ -108,6 +116,34 @@ module Types = struct
         unit_case_incr "ExtSplat" ExtSplat;
         unit_case_incr "ExtZero" ExtZero;
       ]
+
+  let global_type_encoding =
+    let open Data_encoding in
+    conv
+      (fun (Types.GlobalType (v, m)) -> (v, m))
+      (fun (v, m) -> Types.GlobalType (v, m))
+      (tup2 value_type_encoding mutability_encoding)
+
+  let limits_encoding value_encoding =
+    let open Data_encoding in
+    conv
+      (fun {min; max} -> (min, max))
+      (fun (min, max) -> {min; max})
+      (tup2 value_encoding (option value_encoding))
+
+  let table_type_encoding =
+    let open Data_encoding in
+    conv
+      (fun (TableType (l, r)) -> (l, r))
+      (fun (l, r) -> TableType (l, r))
+      (tup2 (limits_encoding int32) ref_type_encoding)
+
+  let memory_type_encoding =
+    let open Data_encoding in
+    conv
+      (fun (MemoryType l) -> l)
+      (fun l -> MemoryType l)
+      (limits_encoding int32)
 end
 
 module Values = struct
@@ -530,20 +566,11 @@ module Ast = struct
             (memop_encoding Types.vec_type_encoding Types.pack_size_encoding))
          (req "lane" int31))
 
-  let var_encoding =
-    let open Data_encoding in
-    let open Source in
-    conv (fun x -> x.it) (fun var -> var @@ no_region) Data_encoding.int32
+  let var_encoding = Source.phrase_encoding Data_encoding.int32
 
-  let num_encoding =
-    let open Data_encoding in
-    let open Source in
-    conv (fun x -> x.it) (fun x -> x @@ no_region) Values.num_encoding
+  let num_encoding = Source.phrase_encoding Values.num_encoding
 
-  let vec_encoding =
-    let open Data_encoding in
-    let open Source in
-    conv (fun x -> x.it) (fun vec -> vec @@ no_region) Values.vec_encoding
+  let vec_encoding = Source.phrase_encoding Values.vec_encoding
 
   let block_type_encoding =
     let open Data_encoding in
@@ -571,4 +598,128 @@ module Ast = struct
     let open Data_encoding in
     let open Ast in
     conv (fun (Data_label l) -> l) (fun l -> Data_label l) int32
+
+  let import_desc_encoding =
+    let open Ast in
+    let unannotated_encoding =
+      union_incr
+        [
+          case_incr
+            "FuncImport"
+            var_encoding
+            (function FuncImport v -> Some v | _ -> None)
+            (fun v -> FuncImport v);
+          case_incr
+            "TableImport"
+            Types.table_type_encoding
+            (function TableImport t -> Some t | _ -> None)
+            (fun t -> TableImport t);
+          case_incr
+            "MemoryImport"
+            Types.memory_type_encoding
+            (function MemoryImport m -> Some m | _ -> None)
+            (fun m -> MemoryImport m);
+          case_incr
+            "GlobalImport"
+            Types.global_type_encoding
+            (function GlobalImport g -> Some g | _ -> None)
+            (fun g -> GlobalImport g);
+        ]
+    in
+    Source.phrase_encoding unannotated_encoding
+
+  let export_desc_encoding =
+    let open Ast in
+    let unannotated_encoding =
+      union_incr
+        [
+          case_incr
+            "FuncExport"
+            var_encoding
+            (function FuncExport v -> Some v | _ -> None)
+            (fun v -> FuncExport v);
+          case_incr
+            "TableExport"
+            var_encoding
+            (function TableExport t -> Some t | _ -> None)
+            (fun t -> TableExport t);
+          case_incr
+            "MemoryExport"
+            var_encoding
+            (function MemoryExport m -> Some m | _ -> None)
+            (fun m -> MemoryExport m);
+          case_incr
+            "GlobalExport"
+            var_encoding
+            (function GlobalExport g -> Some g | _ -> None)
+            (fun g -> GlobalExport g);
+        ]
+    in
+    Source.phrase_encoding unannotated_encoding
+
+  let const_encoding = Source.phrase_encoding block_label_encoding
+
+  let segment_mode_encoding =
+    let open Data_encoding in
+    let unannotated_encoding =
+      union_incr
+        [
+          case_incr
+            "Passive"
+            (constant "Passive")
+            (function Ast.Passive -> Some () | _ -> None)
+            (fun () -> Passive);
+          case_incr
+            "Active"
+            (tup2 var_encoding const_encoding)
+            (function
+              | Ast.Active {index; offset} -> Some (index, offset) | _ -> None)
+            (fun (index, offset) -> Active {index; offset});
+          case_incr
+            "Declarative"
+            (constant "Declarative")
+            (function Ast.Declarative -> Some () | _ -> None)
+            (fun () -> Declarative);
+        ]
+    in
+    Source.phrase_encoding unannotated_encoding
+
+  let table_encoding =
+    let open Data_encoding in
+    let unannoted_encoding =
+      conv
+        (fun {ttype} -> ttype)
+        (fun ttype -> {ttype})
+        Types.table_type_encoding
+    in
+    Source.phrase_encoding unannoted_encoding
+
+  let memory_encoding =
+    let open Data_encoding in
+    let unannoted_encoding =
+      conv
+        (fun {mtype} -> mtype)
+        (fun mtype -> {mtype})
+        Types.memory_type_encoding
+    in
+    Source.phrase_encoding unannoted_encoding
+
+  let global_encoding =
+    let open Data_encoding in
+    let unannoted_encoding =
+      conv
+        (fun {gtype; ginit} -> (gtype, ginit))
+        (fun (gtype, ginit) -> {gtype; ginit})
+        (tup2
+           Types.global_type_encoding
+           (Source.phrase_encoding block_label_encoding))
+    in
+    Source.phrase_encoding unannoted_encoding
+
+  let start_encoding =
+    let open Data_encoding in
+    let unannoted_encoding =
+      conv (fun {sfunc} -> sfunc) (fun sfunc -> {sfunc}) var_encoding
+    in
+    Source.phrase_encoding unannoted_encoding
 end

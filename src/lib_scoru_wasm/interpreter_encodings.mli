@@ -23,6 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Source : sig
+  open Tezos_webassembly_interpreter.Source
+
+  val phrase_encoding : 'a Data_encoding.t -> 'a phrase Data_encoding.t
+end
+
 module Types : sig
   open Tezos_webassembly_interpreter.Types
 
@@ -50,6 +56,8 @@ module Types : sig
   val extension_encoding : extension Data_encoding.t
 
   val vec_extension_encoding : vec_extension Data_encoding.t
+
+  val global_type_encoding : global_type Data_encoding.t
 end
 
 module Values : sig
@@ -215,4 +223,20 @@ module Ast : sig
   val block_label_encoding : Ast.block_label Data_encoding.t
 
   val data_label_encoding : Ast.data_label Data_encoding.t
+
+  val import_desc_encoding : Ast.import_desc Data_encoding.t
+
+  val export_desc_encoding : Ast.export_desc Data_encoding.t
+
+  val const_encoding : Ast.const Data_encoding.t
+
+  val segment_mode_encoding : Ast.segment_mode Data_encoding.t
+
+  val table_encoding : Ast.table Data_encoding.t
+
+  val memory_encoding : Ast.memory Data_encoding.t
+
+  val global_encoding : Ast.global Data_encoding.t
+
+  val start_encoding : Ast.start Data_encoding.t
 end

@@ -349,8 +349,12 @@ module Make (T : Tree.S) : S with type tree = T.tree = struct
         in
         let decode =
           D.map
-            (fun produce_value -> Map.create ~produce_value ())
-            (D.lazy_mapping to_key value.decode)
+            (fun (origin, produce_value) ->
+              Map.create ?origin ~produce_value ())
+            (let open D.Syntax in
+            let+ origin = D.subtree
+            and+ produce_value = D.lazy_mapping to_key value.decode in
+            (origin, produce_value))
         in
         {encode; decode}
     end

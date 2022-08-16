@@ -412,6 +412,66 @@ let allocations_gen =
   let+ datas = datas_table_gen in
   Ast.{blocks; datas}
 
+let limit_gen gen =
+  let* min = gen in
+  let* max = opt gen in
+  return {Types.min; Types.max}
+
+let table_type_gen =
+  let* limit = limit_gen int32 in
+  let* ref_type = ref_type_gen in
+  return @@ Types.TableType (limit, ref_type)
+
+let memory_type_gen =
+  let+ limit = limit_gen int32 in
+  Types.MemoryType limit
+
+let global_type_gen =
+  let* vt = value_type_gen in
+  let* mt = oneofl [Types.Immutable; Types.Mutable] in
+  return @@ Types.GlobalType (vt, mt)
+
+let import_desc_gen =
+  let+ idesc =
+    oneof
+      [
+        map (fun v -> Ast.FuncImport v) var_gen;
+        map (fun tt -> Ast.TableImport tt) table_type_gen;
+        map (fun mt -> Ast.MemoryImport mt) memory_type_gen;
+        map (fun gt -> Ast.GlobalImport gt) global_type_gen;
+      ]
+  in
+  no_region idesc
+
+let export_desc_gen =
+  let+ edesc =
+    oneof
+      [
+        map (fun v -> Ast.FuncExport v) var_gen;
+        map (fun v -> Ast.TableExport v) var_gen;
+        map (fun v -> Ast.MemoryExport v) var_gen;
+        map (fun v -> Ast.GlobalExport v) var_gen;
+      ]
+  in
+  no_region edesc
+
+let const_gen = map no_region block_label_gen
+
+let segment_mode_gen =
+  let passive = return Ast.Passive in
+  let active =
+    let* index = var_gen in
+    let+ offset = block_label_gen in
+    Ast.Active {index; offset = no_region offset}
+  in
+  let declarative = return Ast.Declarative in
+  let+ mode = oneof [passive; active; declarative] in
+  no_region mode
+
+let start_gen =
+  let+ sfunc = var_gen in
+  no_region Ast.{sfunc}
+
 let module_key_and_instance_gen ?module_reg () =
   let module_reg =
     match module_reg with

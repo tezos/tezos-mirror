@@ -27,7 +27,7 @@
     -------
     Component:    Lib_scoru_wasm input
     Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "$Encodings^"
+                    -- test "^Input$"
     Subject:      Input tests for the tezos-scoru-wasm library
 *)
 

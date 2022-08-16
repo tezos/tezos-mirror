@@ -27,7 +27,7 @@
     -------
     Component:    Tree_encoding
     Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
-                    -- test "AST Generators"
+                    -- test "^AST Generators$"
     Subject:      Encoding tests for the tezos-scoru-wasm library
 *)
 
