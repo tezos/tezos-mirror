@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,48 +26,118 @@
 
 (** This module implements bounded (or refined) versions of data types. *)
 
-(** Bounded [int32]. *)
-module Int32 : sig
-  (** Bounds.
+(** Bounds.
 
-      Formally each [B : BOUND] represents the interval of all integers
-      between [B.min_int] and [B.max_int]. This is a closed interval, e.g.
-      the endpoints are included.
+   Formally each [B : BOUND] represents the interval of all values
+   between [B.min_value] and [B.max_value]. This is a closed interval,
+   i.e.  the endpoints are included.
 
-      Intervals can be empty, for example [struct let min_int = 1; let max_int
-      0 end] is empty.
-   *)
-  module type BOUNDS = sig
-    val min_int : int32
+   Intervals can be empty, for example [struct let min_value = 1; let
+   max_value 0 end] is empty. *)
+module type BOUNDS = sig
+  (** [ocaml_type] is the type used for the internal representation of
+     values within the bounded interval.  This is the type that values
+     in the interval are converted to and from. E.g., for an interval
+     of 32-bit integers [ocaml_type = int32]. *)
+  type ocaml_type
 
-    val max_int : int32
-  end
+  (** [min_value] represents the minimal value (included) reprensatable. *)
+  val min_value : ocaml_type
 
-  module type S = sig
-    type t
-
-    include BOUNDS
-
-    include Compare.S with type t := t
-
-    val encoding : t Data_encoding.t
-
-    val to_int32 : t -> int32
-
-    val of_int32 : int32 -> t option
-  end
-
-  (** Produce a module [_ : S] of bounded integers.
-
-      If the given interval is empty, [S.t] is the empty type, and [of_int32]
-      returns [Error] for all inputs.
-
-      {4 Encoding}
-      [(Make B).encoding] is based on the underlying [int32] encoding. This
-      allow future compatiblity with larger bounds, at the price of addding 1-3
-      redundant bytes to each message.
-   *)
-  module Make (_ : BOUNDS) : S
-
-  module NonNegative : S
+  (** [max_value] represents the maximal value (included)
+     reprensatable. *)
+  val max_value : ocaml_type
 end
+
+(** Signature for an interval of (included values) with an encoding
+   and projection functions towards the underlying ocaml datatype. *)
+module type S = sig
+  (** Internal representation of a bounded value. *)
+  type t
+
+  (** Underlying OCaml representation for the bounded value. *)
+  type ocaml_type
+
+  include BOUNDS with type ocaml_type := ocaml_type
+
+  include Compare.S with type t := t
+
+  (** A (partial) encoding of the datatype. If the encoded value is
+     out of bounds, an exception may be raised. See
+     {!val:Data_encoding.conv_with_guard}. *)
+  val encoding : t Data_encoding.t
+
+  (** A pretty-printer for values of type [t]. *)
+  val pp : Format.formatter -> t -> unit
+
+  (** [to_value t] is a projection to the OCaml representation of the
+     bounded value [t]. *)
+  val to_value : t -> ocaml_type
+
+  (** [of_value ocaml_value] represents [ocaml_value] as a bounded
+     value. Returns [None] if the value is outside of the bounds
+     specified by {!val:min_value} and {!val:max_value}. *)
+  val of_value : ocaml_type -> t option
+end
+
+(** Allows to build interval of int64 integers. The encoding used is
+   {!val:Data_encoding.int64} regardless of the actual bounds. *)
+module Int64 (B : BOUNDS with type ocaml_type := int64) :
+  S with type ocaml_type := int64
+
+(** Allows to build interval of int32 integers. The encoding used is
+   {!val:Data_encoding.int32} regardless of the actual bounds. *)
+module Int32 (B : BOUNDS with type ocaml_type := int32) :
+  S with type ocaml_type := int32
+
+(** Allows to build interval of non negative int32 integers. The
+   encoding used is {!val:Data_encoding.int32} regardless of the
+   actual bounds. *)
+module Non_negative_int32 : S with type ocaml_type := int32
+
+(** Allows to build interval of built-in OCaml int integers. The
+   encoding used is {!val:Data_encoding.int31} regardless of the
+   actual bounds.
+
+   @raise Invalid_argument if the bounds provided cannot be
+   representable on 4 bytes (depends on whether [int] is represented
+   on 4 bytes or 8 bytes which depends on the machine architecture)..
+   *)
+module Int31 (B : BOUNDS with type ocaml_type := int) :
+  S with type ocaml_type := int
+
+(** Allows to build interval of int integers representable on 2
+   bytes. The encoding used is {!val:Data_encoding.int16} regardless
+   of the actual bounds.
+
+   @raise Invalid_argument if the bounds provided cannot be
+   representable on 2 bytes.  *)
+module Int16 (B : BOUNDS with type ocaml_type := int) :
+  S with type ocaml_type := int
+
+(** Allows to build interval of non-negative int integers
+   representable on 2 bytes. The encoding used is
+   {!val:Data_encoding.uint16} regardless of the actual bounds.
+
+   @raise Invalid_argument if the bounds provided cannot be
+   representable on 2 bytes. *)
+module Uint16 (B : BOUNDS with type ocaml_type := int) :
+  S with type ocaml_type := int
+
+(** Allows to build interval of non-negative int integers
+   representable on 1 bytes. The encoding used is
+   {!val:Data_encoding.int8} regardless of the actual bounds.
+
+   @raise Invalid_argument if the bounds provided cannot be
+   representable on 1 bytes. *)
+module Int8 (B : BOUNDS with type ocaml_type := int) :
+  S with type ocaml_type := int
+
+(** Allows to build interval of non-negative int integers
+   representable on 1 bytes. The encoding used is
+   {!val:Data_encoding.uint8} regardless of the actual bounds.
+
+   @raise Invalid_argument if the bounds provided cannot be
+   representable on 1 bytes. *)
+module Uint8 (B : BOUNDS with type ocaml_type := int) :
+  S with type ocaml_type := int

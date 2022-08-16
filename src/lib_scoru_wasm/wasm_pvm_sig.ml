@@ -25,14 +25,14 @@
 
 (** Represents the location of an input message. *)
 type input_info = {
-  inbox_level : Tezos_base.Bounded.Int32.NonNegative.t;
+  inbox_level : Tezos_base.Bounded.Non_negative_int32.t;
       (** The inbox level at which the message exists.*)
   message_counter : Z.t;  (** The index of the message in the inbox. *)
 }
 
 (** Represents the location of an output message. *)
 type output_info = {
-  outbox_level : Tezos_base.Bounded.Int32.NonNegative.t;
+  outbox_level : Tezos_base.Bounded.Non_negative_int32.t;
       (** The outbox level at which the message exists.*)
   message_index : Z.t;  (** The index of the message in the outbox. *)
 }
@@ -87,5 +87,5 @@ let input_info_encoding =
     (fun {inbox_level; message_counter} -> (inbox_level, message_counter))
     (fun (inbox_level, message_counter) -> {inbox_level; message_counter})
     (obj2
-       (req "inbox_level" Tezos_base.Bounded.Int32.NonNegative.encoding)
+       (req "inbox_level" Tezos_base.Bounded.Non_negative_int32.encoding)
        (req "message_counter" n))

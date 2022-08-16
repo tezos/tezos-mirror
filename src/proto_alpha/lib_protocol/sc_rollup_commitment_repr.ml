@@ -76,7 +76,7 @@ module V1 = struct
       inbox_level
       Hash.pp
       predecessor
-      (Number_of_ticks.to_int32 number_of_ticks)
+      (Number_of_ticks.to_value number_of_ticks)
 
   let encoding =
     let open Data_encoding in

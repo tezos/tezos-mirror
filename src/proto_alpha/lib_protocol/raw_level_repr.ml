@@ -65,7 +65,7 @@ let diff = Int32.sub
 let to_int32 l = l
 
 let to_int32_non_negative l =
-  match Bounded.Int32.NonNegative.of_int32 l with
+  match Bounded.Non_negative_int32.of_value l with
   | Some x -> x
   | _ -> assert false (* invariant: raw_levels are non-negative *)
 
@@ -95,7 +95,7 @@ let of_int32_exn l =
   | Error _ -> invalid_arg "Level_repr.of_int32"
 
 let of_int32_non_negative l =
-  match of_int32 (Bounded.Int32.NonNegative.to_int32 l) with
+  match of_int32 (Bounded.Non_negative_int32.to_value l) with
   | Ok l -> l
   | Error _ -> assert false (* invariant: raw_levels are non-negative *)
 

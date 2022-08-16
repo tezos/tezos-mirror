@@ -839,7 +839,7 @@ let mk_sc_rollup_origination (oinfos : operation_req) (infos : infos) =
 
 let sc_dummy_commitment =
   let number_of_ticks =
-    match Sc_rollup.Number_of_ticks.of_int32 3000l with
+    match Sc_rollup.Number_of_ticks.of_value 3000l with
     | None -> assert false
     | Some x -> x
   in

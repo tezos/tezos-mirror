@@ -469,7 +469,7 @@ let test_withdrawing_twice () =
     Sc_rollup_errors.Sc_rollup_not_staked
 
 let number_of_ticks_exn n =
-  match Sc_rollup_repr.Number_of_ticks.of_int32 n with
+  match Sc_rollup_repr.Number_of_ticks.of_value n with
   | Some x -> x
   | None -> Stdlib.failwith "Bad Number_of_ticks"
 

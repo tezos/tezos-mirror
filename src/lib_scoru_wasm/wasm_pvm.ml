@@ -264,7 +264,7 @@ module Make (T : Tree_encoding.Runner.TREE) :
       let open Lwt_syntax in
       let open Wasm_pvm_sig in
       let {inbox_level; message_counter} = input_info in
-      let raw_level = Bounded.Int32.NonNegative.to_int32 inbox_level in
+      let raw_level = Bounded.Non_negative_int32.to_value inbox_level in
       let level = Int32.to_string raw_level in
       let id = Z.to_string message_counter in
       let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
