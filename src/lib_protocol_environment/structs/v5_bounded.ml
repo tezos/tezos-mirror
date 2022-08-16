@@ -80,4 +80,8 @@ module Int32 = struct
 
     let max_int = max_value
   end
+
+  let non_negative_of_legacy_non_negative = Fun.id
+
+  let legacy_non_negative_of_non_negative = Fun.id
 end

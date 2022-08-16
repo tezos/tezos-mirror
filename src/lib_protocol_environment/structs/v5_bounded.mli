@@ -69,5 +69,11 @@ module Int32 : sig
    *)
   module Make (_ : BOUNDS) : S
 
-  module NonNegative : S with type t = Tezos_base.Bounded.Non_negative_int32.t
+  module NonNegative : S
+
+  val non_negative_of_legacy_non_negative :
+    NonNegative.t -> Tezos_base.Bounded.Non_negative_int32.t
+
+  val legacy_non_negative_of_non_negative :
+    Tezos_base.Bounded.Non_negative_int32.t -> NonNegative.t
 end
