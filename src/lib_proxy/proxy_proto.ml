@@ -71,7 +71,7 @@ module type PROTO_RPC = sig
   val do_rpc :
     Proxy.proxy_getter_input ->
     Tezos_protocol_environment.Proxy_context.M.key ->
-    Tezos_shell_services.Block_services.raw_context tzresult Lwt.t
+    Tezos_context_sigs.Context.Proof_types.raw_context tzresult Lwt.t
 end
 
 type proto_rpc = (module PROTO_RPC)

@@ -33,7 +33,7 @@ type input = {
       (** The block considered *)
   key : string list;
       (** The key of the context for which data is being requested *)
-  mtree : Tezos_shell_services.Block_services.merkle_tree;
+  mtree : Tezos_context_sigs.Context.Proof_types.merkle_tree;
       (** The tree received from the endpoint providing data.
           It is much smaller than [tree]. *)
   tree : Local_context.tree;

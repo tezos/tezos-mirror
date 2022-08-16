@@ -34,8 +34,7 @@
  (libraries
   tezos-base
   tezos-crypto
-  tezos-test-helpers
-  tezos-shell-services)
+  tezos-test-helpers)
  (modules assert_lib))
 
 (rule (alias runtest_js_base) (action progn))

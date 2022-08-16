@@ -25,13 +25,14 @@
 
 (* Code that is only meant to be used by src/lib_proxy/light*.ml files *)
 
+module Proof = Tezos_context_sigs.Context.Proof_types
+
 let key_to_string = String.concat ";"
 
 module Store = Local_context
 module StringMap = String.Map
 
-let rec raw_context_to_irmin_tree
-    (raw : Tezos_shell_services.Block_services.raw_context) : Store.tree Lwt.t =
+let rec raw_context_to_irmin_tree (raw : Proof.raw_context) : Store.tree Lwt.t =
   let open Lwt_syntax in
   match raw with
   | Key (bytes : Bytes.t) -> Lwt.return (Store.Tree.of_raw (`Value bytes))
@@ -60,7 +61,7 @@ module Merkle = struct
   let rec merkle_node_to_irmin_tree repo mnode :
       (Store.tree, string) result Lwt.t =
     let open Lwt_result_syntax in
-    let open Tezos_shell_services.Block_services in
+    let open Proof in
     match mnode with
     | Hash (kind, s) -> (
         match string_to_hash s with
@@ -93,7 +94,7 @@ module Merkle = struct
   let rec union_irmin_tree_merkle_node repo reversed_key tree =
     let open Lwt_result_syntax in
     function
-    | Tezos_shell_services.Block_services.Hash (_, mnode_hash_str) -> (
+    | Proof.Hash (_, mnode_hash_str) -> (
         match string_to_hash mnode_hash_str with
         | Error _ as err -> Lwt.return err
         | Ok mnode_hash ->
@@ -203,7 +204,7 @@ module Merkle = struct
   (** Whether [tree] contains [mnode]. Returns unit if yes, otherwise
       an explanation as to why [tree] doesn't contain [mnode]. *)
   let rec contains_merkle_node tree key mnode : (unit, string) result Lwt.t =
-    let open Tezos_shell_services.Block_services in
+    let open Proof in
     let open Lwt_result_syntax in
     let apply_or_fail_at k f =
       (* Applies [f] on the tree mapped by [k] if present, otherwise fail *)
@@ -257,10 +258,9 @@ module Merkle = struct
       to [string list option] but more expressive. *)
   type path_to_ignore = NotThisPath | ThisPath of string list
 
-  let rec nodes_shape_match path_to_ignore
-      (left : Tezos_shell_services.Block_services.merkle_node)
-      (right : Tezos_shell_services.Block_services.merkle_node) =
-    let open Tezos_shell_services.Block_services in
+  let rec nodes_shape_match path_to_ignore (left : Proof.merkle_node)
+      (right : Proof.merkle_node) =
+    let open Proof in
     match (left, right, path_to_ignore) with
     | Hash _, Hash _, _ | Data _, Data _, _ -> None
     | Continue left_tree, Continue right_tree, _ -> (
@@ -281,9 +281,8 @@ module Merkle = struct
               right;
           ]
 
-  and trees_shape_match path_to_ignore
-      (left : Tezos_shell_services.Block_services.merkle_tree)
-      (right : Tezos_shell_services.Block_services.merkle_tree) =
+  and trees_shape_match path_to_ignore (left : Proof.merkle_tree)
+      (right : Proof.merkle_tree) =
     String.Map.merge
       (fun key left_val_opt right_val_opt ->
         match (left_val_opt, right_val_opt, path_to_ignore) with
@@ -304,9 +303,8 @@ module Merkle = struct
     |> List.map (fun (_key, errors) -> errors)
     |> List.flatten
 
-  let trees_shape_match key_path
-      (left : Tezos_shell_services.Block_services.merkle_tree)
-      (right : Tezos_shell_services.Block_services.merkle_tree) =
+  let trees_shape_match key_path (left : Proof.merkle_tree)
+      (right : Proof.merkle_tree) =
     trees_shape_match (ThisPath key_path) left right |> function
     | [] -> Ok ()
     | errors -> Error errors

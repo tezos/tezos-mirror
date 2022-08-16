@@ -24,9 +24,10 @@
 (*****************************************************************************)
 
 open Lib_test.Qcheck2_helpers
+module Proof = Tezos_context_sigs.Context.Proof_types
 
 let raw_context_gen =
-  let open Tezos_shell_services.Block_services in
+  let open Proof in
   let module MapGen = MakeMapGen (String.Map) in
   let open QCheck2 in
   let open Gen in
@@ -48,8 +49,7 @@ let raw_context_gen =
         ])
     max_depth_factor
 
-let print_raw_context =
-  Format.asprintf "%a" Tezos_shell_services.Block_services.pp_raw_context
+let print_raw_context = Format.asprintf "%a" Proof.pp_raw_context
 
 (** Strings that are valid Irmin hashes. Taken from the output of:
 
@@ -74,7 +74,7 @@ let irmin_hashes =
 let irmin_hash_gen = QCheck2.Gen.oneofl irmin_hashes
 
 let merkle_node_gen =
-  let open Tezos_shell_services.Block_services in
+  let open Proof in
   let module MapGen = MakeMapGen (String.Map) in
   let open QCheck2.Gen in
   let max_depth_factor = 4 in
@@ -98,8 +98,7 @@ let merkle_node_gen =
         ])
     max_depth_factor
 
-let print_merkle_node =
-  Format.asprintf "%a" Tezos_shell_services.Block_services.pp_merkle_node
+let print_merkle_node = Format.asprintf "%a" Proof.pp_merkle_node
 
 let merkle_tree_gen =
   let open MakeMapGen (String.Map) in
@@ -108,5 +107,4 @@ let merkle_tree_gen =
     (QCheck2.Gen.small_string ?gen:None)
     merkle_node_gen
 
-let print_merkle_tree =
-  Format.asprintf "%a" Tezos_shell_services.Block_services.pp_merkle_tree
+let print_merkle_tree = Format.asprintf "%a" Proof.pp_merkle_tree

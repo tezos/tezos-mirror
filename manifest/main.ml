@@ -1240,6 +1240,14 @@ let _octez_workers_tests =
         alcotest_lwt;
       ]
 
+let octez_context_sigs =
+  public_lib
+    "tezos-context.sigs"
+    ~path:"src/lib_context/sigs"
+    ~opam:"tezos-context"
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_stdlib |> open_]
+    ~js_compatible:true
+
 let octez_shell_services =
   public_lib
     "tezos-shell-services"
@@ -1250,6 +1258,7 @@ let octez_shell_services =
         octez_base |> open_ ~m:"TzPervasives" |> open_;
         octez_p2p_services |> open_;
         octez_version |> open_;
+        octez_context_sigs;
       ]
     ~linkall:true
     ~js_compatible:true
@@ -1260,7 +1269,7 @@ let octez_test_helpers_extra =
     ~path:"src/lib_test"
     ~internal_name:"lib_test_extra"
     ~synopsis:"Test helpers dependent on tezos-base"
-    ~deps:[octez_base; octez_crypto; octez_test_helpers; octez_shell_services]
+    ~deps:[octez_base; octez_crypto; octez_test_helpers]
     ~ocaml:V.(at_least "4.08")
     ~dune:
       Dune.
@@ -1511,17 +1520,6 @@ let _octez_p2p_tests =
               ];
         ])
 
-let octez_context_sigs =
-  public_lib
-    "tezos-context.sigs"
-    ~path:"src/lib_context/sigs"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        octez_stdlib |> open_;
-        octez_shell_services |> open_;
-      ]
-
 let octez_scoru_wasm =
   public_lib
     "tezos-scoru-wasm"
@@ -1580,7 +1578,6 @@ let octez_context_memory =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_stdlib |> open_;
-        octez_shell_services |> open_;
         irmin_pack;
         irmin_pack_mem;
         octez_context_sigs;
@@ -1594,7 +1591,6 @@ let octez_context_disk =
     ~path:"src/lib_context/disk"
     ~deps:
       [
-        octez_shell_services |> open_;
         octez_base |> open_ ~m:"TzPervasives";
         bigstringaf;
         fmt;

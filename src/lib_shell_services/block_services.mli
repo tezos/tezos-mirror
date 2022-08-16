@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Proof = Tezos_context_sigs.Context.Proof_types
+
 type chain = [`Main | `Test | `Hash of Chain_id.t]
 
 type chain_prefix = unit * chain
@@ -81,56 +83,12 @@ val live_blocks_path : ('a, 'b) RPC_path.t -> ('a, 'b) RPC_path.t
 
 type operation_list_quota = {max_size : int; max_op : int option}
 
-(** The low-level storage exposed as a tree *)
-type raw_context =
-  | Key of Bytes.t  (** A leaf, containing a value *)
-  | Dir of raw_context String.Map.t
-      (** A directory, mapping keys to nested [raw_context]s *)
-  | Cut
-      (** An omitted piece, because it is too deep compared to the maximum
-          depth requested in the
-          /chains/<chain_id>/blocks/<block_id/context/raw/bytes RPC *)
-
-(** [raw_context_eq rc1 rc2] tests whether [rc1] and [rc2] are equal,
- *  that is, have the same constructors; and the constructor's content
- *  are recursively equal *)
-val raw_context_eq : raw_context -> raw_context -> bool
-
-val raw_context_encoding : raw_context Data_encoding.t
-
-val pp_raw_context : Format.formatter -> raw_context -> unit
+val raw_context_encoding : Proof.raw_context Data_encoding.t
 
 (** [raw_context_insert (k,v) c] inserts a key-value pair [(k,v)] in a raw_context [c].
     If [k] collides to a existing sub-tree in [c], the sub-tree is replaced by a new key-value pair. *)
-val raw_context_insert : string list * raw_context -> raw_context -> raw_context
-
-(** The kind of a [merkle_node] *)
-type merkle_hash_kind =
-  | Contents  (** The kind associated to leaves *)
-  | Node  (** The kind associated to directories *)
-
-(** A node in a [merkle_tree] *)
-type merkle_node =
-  | Hash of (merkle_hash_kind * string)  (** A shallow node: just a hash *)
-  | Data of raw_context  (** A full-fledged node containing actual data *)
-  | Continue of merkle_tree  (** An edge to a more nested tree *)
-
-(** The type of Merkle tree used by the light mode *)
-and merkle_tree = merkle_node String.Map.t
-
-(** [merkle_tree_eq mtree1 mtree2] tests whether [mtree1] and [mtree2] are equal,
- *  that is, have the same constructors; and the constructor's content
- *  are recursively equal *)
-val merkle_tree_eq : merkle_tree -> merkle_tree -> bool
-
-(** Whether an RPC caller requests an entirely shallow Merkle tree ([Hole])
-    or whether the returned tree should contain data at the given key
-    ([Raw_context]) *)
-type merkle_leaf_kind = Hole | Raw_context
-
-val pp_merkle_node : Format.formatter -> merkle_node -> unit
-
-val pp_merkle_tree : Format.formatter -> merkle_tree -> unit
+val raw_context_insert :
+  string list * Proof.raw_context -> Proof.raw_context -> Proof.raw_context
 
 module type PROTO = sig
   val hash : Protocol_hash.t
@@ -372,7 +330,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ?block:block ->
       ?depth:int ->
       string list ->
-      raw_context tzresult Lwt.t
+      Proof.raw_context tzresult Lwt.t
 
     val merkle_tree :
       #simple ->
@@ -380,7 +338,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ?block:block ->
       ?holey:bool ->
       string list ->
-      merkle_tree option tzresult Lwt.t
+      Proof.merkle_tree option tzresult Lwt.t
   end
 
   module Helpers : sig
@@ -662,7 +620,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           prefix * string list,
           < depth : int option >,
           unit,
-          raw_context )
+          Proof.raw_context )
         RPC_service.t
 
       val merkle_tree :
@@ -671,7 +629,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           prefix * string list,
           < holey : bool option >,
           unit,
-          merkle_tree option )
+          Proof.merkle_tree option )
         RPC_service.t
     end
 

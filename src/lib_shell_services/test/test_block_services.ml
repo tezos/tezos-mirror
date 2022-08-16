@@ -30,17 +30,19 @@
     Subject:      Unit tests for [Block_services]
 *)
 
+module Proof = Tezos_context_sigs.Context.Proof_types
+
 let make_directory n f =
   let rec aux acc n =
     if n <= 0 then acc
     else aux (String.Map.add (string_of_int n) (f n) acc) (n - 1)
   in
-  Block_services.Dir (aux String.Map.empty n)
+  Proof.Dir (aux String.Map.empty n)
 
 (** Check that JSON-encoding for a large directory never stack-overflows.
     This test fails for json-data-encoding.0.9.1 and older. *)
 let test_json_encoding_of_large_directory () =
-  let dir = make_directory 1_000_000 (fun _ -> Block_services.Cut) in
+  let dir = make_directory 1_000_000 (fun _ -> Proof.Cut) in
   let _ =
     Data_encoding.Json.construct Block_services.raw_context_encoding dir
   in

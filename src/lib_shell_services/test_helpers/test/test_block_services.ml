@@ -34,7 +34,7 @@ open Lib_test.Qcheck2_helpers
 
 open Tezos_shell_services_test_helpers.Shell_services_test_helpers
 
-open Tezos_shell_services.Block_services
+open Tezos_context_sigs.Context.Proof_types
 
 let raw_context_eq_tests =
   qcheck_eq_tests
