@@ -247,18 +247,15 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     |> return
 
   let get_block_info cctxt level =
-    let* info =
-      Block_services.info ~chain:cctxt#chain ~block:(`Level level) cctxt ()
+    let* header =
+      Block_services.header ~chain:cctxt#chain ~block:(`Level level) cctxt ()
     in
-    let metadata =
-      Option.value_f ~default:(fun () -> assert false) info.metadata
+    let* metadata =
+      Block_services.metadata ~chain:cctxt#chain ~block:(`Level level) cctxt ()
     in
-    let*? round = raw_block_round info.header.shell in
+    let*? round = raw_block_round header.shell in
     return
-      ( metadata.protocol_data.baker,
-        info.header.shell.timestamp,
-        round,
-        info.hash )
+      (metadata.protocol_data.baker, header.shell.timestamp, round, header.hash)
 end
 
 module Json_loops =
