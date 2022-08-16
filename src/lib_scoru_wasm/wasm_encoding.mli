@@ -27,65 +27,64 @@ open Tezos_webassembly_interpreter
 
 exception Uninitialized_current_module
 
-module Make (M : Tree_encoding.S) : sig
-  type tree = M.tree
+val var_list_encoding : Ast.var list Tree_encoding.t
 
-  type 'a t = 'a M.t
+val instruction_encoding : Ast.instr Tree_encoding.t
 
-  val var_list_encoding : Ast.var list t
+val function_encoding : Instance.func_inst Tree_encoding.t
 
-  val instruction_encoding : Ast.instr t
+val value_ref_encoding : Values.ref_ Tree_encoding.t
 
-  val function_encoding : Instance.func_inst t
+val value_encoding : Values.value Tree_encoding.t
 
-  val value_ref_encoding : Values.ref_ t
+val values_encoding : Values.value list Tree_encoding.t
 
-  val value_encoding : Values.value t
+val memory_encoding : Partial_memory.memory Tree_encoding.t
 
-  val values_encoding : Values.value list t
+val table_encoding : Partial_table.table Tree_encoding.t
 
-  val memory_encoding : Partial_memory.memory t
+val global_encoding : Global.global Tree_encoding.t
 
-  val table_encoding : Partial_table.table t
+val memory_instance_encoding :
+  Partial_memory.memory Instance.Vector.t Tree_encoding.t
 
-  val global_encoding : Global.global t
+val table_vector_encoding :
+  Partial_table.table Instance.Vector.t Tree_encoding.t
 
-  val memory_instance_encoding : Partial_memory.memory Instance.Vector.t t
+val global_vector_encoding : Global.global Instance.Vector.t Tree_encoding.t
 
-  val table_vector_encoding : Partial_table.table Instance.Vector.t t
+val data_label_ref_encoding : Ast.data_label ref Tree_encoding.t
 
-  val global_vector_encoding : Global.global Instance.Vector.t t
+val function_vector_encoding :
+  Instance.func_inst Instance.Vector.t Tree_encoding.t
 
-  val data_label_ref_encoding : Ast.data_label ref t
+val func_type_encoding : Types.func_type Tree_encoding.t
 
-  val function_vector_encoding : Instance.func_inst Instance.Vector.t t
+val function_type_vector_encoding :
+  Types.func_type Instance.Vector.t Tree_encoding.t
 
-  val func_type_encoding : Types.func_type t
+val value_ref_vector_encoding : Values.ref_ Instance.Vector.t Tree_encoding.t
 
-  val function_type_vector_encoding : Types.func_type Instance.Vector.t t
+val extern_map_encoding : Instance.extern Instance.NameMap.t Tree_encoding.t
 
-  val value_ref_vector_encoding : Values.ref_ Instance.Vector.t t
+val value_ref_vector_vector_encoding :
+  Values.ref_ Instance.Vector.t ref Instance.Vector.t Tree_encoding.t
 
-  val extern_map_encoding : Instance.extern Instance.NameMap.t t
+val block_table_encoding : Ast.block_table Tree_encoding.t
 
-  val value_ref_vector_vector_encoding :
-    Values.ref_ Instance.Vector.t ref Instance.Vector.t t
+val datas_table_encoding : Ast.datas_table Tree_encoding.t
 
-  val block_table_encoding : Ast.block_table t
+val allocations_encoding : Ast.allocations Tree_encoding.t
 
-  val datas_table_encoding : Ast.datas_table t
+val module_instance_encoding : Instance.module_inst Tree_encoding.t
 
-  val allocations_encoding : Ast.allocations t
+val module_instances_encoding : Instance.module_reg Tree_encoding.t
 
-  val module_instance_encoding : Instance.module_inst t
+val input_buffer_encoding : Input_buffer.t Tree_encoding.t
 
-  val module_instances_encoding : Instance.module_reg t
+val admin_instr_encoding : Eval.admin_instr Tree_encoding.t
 
-  val input_buffer_encoding : Input_buffer.t t
+val frame_encoding : Eval.frame Tree_encoding.t
 
-  val admin_instr_encoding : Eval.admin_instr t
-
-  val frame_encoding : Eval.frame t
-
-  val config_encoding : host_funcs:Host_funcs.registry -> Eval.config t
-end
+val config_encoding :
+  host_funcs:Host_funcs.registry -> Eval.config Tree_encoding.t

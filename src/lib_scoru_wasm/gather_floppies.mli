@@ -73,5 +73,5 @@ end
     image divided into chunks and provided via both origination- and inbox-
     messages. *)
 module Make
-    (T : Tree_encoding.TREE)
+    (T : Tree_encoding.Runner.TREE)
     (Wasm : Wasm_pvm_sig.S with type tree = T.tree) : S with type tree = T.tree

@@ -67,8 +67,7 @@ module Tree = struct
   let wrap t = Tree t
 end
 
-module Tree_encoding = Tree_encoding.Make (Tree)
-module Wasm_encoding = Wasm_encoding.Make (Tree_encoding)
+module Tree_encoding_runner = Tree_encoding.Runner.Make (Tree)
 
 let empty_tree () =
   let open Lwt_syntax in
@@ -79,8 +78,8 @@ let empty_tree () =
 let encode_decode enc value =
   let open Lwt_syntax in
   let* empty_tree = empty_tree () in
-  let* tree = Tree_encoding.encode enc value empty_tree in
-  Tree_encoding.decode enc tree
+  let* tree = Tree_encoding_runner.encode enc value empty_tree in
+  Tree_encoding_runner.decode enc tree
 
 (** Test serialize/deserialize instructions. *)
 let test_instr_roundtrip () =
@@ -141,13 +140,13 @@ let test_generic_tree ~pp ~gen ~encoding =
       (* We need to print here in order to force lazy bindings to be evaluated. *)
       let _ = print value1 in
       let*! tree1 =
-        Tree_encoding.encode (encoding ~host_funcs) value1 empty_tree
+        Tree_encoding_runner.encode (encoding ~host_funcs) value1 empty_tree
       in
-      let*! value2 = Tree_encoding.decode (encoding ~host_funcs) tree1 in
+      let*! value2 = Tree_encoding_runner.decode (encoding ~host_funcs) tree1 in
       (* We need to print here in order to force lazy bindings to be evaluated. *)
       let _ = print value2 in
       let*! tree2 =
-        Tree_encoding.encode (encoding ~host_funcs) value2 empty_tree
+        Tree_encoding_runner.encode (encoding ~host_funcs) value2 empty_tree
       in
       assert (Tree.equal tree1 tree2) ;
       return_unit)

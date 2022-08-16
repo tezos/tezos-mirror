@@ -41,7 +41,7 @@ module Context = Tezos_context_memory.Context_binary
 
 type Lazy_containers.Lazy_map.tree += Tree of Context.tree
 
-module Tree : Tree_encoding.TREE with type tree = Context.tree = struct
+module Tree : Tree_encoding.Runner.TREE with type tree = Context.tree = struct
   type tree = Context.tree
 
   include Context.Tree
@@ -54,11 +54,12 @@ module Tree : Tree_encoding.TREE with type tree = Context.tree = struct
 end
 
 module Tree_encoding = struct
-  include Tree_encoding.Make (Tree)
+  include Tree_encoding
   include Lazy_map_encoding.Make (Instance.NameMap)
 end
 
-module Parser = Binary_parser_encodings.Make (Tree_encoding)
+module Tree_encoding_runner = Tree_encoding.Runner.Make (Tree)
+module Parser = Binary_parser_encodings
 
 module Utils = struct
   include Tree_encoding
@@ -74,8 +75,8 @@ module Utils = struct
   let test_encode_decode enc value f =
     let open Lwt_result_syntax in
     let*! empty_tree = empty_tree () in
-    let*! tree = Tree_encoding.encode enc value empty_tree in
-    let*! value' = Tree_encoding.decode enc tree in
+    let*! tree = Tree_encoding_runner.encode enc value empty_tree in
+    let*! value' = Tree_encoding_runner.decode enc tree in
     f value'
 
   let encode_decode enc value = test_encode_decode enc value Lwt.return

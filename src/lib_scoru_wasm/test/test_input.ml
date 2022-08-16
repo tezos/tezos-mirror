@@ -193,7 +193,7 @@ let empty_tree () =
 
 type Lazy_containers.Lazy_map.tree += Tree of Context.tree
 
-module Tree : Tree_encoding.TREE with type tree = Context.tree = struct
+module Tree : Tree_encoding.Runner.TREE with type tree = Context.tree = struct
   type tree = Context.tree
 
   include Context.Tree
@@ -206,8 +206,7 @@ module Tree : Tree_encoding.TREE with type tree = Context.tree = struct
 end
 
 module Wasm = Wasm_pvm.Make (Tree)
-module Tree_encoding = Tree_encoding.Make (Tree)
-module Wasm_encoding = Wasm_encoding.Make (Tree_encoding)
+module Tree_encoding_runner = Tree_encoding.Runner.Make (Tree)
 
 let current_tick_encoding =
   Tree_encoding.value ["wasm"; "current_tick"] Data_encoding.n
@@ -256,15 +255,18 @@ let initialise_tree () =
       boot_sector
   in
 
-  let* tree = Tree_encoding.encode current_tick_encoding Z.zero tree in
+  let* tree = Tree_encoding_runner.encode current_tick_encoding Z.zero tree in
   let* tree =
-    Tree_encoding.encode
+    Tree_encoding_runner.encode
       floppy_encoding
       Gather_floppies.Not_gathering_floppies
       tree
   in
   let* tree =
-    Tree_encoding.encode input_request_encoding Wasm_pvm_sig.Input_required tree
+    Tree_encoding_runner.encode
+      input_request_encoding
+      Wasm_pvm_sig.Input_required
+      tree
   in
   Lwt.return tree
 
@@ -284,7 +286,7 @@ let make_inbox_level ~inbox_level ~message_counter =
 let add_input_info ~inbox_level ~message_counter tree =
   let open Lwt_syntax in
   let* tree =
-    Tree_encoding.encode
+    Tree_encoding_runner.encode
       (Tree_encoding.value_option
          ["wasm"; "input"]
          Wasm_pvm_sig.input_info_encoding)
@@ -319,14 +321,14 @@ let encode_tick_state ~host_funcs tick_state tree =
   let open Lwt_syntax in
   (* Encode the tag. *)
   let* tree =
-    Tree_encoding.encode
+    Tree_encoding_runner.encode
       (Tree_encoding.value ["wasm"; "tag"] Data_encoding.string)
       "eval"
       tree
   in
   (* Encode the the value. *)
   let* tree =
-    Tree_encoding.encode
+    Tree_encoding_runner.encode
       (Tree_encoding.scope
          ["wasm"; "value"]
          (Wasm_encoding.config_encoding ~host_funcs))
@@ -342,13 +344,16 @@ let test_set_input () =
   let* tree = initialise_tree () in
   let* tree = add_input_info tree ~inbox_level:5 ~message_counter:10 in
   let* tree =
-    Tree_encoding.encode
+    Tree_encoding_runner.encode
       input_request_encoding
       Wasm_pvm_sig.No_input_required
       tree
   in
   let* tree =
-    Tree_encoding.encode input_request_encoding Wasm_pvm_sig.Input_required tree
+    Tree_encoding_runner.encode
+      input_request_encoding
+      Wasm_pvm_sig.Input_required
+      tree
   in
   let host_funcs = Tezos_webassembly_interpreter.Host_funcs.empty () in
   let tick_state =
@@ -369,9 +374,11 @@ let test_set_input () =
       "hello"
       tree
   in
-  let* result_input = Tree_encoding.decode inp_encoding tree in
-  let* waiting_for_input = Tree_encoding.decode input_request_encoding tree in
-  let* current_tick = Tree_encoding.decode current_tick_encoding tree in
+  let* result_input = Tree_encoding_runner.decode inp_encoding tree in
+  let* waiting_for_input =
+    Tree_encoding_runner.decode input_request_encoding tree
+  in
+  let* current_tick = Tree_encoding_runner.decode current_tick_encoding tree in
   let expected_info =
     let open Wasm_pvm_sig in
     let last_input_read =

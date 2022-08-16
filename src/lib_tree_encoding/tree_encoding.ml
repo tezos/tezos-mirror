@@ -26,8 +26,6 @@
 open Lazy_containers
 include Tree
 
-module type TREE = S
-
 module type Lwt_vector = Lazy_vector.S with type 'a effect = 'a Lwt.t
 
 module type Lwt_map = Lazy_map.S with type 'a effect = 'a Lwt.t
@@ -36,457 +34,309 @@ exception Uninitialized_self_ref
 
 type key = string list
 
-module type S = sig
-  type tree
+module E = Encoding
+module D = Decoding
 
-  type ('tag, 'a) case
+type 'a encoding = 'a E.t
 
-  type 'a t
+type 'a decoding = 'a D.t
 
-  val encode : 'a t -> 'a -> tree -> tree Lwt.t
+type 'a t = {encode : 'a encoding; decode : 'a decoding}
 
-  val decode : 'a t -> tree -> 'a Lwt.t
+let return x = {encode = E.ignore; decode = D.Syntax.return x}
 
-  val return : 'a -> 'a t
+let conv d e {encode; decode} =
+  {encode = E.contramap e encode; decode = D.map d decode}
 
-  val conv : ('a -> 'b) -> ('b -> 'a) -> 'a t -> 'b t
+let conv_lwt d e {encode; decode} =
+  {encode = E.contramap_lwt e encode; decode = D.map_lwt d decode}
 
-  val conv_lwt : ('a -> 'b Lwt.t) -> ('b -> 'a Lwt.t) -> 'a t -> 'b t
+let scope key {encode; decode} =
+  {encode = E.scope key encode; decode = D.scope key decode}
 
-  val tup2 : flatten:bool -> 'a t -> 'b t -> ('a * 'b) t
+let tup2_ a b =
+  {encode = E.tup2 a.encode b.encode; decode = D.Syntax.both a.decode b.decode}
 
-  val tup3 : flatten:bool -> 'a t -> 'b t -> 'c t -> ('a * 'b * 'c) t
+let tup3_ a b c =
+  conv
+    (fun (a, (b, c)) -> (a, b, c))
+    (fun (a, b, c) -> (a, (b, c)))
+    (tup2_ a (tup2_ b c))
 
-  val tup4 :
-    flatten:bool -> 'a t -> 'b t -> 'c t -> 'd t -> ('a * 'b * 'c * 'd) t
+let tup4_ a b c d =
+  conv
+    (fun (a, (b, c, d)) -> (a, b, c, d))
+    (fun (a, b, c, d) -> (a, (b, c, d)))
+    (tup2_ a (tup3_ b c d))
 
-  val tup5 :
-    flatten:bool ->
-    'a t ->
-    'b t ->
-    'c t ->
-    'd t ->
-    'e t ->
-    ('a * 'b * 'c * 'd * 'e) t
+let tup5_ a b c d e =
+  conv
+    (fun (a, (b, c, d, e)) -> (a, b, c, d, e))
+    (fun (a, b, c, d, e) -> (a, (b, c, d, e)))
+    (tup2_ a (tup4_ b c d e))
 
-  val tup6 :
-    flatten:bool ->
-    'a t ->
-    'b t ->
-    'c t ->
-    'd t ->
-    'e t ->
-    'f t ->
-    ('a * 'b * 'c * 'd * 'e * 'f) t
+let tup6_ a b c d e f =
+  conv
+    (fun (a, (b, c, d, e, f)) -> (a, b, c, d, e, f))
+    (fun (a, b, c, d, e, f) -> (a, (b, c, d, e, f)))
+    (tup2_ a (tup5_ b c d e f))
 
-  val tup7 :
-    flatten:bool ->
-    'a t ->
-    'b t ->
-    'c t ->
-    'd t ->
-    'e t ->
-    'f t ->
-    'g t ->
-    ('a * 'b * 'c * 'd * 'e * 'f * 'g) t
+let tup7_ a b c d e f g =
+  conv
+    (fun (a, (b, c, d, e, f, g)) -> (a, b, c, d, e, f, g))
+    (fun (a, b, c, d, e, f, g) -> (a, (b, c, d, e, f, g)))
+    (tup2_ a (tup6_ b c d e f g))
 
-  val tup8 :
-    flatten:bool ->
-    'a t ->
-    'b t ->
-    'c t ->
-    'd t ->
-    'e t ->
-    'f t ->
-    'g t ->
-    'h t ->
-    ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h) t
+let tup8_ a b c d e f g h =
+  conv
+    (fun (a, (b, c, d, e, f, g, h)) -> (a, b, c, d, e, f, g, h))
+    (fun (a, b, c, d, e, f, g, h) -> (a, (b, c, d, e, f, g, h)))
+    (tup2_ a (tup7_ b c d e f g h))
 
-  val tup9 :
-    flatten:bool ->
-    'a t ->
-    'b t ->
-    'c t ->
-    'd t ->
-    'e t ->
-    'f t ->
-    'g t ->
-    'h t ->
-    'i t ->
-    ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i) t
+let tup9_ a b c d e f g h i =
+  conv
+    (fun (a, (b, c, d, e, f, g, h, i)) -> (a, b, c, d, e, f, g, h, i))
+    (fun (a, b, c, d, e, f, g, h, i) -> (a, (b, c, d, e, f, g, h, i)))
+    (tup2_ a (tup8_ b c d e f g h i))
 
-  val raw : key -> bytes t
+(* This is to allow for either flat composition of tuples or  where each
+   element of the tuple is wrapped under an index node. *)
+let flat_or_wrap ~flatten ix enc =
+  if flatten then enc else scope [string_of_int ix] enc
 
-  val value_option : key -> 'a Data_encoding.t -> 'a option t
+let tup2 ~flatten a b =
+  tup2_ (flat_or_wrap ~flatten 1 a) (flat_or_wrap ~flatten 2 b)
 
-  val value : ?default:'a -> key -> 'a Data_encoding.t -> 'a t
+let tup3 ~flatten a b c =
+  tup3_
+    (flat_or_wrap ~flatten 1 a)
+    (flat_or_wrap ~flatten 2 b)
+    (flat_or_wrap ~flatten 3 c)
 
-  val scope : key -> 'a t -> 'a t
+let tup4 ~flatten a b c d =
+  tup4_
+    (flat_or_wrap ~flatten 1 a)
+    (flat_or_wrap ~flatten 2 b)
+    (flat_or_wrap ~flatten 3 c)
+    (flat_or_wrap ~flatten 4 d)
 
-  module Lazy_map_encoding : sig
-    module type S = sig
-      type 'a map
+let tup5 ~flatten a b c d e =
+  tup5_
+    (flat_or_wrap ~flatten 1 a)
+    (flat_or_wrap ~flatten 2 b)
+    (flat_or_wrap ~flatten 3 c)
+    (flat_or_wrap ~flatten 4 d)
+    (flat_or_wrap ~flatten 5 e)
 
-      val lazy_map : 'a t -> 'a map t
-    end
+let tup6 ~flatten a b c d e f =
+  tup6_
+    (flat_or_wrap ~flatten 1 a)
+    (flat_or_wrap ~flatten 2 b)
+    (flat_or_wrap ~flatten 3 c)
+    (flat_or_wrap ~flatten 4 d)
+    (flat_or_wrap ~flatten 5 e)
+    (flat_or_wrap ~flatten 6 f)
 
-    module Make (Map : Lwt_map) : S with type 'a map := 'a Map.t
+let tup7 ~flatten a b c d e f g =
+  tup7_
+    (flat_or_wrap ~flatten 1 a)
+    (flat_or_wrap ~flatten 2 b)
+    (flat_or_wrap ~flatten 3 c)
+    (flat_or_wrap ~flatten 4 d)
+    (flat_or_wrap ~flatten 5 e)
+    (flat_or_wrap ~flatten 6 f)
+    (flat_or_wrap ~flatten 7 g)
+
+let tup8 ~flatten a b c d e f g h =
+  tup8_
+    (flat_or_wrap ~flatten 1 a)
+    (flat_or_wrap ~flatten 2 b)
+    (flat_or_wrap ~flatten 3 c)
+    (flat_or_wrap ~flatten 4 d)
+    (flat_or_wrap ~flatten 5 e)
+    (flat_or_wrap ~flatten 6 f)
+    (flat_or_wrap ~flatten 7 g)
+    (flat_or_wrap ~flatten 8 h)
+
+let tup9 ~flatten a b c d e f g h i =
+  tup9_
+    (flat_or_wrap ~flatten 1 a)
+    (flat_or_wrap ~flatten 2 b)
+    (flat_or_wrap ~flatten 3 c)
+    (flat_or_wrap ~flatten 4 d)
+    (flat_or_wrap ~flatten 5 e)
+    (flat_or_wrap ~flatten 6 f)
+    (flat_or_wrap ~flatten 7 g)
+    (flat_or_wrap ~flatten 8 h)
+    (flat_or_wrap ~flatten 9 i)
+
+let raw key = {encode = E.raw key; decode = D.raw key}
+
+let value ?default key de =
+  {encode = E.value key de; decode = D.value ?default key de}
+
+module Lazy_map_encoding = struct
+  module type S = sig
+    type 'a map
+
+    val lazy_map : 'a t -> 'a map t
   end
 
-  module Lazy_vector_encoding : sig
-    module type S = sig
-      type key
-
-      type 'a vector
-
-      val lazy_vector : key t -> 'a t -> 'a vector t
-    end
-
-    module Make (Vector : Lwt_vector) :
-      S with type key := Vector.key and type 'a vector := 'a Vector.t
-
-    module Int :
-      S with type key := int and type 'a vector := 'a Lazy_vector.LwtIntVector.t
-
-    module Int32 :
-      S
-        with type key := int32
-         and type 'a vector := 'a Lazy_vector.LwtInt32Vector.t
-
-    module Z :
-      S with type key := Z.t and type 'a vector := 'a Lazy_vector.LwtZVector.t
+  module Make (Map : Lwt_map) = struct
+    let lazy_map value =
+      let to_key k = [Map.string_of_key k] in
+      let encode =
+        E.with_subtree
+          Map.origin
+          (E.contramap Map.loaded_bindings (E.lazy_mapping to_key value.encode))
+      in
+      let decode =
+        D.map
+          (fun (origin, produce_value) -> Map.create ?origin ~produce_value ())
+          (let open D.Syntax in
+          let+ origin = D.subtree
+          and+ produce_value = D.lazy_mapping to_key value.decode in
+          (origin, produce_value))
+      in
+      {encode; decode}
   end
-
-  val chunk : Chunked_byte_vector.Chunk.t t
-
-  val chunked_byte_vector : Chunked_byte_vector.Lwt.t t
-
-  val case : 'tag -> 'b t -> ('a -> 'b option) -> ('b -> 'a) -> ('tag, 'a) case
-
-  val case_lwt :
-    'tag ->
-    'b t ->
-    ('a -> 'b Lwt.t option) ->
-    ('b -> 'a Lwt.t) ->
-    ('tag, 'a) case
-
-  val tagged_union : ?default:'a -> 'tag t -> ('tag, 'a) case list -> 'a t
-
-  val option : 'a t -> 'a option t
-
-  val delayed : (unit -> 'a t) -> 'a t
 end
 
-module Make (T : Tree.S) : S with type tree = T.tree = struct
-  module Encoding = Encoding.Make (T)
-  module E = Encoding
-  module D = Decoding
+module Lazy_vector_encoding = struct
+  module type S = sig
+    type key
 
-  type tree = T.tree
+    type 'a vector
 
-  type 'a encoding = 'a E.t
+    val lazy_vector : key t -> 'a t -> 'a vector t
+  end
 
-  type 'a decoding = 'a D.t
+  module Make (Vector : Lwt_vector) = struct
+    let lazy_vector with_key value =
+      let open Vector in
+      let to_key k = [string_of_key k] in
+      let encode =
+        E.with_subtree Vector.origin
+        @@ E.contramap
+             (fun vector ->
+               (loaded_bindings vector, num_elements vector, first_key vector))
+             (E.tup3
+                (E.lazy_mapping to_key value.encode)
+                (E.scope ["length"] with_key.encode)
+                (E.scope ["head"] with_key.encode))
+      in
+      let decode =
+        D.map
+          (fun (origin, produce_value, len, head) ->
+            create ~produce_value ~first_key:head ?origin len)
+          (let open D.Syntax in
+          let+ origin = D.subtree
+          and+ x = D.lazy_mapping to_key value.decode
+          and+ y = D.scope ["length"] with_key.decode
+          and+ z = D.scope ["head"] with_key.decode in
+          (origin, x, y, z))
+      in
+      {encode; decode}
+  end
 
-  type 'a t = {encode : 'a encoding; decode : 'a decoding}
+  module Int = Make (Lazy_vector.LwtIntVector)
+  module Int32 = Make (Lazy_vector.LwtInt32Vector)
+  module Z = Make (Lazy_vector.LwtZVector)
+end
 
-  let return x = {encode = E.ignore; decode = D.Syntax.return x}
+let chunk =
+  let open Chunked_byte_vector.Chunk in
+  conv of_bytes to_bytes (raw [])
 
-  let conv d e {encode; decode} =
-    {encode = E.contramap e encode; decode = D.map d decode}
+let chunked_byte_vector =
+  let open Chunked_byte_vector.Lwt in
+  let to_key k = [Int64.to_string k] in
+  let encode =
+    E.with_subtree Chunked_byte_vector.Lwt.origin
+    @@ E.contramap
+         (fun vector -> (loaded_chunks vector, length vector))
+         (E.tup2
+            (E.lazy_mapping to_key chunk.encode)
+            (E.value ["length"] Data_encoding.int64))
+  in
+  let decode =
+    D.map
+      (fun (origin, get_chunk, len) -> create ?origin ~get_chunk len)
+      (let open D.Syntax in
+      let+ origin = D.subtree
+      and+ x = D.lazy_mapping to_key chunk.decode
+      and+ y = D.value ["length"] Data_encoding.int64 in
+      (origin, x, y))
+  in
+  {encode; decode}
 
-  let conv_lwt d e {encode; decode} =
-    {encode = E.contramap_lwt e encode; decode = D.map_lwt d decode}
-
-  let scope key {encode; decode} =
-    {encode = E.scope key encode; decode = D.scope key decode}
-
-  let tup2_ a b =
-    {
-      encode = E.tup2 a.encode b.encode;
-      decode = D.Syntax.both a.decode b.decode;
+type ('tag, 'a) case =
+  | Case : {
+      tag : 'tag;
+      probe : 'a -> 'b Lwt.t option;
+      extract : 'b -> 'a Lwt.t;
+      delegate : 'b t;
     }
+      -> ('tag, 'a) case
 
-  let tup3_ a b c =
-    conv
-      (fun (a, (b, c)) -> (a, b, c))
-      (fun (a, b, c) -> (a, (b, c)))
-      (tup2_ a (tup2_ b c))
+let case_lwt tag delegate probe extract = Case {tag; delegate; probe; extract}
 
-  let tup4_ a b c d =
-    conv
-      (fun (a, (b, c, d)) -> (a, b, c, d))
-      (fun (a, b, c, d) -> (a, (b, c, d)))
-      (tup2_ a (tup3_ b c d))
+let case tag delegate probe extract =
+  case_lwt
+    tag
+    delegate
+    (fun x -> Option.map Lwt.return @@ probe x)
+    (fun x -> Lwt.return @@ extract x)
 
-  let tup5_ a b c d e =
-    conv
-      (fun (a, (b, c, d, e)) -> (a, b, c, d, e))
-      (fun (a, b, c, d, e) -> (a, (b, c, d, e)))
-      (tup2_ a (tup4_ b c d e))
+let tagged_union ?default {encode; decode} cases =
+  let to_encode_case (Case {tag; delegate; probe; extract = _}) =
+    E.case_lwt tag delegate.encode probe
+  in
+  let to_decode_case (Case {tag; delegate; extract; probe = _}) =
+    D.case_lwt tag delegate.decode extract
+  in
+  let encode = E.tagged_union encode (List.map to_encode_case cases) in
+  let decode = D.tagged_union ?default decode (List.map to_decode_case cases) in
+  {encode; decode}
 
-  let tup6_ a b c d e f =
-    conv
-      (fun (a, (b, c, d, e, f)) -> (a, b, c, d, e, f))
-      (fun (a, b, c, d, e, f) -> (a, (b, c, d, e, f)))
-      (tup2_ a (tup5_ b c d e f))
+let value_option key encoding =
+  let encode = E.value_option key encoding in
+  let decode = D.value_option key encoding in
+  {encode; decode}
 
-  let tup7_ a b c d e f g =
-    conv
-      (fun (a, (b, c, d, e, f, g)) -> (a, b, c, d, e, f, g))
-      (fun (a, b, c, d, e, f, g) -> (a, (b, c, d, e, f, g)))
-      (tup2_ a (tup6_ b c d e f g))
+let option enc =
+  tagged_union
+    ~default:None
+    (value [] Data_encoding.string)
+    [
+      case "Some" enc Fun.id Option.some;
+      case
+        "None"
+        (return ())
+        (function None -> Some () | _ -> None)
+        (fun () -> None);
+    ]
 
-  let tup8_ a b c d e f g h =
-    conv
-      (fun (a, (b, c, d, e, f, g, h)) -> (a, b, c, d, e, f, g, h))
-      (fun (a, b, c, d, e, f, g, h) -> (a, (b, c, d, e, f, g, h)))
-      (tup2_ a (tup7_ b c d e f g h))
+let delayed f =
+  let enc = lazy (f ()) in
+  let encode =
+    E.delayed (fun () ->
+        let {encode; _} = Lazy.force enc in
+        encode)
+  in
+  let decode =
+    D.delayed (fun () ->
+        let {decode; _} = Lazy.force enc in
+        decode)
+  in
+  {encode; decode}
 
-  let tup9_ a b c d e f g h i =
-    conv
-      (fun (a, (b, c, d, e, f, g, h, i)) -> (a, b, c, d, e, f, g, h, i))
-      (fun (a, b, c, d, e, f, g, h, i) -> (a, (b, c, d, e, f, g, h, i)))
-      (tup2_ a (tup8_ b c d e f g h i))
+module Runner = struct
+  module type TREE = S
 
-  (* This is to allow for either flat composition of tuples or  where each
-     element of the tuple is wrapped under an index node. *)
-  let flat_or_wrap ~flatten ix enc =
-    if flatten then enc else scope [string_of_int ix] enc
+  module Make (T : TREE) = struct
+    let encode {encode; _} value tree = E.run (module T) encode value tree
 
-  let tup2 ~flatten a b =
-    tup2_ (flat_or_wrap ~flatten 1 a) (flat_or_wrap ~flatten 2 b)
-
-  let tup3 ~flatten a b c =
-    tup3_
-      (flat_or_wrap ~flatten 1 a)
-      (flat_or_wrap ~flatten 2 b)
-      (flat_or_wrap ~flatten 3 c)
-
-  let tup4 ~flatten a b c d =
-    tup4_
-      (flat_or_wrap ~flatten 1 a)
-      (flat_or_wrap ~flatten 2 b)
-      (flat_or_wrap ~flatten 3 c)
-      (flat_or_wrap ~flatten 4 d)
-
-  let tup5 ~flatten a b c d e =
-    tup5_
-      (flat_or_wrap ~flatten 1 a)
-      (flat_or_wrap ~flatten 2 b)
-      (flat_or_wrap ~flatten 3 c)
-      (flat_or_wrap ~flatten 4 d)
-      (flat_or_wrap ~flatten 5 e)
-
-  let tup6 ~flatten a b c d e f =
-    tup6_
-      (flat_or_wrap ~flatten 1 a)
-      (flat_or_wrap ~flatten 2 b)
-      (flat_or_wrap ~flatten 3 c)
-      (flat_or_wrap ~flatten 4 d)
-      (flat_or_wrap ~flatten 5 e)
-      (flat_or_wrap ~flatten 6 f)
-
-  let tup7 ~flatten a b c d e f g =
-    tup7_
-      (flat_or_wrap ~flatten 1 a)
-      (flat_or_wrap ~flatten 2 b)
-      (flat_or_wrap ~flatten 3 c)
-      (flat_or_wrap ~flatten 4 d)
-      (flat_or_wrap ~flatten 5 e)
-      (flat_or_wrap ~flatten 6 f)
-      (flat_or_wrap ~flatten 7 g)
-
-  let tup8 ~flatten a b c d e f g h =
-    tup8_
-      (flat_or_wrap ~flatten 1 a)
-      (flat_or_wrap ~flatten 2 b)
-      (flat_or_wrap ~flatten 3 c)
-      (flat_or_wrap ~flatten 4 d)
-      (flat_or_wrap ~flatten 5 e)
-      (flat_or_wrap ~flatten 6 f)
-      (flat_or_wrap ~flatten 7 g)
-      (flat_or_wrap ~flatten 8 h)
-
-  let tup9 ~flatten a b c d e f g h i =
-    tup9_
-      (flat_or_wrap ~flatten 1 a)
-      (flat_or_wrap ~flatten 2 b)
-      (flat_or_wrap ~flatten 3 c)
-      (flat_or_wrap ~flatten 4 d)
-      (flat_or_wrap ~flatten 5 e)
-      (flat_or_wrap ~flatten 6 f)
-      (flat_or_wrap ~flatten 7 g)
-      (flat_or_wrap ~flatten 8 h)
-      (flat_or_wrap ~flatten 9 i)
-
-  let encode {encode; _} value tree = E.run encode value tree
-
-  let decode {decode; _} tree = D.run (module T) decode tree
-
-  let raw key = {encode = E.raw key; decode = D.raw key}
-
-  let value ?default key de =
-    {encode = E.value key de; decode = D.value ?default key de}
-
-  module Lazy_map_encoding = struct
-    module type S = sig
-      type 'a map
-
-      val lazy_map : 'a t -> 'a map t
-    end
-
-    module Make (Map : Lwt_map) = struct
-      let lazy_map value =
-        let to_key k = [Map.string_of_key k] in
-        let encode =
-          E.with_subtree
-            Map.origin
-            (E.contramap
-               Map.loaded_bindings
-               (E.lazy_mapping to_key value.encode))
-        in
-        let decode =
-          D.map
-            (fun (origin, produce_value) ->
-              Map.create ?origin ~produce_value ())
-            (let open D.Syntax in
-            let+ origin = D.subtree
-            and+ produce_value = D.lazy_mapping to_key value.decode in
-            (origin, produce_value))
-        in
-        {encode; decode}
-    end
+    let decode {decode; _} tree = D.run (module T) decode tree
   end
-
-  module Lazy_vector_encoding = struct
-    module type S = sig
-      type key
-
-      type 'a vector
-
-      val lazy_vector : key t -> 'a t -> 'a vector t
-    end
-
-    module Make (Vector : Lwt_vector) = struct
-      let lazy_vector with_key value =
-        let open Vector in
-        let to_key k = [string_of_key k] in
-        let encode =
-          E.with_subtree Vector.origin
-          @@ E.contramap
-               (fun vector ->
-                 (loaded_bindings vector, num_elements vector, first_key vector))
-               (E.tup3
-                  (E.lazy_mapping to_key value.encode)
-                  (E.scope ["length"] with_key.encode)
-                  (E.scope ["head"] with_key.encode))
-        in
-        let decode =
-          D.map
-            (fun (origin, produce_value, len, head) ->
-              create ~produce_value ~first_key:head ?origin len)
-            (let open D.Syntax in
-            let+ origin = D.subtree
-            and+ x = D.lazy_mapping to_key value.decode
-            and+ y = D.scope ["length"] with_key.decode
-            and+ z = D.scope ["head"] with_key.decode in
-            (origin, x, y, z))
-        in
-        {encode; decode}
-    end
-
-    module Int = Make (Lazy_vector.LwtIntVector)
-    module Int32 = Make (Lazy_vector.LwtInt32Vector)
-    module Z = Make (Lazy_vector.LwtZVector)
-  end
-
-  let chunk =
-    let open Chunked_byte_vector.Chunk in
-    conv of_bytes to_bytes (raw [])
-
-  let chunked_byte_vector =
-    let open Chunked_byte_vector.Lwt in
-    let to_key k = [Int64.to_string k] in
-    let encode =
-      E.with_subtree Chunked_byte_vector.Lwt.origin
-      @@ E.contramap
-           (fun vector -> (loaded_chunks vector, length vector))
-           (E.tup2
-              (E.lazy_mapping to_key chunk.encode)
-              (E.value ["length"] Data_encoding.int64))
-    in
-    let decode =
-      D.map
-        (fun (origin, get_chunk, len) -> create ?origin ~get_chunk len)
-        (let open D.Syntax in
-        let+ origin = D.subtree
-        and+ x = D.lazy_mapping to_key chunk.decode
-        and+ y = D.value ["length"] Data_encoding.int64 in
-        (origin, x, y))
-    in
-    {encode; decode}
-
-  type ('tag, 'a) case =
-    | Case : {
-        tag : 'tag;
-        probe : 'a -> 'b Lwt.t option;
-        extract : 'b -> 'a Lwt.t;
-        delegate : 'b t;
-      }
-        -> ('tag, 'a) case
-
-  let case_lwt tag delegate probe extract = Case {tag; delegate; probe; extract}
-
-  let case tag delegate probe extract =
-    case_lwt
-      tag
-      delegate
-      (fun x -> Option.map Lwt.return @@ probe x)
-      (fun x -> Lwt.return @@ extract x)
-
-  let tagged_union ?default {encode; decode} cases =
-    let to_encode_case (Case {tag; delegate; probe; extract = _}) =
-      E.case_lwt tag delegate.encode probe
-    in
-    let to_decode_case (Case {tag; delegate; extract; probe = _}) =
-      D.case_lwt tag delegate.decode extract
-    in
-    let encode = E.tagged_union encode (List.map to_encode_case cases) in
-    let decode =
-      D.tagged_union ?default decode (List.map to_decode_case cases)
-    in
-    {encode; decode}
-
-  let value_option key encoding =
-    let encode = E.value_option key encoding in
-    let decode = D.value_option key encoding in
-    {encode; decode}
-
-  let option enc =
-    tagged_union
-      ~default:None
-      (value [] Data_encoding.string)
-      [
-        case "Some" enc Fun.id Option.some;
-        case
-          "None"
-          (return ())
-          (function None -> Some () | _ -> None)
-          (fun () -> None);
-      ]
-
-  let delayed f =
-    let enc = lazy (f ()) in
-    let encode =
-      E.delayed (fun () ->
-          let {encode; _} = Lazy.force enc in
-          encode)
-    in
-    let decode =
-      D.delayed (fun () ->
-          let {decode; _} = Lazy.force enc in
-          decode)
-    in
-    {encode; decode}
 end

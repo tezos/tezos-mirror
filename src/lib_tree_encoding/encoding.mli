@@ -29,94 +29,87 @@ type key = string list
     matching branch. *)
 exception No_tag_matched_on_encoding
 
-module type S = sig
-  type tree
+(** Tree encoder type. *)
+type -'a t
 
-  (** Tree encoder type. *)
-  type -'a t
+(** Represents a partial encoder for specific constructor of a sum-type. *)
+type ('tag, 'a) case
 
-  (** Represents a partial encoder for specific constructor of a sum-type. *)
-  type ('tag, 'a) case
+(** [delayed f] produces a tree encoder that delays evaluation of [f ()] until
+    the encoder is actually needed. This is required to allow for directly
+    recursive encoders. *)
+val delayed : (unit -> 'a t) -> 'a t
 
-  (** [delayed f] produces a tree encoder that delays evaluation of [f ()] until
-      the encoder is actually needed. This is required to allow for directly
-      recursive encoders. *)
-  val delayed : (unit -> 'a t) -> 'a t
+(** [contramap f e] is contravariant map operation that creates a new decoder
+    that maps its input using [f] before feeding it to [e]. *)
+val contramap : ('a -> 'b) -> 'b t -> 'a t
 
-  (** [contramap f e] is contravariant map operation that creates a new decoder
-      that maps its input using [f] before feeding it to [e]. *)
-  val contramap : ('a -> 'b) -> 'b t -> 'a t
+(** [contramap_lwt f e]. Same as [contramap] except that [f] als produces
+    an Lwt effect. *)
+val contramap_lwt : ('a -> 'b Lwt.t) -> 'b t -> 'a t
 
-  (** [contramap_lwt f e]. Same as [contramap] except that [f] als produces
-      an Lwt effect. *)
-  val contramap_lwt : ('a -> 'b Lwt.t) -> 'b t -> 'a t
+(** [ignore] is an encoder that ignores its value. *)
+val ignore : 'a t
 
-  (** [ignore] is an encoder that ignores its value. *)
-  val ignore : 'a t
+(** [run enc x tree] encodes the given value [x] using the encoder [enc] and
+    writes it to the tree [tree]. May raise a [Key_not_found] or a
+    [No_tag_matched] exception. *)
+val run : 'tree Tree.backend -> 'a t -> 'a -> 'tree -> 'tree Lwt.t
 
-  (** [run enc x tree] encodes the given value [x] using the encoder [enc] and
-      writes it to the tree [tree]. May raise a [Key_not_found] or a
-      [No_tag_matched] exception. *)
-  val run : 'a t -> 'a -> tree -> tree Lwt.t
+(** [with_subtree get_subtree enc] will use [get_subtree] to fetch
+    the tree of origin of a value to be encoded with [enc], to place
+    it in the targeted tree before using [enc]. *)
+val with_subtree : ('a -> Lazy_containers.Lazy_map.tree option) -> 'a t -> 'a t
 
-  (** [with_subtree get_subtree enc] will use [get_subtree] to fetch
-      the tree of origin of a value to be encoded with [enc], to place
-      it in the targeted tree before using [enc]. *)
-  val with_subtree :
-    ('a -> Lazy_containers.Lazy_map.tree option) -> 'a t -> 'a t
+(** [raw key] returns an encoder that encodes raw bytes at the given key. *)
+val raw : key -> bytes t
 
-  (** [raw key] returns an encoder that encodes raw bytes at the given key. *)
-  val raw : key -> bytes t
+(** [value_option key enc] encodes the value at a given [key] using the
+    provided [enc] encoder for the value, or remove any previous
+    value stored at [key] if [None] is provided. *)
+val value_option : key -> 'a Data_encoding.t -> 'a option t
 
-  (** [value_option key enc] encodes the value at a given [key] using the
-      provided [enc] encoder for the value, or remove any previous
-      value stored at [key] if [None] is provided. *)
-  val value_option : key -> 'a Data_encoding.t -> 'a option t
+(** [value key enc] encodes the value at a given [key] using the provided
+    [enc] encoder for the value. *)
+val value : key -> 'a Data_encoding.t -> 'a t
 
-  (** [value key enc] encodes the value at a given [key] using the provided
-      [enc] encoder for the value. *)
-  val value : key -> 'a Data_encoding.t -> 'a t
+(** [scope key enc] moves the given encoder [enc] to encode values under a
+    branch [key]. *)
+val scope : key -> 'a t -> 'a t
 
-  (** [scope key enc] moves the given encoder [enc] to encode values under a
-      branch [key]. *)
-  val scope : key -> 'a t -> 'a t
+(** [lazy_mapping to_key enc] returns a key-value list encoder that
+    encodes values from a given key-value list using the key-mapping function
+    [to_key] and the provided encoder [enc] for the values. *)
+val lazy_mapping : ('k -> key) -> 'v t -> ('k * 'v) list t
 
-  (** [lazy_mapping to_key enc] returns a key-value list encoder that
-      encodes values from a given key-value list using the key-mapping function
-      [to_key] and the provided encoder [enc] for the values. *)
-  val lazy_mapping : ('k -> key) -> 'v t -> ('k * 'v) list t
+(** [case tag enc f] return a partial encoder that represents a case in a
+    sum-type. The encoder hides the (existentially bound) type of the
+    parameter to the specific case, provided a converter function [f] and
+    base encoder [enc]. *)
+val case : 'tag -> 'b t -> ('a -> 'b option) -> ('tag, 'a) case
 
-  (** [case tag enc f] return a partial encoder that represents a case in a
-      sum-type. The encoder hides the (existentially bound) type of the
-      parameter to the specific case, provided a converter function [f] and
-      base encoder [enc]. *)
-  val case : 'tag -> 'b t -> ('a -> 'b option) -> ('tag, 'a) case
+(** [case_lwt tag enc f] same as [case tag enc f] except that [f] produces
+    an [Lwt] on a successful match. *)
+val case_lwt : 'tag -> 'b t -> ('a -> 'b Lwt.t option) -> ('tag, 'a) case
 
-  (** [case_lwt tag enc f] same as [case tag enc f] except that [f] produces
-      an [Lwt] on a successful match. *)
-  val case_lwt : 'tag -> 'b t -> ('a -> 'b Lwt.t option) -> ('tag, 'a) case
+(** [tagged_union tag_enc cases] returns an encoder that uses [tag_enc] for
+    encoding the value of a field [tag]. The encoder searches through the list
+    of cases for a matching branch. When a matching branch is found, it
+    applies its embedded encoder for the value. This function is used for
+    constructing encoders for sum-types.
 
-  (** [tagged_union tag_enc cases] returns an encoder that uses [tag_enc] for
-      encoding the value of a field [tag]. The encoder searches through the list
-      of cases for a matching branch. When a matching branch is found, it
-      applies its embedded encoder for the value. This function is used for
-      constructing encoders for sum-types.
+    If an insufficient list of cases are provided, the resulting encoder may
+    fail with a [No_tag_matched] error when [run].  *)
+val tagged_union : 'tag t -> ('tag, 'a) case list -> 'a t
 
-      If an insufficient list of cases are provided, the resulting encoder may
-      fail with a [No_tag_matched] error when [run].  *)
-  val tagged_union : 'tag t -> ('tag, 'a) case list -> 'a t
+(** [lwt enc] promotes the given encoder [enc] to one that can handle lwt
+    values. *)
+val lwt : 'a t -> 'a Lwt.t t
 
-  (** [lwt enc] promotes the given encoder [enc] to one that can handle lwt
-      values. *)
-  val lwt : 'a t -> 'a Lwt.t t
+(** [tup2 e1 e2] creates an encoder that encodes a tuple of elements using
+    [e1] and [e2]. *)
+val tup2 : 'a t -> 'b t -> ('a * 'b) t
 
-  (** [tup2 e1 e2] creates an encoder that encodes a tuple of elements using
-      [e1] and [e2]. *)
-  val tup2 : 'a t -> 'b t -> ('a * 'b) t
-
-  (** [tup3 e1 e2] creates an encoder that encodes a triple of elements using
-      [e1], [e2], and [e3]. *)
-  val tup3 : 'a t -> 'b t -> 'c t -> ('a * 'b * 'c) t
-end
-
-module Make : functor (T : Tree.S) -> S with type tree = T.tree
+(** [tup3 e1 e2] creates an encoder that encodes a triple of elements using
+    [e1], [e2], and [e3]. *)
+val tup3 : 'a t -> 'b t -> 'c t -> ('a * 'b * 'c) t
