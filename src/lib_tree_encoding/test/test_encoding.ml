@@ -410,6 +410,35 @@ let test_return () =
   assert (v = "K") ;
   return_unit
 
+let test_swap_maps () =
+  let open Tree_encoding in
+  let open Lwt_result_syntax in
+  let int_map_enc = lazy_map (value [] Data_encoding.int31) in
+  let enc = tup2 ~flatten:false int_map_enc int_map_enc in
+  let*! tree = empty_tree () in
+  let assert_value_at_index ~key vec expected =
+    let*! value = Map.get key vec in
+    assert (value = expected) ;
+    return_unit
+  in
+  (* Create a pair of maps. *)
+  let map1 = Map.(create () |> set "foo" 1) in
+  let map2 = Map.(create () |> set "bar" 2) in
+  let pair = (map1, map2) in
+  (* Encode the lazy maps to the tree. *)
+  let*! tree = encode enc pair tree in
+  (* Decode the maps. *)
+  let*! pair = decode enc tree in
+  (* Encode a new pair where the elements have been swapped. *)
+  let swapped_pair = (snd pair, fst pair) in
+  let*! tree = encode enc swapped_pair tree in
+  (* Decode the swapped version. *)
+  let*! swapped_pair = decode enc tree in
+  (* Check that it's possible to access the elements of both maps. *)
+  let* () = assert_value_at_index ~key:"foo" (snd swapped_pair) 1 in
+  let* () = assert_value_at_index ~key:"bar" (fst swapped_pair) 2 in
+  return_unit
+
 let test_swap_vectors () =
   let open Tree_encoding in
   let open Lwt_result_syntax in
@@ -471,5 +500,6 @@ let tests =
     tztest "Value-option" `Quick test_value_option;
     tztest "Delayed" `Quick test_delayed;
     tztest "Return" `Quick test_return;
+    tztest "Swap maps" `Quick test_swap_maps;
     tztest "Swap vectors" `Quick test_swap_vectors;
   ]
