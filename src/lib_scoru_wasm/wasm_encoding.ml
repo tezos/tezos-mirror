@@ -838,16 +838,35 @@ let input_buffer_encoding =
              input_buffer_message_encoding))
        (value ["num-messages"] Data_encoding.z))
 
+module Output_bufferMap = Lazy_map_encoding.Make (Output_buffer.Map.Map)
+
+let output_content_encoding =
+  conv
+    Output_buffer.Map.of_immutable
+    Output_buffer.Map.snapshot
+    (Output_bufferMap.lazy_map (value [] Data_encoding.bytes))
+
+let output_buffer_encoding =
+  conv
+    (fun (content, level, id) -> Output_buffer.{content; level; id})
+    (fun Output_buffer.{content; level; id} -> (content, level, id))
+    (tup3
+       ~flatten:true
+       output_content_encoding
+       (value ["level"] Data_encoding.int32)
+       (value ["id"] Data_encoding.z))
+
 let config_encoding ~host_funcs =
   conv
-    (fun (frame, input, instrs, values, budget) ->
-      Eval.{frame; input; code = (values, instrs); host_funcs; budget})
-    (fun Eval.{frame; input; code = values, instrs; budget; _} ->
-      (frame, input, instrs, values, budget))
-    (tup5
+    (fun (frame, input, output, instrs, values, budget) ->
+      Eval.{frame; input; output; code = (values, instrs); host_funcs; budget})
+    (fun Eval.{frame; input; output; code = values, instrs; budget; _} ->
+      (frame, input, output, instrs, values, budget))
+    (tup6
        ~flatten:true
        (scope ["frame"] frame_encoding)
        (scope ["input"] input_buffer_encoding)
+       (scope ["output"] output_buffer_encoding)
        (scope ["instructions"] (list_encoding admin_instr_encoding))
        (scope ["values"] values_encoding)
        (value ["budget"] Data_encoding.int31))

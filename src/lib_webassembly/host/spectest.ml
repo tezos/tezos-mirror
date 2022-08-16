@@ -34,7 +34,7 @@ let print_value v =
 
 let print =
   Host_funcs.Host_func
-    (fun _i _m vs ->
+    (fun _i _o _m vs ->
       List.iter print_value vs ;
       flush_all () ;
       Lwt.return_nil)

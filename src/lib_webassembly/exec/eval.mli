@@ -111,6 +111,7 @@ val invoke :
   module_reg:module_reg ->
   caller:module_key ->
   ?input:Input_buffer.t ->
+  ?output:Output_buffer.t ->
   Host_funcs.registry ->
   func_inst ->
   value list ->
@@ -119,6 +120,7 @@ val invoke :
 type config = {
   frame : frame;
   input : input_inst;
+  output : output_inst;
   code : code;
   host_funcs : Host_funcs.registry;
   budget : int; (* to model stack overflow *)
@@ -128,6 +130,7 @@ val step : module_reg -> config -> config Lwt.t
 
 val config :
   ?input:input_inst ->
+  ?output:output_inst ->
   Host_funcs.registry ->
   module_key ->
   value list ->

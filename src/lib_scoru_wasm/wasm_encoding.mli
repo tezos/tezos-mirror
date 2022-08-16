@@ -88,6 +88,8 @@ val module_instances_encoding : Instance.module_reg Tree_encoding.t
 
 val input_buffer_encoding : Input_buffer.t Tree_encoding.t
 
+val output_buffer_encoding : Output_buffer.t Tree_encoding.t
+
 val admin_instr_encoding : Eval.admin_instr Tree_encoding.t
 
 val frame_encoding : Eval.frame Tree_encoding.t

@@ -40,6 +40,8 @@ and global_inst = Global.t
 
 and input_inst = Input_buffer.t
 
+and output_inst = Output_buffer.t
+
 and export_inst = Ast.name * extern
 
 and elem_inst = Values.ref_ Vector.t ref

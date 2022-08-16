@@ -35,6 +35,7 @@ let () =
     "test lib scoru wasm"
     [
       ("Input", Test_input.tests);
+      ("Output", Test_output.tests);
       ("AST Generators", Test_ast_generators.tests);
       ("WASM Encodings", Test_wasm_encoding.tests);
       ("Parser Encodings", Test_parser_encoding.tests);

@@ -75,6 +75,7 @@ and admin_instr' =
 type config = {
   frame : frame;
   input : input_inst;
+  output : output_inst;
   code : code;
   host_funcs : Host_funcs.registry;
   budget : int; (* to model stack overflow *)
@@ -82,8 +83,16 @@ type config = {
 
 let frame inst locals = {inst; locals}
 
-let config ?(input = Input_buffer.alloc ()) host_funcs inst vs es =
-  {frame = frame inst []; input; code = (vs, es); budget = 300; host_funcs}
+let config ?(input = Input_buffer.alloc ()) ?(output = Output_buffer.alloc ())
+    host_funcs inst vs es =
+  {
+    frame = frame inst [];
+    input;
+    output;
+    code = (vs, es);
+    budget = 300;
+    host_funcs;
+  }
 
 let plain e = Plain e.it @@ e.at
 
@@ -800,6 +809,7 @@ and step_resolved module_reg (c : config) frame vs e es : config Lwt.t =
               frame = frame';
               code = code';
               budget = c.budget - 1;
+              output = c.output;
               input = c.input;
               host_funcs = c.host_funcs;
             }
@@ -837,7 +847,7 @@ and step_resolved module_reg (c : config) frame vs e es : config Lwt.t =
                   Host_funcs.lookup ~global_name c.host_funcs
                 in
                 let* inst = resolve_module_ref module_reg frame.inst in
-                let+ res = f c.input inst (List.rev args) in
+                let+ res = f c.input c.output inst (List.rev args) in
                 (List.rev res @ vs', []))
               (function
                 | Crash (_, msg) -> Crash.error e.at msg | exn -> raise exn))
@@ -854,8 +864,9 @@ let rec eval module_reg (c : config) : value stack Lwt.t =
 
 (* Functions & Constants *)
 
-let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ()) host_funcs
-    (func : func_inst) (vs : value list) : value list Lwt.t =
+let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ())
+    ?(output = Output_buffer.alloc ()) host_funcs (func : func_inst)
+    (vs : value list) : value list Lwt.t =
   let at = match func with Func.AstFunc (_, _, f) -> f.at | _ -> no_region in
   let (FuncType (ins, _out)) = Func.type_of func in
   let* ins_l = Lazy_vector.Int32Vector.to_list ins in
@@ -871,7 +882,9 @@ let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ()) host_funcs
     | Func.AstFunc (_, inst, _) -> inst
     | Func.HostFunc (_, _) -> caller
   in
-  let c = config ~input host_funcs inst (List.rev vs) [Invoke func @@ at] in
+  let c =
+    config ~input ~output host_funcs inst (List.rev vs) [Invoke func @@ at]
+  in
   Lwt.catch
     (fun () ->
       let+ values = eval module_reg c in

@@ -27,6 +27,8 @@ open Tezos_webassembly_interpreter
 open Lazy_containers
 open QCheck2.Gen
 
+let to_int32 = Bounded.Int32.NonNegative.to_int32
+
 let no_region it = Source.{it; at = no_region}
 
 let var_gen =
@@ -594,10 +596,47 @@ let input_buffer_gen =
     num_elements = Z.of_int num_elements;
   }
 
+let output_info_gen =
+  let* level = small_int in
+  let outbox_level = Int32.of_int level in
+  let* message_index = map Z.of_int small_nat in
+  return Output_buffer.{outbox_level; message_index}
+
+let output_buffer_gen =
+  let* seeds = small_list int in
+  let* l = small_list int in
+  let level = 0l in
+  let content =
+    Output_buffer.Map.create
+      ~produce_value:(fun {message_index; _} ->
+        let rand =
+          Random.State.make @@ Array.of_list (Z.to_int message_index :: seeds)
+        in
+        Lwt.return @@ generate1 ~rand
+        @@ map Bytes.of_string (small_string ~gen:char))
+      ()
+  in
+  let level =
+    List.fold_left
+      (fun acc ix ->
+        let rand = Random.State.make @@ Array.of_list (ix :: seeds) in
+        let key = generate1 ~rand output_info_gen in
+        let _ = Output_buffer.Map.get key content in
+        Int32.max acc key.outbox_level)
+      level
+      l
+  in
+  return Output_buffer.{content; level; id = Z.zero}
+
 let config_gen ~host_funcs ~module_reg =
   let* frame = frame_gen ~module_reg in
   let* input = input_buffer_gen in
+  let _input_list =
+    Lazy_vector.LwtZVector.to_list
+    @@ Lazy_vector.Mutable.LwtZVector.snapshot input.content
+  in
+  let* output = output_buffer_gen in
   let* instrs = small_list (admin_instr_gen ~module_reg) in
   let* values = small_list value_gen in
   let+ budget = small_int in
-  Eval.{frame; input; code = (values, instrs); host_funcs; budget}
+  Eval.{frame; input; output; code = (values, instrs); host_funcs; budget}
