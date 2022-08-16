@@ -278,16 +278,15 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                   cctxt
                   errors
               in
-              if dry_run then return_unit
-              else
-                Option.iter_es
-                  (fun (_res, contract) ->
-                    Client_proto_context.save_contract
-                      ~force
-                      cctxt
-                      alias_name
-                      contract)
-                  o);
+              unless dry_run @@ fun () ->
+              Option.iter_es
+                (fun (_res, contract) ->
+                  Client_proto_context.save_contract
+                    ~force
+                    cctxt
+                    alias_name
+                    contract)
+                o);
       command
         ~group
         ~desc:"Sign a transaction for a multisig contract."
