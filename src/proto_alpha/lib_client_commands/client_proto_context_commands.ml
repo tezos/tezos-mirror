@@ -820,7 +820,7 @@ let transfer_command amount (source : Contract.t) destination
           ~successor_level
           ()
   in
-  let*! _ =
+  let*! (_ : (_ Injection.result * Contract_hash.t list) option) =
     report_michelson_errors
       ~no_print_source
       ~msg:"transfer simulation failed"
@@ -1004,7 +1004,11 @@ let commands_rw () =
                 contract
                 (Some delegate)
             in
-            let*! _ =
+            let*! (_ :
+                    (Operation_hash.t
+                    * _ contents
+                    * _ Apply_results.contents_result)
+                    option) =
               report_michelson_errors
                 ~no_print_source:true
                 ~msg:"Setting delegate through entrypoints failed."
@@ -1014,7 +1018,7 @@ let commands_rw () =
             return_unit
         | Implicit mgr ->
             let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
-            let* _ =
+            let* (_ : _ Injection.result) =
               set_delegate
                 cctxt
                 ~chain:cctxt#chain
@@ -1064,7 +1068,7 @@ let commands_rw () =
                 contract
                 None
             in
-            let*! _ =
+            let*! (_ : _ Injection.result option) =
               report_michelson_errors
                 ~no_print_source:true
                 ~msg:"Withdrawing delegate through entrypoints failed."
@@ -1074,7 +1078,7 @@ let commands_rw () =
             return_unit
         | Implicit mgr ->
             let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
-            let*! _ =
+            let*! (_ : _ Injection.result tzresult) =
               set_delegate
                 cctxt
                 ~chain:cctxt#chain
@@ -1295,7 +1299,12 @@ let commands_rw () =
                 ~fee_parameter
                 contents
             in
-            let*! _ =
+            let*! (_ :
+                    (Operation_hash.t
+                    * packed_operation
+                    * _ contents_list
+                    * _ Apply_results.contents_result_list)
+                    option) =
               report_michelson_errors
                 ~no_print_source
                 ~msg:"multiple transfers simulation failed"
@@ -1448,7 +1457,7 @@ let commands_rw () =
             ~constant:global_constant_str
             ()
         in
-        let*! _ =
+        let*! (_ : _ Injection.result option) =
           report_michelson_errors
             ~no_print_source:false
             ~msg:"register global constant simulation failed"
@@ -1615,7 +1624,7 @@ let commands_rw () =
            operation_hash
            (ctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
-        let* _ =
+        let* (_ : Block_hash.t * int * int) =
           Client_confirmations.wait_for_operation_inclusion
             ctxt
             ~chain:ctxt#chain
@@ -1946,7 +1955,7 @@ let commands_rw () =
               contract
         | Implicit mgr ->
             let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
-            let* _ =
+            let* (_ : _ Injection.result) =
               set_deposits_limit
                 cctxt
                 ~chain:cctxt#chain
@@ -1989,7 +1998,7 @@ let commands_rw () =
               contract
         | Implicit mgr ->
             let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
-            let* _ =
+            let* (_ : _ Injection.result) =
               set_deposits_limit
                 cctxt
                 ~chain:cctxt#chain
@@ -2034,7 +2043,7 @@ let commands_rw () =
            (cctxt : Protocol_client_context.full) ->
         let open Lwt_result_syntax in
         let* _, src_pk, manager_sk = Client_keys.get_key cctxt payer in
-        let* _ =
+        let* (_ : _ Injection.result) =
           increase_paid_storage
             cctxt
             ~chain:cctxt#chain

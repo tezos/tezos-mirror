@@ -555,7 +555,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                   ?counter
                   ()
               in
-              let*! _ =
+              let*! (_ : (_ Injection.result * Contract_hash.t list) option) =
                 Client_proto_context_commands.report_michelson_errors
                   ~no_print_source
                   ~msg:"transfer simulation failed"
@@ -625,7 +625,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                   ?counter
                   ()
               in
-              let*! _ =
+              let*! (_ : (_ Injection.result * Contract_hash.t list) option) =
                 Client_proto_context_commands.report_michelson_errors
                   ~no_print_source
                   ~msg:"transfer simulation failed"
@@ -694,7 +694,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                   ?counter
                   ()
               in
-              let*! _ =
+              let*! (_ : (_ Injection.result * Contract_hash.t list) option) =
                 Client_proto_context_commands.report_michelson_errors
                   ~no_print_source
                   ~msg:"transfer simulation failed"
@@ -757,7 +757,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                   ?counter
                   ()
               in
-              let*! _ =
+              let*! (_ : (_ Injection.result * Contract_hash.t list) option) =
                 Client_proto_context_commands.report_michelson_errors
                   ~no_print_source
                   ~msg:"transfer simulation failed"
@@ -831,7 +831,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                   ?counter
                   ()
               in
-              let*! _ =
+              let*! (_ : (_ Injection.result * Contract_hash.t list) option) =
                 Client_proto_context_commands.report_michelson_errors
                   ~no_print_source
                   ~msg:"transfer simulation failed"
@@ -906,7 +906,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                   ?counter
                   ()
               in
-              let*! _ =
+              let*! (_ : (_ Injection.result * Contract_hash.t list) option) =
                 Client_proto_context_commands.report_michelson_errors
                   ~no_print_source
                   ~msg:"transfer simulation failed"
