@@ -157,6 +157,25 @@ let not_equal_pkh ~loc (a : Signature.Public_key_hash.t)
   let module PKH = Signature.Public_key_hash in
   not_equal ~loc PKH.equal "Public key hashes are equal" PKH.pp a b
 
+(* protocol hash *)
+let equal_protocol_hash ~loc (a : Protocol_hash.t) (b : Protocol_hash.t) =
+  equal
+    ~loc
+    Protocol_hash.equal
+    "Protocol hashes aren't equal"
+    Protocol_hash.pp
+    a
+    b
+
+let not_equal_protocol_hash ~loc (a : Protocol_hash.t) (b : Protocol_hash.t) =
+  not_equal
+    ~loc
+    Protocol_hash.equal
+    "Protocol hashes are equal"
+    Protocol_hash.pp
+    a
+    b
+
 let get_some ~loc = function
   | Some x -> return x
   | None -> failwith "Unexpected None (%s)" loc

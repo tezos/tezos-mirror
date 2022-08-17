@@ -43,10 +43,9 @@ let failing_noop_must_fail_when_injected () =
   let source = Context.Contract.pkh contract in
   Op.failing_noop (B blk) source "tezos" >>=? fun operation ->
   Block.bake ~operation blk >>= fun res ->
-  Assert.proto_error_with_info
-    ~loc:__LOC__
-    res
-    "Failing_noop operations are not executed by the protocol"
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Protocol.Validate_errors.Failing_noop_error -> true
+      | _ -> false)
 
 let tests =
   [Tztest.tztest "injection fails" `Quick failing_noop_must_fail_when_injected]

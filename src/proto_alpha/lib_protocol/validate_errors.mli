@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Alpha_context
+
 (** Errors that may arise while validating a consensus operation. *)
 module Consensus : sig
   type consensus_operation_kind =
@@ -36,23 +38,23 @@ module Consensus : sig
     | Consensus_operation_not_allowed
     | Consensus_operation_for_old_level of {
         kind : consensus_operation_kind;
-        expected : Alpha_context.Raw_level.t;
-        provided : Alpha_context.Raw_level.t;
+        expected : Raw_level.t;
+        provided : Raw_level.t;
       }
     | Consensus_operation_for_future_level of {
         kind : consensus_operation_kind;
-        expected : Alpha_context.Raw_level.t;
-        provided : Alpha_context.Raw_level.t;
+        expected : Raw_level.t;
+        provided : Raw_level.t;
       }
     | Consensus_operation_for_old_round of {
         kind : consensus_operation_kind;
-        expected : Alpha_context.Round.t;
-        provided : Alpha_context.Round.t;
+        expected : Round.t;
+        provided : Round.t;
       }
     | Consensus_operation_for_future_round of {
         kind : consensus_operation_kind;
-        expected : Alpha_context.Round.t;
-        provided : Alpha_context.Round.t;
+        expected : Round.t;
+        provided : Round.t;
       }
     | Wrong_consensus_operation_branch of {
         kind : consensus_operation_kind;
@@ -67,8 +69,8 @@ module Consensus : sig
     | Unexpected_preendorsement_in_block
     | Unexpected_endorsement_in_block
     | Preendorsement_round_too_high of {
-        block_round : Alpha_context.Round.t;
-        provided : Alpha_context.Round.t;
+        block_round : Round.t;
+        provided : Round.t;
       }
     | Wrong_slot_used_for_consensus_operation of {
         kind : consensus_operation_kind;
@@ -77,6 +79,47 @@ module Consensus : sig
     | Conflicting_dal_slot_availability of {
         endorser : Signature.Public_key_hash.t;
       }
+end
+
+(** Errors that may arise while validating a voting operation. *)
+module Voting : sig
+  type error +=
+    | (* Shared voting errors *)
+        Wrong_voting_period_index of {
+        expected : int32;
+        provided : int32;
+      }
+    | Wrong_voting_period_kind of {
+        current : Voting_period.kind;
+        expected : Voting_period.kind list;
+      }
+    | Source_not_in_vote_listings
+    | (* Proposals errors *)
+        Empty_proposals
+    | Proposals_contain_duplicate of {proposal : Protocol_hash.t}
+    | Too_many_proposals
+    | Already_proposed of {proposal : Protocol_hash.t}
+    | Conflict_too_many_proposals of {
+        max_allowed : int;
+        count_previous_blocks : int;
+        count_current_block : int;
+        count_operation : int;
+        conflicting_operations : Operation_hash.t list;
+      }
+    | Conflict_already_proposed of {
+        proposal : Protocol_hash.t;
+        conflicting_operation : Operation_hash.t;
+      }
+    | Conflicting_dictator_proposals of Operation_hash.t
+    | Testnet_dictator_multiple_proposals
+    | Testnet_dictator_conflicting_operation
+    | (* Ballot errors *)
+        Ballot_for_wrong_proposal of {
+        current : Protocol_hash.t;
+        submitted : Protocol_hash.t;
+      }
+    | Already_submitted_a_ballot
+    | Conflicting_ballot of {conflicting_operation : Operation_hash.t}
 end
 
 (** Errors that may arise while validating an anonymous operation. *)
@@ -89,11 +132,11 @@ module Anonymous : sig
     | Invalid_denunciation of denunciation_kind
     | Invalid_double_baking_evidence of {
         hash1 : Block_hash.t;
-        level1 : Alpha_context.Raw_level.t;
-        round1 : Alpha_context.Round.t;
+        level1 : Raw_level.t;
+        round1 : Round.t;
         hash2 : Block_hash.t;
-        level2 : Alpha_context.Raw_level.t;
-        round2 : Alpha_context.Round.t;
+        level2 : Raw_level.t;
+        round2 : Round.t;
       }
     | Inconsistent_denunciation of {
         kind : denunciation_kind;
@@ -103,23 +146,23 @@ module Anonymous : sig
     | Already_denounced of {
         kind : denunciation_kind;
         delegate : Signature.Public_key_hash.t;
-        level : Alpha_context.Level.t;
+        level : Level.t;
       }
     | Conflicting_denunciation of {
         kind : denunciation_kind;
         delegate : Signature.Public_key_hash.t;
-        level : Alpha_context.Level.t;
+        level : Level.t;
         hash : Operation_hash.t;
       }
     | Too_early_denunciation of {
         kind : denunciation_kind;
-        level : Alpha_context.Raw_level.t;
-        current : Alpha_context.Raw_level.t;
+        level : Raw_level.t;
+        current : Raw_level.t;
       }
     | Outdated_denunciation of {
         kind : denunciation_kind;
-        level : Alpha_context.Raw_level.t;
-        last_cycle : Alpha_context.Cycle.t;
+        level : Raw_level.t;
+        last_cycle : Cycle.t;
       }
     | Conflicting_nonce_revelation
 end
@@ -136,3 +179,5 @@ module Manager : sig
     | Tx_rollup_feature_disabled
     | Sc_rollup_feature_disabled
 end
+
+type error += Failing_noop_error

@@ -142,6 +142,11 @@ type stamp
     includes it being correctly signed: indeed, we can't take anything
     from a manager without having checked their signature.
 
+    For non-manager operations, any error during the operation
+    application causes the whole block to fail. Therefore, the
+    validation of such an operation must ensure that its application
+    will fully succeed.
+
     @param should_check_signature indicates whether the signature
     check should happen. It defaults to [true] because the signature
     needs to be correct for the operation to be valid. This argument
@@ -155,15 +160,7 @@ type stamp
 
     - The [run_operation] RPC provided by the plugin explicitly
       excludes signature checks: see its documentation in
-      [lib_plugin/RPC.Scripts.S.run_operation].
-
-    TODO: https://gitlab.com/tezos/tezos/-/issues/2603
-
-    This function currently does nothing for voting operations.
-    (instead, the validity of a voting operation is decided by calling
-    {!Apply.apply_operation} to check whether it returns an error).
-    We should specify and implement the validation of every kind of
-    operation. *)
+      [lib_plugin/RPC.Scripts.S.run_operation]. *)
 val validate_operation :
   validate_operation_info ->
   validate_operation_state ->

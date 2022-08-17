@@ -131,9 +131,7 @@ let test_run_proposals =
       [Protocol.demo_counter_hash]
   in
   let* op = Operation.Voting.operation ~client proposals_repr in
-  let* op_json =
-    Operation.make_run_operation_input ~sign_correctly:true op client
-  in
+  let* op_json = Operation.make_run_operation_input op client in
   Log.info "%s" (Ezjsonm.value_to_string ~minify:false op_json) ;
   Log.info "Call the [run_operation] RPC on this operation." ;
   let* _output =

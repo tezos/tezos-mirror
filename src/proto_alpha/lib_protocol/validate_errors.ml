@@ -380,6 +380,352 @@ module Consensus = struct
       (fun endorser -> Conflicting_dal_slot_availability {endorser})
 end
 
+module Voting = struct
+  type error +=
+    | (* Shared voting errors *)
+        Wrong_voting_period_index of {
+        expected : int32;
+        provided : int32;
+      }
+    | Wrong_voting_period_kind of {
+        current : Voting_period.kind;
+        expected : Voting_period.kind list;
+      }
+    | Source_not_in_vote_listings
+    | (* Proposals errors *)
+        Empty_proposals
+    | Proposals_contain_duplicate of {proposal : Protocol_hash.t}
+    | Too_many_proposals
+    | Already_proposed of {proposal : Protocol_hash.t}
+    | Conflict_too_many_proposals of {
+        max_allowed : int;
+        count_previous_blocks : int;
+        count_current_block : int;
+        count_operation : int;
+        conflicting_operations : Operation_hash.t list;
+      }
+    | Conflict_already_proposed of {
+        proposal : Protocol_hash.t;
+        conflicting_operation : Operation_hash.t;
+      }
+    | Conflicting_dictator_proposals of Operation_hash.t
+    | Testnet_dictator_multiple_proposals
+    | Testnet_dictator_conflicting_operation
+    | (* Ballot errors *)
+        Ballot_for_wrong_proposal of {
+        current : Protocol_hash.t;
+        submitted : Protocol_hash.t;
+      }
+    | Already_submitted_a_ballot
+    | Conflicting_ballot of {conflicting_operation : Operation_hash.t}
+
+  let () =
+    (* Shared voting errors *)
+    register_error_kind
+      `Temporary
+      ~id:"validate_operation.wrong_voting_period_index"
+      ~title:"Wrong voting period index"
+      ~description:
+        "The voting operation contains a voting period index different from \
+         the current one."
+      ~pp:(fun ppf (expected, provided) ->
+        Format.fprintf
+          ppf
+          "The voting operation is meant for voting period %ld, whereas the \
+           current period is %ld."
+          provided
+          expected)
+      Data_encoding.(
+        obj2 (req "current_index" int32) (req "provided_index" int32))
+      (function
+        | Wrong_voting_period_index {expected; provided} ->
+            Some (expected, provided)
+        | _ -> None)
+      (fun (expected, provided) ->
+        Wrong_voting_period_index {expected; provided}) ;
+    register_error_kind
+      `Temporary
+      ~id:"validate_operation.wrong_voting_period_kind"
+      ~title:"Wrong voting period kind"
+      ~description:
+        "The voting operation is incompatible the current voting period kind."
+      ~pp:(fun ppf (current, expected) ->
+        Format.fprintf
+          ppf
+          "The voting operation is only valid during a %a voting period, but \
+           we are currently in a %a period."
+          (Format.pp_print_list
+             ~pp_sep:(fun fmt () -> Format.fprintf fmt " or ")
+             Voting_period.pp_kind)
+          expected
+          Voting_period.pp_kind
+          current)
+      Data_encoding.(
+        obj2
+          (req "current" Voting_period.kind_encoding)
+          (req "expected" (list Voting_period.kind_encoding)))
+      (function
+        | Wrong_voting_period_kind {current; expected} ->
+            Some (current, expected)
+        | _ -> None)
+      (fun (current, expected) -> Wrong_voting_period_kind {current; expected}) ;
+    let description = "The delegate is not in the vote listings." in
+    register_error_kind
+      `Temporary
+      ~id:"validate_operation.source_not_in_vote_listings"
+      ~title:"Source not in vote listings"
+      ~description
+      ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+      Data_encoding.empty
+      (function Source_not_in_vote_listings -> Some () | _ -> None)
+      (fun () -> Source_not_in_vote_listings) ;
+
+    (* Proposals errors *)
+    let description = "Proposal list cannot be empty." in
+    register_error_kind
+      `Permanent
+      ~id:"validate_operation.empty_proposals"
+      ~title:"Empty proposals"
+      ~description
+      ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+      Data_encoding.empty
+      (function Empty_proposals -> Some () | _ -> None)
+      (fun () -> Empty_proposals) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate_operation.proposals_contain_duplicate"
+      ~title:"Proposals contain duplicate"
+      ~description:"The list of proposals contains a duplicate element."
+      ~pp:(fun ppf proposal ->
+        Format.fprintf
+          ppf
+          "The list of proposals contains multiple occurrences of the proposal \
+           %a."
+          Protocol_hash.pp
+          proposal)
+      Data_encoding.(obj1 (req "proposal" Protocol_hash.encoding))
+      (function
+        | Proposals_contain_duplicate {proposal} -> Some proposal | _ -> None)
+      (fun proposal -> Proposals_contain_duplicate {proposal}) ;
+    let description =
+      "The proposer exceeded the maximum number of allowed proposals."
+    in
+    register_error_kind
+      `Branch
+      ~id:"validate_operation.too_many_proposals"
+      ~title:"Too many proposals"
+      ~description
+      ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+      Data_encoding.empty
+      (function Too_many_proposals -> Some () | _ -> None)
+      (fun () -> Too_many_proposals) ;
+    register_error_kind
+      `Branch
+      ~id:"validate_operation.already_proposed"
+      ~title:"Already proposed"
+      ~description:
+        "The delegate has already submitted one of the operation's proposals."
+      ~pp:(fun ppf proposal ->
+        Format.fprintf
+          ppf
+          "The delegate has already submitted the proposal %a."
+          Protocol_hash.pp
+          proposal)
+      Data_encoding.(obj1 (req "proposal" Protocol_hash.encoding))
+      (function Already_proposed {proposal} -> Some proposal | _ -> None)
+      (fun proposal -> Already_proposed {proposal}) ;
+    register_error_kind
+      `Temporary
+      ~id:"validate_operation.conflict_too_many_proposals"
+      ~title:"Conflict too many proposals"
+      ~description:
+        "The delegate exceeded the maximum number of allowed proposals due to, \
+         among others, previous Proposals operations in the current \
+         block/mempool."
+      ~pp:
+        (fun ppf
+             ( max_allowed,
+               count_previous_blocks,
+               count_current_block,
+               count_operation,
+               conflicting_operations ) ->
+        Format.fprintf
+          ppf
+          "The delegate has submitted too many proposals (the maximum allowed \
+           is %d): %d in previous blocks, %d in the considered operation, and \
+           %d in the following validated operations of the current \
+           block/mempool: %a."
+          max_allowed
+          count_previous_blocks
+          count_operation
+          count_current_block
+          (Format.pp_print_list Operation_hash.pp)
+          conflicting_operations)
+      Data_encoding.(
+        obj5
+          (req "max_allowed" int8)
+          (req "count_previous_blocks" int8)
+          (req "count_current_block" int8)
+          (req "count_operation" int8)
+          (req "conflicting_operations" (list Operation_hash.encoding)))
+      (function
+        | Conflict_too_many_proposals
+            {
+              max_allowed;
+              count_previous_blocks;
+              count_current_block;
+              count_operation;
+              conflicting_operations;
+            } ->
+            Some
+              ( max_allowed,
+                count_previous_blocks,
+                count_current_block,
+                count_operation,
+                conflicting_operations )
+        | _ -> None)
+      (fun ( max_allowed,
+             count_previous_blocks,
+             count_current_block,
+             count_operation,
+             conflicting_operations ) ->
+        Conflict_too_many_proposals
+          {
+            max_allowed;
+            count_previous_blocks;
+            count_current_block;
+            count_operation;
+            conflicting_operations;
+          }) ;
+    register_error_kind
+      `Temporary
+      ~id:"validate_operation.conflict_already_proposed"
+      ~title:"Conflict already proposed"
+      ~description:
+        "The delegate has already submitted one of the operation's proposals \
+         in a previously validated operation of the current block or mempool."
+      ~pp:(fun ppf (proposal, conflicting_oph) ->
+        Format.fprintf
+          ppf
+          "The delegate has already proposed the protocol hash %a in the \
+           previously validated operation %a of the current block or mempool."
+          Protocol_hash.pp
+          proposal
+          Operation_hash.pp
+          conflicting_oph)
+      Data_encoding.(
+        obj2
+          (req "proposal" Protocol_hash.encoding)
+          (req "conflicting_operation" Operation_hash.encoding))
+      (function
+        | Conflict_already_proposed {proposal; conflicting_operation} ->
+            Some (proposal, conflicting_operation)
+        | _ -> None)
+      (fun (proposal, conflicting_operation) ->
+        Conflict_already_proposed {proposal; conflicting_operation}) ;
+    register_error_kind
+      `Branch
+      ~id:"validate_operation.conflicting_dictator_proposals"
+      ~title:"Conflicting dictator proposals"
+      ~description:
+        "The current block/mempool already contains a testnest dictator \
+         proposals operation, so it cannot have any other voting operation."
+      ~pp:(fun ppf dictator_operation ->
+        Format.fprintf
+          ppf
+          "The current block/mempool already contains the testnest dictator \
+           proposals operation %a, so it cannot have any other voting \
+           operation."
+          Operation_hash.pp
+          dictator_operation)
+      Data_encoding.(obj1 (req "dictator_operation" Operation_hash.encoding))
+      (function Conflicting_dictator_proposals oph -> Some oph | _ -> None)
+      (fun oph -> Conflicting_dictator_proposals oph) ;
+    let description =
+      "A testnet dictator cannot submit more than one proposal at a time."
+    in
+    register_error_kind
+      `Permanent
+      ~id:"validate_operation.testnet_dictator_multiple_proposals"
+      ~title:"Testnet dictator multiple proposals"
+      ~description
+      ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+      Data_encoding.empty
+      (function Testnet_dictator_multiple_proposals -> Some () | _ -> None)
+      (fun () -> Testnet_dictator_multiple_proposals) ;
+    let description =
+      "A testnet dictator proposals operation cannot be included in a block or \
+       mempool that already contains any other voting operation."
+    in
+    register_error_kind
+      `Branch
+      ~id:"validate_operation.testnet_dictator_conflicting_operation"
+      ~title:"Testnet dictator conflicting operation"
+      ~description
+      ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+      Data_encoding.empty
+      (function Testnet_dictator_conflicting_operation -> Some () | _ -> None)
+      (fun () -> Testnet_dictator_conflicting_operation) ;
+
+    (* Ballot errors *)
+    register_error_kind
+      `Branch
+      ~id:"validate_operation.ballot_for_wrong_proposal"
+      ~title:"Ballot for wrong proposal"
+      ~description:"Ballot provided for a proposal that is not the current one."
+      ~pp:(fun ppf (current, submitted) ->
+        Format.fprintf
+          ppf
+          "Ballot provided for proposal %a whereas the current proposal is %a."
+          Protocol_hash.pp
+          submitted
+          Protocol_hash.pp
+          current)
+      Data_encoding.(
+        obj2
+          (req "current_proposal" Protocol_hash.encoding)
+          (req "ballot_proposal" Protocol_hash.encoding))
+      (function
+        | Ballot_for_wrong_proposal {current; submitted} ->
+            Some (current, submitted)
+        | _ -> None)
+      (fun (current, submitted) ->
+        Ballot_for_wrong_proposal {current; submitted}) ;
+    let description =
+      "The delegate has already submitted a ballot for the current voting \
+       period."
+    in
+    register_error_kind
+      `Branch
+      ~id:"validate_operation.already_submitted_a_ballot"
+      ~title:"Already submitted a ballot"
+      ~description
+      ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+      Data_encoding.empty
+      (function Already_submitted_a_ballot -> Some () | _ -> None)
+      (fun () -> Already_submitted_a_ballot) ;
+    register_error_kind
+      `Temporary
+      ~id:"validate_operation.conflicting_ballot"
+      ~title:"Conflicting ballot"
+      ~description:
+        "The delegate has already submitted a ballot in a previously validated \
+         operation of the current block or mempool."
+      ~pp:(fun ppf conflicting_oph ->
+        Format.fprintf
+          ppf
+          "The delegate has already submitted a ballot in the previously \
+           validated operation %a of the current block or mempool."
+          Operation_hash.pp
+          conflicting_oph)
+      Data_encoding.(obj1 (req "conflicting_operation" Operation_hash.encoding))
+      (function
+        | Conflicting_ballot {conflicting_operation} ->
+            Some conflicting_operation
+        | _ -> None)
+      (fun conflicting_operation -> Conflicting_ballot {conflicting_operation})
+end
+
 module Anonymous = struct
   type error +=
     | Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
@@ -816,3 +1162,17 @@ module Manager = struct
       (function Sc_rollup_feature_disabled -> Some () | _ -> None)
       (fun () -> Sc_rollup_feature_disabled)
 end
+
+type error += Failing_noop_error
+
+let () =
+  let description = "A failing_noop operation can never be validated." in
+  register_error_kind
+    `Permanent
+    ~id:"validate_operation.failing_noop_error"
+    ~title:"Failing_noop error"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    Data_encoding.empty
+    (function Failing_noop_error -> Some () | _ -> None)
+    (fun () -> Failing_noop_error)

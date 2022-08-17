@@ -23,13 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let recorded_proposal_count_for_delegate ctxt proposer =
+let get_delegate_proposal_count ctxt proposer =
   Storage.Vote.Proposals_count.find ctxt proposer >|=? Option.value ~default:0
 
-let record_proposal ctxt proposal proposer =
-  recorded_proposal_count_for_delegate ctxt proposer >>=? fun count ->
-  Storage.Vote.Proposals_count.add ctxt proposer (count + 1) >>= fun ctxt ->
-  Storage.Vote.Proposals.add ctxt (proposal, proposer) >|= ok
+let set_delegate_proposal_count ctxt proposer count =
+  Storage.Vote.Proposals_count.add ctxt proposer count
+
+let has_proposed ctxt proposer proposal =
+  Storage.Vote.Proposals.mem ctxt (proposal, proposer)
+
+let add_proposal ctxt proposer proposal =
+  Storage.Vote.Proposals.add ctxt (proposal, proposer)
 
 let get_proposals ctxt =
   Storage.Vote.Proposals.fold
@@ -248,14 +252,15 @@ let get_participation_ema = Storage.Vote.Participation_ema.get
 
 let set_participation_ema = Storage.Vote.Participation_ema.update
 
+let current_proposal_exists = Storage.Vote.Current_proposal.mem
+
 let get_current_proposal = Storage.Vote.Current_proposal.get
 
 let find_current_proposal = Storage.Vote.Current_proposal.find
 
 let init_current_proposal = Storage.Vote.Current_proposal.init
 
-let clear_current_proposal ctxt =
-  Storage.Vote.Current_proposal.remove ctxt >|= ok
+let clear_current_proposal = Storage.Vote.Current_proposal.remove
 
 let init ctxt ~start_position =
   (* participation EMA is in centile of a percentage *)

@@ -265,9 +265,9 @@ module Vote = struct
     remaining_proposals : int;
   }
 
-  let recorded_proposal_count_for_delegate ctxt pkh =
+  let get_delegate_proposal_count ctxt pkh =
     to_alpha_ctxt ctxt >>=? fun alpha_ctxt ->
-    Vote.recorded_proposal_count_for_delegate alpha_ctxt pkh
+    Vote.get_delegate_proposal_count alpha_ctxt pkh
     >|= Environment.wrap_tzresult
 end
 

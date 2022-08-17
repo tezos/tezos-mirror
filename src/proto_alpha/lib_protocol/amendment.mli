@@ -74,36 +74,56 @@ open Alpha_context
     the state machine of the amendment procedure. *)
 val may_start_new_voting_period : context -> context tzresult Lwt.t
 
-(** Records a list of proposals for a delegate.
-    @raise Unexpected_proposal if [ctxt] is not in a proposal period.
-    @raise Unauthorized_proposal if [delegate] is not in the listing. *)
-val record_proposals :
+(** Check whether the given public key hash corresponds to the
+    registered testchain dictator, if any. This function will always
+    return false on mainnet. *)
+val is_testnet_dictator : context -> Chain_id.t -> public_key_hash -> bool
+
+(** {2 Application of voting operations}
+
+    There are two kinds of voting operations:
+
+    - Proposals: A delegate submits a list of protocol amendment
+      proposals. This operation is only accepted during a Proposal period
+      (see above).
+
+    - Ballot: A delegate casts a vote for/against the current proposal
+      (or pass). This operation is only accepted during an Exploration
+      or Promotion period (see above). *)
+
+(** Update the [context] with the effects of a Proposals operation:
+
+    - Its proposals are added to the source's recorded proposals.
+
+    - The recorded proposal count of the source is increased by the
+      number of proposals in the operation.
+
+    Note that a Proposals operation from a testnet dictator (which may
+    be set up when a test chain is initialized) has completely
+    different effects:
+
+    - If the operation contains no proposal, then the current voting
+      period is immediately and forcibly set to a Proposal period.
+
+    - If the operation contains exactly one proposal, then the current
+      voting period is immediately and forcibly set to an Adoption period
+      for this proposal.
+
+    {!validate_proposals} must have been called beforehand, and is
+    responsible for ensuring that [apply_proposals] cannot fail. *)
+val apply_proposals :
   context ->
   Chain_id.t ->
-  public_key_hash ->
-  Protocol_hash.t list ->
-  context tzresult Lwt.t
+  Kind.proposals contents ->
+  (context * Kind.proposals Apply_results.contents_result_list) tzresult Lwt.t
 
-type error +=
-  | Invalid_proposal
-  | Unexpected_proposal
-  | Unauthorized_proposal
-  | Too_many_proposals
-  | Empty_proposal
-  | Unexpected_ballot
-  | Unauthorized_ballot
-  | Duplicate_ballot
+(** Update the [context] with the effects of a Ballot operation:
 
-(** Records a vote for a delegate if the current voting period is
-    Exploration or Promotion.
-    @raise Invalid_proposal if [proposal] ≠ [current_proposal].
-    @raise Duplicate_ballot if delegate already voted.
-    @raise Unauthorized_ballot if delegate is not listed to vote,
-    or if current period differs from Exploration or Promotion.
-*)
-val record_ballot :
+    The couple (source of the operation, submitted ballot) is recorded.
+
+    {!validate_ballot} must have been called beforehand, and is
+    responsible for ensuring that [apply_ballot] cannot fail. *)
+val apply_ballot :
   context ->
-  public_key_hash ->
-  Protocol_hash.t ->
-  Vote.ballot ->
-  context tzresult Lwt.t
+  Kind.ballot contents ->
+  (context * Kind.ballot Apply_results.contents_result_list) tzresult Lwt.t

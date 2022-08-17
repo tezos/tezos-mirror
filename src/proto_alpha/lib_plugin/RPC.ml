@@ -373,11 +373,6 @@ module Scripts = struct
         ~query:RPC_query.empty
         RPC_path.(path / "normalize_type")
 
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3401
-
-       Contrary to its description, this RPC currently does check the
-       signature of voting operations. This is in the process of being
-       fixed. *)
     let run_operation =
       RPC_service.post_service
         ~description:

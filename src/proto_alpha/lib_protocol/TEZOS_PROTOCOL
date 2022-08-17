@@ -216,8 +216,8 @@
         "Dal_apply",
 
         "Baking",
-        "Amendment",
         "Validate_errors",
+        "Amendment",
         "Validate_operation",
         "Apply",
 
