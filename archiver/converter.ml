@@ -107,13 +107,17 @@ let register_block db level data source =
       (Format.pp_print_list
          ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
          (fun f block ->
-           Format.fprintf
+           Format.pp_print_option
+             (fun f reception_time ->
+               Format.fprintf
+                 f
+                 "('%a',x'%a')"
+                 Time.System.pp_hum
+                 reception_time
+                 Hex.pp
+                 (Block_hash.to_hex block.Data.Block.hash))
              f
-             "('%a',x'%a')"
-             Time.System.pp_hum
-             block.Data.Block.reception_time
-             Hex.pp
-             (Block_hash.to_hex block.Data.Block.hash)))
+             block.Data.Block.reception_time))
       data.Data.blocks
       source
   in

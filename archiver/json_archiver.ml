@@ -335,7 +335,7 @@ let dump_included_in_block cctxt path block_level block_hash block_round
             delegate = baker;
             delegate_alias = Wallet.alias_of_pkh aliases baker;
             round = block_round;
-            reception_time;
+            reception_time = Some reception_time;
             timestamp;
             nonce = None;
           }

@@ -49,13 +49,7 @@ let parse_block_row r =
   let timestamp =
     Time.Protocol.of_seconds (Int64.of_string (Stdlib.Option.get r.(5)))
   in
-  let reception_time =
-    match Time.System.of_notation_opt (Stdlib.Option.get r.(4)) with
-    | Some t -> t
-    | None ->
-        Format.eprintf "failed to parse date (%s)" (Stdlib.Option.get r.(4)) ;
-        Time.System.of_protocol_exn timestamp
-  in
+  let reception_time = Time.System.of_notation_opt (Stdlib.Option.get r.(4)) in
   let nonce = None in
   Data.Block.
     {
