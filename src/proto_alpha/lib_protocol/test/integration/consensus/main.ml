@@ -46,5 +46,6 @@ let () =
       ("helpers rpcs", Test_helpers_rpcs.tests);
       ("participation monitoring", Test_participation.tests);
       ("frozen deposits", Test_frozen_deposits.tests);
+      ("consensus key", Test_consensus_key.tests);
     ]
   |> Lwt_main.run
