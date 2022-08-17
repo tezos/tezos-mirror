@@ -133,7 +133,7 @@ let push (ell1, ts1) (ell2, ts2) =
   ( (if ell1 = Ellipses || ell2 = Ellipses then Ellipses else NoEllipses),
     ts2 @ ts1 )
 
-let peek i (ell, ts) = try List.nth (List.rev ts) i with Failure _ -> None
+let peek i (_, ts) = try List.nth (List.rev ts) i with Failure _ -> None
 
 let vec_to_list v =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3378 Ensure `Valid` is never
@@ -338,7 +338,7 @@ let rec check_instr (c : context) (e : instr) (s : infer_result_type) : op_type
       let ts2_l = vec_to_list ts2 in
       ts1_l --> ts2_l
   | CallIndirect (x, y) ->
-      let (TableType (lim, t)) = table c x in
+      let (TableType (_, t)) = table c x in
       let (FuncType (ts1, ts2)) = type_ c y in
       let ts1_l = vec_to_list ts1 in
       let ts2_l = vec_to_list ts2 in
@@ -572,39 +572,39 @@ let check_limits {min; max} range at msg =
         at
         "size minimum must not be greater than maximum"
 
-let check_num_type (t : num_type) at = ()
+let check_num_type (_ : num_type) = ()
 
-let check_vec_type (t : vec_type) at = ()
+let check_vec_type (_ : vec_type) = ()
 
-let check_ref_type (t : ref_type) at = ()
+let check_ref_type (_ : ref_type) = ()
 
-let check_value_type (t : value_type) at =
+let check_value_type (t : value_type) =
   match t with
-  | NumType t' -> check_num_type t' at
-  | VecType t' -> check_vec_type t' at
-  | RefType t' -> check_ref_type t' at
+  | NumType t' -> check_num_type t'
+  | VecType t' -> check_vec_type t'
+  | RefType t' -> check_ref_type t'
 
-let check_func_type (ft : func_type) at =
+let check_func_type (ft : func_type) =
   let (FuncType (ts1, ts2)) = ft in
   let ts1_l = vec_to_list ts1 in
   let ts2_l = vec_to_list ts2 in
-  List.iter (fun t -> check_value_type t at) ts1_l ;
-  List.iter (fun t -> check_value_type t at) ts2_l
+  List.iter check_value_type ts1_l ;
+  List.iter check_value_type ts2_l
 
 let check_table_type (tt : table_type) at =
   let (TableType (lim, t)) = tt in
   check_limits lim 0xffff_ffffl at "table size must be at most 2^32-1" ;
-  check_ref_type t at
+  check_ref_type t
 
 let check_memory_type (mt : memory_type) at =
   let (MemoryType lim) = mt in
   check_limits lim 0x1_0000l at "memory size must be at most 65536 pages (4GiB)"
 
-let check_global_type (gt : global_type) at =
-  let (GlobalType (t, mut)) = gt in
-  check_value_type t at
+let check_global_type (gt : global_type) =
+  let (GlobalType (t, _mut)) = gt in
+  check_value_type t
 
-let check_type (t : type_) = check_func_type t.it t.at
+let check_type (t : type_) = check_func_type t.it
 
 (* Functions & Constants *)
 
@@ -656,11 +656,11 @@ let check_const (c : context) (const : const) (t : value_type) =
 
 (* Tables, Memories, & Globals *)
 
-let check_table (c : context) (tab : table) =
+let check_table (tab : table) =
   let {ttype} = tab.it in
   check_table_type ttype tab.at
 
-let check_memory (c : context) (mem : memory) =
+let check_memory (mem : memory) =
   let {mtype} = mem.it in
   check_memory_type mtype mem.at
 
@@ -692,12 +692,12 @@ let check_data_mode (c : context) (mode : segment_mode) =
   | Declarative -> assert false
 
 let check_data (c : context) (seg : data_segment) =
-  let {dinit; dmode} = seg.it in
+  let {dmode; _} = seg.it in
   check_data_mode c dmode
 
 let check_global (c : context) (glob : global) =
   let {gtype; ginit} = glob.it in
-  let (GlobalType (t, mut)) = gtype in
+  let (GlobalType (t, _)) = gtype in
   check_const c ginit t
 
 (* Modules *)
@@ -720,7 +720,7 @@ let check_import (im : import) (c : context) : context =
       check_memory_type mt idesc.at ;
       {c with memories = mt :: c.memories}
   | GlobalImport gt ->
-      check_global_type gt idesc.at ;
+      check_global_type gt ;
       {c with globals = gt :: c.globals}
 
 module NameSet = Set.Make (struct
@@ -752,7 +752,7 @@ let check_module (m : module_) =
     elems;
     datas;
     exports;
-    allocations = {blocks; datas = allocated_datas};
+    allocations = {blocks; _};
   } =
     m.it
   in
@@ -762,7 +762,6 @@ let check_module (m : module_) =
   in
 
   let* blocks = build_blocks blocks in
-  let* allocated_datas = Ast.Vector.to_list allocated_datas in
   let types = vec_to_list types in
   let imports = vec_to_list imports in
   let tables = vec_to_list tables in
@@ -803,8 +802,8 @@ let check_module (m : module_) =
   in
   List.iter check_type types ;
   List.iter (check_global c1) globals ;
-  List.iter (check_table c1) tables ;
-  List.iter (check_memory c1) memories ;
+  List.iter check_table tables ;
+  List.iter check_memory memories ;
   List.iter (check_elem c1) elems ;
   List.iter (check_data c1) datas ;
   List.iter (check_func c) funcs ;

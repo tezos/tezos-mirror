@@ -248,14 +248,14 @@ struct
 
   (* result is floored (which is the same as truncating for unsigned values) *)
   let div_u x y =
-    let q, r = divrem_u x y in
+    let q, _ = divrem_u x y in
     q
 
   (* result has the sign of the dividend *)
   let rem_s x y = if y = Rep.zero then raise DivideByZero else Rep.rem x y
 
   let rem_u x y =
-    let q, r = divrem_u x y in
+    let _, r = divrem_u x y in
     r
 
   let avgr_u x y =

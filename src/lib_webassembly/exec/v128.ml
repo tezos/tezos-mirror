@@ -159,7 +159,7 @@ module MakeIntShape (IXX : Ixx.S) (Cvt : Convert(IXX).S) :
 
   let cmp f x y = if f x y then IXX.of_int_s (-1) else IXX.zero
 
-  let splat x = of_lanes (List.init num_lanes (fun i -> x))
+  let splat x = of_lanes (List.init num_lanes (fun _ -> x))
 
   let extract_lane_s i s = List.nth (to_lanes s) i
 
@@ -330,7 +330,7 @@ module MakeFloatShape (FXX : Fxx.S) (Cvt : Convert(FXX).S) :
 
   let cmp f x y = if f x y then all_ones else FXX.zero
 
-  let splat x = of_lanes (List.init num_lanes (fun i -> x))
+  let splat x = of_lanes (List.init num_lanes (fun _ -> x))
 
   let extract_lane i s = List.nth (to_lanes s) i
 

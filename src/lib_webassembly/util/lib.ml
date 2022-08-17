@@ -99,8 +99,8 @@ module List = struct
   and index_where' p xs i =
     match xs with
     | [] -> None
-    | x :: xs' when p x -> Some i
-    | x :: xs' -> index_where' p xs' (i + 1)
+    | x :: _ when p x -> Some i
+    | _ :: xs' -> index_where' p xs' (i + 1)
 
   let index_of x = index_where (( = ) x)
 

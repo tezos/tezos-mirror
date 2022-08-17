@@ -15,12 +15,12 @@ let type_error v t =
     ("type error, expected " ^ string_of_value_type t ^ ", got "
     ^ string_of_value_type (type_of_value v))
 
-let empty = function [] -> () | vs -> error "type error, too many arguments"
+let empty = function [] -> () | _ -> error "type error, too many arguments"
 
 let single = function
   | [] -> error "type error, missing arguments"
   | [v] -> v
-  | vs -> error "type error, too many arguments"
+  | _ -> error "type error, too many arguments"
 
 let int = function
   | Num (I32 i) -> Int32.to_int i
