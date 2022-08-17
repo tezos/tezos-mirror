@@ -63,7 +63,9 @@ let register_received_operations db level
 
 let register_block ~db hash ~level ~round timestamp reception_time delegate
     block_ops source =
-  exec db (Sql_requests.insert_block hash ~level ~round timestamp delegate) ;
+  exec
+    db
+    (Sql_requests.maybe_insert_block hash ~level ~round timestamp delegate) ;
   exec db (Sql_requests.insert_received_block ~source hash reception_time) ;
 
   (*** insert into operations and operations_inclusion *)

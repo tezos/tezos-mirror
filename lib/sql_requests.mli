@@ -40,7 +40,7 @@ val maybe_insert_operations_from_block :
 val maybe_insert_operations_from_received :
   level:int32 -> Consensus_ops.delegate_ops -> string
 
-val insert_block :
+val maybe_insert_block :
   Block_hash.t ->
   level:int32 ->
   round:int32 ->

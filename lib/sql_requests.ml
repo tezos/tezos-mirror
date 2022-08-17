@@ -171,11 +171,11 @@ let maybe_insert_operations_from_received ~level operations =
     (fun (op : Consensus_ops.received_operation) -> op.op)
     operations
 
-let insert_block hash ~level ~round timestamp delegate =
+let maybe_insert_block hash ~level ~round timestamp delegate =
   Format.asprintf
-    "INSERT INTO blocks (timestamp, hash, level, round, baker) SELECT column1, \
-     column2, %ld, column4, delegates.id FROM delegates JOIN (VALUES ('%a', \
-     x'%a', x'%a', %ld)) ON delegates.address = column3;"
+    "INSERT OR IGNORE INTO blocks (timestamp, hash, level, round, baker) \
+     SELECT column1, column2, %ld, column4, delegates.id FROM delegates JOIN \
+     (VALUES ('%a', x'%a', x'%a', %ld)) ON delegates.address = column3;"
     level
     Time.Protocol.pp
     timestamp
