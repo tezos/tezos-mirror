@@ -100,7 +100,7 @@ let check_new_cycle state level =
   match state.cycle with
   | None -> state.cycle <- Some current_cycle
   | Some cycle ->
-      if Cycle_repr.(succ cycle = current_cycle) then (
+      if Cycle_repr.(succ cycle <= current_cycle) then (
         state.cycle <- Some current_cycle ;
         state.computation_status <- Not_started)
 
