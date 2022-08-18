@@ -38,11 +38,15 @@ type tick_state =
   | Eval of Wasm.Eval.config
 
 type pvm_state = {
-  kernel : Lazy_containers.Chunked_byte_vector.Lwt.t;
-  current_tick : Z.t;
   last_input_info : Wasm_pvm_sig.input_info option;
+      (** Info about last read input. *)
+  current_tick : Z.t;  (** Current tick of the PVM. *)
+  kernel : Lazy_containers.Chunked_byte_vector.Lwt.t;  (** The loaded kernel. *)
   module_reg : Wasm.Instance.module_reg;
-  tick : tick_state;
+      (** Module registry of the loaded kernel. *)
+  tick_state : tick_state;  (** The current tick state. *)
+  input_request : Wasm_pvm_sig.input_request;
+      (** Signals whether or not the PVM needs input. *)
 }
 
 module Make (T : Tree_encoding.TREE) :
@@ -88,55 +92,78 @@ module Make (T : Tree_encoding.TREE) :
             (fun eval_config -> Eval eval_config);
         ]
 
+    let input_request_encoding =
+      Tree_encoding.conv
+        (function
+          | true -> Wasm_pvm_sig.Input_required
+          | false -> Wasm_pvm_sig.No_input_required)
+        (function
+          | Wasm_pvm_sig.Input_required -> true
+          | Wasm_pvm_sig.No_input_required -> false)
+        (Tree_encoding.value ~default:false [] Data_encoding.bool)
+
     let pvm_state_encoding =
       let open Tree_encoding in
       conv
-        (fun (current_tick, kernel, last_input_info, tick, module_reg) ->
-          {current_tick; kernel; last_input_info; tick; module_reg})
-        (fun {current_tick; kernel; last_input_info; tick; module_reg} ->
-          (current_tick, kernel, last_input_info, tick, module_reg))
-        (tup5
+        (fun ( last_input_info,
+               current_tick,
+               kernel,
+               module_reg,
+               tick_state,
+               input_request ) ->
+          {
+            last_input_info;
+            current_tick;
+            kernel;
+            module_reg;
+            tick_state;
+            input_request;
+          })
+        (fun {
+               last_input_info;
+               current_tick;
+               kernel;
+               module_reg;
+               tick_state;
+               input_request;
+             } ->
+          ( last_input_info,
+            current_tick,
+            kernel,
+            module_reg,
+            tick_state,
+            input_request ))
+        (tup6
            ~flatten:true
+           (value_option ["wasm"; "input"] Wasm_pvm_sig.input_info_encoding)
            (value ~default:Z.zero ["wasm"; "current_tick"] Data_encoding.n)
            (scope ["durable"; "kernel"; "boot.wasm"] chunked_byte_vector)
-           (value_option ["wasm"; "input"] Wasm_pvm_sig.input_info_encoding)
+           (scope ["modules"] Wasm_encoding.module_instances_encoding)
            (scope ["wasm"] tick_state_encoding)
-           (scope ["modules"] Wasm_encoding.module_instances_encoding))
+           (scope ["input"; "consuming"] input_request_encoding))
 
-    let status_encoding =
-      Tree_encoding.value ["input"; "consuming"] Data_encoding.bool
-
-    let next_state state =
+    let next_tick_state {module_reg; kernel; tick_state; _} =
       let open Lwt_syntax in
-      match state.tick with
+      match tick_state with
       | Decode {module_kont = MKStop ast_module; _} ->
           let self = Wasm.Instance.Module_key wasm_main_module_name in
           (* The module instance is registered in [self] that contains the
              module registry, why we can ignore the result here. *)
           let* _module_inst =
-            Wasm.Eval.init
-              ~module_reg:state.module_reg
-              ~self
-              host_funcs
-              ast_module
-              []
+            Wasm.Eval.init ~module_reg ~self host_funcs ast_module []
           in
           let eval_config = Wasm.Eval.config host_funcs self [] [] in
-          Lwt.return {state with tick = Eval eval_config}
+          Lwt.return (Eval eval_config)
       | Decode m ->
-          let+ m =
-            Tezos_webassembly_interpreter.Decode.module_step state.kernel m
-          in
-          {state with tick = Decode m}
+          let+ m = Tezos_webassembly_interpreter.Decode.module_step kernel m in
+          Decode m
       | Eval ({Wasm.Eval.frame; code; _} as eval_config) -> (
           match code with
           | _values, [] ->
               (* We have an empty set of admin instructions so we create one
                  that invokes the main function. *)
               let* module_inst =
-                Wasm.Instance.ModuleMap.get
-                  wasm_main_module_name
-                  state.module_reg
+                Wasm.Instance.ModuleMap.get wasm_main_module_name module_reg
               in
               let* main_name =
                 Wasm.Instance.Vector.to_list @@ Wasm.Utf8.decode wasm_entrypoint
@@ -172,80 +199,46 @@ module Make (T : Tree_encoding.TREE) :
                   code;
                 }
               in
-              Lwt.return {state with tick = Eval eval_config}
+              Lwt.return (Eval eval_config)
           | _ ->
               (* Continue execution. *)
-              let* eval_config = Wasm.Eval.step state.module_reg eval_config in
-              Lwt.return {state with tick = Eval eval_config})
+              let* eval_config = Wasm.Eval.step module_reg eval_config in
+              Lwt.return (Eval eval_config))
 
     let compute_step tree =
       let open Lwt_syntax in
-      let* state = Tree_encoding.decode pvm_state_encoding tree in
-      let* state = next_state state in
-      let state = {state with current_tick = Z.succ state.current_tick} in
-      let want_more_input =
-        match state.tick with
+      let* pvm_state = Tree_encoding.decode pvm_state_encoding tree in
+      (* Calculate the next tick state. *)
+      let* tick_state = next_tick_state pvm_state in
+      let input_request =
+        match pvm_state.tick_state with
         | Eval {code = _, []; _} ->
             (* Ask for more input if the kernel has yielded (empty admin
                instructions). *)
-            true
-        | _ -> false
+            Wasm_pvm_sig.Input_required
+        | _ -> Wasm_pvm_sig.No_input_required
       in
-      let* tree = Tree_encoding.encode status_encoding want_more_input tree in
-      Tree_encoding.encode pvm_state_encoding state tree
+      (* Update the tick state and input-request and increment the current tick *)
+      let pvm_state =
+        {
+          pvm_state with
+          tick_state;
+          input_request;
+          current_tick = Z.succ pvm_state.current_tick;
+        }
+      in
+      Tree_encoding.encode pvm_state_encoding pvm_state tree
 
     let get_output _ _ = Lwt.return ""
 
-    (* TODO: #3444
-       Create a may-fail tree-encoding-decoding combinator.
-       https://gitlab.com/tezos/tezos/-/issues/3444
-    *)
-    (* TODO: #3448
-       Remove the mention of exceptions from lib_scoru_wasm Make signature.
-       Add try_with or similar to catch exceptions and put the machine in a
-       stuck state instead. https://gitlab.com/tezos/tezos/-/issues/3448
-    *)
-    let current_tick_encoding =
-      Tree_encoding.value ["wasm"; "current_tick"] Data_encoding.z
-
-    let level_encoding =
-      Tree_encoding.value ["input"; "level"] Bounded.Int32.NonNegative.encoding
-
-    let id_encoding = Tree_encoding.value ["input"; "id"] Data_encoding.z
-
-    let last_input_read_encoder =
-      Tree_encoding.tup2 ~flatten:true level_encoding id_encoding
-
-    let inp_encoding level id =
-      Tree_encoding.value ["input"; level; id] Data_encoding.string
-
     let get_info tree =
       let open Lwt_syntax in
-      let* waiting =
-        try Tree_encoding.decode status_encoding tree
-        with _ -> Lwt.return false
+      let* {current_tick; last_input_info; input_request; _} =
+        Tree_encoding.decode pvm_state_encoding tree
       in
-      let input_request =
-        if waiting then Wasm_pvm_sig.Input_required
-        else Wasm_pvm_sig.No_input_required
-      in
-      let* input =
-        try
-          let* t = Tree_encoding.decode last_input_read_encoder tree in
-          Lwt.return @@ Some t
-        with _ -> Lwt.return_none
-      in
-      let last_input_read =
-        Option.map
-          (fun (inbox_level, message_counter) ->
-            Wasm_pvm_sig.{inbox_level; message_counter})
-          input
-      in
-      let* current_tick =
-        try Tree_encoding.decode current_tick_encoding tree
-        with _ -> Lwt.return Z.zero
-      in
-      Lwt.return Wasm_pvm_sig.{current_tick; last_input_read; input_request}
+      Lwt.return
+        Wasm_pvm_sig.
+          {current_tick; last_input_read = last_input_info; input_request}
 
     let set_input_step input_info message tree =
       let open Lwt_syntax in
@@ -254,14 +247,13 @@ module Make (T : Tree_encoding.TREE) :
       let raw_level = Bounded.Int32.NonNegative.to_int32 inbox_level in
       let level = Int32.to_string raw_level in
       let id = Z.to_string message_counter in
-      let* current_tick = Tree_encoding.decode current_tick_encoding tree in
-      let* state = Tree_encoding.decode pvm_state_encoding tree in
+      let* pvm_state = Tree_encoding.decode pvm_state_encoding tree in
       let* () =
-        match state.tick with
-        | Eval config ->
+        match pvm_state.tick_state with
+        | Eval {input; _} ->
             Wasm.Input_buffer.(
               enqueue
-                config.input
+                input
                 {
                   (* This is to distinguish (0) Inbox inputs from (1)
                      DAL/Slot_header inputs. *)
@@ -270,19 +262,30 @@ module Make (T : Tree_encoding.TREE) :
                   message_counter;
                   payload = String.to_bytes message;
                 })
-        | _ ->
+        | Decode _ ->
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/3448
                 Avoid throwing exceptions.
                 Possibly use a a new state to indicate, such as [Stuck].
             *)
             assert false
       in
-      let* tree = Tree_encoding.encode pvm_state_encoding state tree in
+      (* Encode the input in the tree under [input/level/id]. *)
       let* tree =
-        Tree_encoding.encode current_tick_encoding (Z.succ current_tick) tree
+        Tree_encoding.encode
+          (Tree_encoding.value ["input"; level; id] Data_encoding.string)
+          message
+          tree
       in
-      let* tree = Tree_encoding.encode status_encoding false tree in
-      Tree_encoding.encode (inp_encoding level id) message tree
+      (* Increase the current tick counter and mark that no input is required. *)
+      let pvm_state =
+        {
+          pvm_state with
+          current_tick = Z.succ pvm_state.current_tick;
+          input_request = Wasm_pvm_sig.No_input_required;
+        }
+      in
+      (* Encode the new pvm-state in the tree. *)
+      Tree_encoding.encode pvm_state_encoding pvm_state tree
   end
 
   include Gather_floppies.Make (T) (Raw)
