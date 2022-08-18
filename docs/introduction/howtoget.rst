@@ -341,6 +341,22 @@ and then do:
   :start-after: [install packages]
   :end-before: [test executables]
 
+.. warning::
+
+   If you are updating to :doc:`Octez v14<../releases/version-14>`
+   using a development environment which had been used to build Octez
+   versions up to v13.x, and also you have previously exported the
+   ``tezos`` directory to the ``$PATH`` environment variable, the
+   following stanza is necessary to avoid potential issues with opam
+   in the ``make build-deps`` step::
+
+     PATH=${PATH##"$HOME"/tezos/:}
+
+   Otherwise, it is possible for ``make build-deps`` to fail with the
+   following (or a similar) error::
+
+     make: opam: Permission denied
+     Makefile:53: *** Unexpected opam version (found: , expected: 2.*).  Stop.
 
 The following sections describe the individual steps above in more detail.
 
