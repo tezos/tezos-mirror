@@ -76,7 +76,7 @@ module Mock_all_unit :
       ~predecessor_hash:_ ~cache:_ _ =
     assert false
 
-  let relative_position_within_block _ = assert false
+  let compare_operations _ = assert false
 
   let acceptable_passes _ = assert false
 

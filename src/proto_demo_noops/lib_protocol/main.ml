@@ -64,7 +64,7 @@ type operation = {
   protocol_data : operation_data;
 }
 
-let relative_position_within_block _ _ = 0
+let compare_operations _ _ = 0
 
 type validation_state = {context : Context.t; fitness : Fitness.t}
 

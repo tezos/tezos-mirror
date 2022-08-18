@@ -616,19 +616,26 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
         List.map
           (fun operations ->
             let operations =
+              List.map
+                (fun op ->
+                  let proto =
+                    Data_encoding.Binary.to_bytes_exn
+                      Next_proto.operation_data_encoding
+                      op.Next_proto.protocol_data
+                  in
+                  (op, {Operation.shell = op.shell; proto}))
+                operations
+            in
+            let operations =
               if q#sort_operations then
-                List.sort Next_proto.relative_position_within_block operations
+                List.sort
+                  (fun (op, ops) (op', ops') ->
+                    let oph, oph' = (Operation.hash ops, Operation.hash ops') in
+                    Next_proto.compare_operations (oph, op) (oph', op'))
+                  operations
               else operations
             in
-            List.map
-              (fun op ->
-                let proto =
-                  Data_encoding.Binary.to_bytes_exn
-                    Next_proto.operation_data_encoding
-                    op.Next_proto.protocol_data
-                in
-                {Operation.shell = op.shell; proto})
-              operations)
+            List.map snd operations)
           p.operations
       in
       let* bv =

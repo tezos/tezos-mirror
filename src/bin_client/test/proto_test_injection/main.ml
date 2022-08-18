@@ -64,7 +64,7 @@ let validation_passes = []
 
 let acceptable_passes _op = []
 
-let relative_position_within_block _ _ = 0
+let compare_operations _ _ = 0
 
 type validation_state = {context : Context.t; fitness : Int64.t}
 

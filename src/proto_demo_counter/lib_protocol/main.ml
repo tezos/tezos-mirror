@@ -195,7 +195,7 @@ let init _chain_id context block_header =
       last_allowed_fork_level = block_header.level;
     }
 
-let relative_position_within_block _ _ = 0
+let compare_operations _ _ = 0
 
 type Context.Cache.value += Demo of int
 
