@@ -35,6 +35,11 @@ module Wasm = Tezos_webassembly_interpreter
 
 type tick_state =
   | Decode of Tezos_webassembly_interpreter.Decode.decode_kont
+  | Init of {
+      self : Wasm.Instance.module_key;
+      ast_module : Tezos_webassembly_interpreter.Ast.module_;
+      init_kont : Tezos_webassembly_interpreter.Eval.init_kont;
+    }
   | Eval of Wasm.Eval.config
 
 type pvm_state = {
@@ -76,6 +81,20 @@ module Make (T : Tree_encoding.Runner.TREE) :
             Parsing.Decode.encoding
             (function Decode m -> Some m | _ -> None)
             (fun m -> Decode m);
+          case
+            "init"
+            (tup3
+               ~flatten:true
+               (scope ["self"] Wasm_encoding.module_key_encoding)
+               (scope ["ast_module"]
+               @@ Parsing.(no_region_encoding Module.module_encoding))
+               (scope ["init_kont"] Init_encodings.init_kont_encoding))
+            (function
+              | Init {self; ast_module; init_kont} ->
+                  Some (self, ast_module, init_kont)
+              | _ -> None)
+            (fun (self, ast_module, init_kont) ->
+              Init {self; ast_module; init_kont});
           case
             "eval"
             (Wasm_encoding.config_encoding ~host_funcs)
@@ -140,14 +159,24 @@ module Make (T : Tree_encoding.Runner.TREE) :
           let self = Wasm.Instance.Module_key wasm_main_module_name in
           (* The module instance is registered in [self] that contains the
              module registry, why we can ignore the result here. *)
-          let* _module_inst =
-            Wasm.Eval.init ~module_reg ~self host_funcs ast_module []
-          in
-          let eval_config = Wasm.Eval.config host_funcs self [] [] in
-          Lwt.return (Eval eval_config)
+          Lwt.return (Init {self; ast_module; init_kont = IK_Start})
       | Decode m ->
           let+ m = Tezos_webassembly_interpreter.Decode.module_step kernel m in
           Decode m
+      | Init {self; ast_module = _; init_kont = IK_Stop _module_inst} ->
+          let eval_config = Wasm.Eval.config host_funcs self [] [] in
+          Lwt.return (Eval eval_config)
+      | Init {self; ast_module; init_kont} ->
+          let* init_kont =
+            Wasm.Eval.init_step
+              ~module_reg
+              ~self
+              host_funcs
+              ast_module
+              []
+              init_kont
+          in
+          Lwt.return (Init {self; ast_module; init_kont})
       | Eval ({Wasm.Eval.frame; code; _} as eval_config) -> (
           match code with
           | _values, [] ->
@@ -253,7 +282,7 @@ module Make (T : Tree_encoding.Runner.TREE) :
                   message_counter;
                   payload = String.to_bytes message;
                 })
-        | Decode _ ->
+        | Decode _ | Init _ ->
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/3448
                 Avoid throwing exceptions.
                 Possibly use a a new state to indicate, such as [Stuck].

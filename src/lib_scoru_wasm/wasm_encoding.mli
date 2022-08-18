@@ -31,6 +31,8 @@ val var_list_encoding : Ast.var list Tree_encoding.t
 
 val instruction_encoding : Ast.instr Tree_encoding.t
 
+val module_key_encoding : Instance.module_key Tree_encoding.t
+
 val function_encoding : Instance.func_inst Tree_encoding.t
 
 val value_ref_encoding : Values.ref_ Tree_encoding.t
