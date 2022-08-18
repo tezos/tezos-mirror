@@ -240,6 +240,15 @@ module Sc_rollup : sig
     Sc_rollup.t ->
     Signature.Public_key_hash.t * Signature.Public_key_hash.t ->
     Sc_rollup.Game.timeout option tzresult Lwt.t
+
+  val ongoing_game_for_staker :
+    t ->
+    Sc_rollup.t ->
+    Signature.public_key_hash ->
+    (Sc_rollup.Game.t * Signature.public_key_hash * Signature.public_key_hash)
+    option
+    tzresult
+    Lwt.t
 end
 
 type (_, _) tup =
