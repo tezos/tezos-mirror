@@ -167,8 +167,9 @@ let maybe_insert_operations level extractor op_extractor l =
   Format.asprintf
     "INSERT INTO operations (hash, endorsement, endorser, level, round) SELECT \
      column1, column2, delegates.id, %ld, column4 FROM delegates JOIN (VALUES \
-     %a) ON delegates.address = column3 WHERE column1 NOT IN (SELECT hash FROM \
-     operations WHERE level = %ld);"
+     %a) ON delegates.address = column3 WHERE (column2, delegates.id, column4) \
+     NOT IN (SELECT endorsement, endorser, round FROM operations WHERE level = \
+     %ld);"
     level
     (Format.pp_print_list
        ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
@@ -228,18 +229,20 @@ let insert_received_operations ~source ~level operations =
   let operations = List.filter (fun (_, l) -> l <> []) operations in
   Format.asprintf
     "INSERT INTO operations_reception (timestamp, operation, source, errors) \
-     SELECT column1, operations.id, nodes.id, column2 FROM operations, nodes, \
-     (VALUES %a) ON operations.hash = column3 AND nodes.name = '%s' WHERE \
-     operations.level = %ld;"
+     SELECT column1, operations.id, nodes.id, column2 FROM operations, \
+     delegates, nodes, (VALUES %a) ON delegates.address = column3 AND \
+     operations.endorser = delegates.id AND operations.endorsement = column4 \
+     AND ((operations.round IS NULL AND column5 IS NULL) OR operations.round = \
+     column5) WHERE nodes.name = '%s' AND operations.level = %ld;"
     (Format.pp_print_list
        ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
-       (fun f (_, l) ->
+       (fun f (endorser, l) ->
          (Format.pp_print_list
             ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
             (fun f (op : Consensus_ops.received_operation) ->
               Format.fprintf
                 f
-                "('%a', %a, x'%a')"
+                "('%a', %a, x'%a', %d, %a)"
                 Time.System.pp_hum
                 op.reception_time
                 (Format.pp_print_option
@@ -255,7 +258,13 @@ let insert_received_operations ~source ~level operations =
                              errors))))
                 op.errors
                 Hex.pp
-                (Operation_hash.to_hex op.op.hash)))
+                (Signature.Public_key_hash.to_hex endorser)
+                (bool_to_int
+                   (op.op.Consensus_ops.kind = Consensus_ops.Endorsement))
+                (Format.pp_print_option
+                   ~none:(fun f () -> Format.pp_print_string f "NULL")
+                   (fun f x -> Format.fprintf f "%li" x))
+                op.Consensus_ops.op.round))
            f
            l))
     operations
@@ -265,16 +274,24 @@ let insert_received_operations ~source ~level operations =
 let insert_included_operations block_hash ~level operations =
   Format.asprintf
     "INSERT INTO operations_inclusion (block, operation) SELECT blocks.id, \
-     operations.id FROM operations, blocks, (VALUES %a) ON operations.hash = \
-     column1 AND blocks.hash = x'%a' WHERE operations.level = %ld;"
+     operations.id FROM operations, delegates, blocks, (VALUES %a) ON \
+     delegates.address = column1 AND operations.endorser = delegates.id AND \
+     operations.endorsement = column2 AND ((operations.round IS NULL AND \
+     column3 IS NULL) OR operations.round = column3) WHERE blocks.hash = x'%a' \
+     AND operations.level = %ld;"
     (Format.pp_print_list
        ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
        (fun f (op : Consensus_ops.block_op) ->
          Format.fprintf
            f
-           "(x'%a')"
+           "(x'%a', %d, %a)"
            Hex.pp
-           (Operation_hash.to_hex op.Consensus_ops.op.hash)))
+           (Signature.Public_key_hash.to_hex op.Consensus_ops.delegate)
+           (bool_to_int (op.op.Consensus_ops.kind = Consensus_ops.Endorsement))
+           (Format.pp_print_option
+              ~none:(fun f () -> Format.pp_print_string f "NULL")
+              (fun f x -> Format.fprintf f "%li" x))
+           op.Consensus_ops.op.round))
     operations
     Hex.pp
     (Block_hash.to_hex block_hash)

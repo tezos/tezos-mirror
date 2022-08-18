@@ -37,26 +37,26 @@ val maybe_insert_endorsing_rights :
   level:Int32.t -> Consensus_ops.rights -> string
 
 val maybe_insert_operations_from_block :
-  level:int32 -> Consensus_ops.block_op list -> string
+  level:Int32.t -> Consensus_ops.block_op list -> string
 
 val maybe_insert_operations_from_received :
-  level:int32 -> Consensus_ops.delegate_ops -> string
+  level:Int32.t -> Consensus_ops.delegate_ops -> string
 
 val maybe_insert_block :
   Block_hash.t ->
-  level:int32 ->
-  round:int32 ->
+  level:Int32.t ->
+  round:Int32.t ->
   Time.Protocol.t ->
   Signature.public_key_hash ->
   string
 
 val insert_received_operations :
   source:string ->
-  level:int32 ->
-  ('a * Consensus_ops.received_operation list) list ->
+  level:Int32.t ->
+  (Signature.public_key_hash * Consensus_ops.received_operation list) list ->
   string
 
 val insert_included_operations :
-  Block_hash.t -> level:int32 -> Consensus_ops.block_op trace -> string
+  Block_hash.t -> level:Int32.t -> Consensus_ops.block_op trace -> string
 
 val insert_received_block : source:string -> Block_hash.t -> Ptime.t -> string
