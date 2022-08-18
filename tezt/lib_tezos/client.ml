@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1730,6 +1730,30 @@ module Sc_rollup = struct
         @ optional_arg "burn-cap" Tez.to_string burn_cap)
     in
     let parse process = Process.check process in
+    {value = process; run = parse}
+
+  let timeout ?expect_failure ?hooks ?(wait = "none") ?burn_cap ~staker ~src
+      ~dst client =
+    let process =
+      spawn_command
+        ?hooks
+        client
+        (["--wait"; wait]
+        @ [
+            "timeout";
+            "dispute";
+            "on";
+            "sc";
+            "rollup";
+            dst;
+            "with";
+            staker;
+            "from";
+            src;
+          ]
+        @ optional_arg "burn-cap" Tez.to_string burn_cap)
+    in
+    let parse process = Process.check ?expect_failure process in
     {value = process; run = parse}
 
   let submit_recover_bond ?(wait = "none") ?burn_cap ?storage_limit ?fee ?hooks

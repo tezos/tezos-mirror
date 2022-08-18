@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -1290,6 +1290,19 @@ module Sc_rollup : sig
     ?wait:string ->
     ?burn_cap:Tez.t ->
     hash:string ->
+    src:string ->
+    dst:string ->
+    t ->
+    unit Runnable.process
+
+  (** Run [tezos-client timeout dispute on sc rollup <dst> with <staker> from
+           <src>]. *)
+  val timeout :
+    ?expect_failure:bool ->
+    ?hooks:Process.hooks ->
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    staker:string ->
     src:string ->
     dst:string ->
     t ->
