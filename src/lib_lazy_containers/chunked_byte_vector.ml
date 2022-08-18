@@ -83,67 +83,12 @@ module Chunk = struct
     else 0L
 end
 
-module Effect = struct
-  module type S = sig
-    include Lazy_vector.Effect.S
-
-    val join : unit t list -> unit t
-  end
-
-  module Identity : S with type 'a t = 'a = struct
-    include Lazy_vector.Effect.Identity
-
-    let join _ = ()
-  end
-
-  module Lwt : S with type 'a t = 'a Lwt.t = struct
-    include Lazy_vector.Effect.Lwt
-
-    let join = Lwt.join
-  end
-end
-
-module type S = sig
-  type 'a effect
-
-  type t
-
-  val create :
-    ?origin:Lazy_map.tree -> ?get_chunk:(int64 -> Chunk.t effect) -> int64 -> t
-
-  val origin : t -> Lazy_map.tree option
-
-  val allocate : int64 -> t
-
-  val of_string : string -> t
-
-  val of_bytes : bytes -> t
-
-  val to_string : t -> string effect
-
-  val to_bytes : t -> bytes effect
-
-  val grow : t -> int64 -> unit
-
-  val length : t -> int64
-
-  val load_byte : t -> int64 -> int effect
-
-  val store_byte : t -> int64 -> int -> unit effect
-
-  val store_bytes : t -> int64 -> bytes -> unit effect
-
-  val loaded_chunks : t -> (int64 * Chunk.t) list
-end
-
-module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
-  module Vector = Lazy_vector.Mutable.Make (Lazy_vector.Make (Effect) (Int64))
-
-  type 'a effect = 'a Effect.t
+module Lwt = struct
+  module Vector = Lazy_vector.Mutable.LwtInt64Vector
 
   type t = {mutable length : int64; chunks : Chunk.t Vector.t}
 
-  let def_get_chunk _ = Effect.return (Chunk.alloc ())
+  let def_get_chunk _ = Lwt.return (Chunk.alloc ())
 
   let create ?origin ?(get_chunk = def_get_chunk) length =
     let chunks =
@@ -179,13 +124,13 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
   let length vector = vector.length
 
   let load_byte vector address =
-    let open Effect in
+    let open Lwt.Syntax in
     if Int64.compare address vector.length >= 0 then raise Exn.Bounds ;
     let+ chunk = Vector.get (Chunk.index address) vector.chunks in
     Array1_64.get chunk (Chunk.offset address)
 
   let store_byte vector address byte =
-    let open Effect in
+    let open Lwt.Syntax in
     if Int64.compare address vector.length >= 0 then raise Exn.Bounds ;
     let+ chunk = Vector.get (Chunk.index address) vector.chunks in
     Array1_64.set chunk (Chunk.offset address) byte
@@ -194,7 +139,7 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
     List.init (Bytes.length bytes) (fun i ->
         let c = Bytes.get bytes i in
         store_byte vector Int64.(of_int i |> add address) (Char.code c))
-    |> Effect.join
+    |> Lwt.join
 
   let of_string str =
     (* Strings are limited in size and contained in `nativeint` (either int31 or
@@ -250,7 +195,7 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
     vector
 
   let to_bytes vector =
-    let open Effect in
+    let open Lwt.Syntax in
     let chunks_number = Vector.num_elements vector.chunks in
     if vector.length > Int64.of_int Sys.max_string_length then raise Exn.Bounds ;
     (* Once we ensure the vector can be contained in a string, we can safely
@@ -274,7 +219,7 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
       done
     in
     let rec fold index =
-      if index >= chunks_number then Effect.return ()
+      if index >= chunks_number then Lwt.return ()
       else
         let* chunk = Vector.get index vector.chunks in
         add_chunk index chunk ;
@@ -284,13 +229,10 @@ module Make (Effect : Effect.S) : S with type 'a effect = 'a Effect.t = struct
     buffer
 
   let to_string vector =
-    let open Effect in
+    let open Lwt.Syntax in
     let+ buffer = to_bytes vector in
     Bytes.to_string buffer
 
   let loaded_chunks vector =
     Vector.Vector.loaded_bindings (Vector.snapshot vector.chunks)
 end
-
-include Make (Effect.Identity)
-module Lwt = Make (Effect.Lwt)

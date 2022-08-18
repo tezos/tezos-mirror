@@ -23,26 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Effect = struct
-  module type S = sig
-    include Lazy_map.Effect.S
-
-    val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
-  end
-
-  module Identity : S with type 'a t = 'a = struct
-    include Lazy_map.Effect.Identity
-
-    let ( let* ) x f = f x
-  end
-
-  module Lwt : S with type 'a t = 'a Lwt.t = struct
-    include Lazy_map.Effect.Lwt
-
-    let ( let* ) = Lwt.bind
-  end
-end
-
 module type KeyS = sig
   include Map.OrderedType
 
@@ -64,11 +44,9 @@ end
 module type S = sig
   type key
 
-  type 'a effect
+  type 'a producer = key -> 'a Lwt.t
 
-  type 'a producer = key -> 'a effect
-
-  module Map : Lazy_map.S with type key = key and type 'a effect = 'a effect
+  module Map : Lazy_map.S with type key = key
 
   type 'a t
 
@@ -96,7 +74,7 @@ module type S = sig
 
   val of_list : 'a list -> 'a t
 
-  val get : key -> 'a t -> 'a effect
+  val get : key -> 'a t -> 'a Lwt.t
 
   val set : key -> 'a -> 'a t -> 'a t
 
@@ -106,11 +84,11 @@ module type S = sig
 
   val append : 'a -> 'a t -> 'a t * key
 
-  val concat : 'a t -> 'a t -> 'a t effect
+  val concat : 'a t -> 'a t -> 'a t Lwt.t
 
   val unsafe_concat : 'a t -> 'a t -> 'a t
 
-  val to_list : 'a t -> 'a list effect
+  val to_list : 'a t -> 'a list Lwt.t
 
   val loaded_bindings : 'a t -> (key * 'a) list
 
@@ -130,15 +108,12 @@ module ZZ : KeyS with type t = Z.t = struct
   let unsigned_compare = Z.compare
 end
 
-module Make (Effect : Effect.S) (Key : KeyS) :
-  S with type key = Key.t and type 'a effect = 'a Effect.t = struct
-  module Map = Lazy_map.Make (Effect) (Key)
+module Make (Key : KeyS) : S with type key = Key.t = struct
+  module Map = Lazy_map.Make (Key)
 
   type key = Key.t
 
-  type 'a effect = 'a Effect.t
-
-  type 'a producer = key -> 'a effect
+  type 'a producer = key -> 'a Lwt.t
 
   type 'a t = {first : key; num_elements : key; values : 'a Map.t}
 
@@ -212,23 +187,23 @@ module Make (Effect : Effect.S) (Key : KeyS) :
       grow ?default Key.(pred delta) map
 
   let to_list map =
-    let open Effect in
+    let open Lwt.Syntax in
     let rec unroll acc index =
       if Key.unsigned_compare index Key.zero > 0 then
         let* prefix = get index map in
         (unroll [@ocaml.tailcall]) (prefix :: acc) (Key.pred index)
       else
         let* prefix = get Key.zero map in
-        return (prefix :: acc)
+        Lwt.return (prefix :: acc)
     in
     (* The empty vector is not correctly taken into account otherwise, since
        `pred zero` = `-1`, which is an invalid key according to
        {!invalid_key}. *)
-    if map.num_elements = Key.zero then return []
+    if map.num_elements = Key.zero then Lwt.return []
     else (unroll [@ocaml.tailcall]) [] (Key.pred map.num_elements)
 
   let concat lhs rhs =
-    let open Effect in
+    let open Lwt.Syntax in
     let* lhs = to_list lhs in
     let+ rhs = to_list rhs in
     of_list (lhs @ rhs)
@@ -249,13 +224,10 @@ module Int = struct
   let unsigned_compare n m = compare (n - min_int) (m - min_int)
 end
 
-module IntVector = Make (Effect.Identity) (Int)
-module Int32Vector = Make (Effect.Identity) (Int32)
-module Int64Vector = Make (Effect.Identity) (Int64)
-module LwtIntVector = Make (Effect.Lwt) (Int)
-module LwtInt32Vector = Make (Effect.Lwt) (Int32)
-module LwtInt64Vector = Make (Effect.Lwt) (Int64)
-module LwtZVector = Make (Effect.Lwt) (ZZ)
+module LwtIntVector = Make (Int)
+module LwtInt32Vector = Make (Int32)
+module LwtInt64Vector = Make (Int64)
+module LwtZVector = Make (ZZ)
 
 module Mutable = struct
   module type ImmutableS = S
@@ -263,9 +235,7 @@ module Mutable = struct
   module type S = sig
     type key
 
-    type 'a effect
-
-    module Vector : S with type key = key and type 'a effect = 'a effect
+    module Vector : S with type key = key
 
     type 'a t
 
@@ -282,7 +252,7 @@ module Mutable = struct
 
     val origin : 'a t -> Lazy_map.tree option
 
-    val get : key -> 'a t -> 'a Vector.effect
+    val get : key -> 'a t -> 'a Lwt.t
 
     val set : key -> 'a -> 'a t -> unit
 
@@ -296,15 +266,10 @@ module Mutable = struct
   end
 
   module Make (Vector : ImmutableS) :
-    S
-      with type key = Vector.key
-       and type 'a effect = 'a Vector.effect
-       and module Vector = Vector = struct
+    S with type key = Vector.key and module Vector = Vector = struct
     module Vector = Vector
 
     type key = Vector.key
-
-    type 'a effect = 'a Vector.effect
 
     type 'a t = 'a Vector.t ref
 
@@ -334,9 +299,6 @@ module Mutable = struct
     let snapshot map_ref = !map_ref
   end
 
-  module IntVector = Make (IntVector)
-  module Int32Vector = Make (Int32Vector)
-  module Int64Vector = Make (Int64Vector)
   module LwtIntVector = Make (LwtIntVector)
   module LwtInt32Vector = Make (LwtInt32Vector)
   module LwtInt64Vector = Make (LwtInt64Vector)

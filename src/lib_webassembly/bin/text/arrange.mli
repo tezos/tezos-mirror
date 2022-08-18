@@ -1,7 +1,6 @@
 open Sexpr
-module Vector := Lazy_vector.Int32Vector
 
-type block_table = Ast.instr Vector.t Vector.t
+type block_table = Ast.instr list list
 
 val instr : block_table -> Ast.instr -> sexpr
 

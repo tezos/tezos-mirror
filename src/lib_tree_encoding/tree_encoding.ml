@@ -26,10 +26,6 @@
 open Lazy_containers
 include Tree
 
-module type Lwt_vector = Lazy_vector.S with type 'a effect = 'a Lwt.t
-
-module type Lwt_map = Lazy_map.S with type 'a effect = 'a Lwt.t
-
 exception Uninitialized_self_ref
 
 type key = string list
@@ -182,7 +178,7 @@ module Lazy_map_encoding = struct
     val lazy_map : 'a t -> 'a map t
   end
 
-  module Make (Map : Lwt_map) = struct
+  module Make (Map : Lazy_map.S) = struct
     let lazy_map value =
       let to_key k = [Map.string_of_key k] in
       let encode =
@@ -202,47 +198,47 @@ module Lazy_map_encoding = struct
   end
 end
 
-module Lazy_vector_encoding = struct
-  module type S = sig
-    type key
-
-    type 'a vector
-
-    val lazy_vector : key t -> 'a t -> 'a vector t
-  end
-
-  module Make (Vector : Lwt_vector) = struct
-    let lazy_vector with_key value =
-      let open Vector in
-      let to_key k = [string_of_key k] in
-      let encode =
-        E.with_subtree Vector.origin
-        @@ E.contramap
-             (fun vector ->
-               (loaded_bindings vector, num_elements vector, first_key vector))
-             (E.tup3
-                (E.lazy_mapping to_key value.encode)
-                (E.scope ["length"] with_key.encode)
-                (E.scope ["head"] with_key.encode))
-      in
-      let decode =
-        D.map
-          (fun (origin, produce_value, len, head) ->
-            create ~produce_value ~first_key:head ?origin len)
-          (let open D.Syntax in
-          let+ origin = D.subtree
-          and+ x = D.lazy_mapping to_key value.decode
-          and+ y = D.scope ["length"] with_key.decode
-          and+ z = D.scope ["head"] with_key.decode in
-          (origin, x, y, z))
-      in
-      {encode; decode}
-  end
-
-  module Int = Make (Lazy_vector.LwtIntVector)
-  module Int32 = Make (Lazy_vector.LwtInt32Vector)
-  module Z = Make (Lazy_vector.LwtZVector)
+module Make_lazy_vector_encoding (Vector : Lazy_containers.Lazy_vector.S) =
+struct
+  let lazy_vector with_key value =
+    let open Vector in
+    let to_key k = [string_of_key k] in
+    let encode =
+      E.with_subtree Vector.origin
+      @@ E.contramap
+           (fun vector ->
+             (loaded_bindings vector, num_elements vector, first_key vector))
+           (E.tup3
+              (E.lazy_mapping to_key value.encode)
+              (E.scope ["length"] with_key.encode)
+              (E.scope ["head"] with_key.encode))
+    in
+    let decode =
+      D.map
+        (fun (origin, produce_value, len, head) ->
+          create ~produce_value ~first_key:head ?origin len)
+        (let open D.Syntax in
+        let+ origin = D.subtree
+        and+ x = D.lazy_mapping to_key value.decode
+        and+ y = D.scope ["length"] with_key.decode
+        and+ z = D.scope ["head"] with_key.decode in
+        (origin, x, y, z))
+    in
+    {encode; decode}
 end
+
+module Int_lazy_vector = Make_lazy_vector_encoding (Lazy_vector.LwtIntVector)
+module Int32_lazy_vector = Make_lazy_vector_encoding (Lazy_vector.LwtInt32Vector)
+module Int64_lazy_vector = Make_lazy_vector_encoding (Lazy_vector.LwtInt64Vector)
+module Z_lazy_vector = Make_lazy_vector_encoding (Lazy_vector.LwtZVector)
+
+let int_lazy_vector = Int_lazy_vector.lazy_vector
+
+let int32_lazy_vector = Int32_lazy_vector.lazy_vector
+
+let int64_lazy_vector = Int64_lazy_vector.lazy_vector
+
+let z_lazy_vector = Z_lazy_vector.lazy_vector
 
 let chunk =
   let open Chunked_byte_vector.Chunk in

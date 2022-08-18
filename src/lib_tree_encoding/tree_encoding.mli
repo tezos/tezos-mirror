@@ -25,11 +25,6 @@
 
 exception Incorrect_tree_type
 
-module type Lwt_vector =
-  Lazy_containers.Lazy_vector.S with type 'a effect = 'a Lwt.t
-
-module type Lwt_map = Lazy_containers.Lazy_map.S with type 'a effect = 'a Lwt.t
-
 exception Uninitialized_self_ref
 
 (** A key in the tree is a list of string. *)
@@ -188,40 +183,21 @@ module Lazy_map_encoding : sig
 
   (** [Make (YouMap)] creates a module with the [lazy_map]
       combinator which can be used to decode [YouMap] specifically. *)
-  module Make (Map : Lwt_map) : S with type 'a map := 'a Map.t
+  module Make (Map : Lazy_containers.Lazy_map.S) :
+    S with type 'a map := 'a Map.t
 end
 
-module Lazy_vector_encoding : sig
-  module type S = sig
-    type key
+val int_lazy_vector :
+  int t -> 'a t -> 'a Lazy_containers.Lazy_vector.LwtIntVector.t t
 
-    type 'a vector
+val int32_lazy_vector :
+  int32 t -> 'a t -> 'a Lazy_containers.Lazy_vector.LwtInt32Vector.t t
 
-    (** [lazy_vector key_enc enc] produces an encoder for [vector]s that uses
-        the given [key_enc] for encoding the keys and [enc] for values. *)
-    val lazy_vector : key t -> 'a t -> 'a vector t
-  end
+val int64_lazy_vector :
+  int64 t -> 'a t -> 'a Lazy_containers.Lazy_vector.LwtInt64Vector.t t
 
-  (** [Make (YourVector)] creates a module with the [lazy_vector]
-      combinator which can be used to decode [YourVector] specifically. *)
-  module Make (Vector : Lwt_vector) :
-    S with type key := Vector.key and type 'a vector := 'a Vector.t
-
-  module Int :
-    S
-      with type key := int
-       and type 'a vector := 'a Lazy_containers.Lazy_vector.LwtIntVector.t
-
-  module Int32 :
-    S
-      with type key := int32
-       and type 'a vector := 'a Lazy_containers.Lazy_vector.LwtInt32Vector.t
-
-  module Z :
-    S
-      with type key := Z.t
-       and type 'a vector := 'a Lazy_containers.Lazy_vector.LwtZVector.t
-end
+val z_lazy_vector :
+  Z.t t -> 'a t -> 'a Lazy_containers.Lazy_vector.LwtZVector.t t
 
 (** [chunk] is an encoder for the chunks used by [chunked_by_vector]. *)
 val chunk : Lazy_containers.Chunked_byte_vector.Chunk.t t

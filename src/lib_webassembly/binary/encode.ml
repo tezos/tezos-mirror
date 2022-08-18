@@ -4,7 +4,6 @@
    fully loaded. *)
 
 module TzStdLib = Tezos_lwt_result_stdlib.Lwtreslib.Bare
-module Vector = Lazy_vector.Int32Vector
 
 (* Version *)
 
@@ -37,10 +36,12 @@ let to_string s =
 
 (* Encoding *)
 
+let i32 = Int32.to_int
+
 module E (S : sig
   val stream : stream
 
-  val blocks : Ast.instr Vector.t Vector.t
+  val blocks : Ast.instr list list
 
   val datas : Ast.datas_table
 end) =
@@ -48,12 +49,12 @@ struct
   let s = S.stream
 
   let lookup_block (Ast.Block_label l) =
-    let block = Vector.get l S.blocks in
+    let block = List.nth S.blocks (i32 l) in
     let rec map acc pos =
       if pos < 0l then acc
-      else map (Vector.get pos block :: acc) (Int32.pred pos)
+      else map (List.nth block (i32 pos) :: acc) (Int32.pred pos)
     in
-    map [] (Int32.pred (Vector.num_elements block))
+    map [] (Int32.pred (List.length block |> Int32.of_int))
 
   (* Generic values *)
 
@@ -1194,9 +1195,7 @@ let encode m =
   let open Lwt.Syntax in
   let* blocks =
     let* bls = Ast.Vector.to_list m.Source.it.Ast.allocations.Ast.blocks in
-    let+ bls_l = TzStdLib.List.map_s Ast.Vector.to_list bls in
-    let bls_v = List.map Vector.of_list bls_l in
-    Vector.of_list bls_v
+    TzStdLib.List.map_s Ast.Vector.to_list bls
   in
   let module E = E (struct
     let stream = stream ()

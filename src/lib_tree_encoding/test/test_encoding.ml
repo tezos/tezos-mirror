@@ -51,20 +51,16 @@ module Tree : Tree_encoding.Runner.TREE with type tree = Context.tree = struct
   let wrap t = Tree t
 end
 
-module Map =
-  Lazy_map.Make
-    (Lazy_map.Effect.Lwt)
-    (struct
-      type t = string
+module Map = Lazy_map.Make (struct
+  type t = string
 
-      let compare = String.compare
+  let compare = String.compare
 
-      let to_string x = x
-    end)
+  let to_string x = x
+end)
 
 module Tree_encoding = struct
   include Tree_encoding
-  include Lazy_vector_encoding.Int
   include Lazy_map_encoding.Make (Map)
   include Tree_encoding.Runner.Make (Tree)
 end
@@ -239,7 +235,9 @@ let test_lazy_vector () =
   let open Tree_encoding in
   let open Lwt_result_syntax in
   let enc =
-    lazy_vector (value [] Data_encoding.int31) (value [] Data_encoding.string)
+    int_lazy_vector
+      (value [] Data_encoding.int31)
+      (value [] Data_encoding.string)
   in
   let vector = Lazy_vector.LwtIntVector.create 100 in
   (* Load the key [K1] from the vector . *)
@@ -444,7 +442,9 @@ let test_swap_vectors () =
   let open Tree_encoding in
   let open Lwt_result_syntax in
   let int_vec_enc =
-    lazy_vector (value [] Data_encoding.int31) (value [] Data_encoding.int31)
+    int_lazy_vector
+      (value [] Data_encoding.int31)
+      (value [] Data_encoding.int31)
   in
   let enc = tup2 ~flatten:false int_vec_enc int_vec_enc in
   let*! tree = empty_tree () in
