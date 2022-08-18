@@ -15,8 +15,8 @@ depends: [
   "ocaml" { >= "4.10" }
   "dune" { >= "1.11" }
   "uri" {>= "1.9.0" }
-  "json-data-encoding" {= "0.9.1" & with-test }
-  "json-data-encoding-bson" {= "0.9.1" & with-test }
+  "json-data-encoding" {>= "0.9.1" & < "1.0" & with-test }
+  "json-data-encoding-bson" {>= "0.9.1" & < "1.0" & with-test }
   "ezjsonm" {with-test}
   "lwt" {with-test}
   "base-unix"{with-test}
