@@ -108,7 +108,7 @@ type context =
     datas : space; elems : space;
     labels : int32 VarMap.t; deferred_locals : (unit -> unit) list ref;
     new_blocks : instr Vector.t Vector.t ref;
-    new_datas : Chunked_byte_vector.Lwt.t Vector.t ref;
+    new_datas : Chunked_byte_vector.t Vector.t ref;
   }
 
 
@@ -207,7 +207,7 @@ let anon_locals (c : context) lazy_ts =
   in c.deferred_locals := f :: !(c.deferred_locals)
 let anon_locals_vector (c : context) lazy_ts =
   let f () =
-    ignore (anon "local" c.locals (Lazy_vector.LwtInt32Vector.num_elements (Lazy.force lazy_ts)))
+    ignore (anon "local" c.locals (Lazy_vector.Int32Vector.num_elements (Lazy.force lazy_ts)))
   in c.deferred_locals := f :: !(c.deferred_locals)
 let anon_global (c : context) = anon "global" c.globals 1l
 let anon_table (c : context) = anon "table" c.tables 1l
@@ -219,7 +219,7 @@ let anon_label (c : context) =
 
 (* Lazy vectors construction and manipulation utilities *)
 
-module Vector = Lazy_vector.LwtInt32Vector
+module Vector = Lazy_vector.Int32Vector
 
 let vec_to_list v =
   (* This is completely safe since the parsed vectors are never partially
@@ -1007,17 +1007,17 @@ data :
   | LPAR DATA bind_var_opt string_list RPAR
     { let at = at () in
       fun c -> ignore ($3 c anon_data bind_data);
-      fun () -> {dinit = alloc_data c (Chunked_byte_vector.Lwt.of_string $4); dmode = Passive @@ at} @@ at }
+      fun () -> {dinit = alloc_data c (Chunked_byte_vector.of_string $4); dmode = Passive @@ at} @@ at }
   | LPAR DATA bind_var_opt memory_use offset string_list RPAR
     { let at = at () in
       fun c -> ignore ($3 c anon_data bind_data);
       fun () ->
-      {dinit = alloc_data c (Chunked_byte_vector.Lwt.of_string $6); dmode = Active {index = $4 c memory; offset = $5 c} @@ at} @@ at }
+      {dinit = alloc_data c (Chunked_byte_vector.of_string $6); dmode = Active {index = $4 c memory; offset = $5 c} @@ at} @@ at }
   | LPAR DATA bind_var_opt offset string_list RPAR  /* Sugar */
     { let at = at () in
       fun c -> ignore ($3 c anon_data bind_data);
       fun () ->
-      {dinit = alloc_data c (Chunked_byte_vector.Lwt.of_string $5); dmode = Active {index = 0l @@ at; offset = $4 c} @@ at} @@ at }
+      {dinit = alloc_data c (Chunked_byte_vector.of_string $5); dmode = Active {index = 0l @@ at; offset = $4 c} @@ at} @@ at }
 
 memory :
   | LPAR MEMORY bind_var_opt memory_fields RPAR
@@ -1041,7 +1041,7 @@ memory_fields :
       let offset = alloc_block c [i32_const (0l @@ at) @@ at] @@ at in
       let size = Int32.(div (add (of_int (String.length $3)) 65535l) 65536l) in
       [{mtype = MemoryType {min = size; max = Some size}} @@ at],
-      [{dinit = alloc_data c (Chunked_byte_vector.Lwt.of_string $3); dmode = Active {index = x; offset} @@ at} @@ at],
+      [{dinit = alloc_data c (Chunked_byte_vector.of_string $3); dmode = Active {index = x; offset} @@ at} @@ at],
       [], [] }
 
 global :

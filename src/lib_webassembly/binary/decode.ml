@@ -1,24 +1,20 @@
 (* Decoding stream *)
 
 open Binary_exn
-module Vector = Lazy_vector.LwtInt32Vector
+module Vector = Lazy_vector.Int32Vector
 
 let lwt_ignore p =
   let open Lwt.Syntax in
   let* _ = p in
   Lwt.return ()
 
-type stream = {
-  name : string;
-  bytes : Chunked_byte_vector.Lwt.t;
-  mutable pos : int;
-}
+type stream = {name : string; bytes : Chunked_byte_vector.t; mutable pos : int}
 
 let make_stream ~name ~bytes = {name; bytes; pos = 0}
 
 let empty_block = Ast.Block_label 0l
 
-let len64 s = Chunked_byte_vector.Lwt.length s.bytes
+let len64 s = Chunked_byte_vector.length s.bytes
 
 let len s = Int64.to_int @@ len64 s
 
@@ -32,7 +28,7 @@ let skip n s =
   if n < 0 then raise EOS else check n s ;
   s.pos <- s.pos + n
 
-let read s = Chunked_byte_vector.Lwt.load_byte s.bytes (Int64.of_int s.pos)
+let read s = Chunked_byte_vector.load_byte s.bytes (Int64.of_int s.pos)
 
 let peek s =
   let open Lwt.Syntax in

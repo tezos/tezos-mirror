@@ -30,7 +30,7 @@ exception Uninitialized_current_module
 
 module V = Instance.Vector
 module M = Instance.NameMap
-module C = Chunked_byte_vector.Lwt
+module C = Chunked_byte_vector
 open Tree_encoding
 module NameMap = Lazy_map_encoding.Make (Instance.NameMap)
 module ModuleMap = Lazy_map_encoding.Make (Instance.ModuleMap.Map)
@@ -816,13 +816,12 @@ let input_buffer_encoding =
   conv
     (fun (content, num_elements) ->
       {
-        Input_buffer.content =
-          Lazy_vector.Mutable.LwtZVector.of_immutable content;
+        Input_buffer.content = Lazy_vector.Mutable.ZVector.of_immutable content;
         num_elements;
       })
     (fun buffer ->
       Input_buffer.
-        ( Lazy_vector.Mutable.LwtZVector.snapshot buffer.content,
+        ( Lazy_vector.Mutable.ZVector.snapshot buffer.content,
           buffer.num_elements ))
     (tup2
        ~flatten:true

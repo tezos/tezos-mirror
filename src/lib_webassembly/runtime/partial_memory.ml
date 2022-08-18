@@ -26,7 +26,7 @@ exception SizeOverflow
 let page_size = 0x10000L (* 64 KiB *)
 
 module Chunked = struct
-  module Backend = Chunked_byte_vector.Lwt
+  module Backend = Chunked_byte_vector
 
   type t = Backend.t
 

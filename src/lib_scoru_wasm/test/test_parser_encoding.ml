@@ -63,8 +63,8 @@ module Parser = Binary_parser_encodings
 
 module Utils = struct
   include Tree_encoding
-  module V = Lazy_vector.LwtInt32Vector
-  module C = Chunked_byte_vector.Lwt
+  module V = Lazy_vector.Int32Vector
+  module C = Chunked_byte_vector
 
   let empty_tree () =
     let open Lwt_syntax in

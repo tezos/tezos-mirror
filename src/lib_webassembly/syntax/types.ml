@@ -11,7 +11,7 @@ type value_type =
   | VecType of vec_type
   | RefType of ref_type
 
-type result_type = value_type Lazy_vector.LwtInt32Vector.t
+type result_type = value_type Lazy_vector.Int32Vector.t
 
 type func_type = FuncType of result_type * result_type
 
@@ -85,8 +85,8 @@ let match_limits lim1 lim2 =
   | Some i, Some j -> I32.le_u i j
 
 let func_type_empty (FuncType (ins, out)) =
-  Lazy_vector.LwtInt32Vector.num_elements ins = 0l
-  && Lazy_vector.LwtInt32Vector.num_elements out = 0l
+  Lazy_vector.Int32Vector.num_elements ins = 0l
+  && Lazy_vector.Int32Vector.num_elements out = 0l
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/3387
 
@@ -94,18 +94,18 @@ let func_type_empty (FuncType (ins, out)) =
    evaluation. *)
 let func_types_equal (FuncType (ins, out)) (FuncType (ins', out')) =
   let open Lwt.Syntax in
-  let ins_len = Lazy_vector.LwtInt32Vector.num_elements ins in
-  let out_len = Lazy_vector.LwtInt32Vector.num_elements out in
+  let ins_len = Lazy_vector.Int32Vector.num_elements ins in
+  let out_len = Lazy_vector.Int32Vector.num_elements out in
   if
-    ins_len <> Lazy_vector.LwtInt32Vector.num_elements ins'
-    || out_len <> Lazy_vector.LwtInt32Vector.num_elements out'
+    ins_len <> Lazy_vector.Int32Vector.num_elements ins'
+    || out_len <> Lazy_vector.Int32Vector.num_elements out'
   then Lwt.return_false
   else
     let rec for_all acc i len vec vec' =
       if i >= len || not acc then Lwt.return acc
       else
-        let* t = Lazy_vector.LwtInt32Vector.get i vec in
-        let* t' = Lazy_vector.LwtInt32Vector.get i vec' in
+        let* t = Lazy_vector.Int32Vector.get i vec in
+        let* t' = Lazy_vector.Int32Vector.get i vec' in
         for_all (t = t') (Int32.succ i) len vec vec'
     in
     let* ins_eq = for_all true 0l ins_len ins ins' in
@@ -179,7 +179,7 @@ let string_of_result_type ts =
      Ensure `string_of_*` functions are never used in the PVM, since it will be
      wrong on partial values. It can only be used during the execution of the
      testsuite. *)
-  let ts = List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings ts) in
+  let ts = List.map snd (Lazy_vector.Int32Vector.loaded_bindings ts) in
   "[" ^ String.concat " " (List.map string_of_value_type ts) ^ "]"
 
 let string_of_func_type (FuncType (ins, out)) =

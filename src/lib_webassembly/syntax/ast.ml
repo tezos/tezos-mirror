@@ -18,7 +18,7 @@
 
 open Types
 module TzStdLib = Tezos_lwt_result_stdlib.Lwtreslib.Bare
-module Vector = Lazy_vector.LwtInt32Vector
+module Vector = Lazy_vector.Int32Vector
 
 type void = Lib.void
 
@@ -407,7 +407,7 @@ and start' = {sfunc : var}
 
 type block_table = instr Vector.t Vector.t
 
-type datas_table = Chunked_byte_vector.Lwt.t Vector.t
+type datas_table = Chunked_byte_vector.t Vector.t
 
 type allocations = {mutable blocks : block_table; mutable datas : datas_table}
 
@@ -432,7 +432,7 @@ and module_' = {
 let empty_allocations () =
   {
     blocks = Vector.(singleton (empty ()));
-    datas = Vector.(singleton (Chunked_byte_vector.Lwt.create 0L));
+    datas = Vector.(singleton (Chunked_byte_vector.create 0L));
   }
 
 let make_allocation_state blocks datas = {blocks; datas}
@@ -450,7 +450,7 @@ let add_to_block allocs (Block_label b) instr =
 
 let alloc_data (allocs : allocations) len =
   let datas, d =
-    Vector.append (Chunked_byte_vector.Lwt.allocate len) allocs.datas
+    Vector.append (Chunked_byte_vector.allocate len) allocs.datas
   in
   allocs.datas <- datas ;
   Data_label d
@@ -458,7 +458,7 @@ let alloc_data (allocs : allocations) len =
 let add_to_data (allocs : allocations) (Data_label d) index byte =
   let open Lwt.Syntax in
   let* data = Vector.get d allocs.datas in
-  Chunked_byte_vector.Lwt.store_byte data index byte
+  Chunked_byte_vector.store_byte data index byte
 
 let empty_module () =
   {

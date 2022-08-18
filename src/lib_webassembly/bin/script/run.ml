@@ -177,7 +177,7 @@ let input_string string run =
 
 (* Printing *)
 
-let map_to_list m = List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings m)
+let map_to_list m = List.map snd (Lazy_vector.Int32Vector.loaded_bindings m)
 
 let print_import m im =
   let open Types in
@@ -364,7 +364,7 @@ let lookup_instance name at =
       | exn -> raise exn)
 
 let lookup_registry module_name item_name =
-  let* item_name = Lazy_vector.LwtInt32Vector.to_list item_name in
+  let* item_name = Lazy_vector.Int32Vector.to_list item_name in
   let+ value = Instance.export (Map.find module_name !registry) item_name in
   match value with Some ext -> ext | None -> raise Not_found
 
@@ -375,7 +375,7 @@ let rec run_definition def : Ast.module_ Lwt.t =
   | Textual m -> Lwt.return m
   | Encoded (name, bytes) ->
       let* () = trace_lwt "Decoding..." in
-      Decode.decode ~name ~bytes:(Chunked_byte_vector.Lwt.of_string bytes)
+      Decode.decode ~name ~bytes:(Chunked_byte_vector.of_string bytes)
   | Quoted (_, s) ->
       let* () = trace_lwt "Parsing quote..." in
       let def' = Parse.string_to_module s in
@@ -388,12 +388,12 @@ let run_action act : Values.value list Lwt.t =
         trace_lwt ("Invoking function \"" ^ Ast.string_of_name name ^ "\"...")
       in
       let* inst = lookup_instance x_opt act.at in
-      let* name = Lazy_vector.LwtInt32Vector.to_list name in
+      let* name = Lazy_vector.Int32Vector.to_list name in
       let* export = Instance.export inst name in
       match export with
       | Some (Instance.ExternFunc f) ->
           let (Types.FuncType (ins, _)) = Func.type_of f in
-          let* ins_l = Lazy_vector.LwtInt32Vector.to_list ins in
+          let* ins_l = Lazy_vector.Int32Vector.to_list ins in
           if List.length vs <> List.length ins_l then
             Script.error act.at "wrong number of arguments" ;
           List.iter2
@@ -418,7 +418,7 @@ let run_action act : Values.value list Lwt.t =
         trace_lwt ("Getting global \"" ^ Ast.string_of_name name ^ "\"...")
       in
       let* inst = lookup_instance x_opt act.at in
-      let* name = Lazy_vector.LwtInt32Vector.to_list name in
+      let* name = Lazy_vector.Int32Vector.to_list name in
       let+ export = Instance.export inst name in
       match export with
       | Some (Instance.ExternGlobal gl) -> [Global.load gl]

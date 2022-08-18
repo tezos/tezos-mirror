@@ -14,7 +14,7 @@ type message = {
     more than [num_elements] messages (see #3340). *)
 
 type t = {
-  content : message Lazy_vector.Mutable.LwtZVector.t;
+  content : message Lazy_vector.Mutable.ZVector.t;
   mutable num_elements : Z.t;
 }
 

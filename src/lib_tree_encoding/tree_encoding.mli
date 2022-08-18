@@ -188,22 +188,21 @@ module Lazy_map_encoding : sig
 end
 
 val int_lazy_vector :
-  int t -> 'a t -> 'a Lazy_containers.Lazy_vector.LwtIntVector.t t
+  int t -> 'a t -> 'a Lazy_containers.Lazy_vector.IntVector.t t
 
 val int32_lazy_vector :
-  int32 t -> 'a t -> 'a Lazy_containers.Lazy_vector.LwtInt32Vector.t t
+  int32 t -> 'a t -> 'a Lazy_containers.Lazy_vector.Int32Vector.t t
 
 val int64_lazy_vector :
-  int64 t -> 'a t -> 'a Lazy_containers.Lazy_vector.LwtInt64Vector.t t
+  int64 t -> 'a t -> 'a Lazy_containers.Lazy_vector.Int64Vector.t t
 
-val z_lazy_vector :
-  Z.t t -> 'a t -> 'a Lazy_containers.Lazy_vector.LwtZVector.t t
+val z_lazy_vector : Z.t t -> 'a t -> 'a Lazy_containers.Lazy_vector.ZVector.t t
 
 (** [chunk] is an encoder for the chunks used by [chunked_by_vector]. *)
 val chunk : Lazy_containers.Chunked_byte_vector.Chunk.t t
 
 (** [chunked_byte_vector] is an encoder for [chunked_byte_vector]. *)
-val chunked_byte_vector : Lazy_containers.Chunked_byte_vector.Lwt.t t
+val chunked_byte_vector : Lazy_containers.Chunked_byte_vector.t t
 
 (** [case tag enc inj proj] returns a partial encoder that represents a case
     in a sum-type. The encoder hides the (existentially bound) type of the

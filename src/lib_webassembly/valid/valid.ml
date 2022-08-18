@@ -141,7 +141,7 @@ let vec_to_list v =
 
      The validation is never used in the rollup (in a context were values can be
      shallow), hence the vectors will be fully loaded. *)
-  Stdlib.List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings v)
+  Stdlib.List.map snd (Lazy_vector.Int32Vector.loaded_bindings v)
 
 (* Type Synthesis *)
 
@@ -321,7 +321,7 @@ let rec check_instr (c : context) (e : instr) (s : infer_result_type) : op_type
   | BrTable (xs, x) ->
       let lx = label c x in
       let lx_l = vec_to_list lx in
-      let n = Lazy_vector.LwtInt32Vector.num_elements lx |> Int32.to_int in
+      let n = Lazy_vector.Int32Vector.num_elements lx |> Int32.to_int in
       let ts = Lib.List.table n (fun i -> peek (n - i) s) in
       check_stack ts (known lx_l) x.at ;
       List.iter
@@ -773,7 +773,7 @@ let check_module (m : module_) =
   let exports = vec_to_list exports in
   let+ refs =
     Free.module_
-      ({m.it with funcs = Lazy_vector.LwtInt32Vector.create 0l; start = None}
+      ({m.it with funcs = Lazy_vector.Int32Vector.create 0l; start = None}
       @@ m.at)
   in
   let c0 =

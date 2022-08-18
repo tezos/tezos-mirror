@@ -7,7 +7,7 @@ type index = int32
 
 type count = int32
 
-module Vector = Lazy_vector.Mutable.LwtInt32Vector
+module Vector = Lazy_vector.Mutable.Int32Vector
 
 type table = {mutable ty : table_type; content : ref_ Vector.t}
 

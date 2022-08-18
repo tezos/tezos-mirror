@@ -18,7 +18,7 @@ let reraise = function
   | Lazy_vector.SizeOverflow -> raise SizeOverflow
   | exn -> raise exn
 
-module Vector = Lazy_vector.Mutable.LwtZVector
+module Vector = Lazy_vector.Mutable.ZVector
 
 type t = {content : message Vector.t; mutable num_elements : Z.t}
 

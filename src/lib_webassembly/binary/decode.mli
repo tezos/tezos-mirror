@@ -1,4 +1,4 @@
-module Vector = Lazy_vector.LwtInt32Vector
+module Vector = Lazy_vector.Int32Vector
 
 exception Code of Source.region * string
 
@@ -239,11 +239,7 @@ type module_kont =
       the section. *)
 
 (** Parsed bytes with the current reading position. *)
-type stream = {
-  name : string;
-  bytes : Chunked_byte_vector.Lwt.t;
-  mutable pos : int;
-}
+type stream = {name : string; bytes : Chunked_byte_vector.t; mutable pos : int}
 
 (** Accumulator of parsed fields *)
 type building_state = {
@@ -272,7 +268,7 @@ type decode_kont = {
 }
 
 (** [make_stream filename bytes] returns a new stream to decode. *)
-val make_stream : name:string -> bytes:Chunked_byte_vector.Lwt.t -> stream
+val make_stream : name:string -> bytes:Chunked_byte_vector.t -> stream
 
 (** [initial_decode_kont ~name] returns the initial tick state to be
     fed to [module_step], such that [name] is the name of the input
@@ -282,19 +278,16 @@ val initial_decode_kont : name:string -> decode_kont
 (** [module_step stream kont] takes one step of parsing from a
    continuation and returns a new continuation. Fails when the
    continuation of the module is [MKStop] since it cannot reduce. *)
-val module_step : Chunked_byte_vector.Lwt.t -> decode_kont -> decode_kont Lwt.t
+val module_step : Chunked_byte_vector.t -> decode_kont -> decode_kont Lwt.t
 
 (** [decode ~name ~bytes] decodes a module [name] from its [bytes] encoding.
 
     @raise Code on parsing errors. *)
-val decode : name:string -> bytes:Chunked_byte_vector.Lwt.t -> Ast.module_ Lwt.t
+val decode : name:string -> bytes:Chunked_byte_vector.t -> Ast.module_ Lwt.t
 
 (** [decode ~name ~bytes] decodes a custom section of name [name] from its
     [bytes] encoding.
 
     @raise Code on parsing errors. *)
 val decode_custom :
-  Ast.name ->
-  name:string ->
-  bytes:Chunked_byte_vector.Lwt.t ->
-  string list Lwt.t
+  Ast.name -> name:string -> bytes:Chunked_byte_vector.t -> string list Lwt.t
