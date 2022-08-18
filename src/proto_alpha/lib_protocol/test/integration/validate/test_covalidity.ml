@@ -112,7 +112,9 @@ let covalid_permutation_and_bake ks nb_bootstrap =
           |> List.rev_filter is_not_preendorsement
         in
         (* Ensure that we can validate and apply this permutation *)
-        let* _b = Block.bake state.block ~operations in
+        let* _b =
+          Block.bake ~allow_manager_failures:true state.block ~operations
+        in
         loop (pred n)
   in
   loop nb_permutations

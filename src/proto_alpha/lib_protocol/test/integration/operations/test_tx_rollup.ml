@@ -1475,7 +1475,7 @@ let test_deposit_too_many_tickets () =
   originate block account1 >>=? fun (block, tx_rollup) ->
   Nat_ticket.init_deposit too_many block tx_rollup account1
   >>=? fun (operation, b, deposit_contract) ->
-  Block.bake ~operation b >>=? fun b ->
+  Block.bake ~allow_manager_failures:true ~operation b >>=? fun b ->
   let fee = Test_tez.of_int 10 in
   let parameters = print_deposit_arg (`Typed tx_rollup) (`Hash pkh) in
   Op.transaction ~fee (B b) account1 deposit_contract Tez.zero ~parameters
@@ -1775,7 +1775,8 @@ let test_storage_burn_for_commitment () =
     ~size_before:storage_size_after_commit
     ~size_after:freed_space_after_finalize
     ~expected_delta:inbox_delta ;
-
+  (* bake one more block so the commitment may be removed *)
+  Block.bake b >>=? fun b ->
   (* test freed storage space after remove commitment *)
   Op.tx_rollup_remove_commitment (B b) contract tx_rollup >>=? fun operation ->
   Block.bake b ~operation >>=? fun b ->
@@ -1982,8 +1983,8 @@ let test_full_inbox () =
     let rec aux n acc = if n < start then acc else aux (n - 1) (n :: acc) in
     aux top []
   in
-  (* Transactions in blocks [2..17) *)
-  make_transactions_in tx_rollup contract (range 2 17) b >>=? fun b ->
+  (* Transactions in blocks [2..16) *)
+  make_transactions_in tx_rollup contract (range 2 16) b >>=? fun b ->
   Incremental.begin_construction b >>=? fun i ->
   Op.tx_rollup_submit_batch (B b) contract tx_rollup "contents" >>=? fun op ->
   Incremental.add_operation

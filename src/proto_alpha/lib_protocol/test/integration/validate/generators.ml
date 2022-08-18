@@ -267,4 +267,6 @@ let wrap ~name ?print ?(count = 1) ?check ~(gen : 'a QCheck2.Gen.t)
     ~gen
     f
 
-let wrap_mode infos op mode = validate_diagnostic ~mode infos op
+let wrap_mode ?(only_validate = false) infos op mode =
+  if only_validate then only_validate_diagnostic ~mode infos op
+  else validate_diagnostic ~mode infos op

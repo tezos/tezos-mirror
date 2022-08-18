@@ -42,11 +42,12 @@ let count = 100
 let ctxt_cstrs_default =
   {
     default_ctxt_cstrs with
-    src_cstrs = Greater {n = 15000; origin = 15000};
+    src_cstrs = Pure 1500000;
     dest_cstrs = Pure 15000;
     del_cstrs = Pure 15000;
     tx_cstrs = Pure 15000;
     sc_cstrs = Pure 15000;
+    zk_cstrs = Pure 15000;
   }
 
 let op_cstrs_default b =
@@ -107,7 +108,7 @@ let positive_tests =
       let open Lwt_result_syntax in
       let* infos = init_ctxt ctxt_req in
       let* op = select_op operation_req infos in
-      let* _infos = wrap_mode infos [op] mode in
+      let* _infos = wrap_mode ~only_validate:true infos [op] mode in
       return_true)
 
 (** Under 1M restriction, neither a block nor a prevalidator's valid
@@ -174,7 +175,7 @@ let batch_is_not_singles_tests =
       let* batch =
         Op.batch_operations ~source (B infos.ctxt.block) [op1; op2]
       in
-      let* _ = validate_diagnostic ~mode infos [batch] in
+      let* _ = only_validate_diagnostic ~mode infos [batch] in
       let* _ = validate_ko_diagnostic ~mode infos [op1; op2] expect_failure in
       return_true)
 
@@ -212,8 +213,8 @@ let conflict_free_tests =
         }
       in
       let* op2 = select_op operation_req' infos2 in
-      let* _ = validate_diagnostic ~mode infos [op1; op2] in
-      let* _ = validate_diagnostic ~mode infos [op2; op1] in
+      let* _ = only_validate_diagnostic ~mode infos [op1; op2] in
+      let* _ = only_validate_diagnostic ~mode infos [op2; op1] in
       return_true)
 
 open Lib_test.Qcheck2_helpers

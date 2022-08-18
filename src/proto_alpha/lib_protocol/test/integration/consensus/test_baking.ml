@@ -216,7 +216,7 @@ let test_rewards_block_and_payload_producer () =
       endorsers
   in
   let fee = Tez.one in
-  Op.transaction (B b1) ~fee baker_b1_contract baker_b1_contract Tez.zero
+  Op.transaction (B b1) ~fee baker_b1_contract baker_b1_contract Tez.one
   >>=? fun tx ->
   Block.bake ~policy:(By_round 0) ~operations:(endos @ [tx]) b1 >>=? fun b2 ->
   Context.get_baker (B b1) ~round:0 >>=? fun baker_b2 ->

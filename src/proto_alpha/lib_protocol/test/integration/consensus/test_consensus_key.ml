@@ -87,9 +87,15 @@ let transfer_tokens blk source destination amount =
     amount
   >>=? fun transfer_op -> Block.bake ~operation:transfer_op blk
 
-let reveal_manager_key blk pk =
-  Op.revelation (B blk) pk >>=? fun reveal_op ->
-  Block.bake ~operation:reveal_op blk
+let may_reveal_manager_key blk (pkh, pk) =
+  let open Lwt_result_syntax in
+  let* is_revealed =
+    Context.Contract.is_manager_key_revealed (B blk) (Contract.Implicit pkh)
+  in
+  if is_revealed then return blk
+  else
+    Op.revelation (B blk) pk >>=? fun reveal_op ->
+    Block.bake ~operation:reveal_op blk
 
 let drain_delegate ~policy blk consensus_key delegate destination
     expected_final_balance =
@@ -125,7 +131,7 @@ let test_drain_delegate ~low_balance ~exclude_ck ~ck_delegates () =
         else Block.By_account delegate
       in
       (if ck_delegates then
-       reveal_manager_key blk consensus_pk >>=? fun blk ->
+       may_reveal_manager_key blk (consensus_pkh, consensus_pk) >>=? fun blk ->
        delegate_stake blk consensus_pkh delegate
       else return blk)
       >>=? fun blk ->
@@ -134,7 +140,7 @@ let test_drain_delegate ~low_balance ~exclude_ck ~ck_delegates () =
       (if low_balance then
        transfer_tokens blk delegate consensus_pkh delegate_balance
        >>=? fun blk ->
-       reveal_manager_key blk consensus_pk >>=? fun blk ->
+       may_reveal_manager_key blk (consensus_pkh, consensus_pk) >>=? fun blk ->
        transfer_tokens blk consensus_pkh delegate Tez.(of_mutez_exn 1_000_000L)
       else return blk)
       >>=? fun blk ->
