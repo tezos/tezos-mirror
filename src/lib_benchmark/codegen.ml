@@ -39,14 +39,14 @@ module Codegen_helpers = struct
 
   let pvar x = Pat.var (loc_str x)
 
+  let saturated name = ["S"; name]
+
   let call f args =
     let f = WithExceptions.Option.get ~loc:__LOC__ @@ Longident.unflatten f in
     let args = List.map (fun x -> (Asttypes.Nolabel, x)) args in
     Exp.(apply (ident (loc f)) args)
 
   let string_of_fv fv = Format.asprintf "%a" Free_variable.pp fv
-
-  let let_open_in x expr = Exp.open_ (Opn.mk (Mod.ident (loc_ident x))) expr
 end
 
 module Codegen : Costlang.S with type 'a repr = Parsetree.expression = struct
@@ -61,11 +61,11 @@ module Codegen : Costlang.S with type 'a repr = Parsetree.expression = struct
 
   let false_ = Exp.construct (loc_ident "false") None
 
-  let int i = call ["S.safe_int"] [Exp.constant (Const.int i)]
+  let int i = call (saturated "safe_int") [Exp.constant (Const.int i)]
 
   let float f =
     call
-      ["S.safe_int"]
+      (saturated "safe_int")
       [call ["int_of_float"] [Exp.constant @@ Const.float (string_of_float f)]]
 
   let ( + ) x y = call ["+"] [x; y]
@@ -76,9 +76,9 @@ module Codegen : Costlang.S with type 'a repr = Parsetree.expression = struct
 
   let ( / ) x y = call ["/"] [x; y]
 
-  let max x y = call ["S.max"] [x; y]
+  let max x y = call (saturated "max") [x; y]
 
-  let min x y = call ["S.min"] [x; y]
+  let min x y = call (saturated "min") [x; y]
 
   let log2 x = call ["log2"] [x]
 
@@ -97,10 +97,7 @@ module Codegen : Costlang.S with type 'a repr = Parsetree.expression = struct
   let lam ~name f =
     let patt = pvar name in
     let var = ident name in
-    let body =
-      Exp.let_ Nonrecursive [Vb.mk patt (call ["S.safe_int"] [var])] (f var)
-    in
-    Exp.fun_ Nolabel None patt body
+    Exp.fun_ Nolabel None patt (f var)
 
   let app x y = Exp.apply x [(Nolabel, y)]
 
@@ -112,20 +109,54 @@ module Codegen : Costlang.S with type 'a repr = Parsetree.expression = struct
   let if_ cond ift iff = Exp.ifthenelse cond ift (Some iff)
 end
 
-let make_module bindings =
-  let open Ast_helper in
-  let structure_items =
-    List.map
-      (fun (name, expr) ->
-        let name = Printf.sprintf "cost_%s" name in
-        Str.value Asttypes.Nonrecursive [Vb.mk (Codegen_helpers.pvar name) expr])
-      bindings
+let detach_funcs =
+  let open Parsetree in
+  let rec aux acc expr =
+    match expr with
+    | {
+     pexp_desc = Pexp_fun (_, _, {ppat_desc = Ppat_var {txt = arg; _}; _}, expr');
+     _;
+    } ->
+        aux (arg :: acc) expr'
+    | _ -> (acc, expr)
   in
+  aux []
+
+let rec restore_funcs (acc, expr) =
+  let open Ast_helper in
+  match acc with
+  | arg :: acc ->
+      let expr = Exp.fun_ Nolabel None (Codegen_helpers.pvar arg) expr in
+      restore_funcs (acc, expr)
+  | [] -> expr
+
+let generate_let_binding =
+  let open Ast_helper in
+  let open Codegen_helpers in
+  let let_open_in x expr = Exp.open_ (Opn.mk (Mod.ident (loc_ident x))) expr in
+  fun name expr ->
+    let args, expr = detach_funcs expr in
+    let expr =
+      List.fold_left
+        (fun e arg ->
+          let var = ident arg in
+          let patt = pvar arg in
+          Exp.let_
+            Nonrecursive
+            [Vb.mk patt (call (saturated "safe_int") [var])]
+            e)
+        expr
+        args
+    in
+    let expr = let_open_in "S_syntax" expr in
+    let expr = restore_funcs (args, expr) in
+    Str.value Asttypes.Nonrecursive [Vb.mk (pvar name) expr]
+
+let make_module structure_items =
+  let open Ast_helper in
   Str.module_
     (Mb.mk (Codegen_helpers.loc (Some "Generated"))
     @@ Mod.structure structure_items)
-
-let pp_expr fmtr expr = Pprintast.expression fmtr expr
 
 let pp_structure_item fmtr generated = Pprintast.structure fmtr [generated]
 
@@ -148,7 +179,7 @@ let save_solution (s : solution) (fn : string) =
 (* ------------------------------------------------------------------------- *)
 
 let codegen (Model.For_codegen model) (sol : solution)
-    (transform : Costlang.transform) =
+    (transform : Costlang.transform) (name : string) =
   let subst fv =
     match Free_variable.Map.find fv sol with
     | None ->
@@ -170,14 +201,14 @@ let codegen (Model.For_codegen model) (sol : solution)
       let module M = (val model) in
       let module M = M.Def (Subst_impl) in
       let expr = Lift_then_print.prj @@ Impl.prj @@ Subst_impl.prj M.model in
-      let expr = Codegen_helpers.let_open_in "S_syntax" expr in
-      Some expr
+      Some (generate_let_binding name expr)
 
 let codegen_module models sol transform =
   let items =
     List.filter_map
       (fun (name, model) ->
-        codegen model sol transform |> Option.map (fun expr -> (name, expr)))
+        let name = Printf.sprintf "cost_%s" name in
+        codegen model sol transform name)
       models
   in
   make_module items
