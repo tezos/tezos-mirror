@@ -39,40 +39,27 @@ open Tezos_scoru_wasm
 (* Use context-binary for testing. *)
 module Context = Tezos_context_memory.Context_binary
 
-module Tree :
-  Tezos_context_sigs.Context.TREE
-    with type t = Context.t
-     and type tree = Context.tree
-     and type key = string list
-     and type value = bytes = struct
-  type t = Context.t
+type Lazy_containers.Lazy_map.tree += Tree of Context.tree
 
+module Tree : Tree_encoding.Runner.TREE with type tree = Context.tree = struct
   type tree = Context.tree
 
-  type key = Context.key
-
-  type value = Context.value
-
   include Context.Tree
+
+  let select = function
+    | Tree t -> t
+    | _ -> raise Tree_encoding.Incorrect_tree_type
+
+  let wrap t = Tree t
 end
 
-type Lazy_containers.Lazy_map.tree += Tree of Tree.tree
-
 module Tree_encoding = struct
-  include Tree_encoding.Make (struct
-    include Tree
-
-    let select = function
-      | Tree t -> t
-      | _ -> raise Tree_encoding.Incorrect_tree_type
-
-    let wrap t = Tree t
-  end)
-
+  include Tree_encoding
   include Lazy_map_encoding.Make (Instance.NameMap)
 end
 
-module Parser = Binary_parser_encodings.Make (Tree_encoding)
+module Tree_encoding_runner = Tree_encoding.Runner.Make (Tree)
+module Parser = Binary_parser_encodings
 
 module Utils = struct
   include Tree_encoding
@@ -88,8 +75,8 @@ module Utils = struct
   let test_encode_decode enc value f =
     let open Lwt_result_syntax in
     let*! empty_tree = empty_tree () in
-    let*! tree = Tree_encoding.encode enc value empty_tree in
-    let*! value' = Tree_encoding.decode enc tree in
+    let*! tree = Tree_encoding_runner.encode enc value empty_tree in
+    let*! value' = Tree_encoding_runner.decode enc tree in
     f value'
 
   let encode_decode enc value = test_encode_decode enc value Lwt.return

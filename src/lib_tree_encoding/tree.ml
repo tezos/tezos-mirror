@@ -23,14 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type key = string list
+
+type value = bytes
+
 exception Incorrect_tree_type
 
 module type S = sig
   type tree
-
-  type key := string list
-
-  type value := bytes
 
   val select : Lazy_containers.Lazy_map.tree -> tree
 
@@ -46,3 +46,26 @@ module type S = sig
 
   val find_tree : tree -> key -> tree option Lwt.t
 end
+
+type 'tree backend = (module S with type tree = 'tree)
+
+let select : type tree. tree backend -> Lazy_containers.Lazy_map.tree -> tree =
+ fun (module T) tree -> T.select tree
+
+let wrap : type tree. tree backend -> tree -> Lazy_containers.Lazy_map.tree =
+ fun (module T) tree -> T.wrap tree
+
+let remove : type tree. tree backend -> tree -> key -> tree Lwt.t =
+ fun (module T) tree key -> T.remove tree key
+
+let add : type tree. tree backend -> tree -> key -> value -> tree Lwt.t =
+ fun (module T) tree key value -> T.add tree key value
+
+let add_tree : type tree. tree backend -> tree -> key -> tree -> tree Lwt.t =
+ fun (module T) tree key subtree -> T.add_tree tree key subtree
+
+let find : type tree. tree backend -> tree -> key -> value option Lwt.t =
+ fun (module T) tree key -> T.find tree key
+
+let find_tree : type tree. tree backend -> tree -> key -> tree option Lwt.t =
+ fun (module T) tree key -> T.find_tree tree key

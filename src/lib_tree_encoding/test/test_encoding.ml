@@ -39,7 +39,7 @@ module Context = Tezos_context_memory.Context_binary
 
 type Lazy_containers.Lazy_map.tree += Tree of Context.tree
 
-module Tree : Tree_encoding.TREE with type tree = Context.tree = struct
+module Tree : Tree_encoding.Runner.TREE with type tree = Context.tree = struct
   type tree = Context.tree
 
   include Context.Tree
@@ -63,9 +63,10 @@ module Map =
     end)
 
 module Tree_encoding = struct
-  include Tree_encoding.Make (Tree)
+  include Tree_encoding
   include Lazy_vector_encoding.Int
   include Lazy_map_encoding.Make (Map)
+  include Tree_encoding.Runner.Make (Tree)
 end
 
 let empty_tree () =

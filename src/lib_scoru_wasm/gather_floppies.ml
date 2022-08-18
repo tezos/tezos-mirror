@@ -111,12 +111,12 @@ module type S = sig
 end
 
 module Make
-    (T : Tree_encoding.TREE)
+    (T : Tree_encoding.Runner.TREE)
     (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
   S with type tree = T.tree = struct
   type tree = Wasm.tree
 
-  module Tree_encoding = Tree_encoding.Make (T)
+  module Tree_encoding_runner = Tree_encoding.Runner.Make (T)
 
   (** The tick state of the [Gathering_floppies] instrumentation. *)
   type state = {
@@ -184,19 +184,21 @@ module Make
     Lwt.catch
       (fun () ->
         (* First, we try to interpret [tree] as a [state]. *)
-        let+ state = Tree_encoding.decode state_merklizer tree in
+        let+ state = Tree_encoding_runner.decode state_merklizer tree in
         Running state)
       (fun _exn ->
         Lwt.catch
           (fun () ->
             (* If it fails, it means the PVM may be stuck. *)
-            let+ current_tick = Tree_encoding.decode broken_merklizer tree in
+            let+ current_tick =
+              Tree_encoding_runner.decode broken_merklizer tree
+            in
             Broken {current_tick})
           (fun _exn ->
             (* In case both previous attempts have failed, it means
                this is probably the very first tick of the PVM. *)
             let+ boot_sector =
-              Tree_encoding.decode boot_sector_merklizer tree
+              Tree_encoding_runner.decode boot_sector_merklizer tree
             in
             Halted boot_sector))
 
@@ -324,14 +326,14 @@ module Make
     let* state = read_state tree in
     match state with
     | Broken {current_tick} ->
-        Tree_encoding.encode broken_merklizer (Z.succ current_tick) tree
+        Tree_encoding_runner.encode broken_merklizer (Z.succ current_tick) tree
     | Halted origination_message -> (
         match origination_kernel_loading_step origination_message with
-        | Some state -> Tree_encoding.encode state_merklizer state tree
+        | Some state -> Tree_encoding_runner.encode state_merklizer state tree
         | None ->
             (* We could not interpret [origination_message],
                meaning the PVM is stuck. *)
-            Tree_encoding.encode broken_merklizer Z.one tree)
+            Tree_encoding_runner.encode broken_merklizer Z.one tree)
     | Running state -> (
         let state = increment_ticks state in
         match state.internal_status with
@@ -357,7 +359,7 @@ module Make
         match state.internal_status with
         | Gathering_floppies _ ->
             let* state = process_input_step input message state in
-            Tree_encoding.encode state_merklizer state tree
+            Tree_encoding_runner.encode state_merklizer state tree
         | Not_gathering_floppies -> Wasm.set_input_step input message tree)
 
   let get_output = Wasm.get_output
@@ -412,7 +414,8 @@ module Make
   module Internal_for_tests = struct
     let initial_tree_from_boot_sector ~empty_tree boot_sector =
       match origination_kernel_loading_step boot_sector with
-      | Some state -> Tree_encoding.encode state_merklizer state empty_tree
+      | Some state ->
+          Tree_encoding_runner.encode state_merklizer state empty_tree
       | None ->
           raise
             (Invalid_argument "initial_tree_from_boot_sector: wrong boot sector")

@@ -49,22 +49,13 @@ type pvm_state = {
       (** Signals whether or not the PVM needs input. *)
 }
 
-module Make (T : Tree_encoding.TREE) :
+module Make (T : Tree_encoding.Runner.TREE) :
   Gather_floppies.S with type tree = T.tree = struct
   module Raw = struct
     type tree = T.tree
 
-    module Tree_encoding = Tree_encoding.Make (T)
-
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3568
-       The [Wasm_encoding] functor is already used in
-       [Binary_parser_encodings].
-       Ideally, we would make [Binary_parser_encodings.Make] reexpose
-       the [Wasm_encoding] module it computes. However, since we have
-       a short-term solution to remove the functor layer of
-       [Tree_encoding], we leave the code as-is. *)
-    module Wasm_encoding = Wasm_encoding.Make (Tree_encoding)
-    module Parsing = Binary_parser_encodings.Make (Tree_encoding)
+    module Tree_encoding_runner = Tree_encoding.Runner.Make (T)
+    module Parsing = Binary_parser_encodings
 
     let host_funcs =
       let registry = Wasm.Host_funcs.empty () in
@@ -207,7 +198,7 @@ module Make (T : Tree_encoding.TREE) :
 
     let compute_step tree =
       let open Lwt_syntax in
-      let* pvm_state = Tree_encoding.decode pvm_state_encoding tree in
+      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
       (* Calculate the next tick state. *)
       let* tick_state = next_tick_state pvm_state in
       let input_request =
@@ -227,14 +218,14 @@ module Make (T : Tree_encoding.TREE) :
           current_tick = Z.succ pvm_state.current_tick;
         }
       in
-      Tree_encoding.encode pvm_state_encoding pvm_state tree
+      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
 
     let get_output _ _ = Lwt.return ""
 
     let get_info tree =
       let open Lwt_syntax in
       let* {current_tick; last_input_info; input_request; _} =
-        Tree_encoding.decode pvm_state_encoding tree
+        Tree_encoding_runner.decode pvm_state_encoding tree
       in
       Lwt.return
         Wasm_pvm_sig.
@@ -247,7 +238,7 @@ module Make (T : Tree_encoding.TREE) :
       let raw_level = Bounded.Int32.NonNegative.to_int32 inbox_level in
       let level = Int32.to_string raw_level in
       let id = Z.to_string message_counter in
-      let* pvm_state = Tree_encoding.decode pvm_state_encoding tree in
+      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
       let* () =
         match pvm_state.tick_state with
         | Eval {input; _} ->
@@ -271,7 +262,7 @@ module Make (T : Tree_encoding.TREE) :
       in
       (* Encode the input in the tree under [input/level/id]. *)
       let* tree =
-        Tree_encoding.encode
+        Tree_encoding_runner.encode
           (Tree_encoding.value ["input"; level; id] Data_encoding.string)
           message
           tree
@@ -285,7 +276,7 @@ module Make (T : Tree_encoding.TREE) :
         }
       in
       (* Encode the new pvm-state in the tree. *)
-      Tree_encoding.encode pvm_state_encoding pvm_state tree
+      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
   end
 
   include Gather_floppies.Make (T) (Raw)
