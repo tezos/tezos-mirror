@@ -1856,6 +1856,35 @@ module Sc_rollup = struct
     in
     let parse process = Process.check process in
     {value = process; run = parse}
+
+  (** Run [tezos-client execute outbox message of sc rollup <rollup> from <src>
+      for commitment hash <hash> and output proof <proof>]. *)
+  let execute_outbox_message ?(wait = "none") ?burn_cap ?storage_limit ?fee
+      ?hooks ~rollup ~src ~commitment_hash ~proof client =
+    let process =
+      spawn_command
+        ?hooks
+        client
+        (["--wait"; wait]
+        @ ["execute"; "outbox"; "message"; "of"; "sc"; "rollup"; rollup]
+        @ ["from"; src]
+        @ ["for"; "commitment"; "hash"; commitment_hash]
+        @ ["and"; "output"; "proof"; proof]
+        @ Option.fold
+            ~none:[]
+            ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
+            burn_cap
+        @ Option.fold
+            ~none:[]
+            ~some:(fun fee -> ["--fee"; Tez.to_string fee])
+            fee
+        @ Option.fold
+            ~none:[]
+            ~some:(fun s -> ["--storage-limit"; string_of_int s])
+            storage_limit)
+    in
+    let parse process = Process.check process in
+    {value = process; run = parse}
 end
 
 let init ?path ?admin_path ?name ?color ?base_dir ?endpoint ?media_type () =

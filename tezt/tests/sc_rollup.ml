@@ -2975,6 +2975,137 @@ let test_refutation_reward_and_punishment protocols =
       unit)
     protocols
 
+(* Testing the execution of outbox messages
+   ----------------------------------------
+
+   When the PVM interprets an input message that produces an output
+   message, the outbox in the PVM state is populated with this output
+   message. When the state is cemented (after the refutation period
+   has passed without refutation), one can trigger the execution of
+   the outbox message, that is a call to a given L1 contract.
+
+   This test first populates an L1 contract that waits for an integer
+   and stores this integer in its state. Then, the test executes a
+   rollup operation that produces a call to this contract. Finally,
+   the test triggers this call and we check that the L1 contract has
+   been correctly executed by observing its local store.
+
+   The input depends on the PVM.
+*)
+let test_outbox_message_generic skip input_message expected_storage kind =
+  let commitment_period = 2 and challenge_window = 5 in
+  test_scenario
+    ~kind
+    ~commitment_period
+    ~challenge_window
+    {
+      tags = ["outbox"];
+      variant = kind;
+      description = "an outbox message should be executable";
+    }
+  @@ fun _protocol sc_rollup_node sc_rollup _node client ->
+  let* () = Sc_rollup_node.run sc_rollup_node in
+  let sc_client = Sc_rollup_client.create sc_rollup_node in
+  let src = Constant.bootstrap1.public_key_hash in
+  let originate_target_contract () =
+    let prg =
+      {|
+      {
+        parameter (int :p);
+        storage (int :s);
+
+        code
+          {
+            UNPAIR;
+            SWAP ;
+            DROP;
+            NIL operation;
+            PAIR;
+          }
+      } |}
+    in
+    let* address =
+      Client.originate_contract
+        ~alias:"target"
+        ~amount:(Tez.of_int 100)
+        ~burn_cap:(Tez.of_int 100)
+        ~src
+        ~prg
+        ~init:"0"
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    return address
+  in
+  let check_contract_execution address expected_storage =
+    let* storage = Client.contract_storage address client in
+    return
+    @@ Check.(
+         (storage = expected_storage)
+           string
+           ~error_msg:"Invalid contract storage: expecting '%R', got '%L'.")
+  in
+  let perform_rollup_execution_and_cement address =
+    let* () = send_text_messages client sc_rollup [input_message address] in
+    let* () =
+      repeat (2 + (2 * commitment_period) + challenge_window) @@ fun () ->
+      Client.bake_for client
+    in
+    let* _c, l = last_cemented_commitment_hash_with_level ~sc_rollup client in
+    Check.(
+      (l = 6) int ~error_msg:"Invalid level for LCC: expected '%R', 'got '%L'.") ;
+    return ()
+  in
+  let trigger_outbox_message_execution address =
+    let* {commitment_hash; proof} =
+      let message_index = 0 in
+      let outbox_level = 4 in
+      let destination = address in
+      let parameters = "37" in
+      Sc_rollup_client.outbox_proof_single
+        sc_client
+        ~message_index
+        ~outbox_level
+        ~destination
+        ~parameters
+    in
+    let*! () =
+      Client.Sc_rollup.execute_outbox_message
+        ~burn_cap:(Tez.of_int 10)
+        ~rollup:sc_rollup
+        ~src
+        ~commitment_hash
+        ~proof
+        client
+    in
+    Client.bake_for client
+  in
+  if skip then return ()
+  else
+    let* target_contract_address = originate_target_contract () in
+    let* () = perform_rollup_execution_and_cement target_contract_address in
+    let* () = trigger_outbox_message_execution target_contract_address in
+    let* () =
+      check_contract_execution target_contract_address expected_storage
+    in
+    return ()
+
+let test_outbox_message ~kind =
+  let skip, input_message, expected_storage =
+    match kind with
+    | "arith" ->
+        (false, (fun contract_address -> "37 " ^ contract_address), "37\n")
+    | "wasm_2_0_0" ->
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3790
+           For the moment, the WASM PVM has no support for
+           output. Hence, the storage is unchanged.*)
+        (true, Fun.const "", "0\n")
+    | _ ->
+        (* There is no other PVM in the protocol. *)
+        assert false
+  in
+  test_outbox_message_generic skip input_message expected_storage kind
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -3085,7 +3216,8 @@ let register ~kind ~protocols =
     ~kind ;
   test_consecutive_commitments protocols ~kind ;
   test_refutation protocols ~kind ;
-  test_late_rollup_node protocols ~kind
+  test_late_rollup_node protocols ~kind ;
+  test_outbox_message protocols ~kind
 
 let register ~protocols =
   (* PVM-independent tests. We still need to specify a PVM kind
