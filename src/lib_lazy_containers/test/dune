@@ -7,14 +7,15 @@
   lazy-containers
   qcheck-core
   qcheck-alcotest
-  alcotest)
+  alcotest
+  lwt.unix)
  (flags
   (:standard)
   -open Lazy_containers))
 
 (rule
  (alias runtest)
- (package lazy-containers)
+ (package lazy-containers-tests)
  (action (run %{dep:./main.exe})))
 
 (include_subdirs no)
