@@ -8,7 +8,7 @@ In Octez, Merkle proofs are used for Optimistic Rollups (see :doc:`../active/tra
 an invalid hash is submitted from a layer 2 node to layer 1.
 An honest layer 2 node can then present a Merkle proof to demonstrate that the previously submitted hash is in fact fraudulent.
 
-This document shows the encoding format of the Merkle proof implemented in :src:`src/lib_context/helpers/merkle_proof_encoding.ml`.
+This document shows the encoding format of the Merkle proof implemented in :src:`src/lib_context/merkle_proof_encoding/merkle_proof_encoding.ml`.
 There are 2 versions of encodings (defined as V1 and V2), each generating 2 types of
 Merkle proofs (named tree_proof and stream_proof), for 2 types of Irmin
 Trees (32-tree and binary tree). The data structure is defined in

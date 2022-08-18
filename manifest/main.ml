@@ -1248,6 +1248,18 @@ let octez_context_sigs =
     ~deps:[octez_base |> open_ ~m:"TzPervasives"; octez_stdlib |> open_]
     ~js_compatible:true
 
+let octez_merkle_proof_encoding =
+  public_lib
+    "tezos-context.merkle_proof_encoding"
+    ~path:"src/lib_context/merkle_proof_encoding"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_stdlib |> open_;
+        octez_context_sigs;
+      ]
+    ~js_compatible:true
+
 let octez_shell_services =
   public_lib
     "tezos-shell-services"
@@ -1559,6 +1571,7 @@ let octez_context_helpers =
         octez_stdlib |> open_;
         octez_context_encoding;
         octez_context_sigs;
+        octez_merkle_proof_encoding;
         irmin;
         irmin_pack;
       ]
@@ -3448,6 +3461,7 @@ end = struct
               octez_micheline |> open_;
               client |> if_some |> open_;
               main |> open_;
+              octez_merkle_proof_encoding;
               octez_test_helpers;
               test_helpers |> if_some |> open_;
               alcotest;

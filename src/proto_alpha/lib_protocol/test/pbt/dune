@@ -21,6 +21,7 @@
   tezos-micheline
   tezos-client-alpha
   tezos-protocol-alpha
+  tezos-context.merkle_proof_encoding
   tezos-test-helpers
   tezos-alpha-test-helpers
   alcotest

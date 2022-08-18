@@ -20,6 +20,7 @@
   tezos-micheline
   tezos-client-013-PtJakart
   tezos-protocol-013-PtJakart
+  tezos-context.merkle_proof_encoding
   tezos-test-helpers
   tezos-013-PtJakart-test-helpers
   alcotest
