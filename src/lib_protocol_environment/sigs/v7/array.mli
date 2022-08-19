@@ -43,7 +43,7 @@ val to_list : 'a t -> 'a list
 
 (**/**)
 
-(* This Array module is the thinest shim we can get away with for use with Plonk.
+(* This Array module is the thinnest shim we can get away with for use with Plonk.
    To avoid any issues with arrays — notably to avoid exceptions when getting
    out of bounds and to avoid any issues with mutability — we shadow [get] and
    [set] as well as a few other functions.

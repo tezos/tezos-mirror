@@ -362,7 +362,7 @@ module type PROOF = sig
 
       [Blinded_inode h] proves that an inode with hash [h] exists in the store.
 
-      [Inode_values ls] is simliar to trees' [Node].
+      [Inode_values ls] is similar to trees' [Node].
 
       [Inode_tree i] is similar to tree's [Inode].
 
@@ -417,7 +417,7 @@ module type PROOF = sig
 
     (** The type for stream proofs.
 
-        The sequance [e_1 ... e_n] proves that the [e_1], ..., [e_n] are
+        The sequence [e_1 ... e_n] proves that the [e_1], ..., [e_n] are
         read in the store in sequence. *)
     type t = elt Seq.t
   end

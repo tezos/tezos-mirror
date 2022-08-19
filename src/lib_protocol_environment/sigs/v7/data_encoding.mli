@@ -735,7 +735,7 @@ val splitted : json:'a encoding -> binary:'a encoding -> 'a encoding
      A stateful recursive encoding can still be put under a [delayed]
      combinator to make sure that a new encoding is generated each
      time it is used. Caching the encoding generation when the state
-     has not changed is then the responsability of the client.
+     has not changed is then the responsibility of the client.
 
   *)
 val mu :

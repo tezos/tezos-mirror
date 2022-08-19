@@ -72,7 +72,7 @@ module Admin : sig
   (** Cached values. *)
   type value
 
-  (** [pp fmt ctxt] is a pretty printter for the [cache] of [ctxt]. *)
+  (** [pp fmt ctxt] is a pretty printer for the [cache] of [ctxt]. *)
   val pp : Format.formatter -> Raw_context.t -> unit
 
   (** [sync ctxt ~cache_nonce] updates the context with the domain of
@@ -97,7 +97,7 @@ module Admin : sig
      [n_blocks] are removed.
 
       This function is based on a heuristic. The context maintains the
-     median of the number of removed entries: this number is multipled
+     median of the number of removed entries: this number is multiplied
      by `n_blocks` to determine the entries that are likely to be
      removed in `n_blocks`.
 
