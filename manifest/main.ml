@@ -1126,7 +1126,6 @@ let octez_webassembly_interpreter =
     ~license:"Apache License 2.0"
     ~extra_authors:["WebAssembly Authors"]
     ~synopsis:"WebAssembly reference interpreter with tweaks for Tezos"
-    ~flags:(Flags.standard ~disable_warnings:[27] ())
     ~dune:Dune.[[S "include_subdirs"; S "unqualified"]]
     ~deps:[octez_lwt_result_stdlib; zarith; lazy_containers |> open_]
 
@@ -1135,7 +1134,6 @@ let _octez_webassembly_repl =
     "main"
     ~path:"src/lib_webassembly/bin"
     ~opam:""
-    ~flags:(Flags.standard ~disable_warnings:[27] ())
     ~dune:Dune.[[S "include"; S "dune.inc"]]
     ~deps:
       [

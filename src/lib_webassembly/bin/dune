@@ -11,7 +11,6 @@
   lazy-containers)
  (flags
   (:standard)
-  -w -27
   -open Tezos_webassembly_interpreter
   -open Tree_encoding
   -open Lazy_containers))

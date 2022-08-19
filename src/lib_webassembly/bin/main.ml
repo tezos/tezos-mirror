@@ -49,7 +49,7 @@ let run () =
   let open Lwt.Syntax in
   Lwt.catch
     (fun () ->
-      let* registry = configure () in
+      let* _ = configure () in
       Arg.parse
         argspec
         (fun file -> add_arg ("(input " ^ quote file ^ ")"))

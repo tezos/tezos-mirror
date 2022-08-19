@@ -152,9 +152,9 @@ let func blocks (f : func) =
   let+ body = block blocks f.it.body in
   {body with locals = Set.empty}
 
-let table (t : table) = empty
+let table (_ : table) = empty
 
-let memory (m : memory) = empty
+let memory (_ : memory) = empty
 
 let segment_mode blocks f (m : segment_mode) =
   match m.it with
@@ -167,7 +167,7 @@ let elem blocks (s : elem_segment) =
 let data blocks _data (s : data_segment) =
   segment_mode blocks memories s.it.dmode
 
-let type_ (t : type_) = empty
+let type_ (_ : type_) = empty
 
 let export_desc (d : export_desc) =
   match d.it with
@@ -179,9 +179,7 @@ let export_desc (d : export_desc) =
 let import_desc (d : import_desc) =
   match d.it with
   | FuncImport x -> types (var x)
-  | TableImport tt -> empty |> Lwt.return
-  | MemoryImport mt -> empty |> Lwt.return
-  | GlobalImport gt -> empty |> Lwt.return
+  | TableImport _ | MemoryImport _ | GlobalImport _ -> empty |> Lwt.return
 
 let export (e : export) = export_desc e.it.edesc
 

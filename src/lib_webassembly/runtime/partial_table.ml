@@ -63,7 +63,7 @@ let grow tab delta r =
 let load tab i = Vector.get i tab.content
 
 let store tab i r =
-  let (TableType (lim, t)) = tab.ty in
+  let (TableType (_, t)) = tab.ty in
   if type_of_ref r <> t then raise Type ;
   Vector.set i r tab.content
 

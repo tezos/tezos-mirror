@@ -6,8 +6,10 @@ module Unknown = Error.Make ()
 
 exception Unknown = Unknown.Error (* indicates unknown import name *)
 
-(* TODO: change this to probably use a better representation of module names,
-   like hashes for example. *)
+(* TODO: #3587
+   change this to probably use a better representation of module
+   names, like hashes for example.
+*)
 module Registry = Map.Make (struct
   type t = Ast.name_list
 
@@ -25,9 +27,9 @@ let register ~module_name lookup =
   registry := Registry.add name lookup !registry ;
   Lwt.return_unit
 
-let lookup (m : module_) (im : import) : Instance.extern Lwt.t =
+let lookup (im : import) : Instance.extern Lwt.t =
   let open Lwt.Syntax in
-  let {module_name; item_name; idesc} = im.it in
+  let {module_name; item_name; _} = im.it in
   let* module_name_l = from_ast_name module_name in
   let* item_name_l = from_ast_name item_name in
   Lwt.catch
@@ -43,4 +45,4 @@ let lookup (m : module_) (im : import) : Instance.extern Lwt.t =
 let link m =
   let open Lwt.Syntax in
   let* imports = Lazy_vector.LwtInt32Vector.to_list m.it.imports in
-  TzStdLib.List.map_s (lookup m) imports
+  TzStdLib.List.map_s lookup imports

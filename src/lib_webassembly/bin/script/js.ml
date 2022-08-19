@@ -307,9 +307,9 @@ let invoke ft vs at =
 
 let get t at = ([], GlobalImport t @@ at, [GlobalGet (subject_idx @@ at) @@ at])
 
-let run ts at = (Vector.empty (), [])
+let run (_ : result_type) (_ : region) = (Vector.empty (), [])
 
-let assert_return ress ts at =
+let assert_return ress (_ : result_type) at =
   let test res =
     let nan_bitmask_of = function
       | CanonicalNan ->
@@ -399,7 +399,7 @@ let assert_return ress ts at =
           Test (I32 I32Op.Eqz) @@ at;
           BrIf (0l @@ at) @@ at;
         ]
-    | RefResult (RefPat {it = Values.NullRef t; _}) ->
+    | RefResult (RefPat {it = Values.NullRef _; _}) ->
         [
           RefIsNull @@ at;
           Test (Values.I32 I32Op.Eqz) @@ at;
@@ -530,8 +530,8 @@ let is_js_num_type = function
 
 let is_js_value_type = function
   | NumType t -> is_js_num_type t
-  | VecType t -> false
-  | RefType t -> true
+  | VecType _ -> false
+  | RefType _ -> true
 
 let is_js_global_type = function
   | GlobalType (t, mut) -> is_js_value_type t && mut = Immutable
@@ -612,7 +612,7 @@ let of_num_pat = function
       | Values.F32 n | Values.F64 n -> of_nan n)
 
 let of_vec_pat = function
-  | VecPat (Values.V128 (shape, pats)) ->
+  | VecPat (Values.V128 (_, pats)) ->
       Printf.sprintf
         "v128(\"%s\")"
         (String.concat " " (List.map of_num_pat pats))

@@ -276,7 +276,7 @@ let byte_vector_step vecs s =
       let+ () = Ast.add_to_data vecs vector index c in
       VKRead (vector, Int64.succ index, len)
   (* Final step, cannot reduce *)
-  | VKStop vector -> assert false
+  | VKStop _ -> assert false
 
 (* Types *)
 
@@ -1097,7 +1097,7 @@ let instr_block_step s allocs cont =
   | _ :: _ :: _ :: _ :: _ ->
       Stdlib.failwith "More than 3 values popped from the stack"
   (* Enforces the number of values popped from the stack, which shouldn't fail. *)
-  | [IKStop lbl] -> invalid_arg "instr_block"
+  | [IKStop _] -> invalid_arg "instr_block"
   | [IKStop lbl; IKBlock (bt, pos); IKNext plbl] ->
       let* () = end_ s in
       let e = Source.(block bt lbl @@ region s pos pos) in
@@ -1189,13 +1189,13 @@ let block_step s allocs =
         let* head = Vector.get 0l vector in
         match head with
         | IKStop lbl -> Lwt.return (BlockStop lbl)
-        | instr ->
+        | _ ->
             let+ kont = instr_block_step s allocs kont in
             BlockParse kont
       else
         let+ kont = instr_block_step s allocs kont in
         BlockParse kont
-  | BlockStop lbl -> assert false
+  | BlockStop _ -> assert false
 
 (** Vector and size continuations *)
 
@@ -1235,7 +1235,7 @@ let name_step s =
       let pos = pos s in
       let+ len = len32 s in
       NKParse (pos, init_lazy_vec 0l, len)
-  | NKParse (pos, LazyVec {vector; _}, 0) -> Lwt.return @@ NKStop vector
+  | NKParse (_, LazyVec {vector; _}, 0) -> Lwt.return @@ NKStop vector
   | NKParse (pos, LazyVec lv, len) ->
       let* d, offset =
         try Utf8.decode_step get s
@@ -1243,7 +1243,7 @@ let name_step s =
       in
       let vec = LazyVec {lv with vector = Vector.grow 1l lv.vector} in
       Lwt.return @@ NKParse (pos, lazy_vec_step d vec, len - offset)
-  | NKStop l -> assert false (* final step, cannot reduce. *)
+  | NKStop _ -> assert false (* final step, cannot reduce. *)
 
 let name s =
   let open Lwt.Syntax in
@@ -1529,7 +1529,7 @@ let code_step s allocs =
         {left; size; pos; vec_kont = lazy_vec_step local vec_kont; locals_size}
       |> Lwt.return
   | CKLocalsAccumulate
-      {left; size; pos; vec_kont = LazyVec {vector = locals; _} as vec_kont; _}
+      {left; size; vec_kont = LazyVec {vector = locals; _} as vec_kont; _}
     when is_end_of_vec vec_kont ->
       CKBody {left; size; locals; const_kont = BlockStart} |> Lwt.return
   | CKLocalsAccumulate
@@ -1619,7 +1619,7 @@ type elem_kont =
       (** Element segment initialization code parsing step for constant values. *)
   | EKStop of elem_segment'  (** Final step of a segment parsing. *)
 
-let ek_start s allocs =
+let ek_start s =
   let open Lwt.Syntax in
   let* v = vu32 s in
   match v with
@@ -1722,7 +1722,7 @@ let ek_start s allocs =
 let elem_step s allocs =
   let open Lwt.Syntax in
   function
-  | EKStart -> ek_start s allocs
+  | EKStart -> ek_start s
   | EKMode
       {
         left;
@@ -1808,7 +1808,7 @@ type data_kont =
   | DKInit of {dmode : segment_mode; init_kont : byte_vector_kont}
   | DKStop of data_segment'  (** Final step of a data segment parsing. *)
 
-let data_start s allocs =
+let data_start s =
   let open Lwt.Syntax in
   let* x = vu32 s in
   match x with
@@ -1833,7 +1833,7 @@ let data_start s allocs =
 let data_step s allocs =
   let open Lwt.Syntax in
   function
-  | DKStart -> data_start s allocs
+  | DKStart -> data_start s
   | DKMode {left; index; offset_kont = left_offset, BlockStop offset} ->
       let* () = end_ s in
       let right = pos s in
@@ -1932,7 +1932,9 @@ type module_kont =
       (** Accumulating the parsed sections vectors into a module and checking
       invariants. *)
   | MKStop of module_  (** Final step of the parsing, cannot reduce. *)
-    (* TODO (https://gitlab.com/tezos/tezos/-/issues/3120): actually, should be module_ *)
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3120
+       actually, should be module_
+    *)
   | MKTypes of func_type_kont * pos * size * type_ lazy_vec_kont
       (** Function types section parsing. *)
   | MKImport of import_kont * pos * size * import lazy_vec_kont
@@ -2119,7 +2121,9 @@ let module_step bytes state =
 
      The values accumulated from the section are accumulated into the building
      state..*)
-  (* TODO (https://gitlab.com/tezos/tezos/-/issues/3120): maybe we can factor-out these similarly shaped module section transitions *)
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3120
+     maybe we can factor-out these similarly shaped module section transitions
+  *)
   | MKField (TypeField, size, vec) when is_end_of_vec vec ->
       check_size size s ;
       next_with_field
@@ -2230,13 +2234,13 @@ let module_step bytes state =
   | MKData (data_kont, pos, size, curr_vec) ->
       let* data_kont = data_step s allocs data_kont in
       next @@ MKData (data_kont, pos, size, curr_vec)
-  | MKCode (CKStop func, left, size, vec) ->
+  | MKCode (CKStop func, _, size, vec) ->
       next @@ MKField (CodeField, size, lazy_vec_step func vec)
   | MKCode (code_kont, pos, size, curr_vec) ->
       let* code_kont = code_step s allocs code_kont in
       next @@ MKCode (code_kont, pos, size, curr_vec)
   | MKElaborateFunc
-      (ft, fb, (LazyVec {vector = func_types; _} as vec), no_datas_in_func)
+      (_ft, _fb, (LazyVec {vector = func_types; _} as vec), no_datas_in_func)
     when is_end_of_vec vec ->
       next @@ MKBuild (Some func_types, no_datas_in_func)
   | MKElaborateFunc (fts, fbs, (LazyVec {offset; _} as vec), no_datas_in_func)
@@ -2245,8 +2249,8 @@ let module_step bytes state =
       let* fb = Vector.get offset fbs in
       let fb' = Source.({fb.it with ftype = ft} @@ fb.at) in
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3387
-
-         `Free` shouldn't be part of the PVM. *)
+         `Free` shouldn't be part of the PVM.
+      *)
       let* free = Free.func allocs.blocks fb' in
       next
       @@ MKElaborateFunc
@@ -2327,7 +2331,7 @@ let initial_decode_kont ~name =
 let module_ name bytes =
   let open Lwt.Syntax in
   let rec loop = function
-    | {module_kont = MKStop m; stream_pos; _} -> Lwt.return m
+    | {module_kont = MKStop m; _} -> Lwt.return m
     | k ->
         let* next_state = module_step bytes k in
         loop next_state

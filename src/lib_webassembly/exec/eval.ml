@@ -234,7 +234,7 @@ and step_resolved module_reg (c : config) frame vs e es : config Lwt.t =
             )
         | Loop (bt, es'), vs ->
             let* inst = resolve_module_ref module_reg frame.inst in
-            let+ (FuncType (ts1, ts2)) = block_type inst bt in
+            let+ (FuncType (ts1, _)) = block_type inst bt in
             let n1 = Lazy_vector.LwtInt32Vector.num_elements ts1 in
             let args, vs' = (take n1 vs e.at, drop n1 vs e.at) in
             ( vs',
@@ -267,7 +267,7 @@ and step_resolved module_reg (c : config) frame vs e es : config Lwt.t =
             if not check_eq then
               (vs, [Trapping "indirect call type mismatch" @@ e.at])
             else (vs, [Invoke func @@ e.at])
-        | Drop, v :: vs' -> Lwt.return (vs', [])
+        | Drop, _ :: vs' -> Lwt.return (vs', [])
         | Select _, Num (I32 i) :: v2 :: v1 :: vs' ->
             Lwt.return (if i = 0l then (v2 :: vs', []) else (v1 :: vs', []))
         | LocalGet x, vs -> Lwt.return (!(local frame x) :: vs, [])
@@ -466,8 +466,8 @@ and step_resolved module_reg (c : config) frame vs e es : config Lwt.t =
                 (vs', []))
               (fun exn ->
                 Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
-        | ( VecLoadLane ({offset; ty; pack; _}, j),
-            Vec (V128 v) :: Num (I32 i) :: vs' ) ->
+        | VecLoadLane ({offset; pack; _}, j), Vec (V128 v) :: Num (I32 i) :: vs'
+          ->
             let* inst = resolve_module_ref module_reg frame.inst in
             let* mem = memory inst (0l @@ e.at) in
             Lwt.catch
@@ -494,7 +494,7 @@ and step_resolved module_reg (c : config) frame vs e es : config Lwt.t =
                 (Vec (V128 v) :: vs', []))
               (fun exn ->
                 Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
-        | ( VecStoreLane ({offset; ty; pack; _}, j),
+        | ( VecStoreLane ({offset; pack; _}, j),
             Vec (V128 v) :: Num (I32 i) :: vs' ) ->
             let* inst = resolve_module_ref module_reg frame.inst in
             let* mem = memory inst (0l @@ e.at) in
@@ -774,25 +774,25 @@ and step_resolved module_reg (c : config) frame vs e es : config Lwt.t =
               ("missing or ill-typed operand on stack (" ^ s1 ^ " : " ^ s2 ^ ")")
         )
     | Refer r, vs -> Lwt.return (Ref r :: vs, [])
-    | Trapping msg, vs -> assert false
-    | Returning vs', vs -> Crash.error e.at "undefined frame"
-    | Breaking (k, vs'), vs -> Crash.error e.at "undefined label"
-    | Label (n, es0, (vs', [])), vs -> Lwt.return (vs' @ vs, [])
-    | Label (n, es0, (vs', {it = Trapping msg; at} :: es')), vs ->
+    | Trapping _, _ -> assert false
+    | Returning _, _ -> Crash.error e.at "undefined frame"
+    | Breaking _, _ -> Crash.error e.at "undefined label"
+    | Label (_, _, (vs', [])), vs -> Lwt.return (vs' @ vs, [])
+    | Label (_, _, (_, {it = Trapping msg; at} :: _)), vs ->
         Lwt.return (vs, [Trapping msg @@ at])
-    | Label (n, es0, (vs', {it = Returning vs0; at} :: es')), vs ->
+    | Label (_, _, (_, {it = Returning vs0; at} :: _)), vs ->
         Lwt.return (vs, [Returning vs0 @@ at])
-    | Label (n, es0, (vs', {it = Breaking (0l, vs0); at} :: es')), vs ->
+    | Label (n, es0, (_, {it = Breaking (0l, vs0); _} :: _)), vs ->
         Lwt.return (take n vs0 e.at @ vs, List.map plain es0)
-    | Label (n, es0, (vs', {it = Breaking (k, vs0); at} :: es')), vs ->
+    | Label (_, _, (_, {it = Breaking (k, vs0); at} :: _)), vs ->
         Lwt.return (vs, [Breaking (Int32.sub k 1l, vs0) @@ at])
     | Label (n, es0, code'), vs ->
         let+ c' = step module_reg {c with code = code'} in
         (vs, [Label (n, es0, c'.code) @@ e.at])
-    | Frame (n, frame', (vs', [])), vs -> Lwt.return (vs' @ vs, [])
-    | Frame (n, frame', (vs', {it = Trapping msg; at} :: es')), vs ->
+    | Frame (_, _, (vs', [])), vs -> Lwt.return (vs' @ vs, [])
+    | Frame (_, _, (_, {it = Trapping msg; at} :: _)), vs ->
         Lwt.return (vs, [Trapping msg @@ at])
-    | Frame (n, frame', (vs', {it = Returning vs0; at} :: es')), vs ->
+    | Frame (n, _, (_, {it = Returning vs0; _} :: _)), vs ->
         Lwt.return (take n vs0 e.at @ vs, [])
     | Frame (n, frame', code'), vs ->
         let+ c' =
@@ -807,7 +807,7 @@ and step_resolved module_reg (c : config) frame vs e es : config Lwt.t =
             }
         in
         (vs, [Frame (n, c'.frame, c'.code) @@ e.at])
-    | Invoke func, vs when c.budget = 0 ->
+    | Invoke _, _ when c.budget = 0 ->
         Exhaustion.error e.at "call stack exhausted"
     | Invoke func, vs -> (
         let (FuncType (ins, out)) = func_type_of func in
@@ -816,7 +816,7 @@ and step_resolved module_reg (c : config) frame vs e es : config Lwt.t =
         in
         let args, vs' = (take n1 vs e.at, drop n1 vs e.at) in
         match func with
-        | Func.AstFunc (t, inst', f) ->
+        | Func.AstFunc (_, inst', f) ->
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/3366 &
                https://gitlab.com/tezos/tezos/-/issues/3082
 
@@ -849,8 +849,8 @@ and step_resolved module_reg (c : config) frame vs e es : config Lwt.t =
 let rec eval module_reg (c : config) : value stack Lwt.t =
   match c.code with
   | vs, [] -> Lwt.return vs
-  | vs, {it = Trapping msg; at} :: _ -> Trap.error at msg
-  | vs, es ->
+  | _, {it = Trapping msg; at} :: _ -> Trap.error at msg
+  | _, _ ->
       let* c = step module_reg c in
       eval module_reg c
 
@@ -859,7 +859,7 @@ let rec eval module_reg (c : config) : value stack Lwt.t =
 let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ()) host_funcs
     (func : func_inst) (vs : value list) : value list Lwt.t =
   let at = match func with Func.AstFunc (_, _, f) -> f.at | _ -> no_region in
-  let (FuncType (ins, out)) = Func.type_of func in
+  let (FuncType (ins, _out)) = Func.type_of func in
   let* ins_l = Lazy_vector.LwtInt32Vector.to_list ins in
   if
     List.length vs
@@ -889,7 +889,7 @@ let eval_const module_reg (inst : module_key) (const : const) : value Lwt.t =
   let+ vs = eval module_reg c in
   match vs with
   | [v] -> v
-  | vs -> Crash.error const.at "wrong number of results on stack"
+  | _ -> Crash.error const.at "wrong number of results on stack"
 
 (* Modules *)
 
@@ -899,12 +899,12 @@ let create_func module_reg (inst_ref : module_key) (f : func) : func_inst Lwt.t
   let+ type_ = type_ inst f.it.ftype in
   Func.alloc type_ inst_ref f
 
-let create_table (inst : module_inst) (tab : table) : table_inst =
+let create_table (tab : table) : table_inst =
   let {ttype} = tab.it in
   let (TableType (_lim, t)) = ttype in
   Table.alloc ttype (NullRef t)
 
-let create_memory (inst : module_inst) (mem : memory) : memory_inst =
+let create_memory (mem : memory) : memory_inst =
   let {mtype} = mem.it in
   Memory.alloc mtype
 
@@ -935,7 +935,7 @@ let create_export (inst : module_inst) (ex : export) : export_inst Lwt.t =
 
 let create_elem module_reg (inst : module_key) (seg : elem_segment) :
     elem_inst Lwt.t =
-  let {etype; einit; _} = seg.it in
+  let {einit; _} = seg.it in
   (* TODO: #3076
      [einit] should be changed to a lazy structure. We want to avoid traversing
      it whole. *)
@@ -949,7 +949,7 @@ let create_elem module_reg (inst : module_key) (seg : elem_segment) :
   in
   ref (Instance.Vector.of_list init)
 
-let create_data (inst : module_inst) (seg : data_segment) : data_inst =
+let create_data (seg : data_segment) : data_inst =
   let {dinit; _} = seg.it in
   ref dinit
 
@@ -976,7 +976,7 @@ let add_import (m : module_) (ext : extern) (im : import) (inst : module_inst) :
   | ExternMemory mem -> {inst with memories = Vector.cons mem inst.memories}
   | ExternGlobal glob -> {inst with globals = Vector.cons glob inst.globals}
 
-let run_elem inst i elem =
+let run_elem i elem =
   let at = elem.it.emode.at in
   let x = i @@ at in
   match elem.it.emode.it with
@@ -1103,16 +1103,14 @@ let init ~module_reg ~self host_funcs (m : module_) (exts : extern list) :
   (* TODO: #3076
      [tables] should be a lazy structure. *)
   let* tables =
-    Vector.concat
-      inst1.tables
-      (Vector.of_list (List.map (create_table inst1) tables))
+    Vector.concat inst1.tables (Vector.of_list (List.map create_table tables))
   in
   (* TODO: #3076
      [memories] should be a lazy structure. *)
   let* memories =
     Vector.concat
       inst1.memories
-      (Vector.of_list (List.map (create_memory inst1) memories))
+      (Vector.of_list (List.map create_memory memories))
   in
   (* TODO: #3076
      [new_globals]/[globals] should be lazy structures. *)
@@ -1122,7 +1120,7 @@ let init ~module_reg ~self host_funcs (m : module_) (exts : extern list) :
 
   let* new_exports = TzStdLib.List.map_s (create_export inst2) exports in
   let* new_elems = TzStdLib.List.map_s (create_elem module_reg self) elems in
-  let new_datas = List.map (create_data inst2) datas in
+  let new_datas = List.map create_data datas in
   let* exports =
     (* TODO: #3076
        [new_exports]/[exports] should be lazy structures. *)
@@ -1149,7 +1147,7 @@ let init ~module_reg ~self host_funcs (m : module_) (exts : extern list) :
   in
   update_module_ref module_reg self inst ;
 
-  let es_elem = List.concat (Lib.List32.mapi (run_elem inst) elems) in
+  let es_elem = List.concat (Lib.List32.mapi run_elem elems) in
   let* datas = Lib.List32.mapi_s (run_data inst) datas in
   let es_data = TzStdLib.List.concat datas in
   let es_start = Lib.Option.get (Lib.Option.map run_start start) [] in
