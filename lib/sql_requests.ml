@@ -130,11 +130,11 @@ let create_tables =
 let db_schema = String.concat "; " create_tables
 
 let maybe_insert_source source =
-  "INSERT OR IGNORE INTO nodes (name) VALUES (\'" ^ source ^ "\');"
+  "INSERT OR IGNORE INTO nodes (name) VALUES (\'" ^ source ^ "\')"
 
 let maybe_insert_delegates_from_rights rights =
   Format.asprintf
-    "INSERT OR IGNORE INTO delegates (address) VALUES %a;"
+    "INSERT OR IGNORE INTO delegates (address) VALUES %a"
     (Format.pp_print_list
        ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
        (fun f r ->
@@ -149,7 +149,7 @@ let maybe_insert_endorsing_rights ~level rights =
   Format.asprintf
     "INSERT OR IGNORE INTO endorsing_rights (level, delegate, first_slot, \
      endorsing_power) SELECT column1, delegates.id, column3, column4 FROM \
-     delegates JOIN (VALUES %a) ON delegates.address = column2;"
+     delegates JOIN (VALUES %a) ON delegates.address = column2"
     (Format.pp_print_list
        ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
        (fun f Consensus_ops.{address; first_slot; power} ->
@@ -169,7 +169,7 @@ let maybe_insert_operations level extractor op_extractor l =
      column1, column2, delegates.id, %ld, column4 FROM delegates JOIN (VALUES \
      %a) ON delegates.address = column3 WHERE (column2, delegates.id, column4) \
      NOT IN (SELECT endorsement, endorser, round FROM operations WHERE level = \
-     %ld);"
+     %ld)"
     level
     (Format.pp_print_list
        ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
@@ -215,7 +215,7 @@ let maybe_insert_block hash ~level ~round timestamp delegate =
   Format.asprintf
     "INSERT OR IGNORE INTO blocks (timestamp, hash, level, round, baker) \
      SELECT column1, column2, %ld, column4, delegates.id FROM delegates JOIN \
-     (VALUES ('%a', x'%a', x'%a', %ld)) ON delegates.address = column3;"
+     (VALUES ('%a', x'%a', x'%a', %ld)) ON delegates.address = column3"
     level
     Time.Protocol.pp
     timestamp
@@ -233,7 +233,7 @@ let insert_received_operations ~source ~level operations =
      delegates, nodes, (VALUES %a) ON delegates.address = column3 AND \
      operations.endorser = delegates.id AND operations.endorsement = column4 \
      AND ((operations.round IS NULL AND column5 IS NULL) OR operations.round = \
-     column5) WHERE nodes.name = '%s' AND operations.level = %ld;"
+     column5) WHERE nodes.name = '%s' AND operations.level = %ld"
     (Format.pp_print_list
        ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
        (fun f (endorser, l) ->
@@ -278,7 +278,7 @@ let insert_included_operations block_hash ~level operations =
      delegates.address = column1 AND operations.endorser = delegates.id AND \
      operations.endorsement = column2 AND ((operations.round IS NULL AND \
      column3 IS NULL) OR operations.round = column3) WHERE blocks.hash = x'%a' \
-     AND operations.level = %ld;"
+     AND operations.level = %ld"
     (Format.pp_print_list
        ~pp_sep:(fun f () -> Format.pp_print_text f ", ")
        (fun f (op : Consensus_ops.block_op) ->
@@ -301,7 +301,7 @@ let insert_received_block ~source hash reception_time =
   Format.asprintf
     "INSERT INTO blocks_reception (timestamp, block, source) SELECT column1, \
      blocks.id, nodes.id FROM blocks JOIN (VALUES ('%a', x'%a')) ON \
-     blocks.hash = column2 JOIN nodes ON nodes.name = '%s';"
+     blocks.hash = column2 JOIN nodes ON nodes.name = '%s'"
     Time.System.pp_hum
     reception_time
     Hex.pp
