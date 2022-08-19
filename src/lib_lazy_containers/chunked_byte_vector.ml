@@ -25,6 +25,15 @@
 
 open Bigarray
 
+exception Bounds
+
+exception SizeOverflow
+
+let reraise = function
+  | Lazy_vector.Bounds -> raise Bounds
+  | Lazy_vector.SizeOverflow -> raise SizeOverflow
+  | exn -> raise exn
+
 module Array1_64 = struct
   let create kind layout n =
     if n < 0L || n > Int64.of_int max_int then
@@ -123,16 +132,22 @@ module Lwt = struct
 
   let length vector = vector.length
 
+  let get_chunk index {chunks; _} =
+    Lwt.catch (fun () -> Vector.get index chunks) reraise
+
+  let set_chunk index chunk {chunks; _} =
+    try Vector.set index chunk chunks with exn -> reraise exn
+
   let load_byte vector address =
     let open Lwt.Syntax in
-    if Int64.compare address vector.length >= 0 then raise Exn.Bounds ;
-    let+ chunk = Vector.get (Chunk.index address) vector.chunks in
+    if Int64.compare address vector.length >= 0 then raise Bounds ;
+    let+ chunk = get_chunk (Chunk.index address) vector in
     Array1_64.get chunk (Chunk.offset address)
 
   let store_byte vector address byte =
     let open Lwt.Syntax in
-    if Int64.compare address vector.length >= 0 then raise Exn.Bounds ;
-    let+ chunk = Vector.get (Chunk.index address) vector.chunks in
+    if Int64.compare address vector.length >= 0 then raise Bounds ;
+    let+ chunk = get_chunk (Chunk.index address) vector in
     Array1_64.set chunk (Chunk.offset address) byte
 
   let store_bytes vector address bytes =
@@ -168,7 +183,7 @@ module Lwt = struct
                   let c = String.get str address in
                   Array1_64.set chunk offset (Char.code c))
           in
-          Vector.set index chunk vector.chunks)
+          set_chunk index chunk vector)
     in
     vector
 
@@ -190,14 +205,14 @@ module Lwt = struct
                   let c = Bytes.get bytes address in
                   Array1_64.set chunk offset (Char.code c))
           in
-          Vector.set index chunk vector.chunks)
+          set_chunk index chunk vector)
     in
     vector
 
   let to_bytes vector =
     let open Lwt.Syntax in
     let chunks_number = Vector.num_elements vector.chunks in
-    if vector.length > Int64.of_int Sys.max_string_length then raise Exn.Bounds ;
+    if vector.length > Int64.of_int Sys.max_string_length then raise Bounds ;
     (* Once we ensure the vector can be contained in a string, we can safely
        convert everything to int, since the size of the vector is contained in
        a `nativeint`. See {!of_string} comment. *)
@@ -221,7 +236,7 @@ module Lwt = struct
     let rec fold index =
       if index >= chunks_number then Lwt.return ()
       else
-        let* chunk = Vector.get index vector.chunks in
+        let* chunk = get_chunk index vector in
         add_chunk index chunk ;
         fold (Int64.succ index)
     in

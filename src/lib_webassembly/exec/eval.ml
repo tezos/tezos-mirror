@@ -96,7 +96,7 @@ let lookup_intmap category store x =
   Lwt.catch
     (fun () -> Instance.Vector.get x.it store)
     (function
-      | Memory_exn.Bounds ->
+      | Lazy_vector.Bounds ->
           Crash.error x.at ("undefined " ^ category ^ " " ^ Int32.to_string x.it)
       | Lazy_map.UnexpectedAccess ->
           Crash.error

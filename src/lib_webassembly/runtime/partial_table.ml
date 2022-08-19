@@ -15,7 +15,21 @@ type t = table
 
 let content {content; _} = Vector.snapshot content
 
-include Memory_exn
+exception Type
+
+exception SizeLimit
+
+exception OutOfMemory
+
+exception Bounds
+
+exception SizeOverflow
+
+let reraise = function
+  | Chunked_byte_vector.Bounds | Lazy_vector.Bounds -> raise Bounds
+  | Chunked_byte_vector.SizeOverflow | Lazy_vector.SizeOverflow ->
+      raise SizeOverflow
+  | exn -> raise exn
 
 let valid_limits {min; max} =
   match max with None -> true | Some m -> I32.le_u min m
@@ -60,12 +74,12 @@ let grow tab delta r =
     tab.ty <- TableType (lim', t) ;
     ()
 
-let load tab i = Vector.get i tab.content
+let load tab i = try Vector.get i tab.content with exn -> reraise exn
 
 let store tab i r =
   let (TableType (_, t)) = tab.ty in
   if type_of_ref r <> t then raise Type ;
-  Vector.set i r tab.content
+  try Vector.set i r tab.content with exn -> reraise exn
 
 let blit tab offset rs =
   List.iteri (fun i r -> store tab Int32.(of_int i |> add offset) r) rs
