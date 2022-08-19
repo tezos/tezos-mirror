@@ -747,7 +747,7 @@ let bls_import_secret_key ?hooks ?force key sc_client =
   spawn_bls_import_secret_key ?hooks ?force key sc_client |> Process.check
 
 let spawn_transfer ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee
-    ?gas_limit ?storage_limit ?counter ?arg ?(simulation = false)
+    ?gas_limit ?storage_limit ?counter ?entrypoint ?arg ?(simulation = false)
     ?(force = false) ~amount ~giver ~receiver client =
   spawn_command
     ?log_output
@@ -764,13 +764,14 @@ let spawn_transfer ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee
     @ optional_arg "gas-limit" string_of_int gas_limit
     @ optional_arg "storage-limit" string_of_int storage_limit
     @ optional_arg "counter" string_of_int counter
+    @ optional_arg "entrypoint" Fun.id entrypoint
     @ optional_arg "arg" Fun.id arg
     @ (if simulation then ["--simulation"] else [])
     @ if force then ["--force"] else [])
 
 let transfer ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
-    ?storage_limit ?counter ?arg ?simulation ?force ?expect_failure ~amount
-    ~giver ~receiver client =
+    ?storage_limit ?counter ?entrypoint ?arg ?simulation ?force ?expect_failure
+    ~amount ~giver ~receiver client =
   spawn_transfer
     ?log_output
     ?endpoint
@@ -781,6 +782,7 @@ let transfer ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
     ?gas_limit
     ?storage_limit
     ?counter
+    ?entrypoint
     ?arg
     ?simulation
     ?force
