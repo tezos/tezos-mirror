@@ -770,8 +770,8 @@ let spawn_transfer ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee
     @ if force then ["--force"] else [])
 
 let transfer ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
-    ?storage_limit ?counter ?entrypoint ?arg ?simulation ?force ?expect_failure ~amount
-    ~giver ~receiver client =
+    ?storage_limit ?counter ?entrypoint ?arg ?simulation ?force ?expect_failure
+    ~amount ~giver ~receiver client =
   spawn_transfer
     ?log_output
     ?endpoint
