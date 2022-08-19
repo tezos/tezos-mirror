@@ -1,26 +1,20 @@
 open Types
 
-module ModuleMap =
-  Lazy_map.Mutable.Make
-    (Lazy_map.Effect.Lwt)
-    (struct
-      include String
+module ModuleMap = Lazy_map.Mutable.Make (struct
+  include String
 
-      let to_string = Fun.id
-    end)
+  let to_string = Fun.id
+end)
 
 module Vector = Lazy_vector.LwtInt32Vector
 
-module NameMap =
-  Lazy_map.Make
-    (Lazy_map.Effect.Lwt)
-    (struct
-      type t = Ast.name_list
+module NameMap = Lazy_map.Make (struct
+  type t = Ast.name_list
 
-      let compare = List.compare Int.compare
+  let compare = List.compare Int.compare
 
-      let to_string = Utf8.encode_list
-    end)
+  let to_string = Utf8.encode_list
+end)
 
 type module_key = Module_key of string
 

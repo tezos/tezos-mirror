@@ -30,12 +30,14 @@ open Lazy_vector
 let gen_of_list gen_items =
   let open Gen in
   let+ list = gen_items in
-  IntVector.of_list list
+  LwtIntVector.of_list list
 
 let gen_create gen_items =
   let open Gen in
   let+ array = gen_items in
-  IntVector.create ~produce_value:(fun i -> array.(i)) (Array.length array)
+  LwtIntVector.create
+    ~produce_value:(fun i -> Lwt.return array.(i))
+    (Array.length array)
 
 let gen gen_item =
   let open Gen in
@@ -44,12 +46,12 @@ let gen gen_item =
   in
   let gen_concat =
     let+ lhs = gen_create and+ rhs = gen_create in
-    IntVector.concat lhs rhs
+    Lwt_main.run @@ LwtIntVector.concat lhs rhs
   in
   let gen_base_or_concat = oneof [gen_create; gen_concat] in
   let gen_cons =
     let+ prefix = small_list gen_item and+ map = gen_base_or_concat in
-    List.fold_left (fun map prefix -> IntVector.cons prefix map) map prefix
+    List.fold_left (fun map prefix -> LwtIntVector.cons prefix map) map prefix
   in
   oneof [gen_base_or_concat; gen_cons]
 
@@ -58,35 +60,55 @@ let of_list_constructs_correctly =
     ~name:"of_list creates the data structure correctly"
     Gen.(list int)
     (fun items ->
-      let map = IntVector.of_list items in
-      let checked = List.mapi (fun i v -> IntVector.get i map = v) items in
+      let open Lwt.Syntax in
+      Lwt_main.run
+      @@
+      let map = LwtIntVector.of_list items in
+      let+ checked =
+        Lwt_list.mapi_p
+          (fun i v ->
+            let+ v' = LwtIntVector.get i map in
+            v' = v)
+          items
+      in
       List.for_all Fun.id checked
-      && IntVector.num_elements map = List.length items)
+      && LwtIntVector.num_elements map = List.length items)
 
 let create_constructs_correctly =
   Test.make ~name:"create constructs correctly" Gen.nat (fun len ->
-      let map = IntVector.create ~produce_value:Fun.id len in
-      List.init len (fun i -> IntVector.get i map = i) |> List.for_all Fun.id)
+      let open Lwt.Syntax in
+      Lwt_main.run
+      @@
+      let map = LwtIntVector.create ~produce_value:Lwt.return len in
+      Lwt_list.for_all_p
+        (fun i ->
+          let+ v = LwtIntVector.get i map in
+          v = i)
+        (List.init len Fun.id))
 
 let grow_works =
   Test.make
     ~name:"grow works"
     Gen.(pair (gen int) nat)
     (fun (map, len) ->
-      let map2 = IntVector.grow ~default:(fun () -> 2) len map in
-      let check1 =
-        List.init (IntVector.num_elements map) (fun i ->
-            IntVector.get i map2 = IntVector.get i map)
-        |> List.for_all Fun.id
-      in
-      let check2 =
-        List.init len (fun i ->
-            let key = i + IntVector.num_elements map in
-            IntVector.get key map2 = 2)
-        |> List.for_all Fun.id
+      let open Lwt.Syntax in
+      Lwt_main.run
+      @@
+      let map2 = LwtIntVector.grow ~default:(fun () -> 2) len map in
+      let+ check1 =
+        Lwt_list.for_all_p (fun i ->
+            let+ v = LwtIntVector.get i map2 and+ v' = LwtIntVector.get i map in
+            v = v')
+        @@ List.init (LwtIntVector.num_elements map) Fun.id
+      and+ check2 =
+        Lwt_list.for_all_p (fun i ->
+            let key = i + LwtIntVector.num_elements map in
+            let+ v = LwtIntVector.get key map2 in
+            v = 2)
+        @@ List.init len Fun.id
       in
       let check3 =
-        IntVector.num_elements map + len = IntVector.num_elements map2
+        LwtIntVector.num_elements map + len = LwtIntVector.num_elements map2
       in
       check1 && check2 && check3)
 
@@ -95,39 +117,53 @@ let cons_works =
     ~name:"cons works"
     Gen.(pair (gen int) int)
     (fun (map, value) ->
-      let map2 = IntVector.cons value map in
-      let check1 = IntVector.get 0 map2 = value in
-      let check2 =
-        List.init (IntVector.num_elements map) (fun i ->
-            IntVector.get i map = IntVector.get (i + 1) map2)
-        |> List.for_all Fun.id
+      let open Lwt.Syntax in
+      Lwt_main.run
+      @@
+      let map2 = LwtIntVector.cons value map in
+      let* v = LwtIntVector.get 0 map2 in
+      let check1 = v = value in
+      let+ check2 =
+        Lwt_list.for_all_p (fun i ->
+            let+ x = LwtIntVector.get i map
+            and+ y = LwtIntVector.get (i + 1) map2 in
+            x = y)
+        @@ List.init (LwtIntVector.num_elements map) Fun.id
       in
       check1 && check2)
 
 let concat_works () =
+  let open Lwt.Syntax in
+  Lwt_main.run
+  @@
   let map1 =
-    IntVector.create
+    LwtIntVector.create
       ~produce_value:(fun x ->
         Printf.printf "> map1: %i\n%!" x ;
-        Int.succ x)
+        Lwt.return @@ Int.succ x)
       1
-    |> IntVector.cons 10
+    |> LwtIntVector.cons 10
   in
   let map2 =
-    IntVector.create
+    LwtIntVector.create
       ~produce_value:(fun x ->
         Printf.printf "> map2: %i\n%!" x ;
-        Int.pred x)
+        Lwt.return @@ Int.pred x)
       1
-    |> IntVector.cons 20
+    |> LwtIntVector.cons 20
   in
-  let map = IntVector.concat map1 map2 in
+  let* map = LwtIntVector.concat map1 map2 in
   let open Alcotest in
-  check int "exact value" 4 (IntVector.num_elements map) ;
-  check int "exact value" 10 (IntVector.get 0 map) ;
-  check int "exact value" 1 (IntVector.get 1 map) ;
-  check int "exact value" 20 (IntVector.get 2 map) ;
-  check int "exact value" (-1) (IntVector.get 3 map)
+  let lwt_check x p =
+    let+ y = p in
+    check int "exact value" x y
+  in
+  check int "exact value" 4 (LwtIntVector.num_elements map) ;
+  let+ () = lwt_check 10 (LwtIntVector.get 0 map)
+  and+ () = lwt_check 1 (LwtIntVector.get 1 map)
+  and+ () = lwt_check 20 (LwtIntVector.get 2 map)
+  and+ () = lwt_check (-1) (LwtIntVector.get 3 map) in
+  ()
 
 let tests =
   [

@@ -40,22 +40,7 @@ module Chunk : sig
   val num_needed : int64 -> int64
 end
 
-module Effect : sig
-  module type S = sig
-    include Lazy_vector.Effect.S
-
-    val join : unit t list -> unit t
-  end
-
-  module Identity : S with type 'a t = 'a
-
-  module Lwt : S with type 'a t = 'a Lwt.t
-end
-
-module type S = sig
-  (** Effect with which chunks are created *)
-  type 'a effect
-
+module Lwt : sig
   (** Chunked byte vector *)
   type t
 
@@ -66,7 +51,7 @@ module type S = sig
       tree-encoding library. To create a brand new chunked byte
       vector, use {!allocate}.  *)
   val create :
-    ?origin:Lazy_map.tree -> ?get_chunk:(int64 -> Chunk.t effect) -> int64 -> t
+    ?origin:Lazy_map.tree -> ?get_chunk:(int64 -> Chunk.t Lwt.t) -> int64 -> t
 
   (** [origin vec] returns the tree of origin of the vector, if it exists.
 
@@ -90,10 +75,10 @@ module type S = sig
   val of_bytes : bytes -> t
 
   (** [to_string vector] creates a string from the given [vector]. *)
-  val to_string : t -> string effect
+  val to_string : t -> string Lwt.t
 
   (** [to_bytes vector] creates a bytes from the given [vector]. *)
-  val to_bytes : t -> bytes effect
+  val to_bytes : t -> bytes Lwt.t
 
   (** [grow vector length_delta] increases the byte vector length by
       [length_delta] and initializes the memory with empty chunks.
@@ -106,21 +91,17 @@ module type S = sig
   val length : t -> int64
 
   (** [load_byte vector offset] read the byte at [offset]. *)
-  val load_byte : t -> int64 -> int effect
+  val load_byte : t -> int64 -> int Lwt.t
 
   (** [store_byte vector offset byte] set the byte at [offset] to [byte]. *)
-  val store_byte : t -> int64 -> int -> unit effect
+  val store_byte : t -> int64 -> int -> unit Lwt.t
 
   (** [store_bytes vector offset bytes] set the bytes from [offset] to the given
       [bytes]. *)
-  val store_bytes : t -> int64 -> bytes -> unit effect
+  val store_bytes : t -> int64 -> bytes -> unit Lwt.t
 
   (** [loaded_chunks vector] returns the chunks of [vector] that have
       been cached in-memory since [vector] has been created, either by
       reading its contents, or by modifying it. *)
   val loaded_chunks : t -> (int64 * Chunk.t) list
 end
-
-include S with type 'a effect = 'a
-
-module Lwt : S with type 'a effect = 'a Lwt.t

@@ -25,32 +25,6 @@
 
 type tree = ..
 
-module Effect = struct
-  module type S = sig
-    type 'a t
-
-    val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
-
-    val return : 'a -> 'a t
-  end
-
-  module Identity : S with type 'a t = 'a = struct
-    type 'a t = 'a
-
-    let ( let+ ) x f = f x
-
-    let return = Fun.id
-  end
-
-  module Lwt : S with type 'a t = 'a Lwt.t = struct
-    type 'a t = 'a Lwt.t
-
-    let ( let+ ) = Lwt.Syntax.( let+ )
-
-    let return = Lwt.return
-  end
-end
-
 module type KeyS = sig
   include Map.OrderedType
 
@@ -60,9 +34,7 @@ end
 module type S = sig
   type key
 
-  type 'a effect
-
-  type 'a producer = key -> 'a effect
+  type 'a producer = key -> 'a Lwt.t
 
   module Map : Map.S with type key = key
 
@@ -83,7 +55,7 @@ module type S = sig
     unit ->
     'a t
 
-  val get : key -> 'a t -> 'a effect
+  val get : key -> 'a t -> 'a Lwt.t
 
   val set : key -> 'a -> 'a t -> 'a t
 
@@ -92,15 +64,12 @@ end
 
 exception UnexpectedAccess
 
-module Make (Effect : Effect.S) (Key : KeyS) :
-  S with type key = Key.t and type 'a effect = 'a Effect.t = struct
+module Make (Key : KeyS) : S with type key = Key.t = struct
   module Map = Map.Make (Key)
 
   type key = Key.t
 
-  type 'a effect = 'a Effect.t
-
-  type 'a producer = key -> 'a effect
+  type 'a producer = key -> 'a Lwt.t
 
   type 'a t = {
     origin : tree option;
@@ -141,34 +110,29 @@ module Make (Effect : Effect.S) (Key : KeyS) :
     {produce_value; values; origin}
 
   let get key map =
-    let open Effect in
+    let open Lwt.Syntax in
     match Map.find_opt key map.values with
     | None ->
         (* Need to create the missing key-value association. *)
         let+ value = map.produce_value key in
         map.values <- Map.add key value map.values ;
         value
-    | Some value -> return value
+    | Some value -> Lwt.return value
 
   let set key value map = {map with values = Map.add key value map.values}
 
   let loaded_bindings m = Map.bindings m.values
 end
 
-module IntMap = Make (Effect.Identity) (Int)
-module Int32Map = Make (Effect.Identity) (Int32)
-module Int64Map = Make (Effect.Identity) (Int64)
-module LwtIntMap = Make (Effect.Lwt) (Int)
-module LwtInt32Map = Make (Effect.Lwt) (Int32)
-module LwtInt64Map = Make (Effect.Lwt) (Int64)
+module LwtIntMap = Make (Int)
+module LwtInt32Map = Make (Int32)
+module LwtInt64Map = Make (Int64)
 
 module Mutable = struct
   module type S = sig
     type key
 
-    type 'a effect
-
-    module Map : S with type key = key and type 'a effect = 'a effect
+    module Map : S with type key = key
 
     type 'a t
 
@@ -181,20 +145,17 @@ module Mutable = struct
       unit ->
       'a t
 
-    val get : key -> 'a t -> 'a Map.effect
+    val get : key -> 'a t -> 'a Lwt.t
 
     val set : key -> 'a -> 'a t -> unit
 
     val snapshot : 'a t -> 'a Map.t
   end
 
-  module Make (Effect : Effect.S) (Key : KeyS) :
-    S with type key = Key.t and type 'a effect = 'a Effect.t = struct
-    module Map = Make (Effect) (Key)
+  module Make (Key : KeyS) : S with type key = Key.t = struct
+    module Map = Make (Key)
 
     type key = Map.key
-
-    type 'a effect = 'a Map.effect
 
     type 'a t = 'a Map.t ref
 
@@ -210,10 +171,7 @@ module Mutable = struct
     let snapshot map_ref = !map_ref
   end
 
-  module IntMap = Make (Effect.Identity) (Int)
-  module Int32Map = Make (Effect.Identity) (Int32)
-  module Int64Map = Make (Effect.Identity) (Int64)
-  module LwtIntMap = Make (Effect.Lwt) (Int)
-  module LwtInt32Map = Make (Effect.Lwt) (Int32)
-  module LwtInt64Map = Make (Effect.Lwt) (Int64)
+  module LwtIntMap = Make (Int)
+  module LwtInt32Map = Make (Int32)
+  module LwtInt64Map = Make (Int64)
 end

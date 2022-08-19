@@ -5,9 +5,8 @@ open Values
 open Types
 open Sexpr
 module TzStdLib = Tezos_lwt_result_stdlib.Lwtreslib.Bare
-module Vector = Lazy_vector.Int32Vector
 
-type block_table = Ast.instr Vector.t Vector.t
+type block_table = Ast.instr list list
 
 (* Generic formatting *)
 
@@ -48,12 +47,12 @@ let name n =
 let list_of_opt = function None -> [] | Some x -> [x]
 
 let list_of_block blocks f (Block_label b) =
-  let block = Vector.get b blocks in
+  let block = List.nth blocks (Int32.to_int b) in
   let rec map acc pos =
     if pos < 0l then acc
-    else map (f (Vector.get pos block) :: acc) (Int32.pred pos)
+    else map (f (List.nth block (Int32.to_int pos)) :: acc) (Int32.pred pos)
   in
-  map [] (Int32.pred (Vector.num_elements block))
+  map [] (Int32.pred (List.length block |> Int32.of_int))
 
 let list f xs = List.map f xs
 
@@ -563,8 +562,8 @@ let rec instr blocks e =
 
 let const blocks head c =
   let (Block_label b) = c.it in
-  let block = Vector.get b blocks in
-  if Vector.num_elements block = 1l then instr blocks (Vector.get 0l block)
+  let block = List.nth blocks (Int32.to_int b) in
+  if List.length block = 1 then instr blocks (List.hd block)
   else Node (head, list_of_block blocks (instr blocks) (Block_label b))
 
 (* Functions *)
@@ -599,16 +598,16 @@ let elem_kind = function FuncRefType -> "func" | _ -> assert false
 
 let is_elem_index blocks e =
   let (Block_label b) = e.it in
-  let block = Vector.get b blocks in
-  if Vector.num_elements block = 1l then
-    match Vector.get 0l block with {it = RefFunc _; _} -> true | _ -> false
+  let block = List.nth blocks (Int32.to_int b) in
+  if List.length block = 1 then
+    match List.hd block with {it = RefFunc _; _} -> true | _ -> false
   else false
 
 let elem_index blocks e =
   let (Block_label b) = e.it in
-  let block = Vector.get b blocks in
-  if Vector.num_elements block = 1l then
-    match Vector.get 0l block with
+  let block = List.nth blocks (Int32.to_int b) in
+  if List.length block = 1 then
+    match List.hd block with
     | {it = RefFunc x; _} -> atom var x
     | _ -> assert false
   else assert false
@@ -698,9 +697,7 @@ let module_with_var_opt x_opt m =
   let imports = lazy_vector (import fx tx mx gx) m.it.imports in
   let* blocks =
     let* bls = Ast.Vector.to_list m.it.allocations.blocks in
-    let+ bls_l = TzStdLib.List.map_s Ast.Vector.to_list bls in
-    let bls_v = List.map Vector.of_list bls_l in
-    Vector.of_list bls_v
+    TzStdLib.List.map_s Ast.Vector.to_list bls
   in
   let+ datas =
     lazy_vectori_lwt (data blocks m.it.allocations.datas) m.it.datas

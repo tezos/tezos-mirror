@@ -32,7 +32,6 @@ module V = Instance.Vector
 module M = Instance.NameMap
 module C = Chunked_byte_vector.Lwt
 open Tree_encoding
-open Lazy_vector_encoding.Int32
 module NameMap = Lazy_map_encoding.Make (Instance.NameMap)
 module ModuleMap = Lazy_map_encoding.Make (Instance.ModuleMap.Map)
 
@@ -40,7 +39,7 @@ module ModuleMap = Lazy_map_encoding.Make (Instance.ModuleMap.Map)
 let string_tag = value [] Data_encoding.string
 
 let list_encoding item_enc =
-  let vector = lazy_vector (value [] Data_encoding.int32) item_enc in
+  let vector = int32_lazy_vector (value [] Data_encoding.int32) item_enc in
   (* TODO: #3076
      This should return a [Instance.Vector.t] instead of a list. Once the AST
      has been sufficiently adapted to lazy vectors and maps, this change can
@@ -48,7 +47,9 @@ let list_encoding item_enc =
   conv_lwt V.to_list (fun list -> Lwt.return (V.of_list list)) vector
 
 let lazy_vector_encoding field_name tree_encoding =
-  scope [field_name] (lazy_vector (value [] Data_encoding.int32) tree_encoding)
+  scope
+    [field_name]
+    (int32_lazy_vector (value [] Data_encoding.int32) tree_encoding)
 
 let function_type_encoding =
   conv
@@ -811,8 +812,6 @@ let input_buffer_message_encoding =
        (value ["message-counter"] Data_encoding.z)
        chunked_byte_vector)
 
-module InputBufferVec = Lazy_vector_encoding.Make (Lazy_vector.LwtZVector)
-
 let input_buffer_encoding =
   conv
     (fun (content, num_elements) ->
@@ -829,7 +828,7 @@ let input_buffer_encoding =
        ~flatten:true
        (scope
           ["messages"]
-          (InputBufferVec.lazy_vector
+          (z_lazy_vector
              (value [] Data_encoding.z)
              input_buffer_message_encoding))
        (value ["num-messages"] Data_encoding.z))

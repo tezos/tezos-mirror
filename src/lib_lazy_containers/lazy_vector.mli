@@ -31,18 +31,6 @@
   logarithmic time complexity and it supports non-int keys.
 *)
 
-module Effect : sig
-  module type S = sig
-    include Lazy_map.Effect.S
-
-    val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
-  end
-
-  module Identity : S with type 'a t = 'a
-
-  module Lwt : S with type 'a t = 'a Lwt.t
-end
-
 (** [KeyS] is the qualifier signature for key types in the lazy vector.
     Externally visible and accessible keys of the lazy vector are always
     non-negative. However, the lazy vector implementation may internally use
@@ -70,11 +58,9 @@ end
 module type S = sig
   type key
 
-  type 'a effect
+  type 'a producer = key -> 'a Lwt.t
 
-  type 'a producer = key -> 'a effect
-
-  module Map : Lazy_map.S with type key = key and type 'a effect = 'a effect
+  module Map : Lazy_map.S with type key = key
 
   type 'a t
 
@@ -136,7 +122,7 @@ module type S = sig
   (** [get key vector] retrieves the element at [key].
 
       @raises Exn.Bounds when trying to access an invalid key  *)
-  val get : key -> 'a t -> 'a effect
+  val get : key -> 'a t -> 'a Lwt.t
 
   (** [set key value vector] sets the element at [key] to [value].
 
@@ -168,7 +154,7 @@ module type S = sig
       {b Note: This function maybe dangerous to use in a tick because
       {i every} entries of both [lhs] and [rhs] will be loaded in
       memory. *)
-  val concat : 'a t -> 'a t -> 'a t effect
+  val concat : 'a t -> 'a t -> 'a t Lwt.t
 
   (** [unsafe_concat] concatenates two lazy vectors, {b assuming every
       entries of both vectors are already loaded in memory}. *)
@@ -179,7 +165,7 @@ module type S = sig
 
       {b Note:} This function may be dangerous to use in a tick
       because all entries of the vector are loaded in memory. *)
-  val to_list : 'a t -> 'a list effect
+  val to_list : 'a t -> 'a list Lwt.t
 
   (** [loaded_bindings vector] returns the [(key * 'a) list] representation of
       the vector [vector] containing only the loaded values, in order of
@@ -190,22 +176,15 @@ module type S = sig
   val first_key : 'a t -> key
 end
 
-module Make (Effect : Effect.S) (Key : KeyS) :
-  S with type key = Key.t and type 'a effect = 'a Effect.t
+module Make (Key : KeyS) : S with type key = Key.t
 
-module IntVector : S with type key = int and type 'a effect = 'a
+module LwtIntVector : S with type key = int
 
-module Int32Vector : S with type key = int32 and type 'a effect = 'a
+module LwtInt32Vector : S with type key = int32
 
-module Int64Vector : S with type key = int64 and type 'a effect = 'a
+module LwtInt64Vector : S with type key = int64
 
-module LwtIntVector : S with type key = int and type 'a effect = 'a Lwt.t
-
-module LwtInt32Vector : S with type key = int32 and type 'a effect = 'a Lwt.t
-
-module LwtInt64Vector : S with type key = int64 and type 'a effect = 'a Lwt.t
-
-module LwtZVector : S with type key = Z.t and type 'a effect = 'a Lwt.t
+module LwtZVector : S with type key = Z.t
 
 (** [Make] generates a lazy vector module using a given [Key] module. *)
 module Mutable : sig
@@ -215,9 +194,7 @@ module Mutable : sig
   module type S = sig
     type key
 
-    type 'a effect
-
-    module Vector : S with type key = key and type 'a effect = 'a effect
+    module Vector : S with type key = key
 
     type 'a t
 
@@ -234,7 +211,7 @@ module Mutable : sig
 
     val origin : 'a t -> Lazy_map.tree option
 
-    val get : key -> 'a t -> 'a Vector.effect
+    val get : key -> 'a t -> 'a Lwt.t
 
     val set : key -> 'a -> 'a t -> unit
 
@@ -248,47 +225,15 @@ module Mutable : sig
   end
 
   module Make (Vector : ImmutableS) :
-    S
-      with type key = Vector.key
-       and type 'a effect = 'a Vector.effect
-       and module Vector = Vector
+    S with type key = Vector.key and module Vector = Vector
 
-  module IntVector :
-    S with type key = int and type 'a effect = 'a and module Vector = IntVector
-
-  module Int32Vector :
-    S
-      with type key = int32
-       and type 'a effect = 'a
-       and module Vector = Int32Vector
-
-  module Int64Vector :
-    S
-      with type key = int64
-       and type 'a effect = 'a
-       and module Vector = Int64Vector
-
-  module LwtIntVector :
-    S
-      with type key = int
-       and type 'a effect = 'a Lwt.t
-       and module Vector = LwtIntVector
+  module LwtIntVector : S with type key = int and module Vector = LwtIntVector
 
   module LwtInt32Vector :
-    S
-      with type key = int32
-       and type 'a effect = 'a Lwt.t
-       and module Vector = LwtInt32Vector
+    S with type key = int32 and module Vector = LwtInt32Vector
 
   module LwtInt64Vector :
-    S
-      with type key = int64
-       and type 'a effect = 'a Lwt.t
-       and module Vector = LwtInt64Vector
+    S with type key = int64 and module Vector = LwtInt64Vector
 
-  module LwtZVector :
-    S
-      with type key = Z.t
-       and type 'a effect = 'a Lwt.t
-       and module Vector = LwtZVector
+  module LwtZVector : S with type key = Z.t and module Vector = LwtZVector
 end

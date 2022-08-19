@@ -3,6 +3,8 @@
 
 # Ignoring package internal-devtools, it only contains tests or private targets
 
+# Ignoring package lazy-containers-tests, it only contains tests or private targets
+
 # Ignoring package tezos-benchmark-tests, it only contains tests or private targets
 
 # Ignoring package tezos-dal-node, it only contains tests or private targets

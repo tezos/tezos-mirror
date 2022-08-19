@@ -25,7 +25,7 @@
 
 open QCheck_alcotest
 open QCheck2
-open Chunked_byte_vector
+open Chunked_byte_vector.Lwt
 
 let create_works =
   Test.make ~name:"create works" Gen.ui64 (fun len ->
@@ -34,34 +34,46 @@ let create_works =
 
 let store_load_byte_works =
   Test.make ~name:"store_byte and load_byte work" Gen.string (fun str ->
+      let open Lwt.Syntax in
+      Lwt_main.run
+      @@
       let bytes = Bytes.of_string str in
       let len = Int64.of_int (Bytes.length bytes) in
       let vector = create len in
-      let mapping =
-        List.init (Bytes.length bytes) (fun i ->
+      let* mapping =
+        Lwt_list.map_s (fun i ->
             let index = Int64.of_int i in
             let byte = Bytes.get_uint8 bytes i in
-            store_byte vector index byte ;
+            let+ () = store_byte vector index byte in
             (index, byte))
+        @@ List.init (Bytes.length bytes) Fun.id
       in
-      List.for_all (fun (i, c) -> load_byte vector i = c) mapping)
+      Lwt_list.for_all_p
+        (fun (i, c) ->
+          let+ v = load_byte vector i in
+          v = c)
+        mapping)
 
 let grow_works =
   Test.make
     ~name:"grow works"
     Gen.(pair string small_int)
     (fun (init_str, grow_len) ->
+      let open Lwt.Syntax in
+      Lwt_main.run
+      @@
       let grow_len = Int64.of_int grow_len in
       let vector = of_string init_str in
       let check_contents () =
-        List.init (String.length init_str) (fun i ->
+        Lwt_list.for_all_p (fun i ->
             let index = Int64.of_int i in
-            load_byte vector index = Char.code (String.get init_str i))
-        |> List.for_all Fun.id
+            let+ v = load_byte vector index in
+            v = Char.code (String.get init_str i))
+        @@ List.init (String.length init_str) Fun.id
       in
-      let check1 = check_contents () in
+      let* check1 = check_contents () in
       grow vector grow_len ;
-      let check2 = check_contents () in
+      let+ check2 = check_contents () in
       let check3 =
         Int64.(length vector = add grow_len (of_int (String.length init_str)))
       in
@@ -72,6 +84,9 @@ let can_write_after_grow =
     ~name:"can write after grow"
     Gen.(string_size (101 -- 1_000))
     (fun append_str ->
+      let open Lwt.Syntax in
+      Lwt_main.run
+      @@
       let chunk_size = Chunked_byte_vector.Chunk.size in
       (* We initialize the vector with a string of a size slightly
          under [chunk_size]. This is to be sure that the previous
@@ -81,21 +96,28 @@ let can_write_after_grow =
       let vector =
         create
           ~get_chunk:(function
-            | 0L -> Chunk.of_bytes @@ Bytes.make (Int64.to_int chunk_size) 'a'
+            | 0L ->
+                Lwt.return
+                  (Chunked_byte_vector.Chunk.of_bytes
+                  @@ Bytes.make (Int64.to_int chunk_size) 'a')
             | _otherwise -> assert false)
           init_size
       in
-      assert (load_byte vector 0L = Char.code 'a') ;
+      let* v = load_byte vector 0L in
+      assert (v = Char.code 'a') ;
       grow vector (String.length append_str |> Int64.of_int) ;
-      store_bytes vector init_size @@ Bytes.of_string append_str ;
-      assert (load_byte vector 0L = Char.code 'a') ;
-      assert (load_byte vector init_size = Char.code (String.get append_str 0)) ;
-      assert (
-        load_byte vector chunk_size = Char.code (String.get append_str 100)) ;
+      let* () = store_bytes vector init_size @@ Bytes.of_string append_str in
+      let* v = load_byte vector 0L in
+      assert (v = Char.code 'a') ;
+      let* v = load_byte vector init_size in
+      assert (v = Char.code (String.get append_str 0)) ;
+      let+ v = load_byte vector chunk_size in
+      assert (v = Char.code (String.get append_str 100)) ;
       true)
 
 let internal_num_pages_edge_case =
   let test () =
+    let open Chunked_byte_vector in
     let open Alcotest in
     check int64 "exact value" 0L (Chunk.num_needed 0L) ;
     check int64 "exact value" 1L (Chunk.num_needed Chunk.size) ;

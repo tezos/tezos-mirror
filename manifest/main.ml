@@ -1093,9 +1093,17 @@ let _lazy_containers_tests =
   test
     "main"
     ~path:"src/lib_lazy_containers/test"
-    ~opam:"lazy-containers"
+    ~opam:"lazy-containers-tests"
+    ~synopsis:"Various tests for the lazy containers library"
     ~dune:Dune.[[S "include_subdirs"; S "no"]]
-    ~deps:[lazy_containers |> open_; qcheck_core; qcheck_alcotest; alcotest]
+    ~deps:
+      [
+        lazy_containers |> open_;
+        qcheck_core;
+        qcheck_alcotest;
+        alcotest;
+        lwt_unix;
+      ]
 
 let tree_encoding =
   public_lib

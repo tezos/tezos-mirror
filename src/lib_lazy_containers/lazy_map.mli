@@ -30,24 +30,6 @@
     takes care of adding a new constructor for the expected tree. *)
 type tree = ..
 
-(**
-  A lazy map is a key-value association where each value is created dynamically.
-*)
-
-module Effect : sig
-  module type S = sig
-    type 'a t
-
-    val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
-
-    val return : 'a -> 'a t
-  end
-
-  module Identity : S with type 'a t = 'a
-
-  module Lwt : S with type 'a t = 'a Lwt.t
-end
-
 (** [KeyS] is the qualifier signature for key types in the lazy map.
     Externally visible and accessible keys of the lazy map are always
     non-negative. However, the lazy map implementation may internally use
@@ -63,9 +45,7 @@ end
 module type S = sig
   type key
 
-  type 'a effect
-
-  type 'a producer = key -> 'a effect
+  type 'a producer = key -> 'a Lwt.t
 
   module Map : Map.S with type key = key
 
@@ -108,7 +88,7 @@ module type S = sig
   (** [get key map] retrieves the element at [key].
 
       @raises Exn.Bounds when trying to access an invalid key  *)
-  val get : key -> 'a t -> 'a effect
+  val get : key -> 'a t -> 'a Lwt.t
 
   (** [set key value map] sets the element at [key] to [value].
 
@@ -125,20 +105,13 @@ end
     to [S.create]. *)
 exception UnexpectedAccess
 
-module Make (Effect : Effect.S) (Key : KeyS) :
-  S with type key = Key.t and type 'a effect = 'a Effect.t
+module Make (Key : KeyS) : S with type key = Key.t
 
-module IntMap : S with type key = int and type 'a effect = 'a
+module LwtIntMap : S with type key = int
 
-module Int32Map : S with type key = int32 and type 'a effect = 'a
+module LwtInt32Map : S with type key = int32
 
-module Int64Map : S with type key = int64 and type 'a effect = 'a
-
-module LwtIntMap : S with type key = int and type 'a effect = 'a Lwt.t
-
-module LwtInt32Map : S with type key = int32 and type 'a effect = 'a Lwt.t
-
-module LwtInt64Map : S with type key = int64 and type 'a effect = 'a Lwt.t
+module LwtInt64Map : S with type key = int64
 
 (** [Make] generates a lazy map module using a given [Key] module. *)
 module Mutable : sig
@@ -146,9 +119,7 @@ module Mutable : sig
   module type S = sig
     type key
 
-    type 'a effect
-
-    module Map : S with type key = key and type 'a effect = 'a effect
+    module Map : S with type key = key
 
     type 'a t
 
@@ -161,25 +132,18 @@ module Mutable : sig
       unit ->
       'a t
 
-    val get : key -> 'a t -> 'a Map.effect
+    val get : key -> 'a t -> 'a Lwt.t
 
     val set : key -> 'a -> 'a t -> unit
 
     val snapshot : 'a t -> 'a Map.t
   end
 
-  module Make (Effect : Effect.S) (Key : KeyS) :
-    S with type key = Key.t and type 'a effect = 'a Effect.t
+  module Make (Key : KeyS) : S with type key = Key.t
 
-  module IntMap : S with type key = int and type 'a effect = 'a
+  module LwtIntMap : S with type key = int
 
-  module Int32Map : S with type key = int32 and type 'a effect = 'a
+  module LwtInt32Map : S with type key = int32
 
-  module Int64Map : S with type key = int64 and type 'a effect = 'a
-
-  module LwtIntMap : S with type key = int and type 'a effect = 'a Lwt.t
-
-  module LwtInt32Map : S with type key = int32 and type 'a effect = 'a Lwt.t
-
-  module LwtInt64Map : S with type key = int64 and type 'a effect = 'a Lwt.t
+  module LwtInt64Map : S with type key = int64
 end
