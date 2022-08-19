@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Error_monad
-include Dal_cryptobox_intf
+include Cryptobox_intf
 module Base58 = Tezos_crypto.Base58
 module Srs_g1 = Bls12_381_polynomial.Polynomial.Srs_g1
 module Srs_g2 = Bls12_381_polynomial.Polynomial.Srs_g2

@@ -30,7 +30,7 @@ module type T = sig
     Tezos_shell_services.Chain_services.chain ->
     Tezos_shell_services.Block_services.block ->
     Client_context.full ->
-    Tezos_crypto_dal.Dal_cryptobox.Verifier.parameters tzresult Lwt.t
+    Tezos_crypto_dal.Cryptobox.Verifier.parameters tzresult Lwt.t
 end
 
 let table : (module T) Protocol_hash.Table.t = Protocol_hash.Table.create 5

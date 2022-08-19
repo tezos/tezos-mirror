@@ -99,17 +99,17 @@ let encode enc v = Data_encoding.Binary.to_string enc v |> wrap_encoding_error
 let share_path slot_header shard_id = [slot_header; string_of_int shard_id]
 
 let decode_share s =
-  Data_encoding.Binary.of_string Dal_cryptobox.share_encoding s
+  Data_encoding.Binary.of_string Cryptobox.share_encoding s
   |> Result.map_error (fun e ->
          [Tezos_base.Data_encoding_wrapper.Decoding_error e])
 
 let save store slot_header shards =
   let open Lwt_result_syntax in
-  let slot_header = Dal_cryptobox.Commitment.to_b58check slot_header in
-  Dal_cryptobox.IntMap.iter_es
+  let slot_header = Cryptobox.Commitment.to_b58check slot_header in
+  Cryptobox.IntMap.iter_es
     (fun i share ->
       let path = share_path slot_header i in
-      let*? share = encode Dal_cryptobox.share_encoding share in
+      let*? share = encode Cryptobox.share_encoding share in
       let*! metadata = Store.set ~msg:"Share stored" store path share in
       return metadata)
     shards
@@ -117,29 +117,25 @@ let save store slot_header shards =
 let split_and_store cb_constants store slot =
   let r =
     let open Result_syntax in
-    let* polynomial = Dal_cryptobox.polynomial_from_slot cb_constants slot in
-    let commitment = Dal_cryptobox.commit cb_constants polynomial in
+    let* polynomial = Cryptobox.polynomial_from_slot cb_constants slot in
+    let commitment = Cryptobox.commit cb_constants polynomial in
     return (polynomial, commitment)
   in
   let open Lwt_result_syntax in
   match r with
   | Ok (polynomial, commitment) ->
-      let shards =
-        Dal_cryptobox.shards_from_polynomial cb_constants polynomial
-      in
+      let shards = Cryptobox.shards_from_polynomial cb_constants polynomial in
       let* () = save store commitment shards in
       let*! () =
         Event.(
-          emit
-            stored_slot
-            (Bytes.length slot, Dal_cryptobox.IntMap.cardinal shards))
+          emit stored_slot (Bytes.length slot, Cryptobox.IntMap.cardinal shards))
       in
       Lwt.return_ok commitment
   | Error (`Slot_wrong_size msg) -> Lwt.return_error [Splitting_failed msg]
 
 let get_shard store slot_header shard_id =
   let open Lwt_result_syntax in
-  let*? slot_header = encode Dal_cryptobox.Commitment.encoding slot_header in
+  let*? slot_header = encode Cryptobox.Commitment.encoding slot_header in
   let* share =
     Lwt.catch
       (fun () ->
@@ -149,20 +145,20 @@ let get_shard store slot_header shard_id =
         | Invalid_argument _ -> fail [Slot_not_found] | e -> fail [Exn e])
   in
   let*? share = decode_share share in
-  return Dal_cryptobox.{index = shard_id; share}
+  return Cryptobox.{index = shard_id; share}
 
 let check_shards initial_constants shards =
   let open Result_syntax in
   if shards = [] then fail [Slot_not_found]
   else if
     Compare.List_length_with.(
-      shards = initial_constants.Dal_cryptobox.number_of_shards)
+      shards = initial_constants.Cryptobox.number_of_shards)
   then Ok ()
   else fail [Missing_shards]
 
 let get_slot initial_constants dal_constants store slot_header =
   let open Lwt_result_syntax in
-  let slot_header = Dal_cryptobox.Commitment.to_b58check slot_header in
+  let slot_header = Cryptobox.Commitment.to_b58check slot_header in
   let*! shards = Store.list store [slot_header] in
   let*? () = check_shards initial_constants shards in
   let* shards =
@@ -178,20 +174,20 @@ let get_slot initial_constants dal_constants store slot_header =
               return share
         in
         let*? share = decode_share share in
-        return (Dal_cryptobox.IntMap.add i share shards))
-      Dal_cryptobox.IntMap.empty
+        return (Cryptobox.IntMap.add i share shards))
+      Cryptobox.IntMap.empty
       shards
   in
   let*? polynomial =
-    match Dal_cryptobox.polynomial_from_shards dal_constants shards with
+    match Cryptobox.polynomial_from_shards dal_constants shards with
     | Ok p -> Ok p
     | Error (`Invert_zero msg | `Not_enough_shards msg) ->
         Error [Merging_failed msg]
   in
-  let slot = Dal_cryptobox.polynomial_to_bytes dal_constants polynomial in
+  let slot = Cryptobox.polynomial_to_bytes dal_constants polynomial in
   let*! () =
     Event.(
-      emit fetched_slot (Bytes.length slot, Dal_cryptobox.IntMap.cardinal shards))
+      emit fetched_slot (Bytes.length slot, Cryptobox.IntMap.cardinal shards))
   in
   return slot
 

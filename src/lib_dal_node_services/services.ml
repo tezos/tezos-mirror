@@ -50,14 +50,12 @@ let slot () =
     ~description:"Show content of a slot"
     ~query:slot_query
     ~output:Data_encoding.string
-    RPC_path.(
-      open_root / "slot" / "content" /: Dal_cryptobox.Commitment.rpc_arg)
+    RPC_path.(open_root / "slot" / "content" /: Cryptobox.Commitment.rpc_arg)
 
 let shard () =
   let shard_arg = RPC_arg.int in
   RPC_service.get_service
     ~description:"Fetch shard as bytes"
     ~query:RPC_query.empty
-    ~output:Dal_cryptobox.shard_encoding
-    RPC_path.(
-      open_root / "shard" /: Dal_cryptobox.Commitment.rpc_arg /: shard_arg)
+    ~output:Cryptobox.shard_encoding
+    RPC_path.(open_root / "shard" /: Cryptobox.Commitment.rpc_arg /: shard_arg)

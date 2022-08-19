@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Dal_cryptobox_intf
+open Cryptobox_intf
 
 (** Initial values to parametrize dal cryptographic primitives. It used to build
     a value of type [t] *)
@@ -84,7 +84,7 @@ val initialisation_parameters_from_files :
 val load_parameters : initialisation_parameters -> unit Error_monad.tzresult
 
 module Commitment : sig
-  include Dal_cryptobox_intf.COMMITMENT with type t = commitment
+  include COMMITMENT with type t = commitment
 
   val rpc_arg : commitment Resto.Arg.t
 end

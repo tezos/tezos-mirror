@@ -25,8 +25,8 @@
 
 type t = {
   config : Configuration.t;
-  dal_constants : Dal_cryptobox.t;
-  dal_parameters : Dal_cryptobox.parameters;
+  dal_constants : Cryptobox.t;
+  dal_parameters : Cryptobox.parameters;
 }
 
-val make : Configuration.t -> Dal_cryptobox.t -> Dal_cryptobox.parameters -> t
+val make : Configuration.t -> Cryptobox.t -> Cryptobox.parameters -> t

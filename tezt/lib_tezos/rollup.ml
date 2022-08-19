@@ -529,7 +529,7 @@ module Dal = struct
       return {number_of_shards; redundancy_factor; slot_size; segment_size}
   end
 
-  module Cryptobox = Tezos_crypto_dal.Dal_cryptobox
+  module Cryptobox = Tezos_crypto_dal.Cryptobox
 
   let make
       ?(on_error =

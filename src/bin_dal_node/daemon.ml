@@ -33,8 +33,6 @@ let resolve_plugin cctxt =
        (Dal_constants_plugin.get protocols.current_protocol)
        (Dal_constants_plugin.get protocols.next_protocol)
 
-open Dal_cryptobox
-
 type error += Cryptobox_initialisation_failed of string
 
 let () =
@@ -53,6 +51,7 @@ let () =
     (fun str -> Cryptobox_initialisation_failed str)
 
 let init_cryptobox unsafe_srs cctxt (module Plugin : Dal_constants_plugin.T) =
+  let open Cryptobox in
   let open Lwt_result_syntax in
   let* parameters = Plugin.get_constants cctxt#chain cctxt#block cctxt in
   let* initialisation_parameters =

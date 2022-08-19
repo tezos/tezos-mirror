@@ -267,7 +267,7 @@ module Manager = struct
 
   let json_of_commitment commitment =
     Data_encoding.Json.construct
-      Tezos_crypto_dal.Dal_cryptobox.Commitment.encoding
+      Tezos_crypto_dal.Cryptobox.Commitment.encoding
       commitment
 
   let get_next_counter ?(source = Constant.bootstrap1) client =
@@ -334,7 +334,7 @@ module Manager = struct
     | Dal_publish_slot_header of {
         level : int;
         index : int;
-        header : Tezos_crypto_dal.Dal_cryptobox.commitment;
+        header : Tezos_crypto_dal.Cryptobox.commitment;
       }
     | Sc_rollup_dal_slot_subscribe of {rollup : string; slot_index : int}
     | Delegation of {delegate : Account.key}

@@ -36,27 +36,21 @@ type slot = bytes
     it onto the disk and returns the corresponding [slot_header], using
     [dal_constants] and trusted setup [ts] *)
 val split_and_store :
-  Dal_cryptobox.t ->
-  Store.t ->
-  slot ->
-  Dal_cryptobox.Commitment.t tzresult Lwt.t
+  Cryptobox.t -> Store.t -> slot -> Cryptobox.Commitment.t tzresult Lwt.t
 
 (** [get_shard store slot_header shard_id] gets the shard associated to
     [slot_header] at the range [shard_id] *)
 val get_shard :
-  Store.t ->
-  Dal_cryptobox.commitment ->
-  int ->
-  Dal_cryptobox.shard tzresult Lwt.t
+  Store.t -> Cryptobox.commitment -> int -> Cryptobox.shard tzresult Lwt.t
 
 (** [get_slot dal_parameters dal_constants store slot_header] fetches from
     disk the shards associated to [slot_header], gathers them, rebuilds and
     returns the [slot]. *)
 val get_slot :
-  Dal_cryptobox.parameters ->
-  Dal_cryptobox.t ->
+  Cryptobox.parameters ->
+  Cryptobox.t ->
   Store.t ->
-  Dal_cryptobox.commitment ->
+  Cryptobox.commitment ->
   slot tzresult Lwt.t
 
 module Utils : sig
