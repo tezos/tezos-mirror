@@ -156,7 +156,7 @@ let input_binary_file file run =
         let* () = trace_lwt "Decoding..." in
         input_binary file (Bytes.to_string buf) run))
 
-let input_js_file file run =
+let input_js_file file _run =
   raise (Sys_error (file ^ ": unrecognized input file type"))
 
 let input_file file run =
@@ -292,7 +292,7 @@ let string_of_num_pat (p : num_pat) =
 
 let string_of_vec_pat (p : vec_pat) =
   match p with
-  | VecPat (Values.V128 (shape, ns)) ->
+  | VecPat (Values.V128 (_, ns)) ->
       String.concat " " (List.map string_of_num_pat ns)
 
 let string_of_ref_pat (p : ref_pat) =
@@ -428,7 +428,7 @@ let run_action act : Values.value list Lwt.t =
       let* export = Instance.export inst name in
       match export with
       | Some (Instance.ExternFunc f) ->
-          let (Types.FuncType (ins, out)) = Func.type_of f in
+          let (Types.FuncType (ins, _)) = Func.type_of f in
           let* ins_l = Lazy_vector.LwtInt32Vector.to_list ins in
           if List.length vs <> List.length ins_l then
             Script.error act.at "wrong number of arguments" ;

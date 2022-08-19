@@ -133,9 +133,9 @@ let vec_extension sz = function
 module IntOp = struct
   open Ast.IntOp
 
-  let testop xx = function Eqz -> "eqz"
+  let testop _xx = function Eqz -> "eqz"
 
-  let relop xx = function
+  let relop _xx = function
     | Eq -> "eq"
     | Ne -> "ne"
     | LtS -> "lt_s"
@@ -147,13 +147,13 @@ module IntOp = struct
     | GeS -> "ge_s"
     | GeU -> "ge_u"
 
-  let unop xx = function
+  let unop _xx = function
     | Clz -> "clz"
     | Ctz -> "ctz"
     | Popcnt -> "popcnt"
     | ExtendS sz -> "extend" ^ pack_size sz ^ "_s"
 
-  let binop xx = function
+  let binop _xx = function
     | Add -> "add"
     | Sub -> "sub"
     | Mul -> "mul"
@@ -188,9 +188,9 @@ end
 module FloatOp = struct
   open Ast.FloatOp
 
-  let testop xx = function (_ : testop) -> .
+  let testop _xx = function (_ : testop) -> .
 
-  let relop xx = function
+  let relop _xx = function
     | Eq -> "eq"
     | Ne -> "ne"
     | Lt -> "lt"
@@ -198,7 +198,7 @@ module FloatOp = struct
     | Le -> "le"
     | Ge -> "ge"
 
-  let unop xx = function
+  let unop _xx = function
     | Neg -> "neg"
     | Abs -> "abs"
     | Ceil -> "ceil"
@@ -207,7 +207,7 @@ module FloatOp = struct
     | Nearest -> "nearest"
     | Sqrt -> "sqrt"
 
-  let binop xx = function
+  let binop _xx = function
     | Add -> "add"
     | Sub -> "sub"
     | Mul -> "mul"
@@ -241,14 +241,14 @@ module V128Op = struct
     | "32x4" -> "64x2"
     | _ -> assert false
 
-  let voidop xxxx = function (_ : void) -> .
+  let voidop _xxxx = function (_ : void) -> .
 
-  let itestop xxxx (op : itestop) = match op with AllTrue -> "all_true"
+  let itestop _xxxx (op : itestop) = match op with AllTrue -> "all_true"
 
-  let iunop xxxx (op : iunop) =
+  let iunop _xxxx (op : iunop) =
     match op with Neg -> "neg" | Abs -> "abs" | Popcnt -> "popcnt"
 
-  let funop xxxx (op : funop) =
+  let funop _xxxx (op : funop) =
     match op with
     | Neg -> "neg"
     | Abs -> "abs"
@@ -283,7 +283,7 @@ module V128Op = struct
     | Shuffle is -> "shuffle " ^ String.concat " " (List.map nat is)
     | Swizzle -> "swizzle"
 
-  let fbinop xxxx (op : fbinop) =
+  let fbinop _xxxx (op : fbinop) =
     match op with
     | Add -> "add"
     | Sub -> "sub"
@@ -294,7 +294,7 @@ module V128Op = struct
     | Pmin -> "pmin"
     | Pmax -> "pmax"
 
-  let irelop xxxx (op : irelop) =
+  let irelop _xxxx (op : irelop) =
     match op with
     | Eq -> "eq"
     | Ne -> "ne"
@@ -307,7 +307,7 @@ module V128Op = struct
     | GeS -> "ge_s"
     | GeU -> "ge_u"
 
-  let frelop xxxx (op : frelop) =
+  let frelop _xxxx (op : frelop) =
     match op with
     | Eq -> "eq"
     | Ne -> "ne"
@@ -338,10 +338,10 @@ module V128Op = struct
     | ConvertUI32x4 ->
         "convert_" ^ (if xxxx = "32x4" then "" else "low_") ^ "i32x4_u"
 
-  let ishiftop xxxx (op : ishiftop) =
+  let ishiftop _xxxx (op : ishiftop) =
     match op with Shl -> "shl" | ShrS -> "shr_s" | ShrU -> "shr_u"
 
-  let ibitmaskop xxxx (op : ibitmaskop) = match op with Bitmask -> "bitmask"
+  let ibitmaskop _xxxx (op : ibitmaskop) = match op with Bitmask -> "bitmask"
 
   let vtestop (op : vtestop) = match op with AnyTrue -> "any_true"
 
@@ -356,16 +356,16 @@ module V128Op = struct
 
   let vternop (op : vternop) = match op with Bitselect -> "bitselect"
 
-  let splatop xxxx (op : nsplatop) = match op with Splat -> "splat"
+  let splatop _xxxx (op : nsplatop) = match op with Splat -> "splat"
 
-  let pextractop xxxx (op : extension nextractop) =
+  let pextractop _xxxx (op : extension nextractop) =
     match op with
     | Extract (i, ext) -> "extract_lane" ^ extension ext ^ " " ^ nat i
 
-  let extractop xxxx (op : unit nextractop) =
+  let extractop _xxxx (op : unit nextractop) =
     match op with Extract (i, ()) -> "extract_lane " ^ nat i
 
-  let replaceop xxxx (op : nreplaceop) =
+  let replaceop _xxxx (op : nreplaceop) =
     match op with Replace i -> "replace_lane " ^ nat i
 
   let lane_oper (pop, iop, fop) op =
