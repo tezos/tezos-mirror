@@ -1019,13 +1019,55 @@ let run_data (inst : module_inst) i data =
 
 let run_start start = List.map plain [Call start.it.sfunc @@ start.at]
 
-type init_kont = IK_Start | IK_Stop of module_inst
+type ('a, 'b, 'acc) fold_right2_kont = {
+  acc : 'acc;
+  lv : 'a Vector.t;
+  rv : 'b Vector.t;
+  offset : int32;
+}
+
+let fold_right2_kont (m : module_) acc lv rv =
+  if Vector.num_elements lv <> Vector.num_elements rv then
+    Link.error m.at "wrong number of imports provided for initialisation"
+  else {acc; lv; rv; offset = Int32.pred (Vector.num_elements lv)}
+
+let fold_right2_completed {offset; _} = offset = -1l
+
+let fold_right2_step {acc; lv; rv; offset} f =
+  let open Lwt.Syntax in
+  let* x = Vector.get offset lv in
+  let* y = Vector.get offset rv in
+  let+ acc = f x y acc in
+  {acc; lv; rv; offset = Int32.pred offset}
+
+type init_kont =
+  | IK_Start
+  | IK_Add_import of (extern, import, module_inst) fold_right2_kont
+  | IK_Remaining of module_inst
+  | IK_Stop of module_inst
 
 let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
   function
   | IK_Start ->
+      (* Initialize as empty module. *)
+      update_module_ref module_reg self empty_module_inst ;
+      Lwt.return
+        (IK_Add_import
+           (fold_right2_kont
+              m
+              empty_module_inst
+              (* This is safe as long as we provide an empty list in
+                 the PVM. *)
+              (Vector.of_list exts)
+              m.it.imports))
+  | IK_Add_import tick when fold_right2_completed tick ->
+      update_module_ref module_reg self tick.acc ;
+      Lwt.return (IK_Remaining tick.acc)
+  | IK_Add_import tick ->
+      let+ tick = fold_right2_step tick (add_import m) in
+      IK_Add_import tick
+  | IK_Remaining init_inst0 ->
       let {
-        imports;
         tables;
         memories;
         globals;
@@ -1036,19 +1078,15 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
         datas;
         start;
         allocations;
+        _;
       } =
         m.it
       in
 
-      (* Initialize as empty module. *)
-      update_module_ref module_reg self empty_module_inst ;
-
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
-
          These transformations should be refactored and abadoned during the
          tickification, to avoid the roundtrip vector -> list -> vector. *)
       let* types = Vector.to_list types in
-      let* imports = Vector.to_list imports in
       let* tables = Vector.to_list tables in
       let* memories = Vector.to_list memories in
       let* globals = Vector.to_list globals in
@@ -1056,26 +1094,6 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
       let* elems = Vector.to_list elems in
       let* datas = Vector.to_list datas in
       let* exports = Vector.to_list exports in
-
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
-         To refactor during the tickification. *)
-      let* init_inst0 =
-        TzStdLib.List.fold_right2_s
-          ~when_different_lengths:()
-          (add_import m)
-          exts
-          imports
-          empty_module_inst
-      in
-      let init_inst0 =
-        match init_inst0 with
-        | Ok i -> i
-        | Error () ->
-            Link.error
-              m.at
-              "wrong number of imports provided for initialisation"
-      in
-      update_module_ref module_reg self init_inst0 ;
 
       let inst0 =
         {

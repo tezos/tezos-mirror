@@ -23,51 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_webassembly_interpreter.Eval
-module Parser = Binary_parser_encodings
-open Tree_encoding
-
-let tag_encoding = value [] Data_encoding.string
-
-let fold_right2_kont_encoding enc_a enc_b enc_acc =
-  conv
-    (fun (acc, lv, rv, offset) -> {acc; lv; rv; offset})
-    (fun {acc; lv; rv; offset} -> (acc, lv, rv, offset))
-  @@ tup4
-       ~flatten:true
-       (scope ["acc"] enc_acc)
-       (scope ["left_vector"] enc_a)
-       (scope ["right_vector"] enc_b)
-       (value ["offset"] @@ Data_encoding.int32)
-
-let lazy_vec_encoding enc = int32_lazy_vector (value [] Data_encoding.int32) enc
-
-let init_kont_encoding =
-  tagged_union
-    tag_encoding
-    [
-      case
-        "IK_Start"
-        (value_option [] Data_encoding.unit)
-        (function IK_Start -> Some None | _ -> None)
-        (function _ -> IK_Start);
-      case
-        "IK_Add_import"
-        (fold_right2_kont_encoding
-           (lazy_vec_encoding Wasm_encoding.extern_encoding)
-           (lazy_vec_encoding
-              Parser.(no_region_encoding Import.import_encoding))
-           Wasm_encoding.module_instance_encoding)
-        (function IK_Add_import m -> Some m | _ -> None)
-        (function m -> IK_Add_import m);
-      case
-        "IK_Remaining"
-        Wasm_encoding.module_instance_encoding
-        (function IK_Remaining m -> Some m | _ -> None)
-        (function m -> IK_Remaining m);
-      case
-        "IK_Stop"
-        Wasm_encoding.module_instance_encoding
-        (function IK_Stop m -> Some m | _ -> None)
-        (function m -> IK_Stop m);
-    ]
+(** [init_kont_encoding] tree-encoder for [init_kont] values. *)
+val init_kont_encoding :
+  Tezos_webassembly_interpreter.Eval.init_kont Tree_encoding.t

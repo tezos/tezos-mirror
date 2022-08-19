@@ -9,8 +9,17 @@ exception Crash of Source.region * string
 
 exception Exhaustion of Source.region * string
 
+type ('a, 'b, 'acc) fold_right2_kont = {
+  acc : 'acc;
+  lv : 'a Vector.t;
+  rv : 'b Vector.t;
+  offset : int32;
+}
+
 type init_kont =
   | IK_Start  (** Very first tick of the [init] function *)
+  | IK_Add_import of (extern, Ast.import, module_inst) fold_right2_kont
+  | IK_Remaining of module_inst
   | IK_Stop of module_inst
       (** Witness that there is no more tick to execute to complete
           the [init] process. *)
