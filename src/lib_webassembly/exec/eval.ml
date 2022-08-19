@@ -790,7 +790,7 @@ and step_resolved module_reg (c : config) frame vs e es : config Lwt.t =
               ("missing or ill-typed operand on stack (" ^ s1 ^ " : " ^ s2 ^ ")")
         )
     | Refer r, vs -> Lwt.return (Ref r :: vs, [])
-    | Trapping _, _ -> assert false
+    | Trapping msg, _ -> Trap.error e.at msg
     | Returning _, _ -> Crash.error e.at "undefined frame"
     | Breaking _, _ -> Crash.error e.at "undefined label"
     | Label (_, _, (vs', [])), vs -> Lwt.return (vs' @ vs, [])

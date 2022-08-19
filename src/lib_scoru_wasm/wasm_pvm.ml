@@ -41,6 +41,7 @@ type tick_state =
       init_kont : Tezos_webassembly_interpreter.Eval.init_kont;
     }
   | Eval of Wasm.Eval.config
+  | Stuck of Wasm_pvm_errors.t
 
 type pvm_state = {
   last_input_info : Wasm_pvm_sig.input_info option;
@@ -102,6 +103,11 @@ module Make (T : Tree_encoding.TREE) :
             (Wasm_encoding.config_encoding ~host_funcs)
             (function Eval eval_config -> Some eval_config | _ -> None)
             (fun eval_config -> Eval eval_config);
+          case
+            "stuck"
+            (value [] Wasm_pvm_errors.encoding)
+            (function Stuck err -> Some err | _ -> None)
+            (fun err -> Stuck err);
         ]
 
     let input_request_encoding =
@@ -154,7 +160,7 @@ module Make (T : Tree_encoding.TREE) :
            (scope ["wasm"] tick_state_encoding)
            (scope ["input"; "consuming"] input_request_encoding))
 
-    let next_tick_state {module_reg; kernel; tick_state; _} =
+    let unsafe_next_tick_state {module_reg; kernel; tick_state; _} =
       let open Lwt_syntax in
       match tick_state with
       | Decode {module_kont = MKStop ast_module; _} ->
@@ -226,6 +232,23 @@ module Make (T : Tree_encoding.TREE) :
               (* Continue execution. *)
               let* eval_config = Wasm.Eval.step module_reg eval_config in
               Lwt.return (Eval eval_config))
+      | Stuck e -> Lwt.return (Stuck e)
+
+    let next_tick_state pvm_state =
+      let to_stuck exn =
+        let error = Wasm_pvm_errors.refine_error exn in
+        let wasm_error =
+          if Wasm_pvm_errors.is_interpreter_error exn then
+            match pvm_state.tick_state with
+            | Decode _ -> Wasm_pvm_errors.Decode_error error
+            | Init _ -> Init_error error
+            | Eval _ -> Eval_error error
+            | Stuck _ -> Unknown_error error.raw_exception
+          else Unknown_error error.raw_exception
+        in
+        Lwt.return (Stuck wasm_error)
+      in
+      Lwt.catch (fun () -> unsafe_next_tick_state pvm_state) to_stuck
 
     let compute_step tree =
       let open Lwt_syntax in
@@ -290,6 +313,7 @@ module Make (T : Tree_encoding.TREE) :
                 Possibly use a a new state to indicate, such as [Stuck].
             *)
             assert false
+        | Stuck _ -> assert false
       in
       (* Encode the input in the tree under [input/level/id]. *)
       let* tree =
