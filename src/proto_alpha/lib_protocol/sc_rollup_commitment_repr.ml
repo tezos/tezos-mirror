@@ -69,7 +69,7 @@ module V1 = struct
       "compressed_state: %a@,\
        inbox_level: %a@,\
        predecessor: %a@,\
-       number_of_ticks: %ld"
+       number_of_ticks: %Ld"
       State_hash.pp
       compressed_state
       Raw_level_repr.pp

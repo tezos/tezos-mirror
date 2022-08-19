@@ -197,7 +197,7 @@ let dummy_commitment ctxt rollup =
       {
         predecessor;
         inbox_level;
-        number_of_ticks = number_of_ticks_exn 3000l;
+        number_of_ticks = number_of_ticks_exn 3000L;
         compressed_state;
       }
 
@@ -625,7 +625,7 @@ let test_publish_fails_on_backtrack () =
   let* i = Incremental.begin_construction ctxt in
   let* commitment1 = dummy_commitment (I i) rollup in
   let commitment2 =
-    {commitment1 with number_of_ticks = number_of_ticks_exn 3001l}
+    {commitment1 with number_of_ticks = number_of_ticks_exn 3001L}
   in
   let* operation1 = Op.sc_rollup_publish (B ctxt) contract rollup commitment1 in
   let* i = Incremental.add_operation i operation1 in
@@ -653,7 +653,7 @@ let test_cement_fails_on_conflict () =
   let* i = Incremental.begin_construction ctxt in
   let* commitment1 = dummy_commitment (I i) rollup in
   let commitment2 =
-    {commitment1 with number_of_ticks = number_of_ticks_exn 3001l}
+    {commitment1 with number_of_ticks = number_of_ticks_exn 3001L}
   in
   let* operation1 =
     Op.sc_rollup_publish (B ctxt) contract1 rollup commitment1
@@ -1469,7 +1469,7 @@ let test_timeout () =
   let commitment1 =
     {
       dummy_commitment with
-      number_of_ticks = number_of_ticks_exn 4l;
+      number_of_ticks = number_of_ticks_exn 4L;
       compressed_state =
         Sc_rollup.State_hash.context_hash_to_state_hash
           (Context_hash.hash_string ["first"]);
@@ -1478,7 +1478,7 @@ let test_timeout () =
   let commitment2 =
     {
       dummy_commitment with
-      number_of_ticks = number_of_ticks_exn 4l;
+      number_of_ticks = number_of_ticks_exn 4L;
       compressed_state =
         Sc_rollup.State_hash.context_hash_to_state_hash
           (Context_hash.hash_string ["second"]);

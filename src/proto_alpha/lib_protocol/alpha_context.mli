@@ -3270,7 +3270,7 @@ module Sc_rollup : sig
   end
 
   module Number_of_ticks : sig
-    include module type of Bounded.Non_negative_int32
+    include Bounded.S with type ocaml_type := int64
 
     val zero : t
   end

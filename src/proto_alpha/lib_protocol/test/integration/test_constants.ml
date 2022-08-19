@@ -120,7 +120,7 @@ let test_sc_rollup_commitment_storage_size () =
   let open Protocol in
   Assert.get_some
     ~loc:__LOC__
-    (Sc_rollup_repr.Number_of_ticks.of_value 1232909l)
+    (Sc_rollup_repr.Number_of_ticks.of_value 1232909L)
   >>=? fun number_of_ticks ->
   let commitment =
     Sc_rollup_commitment_repr.to_versioned

@@ -964,19 +964,19 @@ module Sc_rollup_params = struct
 
   let number_of_ticks_parameter =
     Clic.parameter (fun _ nb_of_ticks ->
-        match Int32.of_string_opt nb_of_ticks with
+        match Int64.of_string_opt nb_of_ticks with
         | Some nb_of_ticks -> (
             match Sc_rollup.Number_of_ticks.of_value nb_of_ticks with
             | None ->
                 failwith
-                  "Parameter '%ld' is out of bounds, it should be between %ld \
-                   and %ld"
+                  "Parameter '%Ld' is out of bounds, it should be between %Ld \
+                   and %Ld"
                   nb_of_ticks
                   Sc_rollup.Number_of_ticks.min_value
                   Sc_rollup.Number_of_ticks.max_value
             | Some nb_of_ticks -> return nb_of_ticks)
         | None ->
-            failwith "'%s' is not valid, should be a int32 value" nb_of_ticks)
+            failwith "'%s' is not valid, should be a int64 value" nb_of_ticks)
 end
 
 let fee_parameter_args =
