@@ -49,7 +49,8 @@ type rpc_error =
   | OCaml_exception of string
   | Unauthorized_host of string option
   | Unauthorized_uri
-  | Redirect_not_supported
+  | Too_many_redirects of string
+  | Redirect_without_location of string
 
 type error +=
   | Request_failed of {meth : RPC_service.meth; uri : Uri.t; error : rpc_error}
@@ -167,10 +168,20 @@ let rpc_error_encoding =
         (function () -> Unauthorized_uri);
       case
         (Tag 11)
-        ~title:"Redirect not supported"
-        unit
-        (function Redirect_not_supported -> Some () | _ -> None)
-        (function () -> Redirect_not_supported);
+        ~title:"Too many redirects"
+        (obj2
+           (req "kind" (constant "too_many_redirects"))
+           (req "content" string))
+        (function Too_many_redirects msg -> Some ((), msg) | _ -> None)
+        (function (), msg -> Too_many_redirects msg);
+      case
+        (Tag 12)
+        ~title:"Redirect without location"
+        (obj2
+           (req "kind" (constant "redirect_without_location"))
+           (req "content" string))
+        (function Redirect_without_location msg -> Some ((), msg) | _ -> None)
+        (function (), msg -> Redirect_without_location msg);
     ]
 
 let pp_rpc_error ppf err =
@@ -249,10 +260,10 @@ let pp_rpc_error ppf err =
       Format.fprintf
         ppf
         "@[<v 2>The server doesn't authorize this endpoint (ACL filtering).@]"
-  | Redirect_not_supported ->
-      Format.fprintf
-        ppf
-        "@[<v 2>The client does not support following HTTP redirects yet.@]"
+  | Too_many_redirects msg ->
+      Format.fprintf ppf "@[<v 2>Too many redirects: %s.@]" msg
+  | Redirect_without_location msg ->
+      Format.fprintf ppf "@[<v 2>Redirect without location: %s.@]" msg
 
 let () =
   register_error_kind

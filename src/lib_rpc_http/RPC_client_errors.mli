@@ -49,9 +49,8 @@ type rpc_error =
   | OCaml_exception of string
   | Unauthorized_host of string option
   | Unauthorized_uri
-  | Redirect_not_supported
-      (** Indicates that the endpoint returned a redirect, which the client does
-        not yet know how to follow. *)
+  | Too_many_redirects of string
+  | Redirect_without_location of string
 
 type error +=
   | Request_failed of {meth : RPC_service.meth; uri : Uri.t; error : rpc_error}

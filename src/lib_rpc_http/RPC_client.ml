@@ -146,8 +146,6 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
     | ( `Conflict _ | `Error _ | `Forbidden _ | `Unauthorized _ | `Not_found _
       | `Gone _ ) as v ->
         return_ok v
-    | `Unexpected_status_code (`Moved_permanently, _) ->
-        request_failed meth uri Redirect_not_supported
     | `Unexpected_status_code (code, (content, _, media_type)) ->
         let media_type = Option.map Media_type.name media_type in
         let* content = Cohttp_lwt.Body.to_string content in
@@ -171,6 +169,10 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
     | `OCaml_exception msg -> request_failed meth uri (OCaml_exception msg)
     | `Unauthorized_host host ->
         request_failed meth uri (Unauthorized_host host)
+    | `Too_many_redirects msg ->
+        request_failed meth uri (Too_many_redirects msg)
+    | `Redirect_without_location msg ->
+        request_failed meth uri (Redirect_without_location msg)
 
   let handle_error (body, content_type, _) f =
     let open Lwt_syntax in
@@ -409,6 +411,10 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
     | `OCaml_exception msg -> request_failed meth uri (OCaml_exception msg)
     | `Unauthorized_host host ->
         request_failed meth uri (Unauthorized_host host)
+    | `Too_many_redirects msg ->
+        request_failed meth uri (Too_many_redirects msg)
+    | `Redirect_without_location msg ->
+        request_failed meth uri (Redirect_without_location msg)
 
   let call_streamed_service (type p q i o) accept ?logger ?headers ~base
       (service : (_, _, p, q, i, o) RPC_service.t) ~on_chunk ~on_close
