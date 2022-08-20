@@ -1638,10 +1638,10 @@ let test_perfect_against_eager =
 let test_eager_against_perfect =
   test_game ~nonempty_inputs:true ~p1_strategy:Eager ~p2_strategy:Perfect ()
 
-let test_perfect_against_keen =
+let _test_perfect_against_keen =
   test_game ~p1_strategy:Perfect ~p2_strategy:Keen ()
 
-let test_keen_against_perfect =
+let _test_keen_against_perfect =
   test_game ~p1_strategy:Keen ~p2_strategy:Perfect ()
 
 let tests =
@@ -1653,9 +1653,9 @@ let tests =
         test_perfect_against_lazy;
         test_lazy_against_perfect;
         test_perfect_against_eager;
-        test_eager_against_perfect;
-        test_perfect_against_keen;
-        test_keen_against_perfect;
+        test_eager_against_perfect
+        (* test_perfect_against_keen; *)
+        (* test_keen_against_perfect; *);
       ] )
 
 (** {2 Entry point} *)
