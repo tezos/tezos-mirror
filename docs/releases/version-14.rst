@@ -21,6 +21,8 @@ Update Instructions
 
 To update from sources::
 
+  # Removes tezos folder from PATH if added with Octez <= v13 instructions
+  PATH=${PATH##"$HOME"/tezos/:}
   git fetch
   git checkout v14.0
   opam switch remove .
@@ -29,9 +31,29 @@ To update from sources::
   eval $(opam env)
   make
 
-Note that ``opam switch remove .`` is only needed if you are updating an already
-compiled repository, not if you are compiling from a freshly cloned repository.
-This command is needed because Octez now requires OCaml 4.14.0.
+.. note::
+
+   Note that ``opam switch remove .`` is only needed if you are
+   updating an already compiled repository, not if you are compiling
+   from a freshly cloned repository. This command is needed because
+   Octez now requires OCaml 4.14.0.
+
+.. warning::
+
+   If you are updating to Octez v14 using a development
+   environment which had been used to build Octez versions up to
+   v13.x, and also you have previously exported the ``tezos``
+   directory to the ``$PATH`` environment variable, the following
+   stanza is necessary to avoid potential issues with opam in the
+   ``make build-deps`` step::
+
+     PATH=${PATH##"$HOME"/tezos/:}
+
+   Otherwise, it is possible for ``make build-deps`` to fail with the
+   following (or a similar) error::
+
+     make: opam: Permission denied
+     Makefile:53: *** Unexpected opam version (found: , expected: 2.*).  Stop.
 
 If you are using Docker instead, use the ``v14.0`` Docker images of Tezos.
 

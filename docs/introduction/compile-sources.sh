@@ -35,6 +35,8 @@ sudo apt-get install -y sudo
 sudo apt-get install -y cargo # NV: to avoid error on compiling rust-conf
 export OPAMYES=true
 # [install packages]
+# [Temporary fix: removes tezos folder from PATH if added with Octez <= v13 instructions]
+PATH=${PATH##"$HOME"/tezos/:}
 sudo apt-get install -y rsync git m4 build-essential patch unzip wget pkg-config libgmp-dev libev-dev libhidapi-dev opam jq zlib1g-dev bc autoconf
 # [install rust]
 wget https://sh.rustup.rs/rustup-init.sh
@@ -53,11 +55,14 @@ make build-deps
 eval $(opam env)
 make
 # [optional setup]
-export PATH=$HOME/tezos/_build/install/default/bin/:$PATH
-# if using bash: source ./src/bin_client/bash-completion.sh
-export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
+# puts Octez binaries in PATH:
+# export PATH=$PWD/_build/install/default/bin/:$PATH
+# if using bash, enables autocompletion:
+# source ./src/bin_client/bash-completion.sh
+# removes Mainnet/testnet disclaimers:
+# export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
 # [test executables]
-tezos-client --version
-tezos-node --version
-tezos-baker-alpha --version
-tezos-accuser-alpha --version
+./tezos-client --version
+./tezos-node --version
+./tezos-baker-alpha --version
+./tezos-accuser-alpha --version
