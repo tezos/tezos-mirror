@@ -25,6 +25,10 @@ It requires protocol environment V7, compared to V6 for Kathmandu.
 
 - Add option monad syntaxes and Update Lwt. (MR :gl:`!6040`)
 
+- Introduce an Array module, making a subset of Stdlib.Array available to the
+  protocol (MR :gl:`!6042`)
+
+
 Smart Contract Optimistic Rollups (ongoing)
 -------------------------------------------
 
