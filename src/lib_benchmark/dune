@@ -18,6 +18,8 @@
   pringo
   pyml
   ocaml-migrate-parsetree)
+ (inline_tests (flags -verbose) (modes native))
+ (preprocess (pps ppx_expect))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
