@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 type t = {
-  unsafe_srs : bool;
+  use_unsafe_srs : bool;
       (** Run dal-node in test mode with an unsafe SRS (Trusted setup) *)
   data_dir : string;  (** The path to the DAL node data directory *)
   rpc_addr : string;  (** The address the DAL node listens to *)

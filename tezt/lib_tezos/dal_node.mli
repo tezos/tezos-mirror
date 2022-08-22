@@ -85,11 +85,11 @@ val wait : t -> Unix.process_status Lwt.t
 (** Run [tezos-dal-node init-config]. Returns the name of the resulting
     configuration file.
 
-    If [unsafe_srs] is [true], the dal node runs with unsafe computed SRS
+    If [use_unsafe_srs] is [true], the dal node runs with unsafe computed SRS
     allowing tests to run faster, without the need of large file. Default is
     [true] in tezt.
 *)
-val init_config : ?unsafe_srs:bool -> t -> string Lwt.t
+val init_config : ?use_unsafe_srs:bool -> t -> string Lwt.t
 
 (** [split_slot_rpc dal_node data] spawns curl process on slot/split on [data] *)
 val split_slot_rpc : t -> string -> string Lwt.t

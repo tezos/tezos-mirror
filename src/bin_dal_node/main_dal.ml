@@ -66,9 +66,9 @@ let rpc_port_arg =
     ~default
     int_parameter
 
-let unsafe_srs_for_tests_arg =
+let use_unsafe_srs_for_tests_arg =
   Clic.switch
-    ~long:"unsafe-srs-for-tests"
+    ~long:"use-unsafe-srs-for-tests"
     ~doc:
       (Format.sprintf
          "Run dal-node in test mode with an unsafe SRS (Trusted setup)")
@@ -80,11 +80,11 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure DAL node."
-    (args4 data_dir_arg rpc_addr_arg rpc_port_arg unsafe_srs_for_tests_arg)
+    (args4 data_dir_arg rpc_addr_arg rpc_port_arg use_unsafe_srs_for_tests_arg)
     (prefixes ["init-config"] stop)
-    (fun (data_dir, rpc_addr, rpc_port, unsafe_srs) cctxt ->
+    (fun (data_dir, rpc_addr, rpc_port, use_unsafe_srs) cctxt ->
       let open Configuration in
-      let config = {data_dir; rpc_addr; rpc_port; unsafe_srs} in
+      let config = {data_dir; rpc_addr; rpc_port; use_unsafe_srs} in
       let* () = save config in
       let*! _ =
         cctxt#message "DAL node configuration written in %s" (filename config)

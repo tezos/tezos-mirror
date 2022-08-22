@@ -100,7 +100,7 @@ let run ~data_dir cctxt =
           let (module Plugin : Dal_constants_plugin.T) = plugin in
           let*! () = Event.emit_protocol_plugin_resolved Plugin.Proto.hash in
           let* dal_constants, dal_parameters =
-            init_cryptobox config.unsafe_srs cctxt plugin
+            init_cryptobox config.use_unsafe_srs cctxt plugin
           in
           let ctxt = Node_context.make config dal_constants dal_parameters in
           let* rpc_server = RPC_server.(start config (register ctxt store)) in
