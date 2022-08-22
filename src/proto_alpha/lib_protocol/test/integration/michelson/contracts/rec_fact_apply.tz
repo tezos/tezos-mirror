@@ -1,11 +1,11 @@
-{ parameter int;
-  storage int;
-  code { CAR ;
-         LAMBDA_REC (pair int int) int
+ {parameter int;
+   storage int;
+   code { CAR ;
+          LAMBDA_REC (pair unit int) int
                      { UNPAIR;
                        DUP 2;
                        EQ;
-                       IF { DUP }
+                       IF { PUSH int 1 }
                           { DUP 2;
                             DUP 4;
                             DUP 3;
@@ -16,9 +16,9 @@
                             EXEC;
                             MUL};
                        DIP { DROP 3 }};
-         PUSH int 1;
-         APPLY;
-         SWAP;
-         EXEC;
-         NIL operation;
-         PAIR}}
+          UNIT;
+          APPLY;
+          SWAP;
+          EXEC;
+          NIL operation;
+          PAIR}}

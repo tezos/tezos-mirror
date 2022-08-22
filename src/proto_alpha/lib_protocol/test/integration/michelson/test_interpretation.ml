@@ -300,8 +300,7 @@ let test_contract path storage param ~entrypoint_str ~ok ~ko =
     close_in ch ;
     s
   in
-  let contract = path in
-  let script = read_file contract in
+  let script = read_file path in
   Contract_helpers.run_script
     ctx
     script
@@ -336,7 +335,7 @@ let test_contract_fail path storage param ?entrypoint_str () =
     param
     ~ok:(fun _ ->
       Alcotest.failf
-        "Unexpected success: interpreting %s should have failed"
+        "Unexpected success: interpreting %s should have failed."
         path)
     ~ko:(fun _ -> return_unit)
     ~entrypoint_str
@@ -359,7 +358,11 @@ let test_store_and_reload path ~init_storage ~entrypoint_str_1 ~param_1
           expected_storage_str_2
           ~entrypoint_str:entrypoint_str_2
           ()
-      else Alcotest.fail "Unexpected result")
+      else
+        Alcotest.failf
+          "Unexpected result. \n Expected :\n %s \n Real : \n %s \n"
+          (Expr.to_string expected_storage_1)
+          (Expr.to_string real.storage))
     ~ko:fail_with_trace
 
 let tests =
@@ -421,15 +424,15 @@ let tests =
          ~param_1:"Unit"
          ~expected_storage_str_1:
            {|Right
-              { PUSH int 1 ;
+              { PUSH unit Unit ;
                 PAIR ;
                 LAMBDA_REC
-                  (pair int int)
+                  (pair unit int)
                   int
                   { UNPAIR ;
                     DUP 2 ;
                     EQ ;
-                    IF { DUP }
+                    IF { PUSH int 1 }
                        { DUP 2 ; DUP 4 ; DUP 3 ; APPLY ; PUSH int 1 ; DUP 3 ;
             SUB ; EXEC ; MUL } ;
                     DIP { DROP 3 } } ;
