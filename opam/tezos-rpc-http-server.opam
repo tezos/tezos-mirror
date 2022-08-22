@@ -11,8 +11,8 @@ depends: [
   "dune" { >= "3.0" }
   "tezos-base"
   "tezos-stdlib-unix"
-  "resto-cohttp-server" { >= "0.8" & < "0.9" }
-  "resto-acl" { >= "0.8" & < "0.9" }
+  "resto-cohttp-server" { >= "0.9" & < "1.0" }
+  "resto-acl" { >= "0.9" & < "1.0" }
   "tezos-rpc"
   "tezos-rpc-http"
   "tezos-stdlib" {with-test}
