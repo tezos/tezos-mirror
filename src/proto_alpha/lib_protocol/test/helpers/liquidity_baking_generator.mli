@@ -26,7 +26,7 @@
 (** This module provides a set of abstractions to reason about the
     so-called “liquidity baking” feature[1].
 
-    [1]: https://gitlab.com/tezos/tzip/-/blob/master/drafts/current/draft-liquidity_baking.md
+    [1]: https://gitlab.com/tezos/tzip/-/blob/367628e1a576c3926bedc1d6107b2945607c2605/drafts/current/draft-liquidity_baking.md
 
     We remind that this feature is built upon three smart contracts:
     (1) a CPMM contract initially based on Dexter 2, and (2) two
