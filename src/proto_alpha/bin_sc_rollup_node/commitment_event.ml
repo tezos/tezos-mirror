@@ -113,22 +113,6 @@ module Simple = struct
       ("inbox_level", Raw_level.encoding)
       ("compressed_state", Sc_rollup.State_hash.encoding)
       ("number_of_ticks", Sc_rollup.Number_of_ticks.encoding)
-
-  let commitment_injected kind =
-    declare_5
-      ~section
-      ~name:(Printf.sprintf "sc_rollup_%s_commitment_injected" kind)
-      ~msg:
-        (kind
-       ^ " commitment {commitment_hash} was injected - predecessor: \
-          {predecessor}, inbox_level: {inbox_level}, compressed_state: \
-          {compressed_state}, number_of_ticks: {number_of_ticks}")
-      ~level:Notice
-      ("commitment_hash", Sc_rollup.Commitment.Hash.encoding)
-      ("predecessor", Sc_rollup.Commitment.Hash.encoding)
-      ("inbox_level", Raw_level.encoding)
-      ("compressed_state", Sc_rollup.State_hash.encoding)
-      ("number_of_ticks", Sc_rollup.Number_of_ticks.encoding)
 end
 
 let starting = Simple.(emit starting)
@@ -156,12 +140,6 @@ let commitment_will_not_be_published lcc_level
       (lcc_level, predecessor, inbox_level, compressed_state, number_of_ticks))
 
 let commitment_stored = emit_commitment_event Simple.commitment_stored
-
-let publish_commitment_injected =
-  emit_commitment_event (Simple.commitment_injected "publish")
-
-let cement_commitment_injected =
-  emit_commitment_event (Simple.commitment_injected "cement")
 
 let last_cemented_commitment_updated head level =
   Simple.(emit last_cemented_commitment_updated (head, level))

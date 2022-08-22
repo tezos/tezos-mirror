@@ -27,10 +27,11 @@
 (** The rollup node stores and publishes commitments for the PVM every
     [Constants.sc_rollup_commitment_period_in_blocks] levels.
 
-    Every time a finalized block is processed  by the rollup node,
-    the latter determines whether the last commitment that the node
-    has produced referred to 20 blocks earlier. In this case, it
-    computes and stores a new commitment in a level-indexed map.
+    Every time a finalized block is processed by the rollup node, the latter
+    determines whether the last commitment that the node has produced referred
+    to [sc_rollup.commitment_period_in_blocks] blocks earlier. For mainnet,
+    [sc_rollup.commitment_period_in_blocks = 30]. In this case, it computes and
+    stores a new commitment in a level-indexed map.
 
     Stored commitments are signed by the rollup node operator
     and published on the layer1 chain. To ensure that commitments
@@ -289,7 +290,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       Store.Commitments.mem store next_level_to_publish
     in
     if is_commitment_available then
-      let*! commitment, commitment_hash =
+      let*! commitment, _commitment_hash =
         Store.Commitments.get store next_level_to_publish
       in
       let* predecessor_published =
@@ -318,40 +319,29 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
                  commitment)
         else return_unit
       in
-      let* operator = Node_context.get_operator_keys node_ctxt Publish in
+      let operator = Node_context.get_operator node_ctxt Publish in
       match operator with
       | None ->
           (* Configured to not publish commitments *)
           return_unit
-      | Some (source, src_pk, src_sk) ->
-          let* _oph, _op, _results =
-            Client_proto_context.sc_rollup_publish
-              cctxt
-              ~chain:cctxt#chain
-              ~block:cctxt#block
-              ~commitment
-              ~source
-              ~rollup:rollup_address
-              ~src_pk
-              ~src_sk
-              ~fee_parameter:Configuration.default_fee_parameter
-              ()
+      | Some source ->
+          let publish_operation =
+            Sc_rollup_publish {rollup = node_ctxt.rollup_address; commitment}
           in
+          let* () = Injector.add_pending_operation ~source publish_operation in
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/3462
+             Decouple commitments from head processing
+
+             Move the following, in a part where we know the operation is
+             included. *)
           let*! () =
             Store.Last_published_commitment_level.set
               store
               commitment.inbox_level
           in
-          let*! () =
-            Commitment_event.publish_commitment_injected
-              commitment_hash
-              commitment
-          in
           return_unit
     else return_unit
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2869
-     use the Injector to publish commitments. *)
   let publish_commitment node_ctxt store =
     let open Lwt_result_syntax in
     (* Check level of next publishable commitment and avoid publishing if it is
@@ -414,35 +404,20 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
         ()
     else return_false
 
-  let cement_commitment ({Node_context.cctxt; rollup_address; _} as node_ctxt)
-      commitment commitment_hash =
+  let cement_commitment (node_ctxt : Node_context.t) commitment_hash =
     let open Lwt_result_syntax in
-    let* operator = Node_context.get_operator_keys node_ctxt Cement in
+    let operator = Node_context.get_operator node_ctxt Cement in
     match operator with
     | None ->
         (* Configured to not cement commitments *)
         return_unit
-    | Some (source, src_pk, src_sk) ->
-        let* _oph, _op, _results =
-          Client_proto_context.sc_rollup_cement
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~commitment:commitment_hash
-            ~source
-            ~rollup:rollup_address
-            ~src_pk
-            ~src_sk
-            ~fee_parameter:Configuration.default_fee_parameter
-            ()
+    | Some source ->
+        let cement_operation =
+          Sc_rollup_cement
+            {rollup = node_ctxt.rollup_address; commitment = commitment_hash}
         in
-        let*! () =
-          Commitment_event.cement_commitment_injected commitment_hash commitment
-        in
-        return_unit
+        Injector.add_pending_operation ~source cement_operation
 
-  (* TODO:  https://gitlab.com/tezos/tezos/-/issues/3008
-     Use the injector to cement commitments. *)
   let cement_commitment_if_possible node_ctxt store
       (Layer1.Head {level = head_level; _}) =
     let open Lwt_result_syntax in
@@ -459,7 +434,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     match commitment_with_hash with
     (* If `commitment_with_hash` is defined, the commitment to be cemented has
        been stored but not necessarily published by the rollup node. *)
-    | Some (commitment, commitment_hash) -> (
+    | Some (_commitment, commitment_hash) -> (
         let*! earliest_cementing_level =
           earliest_cementing_level node_ctxt store commitment_hash
         in
@@ -475,8 +450,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
                 head_level
                 commitment_hash
             in
-            if green_flag then
-              cement_commitment node_ctxt commitment commitment_hash
+            if green_flag then cement_commitment node_ctxt commitment_hash
             else return ()
         | None -> return ())
     | None -> return ()

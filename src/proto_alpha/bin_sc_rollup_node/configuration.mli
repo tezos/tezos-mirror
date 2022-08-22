@@ -35,7 +35,7 @@ type mode =
           the signers *)
 
 (** Purposes for operators, indicating the kind of operations that they sign. *)
-type purpose = Publish | Add_messages | Cement | Refute
+type purpose = Publish | Add_messages | Cement | Timeout | Refute
 
 module Operator_purpose_map : Map.S with type key = purpose
 

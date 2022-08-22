@@ -205,6 +205,15 @@ module Make (PVM : Pvm.S) = struct
         let*! () = Layer1.mark_processed_head store head in
         return ())
 
+  let notify_injector l1_ctxt store chain_event =
+    let open Lwt_result_syntax in
+    let open Layer1 in
+    let hash = chain_event_head_hash chain_event in
+    let* head = fetch_tezos_block l1_ctxt hash in
+    let* reorg = get_tezos_reorg_for_new_head l1_ctxt store hash in
+    let*! () = Injector.new_tezos_head head reorg in
+    return_unit
+
   (* [on_layer_1_chain_event node_ctxt store chain_event] processes a
      list of heads, coming either from a list of [old_heads] persisted in the
      store, or from the current [chain_event]. [old_heads] is a list of heads
@@ -237,6 +246,7 @@ module Make (PVM : Pvm.S) = struct
         node_ctxt
         store
     in
+    let* () = notify_injector node_ctxt.l1_ctxt store chain_event in
     let* non_final_heads =
       match chain_event with
       | SameBranch {new_head; intermediate_heads} ->
@@ -285,6 +295,7 @@ module Make (PVM : Pvm.S) = struct
     in
     let*! () = Layer1.set_heads_not_finalized store non_final_heads in
     let*! () = Layer1.processed chain_event in
+    let*! () = Injector.inject () in
     return_unit
 
   let is_connection_error trace =
@@ -381,6 +392,28 @@ module Make (PVM : Pvm.S) = struct
       in
       let*! () = Inbox.start () in
       let*! () = Components.Commitment.start () in
+      let signers =
+        Configuration.Operator_purpose_map.bindings node_ctxt.operators
+        |> List.fold_left
+             (fun acc (purpose, operator) ->
+               let purposes =
+                 match Signature.Public_key_hash.Map.find operator acc with
+                 | None -> [purpose]
+                 | Some ps -> purpose :: ps
+               in
+               Signature.Public_key_hash.Map.add operator purposes acc)
+             Signature.Public_key_hash.Map.empty
+        |> Signature.Public_key_hash.Map.bindings
+        |> List.map (fun (operator, purposes) ->
+               (operator, `Each_block, purposes))
+      in
+      let* () =
+        Injector.init
+          node_ctxt.cctxt
+          node_ctxt
+          ~data_dir:configuration.data_dir
+          ~signers
+      in
 
       let*! () =
         Event.node_is_ready
