@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+exception Bounds
+
+exception SizeOverflow
+
 module type KeyS = sig
   include Map.OrderedType
 
@@ -153,12 +157,12 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
   let invalid_key key map = Key.unsigned_compare key map.num_elements >= 0
 
   let get key map =
-    if invalid_key key map then raise Exn.Bounds ;
+    if invalid_key key map then raise Bounds ;
     let key = Key.add map.first key in
     Map.get key map.values
 
   let set key value map =
-    if invalid_key key map then raise Exn.Bounds ;
+    if invalid_key key map then raise Bounds ;
     let key = Key.add map.first key in
     {map with values = Map.set key value map.values}
 

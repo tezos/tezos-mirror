@@ -18,6 +18,10 @@ type t = {
   mutable num_elements : Z.t;
 }
 
+exception Bounds
+
+exception SizeOverflow
+
 exception Cannot_store_an_earlier_message
 
 exception Dequeue_from_empty_queue

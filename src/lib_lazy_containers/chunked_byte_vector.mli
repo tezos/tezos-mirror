@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+exception Bounds
+
+exception SizeOverflow
+
 module Chunk : sig
   (** Chunk within the byte vector *)
   type t

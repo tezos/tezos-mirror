@@ -31,6 +31,10 @@
   logarithmic time complexity and it supports non-int keys.
 *)
 
+exception Bounds
+
+exception SizeOverflow
+
 (** [KeyS] is the qualifier signature for key types in the lazy vector.
     Externally visible and accessible keys of the lazy vector are always
     non-negative. However, the lazy vector implementation may internally use
