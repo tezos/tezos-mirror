@@ -2945,6 +2945,14 @@ module Sc_rollup : sig
         (proof * Sc_rollup_PVM_sem.input option) tzresult Lwt.t
 
       val empty : inbox_context -> Sc_rollup_repr.t -> Raw_level.t -> t Lwt.t
+
+      module Internal_for_tests : sig
+        val eq_tree : tree -> tree -> bool
+
+        val history_at_genesis : capacity:int64 -> next_index:int64 -> history
+
+        val history_hashes : history -> Hash.t list
+      end
     end
 
     include

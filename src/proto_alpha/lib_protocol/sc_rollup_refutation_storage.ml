@@ -233,7 +233,7 @@ let start_game ctxt rollup ~player:refuter ~opponent:defender =
   let* () = fail_when game_exists Sc_rollup_game_already_started in
   let* ctxt, opp_1 = Store.Opponent.find (ctxt, rollup) refuter in
   let* ctxt, opp_2 = Store.Opponent.find (ctxt, rollup) defender in
-  let* _ =
+  let* () =
     match (opp_1, opp_2) with
     | None, None -> return ()
     | Some _refuter_opponent, None ->
@@ -372,7 +372,7 @@ let conflicting_stakers_uncarbonated ctxt rollup staker =
     let parent_commitment = our_commitment.predecessor in
     return {other; their_commitment; our_commitment; parent_commitment}
   in
-  let* _, stakers = Store.stakers ctxt rollup in
+  let* _ctxt, stakers = Store.stakers ctxt rollup in
   List.fold_left_es
     (fun conflicts (other_staker, _) ->
       let*! res = get_conflict_point ctxt rollup staker other_staker in
