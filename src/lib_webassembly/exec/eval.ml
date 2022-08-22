@@ -1057,12 +1057,76 @@ let map_step {origin; destination; offset} f =
   let destination = Vector.set offset (f x) destination in
   {origin; destination; offset = Int32.succ offset}
 
+let map_s_step {origin; destination; offset} f =
+  let open Lwt.Syntax in
+  let* x = Vector.get offset origin in
+  let+ y = f x in
+  let destination = Vector.set offset y destination in
+  {origin; destination; offset = Int32.succ offset}
+
+type 'a concat_kont = {
+  lv : 'a Vector.t;
+  rv : 'a Vector.t;
+  res : 'a Vector.t;
+  offset : int32;
+}
+
+let concat_kont lv rv =
+  let lv_len = Vector.num_elements lv in
+  let rv_len = Vector.num_elements rv in
+  let len = Int32.(add lv_len rv_len) in
+  if Int32.(unsigned_compare len lv_len < 0 || unsigned_compare len rv_len < 0)
+  then raise Lazy_vector.SizeOverflow
+  else {lv; rv; res = Vector.create len; offset = 0l}
+
+let concat_step {lv; rv; res; offset} =
+  let lv_len = Vector.num_elements lv in
+  let+ x =
+    if offset < lv_len then Vector.get offset lv
+    else Vector.get Int32.(sub offset lv_len) rv
+  in
+  {lv; rv; res = Vector.set offset x res; offset = Int32.succ offset}
+
+let concat_completed {lv; rv; offset; _} =
+  let lv_len = Vector.num_elements lv in
+  let rv_len = Vector.num_elements rv in
+  Int32.add lv_len rv_len <= offset
+
+type (_, _) init_section = Func : (func, func_inst) init_section
+
+let section_fetch_vec :
+    type a b. module_inst -> (a, b) init_section -> b Vector.t =
+ fun inst sec -> match sec with Func -> inst.funcs
+
+let section_set_vec :
+    type a b. module_inst -> (a, b) init_section -> b Vector.t -> module_inst =
+ fun inst sec vec -> match (sec, vec) with Func, funcs -> {inst with funcs}
+
 type init_kont =
   | IK_Start
   | IK_Add_import of (extern, import, module_inst) fold_right2_kont
   | IK_Type of module_inst * (type_, func_type) map_kont
+  | IK_Aggregate :
+      module_inst * ('a, 'b) init_section * ('a, 'b) map_kont
+      -> init_kont
+  | IK_Aggregate_concat :
+      module_inst * ('a, 'b) init_section * 'b concat_kont
+      -> init_kont
   | IK_Remaining of module_inst
   | IK_Stop of module_inst
+
+let section_next_init_kont :
+    type a b. module_inst -> (a, b) init_section -> init_kont =
+ fun inst0 sec -> match sec with Func -> IK_Remaining inst0
+
+let section_step :
+    type a b.
+    module_inst ModuleMap.t -> module_key -> (a, b) init_section -> a -> b Lwt.t
+    =
+ fun module_reg self -> function Func -> create_func module_reg self
+
+let section_update_module_ref : type a b. (a, b) init_section -> bool = function
+  | Func -> true
 
 let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
   function
@@ -1089,14 +1153,29 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
         {inst0 with types = tick.destination; allocations = m.it.allocations}
       in
       update_module_ref module_reg self inst0 ;
-      Lwt.return (IK_Remaining inst0)
+      Lwt.return (IK_Aggregate (inst0, Func, map_kont m.it.funcs))
   | IK_Type (inst0, tick) ->
       let+ tick = map_step tick (fun x -> x.it) in
       IK_Type (inst0, tick)
-  | IK_Remaining inst0 ->
-      let {tables; memories; globals; funcs; exports; elems; datas; start; _} =
-        m.it
-      in
+  | IK_Aggregate (inst0, sec, tick) when map_completed tick ->
+      Lwt.return
+        (IK_Aggregate_concat
+           ( inst0,
+             sec,
+             concat_kont (section_fetch_vec inst0 sec) tick.destination ))
+  | IK_Aggregate (inst0, sec, tick) ->
+      let+ tick = map_s_step tick (section_step module_reg self sec) in
+      IK_Aggregate (inst0, sec, tick)
+  | IK_Aggregate_concat (inst0, sec, tick) when concat_completed tick ->
+      let inst1 = section_set_vec inst0 sec tick.res in
+      if section_update_module_ref sec then
+        update_module_ref module_reg self inst1 ;
+      Lwt.return (section_next_init_kont inst1 sec)
+  | IK_Aggregate_concat (inst0, sec, tick) ->
+      let+ tick = concat_step tick in
+      IK_Aggregate_concat (inst0, sec, tick)
+  | IK_Remaining inst1 ->
+      let {tables; memories; globals; exports; elems; datas; start; _} = m.it in
 
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
          These transformations should be refactored and abadoned during the
@@ -1104,18 +1183,9 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
       let* tables = Vector.to_list tables in
       let* memories = Vector.to_list memories in
       let* globals = Vector.to_list globals in
-      let* funcs = Vector.to_list funcs in
       let* elems = Vector.to_list elems in
       let* datas = Vector.to_list datas in
       let* exports = Vector.to_list exports in
-
-      let* fs = TzStdLib.List.map_s (create_func module_reg self) funcs in
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
-         [fs]/[funcs] should be a lazy structure so we can avoid traversing it
-         completely. *)
-      let* funcs = Vector.concat inst0.funcs (Vector.of_list fs) in
-      let inst1 = {inst0 with funcs} in
-      update_module_ref module_reg self inst1 ;
 
       let* new_globals =
         TzStdLib.List.map_s (create_global module_reg self) globals

@@ -22,10 +22,25 @@ type ('a, 'b) map_kont = {
   offset : int32;
 }
 
+type 'a concat_kont = {
+  lv : 'a Vector.t;
+  rv : 'a Vector.t;
+  res : 'a Vector.t;
+  offset : int32;
+}
+
+type (_, _) init_section = Func : (Ast.func, func_inst) init_section
+
 type init_kont =
   | IK_Start  (** Very first tick of the [init] function *)
   | IK_Add_import of (extern, Ast.import, module_inst) fold_right2_kont
   | IK_Type of module_inst * (Ast.type_, Types.func_type) map_kont
+  | IK_Aggregate :
+      module_inst * ('a, 'b) init_section * ('a, 'b) map_kont
+      -> init_kont
+  | IK_Aggregate_concat :
+      module_inst * ('a, 'b) init_section * 'b concat_kont
+      -> init_kont
   | IK_Remaining of module_inst
   | IK_Stop of module_inst
       (** Witness that there is no more tick to execute to complete
