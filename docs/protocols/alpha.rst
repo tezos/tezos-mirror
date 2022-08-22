@@ -23,6 +23,8 @@ It requires protocol environment V7, compared to V6 for Kathmandu.
   camlInternalFormatBasic — which is not intended for use by developers.
   (MR :gl:`!5910`)
 
+- Abstract public_parameters type in Plonk. (MR :gl:`!6077`)
+
 - Add option monad syntaxes and Update Lwt. (MR :gl:`!6040`)
 
 - Introduce an Array module, making a subset of Stdlib.Array available to the
@@ -43,7 +45,8 @@ Rollups supporting execution of smart contracts. (MRs :gl:`!5603`, :gl:`!5606`,
 :gl:`!5888`, :gl:`!5893`, :gl:`!5884`, :gl:`!5955`, :gl:`!5692`, :gl:`!5887`,
 :gl:`!5900`, :gl:`!6014`, :gl:`!6009`, :gl:`!6015`, :gl:`!6019`, :gl:`!6012`,
 :gl:`!5851`, :gl:`!5985`, :gl:`!5984`, :gl:`!6037`, :gl:`!5987`, :gl:`!5878`,
-:gl:`!6050`, :gl:`!6030`, :gl:`!6060`)
+:gl:`!6050`, :gl:`!6030`, :gl:`!6060`, :gl:`!5891`, :gl:`!6071`, :gl:`!5926`,
+:gl:`!6104`)
 
 Data Availability Layer (ongoing)
 ---------------------------------
