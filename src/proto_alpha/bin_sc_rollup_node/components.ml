@@ -27,7 +27,7 @@
 module type S = sig
   module PVM : Pvm.S
 
-  module Interpreter : Interpreter.S
+  module Interpreter : Interpreter.S with module PVM = PVM
 
   module Commitment : Commitment_sig.S with module PVM = PVM
 
@@ -41,7 +41,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   module Interpreter = Interpreter.Make (PVM)
   module Commitment = Commitment.Make (PVM)
   module RPC_server = RPC_server.Make (PVM)
-  module Refutation_game = Refutation_game.Make (PVM)
+  module Refutation_game = Refutation_game.Make (Interpreter)
 end
 
 let pvm_of_kind : Protocol.Alpha_context.Sc_rollup.Kind.t -> (module Pvm.S) =

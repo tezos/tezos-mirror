@@ -57,7 +57,11 @@ let default_data_dir =
 
 let storage_dir = "storage"
 
+let context_dir = "context"
+
 let default_storage_dir data_dir = Filename.concat data_dir storage_dir
+
+let default_context_dir data_dir = Filename.concat data_dir context_dir
 
 let relative_filename data_dir = Filename.concat data_dir "config.json"
 

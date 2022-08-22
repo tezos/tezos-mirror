@@ -31,56 +31,15 @@ open Alpha_context
 
     It is imperative that this is aligned with the protocol's implementation.
 *)
-module Wasm_2_0_0_proof_format = struct
-  open Store
+module Wasm_2_0_0_proof_format = Context.Proof (struct
+  include Sc_rollup.State_hash
 
-  type proof = IStoreProof.Proof.tree IStoreProof.Proof.t
-
-  let produce_proof context tree step =
-    let open Lwt_syntax in
-    match IStoreTree.kinded_key tree with
-    | Some k ->
-        let* p = IStoreProof.produce_tree_proof (IStore.repo context) k step in
-        return (Some p)
-    | None -> return None
-
-  let verify_proof proof step =
-    (* The rollup node is not supposed to verify proof. We keep
-       this part in case this changes in the future. *)
-    let open Lwt_syntax in
-    let* result = IStoreProof.verify_tree_proof proof step in
-    match result with
-    | Ok v -> return (Some v)
-    | Error _ ->
-        (* We skip the error analysis here since proof verification is not a
-           job for the rollup node. *)
-        return None
-
-  let kinded_hash_to_state_hash :
-      IStoreProof.Proof.kinded_hash -> Sc_rollup.State_hash.t = function
-    | `Value hash | `Node hash ->
-        Sc_rollup.State_hash.context_hash_to_state_hash hash
-
-  let proof_before proof =
-    kinded_hash_to_state_hash proof.IStoreProof.Proof.before
-
-  let proof_after proof =
-    kinded_hash_to_state_hash proof.IStoreProof.Proof.after
-
-  let proof_encoding =
-    Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V1.Tree32
-    .tree_proof_encoding
-end
+  let of_context_hash = Sc_rollup.State_hash.context_hash_to_state_hash
+end)
 
 module Impl : Pvm.S = struct
-  include Sc_rollup.Wasm_2_0_0PVM.Make (struct
-    open Store
-    module Tree = IStoreTree
-
-    type tree = IStoreTree.tree
-
-    include Wasm_2_0_0_proof_format
-  end)
+  include Sc_rollup.Wasm_2_0_0PVM.Make (Wasm_2_0_0_proof_format)
+  module State = Context.PVMState
 
   let string_of_status : status -> string = function
     | Waiting_for_input_message -> "Waiting for input message"

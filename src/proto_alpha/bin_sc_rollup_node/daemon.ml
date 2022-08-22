@@ -69,8 +69,8 @@ module Make (PVM : Pvm.S) = struct
   (** Process an L1 SCORU operation (for the node's rollup) which is included
       for the first time. {b Note}: this function does not process inboxes for
       the rollup, which is done instead by {!Inbox.process_head}. *)
-  let process_included_l1_operation (type kind) _node_ctxt store ~source:_
-      (operation : kind manager_operation)
+  let process_included_l1_operation (type kind) (node_ctxt : Node_context.t)
+      ~source:_ (operation : kind manager_operation)
       (result : kind successful_manager_operation_result) =
     let open Lwt_syntax in
     match (operation, result) with
@@ -81,26 +81,28 @@ module Make (PVM : Pvm.S) = struct
           Sc_rollup.Commitment.hash_uncarbonated commitment
         in
         Store.Commitments_published_at_level.add
-          store
+          node_ctxt.store
           commitment_hash
           published_at_level
     | Sc_rollup_cement {commitment; _}, Sc_rollup_cement_result {inbox_level; _}
       ->
         (* Cemented commitment ---------------------------------------------- *)
-        let* () = Store.Last_cemented_commitment_level.set store inbox_level in
-        Store.Last_cemented_commitment_hash.set store commitment
+        let* () =
+          Store.Last_cemented_commitment_level.set node_ctxt.store inbox_level
+        in
+        Store.Last_cemented_commitment_hash.set node_ctxt.store commitment
     | _, _ ->
         (* Other manager operations *)
         return_unit
 
   (** Process an L1 SCORU operation (for the node's rollup) which is finalized
       for the first time. *)
-  let process_finalized_l1_operation (type kind) _node_ctxt _store ~source:_
+  let process_finalized_l1_operation (type kind) _node_ctxt ~source:_
       (_operation : kind manager_operation)
       (_result : kind successful_manager_operation_result) =
     Lwt.return_unit
 
-  let process_l1_operation (type kind) ~finalized node_ctxt store ~source
+  let process_l1_operation (type kind) ~finalized node_ctxt ~source
       (operation : kind manager_operation)
       (result : kind Apply_results.manager_operation_result) =
     let open Lwt_syntax in
@@ -133,20 +135,19 @@ module Make (PVM : Pvm.S) = struct
             if finalized then process_finalized_l1_operation
             else process_included_l1_operation
           in
-          process node_ctxt store ~source operation success_result
+          process node_ctxt ~source operation success_result
       | _ ->
           (* No action for non successful operations  *)
           return_unit
 
-  let process_l1_block_operations ~finalized node_ctxt store
-      (Layer1.Head {hash; _}) =
+  let process_l1_block_operations ~finalized node_ctxt (Layer1.Head {hash; _}) =
     let open Lwt_result_syntax in
     let* block = Layer1.fetch_tezos_block node_ctxt.Node_context.l1_ctxt hash in
     let apply (type kind) accu ~source (operation : kind manager_operation)
         result =
       let open Lwt_syntax in
       let* () = accu in
-      process_l1_operation ~finalized node_ctxt store ~source operation result
+      process_l1_operation ~finalized node_ctxt ~source operation result
     in
     let apply_internal (type kind) accu ~source:_
         (_operation : kind Apply_internal_results.internal_operation)
@@ -161,51 +162,50 @@ module Make (PVM : Pvm.S) = struct
     in
     return_unit
 
-  let process_head node_ctxt store head_state =
+  let process_head node_ctxt head_state =
     let open Lwt_result_syntax in
     let {finalized; seen_before; head} = head_state in
     let* () =
       let*! () = emit_head_processing_event head_state in
       (* Avoid processing inbox again if it has been processed before for this head *)
       if seen_before then
-        if finalized then
-          process_l1_block_operations ~finalized node_ctxt store head
+        if finalized then process_l1_block_operations ~finalized node_ctxt head
         else return_unit
       else
-        let* () = Inbox.process_head node_ctxt store head in
-        let* () = process_l1_block_operations ~finalized node_ctxt store head in
+        let* ctxt = Inbox.process_head node_ctxt head in
+        let* () = process_l1_block_operations ~finalized node_ctxt head in
         (* Avoid storing and publishing commitments if the head is not final *)
         (* Avoid triggering the pvm execution if this has been done before for this head *)
-        let* () = Components.Interpreter.process_head node_ctxt store head in
+        let* () = Components.Interpreter.process_head node_ctxt ctxt head in
 
         (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3166
 
            If the rollup is subscribed to at least one slot, then the inbox for
            this block will be downloaded after lag levels have passed and the
            dal slots have been declared available. *)
-        Dal_slots_tracker.process_head node_ctxt store head
+        Dal_slots_tracker.process_head node_ctxt head
     in
     let* () =
       when_ finalized @@ fun () ->
-      Components.Commitment.process_head node_ctxt store head
+      Components.Commitment.process_head node_ctxt head
     in
     (* Publishing a commitment when one is available does not depend on the state of
        the current head. *)
-    let* () = Components.Commitment.publish_commitment node_ctxt store in
+    let* () = Components.Commitment.publish_commitment node_ctxt in
     let* () =
-      Components.Commitment.cement_commitment_if_possible node_ctxt store head
+      Components.Commitment.cement_commitment_if_possible node_ctxt head
     in
     let* () =
       (* At each block, there may be some refutation related actions to
          be performed. *)
       when_ finalized @@ fun () ->
-      Components.Refutation_game.process head node_ctxt store
+      Components.Refutation_game.process head node_ctxt
     in
     when_ finalized (fun () ->
-        let*! () = Layer1.mark_processed_head store head in
+        let*! () = Layer1.mark_processed_head node_ctxt.store head in
         return ())
 
-  let notify_injector l1_ctxt store chain_event =
+  let notify_injector {Node_context.l1_ctxt; store; _} chain_event =
     let open Lwt_result_syntax in
     let open Layer1 in
     let hash = chain_event_head_hash chain_event in
@@ -234,9 +234,11 @@ module Make (PVM : Pvm.S) = struct
      Because heads that still have not been processed as finalized are
      persisted to disk, this function is robust against interruptions.
   *)
-  let on_layer_1_chain_event node_ctxt store chain_event =
+  let on_layer_1_chain_event node_ctxt chain_event =
     let open Lwt_result_syntax in
-    let*! old_heads = Layer1.get_heads_not_finalized store in
+    let*! old_heads =
+      Layer1.get_heads_not_finalized node_ctxt.Node_context.store
+    in
     let open Layer1 in
     let* () =
       (* Get information about the last cemented commitment to determine the
@@ -244,9 +246,8 @@ module Make (PVM : Pvm.S) = struct
          chain event to avoid spamming the layer1 node. *)
       Components.Commitment.sync_last_cemented_commitment_hash_with_level
         node_ctxt
-        store
     in
-    let* () = notify_injector node_ctxt.l1_ctxt store chain_event in
+    let* () = notify_injector node_ctxt chain_event in
     let* non_final_heads =
       match chain_event with
       | SameBranch {new_head; intermediate_heads} ->
@@ -255,7 +256,7 @@ module Make (PVM : Pvm.S) = struct
             Daemon_event.processing_heads_iteration old_heads new_heads
           in
           let head_states = categorise_heads node_ctxt old_heads new_heads in
-          let* () = List.iter_es (process_head node_ctxt store) head_states in
+          let* () = List.iter_es (process_head node_ctxt) head_states in
           (* Return new_head to be processed as finalized head if the
              next chain event is of type SameBranch.
           *)
@@ -287,13 +288,12 @@ module Make (PVM : Pvm.S) = struct
               (fun head ->
                 process_head
                   node_ctxt
-                  store
                   {head; finalized = true; seen_before = true})
               final_heads
           in
           []
     in
-    let*! () = Layer1.set_heads_not_finalized store non_final_heads in
+    let*! () = Layer1.set_heads_not_finalized node_ctxt.store non_final_heads in
     let*! () = Layer1.processed chain_event in
     let*! () = Injector.inject () in
     return_unit
@@ -313,14 +313,14 @@ module Make (PVM : Pvm.S) = struct
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2895
      Use Lwt_stream.fold_es once it is exposed. *)
-  let daemonize configuration node_ctxt store =
+  let daemonize configuration (node_ctxt : Node_context.t) =
     let open Lwt_result_syntax in
     let rec loop (l1_ctxt : Layer1.t) =
       let*! () =
         Lwt_stream.iter_s
           (fun event ->
             let open Lwt_syntax in
-            let* res = on_layer_1_chain_event node_ctxt store event in
+            let* res = on_layer_1_chain_event node_ctxt event in
             match res with
             | Ok () -> return_unit
             | Error trace when is_connection_error trace ->
@@ -337,17 +337,21 @@ module Make (PVM : Pvm.S) = struct
           l1_ctxt.events
       in
       let*! () = Event.connection_lost () in
-      let* l1_ctxt = Layer1.reconnect configuration l1_ctxt store in
+      let* l1_ctxt =
+        Layer1.reconnect configuration node_ctxt.l1_ctxt node_ctxt.store
+      in
       loop l1_ctxt
     in
     protect @@ fun () -> Lwt.no_cancel @@ loop node_ctxt.l1_ctxt
 
-  let install_finalizer store rpc_server (l1_ctxt : Layer1.t) =
+  let install_finalizer {Node_context.l1_ctxt; store; _} rpc_server =
     let open Lwt_syntax in
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
     let message = l1_ctxt.cctxt#message in
     let* () = message "Stopping L1 monitor@." in
     l1_ctxt.stopper () ;
+    let* () = message "Closing L1 events stream@." in
+    let* () = Lwt_stream.closed l1_ctxt.events in
     let* () = message "Shutting down L1@." in
     let* () = Layer1.shutdown store in
     let* () = message "Shutting down RPC server@." in
@@ -357,7 +361,8 @@ module Make (PVM : Pvm.S) = struct
     let* () = Event.shutdown_node exit_status in
     Tezos_base_unix.Internal_event_unix.close ()
 
-  let check_initial_state_hash {Node_context.cctxt; rollup_address; _} store =
+  let check_initial_state_hash {Node_context.cctxt; rollup_address; context; _}
+      =
     let open Lwt_result_syntax in
     let* l1_reference_initial_state_hash =
       RPC.Sc_rollup.initial_pvm_state_hash
@@ -365,7 +370,7 @@ module Make (PVM : Pvm.S) = struct
         (cctxt#chain, cctxt#block)
         rollup_address
     in
-    let*! s = PVM.initial_state store in
+    let*! s = PVM.initial_state context in
     let*! l2_initial_state_hash = PVM.state_hash s in
     if
       not
@@ -380,15 +385,13 @@ module Make (PVM : Pvm.S) = struct
       Lwt_exit.exit_and_raise 1
     else return_unit
 
-  let run node_ctxt configuration store =
+  let run node_ctxt configuration =
     let open Lwt_result_syntax in
-    let* () = check_initial_state_hash node_ctxt store in
+    let* () = check_initial_state_hash node_ctxt in
     let start () =
-      let* rpc_server =
-        Components.RPC_server.start node_ctxt store configuration
-      in
+      let* rpc_server = Components.RPC_server.start node_ctxt configuration in
       let (_ : Lwt_exit.clean_up_callback_id) =
-        install_finalizer store rpc_server node_ctxt.l1_ctxt
+        install_finalizer node_ctxt rpc_server
       in
       let*! () = Inbox.start () in
       let*! () = Components.Commitment.start () in
@@ -420,7 +423,7 @@ module Make (PVM : Pvm.S) = struct
           ~rpc_addr:configuration.rpc_addr
           ~rpc_port:configuration.rpc_port
       in
-      daemonize configuration node_ctxt store
+      daemonize configuration node_ctxt
     in
     start ()
 end
@@ -440,6 +443,7 @@ let run ~data_dir (cctxt : Protocol_client_context.full) =
       configuration.sc_rollup_node_operators
   in
   let*! store = Store.load configuration in
+  let*! context = Context.load configuration in
   let* l1_ctxt, kind = Layer1.start configuration cctxt store in
   let* node_ctxt =
     Node_context.init
@@ -450,6 +454,8 @@ let run ~data_dir (cctxt : Protocol_client_context.full) =
       configuration.sc_rollup_node_operators
       configuration.fee_parameter
       ~loser_mode:configuration.loser_mode
+      store
+      context
   in
   let module Daemon = Make ((val Components.pvm_of_kind node_ctxt.kind)) in
-  Daemon.run node_ctxt configuration store
+  Daemon.run node_ctxt configuration
