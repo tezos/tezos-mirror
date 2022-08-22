@@ -225,3 +225,99 @@ let codegen_module models sol transform =
       models
   in
   make_module items
+
+let%expect_test "basic_printing" =
+  let open Codegen in
+  let term =
+    lam ~name:"x" @@ fun x ->
+    lam ~name:"y" @@ fun y ->
+    let_ ~name:"tmp1" (int 42) @@ fun tmp1 ->
+    let_ ~name:"tmp2" (int 43) @@ fun tmp2 -> x + y + tmp1 + tmp2
+  in
+  let item = generate_let_binding "name" term in
+  Format.printf "%a" pp_structure_item item ;
+  [%expect
+    {|
+    let name x y =
+      let open S.Syntax in
+        let x = S.safe_int x in
+        let y = S.safe_int y in
+        let tmp1 = S.safe_int 42 in
+        let tmp2 = S.safe_int 43 in ((x + y) + tmp1) + tmp2 |}]
+
+let%expect_test "anonymous_int_literals" =
+  let open Codegen in
+  let term =
+    lam ~name:"x" @@ fun x ->
+    lam ~name:"y" @@ fun y -> x + y + int 42 + int 43
+  in
+  let item = generate_let_binding "name" term in
+  Format.printf "%a" pp_structure_item item ;
+  [%expect
+    {|
+    let name x y =
+      let open S.Syntax in
+        let x = S.safe_int x in
+        let y = S.safe_int y in ((x + y) + (S.safe_int 42)) + (S.safe_int 43) |}]
+
+let%expect_test "let_bound_lambda" =
+  let open Codegen in
+  let term =
+    lam ~name:"x" @@ fun x ->
+    lam ~name:"y" @@ fun y ->
+    let_ ~name:"incr" (lam ~name:"x" (fun x -> x + int 1)) @@ fun incr ->
+    app incr x + app incr y
+  in
+  let item = generate_let_binding "name" term in
+  Format.printf "%a" pp_structure_item item ;
+  [%expect
+    {|
+    let name x y =
+      let open S.Syntax in
+        let x = S.safe_int x in
+        let y = S.safe_int y in
+        let incr x = x + (S.safe_int 1) in (incr x) + (incr y) |}]
+
+let%expect_test "ill_typed_higher_order" =
+  let open Codegen in
+  let term =
+    lam ~name:"incr" @@ fun incr ->
+    lam ~name:"x" @@ fun x ->
+    lam ~name:"y" @@ fun y -> app incr x + app incr y
+  in
+  let item = generate_let_binding "name" term in
+  Format.printf "%a" pp_structure_item item ;
+  [%expect
+    {|
+    let name incr x y =
+      let open S.Syntax in
+        let incr = S.safe_int incr in
+        let x = S.safe_int x in let y = S.safe_int y in (incr x) + (incr y) |}]
+
+let%expect_test "if_conditional_operator" =
+  let open Codegen in
+  let term =
+    lam ~name:"x" @@ fun x ->
+    lam ~name:"y" @@ fun y -> if_ (lt x y) y x
+  in
+  let item = generate_let_binding "name" term in
+  Format.printf "%a" pp_structure_item item ;
+  [%expect
+    {|
+    let name x y =
+      let open S.Syntax in
+        let x = S.safe_int x in let y = S.safe_int y in if x < y then y else x |}]
+
+let%expect_test "module_generation" =
+  let open Codegen in
+  let term = lam ~name:"x" @@ fun x -> x in
+  let module_ = make_module [generate_let_binding "func_name" term] in
+  Format.printf "%a" pp_structure_item module_ ;
+  [%expect
+    {|
+    module Generated =
+      struct
+        [@@@warning "-33"]
+        module S = Saturation_repr
+        let func_name x = let open S.Syntax in let x = S.safe_int x in x
+      end |}]
