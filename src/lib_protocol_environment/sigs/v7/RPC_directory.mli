@@ -51,6 +51,7 @@ type conflict =
   | CService of RPC_service.meth
   | CDir
   | CBuilder
+  | CDynDescr of string * string
   | CTail
   | CTypes of RPC_arg.descr * RPC_arg.descr
   | CType of RPC_arg.descr * string list
