@@ -1022,137 +1022,159 @@ let run_data (inst : module_inst) i data =
 
 let run_start start = List.map plain [Call start.it.sfunc @@ start.at]
 
+type init_kont = IK_Start | IK_Stop of module_inst
+
+let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
+  function
+  | IK_Start ->
+      let {
+        imports;
+        tables;
+        memories;
+        globals;
+        funcs;
+        types;
+        exports;
+        elems;
+        datas;
+        start;
+        allocations;
+      } =
+        m.it
+      in
+
+      (* Initialize as empty module. *)
+      update_module_ref module_reg self empty_module_inst ;
+
+      (* TODO: #3076
+
+         These transformations should be refactored and abadoned during the
+         tickification, to avoid the roundtrip vector -> list -> vector. *)
+      let* types = Vector.to_list types in
+      let* imports = Vector.to_list imports in
+      let* tables = Vector.to_list tables in
+      let* memories = Vector.to_list memories in
+      let* globals = Vector.to_list globals in
+      let* funcs = Vector.to_list funcs in
+      let* elems = Vector.to_list elems in
+      let* datas = Vector.to_list datas in
+      let* exports = Vector.to_list exports in
+
+      (* TODO: #3076
+         To refactor during the tickification. *)
+      let* init_inst0 =
+        TzStdLib.List.fold_right2_s
+          ~when_different_lengths:()
+          (add_import m)
+          exts
+          imports
+          empty_module_inst
+      in
+      let init_inst0 =
+        match init_inst0 with
+        | Ok i -> i
+        | Error () ->
+            Link.error
+              m.at
+              "wrong number of imports provided for initialisation"
+      in
+      update_module_ref module_reg self init_inst0 ;
+
+      let inst0 =
+        {
+          init_inst0 with
+          types =
+            (* TODO: #3076
+               [types] should be a lazy structure so we can avoid traversing it
+               whole. *)
+            List.map (fun type_ -> type_.it) types |> Vector.of_list;
+          allocations;
+        }
+      in
+      update_module_ref module_reg self inst0 ;
+
+      let* fs = TzStdLib.List.map_s (create_func module_reg self) funcs in
+      (* TODO: #3076
+         [fs]/[funcs] should be a lazy structure so we can avoid traversing it
+         completely. *)
+      let* funcs = Vector.concat inst0.funcs (Vector.of_list fs) in
+      let inst1 = {inst0 with funcs} in
+      update_module_ref module_reg self inst1 ;
+
+      let* new_globals =
+        TzStdLib.List.map_s (create_global module_reg self) globals
+      in
+      (* TODO: #3076
+         [tables] should be a lazy structure. *)
+      let* tables =
+        Vector.concat
+          inst1.tables
+          (Vector.of_list (List.map create_table tables))
+      in
+      (* TODO: #3076
+         [memories] should be a lazy structure. *)
+      let* memories =
+        Vector.concat
+          inst1.memories
+          (Vector.of_list (List.map create_memory memories))
+      in
+      (* TODO: #3076
+         [new_globals]/[globals] should be lazy structures. *)
+      let* globals = Vector.concat inst1.globals (Vector.of_list new_globals) in
+      let inst2 = {inst1 with tables; memories; globals} in
+      update_module_ref module_reg self inst2 ;
+
+      let* new_exports = TzStdLib.List.map_s (create_export inst2) exports in
+      let* new_elems =
+        TzStdLib.List.map_s (create_elem module_reg self) elems
+      in
+      let new_datas = List.map create_data datas in
+      let* exports =
+        (* TODO: #3076
+           [new_exports]/[exports] should be lazy structures. *)
+        TzStdLib.List.fold_left_s
+          (fun exports (k, v) ->
+            let+ k = Instance.Vector.to_list k in
+            NameMap.set k v exports)
+          (NameMap.create ~produce_value:(fun _ -> Lwt.fail Not_found) ())
+          new_exports
+      in
+      let inst =
+        {
+          inst2 with
+          exports;
+          elems =
+            (* TODO: #3076
+               [new_elems]/[elems] should be lazy structures. *)
+            Vector.of_list new_elems;
+          datas =
+            (* TODO: #3076
+               [new_data]/[datas] should be lazy structures. *)
+            Vector.of_list new_datas;
+        }
+      in
+      update_module_ref module_reg self inst ;
+
+      let es_elem = List.concat (Lib.List32.mapi run_elem elems) in
+      let* datas = Lib.List32.mapi_s (run_data inst) datas in
+      let es_data = TzStdLib.List.concat datas in
+      let es_start = Lib.Option.get (Lib.Option.map run_start start) [] in
+      let+ (_ : Values.value stack) =
+        eval
+          module_reg
+          (config host_funcs self [] (es_elem @ es_data @ es_start))
+      in
+
+      IK_Stop inst
+  | IK_Stop _ -> raise (Invalid_argument "init_step")
+
 let init ~module_reg ~self host_funcs (m : module_) (exts : extern list) :
     module_inst Lwt.t =
   let open Lwt.Syntax in
-  let {
-    imports;
-    tables;
-    memories;
-    globals;
-    funcs;
-    types;
-    exports;
-    elems;
-    datas;
-    start;
-    allocations;
-  } =
-    m.it
+  let rec go = function
+    | IK_Stop inst -> Lwt.return inst
+    | kont ->
+        let* kont = init_step ~module_reg ~self host_funcs m exts kont in
+        go kont
   in
-
-  (* Initialize as empty module. *)
-  update_module_ref module_reg self empty_module_inst ;
-
-  (* TODO: #3076
-
-     These transformations should be refactored and abadoned during the
-     tickification, to avoid the roundtrip vector -> list -> vector. *)
-  let* types = Vector.to_list types in
-  let* imports = Vector.to_list imports in
-  let* tables = Vector.to_list tables in
-  let* memories = Vector.to_list memories in
-  let* globals = Vector.to_list globals in
-  let* funcs = Vector.to_list funcs in
-  let* elems = Vector.to_list elems in
-  let* datas = Vector.to_list datas in
-  let* exports = Vector.to_list exports in
-
-  (* TODO: #3076
-     To refactor during the tickification. *)
-  let* init_inst0 =
-    TzStdLib.List.fold_right2_s
-      ~when_different_lengths:()
-      (add_import m)
-      exts
-      imports
-      empty_module_inst
-  in
-  let init_inst0 =
-    match init_inst0 with
-    | Ok i -> i
-    | Error () ->
-        Link.error m.at "wrong number of imports provided for initialisation"
-  in
-  update_module_ref module_reg self init_inst0 ;
-
-  let inst0 =
-    {
-      init_inst0 with
-      types =
-        (* TODO: #3076
-           [types] should be a lazy structure so we can avoid traversing it
-           whole. *)
-        List.map (fun type_ -> type_.it) types |> Vector.of_list;
-      allocations;
-    }
-  in
-  update_module_ref module_reg self inst0 ;
-
-  let* fs = TzStdLib.List.map_s (create_func module_reg self) funcs in
-  (* TODO: #3076
-     [fs]/[funcs] should be a lazy structure so we can avoid traversing it
-     completely. *)
-  let* funcs = Vector.concat inst0.funcs (Vector.of_list fs) in
-  let inst1 = {inst0 with funcs} in
-  update_module_ref module_reg self inst1 ;
-
-  let* new_globals =
-    TzStdLib.List.map_s (create_global module_reg self) globals
-  in
-  (* TODO: #3076
-     [tables] should be a lazy structure. *)
-  let* tables =
-    Vector.concat inst1.tables (Vector.of_list (List.map create_table tables))
-  in
-  (* TODO: #3076
-     [memories] should be a lazy structure. *)
-  let* memories =
-    Vector.concat
-      inst1.memories
-      (Vector.of_list (List.map create_memory memories))
-  in
-  (* TODO: #3076
-     [new_globals]/[globals] should be lazy structures. *)
-  let* globals = Vector.concat inst1.globals (Vector.of_list new_globals) in
-  let inst2 = {inst1 with tables; memories; globals} in
-  update_module_ref module_reg self inst2 ;
-
-  let* new_exports = TzStdLib.List.map_s (create_export inst2) exports in
-  let* new_elems = TzStdLib.List.map_s (create_elem module_reg self) elems in
-  let new_datas = List.map create_data datas in
-  let* exports =
-    (* TODO: #3076
-       [new_exports]/[exports] should be lazy structures. *)
-    TzStdLib.List.fold_left_s
-      (fun exports (k, v) ->
-        let+ k = Instance.Vector.to_list k in
-        NameMap.set k v exports)
-      (NameMap.create ~produce_value:(fun _ -> Lwt.fail Not_found) ())
-      new_exports
-  in
-  let inst =
-    {
-      inst2 with
-      exports;
-      elems =
-        (* TODO: #3076
-           [new_elems]/[elems] should be lazy structures. *)
-        Vector.of_list new_elems;
-      datas =
-        (* TODO: #3076
-           [new_data]/[datas] should be lazy structures. *)
-        Vector.of_list new_datas;
-    }
-  in
-  update_module_ref module_reg self inst ;
-
-  let es_elem = List.concat (Lib.List32.mapi run_elem elems) in
-  let* datas = Lib.List32.mapi_s (run_data inst) datas in
-  let es_data = TzStdLib.List.concat datas in
-  let es_start = Lib.Option.get (Lib.Option.map run_start start) [] in
-  let+ (_ : Values.value stack) =
-    eval module_reg (config host_funcs self [] (es_elem @ es_data @ es_start))
-  in
-
-  inst
+  go IK_Start

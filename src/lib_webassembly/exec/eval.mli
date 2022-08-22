@@ -9,6 +9,25 @@ exception Crash of Source.region * string
 
 exception Exhaustion of Source.region * string
 
+type init_kont =
+  | IK_Start  (** Very first tick of the [init] function *)
+  | IK_Stop of module_inst
+      (** Witness that there is no more tick to execute to complete
+          the [init] process. *)
+
+(** Small-step execution of the [init] process. See {!init}.
+
+    @raise Invalid_argument if called with [IK_Stop]. There is no
+    transition from the terminal state. *)
+val init_step :
+  module_reg:module_reg ->
+  self:module_key ->
+  Host_funcs.registry ->
+  Ast.module_ ->
+  extern list ->
+  init_kont ->
+  init_kont Lwt.t
+
 val init :
   module_reg:module_reg ->
   self:module_key ->
