@@ -1579,7 +1579,15 @@ let test_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
            levels_and_inputs ) ->
       let open Lwt_result_syntax in
       (* Otherwise, there is no conflict. *)
-      QCheck2.assume (not (p1_client.states = p2_client.states)) ;
+      QCheck2.assume
+        (not
+           (let p1_head = List.last_opt p1_client.states in
+            let p2_head = List.last_opt p2_client.states in
+            Option.equal
+              (fun (t1, state_hash1) (t2, state_hash2) ->
+                Tick.equal t1 t2 && State_hash.equal state_hash1 state_hash2)
+              p1_head
+              p2_head)) ;
       let* block =
         prepare_game
           block
@@ -1638,10 +1646,10 @@ let test_perfect_against_eager =
 let test_eager_against_perfect =
   test_game ~nonempty_inputs:true ~p1_strategy:Eager ~p2_strategy:Perfect ()
 
-let _test_perfect_against_keen =
+let test_perfect_against_keen =
   test_game ~p1_strategy:Perfect ~p2_strategy:Keen ()
 
-let _test_keen_against_perfect =
+let test_keen_against_perfect =
   test_game ~p1_strategy:Keen ~p2_strategy:Perfect ()
 
 let tests =
@@ -1653,9 +1661,9 @@ let tests =
         test_perfect_against_lazy;
         test_lazy_against_perfect;
         test_perfect_against_eager;
-        test_eager_against_perfect
-        (* test_perfect_against_keen; *)
-        (* test_keen_against_perfect; *);
+        test_eager_against_perfect;
+        test_perfect_against_keen;
+        test_keen_against_perfect;
       ] )
 
 (** {2 Entry point} *)
