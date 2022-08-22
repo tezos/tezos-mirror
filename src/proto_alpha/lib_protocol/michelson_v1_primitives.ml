@@ -48,6 +48,7 @@ type prim =
   | D_Some
   | D_True
   | D_Unit
+  | D_Lambda_rec
   | I_PACK
   | I_UNPACK
   | I_BLAKE2B
@@ -91,6 +92,7 @@ type prim =
   | I_IF_NONE
   | I_INT
   | I_LAMBDA
+  | I_LAMBDA_REC
   | I_LE
   | I_LEFT
   | I_LEVEL
@@ -200,7 +202,7 @@ type namespace =
 let namespace = function
   | K_code | K_view | K_parameter | K_storage -> Keyword_namespace
   | D_Elt | D_False | D_Left | D_None | D_Pair | D_Right | D_Some | D_True
-  | D_Unit ->
+  | D_Unit | D_Lambda_rec ->
       Constant_namespace
   | I_ABS | I_ADD | I_ADDRESS | I_AMOUNT | I_AND | I_APPLY | I_BALANCE
   | I_BLAKE2B | I_CAR | I_CAST | I_CDR | I_CHAIN_ID | I_CHECK_SIGNATURE
@@ -209,16 +211,16 @@ let namespace = function
   | I_EMPTY_BIG_MAP | I_EMPTY_MAP | I_EMPTY_SET | I_EQ | I_EXEC | I_FAILWITH
   | I_GE | I_GET | I_GET_AND_UPDATE | I_GT | I_HASH_KEY | I_IF | I_IF_CONS
   | I_IF_LEFT | I_IF_NONE | I_IMPLICIT_ACCOUNT | I_INT | I_ISNAT | I_ITER
-  | I_JOIN_TICKETS | I_KECCAK | I_LAMBDA | I_LE | I_LEFT | I_LEVEL | I_LOOP
-  | I_LOOP_LEFT | I_LSL | I_LSR | I_LT | I_MAP | I_MEM | I_MUL | I_NEG | I_NEQ
-  | I_NEVER | I_NIL | I_NONE | I_NOT | I_NOW | I_MIN_BLOCK_TIME | I_OR | I_PACK
-  | I_PAIR | I_PAIRING_CHECK | I_PUSH | I_READ_TICKET | I_RENAME | I_RIGHT
-  | I_SAPLING_EMPTY_STATE | I_SAPLING_VERIFY_UPDATE | I_SELF | I_SELF_ADDRESS
-  | I_SENDER | I_SET_DELEGATE | I_SHA256 | I_SHA512 | I_SHA3 | I_SIZE | I_SLICE
-  | I_SOME | I_SOURCE | I_SPLIT_TICKET | I_STEPS_TO_QUOTA | I_SUB | I_SUB_MUTEZ
-  | I_SWAP | I_TICKET | I_TOTAL_VOTING_POWER | I_TRANSFER_TOKENS | I_UNIT
-  | I_UNPACK | I_UNPAIR | I_UPDATE | I_VOTING_POWER | I_XOR | I_OPEN_CHEST
-  | I_EMIT ->
+  | I_JOIN_TICKETS | I_KECCAK | I_LAMBDA | I_LAMBDA_REC | I_LE | I_LEFT
+  | I_LEVEL | I_LOOP | I_LOOP_LEFT | I_LSL | I_LSR | I_LT | I_MAP | I_MEM
+  | I_MUL | I_NEG | I_NEQ | I_NEVER | I_NIL | I_NONE | I_NOT | I_NOW
+  | I_MIN_BLOCK_TIME | I_OR | I_PACK | I_PAIR | I_PAIRING_CHECK | I_PUSH
+  | I_READ_TICKET | I_RENAME | I_RIGHT | I_SAPLING_EMPTY_STATE
+  | I_SAPLING_VERIFY_UPDATE | I_SELF | I_SELF_ADDRESS | I_SENDER
+  | I_SET_DELEGATE | I_SHA256 | I_SHA512 | I_SHA3 | I_SIZE | I_SLICE | I_SOME
+  | I_SOURCE | I_SPLIT_TICKET | I_STEPS_TO_QUOTA | I_SUB | I_SUB_MUTEZ | I_SWAP
+  | I_TICKET | I_TOTAL_VOTING_POWER | I_TRANSFER_TOKENS | I_UNIT | I_UNPACK
+  | I_UNPAIR | I_UPDATE | I_VOTING_POWER | I_XOR | I_OPEN_CHEST | I_EMIT ->
       Instr_namespace
   | T_address | T_tx_rollup_l2_address | T_big_map | T_bool | T_bytes
   | T_chain_id | T_contract | T_int | T_key | T_key_hash | T_lambda | T_list
@@ -255,6 +257,7 @@ let string_of_prim = function
   | D_Some -> "Some"
   | D_True -> "True"
   | D_Unit -> "Unit"
+  | D_Lambda_rec -> "Lambda_rec"
   | I_PACK -> "PACK"
   | I_UNPACK -> "UNPACK"
   | I_BLAKE2B -> "BLAKE2B"
@@ -297,6 +300,7 @@ let string_of_prim = function
   | I_IF_NONE -> "IF_NONE"
   | I_INT -> "INT"
   | I_LAMBDA -> "LAMBDA"
+  | I_LAMBDA_REC -> "LAMBDA_REC"
   | I_LE -> "LE"
   | I_LEFT -> "LEFT"
   | I_LEVEL -> "LEVEL"
@@ -409,6 +413,7 @@ let prim_of_string = function
   | "Some" -> ok D_Some
   | "True" -> ok D_True
   | "Unit" -> ok D_Unit
+  | "Lambda_rec" -> ok D_Lambda_rec
   | "PACK" -> ok I_PACK
   | "UNPACK" -> ok I_UNPACK
   | "BLAKE2B" -> ok I_BLAKE2B
@@ -453,6 +458,7 @@ let prim_of_string = function
   | "INT" -> ok I_INT
   | "KECCAK" -> ok I_KECCAK
   | "LAMBDA" -> ok I_LAMBDA
+  | "LAMBDA_REC" -> ok I_LAMBDA_REC
   | "LE" -> ok I_LE
   | "LEFT" -> ok I_LEFT
   | "LEVEL" -> ok I_LEVEL
@@ -761,7 +767,10 @@ let prim_encoding =
          ("sapling_transaction", T_sapling_transaction);
          (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
          (* Alpha_014 addition *)
-         ("EMIT", I_EMIT)
+         ("EMIT", I_EMIT);
+         (* Alpha_015 addition *)
+         ("Lambda_rec", D_Lambda_rec);
+         ("LAMBDA_REC", I_LAMBDA_REC)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *);
        ]

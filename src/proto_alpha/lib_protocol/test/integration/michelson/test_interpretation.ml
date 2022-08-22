@@ -27,9 +27,8 @@
     -------
     Component:    Protocol (interpretation)
     Dependencies: src/proto_alpha/lib_protocol/script_interpreter.ml
-    Invocation:   dune exec \
-                  src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
-                  -- test "^interpretation$"
+    Invocation:   cd src/proto_alpha/lib_protocol/test/integration/michelson && \
+                  dune exec ./main.exe -- test "^interpretation$"
     Subject:      Interpretation of Michelson scripts
 *)
 
@@ -288,6 +287,84 @@ module Test_map_instr_on_options = struct
     assertions storage_before new_storage input
 end
 
+let test_contract path storage param ~entrypoint_str ~ok ~ko =
+  let entrypoint =
+    match entrypoint_str with
+    | None -> Entrypoint.default
+    | Some str -> Entrypoint.of_string_strict_exn str
+  in
+  test_context () >>=? fun ctx ->
+  let read_file filename =
+    let ch = open_in filename in
+    let s = really_input_string ch (in_channel_length ch) in
+    close_in ch ;
+    s
+  in
+  let script = read_file path in
+  Contract_helpers.run_script
+    ctx
+    script
+    ~storage
+    ~parameter:param
+    ~entrypoint
+    ()
+  >>= function
+  | Ok (res, _) -> ok res
+  | Error t -> ko t
+
+let fail_with_trace trace =
+  Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace trace
+
+let test_contract_success path storage param expected_storage_str
+    ?entrypoint_str () =
+  let expected_storage = Expr.from_string expected_storage_str in
+  test_contract
+    path
+    storage
+    param
+    ~ok:(fun real ->
+      if real.storage = expected_storage then return_unit
+      else Alcotest.fail "Unexpected result")
+    ~ko:fail_with_trace
+    ~entrypoint_str
+
+let test_contract_fail path storage param ?entrypoint_str () =
+  test_contract
+    path
+    storage
+    param
+    ~ok:(fun _ ->
+      Alcotest.failf
+        "Unexpected success: interpreting %s should have failed."
+        path)
+    ~ko:(fun _ -> return_unit)
+    ~entrypoint_str
+
+let test_store_and_reload path ~init_storage ~entrypoint_str_1 ~param_1
+    ~expected_storage_str_1 ~entrypoint_str_2 ~param_2 ~expected_storage_str_2
+    () =
+  let expected_storage_1 = Expr.from_string expected_storage_str_1 in
+  test_contract
+    path
+    init_storage
+    param_1
+    ~entrypoint_str:(Some entrypoint_str_1)
+    ~ok:(fun real ->
+      if real.storage = expected_storage_1 then
+        test_contract_success
+          path
+          expected_storage_str_1
+          param_2
+          expected_storage_str_2
+          ~entrypoint_str:entrypoint_str_2
+          ()
+      else
+        Alcotest.failf
+          "Unexpected result. \n Expected :\n %s \n Real : \n %s \n"
+          (Expr.to_string expected_storage_1)
+          (Expr.to_string real.storage))
+    ~ko:fail_with_trace
+
 let tests =
   [
     Tztest.tztest "test bad contract error" `Quick test_bad_contract_parameter;
@@ -306,5 +383,63 @@ let tests =
       QCheck2.Gen.(
         triple (opt small_signed_int) (opt small_signed_int) small_signed_int)
       Test_map_instr_on_options.test_mapping;
+    Tztest.tztest
+      "test lambda_rec instruction"
+      `Quick
+      (test_contract_success "./contracts/rec_fact.tz" "0" "5" "120");
+    Tztest.tztest
+      "test lambda_rec instruction with apply"
+      `Quick
+      (test_contract_success "./contracts/rec_fact_apply.tz" "0" "5" "120");
+    Tztest.tztest
+      "test lambda_rec instruction with an infinite recursion"
+      `Quick
+      (test_contract_fail "./contracts/omega.tz" "Unit" "Unit");
+    Tztest.tztest
+      "test lambda_rec instruction storage"
+      `Quick
+      (test_store_and_reload
+         "./contracts/rec_fact_store.tz"
+         ~init_storage:"Left 0"
+         ~entrypoint_str_1:"gen"
+         ~param_1:"Unit"
+         ~expected_storage_str_1:
+           {|Right
+             (Lambda_rec
+                { DUP ;
+                  EQ ;
+                  IF { PUSH int 1 } { DUP ; DUP 3 ; PUSH int 1 ; DUP 4 ; SUB
+            ; EXEC ; MUL } ;
+                  DIP { DROP 2 } })|}
+         ~entrypoint_str_2:"exec"
+         ~param_2:"5"
+         ~expected_storage_str_2:"Left 120");
+    Tztest.tztest
+      "test lambda_rec instruction storage"
+      `Quick
+      (test_store_and_reload
+         "./contracts/rec_fact_apply_store.tz"
+         ~init_storage:"Left 0"
+         ~entrypoint_str_1:"gen"
+         ~param_1:"Unit"
+         ~expected_storage_str_1:
+           {|Right
+              { PUSH unit Unit ;
+                PAIR ;
+                LAMBDA_REC
+                  (pair unit int)
+                  int
+                  { UNPAIR ;
+                    DUP 2 ;
+                    EQ ;
+                    IF { PUSH int 1 }
+                       { DUP 2 ; DUP 4 ; DUP 3 ; APPLY ; PUSH int 1 ; DUP 3 ;
+            SUB ; EXEC ; MUL } ;
+                    DIP { DROP 3 } } ;
+                SWAP ;
+                EXEC }|}
+         ~entrypoint_str_2:"exec"
+         ~param_2:"5"
+         ~expected_storage_str_2:"Left 120");
   ]
   @ error_encoding_tests

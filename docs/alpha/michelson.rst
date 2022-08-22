@@ -707,6 +707,18 @@ Stack operations
 
     > LAMBDA _ _ code / S  =>  code : S
 
+- ``LAMBDA_REC 'a 'b code``: Push a lambda with itself on top of the
+   code, recursively, with the given parameter type `'a` and return
+   a value of type `'b` onto the stack (if it terminates before gas
+   exhaustion).
+
+::
+
+    :: 'A ->  (lambda 'a 'b) : 'A
+       iff code::'a: (lambda 'a 'b):[] -> 'b:[]
+
+    > LAMBDA_REC 'a 'b code / S  => {LAMBDA_REC 'a 'b code; code} : S
+
 Generic comparison
 ~~~~~~~~~~~~~~~~~~
 
@@ -1419,7 +1431,7 @@ Operations on maps
     > UPDATE / x : Some y : {} : S  =>  { Elt x y } : S
     > UPDATE / x : opt_y : { Elt k v ; <tl> } : S  =>  { Elt k v ; <tl'> } : S
         iff COMPARE / x : k : []  =>  1 : []
-	      where UPDATE / x : opt_y : { <tl> } : S  =>  { <tl'> } : S
+          where UPDATE / x : opt_y : { <tl> } : S  =>  { <tl'> } : S
     > UPDATE / x : None : { Elt k v ; <tl> } : S  =>  { <tl> } : S
         iff COMPARE / x : k : []  =>  0 : []
     > UPDATE / x : Some y : { Elt k v ; <tl> } : S  =>  { Elt k y ; <tl> } : S
@@ -1445,7 +1457,7 @@ value that was previously stored in the ``map`` at the same key as
     > GET_AND_UPDATE / x : Some y : {} : S  =>  None : { Elt x y } : S
     > GET_AND_UPDATE / x : opt_y : { Elt k v ; <tl> } : S  =>  opt_y' : { Elt k v ; <tl'> } : S
         iff COMPARE / x : k : []  =>  1 : []
-	      where GET_AND_UPDATE / x : opt_y : { <tl> } : S  =>  opt_y' : { <tl'> } : S
+          where GET_AND_UPDATE / x : opt_y : { <tl> } : S  =>  opt_y' : { <tl'> } : S
     > GET_AND_UPDATE / x : None : { Elt k v ; <tl> } : S  =>  Some v : { <tl> } : S
         iff COMPARE / x : k : []  =>  0 : []
     > GET_AND_UPDATE / x : Some y : { Elt k v ; <tl> } : S  =>  Some v : { Elt k y ; <tl> } : S
@@ -2350,7 +2362,7 @@ Events
   See :doc:`Event <event>` for more information.
 
 ::
-    
+
     :: 'ty : 'S -> operation : 'S
 
 
@@ -2944,6 +2956,7 @@ The instructions which accept at most one variable annotation are:
    UPDATE
    GET
    LAMBDA
+   LAMBDA_REC
    EXEC
    ADD
    SUB
@@ -3511,6 +3524,49 @@ entrypoint, of type ``unit`` will reset it to ``0``.
               { DROP ; DROP ; PUSH int 0 } ;
             NIL operation ; PAIR } }
 
+
+Example contract with recursive lambda
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The following contract computes the factorial of the given parameter
+using a recursive function and then saves the result in the storage.
+
+In Michelson regular functions start with a stack containing a single
+value, the function argument. If the function is of type ``lambda int
+int``, when calling the function the stack will have just an
+``int``. Recursive functions start with two values, the argument and
+the function itself. Therefore, if the recursive function is of type
+``lambda int int`` then, when it is being called, the stack will have
+an ``int`` at the top and a ``lambda int int`` at the bottom.
+
+In this recursive factorial we can see the first branch of the ``IF``,
+this is the base case. The second one performs the recursive call. To
+do that, we need to access the function. This is what the ``DUP 3``
+instruction does. Then we decrement the argument and finally make the
+recursive call with ``EXEC``.
+
+::
+
+    { parameter int;
+      storage int;
+      code { CAR ;
+	     LAMBDA_REC  int int
+			 { DUP;
+			   EQ;
+			   IF { PUSH int 1 }
+			      { DUP;
+				DUP 3;
+				PUSH int 1;
+				DUP 4;
+				SUB;
+				EXEC;
+				MUL};
+			   DIP { DROP 2 }};
+	     SWAP;
+	     EXEC;
+	     NIL operation;
+	     PAIR}}
+
 Multisig contract
 ~~~~~~~~~~~~~~~~~
 
@@ -3639,6 +3695,7 @@ Full grammar
       | Right <data>
       | Some <data>
       | None
+      | Lambda_rec <instruction>
       | { <data> ; ... }
       | { Elt <data> <data> ; ... }
       | instruction
@@ -3701,6 +3758,7 @@ Full grammar
       | LOOP { <instruction> ... }
       | LOOP_LEFT { <instruction> ... }
       | LAMBDA <type> <type> { <instruction> ... }
+      | LAMBDA_REC <type> <type> { <instruction> ... }
       | EXEC
       | APPLY
       | DIP { <instruction> ... }

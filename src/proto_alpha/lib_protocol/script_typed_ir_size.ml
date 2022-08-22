@@ -352,13 +352,20 @@ and lambda_size :
     type i o.
     count_lambda_nodes:bool -> nodes_and_size -> (i, o) lambda -> nodes_and_size
     =
- fun ~count_lambda_nodes accu (Lam (kdescr, node)) ->
-  (* We assume that the nodes' size have already been counted if the
-     lambda is not a toplevel lambda. *)
-  let accu =
-    ret_adding (accu ++ if count_lambda_nodes then node_size node else zero) h2w
+ fun ~count_lambda_nodes accu lam ->
+  let count_lambda_body kdescr node =
+    (* We assume that the nodes' size have already been counted if the
+       lambda is not a toplevel lambda. *)
+    let accu =
+      ret_adding
+        (accu ++ if count_lambda_nodes then node_size node else zero)
+        h2w
+    in
+    (kdescr_size [@ocaml.tailcall]) ~count_lambda_nodes:false accu kdescr
   in
-  (kdescr_size [@ocaml.tailcall]) ~count_lambda_nodes:false accu kdescr
+  match lam with
+  | Lam (kdescr, node) -> count_lambda_body kdescr node
+  | LamRec (kdescr, node) -> count_lambda_body kdescr node
 
 and kdescr_size :
     type a s r f.

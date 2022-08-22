@@ -1109,6 +1109,10 @@ and ('arg, 'ret) lambda =
   | Lam :
       ('arg, end_of_stack, 'ret, end_of_stack) kdescr * Script.node
       -> ('arg, 'ret) lambda
+  | LamRec :
+      ('arg, ('arg, 'ret) lambda * end_of_stack, 'ret, end_of_stack) kdescr
+      * Script.node
+      -> ('arg, 'ret) lambda
 
 and 'arg typed_contract =
   | Typed_implicit : public_key_hash -> unit typed_contract

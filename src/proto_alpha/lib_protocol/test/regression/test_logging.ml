@@ -389,4 +389,5 @@ let () =
         ~lib:"view_toplevel_lib"
         ~lib_storage:"0"
         "view_fib";
+      transaction ~parameter:"Unit" ~storage:"Unit" "rec_id_unit";
     |]

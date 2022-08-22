@@ -486,15 +486,23 @@ and ifailwith : ifailwith_type =
 and iexec : type a b c d e f g. (a, b, c, d, e, f, g) iexec_type =
  fun instrument logger g gas cont_sty k ks accu stack ->
   let arg = accu and code, stack = stack in
-  let (Lam (code, _)) = code in
-  let code =
-    match logger with
-    | None -> code.kinstr
-    | Some logger ->
-        Script_interpreter_logging.log_kinstr logger code.kbef code.kinstr
+  let log_code b =
+    let body =
+      match logger with
+      | None -> b.kinstr
+      | Some logger ->
+          Script_interpreter_logging.log_kinstr logger b.kbef b.kinstr
+    in
+    let ks = instrument @@ KReturn (stack, cont_sty, KCons (k, ks)) in
+    (body, ks)
   in
-  let ks = instrument @@ KReturn (stack, cont_sty, KCons (k, ks)) in
-  (step [@ocaml.tailcall]) g gas code ks arg (EmptyCell, EmptyCell)
+  match code with
+  | Lam (body, _) ->
+      let body, ks = log_code body in
+      (step [@ocaml.tailcall]) g gas body ks arg (EmptyCell, EmptyCell)
+  | LamRec (body, _) ->
+      let body, ks = log_code body in
+      (step [@ocaml.tailcall]) g gas body ks arg (code, (EmptyCell, EmptyCell))
 
 and iview : type a b c d e f i o. (a, b, c, d, e, f, i, o) iview_type =
  fun instrument
@@ -1918,9 +1926,14 @@ let step_descr ~log_now logger (ctxt, sc) descr accu stack =
   >>=? fun (accu, stack, ctxt, gas) ->
   return (accu, stack, update_context gas ctxt)
 
-let interp logger g (Lam (code, _)) arg =
-  step_descr ~log_now:true logger g code arg (EmptyCell, EmptyCell)
-  >|=? fun (ret, (EmptyCell, EmptyCell), ctxt) -> (ret, ctxt)
+let interp logger g lam arg =
+  match lam with
+  | LamRec (code, _) ->
+      step_descr ~log_now:true logger g code arg (lam, (EmptyCell, EmptyCell))
+      >|=? fun (ret, (EmptyCell, EmptyCell), ctxt) -> (ret, ctxt)
+  | Lam (code, _) ->
+      step_descr ~log_now:true logger g code arg (EmptyCell, EmptyCell)
+      >|=? fun (ret, (EmptyCell, EmptyCell), ctxt) -> (ret, ctxt)
 
 (*
 
