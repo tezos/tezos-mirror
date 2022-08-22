@@ -2834,6 +2834,278 @@ end
 # 28 "v7.in.ml"
 
 
+  module Q : sig
+# 1 "v7/q.mli"
+(**
+   Rationals.
+
+   This modules builds arbitrary precision rationals on top of arbitrary
+   integers from module Z.
+
+
+   This file is part of the Zarith library
+   http://forge.ocamlcore.org/projects/zarith .
+   It is distributed under LGPL 2 licensing, with static linking exception.
+   See the LICENSE file included in the distribution.
+
+   Copyright (c) 2010-2011 Antoine Miné, Abstraction project.
+   Abstraction is part of the LIENS (Laboratoire d'Informatique de l'ENS),
+   a joint laboratory by:
+   CNRS (Centre national de la recherche scientifique, France),
+   ENS (École normale supérieure, Paris, France),
+   INRIA Rocquencourt (Institut national de recherche en informatique, France).
+
+ *)
+
+(** {1 Types} *)
+
+type t = {
+    num: Z.t; (** Numerator. *)
+    den: Z.t; (** Denominator, >= 0 *)
+  }
+(** A rational is represented as a pair numerator/denominator, reduced to
+    have a non-negative denominator and no common factor.
+    This form is canonical (enabling polymorphic equality and hashing).
+    The representation allows three special numbers: [inf] (1/0), [-inf] (-1/0)
+    and [undef] (0/0).
+ *)
+
+(** {1 Construction} *)
+
+val make: Z.t -> Z.t -> t
+(** [make num den] constructs a new rational equal to [num]/[den].
+    It takes care of putting the rational in canonical form.
+ *)
+
+val zero: t
+val one: t
+val minus_one:t
+(** 0, 1, -1. *)
+
+val inf: t
+(** 1/0. *)
+
+val minus_inf: t
+(** -1/0. *)
+
+val undef: t
+(** 0/0. *)
+
+val of_bigint: Z.t -> t
+val of_int: int -> t
+val of_int32: int32 -> t
+val of_int64: int64 -> t
+(** Conversions from various integer types. *)
+
+val of_ints: int -> int -> t
+(** Conversion from an [int] numerator and an [int] denominator. *)
+
+
+
+val of_string: string -> t
+(** Converts a string to a rational.  Plain integers, [/] separated
+   integer ratios (with optional sign), decimal point and scientific
+   notations are understood.
+    Additionally, the special [inf], [-inf], and [undef] are
+   recognized (they can also be typeset respectively as [1/0], [-1/0],
+   [0/0]).  *)
+
+
+(** {1 Inspection} *)
+
+val num: t -> Z.t
+(** Get the numerator. *)
+
+val den: t -> Z.t
+(** Get the denominator. *)
+
+
+(** {1 Testing} *)
+
+type kind =
+  | ZERO   (** 0 *)
+  | INF    (** infinity, i.e. 1/0 *)
+  | MINF   (** minus infinity, i.e. -1/0 *)
+  | UNDEF  (** undefined, i.e., 0/0 *)
+  | NZERO  (** well-defined, non-infinity, non-zero number *)
+(** Rationals can be categorized into different kinds, depending mainly on
+    whether the numerator and/or denominator is null.
+ *)
+
+val classify: t -> kind
+(** Determines the kind of a rational. *)
+
+val is_real: t -> bool
+(** Whether the argument is non-infinity and non-undefined. *)
+
+val sign: t -> int
+(** Returns 1 if the argument is positive (including inf), -1 if it is
+    negative (including -inf), and 0 if it is null or undefined.
+ *)
+
+val compare: t -> t -> int
+(** [compare x y] compares [x] to [y] and returns 1 if [x] is strictly
+    greater that [y], -1 if it is strictly smaller, and 0 if they are
+    equal.
+    This is a total ordering.
+    Infinities are ordered in the natural way, while undefined is considered
+    the smallest of all: undef = undef < -inf <= -inf < x < inf <= inf.
+    This is consistent with OCaml's handling of floating-point infinities
+    and NaN.
+
+    OCaml's polymorphic comparison will NOT return a result consistent with
+    the ordering of rationals.
+ *)
+
+val equal: t -> t -> bool
+(** Equality testing.
+    Unlike [compare], this follows IEEE semantics: [undef] <> [undef].
+ *)
+
+val min: t -> t -> t
+(** Returns the smallest of its arguments. *)
+
+val max: t -> t -> t
+(** Returns the largest of its arguments. *)
+
+val leq: t -> t -> bool
+(** Less than or equal. [leq undef undef] resturns false. *)
+
+val geq: t -> t -> bool
+(** Greater than or equal. [leq undef undef] resturns false. *)
+
+val lt: t -> t -> bool
+(** Less than (not equal). *)
+
+val gt: t -> t -> bool
+(** Greater than (not equal). *)
+
+
+(** {1 Conversions} *)
+
+val to_bigint: t -> Z.t
+val to_int: t -> int
+val to_int32: t -> int32
+val to_int64: t -> int64
+(** Convert to integer by truncation.
+    Raises a [Divide_by_zero] if the argument is an infinity or undefined.
+    Raises a [Z.Overflow] if the result does not fit in the destination
+    type.
+*)
+
+val to_string: t -> string
+(** Converts to human-readable, base-10, [/]-separated rational. *)
+
+(** {1 Arithmetic operations} *)
+
+(**
+   In all operations, the result is [undef] if one argument is [undef].
+   Other operations can return [undef]: such as [inf]-[inf], [inf]*0, 0/0.
+ *)
+
+val neg: t -> t
+(** Negation. *)
+
+val abs: t -> t
+(** Absolute value. *)
+
+val add: t -> t -> t
+(** Addition. *)
+
+val sub: t -> t -> t
+(** Subtraction. We have [sub x y] = [add x (neg y)]. *)
+
+val mul: t -> t -> t
+(** Multiplication. *)
+
+val inv: t -> t
+(** Inverse.
+    Note that [inv 0] is defined, and equals [inf].
+ *)
+
+val div: t -> t -> t
+(** Division.
+    We have [div x y] = [mul x (inv y)], and [inv x] = [div one x].
+ *)
+
+val mul_2exp: t -> int -> t
+(** [mul_2exp x n] multiplies [x] by 2 to the power of [n]. *)
+
+val div_2exp: t -> int -> t
+(** [div_2exp x n] divides [x] by 2 to the power of [n]. *)
+
+
+(** {1 Printing} *)
+
+val pp_print: Format.formatter -> t -> unit
+(** Prints the argument on the specified formatter.
+    Also intended to be used as [%a] format printer in [Format.printf].
+ *)
+
+
+(** {1 Prefix and infix operators} *)
+
+(**
+   Classic prefix and infix [int] operators are redefined on [t].
+*)
+
+val (~-): t -> t
+(** Negation [neg]. *)
+
+val (~+): t -> t
+(** Identity. *)
+
+val (+): t -> t -> t
+(** Addition [add]. *)
+
+val (-): t -> t -> t
+(** Subtraction [sub]. *)
+
+val ( * ): t -> t -> t
+(** Multiplication [mul]. *)
+
+val (/): t -> t -> t
+(** Division [div]. *)
+
+val (lsl): t -> int -> t
+(** Multiplication by a power of two [mul_2exp]. *)
+
+val (asr): t -> int -> t
+(** Division by a power of two [shift_right]. *)
+
+val (~$): int -> t
+(** Conversion from [int]. *)
+
+val (//): int -> int -> t
+(** Creates a rational from two [int]s. *)
+
+val (~$$): Z.t -> t
+(** Conversion from [Z.t]. *)
+
+val (///): Z.t -> Z.t -> t
+(** Creates a rational from two [Z.t]. *)
+
+val (=): t -> t -> bool
+(** Same as [equal]. *)
+
+val (<): t -> t -> bool
+(** Same as [lt]. *)
+
+val (>): t -> t -> bool
+(** Same as [gt]. *)
+
+val (<=): t -> t -> bool
+(** Same as [leq]. *)
+
+val (>=): t -> t -> bool
+(** Same as [geq]. *)
+
+val (<>): t -> t -> bool
+(** [a <> b] is equivalent to [not (equal a b)]. *)
+end
+# 30 "v7.in.ml"
+
+
   module Lwt : sig
 # 1 "v7/lwt.mli"
 (* This file is part of Lwt, released under the MIT license. See LICENSE.md for
@@ -3143,7 +3415,7 @@ val return_error : 'e -> ((_, 'e) result) t
 
     @since Lwt 2.6.0 *)
 end
-# 30 "v7.in.ml"
+# 32 "v7.in.ml"
 
 
   module Data_encoding : sig
@@ -4620,7 +4892,7 @@ module Binary : sig
   val to_string_exn : ?buffer_size:int -> 'a encoding -> 'a -> string
 end
 end
-# 32 "v7.in.ml"
+# 34 "v7.in.ml"
 
 
   module Raw_hashes : sig
@@ -4662,7 +4934,7 @@ val sha3_256 : bytes -> bytes
 
 val sha3_512 : bytes -> bytes
 end
-# 34 "v7.in.ml"
+# 36 "v7.in.ml"
 
 
   module Compare : sig
@@ -4805,6 +5077,9 @@ module Bytes : S with type t = bytes
 (** [Z] is a comparison module for Zarith numbers. *)
 module Z : S with type t = Z.t
 
+(** [Q] is a comparison module for Zarith rationals. *)
+module Q : S with type t = Q.t
+
 (** {2 Type constructors}
 
     Provided the functor argument(s) are compatible with the polymorphic
@@ -4940,7 +5215,7 @@ let compare (foo_a, bar_a) (foo_b, bar_b) =
 *)
 val or_else : int -> (unit -> int) -> int
 end
-# 36 "v7.in.ml"
+# 38 "v7.in.ml"
 
 
   module Time : sig
@@ -4994,7 +5269,7 @@ val rfc_encoding : t Data_encoding.t
 
 val pp_hum : Format.formatter -> t -> unit
 end
-# 38 "v7.in.ml"
+# 40 "v7.in.ml"
 
 
   module TzEndian : sig
@@ -5060,7 +5335,7 @@ val get_uint16_string : string -> int -> int
 
 val set_uint16 : bytes -> int -> int -> unit
 end
-# 40 "v7.in.ml"
+# 42 "v7.in.ml"
 
 
   module Bits : sig
@@ -5097,7 +5372,7 @@ end
     The behaviour is unspecified if [x < 0].*)
 val numbits : int -> int
 end
-# 42 "v7.in.ml"
+# 44 "v7.in.ml"
 
 
   module Equality_witness : sig
@@ -5165,7 +5440,7 @@ val eq : 'a t -> 'b t -> ('a, 'b) eq option
 (** [hash id] returns a hash for [id]. *)
 val hash : 'a t -> int
 end
-# 44 "v7.in.ml"
+# 46 "v7.in.ml"
 
 
   module FallbackArray : sig
@@ -5255,7 +5530,7 @@ val fold : ('b -> 'a -> 'b) -> 'a t -> 'b -> 'b
    filled. *)
 val fold_map : ('b -> 'a -> 'b * 'c) -> 'a t -> 'b -> 'c -> 'b * 'c t
 end
-# 46 "v7.in.ml"
+# 48 "v7.in.ml"
 
 
   module Error_monad : sig
@@ -5737,7 +6012,7 @@ module Lwt_tzresult_syntax : sig
     ('a * 'b, 'error trace) result Lwt.t
 end
 end
-# 48 "v7.in.ml"
+# 50 "v7.in.ml"
 
 
   open Error_monad
@@ -5864,7 +6139,7 @@ val iter_ep :
     them is. *)
 val iter_p : ('a -> unit Lwt.t) -> 'a t -> unit Lwt.t
 end
-# 52 "v7.in.ml"
+# 54 "v7.in.ml"
 
 
   module List : sig
@@ -7196,7 +7471,7 @@ val exists_ep :
   'a list ->
   (bool, 'error Error_monad.trace) result Lwt.t
 end
-# 54 "v7.in.ml"
+# 56 "v7.in.ml"
 
 
   module Array : sig
@@ -7306,7 +7581,7 @@ val fast_sort : [`You_cannot_sort_arrays_in_the_protocol]
 
 module Floatarray : sig end
 end
-# 56 "v7.in.ml"
+# 58 "v7.in.ml"
 
 
   module Set : sig
@@ -7455,7 +7730,7 @@ end
 
 module Make (Ord : Compare.COMPARABLE) : S with type elt = Ord.t
 end
-# 58 "v7.in.ml"
+# 60 "v7.in.ml"
 
 
   module Map : sig
@@ -7624,7 +7899,7 @@ end
 
 module Make (Ord : Compare.COMPARABLE) : S with type key = Ord.t
 end
-# 60 "v7.in.ml"
+# 62 "v7.in.ml"
 
 
   module Option : sig
@@ -7772,7 +8047,7 @@ val catch : ?catch_only:(exn -> bool) -> (unit -> 'a) -> 'a option
 val catch_s :
   ?catch_only:(exn -> bool) -> (unit -> 'a Lwt.t) -> 'a option Lwt.t
 end
-# 62 "v7.in.ml"
+# 64 "v7.in.ml"
 
 
   module Result : sig
@@ -7938,7 +8213,7 @@ val catch_f :
 val catch_s :
   ?catch_only:(exn -> bool) -> (unit -> 'a Lwt.t) -> ('a, exn) result Lwt.t
 end
-# 64 "v7.in.ml"
+# 66 "v7.in.ml"
 
 
   module RPC_arg : sig
@@ -8008,7 +8283,7 @@ type ('a, 'b) eq = Eq : ('a, 'a) eq
 
 val eq : 'a arg -> 'b arg -> ('a, 'b) eq option
 end
-# 66 "v7.in.ml"
+# 68 "v7.in.ml"
 
 
   module RPC_path : sig
@@ -8064,7 +8339,7 @@ val add_final_args :
 val ( /:* ) :
   ('prefix, 'params) path -> 'a RPC_arg.t -> ('prefix, 'params * 'a list) path
 end
-# 68 "v7.in.ml"
+# 70 "v7.in.ml"
 
 
   module RPC_query : sig
@@ -8136,7 +8411,7 @@ exception Invalid of string
 
 val parse : 'a query -> untyped -> 'a
 end
-# 70 "v7.in.ml"
+# 72 "v7.in.ml"
 
 
   module RPC_service : sig
@@ -8213,7 +8488,7 @@ val put_service :
   ('prefix, 'params) RPC_path.t ->
   ([`PUT], 'prefix, 'params, 'query, 'input, 'output) service
 end
-# 72 "v7.in.ml"
+# 74 "v7.in.ml"
 
 
   module RPC_answer : sig
@@ -8274,7 +8549,7 @@ val not_found : 'o t Lwt.t
 
 val fail : error list -> 'a t Lwt.t
 end
-# 74 "v7.in.ml"
+# 76 "v7.in.ml"
 
 
   module RPC_directory : sig
@@ -8539,7 +8814,7 @@ val register_dynamic_directory :
   ('a -> 'a directory Lwt.t) ->
   'prefix directory
 end
-# 76 "v7.in.ml"
+# 78 "v7.in.ml"
 
 
   module Base58 : sig
@@ -8604,7 +8879,7 @@ val check_encoded_prefix : 'a encoding -> string -> int -> unit
     not start with a registered prefix. *)
 val decode : string -> data option
 end
-# 78 "v7.in.ml"
+# 80 "v7.in.ml"
 
 
   module S : sig
@@ -9022,7 +9297,7 @@ module type PVSS = sig
   val reconstruct : Clear_share.t list -> int list -> Public_key.t
 end
 end
-# 80 "v7.in.ml"
+# 82 "v7.in.ml"
 
 
   module Blake2B : sig
@@ -9087,7 +9362,7 @@ end
 
 module Make (Register : Register) (Name : PrefixedName) : S.HASH
 end
-# 82 "v7.in.ml"
+# 84 "v7.in.ml"
 
 
   module Bls12_381 : sig
@@ -9125,7 +9400,7 @@ module G2 : S.CURVE with type Scalar.t = Fr.t
 
 val pairing_check : (G1.t * G2.t) list -> bool
 end
-# 84 "v7.in.ml"
+# 86 "v7.in.ml"
 
 
   module Bls_signature : sig
@@ -9221,7 +9496,7 @@ val verify : pk -> Bytes.t -> signature -> bool
 
 val aggregate_verify : (pk * Bytes.t) list -> signature -> bool
 end
-# 86 "v7.in.ml"
+# 88 "v7.in.ml"
 
 
   module Ed25519 : sig
@@ -9255,7 +9530,7 @@ end
 
 include S.SIGNATURE with type watermark := bytes
 end
-# 88 "v7.in.ml"
+# 90 "v7.in.ml"
 
 
   module Secp256k1 : sig
@@ -9289,7 +9564,7 @@ end
 
 include S.SIGNATURE with type watermark := bytes
 end
-# 90 "v7.in.ml"
+# 92 "v7.in.ml"
 
 
   module P256 : sig
@@ -9323,7 +9598,7 @@ end
 
 include S.SIGNATURE with type watermark := bytes
 end
-# 92 "v7.in.ml"
+# 94 "v7.in.ml"
 
 
   module Chain_id : sig
@@ -9355,7 +9630,7 @@ end
 
 include S.HASH
 end
-# 94 "v7.in.ml"
+# 96 "v7.in.ml"
 
 
   module Signature : sig
@@ -9407,7 +9682,7 @@ include
      and type Public_key.t = public_key
      and type watermark := watermark
 end
-# 96 "v7.in.ml"
+# 98 "v7.in.ml"
 
 
   module Block_hash : sig
@@ -9440,7 +9715,7 @@ end
 (** Blocks hashes / IDs. *)
 include S.HASH
 end
-# 98 "v7.in.ml"
+# 100 "v7.in.ml"
 
 
   module Operation_hash : sig
@@ -9473,7 +9748,7 @@ end
 (** Operations hashes / IDs. *)
 include S.HASH
 end
-# 100 "v7.in.ml"
+# 102 "v7.in.ml"
 
 
   module Operation_list_hash : sig
@@ -9506,7 +9781,7 @@ end
 (** Blocks hashes / IDs. *)
 include S.MERKLE_TREE with type elt = Operation_hash.t
 end
-# 102 "v7.in.ml"
+# 104 "v7.in.ml"
 
 
   module Operation_list_list_hash : sig
@@ -9539,7 +9814,7 @@ end
 (** Blocks hashes / IDs. *)
 include S.MERKLE_TREE with type elt = Operation_list_hash.t
 end
-# 104 "v7.in.ml"
+# 106 "v7.in.ml"
 
 
   module Protocol_hash : sig
@@ -9572,7 +9847,7 @@ end
 (** Protocol hashes / IDs. *)
 include S.HASH
 end
-# 106 "v7.in.ml"
+# 108 "v7.in.ml"
 
 
   module Context_hash : sig
@@ -9625,7 +9900,7 @@ end
 
 type version = Version.t
 end
-# 108 "v7.in.ml"
+# 110 "v7.in.ml"
 
 
   module Pvss_secp256k1 : sig
@@ -9659,7 +9934,7 @@ end
 
 include S.PVSS
 end
-# 110 "v7.in.ml"
+# 112 "v7.in.ml"
 
 
   module Sapling : sig
@@ -9807,7 +10082,7 @@ module Verification : sig
   val final_check : t -> UTXO.transaction -> string -> bool
 end
 end
-# 112 "v7.in.ml"
+# 114 "v7.in.ml"
 
 
   module Timelock : sig
@@ -9866,7 +10141,7 @@ val open_chest : chest -> chest_key -> time:int -> opening_result
     Used for gas accounting*)
 val get_plaintext_size : chest -> int
 end
-# 114 "v7.in.ml"
+# 116 "v7.in.ml"
 
 
   module Vdf : sig
@@ -9954,7 +10229,7 @@ val prove : discriminant -> challenge -> difficulty -> result * proof
     @raise Invalid_argument when inputs are invalid *)
 val verify : discriminant -> challenge -> difficulty -> result -> proof -> bool
 end
-# 116 "v7.in.ml"
+# 118 "v7.in.ml"
 
 
   module Micheline : sig
@@ -10014,7 +10289,7 @@ val annotations : ('l, 'p) node -> string list
 
 val strip_locations : (_, 'p) node -> 'p canonical
 end
-# 118 "v7.in.ml"
+# 120 "v7.in.ml"
 
 
   module Block_header : sig
@@ -10071,7 +10346,7 @@ type t = {shell : shell_header; protocol_data : bytes}
 
 include S.HASHABLE with type t := t and type hash := Block_hash.t
 end
-# 120 "v7.in.ml"
+# 122 "v7.in.ml"
 
 
   module Bounded : sig
@@ -10220,7 +10495,7 @@ module Int8 (B : BOUNDS with type ocaml_type := int) :
 module Uint8 (B : BOUNDS with type ocaml_type := int) :
   S with type ocaml_type := int
 end
-# 122 "v7.in.ml"
+# 124 "v7.in.ml"
 
 
   module Fitness : sig
@@ -10254,7 +10529,7 @@ end
     compared in a lexicographical order (longer list are greater). *)
 include S.T with type t = bytes list
 end
-# 124 "v7.in.ml"
+# 126 "v7.in.ml"
 
 
   module Operation : sig
@@ -10298,7 +10573,7 @@ type t = {shell : shell_header; proto : bytes}
 
 include S.HASHABLE with type t := t and type hash := Operation_hash.t
 end
-# 126 "v7.in.ml"
+# 128 "v7.in.ml"
 
 
   module Context : sig
@@ -10935,7 +11210,7 @@ module Cache :
      and type key = cache_key
      and type value = cache_value
 end
-# 128 "v7.in.ml"
+# 130 "v7.in.ml"
 
 
   module Updater : sig
@@ -11240,7 +11515,7 @@ end
    not complete until [init] in invoked. *)
 val activate : Context.t -> Protocol_hash.t -> Context.t Lwt.t
 end
-# 130 "v7.in.ml"
+# 132 "v7.in.ml"
 
 
   module RPC_context : sig
@@ -11395,7 +11670,7 @@ val make_opt_call3 :
   'i ->
   'o option shell_tzresult Lwt.t
 end
-# 132 "v7.in.ml"
+# 134 "v7.in.ml"
 
 
   module Wasm_2_0_0 : sig
@@ -11448,7 +11723,7 @@ module Make
   val get_info : Tree.tree -> info Lwt.t
 end
 end
-# 134 "v7.in.ml"
+# 136 "v7.in.ml"
 
 
   module Plonk : sig
@@ -11516,7 +11791,7 @@ val verify_multi_circuits :
   proof ->
   bool
 end
-# 136 "v7.in.ml"
+# 138 "v7.in.ml"
 
 
   module Dal : sig
@@ -11622,6 +11897,6 @@ val verify_segment :
     [> `Degree_exceeds_srs_length of string | `Segment_index_out_of_range] )
   Result.t
 end
-# 138 "v7.in.ml"
+# 140 "v7.in.ml"
 
 end
