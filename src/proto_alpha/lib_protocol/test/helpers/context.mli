@@ -58,6 +58,7 @@ val get_total_voting_power :
 
 val get_bakers :
   ?filter:(Plugin.RPC.Baking_rights.t -> bool) ->
+  ?cycle:Cycle.t ->
   t ->
   public_key_hash list tzresult Lwt.t
 

@@ -147,6 +147,8 @@ let create_cycle_eras cycle_eras =
       in
       aux newest_era older_eras >>? fun () -> ok cycle_eras
 
+let add_cycle_era new_era cycle_eras = create_cycle_eras (new_era :: cycle_eras)
+
 let cycle_era_encoding =
   let open Data_encoding in
   conv
