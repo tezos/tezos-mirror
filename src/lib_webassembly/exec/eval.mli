@@ -16,9 +16,16 @@ type ('a, 'b, 'acc) fold_right2_kont = {
   offset : int32;
 }
 
+type ('a, 'b) map_kont = {
+  origin : 'a Vector.t;
+  destination : 'b Vector.t;
+  offset : int32;
+}
+
 type init_kont =
   | IK_Start  (** Very first tick of the [init] function *)
   | IK_Add_import of (extern, Ast.import, module_inst) fold_right2_kont
+  | IK_Type of module_inst * (Ast.type_, Types.func_type) map_kont
   | IK_Remaining of module_inst
   | IK_Stop of module_inst
       (** Witness that there is no more tick to execute to complete

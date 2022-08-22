@@ -40,6 +40,16 @@ let fold_right2_kont_encoding enc_a enc_b enc_acc =
        (scope ["right_vector"] enc_b)
        (value ["offset"] @@ Data_encoding.int32)
 
+let map_kont_encoding enc_a enc_b =
+  conv
+    (fun (origin, destination, offset) -> {origin; destination; offset})
+    (fun {origin; destination; offset} -> (origin, destination, offset))
+  @@ tup3
+       ~flatten:true
+       (scope ["origin"] enc_a)
+       (scope ["destination"] enc_b)
+       (value ["offset"] Data_encoding.int32)
+
 let lazy_vec_encoding enc = int32_lazy_vector (value [] Data_encoding.int32) enc
 
 let init_kont_encoding =
@@ -60,6 +70,19 @@ let init_kont_encoding =
            Wasm_encoding.module_instance_encoding)
         (function IK_Add_import m -> Some m | _ -> None)
         (function m -> IK_Add_import m);
+      case
+        "IK_Types"
+        (tup2
+           ~flatten:true
+           (scope ["module"] Wasm_encoding.module_instance_encoding)
+           (scope
+              ["kont"]
+              (map_kont_encoding
+                 (lazy_vec_encoding
+                    Parser.(no_region_encoding Wasm_encoding.func_type_encoding))
+                 Wasm_encoding.function_type_vector_encoding)))
+        (function IK_Type (m, t) -> Some (m, t) | _ -> None)
+        (function m, t -> IK_Type (m, t));
       case
         "IK_Remaining"
         Wasm_encoding.module_instance_encoding

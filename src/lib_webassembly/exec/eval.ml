@@ -1040,9 +1040,27 @@ let fold_right2_step {acc; lv; rv; offset} f =
   let+ acc = f x y acc in
   {acc; lv; rv; offset = Int32.pred offset}
 
+type ('a, 'b) map_kont = {
+  origin : 'a Vector.t;
+  destination : 'b Vector.t;
+  offset : int32;
+}
+
+let map_kont v =
+  {origin = v; destination = Vector.create (Vector.num_elements v); offset = 0l}
+
+let map_completed {origin; offset; _} = offset = Vector.num_elements origin
+
+let map_step {origin; destination; offset} f =
+  let open Lwt.Syntax in
+  let+ x = Vector.get offset origin in
+  let destination = Vector.set offset (f x) destination in
+  {origin; destination; offset = Int32.succ offset}
+
 type init_kont =
   | IK_Start
   | IK_Add_import of (extern, import, module_inst) fold_right2_kont
+  | IK_Type of module_inst * (type_, func_type) map_kont
   | IK_Remaining of module_inst
   | IK_Stop of module_inst
 
@@ -1062,31 +1080,27 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
               m.it.imports))
   | IK_Add_import tick when fold_right2_completed tick ->
       update_module_ref module_reg self tick.acc ;
-      Lwt.return (IK_Remaining tick.acc)
+      Lwt.return (IK_Type (tick.acc, map_kont m.it.types))
   | IK_Add_import tick ->
       let+ tick = fold_right2_step tick (add_import m) in
       IK_Add_import tick
-  | IK_Remaining init_inst0 ->
-      let {
-        tables;
-        memories;
-        globals;
-        funcs;
-        types;
-        exports;
-        elems;
-        datas;
-        start;
-        allocations;
-        _;
-      } =
+  | IK_Type (inst0, tick) when map_completed tick ->
+      let inst0 =
+        {inst0 with types = tick.destination; allocations = m.it.allocations}
+      in
+      update_module_ref module_reg self inst0 ;
+      Lwt.return (IK_Remaining inst0)
+  | IK_Type (inst0, tick) ->
+      let+ tick = map_step tick (fun x -> x.it) in
+      IK_Type (inst0, tick)
+  | IK_Remaining inst0 ->
+      let {tables; memories; globals; funcs; exports; elems; datas; start; _} =
         m.it
       in
 
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
          These transformations should be refactored and abadoned during the
          tickification, to avoid the roundtrip vector -> list -> vector. *)
-      let* types = Vector.to_list types in
       let* tables = Vector.to_list tables in
       let* memories = Vector.to_list memories in
       let* globals = Vector.to_list globals in
@@ -1094,19 +1108,6 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
       let* elems = Vector.to_list elems in
       let* datas = Vector.to_list datas in
       let* exports = Vector.to_list exports in
-
-      let inst0 =
-        {
-          init_inst0 with
-          types =
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
-               [types] should be a lazy structure so we can avoid traversing it
-               whole. *)
-            List.map (fun type_ -> type_.it) types |> Vector.of_list;
-          allocations;
-        }
-      in
-      update_module_ref module_reg self inst0 ;
 
       let* fs = TzStdLib.List.map_s (create_func module_reg self) funcs in
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
