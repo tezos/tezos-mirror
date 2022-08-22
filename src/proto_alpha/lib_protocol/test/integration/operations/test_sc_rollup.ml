@@ -172,7 +172,7 @@ let init_and_originate ?boot_sector ?origination_proof
   return (block, contracts, rollup)
 
 let number_of_ticks_exn n =
-  match Sc_rollup.Number_of_ticks.of_int32 n with
+  match Sc_rollup.Number_of_ticks.of_value n with
   | Some x -> x
   | None -> Stdlib.failwith "Bad Number_of_ticks"
 

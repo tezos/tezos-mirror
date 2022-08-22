@@ -184,7 +184,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     let*! number_of_ticks = Number_of_ticks.get store inbox_level in
     let+ number_of_ticks =
       match
-        Sc_rollup.Number_of_ticks.of_int32 @@ Z.to_int32 number_of_ticks
+        Sc_rollup.Number_of_ticks.of_value @@ Z.to_int32 number_of_ticks
       with
       | Some number_of_ticks -> return number_of_ticks
       | None ->

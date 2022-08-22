@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,48 +24,56 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The shell's notion of a level: an integer indicating the number of blocks
-    since genesis: genesis is 0, all other blocks have increasing levels from
-    there. *)
-type t
+(** This module implements bounded (or refined) versions of data types. *)
 
-type raw_level = t
+(** Bounded [int32]. *)
+module Int32 : sig
+  (** Bounds.
 
-module Set : Set.S with type elt = t
+      Formally each [B : BOUND] represents the interval of all integers
+      between [B.min_int] and [B.max_int]. This is a closed interval, e.g.
+      the endpoints are included.
 
-(** @raise Invalid_argument when the level to encode is not positive *)
-val encoding : raw_level Data_encoding.t
+      Intervals can be empty, for example [struct let min_int = 1; let max_int
+      0 end] is empty.
+   *)
+  module type BOUNDS = sig
+    val min_int : int32
 
-val rpc_arg : raw_level RPC_arg.arg
+    val max_int : int32
+  end
 
-val pp : Format.formatter -> raw_level -> unit
+  module type S = sig
+    type t
 
-include Compare.S with type t := raw_level
+    include BOUNDS
 
-val to_int32 : raw_level -> int32
+    include Tezos_base.TzPervasives.Compare.S with type t := t
 
-val to_int32_non_negative : raw_level -> Bounded.Non_negative_int32.t
+    val encoding : t Data_encoding.t
 
-(** @raise Invalid_argument when the level to encode is negative *)
-val of_int32_exn : int32 -> raw_level
+    val to_int32 : t -> int32
 
-(** Can trigger Unexpected_level error when the level to encode is negative *)
-val of_int32 : int32 -> raw_level tzresult
+    val of_int32 : int32 -> t option
+  end
 
-val of_int32_non_negative : Bounded.Non_negative_int32.t -> raw_level
+  (** Produce a module [_ : S] of bounded integers.
 
-val diff : raw_level -> raw_level -> int32
+      If the given interval is empty, [S.t] is the empty type, and [of_int32]
+      returns [Error] for all inputs.
 
-val root : raw_level
+      {4 Encoding}
+      [(Make B).encoding] is based on the underlying [int32] encoding. This
+      allow future compatiblity with larger bounds, at the price of addding 1-3
+      redundant bytes to each message.
+   *)
+  module Make (_ : BOUNDS) : S
 
-val succ : raw_level -> raw_level
+  module NonNegative : S
 
-val pred : raw_level -> raw_level option
+  val non_negative_of_legacy_non_negative :
+    NonNegative.t -> Tezos_base.Bounded.Non_negative_int32.t
 
-(** [add l i] i must be positive *)
-val add : raw_level -> int -> raw_level
-
-(** [sub l i] i must be positive *)
-val sub : raw_level -> int -> raw_level option
-
-module Index : Storage_description.INDEX with type t = raw_level
+  val legacy_non_negative_of_non_negative :
+    Tezos_base.Bounded.Non_negative_int32.t -> NonNegative.t
+end

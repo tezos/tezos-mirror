@@ -194,7 +194,7 @@ let assert_refine_conditions_met ctxt rollup lcc commitment =
   let* ctxt = assert_commitment_period ctxt rollup commitment in
   if
     Int32.equal
-      (Sc_rollup_repr.Number_of_ticks.to_int32
+      (Sc_rollup_repr.Number_of_ticks.to_value
          Commitment.(commitment.number_of_ticks))
       0l
   then assert_same_hash_as_predecessor ctxt rollup commitment

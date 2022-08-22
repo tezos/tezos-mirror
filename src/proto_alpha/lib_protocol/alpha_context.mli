@@ -3259,7 +3259,7 @@ module Sc_rollup : sig
   end
 
   module Number_of_ticks : sig
-    include Bounded.Int32.S
+    include module type of Bounded.Non_negative_int32
 
     val zero : t
   end

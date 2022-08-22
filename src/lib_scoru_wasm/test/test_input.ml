@@ -234,7 +234,9 @@ let floppy_encoding =
 let inp_encoding = Tree_encoding.value ["input"; "0"; "1"] Data_encoding.string
 
 let zero =
-  WithExceptions.Option.get ~loc:__LOC__ (Bounded.Int32.NonNegative.of_int32 0l)
+  WithExceptions.Option.get
+    ~loc:__LOC__
+    (Bounded.Non_negative_int32.of_value 0l)
 
 (** Artificial initialization. Under normal circumstances the changes in
     [current_tick], [gather_floppies] and [status] will be done by the other
@@ -276,7 +278,7 @@ let make_inbox_level ~inbox_level ~message_counter =
       inbox_level =
         WithExceptions.Option.get
           ~loc:__LOC__
-          (Bounded.Int32.NonNegative.of_int32 (Int32.of_int inbox_level));
+          (Bounded.Non_negative_int32.of_value (Int32.of_int inbox_level));
       message_counter = Z.of_int message_counter;
     }
 

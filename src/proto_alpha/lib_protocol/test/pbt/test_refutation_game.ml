@@ -60,7 +60,7 @@ let tick_of_int_exn ?(__LOC__ = __LOC__) n =
   WithExceptions.Option.get ~loc:__LOC__ (Tick.of_int n)
 
 let number_of_ticks_of_int32_exn ?(__LOC__ = __LOC__) n =
-  WithExceptions.Option.get ~loc:__LOC__ (Number_of_ticks.of_int32 n)
+  WithExceptions.Option.get ~loc:__LOC__ (Number_of_ticks.of_value n)
 
 let make_external_inbox_message str =
   WithExceptions.Result.get_ok

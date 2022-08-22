@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,48 +24,64 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The shell's notion of a level: an integer indicating the number of blocks
-    since genesis: genesis is 0, all other blocks have increasing levels from
-    there. *)
-type t
+module Int32 = struct
+  module type BOUNDS = sig
+    val min_int : int32
 
-type raw_level = t
+    val max_int : int32
+  end
 
-module Set : Set.S with type elt = t
+  module type S = sig
+    type t
 
-(** @raise Invalid_argument when the level to encode is not positive *)
-val encoding : raw_level Data_encoding.t
+    include BOUNDS
 
-val rpc_arg : raw_level RPC_arg.arg
+    include Tezos_base.TzPervasives.Compare.S with type t := t
 
-val pp : Format.formatter -> raw_level -> unit
+    val encoding : t Data_encoding.t
 
-include Compare.S with type t := raw_level
+    val to_int32 : t -> int32
 
-val to_int32 : raw_level -> int32
+    val of_int32 : int32 -> t option
+  end
 
-val to_int32_non_negative : raw_level -> Bounded.Non_negative_int32.t
+  module Make (B : BOUNDS) = struct
+    include Tezos_base.TzPervasives.Compare.Int32
+    (* This includes [type t = int32] *)
 
-(** @raise Invalid_argument when the level to encode is negative *)
-val of_int32_exn : int32 -> raw_level
+    include B
 
-(** Can trigger Unexpected_level error when the level to encode is negative *)
-val of_int32 : int32 -> raw_level tzresult
+    let to_int32 x = x
 
-val of_int32_non_negative : Bounded.Non_negative_int32.t -> raw_level
+    let of_int32 n =
+      if Tezos_base.TzPervasives.Compare.Int32.(n < B.min_int) then None
+      else if Tezos_base.TzPervasives.Compare.Int32.(n > B.max_int) then None
+      else Some n
 
-val diff : raw_level -> raw_level -> int32
+    let encoding =
+      Data_encoding.(
+        conv_with_guard
+          to_int32
+          (fun x ->
+            match of_int32 x with
+            | None -> Error "Out of bounds"
+            | Some x -> Ok x)
+          int32)
+  end
 
-val root : raw_level
+  module NonNegative = struct
+    include Tezos_base.Bounded.Non_negative_int32
 
-val succ : raw_level -> raw_level
+    let to_int32 = to_value
 
-val pred : raw_level -> raw_level option
+    let of_int32 = of_value
 
-(** [add l i] i must be positive *)
-val add : raw_level -> int -> raw_level
+    let min_int = min_value
 
-(** [sub l i] i must be positive *)
-val sub : raw_level -> int -> raw_level option
+    let max_int = max_value
+  end
 
-module Index : Storage_description.INDEX with type t = raw_level
+  let non_negative_of_legacy_non_negative = Fun.id
+
+  let legacy_non_negative_of_non_negative = Fun.id
+end

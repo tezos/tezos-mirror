@@ -23,9 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type input = {inbox_level : Bounded.Int32.NonNegative.t; message_counter : Z.t}
+type input = {inbox_level : Bounded.Non_negative_int32.t; message_counter : Z.t}
 
-type output = {outbox_level : Bounded.Int32.NonNegative.t; message_index : Z.t}
+type output = {outbox_level : Bounded.Non_negative_int32.t; message_index : Z.t}
 
 type input_request = No_input_required | Input_required
 

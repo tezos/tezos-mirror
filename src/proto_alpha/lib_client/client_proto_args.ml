@@ -966,14 +966,14 @@ module Sc_rollup_params = struct
     Clic.parameter (fun _ nb_of_ticks ->
         match Int32.of_string_opt nb_of_ticks with
         | Some nb_of_ticks -> (
-            match Sc_rollup.Number_of_ticks.of_int32 nb_of_ticks with
+            match Sc_rollup.Number_of_ticks.of_value nb_of_ticks with
             | None ->
                 failwith
                   "Parameter '%ld' is out of bounds, it should be between %ld \
                    and %ld"
                   nb_of_ticks
-                  Sc_rollup.Number_of_ticks.min_int
-                  Sc_rollup.Number_of_ticks.max_int
+                  Sc_rollup.Number_of_ticks.min_value
+                  Sc_rollup.Number_of_ticks.max_value
             | Some nb_of_ticks -> return nb_of_ticks)
         | None ->
             failwith "'%s' is not valid, should be a int32 value" nb_of_ticks)

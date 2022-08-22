@@ -1104,12 +1104,12 @@ struct
 
   module Wasm_2_0_0 = struct
     type input = {
-      inbox_level : Bounded.Int32.NonNegative.t;
+      inbox_level : Bounded.Non_negative_int32.t;
       message_counter : Z.t;
     }
 
     type output = {
-      outbox_level : Bounded.Int32.NonNegative.t;
+      outbox_level : Bounded.Non_negative_int32.t;
       message_index : Z.t;
     }
 

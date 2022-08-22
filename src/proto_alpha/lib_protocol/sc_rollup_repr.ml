@@ -189,14 +189,10 @@ module Index = struct
 end
 
 module Number_of_ticks = struct
-  include Bounded.Int32.Make (struct
-    let min_int = 0l
-
-    let max_int = Int32.max_int
-  end)
+  include Bounded.Non_negative_int32
 
   let zero =
-    match of_int32 0l with
+    match of_value 0l with
     | Some zero -> zero
     | None -> assert false (* unreachable case, since [min_int = 0l] *)
 end
