@@ -263,22 +263,8 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
     in
     return_unit
 
-  let commitment_is_published cctxt rollup_address commitment_hash =
-    let open Lwt_result_syntax in
-    let*! commitment_res =
-      Plugin.RPC.Sc_rollup.commitment
-        cctxt
-        (cctxt#chain, cctxt#block)
-        rollup_address
-        commitment_hash
-    in
-    match commitment_res with
-    | Ok _commitment -> return_true
-    | Error _errors -> return_false
-
   let get_commitment_and_publish ~check_lcc_hash
-      ({cctxt; rollup_address; store; _} as node_ctxt : Node_context.t)
-      next_level_to_publish =
+      ({store; _} as node_ctxt : Node_context.t) next_level_to_publish =
     let open Lwt_result_syntax in
     let*! is_commitment_available =
       Store.Commitments.mem store next_level_to_publish
@@ -287,14 +273,6 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       let*! commitment, _commitment_hash =
         Store.Commitments.get store next_level_to_publish
       in
-      let* predecessor_published =
-        commitment_is_published cctxt rollup_address commitment.predecessor
-      in
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3528
-         The injector should make this test redundant. Therefore, we should
-         remove this test when the injector is merged.
-      *)
-      when_ predecessor_published @@ fun () ->
       let* () =
         if check_lcc_hash then
           let open Lwt_result_syntax in
