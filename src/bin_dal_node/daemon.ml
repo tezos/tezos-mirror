@@ -82,6 +82,10 @@ let daemonize cctxt handle =
      no_cancel renders this cancelation into a no-op.*)
   Lwt.no_cancel t
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
+
+   Improve general architecture, handle L1 disconnection etc
+*)
 let run ~data_dir cctxt =
   let open Lwt_result_syntax in
   let*! () = Event.(emit starting_node) () in
