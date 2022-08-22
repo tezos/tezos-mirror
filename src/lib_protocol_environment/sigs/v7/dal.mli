@@ -84,7 +84,7 @@ val segment_proof_encoding : segment_proof Data_encoding.t
 (** [verify_segment t commitment segment segment_proof] returns [Ok
      true] if the [proof] certifies that the [slot_segment] is indeed
      included in the slot committed with commitment
-     [comitment]. Returns [Ok false] otherwise.
+     [commitment]. Returns [Ok false] otherwise.
 
       Fails if the index of the segment is out of range. *)
 val verify_segment :

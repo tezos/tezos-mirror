@@ -161,7 +161,7 @@ module Result (Ok : COMPARABLE) (Error : COMPARABLE) :
 
 {[
 if Compare.List_length_with.(chunks > max_number_of_chunks) then
-   raise Maximum_size_exceeeded
+   raise Maximum_size_exceeded
 else
    ..
 ]}

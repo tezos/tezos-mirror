@@ -301,7 +301,7 @@ module Proof : sig
 
       [Blinded_inode h] proves that an inode with hash [h] exists in the store.
 
-      [Inode_values ls] is simliar to trees' [Node].
+      [Inode_values ls] is similar to trees' [Node].
 
       [Inode_tree i] is similar to tree's [Inode].
 
@@ -356,7 +356,7 @@ module Proof : sig
 
     (** The type for stream proofs.
 
-        The sequance [e_1 ... e_n] proves that the [e_1], ..., [e_n] are
+        The sequence [e_1 ... e_n] proves that the [e_1], ..., [e_n] are
         read in the store in sequence. *)
     type t = elt Seq.t
   end
@@ -541,7 +541,7 @@ module type CACHE = sig
       [key]. *)
   val identifier_of_key : key -> identifier
 
-  (** [pp fmt cache] is a pretty printter for a [cache]. *)
+  (** [pp fmt cache] is a pretty printer for a [cache]. *)
   val pp : Format.formatter -> t -> unit
 
   (** [find ctxt k = Some v] if [v] is the value associated to [k] in
@@ -606,7 +606,7 @@ module type CACHE = sig
 
       This function is based on a heuristic. The context maintains
       the median of the number of removed entries: this number is
-      multipled by `n_blocks` to determine the entries that are
+      multiplied by `n_blocks` to determine the entries that are
       likely to be removed in `n_blocks`. *)
   val future_cache_expectation : t -> time_in_blocks:int -> t
 

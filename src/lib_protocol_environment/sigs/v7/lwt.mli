@@ -169,10 +169,11 @@ let () =
 
 
 
-(** We omit [dont_wait] and other such functions because we it is only useful in
-    mutation-heavy loosely-synchronised code which the protocol shouldn't be. *)
+(** We omit [dont_wait] and other such functions because they are only useful
+    in mutation-heavy loosely-synchronised code which the protocol shouldn't be.
+    *)
 
-(** We omit many synchronisation primitives such as [choose] because it
+(** We omit many synchronisation primitives such as [choose] because they
     introduce non-determinism. *)
 
 (** We omit cancelation-related primitives because we discourage Cancelation in

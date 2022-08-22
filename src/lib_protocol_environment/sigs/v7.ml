@@ -3007,10 +3007,11 @@ let () =
 
 
 
-(** We omit [dont_wait] and other such functions because we it is only useful in
-    mutation-heavy loosely-synchronised code which the protocol shouldn't be. *)
+(** We omit [dont_wait] and other such functions because they are only useful
+    in mutation-heavy loosely-synchronised code which the protocol shouldn't be.
+    *)
 
-(** We omit many synchronisation primitives such as [choose] because it
+(** We omit many synchronisation primitives such as [choose] because they
     introduce non-determinism. *)
 
 (** We omit cancelation-related primitives because we discourage Cancelation in
@@ -3884,7 +3885,7 @@ val splitted : json:'a encoding -> binary:'a encoding -> 'a encoding
      A stateful recursive encoding can still be put under a [delayed]
      combinator to make sure that a new encoding is generated each
      time it is used. Caching the encoding generation when the state
-     has not changed is then the responsability of the client.
+     has not changed is then the responsibility of the client.
 
   *)
 val mu :
@@ -4829,7 +4830,7 @@ module Result (Ok : COMPARABLE) (Error : COMPARABLE) :
 
 {[
 if Compare.List_length_with.(chunks > max_number_of_chunks) then
-   raise Maximum_size_exceeeded
+   raise Maximum_size_exceeded
 else
    ..
 ]}
@@ -6243,7 +6244,7 @@ val fold_right2 :
 
     The function stops early if it encounters elements [xn], [yn] such that [f
     xn yn] is [false]. (This is consistent with the short-circuit, lazy
-    evaluation strategy of [&&] in the descritpion above.)
+    evaluation strategy of [&&] in the description above.)
 
     Also note that, if such an element is found in the common prefix of [xs]
     and [ys], then the function returns [Ok false] even if [xs] and [ys] are
@@ -6281,7 +6282,7 @@ val for_all2 :
 
     The function stops early if it encounters elements [xn], [yn] such that [f
     xn yn] is [true]. (This is consistent with the short-circuit, lazy
-    evaluation strategy of [||] in the descritpion above.)
+    evaluation strategy of [||] in the description above.)
 
     Also note that, if such an element is found in the common prefix of [xs]
     and [ys], then the function returns [Ok true] even if [xs] and [ys] are of
@@ -7245,7 +7246,7 @@ val to_list : 'a t -> 'a list
 
 (**/**)
 
-(* This Array module is the thinest shim we can get away with for use with Plonk.
+(* This Array module is the thinnest shim we can get away with for use with Plonk.
    To avoid any issues with arrays — notably to avoid exceptions when getting
    out of bounds and to avoid any issues with mutability — we shadow [get] and
    [set] as well as a few other functions.
@@ -10605,7 +10606,7 @@ module Proof : sig
 
       [Blinded_inode h] proves that an inode with hash [h] exists in the store.
 
-      [Inode_values ls] is simliar to trees' [Node].
+      [Inode_values ls] is similar to trees' [Node].
 
       [Inode_tree i] is similar to tree's [Inode].
 
@@ -10660,7 +10661,7 @@ module Proof : sig
 
     (** The type for stream proofs.
 
-        The sequance [e_1 ... e_n] proves that the [e_1], ..., [e_n] are
+        The sequence [e_1 ... e_n] proves that the [e_1], ..., [e_n] are
         read in the store in sequence. *)
     type t = elt Seq.t
   end
@@ -10845,7 +10846,7 @@ module type CACHE = sig
       [key]. *)
   val identifier_of_key : key -> identifier
 
-  (** [pp fmt cache] is a pretty printter for a [cache]. *)
+  (** [pp fmt cache] is a pretty printer for a [cache]. *)
   val pp : Format.formatter -> t -> unit
 
   (** [find ctxt k = Some v] if [v] is the value associated to [k] in
@@ -10910,7 +10911,7 @@ module type CACHE = sig
 
       This function is based on a heuristic. The context maintains
       the median of the number of removed entries: this number is
-      multipled by `n_blocks` to determine the entries that are
+      multiplied by `n_blocks` to determine the entries that are
       likely to be removed in `n_blocks`. *)
   val future_cache_expectation : t -> time_in_blocks:int -> t
 
@@ -11606,7 +11607,7 @@ val segment_proof_encoding : segment_proof Data_encoding.t
 (** [verify_segment t commitment segment segment_proof] returns [Ok
      true] if the [proof] certifies that the [slot_segment] is indeed
      included in the slot committed with commitment
-     [comitment]. Returns [Ok false] otherwise.
+     [commitment]. Returns [Ok false] otherwise.
 
       Fails if the index of the segment is out of range. *)
 val verify_segment :
