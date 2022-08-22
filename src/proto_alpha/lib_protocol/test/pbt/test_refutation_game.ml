@@ -1579,7 +1579,15 @@ let test_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
            levels_and_inputs ) ->
       let open Lwt_result_syntax in
       (* Otherwise, there is no conflict. *)
-      QCheck2.assume (not (p1_client.states = p2_client.states)) ;
+      QCheck2.assume
+        (not
+           (let p1_head = List.last_opt p1_client.states in
+            let p2_head = List.last_opt p2_client.states in
+            Option.equal
+              (fun (t1, state_hash1) (t2, state_hash2) ->
+                Tick.equal t1 t2 && State_hash.equal state_hash1 state_hash2)
+              p1_head
+              p2_head)) ;
       let* block =
         prepare_game
           block
