@@ -30,6 +30,10 @@ It requires protocol environment V7, compared to V6 for Kathmandu.
 - Introduce an Array module, making a subset of Stdlib.Array available to the
   protocol (MR :gl:`!6042`)
 
+- Introduce an Q module, making a subset of Zarith.Q available to the
+  protocol (MR :gl:`!6042`)
+
+
 
 Smart Contract Optimistic Rollups (ongoing)
 -------------------------------------------
@@ -116,6 +120,14 @@ Minor Changes
   (Proposals and Ballot), and move them to ``Validate_errors``.
   (MR :gl:`!5828`)
 
+- Replace `acceptable_passes` by `acceptable_pass` that returns an
+  optional integer instead of a list of at most one element. (MR
+  :gl:`!6092`)
+
+- Removed `relative_position_within_block`. (MR :gl:`!6092`)
+
+- New function `compare_operations` which defines a total ordering
+  relation. (MR :gl:`!6092`)
 
 Internal
 --------
