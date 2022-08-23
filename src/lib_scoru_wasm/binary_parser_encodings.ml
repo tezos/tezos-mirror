@@ -30,7 +30,9 @@ module M = Instance.NameMap
 module C = Chunked_byte_vector.Lwt
 open Tree_encoding
 
-(* TODO: keep region? *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3566
+
+   Locations should either be dropped or not. *)
 let no_region_encoding enc =
   conv (fun s -> Source.(s @@ no_region)) (fun {it; _} -> it) enc
 
@@ -51,7 +53,9 @@ end
 
 module Lazy_stack = struct
   let encoding value_enc =
-    (* TODO: The stack can be probably encoded in a unique key in the tree,
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3569
+
+       The stack can be probably encoded in a unique key in the tree,
        since it is never used concurrently. *)
     let offset = value ["length"] Data_encoding.int32 in
     let vector = scope ["vector"] (vector_encoding value_enc) in

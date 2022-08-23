@@ -24,9 +24,6 @@ let quote s = "\"" ^ String.escaped s ^ "\""
 let argspec =
   Arg.align
     [
-      ( "-",
-        Arg.Set Flags.interactive,
-        " run interactively (default if no files given)" );
       ("-e", Arg.String add_arg, " evaluate string");
       ( "-i",
         Arg.String (fun file -> add_arg ("(input " ^ quote file ^ ")")),
@@ -54,19 +51,11 @@ let run () =
         argspec
         (fun file -> add_arg ("(input " ^ quote file ^ ")"))
         usage ;
-      let* () =
-        Lwt_list.iter_s
-          (fun arg ->
-            let+ res = Run.run_string arg in
-            if not res then exit 1)
-          !args
-      in
-      if !args = [] then Flags.interactive := true ;
-      if !Flags.interactive then (
-        Flags.print_sig := true ;
-        banner () ;
-        Run.run_stdin ())
-      else Lwt.return_unit)
+      Lwt_list.iter_s
+        (fun arg ->
+          let+ res = Run.run_string arg in
+          if not res then exit 1)
+        !args)
     (fun exn ->
       flush_all () ;
       prerr_endline

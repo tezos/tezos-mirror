@@ -148,7 +148,8 @@ module Make (Rep : RepType) : S with type bits = Rep.t = struct
    *)
   let determine_binary_nan x y =
     (*
-     * TODO: There are two nondeterministic things we could do here. When both
+     * Reference-interpreter-todo:
+     * There are two nondeterministic things we could do here. When both
      * x and y are NaN, we can nondeterministically pick which to return. And
      * when neither is NaN, we can nondeterministically pick whether to return
      * pos_nan or neg_nan.
@@ -163,7 +164,8 @@ module Make (Rep : RepType) : S with type bits = Rep.t = struct
    *)
   let determine_unary_nan x =
     (*
-     * TODO: There is one nondeterministic thing we could do here. When the
+     * Reference Interpreter-todo:
+     * There is one nondeterministic thing we could do here. When the
      * operand is not NaN, we can nondeterministically pick whether to return
      * pos_nan or neg_nan.
      *)
