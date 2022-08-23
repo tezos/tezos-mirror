@@ -33,6 +33,7 @@ type (_, _) init_section =
   | Func : (Ast.func, func_inst) init_section
   | Global : (Ast.global, global_inst) init_section
   | Table : (Ast.table, table_inst) init_section
+  | Memory : (Ast.memory, memory_inst) init_section
 
 type init_kont =
   | IK_Start  (** Very first tick of the [init] function *)
