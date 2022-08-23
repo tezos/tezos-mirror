@@ -173,6 +173,7 @@ module Testnet_dictator = struct
     let*! ctxt = Vote.clear_ballots ctxt in
     let*! ctxt = Vote.clear_proposals ctxt in
     let*! ctxt = Vote.clear_current_proposal ctxt in
+    let ctxt = record_dictator_proposal_seen ctxt in
     match proposals with
     | [] ->
         Voting_period.Testnet_dictator.overwrite_current_kind
@@ -196,6 +197,9 @@ let apply_proposals ctxt chain_id (Proposals {source; period = _; proposals}) =
   let* ctxt =
     if is_testnet_dictator ctxt chain_id source then
       Testnet_dictator.record_proposals ctxt chain_id proposals
+    else if dictator_proposal_seen ctxt then
+      (* Noop if dictator voted *)
+      return ctxt
     else
       let* count = Vote.get_delegate_proposal_count ctxt source in
       let new_count = count + List.length proposals in
@@ -212,5 +216,8 @@ let apply_proposals ctxt chain_id (Proposals {source; period = _; proposals}) =
 
 let apply_ballot ctxt (Ballot {source; period = _; proposal = _; ballot}) =
   let open Lwt_tzresult_syntax in
-  let* ctxt = Vote.record_ballot ctxt source ballot in
+  let* ctxt =
+    if dictator_proposal_seen ctxt then (* Noop if dictator voted *) return ctxt
+    else Vote.record_ballot ctxt source ballot
+  in
   return (ctxt, Apply_results.Single_result Ballot_result)

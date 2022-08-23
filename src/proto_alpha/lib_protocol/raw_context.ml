@@ -257,6 +257,7 @@ type back = {
   unlimited_operation_gas : bool;
   consensus : Raw_consensus.t;
   non_consensus_operations_rev : Operation_hash.t list;
+  dictator_proposal_seen : bool;
   sampler_state : (Seed_repr.seed * consensus_pk Sampler.t) Cycle_repr.Map.t;
   stake_distribution_for_current_cycle :
     Tez_repr.t Signature.Public_key_hash.Map.t option;
@@ -342,6 +343,8 @@ let[@inline] remaining_operation_gas ctxt = ctxt.remaining_operation_gas
 let[@inline] non_consensus_operations_rev ctxt =
   ctxt.back.non_consensus_operations_rev
 
+let[@inline] dictator_proposal_seen ctxt = ctxt.back.dictator_proposal_seen
+
 let[@inline] sampler_state ctxt = ctxt.back.sampler_state
 
 let[@inline] update_back ctxt back = {ctxt with back}
@@ -378,6 +381,9 @@ let[@inline] update_temporary_lazy_storage_ids ctxt temporary_lazy_storage_ids =
 let[@inline] update_non_consensus_operations_rev ctxt
     non_consensus_operations_rev =
   update_back ctxt {ctxt.back with non_consensus_operations_rev}
+
+let[@inline] update_dictator_proposal_seen ctxt dictator_proposal_seen =
+  update_back ctxt {ctxt.back with dictator_proposal_seen}
 
 let[@inline] update_sampler_state ctxt sampler_state =
   update_back ctxt {ctxt.back with sampler_state}
@@ -832,6 +838,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
         unlimited_operation_gas = true;
         consensus = Raw_consensus.empty;
         non_consensus_operations_rev = [];
+        dictator_proposal_seen = false;
         sampler_state = Cycle_repr.Map.empty;
         stake_distribution_for_current_cycle = None;
         tx_rollup_current_messages = Tx_rollup_repr.Map.empty;
@@ -1301,6 +1308,10 @@ let record_non_consensus_operation_hash ctxt operation_hash =
     (operation_hash :: non_consensus_operations_rev ctxt)
 
 let non_consensus_operations ctxt = List.rev (non_consensus_operations_rev ctxt)
+
+let record_dictator_proposal_seen ctxt = update_dictator_proposal_seen ctxt true
+
+let dictator_proposal_seen ctxt = dictator_proposal_seen ctxt
 
 module Migration_from_Kathmandu = struct
   let reset_samplers ctxt =

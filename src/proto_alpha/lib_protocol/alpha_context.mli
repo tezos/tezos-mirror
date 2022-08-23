@@ -4648,6 +4648,10 @@ val record_non_consensus_operation_hash : context -> Operation_hash.t -> context
 
 val non_consensus_operations : context -> Operation_hash.t list
 
+val record_dictator_proposal_seen : t -> t
+
+val dictator_proposal_seen : t -> bool
+
 (** Finalize an {{!t} [Alpha_context.t]}, producing a [validation_result].
  *)
 val finalize :
