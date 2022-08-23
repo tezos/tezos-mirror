@@ -77,7 +77,7 @@ This sequence of operations was run:
 
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs1371W53YVrt8USjs6PafacnNV6ZoFr4VjvyKP9UYszqdg5v4ZC7"
+"scs12va7N5ovc2CYcBAsWNki5APZFZp4JaCYqUe2a1FjYnQvp4iUHJ"
 
 ./tezos-client --wait none originate sc rollup from bootstrap1 of kind arith of type string booting with 31 --burn-cap 9999999
 Node is bootstrapped.
@@ -157,4 +157,4 @@ This sequence of operations was run:
 
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs133L8aujCeqJqKx57baw8LMN3CJM6iPTU1tdV72Y171fZpuofKV"
+"scs11ogaqyuvGvcJQFX3pHzPzGMCCJVdYMbR1mVmYnWKPkorSvRJGr"

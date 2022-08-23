@@ -873,7 +873,13 @@ module Make (Context : P) :
         let* () = Status.set Waiting_for_input_message in
         return ()
 
-  let set_input input = state_of @@ set_input_monadic input
+  let ticked m =
+    let open Monad.Syntax in
+    let* tick = Current_tick.get in
+    let* () = Current_tick.set (Sc_rollup_tick_repr.next tick) in
+    m
+
+  let set_input input = set_input_monadic input |> ticked |> state_of
 
   let next_char =
     let open Monad.Syntax in
@@ -1071,12 +1077,6 @@ module Make (Context : P) :
             | Some _ -> start_parsing)
         | Parsing -> parse
         | Evaluating -> evaluate)
-
-  let ticked m =
-    let open Monad.Syntax in
-    let* tick = Current_tick.get in
-    let* () = Current_tick.set (Sc_rollup_tick_repr.next tick) in
-    m
 
   let eval state = state_of (ticked eval_step) state
 
