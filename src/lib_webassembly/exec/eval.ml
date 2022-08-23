@@ -865,7 +865,9 @@ let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ()) host_funcs
     List.length vs
     <> (Lazy_vector.LwtInt32Vector.num_elements ins |> Int32.to_int)
   then Crash.error at "wrong number of arguments" ;
-  (* TODO: tickify? *)
+  (* Invoke is only used to call individual functions from a module,
+     and never used by the PVM. Thus is does not need to be
+     tickified and going from and to list is acceptable. *)
   if not (List.for_all2 (fun v -> ( = ) (type_of_value v)) vs ins_l) then
     Crash.error at "wrong types of arguments" ;
   let inst =
@@ -936,7 +938,7 @@ let create_export (inst : module_inst) (ex : export) : export_inst Lwt.t =
 let create_elem module_reg (inst : module_key) (seg : elem_segment) :
     elem_inst Lwt.t =
   let {einit; _} = seg.it in
-  (* TODO: #3076
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
      [einit] should be changed to a lazy structure. We want to avoid traversing
      it whole. *)
   let* einit = Lazy_vector.LwtInt32Vector.to_list einit in
@@ -1046,7 +1048,7 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
       (* Initialize as empty module. *)
       update_module_ref module_reg self empty_module_inst ;
 
-      (* TODO: #3076
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
 
          These transformations should be refactored and abadoned during the
          tickification, to avoid the roundtrip vector -> list -> vector. *)
@@ -1060,7 +1062,7 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
       let* datas = Vector.to_list datas in
       let* exports = Vector.to_list exports in
 
-      (* TODO: #3076
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
          To refactor during the tickification. *)
       let* init_inst0 =
         TzStdLib.List.fold_right2_s
@@ -1084,7 +1086,7 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
         {
           init_inst0 with
           types =
-            (* TODO: #3076
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
                [types] should be a lazy structure so we can avoid traversing it
                whole. *)
             List.map (fun type_ -> type_.it) types |> Vector.of_list;
@@ -1094,7 +1096,7 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
       update_module_ref module_reg self inst0 ;
 
       let* fs = TzStdLib.List.map_s (create_func module_reg self) funcs in
-      (* TODO: #3076
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
          [fs]/[funcs] should be a lazy structure so we can avoid traversing it
          completely. *)
       let* funcs = Vector.concat inst0.funcs (Vector.of_list fs) in
@@ -1104,21 +1106,21 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
       let* new_globals =
         TzStdLib.List.map_s (create_global module_reg self) globals
       in
-      (* TODO: #3076
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
          [tables] should be a lazy structure. *)
       let* tables =
         Vector.concat
           inst1.tables
           (Vector.of_list (List.map create_table tables))
       in
-      (* TODO: #3076
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
          [memories] should be a lazy structure. *)
       let* memories =
         Vector.concat
           inst1.memories
           (Vector.of_list (List.map create_memory memories))
       in
-      (* TODO: #3076
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
          [new_globals]/[globals] should be lazy structures. *)
       let* globals = Vector.concat inst1.globals (Vector.of_list new_globals) in
       let inst2 = {inst1 with tables; memories; globals} in
@@ -1130,7 +1132,7 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
       in
       let new_datas = List.map create_data datas in
       let* exports =
-        (* TODO: #3076
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
            [new_exports]/[exports] should be lazy structures. *)
         TzStdLib.List.fold_left_s
           (fun exports (k, v) ->
@@ -1144,11 +1146,11 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
           inst2 with
           exports;
           elems =
-            (* TODO: #3076
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
                [new_elems]/[elems] should be lazy structures. *)
             Vector.of_list new_elems;
           datas =
-            (* TODO: #3076
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
                [new_data]/[datas] should be lazy structures. *)
             Vector.of_list new_datas;
         }

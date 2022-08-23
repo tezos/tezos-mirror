@@ -196,7 +196,8 @@ let lexbuf_stdin buf len =
   n
 
 let input_stdin run =
-  (* TODO (#3334): Remove the unused REPL. *)
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3334
+     Remove the unused REPL. *)
   let lexbuf = Lexing.from_function lexbuf_stdin in
   let rec loop () =
     let* success = input_script Parse.Script1 "stdin" lexbuf run in

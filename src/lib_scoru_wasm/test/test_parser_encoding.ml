@@ -86,7 +86,6 @@ module Utils = struct
         let open Lwt_result_syntax in
         let*! value' = encode_decode encoding value in
         let* res = check value value' in
-        (* TODO: a better error reporting could be useful. *)
         if res then return_unit else fail ())
 end
 

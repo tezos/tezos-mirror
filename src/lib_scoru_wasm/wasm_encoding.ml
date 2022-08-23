@@ -40,7 +40,7 @@ let string_tag = value [] Data_encoding.string
 
 let list_encoding item_enc =
   let vector = int32_lazy_vector (value [] Data_encoding.int32) item_enc in
-  (* TODO: #3076
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
      This should return a [Instance.Vector.t] instead of a list. Once the AST
      has been sufficiently adapted to lazy vectors and maps, this change can
      go forward. *)

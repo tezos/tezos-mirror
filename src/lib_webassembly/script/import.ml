@@ -6,7 +6,7 @@ module Unknown = Error.Make ()
 
 exception Unknown = Unknown.Error (* indicates unknown import name *)
 
-(* TODO: #3587
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3587
    change this to probably use a better representation of module
    names, like hashes for example.
 *)
