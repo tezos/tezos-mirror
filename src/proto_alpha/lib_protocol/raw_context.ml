@@ -969,8 +969,6 @@ let prepare_first_block ~level ~timestamp ctxt =
               c.sc_rollup.max_outbox_messages_per_level;
             (* The default number of required sections in a dissection *)
             number_of_sections_in_dissection = 32;
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2902
-               This constant needs to be refined. *)
             timeout_period_in_blocks = 20_160;
             (* We store multiple cemented commitments because we want to
                allow the execution of outbox messages against cemented
