@@ -24,6 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3649
+
+   This type cannot be extended in a retro-compatible way. It should
+   be put into a variant. *)
 type input = {
   inbox_level : Raw_level_repr.t;
   message_counter : Z.t;
