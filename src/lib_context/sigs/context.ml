@@ -485,23 +485,26 @@ module type PROOF_ENCODING = sig
   val stream_proof_encoding : stream t Data_encoding.t
 end
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2967
+(** [TEZOS_CONTEXT] is the module type implemented by all storage
+    implementations. This is the module type that the {e shell} expects for its
+    operation. As such, it should be a strict superset of the interface exposed
+    to the protocol (see module type {!S} above and
+    {!Tezos_protocol_environment.Environment_context_intf.S}).
 
-   What is the purpose of module type [S]?
-
-   [S] is morally the interface to the low-level storage visible to the
-   protocol. "Morally" because the exact module type expected by the protocol
-   is now defined to be {!Tezos_protocol_environment.Environment_context_intf.S}.
+    The main purpose of this module type is to keep the on-disk and in-memory
+    implementations in sync.
 *)
-module type S = sig
+module type TEZOS_CONTEXT = sig
+  (** {2 Generic interface} *)
+
+  (** A block-indexed (key x value) store directory.  *)
+  type index
+
   val equal_config : Config.t -> Config.t -> bool
 
   include VIEW with type key = string list and type value = bytes
 
   module Proof : PROOF
-
-  (** The type for context repositories. *)
-  type index
 
   type node_key
 
@@ -637,29 +640,6 @@ module type S = sig
 
   (** [verify_stream] is the verifier of stream proofs. *)
   val verify_stream_proof : (stream_proof, 'a) verifier
-end
-
-(** [TEZOS_CONTEXT] is the module type implemented by all storage
-    implementations. This is the module type that the {e shell} expects for its
-    operation. As such, it should be a strict superset of the interface exposed
-    to the protocol (see module type {!S} above and
-    {!Tezos_protocol_environment.Environment_context_intf.S}).
-
-    The main purpose of this module type is to keep the on-disk and in-memory
-    implementations in sync.
-*)
-module type TEZOS_CONTEXT = sig
-  (** {2 Generic interface} *)
-
-  module type S = sig
-    (** @inline *)
-    include S
-  end
-
-  (** A block-indexed (key x value) store directory.  *)
-  type index
-
-  include S with type index := index
 
   type context = t
 
