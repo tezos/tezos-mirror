@@ -1026,3 +1026,83 @@ val sc_rollup_timeout :
   * Kind.sc_rollup_timeout Kind.manager Apply_results.contents_result)
   tzresult
   Lwt.t
+
+val zk_rollup_originate :
+  #Protocol_client_context.full ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?simulation:bool ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  ?counter:Manager_counter.t ->
+  source:public_key_hash ->
+  public_parameters:Environment.Plonk.public_parameters ->
+  circuits_info:[`Fee | `Private | `Public] Zk_rollup.Account.SMap.t ->
+  init_state:Bls12_381.Fr.t array ->
+  nb_ops:int ->
+  src_pk:public_key ->
+  src_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
+  unit ->
+  ( Tezos_crypto.Operation_hash.t
+    * Kind.zk_rollup_origination Kind.manager contents
+    * Kind.zk_rollup_origination Kind.manager Apply_results.contents_result,
+    tztrace )
+  result
+  Lwt.t
+
+val zk_rollup_publish :
+  #Protocol_client_context.full ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?simulation:bool ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  ?counter:Manager_counter.t ->
+  source:public_key_hash ->
+  zk_rollup:Zk_rollup.t ->
+  ops:(Zk_rollup.Operation.t * Zk_rollup.Ticket.t option) list ->
+  src_pk:public_key ->
+  src_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
+  unit ->
+  ( Tezos_crypto.Operation_hash.t
+    * Kind.zk_rollup_publish Kind.manager contents
+    * Kind.zk_rollup_publish Kind.manager Apply_results.contents_result,
+    tztrace )
+  result
+  Lwt.t
+
+val zk_rollup_update :
+  #Protocol_client_context.full ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?simulation:bool ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  ?counter:Manager_counter.t ->
+  source:public_key_hash ->
+  zk_rollup:Zk_rollup.t ->
+  update:Zk_rollup.Update.t ->
+  src_pk:public_key ->
+  src_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
+  unit ->
+  ( Tezos_crypto.Operation_hash.t
+    * Kind.zk_rollup_update Kind.manager contents
+    * Kind.zk_rollup_update Kind.manager Apply_results.contents_result,
+    tztrace )
+  result
+  Lwt.t
