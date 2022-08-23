@@ -5,20 +5,22 @@
 #   make && dune exec tezt/tests/main.exe -- --record tezt/test-results.json
 
 .tezt_template:
+  variables:
+    TESTS: "/protocol_override"
+    JUNIT: "tezt-junit.xml"
   artifacts:
     reports:
-      junit: tezt-junit.xml
+      junit: $JUNIT
     paths:
       - tezt.log
       - tezt-results-$CI_NODE_INDEX.json
       - $BISECT_FILE
+      - $JUNIT
     expire_in: 1 day
     # certain tests can be blacklisted by adding it to this variable
     when: always
-  variables:
-    TESTS: "/protocol_override"
   script:
-    - dune exec tezt/tests/main.exe -- $TESTS --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit tezt-junit.xml --from-record tezt/records --job $CI_NODE_INDEX/$CI_NODE_TOTAL --record tezt-results-$CI_NODE_INDEX.json -j 4 --retry 1
+    - dune exec tezt/tests/main.exe -- $TESTS --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit $JUNIT --from-record tezt/records --job $CI_NODE_INDEX/$CI_NODE_TOTAL --record tezt-results-$CI_NODE_INDEX.json -j 4 --retry 1
     - ./scripts/ci/merge_coverage.sh
 
 tezt:
