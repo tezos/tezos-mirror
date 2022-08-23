@@ -804,7 +804,10 @@ let expr_encoding =
   (** [check_size size encoding] ensures that the binary encoding
       of a value will not be allowed to exceed [size] bytes. The reader
       and the writer fails otherwise. This function do not modify
-      the JSON encoding. *)
+      the JSON encoding.
+
+      @raise Invalid_argument if [size < 0]
+  *)
   val check_size : int -> 'a encoding -> 'a encoding
 
   (** Recompute the encoding definition each time it is used.

@@ -456,7 +456,10 @@ end
 
 let dynamic_size ?(kind = `Uint30) e = make @@ Dynamic_size {kind; encoding = e}
 
-let check_size limit encoding = make @@ Check_size {limit; encoding}
+let check_size limit encoding =
+  if limit < 0 then
+    raise (Invalid_argument "Data_encoding.check_size: negative limit") ;
+  make @@ Check_size {limit; encoding}
 
 let delayed f = make @@ Delayed f
 
