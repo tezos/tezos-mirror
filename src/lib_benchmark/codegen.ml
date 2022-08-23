@@ -165,13 +165,21 @@ let make_module structure_items =
     Str.module_
       (Mb.mk (loc (Some "S")) (Mod.ident (loc_ident "Saturation_repr")))
   in
-  Str.module_
-    (Mb.mk (Codegen_helpers.loc (Some "Generated"))
-    @@ Mod.structure
-         (suppress_unused_open_warning :: rename_saturation_repr
-        :: structure_items))
+  ("Generated", ([], suppress_unused_open_warning) ::
+  ([], rename_saturation_repr) :: structure_items)
 
-let pp_structure_item fmtr generated = Pprintast.structure fmtr [generated]
+let pp_model fmtr (comments, item) =
+  List.iter (fun comment -> Format.printf "(* %s *)@;" comment) comments ;
+  Pprintast.structure_item fmtr item
+
+let pp_module fmtr (name, items) =
+  Format.fprintf fmtr "@[<hv 0>@[<hv 2>module %s = struct@;" name ;
+  Format.pp_print_list
+    ~pp_sep:(fun fmtr () -> Format.fprintf fmtr "@;@;")
+    (fun fmtr d -> pp_model fmtr d)
+    fmtr
+    items ;
+  Format.fprintf fmtr "@]@;end@]@;"
 
 (* ------------------------------------------------------------------------- *)
 
@@ -212,9 +220,21 @@ let codegen (Model.For_codegen model) (sol : solution)
   | Model.Preapplied _ -> None
   | Model.Packaged {conv = _; model} ->
       let module M = (val model) in
+      let comments =
+        let module Sub =
+          Costlang.Subst
+            (struct
+              let subst = subst
+            end)
+            (Costlang.Pp)
+        in
+        let module M = M.Def (Sub) in
+        let expr = Sub.prj M.model in
+        ["model " ^ name; expr]
+      in
       let module M = M.Def (Subst_impl) in
       let expr = Lift_then_print.prj @@ Impl.prj @@ Subst_impl.prj M.model in
-      Some (generate_let_binding name expr)
+      Some (comments, generate_let_binding name expr)
 
 let codegen_module models sol transform =
   let items =
@@ -235,7 +255,7 @@ let%expect_test "basic_printing" =
     let_ ~name:"tmp2" (int 43) @@ fun tmp2 -> x + y + tmp1 + tmp2
   in
   let item = generate_let_binding "name" term in
-  Format.printf "%a" pp_structure_item item ;
+  Format.printf "%a" Pprintast.structure_item item ;
   [%expect
     {|
     let name x y =
@@ -252,7 +272,7 @@ let%expect_test "anonymous_int_literals" =
     lam ~name:"y" @@ fun y -> x + y + int 42 + int 43
   in
   let item = generate_let_binding "name" term in
-  Format.printf "%a" pp_structure_item item ;
+  Format.printf "%a" Pprintast.structure_item item ;
   [%expect
     {|
     let name x y =
@@ -269,7 +289,7 @@ let%expect_test "let_bound_lambda" =
     app incr x + app incr y
   in
   let item = generate_let_binding "name" term in
-  Format.printf "%a" pp_structure_item item ;
+  Format.printf "%a" Pprintast.structure_item item ;
   [%expect
     {|
     let name x y =
@@ -286,7 +306,7 @@ let%expect_test "ill_typed_higher_order" =
     lam ~name:"y" @@ fun y -> app incr x + app incr y
   in
   let item = generate_let_binding "name" term in
-  Format.printf "%a" pp_structure_item item ;
+  Format.printf "%a" Pprintast.structure_item item ;
   [%expect
     {|
     let name incr x y =
@@ -301,7 +321,7 @@ let%expect_test "if_conditional_operator" =
     lam ~name:"y" @@ fun y -> if_ (lt x y) y x
   in
   let item = generate_let_binding "name" term in
-  Format.printf "%a" pp_structure_item item ;
+  Format.printf "%a" Pprintast.structure_item item ;
   [%expect
     {|
     let name x y =
@@ -311,13 +331,17 @@ let%expect_test "if_conditional_operator" =
 let%expect_test "module_generation" =
   let open Codegen in
   let term = lam ~name:"x" @@ fun x -> x in
-  let module_ = make_module [generate_let_binding "func_name" term] in
-  Format.printf "%a" pp_structure_item module_ ;
+  let module_ =
+    make_module [(["comment"], generate_let_binding "func_name" term)]
+  in
+  Format.printf "%a" pp_module module_ ;
   [%expect
     {|
-    module Generated =
-      struct
-        [@@@warning "-33"]
-        module S = Saturation_repr
-        let func_name x = let open S.Syntax in let x = S.safe_int x in x
-      end |}]
+    module Generated = struct
+      [@@@warning "-33"]
+
+      module S = Saturation_repr
+
+      (* comment *)
+      let func_name x = let open S.Syntax in let x = S.safe_int x in x
+    end |}]
