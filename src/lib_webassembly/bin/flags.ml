@@ -1,5 +1,3 @@
-let interactive = ref false
-
 let trace = ref false
 
 let unchecked = ref false

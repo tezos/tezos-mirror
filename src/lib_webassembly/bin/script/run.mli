@@ -10,6 +10,4 @@ val run_string : string -> bool Lwt.t
 
 val run_file : string -> bool Lwt.t
 
-val run_stdin : unit -> unit Lwt.t
-
 val host_funcs_registry : Host_funcs.registry

@@ -175,43 +175,6 @@ let input_string string run =
   let* () = trace_lwt "Parsing..." in
   input_script Parse.Script "string" lexbuf run
 
-(* Interactive *)
-
-let continuing = ref false
-
-let lexbuf_stdin buf len =
-  let prompt = if !continuing then "  " else "> " in
-  print_string prompt ;
-  flush_all () ;
-  continuing := true ;
-  let rec loop i =
-    if i = len then i
-    else
-      let ch = input_char stdin in
-      Bytes.set buf i ch ;
-      if ch = '\n' then i + 1 else loop (i + 1)
-  in
-  let n = loop 0 in
-  if n = 1 then continuing := false else trace "Parsing..." ;
-  n
-
-let input_stdin run =
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3334
-     Remove the unused REPL. *)
-  let lexbuf = Lexing.from_function lexbuf_stdin in
-  let rec loop () =
-    let* success = input_script Parse.Script1 "stdin" lexbuf run in
-    if not success then Lexing.flush_input lexbuf ;
-    if Lexing.(lexbuf.lex_curr_pos >= lexbuf.lex_buffer_len - 1) then
-      continuing := false ;
-    loop ()
-  in
-  Lwt.catch loop (function
-      | End_of_file ->
-          let* () = Lwt_io.printf "\n%!" in
-          trace_lwt "Bye."
-      | exn -> raise exn)
-
 (* Printing *)
 
 let map_to_list m = List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings m)
@@ -703,5 +666,3 @@ and run_quote_script script =
 let run_file file = input_file file run_script
 
 let run_string string = input_string string run_script
-
-let run_stdin () = input_stdin run_script
