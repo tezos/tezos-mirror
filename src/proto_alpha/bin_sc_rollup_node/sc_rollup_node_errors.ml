@@ -89,11 +89,11 @@ let () =
 
   register_error_kind
     `Permanent
-    ~id:"internal.cannnot_produce_proof"
-    ~title:"Internal error: Rollup node cannot produce refutation proof"
+    ~id:"internal.cannot_produce_proof"
+    ~title:"Internal error: rollup node cannot produce refutation proof"
     ~description:
-      "The rollup node is in a state that prevent it from produce refutation \
-       proofs."
+      "The rollup node is in a state that prevents it from producing \
+       refutation proofs."
     ~pp:(fun ppf (inbox, history, level) ->
       Format.fprintf
         ppf
