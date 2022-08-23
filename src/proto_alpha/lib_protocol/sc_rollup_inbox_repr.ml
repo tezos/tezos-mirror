@@ -57,6 +57,8 @@ type error += Inbox_proof_error of string
 
 type error += Tried_to_add_zero_messages
 
+type error += Empty_upper_level of Raw_level_repr.t
+
 let () =
   let open Data_encoding in
   register_error_kind
@@ -91,7 +93,18 @@ let () =
     ~pp:(fun ppf _ -> Format.fprintf ppf "Tried to add zero messages")
     empty
     (function Tried_to_add_zero_messages -> Some () | _ -> None)
-    (fun () -> Tried_to_add_zero_messages)
+    (fun () -> Tried_to_add_zero_messages) ;
+
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup_inbox.empty_upper_level"
+    ~title:"Internal error: No payload found in a [Level_crossing] proof"
+    ~description:
+      "Failed to find any message in the [upper_level] of a [Level_crossing] \
+       proof"
+    (obj1 (req "upper_level" Raw_level_repr.encoding))
+    (function Empty_upper_level upper_level -> Some upper_level | _ -> None)
+    (fun upper_level -> Empty_upper_level upper_level)
 
 module Int64_map = Map.Make (Int64)
 
@@ -1011,8 +1024,20 @@ struct
         in
         match payload_opt with
         | None ->
-            if equal_history_proof snapshot p.upper then return None
-            else proof_error "payload is None but proof.upper is not top level"
+            (* [check_inclusions] checks at least two important properties:
+               1. [p.lower_level] is different from [p.upper_level]
+               2. [p.upper_level] is included in the snapshot
+
+               If [p.upper_level] is included in the snapshot, the level was
+               created by the protocol. If the protocol created a level tree
+               at [p.upper_level] it *must* contain at least one message.
+               So, if [p.upper_level] exists, at the index [Z.zero] (fetched
+               here), a payload *must* exist.
+
+               This code is then dead as long as we store only the nonempty
+               inboxes.
+            *)
+            fail (Empty_upper_level p.upper_level)
         | Some payload ->
             return
             @@ Some
