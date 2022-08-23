@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -57,6 +57,7 @@ type sc_rollup_constants = {
   max_active_outbox_levels : int32;
   max_outbox_messages_per_level : int;
   number_of_sections_in_dissection : int;
+  timeout_period_in_blocks : int;
 }
 
 (** [boot_sector_of k] returns a valid boot sector for a PVM of
@@ -95,6 +96,9 @@ let get_sc_rollup_constants client =
   let number_of_sections_in_dissection =
     json |-> "sc_rollup_number_of_sections_in_dissection" |> as_int
   in
+  let timeout_period_in_blocks =
+    json |-> "sc_rollup_timeout_period_in_blocks" |> as_int
+  in
   return
     {
       origination_size;
@@ -106,6 +110,7 @@ let get_sc_rollup_constants client =
       max_active_outbox_levels;
       max_outbox_messages_per_level;
       number_of_sections_in_dissection;
+      timeout_period_in_blocks;
     }
 
 (* List of scoru errors messages used in tests below. *)
@@ -2511,7 +2516,10 @@ let test_forking_scenario ~title ~scenario protocols =
          of [mk_forking_commitments] is cementable without further bakes. *)
       let commitment_period = 3 in
       let challenge_window = commitment_period * 7 in
-      setup ~commitment_period ~challenge_window ~protocol
+      (* Completely arbitrary as we decide when to trigger timeouts in tests.
+         Making it a lot smaller than the default value to speed up tests. *)
+      let timeout = 10 in
+      setup ~commitment_period ~challenge_window ~timeout ~protocol
       @@ fun node client _bootstrap1_key ->
       (* Originate a Sc rollup. *)
       let* sc_rollup = originate_sc_rollup client ~parameters_ty:"unit" in
@@ -2539,6 +2547,10 @@ let test_forking_scenario ~title ~scenario protocols =
         level1)
     protocols
 
+(* A more convenient wrapper around [cement_commitment]. *)
+let cement_commitments client sc_rollup ?fail =
+  Lwt_list.iter_s (fun hash -> cement_commitment client ~sc_rollup ~hash ?fail)
+
 (** Given a commitment tree constructed by {test_forking_scenario}, this function:
     - tests different (failing and non-failing) cementation of commitments
       and checks the returned error for each situation (in case of failure);
@@ -2555,12 +2567,7 @@ let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit protocols =
       let* constants = get_sc_rollup_constants client in
       let challenge_window = constants.challenge_window_in_blocks in
 
-      (* More convenient Wrapper around cement_commitment for the tests below *)
-      let cement ?fail l =
-        Lwt_list.iter_s
-          (fun hash -> cement_commitment client ~sc_rollup ~hash ?fail)
-          l
-      in
+      let cement = cement_commitments client sc_rollup in
       let missing_blocks_to_cement = level0 + challenge_window - level1 in
       let* () =
         if missing_blocks_to_cement <= 0 then unit (* We can already cement *)
@@ -2624,12 +2631,7 @@ let test_valid_dispute_dissection protocols =
     ~scenario:
       (fun client _node ~sc_rollup ~operator1 ~operator2 commits _level0 _level1 ->
       let c1, c2, c31, c32, _c311, _c321 = commits in
-      (* More convenient wrapper around cement_commitment for the tests below *)
-      let cement ?fail l =
-        Lwt_list.iter_s
-          (fun hash -> cement_commitment client ~sc_rollup ~hash ?fail)
-          l
-      in
+      let cement = cement_commitments client sc_rollup in
       let* constants = get_sc_rollup_constants client in
       let challenge_window = constants.challenge_window_in_blocks in
       let commitment_period = constants.commitment_period_in_blocks in
@@ -2701,6 +2703,66 @@ let test_late_rollup_node =
   let* () = bake_levels 30 client in
   let* _status = Sc_rollup_node.wait_for_level ~timeout:2. sc_rollup_node 95 in
   return ()
+
+let timeout ?expect_failure ~sc_rollup ~staker client =
+  let*! () =
+    Client.Sc_rollup.timeout
+      ~hooks
+      ~dst:sc_rollup
+      ~src:"bootstrap1"
+      ~staker
+      client
+      ?expect_failure
+  in
+  Client.bake_for_and_wait client
+
+(* Testing the timeout to record gas consumption in a regression trace and
+   detect when the value changes.
+   For functional tests on timing-out a dispute, see unit tests in
+   [lib_protocol].
+
+   For this test, we rely on [test_forking_scenario] to create a tree structure
+   of commitments and we start a dispute.
+   The first player is not even going to play, we'll simply bake enough blocks
+   to get to the point where we can timeout. *)
+let test_timeout protocols =
+  test_forking_scenario
+    ~title:"refutation game timeout"
+    ~scenario:
+      (fun client _node ~sc_rollup ~operator1 ~operator2 commits level0 level1 ->
+      (* These are the commitments on the rollup. See [test_forking_scenario] to
+         visualize the tree structure. *)
+      let c1, c2, _c31, _c32, _c311, _c321 = commits in
+      (* A helper function to cement a sequence of commitments. *)
+      let cement = cement_commitments client sc_rollup in
+      let* constants = get_sc_rollup_constants client in
+      let challenge_window = constants.challenge_window_in_blocks in
+      let timeout_period = constants.timeout_period_in_blocks in
+
+      (* Bake enough blocks to cement the commitments up to the divergence. *)
+      let* () =
+        repeat
+          (* There are [level0 - level1 - 1] blocks between [level1] and
+             [level0], plus the challenge window for [c1] and the one for [c2].
+          *)
+          (level0 - level1 - 1 + (2 * challenge_window))
+          (fun () -> Client.bake_for_and_wait client)
+      in
+      let* () = cement [c1; c2] in
+
+      let module M = Operation.Manager in
+      (* [operator2] starts a dispute. Its opponent, [operator1], won't play. *)
+      let* () =
+        bake_operation_via_rpc client
+        @@ M.make ~source:operator2
+        @@ M.sc_rollup_refute ~sc_rollup ~opponent:operator1.public_key_hash ()
+      in
+      (* Get exactly to the block where we are able to timeout. *)
+      let* () =
+        repeat (timeout_period + 1) (fun () -> Client.bake_for_and_wait client)
+      in
+      timeout ~sc_rollup ~staker:operator2.public_key_hash client)
+    protocols
 
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
@@ -2822,4 +2884,5 @@ let register ~protocols =
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols ;
   test_no_cementation_if_parent_not_lcc_or_if_disputed_commit protocols ;
-  test_valid_dispute_dissection protocols
+  test_valid_dispute_dissection protocols ;
+  test_timeout protocols
