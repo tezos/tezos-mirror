@@ -1095,10 +1095,15 @@ let concat_completed {lv; rv; offset; _} =
 type (_, _) init_section =
   | Func : (func, func_inst) init_section
   | Global : (global, global_inst) init_section
+  | Table : (table, table_inst) init_section
 
 let section_fetch_vec :
     type a b. module_inst -> (a, b) init_section -> b Vector.t =
- fun inst sec -> match sec with Func -> inst.funcs | Global -> inst.globals
+ fun inst sec ->
+  match sec with
+  | Func -> inst.funcs
+  | Global -> inst.globals
+  | Table -> inst.tables
 
 let section_set_vec :
     type a b. module_inst -> (a, b) init_section -> b Vector.t -> module_inst =
@@ -1106,6 +1111,7 @@ let section_set_vec :
   match (sec, vec) with
   | Func, funcs -> {inst with funcs}
   | Global, globals -> {inst with globals}
+  | Table, tables -> {inst with tables}
 
 type init_kont =
   | IK_Start
@@ -1125,7 +1131,8 @@ let section_next_init_kont :
  fun m inst0 sec ->
   match sec with
   | Func -> IK_Aggregate (inst0, Global, map_kont m.it.globals)
-  | Global -> IK_Remaining inst0
+  | Global -> IK_Aggregate (inst0, Table, map_kont m.it.tables)
+  | Table -> IK_Remaining inst0
 
 let section_step :
     type a b.
@@ -1134,10 +1141,12 @@ let section_step :
  fun module_reg self -> function
   | Func -> create_func module_reg self
   | Global -> create_global module_reg self
+  | Table -> fun x -> Lwt.return (create_table x)
 
 let section_update_module_ref : type a b. (a, b) init_section -> bool = function
   | Func -> true
   | Global -> false
+  | Table -> false
 
 let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
   function
@@ -1186,24 +1195,16 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
       let+ tick = concat_step tick in
       IK_Aggregate_concat (inst0, sec, tick)
   | IK_Remaining inst1 ->
-      let {tables; memories; exports; elems; datas; start; _} = m.it in
+      let {memories; exports; elems; datas; start; _} = m.it in
 
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
          These transformations should be refactored and abadoned during the
          tickification, to avoid the roundtrip vector -> list -> vector. *)
-      let* tables = Vector.to_list tables in
       let* memories = Vector.to_list memories in
       let* elems = Vector.to_list elems in
       let* datas = Vector.to_list datas in
       let* exports = Vector.to_list exports in
 
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
-         [tables] should be a lazy structure. *)
-      let* tables =
-        Vector.concat
-          inst1.tables
-          (Vector.of_list (List.map create_table tables))
-      in
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
          [memories] should be a lazy structure. *)
       let* memories =
@@ -1212,7 +1213,7 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
           (Vector.of_list (List.map create_memory memories))
       in
 
-      let inst2 = {inst1 with tables; memories} in
+      let inst2 = {inst1 with memories} in
       update_module_ref module_reg self inst2 ;
 
       let* new_exports = TzStdLib.List.map_s (create_export inst2) exports in
