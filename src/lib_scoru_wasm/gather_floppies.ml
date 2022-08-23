@@ -126,7 +126,7 @@ module Make
     last_input_info : input_info option;
         (** This field is updated after each [read_input] step to
             reflect the progression of the PVM. *)
-    kernel : Chunked_byte_vector.Lwt.t;
+    kernel : Chunked_byte_vector.t;
         (** The kernel being incrementally loaded into memory. *)
     internal_tick : Z.t;
         (** A counter updated after each small step execution of the
@@ -217,7 +217,7 @@ module Make
     in
     match boot_sector with
     | Some (Complete_kernel kernel) ->
-        let kernel = Chunked_byte_vector.Lwt.of_bytes kernel in
+        let kernel = Chunked_byte_vector.of_bytes kernel in
         Some
           {
             internal_status = Not_gathering_floppies;
@@ -227,7 +227,7 @@ module Make
           }
     | Some (Incomplete_kernel (chunk, _pk)) when Bytes.length chunk < chunk_size
       ->
-        let kernel = Chunked_byte_vector.Lwt.of_bytes chunk in
+        let kernel = Chunked_byte_vector.of_bytes chunk in
         Some
           {
             internal_status = Not_gathering_floppies;
@@ -236,7 +236,7 @@ module Make
             kernel;
           }
     | Some (Incomplete_kernel (chunk, pk)) ->
-        let kernel = Chunked_byte_vector.Lwt.of_bytes chunk in
+        let kernel = Chunked_byte_vector.of_bytes chunk in
         Some
           {
             internal_status = Gathering_floppies pk;
@@ -280,13 +280,13 @@ module Make
         match read_floppy message with
         | Some {chunk; signature} ->
             let state = {state with last_input_info = Some input} in
-            let offset = Chunked_byte_vector.Lwt.length state.kernel in
+            let offset = Chunked_byte_vector.length state.kernel in
             let len = Bytes.length chunk in
             if Tezos_crypto.Signature.check pk signature chunk then
               let* () =
                 if 0 < len then (
-                  Chunked_byte_vector.Lwt.grow state.kernel (Int64.of_int len) ;
-                  Chunked_byte_vector.Lwt.store_bytes state.kernel offset chunk)
+                  Chunked_byte_vector.grow state.kernel (Int64.of_int len) ;
+                  Chunked_byte_vector.store_bytes state.kernel offset chunk)
                 else return_unit
               in
               return

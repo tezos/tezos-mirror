@@ -46,7 +46,7 @@ type pvm_state = {
   last_input_info : Wasm_pvm_sig.input_info option;
       (** Info about last read input. *)
   current_tick : Z.t;  (** Current tick of the PVM. *)
-  kernel : Lazy_containers.Chunked_byte_vector.Lwt.t;  (** The loaded kernel. *)
+  kernel : Lazy_containers.Chunked_byte_vector.t;  (** The loaded kernel. *)
   module_reg : Wasm.Instance.module_reg;
       (** Module registry of the loaded kernel. *)
   tick_state : tick_state;  (** The current tick state. *)

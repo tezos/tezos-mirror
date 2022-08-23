@@ -25,7 +25,7 @@
 
 open QCheck_alcotest
 open QCheck2
-open Chunked_byte_vector.Lwt
+open Chunked_byte_vector
 
 let create_works =
   Test.make ~name:"create works" Gen.ui64 (fun len ->

@@ -41,7 +41,7 @@ let bytes = string_with String.iter add_hex_char
 let string = string_with String.iter add_char
 
 let name n =
-  let n = Lazy_vector.LwtInt32Vector.loaded_bindings n in
+  let n = Lazy_vector.Int32Vector.loaded_bindings n in
   string_with List.iter (fun buf (_, uc) -> add_unicode_char buf uc) n
 
 let list_of_opt = function None -> [] | Some x -> [x]
@@ -59,17 +59,17 @@ let list f xs = List.map f xs
 let opt f xo = list f (list_of_opt xo)
 
 let lazy_vector f map =
-  List.map (fun (_, v) -> f v) (Lazy_vector.LwtInt32Vector.loaded_bindings map)
+  List.map (fun (_, v) -> f v) (Lazy_vector.Int32Vector.loaded_bindings map)
 
 let lazy_vectori f map =
   List.map
     (fun (i32, v) -> f (Int32.to_int i32) v)
-    (Lazy_vector.LwtInt32Vector.loaded_bindings map)
+    (Lazy_vector.Int32Vector.loaded_bindings map)
 
 let lazy_vectori_lwt f map =
   TzStdLib.List.map_s
     (fun (i32, v) -> f (Int32.to_int i32) v)
-    (Lazy_vector.LwtInt32Vector.loaded_bindings map)
+    (Lazy_vector.Int32Vector.loaded_bindings map)
 
 let tab head f xs = if xs = [] then [] else [Node (head, list f xs)]
 
@@ -635,7 +635,7 @@ let data blocks datas i seg =
   let open Lwt.Syntax in
   let {dinit; dmode} = seg.it in
   let* dinit = Ast.get_data dinit datas in
-  let+ dinit = Chunked_byte_vector.Lwt.to_string dinit in
+  let+ dinit = Chunked_byte_vector.to_string dinit in
   Node ("data $" ^ nat i, segment_mode blocks "memory" dmode @ break_bytes dinit)
 
 (* Modules *)
@@ -752,7 +752,7 @@ let definition mode x_opt def =
             | Encoded (_, bytes) ->
                 Decode.decode
                   ~name:""
-                  ~bytes:(Chunked_byte_vector.Lwt.of_string bytes)
+                  ~bytes:(Chunked_byte_vector.of_string bytes)
             | Quoted (_, s) -> unquote (Parse.string_to_module s)
           in
           let* unquoted = unquote def in
@@ -765,7 +765,7 @@ let definition mode x_opt def =
                 let* m =
                   Decode.decode
                     ~name:""
-                    ~bytes:(Chunked_byte_vector.Lwt.of_string bytes)
+                    ~bytes:(Chunked_byte_vector.of_string bytes)
                 in
                 Encode.encode m
             | Quoted (_, s) -> unquote (Parse.string_to_module s)

@@ -3,7 +3,7 @@ open Ast
 open Script
 open Source
 module TzStdLib = Tezos_lwt_result_stdlib.Lwtreslib.Bare
-module Vector = Lazy_vector.LwtInt32Vector
+module Vector = Lazy_vector.Int32Vector
 
 (* Harness *)
 
@@ -208,7 +208,7 @@ let exports m : exports Lwt.t =
       let+ t = export_type m exp in
       NameMap.add exp.it.name t map)
     NameMap.empty
-    (Lazy_vector.LwtInt32Vector.loaded_bindings m.it.exports)
+    (Lazy_vector.Int32Vector.loaded_bindings m.it.exports)
 
 let modules () : modules = {env = Map.empty; current = 0}
 
@@ -454,7 +454,7 @@ let wrap item_name wrap_action wrap_assertion at =
             Vector.singleton (NumType I32Type) )
        @@ at)
     :: itypes
-    |> Lazy_vector.LwtInt32Vector.of_list
+    |> Lazy_vector.Int32Vector.of_list
   in
   let imports_list =
     [
@@ -499,18 +499,17 @@ let wrap item_name wrap_action wrap_assertion at =
       imports_list
     @@ at
   in
-  let imports = imports_list |> Lazy_vector.LwtInt32Vector.of_list in
+  let imports = imports_list |> Lazy_vector.Int32Vector.of_list in
   let edesc = FuncExport item @@ at in
   let exports =
-    [{name = Utf8.decode "run"; edesc} @@ at]
-    |> Lazy_vector.LwtInt32Vector.of_list
+    [{name = Utf8.decode "run"; edesc} @@ at] |> Lazy_vector.Int32Vector.of_list
   in
   let body =
     [Block (ValBlockType None, Block_label 1l) @@ at; Unreachable @@ at]
   in
   let funcs =
     [{ftype = 0l @@ at; locals; body = Block_label 0l} @@ at]
-    |> Lazy_vector.LwtInt32Vector.of_list
+    |> Lazy_vector.Int32Vector.of_list
   in
   let blocks =
     Vector.of_list
@@ -566,7 +565,7 @@ let of_string_with iter add_char s =
 let of_bytes = of_string_with String.iter add_hex_char
 
 let of_name n =
-  let n = Lazy_vector.LwtInt32Vector.loaded_bindings n in
+  let n = Lazy_vector.Int32Vector.loaded_bindings n in
   of_string_with List.iter (fun buf (_, uc) -> add_unicode_char buf uc) n
 
 let of_float z =
@@ -719,7 +718,7 @@ let of_command mods cmd =
           | Encoded (_, bytes) ->
               Decode.decode
                 ~name:"binary"
-                ~bytes:(Chunked_byte_vector.Lwt.of_string bytes)
+                ~bytes:(Chunked_byte_vector.of_string bytes)
           | Quoted (_, s) -> unquote (Parse.string_to_module s)
         in
         let* unquoted = unquote def in

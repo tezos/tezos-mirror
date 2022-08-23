@@ -142,8 +142,8 @@ let func_type_of = function
   | Func.HostFunc (t, _) -> t
 
 let block_type inst bt =
-  let empty () = Lazy_vector.LwtInt32Vector.create 0l in
-  let singleton i = Lazy_vector.LwtInt32Vector.(create 1l |> set 0l i) in
+  let empty () = Lazy_vector.Int32Vector.create 0l in
+  let singleton i = Lazy_vector.Int32Vector.(create 1l |> set 0l i) in
   match bt with
   | VarBlockType x -> type_ inst x
   | ValBlockType None -> FuncType (empty (), empty ()) |> Lwt.return
@@ -179,7 +179,7 @@ let data_oob module_reg frame x i n =
   let+ data = Ast.get_data !data_label inst.allocations.datas in
   I64.gt_u
     (I64.add (I64_convert.extend_i32_u i) (I64_convert.extend_i32_u n))
-    (Chunked_byte_vector.Lwt.length data)
+    (Chunked_byte_vector.length data)
 
 let table_oob module_reg frame x i n =
   let* inst = resolve_module_ref module_reg frame.inst in
@@ -226,8 +226,8 @@ and step_resolved module_reg (c : config) frame vs e es : config Lwt.t =
         | Block (bt, es'), vs ->
             let* inst = resolve_module_ref module_reg frame.inst in
             let+ (FuncType (ts1, ts2)) = block_type inst bt in
-            let n1 = Lazy_vector.LwtInt32Vector.num_elements ts1 in
-            let n2 = Lazy_vector.LwtInt32Vector.num_elements ts2 in
+            let n1 = Lazy_vector.Int32Vector.num_elements ts1 in
+            let n2 = Lazy_vector.Int32Vector.num_elements ts2 in
             let args, vs' = (take n1 vs e.at, drop n1 vs e.at) in
             ( vs',
               [Label (n2, [], (args, [From_block (es', 0l) @@ e.at])) @@ e.at]
@@ -235,7 +235,7 @@ and step_resolved module_reg (c : config) frame vs e es : config Lwt.t =
         | Loop (bt, es'), vs ->
             let* inst = resolve_module_ref module_reg frame.inst in
             let+ (FuncType (ts1, _)) = block_type inst bt in
-            let n1 = Lazy_vector.LwtInt32Vector.num_elements ts1 in
+            let n1 = Lazy_vector.Int32Vector.num_elements ts1 in
             let args, vs' = (take n1 vs e.at, drop n1 vs e.at) in
             ( vs',
               [
@@ -648,9 +648,7 @@ and step_resolved module_reg (c : config) frame vs e es : config Lwt.t =
               let* inst = resolve_module_ref module_reg frame.inst in
               let* seg = data inst x in
               let* seg = Ast.get_data !seg inst.allocations.datas in
-              let+ b =
-                Chunked_byte_vector.Lwt.load_byte seg (Int64.of_int32 s)
-              in
+              let+ b = Chunked_byte_vector.load_byte seg (Int64.of_int32 s) in
               let b = Int32.of_int b in
               ( vs',
                 List.map
@@ -822,7 +820,7 @@ and step_resolved module_reg (c : config) frame vs e es : config Lwt.t =
 
                This conversion to list can probably be avoided by using
                Lazy_vector in the config for local variables. *)
-            let+ locals = Lazy_vector.LwtInt32Vector.to_list f.it.locals in
+            let+ locals = Lazy_vector.Int32Vector.to_list f.it.locals in
             let locals' = List.rev args @ List.map default_value locals in
             let frame' = {inst = inst'; locals = List.map ref locals'} in
             let instr' =
@@ -860,10 +858,8 @@ let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ()) host_funcs
     (func : func_inst) (vs : value list) : value list Lwt.t =
   let at = match func with Func.AstFunc (_, _, f) -> f.at | _ -> no_region in
   let (FuncType (ins, _out)) = Func.type_of func in
-  let* ins_l = Lazy_vector.LwtInt32Vector.to_list ins in
-  if
-    List.length vs
-    <> (Lazy_vector.LwtInt32Vector.num_elements ins |> Int32.to_int)
+  let* ins_l = Lazy_vector.Int32Vector.to_list ins in
+  if List.length vs <> (Lazy_vector.Int32Vector.num_elements ins |> Int32.to_int)
   then Crash.error at "wrong number of arguments" ;
   (* Invoke is only used to call individual functions from a module,
      and never used by the PVM. Thus is does not need to be
@@ -941,7 +937,7 @@ let create_elem module_reg (inst : module_key) (seg : elem_segment) :
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
      [einit] should be changed to a lazy structure. We want to avoid traversing
      it whole. *)
-  let* einit = Lazy_vector.LwtInt32Vector.to_list einit in
+  let* einit = Lazy_vector.Int32Vector.to_list einit in
   let+ init =
     TzStdLib.List.map_s
       (fun v ->
@@ -990,8 +986,7 @@ let run_elem i elem =
            [
              Const (I32 0l @@ at) @@ at;
              Const
-               (I32 (Lazy_vector.LwtInt32Vector.num_elements elem.it.einit)
-               @@ at)
+               (I32 (Lazy_vector.Int32Vector.num_elements elem.it.einit) @@ at)
              @@ at;
              TableInit (index, x) @@ at;
              ElemDrop x @@ at;
@@ -1014,7 +1009,7 @@ let run_data (inst : module_inst) i data =
              Const
                (I32
                   (Int32.of_int
-                     (Int64.to_int (Chunked_byte_vector.Lwt.length data)))
+                     (Int64.to_int (Chunked_byte_vector.length data)))
                @@ at)
              @@ at;
              MemoryInit x @@ at;

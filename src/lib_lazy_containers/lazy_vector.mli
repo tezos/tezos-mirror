@@ -182,13 +182,13 @@ end
 
 module Make (Key : KeyS) : S with type key = Key.t
 
-module LwtIntVector : S with type key = int
+module IntVector : S with type key = int
 
-module LwtInt32Vector : S with type key = int32
+module Int32Vector : S with type key = int32
 
-module LwtInt64Vector : S with type key = int64
+module Int64Vector : S with type key = int64
 
-module LwtZVector : S with type key = Z.t
+module ZVector : S with type key = Z.t
 
 (** [Make] generates a lazy vector module using a given [Key] module. *)
 module Mutable : sig
@@ -231,13 +231,11 @@ module Mutable : sig
   module Make (Vector : ImmutableS) :
     S with type key = Vector.key and module Vector = Vector
 
-  module LwtIntVector : S with type key = int and module Vector = LwtIntVector
+  module IntVector : S with type key = int and module Vector = IntVector
 
-  module LwtInt32Vector :
-    S with type key = int32 and module Vector = LwtInt32Vector
+  module Int32Vector : S with type key = int32 and module Vector = Int32Vector
 
-  module LwtInt64Vector :
-    S with type key = int64 and module Vector = LwtInt64Vector
+  module Int64Vector : S with type key = int64 and module Vector = Int64Vector
 
-  module LwtZVector : S with type key = Z.t and module Vector = LwtZVector
+  module ZVector : S with type key = Z.t and module Vector = ZVector
 end

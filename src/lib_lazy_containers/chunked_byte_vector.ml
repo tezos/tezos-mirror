@@ -92,162 +92,160 @@ module Chunk = struct
     else 0L
 end
 
-module Lwt = struct
-  module Vector = Lazy_vector.Mutable.LwtInt64Vector
+module Vector = Lazy_vector.Mutable.Int64Vector
 
-  type t = {mutable length : int64; chunks : Chunk.t Vector.t}
+type t = {mutable length : int64; chunks : Chunk.t Vector.t}
 
-  let def_get_chunk _ = Lwt.return (Chunk.alloc ())
+let def_get_chunk _ = Lwt.return (Chunk.alloc ())
 
-  let create ?origin ?(get_chunk = def_get_chunk) length =
-    let chunks =
-      Vector.create ?origin ~produce_value:get_chunk (Chunk.num_needed length)
-    in
-    {length; chunks}
+let create ?origin ?(get_chunk = def_get_chunk) length =
+  let chunks =
+    Vector.create ?origin ~produce_value:get_chunk (Chunk.num_needed length)
+  in
+  {length; chunks}
 
-  let origin vector = Vector.origin vector.chunks
+let origin vector = Vector.origin vector.chunks
 
-  let grow vector size_delta =
-    if 0L < size_delta then (
-      let new_size = Int64.add vector.length size_delta in
-      let new_chunks = Chunk.num_needed new_size in
-      let current_chunks = Vector.num_elements vector.chunks in
-      let chunk_count_delta = Int64.sub new_chunks current_chunks in
-      if Int64.compare chunk_count_delta 0L > 0 then
-        (* We cannot make any assumption on the previous value of
-           [produce_value]. In particular, it may very well raise an
-           error in case of absent value (which is the case when
-           growing the chunked byte vector requires to allocate new
-           chunks). *)
-        Vector.grow
-          ~default:(fun () -> Chunk.alloc ())
-          chunk_count_delta
-          vector.chunks ;
-      vector.length <- new_size)
+let grow vector size_delta =
+  if 0L < size_delta then (
+    let new_size = Int64.add vector.length size_delta in
+    let new_chunks = Chunk.num_needed new_size in
+    let current_chunks = Vector.num_elements vector.chunks in
+    let chunk_count_delta = Int64.sub new_chunks current_chunks in
+    if Int64.compare chunk_count_delta 0L > 0 then
+      (* We cannot make any assumption on the previous value of
+         [produce_value]. In particular, it may very well raise an
+         error in case of absent value (which is the case when
+         growing the chunked byte vector requires to allocate new
+         chunks). *)
+      Vector.grow
+        ~default:(fun () -> Chunk.alloc ())
+        chunk_count_delta
+        vector.chunks ;
+    vector.length <- new_size)
 
-  let allocate length =
-    let res = create 0L in
-    grow res length ;
-    res
+let allocate length =
+  let res = create 0L in
+  grow res length ;
+  res
 
-  let length vector = vector.length
+let length vector = vector.length
 
-  let get_chunk index {chunks; _} =
-    Lwt.catch (fun () -> Vector.get index chunks) reraise
+let get_chunk index {chunks; _} =
+  Lwt.catch (fun () -> Vector.get index chunks) reraise
 
-  let set_chunk index chunk {chunks; _} =
-    try Vector.set index chunk chunks with exn -> reraise exn
+let set_chunk index chunk {chunks; _} =
+  try Vector.set index chunk chunks with exn -> reraise exn
 
-  let load_byte vector address =
-    let open Lwt.Syntax in
-    if Int64.compare address vector.length >= 0 then raise Bounds ;
-    let+ chunk = get_chunk (Chunk.index address) vector in
-    Array1_64.get chunk (Chunk.offset address)
+let load_byte vector address =
+  let open Lwt.Syntax in
+  if Int64.compare address vector.length >= 0 then raise Bounds ;
+  let+ chunk = get_chunk (Chunk.index address) vector in
+  Array1_64.get chunk (Chunk.offset address)
 
-  let store_byte vector address byte =
-    let open Lwt.Syntax in
-    if Int64.compare address vector.length >= 0 then raise Bounds ;
-    let+ chunk = get_chunk (Chunk.index address) vector in
-    Array1_64.set chunk (Chunk.offset address) byte
+let store_byte vector address byte =
+  let open Lwt.Syntax in
+  if Int64.compare address vector.length >= 0 then raise Bounds ;
+  let+ chunk = get_chunk (Chunk.index address) vector in
+  Array1_64.set chunk (Chunk.offset address) byte
 
-  let store_bytes vector address bytes =
-    List.init (Bytes.length bytes) (fun i ->
-        let c = Bytes.get bytes i in
-        store_byte vector Int64.(of_int i |> add address) (Char.code c))
-    |> Lwt.join
+let store_bytes vector address bytes =
+  List.init (Bytes.length bytes) (fun i ->
+      let c = Bytes.get bytes i in
+      store_byte vector Int64.(of_int i |> add address) (Char.code c))
+  |> Lwt.join
 
-  let of_string str =
-    (* Strings are limited in size and contained in `nativeint` (either int31 or
-       int63 depending of the architecture). The maximum size of strings in
-       OCaml is limited by {!Sys.max_string_length} which is lesser than
-       `Int64.max_int` (and even Int.max_int). As such conversions from / to
-       Int64 to manipulate the vector is safe since the size of the
-       Chunked_byte_vector from a string can be contained in an `int`.
+let of_string str =
+  (* Strings are limited in size and contained in `nativeint` (either int31 or
+     int63 depending of the architecture). The maximum size of strings in
+     OCaml is limited by {!Sys.max_string_length} which is lesser than
+     `Int64.max_int` (and even Int.max_int). As such conversions from / to
+     Int64 to manipulate the vector is safe since the size of the
+     Chunked_byte_vector from a string can be contained in an `int`.
 
        Moreover, WASM strings are limited to max_uint32 in size for data
        segments, which is the primary usage of this function in the text
        parser. *)
-    let len = String.length str in
-    let vector = create (Int64.of_int len) in
-    let _ =
-      List.init
-        (Vector.num_elements vector.chunks |> Int64.to_int)
-        (fun index ->
-          let index = Int64.of_int index in
-          let chunk = Chunk.alloc () in
-          let _ =
-            List.init (Chunk.size |> Int64.to_int) (fun offset ->
-                let offset = Int64.of_int offset in
-                let address = Chunk.address ~index ~offset |> Int64.to_int in
-                if address < len then
-                  let c = String.get str address in
-                  Array1_64.set chunk offset (Char.code c))
-          in
-          set_chunk index chunk vector)
-    in
-    vector
-
-  let of_bytes bytes =
-    (* See [of_string] heading comment *)
-    let len = Bytes.length bytes in
-    let vector = create (Int64.of_int len) in
-    let _ =
-      List.init
-        (Vector.num_elements vector.chunks |> Int64.to_int)
-        (fun index ->
-          let index = Int64.of_int index in
-          let chunk = Chunk.alloc () in
-          let _ =
-            List.init (Chunk.size |> Int64.to_int) (fun offset ->
-                let offset = Int64.of_int offset in
-                let address = Chunk.address ~index ~offset |> Int64.to_int in
-                if address < len then
-                  let c = Bytes.get bytes address in
-                  Array1_64.set chunk offset (Char.code c))
-          in
-          set_chunk index chunk vector)
-    in
-    vector
-
-  let to_bytes vector =
-    let open Lwt.Syntax in
-    let chunks_number = Vector.num_elements vector.chunks in
-    if vector.length > Int64.of_int Sys.max_string_length then raise Bounds ;
-    (* Once we ensure the vector can be contained in a string, we can safely
-       convert everything to int, since the size of the vector is contained in
-       a `nativeint`. See {!of_string} comment. *)
-    let buffer = Bytes.create (Int64.to_int vector.length) in
-    let add_chunk index chunk =
-      let rem =
-        (* The last chunk (at `length - 1`) is not necessarily of size
-           [Chunk.size], i.e. if the length of the chunked_byte_vector is not a
-           multiple of [Chunk.size]. *)
-        if index >= Int64.pred chunks_number then
-          Int64.rem vector.length Chunk.size
-        else Chunk.size
-      in
-      for offset = 0 to Int64.to_int rem - 1 do
-        let address =
-          Chunk.address ~index ~offset:(Int64.of_int offset) |> Int64.to_int
+  let len = String.length str in
+  let vector = create (Int64.of_int len) in
+  let _ =
+    List.init
+      (Vector.num_elements vector.chunks |> Int64.to_int)
+      (fun index ->
+        let index = Int64.of_int index in
+        let chunk = Chunk.alloc () in
+        let _ =
+          List.init (Chunk.size |> Int64.to_int) (fun offset ->
+              let offset = Int64.of_int offset in
+              let address = Chunk.address ~index ~offset |> Int64.to_int in
+              if address < len then
+                let c = String.get str address in
+                Array1_64.set chunk offset (Char.code c))
         in
-        Bytes.set buffer address (Char.chr @@ Array1.get chunk offset)
-      done
-    in
-    let rec fold index =
-      if index >= chunks_number then Lwt.return ()
-      else
-        let* chunk = get_chunk index vector in
-        add_chunk index chunk ;
-        fold (Int64.succ index)
-    in
-    let+ () = fold 0L in
-    buffer
+        set_chunk index chunk vector)
+  in
+  vector
 
-  let to_string vector =
-    let open Lwt.Syntax in
-    let+ buffer = to_bytes vector in
-    Bytes.to_string buffer
+let of_bytes bytes =
+  (* See [of_string] heading comment *)
+  let len = Bytes.length bytes in
+  let vector = create (Int64.of_int len) in
+  let _ =
+    List.init
+      (Vector.num_elements vector.chunks |> Int64.to_int)
+      (fun index ->
+        let index = Int64.of_int index in
+        let chunk = Chunk.alloc () in
+        let _ =
+          List.init (Chunk.size |> Int64.to_int) (fun offset ->
+              let offset = Int64.of_int offset in
+              let address = Chunk.address ~index ~offset |> Int64.to_int in
+              if address < len then
+                let c = Bytes.get bytes address in
+                Array1_64.set chunk offset (Char.code c))
+        in
+        set_chunk index chunk vector)
+  in
+  vector
 
-  let loaded_chunks vector =
-    Vector.Vector.loaded_bindings (Vector.snapshot vector.chunks)
-end
+let to_bytes vector =
+  let open Lwt.Syntax in
+  let chunks_number = Vector.num_elements vector.chunks in
+  if vector.length > Int64.of_int Sys.max_string_length then raise Bounds ;
+  (* Once we ensure the vector can be contained in a string, we can safely
+     convert everything to int, since the size of the vector is contained in
+     a `nativeint`. See {!of_string} comment. *)
+  let buffer = Bytes.create (Int64.to_int vector.length) in
+  let add_chunk index chunk =
+    let rem =
+      (* The last chunk (at `length - 1`) is not necessarily of size
+         [Chunk.size], i.e. if the length of the chunked_byte_vector is not a
+         multiple of [Chunk.size]. *)
+      if index >= Int64.pred chunks_number then
+        Int64.rem vector.length Chunk.size
+      else Chunk.size
+    in
+    for offset = 0 to Int64.to_int rem - 1 do
+      let address =
+        Chunk.address ~index ~offset:(Int64.of_int offset) |> Int64.to_int
+      in
+      Bytes.set buffer address (Char.chr @@ Array1.get chunk offset)
+    done
+  in
+  let rec fold index =
+    if index >= chunks_number then Lwt.return ()
+    else
+      let* chunk = get_chunk index vector in
+      add_chunk index chunk ;
+      fold (Int64.succ index)
+  in
+  let+ () = fold 0L in
+  buffer
+
+let to_string vector =
+  let open Lwt.Syntax in
+  let+ buffer = to_bytes vector in
+  Bytes.to_string buffer
+
+let loaded_chunks vector =
+  Vector.Vector.loaded_bindings (Vector.snapshot vector.chunks)

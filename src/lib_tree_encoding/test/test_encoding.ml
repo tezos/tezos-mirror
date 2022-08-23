@@ -239,35 +239,35 @@ let test_lazy_vector () =
       (value [] Data_encoding.int31)
       (value [] Data_encoding.string)
   in
-  let vector = Lazy_vector.LwtIntVector.create 100 in
+  let vector = Lazy_vector.IntVector.create 100 in
   (* Load the key [K1] from the vector . *)
-  let vector = Lazy_vector.LwtIntVector.set 42 "42" vector in
-  let*! value = Lazy_vector.LwtIntVector.get 42 vector in
+  let vector = Lazy_vector.IntVector.set 42 "42" vector in
+  let*! value = Lazy_vector.IntVector.get 42 vector in
   assert (value = "42") ;
   let*! decoded_vector = encode_decode enc vector in
   (* Load the key [42] from the decoded vector. *)
-  let*! value = Lazy_vector.LwtIntVector.get 42 decoded_vector in
+  let*! value = Lazy_vector.IntVector.get 42 decoded_vector in
   assert (value = "42") ;
   assert (
-    Lazy_vector.LwtIntVector.to_string Fun.id vector
-    = Lazy_vector.LwtIntVector.to_string Fun.id decoded_vector) ;
+    Lazy_vector.IntVector.to_string Fun.id vector
+    = Lazy_vector.IntVector.to_string Fun.id decoded_vector) ;
   return_unit
 
 let test_chunked_byte_vector () =
   let open Tree_encoding in
   let open Lwt_result_syntax in
   let vector =
-    Chunked_byte_vector.Lwt.of_string
+    Chunked_byte_vector.of_string
       (String.make 10_000 'a' ^ String.make 10_000 'b')
   in
-  let*! value = Chunked_byte_vector.Lwt.load_byte vector 5L in
+  let*! value = Chunked_byte_vector.load_byte vector 5L in
   assert (Char.chr value = 'a') ;
-  let*! value = Chunked_byte_vector.Lwt.load_byte vector 10_005L in
+  let*! value = Chunked_byte_vector.load_byte vector 10_005L in
   assert (Char.chr value = 'b') ;
   let*! decoded_vector = encode_decode chunked_byte_vector vector in
-  let*! value = Chunked_byte_vector.Lwt.load_byte decoded_vector 5L in
+  let*! value = Chunked_byte_vector.load_byte decoded_vector 5L in
   assert (Char.chr value = 'a') ;
-  let*! value = Chunked_byte_vector.Lwt.load_byte decoded_vector 10_005L in
+  let*! value = Chunked_byte_vector.load_byte decoded_vector 10_005L in
   assert (Char.chr value = 'b') ;
   return_unit
 
@@ -449,16 +449,16 @@ let test_swap_vectors () =
   let enc = tup2 ~flatten:false int_vec_enc int_vec_enc in
   let*! tree = empty_tree () in
   let assert_value_at_index ~ix vec expected =
-    let*! value = Lazy_containers.Lazy_vector.LwtIntVector.get ix vec in
+    let*! value = Lazy_containers.Lazy_vector.IntVector.get ix vec in
     assert (value = expected) ;
     return_unit
   in
   (* Create a pair of vectors. *)
   let vec_pair =
-    ( Lazy_containers.Lazy_vector.LwtIntVector.create
+    ( Lazy_containers.Lazy_vector.IntVector.create
         ~produce_value:(fun ix -> Lwt.return ix)
         10,
-      Lazy_containers.Lazy_vector.LwtIntVector.create
+      Lazy_containers.Lazy_vector.IntVector.create
         ~produce_value:(fun ix -> Lwt.return (100 + ix))
         10 )
   in

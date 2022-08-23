@@ -345,13 +345,13 @@ let pp_instr = pp_phrase pp_instr'
 
 let pp_vector pp out v =
   (* Force evaluation of the vector. *)
-  let _ = Lwt_main.run @@ Lazy_vector.LwtInt32Vector.to_list v in
-  Lazy_vector.LwtInt32Vector.pp pp out v
+  let _ = Lwt_main.run @@ Lazy_vector.Int32Vector.to_list v in
+  Lazy_vector.Int32Vector.pp pp out v
 
 let pp_vector_z pp out v =
   (* Force evaluation of the vector. *)
-  let _ = Lwt_main.run @@ Lazy_vector.LwtZVector.to_list v in
-  Lazy_vector.LwtZVector.pp pp out v
+  let _ = Lwt_main.run @@ Lazy_vector.ZVector.to_list v in
+  Lazy_vector.ZVector.pp pp out v
 
 let pp_resul_type = pp_vector pp_value_type
 
@@ -409,7 +409,7 @@ let pp_memory_type out (Types.MemoryType limit) =
   Format.fprintf out "MemoryType %a" (pp_limit pp_int32) limit
 
 let pp_chunk_byte_vector out chunks =
-  let bs = Lwt_main.run @@ Chunked_byte_vector.Lwt.to_string chunks in
+  let bs = Lwt_main.run @@ Chunked_byte_vector.to_string chunks in
   (* We just show the hash of the chunk in order to avoid too much noise. *)
   let hash = Hashtbl.hash bs in
   Format.fprintf out "#%d" hash
@@ -623,7 +623,7 @@ let pp_input_buffer out input =
     out
     "@[<v 2>{content = %a;@;num_elements = %s;@;}@]"
     (pp_vector_z pp_input_message)
-    (Lazy_vector.Mutable.LwtZVector.snapshot input.content)
+    (Lazy_vector.Mutable.ZVector.snapshot input.content)
     (Z.to_string input.num_elements)
 
 let pp_config out

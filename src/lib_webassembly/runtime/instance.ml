@@ -6,7 +6,7 @@ module ModuleMap = Lazy_map.Mutable.Make (struct
   let to_string = Fun.id
 end)
 
-module Vector = Lazy_vector.LwtInt32Vector
+module Vector = Lazy_vector.Int32Vector
 
 module NameMap = Lazy_map.Make (struct
   type t = Ast.name_list

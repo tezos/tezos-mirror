@@ -27,7 +27,7 @@ open Tezos_webassembly_interpreter
 open Lazy_containers
 module V = Instance.Vector
 module M = Instance.NameMap
-module C = Chunked_byte_vector.Lwt
+module C = Chunked_byte_vector
 open Tree_encoding
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/3566

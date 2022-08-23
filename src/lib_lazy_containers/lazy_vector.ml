@@ -228,10 +228,10 @@ module Int = struct
   let unsigned_compare n m = compare (n - min_int) (m - min_int)
 end
 
-module LwtIntVector = Make (Int)
-module LwtInt32Vector = Make (Int32)
-module LwtInt64Vector = Make (Int64)
-module LwtZVector = Make (ZZ)
+module IntVector = Make (Int)
+module Int32Vector = Make (Int32)
+module Int64Vector = Make (Int64)
+module ZVector = Make (ZZ)
 
 module Mutable = struct
   module type ImmutableS = S
@@ -303,8 +303,8 @@ module Mutable = struct
     let snapshot map_ref = !map_ref
   end
 
-  module LwtIntVector = Make (LwtIntVector)
-  module LwtInt32Vector = Make (LwtInt32Vector)
-  module LwtInt64Vector = Make (LwtInt64Vector)
-  module LwtZVector = Make (LwtZVector)
+  module IntVector = Make (IntVector)
+  module Int32Vector = Make (Int32Vector)
+  module Int64Vector = Make (Int64Vector)
+  module ZVector = Make (ZVector)
 end

@@ -227,10 +227,10 @@ struct
     {encode; decode}
 end
 
-module Int_lazy_vector = Make_lazy_vector_encoding (Lazy_vector.LwtIntVector)
-module Int32_lazy_vector = Make_lazy_vector_encoding (Lazy_vector.LwtInt32Vector)
-module Int64_lazy_vector = Make_lazy_vector_encoding (Lazy_vector.LwtInt64Vector)
-module Z_lazy_vector = Make_lazy_vector_encoding (Lazy_vector.LwtZVector)
+module Int_lazy_vector = Make_lazy_vector_encoding (Lazy_vector.IntVector)
+module Int32_lazy_vector = Make_lazy_vector_encoding (Lazy_vector.Int32Vector)
+module Int64_lazy_vector = Make_lazy_vector_encoding (Lazy_vector.Int64Vector)
+module Z_lazy_vector = Make_lazy_vector_encoding (Lazy_vector.ZVector)
 
 let int_lazy_vector = Int_lazy_vector.lazy_vector
 
@@ -245,10 +245,10 @@ let chunk =
   conv of_bytes to_bytes (raw [])
 
 let chunked_byte_vector =
-  let open Chunked_byte_vector.Lwt in
+  let open Chunked_byte_vector in
   let to_key k = [Int64.to_string k] in
   let encode =
-    E.with_subtree Chunked_byte_vector.Lwt.origin
+    E.with_subtree Chunked_byte_vector.origin
     @@ E.contramap
          (fun vector -> (loaded_chunks vector, length vector))
          (E.tup2

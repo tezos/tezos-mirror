@@ -90,5 +90,5 @@ module type S = sig
   (** [of_chunks mem_ty chunks] creates a memory instance using [chunks].
       Modifications are reflected bidirectionally, i.e. modifying the memory
       changes the chunks and vice versa. *)
-  val of_chunks : Types.memory_type -> Chunked_byte_vector.Lwt.t -> t
+  val of_chunks : Types.memory_type -> Chunked_byte_vector.t -> t
 end

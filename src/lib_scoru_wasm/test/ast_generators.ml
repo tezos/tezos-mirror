@@ -268,7 +268,7 @@ let vector_gen gen =
   let* len = int_range 0 10 in
   let* seeds = small_list int in
   return
-    (Lazy_vector.LwtInt32Vector.create
+    (Lazy_vector.Int32Vector.create
        ~produce_value:(fun ix ->
          let rand =
            Random.State.make @@ Array.of_list (Int32.to_int ix :: seeds)
@@ -280,7 +280,7 @@ let vector_z_gen gen =
   let* len = int_range 0 10 in
   let* seeds = small_list int in
   return
-    (Lazy_vector.LwtZVector.create
+    (Lazy_vector.ZVector.create
        ~produce_value:(fun ix ->
          let rand = Random.State.make @@ Array.of_list (Z.to_int ix :: seeds) in
          Lwt.return @@ generate1 ~rand gen)
@@ -345,7 +345,7 @@ let table_gen =
 
 let chunked_byte_vector_gen =
   let* bs = small_string ~gen:char in
-  return @@ Chunked_byte_vector.Lwt.of_string bs
+  return @@ Chunked_byte_vector.of_string bs
 
 let memory_gen =
   let* len = frequency [(10, int_range 1 10); (1, int_range 100 200)] in
@@ -590,7 +590,7 @@ let input_buffer_gen =
   let* messages = vector_z_gen gen_message in
   let+ num_elements = small_nat in
   {
-    Input_buffer.content = Lazy_vector.Mutable.LwtZVector.of_immutable messages;
+    Input_buffer.content = Lazy_vector.Mutable.ZVector.of_immutable messages;
     num_elements = Z.of_int num_elements;
   }
 
