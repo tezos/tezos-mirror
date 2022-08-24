@@ -173,18 +173,10 @@ module Func_type = struct
       (function Decode.FKOut (p, vec) -> Some (p, vec) | _ -> None)
       (fun (p, vec) -> FKOut (p, vec))
 
-  let func_type_encoding =
-    let params = scope ["params"] (vector_encoding value_type_encoding) in
-    let result = scope ["result"] (vector_encoding value_type_encoding) in
-    conv
-      (fun (params, result) -> Types.FuncType (params, result))
-      (fun (Types.FuncType (params, result)) -> (params, result))
-      (tup2 ~flatten:true params result)
-
   let fkstop_case =
     case
       "FKStop"
-      func_type_encoding
+      Wasm_encoding.func_type_encoding
       (function Decode.FKStop ft -> Some ft | _ -> None)
       (fun ft -> FKStop ft)
 
@@ -737,7 +729,7 @@ module Field = struct
   let type_field_encoding =
     scope
       ["module"; "types"]
-      (vector_encoding (no_region_encoding Func_type.func_type_encoding))
+      (vector_encoding (no_region_encoding Wasm_encoding.func_type_encoding))
 
   let import_field_encoding =
     scope
