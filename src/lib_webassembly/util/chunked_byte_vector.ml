@@ -26,7 +26,7 @@ module Chunk = struct
 
   let of_bytes bytes =
     let chunk = alloc () in
-    for i = 0 to Int.max (Int64.to_int size) (Bytes.length bytes) - 1 do
+    for i = 0 to max (Int64.to_int size) (Bytes.length bytes) - 1 do
       Array1.set chunk i (Char.code (Bytes.get bytes i))
     done ;
     chunk
