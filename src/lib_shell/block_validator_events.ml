@@ -32,7 +32,7 @@ let validation_success =
   declare_2
     ~section
     ~name:"validation_success"
-    ~msg:"block {block} successfully validated ({worker_status})"
+    ~msg:"block {block} validated {worker_status}"
     ~level:Notice
     ~pp1:Block_hash.pp
     ~pp2:Worker_types.pp_status
@@ -43,7 +43,7 @@ let validation_failure =
   declare_3
     ~section
     ~name:"validation_failed"
-    ~msg:"validation of block {block} failed ({worker_status}): {errors}"
+    ~msg:"validation of block {block} failed, {worker_status}: {errors}"
     ~level:Notice
     ~pp1:Block_hash.pp
     ~pp2:Worker_types.pp_status
@@ -74,7 +74,7 @@ let preapplication_success =
   declare_2
     ~section
     ~name:"preapplication_success"
-    ~msg:"block at level {level} successfully pre-applied ({worker_status})"
+    ~msg:"block at level {level} successfully pre-applied: {worker_status}"
     ~level:Notice
     ~pp1:(fun fmt -> Format.fprintf fmt "%li")
     ~pp2:Worker_types.pp_status
@@ -86,7 +86,7 @@ let preapplication_failure =
     ~section
     ~name:"preapplication_failed"
     ~msg:
-      "pre-application of block at level {level} failed ({worker_status}): \
+      "pre-application of block at level {level} failed, {worker_status}: \
        {errors}"
     ~level:Notice
     ~pp1:(fun fmt -> Format.fprintf fmt "%li")
@@ -103,7 +103,7 @@ let validation_failure_after_precheck =
     ~level:Info
     ~msg:
       "validation of block {block} failed but precheck succeeded, \
-       ({worker_status}): {errors}"
+       {worker_status}: {errors}"
     ~pp1:Block_hash.pp
     ~pp2:Worker_types.pp_status
     ~pp3:pp_print_top_error_of_trace
@@ -116,7 +116,7 @@ let precheck_failure =
     ~section
     ~name:"precheck_failure"
     ~level:Notice
-    ~msg:"precheck of block {block} failed, ({worker_status}): {errors}"
+    ~msg:"precheck of block {block} failed, {worker_status}: {errors}"
     ~pp1:Block_hash.pp
     ~pp2:Worker_types.pp_status
     ~pp3:pp_print_top_error_of_trace
