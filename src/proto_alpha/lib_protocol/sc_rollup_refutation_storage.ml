@@ -323,20 +323,36 @@ let timeout ctxt rollup stakers =
   in
   return (Sc_rollup_game_repr.{loser = game.turn; reason = Timeout}, ctxt)
 
+let reward ctxt winner =
+  let open Lwt_tzresult_syntax in
+  let winner_contract = Contract_repr.Implicit winner in
+  let stake = Constants_storage.sc_rollup_stake_amount ctxt in
+  let*? reward = Tez_repr.(stake /? 2L) in
+  Token.transfer
+    ctxt
+    `Sc_rollup_refutation_rewards
+    (`Contract winner_contract)
+    reward
+
 let apply_outcome ctxt rollup stakers (outcome : Sc_rollup_game_repr.outcome) =
   let open Lwt_tzresult_syntax in
   let losing_staker = Sc_rollup_game_repr.Index.staker stakers outcome.loser in
-  let* ctxt, balance_updates =
+  let winning_staker =
+    let loser_opponent = Sc_rollup_game_repr.opponent outcome.loser in
+    Sc_rollup_game_repr.Index.staker stakers loser_opponent
+  in
+  let* ctxt, balance_updates_winner = reward ctxt winning_staker in
+  let* ctxt, _, _ = Store.Game.remove (ctxt, rollup) stakers in
+  let* ctxt, balance_updates_loser =
     Stake_storage.remove_staker ctxt rollup losing_staker
   in
-  let* ctxt, _, _ = Store.Game.remove (ctxt, rollup) stakers in
   let* ctxt, _, _ = Store.Game_timeout.remove (ctxt, rollup) stakers in
   let* ctxt, _, _ = Store.Opponent.remove (ctxt, rollup) stakers.alice in
   let* ctxt, _, _ = Store.Opponent.remove (ctxt, rollup) stakers.bob in
   return
     ( Sc_rollup_game_repr.Ended (outcome.reason, losing_staker),
       ctxt,
-      balance_updates )
+      balance_updates_loser @ balance_updates_winner )
 
 module Internal_for_tests = struct
   let get_conflict_point = get_conflict_point

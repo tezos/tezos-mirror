@@ -323,4 +323,6 @@ This sequence of operations was run:
       Balance updates:
         Frozen_bonds([PUBLIC_KEY_HASH],[SC_ROLLUP_HASH]) ... -ꜩ10000
         sc rollup refutation punishments ........................................................... +ꜩ10000
+        sc rollup refutation rewards ............................................................... -ꜩ5000
+        [PUBLIC_KEY_HASH] ....................................................... +ꜩ5000
 
