@@ -39,7 +39,20 @@ Node
   a merge and shouldn't impact normal node operations as much as it
   previously did; especially on light architectures.
 
--  Added support for ``level..level`` range parameters in the replay command.
+- Added support for ``level..level`` range parameters in the replay command.
+
+- Breaking change: Node events using a legacy logging system and are migrated to
+  the actual one. Impacted events are in the following sections:
+  ``validator.chain``, ``validator.peer``, ``prevalidator`` and
+  ``validator.block``. Section ``node.chain_validator`` is merged into
+  ``validator.chain`` for consistency reasons. Those events see their JSON
+  reprensentation shorter, with no duplicated information. e.g.
+  ``validator.peer`` events were named ``validator.peer.v0`` at top-level and
+  had an ``event`` field with a ``name`` field containing the actual event name,
+  for example ``validating_new_branch``. Now, the event is called
+  ``validating_new_branch.v0`` at top-level and contains a ``section`` field
+  with ``validator`` and ``peer``.
+
 
 Client
 ------
