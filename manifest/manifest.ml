@@ -862,6 +862,7 @@ module Target = struct
   type vendored = {
     name : string;
     main_module : string option;
+    version : Version.constraints;
     js_compatible : bool;
     npm_deps : Npm.t list;
     released_on_opam : bool;
@@ -1515,9 +1516,10 @@ module Target = struct
     | head :: tail -> Test_executable {names = (head, tail); runtest_alias}
 
   let vendored_lib ?(released_on_opam = true) ?main_module
-      ?(js_compatible = false) ?(npm_deps = []) name =
+      ?(js_compatible = false) ?(npm_deps = []) name version =
     Some
-      (Vendored {name; main_module; js_compatible; npm_deps; released_on_opam})
+      (Vendored
+         {name; main_module; version; js_compatible; npm_deps; released_on_opam})
 
   let external_lib ?main_module ?opam ?(js_compatible = false) ?(npm_deps = [])
       name version =
@@ -2014,36 +2016,52 @@ let generate_dune_files () =
    [None] is returned, since a package cannot depend on itself
    and there is no need to.
 
-   If [fix_version] is [true], require [target]'s version to be
-   exactly the same as [for_package]'s version, but only if [target] is internal. *)
-let rec as_opam_dependency ~fix_version ~(for_package : string) ~with_test
-    (target : Target.t) : Opam.dependency list =
+   If [for_release] is [true], require [target]'s version to be
+   exactly the same as [for_package]'s version, but only if [target] is internal.
+   Also, if [for_release] is [true], use version constraints of vendored libraries.
+
+   If [for_release] is [false] but [for_conflicts] is [true],
+   ignore vendored libraries. *)
+let rec as_opam_dependency ~for_release ~for_conflicts ~(for_package : string)
+    ~with_test (target : Target.t) : Opam.dependency list =
   match target with
   | External {opam = None; _} -> []
   | Internal {opam = Some package; _} ->
       if package = for_package then []
       else
         let version =
-          if fix_version then Version.(Exactly Version) else Version.True
+          if for_release then Version.(Exactly Version) else Version.True
         in
         [{Opam.package; version; with_test; optional = false}]
   | Internal ({opam = None; _} as internal) ->
       (* If a target depends on a global "private" target, we must include its dependencies as well *)
       let deps = Target.all_internal_deps internal in
       List.concat_map
-        (as_opam_dependency ~fix_version ~for_package ~with_test)
+        (as_opam_dependency ~for_release ~for_conflicts ~for_package ~with_test)
         deps
-  | Vendored {name = package; _} ->
-      [{Opam.package; version = True; with_test; optional = false}]
+  | Vendored {name = package; version; _} ->
+      if for_release then [{Opam.package; version; with_test; optional = false}]
+      else if for_conflicts then []
+      else [{Opam.package; version = True; with_test; optional = false}]
   | External {opam = Some opam; version; _}
   | Opam_only {name = opam; version; _} ->
       [{Opam.package = opam; version; with_test; optional = false}]
   | Optional target | Select {package = target; _} ->
       List.map
         (fun (dep : Opam.dependency) -> {dep with optional = true})
-        (as_opam_dependency ~fix_version ~for_package ~with_test target)
+        (as_opam_dependency
+           ~for_release
+           ~for_conflicts
+           ~for_package
+           ~with_test
+           target)
   | Open (target, _) ->
-      as_opam_dependency ~fix_version ~for_package ~with_test target
+      as_opam_dependency
+        ~for_release
+        ~for_conflicts
+        ~for_package
+        ~with_test
+        target
 
 let as_opam_monorepo_opam_provided = function
   | Target.Opam_only {can_vendor = false; name; _} -> Some name
@@ -2065,7 +2083,11 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     in
     let deps =
       List.concat_map
-        (as_opam_dependency ~fix_version:for_release ~for_package ~with_test)
+        (as_opam_dependency
+           ~for_release
+           ~for_conflicts:false
+           ~for_package
+           ~with_test)
         deps
     in
     (deps, x_opam_monorepo_opam_provided)
@@ -2123,7 +2145,11 @@ let generate_opam ?release for_package (internals : Target.internal list) :
     List.flatten @@ map internals
     @@ fun internal ->
     List.concat_map
-      (as_opam_dependency ~fix_version:false ~for_package ~with_test:Never)
+      (as_opam_dependency
+         ~for_release
+         ~for_conflicts:true
+         ~for_package
+         ~with_test:Never)
       internal.conflicts
   in
   let synopsis =
@@ -2715,7 +2741,8 @@ let generate_opam_ci () =
                |> List.map (fun i -> Target.Internal i)
                |> List.concat_map
                     (as_opam_dependency
-                       ~fix_version:false
+                       ~for_release:false
+                       ~for_conflicts:false
                        ~for_package:package_name
                        ~with_test:Never))
         |> deduplicate_list
