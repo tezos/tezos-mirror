@@ -915,7 +915,8 @@ module Instructions = struct
 
   let exec = ir_sized_step N_IExec nullary
 
-  let apply = ir_sized_step N_IApply nullary
+  let apply ~(rec_flag : bool) =
+    ir_sized_step N_IApply (unary "rec" (if rec_flag then 1 else 0))
 
   let lambda = ir_sized_step N_ILambda nullary
 
@@ -1314,7 +1315,10 @@ let extract_ir_sized_step :
   | ILoop_left (_, _, _), _ -> Instructions.loop_left
   | IDip (_, _, _, _), _ -> Instructions.dip
   | IExec (_, _, _), _ -> Instructions.exec
-  | IApply (_, _, _), _ -> Instructions.apply
+  | IApply (_, _, _), (_, (l, _)) -> (
+      match l with
+      | Lam _ -> Instructions.apply ~rec_flag:false
+      | LamRec _ -> Instructions.apply ~rec_flag:true)
   | ILambda (_, _, _), _ -> Instructions.lambda
   | IFailwith (_, _), _ -> Instructions.failwith_
   | ICompare (_, cmp_ty, _), (a, (b, _)) ->

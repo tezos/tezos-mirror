@@ -309,7 +309,7 @@ module Models = struct
     end in
     (module M : Model.Model_impl with type arg_type = int * (int * unit))
 
-  let branching_model name =
+  let branching_model ~case_0 ~case_1 name =
     let module M = struct
       type arg_type = int * unit
 
@@ -324,11 +324,16 @@ module Models = struct
           lam ~name:"size" @@ fun size ->
           if_
             (eq size (int 0))
-            (free ~name:(fv (sf "%s_empty" name)))
-            (free ~name:(fv (sf "%s_nonempty" name)))
+            (free ~name:(fv (sf "%s_%s" name case_0)))
+            (free ~name:(fv (sf "%s_%s" name case_1)))
       end
     end in
     (module M : Model.Model_impl with type arg_type = int * unit)
+
+  let empty_branch_model name =
+    branching_model ~case_0:"empty" ~case_1:"nonempty" name
+
+  let apply_model name = branching_model ~case_0:"lam" ~case_1:"lamrec" name
 
   let join_tickets_model name =
     let module M = struct
@@ -452,7 +457,7 @@ let ir_model ?specialization instr_or_cont =
       | N_IMap_iter -> model_1 instr_or_cont (affine_model name)
       | N_ISet_iter -> model_1 instr_or_cont (affine_model name)
       | N_IHalt -> model_0 instr_or_cont (const1_model name)
-      | N_IApply -> model_0 instr_or_cont (const1_model name)
+      | N_IApply -> model_1 instr_or_cont (apply_model name)
       | N_ILog -> model_0 instr_or_cont (const1_model name)
       | N_IOpen_chest -> model_2 instr_or_cont (open_chest_model name)
       | N_IEmit -> model_0 instr_or_cont (const1_model name))
@@ -466,10 +471,10 @@ let ir_model ?specialization instr_or_cont =
       | N_KUndip -> model_0 instr_or_cont (const1_model name)
       | N_KLoop_in -> model_0 instr_or_cont (const1_model name)
       | N_KLoop_in_left -> model_0 instr_or_cont (const1_model name)
-      | N_KIter -> model_1 instr_or_cont (branching_model name)
+      | N_KIter -> model_1 instr_or_cont (empty_branch_model name)
       | N_KList_enter_body -> model_2 instr_or_cont (list_enter_body_model name)
       | N_KList_exit_body -> model_0 instr_or_cont (const1_model name)
-      | N_KMap_enter_body -> model_1 instr_or_cont (branching_model name)
+      | N_KMap_enter_body -> model_1 instr_or_cont (empty_branch_model name)
       | N_KMap_exit_body -> model_2 instr_or_cont (nlogm_model name)
       | N_KLog -> model_0 instr_or_cont (const1_model name))
 
