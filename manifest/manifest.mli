@@ -840,13 +840,23 @@ val tezt :
 
     [released_on_opam]: whether the library is available on the upstream opam-repository
     (default true). In case the lib is not available on opam, tezos packages depending
-    on it won't be installable on opam. *)
+    on it won't be installable on opam.
+
+    Version constraints are only added to released [.opam] files
+    (i.e. when running the manifest with [--release]).
+    And when appearing in [~conflicts], vendored libraries are only added to released
+    [.opam] files. The idea is that vendored libraries are compiled from the local copy,
+    so version and conflicts do not matter, except when installing with [opam install],
+    in which case local copies are ignored and vendored libraries are installed through
+    opam. This is because we [rm -r vendors] in [.opam] files because of a bug of dune
+    when multiple layers of vendored libraries are involved. *)
 val vendored_lib :
   ?released_on_opam:bool ->
   ?main_module:string ->
   ?js_compatible:bool ->
   ?npm_deps:Npm.t list ->
   string ->
+  Version.constraints ->
   target
 
 (** Make an external library, for use in internal target dependencies.
