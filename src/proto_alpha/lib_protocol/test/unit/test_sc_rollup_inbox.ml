@@ -374,7 +374,8 @@ let test_inbox_proof_production (list_of_payloads, l, n) =
          for verification. *)
       setup_inbox_with_messages list_of_payloads
       @@ fun _ctxt _current_level_tree _history inbox _inboxes ->
-      let snapshot = take_snapshot inbox in
+      let current_level = Raw_level_repr.succ (inbox_level inbox) in
+      let snapshot = take_snapshot ~current_level inbox in
       let proof = node_proof_to_protocol_proof proof in
       let*! verification = verify_proof (l, n) snapshot proof in
       match verification with
@@ -404,7 +405,8 @@ let test_inbox_proof_verification (list_of_payloads, l, n) =
       (* Use the incorrect inbox *)
       match List.hd inboxes with
       | Some inbox -> (
-          let snapshot = take_snapshot inbox in
+          let current_level = Raw_level_repr.succ (inbox_level inbox) in
+          let snapshot = take_snapshot ~current_level inbox in
           let proof = node_proof_to_protocol_proof proof in
           let*! verification = verify_proof (l, n) snapshot proof in
           match verification with
@@ -432,7 +434,8 @@ let test_empty_inbox_proof (level, n) =
       create_context ()
       >>=? fun ctxt ->
       let*! inbox = empty ctxt rollup level in
-      let snapshot = take_snapshot inbox in
+      let current_level = Raw_level_repr.succ (inbox_level inbox) in
+      let snapshot = take_snapshot ~current_level inbox in
       let proof = node_proof_to_protocol_proof proof in
       let*! verification =
         verify_proof (Raw_level_repr.root, n) snapshot proof

@@ -257,9 +257,10 @@ let start_game ctxt rollup ~player:refuter ~opponent:defender =
     Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt
   in
 
+  let current_level = (Raw_context.current_level ctxt).level in
   let game =
     Sc_rollup_game_repr.initial
-      (Sc_rollup_inbox_repr.take_snapshot inbox)
+      (Sc_rollup_inbox_repr.take_snapshot ~current_level inbox)
       ~pvm_name:(Sc_rollups.Kind.name_of kind)
       ~parent:parent_info
       ~child:child_info

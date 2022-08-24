@@ -3072,7 +3072,7 @@ module Sc_rollup : sig
         tree option ->
         (History.t * history_proof) tzresult Lwt.t
 
-      val take_snapshot : t -> history_proof
+      val take_snapshot : current_level:Raw_level.t -> t -> history_proof
 
       type inclusion_proof
 

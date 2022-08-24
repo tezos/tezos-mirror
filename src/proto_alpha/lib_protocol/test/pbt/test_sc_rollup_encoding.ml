@@ -112,7 +112,7 @@ let gen_inbox rollup level =
 let gen_inbox_history_proof rollup inbox_level =
   let open Gen in
   let* inbox = gen_inbox rollup inbox_level in
-  return (Sc_rollup_inbox_repr.take_snapshot inbox)
+  return (Sc_rollup_inbox_repr.take_snapshot ~current_level:inbox_level inbox)
 
 let gen_pvm_name = Gen.string_printable
 
