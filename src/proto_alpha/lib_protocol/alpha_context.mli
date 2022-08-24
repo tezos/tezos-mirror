@@ -2392,6 +2392,7 @@ module Receipt : sig
     | Tx_rollup_rejection_punishments
     | Tx_rollup_rejection_rewards
     | Sc_rollup_refutation_punishments
+    | Sc_rollup_refutation_rewards
 
   val compare_balance : balance -> balance -> int
 

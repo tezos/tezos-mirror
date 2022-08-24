@@ -466,6 +466,7 @@ let pp_balance_updates ppf balance_updates =
           | Tx_rollup_rejection_punishments -> "tx rollup rejection punishments"
           | Sc_rollup_refutation_punishments ->
               "sc rollup refutation punishments"
+          | Sc_rollup_refutation_rewards -> "sc rollup refutation rewards"
         in
         let balance =
           match origin with
