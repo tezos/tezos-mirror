@@ -98,3 +98,27 @@
  (alias runtest)
  (package tezos-protocol-013-PtJakart-tests)
  (action (run %{dep:./test_carbonated_map.exe})))
+
+(rule (alias runtest1) (action (run %{exe:liquidity_baking_pbt.exe})))
+
+(rule (alias runtest1) (action (run %{exe:saturation_fuzzing.exe})))
+
+(rule (alias runtest1) (action (run %{exe:test_merkle_list.exe})))
+
+(rule (alias runtest1) (action (run %{exe:test_gas_properties.exe})))
+
+(rule (alias runtest2) (action (run %{exe:test_sampler.exe})))
+
+(rule (alias runtest2) (action (run %{exe:test_script_comparison.exe})))
+
+(rule (alias runtest2) (action (run %{exe:test_tez_repr.exe})))
+
+(rule (alias runtest2) (action (run %{exe:test_tx_rollup_l2_encoding.exe})))
+
+(rule (alias runtest2) (action (run %{exe:test_bitset.exe})))
+
+(rule (alias runtest2) (action (run %{exe:test_sc_rollup_tick_repr.exe})))
+
+(rule (alias runtest3) (action (run %{exe:refutation_game_pbt.exe})))
+
+(rule (alias runtest3) (action (run %{exe:test_carbonated_map.exe})))

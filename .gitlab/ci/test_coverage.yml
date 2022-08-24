@@ -74,6 +74,9 @@ unified_coverage:
     - "unit:alpha: [proto_alpha__lib_protocol__1]"
     - "unit:alpha: [proto_alpha__lib_protocol__2]"
     - "unit:alpha: [proto_alpha__lib_protocol__3]"
+    - "unit:alpha: [proto_alpha__lib_protocol__pbt1]"
+    - "unit:alpha: [proto_alpha__lib_protocol__pbt2]"
+    - "unit:alpha: [proto_alpha__lib_protocol__pbt3]"
     - "unit:non-proto-x86_64"
 
   script:
