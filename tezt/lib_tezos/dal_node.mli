@@ -89,11 +89,5 @@ val wait : t -> Unix.process_status Lwt.t
     allowing tests to run faster, without the need of large file. Default is
     [true] in tezt.
 *)
+
 val init_config : ?use_unsafe_srs:bool -> t -> string Lwt.t
-
-(** [split_slot_rpc dal_node data] spawns curl process on slot/split on [data] *)
-val split_slot_rpc : t -> string -> string Lwt.t
-
-(** [slot_content_rpc dal_node slot_header] spawns curl process on slot/content
-    on [data] *)
-val slot_content_rpc : t -> string -> string Lwt.t

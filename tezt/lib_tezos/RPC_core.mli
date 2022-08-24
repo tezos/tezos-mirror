@@ -30,12 +30,13 @@ type verb = Client.meth = GET | PUT | POST | PATCH | DELETE
 
 (** RPC descriptions.
 
-    ['a] is the type of values returned by the RPC after decoding. *)
-type 'a t
+    ['endpoint] is the type the target endpoint.
+    ['result] is the type of values returned by the RPC after decoding. *)
+type ('endpoint, 'result) t
 
 (** Make an RPC description.
 
-    Usage: [make verb path decode]
+    Usage: [make ~get_host ~get_port verb path decode]
 
     - If [data] is specified, it is provided as the request body.
 
@@ -52,23 +53,28 @@ type 'a t
       If you do not want to define it, use [Fun.id] (to return a [JSON.t])
       or [ignore] (to ignore the response body).
 
+    - [get_host] and [get_port] are callbacks to extract host and port from the
+      endpoint to build the targeted url.
+
     Use one of the [call] functions below to actually call the RPC. *)
 val make :
   ?data:JSON.u ->
   ?query_string:(string * string) list ->
+  get_host:('endpoint -> string) ->
+  get_port:('endpoint -> int) ->
   verb ->
   string list ->
-  (JSON.t -> 'a) ->
-  'a t
+  (JSON.t -> 'result) ->
+  ('endpoint, 'result) t
 
 (** Parse and decode a response body using the decode function of an RPC description.
 
     [origin] is used in error messages.
     Its default value is ["RPC response"]. *)
-val decode_raw : ?origin:string -> 'a t -> string -> 'a
+val decode_raw : ?origin:string -> ('endpoint, 'result) t -> string -> 'result
 
 (** Decode a response body using the decode function of an RPC description. *)
-val decode : 'a t -> JSON.t -> 'a
+val decode : ('endpoint, 'result) t -> JSON.t -> 'result
 
 (** RPC responses. *)
 type 'a response = {
@@ -99,9 +105,9 @@ val call :
   ?log_request:bool ->
   ?log_response_status:bool ->
   ?log_response_body:bool ->
-  Node.t ->
-  'a t ->
-  'a Lwt.t
+  'endpoint ->
+  ('endpoint, 'result) t ->
+  'result Lwt.t
 
 (** Call an RPC, but do not parse its response body.
 
@@ -110,8 +116,8 @@ val call_raw :
   ?log_request:bool ->
   ?log_response_status:bool ->
   ?log_response_body:bool ->
-  Node.t ->
-  'a t ->
+  'endpoint ->
+  ('endpoint, 'result) t ->
   string response Lwt.t
 
 (** Call an RPC, but do not decode its response body, only parse as JSON.
@@ -122,11 +128,13 @@ val call_json :
   ?log_request:bool ->
   ?log_response_status:bool ->
   ?log_response_body:bool ->
-  Node.t ->
-  'a t ->
+  'endpoint ->
+  ('endpoint, 'result) t ->
   JSON.t response Lwt.t
 
 module Client : sig
+  type nonrec 'result t = (Node.t, 'result) t
+
   (** Perform RPC calls using [tezos-client]. *)
 
   (** RPC calls performed this way are slower and should only be used to test
@@ -155,8 +163,8 @@ module Client : sig
     ?hooks:Process.hooks ->
     ?env:string String_map.t ->
     Client.t ->
-    'a t ->
-    'a Lwt.t
+    'result t ->
+    'result Lwt.t
 
   (** Call an RPC, but do not parse the client output. *)
   val call_raw :
@@ -168,7 +176,7 @@ module Client : sig
     ?hooks:Process.hooks ->
     ?env:string String_map.t ->
     Client.t ->
-    'a t ->
+    'result t ->
     string Lwt.t
 
   (** Call an RPC, but do not decode the client output, only parse it. *)
@@ -181,7 +189,7 @@ module Client : sig
     ?hooks:Process.hooks ->
     ?env:string String_map.t ->
     Client.t ->
-    'a t ->
+    'result t ->
     JSON.t Lwt.t
 
   (** Same as [call_raw], but do not wait for the process to exit.
@@ -197,6 +205,6 @@ module Client : sig
     ?hooks:Process.hooks ->
     ?env:string String_map.t ->
     Client.t ->
-    'a t ->
+    'result t ->
     JSON.t Runnable.process
 end

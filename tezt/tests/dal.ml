@@ -451,8 +451,12 @@ let test_dal_node_slot_management =
   let* _dir = Dal_node.init_config dal_node in
   let* () = Dal_node.run dal_node in
   let slot_content = "test" in
-  let* slot_header = Dal_node.split_slot_rpc dal_node slot_content in
-  let* received_slot_content = Dal_node.slot_content_rpc dal_node slot_header in
+  let* slot_header =
+    RPC.call dal_node (Rollup.Dal.RPC.split_slot slot_content)
+  in
+  let* received_slot_content =
+    RPC.call dal_node (Rollup.Dal.RPC.slot_content slot_header)
+  in
   assert (slot_content = received_slot_content) ;
   return ()
 

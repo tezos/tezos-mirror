@@ -228,6 +228,14 @@ module Dal : sig
     val from_client : Client.t -> t Lwt.t
   end
 
+  module RPC : sig
+    (** [split_slot data] posts [data] on slot/split *)
+    val split_slot : string -> (Dal_node.t, string) RPC_core.t
+
+    (** [slot_content slot_header] gets slot/content of [slot_header] *)
+    val slot_content : string -> (Dal_node.t, string) RPC_core.t
+  end
+
   module Cryptobox = Tezos_crypto_dal.Cryptobox
 
   val make : ?on_error:(string -> Cryptobox.t) -> Parameters.t -> Cryptobox.t
