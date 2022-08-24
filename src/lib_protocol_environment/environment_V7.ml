@@ -104,6 +104,7 @@ module type T = sig
        and type Plonk.public_parameters =
         Plonk.Main_protocol.verifier_public_parameters
         * Plonk.Main_protocol.transcript
+       and type Dal.parameters = Tezos_crypto_dal.Cryptobox.Verifier.parameters
 
   type error += Ecoproto_error of Error_monad.error
 
@@ -1473,5 +1474,5 @@ struct
 
   module Equality_witness = Environment_context.Equality_witness
   module Plonk = Tezos_protocol_environment_structs.V7.Plonk
-  module Dal = Tezos_crypto_dal.Dal_cryptobox.Verifier
+  module Dal = Tezos_crypto_dal.Cryptobox.Verifier
 end

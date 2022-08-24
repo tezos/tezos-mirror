@@ -23,24 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** FIXME: https://gitlab.com/tezos/tezos/-/issues/3517
-
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3517
     If the layer1 node reboots, the rpc stream breaks.
 *)
-let chain_events cctxt =
+let on_new_head cctxt handle =
   let open Lwt_result_syntax in
-  let* heads, _ = Tezos_shell_services.Monitor_services.heads cctxt `Main in
-  return heads
-
-let handle_event (hash, (block_header : Tezos_base.Block_header.t)) =
-  let open Lwt_result_syntax in
-  let level = block_header.shell.level in
-  let*! () = Event.(emit layer1_node_new_head (hash, level)) in
-  return_true
-
-let iter_events cctxt handle =
-  let open Lwt_result_syntax in
-  let* stream = chain_events cctxt in
+  let* stream, stopper =
+    Tezos_shell_services.Monitor_services.heads cctxt `Main
+  in
   let rec go () =
     Lwt.bind (Lwt_stream.get stream) @@ fun tok ->
     match tok with
@@ -49,4 +39,4 @@ let iter_events cctxt handle =
         let* () = handle element in
         go ()
   in
-  go ()
+  return (go (), stopper)

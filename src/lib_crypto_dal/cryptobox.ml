@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Error_monad
-include Dal_cryptobox_intf
+include Cryptobox_intf
 module Base58 = Tezos_crypto.Base58
 module Srs_g1 = Bls12_381_polynomial.Polynomial.Srs_g1
 module Srs_g2 = Bls12_381_polynomial.Polynomial.Srs_g2
@@ -325,9 +325,16 @@ module Inner = struct
   let slot_as_polynomial_length ~slot_size =
     1 lsl Z.(log2up (of_int slot_size / of_int scalar_bytes_amount))
 
+  type parameters = {
+    redundancy_factor : int;
+    segment_size : int;
+    slot_size : int;
+    number_of_shards : int;
+  }
+
   (* Error cases of this functions are not encapsulated into
      `tzresult` for modularity reasons. *)
-  let make ~redundancy_factor ~slot_size ~segment_size ~number_of_shards =
+  let make {redundancy_factor; slot_size; segment_size; number_of_shards} =
     let open Result_syntax in
     let k = slot_as_polynomial_length ~slot_size in
     let n = redundancy_factor * k in
@@ -383,7 +390,7 @@ module Inner = struct
   (* We encode by segments of [segment_size] bytes each.  The segments
      are arranged in cosets to evaluate in batch with Kate
      amortized. *)
-  let polynomial_from_bytes' t slot =
+  let polynomial_from_bytes' (t : t) slot =
     if Bytes.length slot <> t.slot_size then
       Error
         (`Slot_wrong_size

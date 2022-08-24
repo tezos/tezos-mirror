@@ -23,20 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Plugin = struct
-  module Proto = Registerer.Registered
+(** [on_new_head cctxt handler] opens a [Monitor_services.heads] stream on the
+    targeted layer 1 node and calls [handler] each time a new head is received.
 
-  let get_constants chain block ctxt =
-    let cpctxt = new Protocol_client_context.wrap_full ctxt in
-    let open Lwt_result_syntax in
-    let* constants = Protocol.Constants_services.all cpctxt (chain, block) in
-    let Protocol.Alpha_context.Constants.Parametric.
-          {redundancy_factor; segment_size; slot_size; number_of_shards; _} =
-      constants.parametric.dal
-    in
-    return
-      Environment.Dal.
-        {redundancy_factor; segment_size; slot_size; number_of_shards}
-end
-
-let () = Dal_constants_plugin.register (module Plugin)
+    It returns a couple [(p, stopper)] where [p] is a promise resolving when the
+    stream closes and [stopper] a function closing the stream.
+*)
+val on_new_head :
+  #RPC_context.streamed ->
+  (Block_hash.t * Block_header.t -> unit tzresult Lwt.t) ->
+  (unit tzresult Lwt.t * (unit -> unit)) tzresult Lwt.t

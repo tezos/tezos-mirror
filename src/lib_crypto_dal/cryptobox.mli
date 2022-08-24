@@ -23,10 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Dal_cryptobox_intf
+open Cryptobox_intf
 
-(** Encapsulates parameters required to use the cryptographic primitives exported
-    by this module. *)
+(** Initial values to parametrize dal cryptographic primitives. It used to build
+    a value of type [t] *)
+type parameters = {
+  redundancy_factor : int;
+  segment_size : int;
+  slot_size : int;
+  number_of_shards : int;
+}
+
+(** Encapsulates parameters required to use the cryptographic primitives
+    exported by this module. A value of type [t] contains both initial
+    [parameters] and computed values depending on it. *)
 type t
 
 (** Because of the shell/protocol separation, cryptographic primitives
@@ -49,9 +59,9 @@ type t
    that both the [Verifier] and the [Builder] are instantiated with the
    same parameters and use the same trusted setup. *)
 
-module Verifier : VERIFIER
+module Verifier : VERIFIER with type parameters = parameters
 
-include VERIFIER with type t := t
+include VERIFIER with type t := t and type parameters := parameters
 
 (** The primitives exposed in this modules require some
    preprocessing. This preprocessing generates data from an unknown
@@ -74,7 +84,7 @@ val initialisation_parameters_from_files :
 val load_parameters : initialisation_parameters -> unit Error_monad.tzresult
 
 module Commitment : sig
-  include Dal_cryptobox_intf.COMMITMENT with type t = commitment
+  include COMMITMENT with type t = commitment
 
   val rpc_arg : commitment Resto.Arg.t
 end

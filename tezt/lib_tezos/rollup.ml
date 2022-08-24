@@ -529,7 +529,7 @@ module Dal = struct
       return {number_of_shards; redundancy_factor; slot_size; segment_size}
   end
 
-  module Cryptobox = Tezos_crypto_dal.Dal_cryptobox
+  module Cryptobox = Tezos_crypto_dal.Cryptobox
 
   let make
       ?(on_error =
@@ -543,10 +543,7 @@ module Dal = struct
     Cryptobox.Internal_for_tests.load_parameters initialisation_parameters ;
     match
       Cryptobox.make
-        ~redundancy_factor
-        ~slot_size
-        ~segment_size
-        ~number_of_shards
+        {redundancy_factor; slot_size; segment_size; number_of_shards}
     with
     | Ok cryptobox -> cryptobox
     | Error (`Fail msg) -> on_error msg

@@ -11549,14 +11549,17 @@ end
 (** A precomputed set of constants *)
 type t
 
+(** Parameters to build a value of type [t] *)
+type parameters = {
+  redundancy_factor : int;
+  segment_size : int;
+  slot_size : int;
+  number_of_shards : int;
+}
+
 (** [make] precomputes the set of values needed by cryptographic primitives
   defined in this module and store them in a value of type [t] *)
-val make :
-  redundancy_factor:int ->
-  slot_size:int ->
-  segment_size:int ->
-  number_of_shards:int ->
-  (t, [> `Fail of string]) result
+val make : parameters -> (t, [> `Fail of string]) result
 
 (** Commitment to a polynomial. *)
 type commitment

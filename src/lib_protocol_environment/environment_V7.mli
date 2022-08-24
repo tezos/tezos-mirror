@@ -104,6 +104,7 @@ module type T = sig
        and type Plonk.public_parameters =
         Plonk.Main_protocol.verifier_public_parameters
         * Plonk.Main_protocol.transcript
+       and type Dal.parameters = Tezos_crypto_dal.Cryptobox.Verifier.parameters
 
   (** An [Ecoproto_error e] is a shell error that carry a protocol error.
 

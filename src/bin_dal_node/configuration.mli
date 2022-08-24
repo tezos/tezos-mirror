@@ -22,61 +22,29 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-open Tezos_crypto_dal
-include Dal_cryptobox
 
-type slot = bytes
-
-type slot_header = commitment
-
-let slot_header_encoding = Commitment.encoding
-
-type parameters = {
-  redundancy_factor : int;
-  segment_size : int;
-  slot_size : int;
-  number_of_shards : int;
+type t = {
+  use_unsafe_srs : bool;
+      (** Run dal-node in test mode with an unsafe SRS (Trusted setup) *)
+  data_dir : string;  (** The path to the DAL node data directory *)
+  rpc_addr : string;  (** The address the DAL node listens to *)
+  rpc_port : int;  (** The port the DAL node listens to *)
 }
 
-type error += Cryptobox_initialisation_failed of string
+(** [filename config] gets the path to config file *)
+val filename : t -> string
 
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"dal.node.cryptobox.initialisation_failed"
-    ~title:"Cryptobox initialisation failed"
-    ~description:"Unable to initialise the cryptobox parameters"
-    ~pp:(fun ppf msg ->
-      Format.fprintf
-        ppf
-        "Unable to initialise the cryptobox parameters. Reason: %s"
-        msg)
-    Data_encoding.(obj1 (req "error" string))
-    (function Cryptobox_initialisation_failed str -> Some str | _ -> None)
-    (fun str -> Cryptobox_initialisation_failed str)
+(** [data_dir_path config subpath] builds a subpath relatively to the
+    [config] *)
+val data_dir_path : t -> string -> string
 
-let init unsafe_srs cctxt (module Plugin : Dal_constants_plugin.T) =
-  let open Lwt_result_syntax in
-  let* Plugin.{redundancy_factor; segment_size; slot_size; number_of_shards} =
-    Plugin.get_constants cctxt#chain cctxt#block cctxt
-  in
-  let parameters =
-    {redundancy_factor; segment_size; slot_size; number_of_shards}
-  in
-  let* initialisation_parameters =
-    if unsafe_srs then
-      return
-      @@ Internal_for_tests.initialisation_parameters_from_slot_size ~slot_size
-    else
-      let*? g1_path, g2_path = Tezos_base.Dal_srs.find_trusted_setup_files () in
-      initialisation_parameters_from_files ~g1_path ~g2_path
-  in
-  let*? () = load_parameters initialisation_parameters in
-  let* dal_constants =
-    match
-      make ~redundancy_factor ~segment_size ~slot_size ~number_of_shards
-    with
-    | Ok cryptobox -> return cryptobox
-    | Error (`Fail msg) -> fail [Cryptobox_initialisation_failed msg]
-  in
-  return @@ (dal_constants, parameters)
+val default_data_dir : string
+
+val default_rpc_addr : string
+
+val default_rpc_port : int
+
+(** [save config] writes config file in [config.data_dir] *)
+val save : t -> unit tzresult Lwt.t
+
+val load : data_dir:string -> (t, Error_monad.tztrace) result Lwt.t

@@ -228,7 +228,7 @@ module Dal : sig
     val from_client : Client.t -> t Lwt.t
   end
 
-  module Cryptobox = Tezos_crypto_dal.Dal_cryptobox
+  module Cryptobox = Tezos_crypto_dal.Cryptobox
 
   val make : ?on_error:(string -> Cryptobox.t) -> Parameters.t -> Cryptobox.t
 

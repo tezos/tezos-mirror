@@ -1649,7 +1649,7 @@ let bootstrap_peers config =
 let init_dal dal_config =
   let open Lwt_result_syntax in
   if dal_config.activated then
-    let open Tezos_crypto_dal.Dal_cryptobox in
+    let open Tezos_crypto_dal.Cryptobox in
     let* initialisation_parameters =
       match dal_config.srs_size with
       | None ->

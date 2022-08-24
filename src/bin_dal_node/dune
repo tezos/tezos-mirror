@@ -40,6 +40,7 @@
   -open Tezos_stdlib_unix
   -open Tezos_stdlib
   -open Tezos_dal_node_lib
-  -open Tezos_dal_node_services))
+  -open Tezos_dal_node_services
+  -open Tezos_crypto_dal))
 
 (rule (action (progn (write-file void_for_linking-tezos-dal-alpha.empty ""))))

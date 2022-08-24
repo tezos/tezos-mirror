@@ -23,8 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let group =
-  {Clic.name = "dal-daemon"; title = "Commands related to the DAL daemon"}
+let group = {Clic.name = "dal-node"; title = "Commands related to the DAL node"}
 
 let data_dir_arg =
   let default = Configuration.default_data_dir in
@@ -33,7 +32,7 @@ let data_dir_arg =
     ~placeholder:"data-dir"
     ~doc:
       (Format.sprintf
-         "The path to the DAL daemon data directory. Default value is %s"
+         "The path to the DAL node data directory. Default value is %s"
          default)
     ~default
     (Client_config.string_parameter ())
@@ -45,8 +44,7 @@ let rpc_addr_arg =
     ~placeholder:"rpc-address|ip"
     ~doc:
       (Format.sprintf
-         "The address the smart-contract rollup node listens to. Default value \
-          is %s"
+         "The address the DAL node listens to. Default value is %s"
          default)
     ~default
     (Client_config.string_parameter ())
@@ -63,15 +61,14 @@ let rpc_port_arg =
     ~placeholder:"rpc-port"
     ~doc:
       (Format.sprintf
-         "The port the smart-contract rollup node listens to. Default value is \
-          %s"
+         "The port the DAL node listens to. Default value is %s"
          default)
     ~default
     int_parameter
 
-let unsafe_srs_for_tests_arg =
+let use_unsafe_srs_for_tests_arg =
   Clic.switch
-    ~long:"unsafe-srs-for-tests"
+    ~long:"use-unsafe-srs-for-tests"
     ~doc:
       (Format.sprintf
          "Run dal-node in test mode with an unsafe SRS (Trusted setup)")
@@ -83,11 +80,11 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure DAL node."
-    (args4 data_dir_arg rpc_addr_arg rpc_port_arg unsafe_srs_for_tests_arg)
+    (args4 data_dir_arg rpc_addr_arg rpc_port_arg use_unsafe_srs_for_tests_arg)
     (prefixes ["init-config"] stop)
-    (fun (data_dir, rpc_addr, rpc_port, unsafe_srs) cctxt ->
+    (fun (data_dir, rpc_addr, rpc_port, use_unsafe_srs) cctxt ->
       let open Configuration in
-      let config = {data_dir; rpc_addr; rpc_port; unsafe_srs} in
+      let config = {data_dir; rpc_addr; rpc_port; use_unsafe_srs} in
       let* () = save config in
       let*! _ =
         cctxt#message "DAL node configuration written in %s" (filename config)
@@ -98,7 +95,7 @@ let run_command =
   let open Clic in
   command
     ~group
-    ~desc:"Run the DAL daemon."
+    ~desc:"Run the DAL node."
     (args1 data_dir_arg)
     (prefixes ["run"] @@ stop)
     (fun data_dir cctxt -> Daemon.run ~data_dir cctxt)

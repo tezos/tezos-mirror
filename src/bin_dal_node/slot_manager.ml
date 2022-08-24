@@ -88,6 +88,8 @@ let () =
     (function Illformed_shard -> Some () | _ -> None)
     (fun () -> Illformed_shard)
 
+type slot = bytes
+
 let wrap_encoding_error =
   Result.map_error (fun e ->
       [Tezos_base.Data_encoding_wrapper.Encoding_error e])
@@ -133,7 +135,7 @@ let split_and_store cb_constants store slot =
 
 let get_shard store slot_header shard_id =
   let open Lwt_result_syntax in
-  let*? slot_header = encode Cryptobox.slot_header_encoding slot_header in
+  let*? slot_header = encode Cryptobox.Commitment.encoding slot_header in
   let* share =
     Lwt.catch
       (fun () ->
@@ -189,7 +191,7 @@ let get_slot initial_constants dal_constants store slot_header =
   in
   return slot
 
-(* FIXME https://gitlab.com/tezos/tezos/-/issues/3405
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3405
 
    This can work only if a slot never ends with a `\000`. But I am not
    sure in general such thing is required. *)
