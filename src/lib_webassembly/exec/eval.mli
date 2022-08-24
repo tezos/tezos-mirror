@@ -29,6 +29,8 @@ type 'a concat_kont = {
   offset : int32;
 }
 
+type ('a, 'b) fold_left_kont = {origin : 'a Vector.t; acc : 'b; offset : int32}
+
 type (_, _) init_section =
   | Func : (Ast.func, func_inst) init_section
   | Global : (Ast.global, global_inst) init_section
@@ -45,6 +47,7 @@ type init_kont =
   | IK_Aggregate_concat :
       module_inst * ('a, 'b) init_section * 'b concat_kont
       -> init_kont
+  | IK_Exports of module_inst * (Ast.export, extern NameMap.t) fold_left_kont
   | IK_Remaining of module_inst
   | IK_Stop of module_inst
       (** Witness that there is no more tick to execute to complete

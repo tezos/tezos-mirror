@@ -1092,6 +1092,19 @@ let concat_completed {lv; rv; offset; _} =
   let rv_len = Vector.num_elements rv in
   Int32.add lv_len rv_len <= offset
 
+type ('a, 'b) fold_left_kont = {origin : 'a Vector.t; acc : 'b; offset : int32}
+
+let fold_left_kont origin acc = {origin; acc; offset = 0l}
+
+let fold_left_completed {origin; offset; _} =
+  offset = Vector.num_elements origin
+
+let fold_left_s_step {origin; acc; offset} f =
+  let open Lwt.Syntax in
+  let* x = Vector.get offset origin in
+  let+ acc = f acc x in
+  {origin; acc; offset = Int32.succ offset}
+
 type (_, _) init_section =
   | Func : (func, func_inst) init_section
   | Global : (global, global_inst) init_section
@@ -1126,6 +1139,7 @@ type init_kont =
   | IK_Aggregate_concat :
       module_inst * ('a, 'b) init_section * 'b concat_kont
       -> init_kont
+  | IK_Exports of module_inst * (export, extern NameMap.t) fold_left_kont
   | IK_Remaining of module_inst
   | IK_Stop of module_inst
 
@@ -1136,7 +1150,7 @@ let section_next_init_kont :
   | Func -> IK_Aggregate (inst0, Global, map_kont m.it.globals)
   | Global -> IK_Aggregate (inst0, Table, map_kont m.it.tables)
   | Table -> IK_Aggregate (inst0, Memory, map_kont m.it.memories)
-  | Memory -> IK_Remaining inst0
+  | Memory -> IK_Exports (inst0, fold_left_kont m.it.exports (NameMap.create ()))
 
 let section_step :
     type a b.
@@ -1200,35 +1214,33 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
   | IK_Aggregate_concat (inst0, sec, tick) ->
       let+ tick = concat_step tick in
       IK_Aggregate_concat (inst0, sec, tick)
+  | IK_Exports (inst0, tick) when fold_left_completed tick ->
+      let inst0 = {inst0 with exports = tick.acc} in
+      Lwt.return (IK_Remaining inst0)
+  | IK_Exports (inst0, tick) ->
+      let+ tick =
+        fold_left_s_step tick (fun map export ->
+            let* k, v = create_export inst0 export in
+            let+ k = Instance.Vector.to_list k in
+            NameMap.set k v map)
+      in
+      IK_Exports (inst0, tick)
   | IK_Remaining inst2 ->
-      let {exports; elems; datas; start; _} = m.it in
+      let {elems; datas; start; _} = m.it in
 
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
          These transformations should be refactored and abadoned during the
          tickification, to avoid the roundtrip vector -> list -> vector. *)
       let* elems = Vector.to_list elems in
       let* datas = Vector.to_list datas in
-      let* exports = Vector.to_list exports in
 
-      let* new_exports = TzStdLib.List.map_s (create_export inst2) exports in
       let* new_elems =
         TzStdLib.List.map_s (create_elem module_reg self) elems
       in
       let new_datas = List.map create_data datas in
-      let* exports =
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
-           [new_exports]/[exports] should be lazy structures. *)
-        TzStdLib.List.fold_left_s
-          (fun exports (k, v) ->
-            let+ k = Instance.Vector.to_list k in
-            NameMap.set k v exports)
-          (NameMap.create ~produce_value:(fun _ -> Lwt.fail Not_found) ())
-          new_exports
-      in
       let inst =
         {
           inst2 with
-          exports;
           elems =
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
                [new_elems]/[elems] should be lazy structures. *)

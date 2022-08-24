@@ -535,6 +535,8 @@ let value_encoding =
 
 let values_encoding = list_encoding value_encoding
 
+let name_encoding key = lazy_vector_encoding key (value [] Data_encoding.int31)
+
 let memory_encoding =
   conv
     (fun (min, max, chunks) -> Memory.of_chunks (MemoryType {min; max}) chunks)
@@ -619,6 +621,9 @@ let extern_encoding =
         (function Instance.ExternGlobal x -> Some x | _ -> None)
         (fun x -> Instance.ExternGlobal x);
     ]
+
+let export_instance_encoding =
+  tup2 ~flatten:false (name_encoding "name") (scope ["extern"] extern_encoding)
 
 let extern_map_encoding = NameMap.lazy_map extern_encoding
 
