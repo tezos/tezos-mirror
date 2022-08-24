@@ -77,7 +77,11 @@ type init_kont =
   | IK_Elems of module_inst * (Ast.elem_segment, elem_inst) map_kont
   | IK_Datas of module_inst * (Ast.data_segment, data_inst) map_kont
   | IK_Es_elems of module_inst * (Ast.elem_segment, admin_instr) map_concat_kont
-  | IK_Remaining of module_inst * admin_instr Vector.t
+  | IK_Es_datas of
+      module_inst
+      * (Ast.data_segment, admin_instr) map_concat_kont
+      * admin_instr Vector.t
+  | IK_Remaining of module_inst * admin_instr Vector.t * admin_instr Vector.t
   | IK_Stop of module_inst
       (** Witness that there is no more tick to execute to complete
           the [init] process. *)

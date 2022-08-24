@@ -273,15 +273,37 @@ let init_kont_encoding =
         (function IK_Es_elems (inst, map) -> Some (inst, map) | _ -> None)
         (function inst, map -> IK_Es_elems (inst, map));
       case
+        "IK_Es_data"
+        (tup3
+           ~flatten:true
+           (scope ["module"] Wasm_encoding.module_instance_encoding)
+           (scope
+              ["kont"]
+              (map_concat_kont_encoding
+                 Parser.(no_region_encoding Data.data_segment_encoding)
+                 Wasm_encoding.admin_instr_encoding))
+           (scope
+              ["es_elem"]
+              (lazy_vec_encoding Wasm_encoding.admin_instr_encoding)))
+        (function
+          | IK_Es_datas (inst, map, es_elem) -> Some (inst, map, es_elem)
+          | _ -> None)
+        (function inst, map, es_elem -> IK_Es_datas (inst, map, es_elem));
+      case
         "IK_Remaining"
-        (tup2
+        (tup3
            ~flatten:true
            (scope ["module"] Wasm_encoding.module_instance_encoding)
            (scope
               ["es_elem"]
+              (lazy_vec_encoding Wasm_encoding.admin_instr_encoding))
+           (scope
+              ["es_data"]
               (lazy_vec_encoding Wasm_encoding.admin_instr_encoding)))
-        (function IK_Remaining (m, admin) -> Some (m, admin) | _ -> None)
-        (function m, admin -> IK_Remaining (m, admin));
+        (function
+          | IK_Remaining (m, admin, admin') -> Some (m, admin, admin')
+          | _ -> None)
+        (function m, admin, admin' -> IK_Remaining (m, admin, admin'));
       case
         "IK_Stop"
         Wasm_encoding.module_instance_encoding

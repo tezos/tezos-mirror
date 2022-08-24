@@ -1070,6 +1070,13 @@ let map_s_step {origin; destination; offset} f =
   let destination = Vector.set offset y destination in
   {origin; destination; offset = Int32.succ offset}
 
+let map_i_s_step {origin; destination; offset} f =
+  let open Lwt.Syntax in
+  let* x = Vector.get offset origin in
+  let+ y = f offset x in
+  let destination = Vector.set offset y destination in
+  {origin; destination; offset = Int32.succ offset}
+
 type 'a concat_kont = {
   lv : 'a Vector.t;
   rv : 'a Vector.t;
@@ -1209,7 +1216,11 @@ type init_kont =
   | IK_Elems of module_inst * (elem_segment, elem_inst) map_kont
   | IK_Datas of module_inst * (data_segment, data_inst) map_kont
   | IK_Es_elems of module_inst * (elem_segment, admin_instr) map_concat_kont
-  | IK_Remaining of module_inst * admin_instr Vector.t
+  | IK_Es_datas of
+      module_inst
+      * (data_segment, admin_instr) map_concat_kont
+      * admin_instr Vector.t
+  | IK_Remaining of module_inst * admin_instr Vector.t * admin_instr Vector.t
   | IK_Stop of module_inst
 
 let section_next_init_kont :
@@ -1309,7 +1320,8 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
       IK_Datas (inst0, tick)
   | IK_Es_elems (inst0, tick) -> (
       match map_concat_completed tick with
-      | Some es_elem -> Lwt.return (IK_Remaining (inst0, es_elem))
+      | Some es_elem ->
+          Lwt.return (IK_Es_datas (inst0, map_concat_kont m.it.datas, es_elem))
       | None ->
           let+ tick =
             map_concat_step
@@ -1318,15 +1330,28 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
               tick
           in
           IK_Es_elems (inst0, tick))
-  | IK_Remaining (inst, es_elem) ->
+  | IK_Es_datas (inst0, tick, es_elem) -> (
+      match map_concat_completed tick with
+      | Some es_data -> Lwt.return (IK_Remaining (inst0, es_elem, es_data))
+      | None ->
+          let+ tick =
+            map_concat_step
+              (fun tick ->
+                map_i_s_step tick (fun i x ->
+                    (* [of_list] is safe, because [run_elem] always
+                       produce lists of length 0 or 5. *)
+                    let+ x = run_data inst0 i x in
+                    Vector.of_list x))
+              tick
+          in
+          IK_Es_datas (inst0, tick, es_elem))
+  | IK_Remaining (inst, es_elem, es_data) ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
          These transformations should be refactored and abadoned during the
          tickification, to avoid the roundtrip vector -> list -> vector. *)
       let* es_elem = Vector.to_list es_elem in
+      let* es_data = Vector.to_list es_data in
 
-      let* datas = Vector.to_list m.it.datas in
-      let* datas = Lib.List32.mapi_s (run_data inst) datas in
-      let es_data = TzStdLib.List.concat datas in
       let es_start = Lib.Option.get (Lib.Option.map run_start m.it.start) [] in
 
       let+ (_ : Values.value stack) =
