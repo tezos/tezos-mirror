@@ -730,25 +730,25 @@ module Inner = struct
 
   let _save_precompute_shards_proofs (preprocess : shards_proofs_precomputation)
       filename =
-    let chan = Out_channel.open_bin filename in
-    Out_channel.output_bytes
+    let chan = open_out_bin filename in
+    output_bytes
       chan
       (Data_encoding.Binary.to_bytes_exn
          Encoding.shards_proofs_precomputation_encoding
          preprocess) ;
-    Out_channel.close_noerr chan
+    close_out_noerr chan
 
   let _load_precompute_shards_proofs filename =
-    let chan = In_channel.open_bin filename in
-    let len = Int64.to_int (In_channel.length chan) in
+    let chan = open_in_bin filename in
+    let len = Int64.to_int (LargeFile.in_channel_length chan) in
     let data = Bytes.create len in
-    let (_ : unit option) = In_channel.really_input chan data 0 len in
+    let () = try really_input chan data 0 len with End_of_file -> () in
     let precomp =
       Data_encoding.Binary.of_bytes_exn
         Encoding.shards_proofs_precomputation_encoding
         data
     in
-    In_channel.close_noerr chan ;
+    close_in_noerr chan ;
     precomp
 
   let prove_shards t p =
