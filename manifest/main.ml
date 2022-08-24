@@ -322,6 +322,9 @@ let utop = external_lib "utop" V.(at_least "2.8")
 
 let uutf = external_lib ~js_compatible:true "uutf" V.True
 
+let vdf =
+  external_lib ~js_compatible:true "class_group_vdf" V.(at_least "0.0.4")
+
 (* The signature of the [Z] module has changed in 1.12. *)
 let zarith =
   external_lib
@@ -334,9 +337,6 @@ let zarith_stubs_js = external_lib ~js_compatible:true "zarith_stubs_js" V.True
 (* VENDORED LIBS *)
 
 let ledgerwallet_tezos = vendored_lib "ledgerwallet-tezos"
-
-let vdf =
-  external_lib ~js_compatible:true "class_group_vdf" V.(at_least "0.0.4")
 
 (* INTERNAL LIBS *)
 
