@@ -1141,6 +1141,7 @@ type init_kont =
       -> init_kont
   | IK_Exports of module_inst * (export, extern NameMap.t) fold_left_kont
   | IK_Elems of module_inst * (elem_segment, elem_inst) map_kont
+  | IK_Datas of module_inst * (data_segment, data_inst) map_kont
   | IK_Remaining of module_inst
   | IK_Stop of module_inst
 
@@ -1228,35 +1229,27 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
       IK_Exports (inst0, tick)
   | IK_Elems (inst0, tick) when map_completed tick ->
       let inst0 = {inst0 with elems = tick.destination} in
-      Lwt.return (IK_Remaining inst0)
+      Lwt.return (IK_Datas (inst0, map_kont m.it.datas))
   | IK_Elems (inst0, tick) ->
       let+ tick = map_s_step tick (create_elem module_reg self) in
       IK_Elems (inst0, tick)
-  | IK_Remaining inst2 ->
-      let {datas; start; _} = m.it in
-
+  | IK_Datas (inst0, tick) when map_completed tick ->
+      let inst = {inst0 with datas = tick.destination} in
+      update_module_ref module_reg self inst ;
+      Lwt.return (IK_Remaining inst)
+  | IK_Datas (inst0, tick) ->
+      let+ tick = map_step tick create_data in
+      IK_Datas (inst0, tick)
+  | IK_Remaining inst ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
          These transformations should be refactored and abadoned during the
          tickification, to avoid the roundtrip vector -> list -> vector. *)
-      let* datas = Vector.to_list datas in
-
-      let new_datas = List.map create_data datas in
-      let inst =
-        {
-          inst2 with
-          datas =
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
-               [new_data]/[datas] should be lazy structures. *)
-            Vector.of_list new_datas;
-        }
-      in
-      update_module_ref module_reg self inst ;
-
+      let* datas = Vector.to_list m.it.datas in
       let* elems = Vector.to_list m.it.elems in
       let es_elem = List.concat (Lib.List32.mapi run_elem elems) in
       let* datas = Lib.List32.mapi_s (run_data inst) datas in
       let es_data = TzStdLib.List.concat datas in
-      let es_start = Lib.Option.get (Lib.Option.map run_start start) [] in
+      let es_start = Lib.Option.get (Lib.Option.map run_start m.it.start) [] in
       let+ (_ : Values.value stack) =
         eval
           module_reg

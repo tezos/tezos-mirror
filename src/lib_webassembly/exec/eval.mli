@@ -49,6 +49,7 @@ type init_kont =
       -> init_kont
   | IK_Exports of module_inst * (Ast.export, extern NameMap.t) fold_left_kont
   | IK_Elems of module_inst * (Ast.elem_segment, elem_inst) map_kont
+  | IK_Datas of module_inst * (Ast.data_segment, data_inst) map_kont
   | IK_Remaining of module_inst
   | IK_Stop of module_inst
       (** Witness that there is no more tick to execute to complete
