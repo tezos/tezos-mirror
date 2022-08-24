@@ -357,7 +357,7 @@ let next_input ps l n =
       in
       aux (idx + 1)
 
-let test_inbox_proof_production (list_of_payloads, l, n) =
+let test_inbox_proof_production (list_of_payloads, additional_payloads, l, n) =
   (* We begin with a Node inbox so we can produce a proof. *)
   let exp_input = next_input list_of_payloads l n in
   setup_node_inbox_with_messages list_of_payloads
@@ -372,9 +372,17 @@ let test_inbox_proof_production (list_of_payloads, l, n) =
   | Ok (proof, input) -> (
       (* We now switch to a protocol inbox built from the same messages
          for verification. *)
-      setup_inbox_with_messages list_of_payloads
+      setup_inbox_with_messages (list_of_payloads @ [additional_payloads])
       @@ fun _ctxt _current_level_tree _history inbox _inboxes ->
-      let current_level = Raw_level_repr.succ (inbox_level inbox) in
+      (* If there are [additional_payloads], we will take the snapshot
+         of the additional level, which should ignore the additional
+         payloads. Otherwise, we take a snapshot of the whole inbox. *)
+      let current_level =
+        let curr = inbox_level inbox in
+        match additional_payloads with
+        | [] -> Raw_level_repr.succ curr
+        | _ -> curr
+      in
       let snapshot = take_snapshot ~current_level inbox in
       let proof = node_proof_to_protocol_proof proof in
       let*! verification = verify_proof (l, n) snapshot proof in
@@ -386,7 +394,8 @@ let test_inbox_proof_production (list_of_payloads, l, n) =
       | Error _ -> fail [err "Proof verification failed"])
   | Error _ -> fail [err "Proof production failed"]
 
-let test_inbox_proof_verification (list_of_payloads, l, n) =
+let test_inbox_proof_verification (list_of_payloads, additional_payloads, l, n)
+    =
   (* We begin with a Node inbox so we can produce a proof. *)
   setup_node_inbox_with_messages list_of_payloads
   @@ fun ctxt current_level_tree history inbox _inboxes ->
@@ -400,12 +409,20 @@ let test_inbox_proof_verification (list_of_payloads, l, n) =
   | Ok (proof, _input) -> (
       (* We now switch to a protocol inbox built from the same messages
          for verification. *)
-      setup_inbox_with_messages list_of_payloads
+      setup_inbox_with_messages (list_of_payloads @ [additional_payloads])
       @@ fun _ctxt _current_level_tree _history _inbox inboxes ->
       (* Use the incorrect inbox *)
       match List.hd inboxes with
       | Some inbox -> (
-          let current_level = Raw_level_repr.succ (inbox_level inbox) in
+          (* If there are [additional_payloads], we will take the snapshot
+             of the additional level, which should ignore the additional
+             payloads. Otherwise, we take a snapshot of the whole inbox. *)
+          let current_level =
+            let curr = inbox_level inbox in
+            match additional_payloads with
+            | [] -> Raw_level_repr.succ curr
+            | _ -> curr
+          in
           let snapshot = take_snapshot ~current_level inbox in
           let proof = node_proof_to_protocol_proof proof in
           let*! verification = verify_proof (l, n) snapshot proof in
@@ -810,7 +827,9 @@ let tests =
       let* after = list_size small (list_size small bounded_string) in
       let payloads = List.append before (at :: after) in
       let* n = 0 -- (List.length at + 3) in
-      return (payloads, level_of_int (succ level), Z.of_int n))
+      let* additional_payloads = small_list bounded_string in
+      return
+        (payloads, additional_payloads, level_of_int (succ level), Z.of_int n))
   in
   let gen_history_params =
     QCheck2.Gen.(
