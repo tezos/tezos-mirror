@@ -187,7 +187,7 @@ let json_data_encoding =
   external_lib
     ~js_compatible:true
     "json-data-encoding"
-    V.(at_least "0.11" && less_than "0.12")
+    V.(at_least "0.11" && less_than "0.13")
 
 let logs = external_lib "logs" V.True
 
