@@ -594,32 +594,33 @@ let function_type_vector_encoding =
 
 let value_ref_vector_encoding = lazy_vector_encoding "refs" value_ref_encoding
 
-let extern_map_encoding =
-  NameMap.lazy_map
-    (tagged_union
-       string_tag
-       [
-         case
-           "ExternFunc"
-           function_encoding
-           (function Instance.ExternFunc x -> Some x | _ -> None)
-           (fun x -> Instance.ExternFunc x);
-         case
-           "ExternTable"
-           table_encoding
-           (function Instance.ExternTable x -> Some x | _ -> None)
-           (fun x -> Instance.ExternTable x);
-         case
-           "ExternMemory"
-           memory_encoding
-           (function Instance.ExternMemory x -> Some x | _ -> None)
-           (fun x -> Instance.ExternMemory x);
-         case
-           "ExternGlobal"
-           global_encoding
-           (function Instance.ExternGlobal x -> Some x | _ -> None)
-           (fun x -> Instance.ExternGlobal x);
-       ])
+let extern_encoding =
+  tagged_union
+    string_tag
+    [
+      case
+        "ExternFunc"
+        function_encoding
+        (function Instance.ExternFunc x -> Some x | _ -> None)
+        (fun x -> Instance.ExternFunc x);
+      case
+        "ExternTable"
+        table_encoding
+        (function Instance.ExternTable x -> Some x | _ -> None)
+        (fun x -> Instance.ExternTable x);
+      case
+        "ExternMemory"
+        memory_encoding
+        (function Instance.ExternMemory x -> Some x | _ -> None)
+        (fun x -> Instance.ExternMemory x);
+      case
+        "ExternGlobal"
+        global_encoding
+        (function Instance.ExternGlobal x -> Some x | _ -> None)
+        (fun x -> Instance.ExternGlobal x);
+    ]
+
+let extern_map_encoding = NameMap.lazy_map extern_encoding
 
 let value_ref_vector_vector_encoding =
   lazy_vector_encoding

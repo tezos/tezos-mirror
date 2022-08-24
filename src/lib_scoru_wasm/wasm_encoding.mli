@@ -67,6 +67,8 @@ val function_type_vector_encoding :
 
 val value_ref_vector_encoding : Values.ref_ Instance.Vector.t Tree_encoding.t
 
+val extern_encoding : Instance.extern Tree_encoding.t
+
 val extern_map_encoding : Instance.extern Instance.NameMap.t Tree_encoding.t
 
 val value_ref_vector_vector_encoding :
