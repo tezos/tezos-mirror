@@ -642,6 +642,61 @@ let test_inclusion_proofs_depending_on_history_capacity
     (I.verify_inclusion_proof ip1 hp hp && I.verify_inclusion_proof ip2 hp hp)
     (err "Inclusion proofs are expected to be valid.")
 
+(** In this test, we make sure that the snapshot of an empty inbox is not
+    impacted by the [current_level] parameter. *)
+let test_empty_inbox_snapshot_taking (origination_level, snapshot_level) =
+  let open Lwt_result_syntax in
+  let origination_level =
+    Raw_level_repr.of_int32_exn @@ Int32.of_int origination_level
+  in
+  let snapshot_level =
+    Raw_level_repr.of_int32_exn @@ Int32.of_int snapshot_level
+  in
+  let* ctxt = create_context () in
+  let*! inbox = empty ctxt rollup origination_level in
+  (* We take a snapshot of the whole inbox. *)
+  let current_level = Raw_level_repr.succ origination_level in
+  let expected_snapshot = take_snapshot ~current_level inbox in
+  (* We take a snapshot at a random level. *)
+  let actual_snapshot = take_snapshot ~current_level:snapshot_level inbox in
+  (* They're expected to be the same. *)
+  fail_unless
+    (equal_history_proof expected_snapshot actual_snapshot)
+    (err
+       "Snapshot at origination level of an empty inbox should be equal to \
+        snapshots at any level.")
+
+(** In this test, we make sure that the snapshot of an inbox is taken
+    at the beginning of a block level. *)
+let test_inbox_snapshot_taking (list_of_payloads, payloads) =
+  let open Lwt_result_syntax in
+  setup_inbox_with_messages list_of_payloads
+  @@ fun ctxt current_level_tree history inbox inboxes ->
+  let inbox_level = inbox_level inbox in
+  (* If we take a snapshot of [inbox_level + 1], we take a snapshot of the
+     whole inbox. *)
+  let current_level = Raw_level_repr.succ inbox_level in
+  let expected_snapshot = take_snapshot ~current_level inbox in
+  (* Now, if we add messages to the inbox at [current_level], the inbox's
+     snapshot for this level should not changed. *)
+  let* _level_tree, _history, inbox, _inboxes =
+    populate_inboxes
+      ctxt
+      current_level
+      history
+      inbox
+      inboxes
+      (Some current_level_tree)
+      [payloads]
+  in
+  let new_snapshot = take_snapshot ~current_level inbox in
+  fail_unless
+    (equal_history_proof expected_snapshot new_snapshot)
+    (err
+       "Adding messages in an inbox for a level should not modify the snapshot \
+        when the current level is equal to the level where the messages are \
+        added.")
+
 (** This test checks that inboxes of the same levels that are supposed to contain
     the same messages are equal. It also check the level trees obtained from
     the last calls to add_messages are equal. *)
@@ -667,6 +722,59 @@ let test_for_successive_add_messages_with_different_histories_capacities
     (Option.equal I.Internal_for_tests.eq_tree level_tree0 level_tree1
     && Option.equal I.Internal_for_tests.eq_tree level_tree1 level_tree2)
     (err "Trees of (supposedly) equal inboxes should be equal.")
+
+let test_inclusion_proof_of_unarchived_message () =
+  let open Lwt_result_syntax in
+  let level_zero = first_level in
+  let message_counter_zero = Z.zero in
+  let message = "c4c4" in
+  let payloads = [[message]] in
+
+  let check_expected_input (input : Sc_rollup_PVM_sig.inbox_message option) =
+    match input with
+    | Some {payload; _} ->
+        let message' =
+          Sc_rollup_inbox_message_repr.deserialize payload
+          |> WithExceptions.Result.get_ok ~loc:__LOC__
+        in
+        assert (message' = External message)
+    | None -> assert false
+  in
+
+  let* proof =
+    setup_node_inbox_with_messages payloads
+    @@ fun ctxt level_tree history inbox _inboxes ->
+    let* history, history_proof =
+      Node.form_history_proof ctxt history inbox (Some level_tree)
+      >|= Environment.wrap_tzresult
+    in
+    let* proof, input =
+      Node.produce_proof
+        ctxt
+        history
+        history_proof
+        (level_zero, message_counter_zero)
+      >|= Environment.wrap_tzresult
+    in
+    let () = check_expected_input input in
+    return proof
+  in
+
+  let* snapshot =
+    setup_inbox_with_messages payloads
+    @@ fun _ctxt _level_tree _history inbox _inboxes ->
+    (* We set the inbox level in the future. *)
+    let level = Raw_level_repr.of_int32_exn 42l in
+    return (take_snapshot ~current_level:level inbox)
+  in
+
+  let proof = node_proof_to_protocol_proof proof in
+  let* input =
+    verify_proof (level_zero, message_counter_zero) snapshot proof
+    >|= Environment.wrap_tzresult
+  in
+  let () = check_expected_input input in
+  return_unit
 
 let tests =
   let msg_size = QCheck2.Gen.(0 -- 100) in
@@ -771,4 +879,31 @@ let tests =
          capacities"
       gen_history_params
       test_for_successive_add_messages_with_different_histories_capacities;
+    Tztest.tztest_qcheck2
+      ~count:10
+      ~name:
+        "Take snapshot of an empty inbox for any current level gives the same \
+         result"
+      (let open QCheck2.Gen in
+      let* origination_level = small_nat in
+      let* offset = small_nat in
+      let snapshot_level = origination_level + offset + 1 in
+      return (origination_level, snapshot_level))
+      test_empty_inbox_snapshot_taking;
+    Tztest.tztest_qcheck2
+      ~count:10
+      ~name:
+        "Take snapshot is not impacted by messages added during the current \
+         level"
+      (let open QCheck2.Gen in
+      let* list_of_payloads =
+        list_size (1 -- 50) (list_size (1 -- 10) bounded_string)
+      in
+      let* payloads = list_size (1 -- 10) bounded_string in
+      return (list_of_payloads, payloads))
+      test_inbox_snapshot_taking;
+    Tztest.tztest
+      "Test that a unarchived message belongs to the snapshot"
+      `Quick
+      test_inclusion_proof_of_unarchived_message;
   ]
