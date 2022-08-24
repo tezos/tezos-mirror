@@ -67,7 +67,8 @@ The value of the additional field ``category`` designates one of the following f
 * ``"subsidy"`` is the source of tokens minted to subsidize the liquidity baking CPMM contract
 * ``"invoice"`` is the source of tokens minted to compensate some users who have contributed to the betterment of the chain
 * ``"commitment"`` is the source of tokens minted to match commitments made by some users to supply funds for the chain
-* ``"Tx_rollup_rejection_rewards"`` is the source of tokens minted to reward an account for injecting a transaction-rollup-rejection operation
+* ``"Tx_rollup_rejection_rewards"`` is the source of tokens minted to reward an account for injecting a transaction rollup rejection operation
+* ``"Sc_rollup_refutation_rewards"`` is the source of tokens minted to reward an account for winning a smart-contract rollup refutation game
 * ``"bootstrap"`` is analogous to ``"commitment"`` but is for internal use or testing.
   It will not be used during normal operation on mainnet, but may be used on test networks or in sandboxed mode
 * ``"minted"`` is only for internal use and may be used to mint tokens for testing.
