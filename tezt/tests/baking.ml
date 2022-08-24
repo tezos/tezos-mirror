@@ -259,7 +259,7 @@ let sample_next_transfer_for state ~fee ~branch ~account =
     | Fee_mutez fee -> fee
   in
   let amount = 1 + Random.int 500 in
-  let operation =
+  return
     {
       shell_header = {branch};
       protocol_data =
@@ -270,9 +270,9 @@ let sample_next_transfer_for state ~fee ~branch ~account =
                 kind = "transaction";
                 source = account.Account.public_key_hash;
                 fee = string_of_int fee;
-                counter = string_of_int (get_next_counter state account);
+                counter = string_of_int @@ get_next_counter state account;
                 gas_limit = string_of_int 2000;
-                storage_limit = string_of_int 0;
+                storage_limit = "0";
                 amount = string_of_int amount;
                 destination = receiver.Account.public_key_hash;
               };
@@ -280,25 +280,36 @@ let sample_next_transfer_for state ~fee ~branch ~account =
           signature = None;
         };
     }
-  in
-  return operation
+
+let mutez_of_string s = Tez.of_mutez_int @@ int_of_string s
 
 let bake_with_mempool ?protocol node client mempool =
-  let mempool_json =
-    let open Data_encoding in
-    Json.construct (list mempool_operation_encoding) (List.map snd mempool)
-  in
-  let mempool_str = Ezjsonm.value_to_string mempool_json in
-  let mempool = Temp.file "mempool.json" in
-  let* _ =
-    Lwt_io.with_file ~mode:Lwt_io.Output mempool (fun oc ->
-        Lwt_io.write oc mempool_str)
+  let* () =
+    Lwt_list.iter_s
+      (fun op ->
+        let t = Stdlib.List.hd op.protocol_data.contents in
+        let fee = mutez_of_string t.fee
+        and gas_limit = int_of_string t.gas_limit
+        and amount = mutez_of_string t.amount
+        and giver = t.source
+        and receiver = t.destination
+        and endpoint = Client.Node node
+        and storage_limit = int_of_string t.storage_limit in
+        Client.transfer
+          ~endpoint
+          ~fee
+          ~gas_limit
+          ~amount
+          ~giver
+          ~receiver
+          ~storage_limit
+          client)
+      mempool
   in
   (* Use --context's client argument to prevent the node from sorting
      the operations. *)
   Client.bake_for_and_wait
     ?protocol
-    ~mempool
     ~force:true
     ~context_path:(Node.data_dir node // "context")
     client
@@ -374,37 +385,31 @@ let random_permutation list =
   let rng = Random.State.make_self_init () in
   Tezos_base.TzPervasives.List.shuffle ~rng list
 
-let single_baker_increasing_fees state ~account : mempool Lwt.t =
+let single_baker_increasing_fees state ~account =
   let* branch = get_current_head_hash state in
-  let fees = Array.of_list (random_permutation [1_000; 2_000; 3_000]) in
+  let fees = Array.of_list [1_000; 2_000; 3_000] in
   let* op1 =
     sample_next_transfer_for state ~fee:(Fee_mutez fees.(0)) ~branch ~account
   in
-  let* op2 =
+  let* _op2 =
     sample_next_transfer_for state ~fee:(Fee_mutez fees.(1)) ~branch ~account
   in
-  let* op3 =
+  let* _op3 =
     sample_next_transfer_for state ~fee:(Fee_mutez fees.(2)) ~branch ~account
   in
-  let ops =
-    random_permutation [(account, op1); (account, op2); (account, op3)]
-  in
-  mempool_from_list_of_ops state.sandbox_client state.protocol ops
+  Lwt.return @@ [op1; _op2; _op3]
 
-let distinct_bakers_increasing_fees state sources : mempool Lwt.t =
+let distinct_bakers_increasing_fees state sources =
   let* branch = get_current_head_hash state in
   let fees = random_permutation [1_000; 2_000; 3_000; 4_000; 5_000] in
   let accounts = random_permutation sources in
-  let* ops =
-    Lwt_list.map_s
-      (fun (account, fee) ->
-        let* op =
-          sample_next_transfer_for state ~fee:(Fee_mutez fee) ~branch ~account
-        in
-        return (account, op))
-      (List.combine accounts fees)
-  in
-  mempool_from_list_of_ops state.sandbox_client state.protocol ops
+  Lwt_list.map_s
+    (fun (account, fee) ->
+      let* op =
+        sample_next_transfer_for state ~fee:(Fee_mutez fee) ~branch ~account
+      in
+      return op)
+    (List.combine accounts fees)
 
 (* ------------------------------------------------------------------------- *)
 (* Test entrypoints *)
@@ -412,19 +417,25 @@ let distinct_bakers_increasing_fees state sources : mempool Lwt.t =
 let has_1m_restriction_in_blocks protocol =
   Protocol.(number protocol >= number Kathmandu)
 
-let bake_and_check state ~protocol ~mempool ~sources =
+let bake_and_check ?expected_baked_operations state ~protocol ~mempool ~sources
+    =
   let* () =
     bake_with_mempool ~protocol state.sandbox_node state.sandbox_client mempool
   in
   let* block = RPC.(Client.call state.sandbox_client (get_chain_block ())) in
   let expected_number_manager_op =
-    if has_1m_restriction_in_blocks protocol then
-      List.length
-        (List.sort_uniq
-           (fun src1 src2 ->
-             String.compare src1.Account.public_key_hash src2.public_key_hash)
-           sources)
-    else List.length mempool
+    match expected_baked_operations with
+    | None ->
+        if has_1m_restriction_in_blocks protocol then
+          List.length
+            (List.sort_uniq
+               (fun src1 src2 ->
+                 String.compare
+                   src1.Account.public_key_hash
+                   src2.public_key_hash)
+               sources)
+        else List.length mempool
+    | Some n -> n
   in
   assert_block_is_well_baked block expected_number_manager_op ;
   return ()
@@ -452,7 +463,16 @@ let test_ordering =
   Log.info "Testing ordering by counter" ;
   let account = Constant.bootstrap1 in
   let* mempool = single_baker_increasing_fees state ~account in
-  let* () = bake_and_check state ~protocol ~mempool ~sources:[account] in
+  let* () =
+    bake_and_check
+      state
+      ~expected_baked_operations:1
+        (* We're going through the mempool, with
+           operations from the same source, so that only 1 will be baked in *)
+      ~protocol
+      ~mempool
+      ~sources:[account]
+  in
   (* If 1m restriction is enabled on the protocol side, only one
      operation has been added to the previous block, hence the next
      counter for bootstrap1 is the successor of one. *)
