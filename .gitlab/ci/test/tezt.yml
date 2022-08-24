@@ -20,6 +20,7 @@
     # certain tests can be blacklisted by adding it to this variable
     when: always
   script:
+    # Note: the following line is copy-pasted in tezt:static-binaries.
     - dune exec tezt/tests/main.exe -- $TESTS --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit $JUNIT --from-record tezt/records --job $CI_NODE_INDEX/$CI_NODE_TOTAL --record tezt-results-$CI_NODE_INDEX.json -j 4 --retry 1
     - ./scripts/ci/merge_coverage.sh
 
@@ -35,17 +36,32 @@ tezt:
 # these are tezt tests as above, but run using the static binaries
 tezt:static-binaries:
   extends:
-    - .integration_template
+    # Expansion of .integration_template but without coverage
+    # and without the call to "make all".
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development
     - .tezt_template
   dependencies:
+    # Fetch src/proto_*/parameters/*.json from build_x86_64
+    - build_x86_64
+    # And fetch the static executables from build:static
     - build:static-x86_64-linux-binaries
   needs:
+    - build_x86_64
     - build:static-x86_64-linux-binaries
   # WARNING: if you increase the number of parallel jobs, you need to
   # update test_coverage.yml with the new list of jobs.
   parallel: 2
   variables:
     TESTS: "cli"
+  before_script:
+    - mv tezos-binaries/x86_64/tezos-* .
+  # Override script from .tezt_template to disable coverage reports.
+  # Note that the set of tests that are run for static executables
+  # is a subset, so this should not reduce apparent coverage.
+  script:
+    - dune exec tezt/tests/main.exe -- $TESTS --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit $JUNIT --from-record tezt/records --job $CI_NODE_INDEX/$CI_NODE_TOTAL --record tezt-results-$CI_NODE_INDEX.json -j 4 --retry 1
 
 # Long Tezt tests are not ran in the CI, but we want them to type-check so that
 # they can be built in the performance regression test framework executors.
