@@ -336,7 +336,7 @@ let zarith_stubs_js = external_lib ~js_compatible:true "zarith_stubs_js" V.True
 
 (* VENDORED LIBS *)
 
-let ledgerwallet_tezos = vendored_lib "ledgerwallet-tezos" V.True
+let ledgerwallet_tezos = vendored_lib "ledgerwallet-tezos" V.(at_least "0.2.1")
 
 (* INTERNAL LIBS *)
 
@@ -577,6 +577,7 @@ let octez_error_monad =
         lwt;
         octez_lwt_result_stdlib;
       ]
+    ~conflicts:[external_lib "result" V.(less_than "1.5")]
     ~js_compatible:true
 
 let octez_hacl =
@@ -1123,7 +1124,7 @@ let octez_webassembly_interpreter =
   public_lib
     "tezos-webassembly-interpreter"
     ~path:"src/lib_webassembly"
-    ~license:"Apache License 2.0"
+    ~license:"Apache-2.0"
     ~extra_authors:["WebAssembly Authors"]
     ~synopsis:"WebAssembly reference interpreter with tweaks for Tezos"
     ~dune:Dune.[[S "include_subdirs"; S "unqualified"]]
