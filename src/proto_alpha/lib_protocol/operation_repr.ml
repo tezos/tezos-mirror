@@ -1798,23 +1798,45 @@ let raw ({shell; protocol_data} : _ operation) =
   in
   {Operation.shell; proto}
 
-let acceptable_passes (op : packed_operation) =
+(** Each operation belongs to a validation pass that is an integer
+   abstracting its priority in a block. Except Failing_noop. *)
+
+let consensus_pass = 0
+
+let voting_pass = 1
+
+let anonymous_pass = 2
+
+let manager_pass = 3
+
+(** [acceptable_pass op] returns either the validation_pass of [op]
+   when defines and None when [op] is [Failing_noop]. *)
+let acceptable_pass (op : packed_operation) =
   let (Operation_data protocol_data) = op.protocol_data in
   match protocol_data.contents with
-  | Single (Failing_noop _) -> []
-  | Single (Preendorsement _) -> [0]
-  | Single (Endorsement _) -> [0]
-  | Single (Dal_slot_availability _) -> [0]
-  | Single (Proposals _) -> [1]
-  | Single (Ballot _) -> [1]
-  | Single (Seed_nonce_revelation _) -> [2]
-  | Single (Vdf_revelation _) -> [2]
-  | Single (Double_endorsement_evidence _) -> [2]
-  | Single (Double_preendorsement_evidence _) -> [2]
-  | Single (Double_baking_evidence _) -> [2]
-  | Single (Activate_account _) -> [2]
-  | Single (Manager_operation _) -> [3]
-  | Cons (Manager_operation _, _ops) -> [3]
+  | Single (Failing_noop _) -> None
+  | Single (Preendorsement _) -> Some consensus_pass
+  | Single (Endorsement _) -> Some consensus_pass
+  | Single (Dal_slot_availability _) -> Some consensus_pass
+  | Single (Proposals _) -> Some voting_pass
+  | Single (Ballot _) -> Some voting_pass
+  | Single (Seed_nonce_revelation _) -> Some anonymous_pass
+  | Single (Vdf_revelation _) -> Some anonymous_pass
+  | Single (Double_endorsement_evidence _) -> Some anonymous_pass
+  | Single (Double_preendorsement_evidence _) -> Some anonymous_pass
+  | Single (Double_baking_evidence _) -> Some anonymous_pass
+  | Single (Activate_account _) -> Some anonymous_pass
+  | Single (Manager_operation _) -> Some manager_pass
+  | Cons (Manager_operation _, _ops) -> Some manager_pass
+
+(** [compare_by_passes] orders two operations in the reverse order of
+   their acceptable passes. *)
+let compare_by_passes op1 op2 =
+  match (acceptable_pass op1, acceptable_pass op2) with
+  | Some op1_pass, Some op2_pass -> Compare.Int.compare op2_pass op1_pass
+  | None, Some _ -> -1
+  | Some _, None -> 1
+  | None, None -> 0
 
 type error += Invalid_signature (* `Permanent *)
 
@@ -2561,7 +2583,7 @@ let compare_manager_weight weight1 weight2 =
       compare_pair_in_lexico_order
         (manweight1, source1)
         (manweight2, source2)
-        ~cmp_fst:Q.compare
+        ~cmp_fst:Compare.Q.compare
         ~cmp_snd:Signature.Public_key_hash.compare
 
 (** Two {!operation_weight} are compared by their [pass], see

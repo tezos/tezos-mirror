@@ -78,7 +78,7 @@ module Mock_all_unit :
 
   let compare_operations _ = assert false
 
-  let acceptable_passes _ = assert false
+  let acceptable_pass _ = assert false
 
   let operation_data_and_receipt_encoding =
     Data_encoding.conv (Fun.const ()) (Fun.const ((), ())) Data_encoding.unit

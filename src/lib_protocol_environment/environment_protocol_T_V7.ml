@@ -73,7 +73,7 @@ module type T = sig
   val operation_data_and_receipt_encoding :
     (operation_data * operation_receipt) Data_encoding.t
 
-  val acceptable_passes : operation -> int list
+  val acceptable_pass : operation -> int option
 
   val compare_operations :
     Operation_hash.t * operation -> Operation_hash.t * operation -> int

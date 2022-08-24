@@ -29,7 +29,7 @@ let max_operation_data_length = 0
 
 let validation_passes = []
 
-let acceptable_passes _op = []
+let acceptable_pass _op = None
 
 type block_header_data = string
 

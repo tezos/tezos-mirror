@@ -62,9 +62,9 @@ let max_operation_data_length = 42
 
 let validation_passes = []
 
-let acceptable_passes _op = []
-
 let compare_operations _ _ = 0
+
+let acceptable_pass _ = Some 0
 
 type validation_state = {context : Context.t; fitness : Int64.t}
 

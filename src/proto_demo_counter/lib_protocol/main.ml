@@ -29,7 +29,7 @@ let max_operation_data_length = 100
 
 let validation_passes = Updater.[{max_size = 1000; max_op = None}]
 
-let acceptable_passes _op = [0]
+let acceptable_pass _op = Some 0
 
 type block_header_data = Header.t
 

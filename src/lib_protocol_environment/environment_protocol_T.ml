@@ -81,6 +81,9 @@ module V0toV7
 
   let compare_operations (_, op) (_, op') = compare_operations op op'
 
+  let acceptable_pass op =
+    match acceptable_passes op with [n] -> Some n | _ -> None
+
   let value_of_key ~chain_id:_ ~predecessor_context:_ ~predecessor_timestamp:_
       ~predecessor_level:_ ~predecessor_fitness:_ ~predecessor:_ ~timestamp:_ =
     Lwt.return_ok (fun _ ->

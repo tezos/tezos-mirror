@@ -62,7 +62,7 @@ type operation = Alpha_context.packed_operation = {
   protocol_data : operation_data;
 }
 
-let acceptable_passes = Alpha_context.Operation.acceptable_passes
+let acceptable_pass = Alpha_context.Operation.acceptable_pass
 
 let max_block_length = Alpha_context.Block_header.max_header_length
 
@@ -426,23 +426,26 @@ let apply_operation_with_mode mode ctxt chain_id data op_count operation
 let apply_operation ({mode; chain_id; ctxt; op_count; _} as data)
     (operation : Alpha_context.packed_operation) =
   match mode with
-  | Partial_application _
-    when not
-           (List.exists
-              (Compare.Int.equal 0)
-              (Alpha_context.Operation.acceptable_passes operation)) ->
-      (* Multipass validation only considers operations in pass 0. *)
-      let op_count = op_count + 1 in
-      return ({data with ctxt; op_count}, No_operation_metadata)
-  | Partial_application {payload_producer; _} ->
-      apply_operation_with_mode
-        Apply.Application
-        ctxt
-        chain_id
-        data
-        op_count
-        operation
-        ~payload_producer
+  | Partial_application {payload_producer; _} -> (
+      match acceptable_pass operation with
+      | None ->
+          (* Only occurs with Failing_noop *)
+          fail Validate_errors.Failing_noop_error
+      | Some n ->
+          (* Multipass validation only considers operations in
+             consensus pass. *)
+          if Compare.Int.(n = Operation_repr.consensus_pass) then
+            apply_operation_with_mode
+              Apply.Application
+              ctxt
+              chain_id
+              data
+              op_count
+              operation
+              ~payload_producer
+          else
+            let op_count = op_count + 1 in
+            return ({data with ctxt; op_count}, No_operation_metadata))
   | Application {payload_producer; _} ->
       apply_operation_with_mode
         Apply.Application

@@ -4255,7 +4255,9 @@ module Operation : sig
 
   val hash_packed : packed_operation -> Operation_hash.t
 
-  val acceptable_passes : packed_operation -> int list
+  val acceptable_pass : packed_operation -> int option
+
+  val compare_by_passes : packed_operation -> packed_operation -> int
 
   type error += Missing_signature (* `Permanent *)
 

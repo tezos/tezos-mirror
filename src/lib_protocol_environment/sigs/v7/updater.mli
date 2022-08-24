@@ -124,12 +124,11 @@ module type PROTOCOL = sig
   val operation_data_and_receipt_encoding :
     (operation_data * operation_receipt) Data_encoding.t
 
-  (** [acceptable_passes op] lists the validation passes in which the
-     input operation [op] can appear. For instance, it results in
-     [[0]] if [op] only belongs to the first pass. An answer of [[]]
-     means that the [op] is ill-formed and cannot be included at
-     all in a block. *)
-  val acceptable_passes : operation -> int list
+  (** [acceptable_pass op] gives the validation pass in which the
+      input operation [op] can appear. For instance, it results in
+      [Some 0] if [op] only belongs to the first pass. When [op] is
+      ill-formed, [acceptable_pass op] returns [None]. *)
+  val acceptable_pass : operation -> int option
 
   (** [compare_operations (oph1,op1) (oph2,op2)] defines a total
      ordering relation on valid operations.

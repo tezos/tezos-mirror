@@ -604,7 +604,28 @@ val hash : _ operation -> Operation_hash.t
 
 val hash_packed : packed_operation -> Operation_hash.t
 
-val acceptable_passes : packed_operation -> int list
+(** Each operation belongs to a validation pass that is an integer
+   abstracting its priority in a block. Except Failing_noop. *)
+
+(** The validation pass of consensus operations. *)
+val consensus_pass : int
+
+(** The validation pass of voting operations. *)
+val voting_pass : int
+
+(** The validation pass of anonymous operations. *)
+val anonymous_pass : int
+
+(** The validation pass of anonymous operations. *)
+val manager_pass : int
+
+(** [acceptable_pass op] returns either the validation_pass of [op]
+   when defines and None when [op] is [Failing_noop]. *)
+val acceptable_pass : packed_operation -> int option
+
+(** [compare_by_passes] orders two operations in the reverse order of
+   their acceptable passes. *)
+val compare_by_passes : packed_operation -> packed_operation -> int
 
 (** [compare (oph1,op1) (oph2,op2)] defines a total ordering relation
    on operations.

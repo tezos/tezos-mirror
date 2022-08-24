@@ -30,13 +30,13 @@ module Events = Baking_events.Selection
 
 let quota = Main.validation_passes
 
-let consensus_quota = Stdlib.List.nth quota Operation_pool.consensus_index
+let consensus_quota = Stdlib.List.nth quota Operation_repr.consensus_pass
 
-let votes_quota = Stdlib.List.nth quota Operation_pool.votes_index
+let votes_quota = Stdlib.List.nth quota Operation_repr.voting_pass
 
-let anonymous_quota = Stdlib.List.nth quota Operation_pool.anonymous_index
+let anonymous_quota = Stdlib.List.nth quota Operation_repr.anonymous_pass
 
-let managers_quota = Stdlib.List.nth quota Operation_pool.managers_index
+let managers_quota = Stdlib.List.nth quota Operation_repr.manager_pass
 
 type prioritized_manager = {
   op : Prioritized_operation.t;
