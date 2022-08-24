@@ -126,6 +126,48 @@ let aggregate_cases :
       (function m, t -> IK_Aggregate_concat (m, sec, t));
   ]
 
+let join_kont_encoding enc_b =
+  tagged_union
+    tag_encoding
+    [
+      case
+        "J_Init"
+        (lazy_vec_encoding (lazy_vec_encoding enc_b))
+        (function J_Init v -> Some v | _ -> None)
+        (fun v -> J_Init v);
+      case
+        "J_Next"
+        (tup2
+           ~flatten:true
+           (scope ["kont"] (concat_kont_encoding (lazy_vec_encoding enc_b)))
+           (scope ["acc"] (lazy_vec_encoding (lazy_vec_encoding enc_b))))
+        (function J_Next (kont, acc) -> Some (kont, acc) | _ -> None)
+        (function kont, acc -> J_Next (kont, acc));
+      case
+        "J_Stop"
+        (lazy_vec_encoding enc_b)
+        (function J_Stop res -> Some res | _ -> None)
+        (fun res -> J_Stop res);
+    ]
+
+let map_concat_kont_encoding enc_a enc_b =
+  tagged_union
+    tag_encoding
+    [
+      case
+        "MC_Map"
+        (map_kont_encoding
+           (lazy_vec_encoding enc_a)
+           (lazy_vec_encoding (lazy_vec_encoding enc_b)))
+        (function MC_Map m -> Some m | _ -> None)
+        (fun m -> MC_Map m);
+      case
+        "MC_Join"
+        (join_kont_encoding enc_b)
+        (function MC_Join j -> Some j | _ -> None)
+        (fun j -> MC_Join j);
+    ]
+
 let init_kont_encoding =
   tagged_union tag_encoding
   @@ [
@@ -219,10 +261,27 @@ let init_kont_encoding =
         (function IK_Datas (inst, map) -> Some (inst, map) | _ -> None)
         (function inst, map -> IK_Datas (inst, map));
       case
+        "IK_Es_elem"
+        (tup2
+           ~flatten:true
+           (scope ["module"] Wasm_encoding.module_instance_encoding)
+           (scope
+              ["kont"]
+              (map_concat_kont_encoding
+                 Parser.(no_region_encoding Elem.elem_encoding)
+                 Wasm_encoding.admin_instr_encoding)))
+        (function IK_Es_elems (inst, map) -> Some (inst, map) | _ -> None)
+        (function inst, map -> IK_Es_elems (inst, map));
+      case
         "IK_Remaining"
-        Wasm_encoding.module_instance_encoding
-        (function IK_Remaining m -> Some m | _ -> None)
-        (function m -> IK_Remaining m);
+        (tup2
+           ~flatten:true
+           (scope ["module"] Wasm_encoding.module_instance_encoding)
+           (scope
+              ["es_elem"]
+              (lazy_vec_encoding Wasm_encoding.admin_instr_encoding)))
+        (function IK_Remaining (m, admin) -> Some (m, admin) | _ -> None)
+        (function m, admin -> IK_Remaining (m, admin));
       case
         "IK_Stop"
         Wasm_encoding.module_instance_encoding

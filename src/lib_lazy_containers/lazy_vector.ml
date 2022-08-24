@@ -86,6 +86,8 @@ module type S = sig
 
   val grow : ?default:(unit -> 'a) -> key -> 'a t -> 'a t
 
+  val pop : 'a t -> ('a * 'a t) Lwt.t
+
   val append : 'a -> 'a t -> 'a t * key
 
   val concat : 'a t -> 'a t -> 'a t Lwt.t
@@ -181,6 +183,18 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
       match elt with Some elt -> set num_elements elt map | None -> map
     in
     (map, num_elements)
+
+  let pop map =
+    let open Lwt.Syntax in
+    if Key.(unsigned_compare zero map.num_elements < 0) then
+      let+ x = get Key.zero map in
+      ( x,
+        {
+          map with
+          first = Key.succ map.first;
+          num_elements = Key.pred map.num_elements;
+        } )
+    else raise Bounds
 
   let append elt map = append_opt (Some elt) map
 

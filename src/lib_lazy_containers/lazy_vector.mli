@@ -147,6 +147,11 @@ module type S = sig
       large. *)
   val grow : ?default:(unit -> 'a) -> key -> 'a t -> 'a t
 
+  (** [pop vector] removes the head from [vector], and returns it.
+
+      @raise Bounds when applied on an empty vector. *)
+  val pop : 'a t -> ('a * 'a t) Lwt.t
+
   (** [append elt vector] creates a new lazy vector that has one
       more item than [vector] whose value is [elt]. This is a shortcut
       for [vector |> grow Key.(succ zero) |> set (num_elements vector) elt].

@@ -1057,6 +1057,12 @@ let map_step {origin; destination; offset} f =
   let destination = Vector.set offset (f x) destination in
   {origin; destination; offset = Int32.succ offset}
 
+let map_i_step {origin; destination; offset} f =
+  let open Lwt.Syntax in
+  let+ x = Vector.get offset origin in
+  let destination = Vector.set offset (f offset x) destination in
+  {origin; destination; offset = Int32.succ offset}
+
 let map_s_step {origin; destination; offset} f =
   let open Lwt.Syntax in
   let* x = Vector.get offset origin in
@@ -1129,6 +1135,66 @@ let section_set_vec :
   | Table, tables -> {inst with tables}
   | Memory, memories -> {inst with memories}
 
+type 'b join_kont =
+  | J_Init of 'b Vector.t Vector.t
+  | J_Next of 'b concat_kont * 'b Vector.t Vector.t
+  | J_Stop of 'b Vector.t
+
+let join_kont vec = J_Init vec
+
+let join_completed = function
+  | J_Init v when Vector.num_elements v = 0l -> Some (Vector.create 0l)
+  | J_Stop v -> Some v
+  | _ -> None
+
+let join_step =
+  let open Lwt.Syntax in
+  function
+  | J_Init v when 1l < Vector.num_elements v ->
+      let* x, v = Vector.pop v in
+      let+ y, v = Vector.pop v in
+      J_Next (concat_kont x y, v)
+  | J_Init v when Vector.num_elements v = 1l ->
+      let+ v = Vector.get 0l v in
+      J_Stop v
+  | J_Next (tick, acc)
+    when concat_completed tick && Vector.num_elements acc = 0l ->
+      Lwt.return (J_Stop tick.res)
+  | J_Next (tick, acc) when concat_completed tick ->
+      let+ x, acc = Vector.pop acc in
+      J_Next (concat_kont tick.res x, acc)
+  | J_Next (tick, acc) ->
+      let+ tick = concat_step tick in
+      J_Next (tick, acc)
+  | J_Init _ ->
+      (* [num_elements = 0l], so [join_completed] returns [Some], should not be called in this state *)
+      assert false
+  | J_Stop _ -> assert false
+
+type ('a, 'b) map_concat_kont =
+  | MC_Map of ('a, 'b Vector.t) map_kont
+  | MC_Join of 'b join_kont
+
+let map_concat_kont v = MC_Map (map_kont v)
+
+let map_concat_completed = function MC_Join v -> join_completed v | _ -> None
+
+let map_concat_step f = function
+  | MC_Map map when map_completed map ->
+      Lwt.return (MC_Join (join_kont map.destination))
+  | MC_Map map ->
+      let+ map = f map in
+      MC_Map map
+  | MC_Join tick -> (
+      match join_completed tick with
+      | Some _ ->
+          (* [map_concat_completed] would have returned [Some], so
+             illegal state to call this function *)
+          assert false
+      | None ->
+          let+ tick = join_step tick in
+          MC_Join tick)
+
 type init_kont =
   | IK_Start
   | IK_Add_import of (extern, import, module_inst) fold_right2_kont
@@ -1142,7 +1208,8 @@ type init_kont =
   | IK_Exports of module_inst * (export, extern NameMap.t) fold_left_kont
   | IK_Elems of module_inst * (elem_segment, elem_inst) map_kont
   | IK_Datas of module_inst * (data_segment, data_inst) map_kont
-  | IK_Remaining of module_inst
+  | IK_Es_elems of module_inst * (elem_segment, admin_instr) map_concat_kont
+  | IK_Remaining of module_inst * admin_instr Vector.t
   | IK_Stop of module_inst
 
 let section_next_init_kont :
@@ -1236,20 +1303,32 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
   | IK_Datas (inst0, tick) when map_completed tick ->
       let inst = {inst0 with datas = tick.destination} in
       update_module_ref module_reg self inst ;
-      Lwt.return (IK_Remaining inst)
+      Lwt.return (IK_Es_elems (inst, map_concat_kont m.it.elems))
   | IK_Datas (inst0, tick) ->
       let+ tick = map_step tick create_data in
       IK_Datas (inst0, tick)
-  | IK_Remaining inst ->
+  | IK_Es_elems (inst0, tick) -> (
+      match map_concat_completed tick with
+      | Some es_elem -> Lwt.return (IK_Remaining (inst0, es_elem))
+      | None ->
+          let+ tick =
+            map_concat_step
+              (fun tick ->
+                map_i_step tick (fun i x -> run_elem i x |> Vector.of_list))
+              tick
+          in
+          IK_Es_elems (inst0, tick))
+  | IK_Remaining (inst, es_elem) ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
          These transformations should be refactored and abadoned during the
          tickification, to avoid the roundtrip vector -> list -> vector. *)
+      let* es_elem = Vector.to_list es_elem in
+
       let* datas = Vector.to_list m.it.datas in
-      let* elems = Vector.to_list m.it.elems in
-      let es_elem = List.concat (Lib.List32.mapi run_elem elems) in
       let* datas = Lib.List32.mapi_s (run_data inst) datas in
       let es_data = TzStdLib.List.concat datas in
       let es_start = Lib.Option.get (Lib.Option.map run_start m.it.start) [] in
+
       let+ (_ : Values.value stack) =
         eval
           module_reg
