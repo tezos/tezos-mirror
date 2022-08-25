@@ -474,6 +474,14 @@ val post_chain_block_helpers_preapply_block :
 val post_chain_block_helpers_forge_operations :
   ?chain:string -> ?block:string -> data:Ezjsonm.value -> unit -> JSON.t t
 
+(** RPC: [POST /chains/[chain]/blocks/[block]/helpers/scripts/simulate_operation]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val post_chain_block_helpers_scripts_simulate_operation :
+  ?chain:string -> ?block:string -> data:Ezjsonm.value -> unit -> JSON.t t
+
 (** {2 Smart contract rollup RPC module} *)
 
 (** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup] *)

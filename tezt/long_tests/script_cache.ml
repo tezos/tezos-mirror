@@ -613,7 +613,10 @@ let gas_from_simulation client chain_id contract_id ?blocks_before_activation
 
   let* block = RPC.Client.call client @@ RPC.get_chain_block_hash () in
   let data = data block counter in
-  let* result = RPC.post_simulate_operation client ~data in
+  let* result =
+    RPC.Client.call client
+    @@ RPC.post_chain_block_helpers_scripts_simulate_operation ~data ()
+  in
   return (read_consumed_gas JSON.(get "contents" result |> geti 0))
 
 let check_simulation_takes_cache_into_account ~protocol =

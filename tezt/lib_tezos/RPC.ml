@@ -417,6 +417,22 @@ let post_chain_block_helpers_forge_operations ?(chain = "main")
     ["chains"; chain; "blocks"; block; "helpers"; "forge"; "operations"]
     Fun.id
 
+let post_chain_block_helpers_scripts_simulate_operation ?(chain = "main")
+    ?(block = "head") ~data () =
+  make
+    ~data
+    POST
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "helpers";
+      "scripts";
+      "simulate_operation";
+    ]
+    Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 
