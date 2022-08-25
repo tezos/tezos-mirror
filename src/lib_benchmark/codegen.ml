@@ -155,13 +155,21 @@ let generate_let_binding =
 let make_module structure_items =
   let open Ast_helper in
   let open Codegen_helpers in
+  let suppress_unused_open_warning =
+    Str.attribute
+      (Attr.mk
+         (loc_str "warning")
+         (PStr [Str.eval (Exp.constant (Const.string "-33"))]))
+  in
   let rename_saturation_repr =
     Str.module_
       (Mb.mk (loc (Some "S")) (Mod.ident (loc_ident "Saturation_repr")))
   in
   Str.module_
     (Mb.mk (Codegen_helpers.loc (Some "Generated"))
-    @@ Mod.structure (rename_saturation_repr :: structure_items))
+    @@ Mod.structure
+         (suppress_unused_open_warning :: rename_saturation_repr
+        :: structure_items))
 
 let pp_structure_item fmtr generated = Pprintast.structure fmtr [generated]
 
