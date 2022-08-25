@@ -25,6 +25,8 @@
 
 val bool_to_int : bool -> int
 
+val create_tables : string list
+
 val db_schema : string
 
 val maybe_insert_source : string -> string

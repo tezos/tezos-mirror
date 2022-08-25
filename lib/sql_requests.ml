@@ -28,67 +28,106 @@
    integers. *)
 let bool_to_int b = if b then 1 else 0
 
-let db_schema =
-  "\n\
-  \  CREATE TABLE delegates(\n\
+let create_delegates =
+  "  CREATE TABLE delegates(\n\
   \     id INTEGER PRIMARY KEY,\n\
   \     address BLOB UNIQUE NOT NULL,\n\
-  \     alias TEXT);\n\
-  \   CREATE TABLE nodes(\n\
+  \     alias TEXT)"
+
+let create_nodes =
+  "   CREATE TABLE nodes(\n\
   \     id INTEGER PRIMARY KEY,\n\
   \     name TEXT UNIQUE NOT NULL,\n\
-  \     comment TEXT);\n\
-  \   CREATE TABLE blocks(\n\
+  \     comment TEXT)"
+
+let create_blocks =
+  "   CREATE TABLE blocks(\n\
   \     id INTEGER PRIMARY KEY,\n\
   \     timestamp INTEGER NOT NULL, -- Unix time\n\
   \     hash BLOB UNIQUE NOT NULL,\n\
   \     level INTEGER NOT NULL,\n\
   \     round INTEGER NOT NULL,\n\
   \     baker INTEGER NOT NULL,\n\
-  \     FOREIGN KEY (baker) REFERENCES delegates(id));\n\
-  \   CREATE TABLE blocks_reception(\n\
+  \     FOREIGN KEY (baker) REFERENCES delegates(id))"
+
+let create_blocks_reception =
+  "   CREATE TABLE blocks_reception(\n\
   \     id INTEGER PRIMARY KEY,\n\
   \     timestamp TEXT NOT NULL, -- ISO8601 string\n\
   \     block INTEGER NOT NULL,\n\
   \     source INTEGER NOT NULL,\n\
   \     FOREIGN KEY (block) REFERENCES blocks(id),\n\
-  \     FOREIGN KEY (source) REFERENCES nodes(id));\n\
-  \   CREATE TABLE operations(\n\
+  \     FOREIGN KEY (source) REFERENCES nodes(id))"
+
+let create_operations =
+  "   CREATE TABLE operations(\n\
   \     id INTEGER PRIMARY KEY,\n\
   \     hash BLOB UNIQUE NOT NULL,\n\
   \     endorsement INTEGER NOT NULL,\n\
   \     endorser INTEGER NOT NULL,\n\
   \     level INTEGER NOT NULL,\n\
   \     round INTEGER,\n\
-  \     FOREIGN KEY (endorser) REFERENCES delegates(id));\n\
-  \   CREATE TABLE operations_reception(\n\
+  \     FOREIGN KEY (endorser) REFERENCES delegates(id))"
+
+let create_operations_reception =
+  "   CREATE TABLE operations_reception(\n\
   \     id INTEGER PRIMARY KEY,\n\
   \     timestamp TEXT NOT NULL, -- ISO8601 string\n\
   \     operation INTEGER NOT NULL,\n\
   \     source INTEGER NOT NULL,\n\
   \     errors BLOB,\n\
   \     FOREIGN KEY (operation) REFERENCES operations(id),\n\
-  \     FOREIGN KEY (source) REFERENCES nodes(id));\n\
-  \   CREATE TABLE operations_inclusion(\n\
+  \     FOREIGN KEY (source) REFERENCES nodes(id))"
+
+let create_operations_inclusion =
+  "   CREATE TABLE operations_inclusion(\n\
   \      id INTEGER PRIMARY KEY,\n\
   \      block INTEGER NOT NULL,\n\
   \      operation INTEGER NOT NULL,\n\
   \      FOREIGN KEY (block) REFERENCES blocks(id),\n\
-  \      FOREIGN KEY (operation) REFERENCES operations(id));\n\
-  \   CREATE TABLE endorsing_rights(\n\
+  \      FOREIGN KEY (operation) REFERENCES operations(id))"
+
+let create_endorsing_rights =
+  "   CREATE TABLE endorsing_rights(\n\
   \      id INTEGER PRIMARY KEY,\n\
   \      level INTEGER NOT NULL,\n\
   \      delegate INTEGER NOT NULL,\n\
   \      first_slot INTEGER NOT NULL,\n\
   \      endorsing_power INTEGER NOT NULL,\n\
   \      FOREIGN KEY (delegate) REFERENCES delegates(id),\n\
-  \      UNIQUE (level, delegate));\n\
-  \   CREATE INDEX endorsing_rights_level_idx ON endorsing_rights(level);\n\
-  \   CREATE INDEX operations_level_idx ON operations(level);\n\
-  \   CREATE INDEX operations_reception_operation_idx ON \n\
-  \      operations_reception(operation);\n\
-  \   CREATE INDEX operations_inclusion_operation_idx ON \n\
-  \      operations_inclusion(operation);"
+  \      UNIQUE (level, delegate))"
+
+let create_endorsing_rights_level_idx =
+  "   CREATE INDEX endorsing_rights_level_idx ON endorsing_rights(level)"
+
+let create_operations_level_idx =
+  "   CREATE INDEX operations_level_idx ON operations(level)"
+
+let create_operations_reception_operation_idx =
+  "   CREATE INDEX operations_reception_operation_idx ON \
+   operations_reception(operation)"
+
+let create_operations_inclusion_operation_idx =
+  "   CREATE INDEX operations_inclusion_operation_idx ON \
+   operations_inclusion(operation)"
+
+let create_tables =
+  [
+    create_delegates;
+    create_nodes;
+    create_blocks;
+    create_blocks_reception;
+    create_operations;
+    create_operations_reception;
+    create_operations_inclusion;
+    create_endorsing_rights;
+    create_endorsing_rights_level_idx;
+    create_operations_level_idx;
+    create_operations_reception_operation_idx;
+    create_operations_inclusion_operation_idx;
+  ]
+
+let db_schema = String.concat "; " create_tables
 
 let maybe_insert_source source =
   "INSERT OR IGNORE INTO nodes (name) VALUES (\'" ^ source ^ "\');"
