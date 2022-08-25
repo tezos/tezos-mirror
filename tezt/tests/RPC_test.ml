@@ -842,7 +842,10 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
   let* _output_monitor = Process.check_and_read_stdout proc_monitor in
   (* Test RPCs [GET|POST /chains/main/mempool/filter] *)
   let get_filter_variations () =
-    let get_filter = RPC.get_mempool_filter ?endpoint ~hooks:mempool_hooks in
+    let get_filter ?include_default client =
+      RPC.Client.call ?endpoint ~hooks:mempool_hooks client
+      @@ RPC.get_chain_mempool_filter ?include_default ()
+    in
     let* _ = get_filter client in
     let* _ = get_filter ~include_default:true client in
     let* _ = get_filter ~include_default:false client in

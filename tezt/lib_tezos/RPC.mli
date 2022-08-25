@@ -445,6 +445,13 @@ val post_chain_mempool_unban_operation :
  *)
 val post_chain_mempool_unban_all_operations : ?chain:string -> unit -> JSON.t t
 
+(** RPC: [GET /chains/[chain]/mempool/filter]
+
+    [chain] defaults to ["main"].
+*)
+val get_chain_mempool_filter :
+  ?chain:string -> ?include_default:bool -> unit -> JSON.t t
+
 (** {2 Smart contract rollup RPC module} *)
 
 (** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup] *)

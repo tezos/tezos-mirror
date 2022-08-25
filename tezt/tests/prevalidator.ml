@@ -3637,12 +3637,18 @@ module Filter_config = struct
       for optional argument [include_default] (omitted/[true]/[false]). *)
   let check_RPC_GET_all_variations ?(log = false) expected_config client =
     let expected_full = fill_with_default expected_config in
-    let* json = RPC.get_mempool_filter client in
+    let* json = RPC.Client.call client @@ RPC.get_chain_mempool_filter () in
     check_equal expected_full (of_json json) ;
-    let* json = RPC.get_mempool_filter ~include_default:true client in
+    let* json =
+      RPC.Client.call client
+      @@ RPC.get_chain_mempool_filter ~include_default:true ()
+    in
     check_equal expected_full (of_json json) ;
     let expected_partial = clear_default expected_config in
-    let* json = RPC.get_mempool_filter ~include_default:false client in
+    let* json =
+      RPC.Client.call client
+      @@ RPC.get_chain_mempool_filter ~include_default:false ()
+    in
     check_equal expected_partial (of_json json) ;
     if log then
       Log.info
@@ -3773,7 +3779,7 @@ let test_get_post_mempool_filter =
     let* output = Revamped.set_filter invalid_config_str client1 in
     check_equal config3_full (of_json output) ;
     let* () = waiter in
-    let* output = RPC.get_mempool_filter client1 in
+    let* output = RPC.Client.call client1 @@ RPC.get_chain_mempool_filter () in
     check_equal config3_full (of_json output) ;
     Log.info "Tested invalid config: %s." invalid_config_str ;
     unit

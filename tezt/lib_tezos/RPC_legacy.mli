@@ -34,15 +34,6 @@
 
 (** {2 Shell RPCs} *)
 
-(** Call RPC GET /chains/[chain]/mempool/filter *)
-val get_mempool_filter :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?include_default:bool ->
-  Client.t ->
-  JSON.t Lwt.t
-
 (** Call RPC POST /chains/[chain]/mempool/filter *)
 val post_mempool_filter :
   ?endpoint:Client.endpoint ->

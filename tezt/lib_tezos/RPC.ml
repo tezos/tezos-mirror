@@ -390,6 +390,14 @@ let post_chain_mempool_unban_operation ?(chain = "main") ~data () =
 let post_chain_mempool_unban_all_operations ?(chain = "main") () =
   make POST ["chains"; chain; "mempool"; "unban_all_operations"] Fun.id
 
+let get_chain_mempool_filter ?(chain = "main") ?include_default () =
+  let query_string =
+    Option.map
+      (fun b -> [("include_default", string_of_bool b)])
+      include_default
+  in
+  make ?query_string GET ["chains"; chain; "mempool"; "filter"] Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

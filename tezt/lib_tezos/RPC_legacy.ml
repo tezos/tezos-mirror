@@ -24,16 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let get_mempool_filter ?endpoint ?hooks ?(chain = "main") ?include_default
-    client =
-  let path = ["chains"; chain; "mempool"; "filter"] in
-  let query_string =
-    Option.map
-      (fun b -> [("include_default", string_of_bool b)])
-      include_default
-  in
-  Client.rpc ?endpoint ?hooks ?query_string GET path client
-
 let post_mempool_filter ?endpoint ?hooks ?(chain = "main") ~data client =
   let path = ["chains"; chain; "mempool"; "filter"] in
   Client.rpc ?endpoint ?hooks ~data POST path client
