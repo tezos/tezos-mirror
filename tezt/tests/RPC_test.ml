@@ -980,7 +980,10 @@ let test_chain _test_mode_tag _protocol ?endpoint client =
     RPC.Client.call ?endpoint client @@ RPC.get_chain_invalid_blocks ()
   in
   let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_block () in
-  let* _ = RPC.get_constants_errors ?endpoint client in
+  let* _ =
+    RPC.Client.call ?endpoint client
+    @@ RPC.get_chain_block_context_constants_errors ()
+  in
   let* _ =
     RPC.Client.call ?endpoint client
     @@ RPC.get_chain_block_context_nonce block_level

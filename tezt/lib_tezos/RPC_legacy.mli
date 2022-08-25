@@ -36,15 +36,6 @@
 
 type ctxt_type = Bytes | Json
 
-(** Call RPC /chain/[chain]/blocks/[block]/context/constants/errors *)
-val get_constants_errors :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
 (** Call RPC /chain/[chain]/blocks/[block]/helpers/baking_rights *)
 val get_baking_rights :
   ?endpoint:Client.endpoint ->

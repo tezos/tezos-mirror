@@ -24,13 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let get_constants_errors ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    client =
-  let path =
-    ["chains"; chain; "blocks"; block; "context"; "constants"; "errors"]
-  in
-  Client.rpc ?endpoint ?hooks GET path client
-
 type ctxt_type = Bytes | Json
 
 let get_baking_rights ?endpoint ?hooks ?(chain = "main") ?(block = "head")

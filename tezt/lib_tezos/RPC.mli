@@ -514,6 +514,14 @@ val get_chain_block_context_raw :
 val get_chain_block_context_constants :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
+(** RPC: [GET /chains/[chain]/blocks/[block]/context/constants/errors]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_constants_errors :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
 (** {2 Smart contract rollup RPC module} *)
 
 (** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup] *)

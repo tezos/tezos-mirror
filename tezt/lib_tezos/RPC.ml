@@ -464,6 +464,13 @@ let get_chain_block_context_raw ?(chain = "main") ?(block = "head")
 let get_chain_block_context_constants ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "constants"] Fun.id
 
+let get_chain_block_context_constants_errors ?(chain = "main") ?(block = "head")
+    () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "constants"; "errors"]
+    Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 
