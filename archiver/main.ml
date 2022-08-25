@@ -78,37 +78,37 @@ let select_commands ctxt Client_config.{protocol; chain; block; _} =
               (Clic.parameter (fun _ p -> return (Uri.of_string p)))
          @@ Clic.stop)
          (fun (source, pass) prefix endpoint _cctxt ->
-           Teztale_archiver.Converter.main source pass endpoint prefix);
+           Converter.main source pass endpoint prefix);
      ]
     @ proto_commands)
 
 let () =
-  let () = Teztale_archiver.PtCJ7pwo_machine.register_json_commands () in
-  let () = Teztale_archiver.PsYLVpVv_machine.register_json_commands () in
-  let () = Teztale_archiver.PsddFKi3_machine.register_json_commands () in
-  let () = Teztale_archiver.Pt24m4xi_machine.register_json_commands () in
-  let () = Teztale_archiver.PsBabyM1_machine.register_json_commands () in
-  let () = Teztale_archiver.PsCARTHA_machine.register_json_commands () in
-  let () = Teztale_archiver.PsDELPH1_machine.register_json_commands () in
-  let () = Teztale_archiver.PtEdo2Zk_machine.register_json_commands () in
-  let () = Teztale_archiver.PsFLoren_machine.register_json_commands () in
-  let () = Teztale_archiver.PtGRANAD_machine.register_json_commands () in
-  let () = Teztale_archiver.PtHangz2_machine.register_json_commands () in
-  let () = Teztale_archiver.Psithaca_machine.register_json_commands () in
-  let () = Teztale_archiver.PtJakart_machine.register_json_commands () in
-  let () = Teztale_archiver.PtKathma_machine.register_json_commands () in
-  let () = Teztale_archiver.PtCJ7pwo_machine.register_db_commands () in
-  let () = Teztale_archiver.PsYLVpVv_machine.register_db_commands () in
-  let () = Teztale_archiver.PsddFKi3_machine.register_db_commands () in
-  let () = Teztale_archiver.Pt24m4xi_machine.register_db_commands () in
-  let () = Teztale_archiver.PsBabyM1_machine.register_db_commands () in
-  let () = Teztale_archiver.PsCARTHA_machine.register_db_commands () in
-  let () = Teztale_archiver.PsDELPH1_machine.register_db_commands () in
-  let () = Teztale_archiver.PtEdo2Zk_machine.register_db_commands () in
-  let () = Teztale_archiver.PsFLoren_machine.register_db_commands () in
-  let () = Teztale_archiver.PtGRANAD_machine.register_db_commands () in
-  let () = Teztale_archiver.PtHangz2_machine.register_db_commands () in
-  let () = Teztale_archiver.Psithaca_machine.register_db_commands () in
-  let () = Teztale_archiver.PtJakart_machine.register_db_commands () in
-  let () = Teztale_archiver.PtKathma_machine.register_db_commands () in
+  let () = PtCJ7pwo_machine.register_json_commands () in
+  let () = PsYLVpVv_machine.register_json_commands () in
+  let () = PsddFKi3_machine.register_json_commands () in
+  let () = Pt24m4xi_machine.register_json_commands () in
+  let () = PsBabyM1_machine.register_json_commands () in
+  let () = PsCARTHA_machine.register_json_commands () in
+  let () = PsDELPH1_machine.register_json_commands () in
+  let () = PtEdo2Zk_machine.register_json_commands () in
+  let () = PsFLoren_machine.register_json_commands () in
+  let () = PtGRANAD_machine.register_json_commands () in
+  let () = PtHangz2_machine.register_json_commands () in
+  let () = Psithaca_machine.register_json_commands () in
+  let () = PtJakart_machine.register_json_commands () in
+  let () = PtKathma_machine.register_json_commands () in
+  let () = PtCJ7pwo_machine.register_db_commands () in
+  let () = PsYLVpVv_machine.register_db_commands () in
+  let () = PsddFKi3_machine.register_db_commands () in
+  let () = Pt24m4xi_machine.register_db_commands () in
+  let () = PsBabyM1_machine.register_db_commands () in
+  let () = PsCARTHA_machine.register_db_commands () in
+  let () = PsDELPH1_machine.register_db_commands () in
+  let () = PtEdo2Zk_machine.register_db_commands () in
+  let () = PsFLoren_machine.register_db_commands () in
+  let () = PtGRANAD_machine.register_db_commands () in
+  let () = PtHangz2_machine.register_db_commands () in
+  let () = Psithaca_machine.register_db_commands () in
+  let () = PtJakart_machine.register_db_commands () in
+  let () = PtKathma_machine.register_db_commands () in
   Client_main_run.run (module Client_config) ~select_commands

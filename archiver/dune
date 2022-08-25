@@ -1,6 +1,8 @@
-(library
- (name teztale_archiver)
- (public_name teztale.archiver)
+(executable
+ (name main)
+ (package teztale)
+ (public_name teztale-archiver)
+ (promote (until-clean))
  (libraries
   sqlite3
   tezos-client-base-unix
@@ -64,12 +66,6 @@
    (tezos-client-014-PtKathma -> PtKathma_machine.real.ml)))
  (modules_without_implementation archiver)
  (flags
-  (:standard
-	 -open Tezos_base__TzPervasives
-	 -open Tezos_stdlib_unix
-	 -open Tezos_shell_services
-	 -open Tezos_client_base
-	 -open Tezos_client_base_unix
-	 -open Tezos_rpc_http_client_unix
-	 -open Tezos_rpc_http
-	 -open Teztale_lib)))
+  (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix -open
+    Tezos_shell_services -open Tezos_client_base -open Tezos_client_base_unix
+    -open Tezos_rpc_http_client_unix -open Tezos_rpc_http -open Teztale_lib)))

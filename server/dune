@@ -1,6 +1,8 @@
 (executable
  (name main)
- (public_name teztale_server)
+ (package teztale)
+ (public_name teztale-server)
+ (promote (until-clean))
  (libraries cohttp-lwt-unix caqti-lwt caqti-driver-sqlite3 teztale.lib))
 
 (rule
