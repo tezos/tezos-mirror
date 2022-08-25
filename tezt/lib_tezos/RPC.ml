@@ -488,6 +488,15 @@ let get_chain_block_context_constants_errors ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "context"; "constants"; "errors"]
     Fun.id
 
+let get_chain_block_helper_baking_rights ?(chain = "main") ?(block = "head")
+    ?delegate () =
+  let query_string = Option.map (fun d -> [("delegate", d)]) delegate in
+  make
+    ?query_string
+    GET
+    ["chains"; chain; "blocks"; block; "helpers"; "baking_rights"]
+    Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

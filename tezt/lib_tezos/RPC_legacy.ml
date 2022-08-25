@@ -26,12 +26,6 @@
 
 type ctxt_type = Bytes | Json
 
-let get_baking_rights ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    ?delegate client =
-  let path = ["chains"; chain; "blocks"; block; "helpers"; "baking_rights"] in
-  let query_string = Option.map (fun d -> [("delegate", d)]) delegate in
-  Client.rpc ?endpoint ?hooks ?query_string GET path client
-
 let get_current_level ?endpoint ?hooks ?(chain = "main") ?(block = "head")
     ?(offset = 0) client =
   let path = ["chains"; chain; "blocks"; block; "helpers"; "current_level"] in
