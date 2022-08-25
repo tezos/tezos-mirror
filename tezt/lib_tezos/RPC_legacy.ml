@@ -24,10 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let get_constants ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
-  let path = ["chains"; chain; "blocks"; block; "context"; "constants"] in
-  Client.rpc ?endpoint ?hooks GET path client
-
 let get_constants_errors ?endpoint ?hooks ?(chain = "main") ?(block = "head")
     client =
   let path =

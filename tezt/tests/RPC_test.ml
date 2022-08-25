@@ -611,7 +611,10 @@ let test_votes _test_mode_tag _protocol ?endpoint client =
 
 (* Test the various other RPCs. *)
 let test_misc_protocol _test_mode_tag _protocol ?endpoint client =
-  let* _ = RPC.get_constants ?endpoint ~hooks client in
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_constants ()
+  in
   let* _ = RPC.get_baking_rights ?endpoint ~hooks client in
   let* _ = RPC.get_current_level ?endpoint ~hooks client in
   let* _ = RPC.get_endorsing_rights ?endpoint ~hooks client in

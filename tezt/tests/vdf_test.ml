@@ -185,7 +185,9 @@ let test_vdf : Protocol.t list -> unit =
   let injected = ref false in
   init_vdf_event_listener vdf_baker injected ;
 
-  let* constants = RPC.get_constants client in
+  let* constants =
+    RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+  in
   let* blocks_per_cycle =
     return JSON.(constants |-> "blocks_per_cycle" |> as_int)
   in

@@ -472,7 +472,9 @@ module Regressions = struct
     type limits = {batch_limit : int; inbox_limit : int}
 
     let get_limits client =
-      let* json = RPC.get_constants client in
+      let* json =
+        RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+      in
       let batch_limit =
         JSON.(json |-> "tx_rollup_hard_size_limit_per_message" |> as_int)
       in
@@ -1396,7 +1398,9 @@ let attempt_return_bond ~(expected : [`Ok | `Ko]) ~src state client =
       (fun _exn ->
         if expected = `Ok then
           Test.fail "Return bond expected to succeed but failed" ;
-        let* constants = RPC.get_constants client in
+        let* constants =
+          RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+        in
         return JSON.(constants |-> "tx_rollup_commitment_bond" |> as_int))
   in
   check_bond_is ~src state.client ~expected:expected_bond_after_op
@@ -1414,7 +1418,9 @@ let test_rollup_bond_return =
     init_with_tx_rollup ~parameters ~protocol ()
   in
   let src = Constant.bootstrap2.public_key_hash in
-  let* constants = RPC.get_constants client in
+  let* constants =
+    RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+  in
   let commit_bond =
     JSON.(constants |-> "tx_rollup_commitment_bond" |> as_int)
   in
@@ -1504,7 +1510,9 @@ let test_deposit_withdraw_max_big_tickets =
   let* ({rollup; client; _} as state) =
     init_with_tx_rollup ~parameters ~protocol ()
   in
-  let* constants = RPC.get_constants client in
+  let* constants =
+    RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+  in
   let max_ticket_payload_size =
     (* [overhead] is the number of bytes introduced by the wrapping of a
        string in a ticket. This encompasses the ticketer, amount and ty

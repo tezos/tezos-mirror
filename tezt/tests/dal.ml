@@ -170,7 +170,9 @@ let test_feature_flag _protocol _sc_rollup_node sc_rollup_address node client =
      - 2. It checks the new operations added by the feature flag
      cannot be propagated by checking their classification in the
      mempool. *)
-  let* protocol_parameters = RPC_legacy.get_constants client in
+  let* protocol_parameters =
+    RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+  in
   let feature_flag =
     JSON.(
       protocol_parameters |-> "dal_parametric" |-> "feature_enable" |> as_bool)

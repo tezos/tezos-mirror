@@ -41,7 +41,9 @@ let decode_dictator json =
   Option.map JSON.as_string JSON.(json |-> "testnet_dictator" |> as_opt)
 
 let get_dictator client =
-  let* json = RPC.get_constants client in
+  let* json =
+    RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+  in
   return (decode_dictator json)
 
 let check_dictator client expected_dictator =
