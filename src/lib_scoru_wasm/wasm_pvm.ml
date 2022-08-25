@@ -187,7 +187,7 @@ module Make (T : Tree_encoding.TREE) :
           Lwt.return (Init {self; ast_module; init_kont})
       | Eval ({Wasm.Eval.frame; code; _} as eval_config) -> (
           match code with
-          | _values, [] ->
+          | _values, [] -> (
               (* We have an empty set of admin instructions so we create one
                  that invokes the main function. *)
               let* module_inst =
@@ -201,33 +201,30 @@ module Make (T : Tree_encoding.TREE) :
                   main_name
                   module_inst.Wasm.Instance.exports
               in
-              let main_func =
-                match extern with
-                | Wasm.Instance.ExternFunc func -> func
-                | _ ->
-                    (* We require a function with the name [main] to be exported
-                       rather than any other structure. *)
-                    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3448
-                       Avoid throwing exceptions.
-                       Possibly use a a new state to indicate, such as
-                       [Invalid_module].
-                    *)
-                    assert false
-              in
-              let admin_instr' = Wasm.Eval.Invoke main_func in
-              let admin_instr =
-                Wasm.Source.{it = admin_instr'; at = no_region}
-              in
-              (* Clear the values and the locals in the frame. *)
-              let code = ([], [admin_instr]) in
-              let eval_config =
-                {
-                  eval_config with
-                  Wasm.Eval.frame = {frame with locals = []};
-                  code;
-                }
-              in
-              Lwt.return (Eval eval_config)
+
+              match extern with
+              | Wasm.Instance.ExternFunc main_func ->
+                  let admin_instr' = Wasm.Eval.Invoke main_func in
+                  let admin_instr =
+                    Wasm.Source.{it = admin_instr'; at = no_region}
+                  in
+                  (* Clear the values and the locals in the frame. *)
+                  let code = ([], [admin_instr]) in
+                  let eval_config =
+                    {
+                      eval_config with
+                      Wasm.Eval.frame = {frame with locals = []};
+                      code;
+                    }
+                  in
+                  Lwt.return (Eval eval_config)
+              | _ ->
+                  (* We require a function with the name [main] to be exported
+                     rather than any other structure. *)
+                  Lwt.return
+                    (Stuck
+                       (Invalid_state
+                          "Invalid_module: no `main` function exported")))
           | _ ->
               (* Continue execution. *)
               let* eval_config = Wasm.Eval.step module_reg eval_config in
@@ -257,7 +254,7 @@ module Make (T : Tree_encoding.TREE) :
       let* tick_state = next_tick_state pvm_state in
       let input_request =
         match pvm_state.tick_state with
-        | Eval {code = _, []; _} ->
+        | Eval {code = _, []; _} | Stuck _ ->
             (* Ask for more input if the kernel has yielded (empty admin
                instructions). *)
             Wasm_pvm_sig.Input_required
@@ -293,27 +290,30 @@ module Make (T : Tree_encoding.TREE) :
       let level = Int32.to_string raw_level in
       let id = Z.to_string message_counter in
       let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
-      let* () =
+      let* tick_state =
         match pvm_state.tick_state with
         | Eval {input; _} ->
-            Wasm.Input_buffer.(
-              enqueue
-                input
-                {
-                  (* This is to distinguish (0) Inbox inputs from (1)
-                     DAL/Slot_header inputs. *)
-                  rtype = 0l;
-                  raw_level;
-                  message_counter;
-                  payload = String.to_bytes message;
-                })
-        | Decode _ | Init _ ->
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/3448
-                Avoid throwing exceptions.
-                Possibly use a a new state to indicate, such as [Stuck].
-            *)
-            assert false
-        | Stuck _ -> assert false
+            let+ () =
+              Wasm.Input_buffer.(
+                enqueue
+                  input
+                  {
+                    (* This is to distinguish (0) Inbox inputs from (1)
+                       DAL/Slot_header inputs. *)
+                    rtype = 0l;
+                    raw_level;
+                    message_counter;
+                    payload = String.to_bytes message;
+                  })
+            in
+            pvm_state.tick_state
+        | Decode _ ->
+            Lwt.return
+              (Stuck (Invalid_state "No input required during decoding"))
+        | Init _ ->
+            Lwt.return
+              (Stuck (Invalid_state "No input required during initialization"))
+        | Stuck _ -> Lwt.return pvm_state.tick_state
       in
       (* Encode the input in the tree under [input/level/id]. *)
       let* tree =
@@ -326,6 +326,7 @@ module Make (T : Tree_encoding.TREE) :
       let pvm_state =
         {
           pvm_state with
+          tick_state;
           current_tick = Z.succ pvm_state.current_tick;
           input_request = Wasm_pvm_sig.No_input_required;
         }
