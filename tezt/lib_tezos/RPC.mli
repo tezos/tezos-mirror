@@ -432,6 +432,13 @@ val post_chain_mempool_request_operations :
 val post_chain_mempool_ban_operation :
   ?chain:string -> data:JSON.u -> unit -> JSON.t t
 
+(** RPC: [POST /chains/[chain]/mempool/unban_operation]
+
+    [chain] defaults to ["main"].
+*)
+val post_chain_mempool_unban_operation :
+  ?chain:string -> data:JSON.u -> unit -> JSON.t t
+
 (** {2 Smart contract rollup RPC module} *)
 
 (** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup] *)

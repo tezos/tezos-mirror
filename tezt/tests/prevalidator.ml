@@ -1521,7 +1521,10 @@ module Revamped = struct
     let* () = check_mempool ~applied:[oph3] client1 in
 
     log_step 7 "Unban op1, successfully reinject op1." ;
-    let* _ = RPC.mempool_unban_operation ~data:(`String oph1) client1 in
+    let* _ =
+      RPC.Client.call client1
+      @@ RPC.post_chain_mempool_unban_operation ~data:(`String oph1) ()
+    in
     let* _ = inject_op ~wait:true `A in
     let* () = check_mempool ~applied:[oph3; oph1] client1 in
 
@@ -1533,7 +1536,10 @@ module Revamped = struct
     let* () = wait_reinject_op2_banned in
 
     log_step 9 "Unban op2, successfully reinject op2." ;
-    let* _ = RPC.mempool_unban_operation ~data:(`String oph2) client1 in
+    let* _ =
+      RPC.Client.call client1
+      @@ RPC.post_chain_mempool_unban_operation ~data:(`String oph2) ()
+    in
 
     let* _ = inject_op ~wait:true `B in
     let* () = check_mempool ~applied:[oph3; oph2; oph1] client1 in
@@ -1552,8 +1558,14 @@ module Revamped = struct
     let* () = check_mempool ~applied:[oph3; oph2] client1 in
 
     log_step 11 "Try unban op3 and op2 check that nothing changes." ;
-    let* _ = RPC.mempool_unban_operation ~data:(`String oph3) client1 in
-    let* _ = RPC.mempool_unban_operation ~data:(`String oph2) client1 in
+    let* _ =
+      RPC.Client.call client1
+      @@ RPC.post_chain_mempool_unban_operation ~data:(`String oph3) ()
+    in
+    let* _ =
+      RPC.Client.call client1
+      @@ RPC.post_chain_mempool_unban_operation ~data:(`String oph2) ()
+    in
     check_mempool ~applied:[oph3; oph2] client1
 
   (* This tests ban operations and then use the `unban_all` RPC on

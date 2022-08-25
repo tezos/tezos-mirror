@@ -34,14 +34,6 @@
 
 (** {2 Shell RPCs} *)
 
-(** Call RPC /chains/[chain]/mempool/unban_operation *)
-val mempool_unban_operation :
-  ?endpoint:Client.endpoint ->
-  ?chain:string ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Lwt.t
-
 (** Call RPC /chains/[chain]/mempool/unban_all_operations *)
 val mempool_unban_all_operations :
   ?endpoint:Client.endpoint -> ?chain:string -> Client.t -> JSON.t Lwt.t
