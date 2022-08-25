@@ -316,6 +316,13 @@ let get_stats_memory = make GET ["stats"; "memory"] Fun.id
 
 let post_injection_block ~data = make POST ["injection"; "block"] ~data Fun.id
 
+let get_chain_block_header_protocol_data_raw ?(chain = "main") ?(block = "head")
+    () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "header"; "protocol_data"; "raw"]
+    JSON.as_string
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

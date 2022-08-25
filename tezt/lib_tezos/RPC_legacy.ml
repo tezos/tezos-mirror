@@ -24,13 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let raw_protocol_data ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    client =
-  let path =
-    ["chains"; chain; "blocks"; block; "header"; "protocol_data"; "raw"]
-  in
-  Lwt.(Client.rpc ?endpoint ?hooks GET path client >|= JSON.as_string)
-
 let get_protocol_data ?endpoint ?hooks ?(chain = "main") ?(block = "head")
     ?(offset = 0) client =
   let path = ["chains"; chain; "blocks"; block; "header"; "protocol_data"] in

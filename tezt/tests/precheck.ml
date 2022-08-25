@@ -140,7 +140,9 @@ let forge_block ?client node ~key ~with_op =
     Client.shell_header client2 >>= fun shell ->
     JSON.parse ~origin:"forge_fake_block" shell |> return
   in
-  let* protocol_data = RPC.raw_protocol_data client2 in
+  let* protocol_data =
+    RPC.Client.call client2 @@ RPC.get_chain_block_header_protocol_data_raw ()
+  in
   Log.info
     "Sufficient information retrieved: shutting down second node, restarting \
      first node" ;
