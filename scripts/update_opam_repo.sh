@@ -120,7 +120,7 @@ case $(opam --version) in
 esac
 #shellcheck disable=SC2086
 OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
-  $packages,ocaml,ocaml-base-compiler,odoc,${opam_depext_dep}js_of_ocaml-ppx,opam-ed,$dummy_pkg
+  $packages,ocaml,ocaml-base-compiler,odoc,${opam_depext_dep}js_of_ocaml-ppx,opam-ed,ledgerwallet-tezos,$dummy_pkg
 
 
 ## Adding useful compiler variants

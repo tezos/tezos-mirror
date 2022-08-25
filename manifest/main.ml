@@ -334,9 +334,7 @@ let zarith =
 
 let zarith_stubs_js = external_lib ~js_compatible:true "zarith_stubs_js" V.True
 
-(* VENDORED LIBS *)
-
-let ledgerwallet_tezos = vendored_lib "ledgerwallet-tezos" V.(at_least "0.2.1")
+let ledgerwallet_tezos = external_lib "ledgerwallet-tezos" V.(at_least "0.2.1")
 
 (* INTERNAL LIBS *)
 
