@@ -92,11 +92,12 @@ let metadata_is_too_large client =
    recomputation of the operations metadata.*)
 let metadata_is_available_deprecated ?(force_metadata = false) client exponent =
   let* first_manager_operation =
-    RPC.get_operations_of_validation_pass
-      ~force_metadata
-      ~validation_pass:3
-      ~operation_offset:0
-      client
+    RPC.Client.call client
+    @@ RPC.get_chain_block_operations_validation_pass
+         ~force_metadata
+         ~validation_pass:3
+         ~operation_offset:0
+         ()
   in
   let first_operation_result =
     JSON.(
@@ -114,10 +115,11 @@ let metadata_is_available_deprecated ?(force_metadata = false) client exponent =
 
 let get_endorsement client =
   let* _ =
-    RPC.get_operations_of_validation_pass
-      ~validation_pass:0
-      ~operation_offset:0
-      client
+    RPC.Client.call client
+    @@ RPC.get_chain_block_operations_validation_pass
+         ~validation_pass:0
+         ~operation_offset:0
+         ()
   in
   unit
 

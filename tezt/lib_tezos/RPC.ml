@@ -335,6 +335,23 @@ let get_chain_block_header_protocol_data ?(chain = "main") ?(block = "head")
 let get_chain_block_operations ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "operations"] Fun.id
 
+let get_chain_block_operations_validation_pass ?(chain = "main")
+    ?(block = "head") ?(force_metadata = false) ?operation_offset
+    ~validation_pass () =
+  let path =
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "operations";
+      string_of_int validation_pass;
+    ]
+    @ match operation_offset with None -> [] | Some m -> [string_of_int m]
+  in
+  let query_string = if force_metadata then [("force_metadata", "")] else [] in
+  make ~query_string GET path Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 
