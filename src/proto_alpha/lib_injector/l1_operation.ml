@@ -107,6 +107,7 @@ module Manager_operation = struct
     | Sc_rollup_recover_bond _ -> sc_rollup_recover_bond_case
     | Sc_rollup_dal_slot_subscribe _ -> sc_rollup_dal_slot_subscribe_case
     | Zk_rollup_origination _ -> zk_rollup_origination_case
+    | Zk_rollup_publish _ -> zk_rollup_publish_case
 
   let pp_kind ppf op =
     let open Operation.Encoding.Manager_operations in

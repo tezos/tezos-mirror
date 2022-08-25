@@ -161,7 +161,7 @@ module Make (PVM : Pvm.S) = struct
       | Tx_rollup_submit_batch _ | Tx_rollup_commit _ | Tx_rollup_return_bond _
       | Tx_rollup_finalize_commitment _ | Tx_rollup_remove_commitment _
       | Tx_rollup_rejection _ | Tx_rollup_dispatch_tickets _ | Transfer_ticket _
-      | Sc_rollup_originate _ | Zk_rollup_origination _ ->
+      | Sc_rollup_originate _ | Zk_rollup_origination _ | Zk_rollup_publish _ ->
           false
     in
     if not (is_for_my_rollup operation) then return_unit
