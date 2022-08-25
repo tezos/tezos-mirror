@@ -173,7 +173,9 @@ let decode_level json =
   {level; level_position; cycle; cycle_position; expected_commitment}
 
 let get_current_level client =
-  let* json = RPC.get_current_level client in
+  let* json =
+    RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
+  in
   return (decode_level json)
 
 let check_current_level client expected_level =

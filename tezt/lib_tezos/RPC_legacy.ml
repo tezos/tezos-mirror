@@ -26,12 +26,6 @@
 
 type ctxt_type = Bytes | Json
 
-let get_current_level ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    ?(offset = 0) client =
-  let path = ["chains"; chain; "blocks"; block; "helpers"; "current_level"] in
-  let query_string = [("offset", string_of_int offset)] in
-  Client.rpc ?endpoint ?hooks ~query_string GET path client
-
 let get_endorsing_rights ?endpoint ?hooks ?(chain = "main") ?(block = "head")
     ?delegate client =
   let path =

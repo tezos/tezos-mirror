@@ -534,6 +534,15 @@ val get_chain_block_context_constants_errors :
 val get_chain_block_helper_baking_rights :
   ?chain:string -> ?block:string -> ?delegate:string -> unit -> JSON.t t
 
+(** RPC: [GET /chains/[chain]/blocks/[block]/helpers/current_level]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+    [offset] defaults to [0].
+*)
+val get_chain_block_helper_current_level :
+  ?chain:string -> ?block:string -> ?offset:int -> unit -> JSON.t t
+
 (** {2 Smart contract rollup RPC module} *)
 
 (** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup] *)
