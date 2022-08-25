@@ -506,6 +506,15 @@ let get_chain_block_helper_current_level ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "helpers"; "current_level"]
     Fun.id
 
+let get_chain_block_helper_endorsing_rights ?(chain = "main") ?(block = "head")
+    ?delegate () =
+  let query_string = Option.map (fun d -> [("delegate", d)]) delegate in
+  make
+    ?query_string
+    GET
+    ["chains"; chain; "blocks"; block; "helpers"; "endorsing_rights"]
+    Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

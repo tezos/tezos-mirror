@@ -36,16 +36,6 @@
 
 type ctxt_type = Bytes | Json
 
-(** Call RPC /chain/[chain]/blocks/[block]/helpers/endorsing_rights *)
-val get_endorsing_rights :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  ?delegate:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
 (** Call RPC /chain/[chain]/blocks/[block]/helpers/levels_in_current_cycle *)
 val get_levels_in_current_cycle :
   ?endpoint:Client.endpoint ->
