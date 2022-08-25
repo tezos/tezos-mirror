@@ -266,6 +266,9 @@ val get_chain_block_metadata :
 
 (** RPC: [GET /chains/[chain]/blocks/[block]/hash]
 
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+
     Returns the hash. *)
 val get_chain_block_hash : ?chain:string -> ?block:string -> unit -> string t
 

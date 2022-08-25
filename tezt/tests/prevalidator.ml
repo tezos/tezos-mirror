@@ -2500,12 +2500,13 @@ let forge_pre_filtered_operation =
       client_1
   in
   let counter = JSON.as_int base_counter in
-  let* branch = RPC.get_branch client_1 in
+  let* branch = Operation.Manager.get_branch client_1 in
+
   (* Step 3 *)
   (* Forge operation, inject it and check injection *)
   let* _op =
     forge_and_inject_operation
-      ~branch:(JSON.as_string branch)
+      ~branch
       ~fee:1
       ~gas_limit:1040000
       ~source:Constant.bootstrap1.public_key_hash
@@ -2614,8 +2615,8 @@ let refetch_failed_operation =
       client_1
   in
   let counter = JSON.as_int counter in
-  let* branch = RPC.get_branch client_1 in
-  let branch = JSON.as_string branch in
+  let* branch = Operation.Manager.get_branch client_1 in
+
   (* Step 3 *)
   (* Forge operation and inject it in node_1, checks that the fetch fail in node_2 *)
   let* op_str_hex =
@@ -3139,7 +3140,6 @@ let test_pending_operation_version =
     ~title:"pending operation version"
     ~tags:["mempool"; "pending_operations"; "version"]
   @@ fun protocol ->
-  let open Lwt in
   (* Step 1 *)
   (* Initialise one node *)
   let* node_1 =
@@ -3152,7 +3152,8 @@ let test_pending_operation_version =
   Log.info "Activated protocol." ;
   (* Step 2 *)
   (* Inject refused operation *)
-  let* branch = RPC.get_branch client_1 >|= JSON.as_string in
+  let* branch = Operation.Manager.get_branch client_1 in
+
   let* _ =
     forge_and_inject_operation
       ~branch
@@ -3263,7 +3264,6 @@ let force_operation_injection =
   let proto_activation_level = 1 in
   let* _ = Node.wait_for_level node1 proto_activation_level in
   Log.info "Both nodes are at level %d." proto_activation_level ;
-  let open Lwt in
   Log.info "%s" step3_msg ;
   let*! json =
     RPC.Contracts.get_counter
@@ -3271,7 +3271,8 @@ let force_operation_injection =
       client2
   in
   let counter = JSON.as_int json in
-  let* branch = RPC.get_branch client2 >|= JSON.as_string in
+  let* branch = Operation.Manager.get_branch client2 in
+
   Log.info "%s" step4_msg ;
   let* (`Hex op_str_hex as op_hex) =
     forge_operation
@@ -3332,7 +3333,6 @@ let injecting_old_operation_fails =
     ~title:"Injecting old operation fails"
     ~tags:["mempool"; "injection"]
   @@ fun protocol ->
-  let open Lwt in
   log_step 1 step1 ;
   let* node =
     Node.init [Synchronisation_threshold 0; Private_mode; Connections 0]
@@ -3356,7 +3356,7 @@ let injecting_old_operation_fails =
       client
   in
   let counter = JSON.as_int json in
-  let* branch = RPC.get_branch client >|= JSON.as_string in
+  let* branch = Operation.Manager.get_branch client in
   log_step 3 step3 ;
   (* To avoid off-by-one mistakes *)
   let blocks_to_bake = 2 in

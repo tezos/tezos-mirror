@@ -94,7 +94,9 @@ let get_next_counter ~source client = get_counter client ~source >|= succ
 let get_injection_branch ?branch client =
   match branch with
   | Some b -> Lwt.return b
-  | None -> RPC.get_branch client >|= JSON.as_string
+  | None ->
+      let block = sf "head~%d" 2 in
+      RPC.Client.call client @@ RPC.get_chain_block_hash ~block ()
 
 (* Smart constructors *)
 

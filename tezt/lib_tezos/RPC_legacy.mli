@@ -34,15 +34,6 @@
 
 (** {2 Shell RPCs} *)
 
-(** Call RPC /chain/[chain]/blocks/head~[offset]/hash where default [offset] is [2]. *)
-val get_branch :
-  ?offset:int ->
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
 (** Call RPC /chain/[chain]/blocks/[block]/operations *)
 val get_operations :
   ?endpoint:Client.endpoint ->

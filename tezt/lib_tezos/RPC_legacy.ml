@@ -24,13 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let get_branch ?(offset = 2) ?endpoint ?hooks ?(chain = "main") client =
-  (* By default, we use offset = 2 for Tenderbake, to pick the latest finalized
-     branch *)
-  let block = sf "head~%d" offset in
-  let path = ["chains"; chain; "blocks"; block; "hash"] in
-  Client.rpc ?endpoint ?hooks GET path client
-
 let get_operations ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
   let path = ["chains"; chain; "blocks"; block; "operations"] in
   Client.rpc ?endpoint ?hooks GET path client

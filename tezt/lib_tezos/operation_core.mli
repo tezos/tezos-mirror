@@ -380,4 +380,11 @@ module Manager : sig
     t list ->
     Client.t ->
     [`OpHash of string] Lwt.t
+
+  (** A wrapper for {!RPC.get_chain_block_hash} with an offset for the block.
+
+      [offset] defaults to [2], to pick the latested finalized branch with
+      Tenderbake.
+  *)
+  val get_branch : ?chain:string -> ?offset:int -> Client.t -> string Lwt.t
 end

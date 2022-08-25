@@ -598,7 +598,7 @@ let gas_from_simulation client chain_id contract_id ?blocks_before_activation
         } ],
       "signature": "edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q"
     }, "chain_id" : "%s" %s } |}
-         (JSON.as_string block)
+         block
          Constant.bootstrap1.public_key_hash
          counter
          contract_id
@@ -609,7 +609,7 @@ let gas_from_simulation client chain_id contract_id ?blocks_before_activation
          | Some b -> Printf.sprintf {|, "blocks_before_activation" : %d |} b)
   in
 
-  let* block = RPC.get_branch ~offset:0 client in
+  let* block = RPC.Client.call client @@ RPC.get_chain_block_hash () in
   let data = data block counter in
   let* result = RPC.post_simulate_operation client ~data in
   return (read_consumed_gas JSON.(get "contents" result |> geti 0))
