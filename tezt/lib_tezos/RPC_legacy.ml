@@ -24,15 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let mempool_request_operations ?endpoint ?(chain = "main") ?peer client =
-  let path = ["chains"; chain; "mempool"; "request_operations"] in
-  Client.rpc
-    ?endpoint
-    POST
-    path
-    ~query_string:(match peer with None -> [] | Some p -> [("peer_id", p)])
-    client
-
 let mempool_ban_operation ?endpoint ?(chain = "main") ~data client =
   let path = ["chains"; chain; "mempool"; "ban_operation"] in
   Client.rpc ?endpoint ~data POST path client

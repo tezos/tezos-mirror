@@ -374,6 +374,13 @@ let get_chain_mempool_pending_operations ?(chain = "main") ?version ?applied
     ["chains"; chain; "mempool"; "pending_operations"]
     Fun.id
 
+let post_chain_mempool_request_operations ?(chain = "main") ?peer () =
+  make
+    ~query_string:(match peer with None -> [] | Some p -> [("peer_id", p)])
+    POST
+    ["chains"; chain; "mempool"; "request_operations"]
+    Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

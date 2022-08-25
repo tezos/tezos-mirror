@@ -107,7 +107,9 @@ module Revamped = struct
      event on the [node] (debug events must be enabled). *)
   let synchronize_mempool client node =
     let mempool_notify_waiter = Node.wait_for_request ~request:`Notify node in
-    let* _ = RPC.mempool_request_operations client in
+    let* _ =
+      RPC.Client.call client @@ RPC.post_chain_mempool_request_operations ()
+    in
     mempool_notify_waiter
 
   (* Call the [/chains/[chain]/mempool/pending_operations] RPC and
@@ -2336,7 +2338,9 @@ let wait_for_synch node =
 
 let mempool_synchronisation client node =
   let waiter = wait_for_synch node in
-  let* _ = RPC.mempool_request_operations client in
+  let* _ =
+    RPC.Client.call client @@ RPC.post_chain_mempool_request_operations ()
+  in
   waiter
 
 (** This test checks that future endorsement are still propagated when
@@ -4018,7 +4022,10 @@ let test_request_operations_peer =
   let wait_mempool = wait_for_arrival_of_ophash oph node_2 in
   let* () = Client.Admin.connect_address ~peer:node_1 client_2 in
   let* node1_identity = Node.wait_for_identity node_1 in
-  let* _ = RPC.mempool_request_operations ~peer:node1_identity client_2 in
+  let* _ =
+    RPC.Client.call client_2
+    @@ RPC.post_chain_mempool_request_operations ~peer:node1_identity ()
+  in
   let* () = wait_mempool in
   unit
 
