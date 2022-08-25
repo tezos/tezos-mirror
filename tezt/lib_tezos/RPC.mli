@@ -574,6 +574,20 @@ val get_chain_block_context_big_map :
   unit ->
   JSON.t t
 
+(** RPC: [GET /chains/[chain]/blocks/[block]/context/big_maps/[id]?offset=[offset]&length=[length]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+ *)
+val get_chain_block_context_big_maps :
+  ?chain:string ->
+  ?block:string ->
+  id:string ->
+  ?offset:int ->
+  ?length:int ->
+  unit ->
+  JSON.t t
+
 (** {2 Smart contract rollup RPC module} *)
 
 (** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup] *)

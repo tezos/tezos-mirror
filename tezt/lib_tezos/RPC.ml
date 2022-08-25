@@ -529,6 +529,21 @@ let get_chain_block_context_big_map ?(chain = "main") ?(block = "head") ~id
     ["chains"; chain; "blocks"; block; "context"; "big_maps"; id; key_hash]
     Fun.id
 
+let get_chain_block_context_big_maps ?(chain = "main") ?(block = "head") ~id
+    ?offset ?length () =
+  let query_string =
+    [
+      Option.map (fun offset -> ("offset", Int.to_string offset)) offset;
+      Option.map (fun length -> ("length", Int.to_string length)) length;
+    ]
+    |> List.filter_map Fun.id
+  in
+  make
+    GET
+    ~query_string
+    ["chains"; chain; "blocks"; block; "context"; "big_maps"; id]
+    Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

@@ -26,22 +26,6 @@
 
 type ctxt_type = Bytes | Json
 
-module Big_maps = struct
-  let get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~big_map_id
-      ?offset ?length client =
-    let path =
-      ["chains"; chain; "blocks"; block; "context"; "big_maps"; big_map_id]
-    in
-    let query_string =
-      [
-        Option.map (fun offset -> ("offset", Int.to_string offset)) offset;
-        Option.map (fun length -> ("length", Int.to_string length)) length;
-      ]
-      |> List.filter_map Fun.id
-    in
-    Client.Spawn.rpc ?endpoint ?hooks ~query_string GET path client
-end
-
 module Contracts = struct
   let get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
     let path = ["chains"; chain; "blocks"; block; "context"; "contracts"] in
