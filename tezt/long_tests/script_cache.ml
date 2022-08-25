@@ -49,7 +49,9 @@
 
 *)
 let get_operations client =
-  let* operations = RPC.get_operations client in
+  let* operations =
+    RPC.Client.call client @@ RPC.get_chain_block_operations ()
+  in
   return JSON.(operations |> geti 3 |> geti 0 |> get "contents")
 
 let read_consumed_gas operation =

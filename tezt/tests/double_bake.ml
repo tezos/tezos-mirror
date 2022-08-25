@@ -231,7 +231,7 @@ let double_bake =
 
   log_step 8 "Check denunciation is in the last block." ;
   (* Getting the operations of the current head. *)
-  let* ops = RPC.get_operations client_1 in
+  let* ops = RPC.Client.call client_1 @@ RPC.get_chain_block_operations () in
   let* () = Accuser.terminate accuser_3 in
   if is_operation_in_operations ops denunciation_oph then unit
   else Test.fail "Double baking evidence was not found"

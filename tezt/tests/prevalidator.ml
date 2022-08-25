@@ -1421,7 +1421,7 @@ module Revamped = struct
     let* _ = baking in
     (* empty mempool *)
     let* () = check_mempool client2 in
-    let* ops = RPC.get_operations client2 in
+    let* ops = RPC.Client.call client2 @@ RPC.get_chain_block_operations () in
     let open JSON in
     let ops_list = ops |=> 3 |> as_list in
     let res =
@@ -2970,7 +2970,9 @@ let wait_for_notify_n_valid_ops node n_ops =
     [n_manager_ops] manager operations (which includes the transfer
     operations). *)
 let check_n_manager_ops_in_block ?(log = false) client n_manager_ops =
-  let* baked_ops = RPC.get_operations client in
+  let* baked_ops =
+    RPC.Client.call client @@ RPC.get_chain_block_operations ()
+  in
   let baked_manager_ops = JSON.(baked_ops |=> 3 |> as_list) in
   Check.(
     (List.compare_length_with baked_manager_ops n_manager_ops = 0)

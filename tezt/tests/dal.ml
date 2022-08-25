@@ -338,7 +338,9 @@ let test_slot_management_logic =
   let* bytes = RPC_legacy.raw_bytes client in
   if JSON.(bytes |-> "dal" |> is_null) then
     Test.fail "Expected the context to contain some information about the DAL" ;
-  let* operations_result = RPC_legacy.get_operations client in
+  let* operations_result =
+    RPC.Client.call client @@ RPC.get_chain_block_operations ()
+  in
   let fees_error =
     Failed {error_id = "proto.alpha.dal_publish_slot_heade_duplicate"}
   in

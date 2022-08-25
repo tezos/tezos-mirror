@@ -905,7 +905,10 @@ let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
      contains a proposal for protocol [proto_hash].
   *)
   let proposal_in_level ~proto_hash client level =
-    let* ops = RPC.get_operations ~block:(string_of_int level) client in
+    let* ops =
+      RPC.Client.call client
+      @@ RPC.get_chain_block_operations ~block:(string_of_int level) ()
+    in
     let proposals =
       List.concat_map
         (fun op ->

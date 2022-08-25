@@ -464,7 +464,7 @@ let test_ordering =
   bake_and_check state ~protocol ~mempool ~sources
 
 let check_op_not_in_baked_block client op =
-  let* ops = RPC.get_operations client in
+  let* ops = RPC.Client.call client @@ RPC.get_chain_block_operations () in
   let open JSON in
   let ops_list = ops |=> 3 |> as_list in
   let res = List.exists (fun e -> e |-> "hash" |> as_string = op) ops_list in

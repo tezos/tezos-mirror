@@ -332,6 +332,9 @@ let get_chain_block_header_protocol_data ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "header"; "protocol_data"]
     Fun.id
 
+let get_chain_block_operations ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "operations"] Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

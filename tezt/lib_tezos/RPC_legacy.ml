@@ -24,10 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let get_operations ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
-  let path = ["chains"; chain; "blocks"; block; "operations"] in
-  Client.rpc ?endpoint ?hooks GET path client
-
 let get_operations_of_validation_pass ?endpoint ?hooks ?(chain = "main")
     ?(block = "head") ?(force_metadata = false) ?operation_offset
     ~validation_pass client =
