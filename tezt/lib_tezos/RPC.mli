@@ -490,6 +490,22 @@ val post_chain_block_helpers_scripts_simulate_operation :
 val post_chain_block_helpers_scripts_event_address :
   ?chain:string -> ?block:string -> data:Ezjsonm.value -> unit -> JSON.t t
 
+type ctxt_type = Bytes | Json
+
+(** RPC: [GET /chains/[chain]/blocks/[block]/context/raw/[ctxt_type]/[value_path]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+    [ctxt_type] defaults to [Json].
+*)
+val get_chain_block_context_raw :
+  ?chain:string ->
+  ?block:string ->
+  ?ctxt_type:ctxt_type ->
+  value_path:string list ->
+  unit ->
+  JSON.t t
+
 (** {2 Smart contract rollup RPC module} *)
 
 (** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup] *)

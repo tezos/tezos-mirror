@@ -988,7 +988,8 @@ let test_chain _test_mode_tag _protocol ?endpoint client =
   in
   let* _ =
     (* Calls [/chains/main/blocks/head/context/raw/bytes] *)
-    RPC.get_context_value ?endpoint client ~ctxt_type:Bytes ~value_path:[]
+    RPC.Client.call ?endpoint client
+    @@ RPC.get_chain_block_context_raw ~ctxt_type:Bytes ~value_path:[] ()
   in
   let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_block_hash () in
   let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_block_header () in
