@@ -1640,7 +1640,9 @@ module Revamped = struct
     let wait1 = Node.wait_for_request ~request:`Arrived node1
     and wait2 = Node.wait_for_request ~request:`Arrived node1
     and wait3 = Node.wait_for_request ~request:`Arrived node1 in
-    let* _ = RPC.mempool_unban_all_operations client1 in
+    let* _ =
+      RPC.Client.call client1 @@ RPC.post_chain_mempool_unban_all_operations ()
+    in
     let* () = synchronize_mempool client1 node1 in
     let* () = wait1 and* () = wait2 and* () = wait3 in
 

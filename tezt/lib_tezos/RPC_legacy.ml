@@ -24,10 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let mempool_unban_all_operations ?endpoint ?(chain = "main") client =
-  let path = ["chains"; chain; "mempool"; "unban_all_operations"] in
-  Client.rpc ?endpoint POST path client
-
 let get_mempool_filter ?endpoint ?hooks ?(chain = "main") ?include_default
     client =
   let path = ["chains"; chain; "mempool"; "filter"] in
