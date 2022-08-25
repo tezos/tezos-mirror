@@ -1,0 +1,21 @@
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "utop"
+  "merlin"
+  "ocamlformat"
+  "ometrics" { = "0.2.1" }
+  "odoc"
+  "ocp-indent"
+  "ocaml-lsp-server" { >= "1.6.1" }
+  "js_of_ocaml-compiler"
+  "merge-fmt"
+]
+build: []
+synopsis: "Virtual package depending on all Octez development-only dependencies"
+description: "Install this package to install some dependencies which are useful to develop Octez."

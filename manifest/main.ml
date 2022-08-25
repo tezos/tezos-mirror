@@ -5737,6 +5737,9 @@ let exclude filename =
   | ["opam"; "mandatory-for-make.opam"] -> true
   (* opam-repository is used by scripts/opam-release.sh *)
   | "opam-repository" :: _ -> true
+  (* opam/octez-dev-deps.opam is not released, it's used to make an opam lock file
+     for developement dependencies. There is no use to generate it. *)
+  | [ "opam"; "octez-dev-deps.opam" ] -> true
   (* Tezt is only partially managed by the manifest.
      There is no real good reason for that but only the core Tezt library is released. *)
   | "tezt" :: "long_tests" :: _ -> true
