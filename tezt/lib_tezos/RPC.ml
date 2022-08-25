@@ -433,6 +433,14 @@ let post_chain_block_helpers_scripts_simulate_operation ?(chain = "main")
     ]
     Fun.id
 
+let post_chain_block_helpers_scripts_event_address ?(chain = "main")
+    ?(block = "head") ~data () =
+  make
+    ~data
+    POST
+    ["chains"; chain; "blocks"; block; "helpers"; "scripts"; "event_address"]
+    Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

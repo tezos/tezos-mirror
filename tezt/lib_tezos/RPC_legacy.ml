@@ -82,13 +82,6 @@ let get_levels_in_current_cycle ?endpoint ?hooks ?(chain = "main")
   in
   Client.rpc ?endpoint ?hooks GET path client
 
-let post_compute_event_address ?endpoint ?hooks ?(chain = "main")
-    ?(block = "head") ~data client =
-  let path =
-    ["chains"; chain; "blocks"; block; "helpers"; "scripts"; "event_address"]
-  in
-  Client.rpc ?endpoint ?hooks ~data POST path client
-
 module Big_maps = struct
   let get ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~id ~key_hash
       client =
