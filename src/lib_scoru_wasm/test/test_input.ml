@@ -84,7 +84,6 @@ let read_input () =
   let memory = Memory.alloc lim in
   let input_buffer = Input_buffer.alloc () in
   let output_buffer = Output_buffer.alloc () in
-  Output_buffer.increase_id output_buffer ;
   let* () =
     Input_buffer.enqueue
       input_buffer
@@ -117,10 +116,9 @@ let read_input () =
   let* memory =
     Tezos_webassembly_interpreter.Instance.Vector.get 0l module_inst.memories
   in
-  let output_level = Output_buffer.get_level output_buffer in
-  let output_id = Output_buffer.get_id output_buffer in
+  let* output_level, output_id = Output_buffer.get_id output_buffer in
   assert (output_level = 2l) ;
-  assert (output_id = Z.zero) ;
+  assert (output_id = Z.of_int (-1)) ;
   assert (Input_buffer.num_elements input_buffer = Z.zero) ;
   assert (result = 5) ;
   let* m = Memory.load_bytes memory 0l 1 in

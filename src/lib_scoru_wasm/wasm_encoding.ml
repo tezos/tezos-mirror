@@ -838,23 +838,17 @@ let input_buffer_encoding =
              input_buffer_message_encoding))
        (value ["num-messages"] Data_encoding.z))
 
-module Output_bufferMap = Lazy_map_encoding.Make (Output_buffer.Map.Map)
-
-let output_content_encoding =
+let index_vector_encoding =
   conv
-    Output_buffer.Map.of_immutable
-    Output_buffer.Map.snapshot
-    (Output_bufferMap.lazy_map (value [] Data_encoding.bytes))
+    (fun index -> Output_buffer.Index_Vector.of_immutable index)
+    (fun buffer -> Output_buffer.Index_Vector.snapshot buffer)
+    (z_lazy_vector (value [] Data_encoding.z) (value [] Data_encoding.bytes))
 
 let output_buffer_encoding =
   conv
-    (fun (content, level, id) -> Output_buffer.{content; level; id})
-    (fun Output_buffer.{content; level; id} -> (content, level, id))
-    (tup3
-       ~flatten:true
-       output_content_encoding
-       (value ["level"] Data_encoding.int32)
-       (value ["id"] Data_encoding.z))
+    (fun output -> Output_buffer.Level_Vector.of_immutable output)
+    (fun buffer -> Output_buffer.Level_Vector.snapshot buffer)
+    (int32_lazy_vector (value [] Data_encoding.int32) index_vector_encoding)
 
 let config_encoding ~host_funcs =
   conv

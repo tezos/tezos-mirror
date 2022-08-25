@@ -40,12 +40,10 @@ let retrieve_memory module_inst =
 let aux_write_input_in_memory ~input_buffer ~output_buffer ~module_inst
     ~rtype_offset ~level_offset ~id_offset ~dst ~max_bytes =
   let open Lwt.Syntax in
-  let output_level = Output_buffer.get_level output_buffer in
   let* {rtype; raw_level; message_counter; payload} =
     Input_buffer.dequeue input_buffer
   in
-  if raw_level > output_level then
-    Output_buffer.set_level output_buffer raw_level ;
+  Output_buffer.set_level output_buffer raw_level ;
   let input_size = Bytes.length payload in
   if Int64.of_int input_size > 4096L then
     raise (Eval.Crash (Source.no_region, "input too large"))
@@ -70,17 +68,7 @@ let aux_write_output ~input_buffer:_ ~output_buffer ~module_inst ~src ~num_bytes
     let num_bytes = Int32.to_int num_bytes in
     let* memory = retrieve_memory module_inst in
     let* payload = Memory.load_bytes memory src num_bytes in
-    let level = Output_buffer.get_level output_buffer in
-    let id = Output_buffer.get_id output_buffer in
-    let output_info =
-      Output_buffer.{outbox_level = level; message_index = id}
-    in
-    Output_buffer.increase_id output_buffer ;
-    Output_buffer.Map.set
-      output_info
-      (Bytes.of_string payload)
-      output_buffer.content ;
-
+    let* () = Output_buffer.set_value output_buffer (Bytes.of_string payload) in
     Lwt.return 0l
 
 let read_input_type =

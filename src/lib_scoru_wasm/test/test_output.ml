@@ -81,13 +81,11 @@ let test_aux_write_output () =
       ~src:50l
       ~num_bytes:5l
   in
-  let* z =
-    Output_buffer.(
-      Map.get {outbox_level = 2l; message_index = Z.zero} output_buffer.content)
-  in
+  let* z = Output_buffer.get output_buffer 2l Z.zero in
   assert (result = 0l) ;
-  assert (Output_buffer.get_level output_buffer = output_level) ;
-  assert (Output_buffer.get_id output_buffer = Z.one) ;
+  let* level, id = Output_buffer.get_id output_buffer in
+  assert (level = output_level) ;
+  assert (id = Z.zero) ;
   assert (z = Bytes.of_string "hello") ;
 
   Lwt.return @@ Result.return_unit
@@ -108,7 +106,7 @@ let test_write_host_fun () =
   in
   let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
   let memories =
-    Lazy_vector.LwtInt32Vector.cons
+    Lazy_vector.Int32Vector.cons
       (Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}))
       module_inst.memories
   in
@@ -148,14 +146,12 @@ let test_write_host_fun () =
       Host_funcs.Internal_for_tests.write_output
       values
   in
-  let* z =
-    Output_buffer.(
-      Map.get {outbox_level = 2l; message_index = Z.zero} output.content)
-  in
+  let* z = Output_buffer.get output 2l Z.zero in
+  let* level, id = Output_buffer.get_id output in
   assert (result = Values.[Num (I32 0l)]) ;
   assert (z = Bytes.of_string "hello") ;
-  assert (Output_buffer.get_level output = 2l) ;
-  assert (Output_buffer.get_id output = Z.one) ;
+  assert (level = 2l) ;
+  assert (id = Z.zero) ;
   let values = Values.[Num (I32 50l); Num (I32 5000l)] in
   let* result =
     Eval.invoke
@@ -167,9 +163,10 @@ let test_write_host_fun () =
       Host_funcs.Internal_for_tests.write_output
       values
   in
+  let* level, id = Output_buffer.get_id output in
   assert (result = Values.[Num (I32 1l)]) ;
-  assert (Output_buffer.get_level output = 2l) ;
-  assert (Output_buffer.get_id output = Z.one) ;
+  assert (level = 2l) ;
+  assert (id = Z.zero) ;
   Lwt.return @@ Result.return_unit
 
 let tests =
