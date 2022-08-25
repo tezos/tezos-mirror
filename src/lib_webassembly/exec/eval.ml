@@ -1030,7 +1030,7 @@ let run_data (inst : module_inst) i data =
            ]
   | Declarative -> assert false
 
-let run_start start = List.map plain [Call start.it.sfunc @@ start.at]
+let run_start start = [plain (Call start.it.sfunc @@ start.at)]
 
 type ('a, 'b, 'acc) fold_right2_kont = {
   acc : 'acc;
@@ -1233,7 +1233,8 @@ type init_kont =
       module_inst
       * (data_segment, admin_instr) map_concat_kont
       * admin_instr Vector.t
-  | IK_Remaining of module_inst * admin_instr Vector.t * admin_instr Vector.t
+  | IK_Join_admin of module_inst * admin_instr join_kont
+  | IK_Eval of module_inst * config
   | IK_Stop of module_inst
 
 let section_next_init_kont :
@@ -1345,7 +1346,13 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
           IK_Es_elems (inst0, tick))
   | IK_Es_datas (inst0, tick, es_elem) -> (
       match map_concat_completed tick with
-      | Some es_data -> Lwt.return (IK_Remaining (inst0, es_elem, es_data))
+      | Some es_data ->
+          let es_start =
+            Vector.of_list
+              (Lib.Option.get (Lib.Option.map run_start m.it.start) [])
+          in
+          let v = Vector.of_list [es_elem; es_data; es_start] in
+          Lwt.return (IK_Join_admin (inst0, join_kont v))
       | None ->
           let+ tick =
             map_concat_step
@@ -1358,21 +1365,20 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
               tick
           in
           IK_Es_datas (inst0, tick, es_elem))
-  | IK_Remaining (inst, es_elem, es_data) ->
+  | IK_Join_admin (inst0, tick) -> (
+      match join_completed tick with
+      | Some res ->
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
+             [config] should use lazy vector, not lists *)
+          let+ res = Vector.to_list res in
+          IK_Eval (inst0, config host_funcs self [] res)
+      | None ->
+          let+ tick = join_step tick in
+          IK_Join_admin (inst0, tick))
+  | IK_Eval (inst, config) ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
-         These transformations should be refactored and abadoned during the
-         tickification, to avoid the roundtrip vector -> list -> vector. *)
-      let* es_elem = Vector.to_list es_elem in
-      let* es_data = Vector.to_list es_data in
-
-      let es_start = Lib.Option.get (Lib.Option.map run_start m.it.start) [] in
-
-      let+ (_ : Values.value stack) =
-        eval
-          module_reg
-          (config host_funcs self [] (es_elem @ es_data @ es_start))
-      in
-
+         The call to [eval] should be tickify. *)
+      let+ (_ : Values.value stack) = eval module_reg config in
       IK_Stop inst
   | IK_Stop _ -> raise (Invalid_argument "init_step")
 

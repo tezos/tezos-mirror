@@ -88,7 +88,9 @@ module Make (T : Tree_encoding.Runner.TREE) :
                (scope ["self"] Wasm_encoding.module_key_encoding)
                (scope ["ast_module"]
                @@ Parsing.(no_region_encoding Module.module_encoding))
-               (scope ["init_kont"] Init_encodings.init_kont_encoding))
+               (scope
+                  ["init_kont"]
+                  (Init_encodings.init_kont_encoding ~host_funcs)))
             (function
               | Init {self; ast_module; init_kont} ->
                   Some (self, ast_module, init_kont)
