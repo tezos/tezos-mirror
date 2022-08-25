@@ -2392,6 +2392,7 @@ module Receipt : sig
     | Tx_rollup_rejection_punishments
     | Tx_rollup_rejection_rewards
     | Sc_rollup_refutation_punishments
+    | Sc_rollup_refutation_rewards
 
   val compare_balance : balance -> balance -> int
 
@@ -4590,6 +4591,7 @@ module Token : sig
     | `Minted
     | `Liquidity_baking_subsidies
     | `Tx_rollup_rejection_rewards
+    | `Sc_rollup_refutation_rewards
     | container ]
 
   type sink =

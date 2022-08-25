@@ -63,7 +63,8 @@ type infinite_source =
   | `Baking_bonuses
   | `Minted
   | `Liquidity_baking_subsidies
-  | `Tx_rollup_rejection_rewards ]
+  | `Tx_rollup_rejection_rewards
+  | `Sc_rollup_refutation_rewards ]
 
 (** [source] is the type of token providers. Token providers that are not
     containers are considered to have infinite capacity. *)

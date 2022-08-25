@@ -47,6 +47,7 @@ type balance =
   | Tx_rollup_rejection_punishments
   | Tx_rollup_rejection_rewards
   | Sc_rollup_refutation_punishments
+  | Sc_rollup_refutation_rewards
 
 let balance_encoding =
   let open Data_encoding in
@@ -241,6 +242,15 @@ let balance_encoding =
            (function
              | Sc_rollup_refutation_punishments -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Sc_rollup_refutation_punishments);
+         case
+           (Tag 25)
+           ~title:"Sc_rollup_refutation_rewards"
+           (obj2
+              (req "kind" (constant "minted"))
+              (req "category" (constant "sc_rollup_refutation_rewards")))
+           (function
+             | Sc_rollup_refutation_rewards -> Some ((), ()) | _ -> None)
+           (fun ((), ()) -> Sc_rollup_refutation_rewards);
        ]
 
 let is_not_zero c = not (Compare.Int.equal c 0)
@@ -286,6 +296,7 @@ let compare_balance ba bb =
         | Tx_rollup_rejection_punishments -> 19
         | Tx_rollup_rejection_rewards -> 20
         | Sc_rollup_refutation_punishments -> 21
+        | Sc_rollup_refutation_rewards -> 22
         (* don't forget to add parameterized cases in the first part of the function *)
       in
       Compare.Int.compare (index ba) (index bb)

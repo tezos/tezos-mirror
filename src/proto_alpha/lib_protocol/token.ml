@@ -42,7 +42,8 @@ type infinite_source =
   | `Baking_bonuses
   | `Minted
   | `Liquidity_baking_subsidies
-  | `Tx_rollup_rejection_rewards ]
+  | `Tx_rollup_rejection_rewards
+  | `Sc_rollup_refutation_rewards ]
 
 type source = [infinite_source | container]
 
@@ -174,6 +175,7 @@ let spend ctxt src amount origin =
         | `Baking_rewards -> Baking_rewards
         | `Baking_bonuses -> Baking_bonuses
         | `Tx_rollup_rejection_rewards -> Tx_rollup_rejection_rewards
+        | `Sc_rollup_refutation_rewards -> Sc_rollup_refutation_rewards
       in
       return (ctxt, src)
   | #container as container -> (
