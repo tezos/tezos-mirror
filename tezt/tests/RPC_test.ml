@@ -627,7 +627,10 @@ let test_misc_protocol _test_mode_tag _protocol ?endpoint client =
     RPC.Client.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_helper_endorsing_rights ()
   in
-  let* _ = RPC.get_levels_in_current_cycle ?endpoint ~hooks client in
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_helper_levels_in_current_cycle ()
+  in
   unit
 
 let mempool_hooks =

@@ -515,6 +515,13 @@ let get_chain_block_helper_endorsing_rights ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "helpers"; "endorsing_rights"]
     Fun.id
 
+let get_chain_block_helper_levels_in_current_cycle ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "helpers"; "levels_in_current_cycle"]
+    Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

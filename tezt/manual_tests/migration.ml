@@ -152,7 +152,10 @@ let migration ?yes_node_path ?yes_wallet context protocol =
   Log.info "Bake and wait until migration is finished" ;
   let* () = bake_with_foundation client in
   let* _until_mig = Node.wait_for_level node migration_level in
-  let* levels_in_current_cycle = RPC.get_levels_in_current_cycle client in
+  let* levels_in_current_cycle =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_helper_levels_in_current_cycle ()
+  in
   let last_block_of_cycle =
     JSON.(levels_in_current_cycle |-> "last" |> as_int)
   in

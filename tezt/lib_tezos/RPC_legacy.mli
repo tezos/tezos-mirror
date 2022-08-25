@@ -36,15 +36,6 @@
 
 type ctxt_type = Bytes | Json
 
-(** Call RPC /chain/[chain]/blocks/[block]/helpers/levels_in_current_cycle *)
-val get_levels_in_current_cycle :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
 module Big_maps : sig
   (** Call RPC /chain/[chain]/blocks/[block]/context/big_maps/[id]/[key_hash] *)
   val get :

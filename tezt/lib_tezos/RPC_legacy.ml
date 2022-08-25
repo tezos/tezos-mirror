@@ -26,13 +26,6 @@
 
 type ctxt_type = Bytes | Json
 
-let get_levels_in_current_cycle ?endpoint ?hooks ?(chain = "main")
-    ?(block = "head") client =
-  let path =
-    ["chains"; chain; "blocks"; block; "helpers"; "levels_in_current_cycle"]
-  in
-  Client.rpc ?endpoint ?hooks GET path client
-
 module Big_maps = struct
   let get ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~id ~key_hash
       client =
