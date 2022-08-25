@@ -30,7 +30,7 @@
                   src/proto_alpha/lib_protocol/test/integration/main.exe \
                   -- test "^liquidity baking$"
     Subject:      Test liquidity baking subsidies, CPMM storage updates,
-                  sunset shut off, and toggle vote.
+                  and toggle vote.
 *)
 
 open Liquidity_baking_machine
@@ -124,29 +124,6 @@ let liquidity_baking_subsidies n () =
     expected_credit
   >>=? fun () -> return_unit
 
-(* Test that [n] blocks after the liquidity baking sunset, the subsidy is not applied anymore.
-   More precisely, after the sunset, the total amount credited to the subsidy is only proportional
-   to the sunset level and in particular it does not depend on [n]. *)
-let liquidity_baking_sunset_level n () =
-  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
-  Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
-  let liquidity_baking = Alpha_context.Contract.Originated liquidity_baking in
-  Context.get_constants (B blk) >>=? fun csts ->
-  let sunset = csts.parametric.liquidity_baking_sunset_level in
-  Context.Contract.balance (B blk) liquidity_baking >>=? fun old_balance ->
-  Block.bake_n (Int32.to_int sunset + n) blk >>=? fun blk ->
-  Context.get_liquidity_baking_subsidy (B blk)
-  >>=? fun liquidity_baking_subsidy ->
-  (liquidity_baking_subsidy *? Int64.(sub (of_int32 sunset) 1L))
-  >>?= fun expected_credit ->
-  Assert.balance_was_credited
-    ~loc:__LOC__
-    (B blk)
-    liquidity_baking
-    old_balance
-    expected_credit
-  >>=? fun () -> return_unit
-
 (* Test that subsidy shuts off at correct level alternating baking
    blocks with liquidity_baking_toggle_vote set to [LB_on], [LB_off], and [LB_pass] followed by [bake_after_toggle] blocks with it set to [LB_pass]. *)
 (* Expected level is roughly 2*(log(1-1/(2*p)) / log(0.999)) where [p] is the proportion [LB_off / (LB_on + LB_off)]. *)
@@ -197,32 +174,33 @@ let liquidity_baking_toggle_60 n () =
   liquidity_baking_toggle ~n_vote_on:2 ~n_vote_off:3 ~n_vote_pass:0 3583 n ()
 
 (* 50% of blocks have liquidity_baking_toggle_vote = LB_off.
-   Subsidy should not be stopped. *)
-let liquidity_baking_toggle_50 n () =
+   Subsidy should not be stopped.
+   Bakes until 100 blocks after the test sunset level of 4096 used in previous protocols. *)
+let liquidity_baking_toggle_50 () =
   Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   let liquidity_baking = Alpha_context.Contract.Originated liquidity_baking in
-  Context.get_constants (B blk) >>=? fun csts ->
-  let sunset = csts.parametric.liquidity_baking_sunset_level in
   Context.Contract.balance (B blk) liquidity_baking >>=? fun old_balance ->
-  let rec bake_50_percent_escaping blk i =
-    if i < Int32.to_int sunset + n then
-      Block.bake ~liquidity_baking_toggle_vote:LB_on blk >>=? fun blk ->
-      Block.bake ~liquidity_baking_toggle_vote:LB_off blk >>=? fun blk ->
-      bake_50_percent_escaping blk (i + 2)
-    else return blk
-  in
-  bake_50_percent_escaping blk 0 >>=? fun blk ->
   Context.get_liquidity_baking_subsidy (B blk)
   >>=? fun liquidity_baking_subsidy ->
-  (liquidity_baking_subsidy *? Int64.(sub (of_int32 sunset) 1L))
-  >>?= fun expected_balance ->
+  let rec bake_stopping blk i =
+    if i < 4196 then
+      Block.bake ~liquidity_baking_toggle_vote:LB_on blk >>=? fun blk ->
+      Block.bake ~liquidity_baking_toggle_vote:LB_off blk >>=? fun blk ->
+      bake_stopping blk (i + 2)
+    else return blk
+  in
+  bake_stopping blk 0 >>=? fun blk ->
+  Context.Contract.balance (B blk) liquidity_baking >>=? fun balance ->
+  Assert.balance_is ~loc:__LOC__ (B blk) liquidity_baking balance >>=? fun () ->
+  liquidity_baking_subsidy *? Int64.of_int 4196
+  >>?= fun expected_final_balance ->
   Assert.balance_was_credited
     ~loc:__LOC__
     (B blk)
     liquidity_baking
     old_balance
-    expected_balance
+    expected_final_balance
   >>=? fun () -> return_unit
 
 (* Test that the subsidy can restart if LB_on votes regain majority.
@@ -317,9 +295,8 @@ let liquidity_baking_balance_update () =
   Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   Context.get_constants (B blk) >>=? fun csts ->
-  let sunset = csts.parametric.liquidity_baking_sunset_level in
   let subsidy = csts.parametric.liquidity_baking_subsidy in
-  Block.bake_n_with_all_balance_updates Int32.(to_int (add sunset 100l)) blk
+  Block.bake_n_with_all_balance_updates 128 blk
   >>=? fun (_blk, balance_updates) ->
   let liquidity_baking_updates =
     List.filter
@@ -343,7 +320,7 @@ let liquidity_baking_balance_update () =
   Assert.equal_int
     ~loc:__LOC__
     (Int64.to_int (to_mutez credits))
-    ((Int32.to_int sunset - 1) * Int64.to_int (to_mutez subsidy))
+    (128 * Int64.to_int (to_mutez subsidy))
   >>=? fun () -> return_unit
 
 let get_cpmm_result results =
@@ -466,21 +443,6 @@ let tests =
       `Quick
       (liquidity_baking_subsidies 64);
     Tztest.tztest
-      "test liquidity baking shuts off at sunset level when baking one block \
-       longer"
-      `Quick
-      (liquidity_baking_sunset_level 1);
-    Tztest.tztest
-      "test liquidity baking shuts off at sunset level when baking two blocks \
-       longer"
-      `Quick
-      (liquidity_baking_sunset_level 2);
-    Tztest.tztest
-      "test liquidity baking shuts off at sunset level when baking 100 blocks \
-       longer"
-      `Quick
-      (liquidity_baking_sunset_level 100);
-    Tztest.tztest
       "test liquidity baking toggle vote with 100% of bakers voting LB_off \
        baking one block longer"
       `Quick
@@ -526,20 +488,10 @@ let tests =
       `Quick
       (liquidity_baking_toggle_60 100);
     Tztest.tztest
-      "test liquidity baking shuts off at sunset level with toggle vote at 50% \
-       and baking one block longer"
+      "test liquidity baking does not shut off with toggle vote at 50% and \
+       baking 100 blocks longer than sunset level in previous protocols"
       `Quick
-      (liquidity_baking_toggle_50 1);
-    Tztest.tztest
-      "test liquidity baking shuts off at sunset level with toggle vote at 50% \
-       and baking two blocks longer"
-      `Quick
-      (liquidity_baking_toggle_50 2);
-    Tztest.tztest
-      "test liquidity baking shuts off at sunset level with toggle vote at 50% \
-       and baking 100 blocks longer"
-      `Quick
-      (liquidity_baking_toggle_50 100);
+      liquidity_baking_toggle_50;
     Tztest.tztest
       "test a liquidity baking restart with 100% of bakers voting off, then \
        pass, then on"
