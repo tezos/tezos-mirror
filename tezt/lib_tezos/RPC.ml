@@ -522,6 +522,13 @@ let get_chain_block_helper_levels_in_current_cycle ?(chain = "main")
     ["chains"; chain; "blocks"; block; "helpers"; "levels_in_current_cycle"]
     Fun.id
 
+let get_chain_block_context_big_map ?(chain = "main") ?(block = "head") ~id
+    ~key_hash () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "big_maps"; id; key_hash]
+    Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

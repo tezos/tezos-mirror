@@ -27,13 +27,6 @@
 type ctxt_type = Bytes | Json
 
 module Big_maps = struct
-  let get ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~id ~key_hash
-      client =
-    let path =
-      ["chains"; chain; "blocks"; block; "context"; "big_maps"; id; key_hash]
-    in
-    Client.rpc ?endpoint ?hooks GET path client
-
   let get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~big_map_id
       ?offset ?length client =
     let path =

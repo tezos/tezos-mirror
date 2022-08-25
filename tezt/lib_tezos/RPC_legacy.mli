@@ -37,17 +37,6 @@
 type ctxt_type = Bytes | Json
 
 module Big_maps : sig
-  (** Call RPC /chain/[chain]/blocks/[block]/context/big_maps/[id]/[key_hash] *)
-  val get :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    id:string ->
-    key_hash:string ->
-    Client.t ->
-    JSON.t Lwt.t
-
   (** Call RPC /chain/[chain]/blocks/[block]/context/big_maps/[big_map_id]?offset=[int]&length=[int] *)
   val get_all :
     ?endpoint:Client.endpoint ->
