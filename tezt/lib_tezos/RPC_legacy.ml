@@ -82,13 +82,6 @@ let get_levels_in_current_cycle ?endpoint ?hooks ?(chain = "main")
   in
   Client.rpc ?endpoint ?hooks GET path client
 
-let post_forge_operations ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    ~data client =
-  let path =
-    ["chains"; chain; "blocks"; block; "helpers"; "forge"; "operations"]
-  in
-  Client.rpc ?endpoint ?hooks ~data POST path client
-
 let post_simulate_operation ?endpoint ?hooks ?(chain = "main") ?(block = "head")
     ~data client =
   let path =

@@ -2243,7 +2243,10 @@ let forge_operation ~branch ~fee ~gas_limit ~source ~destination ~counter
   let op_json = operation_json ~fee ~gas_limit ~source ~destination ~counter in
   let op_json_branch = operation_json_branch ~branch op_json in
   let* op_hex =
-    RPC.post_forge_operations ~data:(Ezjsonm.from_string op_json_branch) client
+    RPC.Client.call client
+    @@ RPC.post_chain_block_helpers_forge_operations
+         ~data:(Ezjsonm.from_string op_json_branch)
+         ()
   in
   return (`Hex (JSON.as_string op_hex))
 
