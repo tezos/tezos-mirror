@@ -1304,18 +1304,18 @@ This sequence of operations was run:
 ./tezos-sc-rollup-client-alpha rpc get /global/last_stored_commitment
 { "commitment":
     { "compressed_state":
-        "scs12A4jtbi39DFb3fzb3EBcJGB6hcsUxugy62zf11pQyk1eMMqWjP",
+        "scs123mHW8JnxvBJvMvySAKp99M3Ekvb5ntV5eLQkRJNVexjgXzTK8",
       "inbox_level": 32,
       "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
-      "number_of_ticks": 931 },
+      "number_of_ticks": 1396 },
   "hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
 ./tezos-sc-rollup-client-alpha rpc get /local/last_published_commitment
 { "commitment":
     { "compressed_state":
-        "scs12A4jtbi39DFb3fzb3EBcJGB6hcsUxugy62zf11pQyk1eMMqWjP",
+        "scs123mHW8JnxvBJvMvySAKp99M3Ekvb5ntV5eLQkRJNVexjgXzTK8",
       "inbox_level": 32,
       "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
-      "number_of_ticks": 931 },
+      "number_of_ticks": 1396 },
   "hash": "[SC_ROLLUP_COMMITMENT_HASH]",
   "published_at_level": 35 }

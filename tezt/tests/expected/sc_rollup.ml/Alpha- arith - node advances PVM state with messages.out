@@ -86,16 +86,16 @@ This sequence of operations was run:
 "\000\000\000\007"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs13CGfXJuhF7NnAKY7v3TBokPphzCEYPE5n14UHDnpTAMTAC7GzC"
+"scs11brdXnUqwwkqChBy8JsHPVzsS3b6YU9i1PpLczV3tCSnjkTYd1"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"18"
+"19"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs13CGfXJuhF7NnAKY7v3TBokPphzCEYPE5n14UHDnpTAMTAC7GzC"
+"scs11brdXnUqwwkqChBy8JsHPVzsS3b6YU9i1PpLczV3tCSnjkTYd1"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"18"
+"19"
 
 ./tezos-client --wait none send sc rollup message '["2 8 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -141,16 +141,16 @@ This sequence of operations was run:
 "\000\000\000\n"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12BVD7ers632i9FZGzaeT4Zt9jQi13guYDh7yb5HFipfVc13wku"
+"scs12Tgfr71PpKXJqDp8yXnohfSYoTT57KeRMEi1YacXtRyyvMxjZ4"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"35"
+"37"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12BVD7ers632i9FZGzaeT4Zt9jQi13guYDh7yb5HFipfVc13wku"
+"scs12Tgfr71PpKXJqDp8yXnohfSYoTT57KeRMEi1YacXtRyyvMxjZ4"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"35"
+"37"
 
 ./tezos-client --wait none send sc rollup message '["3 10 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -196,16 +196,16 @@ This sequence of operations was run:
 "\000\000\000\r"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12nXMLncCoT9SGzJX8CwUEG4D1myYhKGYBY6eGvtPrjwqooCovf"
+"scs13M1yuX6NMTpdqWgYMx1uAtaLpiCgQAgXK2n93iua2LjfGajSiT"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"53"
+"56"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12nXMLncCoT9SGzJX8CwUEG4D1myYhKGYBY6eGvtPrjwqooCovf"
+"scs13M1yuX6NMTpdqWgYMx1uAtaLpiCgQAgXK2n93iua2LjfGajSiT"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"53"
+"56"
 
 ./tezos-client --wait none send sc rollup message '["4 12 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -252,16 +252,16 @@ This sequence of operations was run:
 "\000\000\000\016"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs11tcLMA9CwjW3K3VuAFp4RiJRujh9msGbyMSHyediDMTfchY2JY"
+"scs12iwXS6KpaLNTTaBqxFvkyvZpHLq8H5xp35upZ4Tz7Wqtnv68dd"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"71"
+"75"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs11tcLMA9CwjW3K3VuAFp4RiJRujh9msGbyMSHyediDMTfchY2JY"
+"scs12iwXS6KpaLNTTaBqxFvkyvZpHLq8H5xp35upZ4Tz7Wqtnv68dd"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"71"
+"75"
 
 ./tezos-client --wait none send sc rollup message '["5 14 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -308,16 +308,16 @@ This sequence of operations was run:
 "\000\000\000\019"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs11eYQany2zXFhZ6q62wfrHQA1CYzskBu8k5pnnWnBaAQ3ZEWBK6"
+"scs12GyR6dnoCQ3T6NCHe7wCEwzs1FSFdMmKPk8hzvPLMWA9po1vHp"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"89"
+"94"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs11eYQany2zXFhZ6q62wfrHQA1CYzskBu8k5pnnWnBaAQ3ZEWBK6"
+"scs12GyR6dnoCQ3T6NCHe7wCEwzs1FSFdMmKPk8hzvPLMWA9po1vHp"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"89"
+"94"
 
 ./tezos-client --wait none send sc rollup message '["6 16 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -364,16 +364,16 @@ This sequence of operations was run:
 "\000\000\000\022"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs11ibk6bxp8XcMmHchNkLxniEMGeuu67FYqjeFgsFaK2nSbaj6v6"
+"scs13QvpMutd3qKfBeqBUbk719sF8sG2S3PCwbm3nuVr9kib5KA9Vz"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"107"
+"113"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs11ibk6bxp8XcMmHchNkLxniEMGeuu67FYqjeFgsFaK2nSbaj6v6"
+"scs13QvpMutd3qKfBeqBUbk719sF8sG2S3PCwbm3nuVr9kib5KA9Vz"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"107"
+"113"
 
 ./tezos-client --wait none send sc rollup message '["7 18 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -420,16 +420,16 @@ This sequence of operations was run:
 "\000\000\000\025"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs1271ctQaBTEibVsSeGQDQwFHaHUhd8EZ1V35wT87wwNkZRKuod2"
+"scs12d3sxy4uVnARXJi4KWs3cz5DrmR73Y9ZVk2DkLRXNio9i9yyX4"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"125"
+"132"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs1271ctQaBTEibVsSeGQDQwFHaHUhd8EZ1V35wT87wwNkZRKuod2"
+"scs12d3sxy4uVnARXJi4KWs3cz5DrmR73Y9ZVk2DkLRXNio9i9yyX4"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"125"
+"132"
 
 ./tezos-client --wait none send sc rollup message '["8 20 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -477,16 +477,16 @@ This sequence of operations was run:
 "\000\000\000\028"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12hefiWoaPQGYvPcuUYHhiU5FAAfpBtHcztGqTj6LqB3PxDQiyG"
+"scs13CsbaoCfv3vCgBWtL78hQ3sPaH7iVhmCWqBd5hvCqfQWhxje7D"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"143"
+"151"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12hefiWoaPQGYvPcuUYHhiU5FAAfpBtHcztGqTj6LqB3PxDQiyG"
+"scs13CsbaoCfv3vCgBWtL78hQ3sPaH7iVhmCWqBd5hvCqfQWhxje7D"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"143"
+"151"
 
 ./tezos-client --wait none send sc rollup message '["9 22 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -534,16 +534,16 @@ This sequence of operations was run:
 "\000\000\000\031"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs11oq2aLp31bKWq7Tp3GccxvZHpaE41PzH7FUQNNKWpYSvUn7Fex"
+"scs12TkBvyg8cSuoNGfrzwM516T9isZwxAphpo7AnxJYVyPGWDwybq"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"161"
+"170"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs11oq2aLp31bKWq7Tp3GccxvZHpaE41PzH7FUQNNKWpYSvUn7Fex"
+"scs12TkBvyg8cSuoNGfrzwM516T9isZwxAphpo7AnxJYVyPGWDwybq"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"161"
+"170"
 
 ./tezos-client --wait none send sc rollup message '["10 24 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -591,7 +591,7 @@ This sequence of operations was run:
 "\000\000\000\""
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12z8UFkMz6jxQo5hDNhBz96Pjq31V8fSBz3kH3DPgVhpfQFe6Fk"
+"scs13GcPbRV1mSUravbXkE3LFT2SgEGu2muVHjNzKumLC91MikErA8"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
-"180"
+"190"

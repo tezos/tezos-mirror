@@ -317,4 +317,4 @@ This sequence of operations was run:
 
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs11beC6SWs4SDoqDB5qagJdkFFpqMYaZrjb9ScQpkkoku7ee56S1"
+"scs126QNuQZhsoqp3hjoXPYoLJbkh599zuUnch6kzc1pdZAR1KVTXb"
