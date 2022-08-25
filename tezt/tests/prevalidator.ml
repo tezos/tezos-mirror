@@ -77,7 +77,8 @@ module Revamped = struct
       string. *)
   let set_filter ?(log = false) config_str client =
     let* res =
-      RPC.post_mempool_filter ~data:(Ezjsonm.from_string config_str) client
+      RPC.Client.call client
+      @@ RPC.post_chain_mempool_filter ~data:(Ezjsonm.from_string config_str) ()
     in
     if log then Log.info "Updated filter config with: %s." config_str ;
     return res

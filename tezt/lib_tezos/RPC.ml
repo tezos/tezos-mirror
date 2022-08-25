@@ -398,6 +398,9 @@ let get_chain_mempool_filter ?(chain = "main") ?include_default () =
   in
   make ?query_string GET ["chains"; chain; "mempool"; "filter"] Fun.id
 
+let post_chain_mempool_filter ?(chain = "main") ~data () =
+  make ~data POST ["chains"; chain; "mempool"; "filter"] Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

@@ -24,10 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let post_mempool_filter ?endpoint ?hooks ?(chain = "main") ~data client =
-  let path = ["chains"; chain; "mempool"; "filter"] in
-  Client.rpc ?endpoint ?hooks ~data POST path client
-
 let preapply_block ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~data
     client =
   let path =
