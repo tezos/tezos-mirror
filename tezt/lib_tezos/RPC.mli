@@ -352,6 +352,9 @@ val get_stats_gc : JSON.t t
 (** RPC: [GET /stats/memory] *)
 val get_stats_memory : JSON.t t
 
+(** RPC: [POST /injection/block] *)
+val post_injection_block : data:JSON.u -> JSON.t t
+
 (** {2 Smart contract rollup RPC module} *)
 
 (** RPC: [GET chain/[chain]/blocks/[block]/context/sc_rollup] *)

@@ -314,6 +314,8 @@ let get_stats_gc = make GET ["stats"; "gc"] Fun.id
 
 let get_stats_memory = make GET ["stats"; "memory"] Fun.id
 
+let post_injection_block ~data = make POST ["injection"; "block"] ~data Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

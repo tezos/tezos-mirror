@@ -34,14 +34,6 @@
 
 (** {2 Shell RPCs} *)
 
-(** Call RPC /injection/block *)
-val inject_block :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Lwt.t
-
 (** Run [tezos-client rpc /chains/<chain>/blocks/<block>/header/protocol/raw]. *)
 val raw_protocol_data :
   ?endpoint:Client.endpoint ->
