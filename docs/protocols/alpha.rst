@@ -187,6 +187,11 @@ Data Availability Layer (ongoing)
 Distribution of rollup operations data off-chain. (MRs :gl:`!5711`, :gl:`!5938`,
 :gl:`!6024`, :gl:`!5959`)
 
+Liquidity Baking
+------------------
+
+The ``liquidity_baking_sunset_level`` parameter has been removed since the subsidy
+can now be shut off with the toggle introduced in Jakarta. (MR :gl:`!6215`)
 
 Breaking Changes
 ----------------
