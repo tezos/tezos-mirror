@@ -38,9 +38,16 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
   let wrap_full cctxt =
     new Tezos_client_011_PtHangz2.Protocol_client_context.wrap_full cctxt
 
-  let endorsing_rights cctxt block =
+  let endorsing_rights cctxt ~reference_level level =
+    let*? level =
+      Environment.wrap_tzresult
+      @@ Protocol.Alpha_context.Raw_level.of_int32 level
+    in
     let* rights =
-      Plugin.RPC.Endorsing_rights.get cctxt (cctxt#chain, `Level block)
+      Plugin.RPC.Endorsing_rights.get
+        cctxt
+        ~levels:[level]
+        (cctxt#chain, `Level reference_level)
     in
     return
     @@ List.map

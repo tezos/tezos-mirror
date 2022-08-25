@@ -31,7 +31,10 @@ module type PROTOCOL_SERVICES = sig
   val wrap_full : Tezos_client_base.Client_context.full -> wrap_full
 
   val endorsing_rights :
-    wrap_full -> Int32.t -> Consensus_ops.rights tzresult Lwt.t
+    wrap_full ->
+    reference_level:Int32.t ->
+    Int32.t ->
+    Consensus_ops.rights tzresult Lwt.t
 
   (* [couple_ops_to_rights ops rights] returns [(participating,
      missing)], where [participating] is a list associating delegates

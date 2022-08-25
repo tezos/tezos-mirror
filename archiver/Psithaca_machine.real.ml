@@ -44,9 +44,16 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
       Data_encoding.uint16
       (Data_encoding.Binary.to_bytes_exn Protocol.Alpha_context.Slot.encoding x)
 
-  let endorsing_rights cctxt level =
+  let endorsing_rights cctxt ~reference_level level =
+    let*? level =
+      Environment.wrap_tzresult
+      @@ Protocol.Alpha_context.Raw_level.of_int32 level
+    in
     let* answers =
-      Plugin.RPC.Endorsing_rights.get cctxt (cctxt#chain, `Level level)
+      Plugin.RPC.Endorsing_rights.get
+        cctxt
+        ~levels:[level]
+        (cctxt#chain, `Level reference_level)
     in
     match answers with
     | answer :: _ ->

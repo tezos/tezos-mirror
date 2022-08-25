@@ -33,7 +33,10 @@ module type PROTOCOL_SERVICES = sig
   val wrap_full : Tezos_client_base.Client_context.full -> wrap_full
 
   val endorsing_rights :
-    wrap_full -> Int32.t -> Consensus_ops.rights tzresult Lwt.t
+    wrap_full ->
+    reference_level:Int32.t ->
+    Int32.t ->
+    Consensus_ops.rights tzresult Lwt.t
 
   val couple_ops_to_rights :
     (int * 'a) list ->
@@ -100,9 +103,11 @@ module Make_main_loops
         let () = Error_monad.pp_print_trace Format.err_formatter err in
         return Wallet.empty
 
-  let dump_my_current_endorsements cctxt ~full level ops =
+  let dump_my_current_endorsements cctxt ~full reference_level level ops =
     let cctxt' = Protocol_services.wrap_full cctxt in
-    let* rights = Protocol_services.endorsing_rights cctxt' level in
+    let* rights =
+      Protocol_services.endorsing_rights cctxt' ~reference_level level
+    in
     let* aliases = aliases cctxt in
     Archiver.add_rights ~level rights aliases ;
     (* We could slightly optimize the db-archiver by not coupling ops
@@ -149,7 +154,12 @@ module Make_main_loops
     Protocol_services.BlockIdMap.iter_ep
       (fun _ (level, endorsements) ->
         let full = Compare.Int32.(current_level = level) in
-        dump_my_current_endorsements cctxt ~full level endorsements)
+        dump_my_current_endorsements
+          cctxt
+          ~full
+          current_level
+          level
+          endorsements)
       out
 
   let blocks_loop cctxt =
