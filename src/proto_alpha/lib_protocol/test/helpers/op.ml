@@ -811,27 +811,33 @@ let originated_sc_rollup op =
 let sc_rollup_origination ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     ?origination_proof ctxt (src : Contract.t) kind ~boot_sector ~parameters_ty
     =
-  (match origination_proof with
-  | None -> Sc_rollup_helpers.origination_proof ~boot_sector kind
-  | Some origination_proof -> Lwt.return origination_proof)
-  >>= fun origination_proof ->
+  let open Lwt_result_syntax in
+  let* origination_proof =
+    Sc_rollup_helpers.wrap_origination_proof
+      ~boot_sector
+      ~kind
+      origination_proof
+  in
+
   let (module PVM) = Sc_rollup.wrapped_proof_module origination_proof in
   let origination_proof =
     Data_encoding.Binary.to_string_exn PVM.proof_encoding PVM.proof
   in
-  manager_operation
-    ?force_reveal
-    ?counter
-    ?fee
-    ?gas_limit
-    ?storage_limit
-    ~source:src
-    ctxt
-    (Sc_rollup_originate {kind; boot_sector; origination_proof; parameters_ty})
-  >>=? fun to_sign_op ->
-  Context.Contract.manager ctxt src >|=? fun account ->
+  let* to_sign_op =
+    manager_operation
+      ?force_reveal
+      ?counter
+      ?fee
+      ?gas_limit
+      ?storage_limit
+      ~source:src
+      ctxt
+      (Sc_rollup_originate {kind; boot_sector; origination_proof; parameters_ty})
+  in
+  let* account = Context.Contract.manager ctxt src in
   let op = sign account.sk ctxt to_sign_op in
-  originated_sc_rollup op |> fun addr -> (op, addr)
+  let t = originated_sc_rollup op |> fun addr -> (op, addr) in
+  return t
 
 let sc_rollup_publish ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
     (src : Contract.t) rollup commitment =

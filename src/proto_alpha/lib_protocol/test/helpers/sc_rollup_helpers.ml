@@ -128,6 +128,19 @@ let origination_proof ~boot_sector = function
              let proof = proof
            end))
 
+let wrap_origination_proof ~kind ~boot_sector proof_string_opt :
+    Sc_rollup.wrapped_proof tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  match proof_string_opt with
+  | None ->
+      let*! origination_proof = origination_proof ~boot_sector kind in
+      return origination_proof
+  | Some proof_string ->
+      Lwt.map Environment.wrap_tzresult
+      @@ Sc_rollup_operations.Internal_for_tests.origination_proof_of_string
+           proof_string
+           kind
+
 let genesis_commitment ~boot_sector ~origination_level = function
   | Sc_rollup.Kind.Example_arith ->
       let open Lwt_syntax in
