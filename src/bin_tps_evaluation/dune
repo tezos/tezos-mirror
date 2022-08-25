@@ -9,7 +9,7 @@
  (libraries
   tezos-base
   caqti
-  caqti-driver-postgresql
+  caqti-dynload
   caqti-lwt
   data-encoding
   lwt

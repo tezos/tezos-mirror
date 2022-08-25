@@ -99,7 +99,7 @@ let caqti = external_lib "caqti" V.True
 
 let caqti_lwt = external_lib "caqti-lwt" V.True
 
-let caqti_driver_postgresql = external_lib "caqti-driver-postgresql" V.True
+let caqti_dynload = external_lib "caqti-dynload" V.True
 
 let cmdliner = external_lib "cmdliner" V.(at_least "1.1.0")
 
@@ -5442,7 +5442,7 @@ let _octez_tps_evaluation =
       [
         octez_base |> open_ ~m:"TzPervasives";
         caqti;
-        caqti_driver_postgresql;
+        caqti_dynload;
         caqti_lwt;
         data_encoding;
         lwt;

@@ -11,7 +11,7 @@ depends: [
   "dune" { >= "3.0" }
   "tezos-base"
   "caqti"
-  "caqti-driver-postgresql"
+  "caqti-dynload"
   "caqti-lwt"
   "data-encoding" { >= "0.6" & < "0.7" }
   "lwt" { >= "5.4.0" }
