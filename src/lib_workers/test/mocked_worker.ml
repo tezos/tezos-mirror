@@ -105,11 +105,4 @@ module Types = struct
   type state = string list ref
 end
 
-module Logger =
-  Worker_logger.Make (Dummy_event) (Request)
-    (struct
-      let worker_name = "mocked_worker"
-    end)
-
-module Worker =
-  Worker.MakeSingle (Name) (Dummy_event) (Request) (Types) (Logger)
+module Worker = Worker.MakeSingle (Name) (Request) (Types)

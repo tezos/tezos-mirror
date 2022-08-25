@@ -35,33 +35,21 @@ open Lwt.Infix
 type state = Prechecked | Validated
 
 let on_validation_event state node Node.{name; value} =
-  if name = "node_block_validator.v0" then
-    match JSON.(value |=> 1 |-> "event" |-> "kind" |> as_string_opt) with
-    | Some "prechecked" -> (
-        let hash = JSON.(value |=> 1 |-> "event" |-> "block" |> as_string) in
-        match Hashtbl.find_opt state (node, hash) with
-        | None -> Hashtbl.replace state (node, hash) Prechecked
-        | Some Prechecked -> Test.fail "A block should not be prechecked twice"
-        | Some Validated ->
-            Test.fail "A block should not be prechecked after being validated")
-    | Some _ -> ()
-    | None -> (
-        match
-          JSON.(value |=> 1 |-> "event" |-> "successful_validation" |> as_opt)
-        with
-        | None -> ()
-        | Some _ -> (
-            let hash =
-              JSON.(
-                value |=> 1 |-> "event" |-> "successful_validation" |-> "block"
-                |> as_string)
-            in
-            match Hashtbl.find_opt state (node, hash) with
-            | None ->
-                Test.fail "A block should be prechecked before being validated"
-            | Some Prechecked -> Hashtbl.replace state (node, hash) Validated
-            | Some Validated ->
-                Test.fail "A block should not be validated twice"))
+  match name with
+  | "prechecked_block.v0" -> (
+      let hash = JSON.(value |> as_string) in
+      match Hashtbl.find_opt state (node, hash) with
+      | None -> Hashtbl.replace state (node, hash) Prechecked
+      | Some Prechecked -> Test.fail "A block should not be prechecked twice"
+      | Some Validated ->
+          Test.fail "A block should not be prechecked after being validated")
+  | "validation_success.v0" -> (
+      let hash = JSON.(value |-> "block" |> as_string) in
+      match Hashtbl.find_opt state (node, hash) with
+      | None -> Test.fail "A block should be prechecked before being validated"
+      | Some Prechecked -> Hashtbl.replace state (node, hash) Validated
+      | Some Validated -> Test.fail "A block should not be validated twice")
+  | _ -> ()
 
 let wait_for_cluster_at_level cluster level =
   Lwt_list.iter_p
@@ -244,22 +232,18 @@ let propagate_precheckable_bad_block =
   in
   let wait_precheck_but_validation_fail node =
     let got_prechecked = ref false in
-    Node.wait_for node "node_block_validator.v0" (fun value ->
-        match JSON.(value |=> 1 |-> "event" |-> "kind" |> as_string_opt) with
-        | Some "prechecked" ->
-            got_prechecked := true ;
-            None
-        | Some _ -> None
-        | None -> (
-            match
-              JSON.(
-                value |=> 1 |-> "event" |-> "failed_validation_after_precheck"
-                |> as_opt)
-            with
-            | None -> None
-            | Some _ ->
-                if !got_prechecked then Some ()
-                else Test.fail "The block was not expected to be prechecked"))
+    Lwt.join
+      [
+        (let* () = Node.wait_for node "prechecked_block.v0" (fun _ -> Some ()) in
+         got_prechecked := true ;
+         Lwt.return ());
+        (let* () =
+           Node.wait_for node "validation_failure_after_precheck.v0" (fun _ ->
+               Some ())
+         in
+         if !got_prechecked then Lwt.return ()
+         else Test.fail "The block was not expected to be prechecked");
+      ]
   in
   (* Wait all nodes to precheck the block but fail on validation *)
   let precheck_waiter =
@@ -368,22 +352,18 @@ let propagate_precheckable_bad_block_signature =
   in
   let wait_precheck_but_validation_fail node =
     let got_prechecked = ref false in
-    Node.wait_for node "node_block_validator.v0" (fun value ->
-        match JSON.(value |=> 1 |-> "event" |-> "kind" |> as_string_opt) with
-        | Some "prechecked" ->
-            got_prechecked := true ;
-            None
-        | Some _ -> None
-        | None -> (
-            match
-              JSON.(
-                value |=> 1 |-> "event" |-> "failed_validation_after_precheck"
-                |> as_opt)
-            with
-            | None -> None
-            | Some _ ->
-                if !got_prechecked then Some ()
-                else Test.fail "The block was not expected to be prechecked"))
+    Lwt.join
+      [
+        (let* () = Node.wait_for node "prechecked_block.v0" (fun _ -> Some ()) in
+         got_prechecked := true ;
+         Lwt.return ());
+        (let* () =
+           Node.wait_for node "validation_failure_after_precheck.v0" (fun _ ->
+               Some ())
+         in
+         if !got_prechecked then Lwt.return ()
+         else Test.fail "The block was not expected to be prechecked");
+      ]
   in
   (* Wait all nodes to precheck the block but fail on validation *)
   let precheck_waiter =

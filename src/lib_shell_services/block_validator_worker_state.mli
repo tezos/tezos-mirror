@@ -36,38 +36,9 @@ module Request : sig
     | Validation of validation_view
     | Preapplication of preapplication_view
 
+  val validation_view_encoding : validation_view Data_encoding.encoding
+
   val encoding : view Data_encoding.encoding
 
   val pp : Format.formatter -> view -> unit
-end
-
-module Event : sig
-  type t =
-    | Validation_success of
-        Request.validation_view * Worker_types.request_status
-    | Validation_failure of
-        Request.validation_view * Worker_types.request_status * error trace
-    | Preapplication_success of
-        Request.preapplication_view * Worker_types.request_status
-    | Preapplication_failure of
-        Request.preapplication_view * Worker_types.request_status * error trace
-    | Validation_failure_after_precheck of
-        Request.validation_view * Worker_types.request_status * error trace
-    | Precheck_failure of
-        Request.validation_view * Worker_types.request_status * error trace
-    | Could_not_find_context of Block_hash.t
-    | Previously_validated of Block_hash.t
-    | Validating_block of Block_hash.t
-    | Prechecking_block of Block_hash.t
-    | Prechecked_block of Block_hash.t
-
-  type view = t
-
-  val view : view -> t
-
-  val level : t -> Internal_event.level
-
-  val encoding : t Data_encoding.encoding
-
-  val pp : Format.formatter -> t -> unit
 end

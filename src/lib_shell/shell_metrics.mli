@@ -132,9 +132,7 @@ module Chain_validator : sig
   val update_bootstrapped : metrics:t -> bool -> unit
 
   val update_sync_status :
-    metrics:t ->
-    Chain_validator_worker_state.Event.synchronisation_status ->
-    unit
+    metrics:t -> Chain_validator_worker_state.synchronisation_status -> unit
 
   val init : string list -> Chain_id.t -> t
 

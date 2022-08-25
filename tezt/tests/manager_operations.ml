@@ -112,15 +112,17 @@ module Events = struct
   let wait_for_processed_block node =
     let filter json =
       let open JSON in
-      match
-        json |=> 1 |-> "event" |-> "processed_block" |-> "request" |-> "hash"
-        |> as_string_opt
-      with
+      match json |-> "view" |-> "hash" |> as_string_opt with
       | None -> None
       | Some s when s.[0] = 'B' -> Some (Some s)
       | Some _ -> Some None
     in
-    Node.wait_for node "node_chain_validator.v0" filter
+    Lwt.pick
+      [
+        Node.wait_for node "head_increment.v0" filter;
+        Node.wait_for node "branch_switch.v0" filter;
+        Node.wait_for node "ignore_head.v0" filter;
+      ]
 
   (** Wait for a node to be notified of a mempool or have processed a
       new block. *)

@@ -34,28 +34,20 @@ open Base
 
 let wait_for ~statuses node =
   let filter json =
-    match JSON.(json |=> 1 |-> "event" |> as_string_opt) with
-    | None ->
-        Log.info "%s: none" (Node.name node) ;
-        None
-    | Some status ->
-        Log.info "%s: %s" (Node.name node) status ;
-        if List.exists (fun st -> String.equal st status) statuses then Some ()
-        else None
+    let status = JSON.as_string json in
+    Log.info "%s: %s" (Node.name node) status ;
+    if List.exists (fun st -> String.equal st status) statuses then Some ()
+    else None
   in
-  Node.wait_for node "node_chain_validator.v0" filter
+  Node.wait_for node "synchronisation_status.v0" filter
 
 let wait_for_sync node =
   let filter json =
-    match JSON.(json |=> 1 |-> "event" |> as_string_opt) with
-    | None ->
-        Log.info "%s: none" (Node.name node) ;
-        None
-    | Some status ->
-        Log.info "%s: %s" (Node.name node) status ;
-        if String.equal status "synced" then Some () else None
+    let status = JSON.as_string json in
+    Log.info "%s: %s" (Node.name node) status ;
+    if String.equal status "synced" then Some () else None
   in
-  let event = Node.wait_for node "node_chain_validator.v0" filter in
+  let event = Node.wait_for node "synchronisation_status.v0" filter in
   (* A node may be synchronised before it is considered "ready". We check
      whether the node is (already) synchronized via an RPC. *)
   let is_synchronised =

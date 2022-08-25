@@ -88,13 +88,8 @@ module Types = struct
     | Some p -> Bootstrap_pipeline.length p
 end
 
-module Logger =
-  Worker_logger.Make (Event) (Request)
-    (struct
-      let worker_name = "node_peer_validator"
-    end)
-
-module Worker = Worker.MakeSingle (Name) (Event) (Request) (Types) (Logger)
+module Events = Peer_validator_events
+module Worker = Worker.MakeSingle (Name) (Request) (Types)
 open Types
 
 type t = Worker.dropbox Worker.t
@@ -109,11 +104,7 @@ let bootstrap_new_branch w unknown_prefix =
      the point of view of the node sending the locator *)
   let seed = {Block_locator.sender_id = pv.peer_id; receiver_id = sender_id} in
   let len = Block_locator.estimated_length seed unknown_prefix in
-  let*! () =
-    Worker.log_event
-      w
-      (Validating_new_branch {peer = pv.peer_id; nb_blocks = len})
-  in
+  let*! () = Events.(emit validating_new_branch) (pv.peer_id, len) in
   let pipeline =
     Bootstrap_pipeline.create
       ~notify_new_block:pv.parameters.notify_new_block
@@ -137,9 +128,7 @@ let bootstrap_new_branch w unknown_prefix =
   in
   pv.pipeline <- None ;
   let*! () =
-    Worker.log_event
-      w
-      (New_branch_validated {peer = pv.peer_id; hash = unknown_prefix.head_hash})
+    Events.(emit new_branch_validated) (pv.peer_id, unknown_prefix.head_hash)
   in
   return_unit
 
@@ -159,7 +148,7 @@ let only_if_fitness_increases w distant_header hash cont =
         (Store.Block.fitness current_head)
       <= 0
     then (
-      let* () = Worker.log_event w (Ignoring_head {peer = pv.peer_id; hash}) in
+      let* () = Events.(emit ignoring_head) (pv.peer_id, hash) in
       (* Don't download a branch that cannot beat the current head. *)
       let meta =
         Distributed_db.get_peer_metadata pv.parameters.chain_db pv.peer_id
@@ -171,8 +160,8 @@ let only_if_fitness_increases w distant_header hash cont =
 let validate_new_head w hash (header : Block_header.t) =
   let open Lwt_result_syntax in
   let pv = Worker.state w in
-  let block_received = {Event.peer = pv.peer_id; hash} in
-  let*! () = Worker.log_event w (Fetching_operations_for_head block_received) in
+  let block_received = (pv.peer_id, hash) in
+  let*! () = Events.(emit fetching_operations_for_head) block_received in
   let* operations =
     List.map_ep
       (fun i ->
@@ -199,9 +188,7 @@ let validate_new_head w hash (header : Block_header.t) =
         (0 -- (header.shell.validation_passes - 1)) ;
       return_unit
   | `Ok -> (
-      let*! () =
-        Worker.log_event w (Requesting_new_head_validation block_received)
-      in
+      let*! () = Events.(emit requesting_new_head_validation) block_received in
       let*! v =
         Block_validator.validate
           ~notify_new_block:pv.parameters.notify_new_block
@@ -220,9 +207,7 @@ let validate_new_head w hash (header : Block_header.t) =
           Lwt.return_error errs
       | Invalid_after_precheck _errs ->
           let*! () =
-            Worker.log_event
-              w
-              (Ignoring_prechecked_invalid_block block_received)
+            Events.(emit ignoring_prechecked_invalid_block) block_received
           in
           (* We do not kickban the peer if the block received was
              successfully prechecked but invalid -- this means that he
@@ -230,9 +215,7 @@ let validate_new_head w hash (header : Block_header.t) =
              its validation *)
           return_unit
       | Valid ->
-          let*! () =
-            Worker.log_event w (New_head_validation_end block_received)
-          in
+          let*! () = Events.(emit new_head_validation_end) block_received in
           let meta =
             Distributed_db.get_peer_metadata pv.parameters.chain_db pv.peer_id
           in
@@ -262,17 +245,17 @@ let may_validate_new_head w hash (header : Block_header.t) =
   let*! invalid_predecessor =
     Store.Block.is_known_invalid chain_store header.shell.predecessor
   in
-  let block_received = {Event.peer = pv.peer_id; hash} in
+  let block_received = (pv.peer_id, hash) in
   if valid_block then
     let*! () =
-      Worker.log_event w (Ignoring_previously_validated_block block_received)
+      Events.(emit ignoring_previously_validated_block) block_received
     in
     return_unit
   else if invalid_block then
-    let*! () = Worker.log_event w (Ignoring_invalid_block block_received) in
+    let*! () = Events.(emit ignoring_invalid_block) block_received in
     tzfail Validation_errors.Known_invalid
   else if invalid_predecessor then
-    let*! () = Worker.log_event w (Ignoring_invalid_block block_received) in
+    let*! () = Events.(emit ignoring_invalid_block) block_received in
     let* _ =
       Distributed_db.commit_invalid_block
         pv.parameters.chain_db
@@ -282,9 +265,7 @@ let may_validate_new_head w hash (header : Block_header.t) =
     in
     tzfail Validation_errors.Known_invalid
   else if not valid_predecessor then (
-    let*! () =
-      Worker.log_event w (Missing_new_head_predecessor block_received)
-    in
+    let*! () = Events.(emit missing_new_head_predecessor) block_received in
     Distributed_db.Request.current_branch
       pv.parameters.chain_db
       ~peer:pv.peer_id
@@ -312,7 +293,7 @@ let may_validate_new_branch w locator =
       let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
       (* TODO: should we consider level as well ? Rolling could have
          difficulties boostrapping. *)
-      let block_received = {Event.peer = pv.peer_id; hash = distant_hash} in
+      let block_received = (pv.peer_id, distant_hash) in
       let*! v =
         Block_locator.unknown_prefix
           ~is_known:(Store.Block.validity chain_store)
@@ -329,16 +310,12 @@ let may_validate_new_branch w locator =
              - A rolling peer is too far ahead;
              - In rolling mode when the step is too wide. *)
           let*! () =
-            Worker.log_event
-              w
-              (Ignoring_branch_without_common_ancestor block_received)
+            Events.(emit ignoring_branch_without_common_ancestor) block_received
           in
           tzfail Validation_errors.Unknown_ancestor
       | Known_invalid, _ ->
           let*! () =
-            Worker.log_event
-              w
-              (Ignoring_branch_with_invalid_locator block_received)
+            Events.(emit ignoring_branch_with_invalid_locator) block_received
           in
           tzfail (Validation_errors.Invalid_locator (pv.peer_id, locator)))
 
@@ -346,12 +323,8 @@ let on_no_request w =
   let open Lwt_syntax in
   let pv = Worker.state w in
   Prometheus.Counter.inc_one metrics.on_no_request ;
-  let timespan =
-    Ptime.Span.to_float_s pv.parameters.limits.new_head_request_timeout
-  in
-  let* () =
-    Worker.log_event w (No_new_head_from_peer {peer = pv.peer_id; timespan})
-  in
+  let timespan = pv.parameters.limits.new_head_request_timeout in
+  let* () = Events.(emit no_new_head_from_peer) (pv.peer_id, timespan) in
   Distributed_db.Request.current_head pv.parameters.chain_db ~peer:pv.peer_id () ;
   Lwt.return_unit
 
@@ -360,26 +333,23 @@ let on_request (type a b) w (req : (a, b) Request.t) : (a, b) result Lwt.t =
   let pv = Worker.state w in
   match req with
   | Request.New_head (hash, header) ->
-      let* () =
-        Worker.log_event w (Processing_new_head {peer = pv.peer_id; hash})
-      in
+      let* () = Events.(emit processing_new_head) (pv.peer_id, hash) in
       may_validate_new_head w hash header
   | Request.New_branch (locator, _seed) ->
       (* TODO penalize empty locator... ?? *)
       let* () =
-        Worker.log_event
-          w
-          (Processing_new_branch {peer = pv.peer_id; hash = locator.head_hash})
+        Events.(emit processing_new_branch) (pv.peer_id, locator.head_hash)
       in
       may_validate_new_branch w locator
 
-let on_completion (type a request_error) w (r : (a, request_error) Request.t) _
+let on_completion (type a request_error) _w (r : (a, request_error) Request.t) _
     st =
   (match r with
   | Request.New_head _ -> Prometheus.Counter.inc_one metrics.new_head_completed
   | Request.New_branch _ ->
       Prometheus.Counter.inc_one metrics.new_branch_completed) ;
-  Worker.log_event w (Event.Request (Request.view r, st, None))
+
+  Events.(emit request_completed) (Request.view r, st)
 
 let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
     unit tzresult Lwt.t =
@@ -393,10 +363,8 @@ let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
       :: _ ->
         let* () = Distributed_db.greylist pv.parameters.chain_db pv.peer_id in
         let* () =
-          Worker.log_event
-            w
-            (Terminating_worker
-               {peer = pv.peer_id; reason = "invalid data received: kickban"})
+          Events.(emit terminating_worker)
+            (pv.peer_id, "invalid data received: kickban")
         in
         (match e with
         | Validation_errors.Invalid_locator _ ->
@@ -405,15 +373,11 @@ let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
             Prometheus.Counter.inc_one metrics.invalid_block
         | _ -> (* Cannot happen but OCaml type checker disagrees. *) ()) ;
         Worker.trigger_shutdown w ;
-        let* () =
-          Worker.log_event w (Event.Request (request_view, st, Some err))
-        in
+        let* () = Events.(emit request_error) (request_view, st, err) in
         Lwt.return_error err
     | Block_validator_errors.System_error _ :: _ ->
         Prometheus.Counter.inc_one metrics.system_error ;
-        let* () =
-          Worker.log_event w (Event.Request (request_view, st, Some err))
-        in
+        let* () = Events.(emit request_error) (request_view, st, err) in
         return_ok_unit
     | Block_validator_errors.Unavailable_protocol {protocol; _} :: _ -> (
         Prometheus.Counter.inc_one metrics.unavailable_protocol ;
@@ -435,21 +399,14 @@ let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/3061
                should we punish here ? *)
             let* () =
-              Worker.log_event
-                w
-                (Terminating_worker
-                   {
-                     peer = pv.peer_id;
-                     reason =
-                       Format.asprintf
-                         "missing protocol: %a"
-                         Protocol_hash.pp
-                         protocol;
-                   })
+              Events.(emit terminating_worker)
+                ( pv.peer_id,
+                  Format.asprintf
+                    "missing protocol: %a"
+                    Protocol_hash.pp
+                    protocol )
             in
-            let* () =
-              Worker.log_event w (Event.Request (request_view, st, Some err))
-            in
+            let* () = Events.(emit request_error) (request_view, st, err) in
             Lwt.return_error err)
     | (( Validation_errors.Unknown_ancestor
        | Validation_errors.Too_short_locator _ ) as e)
@@ -461,19 +418,12 @@ let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
             Prometheus.Counter.inc_one metrics.too_short_locator
         | _ -> (* Cannot happen but OCaml type checker disagrees. *) ()) ;
         let* () =
-          Worker.log_event
-            w
-            (Terminating_worker
-               {
-                 peer = pv.peer_id;
-                 reason =
-                   Format.asprintf "unknown ancestor or too short locator: kick";
-               })
+          Events.(emit terminating_worker)
+            ( pv.peer_id,
+              Format.asprintf "unknown ancestor or too short locator: kick" )
         in
+        let* () = Events.(emit request_error) (request_view, st, err) in
         Worker.trigger_shutdown w ;
-        let* () =
-          Worker.log_event w (Event.Request (request_view, st, Some err))
-        in
         return_ok_unit
     | Distributed_db.Operations.Canceled _ :: _ -> (
         (* Given two nodes A and B (remote). This may happen if A
@@ -502,9 +452,7 @@ let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
             Lwt.return_error err)
     | _ ->
         Prometheus.Counter.inc_one metrics.unknown_error ;
-        let* () =
-          Worker.log_event w (Event.Request (request_view, st, Some err))
-        in
+        let* () = Events.(emit request_error) (request_view, st, err) in
         Lwt.return_error err
   in
   match request with

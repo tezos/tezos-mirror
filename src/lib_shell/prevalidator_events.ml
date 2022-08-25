@@ -35,6 +35,9 @@ let request_failed =
     ~name:"request_failed"
     ~msg:"request {view} failed ({worker_status}): {errors}"
     ~level:Notice
+    ~pp1:Request.pp
+    ~pp2:Worker_types.pp_status
+    ~pp3:Error_monad.pp_print_trace
     ( "view",
       (* We use [Data_encoding.dynamic_size] because the
          [Request.encoding] is of type [variable length] while the
@@ -42,11 +45,8 @@ let request_failed =
          [Data_encoding.dynamic_Size]. [Data_encoding] requires us to
          cast the first one explicitely. *)
       Data_encoding.dynamic_size Request.encoding )
-    ~pp1:Request.pp
     ("worker_status", Worker_types.request_status_encoding)
-    ~pp2:Worker_types.pp_status
     ("errors", Error_monad.trace_encoding)
-    ~pp3:Error_monad.pp_print_trace
 
 let invalid_mempool_filter_configuration =
   declare_0
@@ -62,6 +62,7 @@ let unparsable_operation =
     ~name:"unparsable_operation"
     ~msg:"unparsable operation {oph}"
     ~level:Debug
+    ~pp1:Operation_hash.pp
     ("oph", Operation_hash.encoding)
 
 let processing_operations =
@@ -76,8 +77,9 @@ let fetching_operation =
   declare_1
     ~section
     ~name:"fetching_operation"
-    ~msg:"fetching operation"
+    ~msg:"fetching operation {oph}"
     ~level:Debug
+    ~pp1:Operation_hash.pp
     ("oph", Operation_hash.encoding)
 
 let operation_included =
@@ -86,6 +88,7 @@ let operation_included =
     ~name:"operation_included"
     ~msg:"operation {oph} included before being prevalidated"
     ~level:Debug
+    ~pp1:Operation_hash.pp
     ("oph", Operation_hash.encoding)
 
 let operations_to_reclassify =
@@ -94,6 +97,7 @@ let operations_to_reclassify =
     ~name:"operations_to_reclassify"
     ~msg:"{count} operations set to be reeclassified after the flush"
     ~level:Debug
+    ~pp1:Format.pp_print_int
     ("count", Data_encoding.int31)
 
 let request_completed_notice =
@@ -102,10 +106,10 @@ let request_completed_notice =
     ~name:"request_completed_notice"
     ~msg:"{view} {worker_status}"
     ~level:Notice
-    ("view", Request.encoding)
-    ("worker_status", Worker_types.request_status_encoding)
     ~pp1:Request.pp
     ~pp2:Worker_types.pp_status
+    ("view", Request.encoding)
+    ("worker_status", Worker_types.request_status_encoding)
 
 (* FIXME https://gitlab.com/tezos/tezos/-/issues/1266
 
@@ -120,10 +124,10 @@ let request_completed_debug =
     ~name:"request_completed_debug"
     ~msg:"{view} {worker_status}"
     ~level:Debug
-    ("view", Request.encoding)
-    ("worker_status", Worker_types.request_status_encoding)
     ~pp1:Request.pp
     ~pp2:Worker_types.pp_status
+    ("view", Request.encoding)
+    ("worker_status", Worker_types.request_status_encoding)
 
 type origin = Peer of P2p_peer_id.t | Arrived | Injected | Leftover
 
@@ -170,10 +174,10 @@ let ban_operation_encountered =
     ~name:"banned_operation_encountered"
     ~msg:"{origin}: banned {oph} encountered"
     ~level:Notice
-    ("origin", origin_encoding)
     ~pp1:pp_origin
-    ("oph", Operation_hash.encoding)
     ~pp2:Operation_hash.pp
+    ("origin", origin_encoding)
+    ("oph", Operation_hash.encoding)
 
 let operation_not_fetched =
   declare_1
@@ -181,5 +185,5 @@ let operation_not_fetched =
     ~name:"operation_not_fetched"
     ~msg:"Operation {oph} was not fetched"
     ~level:Debug
-    ("oph", Operation_hash.encoding)
     ~pp1:Operation_hash.pp
+    ("oph", Operation_hash.encoding)

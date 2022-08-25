@@ -47,7 +47,7 @@ module Request = struct
         (* The peer who sent the block if it was not injected locally. *)
         block : Store.Block.t;
       }
-        -> (Event.update, error trace) t
+        -> (update, error trace) t
     | Notify_branch : P2p_peer.Id.t * Block_locator.t -> (unit, Empty.t) t
     | Notify_head :
         P2p_peer.Id.t * Block_hash.t * Block_header.t * Mempool.t
@@ -103,13 +103,8 @@ module Types = struct
       state.synchronisation_state
 end
 
-module Logger =
-  Worker_logger.Make (Event) (Request)
-    (struct
-      let worker_name = "node_chain_validator"
-    end)
-
-module Worker = Worker.MakeSingle (Name) (Event) (Request) (Types) (Logger)
+module Events = Chain_validator_events
+module Worker = Worker.MakeSingle (Name) (Request) (Types)
 open Types
 
 type t = Worker.infinite Worker.queue Worker.t
@@ -181,7 +176,7 @@ let with_activated_peer_validator w peer_id f =
   let nv = Worker.state w in
   let* pv =
     P2p_peer.Error_table.find_or_make nv.active_peers peer_id (fun () ->
-        let* () = Worker.log_event w (Connection peer_id) in
+        let* () = Events.(emit connection) peer_id in
         let* pv =
           Peer_validator.create
             ~notify_new_block:(notify_new_block w (Some peer_id))
@@ -341,7 +336,7 @@ let may_switch_test_chain w active_chains spawn_child block =
   match r with
   | Ok () -> Lwt.return_unit
   | Error err ->
-      Worker.record_event w (Could_not_switch_testchain err) ;
+      let*! () = Events.(emit could_not_switch_testchain) err in
       Lwt.return_unit
 
 let broadcast_head w ~previous block =
@@ -376,9 +371,7 @@ let safe_get_prevalidator_filter hash =
             Protocol_hash.pp_short
             hash
       | Some protocol ->
-          let* () =
-            Chain_validator_event.(emit prevalidator_filter_not_found) hash
-          in
+          let* () = Events.(emit prevalidator_filter_not_found) hash in
           let (module Proto) = protocol in
           let module Filter = Prevalidator_filters.No_filter (Proto) in
           return_ok (module Filter : Prevalidator_filters.FILTER))
@@ -395,9 +388,7 @@ let instantiate_prevalidator parameters set_prevalidator block chain_db =
   in
   match r with
   | Error errs ->
-      let* () =
-        Chain_validator_event.(emit prevalidator_reinstantiation_failure) errs
-      in
+      let* () = Events.(emit prevalidator_reinstantiation_failure) errs in
       set_prevalidator None ;
       Lwt.return_unit
   | Ok prevalidator ->
@@ -452,14 +443,14 @@ let on_validation_request w peer start_testchain active_chains spawn_child block
   let head_fitness = head_header.shell.fitness in
   let new_fitness = block_header.shell.fitness in
   let accepted_head = Fitness.(new_fitness > head_fitness) in
-  if not accepted_head then return Event.Ignored_head
+  if not accepted_head then return Ignored_head
   else
     let* o = Store.Chain.set_head chain_store block in
     match o with
     | None ->
         (* None means that the given head is below a new_head and
            therefore it must not be broadcasted *)
-        return Event.Ignored_head
+        return Ignored_head
     | Some previous ->
         let*! () = broadcast_head w ~previous block in
         let* () = may_update_protocol_level chain_store ~block in
@@ -473,7 +464,7 @@ let on_validation_request w peer start_testchain active_chains spawn_child block
           Block_hash.equal head_hash block_header.shell.predecessor
         in
         let event =
-          if is_branch_switch then Event.Head_increment else Event.Branch_switch
+          if is_branch_switch then Head_increment else Branch_switch
         in
         let* () =
           if is_branch_switch then
@@ -599,9 +590,7 @@ let on_error (type a b) w st (request : (a, b) Request.t) (errs : b) :
          example. If there is an error at this level, it certainly
          requires a manual operation from the maintener of the
          node. *)
-      let*! () =
-        Worker.log_event w (Request_failure (request_view, st, errs))
-      in
+      let*! () = Events.(emit request_failure) (request_view, st, errs) in
       Lwt.return_error errs
   (* We do not crash the worker in the following cases mainly for one
      reason: Such request comes from a remote peer. The payload for this
@@ -625,19 +614,16 @@ let on_completion (type a b) w (req : (a, b) Request.t) (update : a)
   Prometheus.Counter.inc_one
     nv.parameters.metrics.worker_counters.worker_completion_count ;
   match req with
-  | Request.Validated {block; _} ->
-      let fitness = Store.Block.fitness block in
-      let request = Request.Hash (Store.Block.hash block) in
+  | Request.Validated {block; _} -> (
       let level = Store.Block.level block in
-      let timestamp = Store.Block.timestamp block in
       let () =
         Shell_metrics.Worker.update_timestamps
           nv.parameters.metrics.worker_timestamps
           request_status ;
         match update with
-        | Event.Ignored_head ->
+        | Ignored_head ->
             Prometheus.Counter.inc_one nv.parameters.metrics.ignored_head_count
-        | Event.Branch_switch ->
+        | Branch_switch ->
             Prometheus.Counter.inc_one nv.parameters.metrics.branch_switch_count ;
             Prometheus.Gauge.set
               nv.parameters.metrics.head_level
@@ -646,7 +632,7 @@ let on_completion (type a b) w (req : (a, b) Request.t) (update : a)
                 collect_proto
                   ~metrics:nv.parameters.metrics
                   (nv.parameters.chain_store, block))
-        | Event.Head_increment ->
+        | Head_increment ->
             Prometheus.Counter.inc_one
               nv.parameters.metrics.head_increment_count ;
             Prometheus.Gauge.set
@@ -657,20 +643,17 @@ let on_completion (type a b) w (req : (a, b) Request.t) (update : a)
                   ~metrics:nv.parameters.metrics
                   (nv.parameters.chain_store, block))
       in
-      Worker.record_event
-        w
-        (Processed_block
-           {request; request_status; update; fitness; level; timestamp}) ;
-      Lwt.return_unit
-  | Request.Notify_head (peer_id, _, _, _) ->
-      Worker.record_event w (Event.Notify_head peer_id) ;
-      Lwt.return_unit
-  | Request.Notify_branch (peer_id, _) ->
-      Worker.record_event w (Event.Notify_branch peer_id) ;
-      Lwt.return_unit
-  | Request.Disconnection peer_id ->
-      Worker.record_event w (Event.Disconnection peer_id) ;
-      Lwt.return_unit
+      let fitness = Store.Block.fitness block in
+      let block_hash = Request.Hash (Store.Block.hash block) in
+      let timestamp = Store.Block.timestamp block in
+      let event_infos = (block_hash, level, timestamp, fitness) in
+      match update with
+      | Ignored_head -> Events.(emit ignore_head) event_infos
+      | Branch_switch -> Events.(emit branch_switch) event_infos
+      | Head_increment -> Events.(emit head_increment) event_infos)
+  | Request.Notify_head (peer_id, _, _, _) -> Events.(emit notify_head) peer_id
+  | Request.Notify_branch (peer_id, _) -> Events.(emit notify_branch) peer_id
+  | Request.Disconnection peer_id -> Events.(emit disconnection) peer_id
 
 let on_close w =
   let open Lwt_syntax in
@@ -706,7 +689,7 @@ let may_load_protocols parameters =
         | false -> return_unit
         | true ->
             (* Only compile protocols that are on-disk *)
-            let*! () = Chain_validator_event.(emit loading_protocol protocol) in
+            let*! () = Events.(emit loading_protocol protocol) in
             trace
               (Validation_errors.Cannot_load_protocol protocol)
               (let* _ =
@@ -741,7 +724,7 @@ let on_launch w _ parameters =
   in
   let prevalidator = ref None in
   let when_status_changes status =
-    let*! () = Worker.log_event w (Event.Sync_status status) in
+    let*! () = Events.(emit synchronisation_status) status in
     Shell_metrics.Chain_validator.update_sync_status
       ~metrics:parameters.metrics
       status ;
@@ -763,7 +746,7 @@ let on_launch w _ parameters =
         Shell_metrics.Chain_validator.update_bootstrapped
           ~metrics:parameters.metrics
           is_bootstrapped ;
-        if is_bootstrapped then Worker.log_event w Event.Bootstrapped
+        if is_bootstrapped then Events.(emit bootstrapped) ()
         else Lwt.return_unit)
       ~when_status_changes
       ~threshold:parameters.limits.synchronisation.threshold

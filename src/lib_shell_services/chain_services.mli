@@ -114,7 +114,7 @@ module S : sig
       prefix,
       unit,
       unit,
-      bool * Chain_validator_worker_state.Event.synchronisation_status )
+      bool * Chain_validator_worker_state.synchronisation_status )
     RPC_service.t
 
   val force_bootstrapped :

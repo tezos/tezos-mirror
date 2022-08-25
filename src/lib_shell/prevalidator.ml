@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 open Prevalidator_worker_state
-module Event = Prevalidator_event
+module Events = Prevalidator_events
 
 type limits = {
   max_refused_operations : int;
@@ -64,22 +64,6 @@ module Name = struct
   let equal (c1, p1) (c2, p2) =
     Chain_id.equal c1 c2 && Protocol_hash.equal p1 p2
 end
-
-module Dummy_event = struct
-  type t = unit
-
-  let pp = Format.pp_print_cut
-
-  let encoding = Data_encoding.unit
-
-  let level () = Internal_event.Debug
-end
-
-module Logger =
-  Worker_logger.Make (Dummy_event) (Request)
-    (struct
-      let worker_name = "node_prevalidator"
-    end)
 
 module Classification = Prevalidator_classification
 
@@ -305,8 +289,7 @@ module type T = sig
 
   module Worker :
     Worker.T
-      with type Event.t = Dummy_event.t
-       and type ('a, 'b) Request.t = ('a, 'b) Request.t
+      with type ('a, 'b) Request.t = ('a, 'b) Request.t
        and type Request.view = Request.view
        and type Types.state = types_state
 
@@ -362,7 +345,7 @@ module Make_s
   let already_handled ~origin shell oph =
     let open Lwt_syntax in
     if Operation_hash.Set.mem oph shell.banned_operations then
-      let+ () = Event.(emit ban_operation_encountered) (origin, oph) in
+      let+ () = Events.(emit ban_operation_encountered) (origin, oph) in
       true
     else
       Lwt.return
@@ -703,7 +686,7 @@ module Make_s
     | Ok state ->
         if Pending_ops.is_empty pv.shell.pending then Lwt.return_unit
         else
-          let* () = Event.(emit processing_operations) () in
+          let* () = Events.(emit processing_operations) () in
           let* filter_state, validation_state, delta_mempool =
             classify_pending_operations
               ~notifier
@@ -722,7 +705,7 @@ module Make_s
   let fetch_operation (shell : ('operation_data, _) types_state_shell) ?peer oph
       =
     let open Lwt_syntax in
-    let+ () = Event.(emit fetching_operation) oph in
+    let+ () = Events.(emit fetching_operation) oph in
     let* r =
       shell.parameters.tools.fetch
         ~timeout:shell.parameters.limits.operation_timeout
@@ -734,10 +717,10 @@ module Make_s
         shell.worker.push_request_now (Arrived (oph, op)) ;
         Lwt.return_unit
     | Error (Distributed_db.Operation.Canceled _ :: _) ->
-        Event.(emit operation_included) oph
+        Events.(emit operation_included) oph
     | Error _ ->
         (* This may happen if the peer timed out for example. *)
-        Event.(emit operation_not_fetched) oph
+        Events.(emit operation_not_fetched) oph
 
   (* This function fetches an operation if it is not already handled
      by the mempool. To ensure we fetch at most a given operation,
@@ -754,7 +737,7 @@ module Make_s
       oph =
     let open Lwt_syntax in
     let origin =
-      match peer with Some peer -> Event.Peer peer | None -> Leftover
+      match peer with Some peer -> Events.Peer peer | None -> Leftover
     in
     let* already_handled = already_handled ~origin shell oph in
     if not already_handled then
@@ -775,13 +758,13 @@ module Make_s
     let on_arrived (pv : types_state) oph op : (unit, Empty.t) result Lwt.t =
       let open Lwt_syntax in
       let* already_handled =
-        already_handled ~origin:Event.Arrived pv.shell oph
+        already_handled ~origin:Events.Arrived pv.shell oph
       in
       if already_handled then return_ok_unit
       else
         match Prevalidation_t.parse oph op with
         | Error _ ->
-            let* () = Event.(emit unparsable_operation) oph in
+            let* () = Events.(emit unparsable_operation) oph in
             Prevalidator_classification.add_unparsable
               oph
               pv.shell.classification ;
@@ -824,7 +807,7 @@ module Make_s
       *)
       let prio = `High in
       let*! already_handled =
-        already_handled ~origin:Event.Injected pv.shell oph
+        already_handled ~origin:Events.Injected pv.shell oph
       in
       if already_handled then
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1722
@@ -1000,7 +983,7 @@ module Make_s
           new_pending_operations
           (Pending_ops.empty, 0)
       in
-      let*! () = Event.(emit operations_to_reclassify) nb_pending in
+      let*! () = Events.(emit operations_to_reclassify) nb_pending in
       pv.shell.pending <- new_pending_operations ;
       set_mempool pv.shell Mempool.empty
 
@@ -1077,9 +1060,7 @@ module type ARG = sig
   val chain_id : Chain_id.t
 end
 
-module WorkerGroup =
-  Worker.MakeGroup (Name) (Dummy_event) (Prevalidator_worker_state.Request)
-    (Logger)
+module WorkerGroup = Worker.MakeGroup (Name) (Prevalidator_worker_state.Request)
 
 (** The functor that is not tested, in other words used only in production.
     This functor's code is not tested (contrary to functor {!Make_s} above),
@@ -1114,7 +1095,6 @@ module Make
   module Worker :
     Worker.T
       with type Name.t = Name.t
-       and type Event.t = Dummy_event.t
        and type ('a, 'b) Request.t = ('a, 'b) Request.t
        and type Request.view = Request.view
        and type Types.state = Types.state
@@ -1165,7 +1145,7 @@ module Make
                 in
                 pv.filter_config <- config ;
                 Lwt.return_unit
-              with _ -> Event.(emit invalid_mempool_filter_configuration) ()
+              with _ -> Events.(emit invalid_mempool_filter_configuration) ()
             in
             return_ok (get_filter_config_json pv)) ;
       (* Ban an operation (from its given hash): remove it from the
@@ -1441,7 +1421,7 @@ module Make
              Rebase the advertisement instead. *)
           let* block = pv.shell.parameters.tools.read_block hash in
           let handle_branch_refused =
-            Chain_validator_worker_state.Event.(
+            Chain_validator_worker_state.(
               match event with
               | Head_increment | Ignored_head -> false
               | Branch_switch -> true)
@@ -1628,31 +1608,31 @@ module Make
     let on_error (type a b) _w st (request : (a, b) Request.t) (errs : b) :
         unit tzresult Lwt.t =
       Prometheus.Counter.inc_one metrics.worker_counters.worker_error_count ;
-      let open Lwt_result_syntax in
+      let open Lwt_syntax in
       match request with
       | Request.(Inject _) as r ->
-          let*! () = Event.(emit request_failed) (Request.view r, st, errs) in
-          return_unit
+          let* () = Events.(emit request_failed) (Request.view r, st, errs) in
+          return_ok_unit
       | Request.Notify _ -> ( match errs with _ -> .)
       | Request.Leftover -> ( match errs with _ -> .)
       | Request.Arrived _ -> ( match errs with _ -> .)
       | Request.Advertise -> ( match errs with _ -> .)
       | Request.Flush _ ->
           let request_view = Request.view request in
-          let*! () = Event.(emit request_failed) (request_view, st, errs) in
+          let* () = Events.(emit request_failed) (request_view, st, errs) in
           Lwt.return_error errs
       | Request.Ban _ ->
           let request_view = Request.view request in
-          let*! () = Event.(emit request_failed) (request_view, st, errs) in
+          let* () = Events.(emit request_failed) (request_view, st, errs) in
           Lwt.return_error errs
 
     let on_completion _w r _ st =
       Prometheus.Counter.inc_one metrics.worker_counters.worker_completion_count ;
       match Request.view r with
       | Request.View (Flush _) | View (Inject _) | View (Ban _) ->
-          Event.(emit request_completed_notice) (Request.view r, st)
+          Events.(emit request_completed_notice) (Request.view r, st)
       | View (Notify _) | View Leftover | View (Arrived _) | View Advertise ->
-          Event.(emit request_completed_debug) (Request.view r, st)
+          Events.(emit request_completed_debug) (Request.view r, st)
 
     let on_no_request _ = Lwt.return_unit
   end

@@ -37,8 +37,6 @@ type worker_name = {base : string; name : string}
 module type T = sig
   module Name : Worker_intf.NAME
 
-  module Event : Worker_intf.EVENT
-
   module Request : Worker_intf.REQUEST
 
   module Types : Worker_intf.TYPES
@@ -214,12 +212,6 @@ module type T = sig
   (** Triggers a worker termination. *)
   val trigger_shutdown : _ t -> unit
 
-  (** Record an event in the backlog. *)
-  val record_event : _ t -> Event.t -> unit
-
-  (** Record an event and make sure it is logged. *)
-  val log_event : _ t -> Event.t -> unit Lwt.t
-
   (** Access the internal state, once initialized. *)
   val state : _ t -> Types.state
 
@@ -253,44 +245,32 @@ module type T = sig
   val find_opt : 'a table -> Name.t -> 'a t option
 end
 
-(** [module WG = MakeGroup (Name) (Event) (Request) (Logger)] defines a {e worker
-    group} all using the same [Name], [Event], etc. To instantiate a worker from a group, you
-    must give the [Types] parameter: [WG.MakeWorker(Types)]. This defines a
+(** [module WG = MakeGroup (Name) (Request)] defines a {e worker group} all
+    using the same [Name], [Event], etc. To instantiate a worker from a group,
+    you must give the [Types] parameter: [WG.MakeWorker(Types)]. This defines a
     [Worker] module of type [T]. This last instantiation can be safely used as
     first class module.
 
     The delayed application is there to prevent multiple side-effect executions
     in case of multiple instantiation. (Inner events trigger side effects.)
 *)
-module MakeGroup
-    (Name : Worker_intf.NAME)
-    (Event : Worker_intf.EVENT)
-    (Request : Worker_intf.REQUEST)
-    (Logger : Worker_intf.LOGGER
-                with module Event = Event
-                 and type Request.view = Request.view) : sig
+module MakeGroup (Name : Worker_intf.NAME) (Request : Worker_intf.REQUEST) : sig
   module MakeWorker (Types : Worker_intf.TYPES) :
     T
       with module Name = Name
-       and module Event = Event
        and module Request = Request
        and module Types = Types
 end
 
-(** [MakeSingle (Name) (Event) (Request) (Types) (Logger)] is the same as using
+(** [MakeSingle (Name) (Request) (Types)] is the same as using
     [MakeGroup] and then [MakeWorker]. It's a special case which you can
     use if you only ever need a single instantiation.
 *)
 module MakeSingle
     (Name : Worker_intf.NAME)
-    (Event : Worker_intf.EVENT)
     (Request : Worker_intf.REQUEST)
-    (Types : Worker_intf.TYPES)
-    (Logger : Worker_intf.LOGGER
-                with module Event = Event
-                 and type Request.view = Request.view) :
+    (Types : Worker_intf.TYPES) :
   T
     with module Name = Name
-     and module Event = Event
      and module Request = Request
      and module Types = Types
