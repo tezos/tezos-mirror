@@ -323,6 +323,15 @@ let get_chain_block_header_protocol_data_raw ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "header"; "protocol_data"; "raw"]
     JSON.as_string
 
+let get_chain_block_header_protocol_data ?(chain = "main") ?(block = "head")
+    ?(offset = 0) () =
+  let query_string = [("offset", string_of_int offset)] in
+  make
+    ~query_string
+    GET
+    ["chains"; chain; "blocks"; block; "header"; "protocol_data"]
+    Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

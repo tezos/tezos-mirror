@@ -994,7 +994,8 @@ let test_chain _test_mode_tag _protocol ?endpoint client =
   let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_block_header () in
   let* _ =
     (* Calls [/chains/main/blocks/head/header/protocol_data] *)
-    RPC.get_protocol_data ?endpoint client
+    RPC.Client.call ?endpoint client
+    @@ RPC.get_chain_block_header_protocol_data ()
   in
   let* _ =
     (* Calls [/chains/main/blocks/head/header/protocol_data/raw] *)

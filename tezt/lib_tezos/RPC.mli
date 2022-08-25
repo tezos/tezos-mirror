@@ -363,6 +363,16 @@ val post_injection_block : data:JSON.u -> JSON.t t
 val get_chain_block_header_protocol_data_raw :
   ?chain:string -> ?block:string -> unit -> string t
 
+(** RPC: [GET /chains/[chain]/blocks/[block]/header/protocol_data]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+    [offset] defaults to [0].
+*)
+
+val get_chain_block_header_protocol_data :
+  ?chain:string -> ?block:string -> ?offset:int -> unit -> JSON.t t
+
 (** {2 Smart contract rollup RPC module} *)
 
 (** RPC: [GET chain/[chain]/blocks/[block]/context/sc_rollup] *)
