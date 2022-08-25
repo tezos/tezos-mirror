@@ -93,7 +93,9 @@ let wait_for_denunciation_injection node client accuser =
   let denunciation_event = wait_for_denunciation accuser in
   let* _ = Node.wait_for node "request_completed_notice.v0" filter in
   let* oph = denunciation_event in
-  let* mempool = RPC.get_mempool_pending_operations client in
+  let* mempool =
+    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+  in
   if is_operation_in_applied_mempool mempool oph then return oph
   else Test.fail "the denunciation operation was rejected by the mempool"
 

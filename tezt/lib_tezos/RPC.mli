@@ -403,6 +403,21 @@ val get_chain_block_operations_validation_pass :
   unit ->
   JSON.t t
 
+(** RPC: [GET /chains/[chain]/mempool/pending_operations]
+
+    [chain] defaults to ["main"].
+*)
+val get_chain_mempool_pending_operations :
+  ?chain:string ->
+  ?version:string ->
+  ?applied:bool ->
+  ?branch_delayed:bool ->
+  ?branch_refused:bool ->
+  ?refused:bool ->
+  ?outdated:bool ->
+  unit ->
+  JSON.t t
+
 (** {2 Smart contract rollup RPC module} *)
 
 (** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup] *)

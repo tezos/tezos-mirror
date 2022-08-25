@@ -34,20 +34,6 @@
 
 (** {2 Shell RPCs} *)
 
-(** Call RPC /chains/[chain]/mempool/pending_operations *)
-val get_mempool_pending_operations :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?version:string ->
-  ?applied:bool ->
-  ?branch_delayed:bool ->
-  ?branch_refused:bool ->
-  ?refused:bool ->
-  ?outdated:bool ->
-  Client.t ->
-  JSON.t Lwt.t
-
 (** Call RPC /chains/[chain]/mempool/request_operations *)
 val mempool_request_operations :
   ?endpoint:Client.endpoint ->

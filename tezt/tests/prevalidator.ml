@@ -847,7 +847,9 @@ module Revamped = struct
         ~opts:[`Dotall]
         "Fatal error:\n  Command failed: Error while applying operation.*:"
     in
-    let* _ = RPC.get_mempool_pending_operations client in
+    let* _ =
+      RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+    in
     (* By putting the wrong signature, we also ensure that the
        signature is checked only after the 1M restriction check. *)
     let* _oph2 =
@@ -2013,7 +2015,9 @@ module Revamped = struct
     in
 
     log_step 3 "Check that the batch is correctly [applied] in the mempool." ;
-    let* mempool_json = RPC.get_mempool_pending_operations client in
+    let* mempool_json =
+      RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+    in
     let mempool = Mempool.of_json mempool_json in
     Mempool.check_mempool ~applied:[oph] mempool ;
     Log.info
@@ -2207,7 +2211,10 @@ let forge_and_inject_operation ~branch ~fee ~gas_limit ~source ~destination
    branch delayed/branch refused/refused *)
 
 let check_if_op_is_in_mempool client ~classification oph =
-  let* ops = RPC.get_mempool_pending_operations ~version:"1" client in
+  let* ops =
+    RPC.Client.call client
+    @@ RPC.get_chain_mempool_pending_operations ~version:"1" ()
+  in
   let open JSON in
   let search_in ops c =
     List.exists
@@ -2227,7 +2234,9 @@ let check_if_op_is_in_mempool client ~classification oph =
       if res then Test.fail "%s found in mempool" oph else unit
 
 let get_endorsement_as_bytes client =
-  let* mempool = RPC.get_mempool_pending_operations client in
+  let* mempool =
+    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+  in
   let open JSON in
   let ops_list = as_list (mempool |-> "applied") in
   let op =
@@ -2637,12 +2646,14 @@ let refetch_failed_operation =
   let* () = failed_fetching_waiter in
   (* Step 4 *)
   (* Ensure that the injected operation is in node_1 mempool *)
-  let* mempool_node_1 = RPC.get_mempool_pending_operations client_1 in
+  let* mempool_node_1 =
+    RPC.Client.call client_1 @@ RPC.get_chain_mempool_pending_operations ()
+  in
   check_operation_is_in_applied_mempool mempool_node_1 oph ;
   (* Step 5 *)
   (* Ensure that the mempool of node_2 is empty *)
   let* mempool_count_after_failed_fetch =
-    RPC.get_mempool_pending_operations client_2
+    RPC.Client.call client_2 @@ RPC.get_chain_mempool_pending_operations ()
   in
   let count_failed_fetching = count_mempool mempool_count_after_failed_fetch in
   if count_failed_fetching.total <> 0 then
@@ -2656,12 +2667,16 @@ let refetch_failed_operation =
        in node_1" ;
   (* Step 7 *)
   (* Ensure that the operation is injected in node_2 mempool *)
-  let* mempool_inject_on_node_2 = RPC.get_mempool_pending_operations client_2 in
+  let* mempool_inject_on_node_2 =
+    RPC.Client.call client_2 @@ RPC.get_chain_mempool_pending_operations ()
+  in
   check_operation_is_in_applied_mempool mempool_inject_on_node_2 oph ;
   unit
 
 let check_op_removed client op =
-  let* pending_ops = RPC.get_mempool_pending_operations client in
+  let* pending_ops =
+    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+  in
   let open JSON in
   let ops_list = pending_ops |-> "applied" |> as_list in
   let res = List.exists (fun e -> e |-> "hash" |> as_string = op) ops_list in
@@ -2893,7 +2908,9 @@ let check_mempool_ops ?(log = false) client ~applied ~refused =
         fee
     else fun _ _ _ -> ()
   in
-  let* ops = RPC.get_mempool_pending_operations client in
+  let* ops =
+    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+  in
   let open JSON in
   (* get (and log) applied operations *)
   let applied_ophs =
@@ -3174,8 +3191,13 @@ let test_pending_operation_version =
   let* () = dummy_baking in
   (* Step 4 *)
   (* Get pending operations using different version of the RPC and check  *)
-  let* mempool_v0 = RPC.get_mempool_pending_operations client_1 in
-  let* mempool_v1 = RPC.get_mempool_pending_operations ~version:"1" client_1 in
+  let* mempool_v0 =
+    RPC.Client.call client_1 @@ RPC.get_chain_mempool_pending_operations ()
+  in
+  let* mempool_v1 =
+    RPC.Client.call client_1
+    @@ RPC.get_chain_mempool_pending_operations ~version:"1" ()
+  in
   let ophs_refused_v0 = get_refused_operation_hash_list_v0 mempool_v0 in
   let ophs_refused_v1 = get_refused_operation_hash_list_v1 mempool_v1 in
   try
@@ -3746,7 +3768,10 @@ let check_unordered_int_list_equal expected actual ~error_msg =
     branch_refused, or unprocessed operation. *)
 let check_mempool_ops_fees ~(applied : int list) ~(refused : int list) client =
   let client_name = Client.name client in
-  let* ops = RPC.get_mempool_pending_operations ~version:"1" client in
+  let* ops =
+    RPC.Client.call client
+    @@ RPC.get_chain_mempool_pending_operations ~version:"1" ()
+  in
   let check_fees classification expected =
     let classification_ops = JSON.(ops |-> classification |> as_list) in
     let actual =

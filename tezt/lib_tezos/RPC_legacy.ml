@@ -24,25 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let get_mempool_pending_operations ?endpoint ?hooks ?(chain = "main") ?version
-    ?applied ?branch_delayed ?branch_refused ?refused ?outdated client =
-  let path = ["chains"; chain; "mempool"; "pending_operations"] in
-  let query_parameter param param_s =
-    match param with
-    | None -> []
-    | Some true -> [(param_s, "true")]
-    | Some false -> [(param_s, "false")]
-  in
-  let query_string =
-    (match version with None -> [] | Some v -> [("version", v)])
-    @ query_parameter applied "applied"
-    @ query_parameter refused "refused"
-    @ query_parameter outdated "outdated"
-    @ query_parameter branch_delayed "branch_delayed"
-    @ query_parameter branch_refused "branch_refused"
-  in
-  Client.rpc ?endpoint ?hooks ~query_string GET path client
-
 let mempool_request_operations ?endpoint ?(chain = "main") ?peer client =
   let path = ["chains"; chain; "mempool"; "request_operations"] in
   Client.rpc
