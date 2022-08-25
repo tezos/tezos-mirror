@@ -381,6 +381,9 @@ let post_chain_mempool_request_operations ?(chain = "main") ?peer () =
     ["chains"; chain; "mempool"; "request_operations"]
     Fun.id
 
+let post_chain_mempool_ban_operation ?(chain = "main") ~data () =
+  make ~data POST ["chains"; chain; "mempool"; "ban_operation"] Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

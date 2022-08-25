@@ -425,6 +425,13 @@ val get_chain_mempool_pending_operations :
 val post_chain_mempool_request_operations :
   ?chain:string -> ?peer:string -> unit -> JSON.t t
 
+(** RPC: [POST /chains/[chain]/mempool/ban_operation]
+
+    [chain] defaults to ["main"].
+*)
+val post_chain_mempool_ban_operation :
+  ?chain:string -> data:JSON.u -> unit -> JSON.t t
+
 (** {2 Smart contract rollup RPC module} *)
 
 (** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup] *)

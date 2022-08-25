@@ -24,10 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let mempool_ban_operation ?endpoint ?(chain = "main") ~data client =
-  let path = ["chains"; chain; "mempool"; "ban_operation"] in
-  Client.rpc ?endpoint ~data POST path client
-
 let mempool_unban_operation ?endpoint ?(chain = "main") ~data client =
   let path = ["chains"; chain; "mempool"; "unban_operation"] in
   Client.rpc ?endpoint ~data POST path client
