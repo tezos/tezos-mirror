@@ -1,8 +1,8 @@
 
 ./tezos-client --wait none originate sc rollup from bootstrap1 of kind arith of type string booting with '10 10 10 + +' --burn-cap 9999999
 Node is bootstrapped.
-Estimated gas: 3110.477 units (will add 100 for safety)
-Estimated storage: 6663 bytes added (will add 20 for safety)
+Estimated gas: 3110.497 units (will add 100 for safety)
+Estimated storage: 6667 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
@@ -15,7 +15,7 @@ This sequence of operations was run:
     Fee to the baker: ꜩ0.000686
     Expected counter: 1
     Gas limit: 3211
-    Storage limit: 6683 bytes
+    Storage limit: 6687 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000686
       payload fees(the block proposer) ....... +ꜩ0.000686
@@ -24,13 +24,13 @@ This sequence of operations was run:
       Parameter type: string
       Boot sector: '10 10 10 + +'
       This smart contract rollup origination was successfully applied
-      Consumed gas: 3110.477
-      Storage size: 6663 bytes
+      Consumed gas: 3110.497
+      Storage size: 6667 bytes
       Address: [SC_ROLLUP_HASH]
       Genesis commitment hash: [SC_ROLLUP_COMMITMENT_HASH]
       Balance updates:
-        [PUBLIC_KEY_HASH] ... -ꜩ1.66575
-        storage fees ........................... +ꜩ1.66575
+        [PUBLIC_KEY_HASH] ... -ꜩ1.66675
+        storage fees ........................... +ꜩ1.66675
 
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/sc_rollup/[SC_ROLLUP_HASH]/boot_sector'
