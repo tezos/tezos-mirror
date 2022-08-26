@@ -214,22 +214,8 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
         RPC.get_chain_block_context_contract_delegate;
         RPC.get_chain_block_context_contract_entrypoints;
         RPC.get_chain_block_context_contract_script;
+        RPC.get_chain_block_context_contract_storage;
       ]
-  in
-  let* () =
-    Lwt_list.iter_s
-      (fun rpc ->
-        let*? process =
-          rpc
-            ?endpoint
-            ?hooks:(Some hooks)
-            ?chain:None
-            ?block:None
-            ~contract_id:simple_implicit_key.public_key_hash
-            client
-        in
-        Process.check ~expect_failure:true process)
-      [RPC.Contracts.get_storage]
   in
   Log.info "Test delegated implicit contract" ;
   let delegated_implicit = "delegated" in
@@ -271,22 +257,8 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
       [
         RPC.get_chain_block_context_contract_entrypoints;
         RPC.get_chain_block_context_contract_script;
+        RPC.get_chain_block_context_contract_storage;
       ]
-  in
-  let* () =
-    Lwt_list.iter_s
-      (fun rpc ->
-        let*? process =
-          rpc
-            ?endpoint
-            ?hooks:(Some hooks)
-            ?chain:None
-            ?block:None
-            ~contract_id:delegated_implicit_key.public_key_hash
-            client
-        in
-        Process.check ~expect_failure:true process)
-      [RPC.Contracts.get_storage]
   in
   let test_originated_contract contract_id =
     let* _ =
@@ -326,7 +298,10 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
       RPC.Client.call ?endpoint ~hooks client
       @@ RPC.get_chain_block_context_contract_script ~id:contract_id ()
     in
-    let*! _ = RPC.Contracts.get_storage ?endpoint ~hooks ~contract_id client in
+    let* _ =
+      RPC.Client.call ?endpoint ~hooks client
+      @@ RPC.get_chain_block_context_contract_storage ~id:contract_id ()
+    in
     unit
   in
   (* A smart contract without any big map or entrypoints *)

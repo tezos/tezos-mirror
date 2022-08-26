@@ -683,6 +683,14 @@ val get_chain_block_context_contract_manager_key :
 val get_chain_block_context_contract_script :
   ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
 
+(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts/[id]/storage]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contract_storage :
+  ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
+
 (** {2 Smart contract rollup RPC module} *)
 
 (** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup] *)

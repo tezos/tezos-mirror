@@ -26,28 +26,6 @@
 
 type ctxt_type = Bytes | Json
 
-module Contracts = struct
-  let sub_path ~chain ~block ~contract_id field =
-    [
-      "chains";
-      chain;
-      "blocks";
-      block;
-      "context";
-      "contracts";
-      contract_id;
-      field;
-    ]
-
-  let get_sub ?endpoint ?hooks ~chain ~block ~contract_id field client =
-    let path = sub_path ~chain ~block ~contract_id field in
-    Client.Spawn.rpc ?endpoint ?hooks GET path client
-
-  let get_storage ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "storage" client
-end
-
 module Delegates = struct
   let spawn_get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head") client
       =
