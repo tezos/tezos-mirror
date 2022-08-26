@@ -44,11 +44,12 @@ RAW_BIN=node validator client admin-client signer codec protocol-compiler snoop 
     $(foreach p, $(tx_rollup_protocol_versions), tx-rollup-client-$p) \
     $(foreach p, $(sc_rollup_protocol_versions), sc-rollup-node-$p) \
     $(foreach p, $(sc_rollup_protocol_versions), sc-rollup-client-$p)
-
 OCTEZ_BIN=$(shell echo "$(RAW_BIN)" | sed 's/[^ ]* */octez-&/g')
 TEZOS_BIN=$(shell echo "$(RAW_BIN)" | sed 's/[^ ]* */tezos-&/g')
 
-UNRELEASED_OCTEZ_BIN=octez-dal-node
+UNRELEASED_RAW_BIN=dal-node
+UNRELEASED_OCTEZ_BIN=$(shell echo "$(UNRELEASED_RAW_BIN)" | sed 's/[^ ]* */octez-&/g')
+UNRELEASED_TEZOS_BIN=$(shell echo "$(UNRELEASED_RAW_BIN)" | sed 's/[^ ]* */tezos-&/g')
 
 # See first mention of TEZOS_WITHOUT_OPAM.
 ifndef TEZOS_WITHOUT_OPAM
@@ -345,6 +346,7 @@ endif
 		$(foreach b, $(OCTEZ_BIN) $(UNRELEASED_OCTEZ_BIN), _build/install/default/bin/${b}) \
 		@copy-parameters
 	@cp -f $(foreach b, $(OCTEZ_BIN) $(UNRELEASED_OCTEZ_BIN), _build/install/default/bin/${b}) ./
+	@$(foreach b, $(RAW_BIN) $(UNRELEASED_RAW_BIN), rm -f ./tezos-${b}; ln -s octez-${b} tezos-${b};)
 
 .PHONY: docker-image-build
 docker-image-build:
@@ -408,7 +410,7 @@ coverage-clean:
 .PHONY: clean
 clean: coverage-clean
 	@-dune clean
-	@-rm -f ${OCTEZ_BIN} ${TEZOS_BIN} ${UNRELEASED_OCTEZ_BIN}
+	@-rm -f ${OCTEZ_BIN} ${TEZOS_BIN} ${UNRELEASED_OCTEZ_BIN} ${UNRELEASED_TEZOS_BIN}
 	@-${MAKE} -C docs clean
 	@-${MAKE} -C tests_python clean
 	@-rm -f docs/api/tezos-{baker,endorser,accuser}-alpha.html docs/api/tezos-{admin-,}client.html docs/api/tezos-signer.html
