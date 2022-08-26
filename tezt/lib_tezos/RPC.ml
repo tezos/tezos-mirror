@@ -632,6 +632,13 @@ let get_chain_block_context_contract_manager_key ?(chain = "main")
     ]
     Fun.id
 
+let get_chain_block_context_contract_script ?(chain = "main") ?(block = "head")
+    ~id () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "contracts"; id; "script"]
+    Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

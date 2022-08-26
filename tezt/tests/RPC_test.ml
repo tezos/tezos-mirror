@@ -213,6 +213,7 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
       [
         RPC.get_chain_block_context_contract_delegate;
         RPC.get_chain_block_context_contract_entrypoints;
+        RPC.get_chain_block_context_contract_script;
       ]
   in
   let* () =
@@ -228,7 +229,7 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
             client
         in
         Process.check ~expect_failure:true process)
-      [RPC.Contracts.get_script; RPC.Contracts.get_storage]
+      [RPC.Contracts.get_storage]
   in
   Log.info "Test delegated implicit contract" ;
   let delegated_implicit = "delegated" in
@@ -267,7 +268,10 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
                ()
         in
         Process.check ~expect_failure:true process)
-      [RPC.get_chain_block_context_contract_entrypoints]
+      [
+        RPC.get_chain_block_context_contract_entrypoints;
+        RPC.get_chain_block_context_contract_script;
+      ]
   in
   let* () =
     Lwt_list.iter_s
@@ -282,7 +286,7 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
             client
         in
         Process.check ~expect_failure:true process)
-      [RPC.Contracts.get_script; RPC.Contracts.get_storage]
+      [RPC.Contracts.get_storage]
   in
   let test_originated_contract contract_id =
     let* _ =
@@ -318,7 +322,10 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
       RPC.Client.call ?endpoint ~hooks client
       @@ RPC.get_chain_block_context_contract_entrypoints ~id:contract_id ()
     in
-    let*! _ = RPC.Contracts.get_script ?endpoint ~hooks ~contract_id client in
+    let* _ =
+      RPC.Client.call ?endpoint ~hooks client
+      @@ RPC.get_chain_block_context_contract_script ~id:contract_id ()
+    in
     let*! _ = RPC.Contracts.get_storage ?endpoint ~hooks ~contract_id client in
     unit
   in

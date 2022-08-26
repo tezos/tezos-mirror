@@ -43,10 +43,6 @@ module Contracts = struct
     let path = sub_path ~chain ~block ~contract_id field in
     Client.Spawn.rpc ?endpoint ?hooks GET path client
 
-  let get_script ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "script" client
-
   let get_storage ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
     get_sub ?endpoint ?hooks ~chain ~block ~contract_id "storage" client
