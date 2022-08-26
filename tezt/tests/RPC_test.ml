@@ -145,7 +145,10 @@ let check_rpc ~test_mode_tag ~test_function ?parameter_overrides ?nodes_args
 (* Test the contracts RPC. *)
 let test_contracts _test_mode_tag _protocol ?endpoint client =
   let test_implicit_contract contract_id =
-    let*! _ = RPC.Contracts.get ?endpoint ~hooks ~contract_id client in
+    let* _ =
+      RPC.Client.call ?endpoint ~hooks client
+      @@ RPC.get_chain_block_context_contract ~id:contract_id ()
+    in
     let*! _ = RPC.Contracts.get_balance ?endpoint ~hooks ~contract_id client in
     let*! _ = RPC.Contracts.get_counter ?endpoint ~hooks ~contract_id client in
     let*! _ =
@@ -167,8 +170,9 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
   Log.info "Test un-allocated implicit contract" ;
   let unallocated_implicit = "tz1c5BVkpwCiaPHJBzyjg7UHpJEMPTYA1bHG" in
   assert (not @@ List.mem unallocated_implicit contracts) ;
-  let*! _ =
-    RPC.Contracts.get ?endpoint ~hooks ~contract_id:unallocated_implicit client
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_contract ~id:unallocated_implicit ()
   in
   Log.info "Test non-delegated implicit contract" ;
   let simple_implicit = "simple" in
@@ -252,7 +256,10 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
       ]
   in
   let test_originated_contract contract_id =
-    let*! _ = RPC.Contracts.get ?endpoint ~hooks ~contract_id client in
+    let* _ =
+      RPC.Client.call ?endpoint ~hooks client
+      @@ RPC.get_chain_block_context_contract ~id:contract_id ()
+    in
     let*! _ = RPC.Contracts.get_balance ?endpoint ~hooks ~contract_id client in
     let*? process =
       RPC.Contracts.get_counter ?endpoint ~hooks ~contract_id client

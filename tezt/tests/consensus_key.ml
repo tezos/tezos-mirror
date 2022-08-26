@@ -498,8 +498,9 @@ let drain_delegate ~delegate ~consensus_key ~destination
 let register_key_as_delegate ?(expect_failure = false)
     ?(baker = Constant.bootstrap1.alias) ~(owner : Account.key)
     ~(consensus_key : Account.key) client =
-  let*! _ =
-    RPC.Contracts.get ~hooks ~contract_id:consensus_key.public_key_hash client
+  let* _ =
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_contract ~id:consensus_key.public_key_hash ()
   in
   let* () =
     Client.register_key
@@ -511,8 +512,9 @@ let register_key_as_delegate ?(expect_failure = false)
   in
   let* () = Client.bake_for_and_wait ~keys:[baker] client in
   let* _ = RPC.Delegates.get ~hooks ~pkh:owner.public_key_hash client in
-  let*! _ =
-    RPC.Contracts.get ~hooks ~contract_id:consensus_key.public_key_hash client
+  let* _ =
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_contract ~id:consensus_key.public_key_hash ()
   in
   (* Wait for consensus key to be active *)
   let* () = bake_n_cycles (preserved_cycles + 1) client in

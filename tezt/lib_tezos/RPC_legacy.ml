@@ -27,13 +27,6 @@
 type ctxt_type = Bytes | Json
 
 module Contracts = struct
-  let get ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~contract_id
-      client =
-    let path =
-      ["chains"; chain; "blocks"; block; "context"; "contracts"; contract_id]
-    in
-    Client.Spawn.rpc ?endpoint ?hooks GET path client
-
   let sub_path ~chain ~block ~contract_id field =
     [
       "chains";
