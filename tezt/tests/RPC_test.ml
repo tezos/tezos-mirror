@@ -158,7 +158,8 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
       @@ RPC.get_chain_block_context_contract_counter ~id:contract_id ()
     in
     let*! _ =
-      RPC.Contracts.get_manager_key ?endpoint ~hooks ~contract_id client
+      RPC.Client.spawn ?endpoint ~hooks client
+      @@ RPC.get_chain_block_context_contract_manager_key ~id:contract_id ()
     in
     unit
   in
@@ -298,7 +299,8 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
     in
     let* () = Process.check ~expect_failure:true process in
     let*? process =
-      RPC.Contracts.get_manager_key ?endpoint ~hooks ~contract_id client
+      RPC.Client.spawn ?endpoint ~hooks client
+      @@ RPC.get_chain_block_context_contract_manager_key ~id:contract_id ()
     in
     let* () = Process.check ~expect_failure:true process in
     let big_map_key =

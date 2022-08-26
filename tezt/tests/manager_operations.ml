@@ -698,10 +698,11 @@ module Memchecks = struct
     unit
 
   let check_revealed ~__LOC__ {client; _} key ~revealed =
-    let*! res =
-      RPC.Contracts.get_manager_key
-        ~contract_id:key.Account.public_key_hash
-        client
+    let* res =
+      RPC.Client.call client
+      @@ RPC.get_chain_block_context_contract_manager_key
+           ~id:key.Account.public_key_hash
+           ()
     in
     let is_revealed = not (JSON.is_null res) in
     if is_revealed && JSON.as_string res <> key.public_key then
