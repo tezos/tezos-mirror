@@ -170,8 +170,9 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
   Log.info "Test implicit baker contract" ;
   let bootstrap = List.hd contracts in
   let* () = test_implicit_contract bootstrap in
-  let*! _ =
-    RPC.Contracts.get_delegate ?endpoint ~hooks ~contract_id:bootstrap client
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_contract_delegate ~id:bootstrap ()
   in
   Log.info "Test un-allocated implicit contract" ;
   let unallocated_implicit = "tz1c5BVkpwCiaPHJBzyjg7UHpJEMPTYA1bHG" in
@@ -200,6 +201,20 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
     Lwt_list.iter_s
       (fun rpc ->
         let*? process =
+          RPC.Client.spawn ?endpoint ~hooks client
+          @@ rpc
+               ?chain:None
+               ?block:None
+               ~id:simple_implicit_key.public_key_hash
+               ()
+        in
+        Process.check ~expect_failure:true process)
+      [RPC.get_chain_block_context_contract_delegate]
+  in
+  let* () =
+    Lwt_list.iter_s
+      (fun rpc ->
+        let*? process =
           rpc
             ?endpoint
             ?hooks:(Some hooks)
@@ -210,7 +225,6 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
         in
         Process.check ~expect_failure:true process)
       [
-        RPC.Contracts.get_delegate;
         RPC.Contracts.get_entrypoints;
         RPC.Contracts.get_script;
         RPC.Contracts.get_storage;
@@ -235,12 +249,11 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
   in
   let* () = Client.bake_for_and_wait client in
   let* () = test_implicit_contract delegated_implicit_key.public_key_hash in
-  let*! _ =
-    RPC.Contracts.get_delegate
-      ?endpoint
-      ~hooks
-      ~contract_id:delegated_implicit_key.public_key_hash
-      client
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_contract_delegate
+         ~id:delegated_implicit_key.public_key_hash
+         ()
   in
   let* () =
     Lwt_list.iter_s
