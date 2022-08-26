@@ -64,6 +64,11 @@ module type S = sig
   include Wasm_pvm_sig.S
 
   module Internal_for_tests : sig
+    include
+      Wasm_pvm_sig.Internal_for_tests
+        with type tree := tree
+         and type tick_state := tick_state
+
     val initial_tree_from_boot_sector : empty_tree:tree -> string -> tree Lwt.t
   end
 end
@@ -74,4 +79,5 @@ end
     messages. *)
 module Make
     (T : Tree_encoding.TREE)
-    (Wasm : Wasm_pvm_sig.S with type tree = T.tree) : S with type tree = T.tree
+    (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
+  S with type tree = T.tree and type tick_state = Wasm.tick_state

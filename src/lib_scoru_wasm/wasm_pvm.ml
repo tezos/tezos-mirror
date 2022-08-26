@@ -56,9 +56,12 @@ type pvm_state = {
 }
 
 module Make (T : Tree_encoding.TREE) :
-  Gather_floppies.S with type tree = T.tree = struct
+  Gather_floppies.S with type tree = T.tree and type tick_state = tick_state =
+struct
   module Raw = struct
     type tree = T.tree
+
+    type nonrec tick_state = tick_state
 
     module Tree_encoding_runner = Tree_encoding.Runner.Make (T)
     module Parsing = Binary_parser_encodings
@@ -347,6 +350,13 @@ module Make (T : Tree_encoding.TREE) :
       in
       (* Encode the new pvm-state in the tree. *)
       Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+
+    module Internal_for_tests = struct
+      let get_tick_state tree =
+        let open Lwt_syntax in
+        let+ pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+        pvm_state.tick_state
+    end
   end
 
   include Gather_floppies.Make (T) (Raw)
