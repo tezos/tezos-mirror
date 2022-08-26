@@ -136,7 +136,7 @@ module Client = struct
   type nonrec 'a t = (Node.t, 'a) t
 
   let call_raw ?log_command ?log_status_on_exit ?log_output ?better_errors
-      ?endpoint ?hooks ?env client
+      ?endpoint ?hooks ?env ?protocol_hash client
       {verb; path; query_string; data; decode = _; _} =
     (* No need to log here, the [Process] module already logs. *)
     Client.spawn_rpc
@@ -148,6 +148,7 @@ module Client = struct
       ?hooks
       ?env
       ?data
+      ?protocol_hash
       ~query_string
       verb
       path
@@ -155,7 +156,7 @@ module Client = struct
     |> Process.check_and_read_stdout
 
   let call_json ?log_command ?log_status_on_exit ?log_output ?better_errors
-      ?endpoint ?hooks ?env client rpc =
+      ?endpoint ?hooks ?env ?protocol_hash client rpc =
     let* raw =
       call_raw
         ?log_command
@@ -165,13 +166,14 @@ module Client = struct
         ?endpoint
         ?hooks
         ?env
+        ?protocol_hash
         client
         rpc
     in
     return (JSON.parse ~origin:"RPC response" raw)
 
   let call ?log_command ?log_status_on_exit ?log_output ?better_errors ?endpoint
-      ?hooks ?env client rpc =
+      ?hooks ?env ?protocol_hash client rpc =
     let* json =
       call_json
         ?log_command
@@ -181,13 +183,14 @@ module Client = struct
         ?endpoint
         ?hooks
         ?env
+        ?protocol_hash
         client
         rpc
     in
     return (rpc.decode json)
 
   let spawn ?log_command ?log_status_on_exit ?log_output ?better_errors
-      ?endpoint ?hooks ?env client
+      ?endpoint ?hooks ?env ?protocol_hash client
       {verb; path; query_string; data; decode = _; _} =
     Client.Spawn.rpc
       ?log_command
@@ -198,6 +201,7 @@ module Client = struct
       ?hooks
       ?env
       ?data
+      ?protocol_hash
       ~query_string
       verb
       path

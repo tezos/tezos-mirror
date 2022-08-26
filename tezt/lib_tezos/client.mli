@@ -166,6 +166,9 @@ val rpc_path_query_to_string : ?query_string:query_string -> path -> string
     Run [rpc meth path?query_string with data].
     Fail the test if the RPC call failed.
 
+    The [protocol_hash] argument allows to run the RPC command for a specific
+    protocol hash.
+
     See the documentation of {!Process.spawn} for information about
     [log_*], [hooks] and [env] arguments.
 
@@ -183,6 +186,7 @@ val rpc :
   ?data:JSON.u ->
   ?filename:string ->
   ?query_string:query_string ->
+  ?protocol_hash:string ->
   meth ->
   path ->
   t ->
@@ -200,6 +204,7 @@ val spawn_rpc :
   ?data:JSON.u ->
   ?filename:string ->
   ?query_string:query_string ->
+  ?protocol_hash:string ->
   meth ->
   path ->
   t ->
@@ -219,6 +224,7 @@ module Spawn : sig
     ?data:JSON.u ->
     ?filename:string ->
     ?query_string:query_string ->
+    ?protocol_hash:string ->
     meth ->
     path ->
     t ->
@@ -1485,6 +1491,7 @@ val spawn_command :
   ?endpoint:endpoint ->
   ?hooks:Process.hooks ->
   ?admin:bool ->
+  ?protocol_hash:string ->
   t ->
   string list ->
   Process.t

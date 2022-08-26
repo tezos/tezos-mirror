@@ -159,7 +159,8 @@ let mode_arg client =
   | Proxy _ -> ["--mode"; "proxy"]
 
 let spawn_command ?log_command ?log_status_on_exit ?log_output
-    ?(env = String_map.empty) ?endpoint ?hooks ?(admin = false) client command =
+    ?(env = String_map.empty) ?endpoint ?hooks ?(admin = false) ?protocol_hash
+    client command =
   let env =
     (* Set disclaimer to "Y" if unspecified, otherwise use given value *)
     String_map.update
@@ -167,6 +168,7 @@ let spawn_command ?log_command ?log_status_on_exit ?log_output
       (fun o -> Option.value ~default:"Y" o |> Option.some)
       env
   in
+  let protocol_arg = Cli_arg.optional_arg "protocol" Fun.id protocol_hash in
   Process.spawn
     ~name:client.name
     ~color:client.color
@@ -177,7 +179,8 @@ let spawn_command ?log_command ?log_status_on_exit ?log_output
     ?hooks
     (if admin then client.admin_path else client.path)
   @@ endpoint_arg ?endpoint client
-  @ media_type_arg client.mode @ mode_arg client @ base_dir_arg client @ command
+  @ protocol_arg @ media_type_arg client.mode @ mode_arg client
+  @ base_dir_arg client @ command
 
 let url_encode str =
   let buffer = Buffer.create (String.length str * 3) in
@@ -221,8 +224,8 @@ let rpc_path_query_to_string ?(query_string = []) path =
 
 module Spawn = struct
   let rpc ?log_command ?log_status_on_exit ?log_output ?(better_errors = false)
-      ?endpoint ?hooks ?env ?data ?filename ?query_string meth path client :
-      JSON.t Runnable.process =
+      ?endpoint ?hooks ?env ?data ?filename ?query_string ?protocol_hash meth
+      path client : JSON.t Runnable.process =
     let process =
       let data =
         Option.fold ~none:[] ~some:(fun x -> ["with"; JSON.encode_u x]) data
@@ -243,6 +246,7 @@ module Spawn = struct
         ?endpoint
         ?hooks
         ?env
+        ?protocol_hash
         client
         (better_error
         @ ["rpc"; string_of_meth meth; full_path]
@@ -256,7 +260,8 @@ module Spawn = struct
 end
 
 let spawn_rpc ?log_command ?log_status_on_exit ?log_output ?better_errors
-    ?endpoint ?hooks ?env ?data ?filename ?query_string meth path client =
+    ?endpoint ?hooks ?env ?data ?filename ?query_string ?protocol_hash meth path
+    client =
   let*? res =
     Spawn.rpc
       ?log_command
@@ -269,6 +274,7 @@ let spawn_rpc ?log_command ?log_status_on_exit ?log_output ?better_errors
       ?data
       ?filename
       ?query_string
+      ?protocol_hash
       meth
       path
       client
@@ -276,7 +282,7 @@ let spawn_rpc ?log_command ?log_status_on_exit ?log_output ?better_errors
   res
 
 let rpc ?log_command ?log_status_on_exit ?log_output ?better_errors ?endpoint
-    ?hooks ?env ?data ?filename ?query_string meth path client =
+    ?hooks ?env ?data ?filename ?query_string ?protocol_hash meth path client =
   let*! res =
     Spawn.rpc
       ?log_command
@@ -289,6 +295,7 @@ let rpc ?log_command ?log_status_on_exit ?log_output ?better_errors ?endpoint
       ?data
       ?filename
       ?query_string
+      ?protocol_hash
       meth
       path
       client
