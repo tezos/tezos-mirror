@@ -74,6 +74,7 @@ let init_section_eq :
   match (sec1, sec2) with
   | Func, Func -> Some Eq
   | Global, Global -> Some Eq
+  | Table, Table -> Some Eq
   | _, _ -> None
 
 let aggregate_cases :
@@ -156,6 +157,11 @@ let init_kont_encoding =
       Global
       (value [] Interpreter_encodings.Ast.global_encoding)
       Wasm_encoding.global_encoding
+  @ aggregate_cases
+      "table"
+      Table
+      (value [] Interpreter_encodings.Ast.table_encoding)
+      Wasm_encoding.table_encoding
   @ [
       case
         "IK_Remaining"
