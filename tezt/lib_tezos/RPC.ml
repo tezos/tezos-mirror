@@ -544,6 +544,9 @@ let get_chain_block_context_big_maps ?(chain = "main") ?(block = "head") ~id
     ["chains"; chain; "blocks"; block; "context"; "big_maps"; id]
     Fun.id
 
+let get_chain_block_context_contracts ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "context"; "contracts"] Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

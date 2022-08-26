@@ -27,10 +27,6 @@
 type ctxt_type = Bytes | Json
 
 module Contracts = struct
-  let get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
-    let path = ["chains"; chain; "blocks"; block; "context"; "contracts"] in
-    Client.Spawn.rpc ?endpoint ?hooks GET path client
-
   let get ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~contract_id
       client =
     let path =

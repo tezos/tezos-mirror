@@ -86,7 +86,9 @@ let test_no_endpoint () =
   in
   let client = Client.create_with_mode (Light (min_agreement, endpoints)) in
   let* () = Client.write_sources_file ~min_agreement ~uris client in
-  let*? process = RPC.Contracts.get_all (* ?endpoint omitted *) client in
+  let*? process =
+    RPC.Client.spawn client @@ RPC.get_chain_block_context_contracts ()
+  in
   let* stderr = Process.check_and_read_stderr ~expect_failure:true process in
   let regexp =
     rex "Value of --endpoint is .*. If you did not specify --endpoint, .*"
@@ -119,7 +121,10 @@ let test_endpoint_not_in_sources () =
   in
   let client = Client.create_with_mode (Light (min_agreement, endpoints)) in
   let* () = Client.write_sources_file ~min_agreement ~uris client in
-  let*? process = RPC.Contracts.get_all ~endpoint client in
+  let*? process =
+    RPC.Client.spawn ~endpoint client
+    @@ RPC.get_chain_block_context_contracts ()
+  in
   let* stderr = Process.check_and_read_stderr ~expect_failure:true process in
   let regexp =
     rex "Value of --endpoint is .*. If you did not specify --endpoint, .*"

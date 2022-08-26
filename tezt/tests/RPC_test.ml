@@ -153,7 +153,10 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
     in
     unit
   in
-  let*! _contracts = RPC.Contracts.get_all ?endpoint ~hooks client in
+  let* _contracts =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_contracts ()
+  in
   let* contracts = RPC.Delegates.get_all ?endpoint ~hooks client in
   Log.info "Test implicit baker contract" ;
   let bootstrap = List.hd contracts in
@@ -564,7 +567,10 @@ let test_delegates_on_unregistered_hangzhou ~contracts ?endpoint client =
   unit
 
 let get_contracts ?endpoint client =
-  let*! _ = RPC.Contracts.get_all ?endpoint ~hooks client in
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_contracts ()
+  in
   let* contracts = RPC.Delegates.get_all ?endpoint ~hooks client in
 
   Lwt.return contracts

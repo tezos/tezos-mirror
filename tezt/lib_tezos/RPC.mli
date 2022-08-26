@@ -588,6 +588,16 @@ val get_chain_block_context_big_maps :
   unit ->
   JSON.t t
 
+(** {2 Contracts RPC module} *)
+
+(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contracts :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
 (** {2 Smart contract rollup RPC module} *)
 
 (** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup] *)
