@@ -108,4 +108,27 @@ let simple_transfer =
   test_encoding_retrocompatible "transfer"
   @@ Operation_core.Manager.[make ~source:Constant.bootstrap1 @@ transfer ()]
 
-let register ~protocols = simple_transfer protocols
+let smart_contract_call =
+  test_encoding_retrocompatible "call"
+  @@ Operation_core.Manager.
+       [
+         make ~source:Constant.bootstrap1
+         @@ call
+              ~entrypoint:"super_entrypoint"
+              ~arg:
+                (Ezjsonm.from_string
+                   {|
+                   [{ "prim": "Pair",
+                      "args": [{"int": "9999"},
+                               {"string":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"}]},
+                    { "prim": "Pair",
+                      "args": [{"string": "false"},
+                              {"bytes":"deadbeef"}]}
+                   ]
+                   |})
+              ();
+       ]
+
+let register ~protocols =
+  simple_transfer protocols ;
+  smart_contract_call protocols
