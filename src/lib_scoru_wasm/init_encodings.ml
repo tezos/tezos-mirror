@@ -70,7 +70,11 @@ let init_section_eq :
     (a, b) init_section ->
     (c, d) init_section ->
     ((a, b) init_section, (c, d) init_section) eq option =
- fun sec1 sec2 -> match (sec1, sec2) with Func, Func -> Some Eq
+ fun sec1 sec2 ->
+  match (sec1, sec2) with
+  | Func, Func -> Some Eq
+  | Global, Global -> Some Eq
+  | _, _ -> None
 
 let aggregate_cases :
     type a b.
@@ -147,6 +151,11 @@ let init_kont_encoding =
       Func
       Parser.Code.func_encoding
       Wasm_encoding.function_encoding
+  @ aggregate_cases
+      "global"
+      Global
+      (value [] Interpreter_encodings.Ast.global_encoding)
+      Wasm_encoding.global_encoding
   @ [
       case
         "IK_Remaining"

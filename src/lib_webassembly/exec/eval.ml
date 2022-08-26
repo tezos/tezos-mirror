@@ -1092,15 +1092,20 @@ let concat_completed {lv; rv; offset; _} =
   let rv_len = Vector.num_elements rv in
   Int32.add lv_len rv_len <= offset
 
-type (_, _) init_section = Func : (func, func_inst) init_section
+type (_, _) init_section =
+  | Func : (func, func_inst) init_section
+  | Global : (global, global_inst) init_section
 
 let section_fetch_vec :
     type a b. module_inst -> (a, b) init_section -> b Vector.t =
- fun inst sec -> match sec with Func -> inst.funcs
+ fun inst sec -> match sec with Func -> inst.funcs | Global -> inst.globals
 
 let section_set_vec :
     type a b. module_inst -> (a, b) init_section -> b Vector.t -> module_inst =
- fun inst sec vec -> match (sec, vec) with Func, funcs -> {inst with funcs}
+ fun inst sec vec ->
+  match (sec, vec) with
+  | Func, funcs -> {inst with funcs}
+  | Global, globals -> {inst with globals}
 
 type init_kont =
   | IK_Start
@@ -1116,17 +1121,23 @@ type init_kont =
   | IK_Stop of module_inst
 
 let section_next_init_kont :
-    type a b. module_inst -> (a, b) init_section -> init_kont =
- fun inst0 sec -> match sec with Func -> IK_Remaining inst0
+    type a b. module_ -> module_inst -> (a, b) init_section -> init_kont =
+ fun m inst0 sec ->
+  match sec with
+  | Func -> IK_Aggregate (inst0, Global, map_kont m.it.globals)
+  | Global -> IK_Remaining inst0
 
 let section_step :
     type a b.
     module_inst ModuleMap.t -> module_key -> (a, b) init_section -> a -> b Lwt.t
     =
- fun module_reg self -> function Func -> create_func module_reg self
+ fun module_reg self -> function
+  | Func -> create_func module_reg self
+  | Global -> create_global module_reg self
 
 let section_update_module_ref : type a b. (a, b) init_section -> bool = function
   | Func -> true
+  | Global -> false
 
 let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
   function
@@ -1170,26 +1181,22 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
       let inst1 = section_set_vec inst0 sec tick.res in
       if section_update_module_ref sec then
         update_module_ref module_reg self inst1 ;
-      Lwt.return (section_next_init_kont inst1 sec)
+      Lwt.return (section_next_init_kont m inst1 sec)
   | IK_Aggregate_concat (inst0, sec, tick) ->
       let+ tick = concat_step tick in
       IK_Aggregate_concat (inst0, sec, tick)
   | IK_Remaining inst1 ->
-      let {tables; memories; globals; exports; elems; datas; start; _} = m.it in
+      let {tables; memories; exports; elems; datas; start; _} = m.it in
 
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
          These transformations should be refactored and abadoned during the
          tickification, to avoid the roundtrip vector -> list -> vector. *)
       let* tables = Vector.to_list tables in
       let* memories = Vector.to_list memories in
-      let* globals = Vector.to_list globals in
       let* elems = Vector.to_list elems in
       let* datas = Vector.to_list datas in
       let* exports = Vector.to_list exports in
 
-      let* new_globals =
-        TzStdLib.List.map_s (create_global module_reg self) globals
-      in
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
          [tables] should be a lazy structure. *)
       let* tables =
@@ -1204,10 +1211,8 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
           inst1.memories
           (Vector.of_list (List.map create_memory memories))
       in
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
-         [new_globals]/[globals] should be lazy structures. *)
-      let* globals = Vector.concat inst1.globals (Vector.of_list new_globals) in
-      let inst2 = {inst1 with tables; memories; globals} in
+
+      let inst2 = {inst1 with tables; memories} in
       update_module_ref module_reg self inst2 ;
 
       let* new_exports = TzStdLib.List.map_s (create_export inst2) exports in
