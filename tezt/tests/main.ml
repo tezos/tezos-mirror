@@ -132,7 +132,8 @@ let register_protocol_agnostic_tests () =
   Timelock.register ~protocols ;
   Tx_rollup.register ~protocols ;
   Tx_rollup_l2_node.register ~protocols ;
-  Views.register [Alpha]
+  Views.register [Alpha] ;
+  Retro.register ~protocols
 
 let register_K_plus_tests () =
   (* Relies on a feature only available since K.
