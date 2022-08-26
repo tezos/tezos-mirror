@@ -306,12 +306,13 @@ module Revamped = struct
       "Force inject a transfer with the same counter and the same source as %s \
        on node1."
       oph ;
-    let*! counter =
-      RPC.Contracts.get_counter
-        ~contract_id:Constant.bootstrap1.public_key_hash
-        client1
+    let* counter_json =
+      RPC.Client.call client1
+      @@ RPC.get_chain_block_context_contract_counter
+           ~id:Constant.bootstrap1.public_key_hash
+           ()
     in
-    let counter = JSON.as_int counter in
+    let counter = JSON.as_int counter_json in
     let* (`OpHash oph2) =
       Operation.inject_transfer
         ~wait_for_injection:node1
@@ -649,12 +650,13 @@ module Revamped = struct
     in
 
     log_step 2 "Forge and inject an operation on the node." ;
-    let*! counter =
-      RPC.Contracts.get_counter
-        ~contract_id:Constant.bootstrap1.public_key_hash
-        client
+    let* counter_json =
+      RPC.Client.call client
+      @@ RPC.get_chain_block_context_contract_counter
+           ~id:Constant.bootstrap1.public_key_hash
+           ()
     in
-    let counter = JSON.as_int counter in
+    let counter = JSON.as_int counter_json in
     let* (`OpHash oph1) =
       Operation.inject_transfer
         ~wait_for_injection:node
@@ -736,12 +738,13 @@ module Revamped = struct
     in
 
     log_step 2 "Force inject a transfer with a counter in the futur." ;
-    let*! counter =
-      RPC.Contracts.get_counter
-        ~contract_id:Constant.bootstrap1.public_key_hash
-        client
+    let* counter_json =
+      RPC.Client.call client
+      @@ RPC.get_chain_block_context_contract_counter
+           ~id:Constant.bootstrap1.public_key_hash
+           ()
     in
-    let counter = JSON.as_int counter in
+    let counter = JSON.as_int counter_json in
     let* (`OpHash oph1) =
       Operation.inject_transfer
         ~force:true
@@ -1039,12 +1042,13 @@ module Revamped = struct
     in
 
     log_step 2 "Force inject a transfer with a counter in the futur." ;
-    let*! counter =
-      RPC.Contracts.get_counter
-        ~contract_id:Constant.bootstrap1.public_key_hash
-        client
+    let* counter_json =
+      RPC.Client.call client
+      @@ RPC.get_chain_block_context_contract_counter
+           ~id:Constant.bootstrap1.public_key_hash
+           ()
     in
-    let counter = JSON.as_int counter in
+    let counter = JSON.as_int counter_json in
     let* (`OpHash oph1) =
       Operation.inject_transfer
         ~force:true
@@ -1244,11 +1248,16 @@ module Revamped = struct
     let* _ = bake_for ~wait_for_flush:true ~empty:false ~protocol node client in
 
     log_step 3 "Forge and force inject an operation." ;
-    let*! counter =
-      RPC.Contracts.get_counter ~contract_id:source1.public_key_hash client
+    let* counter_json =
+      RPC.Client.call client
+      @@ RPC.get_chain_block_context_contract_counter
+           ~id:source1.public_key_hash
+           ()
     in
     let counter =
-      counter_shift_from_classification (JSON.as_int counter) classification
+      counter_shift_from_classification
+        (JSON.as_int counter_json)
+        classification
     in
     let fee = operation_fees_from_classification classification in
 
@@ -1282,11 +1291,16 @@ module Revamped = struct
         ~error_msg:"mempool expected to be %L, got %R") ;
 
     log_step 4 "Forge and force inject an operation." ;
-    let*! counter =
-      RPC.Contracts.get_counter ~contract_id:source2.public_key_hash client
+    let* counter_json =
+      RPC.Client.call client
+      @@ RPC.get_chain_block_context_contract_counter
+           ~id:source2.public_key_hash
+           ()
     in
     let counter =
-      counter_shift_from_classification (JSON.as_int counter) classification
+      counter_shift_from_classification
+        (JSON.as_int counter_json)
+        classification
     in
     let fee = operation_fees_from_classification classification in
     let* (`OpHash oph2) =
@@ -2632,12 +2646,13 @@ let forge_pre_filtered_operation =
   Log.info "All nodes are at level %d." 1 ;
   (* Step 2 *)
   (* Get the counter and the current branch *)
-  let*! base_counter =
-    RPC.Contracts.get_counter
-      ~contract_id:Constant.bootstrap1.public_key_hash
-      client_1
+  let* base_counter_json =
+    RPC.Client.call client_1
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:Constant.bootstrap1.public_key_hash
+         ()
   in
-  let counter = JSON.as_int base_counter in
+  let counter = JSON.as_int base_counter_json in
   let* branch = Operation.Manager.get_branch client_1 in
 
   (* Step 3 *)
@@ -2747,12 +2762,13 @@ let refetch_failed_operation =
   Log.info "All nodes are at level %d." 1 ;
   (* Step 2 *)
   (* get counter and branches *)
-  let*! counter =
-    RPC.Contracts.get_counter
-      ~contract_id:Constant.bootstrap1.public_key_hash
-      client_1
+  let* counter_json =
+    RPC.Client.call client_1
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:Constant.bootstrap1.public_key_hash
+         ()
   in
-  let counter = JSON.as_int counter in
+  let counter = JSON.as_int counter_json in
   let* branch = Operation.Manager.get_branch client_1 in
 
   (* Step 3 *)
@@ -3421,10 +3437,11 @@ let force_operation_injection =
   let* _ = Node.wait_for_level node1 proto_activation_level in
   Log.info "Both nodes are at level %d." proto_activation_level ;
   Log.info "%s" step3_msg ;
-  let*! json =
-    RPC.Contracts.get_counter
-      ~contract_id:Constant.bootstrap1.public_key_hash
-      client2
+  let* json =
+    RPC.Client.call client2
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:Constant.bootstrap1.public_key_hash
+         ()
   in
   let counter = JSON.as_int json in
   let* branch = Operation.Manager.get_branch client2 in
@@ -3506,10 +3523,11 @@ let injecting_old_operation_fails =
     Client.activate_protocol_and_wait ~protocol ~parameter_file client
   in
   log_step 2 step2 ;
-  let*! json =
-    RPC.Contracts.get_counter
-      ~contract_id:Constant.bootstrap1.public_key_hash
-      client
+  let* json =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:Constant.bootstrap1.public_key_hash
+         ()
   in
   let counter = JSON.as_int json in
   let* branch = Operation.Manager.get_branch client in

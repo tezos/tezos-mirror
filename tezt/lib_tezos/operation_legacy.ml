@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Lwt.Infix
-open Runnable.Syntax
 
 (* For Smart contracts' script, initial storage and arguments, we offer
    several syntaxes, depending on the test context *)
@@ -84,10 +83,13 @@ let data_to_json =
 
 (* Some basic auxiliary functions *)
 let get_counter ~source client =
-  let*! json =
-    RPC.Contracts.get_counter ~contract_id:source.Account.public_key_hash client
+  let* counter_json =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:source.Account.public_key_hash
+         ()
   in
-  return (JSON.as_int json)
+  return (JSON.as_int counter_json)
 
 let get_next_counter ~source client = get_counter client ~source >|= succ
 

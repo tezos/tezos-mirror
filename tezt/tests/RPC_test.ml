@@ -153,7 +153,10 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
       RPC.Client.call ?endpoint ~hooks client
       @@ RPC.get_chain_block_context_contract_balance ~id:contract_id ()
     in
-    let*! _ = RPC.Contracts.get_counter ?endpoint ~hooks ~contract_id client in
+    let* _ =
+      RPC.Client.call ?endpoint ~hooks client
+      @@ RPC.get_chain_block_context_contract_counter ~id:contract_id ()
+    in
     let*! _ =
       RPC.Contracts.get_manager_key ?endpoint ~hooks ~contract_id client
     in
@@ -268,7 +271,8 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
       @@ RPC.get_chain_block_context_contract_balance ~id:contract_id ()
     in
     let*? process =
-      RPC.Contracts.get_counter ?endpoint ~hooks ~contract_id client
+      RPC.Client.spawn ?endpoint ~hooks client
+      @@ RPC.get_chain_block_context_contract_counter ~id:contract_id ()
     in
     let* () = Process.check ~expect_failure:true process in
     let*? process =
@@ -773,22 +777,24 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
        to record them. *)
     Process.spawn ~hooks:mempool_hooks "curl" ["-s"; monitor_path]
   in
-  let*! counter =
-    RPC.Contracts.get_counter
-      ~contract_id:Constant.bootstrap1.Account.public_key_hash
-      client
+  let* counter_json =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:Constant.bootstrap1.Account.public_key_hash
+         ()
   in
-  let counter = JSON.as_int counter in
+  let counter = JSON.as_int counter_json in
   (* Branch_refused op: counter_in_the_past *)
   let* _ =
     Operation.Manager.(inject ~force:true [make ~counter @@ transfer ()] client)
   in
-  let*! counter =
-    RPC.Contracts.get_counter
-      ~contract_id:Constant.bootstrap2.Account.public_key_hash
-      client
+  let* counter_json =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:Constant.bootstrap2.Account.public_key_hash
+         ()
   in
-  let counter = JSON.as_int counter in
+  let counter = JSON.as_int counter_json in
   (* Branch_delayed op: counter_in_the_future *)
   let* _ =
     Operation.Manager.(
