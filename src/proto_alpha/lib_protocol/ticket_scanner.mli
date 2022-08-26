@@ -90,3 +90,10 @@ val tickets_of_node :
 (** [has_tickets ht] returns whether or not the type of the given [has_tickets]
     witness [ht] has tickets. *)
 val has_tickets : 'a has_tickets -> bool
+
+(** [ex_ticket_size ctxt ex_ticket] returns the size of the in-memory representation of
+    [ex_ticket] in bytes. *)
+val ex_ticket_size :
+  Alpha_context.context ->
+  ex_ticket ->
+  (int * Alpha_context.context) tzresult Lwt.t
