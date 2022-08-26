@@ -34,7 +34,7 @@
 
 open Tztest
 open Tezos_scoru_wasm
-module Wasm = Wasm_pvm.Make (Test_encodings_util.Tree)
+open Wasm_utils
 
 (* Kernel failing at `kernel_next` invocation. *)
 let unreachable_kernel = "unreachable"
@@ -87,6 +87,7 @@ let check_error expected_kind expected_reason error =
      It depends on the backend, if there are registered printers or not, it is
      not safe to rely on its string representation. *)
   | Some `Unknown, Unknown_error _ -> true
+  | Some `Too_many_ticks, Too_many_ticks -> true
   (* The expected step doesn't corresponds to the actual stuck step. *)
   | Some _, _ -> false
   (* No check to do, we simply assume the PVM is in a stuck state. *)
@@ -95,27 +96,6 @@ let check_error expected_kind expected_reason error =
 let is_stuck ?step ?reason = function
   | Wasm_pvm.Stuck err -> check_error step reason err
   | _ -> false
-
-let initial_boot_sector_from_kernel kernel =
-  let open Lwt_syntax in
-  let* empty_tree = Test_encodings_util.empty_tree () in
-  let origination_message =
-    Data_encoding.Binary.to_string_exn
-      Gather_floppies.origination_message_encoding
-    @@ Gather_floppies.Complete_kernel (String.to_bytes kernel)
-  in
-  Wasm.Internal_for_tests.initial_tree_from_boot_sector
-    ~empty_tree
-    origination_message
-
-let rec eval_until_input_requested ?(max_steps = Int64.max_int) tree =
-  let open Lwt_syntax in
-  let* info = Wasm.get_info tree in
-  match info.input_request with
-  | No_input_required ->
-      let* tree = Wasm.Internal_for_tests.compute_step_many ~max_steps tree in
-      eval_until_input_requested ~max_steps tree
-  | Input_required -> return tree
 
 let set_input_step message message_counter tree =
   let input_info =
@@ -131,7 +111,7 @@ let set_input_step message message_counter tree =
 
 let should_boot_unreachable_kernel ~max_steps kernel =
   let open Lwt_syntax in
-  let* tree = initial_boot_sector_from_kernel kernel in
+  let* tree = initial_tree ~from_binary:true kernel in
   (* Make the first ticks of the WASM PVM (parsing of origination
      message, parsing and init of the kernel), to switch it to
      “Input_requested” mode. *)
@@ -176,7 +156,7 @@ let should_boot_unreachable_kernel ~max_steps kernel =
 
 let should_run_debug_kernel kernel =
   let open Lwt_syntax in
-  let* tree = initial_boot_sector_from_kernel kernel in
+  let* tree = initial_tree ~from_binary:true kernel in
   (* Make the first ticks of the WASM PVM (parsing of origination
      message, parsing and init of the kernel), to switch it to
      “Input_requested” mode. *)
@@ -204,7 +184,7 @@ let add_value tree key_steps =
 
 let should_run_store_has_kernel kernel =
   let open Lwt_syntax in
-  let* tree = initial_boot_sector_from_kernel kernel in
+  let* tree = initial_tree ~from_binary:true kernel in
   let* tree = add_value tree ["hi"; "bye"] in
   let* tree = add_value tree ["hello"] in
   let* tree = add_value tree ["hello"; "universe"] in
@@ -232,7 +212,7 @@ let should_run_store_has_kernel kernel =
 
 let should_run_store_list_size_kernel kernel =
   let open Lwt_syntax in
-  let* tree = initial_boot_sector_from_kernel kernel in
+  let* tree = initial_tree ~from_binary:true kernel in
   let* tree = add_value tree ["one"; "two"] in
   let* tree = add_value tree ["one"; "three"] in
   let* tree = add_value tree ["one"; "four"] in

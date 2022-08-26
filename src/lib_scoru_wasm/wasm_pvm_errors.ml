@@ -34,6 +34,7 @@ type t =
   | Eval_error of interpreter_error
   | Invalid_state of string
   | Unknown_error of string
+  | Too_many_ticks
 
 let decode_state_to_string = function
   | Decode.Byte_vector_step -> "Byte_vector_step"
@@ -139,6 +140,12 @@ let encoding =
         (obj1 (req "unknown_error" string))
         (function Unknown_error exn -> Some exn | _ -> None)
         (fun exn -> Unknown_error exn);
+      case
+        (Tag 6)
+        ~title:"Too_many_ticks"
+        (constant "too_many_ticks")
+        (function Too_many_ticks -> Some () | _ -> None)
+        (fun () -> Too_many_ticks);
     ]
 
 let link_error kind ~module_name ~item_name =

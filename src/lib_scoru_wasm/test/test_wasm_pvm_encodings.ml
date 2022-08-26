@@ -218,6 +218,8 @@ let pp_error_state out = function
       Format.fprintf out "@[<hv 2>Invalid_state (%s)@]" err
   | Wasm_pvm_errors.Unknown_error err ->
       Format.fprintf out "@[<hv 2>Unknown_error (%s)@]" err
+  | Wasm_pvm_errors.Too_many_ticks ->
+      Format.fprintf out "@[<hv 2>Too_many_ticks@]"
 
 let print_error_state = Format.asprintf "%a" pp_error_state
 
@@ -235,6 +237,7 @@ let error_state_check state state' =
   | Invalid_state err, Invalid_state err'
   | Unknown_error err, Unknown_error err' ->
       Lwt.return_ok (err = err')
+  | Too_many_ticks, Too_many_ticks -> Lwt.return_ok true
   | _, _ -> Lwt.return_ok false
 
 let tests =

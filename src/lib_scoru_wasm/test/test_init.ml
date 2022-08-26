@@ -24,35 +24,8 @@
 (*****************************************************************************)
 
 open Tztest
-open Test_encodings_util
 open Tezos_scoru_wasm
-module Wasm = Wasm_pvm.Make (Tree)
-
-let initial_tree code =
-  let open Lwt.Syntax in
-  let* empty_tree = empty_tree () in
-  let* code = Wasm_utils.wat2wasm code in
-  let boot_sector =
-    Data_encoding.Binary.to_string_exn
-      Gather_floppies.origination_message_encoding
-      (Gather_floppies.Complete_kernel (Bytes.of_string code))
-  in
-  Wasm.Internal_for_tests.initial_tree_from_boot_sector ~empty_tree boot_sector
-
-let eval_until_stuck tree =
-  let open Lwt.Syntax in
-  let rec go counter tree =
-    let* tree =
-      Wasm.Internal_for_tests.compute_step_many ~max_steps:Int64.max_int tree
-    in
-    let* stuck = Wasm.Internal_for_tests.is_stuck tree in
-    match stuck with
-    | Some stuck -> Lwt_result.return stuck
-    | _ ->
-        if counter > 0 then go (pred counter) tree
-        else failwith "Failed to get stuck in time"
-  in
-  go 10000 tree
+open Wasm_utils
 
 let test_memory0_export () =
   let open Lwt_result_syntax in
@@ -60,7 +33,7 @@ let test_memory0_export () =
   let*! bad_module_tree = initial_tree {|
     (module (memory 1))
   |} in
-  let* stuck = eval_until_stuck bad_module_tree in
+  let* stuck, _ = eval_until_stuck bad_module_tree in
   let* () =
     match stuck with
     | Init_error {explanation = Some "Module must export memory 0"; _} ->
@@ -82,7 +55,7 @@ let test_memory0_export () =
         )
       |}
   in
-  let* stuck = eval_until_stuck good_module_tree in
+  let* stuck, _ = eval_until_stuck good_module_tree in
   match stuck with
   | Eval_error {explanation = Some "unreachable executed"; _} -> return_unit
   | _ -> failwith "Unexpected stuck state!"
@@ -112,7 +85,7 @@ let test_module_name_size () =
       (build size)
   in
   let*! bad_module_tree = initial_tree (build_module 513) in
-  let* stuck = eval_until_stuck bad_module_tree in
+  let* stuck, _ = eval_until_stuck bad_module_tree in
   let* () =
     match stuck with
     | Decode_error {explanation = Some "Names cannot exceed 512 bytes"; _} ->
@@ -120,7 +93,7 @@ let test_module_name_size () =
     | _ -> failwith "Unexpected stuck state!"
   in
   let*! good_module_tree = initial_tree (build_module 512) in
-  let* stuck = eval_until_stuck good_module_tree in
+  let* stuck, _ = eval_until_stuck good_module_tree in
   match stuck with
   | Eval_error {explanation = Some "unreachable executed"; _} -> return_unit
   | _ -> failwith "Unexpected stuck state!"
@@ -149,7 +122,7 @@ let test_imports () =
   let*! bad_module_tree =
     initial_tree (build_module bad_module_name bad_item_name)
   in
-  let* stuck = eval_until_stuck bad_module_tree in
+  let* stuck, _ = eval_until_stuck bad_module_tree in
   let* () =
     let expected_error =
       Wasm_pvm_errors.link_error
@@ -164,7 +137,7 @@ let test_imports () =
   let*! bad_host_func_tree =
     initial_tree (build_module good_module_name bad_item_name)
   in
-  let* stuck = eval_until_stuck bad_host_func_tree in
+  let* stuck, _ = eval_until_stuck bad_host_func_tree in
   let* () =
     let expected_error =
       Wasm_pvm_errors.link_error
@@ -179,7 +152,7 @@ let test_imports () =
   let*! good_module_tree =
     initial_tree (build_module good_module_name good_item_name)
   in
-  let* stuck = eval_until_stuck good_module_tree in
+  let* stuck, _ = eval_until_stuck good_module_tree in
   match stuck with
   | Eval_error {explanation = Some "unreachable executed"; _} -> return_unit
   | _ -> failwith "Unexpected stuck state!"

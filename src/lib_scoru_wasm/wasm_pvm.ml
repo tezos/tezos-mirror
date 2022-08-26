@@ -31,6 +31,12 @@ let wasm_main_module_name = "main"
    kernel to expose a function named [kernel_next]. *)
 let wasm_entrypoint = "kernel_next"
 
+(* TODO: #3590
+   An appropriate number should be used,
+   currently 100 times the nb of ticks it takes tx_kernel to init, deposit, then withdraw
+   (so 100x 2 billion ticks) *)
+let wasm_max_tick = Z.of_int 200_000_000_000
+
 module Wasm = Tezos_webassembly_interpreter
 
 type tick_state =
@@ -48,6 +54,8 @@ type tick_state =
   | Eval of Wasm.Eval.config
   | Stuck of Wasm_pvm_errors.t
 
+type computation_status = Starting | Restarting | Running | Failing
+
 type pvm_state = {
   last_input_info : Wasm_pvm_sig.input_info option;
       (** Info about last read input. *)
@@ -60,6 +68,9 @@ type pvm_state = {
   tick_state : tick_state;  (** The current tick state. *)
   input_request : Wasm_pvm_sig.input_request;
       (** Signals whether or not the PVM needs input. *)
+  last_top_level_call : Z.t;
+      (** Last tick corresponding to a top-level call. *)
+  max_nb_ticks : Z.t;  (** Number of ticks between top level call. *)
 }
 
 module Make (T : Tree_encoding.TREE) :
@@ -160,7 +171,9 @@ struct
                module_reg,
                buffers,
                tick_state,
-               input_request ) ->
+               input_request,
+               last_top_level_call,
+               max_nb_ticks ) ->
           {
             last_input_info;
             current_tick;
@@ -174,6 +187,8 @@ struct
                 buffers;
             tick_state;
             input_request;
+            last_top_level_call;
+            max_nb_ticks;
           })
         (fun {
                last_input_info;
@@ -183,6 +198,8 @@ struct
                buffers;
                tick_state;
                input_request;
+               last_top_level_call;
+               max_nb_ticks;
              } ->
           ( last_input_info,
             current_tick,
@@ -190,8 +207,10 @@ struct
             module_reg,
             Some buffers,
             tick_state,
-            input_request ))
-        (tup7
+            input_request,
+            last_top_level_call,
+            max_nb_ticks ))
+        (tup9
            ~flatten:true
            (value_option ["wasm"; "input"] Wasm_pvm_sig.input_info_encoding)
            (value ~default:Z.zero ["wasm"; "current_tick"] Data_encoding.n)
@@ -199,59 +218,84 @@ struct
            (scope ["modules"] Wasm_encoding.module_instances_encoding)
            (option durable_buffers_encoding)
            (scope ["wasm"] tick_state_encoding)
-           (scope ["input"; "consuming"] input_request_encoding))
+           (scope ["input"; "consuming"] input_request_encoding)
+           (value
+              ~default:Z.zero
+              ["pvm"; "last_top_level_call"]
+              Data_encoding.n)
+           (value
+              ~default:wasm_max_tick
+              ["pvm"; "max_nb_ticks"]
+              Data_encoding.n))
 
     let kernel_key = Durable.key_of_string_exn "/kernel/boot.wasm"
 
     let link_finished (ast : Wasm.Ast.module_) offset =
       offset >= Wasm.Ast.Vector.num_elements ast.it.imports
 
-    let unsafe_next_tick_state {module_reg; buffers; durable; tick_state; _} =
+    let is_time_for_restart {current_tick; last_top_level_call; max_nb_ticks; _}
+        =
+      let open Z in
+      current_tick - last_top_level_call >= max_nb_ticks - Z.one
+
+    let unsafe_next_tick_state
+        ({module_reg; buffers; durable; tick_state; _} as pvm_state) =
       let open Lwt_syntax in
+      let return ?(status = Running) ?(durable = durable) state =
+        Lwt.return (durable, state, status)
+      in
       match tick_state with
+      | Stuck e -> return ~status:Failing (Stuck e)
+      | Eval {step_kont = Wasm.Eval.(SK_Result _); _}
+        when is_time_for_restart pvm_state ->
+          (* We have an empty set of admin instructions *)
+          return ~status:Restarting tick_state
+      | _ when is_time_for_restart pvm_state ->
+          (* Execution took too many ticks *)
+          return ~status:Failing (Stuck Too_many_ticks)
       | Decode {module_kont = MKStop ast_module; _} ->
-          Lwt.return
-            ( durable,
-              Link
-                {
-                  ast_module;
-                  externs = Wasm.Instance.Vector.empty ();
-                  imports_offset = 0l;
-                } )
+          return
+            (Link
+               {
+                 ast_module;
+                 externs = Wasm.Instance.Vector.empty ();
+                 imports_offset = 0l;
+               })
       | Decode m ->
           let* kernel = Durable.find_value_exn durable kernel_key in
-          let+ m = Tezos_webassembly_interpreter.Decode.module_step kernel m in
-          (durable, Decode m)
+          let* m = Tezos_webassembly_interpreter.Decode.module_step kernel m in
+          return (Decode m)
       | Link {ast_module; externs; imports_offset}
         when link_finished ast_module imports_offset ->
           let self = Wasm.Instance.Module_key wasm_main_module_name in
           (* The module instance is registered in [self] that contains the
              module registry, why we can ignore the result here. *)
-          Lwt.return
-            (durable, Init {self; ast_module; init_kont = IK_Start externs})
+          return (Init {self; ast_module; init_kont = IK_Start externs})
       | Link {ast_module; externs; imports_offset} -> (
-          let+ {it = {module_name; item_name; _}; _} =
+          let* {it = {module_name; item_name; _}; _} =
             Wasm.Ast.Vector.get imports_offset ast_module.it.imports
           in
           match (module_name, Host_funcs.lookup_opt item_name) with
           | "rollup_safe_core", Some extern ->
               let externs, _ = Wasm.Ast.Vector.append extern externs in
-              ( durable,
-                Link
-                  {
-                    ast_module;
-                    externs;
-                    imports_offset = Int32.succ imports_offset;
-                  } )
+              return
+                (Link
+                   {
+                     ast_module;
+                     externs;
+                     imports_offset = Int32.succ imports_offset;
+                   })
           | "rollup_safe_core", None ->
-              ( durable,
-                Stuck (Wasm_pvm_errors.link_error `Item ~module_name ~item_name)
-              )
+              return
+                ~status:Failing
+                (Stuck
+                   (Wasm_pvm_errors.link_error `Item ~module_name ~item_name))
           | _, _ ->
-              ( durable,
-                Stuck
-                  (Wasm_pvm_errors.link_error `Module ~module_name ~item_name)
-              ))
+              return
+                ~status:Failing
+                (Stuck
+                   (Wasm_pvm_errors.link_error `Module ~module_name ~item_name))
+          )
       | Init {self; ast_module = _; init_kont = IK_Stop _module_inst} -> (
           let* module_inst =
             Wasm.Instance.ModuleMap.get wasm_main_module_name module_reg
@@ -276,15 +320,15 @@ struct
                   (Lazy_containers.Lazy_vector.Int32Vector.singleton
                      admin_instr)
               in
-              Lwt.return (durable, Eval eval_config)
+              return ~status:Starting (Eval eval_config)
           | _ ->
               (* We require a function with the name [main] to be exported
                  rather than any other structure. *)
-              Lwt.return
-                ( durable,
-                  Stuck
-                    (Invalid_state "Invalid_module: no `main` function exported")
-                ))
+              return
+                ~status:Failing
+                (Stuck
+                   (Invalid_state "Invalid_module: no `main` function exported"))
+          )
       | Init {self; ast_module; init_kont} ->
           let* init_kont =
             Wasm.Eval.init_step
@@ -296,15 +340,27 @@ struct
               ast_module
               init_kont
           in
-          Lwt.return (durable, Init {self; ast_module; init_kont})
+          return (Init {self; ast_module; init_kont})
+      | Eval {step_kont = Wasm.Eval.(SK_Result _); _} ->
+          (* We have an empty set of admin instructions, but need to wait until we can restart *)
+          return tick_state
+      | Eval {step_kont = Wasm.Eval.(SK_Trapped msg); _} ->
+          return
+            ~status:Failing
+            (Stuck
+               (Wasm_pvm_errors.Eval_error
+                  {
+                    raw_exception = "trapped execution";
+                    explanation = Some msg.it;
+                  }))
       | Eval eval_config ->
+          (* Continue execution. *)
           let store = Durable.to_storage durable in
-          let+ store', eval_config =
+          let* store', eval_config =
             Wasm.Eval.step ~durable:store module_reg eval_config buffers
           in
           let durable' = Durable.of_storage ~default:durable store' in
-          (durable', Eval eval_config)
-      | Stuck e -> Lwt.return (durable, Stuck e)
+          return ~durable:durable' (Eval eval_config)
 
     let next_tick_state pvm_state =
       let to_stuck exn =
@@ -320,44 +376,37 @@ struct
               | Stuck _ -> Unknown_error error.raw_exception)
           | `Unknown raw_exception -> Unknown_error raw_exception
         in
-        Lwt.return (pvm_state.durable, Stuck wasm_error)
+        Lwt.return (pvm_state.durable, Stuck wasm_error, Failing)
       in
       Lwt.catch (fun () -> unsafe_next_tick_state pvm_state) to_stuck
+
+    let next_input_request = function
+      | Restarting | Failing -> Wasm_pvm_sig.Input_required
+      | Starting | Running -> Wasm_pvm_sig.No_input_required
+
+    let next_last_top_level_call {current_tick; last_top_level_call; _} =
+      function
+      | Restarting -> Z.succ current_tick
+      | Starting | Failing | Running -> last_top_level_call
 
     let compute_step_inner pvm_state =
       let open Lwt_syntax in
       (* Calculate the next tick state. *)
-      let+ durable, tick_state = next_tick_state pvm_state in
-      let input_request, tick_state =
-        match tick_state with
-        | Eval {step_kont = Wasm.Eval.(SK_Result _); _} ->
-            (* Ask for more input if the kernel has yielded (empty admin
-               instructions, or error). *)
-            (Wasm_pvm_sig.Input_required, tick_state)
-        | Eval {step_kont = Wasm.Eval.(SK_Trapped msg); _} ->
-            ( Wasm_pvm_sig.Input_required,
-              Stuck
-                (Wasm_pvm_errors.Eval_error
-                   {
-                     raw_exception = "trapped execution";
-                     explanation = Some msg.it;
-                   }) )
-        | Stuck _ -> (Wasm_pvm_sig.Input_required, tick_state)
-        | _ -> (Wasm_pvm_sig.No_input_required, tick_state)
-      in
-      (* Update the tick state, input-request, durable and increment the
-         current tick *)
+      let* durable, tick_state, status = next_tick_state pvm_state in
+      let input_request = next_input_request status in
+      let current_tick = Z.succ pvm_state.current_tick in
+      let last_top_level_call = next_last_top_level_call pvm_state status in
       let pvm_state =
         {
           pvm_state with
           tick_state;
           input_request;
-          current_tick = Z.succ pvm_state.current_tick;
           durable;
+          current_tick;
+          last_top_level_call;
         }
       in
-
-      pvm_state
+      return pvm_state
 
     let compute_step_many ?(max_steps = 1L) tree =
       let open Lwt.Syntax in
@@ -500,6 +549,12 @@ struct
         | _ -> Lwt.return_none
 
       let compute_step_many = compute_step_many
+
+      let set_max_nb_ticks n tree =
+        let open Lwt_syntax in
+        let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+        let pvm_state = {pvm_state with max_nb_ticks = n} in
+        Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
     end
   end
 

@@ -44,5 +44,6 @@ let () =
       ("Parser Encodings", Test_parser_encoding.tests);
       ("WASM PVM", Test_wasm_pvm.tests);
       ("Module Initialisation", Test_init.tests);
+      ("Max nb of ticks", Test_fixed_nb_ticks.tests);
     ]
   |> Lwt_main.run
