@@ -2751,7 +2751,7 @@ let test_timeout protocols =
       let* () = cement [c1; c2] in
 
       let module M = Operation.Manager in
-      (* [operator2] starts a dispute. Its opponent, [operator1], won't play. *)
+      (* [operator2] starts a dispute, but won't be playing then. *)
       let* () =
         bake_operation_via_rpc client
         @@ M.make ~source:operator2
@@ -2761,7 +2761,7 @@ let test_timeout protocols =
       let* () =
         repeat (timeout_period + 1) (fun () -> Client.bake_for_and_wait client)
       in
-      timeout ~sc_rollup ~staker:operator2.public_key_hash client)
+      timeout ~sc_rollup ~staker:operator1.public_key_hash client)
     protocols
 
 let test_refutation_reward_and_punishment protocols =
