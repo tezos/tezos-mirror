@@ -41,11 +41,6 @@ let on_cpmm_exists ctxt f =
       return (ctxt, [])
   | true -> f ctxt cpmm_contract
 
-let check_below_sunset ctxt =
-  let sunset_level = Constants_storage.liquidity_baking_sunset_level ctxt in
-  let level = Raw_level_repr.to_int32 (Level_storage.current ctxt).level in
-  Compare.Int32.(level < sunset_level)
-
 let update_toggle_ema ctxt ~toggle_vote =
   get_toggle_ema ctxt >>=? fun old_ema ->
   let new_ema = compute_new_ema ~toggle_vote old_ema in
@@ -58,7 +53,7 @@ let check_ema_below_threshold ctxt ema =
 
 let on_subsidy_allowed ctxt ~toggle_vote f =
   update_toggle_ema ctxt ~toggle_vote >>=? fun (ctxt, toggle_ema) ->
-  if check_ema_below_threshold ctxt toggle_ema && check_below_sunset ctxt then
+  if check_ema_below_threshold ctxt toggle_ema then
     on_cpmm_exists ctxt f >|=? fun (ctxt, operation_results) ->
     (ctxt, operation_results, toggle_ema)
   else return (ctxt, [], toggle_ema)
