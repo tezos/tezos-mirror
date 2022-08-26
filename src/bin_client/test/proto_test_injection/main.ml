@@ -89,7 +89,7 @@ module Fitness = struct
     | [] -> return 0L
     | _ -> fail Invalid_fitness
 
-  let get {fitness} = fitness
+  let get {fitness; _} = fitness
 end
 
 let begin_application ~chain_id:_ ~predecessor_context:context

@@ -5250,6 +5250,17 @@ let _octez_client =
             ]
             ~package:"tezos-client"
             ~section:"bin";
+          alias_rule
+            "runtest_compile_protocol"
+            ~deps_dune:[[S "source_tree"; S "test/proto_test_injection"]]
+            ~action:
+              [
+                S "run";
+                S "%{bin:tezos-protocol-compiler}";
+                S "-no-hash-check";
+                H [S "-warn-error"; S "+a"];
+                S "test/proto_test_injection/";
+              ];
         ]
 
 let _octez_codec =

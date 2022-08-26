@@ -138,3 +138,13 @@
  (package tezos-client)
  (section bin)
  (files (tezos-init-sandboxed-client.sh as tezos-init-sandboxed-client.sh)))
+
+(rule
+ (alias runtest_compile_protocol)
+ (deps (source_tree test/proto_test_injection))
+ (action
+  (run
+   %{bin:tezos-protocol-compiler}
+   -no-hash-check
+   -warn-error +a
+   test/proto_test_injection/)))
