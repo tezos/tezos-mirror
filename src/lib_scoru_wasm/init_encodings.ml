@@ -75,6 +75,7 @@ let init_section_eq :
   | Func, Func -> Some Eq
   | Global, Global -> Some Eq
   | Table, Table -> Some Eq
+  | Memory, Memory -> Some Eq
   | _, _ -> None
 
 let aggregate_cases :
@@ -162,6 +163,11 @@ let init_kont_encoding =
       Table
       (value [] Interpreter_encodings.Ast.table_encoding)
       Wasm_encoding.table_encoding
+  @ aggregate_cases
+      "memory"
+      Memory
+      (value [] Interpreter_encodings.Ast.memory_encoding)
+      Wasm_encoding.memory_encoding
   @ [
       case
         "IK_Remaining"
