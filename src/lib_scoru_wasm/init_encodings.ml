@@ -50,6 +50,13 @@ let map_kont_encoding enc_a enc_b =
        (scope ["destination"] enc_b)
        (value ["offset"] Data_encoding.int32)
 
+let tick_map_kont_encoding enc_kont enc_a enc_b =
+  conv (fun (tick, map) -> {tick; map}) (fun {tick; map} -> (tick, map))
+  @@ tup2
+       ~flatten:true
+       (option (scope ["inner_kont"] enc_kont))
+       (scope ["map_kont"] (map_kont_encoding enc_a enc_b))
+
 let concat_kont_encoding enc_a =
   conv
     (fun (lv, rv, res, offset) -> {lv; rv; res; offset})
@@ -76,10 +83,10 @@ let lazy_vec_encoding enc = int32_lazy_vector (value [] Data_encoding.int32) enc
 type (_, _) eq = Eq : ('a, 'a) eq
 
 let init_section_eq :
-    type a b c d.
-    (a, b) init_section ->
-    (c, d) init_section ->
-    ((a, b) init_section, (c, d) init_section) eq option =
+    type kont kont' a b c d.
+    (kont, a, b) init_section ->
+    (kont', c, d) init_section ->
+    ((kont, a, b) init_section, (kont', c, d) init_section) eq option =
  fun sec1 sec2 ->
   match (sec1, sec2) with
   | Func, Func -> Some Eq
@@ -89,10 +96,14 @@ let init_section_eq :
   | _, _ -> None
 
 let aggregate_cases :
-    type a b.
-    string -> (a, b) init_section -> a t -> b t -> (string, init_kont) case list
-    =
- fun name sec enc_a enc_b ->
+    type kont a b.
+    string ->
+    (kont, a, b) init_section ->
+    kont t ->
+    a t ->
+    b t ->
+    (string, init_kont) case list =
+ fun name sec enc_kont enc_a enc_b ->
   [
     case
       Format.(sprintf "IK_Aggregate_%s" name)
@@ -101,7 +112,8 @@ let aggregate_cases :
          (scope ["module"] Wasm_encoding.module_instance_encoding)
          (scope
             ["kont"]
-            (map_kont_encoding
+            (tick_map_kont_encoding
+               enc_kont
                (lazy_vec_encoding enc_a)
                (lazy_vec_encoding enc_b))))
       (function
@@ -125,6 +137,16 @@ let aggregate_cases :
         | _ -> None)
       (function m, t -> IK_Aggregate_concat (m, sec, t));
   ]
+
+let aggregate_cases_either :
+    type a b.
+    string ->
+    ((a, b) Either.t, a, b) init_section ->
+    a t ->
+    b t ->
+    (string, init_kont) case list =
+ fun name sec enc_a enc_b ->
+  aggregate_cases name sec (either enc_a enc_b) enc_a enc_b
 
 let join_kont_encoding enc_b =
   tagged_union
@@ -200,22 +222,22 @@ let init_kont_encoding ~host_funcs =
          (function IK_Type (m, t) -> Some (m, t) | _ -> None)
          (function m, t -> IK_Type (m, t));
      ]
-  @ aggregate_cases
+  @ aggregate_cases_either
       "func"
       Func
       Parser.Code.func_encoding
       Wasm_encoding.function_encoding
-  @ aggregate_cases
+  @ aggregate_cases_either
       "global"
       Global
       (value [] Interpreter_encodings.Ast.global_encoding)
       Wasm_encoding.global_encoding
-  @ aggregate_cases
+  @ aggregate_cases_either
       "table"
       Table
       (value [] Interpreter_encodings.Ast.table_encoding)
       Wasm_encoding.table_encoding
-  @ aggregate_cases
+  @ aggregate_cases_either
       "memory"
       Memory
       (value [] Interpreter_encodings.Ast.memory_encoding)
