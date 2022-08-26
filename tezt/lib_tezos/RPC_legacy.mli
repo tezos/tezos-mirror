@@ -39,16 +39,6 @@ type ctxt_type = Bytes | Json
 module Contracts : sig
   (** Common protocol RPSs for contracts (i.e. under [/contracts]). *)
 
-  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/frozen_bonds *)
-  val get_frozen_bonds :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    Client.t ->
-    JSON.t Runnable.process
-
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/balance_and_frozen_bonds *)
   val get_balance_and_frozen_bonds :
     ?endpoint:Client.endpoint ->

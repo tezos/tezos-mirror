@@ -1380,8 +1380,11 @@ let test_rollup_wrong_rejection_long_path =
   Process.check_error ~msg:(rex "tx_rollup_wrong_message_path") process
 
 let check_bond_is ~src client ~expected =
-  let*! bond = RPC.Contracts.get_frozen_bonds ~contract_id:src client in
-  let given = JSON.as_int bond in
+  let* bond_json =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_frozen_bonds ~id:src ()
+  in
+  let given = JSON.as_int bond_json in
   Check.(given = expected)
     Check.int
     ~error_msg:"Unexpected frozen bond for tx rollup. Expected %R. Got %L" ;

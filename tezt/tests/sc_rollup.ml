@@ -1799,8 +1799,11 @@ let contract_balances ~pkh client =
     RPC.Client.call client
     @@ RPC.get_chain_block_context_contract_balance ~id:pkh ()
   in
-  let*! frozen = RPC.Contracts.get_frozen_bonds ~contract_id:pkh client in
-  return {liquid = JSON.as_int json_liquid; frozen = JSON.as_int frozen}
+  let* frozen_json =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_frozen_bonds ~id:pkh ()
+  in
+  return {liquid = JSON.as_int json_liquid; frozen = JSON.as_int frozen_json}
 
 (** This helper allow to attempt recovering bond for SCORU rollup operator.
     if [expect_failure] is set to some string then, we expect the command to fail
@@ -2450,20 +2453,22 @@ let test_refutation_scenario ?commitment_period ?challenge_window variant ~kind
   in
   let* () = bake_levels ~hook (final_level - List.length inputs) client in
 
-  let*! honest_deposit =
-    RPC.Contracts.get_frozen_bonds ~contract_id:bootstrap1_key client
+  let* honest_deposit_json =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_frozen_bonds ~id:bootstrap1_key ()
   in
-  let*! loser_deposit =
-    RPC.Contracts.get_frozen_bonds ~contract_id:bootstrap2_key client
+  let* loser_deposit_json =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_frozen_bonds ~id:bootstrap2_key ()
   in
   let* {stake_amount; _} = get_sc_rollup_constants client in
 
   Check.(
-    (JSON.as_int honest_deposit = Tez.to_mutez stake_amount)
+    (JSON.as_int honest_deposit_json = Tez.to_mutez stake_amount)
       int
       ~error_msg:"expecting deposit for honest participant = %R, got %L") ;
   Check.(
-    (JSON.as_int loser_deposit = 0)
+    (JSON.as_int loser_deposit_json = 0)
       int
       ~error_msg:"expecting loss for dishonest participant = %R, got %L") ;
   Log.info "Checking that we can still retrieve state from rollup node" ;
