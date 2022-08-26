@@ -155,7 +155,7 @@ let alias_pkh_pk_list =
 let filter_up_to_staking_share share total_stake to_mutez keys_list =
   let total_stake = to_mutez total_stake in
   match share with
-  | None -> List.map (fun (pkh, pk, _) -> (pkh, pk)) keys_list
+  | None -> List.map (fun (pkh, pk, stb) -> (pkh, pk, to_mutez stb)) keys_list
   | Some share ->
       let staking_amount_limit =
         Int64.add (Int64.mul (Int64.div total_stake 100L) share) 100L
@@ -173,7 +173,10 @@ let filter_up_to_staking_share share total_stake to_mutez keys_list =
             if Compare.Int64.(stb_acc > staking_amount_limit) then acc
               (* Stop whenever the limit is exceeded. *)
             else
-              loop ((pkh, pk) :: keys_acc, Int64.add (to_mutez stb) stb_acc) l
+              loop
+                ( (pkh, pk, to_mutez stb) :: keys_acc,
+                  Int64.add (to_mutez stb) stb_acc )
+                l
       in
       loop ([], 0L) keys_list |> fst |> List.rev
 
@@ -298,7 +301,7 @@ let load_mainnet_bakers_public_keys base_dir active_bakers_only
   let*! () = Tezos_store.Store.close_store store in
   return
   @@ List.mapi
-       (fun i (pkh, pk) ->
+       (fun i (pkh, pk, stake) ->
          let pkh = Signature.Public_key_hash.to_b58check pkh in
          let pk = Signature.Public_key.to_b58check pk in
          let alias =
@@ -311,7 +314,7 @@ let load_mainnet_bakers_public_keys base_dir active_bakers_only
            Option.value_f alias ~default:(fun () ->
                Format.asprintf "baker_%d" i)
          in
-         (alias, pkh, pk))
+         (alias, pkh, pk, stake))
        delegates
 
 let load_mainnet_bakers_public_keys base_dir active_bakers_only
