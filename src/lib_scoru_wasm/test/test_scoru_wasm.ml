@@ -41,5 +41,6 @@ let () =
       ("WASM Encodings", Test_wasm_encoding.tests);
       ("WASM PVM Encodings", Test_wasm_pvm_encodings.tests);
       ("Parser Encodings", Test_parser_encoding.tests);
+      ("WASM PVM", Test_wasm_pvm.tests);
     ]
   |> Lwt_main.run
