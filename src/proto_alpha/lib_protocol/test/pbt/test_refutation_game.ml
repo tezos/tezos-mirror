@@ -59,7 +59,7 @@ let tick_to_int_exn ?(__LOC__ = __LOC__) t =
 let tick_of_int_exn ?(__LOC__ = __LOC__) n =
   WithExceptions.Option.get ~loc:__LOC__ (Tick.of_int n)
 
-let number_of_ticks_of_int32_exn ?(__LOC__ = __LOC__) n =
+let number_of_ticks_of_int64_exn ?(__LOC__ = __LOC__) n =
   WithExceptions.Option.get ~loc:__LOC__ (Number_of_ticks.of_value n)
 
 let make_external_inbox_message str =
@@ -1272,7 +1272,7 @@ let create_commitment ~predecessor ~inbox_level ~our_states =
     | [] -> Number_of_ticks.zero
     | _ ->
         List.length our_states - 1
-        |> Int32.of_int |> number_of_ticks_of_int32_exn
+        |> Int64.of_int |> number_of_ticks_of_int64_exn
   in
   Commitment.{compressed_state; inbox_level; predecessor; number_of_ticks}
 

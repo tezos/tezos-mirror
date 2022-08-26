@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -189,10 +190,14 @@ module Index = struct
 end
 
 module Number_of_ticks = struct
-  include Bounded.Non_negative_int32
+  include Bounded.Int64 (struct
+    let min_value = 0L
+
+    let max_value = Int64.max_int
+  end)
 
   let zero =
-    match of_value 0l with
+    match of_value 0L with
     | Some zero -> zero
     | None -> assert false (* unreachable case, since [min_int = 0l] *)
 end

@@ -45,7 +45,7 @@ let to_int x = if Z.fits_int x then Some (Z.to_int x) else None
 let of_z x = x
 
 let of_number_of_ticks x =
-  Z.of_int32 (Sc_rollup_repr.Number_of_ticks.to_value x)
+  Z.of_int64 (Sc_rollup_repr.Number_of_ticks.to_value x)
 
 let ( <= ) = leq
 

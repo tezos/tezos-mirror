@@ -119,7 +119,7 @@ type sc_rollup = {
      correlated to the maximum distance allowed between the first and last tick
      of a dissection. For example, when the maximum distance allowed is half the
      total distance [(last_tick - last_tick) / 2] then bound is [Log^2
-     (Int32.max_int) + 2 = 33]. See {!Sc_rollup_game_repr.check_dissection} for
+     (Int64.max_int) + 2 = 65]. See {!Sc_rollup_game_repr.check_dissection} for
      more information on the dissection logic. *)
   timeout_period_in_blocks : int;
   (* The maximum number of cemented commitments stored for a sc rollup. *)

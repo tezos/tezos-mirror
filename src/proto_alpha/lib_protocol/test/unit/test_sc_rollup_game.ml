@@ -104,7 +104,7 @@ let two_stakers_in_conflict () =
       {
         predecessor = genesis_hash;
         inbox_level = T.valid_inbox_level ctxt 1l;
-        number_of_ticks = T.number_of_ticks_exn 152231l;
+        number_of_ticks = T.number_of_ticks_exn 152231L;
         compressed_state = hash1;
       }
   in
@@ -121,7 +121,7 @@ let two_stakers_in_conflict () =
       {
         predecessor = parent;
         inbox_level = T.valid_inbox_level ctxt 2l;
-        number_of_ticks = T.number_of_ticks_exn 10000l;
+        number_of_ticks = T.number_of_ticks_exn 10000L;
         compressed_state = hash2;
       }
   in
@@ -130,7 +130,7 @@ let two_stakers_in_conflict () =
       {
         predecessor = parent;
         inbox_level = T.valid_inbox_level ctxt 2l;
-        number_of_ticks = T.number_of_ticks_exn 10000l;
+        number_of_ticks = T.number_of_ticks_exn 10000L;
         compressed_state = hash3;
       }
   in
@@ -239,7 +239,7 @@ let staker_injectivity_gen ~refuter2_plays =
         {
           predecessor = genesis_hash;
           inbox_level = T.valid_inbox_level ctxt 1l;
-          number_of_ticks = T.number_of_ticks_exn 152231l;
+          number_of_ticks = T.number_of_ticks_exn 152231L;
           compressed_state = hash1;
         }
     in
@@ -256,7 +256,7 @@ let staker_injectivity_gen ~refuter2_plays =
         {
           predecessor = c1_hash;
           inbox_level = T.valid_inbox_level ctxt 2l;
-          number_of_ticks = T.number_of_ticks_exn 10000l;
+          number_of_ticks = T.number_of_ticks_exn 10000L;
           compressed_state;
         }
     in

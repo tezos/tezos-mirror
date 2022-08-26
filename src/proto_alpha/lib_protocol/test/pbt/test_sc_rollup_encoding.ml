@@ -57,7 +57,7 @@ let gen_commitment_hash =
 let gen_number_of_ticks =
   let open Gen in
   let open Sc_rollup_repr.Number_of_ticks in
-  let* v = int32_range_gen min_value max_value in
+  let* v = int64_range_gen min_value max_value in
   return (WithExceptions.Option.get ~loc:__LOC__ (of_value v))
 
 let gen_commitment =

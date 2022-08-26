@@ -193,10 +193,9 @@ let assert_refine_conditions_met ctxt rollup lcc commitment =
   let* ctxt = assert_commitment_not_too_far_ahead ctxt rollup lcc commitment in
   let* ctxt = assert_commitment_period ctxt rollup commitment in
   if
-    Int32.equal
-      (Sc_rollup_repr.Number_of_ticks.to_value
-         Commitment.(commitment.number_of_ticks))
-      0l
+    Sc_rollup_repr.Number_of_ticks.equal
+      Commitment.(commitment.number_of_ticks)
+      Sc_rollup_repr.Number_of_ticks.zero
   then assert_same_hash_as_predecessor ctxt rollup commitment
   else return ctxt
 
@@ -275,10 +274,11 @@ let increase_commitment_stake_count ctxt rollup node =
   in
   return (size_diff, ctxt)
 
-(* 73 for Commitments entry + 4 for Commitment_stake_count entry
+(* 77 for Commitments entry
+   + 4 for Commitment_stake_count entry
    + 4 for Commitment_added entry
    + 0 for Staker_count_update entry *)
-let commitment_storage_size_in_bytes = 81
+let commitment_storage_size_in_bytes = 85
 
 let refine_stake ctxt rollup staker staked_on commitment =
   let open Lwt_tzresult_syntax in
