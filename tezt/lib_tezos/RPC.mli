@@ -630,6 +630,19 @@ val get_chain_block_context_contract_frozen_bonds :
 val get_chain_block_context_contract_balance_and_frozen_bonds :
   ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
 
+(** RPC [POST /chains/[chain]/blocks/[block]/context/contracts/[id]/big_map_get]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val post_chain_block_context_contract_big_map_get :
+  ?chain:string ->
+  ?block:string ->
+  id:string ->
+  data:Ezjsonm.value ->
+  unit ->
+  JSON.t t
+
 (** {2 Smart contract rollup RPC module} *)
 
 (** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup] *)

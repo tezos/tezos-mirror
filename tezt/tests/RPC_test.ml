@@ -279,13 +279,12 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
       Ezjsonm.value_from_string
         "{ \"key\": { \"int\": \"0\" }, \"type\": { \"prim\": \"int\" } }"
     in
-    let*! _ =
-      RPC.Contracts.big_map_get
-        ?endpoint
-        ~hooks
-        ~contract_id
-        ~data:big_map_key
-        client
+    let* _ =
+      RPC.Client.call ?endpoint ~hooks client
+      @@ RPC.post_chain_block_context_contract_big_map_get
+           ~id:contract_id
+           ~data:big_map_key
+           ()
     in
     let*! _ =
       RPC.Contracts.get_entrypoints ?endpoint ~hooks ~contract_id client
@@ -327,25 +326,23 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
       "{ \"key\": { \"string\": \"test\" }, \"type\": { \"prim\": \"string\" } \
        }"
   in
-  let*! _ =
-    RPC.Contracts.big_map_get
-      ?endpoint
-      ~hooks
-      ~contract_id:originated_contract_advanced
-      ~data:unique_big_map_key
-      client
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.post_chain_block_context_contract_big_map_get
+         ~id:originated_contract_advanced
+         ~data:unique_big_map_key
+         ()
   in
   let duplicate_big_map_key =
     Ezjsonm.value_from_string
       "{ \"key\": { \"string\": \"dup\" }, \"type\": { \"prim\": \"string\" } }"
   in
-  let*! _ =
-    RPC.Contracts.big_map_get
-      ?endpoint
-      ~hooks
-      ~contract_id:originated_contract_advanced
-      ~data:duplicate_big_map_key
-      client
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.post_chain_block_context_contract_big_map_get
+         ~id:originated_contract_advanced
+         ~data:duplicate_big_map_key
+         ()
   in
   unit
 

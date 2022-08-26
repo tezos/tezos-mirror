@@ -590,6 +590,16 @@ let get_chain_block_context_contract_balance_and_frozen_bonds ?(chain = "main")
     ]
     Fun.id
 
+let post_chain_block_context_contract_big_map_get ?(chain = "main")
+    ?(block = "head") ~id ~data () =
+  make
+    ~data
+    POST
+    [
+      "chains"; chain; "blocks"; block; "context"; "contracts"; id; "big_map_get";
+    ]
+    Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

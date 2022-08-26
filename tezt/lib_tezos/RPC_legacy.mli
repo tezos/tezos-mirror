@@ -39,17 +39,6 @@ type ctxt_type = Bytes | Json
 module Contracts : sig
   (** Common protocol RPSs for contracts (i.e. under [/contracts]). *)
 
-  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/big_map_get *)
-  val big_map_get :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    data:JSON.u ->
-    Client.t ->
-    JSON.t Runnable.process
-
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/counter *)
   val get_counter :
     ?endpoint:Client.endpoint ->
