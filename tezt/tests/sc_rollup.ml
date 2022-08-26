@@ -484,7 +484,6 @@ let test_rollup_get_chain_block_context_sc_rollup_last_cemented_commitment_hash_
         let* origination_level =
           RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
         in
-
         (* Bake 10 blocks to be sure that the origination_level of rollup is different
            from the level of the head node. *)
         let* () = repeat 10 (fun () -> Client.bake_for_and_wait client) in
@@ -1796,9 +1795,12 @@ let commitments_reorgs protocol sc_rollup_node sc_rollup node client =
 type balances = {liquid : int; frozen : int}
 
 let contract_balances ~pkh client =
-  let*! liquid = RPC.Contracts.get_balance ~contract_id:pkh client in
+  let* json_liquid =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_balance ~id:pkh ()
+  in
   let*! frozen = RPC.Contracts.get_frozen_bonds ~contract_id:pkh client in
-  return {liquid = JSON.as_int liquid; frozen = JSON.as_int frozen}
+  return {liquid = JSON.as_int json_liquid; frozen = JSON.as_int frozen}
 
 (** This helper allow to attempt recovering bond for SCORU rollup operator.
     if [expect_failure] is set to some string then, we expect the command to fail

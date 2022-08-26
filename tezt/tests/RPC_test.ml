@@ -149,7 +149,10 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
       RPC.Client.call ?endpoint ~hooks client
       @@ RPC.get_chain_block_context_contract ~id:contract_id ()
     in
-    let*! _ = RPC.Contracts.get_balance ?endpoint ~hooks ~contract_id client in
+    let* _ =
+      RPC.Client.call ?endpoint ~hooks client
+      @@ RPC.get_chain_block_context_contract_balance ~id:contract_id ()
+    in
     let*! _ = RPC.Contracts.get_counter ?endpoint ~hooks ~contract_id client in
     let*! _ =
       RPC.Contracts.get_manager_key ?endpoint ~hooks ~contract_id client
@@ -260,7 +263,10 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
       RPC.Client.call ?endpoint ~hooks client
       @@ RPC.get_chain_block_context_contract ~id:contract_id ()
     in
-    let*! _ = RPC.Contracts.get_balance ?endpoint ~hooks ~contract_id client in
+    let* _ =
+      RPC.Client.call ?endpoint ~hooks client
+      @@ RPC.get_chain_block_context_contract_balance ~id:contract_id ()
+    in
     let*? process =
       RPC.Contracts.get_counter ?endpoint ~hooks ~contract_id client
     in

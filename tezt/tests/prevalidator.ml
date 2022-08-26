@@ -2016,10 +2016,11 @@ module Revamped = struct
       ~tags:["mempool"; "precheck"; "empty"; "balance"]
     @@ fun protocol ->
     let* _node, client = Client.init_with_protocol ~protocol `Client () in
-    let*! json_balance =
-      RPC.Contracts.get_balance
-        ~contract_id:Constant.bootstrap1.public_key_hash
-        client
+    let* json_balance =
+      RPC.Client.call client
+      @@ RPC.get_chain_block_context_contract_balance
+           ~id:Constant.bootstrap1.public_key_hash
+           ()
     in
     let balance = JSON.as_string json_balance |> int_of_string in
     let* _op =

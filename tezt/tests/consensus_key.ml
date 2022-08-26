@@ -621,23 +621,23 @@ let test_drain_delegate_1 ?(baker = Constant.bootstrap1.alias)
     update_consensus_key ~baker ~src:delegate ~consensus_key:consensus client
   in
   let* _ = RPC.Delegates.get ~hooks ~pkh:delegate.public_key_hash client in
-  let*! _ =
-    RPC.Contracts.get_balance
-      ~hooks
-      ~contract_id:delegate.public_key_hash
-      client
+  let* _ =
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_contract_balance
+         ~id:delegate.public_key_hash
+         ()
   in
-  let*! _ =
-    RPC.Contracts.get_balance
-      ~hooks
-      ~contract_id:consensus.public_key_hash
-      client
+  let* _ =
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_contract_balance
+         ~id:consensus.public_key_hash
+         ()
   in
-  let*! _ =
-    RPC.Contracts.get_balance
-      ~hooks
-      ~contract_id:destination.public_key_hash
-      client
+  let* _ =
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_contract_balance
+         ~id:destination.public_key_hash
+         ()
   in
   (* Goto beginning of cycle to ensure a baking slot is available *)
   let* () =
@@ -650,23 +650,23 @@ let test_drain_delegate_1 ?(baker = Constant.bootstrap1.alias)
       client
   in
   let* _ = RPC.Delegates.get ~hooks ~pkh:delegate.public_key_hash client in
-  let*! _ =
-    RPC.Contracts.get_balance
-      ~hooks
-      ~contract_id:delegate.public_key_hash
-      client
+  let* _ =
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_contract_balance
+         ~id:delegate.public_key_hash
+         ()
   in
-  let*! _ =
-    RPC.Contracts.get_balance
-      ~hooks
-      ~contract_id:consensus.public_key_hash
-      client
+  let* _ =
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_contract_balance
+         ~id:consensus.public_key_hash
+         ()
   in
-  let*! _ =
-    RPC.Contracts.get_balance
-      ~hooks
-      ~contract_id:destination.public_key_hash
-      client
+  let* _ =
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_contract_balance
+         ~id:destination.public_key_hash
+         ()
   in
   unit
 
