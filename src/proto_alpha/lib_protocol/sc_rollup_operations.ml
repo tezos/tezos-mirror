@@ -124,7 +124,7 @@ let origination_proof_of_string origination_proof kind =
         | None ->
             fail
               (Sc_rollup_proof_repr.Sc_rollup_proof_check
-                 "invalid encoding for Was,_2_0_0 origination proof")
+                 "invalid encoding for Wasm_2_0_0 origination proof")
       in
       let (module PVM : Sc_rollup.PVM_with_proof
             with type proof =

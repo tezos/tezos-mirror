@@ -1051,6 +1051,9 @@ module Encoding = struct
                 {public_parameters; circuits_info; init_state; nb_ops});
         }
 
+    let string_to_bytes_encoding =
+      Data_encoding.conv Bytes.of_string Bytes.to_string Data_encoding.bytes
+
     let sc_rollup_originate_case =
       MCase
         {
@@ -1059,8 +1062,8 @@ module Encoding = struct
           encoding =
             obj4
               (req "kind" Sc_rollups.Kind.encoding)
-              (req "boot_sector" Data_encoding.string)
-              (req "origination_proof" Data_encoding.string)
+              (req "boot_sector" string_to_bytes_encoding)
+              (req "origination_proof" string_to_bytes_encoding)
               (req "parameters_ty" Script_repr.lazy_expr_encoding);
           select =
             (function
