@@ -262,37 +262,19 @@ protocol run by the node. For instance, ``get timestamp`` isn't available when
 the node runs the genesis protocol, which may happen for a few minutes when
 launching a node for the first time.
 
-.. _using_faucet:
-
-Get Free Tez
-~~~~~~~~~~~~
-
-To test the networks and help users get familiar with the system, on
-:doc:`test networks<test_networks>` you can obtain free tez from
-:ref:`a faucet <faucet>`.
-
-This will provide a faucet account in the form of a JSON file
-``tz1__xxxxxxxxx__.json``, that can be activated with the following
-command::
-
-    tezos-client activate account alice with "tz1__xxxxxxxxx__.json"
-
-Let's check the balance of the new account with::
-
-    tezos-client get balance for alice
-
-Please preserve the JSON file. It will be necessary in order to
-reactivate the faucet account when migrating between test networks, e.g., from
-one protocol to the next, or in the event the test network is reset.
-
-Please drink carefully and don't abuse the faucet: it only contains
-30,000 faucet accounts for a total amount of ꜩ760,000,000.
-
 A Simple Wallet
 ~~~~~~~~~~~~~~~
 
-The client is also a basic wallet and after the activation above you
-will notice that the client data directory (by default, ``~/.tezos-client``) has been populated with
+The client is also a basic wallet. We can, for example, generate a new pair of keys, which can be used locally
+with the alias *bob*::
+
+      $ tezos-client gen keys bob
+
+To check the account (also called a contract) for Bob has been created::
+
+      $ tezos-client list known contracts
+
+You will notice that the client data directory (by default, ``~/.tezos-client``) has been populated with
 3 files ``public_key_hashs``, ``public_keys`` and ``secret_keys``.
 The content of each file is in JSON and keeps the mapping between
 aliases (e.g., ``alice``) and the kind of keys indicated by the name
@@ -302,14 +284,6 @@ using a hardware wallet (see :ref:`ledger`).
 An additional file ``contracts`` contains the addresses of smart
 contracts, which have the form *KT1…*.
 
-We can, for example, generate a new pair of keys, which can be used locally
-with the alias *bob*::
-
-      $ tezos-client gen keys bob
-
-To check the account (also called a contract) for Bob has been created::
-
-      $ tezos-client list known contracts
 
 Notice that by default, the keys were stored unencrypted, which is fine in our test example.
 In more realistic scenarios, you should supply the option ``--encrypted`` when generating a new account::
@@ -330,6 +304,14 @@ protecting your secret keys is properly managed (if you stored them encrypted).
 For more advanced key management we offer :ref:`ledger support
 <ledger>` and a :ref:`remote signer<signer>`.
 
+.. _using_faucet:
+
+Get Free Test Tokens
+~~~~~~~~~~~~~~~~~~~~
+
+To test the networks and help users get familiar with the system, on
+:doc:`test networks<test_networks>` you can obtain free tokens from
+:ref:`a faucet <faucet>`.
 
 Transfers and Receipts
 ~~~~~~~~~~~~~~~~~~~~~~

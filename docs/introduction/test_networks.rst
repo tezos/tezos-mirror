@@ -28,13 +28,10 @@ faster than with a long-lived network.
 Faucets
 =======
 
-Test networks have a list of built-in accounts with some funds. You
-can obtain the key to these accounts from a faucet to claim the funds.
 Faucets can be accessed from https://teztnets.xyz/. Each of the test
 network listed there, including the active test networks described
-below, have independent faucets.
-
-See :ref:`using_faucet` for detailed instructions on using a faucet.
+below, have independent faucets. Enter the public key hash of any test
+account on the website to receive test tokens.
 
 Kathmandunet
 ============
@@ -82,7 +79,7 @@ Ghostnet
 ========
 
 Ghostnet is a long running, centrally managed test network designed to follow (in fact, anticipate!) Tezos Mainnet protocol upgrades.
-Indeed, Ghostnet generally updates to the same protocol as Mainnet a few hours or days before the Mainnet itself.
+Indeed, Ghostnet generally updates to the same protocol as Mainnet a few days before the Mainnet itself.
 
 Ghostnet was previously known as :ref:`ithacanet`, the testchain for the Ithaca protocol.
 
