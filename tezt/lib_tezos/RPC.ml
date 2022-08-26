@@ -614,6 +614,15 @@ let get_chain_block_context_contract_delegate ?(chain = "main")
     ["chains"; chain; "blocks"; block; "context"; "contracts"; id; "delegate"]
     Fun.id
 
+let get_chain_block_context_contract_entrypoints ?(chain = "main")
+    ?(block = "head") ~id () =
+  make
+    GET
+    [
+      "chains"; chain; "blocks"; block; "context"; "contracts"; id; "entrypoints";
+    ]
+    Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

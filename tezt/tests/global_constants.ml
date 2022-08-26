@@ -153,7 +153,10 @@ let test_entrypoint_expansion =
   in
   let* () = Client.bake_for_and_wait client in
   (* Get the entrypoints. *)
-  let*! result = RPC.Contracts.get_entrypoints ~contract_id:contract client in
+  let* result =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_entrypoints ~id:contract ()
+  in
   let open JSON in
   let entrypoints =
     result |-> "entrypoints" |> as_object |> List.map fst
