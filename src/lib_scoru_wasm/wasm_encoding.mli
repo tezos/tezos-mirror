@@ -47,6 +47,8 @@ val table_encoding : Partial_table.table Tree_encoding.t
 
 val global_encoding : Global.global Tree_encoding.t
 
+val export_instance_encoding : Instance.export_inst Tree_encoding.t
+
 val memory_instance_encoding :
   Partial_memory.memory Instance.Vector.t Tree_encoding.t
 

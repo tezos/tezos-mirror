@@ -61,6 +61,16 @@ let concat_kont_encoding enc_a =
        (scope ["res"] enc_a)
        (value ["offset"] Data_encoding.int32)
 
+let fold_left_kont_encoding enc_a enc_acc =
+  conv
+    (fun (origin, acc, offset) -> {origin; acc; offset})
+    (fun {origin; acc; offset} -> (origin, acc, offset))
+  @@ tup3
+       ~flatten:true
+       (scope ["origin"] enc_a)
+       (scope ["acc"] enc_acc)
+       (value ["offset"] Data_encoding.int32)
+
 let lazy_vec_encoding enc = int32_lazy_vector (value [] Data_encoding.int32) enc
 
 type (_, _) eq = Eq : ('a, 'a) eq
@@ -169,6 +179,18 @@ let init_kont_encoding =
       (value [] Interpreter_encodings.Ast.memory_encoding)
       Wasm_encoding.memory_encoding
   @ [
+      case
+        "IK_Exports"
+        (tup2
+           ~flatten:true
+           (scope ["module"] Wasm_encoding.module_instance_encoding)
+           (scope ["kont"]
+           @@ fold_left_kont_encoding
+                (lazy_vec_encoding
+                   Parser.(no_region_encoding Export.export_encoding))
+                Wasm_encoding.extern_map_encoding))
+        (function IK_Exports (inst, fold) -> Some (inst, fold) | _ -> None)
+        (function inst, fold -> IK_Exports (inst, fold));
       case
         "IK_Remaining"
         Wasm_encoding.module_instance_encoding
