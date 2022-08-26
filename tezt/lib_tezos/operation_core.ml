@@ -329,9 +329,15 @@ module Manager = struct
         ("refutation", refutation);
       ]
 
+  type transfer_parameters = {entrypoint : string; arg : JSON.u}
+
   type payload =
     | Reveal of Account.key
-    | Transfer of {amount : int; dest : Account.key}
+    | Transfer of {
+        amount : int;
+        dest : string;
+        parameters : transfer_parameters option;
+      }
     | Dal_publish_slot_header of {
         level : int;
         index : int;
@@ -349,7 +355,11 @@ module Manager = struct
   let reveal account = Reveal account
 
   let transfer ?(dest = Constant.bootstrap2) ?(amount = 1_000_000) () =
-    Transfer {amount; dest}
+    Transfer {amount; dest = dest.public_key_hash; parameters = None}
+
+  let call ?(dest = "KT1LfQjDNgPpdwMHbhzyQcD8GTE2L4rwxxpN") ?(amount = 0)
+      ?(entrypoint = "default") ?(arg = `O [("prim", `String "Unit")]) () =
+    Transfer {amount; dest; parameters = Some {entrypoint; arg}}
 
   let dal_publish_slot_header ~level ~index ~header =
     Dal_publish_slot_header {level; index; header}
@@ -374,12 +384,22 @@ module Manager = struct
   let json_payload_binding = function
     | Reveal account ->
         [("kind", `String "reveal"); ("public_key", `String account.public_key)]
-    | Transfer {amount; dest} ->
+    | Transfer {amount; dest; parameters} ->
+        let parameters =
+          match parameters with
+          | None -> []
+          | Some {entrypoint; arg} ->
+              [
+                ( "parameters",
+                  `O [("entrypoint", `String entrypoint); ("value", arg)] );
+              ]
+        in
         [
           ("kind", `String "transaction");
           ("amount", json_of_tez amount);
-          ("destination", json_of_account dest);
+          ("destination", `String dest);
         ]
+        @ parameters
     | Dal_publish_slot_header {level; index; header} ->
         let slot =
           `O

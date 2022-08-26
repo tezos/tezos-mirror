@@ -264,6 +264,17 @@ module Manager : sig
      mutez. *)
   val transfer : ?dest:Account.key -> ?amount:int -> unit -> payload
 
+  (** [call ~dest ~amount:0 ~entrypoint ~arg ()] builds a smart contract call
+      operation to the [entrypoint] with the provided Michelson argument
+      [arg]. Note that the amount is expressed in mutez. *)
+  val call :
+    ?dest:string ->
+    ?amount:int ->
+    ?entrypoint:string ->
+    ?arg:JSON.u ->
+    unit ->
+    payload
+
   (** [dal_publish_slot_header ~level ~index ~header] builds an
      operation for the data-availability layer that publishes a
      slot. *)
