@@ -259,7 +259,7 @@ let sample_next_transfer_for state ~fee ~branch ~account =
     | Fee_mutez fee -> fee
   in
   let amount = 1 + Random.int 500 in
-  let operation =
+  return
     {
       shell_header = {branch};
       protocol_data =
@@ -270,9 +270,9 @@ let sample_next_transfer_for state ~fee ~branch ~account =
                 kind = "transaction";
                 source = account.Account.public_key_hash;
                 fee = string_of_int fee;
-                counter = string_of_int (get_next_counter state account);
+                counter = string_of_int @@ get_next_counter state account;
                 gas_limit = string_of_int 2000;
-                storage_limit = string_of_int 0;
+                storage_limit = "0";
                 amount = string_of_int amount;
                 destination = receiver.Account.public_key_hash;
               };
@@ -280,25 +280,36 @@ let sample_next_transfer_for state ~fee ~branch ~account =
           signature = None;
         };
     }
-  in
-  return operation
+
+let mutez_of_string s = Tez.of_mutez_int @@ int_of_string s
 
 let bake_with_mempool ?protocol node client mempool =
-  let mempool_json =
-    let open Data_encoding in
-    Json.construct (list mempool_operation_encoding) (List.map snd mempool)
-  in
-  let mempool_str = Ezjsonm.value_to_string mempool_json in
-  let mempool = Temp.file "mempool.json" in
-  let* _ =
-    Lwt_io.with_file ~mode:Lwt_io.Output mempool (fun oc ->
-        Lwt_io.write oc mempool_str)
+  let* () =
+    Lwt_list.iter_s
+      (fun op ->
+        let t = Stdlib.List.hd op.protocol_data.contents in
+        let fee = mutez_of_string t.fee
+        and gas_limit = int_of_string t.gas_limit
+        and amount = mutez_of_string t.amount
+        and giver = t.source
+        and receiver = t.destination
+        and endpoint = Client.Node node
+        and storage_limit = int_of_string t.storage_limit in
+        Client.transfer
+          ~endpoint
+          ~fee
+          ~gas_limit
+          ~amount
+          ~giver
+          ~receiver
+          ~storage_limit
+          client)
+      mempool
   in
   (* Use --context's client argument to prevent the node from sorting
      the operations. *)
   Client.bake_for_and_wait
     ?protocol
-    ~mempool
     ~force:true
     ~context_path:(Node.data_dir node // "context")
     client
@@ -374,37 +385,31 @@ let random_permutation list =
   let rng = Random.State.make_self_init () in
   Tezos_base.TzPervasives.List.shuffle ~rng list
 
-let single_baker_increasing_fees state ~account : mempool Lwt.t =
+let single_baker_increasing_fees state ~account =
   let* branch = get_current_head_hash state in
-  let fees = Array.of_list (random_permutation [1_000; 2_000; 3_000]) in
+  let fees = Array.of_list [1_000; 2_000; 3_000] in
   let* op1 =
     sample_next_transfer_for state ~fee:(Fee_mutez fees.(0)) ~branch ~account
   in
-  let* op2 =
+  let* _op2 =
     sample_next_transfer_for state ~fee:(Fee_mutez fees.(1)) ~branch ~account
   in
-  let* op3 =
+  let* _op3 =
     sample_next_transfer_for state ~fee:(Fee_mutez fees.(2)) ~branch ~account
   in
-  let ops =
-    random_permutation [(account, op1); (account, op2); (account, op3)]
-  in
-  mempool_from_list_of_ops state.sandbox_client state.protocol ops
+  Lwt.return @@ [op1; _op2; _op3]
 
-let distinct_bakers_increasing_fees state sources : mempool Lwt.t =
+let distinct_bakers_increasing_fees state sources =
   let* branch = get_current_head_hash state in
   let fees = random_permutation [1_000; 2_000; 3_000; 4_000; 5_000] in
   let accounts = random_permutation sources in
-  let* ops =
-    Lwt_list.map_s
-      (fun (account, fee) ->
-        let* op =
-          sample_next_transfer_for state ~fee:(Fee_mutez fee) ~branch ~account
-        in
-        return (account, op))
-      (List.combine accounts fees)
-  in
-  mempool_from_list_of_ops state.sandbox_client state.protocol ops
+  Lwt_list.map_s
+    (fun (account, fee) ->
+      let* op =
+        sample_next_transfer_for state ~fee:(Fee_mutez fee) ~branch ~account
+      in
+      return op)
+    (List.combine accounts fees)
 
 (* ------------------------------------------------------------------------- *)
 (* Test entrypoints *)
@@ -412,19 +417,25 @@ let distinct_bakers_increasing_fees state sources : mempool Lwt.t =
 let has_1m_restriction_in_blocks protocol =
   Protocol.(number protocol >= number Kathmandu)
 
-let bake_and_check state ~protocol ~mempool ~sources =
+let bake_and_check ?expected_baked_operations state ~protocol ~mempool ~sources
+    =
   let* () =
     bake_with_mempool ~protocol state.sandbox_node state.sandbox_client mempool
   in
   let* block = RPC.(Client.call state.sandbox_client (get_chain_block ())) in
   let expected_number_manager_op =
-    if has_1m_restriction_in_blocks protocol then
-      List.length
-        (List.sort_uniq
-           (fun src1 src2 ->
-             String.compare src1.Account.public_key_hash src2.public_key_hash)
-           sources)
-    else List.length mempool
+    match expected_baked_operations with
+    | None ->
+        if has_1m_restriction_in_blocks protocol then
+          List.length
+            (List.sort_uniq
+               (fun src1 src2 ->
+                 String.compare
+                   src1.Account.public_key_hash
+                   src2.public_key_hash)
+               sources)
+        else List.length mempool
+    | Some n -> n
   in
   assert_block_is_well_baked block expected_number_manager_op ;
   return ()
@@ -452,7 +463,16 @@ let test_ordering =
   Log.info "Testing ordering by counter" ;
   let account = Constant.bootstrap1 in
   let* mempool = single_baker_increasing_fees state ~account in
-  let* () = bake_and_check state ~protocol ~mempool ~sources:[account] in
+  let* () =
+    bake_and_check
+      state
+      ~expected_baked_operations:1
+        (* We're going through the mempool, with
+           operations from the same source, so that only 1 will be baked in *)
+      ~protocol
+      ~mempool
+      ~sources:[account]
+  in
   (* If 1m restriction is enabled on the protocol side, only one
      operation has been added to the previous block, hence the next
      counter for bootstrap1 is the successor of one. *)
@@ -570,7 +590,144 @@ let baking_operation_exception =
   in
   Client.bake_for_and_wait ~context_path:(data_dir // "context") client
 
+let init ?(overrides = []) protocol =
+  let* sandbox_node = Node.init [Synchronisation_threshold 0; Private_mode] in
+  let sandbox_endpoint = Client.Node sandbox_node in
+  let* sandbox_client = Client.init ~endpoint:sandbox_endpoint () in
+  let* parameter_file =
+    let base = Either.Right (protocol, None) in
+    Protocol.write_parameter_file ~base overrides
+  in
+  let* () =
+    (* activate in the past - let timestamp_delay be the default value of 1 year *)
+    Client.activate_protocol ~protocol sandbox_client ~parameter_file
+  in
+  return @@ (sandbox_endpoint, sandbox_client)
+
+let test_operation_pool_ordering
+    ?(accounts = Array.map (fun k -> k.Account.alias) Account.Bootstrap.keys)
+    operations n_transfers =
+  Protocol.register_test
+    ~__FILE__
+    ~title:
+      (Printf.sprintf
+         "External operations are ordered (%d transfers, max %d operations)"
+         n_transfers
+         operations)
+    ~tags:["operations_pool"; "baking"]
+  @@ fun protocol ->
+  let* endpoint, client = init protocol in
+  (* Test preparation *)
+  Log.info "Evaluating gas cost of a single transfer" ;
+  let* () =
+    Client.transfer
+      ~amount:(Tez.of_int 2)
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      client
+  in
+
+  let* () = Client.bake_for_and_wait ~endpoint client in
+  let* gas_limit =
+    let* block = RPC.Client.call_json client (RPC.get_chain_block ()) in
+    JSON.get "operations" block
+    |> JSON.geti 3 |> JSON.geti 0 |> JSON.get "contents" |> JSON.geti 0
+    |> JSON.get "gas_limit" |> JSON.as_int |> Lwt.return
+  in
+
+  let* () =
+    Node.terminate (match endpoint with Node n -> n | _ -> assert false)
+  in
+
+  (* The test in itself *)
+  Log.info "Restarting protocol to test --operations option" ;
+  let expected_n_ops = operations in
+  (* Create a new protocol instance with a small limit of gas per block, so
+     that a number of transfers cannot be included. *)
+  let* _endpoint, client =
+    init
+      ~overrides:
+        [
+          ( ["hard_gas_limit_per_block"],
+            Some (Printf.sprintf "\"%d\"" (expected_n_ops * gas_limit)) );
+        ]
+      protocol
+  in
+  let rec do_transfer i =
+    let len = Array.length accounts in
+    if i < 0 || i > len || i >= n_transfers then Lwt.return_unit
+    else
+      let giver = accounts.(i) and receiver = accounts.((i + 1) mod len) in
+      let* () = Client.transfer ~amount:Tez.one ~giver ~receiver client in
+      do_transfer (i + 1)
+  in
+  let* () = do_transfer 0 in
+
+  (* Create a valid operation pool from current mempool *)
+  let* mempool = RPC_legacy.get_mempool_pending_operations client in
+  let mgmt_ops = JSON.get "applied" mempool in
+
+  let filename = Filename.temp_file "opool_" ".json" in
+  let json = JSON.as_list mgmt_ops in
+  let to_op o =
+    let of_field name = (name, JSON.get name o |> JSON.unannotate) in
+    ( JSON.get "hash" o,
+      `O [of_field "contents"; of_field "branch"; of_field "signature"] )
+  in
+  let hashes, pool =
+    let l = List.map to_op json in
+    (List.map fst l, `A (List.map snd l))
+  in
+
+  Log.info "Writing external operations pool (%s)" filename ;
+  let oc = open_out_bin filename in
+  Printf.fprintf oc "%s%!" (JSON.encode (JSON.annotate ~origin:"mempool" pool)) ;
+  close_out oc ;
+
+  let* () =
+    Client.bake_for_and_wait ~ignore_node_mempool:true ~mempool:filename client
+  in
+  let* op_hashes =
+    let* json =
+      RPC.Client.call_json client (RPC.get_chain_block_operation_hashes ())
+    in
+    JSON.as_list (JSON.geti 3 json) |> Lwt.return
+  in
+  Check.(List.length op_hashes = expected_n_ops)
+    Check.int
+    ~error_msg:"Expected %R operations, got %L" ;
+  (* Check that the order of hash in the block is the same as the order of
+     hashe in the external pool *)
+  let check_hashes l1 l2 =
+    let len = List.length l1 in
+    let should_be_in =
+      Tezos_base__TzPervasives.List.take_n len l2 |> List.map JSON.encode
+    in
+    List.iter
+      (fun oph ->
+        let oph_s = JSON.encode oph in
+        Check.(List.mem oph_s should_be_in = true)
+          Check.bool
+          ~error_msg:
+            (Printf.sprintf
+               "operation hash %s not in first %d elements of initial pool"
+               oph_s
+               len))
+      l1
+  in
+  check_hashes op_hashes hashes ;
+  Lwt.return_unit
+
 let register ~protocols =
   test_ordering protocols ;
   wrong_branch_operation_dismissal protocols ;
   baking_operation_exception protocols
+
+let register_operations_pool ~protocols =
+  List.iter
+    (fun n ->
+      List.iter
+        (fun max_operations ->
+          test_operation_pool_ordering max_operations n protocols)
+        (Base.range 1 n))
+    (Base.range 1 (Array.length Account.Bootstrap.keys))

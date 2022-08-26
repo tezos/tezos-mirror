@@ -85,6 +85,7 @@ let register_protocol_agnostic_tests () =
      We can run them on all protocols, or only one if the CI would be too slow. *)
   Baker_test.register ~protocols:[Alpha] ;
   Baking.register ~protocols ;
+  Baking.register_operations_pool ~protocols:[Jakarta; Kathmandu; Alpha] ;
   Basic.register ~protocols:[Alpha] ;
   Big_map_all.register ~protocols:[Alpha] ;
   Bootstrap.register ~protocols:[Alpha] ;

@@ -58,6 +58,11 @@ val pp_pool : Format.formatter -> pool -> unit
 
 val filter_pool : (packed_operation -> bool) -> pool -> pool
 
+val add_operation : pool -> packed_operation -> pool
+
+val add_operations : pool -> packed_operation list -> pool
+
+(** {2 Ordered pool of operations} *)
 type ordered_pool = packed_operation list t
 
 val ordered_pool_encoding : ordered_pool Data_encoding.t
@@ -82,10 +87,6 @@ val payload_of_ordered_pool : ordered_pool -> payload
 
 val ordered_pool_of_payload :
   consensus_operations:packed_operation list -> payload -> ordered_pool
-
-val add_operation : pool -> packed_operation -> pool
-
-val add_operations : pool -> packed_operation list -> pool
 
 type consensus_filter = {
   level : int32;
@@ -125,8 +126,10 @@ val extract_operations_of_list_list :
 module Prioritized_operation : sig
   type t
 
-  (** prioritize operations coming from an external source (file, uri, ...)*)
-  val extern : packed_operation -> t
+  (** prioritize operations coming from an external source (file, uri, ...).
+      An operation with higher [priority] (aka a bigger integer) will be
+      included before others with lower [priority]. *)
+  val extern : ?priority:int -> packed_operation -> t
 
   (** prioritize operations coming from a node *)
   val node : packed_operation -> t
@@ -158,9 +161,13 @@ module Prioritized : sig
       low priority. *)
   val of_pool : pool -> t
 
-  (** [merge_external_operations pool extern_ops] creates a prioritized pool
+  (** [merge_external_operations ?initial_priority pool extern_ops] creates a prioritized pool
      from a [pool] and [extern_ops] coming from an external source, which we
-     prioritize. *)
+     prioritize.
+
+     Priorities for these operations is given according to the order of the
+     list. The first element of the list has highest priority.
+   *)
   val merge_external_operations : t -> packed_operation list -> t
 
   val filter : (packed_operation -> bool) -> t -> t
