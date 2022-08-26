@@ -130,10 +130,11 @@ let get_endorsement_power ~level client =
   let block = string_of_int level in
   let* consensus_operations =
     let consensus_pass = 0 in
-    RPC.get_operations_of_validation_pass
-      ~block
-      ~validation_pass:consensus_pass
-      client
+    RPC.Client.call client
+    @@ RPC.get_chain_block_operations_validation_pass
+         ~block
+         ~validation_pass:consensus_pass
+         ()
   in
   Lwt.return
   @@

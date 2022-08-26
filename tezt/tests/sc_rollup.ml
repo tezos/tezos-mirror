@@ -623,7 +623,7 @@ module Sc_rollup_inbox = struct
 end
 
 let fetch_messages_from_block sc_rollup client =
-  let* ops = RPC.get_operations client in
+  let* ops = RPC.Client.call client @@ RPC.get_chain_block_operations () in
   let messages =
     ops |> JSON.as_list
     |> List.concat_map JSON.as_list

@@ -994,11 +994,13 @@ let test_chain _test_mode_tag _protocol ?endpoint client =
   let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_block_header () in
   let* _ =
     (* Calls [/chains/main/blocks/head/header/protocol_data] *)
-    RPC.get_protocol_data ?endpoint client
+    RPC.Client.call ?endpoint client
+    @@ RPC.get_chain_block_header_protocol_data ()
   in
   let* _ =
     (* Calls [/chains/main/blocks/head/header/protocol_data/raw] *)
-    RPC.raw_protocol_data ?endpoint client
+    RPC.Client.call ?endpoint client
+    @@ RPC.get_chain_block_header_protocol_data_raw ()
   in
   let* _ =
     RPC.Client.call ?endpoint client @@ RPC.get_chain_block_header_raw ()
@@ -1066,16 +1068,19 @@ let test_chain _test_mode_tag _protocol ?endpoint client =
            ~operation_offset
            ()
     in
-    let* _ = RPC.get_operations ?endpoint client in
     let* _ =
-      RPC.get_operations_of_validation_pass ?endpoint ~validation_pass client
+      RPC.Client.call ?endpoint client @@ RPC.get_chain_block_operations ()
     in
     let* _ =
-      RPC.get_operations_of_validation_pass
-        ?endpoint
-        ~validation_pass
-        ~operation_offset
-        client
+      RPC.Client.call ?endpoint client
+      @@ RPC.get_chain_block_operations_validation_pass ~validation_pass ()
+    in
+    let* _ =
+      RPC.Client.call ?endpoint client
+      @@ RPC.get_chain_block_operations_validation_pass
+           ~validation_pass
+           ~operation_offset
+           ()
     in
     unit
   in

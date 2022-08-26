@@ -314,6 +314,44 @@ let get_stats_gc = make GET ["stats"; "gc"] Fun.id
 
 let get_stats_memory = make GET ["stats"; "memory"] Fun.id
 
+let post_injection_block ~data = make POST ["injection"; "block"] ~data Fun.id
+
+let get_chain_block_header_protocol_data_raw ?(chain = "main") ?(block = "head")
+    () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "header"; "protocol_data"; "raw"]
+    JSON.as_string
+
+let get_chain_block_header_protocol_data ?(chain = "main") ?(block = "head")
+    ?(offset = 0) () =
+  let query_string = [("offset", string_of_int offset)] in
+  make
+    ~query_string
+    GET
+    ["chains"; chain; "blocks"; block; "header"; "protocol_data"]
+    Fun.id
+
+let get_chain_block_operations ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "operations"] Fun.id
+
+let get_chain_block_operations_validation_pass ?(chain = "main")
+    ?(block = "head") ?(force_metadata = false) ?operation_offset
+    ~validation_pass () =
+  let path =
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "operations";
+      string_of_int validation_pass;
+    ]
+    @ match operation_offset with None -> [] | Some m -> [string_of_int m]
+  in
+  let query_string = if force_metadata then [("force_metadata", "")] else [] in
+  make ~query_string GET path Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

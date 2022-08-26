@@ -933,7 +933,7 @@ let test_rollup_with_two_commitments =
   Check.(inbox = None)
     (Check.option Rollup.Check.inbox)
     ~error_msg:"Expected no inbox" ;
-  let* json = RPC.get_operations client in
+  let* json = RPC.Client.call client @@ RPC.get_chain_block_operations () in
   let manager_operations = JSON.(json |=> 3 |> as_list) in
   Check.(List.length manager_operations = 2)
     Check.int

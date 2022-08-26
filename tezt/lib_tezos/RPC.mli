@@ -266,6 +266,9 @@ val get_chain_block_metadata :
 
 (** RPC: [GET /chains/[chain]/blocks/[block]/hash]
 
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+
     Returns the hash. *)
 val get_chain_block_hash : ?chain:string -> ?block:string -> unit -> string t
 
@@ -352,28 +355,76 @@ val get_stats_gc : JSON.t t
 (** RPC: [GET /stats/memory] *)
 val get_stats_memory : JSON.t t
 
+(** RPC: [POST /injection/block] *)
+val post_injection_block : data:JSON.u -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/header/protocol_data/raw]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_header_protocol_data_raw :
+  ?chain:string -> ?block:string -> unit -> string t
+
+(** RPC: [GET /chains/[chain]/blocks/[block]/header/protocol_data]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+    [offset] defaults to [0].
+*)
+
+val get_chain_block_header_protocol_data :
+  ?chain:string -> ?block:string -> ?offset:int -> unit -> JSON.t t
+
+(** RPC: [GET /chains/[chain]/blocks/[block]/operations]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_operations :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/[chain]/blocks/[block]/operations/[validation_pass]] if
+    [operation_offset] is unset
+
+    Otherwise,
+    RPC: [GET /chains/[chain]/blocks/[block]/operations/[validation_pass]/[operation_offset]]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+    [force_metadata] defaults to [false].
+*)
+val get_chain_block_operations_validation_pass :
+  ?chain:string ->
+  ?block:string ->
+  ?force_metadata:bool ->
+  ?operation_offset:int ->
+  validation_pass:int ->
+  unit ->
+  JSON.t t
+
 (** {2 Smart contract rollup RPC module} *)
 
-(** RPC: [GET chain/[chain]/blocks/[block]/context/sc_rollup] *)
+(** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup] *)
 val get_chain_block_context_sc_rollup :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
-(** RPC: [GET chain/[chain]/blocks/[block]/context/sc_rollup/<sc_rollup_address>/inbox] *)
+(** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup/<sc_rollup_address>/inbox] *)
 val get_chain_block_context_sc_rollup_inbox :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
-(** RPC: [GET chain/[chain]/blocks/[block]/context/sc_rollup/<sc_rollup_address>/genesis_info] *)
+(** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup/<sc_rollup_address>/genesis_info] *)
 val get_chain_block_context_sc_rollup_genesis_info :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
-(** RPC: [GET chain/[chain]/blocks/[block]/context/sc_rollup/<sc_rollup_address>/boot_sector] *)
+(** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup/<sc_rollup_address>/boot_sector] *)
 val get_chain_block_context_sc_rollup_boot_sector :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
-(** RPC: [GET chain/[chain]/blocks/[block]/context/sc_rollup/<sc_rollup_address>/get_last_cemented_commitment_hash_with_level] *)
+(** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup/<sc_rollup_address>/get_last_cemented_commitment_hash_with_level] *)
 val get_chain_block_context_sc_rollup_last_cemented_commitment_hash_with_level :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
-(** Call RPC /chain/[chain]/blocks/[block]/context/sc_rollup/[rollup_hash]/staker/[staker]/staked_on_commitment *)
+(** Call RPC /chains/[chain]/blocks/[block]/context/sc_rollup/[rollup_hash]/staker/[staker]/staked_on_commitment *)
 val get_chain_block_context_sc_rollup_staker_staked_on_commitment :
   ?chain:string -> ?block:string -> sc_rollup:string -> string -> JSON.t t

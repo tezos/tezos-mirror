@@ -36,9 +36,9 @@ type t = {
       (* This is mutable to avoid computing the raw representation several times. *)
 }
 
-let get_branch ?offset client =
-  let* json = RPC.get_branch ?offset client in
-  return (JSON.as_string json)
+let get_branch ?(offset = 2) client =
+  let block = sf "head~%d" offset in
+  RPC.Client.call client @@ RPC.get_chain_block_hash ~block ()
 
 let make ~branch ~signer ~kind contents =
   {branch; contents; kind; signer; raw = None}
@@ -475,4 +475,8 @@ module Manager = struct
   let inject ?request ?force ?branch ?signer ?error managers client =
     let* op = operation ?branch ?signer managers client in
     inject ?request ?force ?error op client
+
+  let get_branch ?chain ?(offset = 2) client =
+    let block = sf "head~%d" offset in
+    RPC.Client.call client @@ RPC.get_chain_block_hash ?chain ~block ()
 end

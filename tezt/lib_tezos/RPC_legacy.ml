@@ -24,47 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let raw_protocol_data ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    client =
-  let path =
-    ["chains"; chain; "blocks"; block; "header"; "protocol_data"; "raw"]
-  in
-  Lwt.(Client.rpc ?endpoint ?hooks GET path client >|= JSON.as_string)
-
-let get_protocol_data ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    ?(offset = 0) client =
-  let path = ["chains"; chain; "blocks"; block; "header"; "protocol_data"] in
-  let query_string = [("offset", string_of_int offset)] in
-  Client.rpc ?endpoint ?hooks GET path ~query_string client
-
-let get_branch ?(offset = 2) ?endpoint ?hooks ?(chain = "main") client =
-  (* By default, we use offset = 2 for Tenderbake, to pick the latest finalized
-     branch *)
-  let block = sf "head~%d" offset in
-  let path = ["chains"; chain; "blocks"; block; "hash"] in
-  Client.rpc ?endpoint ?hooks GET path client
-
-let get_operations ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
-  let path = ["chains"; chain; "blocks"; block; "operations"] in
-  Client.rpc ?endpoint ?hooks GET path client
-
-let get_operations_of_validation_pass ?endpoint ?hooks ?(chain = "main")
-    ?(block = "head") ?(force_metadata = false) ?operation_offset
-    ~validation_pass client =
-  let path =
-    [
-      "chains";
-      chain;
-      "blocks";
-      block;
-      "operations";
-      string_of_int validation_pass;
-    ]
-    @ match operation_offset with None -> [] | Some m -> [string_of_int m]
-  in
-  let query_string = if force_metadata then [("force_metadata", "")] else [] in
-  Client.rpc ~query_string ?endpoint ?hooks GET path client
-
 let get_mempool_pending_operations ?endpoint ?hooks ?(chain = "main") ?version
     ?applied ?branch_delayed ?branch_refused ?refused ?outdated client =
   let path = ["chains"; chain; "mempool"; "pending_operations"] in
@@ -124,10 +83,6 @@ let preapply_block ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~data
   let path =
     ["chains"; chain; "blocks"; block; "helpers"; "preapply"; "block"]
   in
-  Client.rpc ?endpoint ?hooks ~data POST path client
-
-let inject_block ?endpoint ?hooks ~data client =
-  let path = ["injection"; "block"] in
   Client.rpc ?endpoint ?hooks ~data POST path client
 
 let get_constants ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =

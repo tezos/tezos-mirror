@@ -188,7 +188,7 @@ let test_debug_level_misc =
   in
   Log.info "Hash of injected operation: %s" oph1 ;
   Log.info "2b) operations in block should be empty." ;
-  let* ops = RPC.get_operations client_1 in
+  let* ops = RPC.Client.call client_1 @@ RPC.get_chain_block_operations () in
   Log.info "RPC.get_operations done." ;
   check_json_is_empty_list
     ?fail_msg:
@@ -207,7 +207,7 @@ let test_debug_level_misc =
   | _ -> Test.fail "List of applied operations in mempool should be empty.") ;
   Log.info
     "3b) operations in block should contain the previously pending operation." ;
-  let* ops = RPC.get_operations client_1 in
+  let* ops = RPC.Client.call client_1 @@ RPC.get_chain_block_operations () in
   Log.info "RPC.get_operations done." ;
   (match JSON.(ops |> as_list_opt) with
   | Some [x1; x2; x3; x4] -> (

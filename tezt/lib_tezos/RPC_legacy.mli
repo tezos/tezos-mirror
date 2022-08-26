@@ -34,67 +34,6 @@
 
 (** {2 Shell RPCs} *)
 
-(** Call RPC /injection/block *)
-val inject_block :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Run [tezos-client rpc /chains/<chain>/blocks/<block>/header/protocol/raw]. *)
-val raw_protocol_data :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  Client.t ->
-  string Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/header/protocol_data *)
-val get_protocol_data :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  ?offset:int ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/head~[offset]/hash where default [offset] is [2]. *)
-val get_branch :
-  ?offset:int ->
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/operations *)
-val get_operations :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/operations/[validation_pass] if
-  [operation_offset] is unset
-
-  Call RPC /chain/[chain]/blocks/[block]/operations/[validation_pass]/[operation_offset] otherwise.
- *)
-val get_operations_of_validation_pass :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  ?force_metadata:bool ->
-  ?operation_offset:int ->
-  validation_pass:int ->
-  Client.t ->
-  JSON.t Lwt.t
-
 (** Call RPC /chains/[chain]/mempool/pending_operations *)
 val get_mempool_pending_operations :
   ?endpoint:Client.endpoint ->
