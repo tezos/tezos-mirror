@@ -69,13 +69,13 @@ type 'a concat_kont = {
 
 type ('a, 'b) fold_left_kont = {origin : 'a Vector.t; acc : 'b; offset : int32}
 
+type eval_const_kont = EC_Next of config | EC_Stop of value
+
+type create_global_kont = Types.global_type * eval_const_kont
+
 type (_, _, _) init_section =
   | Func : ((Ast.func, func_inst) Either.t, Ast.func, func_inst) init_section
-  | Global
-      : ( (Ast.global, global_inst) Either.t,
-          Ast.global,
-          global_inst )
-        init_section
+  | Global : (create_global_kont, Ast.global, global_inst) init_section
   | Table
       : ((Ast.table, table_inst) Either.t, Ast.table, table_inst) init_section
   | Memory

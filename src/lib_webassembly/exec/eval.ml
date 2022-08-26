@@ -951,11 +951,22 @@ let create_memory (mem : memory) : memory_inst =
   let {mtype} = mem.it in
   Memory.alloc mtype
 
-let create_global module_reg (inst : module_key) (glob : global) :
-    global_inst Lwt.t =
-  let {gtype; ginit} = glob.it in
-  let+ v = eval_const module_reg inst ginit in
-  Global.alloc gtype v
+type create_global_kont = global_type * eval_const_kont
+
+let create_global_kont inst glob =
+  (glob.it.gtype, eval_const_kont inst glob.it.ginit)
+
+let create_global_completed (gtype, kont) =
+  match eval_const_completed kont with
+  | Some v -> Some (Global.alloc gtype v)
+  | None -> None
+
+let create_global_step module_reg ((gtype, ekont) as kont) =
+  match create_global_completed kont with
+  | Some _ -> assert false
+  | None ->
+      let+ ekont = eval_const_step module_reg ekont in
+      (gtype, ekont)
 
 let create_export (inst : module_inst) (ex : export) : export_inst Lwt.t =
   let {name; edesc} = ex.it in
@@ -1195,7 +1206,7 @@ let tick_map_step first_kont kont_completed kont_step = function
 
 type (_, _, _) init_section =
   | Func : ((func, func_inst) Either.t, func, func_inst) init_section
-  | Global : ((global, global_inst) Either.t, global, global_inst) init_section
+  | Global : (create_global_kont, global, global_inst) init_section
   | Table : ((table, table_inst) Either.t, table, table_inst) init_section
   | Memory : ((memory, memory_inst) Either.t, memory, memory_inst) init_section
 
@@ -1310,11 +1321,12 @@ let section_next_init_kont :
   | Table -> IK_Aggregate (inst0, Memory, tick_map_kont m.it.memories)
   | Memory -> IK_Exports (inst0, fold_left_kont m.it.exports (NameMap.create ()))
 
-let section_inner_kont : type kont a b. (kont, a, b) init_section -> a -> kont =
- fun sec x ->
+let section_inner_kont :
+    type kont a b. module_key -> (kont, a, b) init_section -> a -> kont =
+ fun self sec x ->
   match sec with
   | Func -> Either.Left x
-  | Global -> Left x
+  | Global -> create_global_kont self x
   | Table -> Left x
   | Memory -> Left x
 
@@ -1323,7 +1335,7 @@ let section_inner_completed :
  fun sec kont ->
   match (sec, kont) with
   | Func, Right y -> Some y
-  | Global, Right y -> Some y
+  | Global, kont -> create_global_completed kont
   | Table, Right y -> Some y
   | Memory, Right y -> Some y
   | _ -> None
@@ -1346,7 +1358,7 @@ let section_inner_step :
   in
   function
   | Func -> lift_either (create_func module_reg self)
-  | Global -> lift_either (create_global module_reg self)
+  | Global -> create_global_step module_reg
   | Table -> lift_either (fun x -> Lwt.return (create_table x))
   | Memory -> lift_either (fun x -> Lwt.return (create_memory x))
 
@@ -1395,7 +1407,7 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
   | IK_Aggregate (inst0, sec, tick) ->
       let+ tick =
         tick_map_step
-          (section_inner_kont sec)
+          (section_inner_kont self sec)
           (section_inner_completed sec)
           (section_inner_step module_reg self sec)
           tick

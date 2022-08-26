@@ -80,6 +80,28 @@ let fold_left_kont_encoding enc_a enc_acc =
 
 let lazy_vec_encoding enc = int32_lazy_vector (value [] Data_encoding.int32) enc
 
+let eval_const_kont_encoding ~host_funcs =
+  tagged_union
+    tag_encoding
+    [
+      case
+        "EC_Next"
+        (Wasm_encoding.config_encoding ~host_funcs)
+        (function EC_Next c -> Some c | _ -> None)
+        (fun c -> EC_Next c);
+      case
+        "EC_Stop"
+        Wasm_encoding.value_encoding
+        (function EC_Stop v -> Some v | _ -> None)
+        (fun v -> EC_Stop v);
+    ]
+
+let create_global_kont_encoding ~host_funcs =
+  tup2
+    ~flatten:true
+    (value ["global_type"] Interpreter_encodings.Types.global_type_encoding)
+    (scope ["kont"] (eval_const_kont_encoding ~host_funcs))
+
 type (_, _) eq = Eq : ('a, 'a) eq
 
 let init_section_eq :
@@ -227,9 +249,10 @@ let init_kont_encoding ~host_funcs =
       Func
       Parser.Code.func_encoding
       Wasm_encoding.function_encoding
-  @ aggregate_cases_either
+  @ aggregate_cases
       "global"
       Global
+      (create_global_kont_encoding ~host_funcs)
       (value [] Interpreter_encodings.Ast.global_encoding)
       Wasm_encoding.global_encoding
   @ aggregate_cases_either
