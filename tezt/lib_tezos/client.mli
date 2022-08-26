@@ -307,6 +307,15 @@ module Admin : sig
 
   (** Same as [list_protocols], but do not wait for the process to exit. *)
   val spawn_list_protocols : ?endpoint:endpoint -> t -> Process.t
+
+  (** Run [tezos-admin-client protocol environment] on a protocol hash.
+
+      Return its environment version as a string such as ["V1"]. *)
+  val protocol_environment : ?endpoint:endpoint -> t -> string -> string Lwt.t
+
+  (** Same as [protocol_environment], but do not wait for the process to exit. *)
+  val spawn_protocol_environment :
+    ?endpoint:endpoint -> t -> string -> Process.t
 end
 
 (** {2 Regular Client Commands} *)

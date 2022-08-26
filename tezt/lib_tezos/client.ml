@@ -410,6 +410,21 @@ module Admin = struct
       spawn_list_protocols ?endpoint client |> Process.check_and_read_stdout
     in
     return (parse_list_protocols_output output)
+
+  let spawn_protocol_environment ?endpoint client protocol =
+    spawn_command ?endpoint client ["protocol"; "environment"; protocol]
+
+  let protocol_environment ?endpoint client protocol =
+    let* output =
+      spawn_protocol_environment ?endpoint client protocol
+      |> Process.check_and_read_stdout
+    in
+    match output =~* rex "Protocol [^ ]+ uses environment (V\\d+)" with
+    | None ->
+        Test.fail
+          "tezos-admin-client protocol environment did not answer \"Protocol \
+           ... uses environment V...\""
+    | Some version -> return version
 end
 
 let spawn_version client = spawn_command client ["--version"]
