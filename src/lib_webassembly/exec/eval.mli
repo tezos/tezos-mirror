@@ -98,6 +98,8 @@ type ('kont, 'a, 'b) tick_map_kont = {
   map : ('a, 'b) map_kont;
 }
 
+type create_elem_kont = (eval_const_kont, Ast.const, ref_) tick_map_kont
+
 type init_kont =
   | IK_Start  (** Very first tick of the [init] function *)
   | IK_Add_import of (extern, Ast.import, module_inst) fold_right2_kont
@@ -109,7 +111,9 @@ type init_kont =
       module_inst * ('kont, 'a, 'b) init_section * 'b concat_kont
       -> init_kont
   | IK_Exports of module_inst * (Ast.export, extern NameMap.t) fold_left_kont
-  | IK_Elems of module_inst * (Ast.elem_segment, elem_inst) map_kont
+  | IK_Elems of
+      module_inst
+      * (create_elem_kont, Ast.elem_segment, elem_inst) tick_map_kont
   | IK_Datas of module_inst * (Ast.data_segment, data_inst) map_kont
   | IK_Es_elems of module_inst * (Ast.elem_segment, admin_instr) map_concat_kont
   | IK_Es_datas of
