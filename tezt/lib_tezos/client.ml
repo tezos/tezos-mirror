@@ -384,9 +384,10 @@ module Admin = struct
     spawn_command ?endpoint client ["inject"; "protocol"; protocol_path]
 
   let inject_protocol ?endpoint ~protocol_path client =
-    let process = spawn_inject_protocol ?endpoint ~protocol_path client in
-    let* () = Process.check process
-    and* output = Lwt_io.read (Process.stdout process) in
+    let* output =
+      spawn_inject_protocol ?endpoint ~protocol_path client
+      |> Process.check_and_read_stdout
+    in
     match output =~* rex "Injected protocol ([^ ]+) successfully" with
     | None ->
         Test.fail
@@ -398,9 +399,9 @@ module Admin = struct
     spawn_command ?endpoint client ["list"; "protocols"]
 
   let list_protocols ?endpoint client =
-    let process = spawn_list_protocols ?endpoint client in
-    let* () = Process.check process
-    and* output = Lwt_io.read (Process.stdout process) in
+    let* output =
+      spawn_list_protocols ?endpoint client |> Process.check_and_read_stdout
+    in
     return (parse_list_protocols_output output)
 end
 
@@ -872,9 +873,10 @@ let spawn_get_balance_for ?endpoint ~account client =
   spawn_command ?endpoint client ["get"; "balance"; "for"; account]
 
 let get_balance_for ?endpoint ~account client =
-  let process = spawn_get_balance_for ?endpoint ~account client in
-  let* () = Process.check process
-  and* output = Lwt_io.read (Process.stdout process) in
+  let* output =
+    spawn_get_balance_for ?endpoint ~account client
+    |> Process.check_and_read_stdout
+  in
   return @@ Tez.parse_floating output
 
 let spawn_create_mockup ?(sync_mode = Synchronous) ?parameter_file ~protocol
@@ -1388,9 +1390,9 @@ let spawn_list_protocols mode client =
   spawn_command client (mode_arg client @ ["list"; mode_str; "protocols"])
 
 let list_protocols mode client =
-  let process = spawn_list_protocols mode client in
-  let* () = Process.check process
-  and* output = Lwt_io.read (Process.stdout process) in
+  let* output =
+    spawn_list_protocols mode client |> Process.check_and_read_stdout
+  in
   return (parse_list_protocols_output output)
 
 let spawn_migrate_mockup ~next_protocol client =
@@ -1645,9 +1647,9 @@ let spawn_show_voting_period ?endpoint client =
   spawn_command ?endpoint client (mode_arg client @ ["show"; "voting"; "period"])
 
 let show_voting_period ?endpoint client =
-  let process = spawn_show_voting_period ?endpoint client in
-  let* () = Process.check process
-  and* output = Lwt_io.read (Process.stdout process) in
+  let* output =
+    spawn_show_voting_period ?endpoint client |> Process.check_and_read_stdout
+  in
   match output =~* rex "Current period: \"([a-z]+)\"" with
   | None ->
       Test.fail
