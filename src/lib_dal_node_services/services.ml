@@ -52,6 +52,13 @@ let slot () =
     ~output:Data_encoding.string
     RPC_path.(open_root / "slot" / "content" /: Cryptobox.Commitment.rpc_arg)
 
+let slot_segments () =
+  RPC_service.get_service
+    ~description:"Fetch slot as list of segments"
+    ~query:RPC_query.empty
+    ~output:(Data_encoding.list Data_encoding.string)
+    RPC_path.(open_root / "slot" / "segments" /: Cryptobox.Commitment.rpc_arg)
+
 let shard () =
   let shard_arg = RPC_arg.int in
   RPC_service.get_service

@@ -30,6 +30,7 @@ type error +=
   | Missing_shards
   | Illformed_shard
   | Slot_not_found
+  | Illformed_segments
 
 let () =
   register_error_kind
@@ -86,7 +87,17 @@ let () =
     ~pp:(fun ppf () -> Format.fprintf ppf "Illformed shard found in the store")
     Data_encoding.(unit)
     (function Illformed_shard -> Some () | _ -> None)
-    (fun () -> Illformed_shard)
+    (fun () -> Illformed_shard) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.illformed_segments"
+    ~title:"Illformed segments"
+    ~description:"Illformed segments found in the store"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "Illformed segments found in the store")
+    Data_encoding.(unit)
+    (function Illformed_segments -> Some () | _ -> None)
+    (fun () -> Illformed_segments)
 
 type slot = bytes
 
@@ -190,6 +201,21 @@ let get_slot initial_constants dal_constants store slot_header =
       emit fetched_slot (Bytes.length slot, Cryptobox.IntMap.cardinal shards))
   in
   return slot
+
+let get_slot_segments ({Cryptobox.segment_size; _} as initial_constants)
+    dal_constants store slot_header =
+  let open Lwt_result_syntax in
+  let* slot = get_slot initial_constants dal_constants store slot_header in
+  (* The slot size `Bytes.length slot` should be an exact multiple of `segment_size`.
+     If this is not the case, we throw an `Illformed_segments` error.
+  *)
+  let*? segments =
+    String.chunk_bytes
+      segment_size
+      slot
+      ~error_on_partial_chunk:(TzTrace.make Illformed_segments)
+  in
+  return segments
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3405
 
