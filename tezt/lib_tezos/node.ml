@@ -420,6 +420,19 @@ let handle_event node {name; value} =
           ()
       | Some level -> update_level node level)
   | "read_identity.v0" -> update_identity node (JSON.as_string value)
+  | "compilation_error.v0" -> (
+      match JSON.as_string_opt value with
+      | Some fname ->
+          if Sys.file_exists fname then (
+            let content = read_file fname in
+            Log.error "Protocol compilation failed:" ;
+            Log.error "%s" (String.trim content))
+          else
+            Log.error
+              "Protocol compilation failed but log file %S was not found"
+              fname
+      | None ->
+          Log.error "Protocol compilation failed but cannot read the payload")
   | _ -> ()
 
 let check_event ?where node name promise =
