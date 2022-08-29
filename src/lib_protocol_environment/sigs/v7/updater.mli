@@ -124,32 +124,39 @@ module type PROTOCOL = sig
   val operation_data_and_receipt_encoding :
     (operation_data * operation_receipt) Data_encoding.t
 
-  (** [acceptable_passes op] lists the validation passes in which the
-     input operation [op] can appear. For instance, it results in
-     [[0]] if [op] only belongs to the first pass. An answer of [[]]
-     means that the [op] is ill-formed and cannot be included at
-     all in a block. *)
-  val acceptable_passes : operation -> int list
+  (** [acceptable_pass op] gives the validation pass in which the
+      input operation [op] can appear. For instance, it results in
+      [Some 0] if [op] only belongs to the first pass. When [op] is
+      ill-formed, [acceptable_pass op] returns [None]. *)
+  val acceptable_pass : operation -> int option
 
-  (** [relative_position_within_block op1 op2] provides a partial and
-     strict order of operations within a block. It is intended to be
-     used as an argument to {!List.sort} (and other sorting/ordering
-     functions) to arrange a set of operations into a sequence, the
-     order of which is valid for the protocol.
+  (** [compare_operations (oph1,op1) (oph2,op2)] defines a total
+     ordering relation on valid operations.
 
-     A negative (respectively, positive) results means that [op1]
-     should appear before (and, respectively, after) [op2] in a
-     block. This function does not provide a total ordering on the
-     operations: a result of [0] entails that the protocol does not
-     impose any preferences to the order in which [op1] and [op2]
-     should be included in a block.
+     The following requirements must be satisfied: [oph1] is the
+     [Operation.hash.p1], [oph2] is [Operation.hash op2] and that
+     [op1] and [op2] are valid in the same context.
 
-     {b Caveat Emptor!} [relative_position_within_block o1 o2 = 0]
-     does NOT imply that [o1] is equal to [o2] in any way.
-     Consequently, it {e MUST NOT} be used as a [compare] component of
-     an {!Stdlib.Map.OrderedType}, or any such collection which relies
-     on a total comparison function. *)
-  val relative_position_within_block : operation -> operation -> int
+     [compare_operations (oph1,op1) (oph2,op2) = 0] happens only if
+     [Operation_hash.compare oph1 oph2 = 0], meaning [op1 = op2] only
+     when [op1] and [op2] are structurally identical.
+
+     Two operations of different validation_passes are compared in the
+     reverse order of their [validation_pass]: the one with the
+     smaller [validation_pass] is compared as being the greater.
+
+     When belonging to the same validation_pass, two operations
+     comparison depends on their static parameters. An abstract weight
+     is computed for each operation based on its static parameters.
+     When two operations' weights are compared as equal,
+     [compare_operation (oph1,op1) (oph2,op2)] is
+     [Operation_hash.compare oph1 oph2].
+
+     [compare_operations] can be used as a [compare] component of an
+     {!Stdlib.Map.OrderedType}, or any such collection which relies on
+     a total comparison function. *)
+  val compare_operations :
+    Operation_hash.t * operation -> Operation_hash.t * operation -> int
 
   (** A functional state that is transmitted through the steps of a
      block validation sequence: it can be created by any of the

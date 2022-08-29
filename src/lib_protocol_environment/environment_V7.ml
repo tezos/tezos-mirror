@@ -84,6 +84,7 @@ module type T = sig
        and type Micheline.canonical_location = Micheline.canonical_location
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type Z.t = Z.t
+       and type Q.t = Q.t
        and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node
        and type Data_encoding.json_schema = Data_encoding.json_schema
        and type ('a, 'b) RPC_path.t = ('a, 'b) RPC_path.t
@@ -250,6 +251,7 @@ struct
   end
 
   module Z = Z
+  module Q = Q
   module Lwt = Lwt
 
   module Data_encoding = struct
@@ -1067,7 +1069,7 @@ struct
     let activate = Context.set_protocol
 
     module type PROTOCOL =
-      Environment_protocol_T_V6.T
+      Environment_protocol_T_V7.T
         with type context := Context.t
          and type cache_value := Environment_context.Context.cache_value
          and type cache_key := Environment_context.Context.cache_key

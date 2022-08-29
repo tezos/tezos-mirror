@@ -138,6 +138,9 @@ module Bytes : S with type t = bytes
 (** [Z] is a comparison module for Zarith numbers. *)
 module Z : S with type t = Z.t
 
+(** [Q] is a comparison module for Zarith-based rational numbers. *)
+module Q : S with type t = Q.t
+
 (** {2 Type constructors}
 
     Provided the functor argument(s) are compatible with the polymorphic

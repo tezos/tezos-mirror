@@ -1345,6 +1345,9 @@ module Seed : sig
   (** See {!Seed_storage.update_seed}. *)
   val update_seed : context -> vdf_solution -> context tzresult Lwt.t
 
+  (** See {!Seed_repr.compare_vdf_solution}. *)
+  val compare_vdf_solution : vdf_solution -> vdf_solution -> int
+
   val compute_randao : context -> context tzresult Lwt.t
 
   val cycle_end :
@@ -4252,7 +4255,9 @@ module Operation : sig
 
   val hash_packed : packed_operation -> Operation_hash.t
 
-  val acceptable_passes : packed_operation -> int list
+  val acceptable_pass : packed_operation -> int option
+
+  val compare_by_passes : packed_operation -> packed_operation -> int
 
   type error += Missing_signature (* `Permanent *)
 
@@ -4261,6 +4266,11 @@ module Operation : sig
   val check_signature : public_key -> Chain_id.t -> _ operation -> unit tzresult
 
   val pack : 'kind operation -> packed_operation
+
+  val compare :
+    Operation_hash.t * packed_operation ->
+    Operation_hash.t * packed_operation ->
+    int
 
   type ('a, 'b) eq = Eq : ('a, 'a) eq
 

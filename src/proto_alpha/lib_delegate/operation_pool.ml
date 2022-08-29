@@ -159,26 +159,20 @@ let pp_ordered_pool fmt {consensus; votes; anonymous; managers} =
     (List.length anonymous)
     (List.length managers)
 
-(* Hypothesis : we suppose [List.length Protocol.Main.validation_passes = 4] *)
-let consensus_index = 0
-
-let votes_index = 1
-
-let anonymous_index = 2
-
-let managers_index = 3
-
 let classify op =
-  (* Hypothesis: acceptable passes returns a size at most 1 list  *)
-  match Main.acceptable_passes op with
-  | [pass] ->
-      if pass = consensus_index then `Consensus
+  (* Hypothesis: acceptable passes on an ill-formed operation returns
+     None. *)
+  let pass = Main.acceptable_pass op in
+  match pass with
+  | None -> `Bad
+  | Some pass ->
+      let open Operation_repr in
+      if pass = consensus_pass then `Consensus
         (* TODO filter outdated consensus ops ? *)
-      else if pass = votes_index then `Votes
-      else if pass = anonymous_index then `Anonymous
-      else if pass = managers_index then `Managers
+      else if pass = voting_pass then `Votes
+      else if pass = anonymous_pass then `Anonymous
+      else if pass = manager_pass then `Managers
       else `Bad
-  | _ -> `Bad
 
 let add_operation_to_pool add classify pool operation =
   match classify operation with

@@ -26,14 +26,6 @@
 open Protocol
 open Alpha_context
 
-val consensus_index : int
-
-val votes_index : int
-
-val anonymous_index : int
-
-val managers_index : int
-
 module Operation_set : Set.S with type elt = packed_operation
 
 (** Generic base type for pools *)

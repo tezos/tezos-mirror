@@ -47,7 +47,7 @@ type block_error =
   | Unallowed_pass of {
       operation : Operation_hash.t;
       pass : int;
-      allowed_pass : int list;
+      allowed_pass : int option;
     }
   | Cannot_parse_block_header
   | Economic_protocol_error

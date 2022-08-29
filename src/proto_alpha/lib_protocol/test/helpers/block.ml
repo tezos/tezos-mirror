@@ -180,9 +180,9 @@ module Forge = struct
     let t = Array.make validation_passes_len [] in
     List.iter
       (fun (op : packed_operation) ->
-        List.iter
-          (fun pass -> t.(pass) <- op :: t.(pass))
-          (Main.acceptable_passes op))
+        match Main.acceptable_pass op with
+        | None -> ()
+        | Some pass -> t.(pass) <- op :: t.(pass))
       operations ;
     let t = Array.map List.rev t in
     Array.to_list t

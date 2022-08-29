@@ -29,7 +29,7 @@ let max_operation_data_length = 100
 
 let validation_passes = Updater.[{max_size = 1000; max_op = None}]
 
-let acceptable_passes _op = [0]
+let acceptable_pass _op = Some 0
 
 type block_header_data = Header.t
 
@@ -195,7 +195,7 @@ let init _chain_id context block_header =
       last_allowed_fork_level = block_header.level;
     }
 
-let relative_position_within_block _ _ = 0
+let compare_operations _ _ = 0
 
 type Context.Cache.value += Demo of int
 

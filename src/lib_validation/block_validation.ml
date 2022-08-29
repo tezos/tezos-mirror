@@ -402,10 +402,15 @@ module Make (Proto : Registered_protocol.T) = struct
                   (invalid_block block_hash (Cannot_parse_operation op_hash))
             | Some protocol_data ->
                 let op = {Proto.shell = op.shell; protocol_data} in
-                let allowed_pass = Proto.acceptable_passes op in
+                let allowed_pass = Proto.acceptable_pass op in
+                let is_pass_consistent =
+                  match allowed_pass with
+                  | None -> false
+                  | Some n -> Int.equal pass n
+                in
                 let* () =
                   fail_unless
-                    (List.mem ~equal:Int.equal pass allowed_pass)
+                    is_pass_consistent
                     (invalid_block
                        block_hash
                        (Unallowed_pass {operation = op_hash; pass; allowed_pass}))

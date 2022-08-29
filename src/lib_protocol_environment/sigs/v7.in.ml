@@ -27,6 +27,8 @@ module type T = sig
 
   module Z : [%sig "v7/z.mli"]
 
+  module Q : [%sig "v7/q.mli"]
+
   module Lwt : [%sig "v7/lwt.mli"]
 
   module Data_encoding : [%sig "v7/data_encoding.mli"]

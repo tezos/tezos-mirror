@@ -49,18 +49,18 @@ open Environment_context
    environment ([module type Vx_T]).
 
    If you want to mock this module type, see {!Environment_protocol_T_test}. *)
-module type T = Environment_protocol_T_V6.T
+module type T = Environment_protocol_T_V7.T
 (* Documentation for this interface may be found in
    module type [PROTOCOL] of [sigs/v6/updater.mli]. *)
 
-module V0toV6
+module V0toV7
     (E : Environment_protocol_T_V0.T
            with type context := Context.t
             and type quota := quota
             and type validation_result := validation_result
             and type rpc_context := rpc_context
             and type 'a tzresult := 'a Error_monad.tzresult) :
-  Environment_protocol_T_V6.T
+  Environment_protocol_T_V7.T
     with type context := Context.t
      and type quota := quota
      and type validation_result := validation_result
@@ -79,8 +79,10 @@ module V0toV6
 
   let finalize_block vs _ = E.finalize_block vs
 
-  (* Add backwards compatibility shadowing here *)
-  let relative_position_within_block = compare_operations
+  let compare_operations (_, op) (_, op') = compare_operations op op'
+
+  let acceptable_pass op =
+    match acceptable_passes op with [n] -> Some n | _ -> None
 
   let value_of_key ~chain_id:_ ~predecessor_context:_ ~predecessor_timestamp:_
       ~predecessor_level:_ ~predecessor_fitness:_ ~predecessor:_ ~timestamp:_ =

@@ -1323,6 +1323,12 @@ struct
       wrap_tzresult r
 
     let set_log_message_consumer f = Logging.logging_function := Some f
+
+    let compare_operations (_, op) (_, op') =
+      relative_position_within_block op op'
+
+    let acceptable_pass op =
+      match acceptable_passes op with [n] -> Some n | _ -> None
   end
 
   class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.RPC_context.t)

@@ -29,7 +29,7 @@ let max_operation_data_length = 0
 
 let validation_passes = []
 
-let acceptable_passes _op = []
+let acceptable_pass _op = None
 
 type block_header_data = string
 
@@ -64,7 +64,7 @@ type operation = {
   protocol_data : operation_data;
 }
 
-let relative_position_within_block _ _ = 0
+let compare_operations _ _ = 0
 
 type validation_state = {context : Context.t; fitness : Fitness.t}
 
