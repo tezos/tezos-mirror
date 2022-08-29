@@ -18,6 +18,7 @@ like Bitcoin or Ethereum. It also attempts to come to consensus about how the
 protocol and the nodes should adapt and upgrade.
 The website https://tezos.com/ contains more information about the project.
 
+
 .. _octez:
 
 Octez
@@ -114,36 +115,22 @@ in the :ref:`introduction <howtoget>`.
    :maxdepth: 2
    :caption: User documentation:
 
-   user/key-management
-   user/node-configuration
-   user/node-monitoring
    user/versioning
-   user/snapshots
-   user/history_modes
-   user/multinetwork
-   user/sandbox
-   user/mockup
-   user/proxy
-   user/light
+   user/setup-client
+   user/setup-node
    user/proxy-server
    user/multisig
    user/fa12
-   user/various
    user/logging
+   user/various
 
 .. toctree::
    :maxdepth: 2
    :caption: Shell doc:
 
    shell/the_big_picture
-   shell/validation
-   shell/prevalidation
-   shell/storage
-   shell/sync
-   shell/p2p
+   shell/shell
    shell/p2p_api
-   shell/protocol_environment
-   shell/micheline
    shell/cli-commands
    shell/rpc
 
@@ -208,42 +195,20 @@ in the :ref:`introduction <howtoget>`.
    :caption: Protocols:
 
    protocols/naming
-   protocols/003_PsddFKi3
-   protocols/004_Pt24m4xi
-   protocols/005_babylon
-   protocols/006_carthage
-   protocols/007_delphi
-   protocols/008_edo
-   protocols/009_florence
-   protocols/010_granada
-   protocols/011_hangzhou
-   protocols/012_ithaca
    protocols/013_jakarta
    protocols/014_kathmandu
    protocols/015_lima
    protocols/016_mumbai
    protocols/alpha
+   protocols/history
 
 .. toctree::
    :maxdepth: 2
    :caption: Releases:
 
    releases/releases
-   releases/april-2019
-   releases/may-2019
-   releases/september-2019
-   releases/october-2019
-   releases/december-2019
-   releases/january-2020
-   releases/version-7
-   releases/version-8
-   releases/version-9
-   releases/version-10
-   releases/version-11
-   releases/version-12
-   releases/version-13
-   releases/version-14
    releases/version-15
+   releases/history
 
 .. toctree::
    :maxdepth: 2
