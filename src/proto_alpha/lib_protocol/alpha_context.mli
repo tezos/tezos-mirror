@@ -2372,6 +2372,63 @@ module Bond_id : sig
   end
 end
 
+module Zk_rollup : sig
+  module Address : S.HASH
+
+  type t = Address.t
+
+  type scalar := Bls12_381.Fr.t
+
+  val to_scalar : t -> scalar
+
+  module State : sig
+    type t = scalar array
+
+    val encoding : t Data_encoding.t
+  end
+
+  module Account : sig
+    module SMap : Map.S with type key = string
+
+    type static = {
+      public_parameters : Plonk.public_parameters;
+      state_length : int;
+      circuits_info : bool SMap.t;
+      nb_ops : int;
+    }
+
+    type dynamic = {state : State.t}
+
+    type t = {static : static; dynamic : dynamic}
+
+    val encoding : t Data_encoding.t
+  end
+
+  module Operation : sig
+    type t = {
+      op_code : int;
+      price : Ticket_hash.t * Z.t;
+      l1_dst : Signature.Public_key_hash.t;
+      rollup_id : Address.t;
+      payload : scalar array;
+    }
+
+    val encoding : t Data_encoding.t
+
+    val to_scalar_array : t -> scalar array
+  end
+
+  type pending_list =
+    | Empty of {next_index : int64}
+    | Pending of {next_index : int64; length : int}
+
+  val pending_list_encoding : pending_list Data_encoding.t
+
+  module Internal_for_tests : sig
+    val originated_zk_rollup : Origination_nonce.Internal_for_tests.t -> t
+  end
+end
+
 (** This module re-exports definitions from {!Receipt_repr}. *)
 module Receipt : sig
   type balance =

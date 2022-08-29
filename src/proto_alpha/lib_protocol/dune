@@ -107,6 +107,11 @@
   Dal_slot_repr
   Dal_endorsement_repr
   Dal_errors_repr
+  Zk_rollup_scalar
+  Zk_rollup_repr
+  Zk_rollup_state_repr
+  Zk_rollup_account_repr
+  Zk_rollup_operation_repr
   Bond_id_repr
   Vote_repr
   Liquidity_baking_repr
@@ -353,6 +358,11 @@
   dal_slot_repr.ml dal_slot_repr.mli
   dal_endorsement_repr.ml dal_endorsement_repr.mli
   dal_errors_repr.ml
+  zk_rollup_scalar.ml zk_rollup_scalar.mli
+  zk_rollup_repr.ml zk_rollup_repr.mli
+  zk_rollup_state_repr.ml zk_rollup_state_repr.mli
+  zk_rollup_account_repr.ml zk_rollup_account_repr.mli
+  zk_rollup_operation_repr.ml zk_rollup_operation_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
   liquidity_baking_repr.ml liquidity_baking_repr.mli
@@ -579,6 +589,11 @@
   dal_slot_repr.ml dal_slot_repr.mli
   dal_endorsement_repr.ml dal_endorsement_repr.mli
   dal_errors_repr.ml
+  zk_rollup_scalar.ml zk_rollup_scalar.mli
+  zk_rollup_repr.ml zk_rollup_repr.mli
+  zk_rollup_state_repr.ml zk_rollup_state_repr.mli
+  zk_rollup_account_repr.ml zk_rollup_account_repr.mli
+  zk_rollup_operation_repr.ml zk_rollup_operation_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
   liquidity_baking_repr.ml liquidity_baking_repr.mli
@@ -810,6 +825,11 @@
   dal_slot_repr.ml dal_slot_repr.mli
   dal_endorsement_repr.ml dal_endorsement_repr.mli
   dal_errors_repr.ml
+  zk_rollup_scalar.ml zk_rollup_scalar.mli
+  zk_rollup_repr.ml zk_rollup_repr.mli
+  zk_rollup_state_repr.ml zk_rollup_state_repr.mli
+  zk_rollup_account_repr.ml zk_rollup_account_repr.mli
+  zk_rollup_operation_repr.ml zk_rollup_operation_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
   liquidity_baking_repr.ml liquidity_baking_repr.mli

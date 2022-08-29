@@ -113,6 +113,14 @@ module Dal = struct
 end
 
 module Dal_errors = Dal_errors_repr
+
+module Zk_rollup = struct
+  include Zk_rollup_repr
+  module State = Zk_rollup_state_repr
+  module Account = Zk_rollup_account_repr
+  module Operation = Zk_rollup_operation_repr
+end
+
 module Entrypoint = Entrypoint_repr
 include Operation_repr
 
