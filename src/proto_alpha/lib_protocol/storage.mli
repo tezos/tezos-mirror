@@ -875,3 +875,33 @@ module Dal : sig
        and type key = Raw_level_repr.t
        and type value = Dal_slot_repr.slot list
 end
+
+module Zk_rollup : sig
+  (** Zero ZK rollup.
+
+      Each ZK rollup is associated to:
+
+      - an Account, as described in [Zk_rollup_repr]
+      - a pending list description, consisting of its head's index and
+        a counter
+      - a map from integer indeces to L2 operations, to store the actual
+        pending list
+  *)
+  module Account :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t
+       and type key = Zk_rollup_repr.t
+       and type value = Zk_rollup_account_repr.t
+
+  module Pending_list :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t
+       and type key = Zk_rollup_repr.t
+       and type value = Zk_rollup_repr.pending_list
+
+  module Pending_operation :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t * Zk_rollup_repr.t
+       and type key = int64
+       and type value = Zk_rollup_operation_repr.t * Ticket_hash_repr.t option
+end

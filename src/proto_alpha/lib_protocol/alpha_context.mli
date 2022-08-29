@@ -2426,6 +2426,14 @@ module Zk_rollup : sig
 
   val pending_list_encoding : pending_list Data_encoding.t
 
+  val originate :
+    context ->
+    Account.static ->
+    init_state:State.t ->
+    (context * Address.t * Z.t) tzresult Lwt.t
+
+  val exists : context -> t -> (context * bool) tzresult Lwt.t
+
   module Internal_for_tests : sig
     val originated_zk_rollup : Origination_nonce.Internal_for_tests.t -> t
   end

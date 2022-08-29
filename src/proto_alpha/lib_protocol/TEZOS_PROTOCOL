@@ -126,6 +126,8 @@
         "Voting_period_storage",
         "Cache_repr",
 
+        "Zk_rollup_storage",
+
         "Contract_delegate_storage",
         "Stake_storage",
         "Contract_storage",

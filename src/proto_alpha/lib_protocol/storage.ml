@@ -1897,3 +1897,89 @@ module Dal = struct
         let encoding = Data_encoding.(list Dal_slot_repr.encoding)
       end)
 end
+
+module Zk_rollup = struct
+  module Indexed_context =
+    Make_indexed_subcontext
+      (Make_subcontext (Registered) (Raw_context)
+         (struct
+           let name = ["zk_rollup"]
+         end))
+         (Make_index (Zk_rollup_repr.Index))
+
+  module Account :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t
+       and type key = Zk_rollup_repr.t
+       and type value = Zk_rollup_account_repr.t =
+    Indexed_context.Make_carbonated_map
+      (struct
+        let name = ["account"]
+      end)
+      (Zk_rollup_account_repr)
+
+  module Pending_list =
+    Indexed_context.Make_carbonated_map
+      (struct
+        let name = ["pending_list"]
+      end)
+      (struct
+        type t = Zk_rollup_repr.pending_list
+
+        let encoding = Zk_rollup_repr.pending_list_encoding
+      end)
+
+  module Pending_operation :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t * Zk_rollup_repr.t
+       and type key = int64
+       and type value = Zk_rollup_operation_repr.t * Ticket_hash_repr.t option =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["pending_operations"]
+         end))
+         (Make_index (struct
+           type t = int64
+
+           let rpc_arg =
+             let construct = Int64.to_string in
+             let destruct hash =
+               Int64.of_string_opt hash
+               |> Result.of_option
+                    ~error:"Cannot parse pending operation position"
+             in
+             RPC_arg.make
+               ~descr:
+                 "The position of an operation in a pending operations list"
+               ~name:"zkru_pending_op_position"
+               ~construct
+               ~destruct
+               ()
+
+           let encoding =
+             Data_encoding.def
+               "zkru_pending_op_position"
+               ~title:"Zkru pending operation position"
+               ~description:
+                 "The position of an operation in a pending operations list"
+               Data_encoding.Compact.(make ~tag_size:`Uint8 int64)
+
+           let compare = Compare.Int64.compare
+
+           let path_length = 1
+
+           let to_path c l = Int64.to_string c :: l
+
+           let of_path = function [c] -> Int64.of_string_opt c | _ -> None
+         end))
+      (struct
+        type t = Zk_rollup_operation_repr.t * Ticket_hash_repr.t option
+
+        let encoding =
+          Data_encoding.(
+            tup2
+              Zk_rollup_operation_repr.encoding
+              (option Ticket_hash_repr.encoding))
+      end)
+end
