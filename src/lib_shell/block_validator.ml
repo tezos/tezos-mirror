@@ -492,11 +492,11 @@ let validate w ?canceler ?peer ?(notify_new_block = fun _ -> ())
                  expected = header.shell.operations_hash;
                  found = computed_hash;
                })
-          |> Lwt_result.map_err (fun e -> Worker.Request_error e)
+          |> Lwt_result.map_error (fun e -> Worker.Request_error e)
         in
         let* () =
           check_chain_liveness chain_db hash header
-          |> Lwt_result.map_err (fun e -> Worker.Request_error e)
+          |> Lwt_result.map_error (fun e -> Worker.Request_error e)
         in
         Worker.Queue.push_request_and_wait
           w
