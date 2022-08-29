@@ -192,6 +192,20 @@ let init_kont_encoding =
         (function IK_Exports (inst, fold) -> Some (inst, fold) | _ -> None)
         (function inst, fold -> IK_Exports (inst, fold));
       case
+        "IK_Elems"
+        (tup2
+           ~flatten:true
+           (scope ["module"] Wasm_encoding.module_instance_encoding)
+           (scope
+              ["kont"]
+              (map_kont_encoding
+                 (lazy_vec_encoding
+                    Parser.(no_region_encoding Elem.elem_encoding))
+                 (lazy_vec_encoding
+                    (conv ref ( ! ) Wasm_encoding.value_ref_vector_encoding)))))
+        (function IK_Elems (inst, map) -> Some (inst, map) | _ -> None)
+        (function inst, map -> IK_Elems (inst, map));
+      case
         "IK_Remaining"
         Wasm_encoding.module_instance_encoding
         (function IK_Remaining m -> Some m | _ -> None)

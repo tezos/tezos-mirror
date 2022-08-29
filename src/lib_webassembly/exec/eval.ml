@@ -1140,6 +1140,7 @@ type init_kont =
       module_inst * ('a, 'b) init_section * 'b concat_kont
       -> init_kont
   | IK_Exports of module_inst * (export, extern NameMap.t) fold_left_kont
+  | IK_Elems of module_inst * (elem_segment, elem_inst) map_kont
   | IK_Remaining of module_inst
   | IK_Stop of module_inst
 
@@ -1216,7 +1217,7 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
       IK_Aggregate_concat (inst0, sec, tick)
   | IK_Exports (inst0, tick) when fold_left_completed tick ->
       let inst0 = {inst0 with exports = tick.acc} in
-      Lwt.return (IK_Remaining inst0)
+      Lwt.return (IK_Elems (inst0, map_kont m.it.elems))
   | IK_Exports (inst0, tick) ->
       let+ tick =
         fold_left_s_step tick (fun map export ->
@@ -1225,26 +1226,24 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
             NameMap.set k v map)
       in
       IK_Exports (inst0, tick)
+  | IK_Elems (inst0, tick) when map_completed tick ->
+      let inst0 = {inst0 with elems = tick.destination} in
+      Lwt.return (IK_Remaining inst0)
+  | IK_Elems (inst0, tick) ->
+      let+ tick = map_s_step tick (create_elem module_reg self) in
+      IK_Elems (inst0, tick)
   | IK_Remaining inst2 ->
-      let {elems; datas; start; _} = m.it in
+      let {datas; start; _} = m.it in
 
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
          These transformations should be refactored and abadoned during the
          tickification, to avoid the roundtrip vector -> list -> vector. *)
-      let* elems = Vector.to_list elems in
       let* datas = Vector.to_list datas in
 
-      let* new_elems =
-        TzStdLib.List.map_s (create_elem module_reg self) elems
-      in
       let new_datas = List.map create_data datas in
       let inst =
         {
           inst2 with
-          elems =
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
-               [new_elems]/[elems] should be lazy structures. *)
-            Vector.of_list new_elems;
           datas =
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
                [new_data]/[datas] should be lazy structures. *)
@@ -1253,6 +1252,7 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
       in
       update_module_ref module_reg self inst ;
 
+      let* elems = Vector.to_list m.it.elems in
       let es_elem = List.concat (Lib.List32.mapi run_elem elems) in
       let* datas = Lib.List32.mapi_s (run_data inst) datas in
       let es_data = TzStdLib.List.concat datas in
