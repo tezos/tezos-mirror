@@ -452,6 +452,29 @@ module type AGGREGATE_SIGNATURE = sig
   val aggregate_signature_opt : t list -> t option
 end
 
+module type SPLIT_SIGNATURE = sig
+  include SIGNATURE
+
+  (** A signature prefix potentially carries data. *)
+  type prefix
+
+  (** A splitted signature is a binary representation of a signature with a
+      fixed 64 bytes suffix and a possible prefix. *)
+  type splitted = {prefix : prefix option; suffix : Bytes.t}
+
+  (** [split_signature s] splits the signature [s] into [{prefix; suffix}] where
+      suffix is the fixed 64 bytes suffix of [s] and prefix are the remaining
+      preceding bytes if any. *)
+  val split_signature : t -> splitted
+
+  (** [of_splitted s] reconstructs a signature from a splitted one, if
+      possible. *)
+  val of_splitted : splitted -> t option
+
+  (** Encoding for signature prefixes. *)
+  val prefix_encoding : prefix Data_encoding.t
+end
+
 module type FIELD = sig
   exception Not_in_field of Bytes.t
 

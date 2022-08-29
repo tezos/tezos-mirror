@@ -59,12 +59,22 @@ type signature =
   | Bls of Bls.t
   | Unknown of Bytes.t
 
+(** A signature prefix holds data only for signature that are more than 64 bytes
+    long.  *)
+type prefix =
+  | Ed25519_prefix
+  | Secp256k1_prefix
+  | P256_prefix
+  | Bls_prefix of Bytes.t
+  | Unknown_prefix of Bytes.t
+
 include
-  S.SIGNATURE
+  S.SPLIT_SIGNATURE
     with type Public_key_hash.t = public_key_hash
      and type Public_key.t = public_key
      and type Secret_key.t = secret_key
      and type watermark := watermark
+     and type prefix := prefix
      and type t = signature
 
 (** [append sk buf] is the concatenation of [buf] and the
