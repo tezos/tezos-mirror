@@ -627,6 +627,15 @@ let octez_hacl =
           ];
         ]
 
+let _octez_hacl_gen0 =
+  private_exe
+    "gen0"
+    ~path:"src/lib_hacl/gen/"
+    ~opam:"tezos-hacl"
+    ~bisect_ppx:false
+    ~modules:["gen0"]
+    ~deps:[compiler_libs_common]
+
 let _octez_hacl_gen =
   private_exe
     "gen"
@@ -634,10 +643,24 @@ let _octez_hacl_gen =
     ~opam:"tezos-hacl"
     ~bisect_ppx:false
     ~deps:[ctypes_stubs; ctypes; hacl_star_raw; ezjsonm]
+    ~modules:["gen"; "bindings"; "api_json"]
     ~dune:
       (let package = "tezos-hacl" in
        Dune.
          [
+           targets_rule
+             ["bindings.ml"]
+             ~deps:[Dune.(H [[S "package"; S "hacl-star-raw"]])]
+             ~action:
+               [
+                 S "with-stdout-to";
+                 S "%{targets}";
+                 [
+                   S "run";
+                   S "./gen0.exe";
+                   S "%{lib:hacl-star-raw:ocamlevercrypt.cma}";
+                 ];
+               ];
            [
              S "rule";
              [S "alias"; S "runtest_js"];

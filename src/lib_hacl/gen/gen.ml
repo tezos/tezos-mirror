@@ -393,13 +393,7 @@ let gen_value ~api ~manually_implemented ~required ~name ~ctypes_name add typ =
     add
     (Ctypes_static.Function (Void, Returns typ))
 
-module type FOREIGN = Ctypes.FOREIGN
-
-module type FOREIGN' = FOREIGN with type 'a result = unit
-
-module type BINDINGS = functor (F : FOREIGN') -> sig end
-
-let collect ~api ~manually_implemented ~required add (module B : BINDINGS) =
+let collect ~api ~manually_implemented ~required add (module B : Bindings.S) =
   let prefix = "" in
   let module M = B (struct
     let counter = ref 0
@@ -444,99 +438,7 @@ let collect_all ~api ~manually_implemented ~required =
   let l = ref [] in
   let add x = l := x :: !l in
   let collect m = collect ~api ~manually_implemented ~required add m in
-  collect (module EverCrypt_AEAD_bindings.Bindings) ;
-  collect (module EverCrypt_AutoConfig2_bindings.Bindings) ;
-  collect (module EverCrypt_Chacha20Poly1305_bindings.Bindings) ;
-  collect (module EverCrypt_Cipher_bindings.Bindings) ;
-  collect (module EverCrypt_CTR_bindings.Bindings) ;
-  collect (module EverCrypt_Curve25519_bindings.Bindings) ;
-  collect (module EverCrypt_DRBG_bindings.Bindings) ;
-  collect (module EverCrypt_Ed25519_bindings.Bindings) ;
-  collect (module EverCrypt_Error_bindings.Bindings) ;
-  collect (module EverCrypt_Hash_bindings.Bindings) ;
-  collect (module EverCrypt_HKDF_bindings.Bindings) ;
-  collect (module EverCrypt_HMAC_bindings.Bindings) ;
-  collect (module EverCrypt_Poly1305_bindings.Bindings) ;
-  collect (module EverCrypt_StaticConfig_bindings.Bindings) ;
-  collect (module EverCrypt_Vale_bindings.Bindings) ;
-  collect (module Hacl_Bignum25519_51_bindings.Bindings) ;
-  collect (module Hacl_Bignum256_32_bindings.Bindings) ;
-  collect (module Hacl_Bignum256_bindings.Bindings) ;
-  collect (module Hacl_Bignum32_bindings.Bindings) ;
-  collect (module Hacl_Bignum4096_32_bindings.Bindings) ;
-  collect (module Hacl_Bignum4096_bindings.Bindings) ;
-  collect (module Hacl_Bignum64_bindings.Bindings) ;
-  collect (module Hacl_Bignum_Base_bindings.Bindings) ;
-  collect (module Hacl_Bignum_bindings.Bindings) ;
-  collect (module Hacl_Chacha20_bindings.Bindings) ;
-  collect (module Hacl_Chacha20Poly1305_128_bindings.Bindings) ;
-  collect (module Hacl_Chacha20Poly1305_256_bindings.Bindings) ;
-  collect (module Hacl_Chacha20Poly1305_32_bindings.Bindings) ;
-  collect (module Hacl_Chacha20_Vec128_bindings.Bindings) ;
-  collect (module Hacl_Chacha20_Vec256_bindings.Bindings) ;
-  collect (module Hacl_Chacha20_Vec32_bindings.Bindings) ;
-  collect (module Hacl_Curve25519_51_bindings.Bindings) ;
-  collect (module Hacl_Curve25519_64_bindings.Bindings) ;
-  collect (module Hacl_Curve25519_64_Slow_bindings.Bindings) ;
-  collect (module Hacl_EC_Ed25519_bindings.Bindings) ;
-  collect (module Hacl_Ed25519_bindings.Bindings) ;
-  collect (module Hacl_FFDHE_bindings.Bindings) ;
-  collect (module Hacl_Frodo1344_bindings.Bindings) ;
-  collect (module Hacl_Frodo640_bindings.Bindings) ;
-  collect (module Hacl_Frodo64_bindings.Bindings) ;
-  collect (module Hacl_Frodo976_bindings.Bindings) ;
-  collect (module Hacl_Frodo_KEM_bindings.Bindings) ;
-  collect (module Hacl_GenericField32_bindings.Bindings) ;
-  collect (module Hacl_GenericField64_bindings.Bindings) ;
-  collect (module Hacl_Hash_Base_bindings.Bindings) ;
-  collect (module Hacl_Hash_Blake2b_256_bindings.Bindings) ;
-  collect (module Hacl_Hash_Blake2_bindings.Bindings) ;
-  collect (module Hacl_Hash_Blake2s_128_bindings.Bindings) ;
-  collect (module Hacl_Hash_MD5_bindings.Bindings) ;
-  collect (module Hacl_Hash_SHA1_bindings.Bindings) ;
-  collect (module Hacl_Hash_SHA2_bindings.Bindings) ;
-  collect (module Hacl_HKDF_bindings.Bindings) ;
-  collect (module Hacl_HKDF_Blake2b_256_bindings.Bindings) ;
-  collect (module Hacl_HKDF_Blake2s_128_bindings.Bindings) ;
-  collect (module Hacl_HMAC_bindings.Bindings) ;
-  collect (module Hacl_HMAC_Blake2b_256_bindings.Bindings) ;
-  collect (module Hacl_HMAC_Blake2s_128_bindings.Bindings) ;
-  collect (module Hacl_HMAC_DRBG_bindings.Bindings) ;
-  collect (module Hacl_HPKE_Curve51_CP128_SHA256_bindings.Bindings) ;
-  collect (module Hacl_HPKE_Curve51_CP128_SHA512_bindings.Bindings) ;
-  collect (module Hacl_HPKE_Curve51_CP256_SHA256_bindings.Bindings) ;
-  collect (module Hacl_HPKE_Curve51_CP256_SHA512_bindings.Bindings) ;
-  collect (module Hacl_HPKE_Curve51_CP32_SHA256_bindings.Bindings) ;
-  collect (module Hacl_HPKE_Curve51_CP32_SHA512_bindings.Bindings) ;
-  collect (module Hacl_HPKE_Curve64_CP128_SHA256_bindings.Bindings) ;
-  collect (module Hacl_HPKE_Curve64_CP128_SHA512_bindings.Bindings) ;
-  collect (module Hacl_HPKE_Curve64_CP256_SHA256_bindings.Bindings) ;
-  collect (module Hacl_HPKE_Curve64_CP256_SHA512_bindings.Bindings) ;
-  collect (module Hacl_HPKE_Curve64_CP32_SHA256_bindings.Bindings) ;
-  collect (module Hacl_HPKE_Curve64_CP32_SHA512_bindings.Bindings) ;
-  collect (module Hacl_HPKE_P256_CP128_SHA256_bindings.Bindings) ;
-  collect (module Hacl_HPKE_P256_CP256_SHA256_bindings.Bindings) ;
-  collect (module Hacl_HPKE_P256_CP32_SHA256_bindings.Bindings) ;
-  collect (module Hacl_IntTypes_Intrinsics_128_bindings.Bindings) ;
-  collect (module Hacl_IntTypes_Intrinsics_bindings.Bindings) ;
-  collect (module Hacl_NaCl_bindings.Bindings) ;
-  collect (module Hacl_P256_bindings.Bindings) ;
-  collect (module Hacl_Poly1305_128_bindings.Bindings) ;
-  collect (module Hacl_Poly1305_256_bindings.Bindings) ;
-  collect (module Hacl_Poly1305_32_bindings.Bindings) ;
-  collect (module Hacl_RSAPSS_bindings.Bindings) ;
-  collect (module Hacl_Salsa20_bindings.Bindings) ;
-  collect (module Hacl_SHA2_Scalar32_bindings.Bindings) ;
-  collect (module Hacl_SHA2_Vec128_bindings.Bindings) ;
-  collect (module Hacl_SHA2_Vec256_bindings.Bindings) ;
-  collect (module Hacl_SHA3_bindings.Bindings) ;
-  collect (module Hacl_Spec_bindings.Bindings) ;
-  collect (module Hacl_Streaming_Blake2_bindings.Bindings) ;
-  collect (module Hacl_Streaming_MD5_bindings.Bindings) ;
-  collect (module Hacl_Streaming_Poly1305_32_bindings.Bindings) ;
-  collect (module Hacl_Streaming_SHA1_bindings.Bindings) ;
-  collect (module Hacl_Streaming_SHA2_bindings.Bindings) ;
-  collect (module Lib_RandomBuffer_System_bindings.Bindings) ;
+  List.iter collect Bindings.all ;
   !l
 
 let entries =

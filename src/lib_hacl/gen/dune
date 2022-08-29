@@ -2,12 +2,27 @@
 ; Edit file manifest/main.ml instead.
 
 (executable
+ (name gen0)
+ (libraries
+  compiler-libs.common)
+ (modules gen0))
+
+(executable
  (name gen)
  (libraries
   ctypes.stubs
   ctypes
   hacl-star-raw
-  ezjsonm))
+  ezjsonm)
+ (modules gen bindings api_json))
+
+(rule
+ (targets bindings.ml)
+ (deps (package hacl-star-raw))
+ (action
+  (with-stdout-to
+   %{targets}
+   (run ./gen0.exe %{lib:hacl-star-raw:ocamlevercrypt.cma}))))
 
 (rule
  (alias runtest_js)
