@@ -107,6 +107,11 @@
   Dal_slot_repr
   Dal_endorsement_repr
   Dal_errors_repr
+  Zk_rollup_scalar
+  Zk_rollup_repr
+  Zk_rollup_state_repr
+  Zk_rollup_account_repr
+  Zk_rollup_operation_repr
   Bond_id_repr
   Vote_repr
   Liquidity_baking_repr
@@ -143,6 +148,7 @@
   Commitment_storage
   Voting_period_storage
   Cache_repr
+  Zk_rollup_storage
   Contract_delegate_storage
   Stake_storage
   Contract_storage
@@ -226,6 +232,7 @@
   Sc_rollup_management_protocol
   Sc_rollup_operations
   Dal_apply
+  Zk_rollup_apply
   Baking
   Validate_errors
   Amendment
@@ -353,6 +360,11 @@
   dal_slot_repr.ml dal_slot_repr.mli
   dal_endorsement_repr.ml dal_endorsement_repr.mli
   dal_errors_repr.ml
+  zk_rollup_scalar.ml zk_rollup_scalar.mli
+  zk_rollup_repr.ml zk_rollup_repr.mli
+  zk_rollup_state_repr.ml zk_rollup_state_repr.mli
+  zk_rollup_account_repr.ml zk_rollup_account_repr.mli
+  zk_rollup_operation_repr.ml zk_rollup_operation_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
   liquidity_baking_repr.ml liquidity_baking_repr.mli
@@ -389,6 +401,7 @@
   commitment_storage.ml commitment_storage.mli
   voting_period_storage.ml voting_period_storage.mli
   cache_repr.ml cache_repr.mli
+  zk_rollup_storage.ml zk_rollup_storage.mli
   contract_delegate_storage.ml contract_delegate_storage.mli
   stake_storage.ml stake_storage.mli
   contract_storage.ml contract_storage.mli
@@ -472,6 +485,7 @@
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli
   dal_apply.ml dal_apply.mli
+  zk_rollup_apply.ml zk_rollup_apply.mli
   baking.ml baking.mli
   validate_errors.ml validate_errors.mli
   amendment.ml amendment.mli
@@ -579,6 +593,11 @@
   dal_slot_repr.ml dal_slot_repr.mli
   dal_endorsement_repr.ml dal_endorsement_repr.mli
   dal_errors_repr.ml
+  zk_rollup_scalar.ml zk_rollup_scalar.mli
+  zk_rollup_repr.ml zk_rollup_repr.mli
+  zk_rollup_state_repr.ml zk_rollup_state_repr.mli
+  zk_rollup_account_repr.ml zk_rollup_account_repr.mli
+  zk_rollup_operation_repr.ml zk_rollup_operation_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
   liquidity_baking_repr.ml liquidity_baking_repr.mli
@@ -615,6 +634,7 @@
   commitment_storage.ml commitment_storage.mli
   voting_period_storage.ml voting_period_storage.mli
   cache_repr.ml cache_repr.mli
+  zk_rollup_storage.ml zk_rollup_storage.mli
   contract_delegate_storage.ml contract_delegate_storage.mli
   stake_storage.ml stake_storage.mli
   contract_storage.ml contract_storage.mli
@@ -698,6 +718,7 @@
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli
   dal_apply.ml dal_apply.mli
+  zk_rollup_apply.ml zk_rollup_apply.mli
   baking.ml baking.mli
   validate_errors.ml validate_errors.mli
   amendment.ml amendment.mli
@@ -810,6 +831,11 @@
   dal_slot_repr.ml dal_slot_repr.mli
   dal_endorsement_repr.ml dal_endorsement_repr.mli
   dal_errors_repr.ml
+  zk_rollup_scalar.ml zk_rollup_scalar.mli
+  zk_rollup_repr.ml zk_rollup_repr.mli
+  zk_rollup_state_repr.ml zk_rollup_state_repr.mli
+  zk_rollup_account_repr.ml zk_rollup_account_repr.mli
+  zk_rollup_operation_repr.ml zk_rollup_operation_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
   liquidity_baking_repr.ml liquidity_baking_repr.mli
@@ -846,6 +872,7 @@
   commitment_storage.ml commitment_storage.mli
   voting_period_storage.ml voting_period_storage.mli
   cache_repr.ml cache_repr.mli
+  zk_rollup_storage.ml zk_rollup_storage.mli
   contract_delegate_storage.ml contract_delegate_storage.mli
   stake_storage.ml stake_storage.mli
   contract_storage.ml contract_storage.mli
@@ -929,6 +956,7 @@
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli
   dal_apply.ml dal_apply.mli
+  zk_rollup_apply.ml zk_rollup_apply.mli
   baking.ml baking.mli
   validate_errors.ml validate_errors.mli
   amendment.ml amendment.mli

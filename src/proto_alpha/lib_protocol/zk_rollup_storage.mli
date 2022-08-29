@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,28 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/operations
-    Subject:      Entrypoint
-*)
+(** These errors are only to be matched in tests. *)
+type error +=
+  | Zk_rollup_does_not_exist of Zk_rollup_repr.t
+        (** Emitted when trying to perform an operation over a ZK rollup
+            that hasn't been initialised. *)
 
-let () =
-  Alcotest_lwt.run
-    "protocol > integration > operations"
-    [
-      ("voting", Test_voting.tests);
-      ("origination", Test_origination.tests);
-      ("revelation", Test_reveal.tests);
-      ("transfer", Test_transfer.tests);
-      ("activation", Test_activation.tests);
-      ("paid storage increase", Test_paid_storage_increase.tests);
-      ("combined", Test_combined_operations.tests);
-      ("failing_noop operation", Test_failing_noop.tests);
-      ("tx rollup", Test_tx_rollup.tests);
-      ("sc rollup", Test_sc_rollup.tests);
-      ("sc rollup transfer", Test_sc_rollup_transfer.tests);
-      ("zk rollup", Test_zk_rollup.tests);
-    ]
-  |> Lwt_main.run
+(** [originate context static ~init_state] produces an address [a] for
+    a ZK rollup storage using the [origination_nonce] from
+    the [context]. This function also initializes the storage,
+    indexing the initial ZKRU account by [a].
+
+     Returns the new context and ZKRU address, alongside the size
+     of the new account.
+*)
+val originate :
+  Raw_context.t ->
+  Zk_rollup_account_repr.static ->
+  init_state:Zk_rollup_state_repr.t ->
+  (Raw_context.t * Zk_rollup_repr.t * Z.t) tzresult Lwt.t
+
+(** [exists context rollup] returns a boolean representing whether
+    [rollup] has been initialized.
+*)
+val exists :
+  Raw_context.t -> Zk_rollup_repr.t -> (Raw_context.t * bool) tzresult Lwt.t

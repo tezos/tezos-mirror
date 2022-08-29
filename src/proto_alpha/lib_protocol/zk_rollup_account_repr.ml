@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,28 +23,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/operations
-    Subject:      Entrypoint
-*)
+module SMap = Map.Make (String)
 
-let () =
-  Alcotest_lwt.run
-    "protocol > integration > operations"
-    [
-      ("voting", Test_voting.tests);
-      ("origination", Test_origination.tests);
-      ("revelation", Test_reveal.tests);
-      ("transfer", Test_transfer.tests);
-      ("activation", Test_activation.tests);
-      ("paid storage increase", Test_paid_storage_increase.tests);
-      ("combined", Test_combined_operations.tests);
-      ("failing_noop operation", Test_failing_noop.tests);
-      ("tx rollup", Test_tx_rollup.tests);
-      ("sc rollup", Test_sc_rollup.tests);
-      ("sc rollup transfer", Test_sc_rollup_transfer.tests);
-      ("zk rollup", Test_zk_rollup.tests);
-    ]
-  |> Lwt_main.run
+type static = {
+  public_parameters : Plonk.public_parameters;
+  state_length : int;
+  circuits_info : bool SMap.t;
+  nb_ops : int;
+}
+
+type dynamic = {state : Zk_rollup_state_repr.t}
+
+type t = {static : static; dynamic : dynamic}
+
+let encoding =
+  let open Data_encoding in
+  let static_encoding =
+    let circuits_info_encoding =
+      conv
+        (fun m -> List.of_seq @@ SMap.to_seq m)
+        (fun l -> SMap.of_seq @@ List.to_seq l)
+        (list (tup2 string bool))
+    in
+    conv
+      (fun {public_parameters; state_length; circuits_info; nb_ops} ->
+        (public_parameters, state_length, circuits_info, nb_ops))
+      (fun (public_parameters, state_length, circuits_info, nb_ops) ->
+        {public_parameters; state_length; circuits_info; nb_ops})
+      (obj4
+         (req "public_parameters" Plonk.public_parameters_encoding)
+         (req "state_length" int31)
+         (req "circuits_info" circuits_info_encoding)
+         (req "nb_ops" int31))
+  in
+  let dynamic_encoding =
+    conv
+      (fun {state} -> state)
+      (fun state -> {state})
+      (obj1 (req "state" Zk_rollup_state_repr.encoding))
+  in
+  conv
+    (fun {static; dynamic} -> (static, dynamic))
+    (fun (static, dynamic) -> {static; dynamic})
+    (obj2 (req "static" static_encoding) (req "dynamic" dynamic_encoding))

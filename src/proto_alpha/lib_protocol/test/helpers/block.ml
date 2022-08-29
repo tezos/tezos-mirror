@@ -446,7 +446,8 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
     ?blocks_per_cycle ?cycles_per_voting_period ?tx_rollup_enable
     ?tx_rollup_sunset_level ?tx_rollup_origination_size ?sc_rollup_enable
     ?sc_rollup_max_number_of_messages_per_commitment_period ?dal_enable
-    ?hard_gas_limit_per_block ?nonce_revelation_threshold initial_accounts =
+    ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold
+    initial_accounts =
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
   let min_proposal_quorum =
@@ -513,6 +514,9 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
   let dal_enable =
     Option.value ~default:constants.dal.feature_enable dal_enable
   in
+  let zk_rollup_enable =
+    Option.value ~default:constants.zk_rollup.enable zk_rollup_enable
+  in
   let hard_gas_limit_per_block =
     Option.value
       ~default:constants.hard_gas_limit_per_block
@@ -551,6 +555,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
             sc_rollup_max_number_of_messages_per_commitment_period;
         };
       dal = {constants.dal with feature_enable = dal_enable};
+      zk_rollup = {constants.zk_rollup with enable = zk_rollup_enable};
       hard_gas_limit_per_block;
       nonce_revelation_threshold;
     }
@@ -604,7 +609,7 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?cycles_per_voting_period ?tx_rollup_enable ?tx_rollup_sunset_level
     ?tx_rollup_origination_size ?sc_rollup_enable
     ?sc_rollup_max_number_of_messages_per_commitment_period ?dal_enable
-    ?hard_gas_limit_per_block ?nonce_revelation_threshold
+    ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold
     (initial_accounts :
       (Account.t * Tez.t * Signature.Public_key_hash.t option) list) =
   prepare_initial_context_params
@@ -625,6 +630,7 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?sc_rollup_enable
     ?sc_rollup_max_number_of_messages_per_commitment_period
     ?dal_enable
+    ?zk_rollup_enable
     ?hard_gas_limit_per_block
     ?nonce_revelation_threshold
     initial_accounts
@@ -818,7 +824,8 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
               | Sc_rollup_timeout_result _
               | Sc_rollup_execute_outbox_message_result _
               | Sc_rollup_recover_bond_result _
-              | Sc_rollup_dal_slot_subscribe_result _ ->
+              | Sc_rollup_dal_slot_subscribe_result _
+              | Zk_rollup_origination_result _ ->
                   balance_updates_rev
               | Transaction_result
                   ( Transaction_to_contract_result {balance_updates; _}
@@ -870,7 +877,7 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
                 (Sc_rollup_execute_outbox_message_result _)
             | Successful_manager_result (Sc_rollup_recover_bond_result _)
             | Successful_manager_result (Sc_rollup_dal_slot_subscribe_result _)
-              ->
+            | Successful_manager_result (Zk_rollup_origination_result _) ->
                 origination_results_rev
             | Successful_manager_result (Origination_result x) ->
                 Origination_result x :: origination_results_rev)

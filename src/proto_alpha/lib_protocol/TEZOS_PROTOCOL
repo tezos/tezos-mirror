@@ -80,6 +80,12 @@
         "Dal_endorsement_repr",
         "Dal_errors_repr",
 
+        "Zk_rollup_scalar",
+        "Zk_rollup_repr",
+        "Zk_rollup_state_repr",
+        "Zk_rollup_account_repr",
+        "Zk_rollup_operation_repr",
+
         "Bond_id_repr",
         "Vote_repr",
         "Liquidity_baking_repr",
@@ -119,6 +125,8 @@
         "Commitment_storage",
         "Voting_period_storage",
         "Cache_repr",
+
+        "Zk_rollup_storage",
 
         "Contract_delegate_storage",
         "Stake_storage",
@@ -214,6 +222,7 @@
         "Sc_rollup_operations",
 
         "Dal_apply",
+        "Zk_rollup_apply",
 
         "Baking",
         "Validate_errors",

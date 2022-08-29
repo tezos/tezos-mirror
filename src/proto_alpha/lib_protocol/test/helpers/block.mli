@@ -130,6 +130,7 @@ val genesis :
   ?sc_rollup_enable:bool ->
   ?sc_rollup_max_number_of_messages_per_commitment_period:int ->
   ?dal_enable:bool ->
+  ?zk_rollup_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
   (Account.t * Tez.tez * Signature.Public_key_hash.t option) list ->
@@ -275,6 +276,7 @@ val prepare_initial_context_params :
   ?sc_rollup_enable:bool ->
   ?sc_rollup_max_number_of_messages_per_commitment_period:int ->
   ?dal_enable:bool ->
+  ?zk_rollup_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
   (Account.t * Tez.t * Signature.Public_key_hash.t option) list ->

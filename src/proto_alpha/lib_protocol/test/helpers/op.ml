@@ -950,3 +950,26 @@ let dal_publish_slot_header ?force_reveal ?counter ?fee ?gas_limit
   >>=? fun to_sign_op ->
   Context.Contract.manager ctxt src >|=? fun account ->
   sign account.sk ctxt to_sign_op
+
+let originated_zk_rollup op =
+  let packed = Operation.hash_packed op in
+  let nonce = Origination_nonce.Internal_for_tests.initial packed in
+  Zk_rollup.Internal_for_tests.originated_zk_rollup nonce
+
+let zk_rollup_origination ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    ctxt (src : Contract.t) ~public_parameters ~circuits_info ~init_state
+    ~nb_ops =
+  manager_operation
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~source:src
+    ctxt
+    (Zk_rollup_origination
+       {public_parameters; circuits_info; init_state; nb_ops})
+  >>=? fun to_sign_op ->
+  Context.Contract.manager ctxt src >|=? fun account ->
+  let op = sign account.sk ctxt to_sign_op in
+  originated_zk_rollup op |> fun addr -> (op, addr)

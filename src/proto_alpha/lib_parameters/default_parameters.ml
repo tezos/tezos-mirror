@@ -239,6 +239,7 @@ let constants_mainnet =
          timeout_period_in_blocks = sc_rollup_timeout_period_in_blocks;
          max_number_of_stored_cemented_commitments = 5;
        });
+    zk_rollup = {enable = false; min_pending_to_process = 10};
   }
 
 let default_dal_sandbox =

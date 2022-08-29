@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,28 +23,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/operations
-    Subject:      Entrypoint
-*)
+type error += Zk_rollup_does_not_exist of Zk_rollup_repr.t
 
 let () =
-  Alcotest_lwt.run
-    "protocol > integration > operations"
-    [
-      ("voting", Test_voting.tests);
-      ("origination", Test_origination.tests);
-      ("revelation", Test_reveal.tests);
-      ("transfer", Test_transfer.tests);
-      ("activation", Test_activation.tests);
-      ("paid storage increase", Test_paid_storage_increase.tests);
-      ("combined", Test_combined_operations.tests);
-      ("failing_noop operation", Test_failing_noop.tests);
-      ("tx rollup", Test_tx_rollup.tests);
-      ("sc rollup", Test_sc_rollup.tests);
-      ("sc rollup transfer", Test_sc_rollup_transfer.tests);
-      ("zk rollup", Test_zk_rollup.tests);
-    ]
-  |> Lwt_main.run
+  register_error_kind
+    `Temporary
+    ~id:"Zk_rollup_does_not_exist"
+    ~title:"ZK Rollup does not exist"
+    ~description:"Attempted to use a ZK rollup that has not been originated."
+    ~pp:(fun ppf x ->
+      Format.fprintf ppf "Rollup %a does not exist" Zk_rollup_repr.Address.pp x)
+    Data_encoding.(obj1 (req "rollup" Zk_rollup_repr.Address.encoding))
+    (function Zk_rollup_does_not_exist x -> Some x | _ -> None)
+    (fun x -> Zk_rollup_does_not_exist x)
+
+let originate ctxt static ~init_state =
+  let open Lwt_result_syntax in
+  let*? ctxt, nonce = Raw_context.increment_origination_nonce ctxt in
+  let*? address = Zk_rollup_repr.Address.from_nonce nonce in
+  let initial_account =
+    Zk_rollup_account_repr.{static; dynamic = {state = init_state}}
+  in
+  let* ctxt, account_size =
+    Storage.Zk_rollup.Account.init ctxt address initial_account
+  in
+  let init_pl = Zk_rollup_repr.(Empty {next_index = 0L}) in
+  let* ctxt, pl_size =
+    Storage.Zk_rollup.Pending_list.init ctxt address init_pl
+  in
+  let address_size = Zk_rollup_repr.Address.size in
+  let size = Z.of_int (address_size + account_size + pl_size) in
+  return (ctxt, address, size)
+
+let exists ctxt rollup = Storage.Zk_rollup.Account.mem ctxt rollup

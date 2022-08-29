@@ -284,6 +284,7 @@ type 'accounts init :=
   ?sc_rollup_enable:bool ->
   ?sc_rollup_max_number_of_messages_per_commitment_period:int ->
   ?dal_enable:bool ->
+  ?zk_rollup_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
   unit ->

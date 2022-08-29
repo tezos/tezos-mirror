@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,28 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/operations
-    Subject:      Entrypoint
-*)
+type t = Bls12_381.Fr.t
 
-let () =
-  Alcotest_lwt.run
-    "protocol > integration > operations"
-    [
-      ("voting", Test_voting.tests);
-      ("origination", Test_origination.tests);
-      ("revelation", Test_reveal.tests);
-      ("transfer", Test_transfer.tests);
-      ("activation", Test_activation.tests);
-      ("paid storage increase", Test_paid_storage_increase.tests);
-      ("combined", Test_combined_operations.tests);
-      ("failing_noop operation", Test_failing_noop.tests);
-      ("tx rollup", Test_tx_rollup.tests);
-      ("sc rollup", Test_sc_rollup.tests);
-      ("sc rollup transfer", Test_sc_rollup_transfer.tests);
-      ("zk rollup", Test_zk_rollup.tests);
-    ]
-  |> Lwt_main.run
+let of_z z =
+  (* In case [z] is outside of the field, i.e. Z >= Fr.order,
+     [Bls12_381.Fr.of_z] will apply a modulo reduction to ge
+     t a field element *)
+  Bls12_381.Fr.of_z z
+
+let of_bytes bs =
+  (* The bytes are interpreted as a Z integer *)
+  let z = Z.of_bits @@ Bytes.to_string bs in
+  of_z z

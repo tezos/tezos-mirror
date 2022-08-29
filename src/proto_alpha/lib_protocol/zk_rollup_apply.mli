@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,28 +23,54 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/operations
-    Subject:      Entrypoint
+(** This module handles all the validation/application of any operation
+    related to the ZK Rollup.
+    All of the functions defined in this module require that the ZKRU
+    feature flag is enabled.
 *)
 
-let () =
-  Alcotest_lwt.run
-    "protocol > integration > operations"
-    [
-      ("voting", Test_voting.tests);
-      ("origination", Test_origination.tests);
-      ("revelation", Test_reveal.tests);
-      ("transfer", Test_transfer.tests);
-      ("activation", Test_activation.tests);
-      ("paid storage increase", Test_paid_storage_increase.tests);
-      ("combined", Test_combined_operations.tests);
-      ("failing_noop operation", Test_failing_noop.tests);
-      ("tx rollup", Test_tx_rollup.tests);
-      ("sc rollup", Test_sc_rollup.tests);
-      ("sc rollup transfer", Test_sc_rollup_transfer.tests);
-      ("zk rollup", Test_zk_rollup.tests);
-    ]
-  |> Lwt_main.run
+open Alpha_context
+
+(** These errors are only to be matched in tests. *)
+type error +=
+  | Zk_rollup_feature_disabled
+        (** Emitted when trying to apply a ZK Rollup operation while the ZKRU
+            feature flag is not active. *)
+  | Zk_rollup_negative_nb_ops
+        (** Emitted when originating a ZK Rollup with a negative [nb_ops]. *)
+
+(** [assert_feature_enabled ctxt] asserts that the ZK Rollup feature flag
+    is activated.
+
+    May fail with:
+    {ul
+      {li [Zk_rollup_feature_disabled] if the ZKRU feature flag is not
+        activated.}
+    }
+*)
+val assert_feature_enabled : t -> unit tzresult Lwt.t
+
+(** [originate ~ctxt_before_op ~ctxt ~public_parameters ~transcript
+               ~circuits_info ~init_state ~nb_ops]
+    applies the origination operation for a ZK rollup.
+    See {!Zk_rollup_storage:originate}.
+
+    May fail with:
+    {ul
+      {li [Zk_rollup_feature_disabled] if the ZKRU feature flag is not
+        activated.}
+      {li [Zk_rollup_negative_nb_ops] if [nb_ops] is negative.}
+    }
+*)
+val originate :
+  ctxt_before_op:t ->
+  ctxt:t ->
+  public_parameters:Plonk.public_parameters ->
+  circuits_info:bool Zk_rollup.Account.SMap.t ->
+  init_state:Zk_rollup.State.t ->
+  nb_ops:int ->
+  (t
+  * Kind.zk_rollup_origination Apply_results.successful_manager_operation_result
+  * Script_typed_ir.packed_internal_operation list)
+  tzresult
+  Lwt.t

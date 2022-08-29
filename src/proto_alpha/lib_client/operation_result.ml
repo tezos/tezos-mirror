@@ -412,6 +412,8 @@ let pp_manager_operation_content (type kind) source ppf
         "Data availability slot header publishing:@,Slot: %a"
         Dal.Slot.pp
         slot
+  | Zk_rollup_origination _ ->
+      Format.fprintf ppf "Zk rollup origination:@,From: %a" Contract.pp source
 
 let pp_balance_updates ppf balance_updates =
   let open Receipt in
@@ -787,6 +789,14 @@ let pp_manager_operation_contents_result ppf op_result =
     pp_balance_updates ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas
   in
+  let pp_zk_rollup_origination_result
+      (Zk_rollup_origination_result
+        {consumed_gas; originated_zk_rollup; size = _; balance_updates}) =
+    pp_consumed_gas ppf consumed_gas ;
+    Format.fprintf ppf "@,Address: %a" Zk_rollup.Address.pp originated_zk_rollup ;
+    pp_balance_updates ppf balance_updates
+  in
+
   let manager_operation_name (type kind)
       (result : kind successful_manager_operation_result) =
     match result with
@@ -824,6 +834,7 @@ let pp_manager_operation_contents_result ppf op_result =
         "data availability slot subscription"
     | Dal_publish_slot_header_result _ ->
         "data availability slot header publishing"
+    | Zk_rollup_origination_result _ -> "zk rollup originate"
   in
   let pp_manager_operation_contents_result (type kind) ppf
       (result : kind successful_manager_operation_result) =
@@ -865,6 +876,7 @@ let pp_manager_operation_contents_result ppf op_result =
         pp_sc_rollup_dal_slot_subscribe_result op
     | Dal_publish_slot_header_result _ as op ->
         pp_dal_publish_slot_header_result op
+    | Zk_rollup_origination_result _ as op -> pp_zk_rollup_origination_result op
   in
   pp_operation_result
     ~operation_name:manager_operation_name

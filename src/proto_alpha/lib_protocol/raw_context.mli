@@ -109,6 +109,8 @@ val tx_rollup : t -> Constants_parametric_repr.tx_rollup
 
 val sc_rollup : t -> Constants_parametric_repr.sc_rollup
 
+val zk_rollup : t -> Constants_parametric_repr.zk_rollup
+
 val patch_constants :
   t -> (Constants_parametric_repr.t -> Constants_parametric_repr.t) -> t Lwt.t
 

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,28 +23,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/operations
-    Subject:      Entrypoint
-*)
+module SMap : Map.S with type key = string
 
-let () =
-  Alcotest_lwt.run
-    "protocol > integration > operations"
-    [
-      ("voting", Test_voting.tests);
-      ("origination", Test_origination.tests);
-      ("revelation", Test_reveal.tests);
-      ("transfer", Test_transfer.tests);
-      ("activation", Test_activation.tests);
-      ("paid storage increase", Test_paid_storage_increase.tests);
-      ("combined", Test_combined_operations.tests);
-      ("failing_noop operation", Test_failing_noop.tests);
-      ("tx rollup", Test_tx_rollup.tests);
-      ("sc rollup", Test_sc_rollup.tests);
-      ("sc rollup transfer", Test_sc_rollup_transfer.tests);
-      ("zk rollup", Test_zk_rollup.tests);
-    ]
-  |> Lwt_main.run
+(** Representation of a ZK Rollup account. *)
+
+(** Static part of a ZKRU account. These are set at origination,
+    after which they cannot be modified. *)
+type static = {
+  public_parameters : Plonk.public_parameters;
+      (** Input to the Plonk verifier that are fixed once the circuits
+          are decided. *)
+  state_length : int;  (** Number of scalars in the state. *)
+  circuits_info : bool SMap.t;
+      (** Circuit names, alongside a boolean flag indicating
+      if they can be used for private ops. *)
+  nb_ops : int;  (** Valid op codes of L2 operations must be in \[0, nb_ops) *)
+}
+
+(**  Dynamic part of a ZKRU account. *)
+type dynamic = {
+  state : Zk_rollup_state_repr.t;
+      (** Array of scalars representing the state of the rollup
+          at a given level. *)
+}
+
+type t = {static : static; dynamic : dynamic}
+
+val encoding : t Data_encoding.t

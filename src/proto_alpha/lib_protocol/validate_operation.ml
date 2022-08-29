@@ -1623,6 +1623,9 @@ module Manager = struct
     | [] -> error Sc_rollup_errors.Sc_rollup_add_zero_messages
     | _ -> ok ()
 
+  let assert_zk_rollup_feature_enabled vi =
+    error_unless (Constants.zk_rollup_enable vi.ctxt) Zk_rollup_feature_disabled
+
   let consume_decoding_gas ctxt lexpr =
     record_trace Gas_quota_exceeded_init_deserialize
     @@ (* Fail early if the operation does not have enough gas to
@@ -1800,6 +1803,9 @@ module Manager = struct
           return remaining_gas
       | Dal_publish_slot_header {slot} ->
           let* () = Dal_apply.validate_publish_slot_header vi.ctxt slot in
+          return remaining_gas
+      | Zk_rollup_origination _ ->
+          let* () = assert_zk_rollup_feature_enabled vi in
           return remaining_gas
     in
     let* balance, is_allocated =

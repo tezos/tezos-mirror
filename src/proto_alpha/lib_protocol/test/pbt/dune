@@ -15,7 +15,8 @@
   test_sc_rollup_tick_repr
   test_sc_rollup_encoding
   test_refutation_game
-  test_carbonated_map)
+  test_carbonated_map
+  test_zk_rollup_encoding)
  (libraries
   tezos-base
   tezos-micheline
@@ -106,3 +107,8 @@
  (alias runtest)
  (package tezos-protocol-alpha-tests)
  (action (run %{dep:./test_carbonated_map.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{dep:./test_zk_rollup_encoding.exe})))

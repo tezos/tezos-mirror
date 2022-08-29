@@ -126,6 +126,17 @@ type sc_rollup = {
   max_number_of_stored_cemented_commitments : int;
 }
 
+type zk_rollup = {
+  enable : bool;
+  (* Minimum number of pending operations that can be processed by a ZKRU
+     update, if available.
+     If the length of the pending list is less than [min_pending_to_process],
+     then an update needs to process all pending operations to be valid.
+     That is, every update must process at least
+     [min(length pending_list, min_pending_to_process)] pending operations. *)
+  min_pending_to_process : int;
+}
+
 type t = {
   preserved_cycles : int;
   blocks_per_cycle : int32;
@@ -177,6 +188,7 @@ type t = {
   tx_rollup : tx_rollup;
   dal : dal;
   sc_rollup : sc_rollup;
+  zk_rollup : zk_rollup;
 }
 
 val encoding : t Data_encoding.encoding

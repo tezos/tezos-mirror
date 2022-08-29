@@ -83,6 +83,7 @@ type ctxt_cstrs = {
   del_cstrs : cstrs;
   tx_cstrs : cstrs;
   sc_cstrs : cstrs;
+  zk_cstrs : cstrs;
 }
 (** {2 Default values} *)
 
@@ -113,6 +114,7 @@ let default_ctxt_cstrs =
     del_cstrs = default_cstrs;
     tx_cstrs = default_cstrs;
     sc_cstrs = default_cstrs;
+    zk_cstrs = default_cstrs;
   }
 
 (** {2 Generators} *)
@@ -229,6 +231,7 @@ let gen_ctxt_req : ctxt_cstrs -> ctxt_req QCheck2.Gen.t =
        del_cstrs;
        tx_cstrs;
        sc_cstrs;
+       zk_cstrs;
      } ->
   let open QCheck2.Gen in
   let* hard_gas_limit_per_block = gen_gas_integral hard_gas_limit_per_block in
@@ -236,7 +239,8 @@ let gen_ctxt_req : ctxt_cstrs -> ctxt_req QCheck2.Gen.t =
   let* fund_dest = gen_tez dest_cstrs in
   let* fund_del = gen_tez del_cstrs in
   let* fund_tx = gen_tez tx_cstrs in
-  let+ fund_sc = gen_tez sc_cstrs in
+  let* fund_sc = gen_tez sc_cstrs in
+  let+ fund_zk = gen_tez zk_cstrs in
   {
     hard_gas_limit_per_block;
     fund_src;
@@ -244,6 +248,7 @@ let gen_ctxt_req : ctxt_cstrs -> ctxt_req QCheck2.Gen.t =
     fund_del;
     fund_tx;
     fund_sc;
+    fund_zk;
     flags = all_enabled;
   }
 

@@ -281,3 +281,11 @@ let dal_number_of_slots c =
 let dal_enable c =
   let constants = Raw_context.constants c in
   constants.dal.feature_enable
+
+let zk_rollup_enable c =
+  let zk_rollup = Raw_context.zk_rollup c in
+  zk_rollup.enable
+
+let zk_rollup_min_pending_to_process c =
+  let zk_rollup = Raw_context.zk_rollup c in
+  zk_rollup.min_pending_to_process

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,28 +23,47 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/operations
-    Subject:      Entrypoint
-*)
+type t = {
+  op_code : int;
+  price : Ticket_hash_repr.t * Z.t;
+  l1_dst : Signature.Public_key_hash.t;
+  rollup_id : Zk_rollup_repr.t;
+  payload : Zk_rollup_scalar.t array;
+}
 
-let () =
-  Alcotest_lwt.run
-    "protocol > integration > operations"
+let int_to_scalar x = Zk_rollup_scalar.of_z (Z.of_int x)
+
+let pkh_to_scalar x =
+  Zk_rollup_scalar.of_bytes
+    (Data_encoding.Binary.to_bytes_exn Signature.Public_key_hash.encoding x)
+
+let ticket_hash_to_scalar ticket_hash =
+  Zk_rollup_scalar.of_bytes
+  @@ Data_encoding.Binary.to_bytes_exn Ticket_hash_repr.encoding ticket_hash
+
+let to_scalar_array {op_code; price; l1_dst; rollup_id; payload} =
+  Array.concat
     [
-      ("voting", Test_voting.tests);
-      ("origination", Test_origination.tests);
-      ("revelation", Test_reveal.tests);
-      ("transfer", Test_transfer.tests);
-      ("activation", Test_activation.tests);
-      ("paid storage increase", Test_paid_storage_increase.tests);
-      ("combined", Test_combined_operations.tests);
-      ("failing_noop operation", Test_failing_noop.tests);
-      ("tx rollup", Test_tx_rollup.tests);
-      ("sc rollup", Test_sc_rollup.tests);
-      ("sc rollup transfer", Test_sc_rollup_transfer.tests);
-      ("zk rollup", Test_zk_rollup.tests);
+      [|
+        int_to_scalar op_code;
+        ticket_hash_to_scalar (fst price);
+        Zk_rollup_scalar.of_z (snd price);
+        pkh_to_scalar l1_dst;
+        Zk_rollup_repr.to_scalar rollup_id;
+      |];
+      payload;
     ]
-  |> Lwt_main.run
+
+let encoding =
+  Data_encoding.(
+    conv
+      (fun {op_code; price; l1_dst; rollup_id; payload} ->
+        (op_code, price, l1_dst, rollup_id, payload))
+      (fun (op_code, price, l1_dst, rollup_id, payload) ->
+        {op_code; price; l1_dst; rollup_id; payload})
+      (obj5
+         (req "op_code" int31)
+         (req "price" (tup2 Ticket_hash_repr.encoding z))
+         (req "l1_dst" Signature.Public_key_hash.encoding)
+         (req "rollup_id" Zk_rollup_repr.Address.encoding)
+         (req "payload" Plonk.scalar_array_encoding)))

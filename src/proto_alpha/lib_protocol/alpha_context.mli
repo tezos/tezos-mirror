@@ -819,6 +819,8 @@ module Constants : sig
       max_number_of_stored_cemented_commitments : int;
     }
 
+    type zk_rollup = {enable : bool; min_pending_to_process : int}
+
     type t = {
       preserved_cycles : int;
       blocks_per_cycle : int32;
@@ -862,6 +864,7 @@ module Constants : sig
       tx_rollup : tx_rollup;
       dal : dal;
       sc_rollup : sc_rollup;
+      zk_rollup : zk_rollup;
     }
 
     val encoding : t Data_encoding.t
@@ -1005,6 +1008,10 @@ module Constants : sig
   val sc_rollup_number_of_sections_in_dissection : context -> int
 
   val max_number_of_stored_cemented_commitments : context -> int
+
+  val zk_rollup_enable : context -> bool
+
+  val zk_rollup_min_pending_to_process : context -> int
 
   (** All constants: fixed and parametric *)
   type t = private {fixed : fixed; parametric : Parametric.t}
@@ -2364,6 +2371,71 @@ module Bond_id : sig
       init:'a ->
       f:(t -> 'a -> 'a Lwt.t) ->
       'a Lwt.t
+  end
+end
+
+module Zk_rollup : sig
+  module Address : S.HASH
+
+  type t = Address.t
+
+  type scalar := Bls12_381.Fr.t
+
+  val to_scalar : t -> scalar
+
+  module State : sig
+    type t = scalar array
+
+    val encoding : t Data_encoding.t
+  end
+
+  module Account : sig
+    module SMap : Map.S with type key = string
+
+    type static = {
+      public_parameters : Plonk.public_parameters;
+      state_length : int;
+      circuits_info : bool SMap.t;
+      nb_ops : int;
+    }
+
+    type dynamic = {state : State.t}
+
+    type t = {static : static; dynamic : dynamic}
+
+    val encoding : t Data_encoding.t
+  end
+
+  module Operation : sig
+    type t = {
+      op_code : int;
+      price : Ticket_hash.t * Z.t;
+      l1_dst : Signature.Public_key_hash.t;
+      rollup_id : Address.t;
+      payload : scalar array;
+    }
+
+    val encoding : t Data_encoding.t
+
+    val to_scalar_array : t -> scalar array
+  end
+
+  type pending_list =
+    | Empty of {next_index : int64}
+    | Pending of {next_index : int64; length : int}
+
+  val pending_list_encoding : pending_list Data_encoding.t
+
+  val originate :
+    context ->
+    Account.static ->
+    init_state:State.t ->
+    (context * Address.t * Z.t) tzresult Lwt.t
+
+  val exists : context -> t -> (context * bool) tzresult Lwt.t
+
+  module Internal_for_tests : sig
+    val originated_zk_rollup : Origination_nonce.Internal_for_tests.t -> t
   end
 end
 
@@ -3830,6 +3902,8 @@ module Kind : sig
 
   type sc_rollup_dal_slot_subscribe = Sc_rollup_dal_slot_subscribe_kind
 
+  type zk_rollup_origination = Zk_rollup_origination_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -3863,6 +3937,7 @@ module Kind : sig
     | Sc_rollup_recover_bond_manager_kind : sc_rollup_recover_bond manager
     | Sc_rollup_dal_slot_subscribe_manager_kind
         : sc_rollup_dal_slot_subscribe manager
+    | Zk_rollup_origination_manager_kind : zk_rollup_origination manager
 end
 
 (** All the definitions below are re-exported from {!Operation_repr}. *)
@@ -4100,6 +4175,13 @@ and _ manager_operation =
       slot_index : Dal.Slot_index.t;
     }
       -> Kind.sc_rollup_dal_slot_subscribe manager_operation
+  | Zk_rollup_origination : {
+      public_parameters : Plonk.public_parameters;
+      circuits_info : bool Zk_rollup.Account.SMap.t;
+      init_state : Zk_rollup.State.t;
+      nb_ops : int;
+    }
+      -> Kind.zk_rollup_origination manager_operation
 
 and counter = Z.t
 
@@ -4286,6 +4368,9 @@ module Operation : sig
     val sc_rollup_dal_slot_subscribe_case :
       Kind.sc_rollup_dal_slot_subscribe Kind.manager case
 
+    val zk_rollup_origination_case :
+      Kind.zk_rollup_origination Kind.manager case
+
     module Manager_operations : sig
       type 'b case =
         | MCase : {
@@ -4353,6 +4438,8 @@ module Operation : sig
 
       val sc_rollup_dal_slot_subscribe_case :
         Kind.sc_rollup_dal_slot_subscribe case
+
+      val zk_rollup_origination_case : Kind.zk_rollup_origination case
     end
   end
 
@@ -4660,6 +4747,14 @@ module Fees : sig
     (context * Z.t * Receipt.balance_updates) tzresult Lwt.t
 
   val burn_sc_rollup_origination_fees :
+    ?origin:Receipt.update_origin ->
+    context ->
+    storage_limit:Z.t ->
+    payer:Token.source ->
+    Z.t ->
+    (context * Z.t * Receipt.balance_updates) tzresult Lwt.t
+
+  val burn_zk_rollup_origination_fees :
     ?origin:Receipt.update_origin ->
     context ->
     storage_limit:Z.t ->

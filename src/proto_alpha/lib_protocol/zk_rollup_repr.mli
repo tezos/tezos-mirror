@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,28 +23,44 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/operations
-    Subject:      Entrypoint
+(** A ZK rollup has an address starting with "zkr1".
+    ZKRU addresses have a length of 20 bytes, which means
+    that they have an injective encoding as BLS12-381 scalars.
 *)
+module Address : sig
+  include S.HASH
 
-let () =
-  Alcotest_lwt.run
-    "protocol > integration > operations"
-    [
-      ("voting", Test_voting.tests);
-      ("origination", Test_origination.tests);
-      ("revelation", Test_reveal.tests);
-      ("transfer", Test_transfer.tests);
-      ("activation", Test_activation.tests);
-      ("paid storage increase", Test_paid_storage_increase.tests);
-      ("combined", Test_combined_operations.tests);
-      ("failing_noop operation", Test_failing_noop.tests);
-      ("tx rollup", Test_tx_rollup.tests);
-      ("sc rollup", Test_sc_rollup.tests);
-      ("sc rollup transfer", Test_sc_rollup_transfer.tests);
-      ("zk rollup", Test_zk_rollup.tests);
-    ]
-  |> Lwt_main.run
+  (** [from_nonce nonce] produces an address completely determined by
+     an operation hash and an origination counter. *)
+  val from_nonce : Origination_nonce.t -> t tzresult
+
+  (** [encoded_size] is the number of bytes needed to represent an address. *)
+  val encoded_size : int
+
+  val of_b58data : Base58.data -> t option
+
+  val prefix : string
+end
+
+type t = Address.t
+
+(** [to_scalar address] returns the scalar corresponding to [address] *)
+val to_scalar : t -> Zk_rollup_scalar.t
+
+(** Description of a ZK rollup's pending list. *)
+type pending_list =
+  | Empty of {next_index : int64}
+      (** Empty pending list but starting point will be [next_index]
+          when adding to the list *)
+  | Pending of {next_index : int64; length : int}
+      (** Pending list with
+          [(next_index - length) .. (next_index - 1)].
+          [length] is encoded as a [uint16]. *)
+
+val pending_list_encoding : pending_list Data_encoding.t
+
+module Index : Storage_description.INDEX with type t = t
+
+module Internal_for_tests : sig
+  val originated_zk_rollup : Origination_nonce.t -> Address.t
+end

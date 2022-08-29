@@ -119,6 +119,8 @@ module Kind = struct
 
   type sc_rollup_dal_slot_subscribe = Sc_rollup_dal_slot_subscribe_kind
 
+  type zk_rollup_origination = Zk_rollup_origination_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -152,6 +154,7 @@ module Kind = struct
     | Sc_rollup_recover_bond_manager_kind : sc_rollup_recover_bond manager
     | Sc_rollup_dal_slot_subscribe_manager_kind
         : sc_rollup_dal_slot_subscribe manager
+    | Zk_rollup_origination_manager_kind : zk_rollup_origination manager
 end
 
 type 'a consensus_operation_type =
@@ -457,6 +460,13 @@ and _ manager_operation =
       slot_index : Dal_slot_repr.Index.t;
     }
       -> Kind.sc_rollup_dal_slot_subscribe manager_operation
+  | Zk_rollup_origination : {
+      public_parameters : Plonk.public_parameters;
+      circuits_info : bool Zk_rollup_account_repr.SMap.t;
+      init_state : Zk_rollup_state_repr.t;
+      nb_ops : int;
+    }
+      -> Kind.zk_rollup_origination manager_operation
 
 and counter = Z.t
 
@@ -492,6 +502,7 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Sc_rollup_recover_bond _ -> Kind.Sc_rollup_recover_bond_manager_kind
   | Sc_rollup_dal_slot_subscribe _ ->
       Kind.Sc_rollup_dal_slot_subscribe_manager_kind
+  | Zk_rollup_origination _ -> Kind.Zk_rollup_origination_manager_kind
 
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation
@@ -589,6 +600,10 @@ let sc_rollup_operation_dal_slot_subscribe_tag =
 let dal_offset = 230
 
 let dal_publish_slot_header_tag = dal_offset + 0
+
+let zk_rollup_operation_tag_offset = 250
+
+let zk_rollup_operation_create_tag = zk_rollup_operation_tag_offset + 0
 
 module Encoding = struct
   open Data_encoding
@@ -1005,6 +1020,52 @@ module Encoding = struct
             (fun (contents, ty, ticketer, amount, destination, entrypoint) ->
               Transfer_ticket
                 {contents; ty; ticketer; amount; destination; entrypoint});
+        }
+
+    let zk_rollup_origination_case =
+      MCase
+        {
+          tag = zk_rollup_operation_create_tag;
+          name = "zk_rollup_origination";
+          encoding =
+            obj4
+              (req "public_parameters" Plonk.public_parameters_encoding)
+              (let circuits_info_encoding =
+                 conv_with_guard
+                   (fun m ->
+                     List.of_seq @@ Zk_rollup_account_repr.SMap.to_seq m)
+                   (fun l ->
+                     let m =
+                       Zk_rollup_account_repr.SMap.of_seq @@ List.to_seq l
+                     in
+                     if
+                       (* Check that the list has no duplicated keys *)
+                       Compare.List_length_with.(
+                         l <> Zk_rollup_account_repr.SMap.cardinal m)
+                     then
+                       Error
+                         "Zk_rollup_origination: circuits_info has duplicated \
+                          keys"
+                     else Ok m)
+                   (list (tup2 string bool))
+               in
+               req "circuits_info" circuits_info_encoding)
+              (req "init_state" Zk_rollup_state_repr.encoding)
+              (* TODO https://gitlab.com/tezos/tezos/-/issues/3655
+                 Encoding of non-negative [nb_ops] for origination *)
+              (req "nb_ops" int31);
+          select =
+            (function
+            | Manager (Zk_rollup_origination _ as op) -> Some op | _ -> None);
+          proj =
+            (function
+            | Zk_rollup_origination
+                {public_parameters; circuits_info; init_state; nb_ops} ->
+                (public_parameters, circuits_info, init_state, nb_ops));
+          inj =
+            (fun (public_parameters, circuits_info, init_state, nb_ops) ->
+              Zk_rollup_origination
+                {public_parameters; circuits_info; init_state; nb_ops});
         }
 
     let sc_rollup_originate_case =
@@ -1628,6 +1689,11 @@ module Encoding = struct
       sc_rollup_operation_dal_slot_subscribe_tag
       Manager_operations.sc_rollup_dal_slot_subscribe_case
 
+  let zk_rollup_origination_case =
+    make_manager_case
+      zk_rollup_operation_create_tag
+      Manager_operations.zk_rollup_origination_case
+
   let contents_encoding =
     let make (Case {tag; name; encoding; select; proj; inj}) =
       case
@@ -1678,6 +1744,7 @@ module Encoding = struct
            make sc_rollup_execute_outbox_message_case;
            make sc_rollup_recover_bond_case;
            make sc_rollup_dal_slot_subscribe_case;
+           make zk_rollup_origination_case;
          ]
 
   let contents_list_encoding =
@@ -1912,6 +1979,8 @@ let equal_manager_operation_kind :
   | Sc_rollup_recover_bond _, _ -> None
   | Sc_rollup_dal_slot_subscribe _, Sc_rollup_dal_slot_subscribe _ -> Some Eq
   | Sc_rollup_dal_slot_subscribe _, _ -> None
+  | Zk_rollup_origination _, Zk_rollup_origination _ -> Some Eq
+  | Zk_rollup_origination _, _ -> None
 
 let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
     =

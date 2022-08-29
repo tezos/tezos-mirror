@@ -145,6 +145,10 @@ let burn_sc_rollup_origination_fees ?(origin = Receipt_repr.Block_application) c
     ~storage_limit ~payer consumed =
   burn_storage_fees ~origin c ~storage_limit ~payer consumed
 
+let burn_zk_rollup_origination_fees ?(origin = Receipt_repr.Block_application) c
+    ~storage_limit ~payer consumed =
+  burn_storage_fees ~origin c ~storage_limit ~payer consumed
+
 let check_storage_limit c ~storage_limit =
   if
     Compare.Z.(
