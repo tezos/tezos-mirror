@@ -9,6 +9,23 @@ exception Crash of Source.region * string
 
 exception Exhaustion of Source.region * string
 
+type frame = {inst : module_key; locals : value ref list}
+
+type code = value list * admin_instr list
+
+and admin_instr = admin_instr' Source.phrase
+
+and admin_instr' =
+  | From_block of Ast.block_label * int32
+  | Plain of Ast.instr'
+  | Refer of ref_
+  | Invoke of func_inst
+  | Trapping of string
+  | Returning of value list
+  | Breaking of int32 * value list
+  | Label of int32 * Ast.instr list * code
+  | Frame of int32 * frame * code
+
 type ('a, 'b, 'acc) fold_right2_kont = {
   acc : 'acc;
   lv : 'a Vector.t;
@@ -37,6 +54,15 @@ type (_, _) init_section =
   | Table : (Ast.table, table_inst) init_section
   | Memory : (Ast.memory, memory_inst) init_section
 
+type 'b join_kont =
+  | J_Init of 'b Vector.t Vector.t
+  | J_Next of 'b concat_kont * 'b Vector.t Vector.t
+  | J_Stop of 'b Vector.t
+
+type ('a, 'b) map_concat_kont =
+  | MC_Map of ('a, 'b Vector.t) map_kont
+  | MC_Join of 'b join_kont
+
 type init_kont =
   | IK_Start  (** Very first tick of the [init] function *)
   | IK_Add_import of (extern, Ast.import, module_inst) fold_right2_kont
@@ -50,7 +76,8 @@ type init_kont =
   | IK_Exports of module_inst * (Ast.export, extern NameMap.t) fold_left_kont
   | IK_Elems of module_inst * (Ast.elem_segment, elem_inst) map_kont
   | IK_Datas of module_inst * (Ast.data_segment, data_inst) map_kont
-  | IK_Remaining of module_inst
+  | IK_Es_elems of module_inst * (Ast.elem_segment, admin_instr) map_concat_kont
+  | IK_Remaining of module_inst * admin_instr Vector.t
   | IK_Stop of module_inst
       (** Witness that there is no more tick to execute to complete
           the [init] process. *)
@@ -84,23 +111,6 @@ val invoke :
   func_inst ->
   value list ->
   value list Lwt.t (* raises Trap *)
-
-type frame = {inst : module_key; locals : value ref list}
-
-type code = value list * admin_instr list
-
-and admin_instr = admin_instr' Source.phrase
-
-and admin_instr' =
-  | From_block of Ast.block_label * int32
-  | Plain of Ast.instr'
-  | Refer of ref_
-  | Invoke of func_inst
-  | Trapping of string
-  | Returning of value list
-  | Breaking of int32 * value list
-  | Label of int32 * Ast.instr list * code
-  | Frame of int32 * frame * code
 
 type config = {
   frame : frame;
