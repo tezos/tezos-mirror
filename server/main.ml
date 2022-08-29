@@ -23,6 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let rec find_in_ocamlres path dir =
+  match (path, dir) with
+  | ([], _) | (_ :: _, []) -> None
+  | ([x], `File (y, a) :: t) ->
+      if String.equal x y then Some a else find_in_ocamlres path t
+  | (_ :: _ :: _, `File _ :: t) -> find_in_ocamlres path t
+  | ([_], _ :: t) -> find_in_ocamlres path t
+  | (x :: p, `Dir (y, a) :: t) ->
+      if String.equal x y then find_in_ocamlres p a else find_in_ocamlres path t
+
 let mainnet_cycle_of_level level =
   if level < 1_589_248 then level / 4096 else 388 + ((level - 1_589_248) / 8192)
 
@@ -129,7 +139,8 @@ let get_summary db_pool =
     (Format.sprintf
        "<!DOCTYPE html><html><head><title>Teztale \
         status</title></head><body><p>%li levels in rights tables</p><p>%li \
-        levels in operations tables</p></body></html>"
+        levels in operations tables</p><p><a href=\"visualization/\">Vizualize \
+        data</a></p></body></html>"
        nb_level_rights
        nb_level_operations)
 
@@ -452,7 +463,7 @@ let callback rights db_pool _connection request body =
                                 ())
                       | `OPTIONS -> options_respond methods
                       | _ -> method_not_allowed_respond methods)
-                  | None ->
+                  | None -> (
                       if path = "/" then
                         with_caqti_error (get_summary db_pool) (fun body ->
                             Cohttp_lwt_unix.Server.respond_string
@@ -463,7 +474,36 @@ let callback rights db_pool _connection request body =
                               ~status:`OK
                               ~body
                               ())
-                      else Cohttp_lwt_unix.Server.respond_not_found ~uri ()))))
+                      else
+                        let subpath = String.split_on_char '/' path in
+                        match subpath with
+                        | [] | [_] ->
+                            Cohttp_lwt_unix.Server.respond_not_found ~uri ()
+                        | _ :: pre :: subpath -> (
+                            if pre <> "visualization" then
+                              Cohttp_lwt_unix.Server.respond_not_found ~uri ()
+                            else
+                              let (path, subpath) =
+                                match subpath with
+                                | [] | [""] -> ("index.html", ["index.html"])
+                                | _ -> (path, subpath)
+                              in
+                              match
+                                find_in_ocamlres subpath Visualization.root
+                              with
+                              | Some body ->
+                                  Cohttp_lwt_unix.Server.respond_string
+                                    ~headers:
+                                      (Cohttp.Header.init_with
+                                         "content-type"
+                                         (Magic_mime.lookup path))
+                                    ~status:`OK
+                                    ~body
+                                    ()
+                              | None ->
+                                  Cohttp_lwt_unix.Server.respond_not_found
+                                    ~uri
+                                    ()))))))
 
 (* Must exists somewhere but where ! *)
 let print_location f ((fl, fc), (tl, tc)) =
