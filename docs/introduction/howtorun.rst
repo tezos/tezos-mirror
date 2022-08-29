@@ -157,7 +157,7 @@ Alternatively, you may use the baking rights RPC and the endorsing rights RPC (s
 Baker
 ~~~~~
 
-The baker is a daemon that executes Tezos' :ref:<consensus algorithm<active/consensus>.
+The baker is a daemon that executes Tezos' :doc:`consensus algorithm<../active/consensus>`.
 The baker runs on behalf of one or more specified accounts or, if none is specified, on behalf of
 all accounts whose secret keys are known.
 
@@ -169,7 +169,7 @@ accounts have the necessary rights.
 Let's launch the daemon pointing to the standard node directory and
 baking for user *bob*::
 
-   tezos-baker-alpha run with local node ~/.tezos-node bob
+   tezos-baker-alpha run with local node ~/.tezos-node bob --liquidity-baking-toggle-vote pass
 
 Note that the baker needs direct access to
 the node data directory for performance reasons (to reduce the number of RPC calls to the node).
