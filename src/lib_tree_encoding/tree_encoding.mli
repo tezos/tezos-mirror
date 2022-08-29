@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -238,30 +239,37 @@ val delayed : (unit -> 'a t) -> 'a t
     the left case of [Either.t], and [enc_b] for the [Right] case. *)
 val either : 'a t -> 'b t -> ('a, 'b) Either.t t
 
+module type TREE = sig
+  type tree
+
+  type key := string list
+
+  type value := bytes
+
+  (** @raise Incorrect_tree_type *)
+  val select : Lazy_containers.Lazy_map.tree -> tree
+
+  val wrap : tree -> Lazy_containers.Lazy_map.tree
+
+  val remove : tree -> key -> tree Lwt.t
+
+  val add : tree -> key -> value -> tree Lwt.t
+
+  val add_tree : tree -> key -> tree -> tree Lwt.t
+
+  val find : tree -> key -> value option Lwt.t
+
+  val find_tree : tree -> key -> tree option Lwt.t
+end
+
+type wrapped_tree
+
+module Wrapped : TREE with type tree = wrapped_tree
+
+(** [wrapped_tree] is a tree encoding for wrapped tree. *)
+val wrapped_tree : wrapped_tree t
+
 module Runner : sig
-  module type TREE = sig
-    type tree
-
-    type key := string list
-
-    type value := bytes
-
-    (** @raise Incorrect_tree_type *)
-    val select : Lazy_containers.Lazy_map.tree -> tree
-
-    val wrap : tree -> Lazy_containers.Lazy_map.tree
-
-    val remove : tree -> key -> tree Lwt.t
-
-    val add : tree -> key -> value -> tree Lwt.t
-
-    val add_tree : tree -> key -> tree -> tree Lwt.t
-
-    val find : tree -> key -> value option Lwt.t
-
-    val find_tree : tree -> key -> tree option Lwt.t
-  end
-
   (** Builds a new runner for encoders using a specific tree. *)
   module Make (T : TREE) : sig
     (** [encode enc x tree] encodes a value [x] using the encoder [enc]

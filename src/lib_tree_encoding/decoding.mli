@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -128,6 +129,12 @@ val case_lwt : 'tag -> 'b t -> ('b -> 'a Lwt.t) -> ('tag, 'a) case
     If an insufficient list of cases are provided, the resulting encoder may
     fail with a [No_tag_matched] error when [run].  *)
 val tagged_union : ?default:'a -> 'tag t -> ('tag, 'a) case list -> 'a t
+
+(** [wrapped_tree] returns the [Tree.wrapped_tree] located at the prefix tree
+    under which it is called.
+
+    @raises Key_not_found when the requested key is not present. *)
+val wrapped_tree : Tree.wrapped_tree t
 
 (** Syntax module for the {!Tree_decoding}. This is intended to be opened
     locally in functions. Within the scope of this module, the code can

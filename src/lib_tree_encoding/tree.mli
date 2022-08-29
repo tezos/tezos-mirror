@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -66,3 +67,9 @@ val add_tree : 'tree backend -> 'tree -> key -> 'tree -> 'tree Lwt.t
 val find : 'tree backend -> 'tree -> key -> value option Lwt.t
 
 val find_tree : 'tree backend -> 'tree -> key -> 'tree option Lwt.t
+
+(** A [wrapped_tree] allows modifications to the underlying tree, without
+    affecting the tree that it was decoded from. *)
+type wrapped_tree = Wrapped_tree : 'tree * 'tree backend -> wrapped_tree
+
+module Wrapped : S with type tree = wrapped_tree

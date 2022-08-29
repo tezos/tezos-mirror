@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -343,9 +344,16 @@ let either enc_a enc_b =
         (function x -> Right x);
     ]
 
-module Runner = struct
-  module type TREE = S
+module type TREE = S
 
+type wrapped_tree = Tree.wrapped_tree
+
+module Wrapped : TREE with type tree = wrapped_tree = Tree.Wrapped
+
+let wrapped_tree : wrapped_tree t =
+  {encode = E.wrapped_tree; decode = D.wrapped_tree}
+
+module Runner = struct
   module Make (T : TREE) = struct
     let encode {encode; _} value tree = E.run (module T) encode value tree
 

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -202,4 +203,16 @@ let tagged_union ?default decode_tag cases =
                 | Some default -> return default
                 | None -> raise exn)
             | exn -> raise exn));
+  }
+
+let wrapped_tree =
+  {
+    decode =
+      (fun backend tree prefix ->
+        let open Lwt.Syntax in
+        let+ tree = subtree.decode backend tree prefix in
+        match tree with
+        | Some subtree ->
+            Tree.Wrapped_tree (Tree.select backend subtree, backend)
+        | _ -> raise Not_found);
   }
