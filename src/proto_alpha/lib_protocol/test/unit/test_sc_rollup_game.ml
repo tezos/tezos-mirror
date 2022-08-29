@@ -317,7 +317,11 @@ let test_invalid_serialized_inbox_proof () =
   let*! inbox =
     Sc_rollup.Inbox.empty ctxt Sc_rollup.Address.zero Raw_level.(succ root)
   in
-  let snapshot = Sc_rollup.Inbox.take_snapshot inbox in
+  let snapshot =
+    Sc_rollup.Inbox.take_snapshot
+      ~current_level:(Raw_level.of_int32_exn 42l)
+      inbox
+  in
 
   let ctxt = Tezos_context_memory.make_empty_context () in
   let*! state = Arith_pvm.initial_state ctxt in

@@ -1490,6 +1490,7 @@ let gen_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
   in
   let* p1_start = bool in
   let commitment_level = origination_level + commitment_period in
+  let* additional_payloads = small_list (string_size (1 -- 15)) in
   return
     ( block,
       rollup,
@@ -1499,7 +1500,8 @@ let gen_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
       p2_client,
       contract3,
       p1_start,
-      levels_and_inputs )
+      levels_and_inputs,
+      additional_payloads )
 
 (** [prepare_game block lcc originated_level p1_client p2_client
     inputs_and_levels] prepares a context where [p1_client] and [p2_client]
@@ -1542,7 +1544,8 @@ let test_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
              p2_client,
              _contract3,
              p1_start,
-             levels_and_inputs ) ->
+             levels_and_inputs,
+             _additional_payloads ) ->
       let level =
         WithExceptions.Result.get_ok ~loc:__LOC__ @@ Context.get_level (B block)
       in
@@ -1585,7 +1588,8 @@ let test_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
            p2_client,
            contract3,
            p1_start,
-           levels_and_inputs ) ->
+           levels_and_inputs,
+           additional_payloads ) ->
       let open Lwt_result_syntax in
       (* Otherwise, there is no conflict. *)
       QCheck2.assume
@@ -1619,7 +1623,32 @@ let test_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
           defender.player.pkh
           None
       in
-      let* block = Block.bake ~operation:operation_start_game block in
+      let* block =
+        match additional_payloads with
+        | [] -> Block.bake ~operation:operation_start_game block
+        | payloads ->
+            (* Add messages before starting the game. *)
+            let* operation_add_messages1 =
+              Op.sc_rollup_add_messages
+                (B block)
+                defender.player.contract
+                rollup
+                payloads
+            in
+            (* Start the game in between adding messages so the latest protocol
+               inbox is no longer equal to the player's view on inbox. *)
+            let* operation_add_messages2 =
+              Op.sc_rollup_add_messages (B block) contract3 rollup payloads
+            in
+            Block.bake
+              ~operations:
+                [
+                  operation_add_messages1;
+                  operation_start_game;
+                  operation_add_messages2;
+                ]
+              block
+      in
       let* game_result =
         play_until_game_result
           ~rollup
