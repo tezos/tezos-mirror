@@ -82,5 +82,6 @@ let () =
         "sc rollup management protocol"
         Test_sc_rollup_management_protocol.tests;
       Unit_test.spec "Bond_id_repr.ml" Test_bond_id_repr.tests;
+      Unit_test.spec "zk rollup storage" Test_zk_rollup_storage.tests;
     ]
   |> Lwt_main.run

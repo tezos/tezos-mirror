@@ -3466,6 +3466,7 @@ end = struct
                ("refutation_game_pbt", N.(number == 013));
                ("test_refutation_game", N.(number >= 014));
                ("test_carbonated_map", N.(number >= 013));
+               ("test_zk_rollup_encoding", N.(number >= 015));
              ])
           ~synopsis:"Tezos/Protocol: tests for economic-protocol definition"
           ~path:(path // "lib_protocol/test/pbt")
