@@ -732,7 +732,7 @@ struct
   end
 
   module RPC_directory = struct
-    include RPC_directory
+    include Tezos_protocol_environment_structs.V6.RPC_directory
 
     let gen_register dir service handler =
       let open Lwt_syntax in

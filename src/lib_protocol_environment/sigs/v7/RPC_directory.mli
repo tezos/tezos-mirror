@@ -35,7 +35,11 @@ val map : ('a -> 'b Lwt.t) -> 'b directory -> 'a directory
 
 val prefix : ('pr, 'p) RPC_path.path -> 'p directory -> 'pr directory
 
-val merge : 'a directory -> 'a directory -> 'a directory
+val merge :
+  ?strategy:[`Raise | `Pick_left | `Pick_right] ->
+  'a directory ->
+  'a directory ->
+  'a directory
 
 (** Possible error while registering services. *)
 type step =

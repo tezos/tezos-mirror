@@ -18,6 +18,7 @@ module V0 = struct
   module Data_encoding = V0_data_encoding
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Error_monad_trace_eval = V0_error_monad_trace_eval
+  module RPC_directory = V0_RPC_directory
 end
 
 module V1 = struct
@@ -42,6 +43,7 @@ module V1 = struct
   module Hex = V1_hex
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Error_monad_trace_eval = V0_error_monad_trace_eval
+  module RPC_directory = V0_RPC_directory
 end
 
 module V2 = struct
@@ -65,6 +67,7 @@ module V2 = struct
   module Hex = V1_hex
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Error_monad_trace_eval = V0_error_monad_trace_eval
+  module RPC_directory = V0_RPC_directory
 end
 
 module V3 = struct
@@ -76,6 +79,7 @@ module V3 = struct
   module Hex = V1_hex
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Error_monad_trace_eval = V0_error_monad_trace_eval
+  module RPC_directory = V0_RPC_directory
 end
 
 module V4 = struct
@@ -83,17 +87,20 @@ module V4 = struct
   module Replicated_signatures = V3_replicated_signatures
   module Lwtreslib_list_combine = V3_lwtreslib_list_combine
   module Error_monad_infix_globals = V0_error_monad_infix_globals
+  module RPC_directory = V0_RPC_directory
 end
 
 module V5 = struct
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Bounded = V5_bounded
+  module RPC_directory = V0_RPC_directory
 end
 
 module V6 = struct
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Plonk = V6_plonk
   module Bounded = V5_bounded
+  module RPC_directory = V0_RPC_directory
 end
 
 module V7 = struct
