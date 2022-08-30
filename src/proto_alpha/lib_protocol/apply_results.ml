@@ -753,10 +753,9 @@ module Manager_result = struct
       ~op_case:Operation.Encoding.Manager_operations.zk_rollup_origination_case
       ~encoding:
         Data_encoding.(
-          obj5
+          obj4
             (req "balance_updates" Receipt.balance_updates_encoding)
             (req "originated_zk_rollup" Zk_rollup.Address.encoding)
-            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (req "size" z))
       ~select:(function
@@ -767,25 +766,10 @@ module Manager_result = struct
       ~proj:(function
         | Zk_rollup_origination_result
             {balance_updates; originated_zk_rollup; consumed_gas; size} ->
-            ( balance_updates,
-              originated_zk_rollup,
-              Gas.Arith.ceil consumed_gas,
-              consumed_gas,
-              size ))
-      ~inj:
-        (fun ( balance_updates,
-               originated_zk_rollup,
-               consumed_gas,
-               consumed_milligas,
-               size ) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+            (balance_updates, originated_zk_rollup, consumed_gas, size))
+      ~inj:(fun (balance_updates, originated_zk_rollup, consumed_gas, size) ->
         Zk_rollup_origination_result
-          {
-            balance_updates;
-            originated_zk_rollup;
-            consumed_gas = consumed_milligas;
-            size;
-          })
+          {balance_updates; originated_zk_rollup; consumed_gas; size})
 
   let sc_rollup_originate_case =
     make
