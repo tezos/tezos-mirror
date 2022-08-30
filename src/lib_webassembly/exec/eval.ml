@@ -847,7 +847,7 @@ and step_resolved module_reg (c : config) frame vs e es : config Lwt.t =
                   Host_funcs.lookup ~global_name c.host_funcs
                 in
                 let* inst = resolve_module_ref module_reg frame.inst in
-                let+ res = f c.input c.output inst (List.rev args) in
+                let+ res = f c.input c.output inst.memories (List.rev args) in
                 (List.rev res @ vs', []))
               (function
                 | Crash (_, msg) -> Crash.error e.at msg | exn -> raise exn))

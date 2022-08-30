@@ -53,18 +53,11 @@ let test_aux_write_output () =
       }
   in
   assert (Input_buffer.num_elements input_buffer = Z.one) ;
-  let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
-  let memories =
-    Tezos_webassembly_interpreter.Instance.Vector.cons
-      memory
-      module_inst.memories
-  in
-  let module_inst = {module_inst with memories} in
   let* _ =
     Host_funcs.Internal_for_tests.aux_write_input_in_memory
       ~input_buffer
       ~output_buffer
-      ~module_inst
+      ~memory
       ~rtype_offset:0l
       ~level_offset:4l
       ~id_offset:10l
@@ -77,7 +70,7 @@ let test_aux_write_output () =
     Host_funcs.Internal_for_tests.aux_write_output
       ~input_buffer
       ~output_buffer
-      ~module_inst
+      ~memory
       ~src:50l
       ~num_bytes:5l
   in

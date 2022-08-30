@@ -28,17 +28,17 @@ open Instance
 
 exception Bad_input
 
-let retrieve_memory module_inst =
-  let memories = module_inst.memories in
+let retrieve_memory memories =
   match Vector.num_elements memories with
   | 1l -> Vector.get 0l memories
   | _ ->
       raise
         (Eval.Crash
-           (Source.no_region, "the memories is supposed to be a singleton"))
+           ( Source.no_region,
+             "caller module must have exactly 1 memory instance" ))
 
-let aux_write_input_in_memory ~input_buffer ~output_buffer ~module_inst
-    ~rtype_offset ~level_offset ~id_offset ~dst ~max_bytes =
+let aux_write_input_in_memory ~input_buffer ~output_buffer ~memory ~rtype_offset
+    ~level_offset ~id_offset ~dst ~max_bytes =
   let open Lwt.Syntax in
   let* {rtype; raw_level; message_counter; payload} =
     Input_buffer.dequeue input_buffer
@@ -51,7 +51,6 @@ let aux_write_input_in_memory ~input_buffer ~output_buffer ~module_inst
     let payload =
       Bytes.sub payload 0 @@ min input_size (Int32.to_int max_bytes)
     in
-    let* memory = retrieve_memory module_inst in
     let _ = Memory.store_bytes memory dst (Bytes.to_string payload) in
     let _ = Memory.store_num memory rtype_offset 0l (I32 rtype) in
     let _ = Memory.store_num memory level_offset 0l (I32 raw_level) in
@@ -60,13 +59,11 @@ let aux_write_input_in_memory ~input_buffer ~output_buffer ~module_inst
     in
     Lwt.return input_size
 
-let aux_write_output ~input_buffer:_ ~output_buffer ~module_inst ~src ~num_bytes
-    =
+let aux_write_output ~input_buffer:_ ~output_buffer ~memory ~src ~num_bytes =
   let open Lwt.Syntax in
   if num_bytes > 4096l then Lwt.return 1l
   else
     let num_bytes = Int32.to_int num_bytes in
-    let* memory = retrieve_memory module_inst in
     let* payload = Memory.load_bytes memory src num_bytes in
     let* () = Output_buffer.set_value output_buffer (Bytes.of_string payload) in
     Lwt.return 0l
@@ -90,7 +87,7 @@ let read_input_name = "tezos_read_input"
 
 let read_input =
   Host_funcs.Host_func
-    (fun input_buffer output_buffer module_inst inputs ->
+    (fun input_buffer output_buffer memories inputs ->
       let open Lwt.Syntax in
       match inputs with
       | [
@@ -100,11 +97,12 @@ let read_input =
        Values.(Num (I32 dst));
        Values.(Num (I32 max_bytes));
       ] ->
+          let* memory = retrieve_memory memories in
           let* x =
             aux_write_input_in_memory
               ~input_buffer
               ~output_buffer
-              ~module_inst
+              ~memory
               ~rtype_offset
               ~level_offset
               ~id_offset
@@ -125,15 +123,16 @@ let write_output_type =
 
 let write_output =
   Host_funcs.Host_func
-    (fun input_buffer output_buffer module_inst inputs ->
+    (fun input_buffer output_buffer memories inputs ->
       let open Lwt.Syntax in
       match inputs with
       | [Values.(Num (I32 src)); Values.(Num (I32 num_bytes))] ->
+          let* memory = retrieve_memory memories in
           let* x =
             aux_write_output
               ~input_buffer
               ~output_buffer
-              ~module_inst
+              ~memory
               ~src
               ~num_bytes
           in

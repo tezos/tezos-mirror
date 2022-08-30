@@ -52,14 +52,14 @@ exception Bad_input
 
 module Internal_for_tests : sig
   (** [aux_write_output ~input_buffer ~output_buffer ~module_inst ~src
-       ~num_bytes] reads num_bytes from the memory of module_inst starting at 
+       ~num_bytes] reads num_bytes from the memory of module_inst starting at
        src and writes this to the output_buffer. It also checks that
        the input payload is no larger than `max_output`. It returns 0 for Ok and
       1 for `output too large`.*)
   val aux_write_output :
     input_buffer:Tezos_webassembly_interpreter.Input_buffer.t ->
     output_buffer:Tezos_webassembly_interpreter.Output_buffer.t ->
-    module_inst:Tezos_webassembly_interpreter.Instance.module_inst ->
+    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
     src:int32 ->
     num_bytes:int32 ->
     int32 Lwt.t
@@ -72,12 +72,12 @@ module Internal_for_tests : sig
        on the memory addreses offsets described. It also checks that
        the input payload is no larger than `max_input` and crashes
        with `input too large` otherwise. It returns the size of the
-       payload. Note also that, if the level increases this function also 
+       payload. Note also that, if the level increases this function also
       updates the level of the output buffer and resets its id to zero.*)
   val aux_write_input_in_memory :
     input_buffer:Tezos_webassembly_interpreter.Input_buffer.t ->
     output_buffer:Tezos_webassembly_interpreter.Output_buffer.t ->
-    module_inst:Tezos_webassembly_interpreter.Instance.module_inst ->
+    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
     rtype_offset:int32 ->
     level_offset:int32 ->
     id_offset:int32 ->
