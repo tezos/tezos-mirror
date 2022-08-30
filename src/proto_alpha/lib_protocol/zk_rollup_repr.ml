@@ -76,8 +76,8 @@ end
 type t = Address.t
 
 let to_scalar x =
-  Zk_rollup_scalar.of_bytes
-    (Data_encoding.Binary.to_bytes_exn Address.encoding x)
+  Zk_rollup_scalar.of_bits
+    (Data_encoding.Binary.to_string_exn Address.encoding x)
 
 type pending_list =
   | Empty of {next_index : int64}

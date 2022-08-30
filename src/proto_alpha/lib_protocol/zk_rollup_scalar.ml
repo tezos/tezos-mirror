@@ -31,7 +31,7 @@ let of_z z =
      t a field element *)
   Bls12_381.Fr.of_z z
 
-let of_bytes bs =
-  (* The bytes are interpreted as a Z integer *)
-  let z = Z.of_bits @@ Bytes.to_string bs in
+let of_bits bs =
+  (* The bits are interpreted as a Z integer *)
+  let z = Z.of_bits bs in
   of_z z

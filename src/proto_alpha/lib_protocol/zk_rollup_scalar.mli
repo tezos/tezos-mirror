@@ -34,7 +34,7 @@ type t = Bls12_381.Fr.t
     is applied. *)
 val of_z : Z.t -> t
 
-(** Safe conversion from bytes.
+(** Safe conversion from bits, represented as a string.
     If the numerical value is not in the field, modulo reduction
     is applied. *)
-val of_bytes : bytes -> t
+val of_bits : string -> t

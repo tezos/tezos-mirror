@@ -41,7 +41,7 @@ let encoding =
   let static_encoding =
     let circuits_info_encoding =
       conv
-        (fun m -> List.of_seq @@ SMap.to_seq m)
+        SMap.bindings
         (fun l -> SMap.of_seq @@ List.to_seq l)
         (list (tup2 string bool))
     in
