@@ -284,7 +284,7 @@ let other_prio = `Medium
 
 let on_flush config filter_state ?(validation_state : validation_state option)
     ~predecessor () =
-  ignore filter_state ;
+  ignore (filter_state : state) ;
   init config ?validation_state ~predecessor ()
 
 let get_manager_operation_gas_and_fee contents =

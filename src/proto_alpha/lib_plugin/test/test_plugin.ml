@@ -47,11 +47,9 @@ let test_flush () =
          QCheck2.Gen.bool)
   in
   List.iter_es
-    (fun ( (filter_state, ((op_info : manager_op_info), pkh)),
+    (fun ( (filter_state, (oph, (op_info : manager_op_info))),
            with_validation_state ) ->
-      let filter_state =
-        add_manager_restriction filter_state op_info.operation_hash op_info pkh
-      in
+      let filter_state = add_manager_op filter_state oph op_info `No_replace in
       Context.init1 () >>= function
       | Error e ->
           failwith "Error at context initialisation: %a" pp_print_trace e
