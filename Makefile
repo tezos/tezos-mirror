@@ -34,7 +34,7 @@ CODE_QUALITY_REPORT := _reports/gl-code-quality-report.json
 PROFILE?=dev
 VALID_PROFILES=dev release static
 
-TEZOS_BIN=octez-node octez-validator octez-client octez-admin-client octez-signer octez-codec tezos-protocol-compiler octez-snoop octez-proxy-server \
+TEZOS_BIN=octez-node octez-validator octez-client octez-admin-client octez-signer octez-codec octez-protocol-compiler octez-snoop octez-proxy-server \
     $(foreach p, $(active_protocol_versions), octez-baker-$(p)) \
     $(foreach p, $(active_protocol_versions), octez-accuser-$(p)) \
     $(foreach p, $(active_protocol_versions), \

@@ -2001,7 +2001,7 @@ let _octez_protocol_shell_context_tests =
 
 let octez_protocol_compiler_registerer =
   public_lib
-    "tezos-protocol-compiler.registerer"
+    "octez-protocol-compiler.registerer"
     ~path:"src/lib_protocol_compiler/registerer"
     ~internal_name:"tezos_protocol_registerer"
     ~deps:
@@ -2012,13 +2012,13 @@ let _octez_protocol_compiler_cmis_of_cma =
   private_exe
     "cmis_of_cma"
     ~path:"src/lib_protocol_compiler/bin"
-    ~opam:"tezos-protocol-compiler"
+    ~opam:"octez-protocol-compiler"
     ~deps:[compiler_libs_common]
     ~modules:["cmis_of_cma"]
 
 let octez_protocol_compiler_lib =
   public_lib
-    "tezos-protocol-compiler"
+    "octez-protocol-compiler"
     ~path:"src/lib_protocol_compiler"
     ~synopsis:"Tezos: economic-protocol compiler"
     ~ocaml:
@@ -2114,7 +2114,7 @@ let octez_protocol_compiler_lib =
 
 let octez_protocol_compiler_native =
   public_lib
-    "tezos-protocol-compiler.native"
+    "octez-protocol-compiler.native"
     ~path:"src/lib_protocol_compiler"
     ~deps:
       [
@@ -2128,7 +2128,7 @@ let octez_protocol_compiler_native =
         [
           install
             [V [S "final_protocol_versions"]]
-            ~package:"tezos-protocol-compiler"
+            ~package:"octez-protocol-compiler"
             ~section:"libexec";
         ]
 
@@ -3051,9 +3051,9 @@ let octez_openapi =
 
 let _octez_protocol_compiler_bin =
   public_exe
-    "tezos-protocol-compiler"
+    "octez-protocol-compiler"
     ~path:"src/lib_protocol_compiler/bin"
-    ~opam:"tezos-protocol-compiler"
+    ~opam:"octez-protocol-compiler"
     ~internal_name:"main_native"
     ~modes:[Native]
     ~deps:[octez_protocol_compiler_native]
@@ -3062,9 +3062,9 @@ let _octez_protocol_compiler_bin =
 
 let octez_protocol_compiler_tezos_protocol_packer =
   public_exe
-    "tezos-protocol-compiler.tezos-protocol-packer"
+    "octez-protocol-compiler.tezos-protocol-packer"
     ~path:"src/lib_protocol_compiler/bin"
-    ~opam:"tezos-protocol-compiler"
+    ~opam:"octez-protocol-compiler"
     ~internal_name:"main_packer"
     ~deps:
       [
@@ -3078,7 +3078,7 @@ let _octez_embedded_protocol_packer =
   public_exe
     "tezos-embedded-protocol-packer"
     ~path:"src/lib_protocol_compiler/bin"
-    ~opam:"tezos-protocol-compiler"
+    ~opam:"octez-protocol-compiler"
     ~internal_name:"main_embedded_packer"
     ~modes:[Native]
     ~deps:
@@ -3840,7 +3840,7 @@ module Protocol = Protocol
                   ~action:
                     [
                       S "run";
-                      S "%{bin:tezos-protocol-compiler}";
+                      S "%{bin:octez-protocol-compiler}";
                       (if
                        String_set.mem
                          tezos_protocol.Tezos_protocol.hash
@@ -3903,7 +3903,7 @@ module Protocol = Protocol
                         [
                           S "run";
                           S
-                            "%{bin:tezos-protocol-compiler.tezos-protocol-packer}";
+                            "%{bin:octez-protocol-compiler.octez-protocol-packer}";
                           S "%{src_dir}";
                         ];
                       ];
@@ -5408,7 +5408,7 @@ let _octez_client =
             ~action:
               [
                 S "run";
-                S "%{bin:tezos-protocol-compiler}";
+                S "%{bin:octez-protocol-compiler}";
                 S "-no-hash-check";
                 H [S "-warn-error"; S "+a"];
                 S "test/proto_test_injection/";

@@ -40,7 +40,7 @@ let get_datadir () =
 
 let init dir = datadir := Some dir
 
-let compiler_name = "tezos-protocol-compiler"
+let compiler_name = "octez-protocol-compiler"
 
 let do_compile hash p =
   let open Lwt_syntax in

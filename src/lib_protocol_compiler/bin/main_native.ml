@@ -25,8 +25,8 @@
 
 let () =
   try
-    Tezos_protocol_compiler.Compiler.main
-      Tezos_protocol_compiler_native.Native.driver ;
+    Octez_protocol_compiler.Compiler.main
+      Octez_protocol_compiler_native.Native.driver ;
     Stdlib.exit 0
   with exn ->
     Format.eprintf "%a\n%!" Opterrors.report_error exn ;
