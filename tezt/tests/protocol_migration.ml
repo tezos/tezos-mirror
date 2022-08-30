@@ -30,6 +30,18 @@
    Subject:      Checks the migration of protocol alpha
 *)
 
+(** Boilerplate code to create a user-migratable node. Used in the tests below. **)
+let user_migratable_node_init ~migration_level ~migrate_to =
+  let* node =
+    Node.init
+      ~patch_config:
+        (Node.Config_file.set_sandbox_network_with_user_activated_upgrades
+           [(migration_level, migrate_to)])
+      [Synchronisation_threshold 0; Private_mode]
+  in
+  let* client = Client.(init ~endpoint:(Node node) ()) in
+  Lwt.return (client, node)
+
 (* Migration to Tenderbake is only supported after the first cycle,
    therefore at [migration_level >= blocks_per_cycle]. *)
 let test_protocol_migration ~blocks_per_cycle ~migration_level ~migrate_from
@@ -41,15 +53,8 @@ let test_protocol_migration ~blocks_per_cycle ~migration_level ~migrate_from
   @@ fun () ->
   assert (migration_level >= blocks_per_cycle) ;
   Log.info "Node starting" ;
-  let* node =
-    Node.init
-      ~patch_config:
-        (Node.Config_file.set_sandbox_network_with_user_activated_upgrades
-           [(migration_level, migrate_to)])
-      []
-  in
+  let* client, _node = user_migratable_node_init ~migration_level ~migrate_to in
   Log.info "Node initialized" ;
-  let* client = Client.(init ~endpoint:(Node node) ()) in
   let* () = Client.activate_protocol ~protocol:migrate_from client in
   Log.info "Protocol activated" ;
   (* Bake until migration *)
@@ -82,18 +87,6 @@ let test_migration_for_whole_cycle ~migrate_from ~migrate_to =
       ~migrate_from
       ~migrate_to
   done
-
-(** Boilerplate code to create a user-migratable node. Used in the tests below. **)
-let user_migratable_node_init ~migration_level ~migrate_to =
-  let* node =
-    Node.init
-      ~patch_config:
-        (Node.Config_file.set_sandbox_network_with_user_activated_upgrades
-           [(migration_level, migrate_to)])
-      [Synchronisation_threshold 0; Private_mode]
-  in
-  let* client = Client.(init ~endpoint:(Node node) ()) in
-  Lwt.return (client, node)
 
 (** [block_check ~level ~expected_block_type ~migrate_to ~migrate_from client]
     is generic check that a block of type [expected_block_type] contains
