@@ -24,6 +24,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error += Sc_rollup_proof_check of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"Sc_rollup_proof_check"
+    ~title:"Invalid proof"
+    ~description:"An invalid proof has been submitted"
+    ~pp:(fun fmt msg -> Format.fprintf fmt "Invalid proof: %s" msg)
+    Data_encoding.(obj1 @@ req "reason" string)
+    (function Sc_rollup_proof_check msg -> Some msg | _ -> None)
+    (fun msg -> Sc_rollup_proof_check msg)
+
 type t = {
   pvm_step : Sc_rollups.wrapped_proof;
   inbox : Sc_rollup_inbox_repr.serialized_proof option;
@@ -58,19 +71,6 @@ let stop proof =
 let cut_at_level level input =
   let input_level = Sc_rollup_PVM_sem.(input.inbox_level) in
   if Raw_level_repr.(level <= input_level) then None else Some input
-
-type error += Sc_rollup_proof_check of string
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"Sc_rollup_proof_check"
-    ~title:"Invalid proof"
-    ~description:"An invalid proof has been submitted"
-    ~pp:(fun fmt msg -> Format.fprintf fmt "Invalid proof: %s" msg)
-    Data_encoding.(obj1 @@ req "reason" string)
-    (function Sc_rollup_proof_check msg -> Some msg | _ -> None)
-    (fun msg -> Sc_rollup_proof_check msg)
 
 let proof_error reason =
   let open Lwt_tzresult_syntax in
