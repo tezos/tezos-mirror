@@ -9,6 +9,7 @@
   tezos-lwt-result-stdlib
   zarith
   lazy-containers)
+ (preprocess (pps ppx_deriving.show))
  (flags
   (:standard)
   -open Lazy_containers))

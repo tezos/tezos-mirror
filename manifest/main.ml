@@ -1152,6 +1152,7 @@ let octez_webassembly_interpreter =
     ~synopsis:"WebAssembly reference interpreter with tweaks for Tezos"
     ~dune:Dune.[[S "include_subdirs"; S "unqualified"]]
     ~deps:[octez_lwt_result_stdlib; zarith; lazy_containers |> open_]
+    ~preprocess:[pps ppx_deriving_show]
 
 let _octez_webassembly_repl =
   private_exe

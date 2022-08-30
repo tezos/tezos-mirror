@@ -707,6 +707,8 @@ let of_strings shape ss =
         ss) ;
   to_string b
 
+let pp fmt v128 = Format.pp_print_string fmt v128
+
 let string_of_shape = function
   | I8x16 _ -> "i8x16"
   | I16x8 _ -> "i16x8"
