@@ -138,7 +138,7 @@ with the following formula::
 
 This formula avoids establishing quorums close to 100% that would be
 very difficult to attain, or, conversely, low quorums close to 0% making
-little participation chronicle, ensuring that the quorums are lower- and upper-bounded by :ref:`quorum_caps` (0.2 and 0.7, respectively).
+little participation chronic, ensuring that the quorums are lower- and upper-bounded by :ref:`quorum_caps` (0.2 and 0.7, respectively).
 
 The *super-majority* is reached if the cumulated stake of Yay ballots is
 greater than 8/10 of the cumulated stake of Yay and Nay ballots.
