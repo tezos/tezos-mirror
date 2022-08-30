@@ -58,23 +58,42 @@ let test_protocol_migration ~blocks_per_cycle ~migration_level ~migrate_from
   let* () = Client.activate_protocol ~protocol:migrate_from client in
   Log.info "Protocol activated" ;
   (* Bake until migration *)
-  let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
-  (* Ensure that we did migrate *)
-  let* migration_block =
-    RPC.Client.call client @@ RPC.get_chain_block_metadata ~block:"2" ()
+  let* () =
+    repeat (migration_level - 1) (fun () -> Client.bake_for_and_wait client)
+  in
+  (* Ensure that the block before migration *)
+  let* pre_migration_block =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_metadata ~block:(Int.to_string migration_level) ()
   in
   Log.info "Checking migration block consistency" ;
   Check.(
-    (migration_block.protocol = Protocol.hash migrate_from)
+    (pre_migration_block.protocol = Protocol.hash migrate_from)
       string
       ~error_msg:"expected protocol = %R, got %L") ;
   Check.(
-    (migration_block.next_protocol = Protocol.hash migrate_from)
+    (pre_migration_block.next_protocol = Protocol.hash migrate_to)
+      string
+      ~error_msg:"expected next_protocol = %R, got %L") ;
+  let* () = Client.bake_for_and_wait client in
+  (* Ensure that we migrated *)
+  let* migration_block =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_metadata
+         ~block:(Int.to_string (migration_level + 1))
+         ()
+  in
+  Log.info "Checking migration block consistency" ;
+  Check.(
+    (migration_block.protocol = Protocol.hash migrate_to)
+      string
+      ~error_msg:"expected protocol = %R, got %L") ;
+  Check.(
+    (migration_block.next_protocol = Protocol.hash migrate_to)
       string
       ~error_msg:"expected next_protocol = %R, got %L") ;
   (* Test that we can still bake after migration *)
-  let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
-  unit
+  repeat 5 (fun () -> Client.bake_for_and_wait client)
 
 (** Test all levels for one cycle, after the first cycle. *)
 let test_migration_for_whole_cycle ~migrate_from ~migrate_to =
@@ -181,7 +200,7 @@ let check_block_has_endorsements ~level client =
 
    @param consensus_threshold is a function of [consensus_committee_size],
    defauls to the mainnet value (2/3 [consensus_committee_size] + 1), instead of
-   0 in the sandbox. 
+   0 in the sandbox.
    @param round_duration is the (minimal) round duration in seconds (set by
    parameter [minimal_block_delay]), defaults to the sandbox value (typically 1s).
    @param expected_bake_for_blocks is how many blocks you are going to bake with
