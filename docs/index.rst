@@ -49,7 +49,6 @@ The Community
 - Several community-built block explorers are available:
 
     - https://tzstats.com
-    - https://tezblock.io
     - https://tzkt.io (Baking focused explorer)
     - https://arronax.io (Analytics-oriented explorer)
     - https://mininax.io

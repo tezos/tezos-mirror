@@ -92,7 +92,7 @@ Common options:
       separate JSON records,
    -  ``pp`` to output the events pretty-printed, one per line, using a
       format compatible with
-      `RFC-5424 <https://tools.ietf.org/html/rfc5424#section-6>`__ (or
+      `RFC-5424 <https://www.rfc-editor.org/rfc/rfc5424#section-6>`__ (or
       Syslog).
 
 Options available only for the ``file-descriptor-path://`` case:

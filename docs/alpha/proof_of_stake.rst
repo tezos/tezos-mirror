@@ -147,7 +147,8 @@ The list of protocol constants can be found in the API of the `Constants module 
 
 The values of protocol constants can be found using a :ref:`specific RPC call <GET_..--block_id--context--constants>`, as shown in :ref:`this example <get_protocol_constants>`.
 
-In particular, the protocol constants related to the proof-of-stake mechanism are detailed below.
+In particular, the protocol constants related to the proof-of-stake mechanism are detailed :ref:`below <ps_constants_alpha>`.
+Other important subsystems of the protocol have their own list of protocol constants, such as the :ref:`consensus-related parameters <cs_constants_alpha>` and the :ref:`randomness generation parameters <rg_constants_alpha>`.
 
 .. _ps_constants_alpha:
 

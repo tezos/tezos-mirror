@@ -26,7 +26,7 @@ contract.
 -  Commit:
    :gl:`tezos@3ff6bc8d`
 -  TZIP:
-   `increase_operation_size_limit <https://gitlab.com/tezos/tzip/-/blob/master/drafts/current/draft-increase_operation_size_limit.md>`__
+   `increase_operation_size_limit <https://gitlab.com/tezos/tzip/-/blob/bd1a3e6e2169248165df3ba24e24099d7bd1d431/drafts/current/draft-increase_operation_size_limit.md>`__
 
 Fixed a discrepancy between ``CONTRACT`` and ``PACK`` in addresses without entrypoints
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -8,7 +8,7 @@ History
 -------
 
 Before Tenderbake, there was
-`Emmy* <https://gitlab.com/tezos/tzip/-/blob/master/drafts/current/draft_emmy-star.md>`_,
+`Emmy* <https://gitlab.com/tezos/tzip/-/blob/1728fcfe0ac90463ef15e6a994b6d6a15357e373/drafts/current/draft_emmy-star.md>`_,
 a Nakamoto-style consensus consisting of a series of improvements of the one in
 the `Tezos whitepaper <https://tezos.com/whitepaper.pdf>`_.
 
@@ -505,4 +505,4 @@ Further External Resources
 
 * Tenderbake `report <https://arxiv.org/abs/2001.11965>`_
 * Tenderbake `blog post <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_.
-* Tenderbake `tzip <https://gitlab.com/tezos/tzip/-/blob/master/drafts/current/draft_tenderbake.md>`_.
+* Tenderbake `tzip <https://gitlab.com/tezos/tzip/-/blob/081c7691c24722ff15d2d0dfca9457f6f4d76fa2/drafts/current/draft_tenderbake.md>`_.
