@@ -168,7 +168,7 @@ let map_concat_kont_encoding enc_a enc_b =
         (fun j -> MC_Join j);
     ]
 
-let init_kont_encoding =
+let init_kont_encoding ~host_funcs =
   tagged_union tag_encoding
   @@ [
        case
@@ -290,20 +290,23 @@ let init_kont_encoding =
           | _ -> None)
         (function inst, map, es_elem -> IK_Es_datas (inst, map, es_elem));
       case
-        "IK_Remaining"
-        (tup3
+        "IK_Join_admin"
+        (tup2
            ~flatten:true
            (scope ["module"] Wasm_encoding.module_instance_encoding)
            (scope
-              ["es_elem"]
-              (lazy_vec_encoding Wasm_encoding.admin_instr_encoding))
-           (scope
-              ["es_data"]
-              (lazy_vec_encoding Wasm_encoding.admin_instr_encoding)))
-        (function
-          | IK_Remaining (m, admin, admin') -> Some (m, admin, admin')
-          | _ -> None)
-        (function m, admin, admin' -> IK_Remaining (m, admin, admin'));
+              ["kont"]
+              (join_kont_encoding Wasm_encoding.admin_instr_encoding)))
+        (function IK_Join_admin (m, admin) -> Some (m, admin) | _ -> None)
+        (function m, admin -> IK_Join_admin (m, admin));
+      case
+        "IK_Eval"
+        (tup2
+           ~flatten:true
+           (scope ["module"] Wasm_encoding.module_instance_encoding)
+           (scope ["config"] (Wasm_encoding.config_encoding ~host_funcs)))
+        (function IK_Eval (m, config) -> Some (m, config) | _ -> None)
+        (function m, config -> IK_Eval (m, config));
       case
         "IK_Stop"
         Wasm_encoding.module_instance_encoding

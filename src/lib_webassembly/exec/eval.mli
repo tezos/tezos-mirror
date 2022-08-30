@@ -26,6 +26,15 @@ and admin_instr' =
   | Label of int32 * Ast.instr list * code
   | Frame of int32 * frame * code
 
+type config = {
+  frame : frame;
+  input : input_inst;
+  output : output_inst;
+  code : code;
+  host_funcs : Host_funcs.registry;
+  budget : int; (* to model stack overflow *)
+}
+
 type ('a, 'b, 'acc) fold_right2_kont = {
   acc : 'acc;
   lv : 'a Vector.t;
@@ -81,7 +90,8 @@ type init_kont =
       module_inst
       * (Ast.data_segment, admin_instr) map_concat_kont
       * admin_instr Vector.t
-  | IK_Remaining of module_inst * admin_instr Vector.t * admin_instr Vector.t
+  | IK_Join_admin of module_inst * admin_instr join_kont
+  | IK_Eval of module_inst * config
   | IK_Stop of module_inst
       (** Witness that there is no more tick to execute to complete
           the [init] process. *)
@@ -116,15 +126,6 @@ val invoke :
   func_inst ->
   value list ->
   value list Lwt.t (* raises Trap *)
-
-type config = {
-  frame : frame;
-  input : input_inst;
-  output : output_inst;
-  code : code;
-  host_funcs : Host_funcs.registry;
-  budget : int; (* to model stack overflow *)
-}
 
 val step : module_reg -> config -> config Lwt.t
 
