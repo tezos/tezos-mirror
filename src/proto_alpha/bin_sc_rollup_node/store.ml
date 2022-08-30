@@ -67,8 +67,6 @@ module type Mutable_value = sig
 
   val path_key : path
 
-  val decode_value : bytes -> value Lwt.t
-
   val set : t -> value -> unit Lwt.t
 
   val get : t -> value Lwt.t
@@ -88,182 +86,6 @@ module type KeyValue = sig
   type value
 
   val value_encoding : value Data_encoding.t
-end
-
-(* An interface for constructing nested maps with a primary and secondary key.
-   This can be thought as a primary-key indexed maps whose values are
-   secondary-key indexed maps. *)
-module type DoubleKeyValue = sig
-  val path : path
-
-  val keep_last_n_entries_in_memory : int
-
-  type primary_key
-
-  type secondary_key
-
-  (* `string_of_primary_key` should return a string that does not include
-     the character `/`, to avoid breaking the structure of Irmin paths used
-     by the underlying store. One possibility to guarantee that this
-     property is satisfied is to return strings in Base58 format, as
-     these only contain alphanumeric characters (and therefore not the '/'
-     character).
-  *)
-  val string_of_primary_key : primary_key -> string
-
-  (* `string_of_secondary_key` should return a string that does not include
-     the character `/`, to avoid breaking the structure of Irmin paths used
-     by the underlying store. See
-     [Make_nested_map.list_secondary_keys_with_values] and
-     [Make_nested_map.add] for more details about how not enforcing this
-     property would break the store. One possibility to guarantee that this
-     property is satisfied is to return strings in Base58 format, as these only
-     contain alphanumeric characters (and therefore not the '/' character).
-     Furthermore, the function should satisfy the following equality for all
-     strings `s` for which `secondary_key_of_string_exn s` is defined:
-     `string_of_secondary_key @@ secondary_key_of_string_exn s = s`.
-  *)
-  val string_of_secondary_key : secondary_key -> string
-
-  (* This function should satisfy the following equality for
-     all secondary_keys `k`:
-     `secondary_key_of_string_exn @@ string_of_secondary_key k = k`.
-  *)
-  val secondary_key_of_string_exn : string -> secondary_key
-
-  type value
-
-  val value_encoding : value Data_encoding.t
-
-  val compare_secondary_keys : secondary_key -> secondary_key -> int
-end
-
-(** A functor for building a nested storage map, with primary and secondary key,
-   from a module of type `DoubleKeyValue`.
-   This map provides the following functionalities:
-   {ul
-     {li inserting values in the map by specifying a primary and a secondary key}
-     {li fetching a value in the map associated with a given primary and
-      a given secondary key}
-     {li given a primary key, retrieving the list of secondary keys for which
-         there is a value associated with the primary and secondary keys in the map.
-     }
-   }
-   Similarly to storage maps with a single key, the contents of this map cannot be
-   overwritten. However, trying to overwrite the value for a key with the same
-   value will not result in an error. This is required to address the case
-   where the rollup node needs to rewrite some entries in the map as a
-   consequence of some work being redone after a violent interruption.
-*)
-module Make_nested_map (P : DoubleKeyValue) = struct
-  (* Ignored for now. *)
-  let _ = P.keep_last_n_entries_in_memory
-
-  let path_key = P.path
-
-  let make_primary_key primary_key =
-    path_key @ [P.string_of_primary_key primary_key]
-
-  let make_composite_key primary_key secondary_key =
-    path_key
-    @ [
-        P.string_of_primary_key primary_key;
-        P.string_of_secondary_key secondary_key;
-      ]
-
-  let mem_primary store primary_key =
-    IStore.mem store (make_primary_key primary_key)
-
-  let mem store ~primary_key ~secondary_key =
-    IStore.mem store (make_composite_key primary_key secondary_key)
-
-  let decode_value encoded_value =
-    Data_encoding.Binary.of_bytes_exn P.value_encoding encoded_value
-
-  let get store ~primary_key ~secondary_key =
-    let open Lwt_syntax in
-    let+ value =
-      IStore.get store (make_composite_key primary_key secondary_key)
-    in
-    decode_value value
-
-  let list_secondary_keys_with_values store ~primary_key =
-    let open Lwt_syntax in
-    let primary_key_path = make_primary_key primary_key in
-    let* subtrees = IStore.list store primary_key_path in
-    let+ keys_with_values =
-      subtrees
-      |> List.map_s (fun (inner_key, tree) ->
-             let inner_key = P.secondary_key_of_string_exn inner_key in
-             let+ value =
-               match IStore.Tree.destruct tree with
-               | `Node _ ->
-                   (* If `P.string_of_secondary_keys` never returns a
-                      string containing the character `/`, then subtrees of a
-                      primary key can only be of type `Contents. See
-                      also the function `add`. *)
-                   assert false
-               | `Contents (c, _metadata) ->
-                   let+ raw_value = IStore.Tree.Contents.force_exn c in
-                   decode_value raw_value
-             in
-             (inner_key, value))
-    in
-    keys_with_values
-    |> List.sort (fun (key1, _value1) (key2, _value2) ->
-           P.compare_secondary_keys key1 key2)
-
-  let list_secondary_keys store ~primary_key =
-    let open Lwt_syntax in
-    let+ keys_with_values =
-      list_secondary_keys_with_values store ~primary_key
-    in
-    keys_with_values |> List.map fst
-
-  let list_values store ~primary_key =
-    let open Lwt_syntax in
-    let+ keys_with_values =
-      list_secondary_keys_with_values store ~primary_key
-    in
-    keys_with_values |> List.map snd
-
-  let find store ~primary_key ~secondary_key =
-    let open Lwt_option_syntax in
-    let+ value =
-      IStore.find store (make_composite_key primary_key secondary_key)
-    in
-    decode_value value
-
-  (* This function requires that `string_of_secondary_key secondary_key`
-     does not return a string containing the character `/`. If this
-     happens, then storing the value would create a child of `primary_key`
-     in the store tree with type `Node, which in turn breaks one of  the
-     assumptions of `list_secondary_keys_with_values`.
-     If `string_of_secondary_key` never returns a string containing
-     the character `/`, then invoking `add` ensures that all the
-     children of `primary_key` in the store have type `Contents. *)
-  let add store ~primary_key ~secondary_key value =
-    let open Lwt_syntax in
-    let key_path = make_composite_key primary_key secondary_key in
-    let full_path = String.concat "/" key_path in
-    let* existing_value = find store ~primary_key ~secondary_key in
-    let encode v = Data_encoding.Binary.to_bytes_exn P.value_encoding v in
-    let encoded_value = encode value in
-    match existing_value with
-    | None ->
-        let info () = info full_path in
-        IStore.set_exn ~info store key_path encoded_value
-    | Some existing_value ->
-        (* To be robust to interruption in the middle of processes,
-           we accept to redo some work when we restart the node.
-           Hence, it is fine to insert twice the same value for a
-           given value. *)
-        if not (Bytes.equal (encode existing_value) encoded_value) then
-          Stdlib.failwith
-            (Printf.sprintf
-               "Key %s already exists with a different value"
-               full_path)
-        else return_unit
 end
 
 module Make_map (P : KeyValue) = struct
@@ -345,8 +167,7 @@ struct
   let path_key = P.path
 
   let decode_value encoded_value =
-    Lwt.return
-    @@ Data_encoding.Binary.of_bytes_exn P.value_encoding encoded_value
+    Data_encoding.Binary.of_bytes_exn P.value_encoding encoded_value
 
   let set store value =
     let encoded_value =
@@ -355,12 +176,15 @@ struct
     let info () = info (String.concat "/" P.path) in
     IStore.set_exn ~info store path_key encoded_value
 
-  let get store = IStore.get store path_key >>= decode_value
+  let get store =
+    let open Lwt_syntax in
+    let+ value = IStore.get store path_key in
+    decode_value value
 
   let find store =
-    let open Lwt_syntax in
-    let* value = IStore.find store path_key in
-    Option.map_s decode_value value
+    let open Lwt_option_syntax in
+    let+ value = IStore.find store path_key in
+    decode_value value
 end
 
 (** Aggregated collection of messages from the L1 inbox *)
@@ -569,6 +393,9 @@ module Commitments_published_at_level = Make_updatable_map (struct
   let value_encoding = Raw_level.encoding
 end)
 
+(* Slot subscriptions per block hash, saved as a list of
+   `Dal.Slot_index.t`, which is a bounded integer between `0` and `255`
+   included. *)
 module Dal_slot_subscriptions = Make_append_only_map (struct
   let path = ["dal"; "slot_subscriptions"]
 
@@ -597,42 +424,84 @@ module Contexts = Make_append_only_map (struct
   let value_encoding = Context.hash_encoding
 end)
 
-module Dal_slots = Make_nested_map (struct
-  let path = ["dal"; "slot_headers"]
+(* Published slot headers per block hash,
+   stored as a list of bindings from `Dal_slot_index.t`
+   to `Dal.Slot.t`. The encoding function converts this
+   list into a `Dal.Slot_index.t`-indexed map. *)
+module Dal_slots = struct
+  module Dal_slots_map = Map.Make (struct
+    type t = Dal.Slot_index.t
 
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3527
-     Check if we actually need `keep_last_n_entries_in_memory`.
-  *)
-  let keep_last_n_entries_in_memory = 10
+    let compare = Dal.Slot_index.compare
+  end)
 
-  type primary_key = Block_hash.t
+  include Make_updatable_map (struct
+    let keep_last_n_entries_in_memory = 10
 
-  type secondary_key = Dal.Slot_index.t
+    let path = ["dal"; "slot_headers"]
 
-  let string_of_primary_key block_hash = Block_hash.to_b58check block_hash
+    type key = Block_hash.t
 
-  let string_of_secondary_key slot_index =
-    string_of_int @@ Dal.Slot_index.to_int slot_index
+    let string_of_key = Block_hash.to_b58check
 
-  let secondary_key_of_string_exn slot_index =
-    match Dal.Slot_index.of_int @@ int_of_string slot_index with
-    | None ->
-        (* This value is never going to be `None. This is because the function
-           `secondary_key_of_string_exn` is only called by the function
-           `Dal_slots.list_secondary_keys_with_values`. The parameter of the
-           function is guaranteed to be a string `slot_index` from a path of
-           the forms `/dal/slot_headers/<block_hash>/<slot_index>`, which must
-           have been previously created via the `Dal_slots.add` function, which
-           converts a slot_index - a bounded integer in the range [0, 256) -
-           into a string. Therefore, `slot_index` must be the representation as
-           a string of a valid slot index.
-        *)
-        assert false
-    | Some slot_index -> slot_index
+    type value = Dal.Slot.t Dal_slots_map.t
 
-  type value = Dal.Slot.t
+    (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3732
+       Use data encodings for maps once they are available in the
+       `Data_encoding` library.
+    *)
+    let value_encoding =
+      Data_encoding.conv
+        (fun dal_slots_map -> Dal_slots_map.bindings dal_slots_map)
+        (fun dal_slots_bindings ->
+          Dal_slots_map.of_seq @@ List.to_seq dal_slots_bindings)
+        Data_encoding.(
+          list
+          @@ obj2
+               (req "slot_index" Dal.Slot_index.encoding)
+               (req "slot_metadata" Dal.Slot.encoding))
+  end)
 
-  let value_encoding = Dal.Slot.encoding
+  let list_secondary_keys_with_values store ~primary_key =
+    let open Lwt_syntax in
+    let+ slots_map = find store primary_key in
+    Option.fold ~none:[] ~some:Dal_slots_map.bindings slots_map
 
-  let compare_secondary_keys = Dal.Slot_index.compare
-end)
+  let list_secondary_keys store ~primary_key =
+    let open Lwt_syntax in
+    let+ secondary_keys_with_values =
+      list_secondary_keys_with_values store ~primary_key
+    in
+    secondary_keys_with_values |> List.map fst
+
+  let list_values store ~primary_key =
+    let open Lwt_syntax in
+    let+ secondary_keys_with_values =
+      list_secondary_keys_with_values store ~primary_key
+    in
+    secondary_keys_with_values |> List.map snd
+
+  let add store ~primary_key ~secondary_key value =
+    let open Lwt_syntax in
+    let* slots_map = find store primary_key in
+    let slots_map = Option.value ~default:Dal_slots_map.empty slots_map in
+    let value_can_be_added =
+      match Dal_slots_map.find secondary_key slots_map with
+      | None -> true
+      | Some old_value ->
+          Data_encoding.Binary.(
+            Bytes.equal
+              (to_bytes_exn Dal.Slot.encoding old_value)
+              (to_bytes_exn Dal.Slot.encoding value))
+    in
+    if value_can_be_added then
+      let new_slots_map = Dal_slots_map.add secondary_key value slots_map in
+      add store primary_key new_slots_map
+    else
+      Stdlib.failwith
+        (Printf.sprintf
+           "A binding for slot index %d under block_hash %s already exists \
+            with a different value"
+           (Dal.Slot_index.to_int secondary_key)
+           (Block_hash.to_b58check primary_key))
+end
