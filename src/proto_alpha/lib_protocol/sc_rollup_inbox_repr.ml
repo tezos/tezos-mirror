@@ -739,7 +739,7 @@ struct
     return (history, cell)
 
   (** [archive_if_needed ctxt history inbox new_level level_tree]
-      is responsible for ensuring that the {!add_messages_aux} function
+      is responsible for ensuring that the {!add_messages} function
       below has a correctly set-up [level_tree] to which to add the
       messages. If [new_level] is a higher level than the current inbox,
       we create a new inbox level tree at that level in which to start
@@ -778,7 +778,7 @@ struct
       in
       return (history, inbox, tree)
 
-  let add_messages_aux ctxt history inbox level payloads level_tree =
+  let add_messages ctxt history inbox level payloads level_tree =
     let open Lwt_tzresult_syntax in
     let* () =
       fail_when
@@ -803,19 +803,12 @@ struct
     let current_level_hash () = hash_level_tree level_tree in
     return (level_tree, history, {inbox with current_level_hash})
 
-  let add_messages ctxt history inbox level payloads level_tree =
-    let open Lwt_tzresult_syntax in
-    let* level_tree, history, inbox =
-      add_messages_aux ctxt history inbox level payloads level_tree
-    in
-    return (level_tree, history, inbox)
-
   let add_messages_no_history ctxt inbox level payloads level_tree =
     let open Lwt_tzresult_syntax in
-    let* level_tree, _, inbox =
-      add_messages_aux ctxt no_history inbox level payloads level_tree
+    let+ level_tree, _, inbox =
+      add_messages ctxt no_history inbox level payloads level_tree
     in
-    return (level_tree, inbox)
+    (level_tree, inbox)
 
   (* An [inclusion_proof] is a path in the Merkelized skip list
      showing that a given inbox history is a prefix of another one.
