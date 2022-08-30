@@ -154,7 +154,8 @@ let all_interpreter_costs =
     ("concat_string", concat_string (S.safe_int 42));
     ("concat_bytes", concat_bytes (S.safe_int 42));
     ("exec", exec);
-    ("apply", apply);
+    ("apply_rec", apply ~rec_flag:true);
+    ("apply", apply ~rec_flag:false);
     ("lambda", lambda);
     ("address", address);
     ("contract", contract);

@@ -2018,9 +2018,28 @@ module Registration_section = struct
     let dummy_lambda =
       let open Script_typed_ir in
       let descr =
-        {kloc = 0; kbef = unit @$ bot; kaft = unit @$ bot; kinstr = halt}
+        {
+          kloc = dummy_loc;
+          kbef = unit @$ bot;
+          kaft = unit @$ bot;
+          kinstr = halt;
+        }
       in
-      Lam (descr, Micheline.Int (0, Z.zero))
+      Lam (descr, Micheline.Int (dummy_loc, Z.zero))
+
+    let dummy_lambda_rec =
+      let open Script_typed_ir in
+      let descr =
+        {
+          kloc = dummy_loc;
+          kbef = unit @$ lambda unit unit @$ bot;
+          kaft = unit @$ bot;
+          kinstr =
+            IDrop
+              (dummy_loc, IDrop (dummy_loc, IConst (dummy_loc, unit, (), halt)));
+        }
+      in
+      LamRec (descr, Micheline.Int (dummy_loc, Z.zero))
 
     let () =
       (*
@@ -2033,7 +2052,9 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_IExec
         ~stack_type:(unit @$ lambda unit unit @$ bot)
         ~kinstr:(IExec (dummy_loc, Some (unit @$ bot), halt))
-        ~stack_sampler:(fun _cfg _rng_state () -> ((), (dummy_lambda, eos)))
+        ~stack_sampler:(fun _cfg rng_state () ->
+          if Base_samplers.uniform_bool rng_state then ((), (dummy_lambda, eos))
+          else ((), (dummy_lambda_rec, eos)))
         ()
 
     let () =
@@ -2044,23 +2065,41 @@ module Registration_section = struct
         construct term ->
         IHalt
        *)
-      let code =
+      let dummy_lambda_pair =
         let open Script_typed_ir in
         let descr =
           {
-            kloc = 0;
+            kloc = dummy_loc;
             kbef = cpair unit unit @$ bot;
             kaft = unit @$ bot;
             kinstr = ICdr (dummy_loc, halt);
           }
         in
-        Lam (descr, Micheline.Int (0, Z.zero))
+        Lam (descr, Micheline.Int (dummy_loc, Z.zero))
+      in
+      let dummy_lambda_pair_rec =
+        let open Script_typed_ir in
+        let descr =
+          {
+            kloc = dummy_loc;
+            kbef = cpair unit unit @$ lambda (cpair unit unit) unit @$ bot;
+            kaft = unit @$ bot;
+            kinstr =
+              IDrop
+                ( dummy_loc,
+                  IDrop (dummy_loc, IConst (dummy_loc, unit, (), halt)) );
+          }
+        in
+        LamRec (descr, Micheline.Int (dummy_loc, Z.zero))
       in
       simple_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IApply
         ~stack_type:(unit @$ lambda (cpair unit unit) unit @$ bot)
         ~kinstr:(IApply (dummy_loc, unit, halt))
-        ~stack_sampler:(fun _cfg _rng_state () -> ((), (code, eos)))
+        ~stack_sampler:(fun _cfg rng_state () ->
+          if Base_samplers.uniform_bool rng_state then
+            ((), (dummy_lambda_pair, eos))
+          else ((), (dummy_lambda_pair_rec, eos)))
         ()
 
     let () =
@@ -2072,6 +2111,18 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_ILambda
         ~stack_type:(unit @$ bot)
         ~kinstr:(ILambda (dummy_loc, dummy_lambda, halt))
+        ()
+
+    let () =
+      (*
+        ILambda (rec) ->
+        IHalt
+       *)
+      simple_benchmark
+        ~name:Interpreter_workload.N_ILambda
+        ~salt:"_rec"
+        ~stack_type:(unit @$ bot)
+        ~kinstr:(ILambda (dummy_loc, dummy_lambda_rec, halt))
         ()
 
     let () =

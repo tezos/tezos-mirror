@@ -291,7 +291,7 @@ module Cost_of : sig
 
     val exec : Gas.cost
 
-    val apply : Gas.cost
+    val apply : rec_flag:bool -> Gas.cost
 
     val lambda : Gas.cost
 

@@ -288,7 +288,11 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | ILoop_left _ -> Interp_costs.loop_left
   | IDip _ -> Interp_costs.dip
   | IExec _ -> Interp_costs.exec
-  | IApply _ -> Interp_costs.apply
+  | IApply _ -> (
+      let l, _ = stack in
+      match l with
+      | Lam _ -> Interp_costs.apply ~rec_flag:false
+      | LamRec _ -> Interp_costs.apply ~rec_flag:true)
   | ILambda _ -> Interp_costs.lambda
   | IFailwith _ -> Gas.free
   | IEq _ -> Interp_costs.eq

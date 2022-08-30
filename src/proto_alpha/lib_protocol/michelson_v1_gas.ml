@@ -121,7 +121,8 @@ module Cost_of = struct
       S.safe_int 35 + ((v0 lsr 4) + (v0 lsr 7))
 
     (* model N_IApply *)
-    let cost_N_IApply = S.safe_int 140
+    let cost_N_IApply rec_flag =
+      if rec_flag then S.safe_int 220 else S.safe_int 140
 
     (* model N_IBlake2b *)
     (* Approximating 1.120804 x term *)
@@ -1272,7 +1273,7 @@ module Cost_of = struct
 
     let exec = atomic_step_cost cost_N_IExec
 
-    let apply = atomic_step_cost cost_N_IApply
+    let apply ~(rec_flag : bool) = atomic_step_cost (cost_N_IApply rec_flag)
 
     let lambda = atomic_step_cost cost_N_ILambda
 
