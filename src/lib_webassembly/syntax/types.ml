@@ -1,29 +1,30 @@
 (* Types *)
 
-type num_type = I32Type | I64Type | F32Type | F64Type
+type num_type = I32Type | I64Type | F32Type | F64Type [@@deriving show]
 
-type vec_type = V128Type
+type vec_type = V128Type [@@deriving show]
 
-type ref_type = FuncRefType | ExternRefType
+type ref_type = FuncRefType | ExternRefType [@@deriving show]
 
 type value_type =
   | NumType of num_type
   | VecType of vec_type
   | RefType of ref_type
+[@@deriving show]
 
 type result_type = value_type Lazy_vector.Int32Vector.t
 
 type func_type = FuncType of result_type * result_type
 
-type 'a limits = {min : 'a; max : 'a option}
+type 'a limits = {min : 'a; max : 'a option} [@@deriving show]
 
-type mutability = Immutable | Mutable
+type mutability = Immutable | Mutable [@@deriving show]
 
-type table_type = TableType of Int32.t limits * ref_type
+type table_type = TableType of Int32.t limits * ref_type [@@deriving show]
 
-type memory_type = MemoryType of Int32.t limits
+type memory_type = MemoryType of Int32.t limits [@@deriving show]
 
-type global_type = GlobalType of value_type * mutability
+type global_type = GlobalType of value_type * mutability [@@deriving show]
 
 type extern_type =
   | ExternFuncType of func_type
@@ -32,13 +33,14 @@ type extern_type =
   | ExternGlobalType of global_type
 
 (* Reference-interpreter-todo: these types should move somewhere else *)
-type pack_size = Pack8 | Pack16 | Pack32 | Pack64
+type pack_size = Pack8 | Pack16 | Pack32 | Pack64 [@@deriving show]
 
-type extension = SX | ZX
+type extension = SX | ZX [@@deriving show]
 
-type pack_shape = Pack8x8 | Pack16x4 | Pack32x2
+type pack_shape = Pack8x8 | Pack16x4 | Pack32x2 [@@deriving show]
 
 type vec_extension = ExtLane of pack_shape * extension | ExtSplat | ExtZero
+[@@deriving show]
 
 (* Attributes *)
 

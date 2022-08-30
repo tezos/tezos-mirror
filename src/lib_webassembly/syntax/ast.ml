@@ -25,7 +25,7 @@ type void = Lib.void
 (* Operators *)
 
 module IntOp = struct
-  type unop = Clz | Ctz | Popcnt | ExtendS of pack_size
+  type unop = Clz | Ctz | Popcnt | ExtendS of pack_size [@@deriving show]
 
   type binop =
     | Add
@@ -43,10 +43,12 @@ module IntOp = struct
     | ShrU
     | Rotl
     | Rotr
+  [@@deriving show]
 
   type testop = Eqz
 
   type relop = Eq | Ne | LtS | LtU | GtS | GtU | LeS | LeU | GeS | GeU
+  [@@deriving show]
 
   type cvtop =
     | ExtendSI32
@@ -61,16 +63,18 @@ module IntOp = struct
     | TruncSatSF64
     | TruncSatUF64
     | ReinterpretFloat
+  [@@deriving show]
 end
 
 module FloatOp = struct
   type unop = Neg | Abs | Ceil | Floor | Trunc | Nearest | Sqrt
+  [@@deriving show]
 
-  type binop = Add | Sub | Mul | Div | Min | Max | CopySign
+  type binop = Add | Sub | Mul | Div | Min | Max | CopySign [@@deriving show]
 
   type testop = |
 
-  type relop = Eq | Ne | Lt | Gt | Le | Ge
+  type relop = Eq | Ne | Lt | Gt | Le | Ge [@@deriving show]
 
   type cvtop =
     | ConvertSI32
@@ -80,6 +84,7 @@ module FloatOp = struct
     | PromoteF32
     | DemoteF64
     | ReinterpretInt
+  [@@deriving show]
 end
 
 module I32Op = IntOp
@@ -201,12 +206,16 @@ end
 type testop = (I32Op.testop, I64Op.testop, F32Op.testop, F64Op.testop) Values.op
 
 type unop = (I32Op.unop, I64Op.unop, F32Op.unop, F64Op.unop) Values.op
+[@@deriving show]
 
 type binop = (I32Op.binop, I64Op.binop, F32Op.binop, F64Op.binop) Values.op
+[@@deriving show]
 
 type relop = (I32Op.relop, I64Op.relop, F32Op.relop, F64Op.relop) Values.op
+[@@deriving show]
 
 type cvtop = (I32Op.cvtop, I64Op.cvtop, F32Op.cvtop, F64Op.cvtop) Values.op
+[@@deriving show]
 
 type vec_testop = V128Op.testop Values.vecop
 
@@ -237,32 +246,35 @@ type vec_extractop = V128Op.extractop Values.vecop
 type vec_replaceop = V128Op.replaceop Values.vecop
 
 type ('t, 'p) memop = {ty : 't; align : int; offset : int32; pack : 'p}
+[@@deriving show]
 
-type loadop = (num_type, (pack_size * extension) option) memop
+type loadop = (num_type, (pack_size * extension) option) memop [@@deriving show]
 
-type storeop = (num_type, pack_size option) memop
+type storeop = (num_type, pack_size option) memop [@@deriving show]
 
 type vec_loadop = (vec_type, (pack_size * vec_extension) option) memop
+[@@deriving show]
 
-type vec_storeop = (vec_type, unit) memop
+type vec_storeop = (vec_type, unit) memop [@@deriving show]
 
-type vec_laneop = (vec_type, pack_size) memop * int
+type vec_laneop = (vec_type, pack_size) memop * int [@@deriving show]
 
 (* Expressions *)
 
-type var = int32 Source.phrase
+type var = int32 Source.phrase [@@deriving show]
 
 type num = Values.num Source.phrase
 
-type vec = Values.vec Source.phrase
+type vec = Values.vec Source.phrase [@@deriving show]
 
 type name = int Vector.t
 
 type name_list = int list
 
 type block_type = VarBlockType of var | ValBlockType of value_type option
+[@@deriving show]
 
-type block_label = Block_label of int32
+type block_label = Block_label of int32 [@@deriving show]
 
 type nonrec instr' =
   | Unreachable (* trap unconditionally *)
@@ -367,7 +379,7 @@ and elem_segment' = {
   emode : segment_mode;
 }
 
-type data_label = Data_label of int32
+type data_label = Data_label of int32 [@@deriving show]
 
 type data_segment = data_segment' Source.phrase
 

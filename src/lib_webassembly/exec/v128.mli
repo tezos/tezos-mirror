@@ -38,6 +38,8 @@ val to_hex_string : t -> string
 
 val of_strings : shape -> string list -> t
 
+val pp : Format.formatter -> t -> unit
+
 (* Shape-based operations *)
 
 module type IntShape = sig

@@ -7,6 +7,7 @@ type message = {
   message_counter : Z.t;
   payload : bytes;
 }
+[@@deriving show]
 
 (** An element of type t will have a content which is a lazy_vector of messages
     and a pointer to the number of elements to be able to dequeue. At this point
