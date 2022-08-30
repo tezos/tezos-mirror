@@ -83,6 +83,7 @@ let read_input () =
   let lim = Types.(MemoryType {min = 100l; max = Some 1000l}) in
   let memory = Memory.alloc lim in
   let input_buffer = Input_buffer.alloc () in
+  let output_buffer = Output_buffer.alloc () in
   let* () =
     Input_buffer.enqueue
       input_buffer
@@ -104,6 +105,7 @@ let read_input () =
   let* result =
     Host_funcs.Internal_for_tests.aux_write_input_in_memory
       ~input_buffer
+      ~output_buffer
       ~module_inst
       ~rtype_offset:0l
       ~level_offset:4l
@@ -114,6 +116,9 @@ let read_input () =
   let* memory =
     Tezos_webassembly_interpreter.Instance.Vector.get 0l module_inst.memories
   in
+  let* output_level, output_id = Output_buffer.get_id output_buffer in
+  assert (output_level = 2l) ;
+  assert (output_id = Z.of_int (-1)) ;
   assert (Input_buffer.num_elements input_buffer = Z.zero) ;
   assert (result = 5) ;
   let* m = Memory.load_bytes memory 0l 1 in
@@ -364,6 +369,7 @@ let test_set_input () =
       {
         frame = {inst = Module_key "main"; locals = []};
         input = Input_buffer.alloc ();
+        output = Output_buffer.alloc ();
         code = ([], []);
         host_funcs;
         budget = 1000;

@@ -838,16 +838,29 @@ let input_buffer_encoding =
              input_buffer_message_encoding))
        (value ["num-messages"] Data_encoding.z))
 
+let index_vector_encoding =
+  conv
+    (fun index -> Output_buffer.Index_Vector.of_immutable index)
+    (fun buffer -> Output_buffer.Index_Vector.snapshot buffer)
+    (z_lazy_vector (value [] Data_encoding.z) (value [] Data_encoding.bytes))
+
+let output_buffer_encoding =
+  conv
+    (fun output -> Output_buffer.Level_Vector.of_immutable output)
+    (fun buffer -> Output_buffer.Level_Vector.snapshot buffer)
+    (int32_lazy_vector (value [] Data_encoding.int32) index_vector_encoding)
+
 let config_encoding ~host_funcs =
   conv
-    (fun (frame, input, instrs, values, budget) ->
-      Eval.{frame; input; code = (values, instrs); host_funcs; budget})
-    (fun Eval.{frame; input; code = values, instrs; budget; _} ->
-      (frame, input, instrs, values, budget))
-    (tup5
+    (fun (frame, input, output, instrs, values, budget) ->
+      Eval.{frame; input; output; code = (values, instrs); host_funcs; budget})
+    (fun Eval.{frame; input; output; code = values, instrs; budget; _} ->
+      (frame, input, output, instrs, values, budget))
+    (tup6
        ~flatten:true
        (scope ["frame"] frame_encoding)
        (scope ["input"] input_buffer_encoding)
+       (scope ["output"] output_buffer_encoding)
        (scope ["instructions"] (list_encoding admin_instr_encoding))
        (scope ["values"] values_encoding)
        (value ["budget"] Data_encoding.int31))

@@ -594,10 +594,35 @@ let input_buffer_gen =
     num_elements = Z.of_int num_elements;
   }
 
+let output_info_gen =
+  let* level = small_int in
+  let outbox_level = Int32.of_int level in
+  let* message_index = map Z.of_int small_nat in
+  return Output_buffer.{outbox_level; message_index}
+
+let output_buffer_gen =
+  let* l = small_list int in
+  let s =
+    List.map
+      (fun _ ->
+        generate1
+        @@ map
+             (fun a ->
+               Output_buffer.Index_Vector.(of_immutable @@ Vector.of_list a))
+             (list (map Bytes.of_string string)))
+      l
+  in
+  return Output_buffer.Level_Vector.(of_immutable @@ Vector.of_list s)
+
 let config_gen ~host_funcs ~module_reg =
   let* frame = frame_gen ~module_reg in
   let* input = input_buffer_gen in
+  let _input_list =
+    Lwt_main.run @@ Lazy_vector.ZVector.to_list
+    @@ Lazy_vector.Mutable.ZVector.snapshot input.content
+  in
+  let* output = output_buffer_gen in
   let* instrs = small_list (admin_instr_gen ~module_reg) in
   let* values = small_list value_gen in
   let+ budget = small_int in
-  Eval.{frame; input; code = (values, instrs); host_funcs; budget}
+  Eval.{frame; input; output; code = (values, instrs); host_funcs; budget}

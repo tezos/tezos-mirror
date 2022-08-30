@@ -126,7 +126,7 @@ let test_module_roundtrip () =
     More formally, test that for all values, encoding, decoding and
     re-encoding yields the same tree.
  *)
-let test_generic_tree ~pp ~gen ~encoding =
+let test_generic_tree ~pp ~gen ~encoding () =
   let print = Format.asprintf "%a" pp in
   let open Lwt_result_syntax in
   let dummy_module_reg =
@@ -152,7 +152,7 @@ let test_generic_tree ~pp ~gen ~encoding =
       return_unit)
 
 (** Test serialize/deserialize modules and compare trees. *)
-let test_module_tree () =
+let test_module_tree =
   test_generic_tree
     ~pp:Ast_printer.pp_module
     ~gen:(fun ~host_funcs:_ ~module_reg ->
@@ -160,21 +160,28 @@ let test_module_tree () =
     ~encoding:(fun ~host_funcs:_ -> Wasm_encoding.module_instance_encoding)
 
 (** Test serialize/deserialize frames and compare trees. *)
-let test_frame_tree () =
+let test_frame_tree =
   test_generic_tree
     ~pp:Ast_printer.pp_frame
     ~gen:(fun ~host_funcs:_ -> Ast_generators.frame_gen)
     ~encoding:(fun ~host_funcs:_ -> Wasm_encoding.frame_encoding)
 
 (** Test serialize/deserialize input buffers and compare trees. *)
-let test_input_buffer_tree () =
+let test_input_buffer_tree =
   test_generic_tree
     ~pp:Ast_printer.pp_input_buffer
     ~gen:(fun ~host_funcs:_ ~module_reg:_ -> Ast_generators.input_buffer_gen)
     ~encoding:(fun ~host_funcs:_ -> Wasm_encoding.input_buffer_encoding)
 
+(** Test serialize/deserialize output buffers and compare trees. *)
+let test_output_buffer_tree =
+  test_generic_tree
+    ~pp:Ast_printer.pp_output_buffer
+    ~gen:(fun ~host_funcs:_ ~module_reg:_ -> Ast_generators.output_buffer_gen)
+    ~encoding:(fun ~host_funcs:_ -> Wasm_encoding.output_buffer_encoding)
+
 (** Test serialize/deserialize values and compare trees. *)
-let test_values_tree () =
+let test_values_tree =
   test_generic_tree
     ~pp:(Format.pp_print_list Ast_printer.pp_value)
     ~gen:(fun ~host_funcs:_ ~module_reg:_ ->
@@ -182,15 +189,14 @@ let test_values_tree () =
     ~encoding:(fun ~host_funcs:_ -> Wasm_encoding.values_encoding)
 
 (** Test serialize/deserialize administrative instructions and compare trees. *)
-let test_admin_instr_tree () =
+let test_admin_instr_tree =
   test_generic_tree
     ~pp:Ast_printer.pp_admin_instr
     ~gen:(fun ~host_funcs:_ ~module_reg ->
       Ast_generators.admin_instr_gen ~module_reg)
     ~encoding:(fun ~host_funcs:_ -> Wasm_encoding.admin_instr_encoding)
 
-(** Test serialize/deserialize evaluation configuration and compare trees. *)
-let test_config_tree () =
+let test_config_tree =
   test_generic_tree
     ~pp:Ast_printer.pp_config
     ~gen:Ast_generators.config_gen
@@ -204,6 +210,7 @@ let tests =
     tztest "Values trees" `Quick test_values_tree;
     tztest "Admin_instr trees" `Quick test_admin_instr_tree;
     tztest "Input_buffer trees" `Quick test_input_buffer_tree;
+    tztest "Output_buffer trees" `Quick test_output_buffer_tree;
     tztest "Frame trees" `Quick test_frame_tree;
     tztest "Config trees" `Quick test_config_tree;
   ]

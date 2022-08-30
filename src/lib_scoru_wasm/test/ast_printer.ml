@@ -626,12 +626,27 @@ let pp_input_buffer out input =
     (Lazy_vector.Mutable.ZVector.snapshot input.content)
     (Z.to_string input.num_elements)
 
+let pp_index_vector out index_vector =
+  Format.fprintf
+    out
+    "@[<v 2>%a@]"
+    (pp_vector_z (fun o x -> Format.fprintf o "@[<v 2>%s@]" (Bytes.to_string x)))
+    (Output_buffer.Index_Vector.snapshot index_vector)
+
+let pp_output_buffer out (output : Output_buffer.t) =
+  Format.fprintf
+    out
+    "@[<v 2>%a@]"
+    (pp_vector (fun o -> pp_index_vector o))
+    (Output_buffer.Level_Vector.snapshot output)
+
 let pp_config out
-    Eval.{frame; input; code = values, instrs; host_funcs = _; budget} =
+    Eval.{frame; input; output; code = values, instrs; host_funcs = _; budget} =
   Format.fprintf
     out
     "@[<v 2>{frame = %a;@;\
      input = %a;@;\
+     output = %a;@;\
      instructions = %a;@;\
      values = %a;@;\
      budget = %i;@;\
@@ -640,6 +655,8 @@ let pp_config out
     frame
     pp_input_buffer
     input
+    pp_output_buffer
+    output
     (Format.pp_print_list pp_admin_instr)
     instrs
     (Format.pp_print_list pp_value)
