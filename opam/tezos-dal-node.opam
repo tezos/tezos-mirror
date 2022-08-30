@@ -22,8 +22,8 @@ depends: [
   "tezos-dal-node-lib"
   "tezos-dal-node-services"
   "tezos-crypto-dal"
-  "irmin-pack" { >= "3.3.1" & < "3.4.0" }
-  "irmin" { >= "3.3.2" & < "3.4.0" }
+  "irmin-pack" { >= "3.4.0" & < "3.5.0" }
+  "irmin" { >= "3.4.0" & < "3.5.0" }
 ]
 depopts: [
   "tezos-dal-alpha"
