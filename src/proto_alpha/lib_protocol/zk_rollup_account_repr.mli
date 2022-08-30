@@ -50,3 +50,7 @@ type dynamic = {
 type t = {static : static; dynamic : dynamic}
 
 val encoding : t Data_encoding.t
+
+(* Encoding for the [circuits_info] field.
+   Checks that keys are not duplicated in serialized representation. *)
+val circuits_info_encoding : bool SMap.t Data_encoding.t

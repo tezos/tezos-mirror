@@ -1030,26 +1030,9 @@ module Encoding = struct
           encoding =
             obj4
               (req "public_parameters" Plonk.public_parameters_encoding)
-              (let circuits_info_encoding =
-                 conv_with_guard
-                   (fun m ->
-                     List.of_seq @@ Zk_rollup_account_repr.SMap.to_seq m)
-                   (fun l ->
-                     let m =
-                       Zk_rollup_account_repr.SMap.of_seq @@ List.to_seq l
-                     in
-                     if
-                       (* Check that the list has no duplicated keys *)
-                       Compare.List_length_with.(
-                         l <> Zk_rollup_account_repr.SMap.cardinal m)
-                     then
-                       Error
-                         "Zk_rollup_origination: circuits_info has duplicated \
-                          keys"
-                     else Ok m)
-                   (list (tup2 string bool))
-               in
-               req "circuits_info" circuits_info_encoding)
+              (req
+                 "circuits_info"
+                 Zk_rollup_account_repr.circuits_info_encoding)
               (req "init_state" Zk_rollup_state_repr.encoding)
               (* TODO https://gitlab.com/tezos/tezos/-/issues/3655
                  Encoding of non-negative [nb_ops] for origination *)
