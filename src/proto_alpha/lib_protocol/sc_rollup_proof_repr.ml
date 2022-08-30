@@ -26,6 +26,8 @@
 
 type error += Sc_rollup_proof_check of string
 
+type error += Sc_rollup_invalid_serialized_inbox_proof
+
 let () =
   register_error_kind
     `Permanent
@@ -35,7 +37,17 @@ let () =
     ~pp:(fun fmt msg -> Format.fprintf fmt "Invalid proof: %s" msg)
     Data_encoding.(obj1 @@ req "reason" string)
     (function Sc_rollup_proof_check msg -> Some msg | _ -> None)
-    (fun msg -> Sc_rollup_proof_check msg)
+    (fun msg -> Sc_rollup_proof_check msg) ;
+
+  register_error_kind
+    `Permanent
+    ~id:"Sc_rollup_invalid_serialized_inbox_proof"
+    ~title:"Invalid serialized inbox proof"
+    ~description:"The serialized inbox proof can not be de-serialized"
+    ~pp:(fun fmt () -> Format.fprintf fmt "Invalid serialized inbox proof")
+    Data_encoding.unit
+    (function Sc_rollup_invalid_serialized_inbox_proof -> Some () | _ -> None)
+    (fun () -> Sc_rollup_invalid_serialized_inbox_proof)
 
 type t = {
   pvm_step : Sc_rollups.wrapped_proof;
@@ -82,7 +94,7 @@ let check p reason =
 
 let check_inbox_proof snapshot serialized_inbox_proof (level, counter) =
   match Sc_rollup_inbox_repr.of_serialized_proof serialized_inbox_proof with
-  | None -> return None
+  | None -> fail Sc_rollup_invalid_serialized_inbox_proof
   | Some inbox_proof ->
       Sc_rollup_inbox_repr.verify_proof (level, counter) snapshot inbox_proof
 
