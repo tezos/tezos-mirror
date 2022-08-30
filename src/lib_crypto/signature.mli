@@ -2,6 +2,8 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,58 +25,38 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type public_key_hash =
-  | Ed25519 of Ed25519.Public_key_hash.t
-  | Secp256k1 of Secp256k1.Public_key_hash.t
-  | P256 of P256.Public_key_hash.t
+(** Cryptographic signatures are versioned to expose different versions to
+    different protocols, depending on the support.  *)
 
-type public_key =
-  | Ed25519 of Ed25519.Public_key.t
-  | Secp256k1 of Secp256k1.Public_key.t
-  | P256 of P256.Public_key.t
+(** [V0] supports Ed25519, Secp256k1, and P256. *)
+module V0 = Signature_v0
 
-type secret_key =
-  | Ed25519 of Ed25519.Secret_key.t
-  | Secp256k1 of Secp256k1.Secret_key.t
-  | P256 of P256.Secret_key.t
+(** [V1] supports Ed25519, Secp256k1, P256 and BLS. *)
+module V1 = Signature_v1
 
-type watermark =
-  | Block_header of Chain_id.t
-  | Endorsement of Chain_id.t
-  | Generic_operation
-  | Custom of Bytes.t
+(** The type of conversion modules from one version to another. *)
+module type CONV = sig
+  module V_from : S.COMMON_SIGNATURE
 
-val bytes_of_watermark : watermark -> Bytes.t
+  module V_to : S.COMMON_SIGNATURE
 
-val pp_watermark : Format.formatter -> watermark -> unit
+  val public_key_hash : V_from.Public_key_hash.t -> V_to.Public_key_hash.t
 
-include
-  S.SIGNATURE
-    with type Public_key_hash.t = public_key_hash
-     and type Public_key.t = public_key
-     and type Secret_key.t = secret_key
-     and type watermark := watermark
+  val public_key : V_from.Public_key.t -> V_to.Public_key.t
 
-(** [append sk buf] is the concatenation of [buf] and the
-    serialization of the signature of [buf] signed by [sk]. *)
-val append : ?watermark:watermark -> secret_key -> Bytes.t -> Bytes.t
+  val secret_key : V_from.Secret_key.t -> V_to.Secret_key.t
 
-(** [concat buf t] is the concatenation of [buf] and the serialization
-    of [t]. *)
-val concat : Bytes.t -> t -> Bytes.t
+  val signature : V_from.t -> V_to.t
+end
 
-include S.RAW_DATA with type t := t
+(** The module [V_latest] is to be used by the shell and points to the latest
+    available version of signatures. *)
+module V_latest : module type of V1
 
-val of_secp256k1 : Secp256k1.t -> t
+include module type of V_latest
 
-val of_ed25519 : Ed25519.t -> t
+(** Converting from signatures of {!V0} to {!V_latest}. *)
+module Of_V0 : CONV with module V_from := V0 and module V_to := V_latest
 
-val of_p256 : P256.t -> t
-
-type algo = Ed25519 | Secp256k1 | P256
-
-val generate_key :
-  ?algo:algo ->
-  ?seed:Bytes.t ->
-  unit ->
-  public_key_hash * public_key * secret_key
+(** Converting from signatures of {!V1} to {!V_latest}. *)
+module Of_V1 : CONV with module V_from := V1 and module V_to := V_latest

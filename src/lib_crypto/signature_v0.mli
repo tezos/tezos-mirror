@@ -2,8 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
-(* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,35 +24,69 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module V0 = Signature_v0
-module V1 = Signature_v1
+type public_key_hash =
+  | Ed25519 of Ed25519.Public_key_hash.t
+  | Secp256k1 of Secp256k1.Public_key_hash.t
+  | P256 of P256.Public_key_hash.t
 
-module type CONV = sig
-  module V_from : S.COMMON_SIGNATURE
+type public_key =
+  | Ed25519 of Ed25519.Public_key.t
+  | Secp256k1 of Secp256k1.Public_key.t
+  | P256 of P256.Public_key.t
 
-  module V_to : S.COMMON_SIGNATURE
+type secret_key =
+  | Ed25519 of Ed25519.Secret_key.t
+  | Secp256k1 of Secp256k1.Secret_key.t
+  | P256 of P256.Secret_key.t
 
-  val public_key_hash : V_from.Public_key_hash.t -> V_to.Public_key_hash.t
+type watermark =
+  | Block_header of Chain_id.t
+  | Endorsement of Chain_id.t
+  | Generic_operation
+  | Custom of Bytes.t
 
-  val public_key : V_from.Public_key.t -> V_to.Public_key.t
+val bytes_of_watermark : watermark -> Bytes.t
 
-  val secret_key : V_from.Secret_key.t -> V_to.Secret_key.t
+val pp_watermark : Format.formatter -> watermark -> unit
 
-  val signature : V_from.t -> V_to.t
-end
+type signature =
+  | Ed25519 of Ed25519.t
+  | Secp256k1 of Secp256k1.t
+  | P256 of P256.t
+  | Unknown of Bytes.t
 
-module V_latest = struct
-  include V1
+include
+  S.SIGNATURE
+    with type Public_key_hash.t = public_key_hash
+     and type Public_key.t = public_key
+     and type Secret_key.t = secret_key
+     and type watermark := watermark
+     and type t = signature
 
-  module Of_V1 : CONV with module V_from := V1 and module V_to := V1 = struct
-    let public_key_hash x = x
+(** [append sk buf] is the concatenation of [buf] and the
+    serialization of the signature of [buf] signed by [sk]. *)
+val append : ?watermark:watermark -> secret_key -> Bytes.t -> Bytes.t
 
-    let public_key x = x
+(** [concat buf t] is the concatenation of [buf] and the serialization
+    of [t]. *)
+val concat : Bytes.t -> t -> Bytes.t
 
-    let secret_key x = x
+include S.RAW_DATA with type t := t
 
-    let signature x = x
-  end
-end
+val of_secp256k1 : Secp256k1.t -> t
 
-include V_latest
+val of_ed25519 : Ed25519.t -> t
+
+val of_p256 : P256.t -> t
+
+type algo = Ed25519 | Secp256k1 | P256
+
+(** The list of signing algorithm supported, i.e. all constructors of type
+    {!algo{}. *)
+val algos : algo list
+
+val generate_key :
+  ?algo:algo ->
+  ?seed:Bytes.t ->
+  unit ->
+  public_key_hash * public_key * secret_key
