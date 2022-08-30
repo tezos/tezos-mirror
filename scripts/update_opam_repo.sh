@@ -120,8 +120,14 @@ case $(opam --version) in
 esac
 #shellcheck disable=SC2086
 OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
-  $packages,ocaml,ocaml-base-compiler,odoc,${opam_depext_dep}js_of_ocaml-ppx,opam-ed,ledgerwallet-tezos,$dummy_pkg
-
+  $packages,ocaml,ocaml-base-compiler,odoc,${opam_depext_dep}ledgerwallet-tezos,caqti-driver-postgresql,$dummy_pkg
+## - ocaml-base-compiler has to be explicitely listed for the solver
+##   to not prefer the "variant" `system` of the compiler
+## - odoc is used by the CI to generate the doc
+## - ledgerwallet-tezos is an optional dependency of signer-services
+##   we want to have when building released binaries
+## - caqti-driver-postgresq is needed by tps measurement software to
+##   read tezos-indexer databases
 
 ## Adding useful compiler variants
 for variant in afl flambda fp ; do
