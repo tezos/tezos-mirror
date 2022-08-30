@@ -266,11 +266,11 @@ A Simple Wallet
 ~~~~~~~~~~~~~~~
 
 The client is also a basic wallet. We can, for example, generate a new pair of keys, which can be used locally
-with the alias *bob*::
+with the alias *alice*::
 
-      $ tezos-client gen keys bob
+      $ tezos-client gen keys alice
 
-To check the account (also called a contract) for Bob has been created::
+To check the account (also called a contract) for Alice has been created::
 
       $ tezos-client list known contracts
 
@@ -288,7 +288,7 @@ contracts, which have the form *KT1…*.
 Notice that by default, the keys were stored unencrypted, which is fine in our test example.
 In more realistic scenarios, you should supply the option ``--encrypted`` when generating a new account::
 
-      $ tezos-client gen keys tom --encrypted
+      $ tezos-client gen keys bob --encrypted
 
 Tezos support three different ECC (`Elliptic-Curve Cryptography <https://en.wikipedia.org/wiki/Elliptic-curve_cryptography>`_) schemes: *Ed25519*, *secp256k1* (the
 one used in Bitcoin), and *P-256* (also called *secp256r1*). The two
@@ -311,7 +311,7 @@ Get Free Test Tokens
 
 To test the networks and help users get familiar with the system, on
 :doc:`test networks<test_networks>` you can obtain free tokens from
-:ref:`a faucet <faucet>`.
+:ref:`a faucet <faucet>`. Transfer some to Alice's address.
 
 Transfers and Receipts
 ~~~~~~~~~~~~~~~~~~~~~~
