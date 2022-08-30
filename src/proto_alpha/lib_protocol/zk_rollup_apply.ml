@@ -57,7 +57,7 @@ let originate ~ctxt_before_op ~ctxt ~public_parameters ~circuits_info
   let open Lwt_result_syntax in
   let*? () = assert_feature_enabled ctxt in
   let*? () = error_when Compare.Int.(nb_ops < 0) Zk_rollup_negative_nb_ops in
-  let+ ctxt, originated_zk_rollup, size =
+  let+ ctxt, originated_zk_rollup, storage_size =
     Zk_rollup.originate
       ctxt
       {
@@ -77,7 +77,7 @@ let originate ~ctxt_before_op ~ctxt ~public_parameters ~circuits_info
         (* TODO https://gitlab.com/tezos/tezos/-/issues/3544
            Carbonate ZKRU operations *)
         consumed_gas;
-        size;
+        storage_size;
       }
   in
   (ctxt, result, [])

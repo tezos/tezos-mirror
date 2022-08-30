@@ -180,7 +180,7 @@ type _ successful_manager_operation_result =
       balance_updates : Receipt.balance_updates;
       originated_zk_rollup : Zk_rollup.t;
       consumed_gas : Gas.Arith.fp;
-      size : Z.t;
+      storage_size : Z.t;
     }
       -> Kind.zk_rollup_origination successful_manager_operation_result
 
@@ -765,11 +765,13 @@ module Manager_result = struct
       ~kind:Kind.Zk_rollup_origination_manager_kind
       ~proj:(function
         | Zk_rollup_origination_result
-            {balance_updates; originated_zk_rollup; consumed_gas; size} ->
-            (balance_updates, originated_zk_rollup, consumed_gas, size))
-      ~inj:(fun (balance_updates, originated_zk_rollup, consumed_gas, size) ->
+            {balance_updates; originated_zk_rollup; consumed_gas; storage_size}
+          ->
+            (balance_updates, originated_zk_rollup, consumed_gas, storage_size))
+      ~inj:
+        (fun (balance_updates, originated_zk_rollup, consumed_gas, storage_size) ->
         Zk_rollup_origination_result
-          {balance_updates; originated_zk_rollup; consumed_gas; size})
+          {balance_updates; originated_zk_rollup; consumed_gas; storage_size})
 
   let sc_rollup_originate_case =
     make

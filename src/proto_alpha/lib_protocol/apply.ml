@@ -1612,7 +1612,7 @@ let burn_manager_storage_fees :
         ctxt
         ~storage_limit
         ~payer
-        payload.size
+        payload.storage_size
       >>=? fun (ctxt, storage_limit, balance_updates) ->
       let result =
         Zk_rollup_origination_result {payload with balance_updates}

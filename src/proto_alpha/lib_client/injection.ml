@@ -393,7 +393,7 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
         | Transfer_ticket_result {paid_storage_size_diff; _} ->
             Ok paid_storage_size_diff
         | Sc_rollup_originate_result {size; _} -> Ok size
-        | Zk_rollup_origination_result {size; _} -> Ok size
+        | Zk_rollup_origination_result {storage_size; _} -> Ok storage_size
         | Transaction_result (Transaction_to_tx_rollup_result _) ->
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
                Storage fees for transaction rollup.
