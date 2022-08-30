@@ -3618,6 +3618,7 @@ end = struct
             (3, "test_carbonated_map", N.(number >= 013));
             (3, "test_zk_rollup_encoding", N.(number >= 015));
             (3, "test_dal_slot_proof", N.(number >= 016));
+            (3, "test_compare_operations", N.(number >= 015));
           ]
           |> List.filter_map (fun (i, n, b) -> if b then Some (i, n) else None)
         in

@@ -99,6 +99,10 @@ module Slot : sig
   module Map : Map.S with type key = t
 
   module Set : Set.S with type elt = t
+
+  module Internal_for_tests : sig
+    val of_int : int -> t tzresult
+  end
 end
 
 (** This module re-exports definitions from {!Tez_repr}. *)
