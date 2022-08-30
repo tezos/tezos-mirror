@@ -72,8 +72,7 @@ module V0 : sig
     CONV_OPT with module V_from := V_latest and module V_to := Signature_v0
 end
 
-(** [V1] supports Ed25519, Secp256k1, P256. It is a copy of {!V0} without type
-    equalities. *)
+(** [V1] supports Ed25519, Secp256k1, P256, and BLS. *)
 module V1 : sig
   include module type of Signature_v1
 
