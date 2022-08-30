@@ -549,7 +549,7 @@ module External_validator_process = struct
     (* We assume that there is only one validation process per socket *)
     let socket_dir = get_temporary_socket_dir () in
     let args =
-      ["tezos-validator"; "--socket-dir"; socket_dir]
+      ["octez-validator"; "--socket-dir"; socket_dir]
       @ match vp.readonly with true -> ["--readonly"] | false -> []
     in
     let process =

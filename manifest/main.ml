@@ -2463,10 +2463,10 @@ let _octez_context_merkle_proof_tests =
 
 let octez_validator_lib =
   public_lib
-    "tezos-validator"
+    "octez-validator"
     ~path:"src/bin_validation"
     ~synopsis:
-      "Tezos: `tezos-validator` binary for external validation of blocks"
+      "Tezos: `octez-validator` binary for external validation of blocks"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -5254,9 +5254,9 @@ let _ppinclude =
 
 let _octez_validator_bin =
   public_exe
-    "tezos-validator"
+    "octez-validator"
     ~path:"src/bin_validation/bin"
-    ~opam:"tezos-validator"
+    ~opam:"octez-validator"
     ~internal_name:"main_validator"
     ~deps:
       [

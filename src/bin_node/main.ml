@@ -74,8 +74,8 @@ let () =
       Stdlib.exit 1)
 
 let () =
-  if Filename.basename Sys.argv.(0) = "tezos-validator" then
-    Tezos_validator.Command_line.run ()
+  if Filename.basename Sys.argv.(0) = "octez-validator" then
+    Octez_validator.Command_line.run ()
 
 let term =
   let open Cmdliner.Term in
