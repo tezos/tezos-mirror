@@ -1679,44 +1679,41 @@ module Contract = struct
       ~chunked:true
       S.get_storage_normalized
       (fun ctxt contract () unparsing_mode ->
-         get_contract contract
-         @@ fun contract ->
-            Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
-            match script with
-            | None -> return_none
-            | Some script ->
-                let ctxt = Gas.set_unlimited ctxt in
-                let open Script_ir_translator in
-                parse_script
-                  ctxt
-                  ~elab_conf:(elab_conf ~legacy:true ())
-                  ~allow_forged_in_storage:true
-                  script
-                >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt)
-                  ->
-                unparse_data ctxt unparsing_mode storage_type storage
-                >|=? fun (storage, _ctxt) ->
-                Some (Micheline.strip_locations storage)) ;
+        get_contract contract @@ fun contract ->
+        Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+        match script with
+        | None -> return_none
+        | Some script ->
+            let ctxt = Gas.set_unlimited ctxt in
+            let open Script_ir_translator in
+            parse_script
+              ctxt
+              ~elab_conf:(elab_conf ~legacy:true ())
+              ~allow_forged_in_storage:true
+              script
+            >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt) ->
+            unparse_data ctxt unparsing_mode storage_type storage
+            >|=? fun (storage, _ctxt) ->
+            Some (Micheline.strip_locations storage)) ;
     (* Patched RPC: get_script *)
     Registration.register1
       ~chunked:true
       S.get_script_normalized
       (fun ctxt contract () (unparsing_mode, normalize_types) ->
-        get_contract contract
-        @@ fun contract ->
-            Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
-            match script with
-            | None -> return_none
-            | Some script ->
-                let ctxt = Gas.set_unlimited ctxt in
-                Script_ir_translator.parse_and_unparse_script_unaccounted
-                  ctxt
-                  ~legacy:true
-                  ~allow_forged_in_storage:true
-                  unparsing_mode
-                  ~normalize_types
-                  script
-                >>=? fun (script, _ctxt) -> return_some script)
+        get_contract contract @@ fun contract ->
+        Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+        match script with
+        | None -> return_none
+        | Some script ->
+            let ctxt = Gas.set_unlimited ctxt in
+            Script_ir_translator.parse_and_unparse_script_unaccounted
+              ctxt
+              ~legacy:true
+              ~allow_forged_in_storage:true
+              unparsing_mode
+              ~normalize_types
+              script
+            >>=? fun (script, _ctxt) -> return_some script)
 
   let get_storage_normalized ctxt block ~contract ~unparsing_mode =
     RPC_context.make_call1
