@@ -284,6 +284,7 @@ let assert_sc_rollup_feature_enabled ctxt =
 
 let update_script_storage_and_ticket_balances ctxt ~self_contract storage
     lazy_storage_diff ticket_diffs operations =
+  let self_contract = Contract.Originated self_contract in
   Contract.update_script_storage ctxt self_contract storage lazy_storage_diff
   >>=? fun ctxt ->
   Ticket_accounting.update_ticket_balances
@@ -391,7 +392,7 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
                  ctxt ) ->
       update_script_storage_and_ticket_balances
         ctxt
-        ~self_contract:contract
+        ~self_contract:contract_hash
         storage
         lazy_storage_diff
         ticket_diffs
@@ -2408,7 +2409,7 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                (* update CPMM storage *)
                update_script_storage_and_ticket_balances
                  ctxt
-                 ~self_contract:liquidity_baking_cpmm_contract
+                 ~self_contract:liquidity_baking_cpmm_contract_hash
                  storage
                  lazy_storage_diff
                  ticket_diffs
