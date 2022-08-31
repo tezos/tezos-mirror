@@ -15,6 +15,7 @@ depends: [
   "tezos-dal-node-lib"
   "tezos-client-alpha"
   "tezos-embedded-protocol-alpha"
+  "tezos-layer2-utils-alpha"
   "tezos-protocol-alpha"
   "tezos-base-test-helpers" {with-test}
   "tezos-alpha-test-helpers" {with-test}

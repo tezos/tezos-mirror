@@ -11,6 +11,7 @@
   tezos_dal_node_lib
   tezos-client-alpha
   tezos-embedded-protocol-alpha
+  tezos-layer2-utils-alpha
   tezos-protocol-alpha)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
@@ -23,4 +24,5 @@
   -open Tezos_dal_node_lib
   -open Tezos_client_alpha
   -open Tezos_embedded_protocol_alpha
+  -open Tezos_layer2_utils_alpha
   -open Tezos_protocol_alpha))

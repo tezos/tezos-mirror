@@ -21,6 +21,7 @@ depends: [
   "tezos-stdlib"
   "tezos-dal-node-lib"
   "tezos-dal-node-services"
+  "tezos-layer2-store"
   "tezos-crypto-dal"
   "irmin-pack" { >= "3.4.0" & < "3.5.0" }
   "irmin" { >= "3.4.0" & < "3.5.0" }
