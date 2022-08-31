@@ -5003,7 +5003,7 @@ end
 (** This module re-exports definitions from {!Fees_storage}. *)
 module Fees : sig
   val record_paid_storage_space :
-    context -> Contract.t -> (context * Z.t * Z.t) tzresult Lwt.t
+    context -> Contract_hash.t -> (context * Z.t * Z.t) tzresult Lwt.t
 
   val record_global_constant_storage_space : context -> Z.t -> context * Z.t
 

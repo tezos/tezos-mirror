@@ -78,7 +78,8 @@ let record_global_constant_storage_space context size =
   let to_be_paid = Z.add size cost_of_key in
   (context, to_be_paid)
 
-let record_paid_storage_space ctxt contract =
+let record_paid_storage_space ctxt contract_hash =
+  let contract = Contract_repr.Originated contract_hash in
   (* Get the new size of the contract's storage. *)
   Contract_storage.used_storage_space ctxt contract >>=? fun new_storage_size ->
   Contract_storage.set_paid_storage_space_and_return_fees_to_pay

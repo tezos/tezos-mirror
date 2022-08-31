@@ -402,7 +402,7 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
         ctxt
         ~storage_diff:ticket_table_size_diff
       >>=? fun (ticket_paid_storage_diff, ctxt) ->
-      Fees.record_paid_storage_space ctxt contract
+      Fees.record_paid_storage_space ctxt contract_hash
       >>=? fun (ctxt, new_size, contract_paid_storage_size_diff) ->
       Contract.originated_from_current_nonce ~since:before_operation ~until:ctxt
       >>=? fun originated_contracts ->
@@ -531,7 +531,7 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
   >>=? fun ctxt ->
   Token.transfer ctxt (`Contract source) (`Contract contract) credit
   >>=? fun (ctxt, balance_updates) ->
-  Fees.record_paid_storage_space ctxt contract
+  Fees.record_paid_storage_space ctxt contract_hash
   >|=? fun (ctxt, size, paid_storage_size_diff) ->
   let result =
     {
@@ -2417,7 +2417,7 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                >>=? fun (ticket_table_size_diff, ctxt) ->
                Fees.record_paid_storage_space
                  ctxt
-                 liquidity_baking_cpmm_contract
+                 liquidity_baking_cpmm_contract_hash
                >>=? fun (ctxt, new_size, paid_storage_size_diff) ->
                Ticket_balance.adjust_storage_space
                  ctxt
