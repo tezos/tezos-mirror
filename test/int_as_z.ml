@@ -27,11 +27,21 @@ let expect_fail_serialise ?min_value ?max_value i =
   let encoding = Data_encoding.int_as_z ?min_value ?max_value () in
   match Data_encoding.Binary.to_string_opt encoding i with
   | None -> ()
-  | Some _ -> raise (Failure "Unexpected success")
+  | Some s ->
+      let msg =
+        Format.asprintf
+          "Unexpected success (v:%d, range:[%s;%s], result:%s)"
+          i
+          (match min_value with None -> "-" | Some v -> string_of_int v)
+          (match max_value with None -> "-" | Some v -> string_of_int v)
+          (let (`Hex h) = Hex.of_string s in
+           h)
+      in
+      raise (Failure msg)
 
 let expect_fail_serialise () =
-  expect_fail_serialise Int32.(to_int max_int) ;
-  expect_fail_serialise Int32.(to_int min_int) ;
+  if Sys.word_size = 64 then expect_fail_serialise Int32.(to_int max_int) ;
+  if Sys.word_size = 64 then expect_fail_serialise Int32.(to_int min_int) ;
   expect_fail_serialise ~max_value:1 2 ;
   expect_fail_serialise ~max_value:(-100) 0 ;
   expect_fail_serialise ~max_value:(-100) (-3) ;
@@ -168,5 +178,5 @@ let tests =
     ("serialise-out-of-range-fails", `Quick, expect_fail_serialise);
     ("deserialise-out-of-range-fails", `Quick, expect_fail_deserialise);
     ("roundtrip-succeeds", `Quick, expect_success_roundtrip);
-    ("deserialise-an-n-succeeds", `Quick, expect_success_deserilaisation);
+    ("deserialise-a-z-succeeds", `Quick, expect_success_deserilaisation);
   ]
