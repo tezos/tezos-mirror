@@ -451,6 +451,14 @@ let () =
                                     `Port con.Config.port )
                             | None -> `TCP (`Port con.Config.port)
                           in
+                          Format.printf
+                            "Server listening at %a:%d@."
+                            (Format.pp_print_option
+                               ~none:(fun f () ->
+                                 Format.pp_print_string f "<default>")
+                               Format.pp_print_string)
+                            con.Config.source
+                            con.port ;
                           Cohttp_lwt_unix.Server.create
                             ~stop
                             ~ctx
