@@ -20,9 +20,7 @@
     # certain tests can be blacklisted by adding it to this variable
     when: always
   script:
-    # Note: the following line is copy-pasted in tezt:static-binaries.
-    - dune exec tezt/tests/main.exe -- $TESTS --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit $JUNIT --from-record tezt/records --job $CI_NODE_INDEX/$CI_NODE_TOTAL --record tezt-results-$CI_NODE_INDEX.json -j 4 --retry 1
-    - ./scripts/ci/merge_coverage.sh
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-tezt
 
 tezt:
   extends:
@@ -61,7 +59,7 @@ tezt:static-binaries:
   # Note that the set of tests that are run for static executables
   # is a subset, so this should not reduce apparent coverage.
   script:
-    - dune exec tezt/tests/main.exe -- $TESTS --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit $JUNIT --from-record tezt/records --job $CI_NODE_INDEX/$CI_NODE_TOTAL --record tezt-results-$CI_NODE_INDEX.json -j 4 --retry 1
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-tezt-static-binaries
 
 # Long Tezt tests are not ran in the CI, but we want them to type-check so that
 # they can be built in the performance regression test framework executors.
@@ -71,7 +69,7 @@ tezt:build-long:
     - .rules_template__development
   stage: test
   script:
-    - dune build @tezt/long_tests/check
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-tezt-build-long
 
 # Tests tezt itself
 tezt:self_tests:
@@ -80,7 +78,7 @@ tezt:self_tests:
     - .rules_template__development
   stage: test
   script:
-    - dune runtest tezt/self_tests/
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-tezt-self-test
 
 # Note: if you reactivate this test and if you keep it manual, put it in the "manual" stage.
 #
