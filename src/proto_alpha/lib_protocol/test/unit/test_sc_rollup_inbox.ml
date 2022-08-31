@@ -141,7 +141,7 @@ let test_inclusion_proof_production (list_of_payloads, n) =
   @@ fun _ctxt _messages history _inbox inboxes ->
   let inbox = Stdlib.List.hd inboxes in
   let old_inbox = Stdlib.List.nth inboxes n in
-  produce_inclusion_proof
+  Internal_for_tests.produce_inclusion_proof
     history
     (old_levels_messages old_inbox)
     (old_levels_messages inbox)
@@ -164,7 +164,7 @@ let test_inclusion_proof_verification (list_of_payloads, n) =
   @@ fun _ctxt _messages history _inbox inboxes ->
   let inbox = Stdlib.List.hd inboxes in
   let old_inbox = Stdlib.List.nth inboxes n in
-  produce_inclusion_proof
+  Internal_for_tests.produce_inclusion_proof
     history
     (old_levels_messages old_inbox)
     (old_levels_messages inbox)
@@ -599,9 +599,15 @@ let test_inclusion_proofs_depending_on_history_capacity
   (* Producing inclusion proofs using history1 and history2 should succeeed.
      But, we should not be able to produce any proof with history0 as bound
      is 0. *)
-  let ip0 = I.produce_inclusion_proof history0 hp hp in
-  let*? ip1 = proof "history1" @@ I.produce_inclusion_proof history1 hp hp in
-  let*? ip2 = proof "history2" @@ I.produce_inclusion_proof history2 hp hp in
+  let ip0 = I.Internal_for_tests.produce_inclusion_proof history0 hp hp in
+  let*? ip1 =
+    proof "history1"
+    @@ I.Internal_for_tests.produce_inclusion_proof history1 hp hp
+  in
+  let*? ip2 =
+    proof "history2"
+    @@ I.Internal_for_tests.produce_inclusion_proof history2 hp hp
+  in
   let* () =
     fail_unless
       (Option.is_none ip0)

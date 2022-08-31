@@ -343,11 +343,6 @@ module type Merkelized_operations = sig
   (** [number_of_proof_steps proof] returns the length of [proof]. *)
   val number_of_proof_steps : inclusion_proof -> int
 
-  (** [produce_inclusion_proof history a b] exploits [history] to produce
-      a self-contained proof that [a] is an older version of [b]. *)
-  val produce_inclusion_proof :
-    history -> history_proof -> history_proof -> inclusion_proof option
-
   (** [verify_inclusion_proof proof a b] returns [true] iff [proof] is a
       minimal and valid proof that [a] is included in [b]. *)
   val verify_inclusion_proof :
@@ -416,6 +411,11 @@ module type Merkelized_operations = sig
     (** [history_hashes history] returns the keys of the entries stored in [history] in the order of
         their insertions. *)
     val history_hashes : history -> Hash.t list
+
+    (** [produce_inclusion_proof history a b] exploits [history] to produce
+      a self-contained proof that [a] is an older version of [b]. *)
+    val produce_inclusion_proof :
+      history -> history_proof -> history_proof -> inclusion_proof option
   end
 end
 

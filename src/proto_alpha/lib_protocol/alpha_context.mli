@@ -2995,9 +2995,6 @@ module Sc_rollup : sig
 
       val number_of_proof_steps : inclusion_proof -> int
 
-      val produce_inclusion_proof :
-        history -> history_proof -> history_proof -> inclusion_proof option
-
       val verify_inclusion_proof :
         inclusion_proof -> history_proof -> history_proof -> bool
 
@@ -3030,6 +3027,9 @@ module Sc_rollup : sig
         val history_at_genesis : capacity:int64 -> next_index:int64 -> history
 
         val history_hashes : history -> Hash.t list
+
+        val produce_inclusion_proof :
+          history -> history_proof -> history_proof -> inclusion_proof option
       end
     end
 
