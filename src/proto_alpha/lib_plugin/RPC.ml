@@ -1666,6 +1666,22 @@ module Contract = struct
         ~query:RPC_query.empty
         ~output:(option Script.encoding)
         RPC_path.(path /: Contract.rpc_arg / "script" / "normalized")
+
+    let get_used_storage_space =
+      let open Data_encoding in
+      RPC_service.get_service
+        ~description:"Access the used storage space of the contract."
+        ~query:RPC_query.empty
+        ~output:(option z)
+        RPC_path.(path /: Contract.rpc_arg / "storage" / "used_space")
+
+    let get_paid_storage_space =
+      let open Data_encoding in
+      RPC_service.get_service
+        ~description:"Access the paid storage space of the contract."
+        ~query:RPC_query.empty
+        ~output:(option z)
+        RPC_path.(path /: Contract.rpc_arg / "storage" / "paid_space")
   end
 
   let get_contract contract f =
@@ -1713,7 +1729,19 @@ module Contract = struct
               unparsing_mode
               ~normalize_types
               script
-            >>=? fun (script, _ctxt) -> return_some script)
+            >>=? fun (script, _ctxt) -> return_some script) ;
+    Registration.register1
+      ~chunked:false
+      S.get_used_storage_space
+      (fun ctxt contract () () ->
+        get_contract contract @@ fun _ ->
+        Contract.used_storage_space ctxt contract >>=? return_some) ;
+    Registration.register1
+      ~chunked:false
+      S.get_paid_storage_space
+      (fun ctxt contract () () ->
+        get_contract contract @@ fun _ ->
+        Contract.paid_storage_space ctxt contract >>=? return_some)
 
   let get_storage_normalized ctxt block ~contract ~unparsing_mode =
     RPC_context.make_call1
@@ -1733,6 +1761,24 @@ module Contract = struct
       (Contract.Originated contract)
       ()
       (unparsing_mode, normalize_types)
+
+  let get_used_storage_space ctxt block ~contract =
+    RPC_context.make_call1
+      S.get_used_storage_space
+      ctxt
+      block
+      (Contract.Originated contract)
+      ()
+      ()
+
+  let get_paid_storage_space ctxt block ~contract =
+    RPC_context.make_call1
+      S.get_paid_storage_space
+      ctxt
+      block
+      (Contract.Originated contract)
+      ()
+      ()
 end
 
 module Big_map = struct
