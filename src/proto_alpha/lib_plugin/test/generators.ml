@@ -117,3 +117,18 @@ let filter_state_with_operation_gen :
   let open QCheck2.Gen in
   filter_state_gen >>= fun state ->
   pair (return state) (with_filter_state_operation_gen state)
+
+(** Generate a filter_state, and two pairs of operation hash and
+    manager_op_info. The pairs have indepedent, even odds of belonging
+    to the filter_state or being fresh. *)
+let filter_state_with_two_operations_gen :
+    (Plugin.Mempool.state
+    * (Operation_hash.t * Plugin.Mempool.manager_op_info)
+    * (Operation_hash.t * Plugin.Mempool.manager_op_info))
+    QCheck2.Gen.t =
+  let open QCheck2.Gen in
+  let* filter_state = filter_state_gen in
+  triple
+    (return filter_state)
+    (with_filter_state_operation_gen filter_state)
+    (with_filter_state_operation_gen filter_state)
