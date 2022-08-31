@@ -278,3 +278,15 @@ val raises :
 
 (** Check that a file with the given name exists. *)
 val file_exists : ?__LOC__:string -> string -> unit
+
+(** {2 Predicates on booleans} *)
+
+(** Check that a boolean is true.
+
+    Example: [Check.is_true cond ~error_msg:"expected condition to be true"] *)
+val is_true : ?__LOC__:string -> bool -> error_msg:string -> unit
+
+(** Check that a boolean is false.
+
+    Example: [Check.is_false cond ~error_msg:"expected condition to be false"] *)
+val is_false : ?__LOC__:string -> bool -> error_msg:string -> unit
