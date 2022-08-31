@@ -66,6 +66,41 @@ let all_int encoding size =
   binary encoding (string_int 12) (max_int size - 1) ;
   binary encoding (string_int 12) (max_int size)
 
+let test_uint_as_n () =
+  binary (uint_as_n ()) (string_int 12) 0 ;
+  binary (uint_as_n ()) (string_int 12) 1 ;
+  binary (uint_as_n ()) (string_int 12) 2 ;
+  binary (uint_as_n ()) (string_int 12) 6 ;
+  binary (uint_as_n ()) (string_int 12) 7 ;
+  binary (uint_as_n ()) (string_int 12) 8 ;
+  binary (uint_as_n ()) (string_int 12) 127 ;
+  binary (uint_as_n ()) (string_int 12) 128 ;
+  binary (uint_as_n ()) (string_int 12) 341234 ;
+  binary (uint_as_n ()) (string_int 12) 34341234
+
+let test_int_as_z () =
+  binary (int_as_z ()) (string_int 12) 0 ;
+  binary (int_as_z ()) (string_int 12) 1 ;
+  binary (int_as_z ()) (string_int 12) 2 ;
+  binary (int_as_z ()) (string_int 12) 7 ;
+  binary (int_as_z ()) (string_int 12) 8 ;
+  binary (int_as_z ()) (string_int 12) 63 ;
+  binary (int_as_z ()) (string_int 12) 64 ;
+  binary (int_as_z ()) (string_int 12) 127 ;
+  binary (int_as_z ()) (string_int 12) 128 ;
+  binary (int_as_z ()) (string_int 12) 341234 ;
+  binary (int_as_z ()) (string_int 12) 34341234 ;
+  binary (int_as_z ()) (string_int 12) (-1) ;
+  binary (int_as_z ()) (string_int 12) (-2) ;
+  binary (int_as_z ()) (string_int 12) (-7) ;
+  binary (int_as_z ()) (string_int 12) (-8) ;
+  binary (int_as_z ()) (string_int 12) (-63) ;
+  binary (int_as_z ()) (string_int 12) (-64) ;
+  binary (int_as_z ()) (string_int 12) (-127) ;
+  binary (int_as_z ()) (string_int 12) (-256) ;
+  binary (int_as_z ()) (string_int 12) (-341234) ;
+  binary (int_as_z ()) (string_int 12) (-34341234)
+
 let test_n () =
   binary n (string_z 12) (Z.of_int 0) ;
   binary n (string_z 12) (Z.of_int 1) ;
@@ -139,6 +174,43 @@ let%expect_test _ =
       536870911 => 1FFFFFFF
      1073741822 => 3FFFFFFE
      1073741823 => 3FFFFFFF |}] ;
+  test_uint_as_n () ;
+  [%expect
+    {|
+           0 => 00
+           1 => 01
+           2 => 02
+           6 => 06
+           7 => 07
+           8 => 08
+         127 => 7F
+         128 => 8001
+      341234 => F2E914
+    34341234 => F282B010 |}] ;
+  test_int_as_z () ;
+  [%expect
+    {|
+            0 => 00
+            1 => 01
+            2 => 02
+            7 => 07
+            8 => 08
+           63 => 3F
+           64 => 8001
+          127 => BF01
+          128 => 8002
+       341234 => B2D329
+     34341234 => B285E020
+           -1 => 41
+           -2 => 42
+           -7 => 47
+           -8 => 48
+          -63 => 7F
+          -64 => C001
+         -127 => FF01
+         -256 => C004
+      -341234 => F2D329
+    -34341234 => F285E020 |}] ;
   test_n () ;
   [%expect
     {|
