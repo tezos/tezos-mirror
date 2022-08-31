@@ -31,6 +31,11 @@ module type T = sig
     Tezos_shell_services.Block_services.block ->
     Client_context.full ->
     Tezos_crypto_dal.Cryptobox.Verifier.parameters tzresult Lwt.t
+
+  val get_published_slot_headers :
+    Tezos_shell_services.Block_services.block ->
+    Client_context.full ->
+    (int * Tezos_crypto_dal.Cryptobox.Verifier.commitment) list tzresult Lwt.t
 end
 
 val register : (module T) -> unit
