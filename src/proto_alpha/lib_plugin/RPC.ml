@@ -1668,15 +1668,19 @@ module Contract = struct
         RPC_path.(path /: Contract.rpc_arg / "script" / "normalized")
   end
 
+  let get_contract contract f =
+    match contract with
+    | Contract.Implicit _ -> return_none
+    | Contract.Originated contract -> f contract
+
   let register () =
     (* Patched RPC: get_storage *)
     Registration.register1
       ~chunked:true
       S.get_storage_normalized
       (fun ctxt contract () unparsing_mode ->
-        match contract with
-        | Implicit _ -> return_none
-        | Originated contract -> (
+         get_contract contract
+         @@ fun contract ->
             Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
             match script with
             | None -> return_none
@@ -1692,15 +1696,14 @@ module Contract = struct
                   ->
                 unparse_data ctxt unparsing_mode storage_type storage
                 >|=? fun (storage, _ctxt) ->
-                Some (Micheline.strip_locations storage))) ;
+                Some (Micheline.strip_locations storage)) ;
     (* Patched RPC: get_script *)
     Registration.register1
       ~chunked:true
       S.get_script_normalized
       (fun ctxt contract () (unparsing_mode, normalize_types) ->
-        match contract with
-        | Implicit _ -> return_none
-        | Originated contract -> (
+        get_contract contract
+        @@ fun contract ->
             Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
             match script with
             | None -> return_none
@@ -1713,7 +1716,7 @@ module Contract = struct
                   unparsing_mode
                   ~normalize_types
                   script
-                >>=? fun (script, _ctxt) -> return_some script))
+                >>=? fun (script, _ctxt) -> return_some script)
 
   let get_storage_normalized ctxt block ~contract ~unparsing_mode =
     RPC_context.make_call1
