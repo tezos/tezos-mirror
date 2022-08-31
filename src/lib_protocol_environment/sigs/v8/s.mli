@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -240,6 +241,20 @@ module type AGGREGATE_SIGNATURE = sig
   val aggregate_check : (Public_key.t * watermark option * bytes) list -> t -> bool
 
   val aggregate_signature_opt : t list -> t option
+end
+
+module type SPLIT_SIGNATURE = sig
+  include SIGNATURE
+
+  type prefix
+
+  type splitted = {prefix : prefix option; suffix : Bytes.t}
+
+  val split_signature : t -> splitted
+
+  val of_splitted : splitted -> t option
+
+  val prefix_encoding : prefix Data_encoding.t
 end
 
 module type FIELD = sig

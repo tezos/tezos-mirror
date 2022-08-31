@@ -80,6 +80,7 @@ module type T = sig
        and type Signature.public_key_hash =
         Tezos_crypto.Signature.V1.public_key_hash
        and type Signature.public_key = Tezos_crypto.Signature.V1.public_key
+       and type Signature.signature = Tezos_crypto.Signature.V1.signature
        and type Signature.t = Tezos_crypto.Signature.V1.t
        and type Signature.watermark = Tezos_crypto.Signature.V1.watermark
        and type Micheline.canonical_location = Micheline.canonical_location
@@ -453,6 +454,20 @@ struct
         (Public_key.t * watermark option * bytes) list -> t -> bool
 
       val aggregate_signature_opt : t list -> t option
+    end
+
+    module type SPLIT_SIGNATURE = sig
+      include SIGNATURE
+
+      type prefix
+
+      type splitted = {prefix : prefix option; suffix : Bytes.t}
+
+      val split_signature : t -> splitted
+
+      val of_splitted : splitted -> t option
+
+      val prefix_encoding : prefix Data_encoding.t
     end
 
     module type FIELD = sig

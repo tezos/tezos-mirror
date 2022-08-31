@@ -9194,6 +9194,7 @@ end
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -9431,6 +9432,20 @@ module type AGGREGATE_SIGNATURE = sig
   val aggregate_check : (Public_key.t * watermark option * bytes) list -> t -> bool
 
   val aggregate_signature_opt : t list -> t option
+end
+
+module type SPLIT_SIGNATURE = sig
+  include SIGNATURE
+
+  type prefix
+
+  type splitted = {prefix : prefix option; suffix : Bytes.t}
+
+  val split_signature : t -> splitted
+
+  val of_splitted : splitted -> t option
+
+  val prefix_encoding : prefix Data_encoding.t
 end
 
 module type FIELD = sig
@@ -9800,6 +9815,7 @@ end
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -9825,11 +9841,13 @@ type public_key_hash =
   | Ed25519 of Ed25519.Public_key_hash.t
   | Secp256k1 of Secp256k1.Public_key_hash.t
   | P256 of P256.Public_key_hash.t
+  | Bls of Bls.Public_key_hash.t
 
 type public_key =
   | Ed25519 of Ed25519.Public_key.t
   | Secp256k1 of Secp256k1.Public_key.t
   | P256 of P256.Public_key.t
+  | Bls of Bls.Public_key.t
 
 type watermark =
   | Block_header of Chain_id.t
@@ -9837,11 +9855,29 @@ type watermark =
   | Generic_operation
   | Custom of bytes
 
+type signature =
+  | Ed25519 of Ed25519.t
+  | Secp256k1 of Secp256k1.t
+  | P256 of P256.t
+  | Bls of Bls.t
+  | Unknown of Bytes.t
+
+type prefix =
+  | Ed25519_prefix
+  | Secp256k1_prefix
+  | P256_prefix
+  | Bls_prefix of Bytes.t
+  | Unknown_prefix of Bytes.t
+
 include
-  S.SIGNATURE
+  S.SPLIT_SIGNATURE
     with type Public_key_hash.t = public_key_hash
      and type Public_key.t = public_key
      and type watermark := watermark
+     and type prefix := prefix
+     and type t = signature
+
+val size : t -> int
 end
 # 96 "v8.in.ml"
 
