@@ -23,11 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {
-  config : Configuration.t;
+type ready_ctxt = {
   dal_constants : Cryptobox.t;
   dal_parameters : Cryptobox.parameters;
+  plugin : (module Dal_constants_plugin.T);
 }
 
-let make config dal_constants dal_parameters =
-  {config; dal_constants; dal_parameters}
+type status = Ready of ready_ctxt | Starting
+
+type t = {mutable status : status; config : Configuration.t}
+
+let make config = {status = Starting; config}

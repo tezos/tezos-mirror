@@ -91,34 +91,33 @@ let run ~data_dir cctxt =
   let*! () = Event.(emit starting_node) () in
   let* config = Configuration.load ~data_dir in
   let config = {config with data_dir} in
+  let ctxt = Node_context.make config in
   let*! store = Store.init config in
-  let ready = ref false in
+  let* rpc_server = RPC_server.(start config (register ctxt store)) in
+  let _ = RPC_server.install_finalizer rpc_server in
+  let*! () =
+    Event.(emit rpc_server_is_ready (config.rpc_addr, config.rpc_port))
+  in
   let*! () = Event.(emit layer1_node_tracking_started ()) in
-  let new_head_handler (_hash, (_block_header : Tezos_base.Block_header.t)) =
+  let new_head_handler (_block_hash, (_block_header : Tezos_base.Block_header.t))
+      =
     (* Try to resolve the protocol plugin corresponding to the protocol of the
        targeted node. *)
-    if not !ready then
-      let* plugin = resolve_plugin cctxt in
-      match plugin with
-      | Some plugin ->
-          let (module Plugin : Dal_constants_plugin.T) = plugin in
-          let*! () = Event.emit_protocol_plugin_resolved Plugin.Proto.hash in
-          let* dal_constants, dal_parameters =
-            init_cryptobox config.use_unsafe_srs cctxt plugin
-          in
-          let ctxt = Node_context.make config dal_constants dal_parameters in
-          let* rpc_server = RPC_server.(start config (register ctxt store)) in
-          let _ = RPC_server.install_finalizer rpc_server in
-          let*! () =
-            Event.(emit rpc_server_is_ready (config.rpc_addr, config.rpc_port))
-          in
-          let*! () = Event.(emit node_is_ready ()) in
-          ready := true ;
-          return_unit
-      | None -> return_unit
-    else
-      (* If rpc and plugin are ready, there is nothing else to do.
-         Future work will update this part of the code *)
-      return_unit
+    match ctxt.status with
+    | Starting -> (
+        let* plugin = resolve_plugin cctxt in
+        match plugin with
+        | Some plugin ->
+            let (module Plugin : Dal_constants_plugin.T) = plugin in
+            let*! () = Event.emit_protocol_plugin_resolved Plugin.Proto.hash in
+            let* dal_constants, dal_parameters =
+              init_cryptobox config.use_unsafe_srs cctxt plugin
+            in
+            ctxt.status <-
+              Ready {plugin = (module Plugin); dal_constants; dal_parameters} ;
+            let*! () = Event.(emit node_is_ready ()) in
+            return_unit
+        | None -> return_unit)
+    | Ready _ready_ctxt -> return_unit
   in
   daemonize cctxt new_head_handler

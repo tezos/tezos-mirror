@@ -29,8 +29,31 @@ open Tezos_rpc_http
 open Tezos_rpc_http_server
 open Tezos_dal_node_services
 
-let handle_split_slot dal_parameters dal_constants store fill slot =
+type error += Node_not_ready
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.not.ready"
+    ~title:"DAL Node not ready"
+    ~description:"DAL node is starting. It's not ready to respond to RPCs"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "DAL node is starting. It's not ready to respond to RPCs")
+    Data_encoding.(unit)
+    (function Node_not_ready -> Some () | _ -> None)
+    (fun () -> Node_not_ready)
+
+let ready_ctxt ctxt =
+  let open Result_syntax in
+  match ctxt.Node_context.status with
+  | Ready ctxt -> Ok ctxt
+  | Starting -> fail [Node_not_ready]
+
+let handle_split_slot ctxt store fill slot =
   let open Lwt_result_syntax in
+  let*? {dal_parameters; dal_constants; _} = ready_ctxt ctxt in
   let slot = String.to_bytes slot in
   let slot =
     if fill then
@@ -40,10 +63,11 @@ let handle_split_slot dal_parameters dal_constants store fill slot =
   let+ commitment = Slot_manager.split_and_store dal_constants store slot in
   Cryptobox.Commitment.to_b58check commitment
 
-let handle_slot initial_constants dal_constants store (_, commitment) trim () =
+let handle_slot ctxt store (_, commitment) trim () =
   let open Lwt_result_syntax in
+  let*? {dal_parameters; dal_constants; _} = ready_ctxt ctxt in
   let* slot =
-    Slot_manager.get_slot initial_constants dal_constants store commitment
+    Slot_manager.get_slot dal_parameters dal_constants store commitment
   in
   let slot = if trim then Slot_manager.Utils.trim_x00 slot else slot in
   return (String.of_bytes slot)
@@ -55,19 +79,14 @@ let handle_slot_pages initial_constants dal_constants store (_, commitment) ()
 let handle_shard store ((_, commitment), shard) () () =
   Slot_manager.get_shard store commitment shard
 
-let register_split_slot {Node_context.dal_parameters; dal_constants; _} store
-    dir =
+let register_split_slot ctxt store dir =
   RPC_directory.register0
     dir
     (Services.split_slot ())
-    (handle_split_slot dal_parameters dal_constants store)
+    (handle_split_slot ctxt store)
 
-let register_show_slot {Node_context.dal_parameters; dal_constants; _} store dir
-    =
-  RPC_directory.register
-    dir
-    (Services.slot ())
-    (handle_slot dal_parameters dal_constants store)
+let register_show_slot ctxt store dir =
+  RPC_directory.register dir (Services.slot ()) (handle_slot ctxt store)
 
 let register_show_slot_pages {Node_context.dal_parameters; dal_constants; _}
     store dir =
