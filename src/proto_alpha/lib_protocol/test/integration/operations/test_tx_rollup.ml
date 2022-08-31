@@ -4256,7 +4256,7 @@ module Withdraw = struct
                deposit_contract,
                withdraw_contract,
                block ) ->
-    Contract_helpers.originate_contract_from_string
+    Contract_helpers.originate_contract_from_string_hash
       ~script:
         (Format.sprintf
            {| parameter (ticket %s);
@@ -4492,7 +4492,7 @@ module Withdraw = struct
         (WithExceptions.Option.get ~loc:__LOC__
         @@ Ticket_amount.of_z
         @@ Script_int.of_int64 int64_half_amount)
-      ~destination:withdraw_dropping_contract
+      ~destination:(Originated withdraw_dropping_contract)
       ~entrypoint
     >>=? fun operation ->
     Block.bake ~operation block >>=? fun block ->
@@ -4500,7 +4500,7 @@ module Withdraw = struct
        expected *)
     Incremental.begin_construction block >>=? fun i ->
     let ctxt = Incremental.alpha_ctxt i in
-    Contract.get_storage ctxt withdraw_dropping_contract
+    Contract.get_storage ctxt (Originated withdraw_dropping_contract)
     >>=?? fun (_ctxt, found_storage) ->
     let expected_storage = "Unit" |> Expr.from_string |> Option.some in
     (if expected_storage = found_storage then return_unit
