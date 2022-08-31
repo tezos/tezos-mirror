@@ -664,7 +664,9 @@ let test_operation_pool_ordering
   let* () = do_transfer 0 in
 
   (* Create a valid operation pool from current mempool *)
-  let* mempool = RPC_legacy.get_mempool_pending_operations client in
+  let* mempool =
+    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+  in
   let mgmt_ops = JSON.get "applied" mempool in
 
   let filename = Filename.temp_file "opool_" ".json" in

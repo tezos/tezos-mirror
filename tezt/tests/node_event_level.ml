@@ -122,7 +122,9 @@ let get_hash op = JSON.(op |-> "hash" |> as_string)
    RPC get /chains/main/mempool/pending_operations that provides all
    the operations in the mempool). *)
 let get_applied_operation_hash_list client =
-  let* pending_ops = RPC.get_mempool_pending_operations client in
+  let* pending_ops =
+    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+  in
   return (List.map get_hash JSON.(pending_ops |-> "applied" |> as_list))
 
 (* Assert that [json] represents an empty list. *)

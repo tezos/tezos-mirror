@@ -77,7 +77,8 @@ module Revamped = struct
       string. *)
   let set_filter ?(log = false) config_str client =
     let* res =
-      RPC.post_mempool_filter ~data:(Ezjsonm.from_string config_str) client
+      RPC.Client.call client
+      @@ RPC.post_chain_mempool_filter ~data:(Ezjsonm.from_string config_str) ()
     in
     if log then Log.info "Updated filter config with: %s." config_str ;
     return res
@@ -107,7 +108,9 @@ module Revamped = struct
      event on the [node] (debug events must be enabled). *)
   let synchronize_mempool client node =
     let mempool_notify_waiter = Node.wait_for_request ~request:`Notify node in
-    let* _ = RPC.mempool_request_operations client in
+    let* _ =
+      RPC.Client.call client @@ RPC.post_chain_mempool_request_operations ()
+    in
     mempool_notify_waiter
 
   (* Call the [/chains/[chain]/mempool/pending_operations] RPC and
@@ -456,7 +459,10 @@ module Revamped = struct
     let* () = check_mempool ~applied:[oph1] ~branch_delayed:[oph2] client in
 
     log_step 6 "Ban the operation %s." oph1 ;
-    let* _ = RPC.mempool_ban_operation ~data:(`String oph1) client in
+    let* _ =
+      RPC.Client.call client
+      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+    in
 
     log_step 7 "Check that the node's mempool contains %s as applied." oph2 ;
     let* mempool = Mempool.get_mempool client in
@@ -847,7 +853,9 @@ module Revamped = struct
         ~opts:[`Dotall]
         "Fatal error:\n  Command failed: Error while applying operation.*:"
     in
-    let* _ = RPC.get_mempool_pending_operations client in
+    let* _ =
+      RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+    in
     (* By putting the wrong signature, we also ensure that the
        signature is checked only after the 1M restriction check. *)
     let* _oph2 =
@@ -925,7 +933,10 @@ module Revamped = struct
     in
 
     log_step 6 "Ban the operation %s." oph1 ;
-    let* _ = RPC.mempool_ban_operation ~data:(`String oph1) client in
+    let* _ =
+      RPC.Client.call client
+      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+    in
 
     log_step
       7
@@ -935,7 +946,10 @@ module Revamped = struct
     let* () = check_mempool ~applied:[oph2] ~branch_delayed:[oph3] client in
 
     log_step 8 "Ban the operation %s." oph2 ;
-    let* _ = RPC.mempool_ban_operation ~data:(`String oph2) client in
+    let* _ =
+      RPC.Client.call client
+      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph2) ()
+    in
 
     log_step
       9
@@ -1004,7 +1018,10 @@ module Revamped = struct
           to_reclassified := true ;
           Some ())
     in
-    let* _ = RPC.mempool_ban_operation ~data:(`String oph1) client in
+    let* _ =
+      RPC.Client.call client
+      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+    in
 
     log_step
       6
@@ -1083,7 +1100,10 @@ module Revamped = struct
     in
 
     log_step 5 "Ban the operation %s." oph1 ;
-    let* _ = RPC.mempool_ban_operation ~data:(`String oph1) client in
+    let* _ =
+      RPC.Client.call client
+      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+    in
 
     log_step
       6
@@ -1390,7 +1410,10 @@ module Revamped = struct
     let* () = check_mempool ~applied:[oph2; oph1] client2 in
 
     log_step 3 "Ban %s on node 2." oph1 ;
-    let* _ = RPC.mempool_ban_operation ~data:(`String oph1) client2 in
+    let* _ =
+      RPC.Client.call client2
+      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+    in
     let* () = check_mempool ~applied:[oph2] client2 in
 
     log_step 4 "Try to reinject the banned operation in Node 2." ;
@@ -1465,8 +1488,14 @@ module Revamped = struct
 
     log_step 3 "Ban op1 and ensure the operation is not in the mempool." ;
     (* We ban twice to check banning an operation is idempotent. *)
-    let* _ = RPC.mempool_ban_operation ~data:(`String oph1) client1 in
-    let* _ = RPC.mempool_ban_operation ~data:(`String oph1) client1 in
+    let* _ =
+      RPC.Client.call client1
+      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+    in
+    let* _ =
+      RPC.Client.call client1
+      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+    in
     let* () = check_mempool ~applied:[oph2] client1 in
 
     log_step 4 "Inject op3." ;
@@ -1474,8 +1503,14 @@ module Revamped = struct
     let* () = check_mempool ~applied:[oph3; oph2] client1 in
 
     log_step 5 "Ban op2 and op1 again." ;
-    let* _ = RPC.mempool_ban_operation ~data:(`String oph2) client1 in
-    let* _ = RPC.mempool_ban_operation ~data:(`String oph1) client1 in
+    let* _ =
+      RPC.Client.call client1
+      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph2) ()
+    in
+    let* _ =
+      RPC.Client.call client1
+      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+    in
     let* () = check_mempool ~applied:[oph3] client1 in
 
     log_step 6 "Check that reinjecting op1 fails." ;
@@ -1487,7 +1522,10 @@ module Revamped = struct
     let* () = check_mempool ~applied:[oph3] client1 in
 
     log_step 7 "Unban op1, successfully reinject op1." ;
-    let* _ = RPC.mempool_unban_operation ~data:(`String oph1) client1 in
+    let* _ =
+      RPC.Client.call client1
+      @@ RPC.post_chain_mempool_unban_operation ~data:(`String oph1) ()
+    in
     let* _ = inject_op ~wait:true `A in
     let* () = check_mempool ~applied:[oph3; oph1] client1 in
 
@@ -1499,13 +1537,19 @@ module Revamped = struct
     let* () = wait_reinject_op2_banned in
 
     log_step 9 "Unban op2, successfully reinject op2." ;
-    let* _ = RPC.mempool_unban_operation ~data:(`String oph2) client1 in
+    let* _ =
+      RPC.Client.call client1
+      @@ RPC.post_chain_mempool_unban_operation ~data:(`String oph2) ()
+    in
 
     let* _ = inject_op ~wait:true `B in
     let* () = check_mempool ~applied:[oph3; oph2; oph1] client1 in
 
     log_step 10 "Ban op1 again, check that reinjecting it fails." ;
-    let* _ = RPC.mempool_ban_operation ~data:(`String oph1) client1 in
+    let* _ =
+      RPC.Client.call client1
+      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+    in
 
     let wait_reinject_op1_banned_again =
       wait_for_banned_operation_injection node1 oph1
@@ -1515,8 +1559,14 @@ module Revamped = struct
     let* () = check_mempool ~applied:[oph3; oph2] client1 in
 
     log_step 11 "Try unban op3 and op2 check that nothing changes." ;
-    let* _ = RPC.mempool_unban_operation ~data:(`String oph3) client1 in
-    let* _ = RPC.mempool_unban_operation ~data:(`String oph2) client1 in
+    let* _ =
+      RPC.Client.call client1
+      @@ RPC.post_chain_mempool_unban_operation ~data:(`String oph3) ()
+    in
+    let* _ =
+      RPC.Client.call client1
+      @@ RPC.post_chain_mempool_unban_operation ~data:(`String oph2) ()
+    in
     check_mempool ~applied:[oph3; oph2] client1
 
   (* This tests ban operations and then use the `unban_all` RPC on
@@ -1572,9 +1622,18 @@ module Revamped = struct
 
     log_step 3 "Ban the first three of these operations." ;
     let* () = check_mempool ~applied:[oph4; oph3; oph2; oph1] client1 in
-    let* _ = RPC.mempool_ban_operation ~data:(`String oph1) client1 in
-    let* _ = RPC.mempool_ban_operation ~data:(`String oph2) client1 in
-    let* _ = RPC.mempool_ban_operation ~data:(`String oph3) client1 in
+    let* _ =
+      RPC.Client.call client1
+      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph1) ()
+    in
+    let* _ =
+      RPC.Client.call client1
+      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph2) ()
+    in
+    let* _ =
+      RPC.Client.call client1
+      @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph3) ()
+    in
     let* () = check_mempool ~applied:[oph4] client1 in
 
     log_step 4 "Unban all operations." ;
@@ -1582,7 +1641,9 @@ module Revamped = struct
     let wait1 = Node.wait_for_request ~request:`Arrived node1
     and wait2 = Node.wait_for_request ~request:`Arrived node1
     and wait3 = Node.wait_for_request ~request:`Arrived node1 in
-    let* _ = RPC.mempool_unban_all_operations client1 in
+    let* _ =
+      RPC.Client.call client1 @@ RPC.post_chain_mempool_unban_all_operations ()
+    in
     let* () = synchronize_mempool client1 node1 in
     let* () = wait1 and* () = wait2 and* () = wait3 in
 
@@ -2013,7 +2074,9 @@ module Revamped = struct
     in
 
     log_step 3 "Check that the batch is correctly [applied] in the mempool." ;
-    let* mempool_json = RPC.get_mempool_pending_operations client in
+    let* mempool_json =
+      RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+    in
     let mempool = Mempool.of_json mempool_json in
     Mempool.check_mempool ~applied:[oph] mempool ;
     Log.info
@@ -2207,7 +2270,10 @@ let forge_and_inject_operation ~branch ~fee ~gas_limit ~source ~destination
    branch delayed/branch refused/refused *)
 
 let check_if_op_is_in_mempool client ~classification oph =
-  let* ops = RPC.get_mempool_pending_operations ~version:"1" client in
+  let* ops =
+    RPC.Client.call client
+    @@ RPC.get_chain_mempool_pending_operations ~version:"1" ()
+  in
   let open JSON in
   let search_in ops c =
     List.exists
@@ -2227,7 +2293,9 @@ let check_if_op_is_in_mempool client ~classification oph =
       if res then Test.fail "%s found in mempool" oph else unit
 
 let get_endorsement_as_bytes client =
-  let* mempool = RPC.get_mempool_pending_operations client in
+  let* mempool =
+    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+  in
   let open JSON in
   let ops_list = as_list (mempool |-> "applied") in
   let op =
@@ -2327,7 +2395,9 @@ let wait_for_synch node =
 
 let mempool_synchronisation client node =
   let waiter = wait_for_synch node in
-  let* _ = RPC.mempool_request_operations client in
+  let* _ =
+    RPC.Client.call client @@ RPC.post_chain_mempool_request_operations ()
+  in
   waiter
 
 (** This test checks that future endorsement are still propagated when
@@ -2410,7 +2480,10 @@ let propagation_future_endorsement =
   Log.info "%s" step4_msg ;
   let* bytes, hash = get_endorsement_as_bytes client_1 in
   Log.info "%s" step5_msg ;
-  let* _ = RPC.mempool_ban_operation ~data:(`String hash) client_1 in
+  let* _ =
+    RPC.Client.call client_1
+    @@ RPC.post_chain_mempool_ban_operation ~data:(`String hash) ()
+  in
   Log.info "%s" step6_msg ;
   let (`Hex bytes) = Hex.of_bytes bytes in
   let injection_waiter = wait_for_injection node_2 in
@@ -2637,12 +2710,14 @@ let refetch_failed_operation =
   let* () = failed_fetching_waiter in
   (* Step 4 *)
   (* Ensure that the injected operation is in node_1 mempool *)
-  let* mempool_node_1 = RPC.get_mempool_pending_operations client_1 in
+  let* mempool_node_1 =
+    RPC.Client.call client_1 @@ RPC.get_chain_mempool_pending_operations ()
+  in
   check_operation_is_in_applied_mempool mempool_node_1 oph ;
   (* Step 5 *)
   (* Ensure that the mempool of node_2 is empty *)
   let* mempool_count_after_failed_fetch =
-    RPC.get_mempool_pending_operations client_2
+    RPC.Client.call client_2 @@ RPC.get_chain_mempool_pending_operations ()
   in
   let count_failed_fetching = count_mempool mempool_count_after_failed_fetch in
   if count_failed_fetching.total <> 0 then
@@ -2656,12 +2731,16 @@ let refetch_failed_operation =
        in node_1" ;
   (* Step 7 *)
   (* Ensure that the operation is injected in node_2 mempool *)
-  let* mempool_inject_on_node_2 = RPC.get_mempool_pending_operations client_2 in
+  let* mempool_inject_on_node_2 =
+    RPC.Client.call client_2 @@ RPC.get_chain_mempool_pending_operations ()
+  in
   check_operation_is_in_applied_mempool mempool_inject_on_node_2 oph ;
   unit
 
 let check_op_removed client op =
-  let* pending_ops = RPC.get_mempool_pending_operations client in
+  let* pending_ops =
+    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+  in
   let open JSON in
   let ops_list = pending_ops |-> "applied" |> as_list in
   let res = List.exists (fun e -> e |-> "hash" |> as_string = op) ops_list in
@@ -2842,7 +2921,10 @@ let ban_operation_and_check_applied =
       (List.length applied_ophs) ;
   let oph_to_ban = List.nth applied_ophs 2 in
   Log.info "Operation to ban: %s" oph_to_ban ;
-  let* _ = RPC.mempool_ban_operation ~data:(`String oph_to_ban) client_1 in
+  let* _ =
+    RPC.Client.call client_1
+    @@ RPC.post_chain_mempool_ban_operation ~data:(`String oph_to_ban) ()
+  in
   Log.info "Operation %s is now banned." oph_to_ban ;
   Log.info "Step 4: Check that applied operations in node_1 are still applied." ;
   let expected_reapplied_ophs =
@@ -2893,7 +2975,9 @@ let check_mempool_ops ?(log = false) client ~applied ~refused =
         fee
     else fun _ _ _ -> ()
   in
-  let* ops = RPC.get_mempool_pending_operations client in
+  let* ops =
+    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+  in
   let open JSON in
   (* get (and log) applied operations *)
   let applied_ophs =
@@ -3174,8 +3258,13 @@ let test_pending_operation_version =
   let* () = dummy_baking in
   (* Step 4 *)
   (* Get pending operations using different version of the RPC and check  *)
-  let* mempool_v0 = RPC.get_mempool_pending_operations client_1 in
-  let* mempool_v1 = RPC.get_mempool_pending_operations ~version:"1" client_1 in
+  let* mempool_v0 =
+    RPC.Client.call client_1 @@ RPC.get_chain_mempool_pending_operations ()
+  in
+  let* mempool_v1 =
+    RPC.Client.call client_1
+    @@ RPC.get_chain_mempool_pending_operations ~version:"1" ()
+  in
   let ophs_refused_v0 = get_refused_operation_hash_list_v0 mempool_v0 in
   let ophs_refused_v1 = get_refused_operation_hash_list_v1 mempool_v1 in
   try
@@ -3549,12 +3638,18 @@ module Filter_config = struct
       for optional argument [include_default] (omitted/[true]/[false]). *)
   let check_RPC_GET_all_variations ?(log = false) expected_config client =
     let expected_full = fill_with_default expected_config in
-    let* json = RPC.get_mempool_filter client in
+    let* json = RPC.Client.call client @@ RPC.get_chain_mempool_filter () in
     check_equal expected_full (of_json json) ;
-    let* json = RPC.get_mempool_filter ~include_default:true client in
+    let* json =
+      RPC.Client.call client
+      @@ RPC.get_chain_mempool_filter ~include_default:true ()
+    in
     check_equal expected_full (of_json json) ;
     let expected_partial = clear_default expected_config in
-    let* json = RPC.get_mempool_filter ~include_default:false client in
+    let* json =
+      RPC.Client.call client
+      @@ RPC.get_chain_mempool_filter ~include_default:false ()
+    in
     check_equal expected_partial (of_json json) ;
     if log then
       Log.info
@@ -3685,7 +3780,7 @@ let test_get_post_mempool_filter =
     let* output = Revamped.set_filter invalid_config_str client1 in
     check_equal config3_full (of_json output) ;
     let* () = waiter in
-    let* output = RPC.get_mempool_filter client1 in
+    let* output = RPC.Client.call client1 @@ RPC.get_chain_mempool_filter () in
     check_equal config3_full (of_json output) ;
     Log.info "Tested invalid config: %s." invalid_config_str ;
     unit
@@ -3746,7 +3841,10 @@ let check_unordered_int_list_equal expected actual ~error_msg =
     branch_refused, or unprocessed operation. *)
 let check_mempool_ops_fees ~(applied : int list) ~(refused : int list) client =
   let client_name = Client.name client in
-  let* ops = RPC.get_mempool_pending_operations ~version:"1" client in
+  let* ops =
+    RPC.Client.call client
+    @@ RPC.get_chain_mempool_pending_operations ~version:"1" ()
+  in
   let check_fees classification expected =
     let classification_ops = JSON.(ops |-> classification |> as_list) in
     let actual =
@@ -3993,7 +4091,10 @@ let test_request_operations_peer =
   let wait_mempool = wait_for_arrival_of_ophash oph node_2 in
   let* () = Client.Admin.connect_address ~peer:node_1 client_2 in
   let* node1_identity = Node.wait_for_identity node_1 in
-  let* _ = RPC.mempool_request_operations ~peer:node1_identity client_2 in
+  let* _ =
+    RPC.Client.call client_2
+    @@ RPC.post_chain_mempool_request_operations ~peer:node1_identity ()
+  in
   let* () = wait_mempool in
   unit
 

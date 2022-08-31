@@ -24,60 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let get_mempool_pending_operations ?endpoint ?hooks ?(chain = "main") ?version
-    ?applied ?branch_delayed ?branch_refused ?refused ?outdated client =
-  let path = ["chains"; chain; "mempool"; "pending_operations"] in
-  let query_parameter param param_s =
-    match param with
-    | None -> []
-    | Some true -> [(param_s, "true")]
-    | Some false -> [(param_s, "false")]
-  in
-  let query_string =
-    (match version with None -> [] | Some v -> [("version", v)])
-    @ query_parameter applied "applied"
-    @ query_parameter refused "refused"
-    @ query_parameter outdated "outdated"
-    @ query_parameter branch_delayed "branch_delayed"
-    @ query_parameter branch_refused "branch_refused"
-  in
-  Client.rpc ?endpoint ?hooks ~query_string GET path client
-
-let mempool_request_operations ?endpoint ?(chain = "main") ?peer client =
-  let path = ["chains"; chain; "mempool"; "request_operations"] in
-  Client.rpc
-    ?endpoint
-    POST
-    path
-    ~query_string:(match peer with None -> [] | Some p -> [("peer_id", p)])
-    client
-
-let mempool_ban_operation ?endpoint ?(chain = "main") ~data client =
-  let path = ["chains"; chain; "mempool"; "ban_operation"] in
-  Client.rpc ?endpoint ~data POST path client
-
-let mempool_unban_operation ?endpoint ?(chain = "main") ~data client =
-  let path = ["chains"; chain; "mempool"; "unban_operation"] in
-  Client.rpc ?endpoint ~data POST path client
-
-let mempool_unban_all_operations ?endpoint ?(chain = "main") client =
-  let path = ["chains"; chain; "mempool"; "unban_all_operations"] in
-  Client.rpc ?endpoint POST path client
-
-let get_mempool_filter ?endpoint ?hooks ?(chain = "main") ?include_default
-    client =
-  let path = ["chains"; chain; "mempool"; "filter"] in
-  let query_string =
-    Option.map
-      (fun b -> [("include_default", string_of_bool b)])
-      include_default
-  in
-  Client.rpc ?endpoint ?hooks ?query_string GET path client
-
-let post_mempool_filter ?endpoint ?hooks ?(chain = "main") ~data client =
-  let path = ["chains"; chain; "mempool"; "filter"] in
-  Client.rpc ?endpoint ?hooks ~data POST path client
-
 let preapply_block ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~data
     client =
   let path =

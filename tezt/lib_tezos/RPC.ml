@@ -352,6 +352,55 @@ let get_chain_block_operations_validation_pass ?(chain = "main")
   let query_string = if force_metadata then [("force_metadata", "")] else [] in
   make ~query_string GET path Fun.id
 
+let get_chain_mempool_pending_operations ?(chain = "main") ?version ?applied
+    ?branch_delayed ?branch_refused ?refused ?outdated () =
+  let query_parameter param param_s =
+    match param with
+    | None -> []
+    | Some true -> [(param_s, "true")]
+    | Some false -> [(param_s, "false")]
+  in
+  let query_string =
+    (match version with None -> [] | Some v -> [("version", v)])
+    @ query_parameter applied "applied"
+    @ query_parameter refused "refused"
+    @ query_parameter outdated "outdated"
+    @ query_parameter branch_delayed "branch_delayed"
+    @ query_parameter branch_refused "branch_refused"
+  in
+  make
+    ~query_string
+    GET
+    ["chains"; chain; "mempool"; "pending_operations"]
+    Fun.id
+
+let post_chain_mempool_request_operations ?(chain = "main") ?peer () =
+  make
+    ~query_string:(match peer with None -> [] | Some p -> [("peer_id", p)])
+    POST
+    ["chains"; chain; "mempool"; "request_operations"]
+    Fun.id
+
+let post_chain_mempool_ban_operation ?(chain = "main") ~data () =
+  make ~data POST ["chains"; chain; "mempool"; "ban_operation"] Fun.id
+
+let post_chain_mempool_unban_operation ?(chain = "main") ~data () =
+  make ~data POST ["chains"; chain; "mempool"; "unban_operation"] Fun.id
+
+let post_chain_mempool_unban_all_operations ?(chain = "main") () =
+  make POST ["chains"; chain; "mempool"; "unban_all_operations"] Fun.id
+
+let get_chain_mempool_filter ?(chain = "main") ?include_default () =
+  let query_string =
+    Option.map
+      (fun b -> [("include_default", string_of_bool b)])
+      include_default
+  in
+  make ?query_string GET ["chains"; chain; "mempool"; "filter"] Fun.id
+
+let post_chain_mempool_filter ?(chain = "main") ~data () =
+  make ~data POST ["chains"; chain; "mempool"; "filter"] Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

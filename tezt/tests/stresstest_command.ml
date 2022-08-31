@@ -62,7 +62,9 @@ let non_terminating_process (_process : Process.t) = ()
     return these applied operations (which will usually be transactions
     injected by the transfer command). *)
 let check_n_applied_operations_in_mempool n client =
-  let* mempool_ops = RPC.get_mempool_pending_operations client in
+  let* mempool_ops =
+    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+  in
   let applied_ops = JSON.(mempool_ops |-> "applied" |> as_list) in
   Check.(
     (List.length applied_ops = n)

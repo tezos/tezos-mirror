@@ -34,66 +34,6 @@
 
 (** {2 Shell RPCs} *)
 
-(** Call RPC /chains/[chain]/mempool/pending_operations *)
-val get_mempool_pending_operations :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?version:string ->
-  ?applied:bool ->
-  ?branch_delayed:bool ->
-  ?branch_refused:bool ->
-  ?refused:bool ->
-  ?outdated:bool ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chains/[chain]/mempool/request_operations *)
-val mempool_request_operations :
-  ?endpoint:Client.endpoint ->
-  ?chain:string ->
-  ?peer:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chains/[chain]/mempool/ban_operation *)
-val mempool_ban_operation :
-  ?endpoint:Client.endpoint ->
-  ?chain:string ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chains/[chain]/mempool/unban_operation *)
-val mempool_unban_operation :
-  ?endpoint:Client.endpoint ->
-  ?chain:string ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chains/[chain]/mempool/unban_all_operations *)
-val mempool_unban_all_operations :
-  ?endpoint:Client.endpoint -> ?chain:string -> Client.t -> JSON.t Lwt.t
-
-(** Call RPC GET /chains/[chain]/mempool/filter *)
-val get_mempool_filter :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?include_default:bool ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC POST /chains/[chain]/mempool/filter *)
-val post_mempool_filter :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Lwt.t
-
 (** Call RPC /chain/[chain]/blocks/[block]/helpers/preapply/block *)
 val preapply_block :
   ?endpoint:Client.endpoint ->

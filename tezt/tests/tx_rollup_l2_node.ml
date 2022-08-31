@@ -2515,7 +2515,9 @@ let test_accuser =
   Log.info "Baking 1 L1 block for rejection to be included" ;
   let* () = Client.bake_for_and_wait client in
   let* block = RPC.Client.call client @@ RPC.get_chain_block () in
-  let* _ = RPC.get_mempool_pending_operations client in
+  let* _ =
+    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+  in
   check_l1_block_contains_rejection ~level:0 block ;
   unit
 

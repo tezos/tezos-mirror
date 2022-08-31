@@ -403,6 +403,61 @@ val get_chain_block_operations_validation_pass :
   unit ->
   JSON.t t
 
+(** RPC: [GET /chains/[chain]/mempool/pending_operations]
+
+    [chain] defaults to ["main"].
+*)
+val get_chain_mempool_pending_operations :
+  ?chain:string ->
+  ?version:string ->
+  ?applied:bool ->
+  ?branch_delayed:bool ->
+  ?branch_refused:bool ->
+  ?refused:bool ->
+  ?outdated:bool ->
+  unit ->
+  JSON.t t
+
+(** RPC: [POST /chains/[chain]/mempool/request_operations]
+
+    [chain] defaults to ["main"].
+*)
+val post_chain_mempool_request_operations :
+  ?chain:string -> ?peer:string -> unit -> JSON.t t
+
+(** RPC: [POST /chains/[chain]/mempool/ban_operation]
+
+    [chain] defaults to ["main"].
+*)
+val post_chain_mempool_ban_operation :
+  ?chain:string -> data:JSON.u -> unit -> JSON.t t
+
+(** RPC: [POST /chains/[chain]/mempool/unban_operation]
+
+    [chain] defaults to ["main"].
+*)
+val post_chain_mempool_unban_operation :
+  ?chain:string -> data:JSON.u -> unit -> JSON.t t
+
+(** RPC: [POST /chains/[chain]/mempool/unban_all_operations]
+
+    [chain] defaults to ["main"].
+ *)
+val post_chain_mempool_unban_all_operations : ?chain:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/[chain]/mempool/filter]
+
+    [chain] defaults to ["main"].
+*)
+val get_chain_mempool_filter :
+  ?chain:string -> ?include_default:bool -> unit -> JSON.t t
+
+(** RPC: [POST /chains/[chain]/mempool/filter]
+
+    [chain] defaults to ["main"].
+*)
+val post_chain_mempool_filter : ?chain:string -> data:JSON.u -> unit -> JSON.t t
+
 (** {2 Smart contract rollup RPC module} *)
 
 (** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup] *)
