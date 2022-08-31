@@ -542,6 +542,55 @@ let with_decoding_guard guard encoding =
       | Error s -> raise (Binary_error_types.Invariant_guard s))
     encoding
 
+let uint_as_n ?max_value () =
+  let max_value =
+    match max_value with
+    | None -> (1 lsl 30) - 1
+    | Some max_value ->
+        if max_value <= 0 || (1 lsl 30) - 1 < max_value then
+          invalid_arg "Data_encoding.uint_as_n" ;
+        max_value
+  in
+  let max_size =
+    if max_value < 1 lsl 7 then 1
+    else if max_value < 1 lsl 14 then 2
+    else if max_value < 1 lsl 21 then 3
+    else if max_value < 1 lsl 28 then 4
+    else 5
+  in
+  check_size
+    max_size
+    (conv
+       (fun i ->
+         if i < 0 || i > max_value then
+           raise
+             Binary_error_types.(
+               Write_error (Invalid_int {min = 0; v = i; max = max_value})) ;
+         Z.of_int i)
+       (fun z ->
+         (if Z.compare z (Z.of_int (-(1 lsl 30))) < 0 then
+          let i = -(1 lsl 30) in
+          raise
+            Binary_error_types.(
+              Read_error (Invalid_int {min = 0; v = i; max = max_value}))) ;
+         (if Z.compare z Z.zero < 0 then
+          let i = Z.to_int z in
+          raise
+            Binary_error_types.(
+              Read_error (Invalid_int {min = 0; v = i; max = max_value}))) ;
+         (if Z.compare z (Z.of_int ((1 lsl 30) - 1)) > 0 then
+          let i = (1 lsl 30) - 1 in
+          raise
+            Binary_error_types.(
+              Read_error (Invalid_int {min = 0; v = i; max = max_value}))) ;
+         (if Z.compare z (Z.of_int max_value) > 0 then
+          let i = Z.to_int z in
+          raise
+            Binary_error_types.(
+              Read_error (Invalid_int {min = 0; v = i; max = max_value}))) ;
+         Z.to_int z)
+       n)
+
 let def id ?title ?description encoding =
   make @@ Describe {id; title; description; encoding}
 

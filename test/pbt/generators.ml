@@ -35,6 +35,13 @@ let int31 : int Crowbar.gen =
       guard (neg (shift_left 1l 30) <= i32 && i32 <= sub (shift_left 1l 30) 1l) ;
       Int32.to_int i32)
 
+let uint30 : int Crowbar.gen =
+  let open Crowbar in
+  map [int32] (fun i32 ->
+      let open Int32 in
+      guard (0l <= i32 && i32 <= sub (shift_left 1l 30) 1l) ;
+      Int32.to_int i32)
+
 let string = Crowbar.bytes
 
 let short_string =
@@ -79,6 +86,7 @@ type _ ty =
   | UInt16 : int ty
   | Int31 : int ty
   | RangedInt : int * int -> int ty
+  | UInt30_as_N : int -> int ty
   | Int32 : int32 ty
   | Int64 : int64 ty
   | Float : float ty
@@ -164,6 +172,7 @@ let rec pp_ty : type a. a ty Crowbar.printer =
   | UInt16 -> Crowbar.pp ppf "uint16"
   | Int31 -> Crowbar.pp ppf "int31"
   | RangedInt (low, high) -> Crowbar.pp ppf "rangedint:[%d;%d]" low high
+  | UInt30_as_N high -> Crowbar.pp ppf "uint30asn:[0;%d]" high
   | Int32 -> Crowbar.pp ppf "int32"
   | Int64 -> Crowbar.pp ppf "int64"
   | Float -> Crowbar.pp ppf "float"
@@ -299,6 +308,9 @@ let any_ty_ground_gen =
             let low = min a b in
             let high = max a b in
             AnyTy (RangedInt (low, high)));
+        map [uint30] (fun a ->
+            if a = 0 then Crowbar.bad_test () ;
+            AnyTy (UInt30_as_N a));
         const @@ AnyTy Int32;
         const @@ AnyTy Int64;
         const @@ AnyTy Float;
@@ -514,6 +526,12 @@ let full_rangedint low high : int full =
         choose [range high; map [range (-low)] (fun v -> -v)]
       else map [range (high - low)] (fun v -> v + low))
     (Data_encoding.ranged_int low high)
+
+let full_uint30_as_n high : int full =
+  make_int
+    (UInt30_as_N high)
+    (Crowbar.range high)
+    (Data_encoding.uint_as_n ~max_value:high ())
 
 let full_int32 : int32 full =
   (module struct
@@ -1955,6 +1973,7 @@ let rec full_of_ty : type a. a ty -> a full = function
   | UInt16 -> full_uint16
   | Int31 -> full_int31
   | RangedInt (low, high) -> full_rangedint low high
+  | UInt30_as_N high -> full_uint30_as_n high
   | Int32 -> full_int32
   | Int64 -> full_int64
   | Float -> full_float
