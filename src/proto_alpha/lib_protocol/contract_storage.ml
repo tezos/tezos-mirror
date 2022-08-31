@@ -501,7 +501,9 @@ let increment_counter c manager =
   Storage.Contract.Counter.get c contract >>=? fun contract_counter ->
   Storage.Contract.Counter.update c contract (Z.succ contract_counter)
 
-let get_script_code c contract = Storage.Contract.Code.find c contract
+let get_script_code c contract_hash =
+  let contract = Contract_repr.Originated contract_hash in
+  Storage.Contract.Code.find c contract
 
 let get_script c contract_hash =
   let contract = Contract_repr.Originated contract_hash in

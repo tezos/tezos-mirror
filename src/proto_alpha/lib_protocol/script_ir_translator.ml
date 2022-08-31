@@ -4514,7 +4514,8 @@ and parse_contract :
       | Originated contract_hash ->
           trace
             (Invalid_contract (loc, contract))
-            ( Contract.get_script_code ctxt contract >>=? fun (ctxt, code) ->
+            ( Contract.get_script_code ctxt contract_hash
+            >>=? fun (ctxt, code) ->
               Lwt.return
                 (match code with
                 | None ->

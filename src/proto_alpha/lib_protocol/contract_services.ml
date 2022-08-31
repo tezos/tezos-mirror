@@ -429,7 +429,7 @@ let register () =
     (fun ctxt v entrypoint {normalize_types} () ->
       match (v : Contract.t) with
       | Implicit _ -> return_none
-      | Originated _ -> (
+      | Originated v -> (
           Contract.get_script_code ctxt v >>=? fun (_, expr) ->
           match expr with
           | None -> return_none
@@ -469,7 +469,7 @@ let register () =
     (fun ctxt v {normalize_types} () ->
       match (v : Contract.t) with
       | Implicit _ -> return_none
-      | Originated _ -> (
+      | Originated v -> (
           Contract.get_script_code ctxt v >>=? fun (_, expr) ->
           match expr with
           | None -> return_none
