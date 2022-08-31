@@ -291,7 +291,9 @@ module Helpers = struct
   }
 
   let gas_limits client =
-    let* constants = RPC.get_constants client in
+    let* constants =
+      RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+    in
     let hard_gas_limit_per_operation =
       JSON.(constants |-> "hard_gas_limit_per_operation" |> as_int)
     in

@@ -401,6 +401,76 @@ let get_chain_mempool_filter ?(chain = "main") ?include_default () =
 let post_chain_mempool_filter ?(chain = "main") ~data () =
   make ~data POST ["chains"; chain; "mempool"; "filter"] Fun.id
 
+let post_chain_block_helpers_preapply_block ?(chain = "main") ?(block = "head")
+    ~data () =
+  make
+    ~data
+    POST
+    ["chains"; chain; "blocks"; block; "helpers"; "preapply"; "block"]
+    Fun.id
+
+let post_chain_block_helpers_forge_operations ?(chain = "main")
+    ?(block = "head") ~data () =
+  make
+    ~data
+    POST
+    ["chains"; chain; "blocks"; block; "helpers"; "forge"; "operations"]
+    Fun.id
+
+let post_chain_block_helpers_scripts_simulate_operation ?(chain = "main")
+    ?(block = "head") ~data () =
+  make
+    ~data
+    POST
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "helpers";
+      "scripts";
+      "simulate_operation";
+    ]
+    Fun.id
+
+let post_chain_block_helpers_scripts_event_address ?(chain = "main")
+    ?(block = "head") ~data () =
+  make
+    ~data
+    POST
+    ["chains"; chain; "blocks"; block; "helpers"; "scripts"; "event_address"]
+    Fun.id
+
+type ctxt_type = Bytes | Json
+
+let ctxt_type_to_string = function Bytes -> "bytes" | Json -> "json"
+
+let get_chain_block_context_raw ?(chain = "main") ?(block = "head")
+    ?(ctxt_type = Json) ~value_path () =
+  make
+    GET
+    ([
+       "chains";
+       chain;
+       "blocks";
+       block;
+       "context";
+       "raw";
+       ctxt_type_to_string ctxt_type;
+     ]
+    @ value_path)
+    Fun.id
+
+let get_chain_block_context_constants ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "context"; "constants"] Fun.id
+
+let get_chain_block_context_constants_errors ?(chain = "main") ?(block = "head")
+    () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "constants"; "errors"]
+    Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

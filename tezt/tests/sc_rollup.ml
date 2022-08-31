@@ -68,7 +68,9 @@ let boot_sector_of = function
   | kind -> raise (Invalid_argument kind)
 
 let get_sc_rollup_constants client =
-  let* json = RPC.get_constants client in
+  let* json =
+    RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+  in
   let open JSON in
   let origination_size = json |-> "sc_rollup_origination_size" |> as_int in
   let challenge_window_in_blocks =
@@ -1730,7 +1732,9 @@ let attempt_withdraw_stake =
           argument to scenarios.
     *)
     let bootstrap1_key = Constant.bootstrap1.public_key_hash in
-    let* constants = RPC.get_constants ~hooks client in
+    let* constants =
+      RPC.Client.call ~hooks client @@ RPC.get_chain_block_context_constants ()
+    in
     let recover_bond_unfreeze =
       JSON.(constants |-> "sc_rollup_stake_amount" |> as_int)
     in

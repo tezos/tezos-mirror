@@ -32,81 +32,9 @@
 (** In all RPCs, default [chain] is "main" and default [block] is
    "head~2" to pick the finalized branch for Tenderbake. *)
 
-(** {2 Shell RPCs} *)
-
-(** Call RPC /chain/[chain]/blocks/[block]/helpers/preapply/block *)
-val preapply_block :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/helpers/forge/operations *)
-val post_forge_operations :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/helpers/scripts/simulate_operation *)
-val post_simulate_operation :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/helpers/scripts/event_address *)
-val post_compute_event_address :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  data:JSON.u ->
-  Client.t ->
-  JSON.t Lwt.t
-
 (** {2 Protocol RPCs} *)
 
 type ctxt_type = Bytes | Json
-
-(** Call RPC /chain/[chain]/blocks/[block]/context/raw/[ctxt_type]/[value_path]
-*)
-val get_context_value :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  ?ctxt_type:ctxt_type ->
-  value_path:string list ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/context/constants *)
-val get_constants :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  Client.t ->
-  JSON.t Lwt.t
-
-(** Call RPC /chain/[chain]/blocks/[block]/context/constants/errors *)
-val get_constants_errors :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?chain:string ->
-  ?block:string ->
-  Client.t ->
-  JSON.t Lwt.t
 
 (** Call RPC /chain/[chain]/blocks/[block]/helpers/baking_rights *)
 val get_baking_rights :

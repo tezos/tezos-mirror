@@ -49,7 +49,8 @@ let raw t client =
   match t.raw with
   | None ->
       let* raw =
-        RPC.post_forge_operations ~data:(json t) client
+        RPC.Client.call client
+        @@ RPC.post_chain_block_helpers_forge_operations ~data:(json t) ()
         |> Lwt.map JSON.as_string
       in
       t.raw <- Some (`Hex raw) ;

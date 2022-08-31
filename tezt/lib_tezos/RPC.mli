@@ -458,6 +458,70 @@ val get_chain_mempool_filter :
 *)
 val post_chain_mempool_filter : ?chain:string -> data:JSON.u -> unit -> JSON.t t
 
+(** RPC: [POST /chains/[chain]/blocks/[block]/helpers/preapply/block]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val post_chain_block_helpers_preapply_block :
+  ?chain:string -> ?block:string -> data:Ezjsonm.value -> unit -> JSON.t t
+
+(** RPC: [POST /chains/[chain]/blocks/[block]/helpers/forge/operations]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val post_chain_block_helpers_forge_operations :
+  ?chain:string -> ?block:string -> data:Ezjsonm.value -> unit -> JSON.t t
+
+(** RPC: [POST /chains/[chain]/blocks/[block]/helpers/scripts/simulate_operation]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val post_chain_block_helpers_scripts_simulate_operation :
+  ?chain:string -> ?block:string -> data:Ezjsonm.value -> unit -> JSON.t t
+
+(** RPC: [POST /chains/[chain]/blocks/[block]/helpers/scripts/event_address]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val post_chain_block_helpers_scripts_event_address :
+  ?chain:string -> ?block:string -> data:Ezjsonm.value -> unit -> JSON.t t
+
+type ctxt_type = Bytes | Json
+
+(** RPC: [GET /chains/[chain]/blocks/[block]/context/raw/[ctxt_type]/[value_path]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+    [ctxt_type] defaults to [Json].
+*)
+val get_chain_block_context_raw :
+  ?chain:string ->
+  ?block:string ->
+  ?ctxt_type:ctxt_type ->
+  value_path:string list ->
+  unit ->
+  JSON.t t
+
+(** RPC: [GET /chains/[chain]/blocks/[block]/context/constants]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_constants :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/[chain]/blocks/[block]/context/constants/errors]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_constants_errors :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
 (** {2 Smart contract rollup RPC module} *)
 
 (** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup] *)

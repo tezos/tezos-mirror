@@ -519,7 +519,7 @@ module Dal = struct
 
     let from_client client =
       let* json =
-        RPC_legacy.get_constants client
+        RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
         |> Lwt.map (fun json -> JSON.(json |-> "dal_parametric"))
       in
       let number_of_shards = JSON.(json |-> "number_of_shards" |> as_int) in

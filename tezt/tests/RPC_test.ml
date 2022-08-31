@@ -611,7 +611,10 @@ let test_votes _test_mode_tag _protocol ?endpoint client =
 
 (* Test the various other RPCs. *)
 let test_misc_protocol _test_mode_tag _protocol ?endpoint client =
-  let* _ = RPC.get_constants ?endpoint ~hooks client in
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_constants ()
+  in
   let* _ = RPC.get_baking_rights ?endpoint ~hooks client in
   let* _ = RPC.get_current_level ?endpoint ~hooks client in
   let* _ = RPC.get_endorsing_rights ?endpoint ~hooks client in
@@ -977,7 +980,10 @@ let test_chain _test_mode_tag _protocol ?endpoint client =
     RPC.Client.call ?endpoint client @@ RPC.get_chain_invalid_blocks ()
   in
   let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_block () in
-  let* _ = RPC.get_constants_errors ?endpoint client in
+  let* _ =
+    RPC.Client.call ?endpoint client
+    @@ RPC.get_chain_block_context_constants_errors ()
+  in
   let* _ =
     RPC.Client.call ?endpoint client
     @@ RPC.get_chain_block_context_nonce block_level
@@ -988,7 +994,8 @@ let test_chain _test_mode_tag _protocol ?endpoint client =
   in
   let* _ =
     (* Calls [/chains/main/blocks/head/context/raw/bytes] *)
-    RPC.get_context_value ?endpoint client ~ctxt_type:Bytes ~value_path:[]
+    RPC.Client.call ?endpoint client
+    @@ RPC.get_chain_block_context_raw ~ctxt_type:Bytes ~value_path:[] ()
   in
   let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_block_hash () in
   let* _ = RPC.Client.call ?endpoint client @@ RPC.get_chain_block_header () in

@@ -24,43 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let preapply_block ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~data
-    client =
-  let path =
-    ["chains"; chain; "blocks"; block; "helpers"; "preapply"; "block"]
-  in
-  Client.rpc ?endpoint ?hooks ~data POST path client
-
-let get_constants ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
-  let path = ["chains"; chain; "blocks"; block; "context"; "constants"] in
-  Client.rpc ?endpoint ?hooks GET path client
-
-let get_constants_errors ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    client =
-  let path =
-    ["chains"; chain; "blocks"; block; "context"; "constants"; "errors"]
-  in
-  Client.rpc ?endpoint ?hooks GET path client
-
 type ctxt_type = Bytes | Json
-
-let ctxt_type_to_string = function Bytes -> "bytes" | Json -> "json"
-
-let get_context_value ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    ?(ctxt_type = Json) ~value_path client =
-  let path =
-    [
-      "chains";
-      chain;
-      "blocks";
-      block;
-      "context";
-      "raw";
-      ctxt_type_to_string ctxt_type;
-    ]
-    @ value_path
-  in
-  Client.rpc ?endpoint ?hooks GET path client
 
 let get_baking_rights ?endpoint ?hooks ?(chain = "main") ?(block = "head")
     ?delegate client =
@@ -88,35 +52,6 @@ let get_levels_in_current_cycle ?endpoint ?hooks ?(chain = "main")
     ["chains"; chain; "blocks"; block; "helpers"; "levels_in_current_cycle"]
   in
   Client.rpc ?endpoint ?hooks GET path client
-
-let post_forge_operations ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    ~data client =
-  let path =
-    ["chains"; chain; "blocks"; block; "helpers"; "forge"; "operations"]
-  in
-  Client.rpc ?endpoint ?hooks ~data POST path client
-
-let post_simulate_operation ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    ~data client =
-  let path =
-    [
-      "chains";
-      chain;
-      "blocks";
-      block;
-      "helpers";
-      "scripts";
-      "simulate_operation";
-    ]
-  in
-  Client.rpc ?endpoint ?hooks ~data POST path client
-
-let post_compute_event_address ?endpoint ?hooks ?(chain = "main")
-    ?(block = "head") ~data client =
-  let path =
-    ["chains"; chain; "blocks"; block; "helpers"; "scripts"; "event_address"]
-  in
-  Client.rpc ?endpoint ?hooks ~data POST path client
 
 module Big_maps = struct
   let get ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~id ~key_hash

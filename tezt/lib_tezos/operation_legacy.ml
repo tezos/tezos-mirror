@@ -231,7 +231,10 @@ let forge_operation ?protocol ~branch ~batch client =
   let op_json = op_to_json_string ~branch (`A json_batch) in
   let* hex =
     match protocol with
-    | None -> RPC.post_forge_operations ~data:op_json client >|= JSON.as_string
+    | None ->
+        RPC.Client.call client
+        @@ RPC.post_chain_block_helpers_forge_operations ~data:op_json ()
+        >|= JSON.as_string
     | Some p ->
         let name = Protocol.daemon_name p ^ ".operation.unsigned" in
         Codec.encode ~name op_json
