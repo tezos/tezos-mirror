@@ -177,6 +177,152 @@ let maybe_create_tables db_pool =
           else return_unit))
     db_pool
 
+let endorsing_rights_callback db_pool g rights =
+  let level = Int32.of_string (Re.Group.get g 1) in
+  let out =
+    let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
+    Caqti_lwt.Pool.use
+      (fun (module Db : Caqti_lwt.CONNECTION) ->
+        Db.with_transaction (fun () ->
+            let* () =
+              Db.exec
+                (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
+                   ~oneshot:true
+                   (Teztale_lib.Sql_requests.maybe_insert_delegates_from_rights
+                      rights))
+                ()
+            in
+            Db.exec
+              (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
+                 ~oneshot:true
+                 (Teztale_lib.Sql_requests.maybe_insert_endorsing_rights
+                    ~level
+                    rights))
+              ()))
+      db_pool
+  in
+  with_caqti_error out (fun () ->
+      Cohttp_lwt_unix.Server.respond_string
+        ~headers:
+          (Cohttp.Header.init_with "content-type" "text/plain; charset=UTF-8")
+        ~status:`OK
+        ~body:"Endorsing_right noted"
+        ())
+
+let block_callback db_pool g source
+    ( Teztale_lib.Data.Block.
+        {delegate; timestamp; reception_time; round; hash; _},
+      operations ) =
+  let out =
+    let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
+    Caqti_lwt.Pool.use
+      (fun (module Db : Caqti_lwt.CONNECTION) ->
+        Db.with_transaction (fun () ->
+            let* () =
+              Db.exec
+                (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
+                   ~oneshot:true
+                   (Teztale_lib.Sql_requests.maybe_insert_source source))
+                ()
+            in
+            let level = Int32.of_string (Re.Group.get g 1) in
+            let* () =
+              Db.exec
+                (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
+                   ~oneshot:true
+                   (Teztale_lib.Sql_requests.maybe_insert_block
+                      hash
+                      ~level
+                      ~round
+                      timestamp
+                      delegate))
+                ()
+            in
+            let* () =
+              Tezos_lwt_result_stdlib.Lwtreslib.Bare.Option.iter_es
+                (fun reception_time ->
+                  Db.exec
+                    (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
+                       ~oneshot:true
+                       (Teztale_lib.Sql_requests.insert_received_block
+                          ~source
+                          hash
+                          reception_time))
+                    ())
+                reception_time
+            in
+            if operations <> [] then
+              let* () =
+                Db.exec
+                  (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
+                     ~oneshot:true
+                     (Teztale_lib.Sql_requests
+                      .maybe_insert_operations_from_block
+                        ~level:(Int32.pred level)
+                        operations))
+                  ()
+              in
+              Db.exec
+                (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
+                   ~oneshot:true
+                   (Teztale_lib.Sql_requests.insert_included_operations
+                      hash
+                      ~level:(Int32.pred level)
+                      operations))
+                ()
+            else return_unit))
+      db_pool
+  in
+  with_caqti_error out (fun () ->
+      Cohttp_lwt_unix.Server.respond_string
+        ~headers:
+          (Cohttp.Header.init_with "content-type" "text/plain; charset=UTF-8")
+        ~status:`OK
+        ~body:"Block registered"
+        ())
+
+let operations_callback db_pool g source operations =
+  let level = Int32.of_string (Re.Group.get g 1) in
+  let out =
+    let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
+    Caqti_lwt.Pool.use
+      (fun (module Db : Caqti_lwt.CONNECTION) ->
+        Db.with_transaction (fun () ->
+            let* () =
+              Db.exec
+                (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
+                   ~oneshot:true
+                   (Teztale_lib.Sql_requests.maybe_insert_source source))
+                ()
+            in
+            let* () =
+              Db.exec
+                (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
+                   ~oneshot:true
+                   (Teztale_lib.Sql_requests
+                    .maybe_insert_operations_from_received
+                      ~level
+                      operations))
+                ()
+            in
+            Db.exec
+              (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
+                 ~oneshot:true
+                 (Teztale_lib.Sql_requests.insert_received_operations
+                    ~source
+                    ~level
+                    operations))
+              ()))
+      db_pool
+  in
+  with_caqti_error out (fun () ->
+      Cohttp_lwt_unix.Server.respond_string
+        ~headers:
+          (Cohttp.Header.init_with "content-type" "text/plain; charset=UTF-8")
+        ~status:`OK
+        ~body:"Received operations stored"
+        ())
+
 let callback rights db_pool _connection request body =
   let header = Cohttp.Request.headers request in
   let meth = Cohttp.Request.meth request in
@@ -188,42 +334,7 @@ let callback rights db_pool _connection request body =
           with_data
             Teztale_lib.Consensus_ops.rights_encoding
             body
-            (fun rights ->
-              let level = Int32.of_string (Re.Group.get g 1) in
-              let out =
-                let open
-                  Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
-                Caqti_lwt.Pool.use
-                  (fun (module Db : Caqti_lwt.CONNECTION) ->
-                    Db.with_transaction (fun () ->
-                        let* () =
-                          Db.exec
-                            (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
-                               ~oneshot:true
-                               (Teztale_lib.Sql_requests
-                                .maybe_insert_delegates_from_rights
-                                  rights))
-                            ()
-                        in
-                        Db.exec
-                          (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
-                             ~oneshot:true
-                             (Teztale_lib.Sql_requests
-                              .maybe_insert_endorsing_rights
-                                ~level
-                                rights))
-                          ()))
-                  db_pool
-              in
-              with_caqti_error out (fun () ->
-                  Cohttp_lwt_unix.Server.respond_string
-                    ~headers:
-                      (Cohttp.Header.init_with
-                         "content-type"
-                         "text/plain; charset=UTF-8")
-                    ~status:`OK
-                    ~body:"Endorsing_right noted"
-                    ())))
+            (endorsing_rights_callback db_pool g))
   | None -> (
       match Re.exec_opt level_block path with
       | Some g ->
@@ -231,91 +342,7 @@ let callback rights db_pool _connection request body =
               with_data
                 Teztale_lib.Data.block_data_encoding
                 body
-                (fun
-                  ( Teztale_lib.Data.Block.
-                      {delegate; timestamp; reception_time; round; hash; _},
-                    operations )
-                ->
-                  let out =
-                    let open
-                      Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad
-                      .Lwt_result_syntax in
-                    Caqti_lwt.Pool.use
-                      (fun (module Db : Caqti_lwt.CONNECTION) ->
-                        Db.with_transaction (fun () ->
-                            let* () =
-                              Db.exec
-                                (Caqti_request.Infix.(
-                                   Caqti_type.(unit ->. unit))
-                                   ~oneshot:true
-                                   (Teztale_lib.Sql_requests.maybe_insert_source
-                                      source))
-                                ()
-                            in
-                            let level = Int32.of_string (Re.Group.get g 1) in
-                            let* () =
-                              Db.exec
-                                (Caqti_request.Infix.(
-                                   Caqti_type.(unit ->. unit))
-                                   ~oneshot:true
-                                   (Teztale_lib.Sql_requests.maybe_insert_block
-                                      hash
-                                      ~level
-                                      ~round
-                                      timestamp
-                                      delegate))
-                                ()
-                            in
-                            let* () =
-                              Tezos_lwt_result_stdlib.Lwtreslib.Bare.Option
-                              .iter_es
-                                (fun reception_time ->
-                                  Db.exec
-                                    (Caqti_request.Infix.(
-                                       Caqti_type.(unit ->. unit))
-                                       ~oneshot:true
-                                       (Teztale_lib.Sql_requests
-                                        .insert_received_block
-                                          ~source
-                                          hash
-                                          reception_time))
-                                    ())
-                                reception_time
-                            in
-                            if operations <> [] then
-                              let* () =
-                                Db.exec
-                                  (Caqti_request.Infix.(
-                                     Caqti_type.(unit ->. unit))
-                                     ~oneshot:true
-                                     (Teztale_lib.Sql_requests
-                                      .maybe_insert_operations_from_block
-                                        ~level:(Int32.pred level)
-                                        operations))
-                                  ()
-                              in
-                              Db.exec
-                                (Caqti_request.Infix.(
-                                   Caqti_type.(unit ->. unit))
-                                   ~oneshot:true
-                                   (Teztale_lib.Sql_requests
-                                    .insert_included_operations
-                                      hash
-                                      ~level:(Int32.pred level)
-                                      operations))
-                                ()
-                            else return_unit))
-                      db_pool
-                  in
-                  with_caqti_error out (fun () ->
-                      Cohttp_lwt_unix.Server.respond_string
-                        ~headers:
-                          (Cohttp.Header.init_with
-                             "content-type"
-                             "text/plain; charset=UTF-8")
-                        ~status:`OK
-                        ~body:"Block registered"
-                        ())))
+                (block_callback db_pool g source))
       | None -> (
           match Re.exec_opt level_mempool path with
           | Some g ->
@@ -323,57 +350,7 @@ let callback rights db_pool _connection request body =
                   with_data
                     Teztale_lib.Consensus_ops.delegate_ops_encoding
                     body
-                    (fun operations ->
-                      let level = Int32.of_string (Re.Group.get g 1) in
-                      let out =
-                        let open
-                          Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad
-                          .Lwt_result_syntax in
-                        Caqti_lwt.Pool.use
-                          (fun (module Db : Caqti_lwt.CONNECTION) ->
-                            Db.with_transaction (fun () ->
-                                let* () =
-                                  Db.exec
-                                    (Caqti_request.Infix.(
-                                       Caqti_type.(unit ->. unit))
-                                       ~oneshot:true
-                                       (Teztale_lib.Sql_requests
-                                        .maybe_insert_source
-                                          source))
-                                    ()
-                                in
-                                let* () =
-                                  Db.exec
-                                    (Caqti_request.Infix.(
-                                       Caqti_type.(unit ->. unit))
-                                       ~oneshot:true
-                                       (Teztale_lib.Sql_requests
-                                        .maybe_insert_operations_from_received
-                                          ~level
-                                          operations))
-                                    ()
-                                in
-                                Db.exec
-                                  (Caqti_request.Infix.(
-                                     Caqti_type.(unit ->. unit))
-                                     ~oneshot:true
-                                     (Teztale_lib.Sql_requests
-                                      .insert_received_operations
-                                        ~source
-                                        ~level
-                                        operations))
-                                  ()))
-                          db_pool
-                      in
-                      with_caqti_error out (fun () ->
-                          Cohttp_lwt_unix.Server.respond_string
-                            ~headers:
-                              (Cohttp.Header.init_with
-                                 "content-type"
-                                 "text/plain; charset=UTF-8")
-                            ~status:`OK
-                            ~body:"Received operations stored"
-                            ())))
+                    (operations_callback db_pool g source))
           | None -> (
               match Re.exec_opt one_level_json path with
               | Some _g -> (
