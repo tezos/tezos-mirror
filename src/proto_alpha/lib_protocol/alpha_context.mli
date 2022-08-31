@@ -1596,6 +1596,8 @@ end
 module Contract : sig
   type t = Implicit of public_key_hash | Originated of Contract_hash.t
 
+  (** Functions related to contracts address. *)
+
   type error += Non_existing_contract of t
 
   include BASIC_DATA with type t := t
@@ -1612,6 +1614,8 @@ module Contract : sig
 
   val of_b58check : string -> t tzresult
 
+  (** Functions related to contracts existence. *)
+
   val exists : context -> t -> bool Lwt.t
 
   val must_exist : context -> t -> unit tzresult Lwt.t
@@ -1621,6 +1625,19 @@ module Contract : sig
   val must_be_allocated : context -> t -> unit tzresult Lwt.t
 
   val list : context -> t list Lwt.t
+
+  (** Functions related to both implicit accounts and originated contracts. *)
+
+  (** See {!Contract_storage.get_balance}. *)
+  val get_balance : context -> t -> Tez.t tzresult Lwt.t
+
+  val get_balance_carbonated : context -> t -> (context * Tez.t) tzresult Lwt.t
+
+  val get_frozen_bonds : context -> t -> Tez.t tzresult Lwt.t
+
+  val get_balance_and_frozen_bonds : context -> t -> Tez.t tzresult Lwt.t
+
+  (** Functions related to implicit accounts. *)
 
   (** See {!Contract_manager_storage.get_manager_key}. *)
   val get_manager_key :
@@ -1641,6 +1658,27 @@ module Contract : sig
     public_key ->
     context tzresult Lwt.t
 
+  val get_counter : context -> public_key_hash -> Z.t tzresult Lwt.t
+
+  val increment_counter : context -> public_key_hash -> context tzresult Lwt.t
+
+  val check_counter_increment :
+    context -> public_key_hash -> Z.t -> unit tzresult Lwt.t
+
+  (** See {!Contract_storage.check_allocated_and_get_balance}. *)
+  val check_allocated_and_get_balance :
+    context -> public_key_hash -> Tez.t tzresult Lwt.t
+
+  (** See {!Contract_storage.simulate_spending}. *)
+  val simulate_spending :
+    context ->
+    balance:Tez.t ->
+    amount:Tez.t ->
+    public_key_hash ->
+    (Tez.t * bool) tzresult Lwt.t
+
+  (** Functions related to smart contracts. *)
+
   val get_script_code :
     context ->
     Contract_hash.t ->
@@ -1652,16 +1690,9 @@ module Contract : sig
   val get_storage :
     context -> Contract_hash.t -> (context * Script.expr option) tzresult Lwt.t
 
-  val get_counter : context -> public_key_hash -> Z.t tzresult Lwt.t
+  val used_storage_space : context -> t -> Z.t tzresult Lwt.t
 
-  (** See {Contract_storage.get_balance}. *)
-  val get_balance : context -> t -> Tez.t tzresult Lwt.t
-
-  val get_balance_carbonated : context -> t -> (context * Tez.t) tzresult Lwt.t
-
-  (** See {Contract_storage.check_allocated_and_get_balance}. *)
-  val check_allocated_and_get_balance :
-    context -> public_key_hash -> Tez.t tzresult Lwt.t
+  val paid_storage_space : context -> t -> Z.t tzresult Lwt.t
 
   val increase_paid_storage :
     context -> Contract_hash.t -> amount_in_bytes:Z.t -> context tzresult Lwt.t
@@ -1672,9 +1703,19 @@ module Contract : sig
   val originated_from_current_nonce :
     since:context -> until:context -> Contract_hash.t list tzresult Lwt.t
 
-  val get_frozen_bonds : context -> t -> Tez.t tzresult Lwt.t
+  val update_script_storage :
+    context ->
+    Contract_hash.t ->
+    Script.expr ->
+    Lazy_storage.diffs option ->
+    context tzresult Lwt.t
 
-  val get_balance_and_frozen_bonds : context -> t -> Tez.t tzresult Lwt.t
+  val raw_originate :
+    context ->
+    prepaid_bootstrap_storage:bool ->
+    Contract_hash.t ->
+    script:Script.t * Lazy_storage.diffs option ->
+    context tzresult Lwt.t
 
   module Legacy_big_map_diff : sig
     type item = private
@@ -1696,37 +1737,6 @@ module Contract : sig
 
     val of_lazy_storage_diff : Lazy_storage.diffs -> t
   end
-
-  val update_script_storage :
-    context ->
-    Contract_hash.t ->
-    Script.expr ->
-    Lazy_storage.diffs option ->
-    context tzresult Lwt.t
-
-  val used_storage_space : context -> t -> Z.t tzresult Lwt.t
-
-  val paid_storage_space : context -> t -> Z.t tzresult Lwt.t
-
-  val increment_counter : context -> public_key_hash -> context tzresult Lwt.t
-
-  val check_counter_increment :
-    context -> public_key_hash -> Z.t -> unit tzresult Lwt.t
-
-  (** See {Contract_storage.simulate_spending}. *)
-  val simulate_spending :
-    context ->
-    balance:Tez.t ->
-    amount:Tez.t ->
-    public_key_hash ->
-    (Tez.t * bool) tzresult Lwt.t
-
-  val raw_originate :
-    context ->
-    prepaid_bootstrap_storage:bool ->
-    Contract_hash.t ->
-    script:Script.t * Lazy_storage.diffs option ->
-    context tzresult Lwt.t
 
   (** Functions for handling the delegate of a contract.*)
   module Delegate : sig
