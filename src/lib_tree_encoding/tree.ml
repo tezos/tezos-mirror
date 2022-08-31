@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -69,3 +70,40 @@ let find : type tree. tree backend -> tree -> key -> value option Lwt.t =
 
 let find_tree : type tree. tree backend -> tree -> key -> tree option Lwt.t =
  fun (module T) tree key -> T.find_tree tree key
+
+type wrapped_tree = Wrapped_tree : 'tree * 'tree backend -> wrapped_tree
+
+type Lazy_containers.Lazy_map.tree += Wrapped of wrapped_tree
+
+module Wrapped : S with type tree = wrapped_tree = struct
+  type tree = wrapped_tree
+
+  let remove (Wrapped_tree (t, b)) key =
+    let open Lwt.Syntax in
+    let+ t = remove b t key in
+    Wrapped_tree (t, b)
+
+  let add (Wrapped_tree (t, b)) key v =
+    let open Lwt.Syntax in
+    let+ t = add b t key v in
+    Wrapped_tree (t, b)
+
+  let add_tree (Wrapped_tree (t, b)) key (Wrapped_tree (t', b')) =
+    let open Lwt.Syntax in
+    let t' = select b (wrap b' t') in
+    let+ t = add_tree b t key t' in
+    Wrapped_tree (t, b)
+
+  let find_tree (Wrapped_tree (t, b)) key =
+    let open Lwt.Syntax in
+    let+ t' = find_tree b t key in
+    match t' with Some t' -> Some (Wrapped_tree (t', b)) | None -> None
+
+  let find (Wrapped_tree (t, b)) key = find b t key
+
+  let select = function
+    | Wrapped (Wrapped_tree (_, _) as wt) -> wt
+    | _ -> raise Incorrect_tree_type
+
+  let wrap t = Wrapped t
+end

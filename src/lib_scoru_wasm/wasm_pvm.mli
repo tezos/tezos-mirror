@@ -25,5 +25,4 @@
 
 (** Builds a WASM VM given a concrete implementation of {!Tree.S}. *)
 
-module Make (T : Tree_encoding.Runner.TREE) :
-  Gather_floppies.S with type tree = T.tree
+module Make (T : Tree_encoding.TREE) : Gather_floppies.S with type tree = T.tree

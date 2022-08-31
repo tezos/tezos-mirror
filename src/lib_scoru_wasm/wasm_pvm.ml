@@ -54,7 +54,7 @@ type pvm_state = {
       (** Signals whether or not the PVM needs input. *)
 }
 
-module Make (T : Tree_encoding.Runner.TREE) :
+module Make (T : Tree_encoding.TREE) :
   Gather_floppies.S with type tree = T.tree = struct
   module Raw = struct
     type tree = T.tree

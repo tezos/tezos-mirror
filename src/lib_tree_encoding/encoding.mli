@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -113,3 +114,7 @@ val tup2 : 'a t -> 'b t -> ('a * 'b) t
 (** [tup3 e1 e2] creates an encoder that encodes a triple of elements using
     [e1], [e2], and [e3]. *)
 val tup3 : 'a t -> 'b t -> 'c t -> ('a * 'b * 'c) t
+
+(** [wrapped_tree] adds the [Tree.wrapped_tree] to the tree under the prefix
+    at which it is called. *)
+val wrapped_tree : Tree.wrapped_tree t

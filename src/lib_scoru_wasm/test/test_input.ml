@@ -198,7 +198,7 @@ let empty_tree () =
 
 type Lazy_containers.Lazy_map.tree += Tree of Context.tree
 
-module Tree : Tree_encoding.Runner.TREE with type tree = Context.tree = struct
+module Tree : Tree_encoding.TREE with type tree = Context.tree = struct
   type tree = Context.tree
 
   include Context.Tree

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -39,7 +39,7 @@ module Context = Tezos_context_memory.Context_binary
 
 type Lazy_containers.Lazy_map.tree += Tree of Context.tree
 
-module Tree : Tree_encoding.Runner.TREE with type tree = Context.tree = struct
+module Tree : Tree_encoding.TREE with type tree = Context.tree = struct
   type tree = Context.tree
 
   include Context.Tree
@@ -63,6 +63,7 @@ module Tree_encoding = struct
   include Tree_encoding
   include Lazy_map_encoding.Make (Map)
   include Tree_encoding.Runner.Make (Tree)
+  module Wrapped_runner = Tree_encoding.Runner.Make (Tree_encoding.Wrapped)
 end
 
 let empty_tree () =
@@ -229,6 +230,49 @@ let test_add_to_decoded_empty_map () =
   let*! decoded_map2 = encode_decode enc map in
   let*! value' = Map.get "key" decoded_map2 in
   assert (value' = "value") ;
+  return_unit
+
+let test_wrapped_tree () =
+  let open Tree_encoding in
+  let open Lwt_result_syntax in
+  (* helpers *)
+  let val_enc key = Tree_encoding.value key Data_encoding.int32 in
+  let tree_enc = Tree_encoding.scope ["foo"] @@ Tree_encoding.wrapped_tree in
+  let assert_none key tree =
+    let*! value =
+      decode (Tree_encoding.value_option key Data_encoding.int32) tree
+    in
+    assert (value = None) ;
+    return_unit
+  in
+  let assert_some key expected tree =
+    let*! value =
+      decode (Tree_encoding.value_option key Data_encoding.int32) tree
+    in
+    assert (value = Some expected) ;
+    return_unit
+  in
+  (* test *)
+  let*! tree = empty_tree () in
+  let*! tree = encode (val_enc ["foo"; "bar"; "key"]) 42l tree in
+  let*! sub_tree = decode tree_enc tree in
+  let*! key_value = Wrapped.find_tree sub_tree ["bar"; "key"] in
+  let*! key_value =
+    match key_value with
+    | Some v -> Wrapped_runner.decode (val_enc []) v
+    | None -> assert false
+  in
+  assert (key_value = 42l) ;
+  let*! sub_tree = sub_tree |> Wrapped_runner.encode (val_enc ["baz"]) 41l in
+  let*! sub_tree = Wrapped.remove sub_tree ["bar"; "key"] in
+  let*! tree = encode tree_enc sub_tree tree in
+  let* () = assert_some ["foo"; "baz"] 41l tree in
+  let* () = assert_none ["foo"; "bar"; "key"] tree in
+  (* Ensure removing another key is encoded correctly *)
+  let*! sub_tree = decode tree_enc tree in
+  let*! sub_tree = Wrapped.remove sub_tree ["baz"] in
+  let*! tree = encode tree_enc sub_tree tree in
+  let* () = assert_none ["foo"; "baz"] tree in
   return_unit
 
 let test_lazy_vector () =
@@ -493,6 +537,7 @@ let tests =
       "Add element to decoded empty map"
       `Quick
       test_add_to_decoded_empty_map;
+    tztest "Lazy tree" `Quick test_wrapped_tree;
     tztest "Lazy vector" `Quick test_lazy_vector;
     tztest "Chunked byte vector" `Quick test_chunked_byte_vector;
     tztest "Tuples" `Quick test_tuples;

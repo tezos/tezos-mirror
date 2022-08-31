@@ -111,7 +111,7 @@ module type S = sig
 end
 
 module Make
-    (T : Tree_encoding.Runner.TREE)
+    (T : Tree_encoding.TREE)
     (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
   S with type tree = T.tree = struct
   type tree = Wasm.tree
