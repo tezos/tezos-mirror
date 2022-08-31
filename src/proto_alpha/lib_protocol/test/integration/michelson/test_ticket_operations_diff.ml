@@ -1040,7 +1040,7 @@ let test_originate_and_transfer () =
 let test_originate_big_map_with_tickets () =
   let* baker, ticketer, block = init () in
   let* operation, originated =
-    Op.contract_origination (B block) ticketer ~script:Op.dummy_script
+    Op.contract_origination_hash (B block) ticketer ~script:Op.dummy_script
   in
   let* block = Block.bake ~operation block in
   let* incr = Incremental.begin_construction block in
@@ -1098,7 +1098,10 @@ let test_originate_big_map_with_tickets () =
 let test_transfer_big_map_with_tickets () =
   let* baker, ticketer_contract, block = init () in
   let* operation, originated =
-    Op.contract_origination (B block) ticketer_contract ~script:Op.dummy_script
+    Op.contract_origination_hash
+      (B block)
+      ticketer_contract
+      ~script:Op.dummy_script
   in
   let* block = Block.bake ~operation block in
   let* incr = Incremental.begin_construction block in

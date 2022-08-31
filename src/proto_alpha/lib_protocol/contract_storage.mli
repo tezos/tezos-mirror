@@ -143,7 +143,7 @@ end
 
 val update_script_storage :
   Raw_context.t ->
-  Contract_repr.t ->
+  Contract_hash.t ->
   Script_repr.expr ->
   Lazy_storage_diff.diffs option ->
   Raw_context.t tzresult Lwt.t

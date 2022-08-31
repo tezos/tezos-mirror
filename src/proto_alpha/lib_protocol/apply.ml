@@ -284,9 +284,9 @@ let assert_sc_rollup_feature_enabled ctxt =
 
 let update_script_storage_and_ticket_balances ctxt ~self_contract storage
     lazy_storage_diff ticket_diffs operations =
-  let self_contract = Contract.Originated self_contract in
   Contract.update_script_storage ctxt self_contract storage lazy_storage_diff
   >>=? fun ctxt ->
+  let self_contract = Contract.Originated self_contract in
   Ticket_accounting.update_ticket_balances
     ctxt
     ~self_contract

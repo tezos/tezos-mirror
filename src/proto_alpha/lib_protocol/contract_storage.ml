@@ -558,7 +558,8 @@ let check_allocated_and_get_balance c pkh =
   | None -> fail (Empty_implicit_contract pkh)
   | Some balance -> return balance
 
-let update_script_storage c contract storage lazy_storage_diff =
+let update_script_storage c contract_hash storage lazy_storage_diff =
+  let contract = Contract_repr.Originated contract_hash in
   let storage = Script_repr.lazy_expr storage in
   update_script_lazy_storage c lazy_storage_diff
   >>=? fun (c, lazy_storage_size_diff) ->

@@ -134,7 +134,7 @@ let make_alloc big_map_id alloc updates =
 let init () =
   let* block, source = Context.init1 () in
   let* operation, originated =
-    Op.contract_origination (B block) source ~script:Op.dummy_script
+    Op.contract_origination_hash (B block) source ~script:Op.dummy_script
   in
   let* block = Block.bake ~operation block in
   let* inc = Incremental.begin_construction block in

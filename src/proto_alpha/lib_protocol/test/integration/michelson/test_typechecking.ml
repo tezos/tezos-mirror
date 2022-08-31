@@ -107,7 +107,7 @@ let test_context_with_nat_nat_big_map ?(sc_rollup_enable = false) () =
         };
     }
   >>=? fun (b, source) ->
-  Op.contract_origination (B b) source ~script:Op.dummy_script
+  Op.contract_origination_hash (B b) source ~script:Op.dummy_script
   >>=? fun (operation, originated) ->
   Block.bake ~operation b >>=? fun b ->
   Incremental.begin_construction b >>=? fun v ->

@@ -1699,7 +1699,7 @@ module Contract : sig
 
   val update_script_storage :
     context ->
-    t ->
+    Contract_hash.t ->
     Script.expr ->
     Lazy_storage.diffs option ->
     context tzresult Lwt.t

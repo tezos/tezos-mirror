@@ -182,7 +182,7 @@ let init () =
   let open Lwt_result_syntax in
   let* block, source = Context.init1 () in
   let* operation, originated =
-    Op.contract_origination (B block) source ~script:Op.dummy_script
+    Op.contract_origination_hash (B block) source ~script:Op.dummy_script
   in
   let* block = Block.bake ~operation block in
   let* inc = Incremental.begin_construction block in
@@ -452,7 +452,7 @@ let assert_ticket_diffs ctxt ~loc ~self_contract ~arg_type ~storage_type ~arg
     wrap
       (Ticket_accounting.ticket_diffs
          ctxt
-         ~self_contract
+         ~self_contract:(Originated self_contract)
          ~arg_type_has_tickets
          ~storage_type_has_tickets
          ~arg
@@ -464,6 +464,17 @@ let assert_ticket_diffs ctxt ~loc ~self_contract ~arg_type ~storage_type ~arg
     Environment.wrap_tzresult @@ Ticket_token_map.to_list ctxt ticket_diff
   in
   let* () = assert_equal_ticket_diffs ~loc ctxt ticket_diffs expected_diff in
+  let expected_receipt =
+    List.map
+      (fun (contract, contents, amounts) ->
+        let amounts =
+          List.map
+            (fun (contract, amount) -> (Contract.Originated contract, amount))
+            amounts
+        in
+        (contract, contents, amounts))
+      expected_receipt
+  in
   assert_equal_ticket_receipt ~loc ticket_receipt expected_receipt
 
 let assert_balance = Ticket_helpers.assert_balance
