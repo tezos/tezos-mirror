@@ -568,23 +568,12 @@ let uint_as_n ?max_value () =
                Write_error (Invalid_int {min = 0; v = i; max = max_value})) ;
          Z.of_int i)
        (fun z ->
-         (if Z.compare z (Z.of_int (-(1 lsl 30))) < 0 then
-          let i = -(1 lsl 30) in
-          raise
-            Binary_error_types.(
-              Read_error (Invalid_int {min = 0; v = i; max = max_value}))) ;
-         (if Z.compare z Z.zero < 0 then
-          let i = Z.to_int z in
-          raise
-            Binary_error_types.(
-              Read_error (Invalid_int {min = 0; v = i; max = max_value}))) ;
-         (if Z.compare z (Z.of_int ((1 lsl 30) - 1)) > 0 then
-          let i = (1 lsl 30) - 1 in
-          raise
-            Binary_error_types.(
-              Read_error (Invalid_int {min = 0; v = i; max = max_value}))) ;
          (if Z.compare z (Z.of_int max_value) > 0 then
-          let i = Z.to_int z in
+          let i =
+            if Z.compare z (Z.of_int ((1 lsl 30) - 1)) > 0 then (1 lsl 30) - 1
+              (* we avoid overflow on 32 bit machines by just giving the max value *)
+            else Z.to_int z
+          in
           raise
             Binary_error_types.(
               Read_error (Invalid_int {min = 0; v = i; max = max_value}))) ;
@@ -625,23 +614,19 @@ let int_as_z ?min_value ?max_value () =
                  (Invalid_int {min = min_value; v = i; max = max_value})) ;
          Z.of_int i)
        (fun z ->
-         (if Z.compare z (Z.of_int (-(1 lsl 30))) < 0 then
-          let i = -(1 lsl 30) in
-          raise
-            Binary_error_types.(
-              Read_error (Invalid_int {min = min_value; v = i; max = max_value}))) ;
          (if Z.compare z (Z.of_int min_value) < 0 then
-          let i = Z.to_int z in
-          raise
-            Binary_error_types.(
-              Read_error (Invalid_int {min = min_value; v = i; max = max_value}))) ;
-         (if Z.compare z (Z.of_int ((1 lsl 30) - 1)) > 0 then
-          let i = (1 lsl 30) - 1 in
+          let i =
+            if Z.compare z (Z.of_int (-(1 lsl 30))) < 0 then -(1 lsl 30)
+            else Z.to_int z
+          in
           raise
             Binary_error_types.(
               Read_error (Invalid_int {min = min_value; v = i; max = max_value}))) ;
          (if Z.compare z (Z.of_int max_value) > 0 then
-          let i = Z.to_int z in
+          let i =
+            if Z.compare z (Z.of_int ((1 lsl 30) - 1)) > 0 then (1 lsl 30) - 1
+            else Z.to_int z
+          in
           raise
             Binary_error_types.(
               Read_error (Invalid_int {min = min_value; v = i; max = max_value}))) ;
