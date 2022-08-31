@@ -123,7 +123,3 @@ let contract_rank ctxt addr =
 let size = Cache.size
 
 let size_limit = Cache.size_limit
-
-let insert ctxt addr updated_script approx_size =
-  let identifier = identifier_of_contract addr in
-  Cache.update ctxt identifier (Some (updated_script, approx_size))
