@@ -514,7 +514,8 @@ let get_script c contract_hash =
   | Some code, Some storage -> return (c, Some {Script_repr.code; storage})
   | None, Some _ | Some _, None -> failwith "get_script"
 
-let get_storage ctxt contract =
+let get_storage ctxt contract_hash =
+  let contract = Contract_repr.Originated contract_hash in
   Storage.Contract.Storage.find ctxt contract >>=? function
   | ctxt, None -> return (ctxt, None)
   | ctxt, Some storage ->

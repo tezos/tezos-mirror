@@ -1650,7 +1650,7 @@ module Contract : sig
     context -> Contract_hash.t -> (context * Script.t option) tzresult Lwt.t
 
   val get_storage :
-    context -> t -> (context * Script.expr option) tzresult Lwt.t
+    context -> Contract_hash.t -> (context * Script.expr option) tzresult Lwt.t
 
   val get_counter : context -> public_key_hash -> Z.t tzresult Lwt.t
 

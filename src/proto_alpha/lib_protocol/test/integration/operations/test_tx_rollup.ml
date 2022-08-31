@@ -4432,7 +4432,7 @@ module Withdraw = struct
     assert (extra_storage_space = Z.zero) ;
     Incremental.begin_construction block >>=? fun i ->
     let ctxt = Incremental.alpha_ctxt i in
-    Contract.get_storage ctxt (Originated withdraw_contract)
+    Contract.get_storage ctxt withdraw_contract
     >>=?? fun (_ctxt, found_storage) ->
     let expected_storage =
       Format.sprintf
@@ -4500,7 +4500,7 @@ module Withdraw = struct
        expected *)
     Incremental.begin_construction block >>=? fun i ->
     let ctxt = Incremental.alpha_ctxt i in
-    Contract.get_storage ctxt (Originated withdraw_dropping_contract)
+    Contract.get_storage ctxt withdraw_dropping_contract
     >>=?? fun (_ctxt, found_storage) ->
     let expected_storage = "Unit" |> Expr.from_string |> Option.some in
     (if expected_storage = found_storage then return_unit

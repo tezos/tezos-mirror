@@ -86,7 +86,7 @@ let contract_test () =
   let storage = "0xdeadbeef" in
   let script = Contract_helpers.read_file "./contracts/timelock.tz" in
   let* dst, _script, block =
-    Contract_helpers.originate_contract_from_string
+    Contract_helpers.originate_contract_from_string_hash
       ~script
       ~storage
       ~source_contract
@@ -129,7 +129,7 @@ let contract_test () =
       ~fee
       (B block)
       source_contract
-      dst
+      (Originated dst)
       (Test_tez.of_int 3)
       ~parameters
     >>=? fun operation ->

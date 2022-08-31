@@ -113,7 +113,7 @@ val get_script :
 
 val get_storage :
   Raw_context.t ->
-  Contract_repr.t ->
+  Contract_hash.t ->
   (Raw_context.t * Script_repr.expr option) tzresult Lwt.t
 
 module Legacy_big_map_diff : sig
