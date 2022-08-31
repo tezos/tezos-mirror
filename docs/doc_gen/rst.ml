@@ -25,7 +25,7 @@
 
 let pp_title ~char ppf title =
   let sub = String.map (fun _ -> char) title in
-  Format.fprintf ppf "%s@\n%s@\n@\n" title sub
+  Format.fprintf ppf "@[<v 0>%s@ %s@ @ @]" title sub
 
 let pp_h1 = pp_title ~char:'#'
 
@@ -38,13 +38,13 @@ let pp_h4 = pp_title ~char:'`'
 let pp_raw_html ppf str =
   Format.fprintf
     ppf
-    "@[<v>.. raw:: html@\n  %s@]@\n"
+    "@[<v>.. raw:: html@   @   %s@ @ @]"
     (Re.Str.global_replace (Re.Str.regexp "\n") "\n  " str)
 
 let pp_html ppf f =
   Format.fprintf
     ppf
-    "@[<v 2>.. raw:: html@ @ @[<h>%a@]@]@\n@\n"
+    "@[<v 2>.. raw:: html@ @ %a@]@\n@\n"
     (fun ppf () -> f ppf)
     ()
 
@@ -53,6 +53,43 @@ let pp_ref ppf name = Format.fprintf ppf ".. _%s :@\n@\n" name
 let style =
   {css|
 <style>
+   .wy-nav-content {
+      max-width: 100%;
+   }
+  .tab {
+    overflow: hidden;
+    border: 1px solid #ccc;
+    background-color: #f1f1f1;
+  }
+  .tab button {
+    background-color: inherit;
+    float: left;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    padding: 5px 10px;
+  }
+  .tab button:hover {
+    background-color: #ddd;
+  }
+  .tab button.active {
+    background-color: #ccc;
+  }
+  .tabcontent {
+    display: none;
+    padding: 6px 12px;
+    border: 1px solid #ccc;
+    border-top: none;
+    max-height: 40ex;
+    margin-bottom: 7ex;
+    overflow: auto;
+  }
+  .tabcontent p {
+    margin-bottom: 12px;
+  }
+  pre {
+    font-size: 12px
+  }
   .rst-content .section ul p {
     margin-bottom: 0;
   }
@@ -60,60 +97,31 @@ let style =
     font-family: monospace;
     white-space: pre;
   }
-  .wy-nav-content {
-      max-width: 100%;
+</style>
+|css}
+
+let script =
+  {script|
+<script>
+  function showTab(elt, tab, ref) {
+    var i, tabcontent, tablinks;
+    tabcontent = document.getElementsByClassName(ref);
+    for (i = 0; i < tabcontent.length; i++) {
+      tabcontent[i].style.display = 'none';
+    }
+
+    tablinks = elt.parentNode.children;
+    for (i = 0; i < tablinks.length; i++) {
+      tablinks[i].className = tablinks[i].className.replace(' active', '');
+    }
+
+    document.getElementById(tab).style.display = 'block';
+    elt.className += ' active';
   }
-  .tab  {
-    overflow: hidden;
-    border: 1px solid #ccc;
-    background-color: #f1f1f1;
-  }
-  .tab .meth {
-    display: inline;
-    font-weight: bold;
-    padding: 5px;
-    margin-right:10px;
-    color: white;
-  }
-  .tab .rpc-path {
-    display: inline;
-    font-weight: bold;
-    font-size: 18px;
-  }
-  .get-meth {
-    background-color: #61affe;
-  }
-  .post-meth {
-    background: #49cc90;
-  }
-  .delete-meth {
-    background: #f93e3e;
-  }
-  .put-meth {
-    background: #fca130;
-  }
-  .patch-meth {
-    background: #50e3c2;
-  }
-  .tab .dynamic-arg {
-    display: inline;
-    opacity:0.7;
-  }
-  .tabcontent {
-    padding: 6px 12px;
-    border: 1px solid #ccc;
-    border-top: none;
-  }
-  .tabcontent h6 {
-    margin: 5px 0px 0px 0px;
-  }
-  .tabcontent p {
-     margin: 10px 0px 0px 10px;
-  }
-  .tabcontent ul {
-     margin: 10px 0px 0px 10px;
-  }
-  pre {
-    font-size: 12px
-  }
-</style>|css}
+
+  document.addEventListener('DOMContentLoaded', function() {
+    var a = document.getElementsByClassName('defaultOpen');
+    for (i = 0; i < a.length; i++) { a[i].click() }
+  })
+</script>
+|script}
