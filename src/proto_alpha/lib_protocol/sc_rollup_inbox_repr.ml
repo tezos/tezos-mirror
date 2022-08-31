@@ -829,10 +829,10 @@ struct
 
   let number_of_proof_steps proof = List.length proof
 
-  let lift_ptr_path history ptr_path =
+  let lift_ptr_path deref ptr_path =
     let rec aux accu = function
       | [] -> Some (List.rev accu)
-      | x :: xs -> Option.bind (history x) @@ fun c -> aux (c :: accu) xs
+      | x :: xs -> Option.bind (deref x) @@ fun c -> aux (c :: accu) xs
     in
     aux [] ptr_path
 
