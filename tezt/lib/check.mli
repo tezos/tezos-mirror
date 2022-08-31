@@ -273,3 +273,8 @@ val list_not_mem :
     Example: [Check.raises f exn ~error_msg:"expected f to raise %L, got %R"] *)
 val raises :
   ?__LOC__:string -> exn -> (unit -> unit) -> error_msg:string -> unit
+
+(** {2 Predicates on files} *)
+
+(** Check that a file with the given name exists. *)
+val file_exists : ?__LOC__:string -> string -> unit
