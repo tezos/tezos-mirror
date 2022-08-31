@@ -577,6 +577,9 @@ let uint_as_n ?max_value () =
           raise
             Binary_error_types.(
               Read_error (Invalid_int {min = 0; v = i; max = max_value}))) ;
+         (* we don't need to check [Z.compare z Z.zero < 0] because it can never
+            happen: [n] (used as the last argument of the [conv]) returns
+            positive Zs only *)
          Z.to_int z)
        n)
 
