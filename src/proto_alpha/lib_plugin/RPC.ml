@@ -1987,10 +1987,6 @@ module Sc_rollup = struct
 
   let register_inbox () =
     Registration.register1 ~chunked:true S.inbox (fun ctxt rollup () () ->
-        Stdlib.Format.eprintf
-          "@[Context level at RPC time at %a@]@."
-          Level.pp
-          (Level.current ctxt) ;
         Sc_rollup.Inbox.inbox ctxt rollup >>=? fun (inbox, _ctxt) ->
         return inbox)
 
