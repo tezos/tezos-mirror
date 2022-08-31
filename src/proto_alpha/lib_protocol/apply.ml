@@ -707,7 +707,6 @@ let apply_manager_operation :
     Lwt.t =
  fun ctxt_before_op ~source ~chain_id operation ->
   let source_contract = Contract.Implicit source in
-  Contract.must_exist ctxt_before_op source_contract >>=? fun () ->
   Gas.consume ctxt_before_op Michelson_v1_gas.Cost_of.manager_operation
   >>?= fun ctxt ->
   (* Note that [ctxt_before_op] will be used again later to compute
