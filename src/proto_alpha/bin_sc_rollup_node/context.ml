@@ -97,6 +97,9 @@ module Proof (Hash : sig
   type t
 
   val of_context_hash : Context_hash.t -> t
+end) (Proof_encoding : sig
+  val proof_encoding :
+    Environment.Context.Proof.tree Environment.Context.Proof.t Data_encoding.t
 end) =
 struct
   module IStoreProof =
@@ -122,9 +125,7 @@ struct
 
   let hash_tree tree = Hash.of_context_hash (Tree.hash tree)
 
-  let proof_encoding =
-    Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree32
-    .tree_proof_encoding
+  let proof_encoding = Proof_encoding.proof_encoding
 
   let proof_before proof =
     let (`Value hash | `Node hash) = proof.IStoreProof.Proof.before in
@@ -176,7 +177,14 @@ module Inbox = struct
   include Sc_rollup.Inbox
 
   include Sc_rollup.Inbox.Make_hashing_scheme (struct
-    include Proof (Hash)
+    include
+      Proof
+        (Hash)
+        (struct
+          let proof_encoding =
+            Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V1.Tree32
+            .tree_proof_encoding
+        end)
 
     type t = index
 

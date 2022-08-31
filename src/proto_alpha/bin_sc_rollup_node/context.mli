@@ -85,6 +85,9 @@ module Proof (Hash : sig
   type t
 
   val of_context_hash : Context_hash.t -> t
+end) (Proof_encoding : sig
+  val proof_encoding :
+    Environment.Context.Proof.tree Environment.Context.Proof.t Data_encoding.t
 end) : sig
   module Tree :
     Tezos_context_sigs.Context.TREE
