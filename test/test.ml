@@ -46,5 +46,6 @@ let () =
       ("fixed_array", Fixed_array.tests);
       ("compact", Compact.tests);
       ("check-size", Check_size_negative.tests);
+      ("uint-as-n", Uint_as_n.tests);
       ("int-as-n", Int_as_z.tests);
     ]

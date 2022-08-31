@@ -222,6 +222,8 @@ val z : Z.t encoding
 
 val uint_as_n : ?max_value:int -> unit -> int encoding
 
+val int_as_z : ?min_value:int -> ?max_value:int -> unit -> int encoding
+
 val ranged_int : int -> int -> int encoding
 
 val ranged_float : float -> float -> float encoding

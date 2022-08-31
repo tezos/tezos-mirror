@@ -591,6 +591,63 @@ let uint_as_n ?max_value () =
          Z.to_int z)
        n)
 
+let int_as_z ?min_value ?max_value () =
+  let max_value =
+    match max_value with
+    | None -> (1 lsl 30) - 1
+    | Some max_value ->
+        if (1 lsl 30) - 1 < max_value then invalid_arg "Data_encoding.int_as_z" ;
+        max_value
+  in
+  let min_value =
+    match min_value with
+    | None -> -(1 lsl 30)
+    | Some min_value ->
+        if min_value < -(1 lsl 30) then invalid_arg "Data_encoding.int_as_z" ;
+        min_value
+  in
+  if max_value < min_value then invalid_arg "Data_encoding.int_as_z" ;
+  let max_size =
+    if max_value < 1 lsl 6 && min_value > -(1 lsl 6) then 1
+    else if max_value < 1 lsl 13 && min_value > -(1 lsl 13) then 2
+    else if max_value < 1 lsl 20 && min_value > -(1 lsl 20) then 3
+    else if max_value < 1 lsl 27 && min_value > -(1 lsl 27) then 4
+    else 5
+  in
+  check_size
+    max_size
+    (conv
+       (fun i ->
+         if i < min_value || i > max_value then
+           raise
+             Binary_error_types.(
+               Write_error
+                 (Invalid_int {min = min_value; v = i; max = max_value})) ;
+         Z.of_int i)
+       (fun z ->
+         (if Z.compare z (Z.of_int (-(1 lsl 30))) < 0 then
+          let i = -(1 lsl 30) in
+          raise
+            Binary_error_types.(
+              Read_error (Invalid_int {min = min_value; v = i; max = max_value}))) ;
+         (if Z.compare z (Z.of_int min_value) < 0 then
+          let i = Z.to_int z in
+          raise
+            Binary_error_types.(
+              Read_error (Invalid_int {min = min_value; v = i; max = max_value}))) ;
+         (if Z.compare z (Z.of_int ((1 lsl 30) - 1)) > 0 then
+          let i = (1 lsl 30) - 1 in
+          raise
+            Binary_error_types.(
+              Read_error (Invalid_int {min = min_value; v = i; max = max_value}))) ;
+         (if Z.compare z (Z.of_int max_value) > 0 then
+          let i = Z.to_int z in
+          raise
+            Binary_error_types.(
+              Read_error (Invalid_int {min = min_value; v = i; max = max_value}))) ;
+         Z.to_int z)
+       z)
+
 let def id ?title ?description encoding =
   make @@ Describe {id; title; description; encoding}
 
