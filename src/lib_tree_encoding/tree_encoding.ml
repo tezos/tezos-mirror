@@ -327,6 +327,22 @@ let delayed f =
   in
   {encode; decode}
 
+let either enc_a enc_b =
+  tagged_union
+    (value [] Data_encoding.string)
+    [
+      case
+        "Left"
+        enc_a
+        (function Either.Left x -> Some x | _ -> None)
+        (function x -> Left x);
+      case
+        "Right"
+        enc_b
+        (function Either.Right x -> Some x | _ -> None)
+        (function x -> Right x);
+    ]
+
 module Runner = struct
   module type TREE = S
 

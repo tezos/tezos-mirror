@@ -57,11 +57,20 @@ type 'a concat_kont = {
 
 type ('a, 'b) fold_left_kont = {origin : 'a Vector.t; acc : 'b; offset : int32}
 
-type (_, _) init_section =
-  | Func : (Ast.func, func_inst) init_section
-  | Global : (Ast.global, global_inst) init_section
-  | Table : (Ast.table, table_inst) init_section
-  | Memory : (Ast.memory, memory_inst) init_section
+type (_, _, _) init_section =
+  | Func : ((Ast.func, func_inst) Either.t, Ast.func, func_inst) init_section
+  | Global
+      : ( (Ast.global, global_inst) Either.t,
+          Ast.global,
+          global_inst )
+        init_section
+  | Table
+      : ((Ast.table, table_inst) Either.t, Ast.table, table_inst) init_section
+  | Memory
+      : ( (Ast.memory, memory_inst) Either.t,
+          Ast.memory,
+          memory_inst )
+        init_section
 
 type 'b join_kont =
   | J_Init of 'b Vector.t Vector.t
@@ -72,15 +81,20 @@ type ('a, 'b) map_concat_kont =
   | MC_Map of ('a, 'b Vector.t) map_kont
   | MC_Join of 'b join_kont
 
+type ('kont, 'a, 'b) tick_map_kont = {
+  tick : 'kont option;
+  map : ('a, 'b) map_kont;
+}
+
 type init_kont =
   | IK_Start  (** Very first tick of the [init] function *)
   | IK_Add_import of (extern, Ast.import, module_inst) fold_right2_kont
   | IK_Type of module_inst * (Ast.type_, Types.func_type) map_kont
   | IK_Aggregate :
-      module_inst * ('a, 'b) init_section * ('a, 'b) map_kont
+      module_inst * ('kont, 'a, 'b) init_section * ('kont, 'a, 'b) tick_map_kont
       -> init_kont
   | IK_Aggregate_concat :
-      module_inst * ('a, 'b) init_section * 'b concat_kont
+      module_inst * ('kont, 'a, 'b) init_section * 'b concat_kont
       -> init_kont
   | IK_Exports of module_inst * (Ast.export, extern NameMap.t) fold_left_kont
   | IK_Elems of module_inst * (Ast.elem_segment, elem_inst) map_kont

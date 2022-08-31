@@ -234,6 +234,10 @@ val option : 'a t -> 'a option t
     to allow for directly recursive encoders/decoders. *)
 val delayed : (unit -> 'a t) -> 'a t
 
+(** [either enc_a enc_b] returns an encoder where [enc_a] is used for
+    the left case of [Either.t], and [enc_b] for the [Right] case. *)
+val either : 'a t -> 'b t -> ('a, 'b) Either.t t
+
 module Runner : sig
   module type TREE = sig
     type tree

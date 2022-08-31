@@ -1131,14 +1131,44 @@ let fold_left_s_step {origin; acc; offset} f =
   let+ acc = f acc x in
   {origin; acc; offset = Int32.succ offset}
 
-type (_, _) init_section =
-  | Func : (func, func_inst) init_section
-  | Global : (global, global_inst) init_section
-  | Table : (table, table_inst) init_section
-  | Memory : (memory, memory_inst) init_section
+type ('kont, 'a, 'b) tick_map_kont = {
+  tick : 'kont option;
+  map : ('a, 'b) map_kont;
+}
+
+let tick_map_completed {map; _} = map_completed map
+
+let tick_map_kont v = {tick = None; map = map_kont v}
+
+let tick_map_step first_kont kont_completed kont_step = function
+  | {map; _} when map_completed map -> assert false
+  | {tick = None; map} ->
+      let+ x = Vector.get map.offset map.origin in
+      let tick = first_kont x in
+      {tick = Some tick; map}
+  | {tick = Some tick; map} -> (
+      match kont_completed tick with
+      | Some v ->
+          let map =
+            {
+              map with
+              destination = Vector.set map.offset v map.destination;
+              offset = Int32.succ map.offset;
+            }
+          in
+          Lwt.return {tick = None; map}
+      | None ->
+          let+ tick = kont_step tick in
+          {tick = Some tick; map})
+
+type (_, _, _) init_section =
+  | Func : ((func, func_inst) Either.t, func, func_inst) init_section
+  | Global : ((global, global_inst) Either.t, global, global_inst) init_section
+  | Table : ((table, table_inst) Either.t, table, table_inst) init_section
+  | Memory : ((memory, memory_inst) Either.t, memory, memory_inst) init_section
 
 let section_fetch_vec :
-    type a b. module_inst -> (a, b) init_section -> b Vector.t =
+    type kont a b. module_inst -> (kont, a, b) init_section -> b Vector.t =
  fun inst sec ->
   match sec with
   | Func -> inst.funcs
@@ -1147,7 +1177,8 @@ let section_fetch_vec :
   | Memory -> inst.memories
 
 let section_set_vec :
-    type a b. module_inst -> (a, b) init_section -> b Vector.t -> module_inst =
+    type kont a b.
+    module_inst -> (kont, a, b) init_section -> b Vector.t -> module_inst =
  fun inst sec vec ->
   match (sec, vec) with
   | Func, funcs -> {inst with funcs}
@@ -1220,10 +1251,10 @@ type init_kont =
   | IK_Add_import of (extern, import, module_inst) fold_right2_kont
   | IK_Type of module_inst * (type_, func_type) map_kont
   | IK_Aggregate :
-      module_inst * ('a, 'b) init_section * ('a, 'b) map_kont
+      module_inst * ('kont, 'a, 'b) init_section * ('kont, 'a, 'b) tick_map_kont
       -> init_kont
   | IK_Aggregate_concat :
-      module_inst * ('a, 'b) init_section * 'b concat_kont
+      module_inst * ('kont, 'a, 'b) init_section * 'b concat_kont
       -> init_kont
   | IK_Exports of module_inst * (export, extern NameMap.t) fold_left_kont
   | IK_Elems of module_inst * (elem_segment, elem_inst) map_kont
@@ -1238,25 +1269,57 @@ type init_kont =
   | IK_Stop of module_inst
 
 let section_next_init_kont :
-    type a b. module_ -> module_inst -> (a, b) init_section -> init_kont =
+    type kont a b.
+    module_ -> module_inst -> (kont, a, b) init_section -> init_kont =
  fun m inst0 sec ->
   match sec with
-  | Func -> IK_Aggregate (inst0, Global, map_kont m.it.globals)
-  | Global -> IK_Aggregate (inst0, Table, map_kont m.it.tables)
-  | Table -> IK_Aggregate (inst0, Memory, map_kont m.it.memories)
+  | Func -> IK_Aggregate (inst0, Global, tick_map_kont m.it.globals)
+  | Global -> IK_Aggregate (inst0, Table, tick_map_kont m.it.tables)
+  | Table -> IK_Aggregate (inst0, Memory, tick_map_kont m.it.memories)
   | Memory -> IK_Exports (inst0, fold_left_kont m.it.exports (NameMap.create ()))
 
-let section_step :
-    type a b.
-    module_inst ModuleMap.t -> module_key -> (a, b) init_section -> a -> b Lwt.t
-    =
- fun module_reg self -> function
-  | Func -> create_func module_reg self
-  | Global -> create_global module_reg self
-  | Table -> fun x -> Lwt.return (create_table x)
-  | Memory -> fun x -> Lwt.return (create_memory x)
+let section_inner_kont : type kont a b. (kont, a, b) init_section -> a -> kont =
+ fun sec x ->
+  match sec with
+  | Func -> Either.Left x
+  | Global -> Left x
+  | Table -> Left x
+  | Memory -> Left x
 
-let section_update_module_ref : type a b. (a, b) init_section -> bool = function
+let section_inner_completed :
+    type kont a b. (kont, a, b) init_section -> kont -> b option =
+ fun sec kont ->
+  match (sec, kont) with
+  | Func, Right y -> Some y
+  | Global, Right y -> Some y
+  | Table, Right y -> Some y
+  | Memory, Right y -> Some y
+  | _ -> None
+
+let section_inner_step :
+    type kont a b.
+    module_inst ModuleMap.t ->
+    module_key ->
+    (kont, a, b) init_section ->
+    kont ->
+    kont Lwt.t =
+ fun module_reg self ->
+  let lift_either f =
+    let open Either in
+    function
+    | Left x ->
+        let+ y = f x in
+        Right y
+    | Right _ -> assert false
+  in
+  function
+  | Func -> lift_either (create_func module_reg self)
+  | Global -> lift_either (create_global module_reg self)
+  | Table -> lift_either (fun x -> Lwt.return (create_table x))
+  | Memory -> lift_either (fun x -> Lwt.return (create_memory x))
+
+let section_update_module_ref : type kont a b. (kont, a, b) init_section -> bool
+    = function
   | Func -> true
   | Global -> false
   | Table -> false
@@ -1287,18 +1350,24 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
         {inst0 with types = tick.destination; allocations = m.it.allocations}
       in
       update_module_ref module_reg self inst0 ;
-      Lwt.return (IK_Aggregate (inst0, Func, map_kont m.it.funcs))
+      Lwt.return (IK_Aggregate (inst0, Func, tick_map_kont m.it.funcs))
   | IK_Type (inst0, tick) ->
       let+ tick = map_step tick (fun x -> x.it) in
       IK_Type (inst0, tick)
-  | IK_Aggregate (inst0, sec, tick) when map_completed tick ->
+  | IK_Aggregate (inst0, sec, tick) when tick_map_completed tick ->
       Lwt.return
         (IK_Aggregate_concat
            ( inst0,
              sec,
-             concat_kont (section_fetch_vec inst0 sec) tick.destination ))
+             concat_kont (section_fetch_vec inst0 sec) tick.map.destination ))
   | IK_Aggregate (inst0, sec, tick) ->
-      let+ tick = map_s_step tick (section_step module_reg self sec) in
+      let+ tick =
+        tick_map_step
+          (section_inner_kont sec)
+          (section_inner_completed sec)
+          (section_inner_step module_reg self sec)
+          tick
+      in
       IK_Aggregate (inst0, sec, tick)
   | IK_Aggregate_concat (inst0, sec, tick) when concat_completed tick ->
       let inst1 = section_set_vec inst0 sec tick.res in
