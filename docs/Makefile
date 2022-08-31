@@ -135,7 +135,11 @@ user/default-acl.json: $(RPCDOCEXE)
 	$(RPCDOCEXE) acl > $@
 
 rpc: user/default-acl.json shell/rpc.rst \
-			$(PROTOCOLS:%=%/rpc.rst)
+	alpha/rpc.rst
+
+# To be triggered manually when needed
+rpc-protocols:
+	$(NAMED_PROTOS:%=%/rpc.rst)
 
 p2p: $(P2PDOCEXE) shell/p2p_usage.rst.inc
 	@$(P2PDOCEXE) < shell/p2p_usage.rst.inc > shell/p2p_api.rst
@@ -196,5 +200,5 @@ lint: pylint pycodestyle lint_black
 
 clean:
 	@-rm -Rf "$(BUILDDIR)" linkcheck
-	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json active/rpc.rst jakarta/rpc.rst kathmandu/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
+	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
 	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html jakarta/tezos-*.html kathmandu/tezos-*.html alpha/tezos-*.html
