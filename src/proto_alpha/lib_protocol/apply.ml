@@ -1034,8 +1034,7 @@ let apply_manager_operation :
             {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt},
           [] )
   | Increase_paid_storage {amount_in_bytes; destination} ->
-      let contract = Contract.Originated destination in
-      Contract.increase_paid_storage ctxt contract ~amount_in_bytes
+      Contract.increase_paid_storage ctxt destination ~amount_in_bytes
       >>=? fun ctxt ->
       let payer = `Contract (Contract.Implicit source) in
       Fees.burn_storage_increase_fees ctxt ~payer amount_in_bytes

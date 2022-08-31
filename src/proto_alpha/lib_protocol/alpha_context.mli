@@ -1664,7 +1664,7 @@ module Contract : sig
     context -> public_key_hash -> Tez.t tzresult Lwt.t
 
   val increase_paid_storage :
-    context -> t -> amount_in_bytes:Z.t -> context tzresult Lwt.t
+    context -> Contract_hash.t -> amount_in_bytes:Z.t -> context tzresult Lwt.t
 
   val fresh_contract_from_current_nonce :
     context -> (context * Contract_hash.t) tzresult
