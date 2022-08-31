@@ -398,11 +398,19 @@ let callback rights db_pool _connection request body =
                                  Teztale_lib.Data.encoding
                                  data)
                           in
+                          let headers =
+                            Cohttp.Header.init_with
+                              "content-type"
+                              "application/json; charset=UTF-8"
+                          in
+                          let headers =
+                            Cohttp.Header.add
+                              headers
+                              "Access-Control-Allow-Origin"
+                              "*"
+                          in
                           Cohttp_lwt_unix.Server.respond_string
-                            ~headers:
-                              (Cohttp.Header.init_with
-                                 "content-type"
-                                 "application/json; charset=UTF-8")
+                            ~headers
                             ~status:`OK
                             ~body
                             ())
