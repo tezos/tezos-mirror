@@ -105,8 +105,6 @@ module type T = sig
 
   module Context_hash : [%sig "v5/context_hash.mli"]
 
-  module Pvss_secp256k1 : [%sig "v5/pvss_secp256k1.mli"]
-
   module Sapling : [%sig "v5/sapling.mli"]
 
   module Timelock : [%sig "v5/timelock.mli"]

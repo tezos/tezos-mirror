@@ -63,12 +63,6 @@ module type T = sig
        and type Signature.public_key = Signature.public_key
        and type Signature.t = Signature.t
        and type Signature.watermark = Signature.watermark
-       and type Pvss_secp256k1.Commitment.t = Pvss_secp256k1.Commitment.t
-       and type Pvss_secp256k1.Encrypted_share.t =
-        Pvss_secp256k1.Encrypted_share.t
-       and type Pvss_secp256k1.Clear_share.t = Pvss_secp256k1.Clear_share.t
-       and type Pvss_secp256k1.Public_key.t = Pvss_secp256k1.Public_key.t
-       and type Pvss_secp256k1.Secret_key.t = Pvss_secp256k1.Secret_key.t
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type Z.t = Z.t
        and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node
@@ -166,7 +160,6 @@ struct
   module Secp256k1 = Secp256k1
   module P256 = P256
   module Signature = Signature
-  module Pvss_secp256k1 = Pvss_secp256k1
 
   module S = struct
     module type T = Tezos_base.S.T
@@ -457,70 +450,6 @@ struct
       val final_exponentiation_opt : Gt.t -> Gt.t option
 
       val pairing : G1.t -> G2.t -> Gt.t
-    end
-
-    module type PVSS_ELEMENT = sig
-      type t
-
-      include B58_DATA with type t := t
-
-      include ENCODER with type t := t
-    end
-
-    module type PVSS_PUBLIC_KEY = sig
-      type t
-
-      val pp : Format.formatter -> t -> unit
-
-      include Compare.S with type t := t
-
-      include RAW_DATA with type t := t
-
-      include B58_DATA with type t := t
-
-      include ENCODER with type t := t
-    end
-
-    module type PVSS_SECRET_KEY = sig
-      type public_key
-
-      type t
-
-      include ENCODER with type t := t
-
-      val to_public_key : t -> public_key
-    end
-
-    module type PVSS = sig
-      type proof
-
-      module Clear_share : PVSS_ELEMENT
-
-      module Commitment : PVSS_ELEMENT
-
-      module Encrypted_share : PVSS_ELEMENT
-
-      module Public_key : PVSS_PUBLIC_KEY
-
-      module Secret_key : PVSS_SECRET_KEY with type public_key := Public_key.t
-
-      val proof_encoding : proof Data_encoding.t
-
-      val check_dealer_proof :
-        Encrypted_share.t list ->
-        Commitment.t list ->
-        proof:proof ->
-        public_keys:Public_key.t list ->
-        bool
-
-      val check_revealed_share :
-        Encrypted_share.t ->
-        Clear_share.t ->
-        public_key:Public_key.t ->
-        proof ->
-        bool
-
-      val reconstruct : Clear_share.t list -> int list -> Public_key.t
     end
   end
 

@@ -93,8 +93,6 @@ module type T = sig
 
   module Context_hash : [%sig "v1/context_hash.mli"]
 
-  module Pvss_secp256k1 : [%sig "v1/pvss_secp256k1.mli"]
-
   module Sapling : [%sig "v1/sapling.mli"]
 
   module Micheline : [%sig "v1/micheline.mli"]

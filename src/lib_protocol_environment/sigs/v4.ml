@@ -6825,70 +6825,6 @@ module type CURVE = sig
   (** Multiply an element by a scalar *)
   val mul : t -> Scalar.t -> t
 end
-
-module type PVSS_ELEMENT = sig
-   type t
-
-   include B58_DATA with type t := t
-
-   include ENCODER with type t := t
-end
-
-module type PVSS_PUBLIC_KEY = sig
-   type t
-
-   val pp : Format.formatter -> t -> unit
-
-   include Compare.S with type t := t
-
-   include RAW_DATA with type t := t
-
-   include B58_DATA with type t := t
-
-   include ENCODER with type t := t
-end
-
-module type PVSS_SECRET_KEY = sig
-   type public_key
-
-   type t
-
-    include ENCODER with type t := t
-
-    val to_public_key : t -> public_key
-end
-
-module type PVSS = sig
-  type proof
-
-  module Clear_share : PVSS_ELEMENT
-
-  module Commitment : PVSS_ELEMENT
-
-  module Encrypted_share : PVSS_ELEMENT
-
-  module Public_key : PVSS_PUBLIC_KEY
-
-  module Secret_key : PVSS_SECRET_KEY with type public_key := Public_key.t
-
-  val proof_encoding : proof Data_encoding.t
-
-  val check_dealer_proof :
-    Encrypted_share.t list ->
-    Commitment.t list ->
-    proof:proof ->
-    public_keys:Public_key.t list ->
-    bool
-
-  val check_revealed_share :
-    Encrypted_share.t ->
-    Clear_share.t ->
-    public_key:Public_key.t ->
-    proof ->
-    bool
-
-  val reconstruct : Clear_share.t list -> int list -> Public_key.t
-end
 end
 # 76 "v4.in.ml"
 
@@ -7467,40 +7403,6 @@ end
 # 104 "v4.in.ml"
 
 
-  module Pvss_secp256k1 : sig
-# 1 "v4/pvss_secp256k1.mli"
-(*****************************************************************************)
-(*                                                                           *)
-(* Open Source License                                                       *)
-(* Copyright (c) 2020 Metastate AG <contact@metastate.ch>                    *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
-(*                                                                           *)
-(*****************************************************************************)
-
-(** Tezos - PVSS Secp256k1 cryptography *)
-
-include S.PVSS
-end
-# 106 "v4.in.ml"
-
-
   module Sapling : sig
 # 1 "v4/sapling.mli"
 (* The MIT License (MIT)
@@ -7629,7 +7531,7 @@ module Verification : sig
   val final_check : t -> UTXO.transaction -> string -> bool
 end
 end
-# 108 "v4.in.ml"
+# 106 "v4.in.ml"
 
 
   module Timelock : sig
@@ -7688,7 +7590,7 @@ val open_chest : chest -> chest_key -> time:int -> opening_result
     Used for gas accounting*)
 val get_plaintext_size : chest -> int
 end
-# 110 "v4.in.ml"
+# 108 "v4.in.ml"
 
 
   module Micheline : sig
@@ -7748,7 +7650,7 @@ val annotations : ('l, 'p) node -> string list
 
 val strip_locations : (_, 'p) node -> 'p canonical
 end
-# 112 "v4.in.ml"
+# 110 "v4.in.ml"
 
 
   module Block_header : sig
@@ -7799,7 +7701,7 @@ type t = {shell : shell_header; protocol_data : bytes}
 
 include S.HASHABLE with type t := t and type hash := Block_hash.t
 end
-# 114 "v4.in.ml"
+# 112 "v4.in.ml"
 
 
   module Fitness : sig
@@ -7833,7 +7735,7 @@ end
     compared in a lexicographical order (longer list are greater). *)
 include S.T with type t = bytes list
 end
-# 116 "v4.in.ml"
+# 114 "v4.in.ml"
 
 
   module Operation : sig
@@ -7877,7 +7779,7 @@ type t = {shell : shell_header; proto : bytes}
 
 include S.HASHABLE with type t := t and type hash := Operation_hash.t
 end
-# 118 "v4.in.ml"
+# 116 "v4.in.ml"
 
 
   module Context : sig
@@ -8207,7 +8109,7 @@ module Cache :
      and type key = cache_key
      and type value = cache_value
 end
-# 120 "v4.in.ml"
+# 118 "v4.in.ml"
 
 
   module Updater : sig
@@ -8508,7 +8410,7 @@ end
    not complete until [init] in invoked. *)
 val activate : Context.t -> Protocol_hash.t -> Context.t Lwt.t
 end
-# 122 "v4.in.ml"
+# 120 "v4.in.ml"
 
 
   module RPC_context : sig
@@ -8663,6 +8565,6 @@ val make_opt_call3 :
   'i ->
   'o option shell_tzresult Lwt.t
 end
-# 124 "v4.in.ml"
+# 122 "v4.in.ml"
 
 end
