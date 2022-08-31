@@ -4123,7 +4123,7 @@ module Withdraw = struct
       (account1, account2, tx_rollup, deposit_contract, withdraw_contract, b)
 
   let originate_forge_withdraw_deposit_contract account block =
-    Contract_helpers.originate_contract_from_string
+    Contract_helpers.originate_contract_from_string_hash
       ~script:
         {| parameter (or (pair %default nat nat)
                          (or (ticket %withdraw nat)
@@ -5460,7 +5460,7 @@ module Withdraw = struct
           |> Tezos_micheline.Micheline.strip_locations |> Script.lazy_expr)
         ~fee:Tez.one
         account
-        forge_withdraw_deposit_contract
+        (Originated forge_withdraw_deposit_contract)
         (Tez.of_mutez_exn 0L)
       >>=? fun operation -> Block.bake ~operation block
     in
@@ -5478,14 +5478,14 @@ module Withdraw = struct
           |> Tezos_micheline.Micheline.strip_locations |> Script.lazy_expr)
         ~fee:Tez.one
         account
-        forge_withdraw_deposit_contract
+        (Originated forge_withdraw_deposit_contract)
         (Tez.of_mutez_exn 0L)
       >>=? fun operation -> Block.bake ~operation block
     in
     let dispatch_ticket block =
       Nat_ticket.withdrawal
         (B block)
-        ~ticketer:forge_withdraw_deposit_contract
+        ~ticketer:(Originated forge_withdraw_deposit_contract)
         ~claimer:account
         tx_rollup
       >>=? fun (withdraw, ticket_info) ->
@@ -5522,24 +5522,24 @@ module Withdraw = struct
         ~source:account
         ~contents:(Script.lazy_expr Nat_ticket.contents)
         ~ty:(Script.lazy_expr Nat_ticket.ty)
-        ~ticketer:forge_withdraw_deposit_contract
+        ~ticketer:(Originated forge_withdraw_deposit_contract)
         ~amount:
           (WithExceptions.Option.get ~loc:__LOC__
           @@ Ticket_amount.of_zint
           @@ Tx_rollup_l2_qty.to_z Nat_ticket.amount)
-        ~destination:forge_withdraw_deposit_contract
+        ~destination:(Originated forge_withdraw_deposit_contract)
         ~entrypoint:(Entrypoint.of_string_strict_exn "withdraw")
       >>=? fun operation -> Block.bake ~operation block
     in
     let token_one =
-      Nat_ticket.ex_token ~ticketer:forge_withdraw_deposit_contract
+      Nat_ticket.ex_token ~ticketer:(Originated forge_withdraw_deposit_contract)
     in
     let assert_contract_ticket_balance ~__LOC__ block balance =
       assert_ticket_balance
         ~loc:__LOC__
         block
         token_one
-        (Contract forge_withdraw_deposit_contract)
+        (Contract (Originated forge_withdraw_deposit_contract))
         balance
     in
     let assert_account_ticket_balance ~__LOC__ block balance =
