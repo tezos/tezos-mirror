@@ -469,17 +469,32 @@ let time_of_timestamp timestamp =
       | Some tm -> tm)
   | At tm -> tm
 
-let spawn_activate_protocol ?endpoint ~protocol ?(fitness = 1)
+let spawn_activate_protocol ?endpoint ?protocol ?protocol_hash ?(fitness = 1)
     ?(key = Constant.activator.alias) ?(timestamp = Ago default_delay)
     ?parameter_file client =
   let timestamp = time_of_timestamp timestamp in
+  let protocol_hash, parameter_file =
+    match (protocol, protocol_hash, parameter_file) with
+    | Some protocol, None, _ ->
+        ( Protocol.hash protocol,
+          Option.value
+            parameter_file
+            ~default:(Protocol.parameter_file protocol) )
+    | None, Some protocol_hash, Some parameter_file ->
+        (protocol_hash, parameter_file)
+    | _, _, _ ->
+        Test.fail
+          ~__LOC__
+          "Must pass either protocol or both protocol_file and parameter_file \
+           to spawn_activate_protocol"
+  in
   spawn_command
     ?endpoint
     client
     [
       "activate";
       "protocol";
-      Protocol.hash protocol;
+      protocol_hash;
       "with";
       "fitness";
       string_of_int fitness;
@@ -488,16 +503,17 @@ let spawn_activate_protocol ?endpoint ~protocol ?(fitness = 1)
       key;
       "and";
       "parameters";
-      Option.value parameter_file ~default:(Protocol.parameter_file protocol);
+      parameter_file;
       "--timestamp";
       Time.to_notation timestamp;
     ]
 
-let activate_protocol ?endpoint ~protocol ?fitness ?key ?timestamp
-    ?parameter_file client =
+let activate_protocol ?endpoint ?protocol ?protocol_hash ?fitness ?key
+    ?timestamp ?parameter_file client =
   spawn_activate_protocol
     ?endpoint
-    ~protocol
+    ?protocol
+    ?protocol_hash
     ?fitness
     ?key
     ?timestamp
@@ -514,8 +530,8 @@ let node_of_client_mode = function
   | Client (None, _) -> None
   | Mockup -> None
 
-let activate_protocol_and_wait ?endpoint ~protocol ?fitness ?key ?timestamp
-    ?parameter_file ?node client =
+let activate_protocol_and_wait ?endpoint ?protocol ?protocol_hash ?fitness ?key
+    ?timestamp ?parameter_file ?node client =
   let node =
     match node with
     | Some n -> n
@@ -528,7 +544,8 @@ let activate_protocol_and_wait ?endpoint ~protocol ?fitness ?key ?timestamp
   let* () =
     activate_protocol
       ?endpoint
-      ~protocol
+      ?protocol
+      ?protocol_hash
       ?fitness
       ?key
       ?timestamp

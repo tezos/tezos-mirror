@@ -350,13 +350,18 @@ val spawn_import_secret_key :
     present (at which point one would have to wait between each block
     so that peers do not reject them for being in the future).
 
+    You must either provide [protocol] (in which case [parameter_file] defaults
+    to [Protocol.parameter_file protocol]), or provide both [protocol_hash]
+    and [parameter_file].
+
     If you want to wait until the node switches its head to the block
     activating the given protocol, consider using
     {!activate_protocol_and_wait} below.
 *)
 val activate_protocol :
   ?endpoint:endpoint ->
-  protocol:Protocol.t ->
+  ?protocol:Protocol.t ->
+  ?protocol_hash:string ->
   ?fitness:int ->
   ?key:string ->
   ?timestamp:timestamp ->
@@ -374,7 +379,8 @@ val activate_protocol :
     found. *)
 val activate_protocol_and_wait :
   ?endpoint:endpoint ->
-  protocol:Protocol.t ->
+  ?protocol:Protocol.t ->
+  ?protocol_hash:string ->
   ?fitness:int ->
   ?key:string ->
   ?timestamp:timestamp ->
@@ -386,7 +392,8 @@ val activate_protocol_and_wait :
 (** Same as [activate_protocol], but do not wait for the process to exit. *)
 val spawn_activate_protocol :
   ?endpoint:endpoint ->
-  protocol:Protocol.t ->
+  ?protocol:Protocol.t ->
+  ?protocol_hash:string ->
   ?fitness:int ->
   ?key:string ->
   ?timestamp:timestamp ->
