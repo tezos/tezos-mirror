@@ -251,11 +251,11 @@ let rec read_rec :
   | N -> Atom.n !!"N" state
   | Z -> Atom.z !!"Z" state
   | Float -> Atom.float !!"float" state
-  | Bytes (`Fixed n) -> Atom.fixed_length_bytes n !!"bytes" state
-  | Bytes `Variable ->
+  | Bytes (`Fixed n, _) -> Atom.fixed_length_bytes n !!"bytes" state
+  | Bytes (`Variable, _) ->
       Atom.fixed_length_bytes state.remaining_bytes !!"bytes" state
-  | String (`Fixed n) -> Atom.fixed_length_string n !!"string" state
-  | String `Variable ->
+  | String (`Fixed n, _) -> Atom.fixed_length_string n !!"string" state
+  | String (`Variable, _) ->
       Atom.fixed_length_string state.remaining_bytes !!"string" state
   | Padded (e, n) ->
       let v = read_rec e ?name state in

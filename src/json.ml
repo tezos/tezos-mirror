@@ -80,7 +80,7 @@ let z_encoding =
     ~description:"Decimal representation of a big number"
   @@ conv Z.to_string Z.of_string string
 
-let bytes_jsont =
+let jsont_as_hex to_hex of_hex =
   let open Json_encoding in
   let schema =
     let open Json_schema in
@@ -107,10 +107,14 @@ let bytes_jsont =
   conv
     ~schema
     (fun h ->
-      let (`Hex s) = Hex.of_bytes h in
+      let (`Hex s) = to_hex h in
       s)
-    (fun h -> wrap_error Hex.to_bytes (`Hex h))
+    (fun h -> wrap_error of_hex (`Hex h))
     string
+
+let bytes_as_hex_jsont = jsont_as_hex Hex.of_bytes Hex.to_bytes
+
+let string_as_hex_jsont = jsont_as_hex Hex.of_string Hex.to_string
 
 let check_utf8 s =
   Uutf.String.fold_utf_8
@@ -139,6 +143,9 @@ let raw_string_encoding =
       "Either a plain UTF8 string, or a sequence of bytes for strings that \
        contain invalid byte sequences."
     (union [utf8_case; obj_case])
+
+let raw_bytes_encoding =
+  Json_encoding.conv Bytes.to_string Bytes.of_string raw_string_encoding
 
 let rec lift_union : type a. a Encoding.t -> a Encoding.t =
  fun e ->
@@ -283,35 +290,50 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
   | Float -> float
   | RangedFloat {minimum; maximum} ->
       ranged_float ~minimum ~maximum "rangedFloat"
-  | String (`Fixed expected) ->
-      let check s =
-        let found = String.length s in
-        if found <> expected then
-          raise
-            (Cannot_destruct
-               ( [],
-                 Unexpected
-                   ( Format.asprintf "string (len %d)" found,
-                     Format.asprintf "string (len %d)" expected ) )) ;
-        s
+  | String (kind, json_repr) -> (
+      let f =
+        match json_repr with
+        | Plain -> raw_string_encoding
+        | Hex -> string_as_hex_jsont
       in
-      conv check check raw_string_encoding
-  | String _ -> raw_string_encoding
+      match kind with
+      | `Fixed expected ->
+          let check s =
+            let found = String.length s in
+            if found <> expected then
+              raise
+                (Cannot_destruct
+                   ( [],
+                     Unexpected
+                       ( Format.asprintf "string (len %d)" found,
+                         Format.asprintf "string (len %d)" expected ) )) ;
+            s
+          in
+
+          conv check check f
+      | _ -> f)
   | Padded (e, _) -> get_json e
-  | Bytes (`Fixed expected) ->
-      let check s =
-        let found = Bytes.length s in
-        if found <> expected then
-          raise
-            (Cannot_destruct
-               ( [],
-                 Unexpected
-                   ( Format.asprintf "string (len %d)" found,
-                     Format.asprintf "string (len %d)" expected ) )) ;
-        s
+  | Bytes (kind, json_repr) -> (
+      let f =
+        match json_repr with
+        | Hex -> bytes_as_hex_jsont
+        | Plain -> raw_bytes_encoding
       in
-      conv check check bytes_jsont
-  | Bytes _ -> bytes_jsont
+      match kind with
+      | `Fixed expected ->
+          let check s =
+            let found = Bytes.length s in
+            if found <> expected then
+              raise
+                (Cannot_destruct
+                   ( [],
+                     Unexpected
+                       ( Format.asprintf "string (len %d)" found,
+                         Format.asprintf "string (len %d)" expected ) )) ;
+            s
+          in
+          conv check check f
+      | _ -> f)
   | String_enum (tbl, _) ->
       string_enum (Hashtbl.fold (fun a (str, _) acc -> (str, a) :: acc) tbl [])
   | Array {elts = e; length_limit = _} ->
@@ -436,3 +458,11 @@ let encoding =
 
 let schema_encoding =
   Encoding.conv Json_schema.to_json Json_schema.of_json encoding
+
+let bytes : Encoding.string_json_repr -> bytes Json_encoding.encoding = function
+  | Encoding.Hex -> bytes_as_hex_jsont
+  | Plain -> raw_bytes_encoding
+
+let string = function
+  | Encoding.Hex -> string_as_hex_jsont
+  | Plain -> raw_string_encoding

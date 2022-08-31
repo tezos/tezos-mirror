@@ -264,12 +264,12 @@ let rec read_rec :
   | N -> Atom.n resume state k
   | Z -> Atom.z resume state k
   | Float -> Atom.float resume state k
-  | Bytes (`Fixed n) -> Atom.fixed_length_bytes n resume state k
-  | Bytes `Variable ->
+  | Bytes (`Fixed n, _) -> Atom.fixed_length_bytes n resume state k
+  | Bytes (`Variable, _) ->
       let size = remaining_bytes state in
       Atom.fixed_length_bytes size resume state k
-  | String (`Fixed n) -> Atom.fixed_length_string n resume state k
-  | String `Variable ->
+  | String (`Fixed n, _) -> Atom.fixed_length_string n resume state k
+  | String (`Variable, _) ->
       let size = remaining_bytes state in
       Atom.fixed_length_string size resume state k
   | Padded (e, n) ->

@@ -195,10 +195,11 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
   | N -> Atom.n state
   | Z -> Atom.z state
   | Float -> Atom.float state
-  | Bytes (`Fixed n) -> Atom.fixed_length_bytes n state
-  | Bytes `Variable -> Atom.fixed_length_bytes state.remaining_bytes state
-  | String (`Fixed n) -> Atom.fixed_length_string n state
-  | String `Variable -> Atom.fixed_length_string state.remaining_bytes state
+  | Bytes (`Fixed n, _) -> Atom.fixed_length_bytes n state
+  | Bytes (`Variable, _) -> Atom.fixed_length_bytes state.remaining_bytes state
+  | String (`Fixed n, _) -> Atom.fixed_length_string n state
+  | String (`Variable, _) ->
+      Atom.fixed_length_string state.remaining_bytes state
   | Padded (e, n) ->
       let v = read_rec e state in
       ignore (Atom.fixed_length_string n state : string) ;

@@ -88,7 +88,9 @@ val to_string : ?newline:bool -> ?minify:bool -> json -> string
 
 val pp : Format.formatter -> json -> unit
 
-val bytes_jsont : Bytes.t Json_encoding.encoding
+val bytes : Encoding.string_json_repr -> bytes Json_encoding.encoding
+
+val string : Encoding.string_json_repr -> string Json_encoding.encoding
 
 type jsonm_lexeme =
   [ `Null

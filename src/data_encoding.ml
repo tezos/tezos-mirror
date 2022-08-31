@@ -70,7 +70,7 @@ module Encoding = struct
     raw_splitted ~json ~binary
 
   module Bounded = struct
-    let string length =
+    let string' json_repr length =
       raw_splitted
         ~binary:
           (let kind = Binary_size.unsigned_range_to_size length in
@@ -87,9 +87,11 @@ module Encoding = struct
                 raise
                   (Cannot_destruct ([], Invalid_argument "oversized string")) ;
               s)
-            string)
+            (Json.string json_repr))
 
-    let bytes length =
+    let string length = string' Plain length
+
+    let bytes' json_repr length =
       raw_splitted
         ~binary:
           (let kind = Binary_size.unsigned_range_to_size length in
@@ -106,7 +108,9 @@ module Encoding = struct
                 raise
                   (Cannot_destruct ([], Invalid_argument "oversized string")) ;
               s)
-            Json.bytes_jsont)
+            (Json.bytes json_repr))
+
+    let bytes length = bytes' Hex length
   end
 
   type 'a lazy_state = Value of 'a | Bytes of Bytes.t | Both of Bytes.t * 'a

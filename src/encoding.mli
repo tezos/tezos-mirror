@@ -63,6 +63,8 @@ type case_tag = Tag of int | Json_only
 (* [none] is [Json_only], [some t] is [Tag t] *)
 type case_tag_internal = Uint_option.t
 
+type string_json_repr = Hex | Plain
+
 type 'a desc =
   | Null : unit desc
   | Empty : unit desc
@@ -82,8 +84,10 @@ type 'a desc =
       (** Note: the encoding size is determined by range *)
   | RangedFloat : {minimum : float; maximum : float} -> float desc
   | Float : float desc
-  | Bytes : Kind.length -> Bytes.t desc  (** A mutable string *)
-  | String : Kind.length -> string desc  (** An immutable string *)
+  | Bytes : Kind.length * string_json_repr -> Bytes.t desc
+      (** A mutable string *)
+  | String : Kind.length * string_json_repr -> string desc
+      (** An immutable string *)
   | Padded : 'a t * int -> 'a desc
       (** The [int] indicates how many null bytes should be added on the right
           of the value. *)
@@ -232,7 +236,11 @@ val bool : bool encoding
 
 val string : string encoding
 
+val string' : string_json_repr -> string encoding
+
 val bytes : Bytes.t encoding
+
+val bytes' : string_json_repr -> Bytes.t encoding
 
 val float : float encoding
 
@@ -249,7 +257,11 @@ val is_tup : 'a encoding -> bool
 module Fixed : sig
   val string : int -> string encoding
 
+  val string' : string_json_repr -> int -> string encoding
+
   val bytes : int -> Bytes.t encoding
+
+  val bytes' : string_json_repr -> int -> Bytes.t encoding
 
   val add_padding : 'a encoding -> int -> 'a encoding
 
@@ -261,7 +273,11 @@ end
 module Variable : sig
   val string : string encoding
 
+  val string' : string_json_repr -> string encoding
+
   val bytes : Bytes.t encoding
+
+  val bytes' : string_json_repr -> Bytes.t encoding
 
   val array : ?max_length:int -> 'a encoding -> 'a array encoding
 

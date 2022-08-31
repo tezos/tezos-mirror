@@ -1,6 +1,6 @@
 (library
  (name data_encoding_expect_tests)
  (inline_tests)
- (libraries data_encoding zarith zarith_stubs_js)
+ (libraries data_encoding zarith zarith_stubs_js ezjsonm)
  (preprocess
   (pps ppx_expect)))

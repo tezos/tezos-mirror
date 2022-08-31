@@ -38,7 +38,15 @@ let%expect_test _ =
   pp string s1 ;
   [%expect {| "\u0000\u0001\u0002\u0003🐫" |}] ;
   pp string s2 ;
-  [%expect {| {"invalid_utf8_string":[0,1,2,255,1]} |}]
+  [%expect {| {"invalid_utf8_string":[0,1,2,255,1]} |}] ;
+  pp (string' Plain) s1 ;
+  [%expect {| "\u0000\u0001\u0002\u0003🐫" |}] ;
+  pp (string' Plain) s2 ;
+  [%expect {| {"invalid_utf8_string":[0,1,2,255,1]} |}] ;
+  pp (string' Hex) s1 ;
+  [%expect {| "00010203f09f90ab" |}] ;
+  pp (string' Hex) s2 ;
+  [%expect {| "000102ff01" |}]
 
 let%expect_test _ =
   let s1 = Bytes.of_string "\x00\x01\x02\x03\xF0\x9F\x90\xAB" in
@@ -48,4 +56,12 @@ let%expect_test _ =
   pp bytes s1 ;
   [%expect {| "00010203f09f90ab" |}] ;
   pp bytes s2 ;
+  [%expect {| "000102ff01" |}] ;
+  pp (bytes' Plain) s1 ;
+  [%expect {| "\u0000\u0001\u0002\u0003🐫" |}] ;
+  pp (bytes' Plain) s2 ;
+  [%expect {| {"invalid_utf8_string":[0,1,2,255,1]} |}] ;
+  pp (bytes' Hex) s1 ;
+  [%expect {| "00010203f09f90ab" |}] ;
+  pp (bytes' Hex) s2 ;
   [%expect {| "000102ff01" |}]

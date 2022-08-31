@@ -345,8 +345,10 @@ let describe (type x) (encoding : x Encoding.t) =
     | Array {length_limit = len; elts = {encoding; _}} ->
         let layout, references = layout None recursives references encoding in
         ([Anonymous_field (`Variable, Seq (layout, len))], references)
-    | Bytes kind -> ([Anonymous_field ((kind :> Kind.t), Bytes)], references)
-    | String kind -> ([Anonymous_field ((kind :> Kind.t), String)], references)
+    | Bytes (kind, _) ->
+        ([Anonymous_field ((kind :> Kind.t), Bytes)], references)
+    | String (kind, _) ->
+        ([Anonymous_field ((kind :> Kind.t), String)], references)
     | Padded ({encoding = e; _}, n) ->
         let fields, references = fields ref_name recursives references e in
         (fields @ [Named_field ("padding", `Fixed n, Padding)], references)
@@ -456,8 +458,8 @@ let describe (type x) (encoding : x Encoding.t) =
     | RangedFloat {minimum; maximum} ->
         (RangedFloat (minimum, maximum), references)
     | Float -> (Float, references)
-    | Bytes _kind -> (Bytes, references)
-    | String _kind -> (String, references)
+    | Bytes (_kind, _) -> (Bytes, references)
+    | String (_kind, _) -> (String, references)
     | Padded _ as enc ->
         let name = may_new_reference ref_name in
         let fields, references = fields None recursives references enc in
