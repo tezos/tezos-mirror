@@ -117,6 +117,14 @@
 
 *)
 
+module Hash : sig
+  include S.HASH
+
+  val of_context_hash : Context_hash.t -> t
+
+  val to_context_hash : t -> Context_hash.t
+end
+
 module V1 : sig
   (** The type of the inbox for a smart-contract rollup as stored
     by the protocol in the context. Values that inhabit this type
@@ -162,7 +170,7 @@ module V1 : sig
   *)
   type history_proof
 
-  (** A [history] is basically a lookup table of {!history_proof}s. We
+  (** A [History.t] is basically a lookup table of {!history_proof}s. We
       need this if we want to produce inbox proofs because it allows us
       to dereference the 'pointer' hashes in any of the
       [history_proof]s. This [deref] function is passed to
@@ -177,7 +185,8 @@ module V1 : sig
       uses a history that is sufficiently large to be able to take part
       in all potential refutation games occurring during the challenge
       period. *)
-  type history
+  module History :
+    Bounded_history_repr.S with type key = Hash.t and type value = history_proof
 
   val pp_history_proof : Format.formatter -> history_proof -> unit
 
@@ -209,14 +218,6 @@ include Sc_rollup_data_version_sig.S with type t = V1.t
 
 include module type of V1 with type t = V1.t
 
-module Hash : sig
-  include S.HASH
-
-  val of_context_hash : Context_hash.t -> t
-
-  val to_context_hash : t -> Context_hash.t
-end
-
 (** This extracts the current level hash from the inbox. Note: the
     current level hash is stored lazily as [fun () -> ...], and this
     function will call that function. So don't use this if you want to
@@ -244,15 +245,6 @@ module type Merkelized_operations = sig
       check that in proofs. *)
   val new_level_tree : inbox_context -> Raw_level_repr.t -> tree Lwt.t
 
-  val history_encoding : history Data_encoding.t
-
-  val pp_history : Format.formatter -> history -> unit
-
-  (** Construct an empty initial [history] with a given [capacity]. If you
-      are running a rollup node, [capacity] needs to be large enough to
-      remember any levels for which you may need to produce proofs. *)
-  val history_at_genesis : capacity:int64 -> history
-
   (** [add_messages ctxt history inbox level payloads level_tree] inserts
       a list of [payloads] as new messages in the [level_tree] of the
       current [level] of the [inbox]. This function returns the new level
@@ -270,12 +262,12 @@ module type Merkelized_operations = sig
   *)
   val add_messages :
     inbox_context ->
-    history ->
+    History.t ->
     t ->
     Raw_level_repr.t ->
     Sc_rollup_inbox_message_repr.serialized list ->
     tree option ->
-    (tree * history * t) tzresult Lwt.t
+    (tree * History.t * t) tzresult Lwt.t
 
   (** [add_messages_no_history ctxt inbox level payloads level_tree] behaves
       as {!add_external_messages} except that it does not remember the inbox
@@ -308,10 +300,10 @@ module type Merkelized_operations = sig
       if the inbox hasn't been added to for a while). *)
   val form_history_proof :
     inbox_context ->
-    history ->
+    History.t ->
     t ->
     tree option ->
-    (history * history_proof) Lwt.t
+    (History.t * history_proof) tzresult Lwt.t
 
   (** This is similar to {!form_history_proof} except that it is just to
       be used on the protocol side because it doesn't ensure the history
@@ -392,7 +384,7 @@ module type Merkelized_operations = sig
       full history). *)
   val produce_proof :
     inbox_context ->
-    history ->
+    History.t ->
     history_proof ->
     Raw_level_repr.t * Z.t ->
     (proof * Sc_rollup_PVM_sem.input option) tzresult Lwt.t
@@ -404,18 +396,13 @@ module type Merkelized_operations = sig
   module Internal_for_tests : sig
     val eq_tree : tree -> tree -> bool
 
-    (** A variant of {!history_at_genesis} where one specifies next_index for
-        testing purpose. *)
-    val history_at_genesis : capacity:int64 -> next_index:int64 -> history
-
-    (** [history_hashes history] returns the keys of the entries stored in [history] in the order of
-        their insertions. *)
-    val history_hashes : history -> Hash.t list
-
     (** [produce_inclusion_proof history a b] exploits [history] to produce
       a self-contained proof that [a] is an older version of [b]. *)
     val produce_inclusion_proof :
-      history -> history_proof -> history_proof -> inclusion_proof option
+      History.t ->
+      history_proof ->
+      history_proof ->
+      inclusion_proof option tzresult
   end
 end
 

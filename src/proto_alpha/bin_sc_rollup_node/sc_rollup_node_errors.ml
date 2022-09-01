@@ -27,7 +27,7 @@ open Protocol.Alpha_context
 
 type error +=
   | Cannot_produce_proof of
-      Sc_rollup.Inbox.t * Sc_rollup.Inbox.history * Raw_level.t
+      Sc_rollup.Inbox.t * Sc_rollup.Inbox.History.t * Raw_level.t
   | Missing_mode_operators of {mode : string; missing_operators : string list}
   | Bad_minimal_fees of string
   | Commitment_predecessor_should_be_LCC of Sc_rollup.Commitment.t
@@ -102,12 +102,12 @@ let () =
         inbox
         Raw_level.pp
         level
-        Sc_rollup.Inbox.pp_history
+        Sc_rollup.Inbox.History.pp
         history)
     Data_encoding.(
       obj3
         (req "inbox" Sc_rollup.Inbox.encoding)
-        (req "history" Sc_rollup.Inbox.history_encoding)
+        (req "history" Sc_rollup.Inbox.History.encoding)
         (req "level" Raw_level.encoding))
     (function
       | Cannot_produce_proof (inbox, history, level) ->

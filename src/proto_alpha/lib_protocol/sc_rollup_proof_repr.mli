@@ -114,7 +114,7 @@ module type PVM_with_context_and_state = sig
 
     val inbox : Sc_rollup_inbox_repr.history_proof
 
-    val history : Sc_rollup_inbox_repr.history
+    val history : Sc_rollup_inbox_repr.History.t
   end
 end
 

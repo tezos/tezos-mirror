@@ -73,6 +73,7 @@
   Contract_repr
   Indexable
   Entrypoint_repr
+  Bounded_history_repr
   Sc_rollup_repr
   Sc_rollup_tick_repr
   Sc_rollup_inbox_message_repr
@@ -325,6 +326,7 @@
   contract_repr.ml contract_repr.mli
   indexable.ml indexable.mli
   entrypoint_repr.ml entrypoint_repr.mli
+  bounded_history_repr.ml bounded_history_repr.mli
   sc_rollup_repr.ml sc_rollup_repr.mli
   sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli
@@ -558,6 +560,7 @@
   contract_repr.ml contract_repr.mli
   indexable.ml indexable.mli
   entrypoint_repr.ml entrypoint_repr.mli
+  bounded_history_repr.ml bounded_history_repr.mli
   sc_rollup_repr.ml sc_rollup_repr.mli
   sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli
@@ -796,6 +799,7 @@
   contract_repr.ml contract_repr.mli
   indexable.ml indexable.mli
   entrypoint_repr.ml entrypoint_repr.mli
+  bounded_history_repr.ml bounded_history_repr.mli
   sc_rollup_repr.ml sc_rollup_repr.mli
   sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli

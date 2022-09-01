@@ -44,6 +44,7 @@
         "Contract_repr",
         "Indexable",
         "Entrypoint_repr",
+        "Bounded_history_repr",
         "Sc_rollup_repr",
         "Sc_rollup_tick_repr",
         "Sc_rollup_inbox_message_repr",
