@@ -130,4 +130,8 @@ val micheline_nodes : node -> int
 
 (** [fold node i f] traverses [node] applying [f] on an
     accumulator initialized by [i]. *)
-val fold : node -> 'c -> ('c -> node -> 'c) -> 'c
+val fold :
+  ('loc, 'prim) Micheline.node ->
+  'acc ->
+  ('acc -> ('loc, 'prim) Micheline.node -> 'acc) ->
+  'acc
