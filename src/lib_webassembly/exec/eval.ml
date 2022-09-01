@@ -222,13 +222,15 @@ let rec step (module_reg : module_reg) (c : config) : config Lwt.t =
       let length = Vector.num_elements block in
       if i = length then Lwt.return {c with code = (vs, es)}
       else
-        let* e, es =
-          let* instr = Vector.get i block in
-          Lwt.return
-            ( Plain instr.it @@ instr.at,
-              {it = From_block (Block_label b, Int32.succ i); at} :: es )
-        in
-        step_resolved module_reg c frame vs e es
+        let+ instr = Vector.get i block in
+        {
+          c with
+          code =
+            ( vs,
+              (Plain instr.it @@ instr.at)
+              :: {it = From_block (Block_label b, Int32.succ i); at}
+              :: es );
+        }
   | e :: es -> step_resolved module_reg c frame vs e es
   | [] -> Lwt.return c
 
