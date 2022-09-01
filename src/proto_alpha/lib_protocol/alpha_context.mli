@@ -2821,6 +2821,8 @@ module Dal : sig
 
     val empty : t
 
+    val is_available : t -> Slot_index.t -> bool
+
     val occupied_size_in_bits : t -> int
 
     val expected_size_in_bits : max_index:Slot_index.t -> int
