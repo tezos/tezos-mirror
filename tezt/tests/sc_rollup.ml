@@ -2563,7 +2563,7 @@ let test_scenario_client_with_account ~account ~variant ~kind f =
    -------------------------------------------------------------------
 *)
 let test_rollup_client_show_address ~kind =
-  let account = Constant.tz4_account in
+  let account = Constant.aggregate_tz4_account in
   test_scenario_client_with_account ~account ~kind ~variant:"show address"
   @@ fun rollup_client ->
   let* shown_account =
@@ -2589,7 +2589,7 @@ let test_rollup_client_show_address ~kind =
    ----------------------------------------
 *)
 let test_rollup_client_generate_keys ~kind =
-  let account = Constant.tz4_account in
+  let account = Constant.aggregate_tz4_account in
   test_scenario_client_with_account ~account ~kind ~variant:"gen address"
   @@ fun rollup_client ->
   let alias = "test_key" in
@@ -2601,7 +2601,7 @@ let test_rollup_client_generate_keys ~kind =
    ------------------------------------
 *)
 let test_rollup_client_list_keys ~kind =
-  let account = Constant.tz4_account in
+  let account = Constant.aggregate_tz4_account in
   test_scenario_client_with_account ~account ~kind ~variant:"list alias"
   @@ fun rollup_client ->
   let* maybe_keys = Sc_rollup_client.list_keys rollup_client in
