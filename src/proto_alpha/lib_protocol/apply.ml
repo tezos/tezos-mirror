@@ -446,7 +446,7 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~payer
   Ticket_scanner.ex_ticket_size ctxt ex_ticket >>=? fun (ticket_size, ctxt) ->
   let limit = Constants.tx_rollup_max_ticket_payload_size ctxt in
   fail_when
-    Compare.Int.(ticket_size > limit)
+    Saturation_repr.(ticket_size >! limit)
     (Tx_rollup_errors_repr.Ticket_payload_size_limit_exceeded
        {payload_size = ticket_size; limit})
   >>=? fun () ->

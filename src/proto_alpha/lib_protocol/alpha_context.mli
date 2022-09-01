@@ -2414,7 +2414,10 @@ module Zk_rollup : sig
       | Invalid_deposit_amount
       | Invalid_deposit_ticket
       | Wrong_deposit_parameters
-      | Ticket_payload_size_limit_exceeded of {payload_size : int; limit : int}
+      | Ticket_payload_size_limit_exceeded of {
+          payload_size : Saturation_repr.may_saturate Saturation_repr.t;
+          limit : int;
+        }
   end
 
   module Internal_for_tests : sig

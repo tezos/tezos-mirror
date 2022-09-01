@@ -86,7 +86,10 @@ type error +=
         [ `Valid_path of Tx_rollup_commitment_repr.Merkle.h * int
         | `Hash of Tx_rollup_message_result_hash_repr.t ];
     }
-  | Ticket_payload_size_limit_exceeded of {payload_size : int; limit : int}
+  | Ticket_payload_size_limit_exceeded of {
+      payload_size : Saturation_repr.may_saturate Saturation_repr.t;
+      limit : int;
+    }
   | Proof_undecodable
   | Proof_failed_to_reject
   | Proof_produced_rejected_state
@@ -614,7 +617,7 @@ let () =
     ~id:"tx_rollup_ticket_payload_size_limit_exceeded"
     ~title:"The payload of the deposited ticket exceeded the size limit"
     ~description:"The payload of the deposited ticket exceeded the size limit"
-    (obj2 (req "payload_size" int31) (req "limit" int31))
+    (obj2 (req "payload_size" Saturation_repr.n_encoding) (req "limit" int31))
     (function
       | Ticket_payload_size_limit_exceeded {payload_size; limit} ->
           Some (payload_size, limit)

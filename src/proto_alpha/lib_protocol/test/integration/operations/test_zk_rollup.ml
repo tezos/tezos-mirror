@@ -726,11 +726,12 @@ let test_invalid_deposit () =
     constants.parametric.tx_rollup.max_ticket_payload_size |> return
   in
   let* _i =
+    let payload_size = Saturation_repr.safe_int (contents_size + 216) in
     Incremental.add_operation
       ~expect_apply_failure:
         (check_proto_error
            (Zk_rollup.Errors.Ticket_payload_size_limit_exceeded
-              {payload_size = contents_size + 216; limit}))
+              {payload_size; limit}))
       i
       operation
   in

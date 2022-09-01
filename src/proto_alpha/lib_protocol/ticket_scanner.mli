@@ -96,4 +96,6 @@ val has_tickets : 'a has_tickets -> bool
 val ex_ticket_size :
   Alpha_context.context ->
   ex_ticket ->
-  (int * Alpha_context.context) tzresult Lwt.t
+  (Saturation_repr.may_saturate Saturation_repr.t * Alpha_context.context)
+  tzresult
+  Lwt.t

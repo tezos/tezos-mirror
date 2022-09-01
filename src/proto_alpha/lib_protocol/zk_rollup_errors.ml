@@ -28,7 +28,10 @@ type error +=
   | Invalid_deposit_amount
   | Invalid_deposit_ticket
   | Wrong_deposit_parameters
-  | Ticket_payload_size_limit_exceeded of {payload_size : int; limit : int}
+  | Ticket_payload_size_limit_exceeded of {
+      payload_size : Saturation_repr.may_saturate Saturation_repr.t;
+      limit : int;
+    }
 
 let () =
   register_error_kind
@@ -78,7 +81,8 @@ let () =
     ~id:"zk_rollup_ticket_payload_size_limit_exceeded"
     ~title:"The payload of the deposited ticket exceeded the size limit"
     ~description:"The payload of the deposited ticket exceeded the size limit"
-    Data_encoding.(obj2 (req "payload_size" int31) (req "limit" int31))
+    Data_encoding.(
+      obj2 (req "payload_size" Saturation_repr.n_encoding) (req "limit" int31))
     (function
       | Ticket_payload_size_limit_exceeded {payload_size; limit} ->
           Some (payload_size, limit)

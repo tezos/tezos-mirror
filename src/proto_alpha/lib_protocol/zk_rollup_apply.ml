@@ -183,7 +183,7 @@ let transaction_to_zk_rollup ~ctxt ~parameters_ty ~parameters ~dst_rollup ~since
   let limit = Constants.tx_rollup_max_ticket_payload_size ctxt in
   let*? () =
     error_when
-      Compare.Int.(ticket_size > limit)
+      Saturation_repr.(ticket_size >! limit)
       (Zk_rollup.Errors.Ticket_payload_size_limit_exceeded
          {payload_size = ticket_size; limit})
   in
