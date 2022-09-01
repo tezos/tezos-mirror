@@ -105,11 +105,14 @@ type parameter_overrides =
     the default parameters of the given protocol are the base parameters.
 
     Then, the base parameters are tweaked with:
+    - [bootstrap_accounts], when given these accounts are used instead of
+      [Account.Bootstrap.keys]
     - [parameters_overrides]
     - [additional_bootstrap_accounts] (with their optional default balance) are
       added to the list of bootstrap accounts of the protocol.
     *)
 val write_parameter_file :
+  ?bootstrap_accounts:(Account.key * int option) list ->
   ?additional_bootstrap_accounts:(Account.key * int option) list ->
   base:(string, t * constants option) Either.t ->
   parameter_overrides ->
