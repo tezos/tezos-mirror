@@ -34,52 +34,7 @@
 open Tztest
 open Tezos_scoru_wasm
 open Tezos_webassembly_interpreter
-
-let qcheck ?count ?print gen f =
-  let open Lwt_result_syntax in
-  let test =
-    QCheck2.Test.make ?count ?print gen (fun x ->
-        Result.is_ok @@ Lwt_main.run (f x))
-  in
-  let res = QCheck_base_runner.run_tests ~verbose:true [test] in
-  if res = 0 then return_unit else failwith "QCheck tests failed"
-
-(* Use context-binary for testing. *)
-module Context = Tezos_context_memory.Context_binary
-
-type Lazy_containers.Lazy_map.tree += Tree of Context.tree
-
-module Tree = struct
-  type t = Context.t
-
-  type tree = Context.tree
-
-  type key = Context.key
-
-  type value = Context.value
-
-  include Context.Tree
-
-  let select = function
-    | Tree t -> t
-    | _ -> raise Tree_encoding.Incorrect_tree_type
-
-  let wrap t = Tree t
-end
-
-module Tree_encoding_runner = Tree_encoding.Runner.Make (Tree)
-
-let empty_tree () =
-  let open Lwt_syntax in
-  let* index = Context.init "/tmp" in
-  let empty_store = Context.empty index in
-  return @@ Context.Tree.empty empty_store
-
-let encode_decode enc value =
-  let open Lwt_syntax in
-  let* empty_tree = empty_tree () in
-  let* tree = Tree_encoding_runner.encode enc value empty_tree in
-  Tree_encoding_runner.decode enc tree
+open Test_encodings_util
 
 (** Test serialize/deserialize instructions. *)
 let test_instr_roundtrip () =

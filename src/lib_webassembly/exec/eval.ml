@@ -23,6 +23,15 @@ exception Crash = Crash.Error (* failure that cannot happen in valid code *)
 
 exception Exhaustion = Exhaustion.Error
 
+type init_state =
+  | Init_step
+  | Map_step
+  | Map_concat_step
+  | Join_step
+  | Section_step
+
+exception Init_step_error of init_state
+
 let table_error at = function
   | Table.Bounds -> "out of bounds table access"
   | Table.SizeOverflow -> "table size overflow"
@@ -781,7 +790,7 @@ and step_resolved module_reg (c : config) frame vs e es : config Lwt.t =
               ("missing or ill-typed operand on stack (" ^ s1 ^ " : " ^ s2 ^ ")")
         )
     | Refer r, vs -> Lwt.return (Ref r :: vs, [])
-    | Trapping _, _ -> assert false
+    | Trapping msg, _ -> Trap.error e.at msg
     | Returning _, _ -> Crash.error e.at "undefined frame"
     | Breaking _, _ -> Crash.error e.at "undefined label"
     | Label (_, _, (vs', [])), vs -> Lwt.return (vs' @ vs, [])
@@ -1141,7 +1150,7 @@ let tick_map_completed {map; _} = map_completed map
 let tick_map_kont v = {tick = None; map = map_kont v}
 
 let tick_map_step first_kont kont_completed kont_step = function
-  | {map; _} when map_completed map -> assert false
+  | {map; _} when map_completed map -> raise (Init_step_error Map_step)
   | {tick = None; map} ->
       let+ x = Vector.get map.offset map.origin in
       let tick = first_kont x in
@@ -1219,8 +1228,8 @@ let join_step =
       J_Next (tick, acc)
   | J_Init _ ->
       (* [num_elements = 0l], so [join_completed] returns [Some], should not be called in this state *)
-      assert false
-  | J_Stop _ -> assert false
+      raise (Init_step_error Join_step)
+  | J_Stop _ -> raise (Init_step_error Join_step)
 
 type ('a, 'b) map_concat_kont =
   | MC_Map of ('a, 'b Vector.t) map_kont
@@ -1241,7 +1250,7 @@ let map_concat_step f = function
       | Some _ ->
           (* [map_concat_completed] would have returned [Some], so
              illegal state to call this function *)
-          assert false
+          raise (Init_step_error Map_concat_step)
       | None ->
           let+ tick = join_step tick in
           MC_Join tick)
@@ -1310,7 +1319,7 @@ let section_inner_step :
     | Left x ->
         let+ y = f x in
         Right y
-    | Right _ -> assert false
+    | Right _ -> raise (Init_step_error Section_step)
   in
   function
   | Func -> lift_either (create_func module_reg self)
@@ -1453,7 +1462,7 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
   | IK_Eval (inst, config) ->
       let+ config = step module_reg config in
       IK_Eval (inst, config)
-  | IK_Stop _ -> raise (Invalid_argument "init_step")
+  | IK_Stop _ -> raise (Init_step_error Init_step)
 
 let init ~module_reg ~self host_funcs (m : module_) (exts : extern list) :
     module_inst Lwt.t =

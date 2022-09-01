@@ -9,6 +9,18 @@ exception Crash of Source.region * string
 
 exception Exhaustion of Source.region * string
 
+(** Possible states of the small-step initializer, used for error reporting. *)
+type init_state =
+  | Init_step
+  | Map_step
+  | Map_concat_step
+  | Join_step
+  | Section_step
+
+(** Exception raised on irreducible states of the small step
+    initialization. *)
+exception Init_step_error of init_state
+
 type frame = {inst : module_key; locals : value ref list}
 
 type code = value list * admin_instr list

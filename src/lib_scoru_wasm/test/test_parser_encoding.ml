@@ -36,58 +36,12 @@ open Tztest
 open Lazy_containers
 open Tezos_webassembly_interpreter
 open Tezos_scoru_wasm
-
-(* Use context-binary for testing. *)
-module Context = Tezos_context_memory.Context_binary
-
-type Lazy_containers.Lazy_map.tree += Tree of Context.tree
-
-module Tree : Tree_encoding.TREE with type tree = Context.tree = struct
-  type tree = Context.tree
-
-  include Context.Tree
-
-  let select = function
-    | Tree t -> t
-    | _ -> raise Tree_encoding.Incorrect_tree_type
-
-  let wrap t = Tree t
-end
-
-module Tree_encoding = struct
-  include Tree_encoding
-  include Lazy_map_encoding.Make (Instance.NameMap)
-end
-
-module Tree_encoding_runner = Tree_encoding.Runner.Make (Tree)
 module Parser = Binary_parser_encodings
 
 module Utils = struct
-  include Tree_encoding
   module V = Lazy_vector.Int32Vector
   module C = Chunked_byte_vector
-
-  let empty_tree () =
-    let open Lwt_syntax in
-    let* index = Context.init "/tmp" in
-    let empty_store = Context.empty index in
-    return @@ Context.Tree.empty empty_store
-
-  let test_encode_decode enc value f =
-    let open Lwt_result_syntax in
-    let*! empty_tree = empty_tree () in
-    let*! tree = Tree_encoding_runner.encode enc value empty_tree in
-    let*! value' = Tree_encoding_runner.decode enc tree in
-    f value'
-
-  let encode_decode enc value = test_encode_decode enc value Lwt.return
-
-  let make_test encoding gen check () =
-    Test_wasm_encoding.qcheck gen (fun value ->
-        let open Lwt_result_syntax in
-        let*! value' = encode_decode encoding value in
-        let* res = check value value' in
-        if res then return_unit else fail ())
+  include Test_encodings_util
 end
 
 module Byte_vector = struct

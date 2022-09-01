@@ -64,6 +64,22 @@ let get_string n s =
 
 exception Code = Decode_error.Error
 
+type state =
+  | Byte_vector_step
+  | Instr_step
+  | Instr_block_step
+  | Block_step
+  | Name_step
+  | Func_type_step
+  | Import_step
+  | Export_step
+  | Code_step
+  | Elem_step
+  | Data_step
+  | Module_step
+
+exception Step_error of state
+
 let string_of_byte b = Printf.sprintf "%02x" b
 
 let string_of_multi n = Printf.sprintf "%02lx" n
@@ -272,7 +288,7 @@ let byte_vector_step vecs s =
       let+ () = Ast.add_to_data vecs vector index c in
       VKRead (vector, Int64.succ index, len)
   (* Final step, cannot reduce *)
-  | VKStop _ -> assert false
+  | VKStop _ -> raise (Step_error Byte_vector_step)
 
 (* Types *)
 
@@ -433,7 +449,7 @@ let instr s pos tag =
   match tag with
   (* These tags corresponds to resp. block, loop and if, and are now handled
      directly by the main step loop (see `IKBlock`, `IKLoop` and `IKIf1`. *)
-  | 0x02 | 0x03 | 0x04 -> assert false
+  | 0x02 | 0x03 | 0x04 -> raise (Step_error Instr_step)
   | 0x00 -> Lwt.return unreachable
   | 0x01 -> Lwt.return nop
   | 0x05 -> error s pos "misplaced ELSE opcode"
@@ -1093,7 +1109,7 @@ let instr_block_step s allocs cont =
   | _ :: _ :: _ :: _ :: _ ->
       Stdlib.failwith "More than 3 values popped from the stack"
   (* Enforces the number of values popped from the stack, which shouldn't fail. *)
-  | [IKStop _] -> invalid_arg "instr_block"
+  | [IKStop _] -> raise (Step_error Instr_block_step)
   | [IKStop lbl; IKBlock (bt, pos); IKNext plbl] ->
       let* () = end_ s in
       let e = Source.(block bt lbl @@ region s pos pos) in
@@ -1161,12 +1177,13 @@ let instr_block_step s allocs cont =
               let+ () = add_to_block allocs lbl e in
               push_rev_values (IKNext lbl :: ks) stack))
   (* Stop can only be followed a new block, or being the final state. *)
-  | IKStop _ :: _ -> invalid_arg "instr_block"
+  | IKStop _ :: _ -> raise (Step_error Instr_block_step)
   (* These continuations never reduce directly and are always preceded by an end
      of block or the accumulation of parsed instructions (`IKNext`). *)
-  | IKBlock _ :: _ | IKLoop _ :: _ | IKIf1 _ :: _ | IKIf2 _ :: _ -> assert false
+  | IKBlock _ :: _ | IKLoop _ :: _ | IKIf1 _ :: _ | IKIf2 _ :: _ ->
+      raise (Step_error Instr_block_step)
   (* The empty continuation cannot reduce. *)
-  | [] -> assert false
+  | [] -> raise (Step_error Instr_block_step)
 
 type block_kont =
   | BlockStart
@@ -1191,7 +1208,7 @@ let block_step s allocs =
       else
         let+ kont = instr_block_step s allocs kont in
         BlockParse kont
-  | BlockStop _ -> assert false
+  | BlockStop _ -> raise (Step_error Block_step)
 
 (** Vector and size continuations *)
 
@@ -1239,7 +1256,8 @@ let name_step s =
       in
       let vec = LazyVec {lv with vector = Vector.grow 1l lv.vector} in
       Lwt.return @@ NKParse (pos, lazy_vec_step d vec, len - offset)
-  | NKStop _ -> assert false (* final step, cannot reduce. *)
+  (* final step, cannot reduce. *)
+  | NKStop _ -> raise (Step_error Name_step)
 
 let name s =
   let open Lwt.Syntax in
@@ -1329,7 +1347,8 @@ let func_type_step s =
   | FKOut (ins, out_vec) ->
       let+ vt = value_type s in
       FKOut (ins, lazy_vec_step vt out_vec)
-  | FKStop _ -> assert false (* cannot reduce *)
+  | FKStop _ -> raise (Step_error Func_type_step)
+(* cannot reduce *)
 
 (* let _type_ s = at func_type s *)
 
@@ -1376,7 +1395,8 @@ let import_step s =
   | ImpKItemName (module_name, nk) ->
       let+ x = name_step s nk in
       ImpKItemName (module_name, x)
-  | ImpKStop _ -> assert false (* Final step, cannot reduce *)
+  (* Final step, cannot reduce *)
+  | ImpKStop _ -> raise (Step_error Import_step)
 
 (* Table section *)
 
@@ -1427,7 +1447,8 @@ let export_step s =
   | ExpKName nk ->
       let+ x = name_step s nk in
       ExpKName x
-  | ExpKStop _ -> assert false (* Final step, cannot reduce *)
+  (* Final step, cannot reduce *)
+  | ExpKStop _ -> raise (Step_error Export_step)
 
 (* Start section *)
 
@@ -1571,7 +1592,8 @@ let code_step s allocs =
   | CKBody {left; size; locals; const_kont} ->
       let+ const_kont = block_step s allocs const_kont in
       CKBody {left; size; locals; const_kont}
-  | CKStop _ -> assert false (* final step, cannot reduce *)
+  (* final step, cannot reduce *)
+  | CKStop _ -> raise (Step_error Code_step)
 
 (* Element section *)
 
@@ -1790,7 +1812,8 @@ let elem_step s allocs =
   | EKInitConst {mode; ref_type; einit_vec; einit_kont = left, k} ->
       let+ k' = block_step s allocs k in
       EKInitConst {mode; ref_type; einit_vec; einit_kont = (left, k')}
-  | EKStop _ -> assert false (* Final step, cannot reduce *)
+  (* Final step, cannot reduce *)
+  | EKStop _ -> raise (Step_error Elem_step)
 
 (* Data section *)
 
@@ -1844,7 +1867,8 @@ let data_step s allocs =
   | DKInit {dmode; init_kont} ->
       let+ init_kont = byte_vector_step allocs s init_kont in
       DKInit {dmode; init_kont}
-  | DKStop _ -> assert false (* final step, cannot reduce *)
+  (* final step, cannot reduce *)
+  | DKStop _ -> raise (Step_error Data_step)
 
 (* DataCount section *)
 
@@ -2312,7 +2336,7 @@ let module_step bytes state =
           @@ region_ state.stream_name 0 state.stream_pos)
       in
       {state with module_kont = MKStop m} |> Lwt.return
-  | MKStop _ (* Stop cannot reduce. *) -> assert false
+  | MKStop _ (* Stop cannot reduce. *) -> raise (Step_error Module_step)
 
 let initial_decode_kont ~name =
   let allocation_state = Ast.empty_allocations () in

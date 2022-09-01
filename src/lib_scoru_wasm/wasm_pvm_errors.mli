@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,22 +23,37 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Lib_scoru_wasm
-    Invocation:   dune runtest src/lib_scoru_wasm/
-    Subject:      Tests for the tezos-scoru-wasm library
-*)
+(** Representation of errors of the WASM PVM. *)
 
-let () =
-  Alcotest_lwt.run
-    "test lib scoru wasm"
-    [
-      ("Input", Test_input.tests);
-      ("Output", Test_output.tests);
-      ("AST Generators", Test_ast_generators.tests);
-      ("WASM Encodings", Test_wasm_encoding.tests);
-      ("WASM PVM Encodings", Test_wasm_pvm_encodings.tests);
-      ("Parser Encodings", Test_parser_encoding.tests);
-    ]
-  |> Lwt_main.run
+(** Raw exception as printed by `Printexc.to_string`. *)
+type raw_exception := string
+
+(** Embedded message in the exception. *)
+type explanation := string
+
+(** Wrapped exceptions from the interpreter.  *)
+type interpreter_error = {
+  raw_exception : raw_exception;
+  explanation : string option;
+}
+
+type t =
+  | Decode_error of interpreter_error
+      (** Wraps exceptions raised during parsing. *)
+  | Init_error of interpreter_error
+      (** Wraps exceptions raised during initialization. *)
+  | Eval_error of interpreter_error
+      (** Wraps exceptions raised during evaluation. *)
+  | Invalid_state of explanation
+      (** Invalid state of the PVM (waiting for input during the parsing for example). *)
+  | Unknown_error of raw_exception
+      (** Wraps unexpected exceptions raised by the interpreter. *)
+
+(** [is_interpreter_error exn] returns true if the exception comes
+    from the interpreter. *)
+
+val is_interpreter_error : exn -> bool
+
+val refine_error : exn -> interpreter_error
+
+val encoding : t Data_encoding.t

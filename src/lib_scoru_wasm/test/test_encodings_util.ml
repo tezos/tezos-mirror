@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,22 +23,59 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Lib_scoru_wasm
-    Invocation:   dune runtest src/lib_scoru_wasm/
-    Subject:      Tests for the tezos-scoru-wasm library
-*)
+(* Use context-binary for testing. *)
+module Context = Tezos_context_memory.Context_binary
+include Tree_encoding
 
-let () =
-  Alcotest_lwt.run
-    "test lib scoru wasm"
-    [
-      ("Input", Test_input.tests);
-      ("Output", Test_output.tests);
-      ("AST Generators", Test_ast_generators.tests);
-      ("WASM Encodings", Test_wasm_encoding.tests);
-      ("WASM PVM Encodings", Test_wasm_pvm_encodings.tests);
-      ("Parser Encodings", Test_parser_encoding.tests);
-    ]
-  |> Lwt_main.run
+type Lazy_containers.Lazy_map.tree += Tree of Context.tree
+
+module Tree = struct
+  type t = Context.t
+
+  type tree = Context.tree
+
+  type key = Context.key
+
+  type value = Context.value
+
+  include Context.Tree
+
+  let select = function
+    | Tree t -> t
+    | _ -> raise Tree_encoding.Incorrect_tree_type
+
+  let wrap t = Tree t
+end
+
+module Tree_encoding_runner = Tree_encoding.Runner.Make (Tree)
+
+let empty_tree () =
+  let open Lwt_syntax in
+  let* index = Context.init "/tmp" in
+  let empty_store = Context.empty index in
+  return @@ Context.Tree.empty empty_store
+
+let test_encode_decode enc value f =
+  let open Lwt_result_syntax in
+  let*! empty_tree = empty_tree () in
+  let*! tree = Tree_encoding_runner.encode enc value empty_tree in
+  let*! value' = Tree_encoding_runner.decode enc tree in
+  f value'
+
+let encode_decode enc value = test_encode_decode enc value Lwt.return
+
+let qcheck ?count ?print gen f =
+  let open Lwt_result_syntax in
+  let test =
+    QCheck2.Test.make ?count ?print gen (fun x ->
+        Result.is_ok @@ Lwt_main.run (f x))
+  in
+  let res = QCheck_base_runner.run_tests ~verbose:true [test] in
+  if res = 0 then return_unit else failwith "QCheck tests failed"
+
+let make_test ?print encoding gen check () =
+  qcheck ?print gen (fun value ->
+      let open Lwt_result_syntax in
+      let*! value' = encode_decode encoding value in
+      let* res = check value value' in
+      if res then return_unit else fail ())

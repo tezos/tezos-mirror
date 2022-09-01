@@ -2,6 +2,24 @@ module Vector = Lazy_vector.Int32Vector
 
 exception Code of Source.region * string
 
+(** States representation. *)
+type state =
+  | Byte_vector_step
+  | Instr_step
+  | Instr_block_step
+  | Block_step
+  | Name_step
+  | Func_type_step
+  | Import_step
+  | Export_step
+  | Code_step
+  | Elem_step
+  | Data_step
+  | Module_step
+
+(** Exception raised when the small-step parser evaluate an impossible state. *)
+exception Step_error of state
+
 (** Lazy stack using an underlying lazy vector, and a pointer on the head of the
     stack. *)
 type 'a lazy_stack = LazyStack of {length : int32; vector : 'a Vector.t}
