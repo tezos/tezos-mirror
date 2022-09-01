@@ -148,15 +148,6 @@ let make_sapling_uri (x : Uri.t) : sapling_uri tzresult =
   | None -> tzfail (Exn (Failure "SAPLING_URI needs a scheme"))
   | Some _ -> return x
 
-type pvss_sk_uri = Uri.t
-
-let make_pvss_sk_uri (x : Uri.t) : pvss_sk_uri tzresult =
-  let open Result_syntax in
-  match Uri.scheme x with
-  | None ->
-      tzfail (Exn (Failure "Error while parsing URI: PVSS_URI needs a scheme"))
-  | Some _ -> return x
-
 type aggregate_pk_uri = Uri.t
 
 type aggregate_sk_uri = Uri.t
@@ -328,30 +319,6 @@ module Sapling_key = Client_aliases.Alias (struct
   let to_source k =
     let open Data_encoding in
     Lwt.return_ok @@ Json.to_string (Json.construct encoding k)
-end)
-
-module PVSS_public_key = Client_aliases.Alias (struct
-  include Pvss_secp256k1.Public_key (* t, Compare, encoding *)
-
-  let name = "PVSS public key"
-
-  let of_source s = Lwt.return (Pvss_secp256k1.Public_key.of_b58check s)
-
-  let to_source t = Lwt.return_ok (Pvss_secp256k1.Public_key.to_b58check t)
-end)
-
-module PVSS_secret_key = Client_aliases.Alias (struct
-  let name = "PVSS secret key"
-
-  type t = pvss_sk_uri
-
-  include CompareUri
-
-  let encoding = uri_encoding
-
-  let of_source s = Lwt.return (make_pvss_sk_uri @@ Uri.of_string s)
-
-  let to_source t = Lwt.return_ok (Uri.to_string t)
 end)
 
 module Aggregate_alias = struct

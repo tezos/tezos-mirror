@@ -75,14 +75,6 @@ module Raw = struct
     in
     Bytes.cat salt (Crypto_box.Secretbox.secretbox key msg nonce)
 
-  let encrypt_pvss ~password sk =
-    let salt = Hacl.Rand.gen salt_len in
-    let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
-    let msg =
-      Data_encoding.Binary.to_bytes_exn Pvss_secp256k1.Secret_key.encoding sk
-    in
-    Bytes.cat salt (Crypto_box.Secretbox.secretbox key msg nonce)
-
   let decrypt algo ~password ~encrypted_sk =
     let open Lwt_result_syntax in
     let salt = Bytes.sub encrypted_sk 0 salt_len in
@@ -565,12 +557,3 @@ struct
     let* sk = decrypt_aggregate C.cctxt sk_uri in
     return (Aggregate_signature.sign sk buf)
 end
-
-let encrypt_pvss_key cctxt sk =
-  let open Lwt_result_syntax in
-  let* password = read_password cctxt in
-  let payload = Raw.encrypt_pvss ~password sk in
-  let encoding = Encodings.secp256k1_scalar in
-  let path = Base58.simple_encode encoding payload in
-  let*? v = Client_keys.make_pvss_sk_uri (Uri.make ~scheme ~path ()) in
-  return v
