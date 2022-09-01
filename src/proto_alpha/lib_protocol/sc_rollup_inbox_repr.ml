@@ -448,9 +448,6 @@ module type Merkelized_operations = sig
 
   val number_of_proof_steps : inclusion_proof -> int
 
-  val produce_inclusion_proof :
-    history -> history_proof -> history_proof -> inclusion_proof option
-
   val verify_inclusion_proof :
     inclusion_proof -> history_proof -> history_proof -> bool
 
@@ -483,6 +480,9 @@ module type Merkelized_operations = sig
     val history_at_genesis : capacity:int64 -> next_index:int64 -> history
 
     val history_hashes : history -> Hash.t list
+
+    val produce_inclusion_proof :
+      history -> history_proof -> history_proof -> inclusion_proof option
   end
 end
 
@@ -829,21 +829,12 @@ struct
 
   let number_of_proof_steps proof = List.length proof
 
-  let lift_ptr_path history ptr_path =
+  let lift_ptr_path deref ptr_path =
     let rec aux accu = function
       | [] -> Some (List.rev accu)
-      | x :: xs -> Option.bind (history x) @@ fun c -> aux (c :: accu) xs
+      | x :: xs -> Option.bind (deref x) @@ fun c -> aux (c :: accu) xs
     in
     aux [] ptr_path
-
-  let produce_inclusion_proof history a b =
-    let cell_ptr = hash_skip_list_cell b in
-    let target_index = Skip_list.index a in
-    let history = remember cell_ptr b history in
-    let deref ptr = Hash.Map.find_opt ptr history.events in
-    Skip_list.back_path ~deref ~cell_ptr ~target_index
-    |> Option.map (lift_ptr_path deref)
-    |> Option.join
 
   let verify_inclusion_proof proof a b =
     let assoc = List.map (fun c -> (hash_skip_list_cell c, c)) proof in
@@ -1304,6 +1295,15 @@ struct
       in
       (* do a tail recursive concatenation lp @ ln *)
       List.rev_append (List.rev lp) ln
+
+    let produce_inclusion_proof history a b =
+      let cell_ptr = hash_skip_list_cell b in
+      let target_index = Skip_list.index a in
+      let history = remember cell_ptr b history in
+      let deref ptr = Hash.Map.find_opt ptr history.events in
+      Skip_list.back_path ~deref ~cell_ptr ~target_index
+      |> Option.map (lift_ptr_path deref)
+      |> Option.join
   end
 end
 
