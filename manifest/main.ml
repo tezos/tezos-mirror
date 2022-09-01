@@ -610,7 +610,6 @@ let octez_hacl =
               S "gen/gen.exe";
               G (of_atom_list js_stubs);
             ];
-            [S "mode"; S "promote"];
             [
               S "action";
               [
