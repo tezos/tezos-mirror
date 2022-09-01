@@ -2,7 +2,7 @@ type host_func =
   | Host_func of
       (Input_buffer.t ->
       Output_buffer.t ->
-      Instance.module_inst ->
+      Instance.memory_inst Instance.Vector.t ->
       Values.value list ->
       Values.value list Lwt.t)
 [@@ocaml.unboxed]
