@@ -102,6 +102,8 @@ module type S = sig
   val ge : t -> t -> bool
 
   val zero : t
+
+  val pp : Format.formatter -> t -> unit
 end
 
 module Make (Rep : RepType) : S with type bits = Rep.t = struct
@@ -432,4 +434,6 @@ module Make (Rep : RepType) : S with type bits = Rep.t = struct
   let to_hex_string x =
     if is_inf x then to_string x
     else to_string' (Printf.sprintf "%h") is_hex_digit 4 x
+
+  let pp fmt x = Format.fprintf fmt "%s" @@ to_string x
 end

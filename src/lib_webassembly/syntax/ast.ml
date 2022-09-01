@@ -22,6 +22,8 @@ module Vector = Lazy_vector.Int32Vector
 
 type void = Lib.void
 
+let pp_void _ _ = Stdlib.failwith "You are not supposed to be able to call this"
+
 (* Operators *)
 
 module IntOp = struct
@@ -45,7 +47,7 @@ module IntOp = struct
     | Rotr
   [@@deriving show]
 
-  type testop = Eqz
+  type testop = Eqz [@@deriving show]
 
   type relop = Eq | Ne | LtS | LtU | GtS | GtU | LeS | LeU | GeS | GeU
   [@@deriving show]
@@ -72,7 +74,7 @@ module FloatOp = struct
 
   type binop = Add | Sub | Mul | Div | Min | Max | CopySign [@@deriving show]
 
-  type testop = |
+  type testop = | [@@deriving show]
 
   type relop = Eq | Ne | Lt | Gt | Le | Ge [@@deriving show]
 
@@ -93,11 +95,12 @@ module F32Op = FloatOp
 module F64Op = FloatOp
 
 module V128Op = struct
-  type itestop = AllTrue
+  type itestop = AllTrue [@@deriving show]
 
-  type iunop = Abs | Neg | Popcnt
+  type iunop = Abs | Neg | Popcnt [@@deriving show]
 
   type funop = Abs | Neg | Sqrt | Ceil | Floor | Trunc | Nearest
+  [@@deriving show]
 
   type ibinop =
     | Add
@@ -122,12 +125,15 @@ module V128Op = struct
     | Shuffle of int list
     | NarrowS
     | NarrowU
+  [@@deriving show]
 
   type fbinop = Add | Sub | Mul | Div | Min | Max | Pmin | Pmax
+  [@@deriving show]
 
   type irelop = Eq | Ne | LtS | LtU | LeS | LeU | GtS | GtU | GeS | GeU
+  [@@deriving show]
 
-  type frelop = Eq | Ne | Lt | Le | Gt | Ge
+  type frelop = Eq | Ne | Lt | Le | Gt | Ge [@@deriving show]
 
   type icvtop =
     | ExtendLowS
@@ -140,49 +146,59 @@ module V128Op = struct
     | TruncSatUF32x4
     | TruncSatSZeroF64x2
     | TruncSatUZeroF64x2
+  [@@deriving show]
 
   type fcvtop =
     | DemoteZeroF64x2
     | PromoteLowF32x4
     | ConvertSI32x4
     | ConvertUI32x4
+  [@@deriving show]
 
-  type ishiftop = Shl | ShrS | ShrU
+  type ishiftop = Shl | ShrS | ShrU [@@deriving show]
 
-  type ibitmaskop = Bitmask
+  type ibitmaskop = Bitmask [@@deriving show]
 
-  type vtestop = AnyTrue
+  type vtestop = AnyTrue [@@deriving show]
 
-  type vunop = Not
+  type vunop = Not [@@deriving show]
 
-  type vbinop = And | Or | Xor | AndNot
+  type vbinop = And | Or | Xor | AndNot [@@deriving show]
 
-  type vternop = Bitselect
+  type vternop = Bitselect [@@deriving show]
 
   type testop = (itestop, itestop, itestop, itestop, void, void) V128.laneop
+  [@@deriving show]
 
   type unop = (iunop, iunop, iunop, iunop, funop, funop) V128.laneop
+  [@@deriving show]
 
   type binop = (ibinop, ibinop, ibinop, ibinop, fbinop, fbinop) V128.laneop
+  [@@deriving show]
 
   type relop = (irelop, irelop, irelop, irelop, frelop, frelop) V128.laneop
+  [@@deriving show]
 
   type cvtop = (icvtop, icvtop, icvtop, icvtop, fcvtop, fcvtop) V128.laneop
+  [@@deriving show]
 
   type shiftop =
     (ishiftop, ishiftop, ishiftop, ishiftop, void, void) V128.laneop
+  [@@deriving show]
 
   type bitmaskop =
     (ibitmaskop, ibitmaskop, ibitmaskop, ibitmaskop, void, void) V128.laneop
+  [@@deriving show]
 
-  type nsplatop = Splat
+  type nsplatop = Splat [@@deriving show]
 
-  type 'a nextractop = Extract of int * 'a
+  type 'a nextractop = Extract of int * 'a [@@deriving show]
 
-  type nreplaceop = Replace of int
+  type nreplaceop = Replace of int [@@deriving show]
 
   type splatop =
     (nsplatop, nsplatop, nsplatop, nsplatop, nsplatop, nsplatop) V128.laneop
+  [@@deriving show]
 
   type extractop =
     ( extension nextractop,
@@ -192,6 +208,7 @@ module V128Op = struct
       unit nextractop,
       unit nextractop )
     V128.laneop
+  [@@deriving show]
 
   type replaceop =
     ( nreplaceop,
@@ -201,9 +218,11 @@ module V128Op = struct
       nreplaceop,
       nreplaceop )
     V128.laneop
+  [@@deriving show]
 end
 
 type testop = (I32Op.testop, I64Op.testop, F32Op.testop, F64Op.testop) Values.op
+[@@deriving show]
 
 type unop = (I32Op.unop, I64Op.unop, F32Op.unop, F64Op.unop) Values.op
 [@@deriving show]
@@ -217,33 +236,33 @@ type relop = (I32Op.relop, I64Op.relop, F32Op.relop, F64Op.relop) Values.op
 type cvtop = (I32Op.cvtop, I64Op.cvtop, F32Op.cvtop, F64Op.cvtop) Values.op
 [@@deriving show]
 
-type vec_testop = V128Op.testop Values.vecop
+type vec_testop = V128Op.testop Values.vecop [@@deriving show]
 
-type vec_relop = V128Op.relop Values.vecop
+type vec_relop = V128Op.relop Values.vecop [@@deriving show]
 
-type vec_unop = V128Op.unop Values.vecop
+type vec_unop = V128Op.unop Values.vecop [@@deriving show]
 
-type vec_binop = V128Op.binop Values.vecop
+type vec_binop = V128Op.binop Values.vecop [@@deriving show]
 
-type vec_cvtop = V128Op.cvtop Values.vecop
+type vec_cvtop = V128Op.cvtop Values.vecop [@@deriving show]
 
-type vec_shiftop = V128Op.shiftop Values.vecop
+type vec_shiftop = V128Op.shiftop Values.vecop [@@deriving show]
 
-type vec_bitmaskop = V128Op.bitmaskop Values.vecop
+type vec_bitmaskop = V128Op.bitmaskop Values.vecop [@@deriving show]
 
-type vec_vtestop = V128Op.vtestop Values.vecop
+type vec_vtestop = V128Op.vtestop Values.vecop [@@deriving show]
 
-type vec_vunop = V128Op.vunop Values.vecop
+type vec_vunop = V128Op.vunop Values.vecop [@@deriving show]
 
-type vec_vbinop = V128Op.vbinop Values.vecop
+type vec_vbinop = V128Op.vbinop Values.vecop [@@deriving show]
 
-type vec_vternop = V128Op.vternop Values.vecop
+type vec_vternop = V128Op.vternop Values.vecop [@@deriving show]
 
-type vec_splatop = V128Op.splatop Values.vecop
+type vec_splatop = V128Op.splatop Values.vecop [@@deriving show]
 
-type vec_extractop = V128Op.extractop Values.vecop
+type vec_extractop = V128Op.extractop Values.vecop [@@deriving show]
 
-type vec_replaceop = V128Op.replaceop Values.vecop
+type vec_replaceop = V128Op.replaceop Values.vecop [@@deriving show]
 
 type ('t, 'p) memop = {ty : 't; align : int; offset : int32; pack : 'p}
 [@@deriving show]
@@ -263,7 +282,7 @@ type vec_laneop = (vec_type, pack_size) memop * int [@@deriving show]
 
 type var = int32 Source.phrase [@@deriving show]
 
-type num = Values.num Source.phrase
+type num = Values.num Source.phrase [@@deriving show]
 
 type vec = Values.vec Source.phrase [@@deriving show]
 
@@ -276,7 +295,7 @@ type block_type = VarBlockType of var | ValBlockType of value_type option
 
 type block_label = Block_label of int32 [@@deriving show]
 
-type nonrec instr' =
+type instr' =
   | Unreachable (* trap unconditionally *)
   | Nop (* do nothing *)
   | Drop (* forget a value *)
@@ -339,8 +358,9 @@ type nonrec instr' =
   | VecSplat of vec_splatop (* number to vector conversion *)
   | VecExtract of vec_extractop (* extract lane from vector *)
   | VecReplace of vec_replaceop (* replace lane in vector *)
+[@@deriving show]
 
-type instr = instr' Source.phrase
+type instr = instr' Source.phrase [@@deriving show]
 
 (* Globals & Functions *)
 
