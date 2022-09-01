@@ -30,10 +30,21 @@
    Subject:      Run the baker while performing a lot of transfers
 *)
 
-let baker_test ~title ~tags =
-  Protocol.register_test ~__FILE__ ~title ~tags @@ fun protocol ->
+let baker_test protocol ~keys =
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~bootstrap_accounts:(List.map (fun k -> (k, None)) keys)
+      ~base:(Right (protocol, None))
+      []
+  in
   let* node, client =
-    Client.init_with_protocol `Client ~protocol ~timestamp:Now ()
+    Client.init_with_protocol
+      ~keys:(Constant.activator :: keys)
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ~parameter_file
+      ()
   in
   let level_2_promise = Node.wait_for_level node 2 in
   let level_3_promise = Node.wait_for_level node 3 in
@@ -44,7 +55,15 @@ let baker_test ~title ~tags =
   Log.info "New head arrive level 2" ;
   let* _ = level_3_promise in
   Log.info "New head arrive level 3" ;
-  Lwt.return_unit
+  Lwt.return client
+
+let baker_simple_test =
+  Protocol.register_test ~__FILE__ ~title:"baker test" ~tags:["node"; "baker"]
+  @@ fun protocol ->
+  let* _ =
+    baker_test protocol ~keys:(Account.Bootstrap.keys |> Array.to_list)
+  in
+  unit
 
 let baker_stresstest =
   Protocol.register_test
@@ -61,6 +80,37 @@ let baker_stresstest =
   let* () = Client.stresstest ~tps:25 ~transfers:100 client in
   Lwt.return_unit
 
+let baker_bls_test =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"BLS baker test"
+    ~tags:["node"; "baker"; "bls"]
+  @@ fun protocol ->
+  let* client0 = Client.init_mockup ~protocol () in
+  Log.info "Generate BLS keys for client" ;
+  let* keys =
+    Lwt_list.map_s
+      (fun i ->
+        Client.gen_and_show_keys
+          ~alias:(sf "bootstrap_bls_%d" i)
+          ~sig_alg:"bls"
+          client0)
+      (Base.range 1 5)
+  in
+  let* client = baker_test protocol ~keys in
+  Log.info "Checking that block was signed with BLS" ;
+  let* block = RPC.Client.call client @@ RPC.get_chain_block () in
+  let block_sig = JSON.(block |-> "header" |-> "signature" |> as_string) in
+  let block_sig_prefix = String.sub block_sig 0 5 in
+  Check.((block_sig_prefix = "BLsig") string)
+    ~error_msg:"Signature starts with %L but should start with %R" ;
+  let baker = JSON.(block |-> "metadata" |-> "baker" |> as_string) in
+  let baker_prefix = String.sub baker 0 3 in
+  Check.((baker_prefix = "tz4") string)
+    ~error_msg:"Baker starts with %L but should start with %R" ;
+  unit
+
 let register ~protocols =
-  let () = baker_test ~title:"baker test" ~tags:["node"; "baker"] protocols in
-  baker_stresstest protocols
+  baker_simple_test protocols ;
+  baker_stresstest protocols ;
+  baker_bls_test [Alpha]
