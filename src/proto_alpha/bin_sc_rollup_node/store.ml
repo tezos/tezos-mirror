@@ -424,27 +424,52 @@ module Contexts = Make_append_only_map (struct
   let value_encoding = Context.hash_encoding
 end)
 
-(* Published slot headers per block hash,
-   stored as a list of bindings from `Dal_slot_index.t`
-   to `Dal.Slot.t`. The encoding function converts this
-   list into a `Dal.Slot_index.t`-indexed map. *)
-module Dal_slots = struct
-  module Dal_slots_map = Map.Make (struct
-    type t = Dal.Slot_index.t
+(* A nested map is a (IStore) updatable map whose values are themselves
+   maps constructed via the `Map.Make` functor, encoded in the Irmin
+   store as lists of bindings. The module returned by the
+   `Make_nested_map` functor implement some utility functions on top of
+   Make_nested_map, to provide functionalities for  iterating over the
+   bindings of the store value.
+   It also shadows the get, add and mem operations of updatable_maps,
+   to allow updating and retrieveing only one binding from the value of the
+   store. The keys of the IStore updatable map are referred to
+   as primary keys. The keys of the values of the updatable
+   map are referred to as secondary keys.
+*)
+module Make_nested_map (K : sig
+  type key
 
-    let compare = Dal.Slot_index.compare
+  val string_of_key : key -> string
+
+  val path : string list
+
+  val keep_last_n_entries_in_memory : int
+
+  type secondary_key
+
+  val secondary_key_name : string
+
+  val value_name : string
+
+  val compare_secondary_keys : secondary_key -> secondary_key -> int
+
+  type value
+
+  val secondary_key_encoding : secondary_key Data_encoding.t
+
+  val value_encoding : value Data_encoding.t
+end) =
+struct
+  module Secondary_key_map = Map.Make (struct
+    type t = K.secondary_key
+
+    let compare = K.compare_secondary_keys
   end)
 
   include Make_updatable_map (struct
-    let keep_last_n_entries_in_memory = 10
+    include K
 
-    let path = ["dal"; "slot_headers"]
-
-    type key = Block_hash.t
-
-    let string_of_key = Block_hash.to_b58check
-
-    type value = Dal.Slot.t Dal_slots_map.t
+    type value = K.value Secondary_key_map.t
 
     (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3732
        Use data encodings for maps once they are available in the
@@ -452,56 +477,144 @@ module Dal_slots = struct
     *)
     let value_encoding =
       Data_encoding.conv
-        (fun dal_slots_map -> Dal_slots_map.bindings dal_slots_map)
+        (fun dal_slots_map -> Secondary_key_map.bindings dal_slots_map)
         (fun dal_slots_bindings ->
-          Dal_slots_map.of_seq @@ List.to_seq dal_slots_bindings)
+          Secondary_key_map.of_seq @@ List.to_seq dal_slots_bindings)
         Data_encoding.(
           list
           @@ obj2
-               (req "slot_index" Dal.Slot_index.encoding)
-               (req "slot_metadata" Dal.Slot.encoding))
+               (req K.secondary_key_name K.secondary_key_encoding)
+               (req K.value_name K.value_encoding))
   end)
 
+  (* Return the bindings associated with a primary key. *)
   let list_secondary_keys_with_values store ~primary_key =
     let open Lwt_syntax in
     let+ slots_map = find store primary_key in
-    Option.fold ~none:[] ~some:Dal_slots_map.bindings slots_map
+    Option.fold ~none:[] ~some:Secondary_key_map.bindings slots_map
 
+  (* Check whether the updatable store contains an entry
+     for the primary_key, which itself contains a
+     binding whose key is ~secondary_key. *)
+  let mem store ~primary_key ~secondary_key =
+    let open Lwt_syntax in
+    let* primary_key_binding_exists = mem store primary_key in
+    if not primary_key_binding_exists then return false
+    else
+      let+ secondary_key_map = get store primary_key in
+      Secondary_key_map.mem secondary_key secondary_key_map
+
+  (* unsafe call. The existence of a value for
+     primary and secondary key in the store must be
+     checked before invoking this function. *)
+  let get store ~primary_key ~secondary_key =
+    let open Lwt_syntax in
+    let+ secondary_key_map = get store primary_key in
+    match Secondary_key_map.find secondary_key secondary_key_map with
+    | None ->
+        (* value for primary and secondary key does not exist *)
+        assert false
+    | Some value -> value
+
+  (* Returns the set of keys from the bindings of
+     ~primary_key in the store. *)
   let list_secondary_keys store ~primary_key =
     let open Lwt_syntax in
     let+ secondary_keys_with_values =
       list_secondary_keys_with_values store ~primary_key
     in
-    secondary_keys_with_values |> List.map fst
+    List.map (fun (key, _value) -> key) secondary_keys_with_values
 
+  (* Returns the set of values from the bindings of
+     ~primary_key in the store. *)
   let list_values store ~primary_key =
     let open Lwt_syntax in
     let+ secondary_keys_with_values =
       list_secondary_keys_with_values store ~primary_key
     in
-    secondary_keys_with_values |> List.map snd
+    List.map (fun (_key, value) -> value) secondary_keys_with_values
 
+  (* Updates the entry of the updatable map with key ~primary_key
+     by adding to it a binding with key ~secondary_key and
+     value `value`.*)
   let add store ~primary_key ~secondary_key value =
     let open Lwt_syntax in
-    let* slots_map = find store primary_key in
-    let slots_map = Option.value ~default:Dal_slots_map.empty slots_map in
+    let* value_map = find store primary_key in
+    let value_map = Option.value ~default:Secondary_key_map.empty value_map in
     let value_can_be_added =
-      match Dal_slots_map.find secondary_key slots_map with
+      match Secondary_key_map.find secondary_key value_map with
       | None -> true
       | Some old_value ->
           Data_encoding.Binary.(
             Bytes.equal
-              (to_bytes_exn Dal.Slot.encoding old_value)
-              (to_bytes_exn Dal.Slot.encoding value))
+              (to_bytes_exn K.value_encoding old_value)
+              (to_bytes_exn K.value_encoding value))
     in
     if value_can_be_added then
-      let new_slots_map = Dal_slots_map.add secondary_key value slots_map in
-      add store primary_key new_slots_map
+      let updated_map = Secondary_key_map.add secondary_key value value_map in
+      add store primary_key updated_map
     else
       Stdlib.failwith
         (Printf.sprintf
-           "A binding for slot index %d under block_hash %s already exists \
-            with a different value"
-           (Dal.Slot_index.to_int secondary_key)
-           (Block_hash.to_b58check primary_key))
+           "A binding for binding %s under block_hash %s already exists with a \
+            different %s"
+           (Data_encoding.Binary.to_string_exn
+              K.secondary_key_encoding
+              secondary_key)
+           (K.string_of_key primary_key)
+           K.value_name)
 end
+
+module Block_slot_map_parameter = struct
+  type key = Block_hash.t
+
+  let string_of_key = Block_hash.to_b58check
+
+  type secondary_key = Dal.Slot_index.t
+
+  let compare_secondary_keys = Dal.Slot_index.compare
+
+  type value = Dal.Slot.t
+
+  let secondary_key_encoding = Dal.Slot_index.encoding
+
+  let secondary_key_name = "slot_index"
+
+  let value_encoding = Dal.Slot.encoding
+
+  let value_name = "slots_metadata"
+end
+
+(* Published slot headers per block hash,
+   stored as a list of bindings from `Dal_slot_index.t`
+   to `Dal.Slot.t`. The encoding function converts this
+   list into a `Dal.Slot_index.t`-indexed map. *)
+module Dal_slots = Make_nested_map (struct
+  let path = ["dal"; "slot_headers"]
+
+  (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3527
+     This value is currently not used, but required by the module type. *)
+  let keep_last_n_entries_in_memory = 10
+
+  include Block_slot_map_parameter
+end)
+
+(* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3515
+   temporary - this is used for test purposes only.
+   Remove this piece of storage once we download blocks from the dal node.
+*)
+(* Published slot headers per block hash, stored as a list of bindings from
+   `Dal_slot_index.t` to `Dal.Slot.t`. The encoding function converts this
+   list into a `Dal.Slot_index.t`-indexed map. Note that the block_hash
+   refers to the block where slots headers have been confirmed, not
+   the block where they have been published.
+*)
+module Dal_confirmed_slots = Make_nested_map (struct
+  let path = ["dal"; "confirmed_slots"]
+
+  (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3527
+     This value is currently not used, but required by the module type. *)
+  let keep_last_n_entries_in_memory = 10
+
+  include Block_slot_map_parameter
+end)

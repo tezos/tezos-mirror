@@ -187,17 +187,11 @@ module Make (PVM : Pvm.S) = struct
         else return_unit
       else
         let* ctxt = Inbox.process_head node_ctxt head in
+        let* () = Dal_slots_tracker.process_head node_ctxt head in
         let* () = process_l1_block_operations ~finalized node_ctxt head in
         (* Avoid storing and publishing commitments if the head is not final *)
         (* Avoid triggering the pvm execution if this has been done before for this head *)
-        let* () = Components.Interpreter.process_head node_ctxt ctxt head in
-
-        (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3166
-
-           If the rollup is subscribed to at least one slot, then the inbox for
-           this block will be downloaded after lag levels have passed and the
-           dal slots have been declared available. *)
-        Dal_slots_tracker.process_head node_ctxt head
+        Components.Interpreter.process_head node_ctxt ctxt head
     in
     let* () =
       when_ finalized @@ fun () ->
