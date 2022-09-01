@@ -1670,25 +1670,6 @@ let _tree_encoding_tests =
         alcotest_lwt;
       ]
 
-let _octez_scoru_wasm_tests =
-  test
-    "test_scoru_wasm"
-    ~path:"src/lib_scoru_wasm/test"
-    ~opam:"tezos-scoru-wasm-test"
-    ~synopsis:"Tests for the scoru-wasm functionality"
-    ~deps:
-      [
-        octez_base |> open_ ~m:"TzPervasives";
-        tree_encoding;
-        octez_base_unix;
-        octez_context_disk;
-        octez_base_test_helpers |> open_;
-        octez_test_helpers;
-        octez_scoru_wasm;
-        qcheck_alcotest;
-        alcotest_lwt;
-      ]
-
 let octez_context =
   public_lib
     "tezos-context"
@@ -3073,6 +3054,26 @@ let octez_dal_node_lib =
         octez_base_unix;
         octez_client_base |> open_;
         octez_protocol_updater |> open_;
+      ]
+
+let _octez_scoru_wasm_tests =
+  test
+    "test_scoru_wasm"
+    ~path:"src/lib_scoru_wasm/test"
+    ~opam:"tezos-scoru-wasm-test"
+    ~synopsis:"Tests for the scoru-wasm functionality"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        tree_encoding;
+        octez_base_unix;
+        octez_context_disk;
+        octez_base_test_helpers |> open_;
+        octez_test_helpers;
+        octez_scoru_wasm;
+        qcheck_alcotest;
+        alcotest_lwt;
+        tezt_lib;
       ]
 
 (* PROTOCOL PACKAGES *)

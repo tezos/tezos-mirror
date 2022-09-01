@@ -36,7 +36,7 @@ open Tezos_scoru_wasm
 module Wasm = Wasm_pvm.Make (Test_encodings_util.Tree)
 
 (* Kernel failing at `kernel_next` invocation. *)
-let unreachable_kernel = "unreachable.wasm"
+let unreachable_kernel = "unreachable"
 
 let is_stuck = function Wasm_pvm.Stuck _ -> true | _ -> false
 
@@ -110,8 +110,12 @@ let should_boot_unreachable_kernel kernel =
 
 let test_with_kernel kernel test () =
   let open Lwt_result_syntax in
+  let open Tezt.Base in
+  (* Reading files using `Tezt_lib` can be fragile and not future-proof, see
+     issue https://gitlab.com/tezos/tezos/-/issues/3746. *)
   let kernel_file =
-    Filename.(concat (dirname __FILE__) (concat "wasm_kernels" kernel))
+    project_root // Filename.dirname __FILE__ // "wasm_kernels"
+    // (kernel ^ ".wasm")
   in
   let*! () =
     Lwt_io.with_file ~mode:Lwt_io.Input kernel_file (fun channel ->
