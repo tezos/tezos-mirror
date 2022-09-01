@@ -11,7 +11,7 @@ type ('i32, 'i64, 'f32, 'f64) op =
 
 type 'v128 vecop = V128 of 'v128 [@@deriving show]
 
-type num = (I32.t, I64.t, F32.t, F64.t) op
+type num = (I32.t, I64.t, F32.t, F64.t) op [@@deriving show]
 
 type vec = V128.t vecop [@@deriving show]
 

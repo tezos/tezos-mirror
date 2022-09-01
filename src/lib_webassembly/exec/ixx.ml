@@ -175,6 +175,8 @@ module type S = sig
   val to_string_u : t -> string
 
   val to_hex_string : t -> string
+
+  val pp : Format.formatter -> t -> unit
 end
 
 module Make (Rep : RepType) : S with type bits = Rep.t and type t = Rep.t =
@@ -507,4 +509,6 @@ struct
       group_digits 3 (Rep.to_string (div_u i ten) ^ Rep.to_string (rem_u i ten))
 
   let to_hex_string i = "0x" ^ group_digits 4 (Rep.to_hex_string i)
+
+  let pp fmt i = Format.fprintf fmt "%s" @@ to_string_s i
 end

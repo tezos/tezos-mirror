@@ -55,20 +55,6 @@ let pp_unit out () = Format.pp_print_string out "()"
 
 let pp_pair pp1 pp2 out (x, y) = Format.fprintf out "(%a, %a)" pp1 x pp2 y
 
-let pp_memop pp_ty pp_pack out {Ast.ty; align; pack; offset} =
-  Format.fprintf
-    out
-    "@[<hv 2>{ty = %a;@; align = %d;@; pack = %a;@; offset = %a}@]"
-    pp_ty
-    ty
-    align
-    pp_pack
-    pack
-    pp_int32
-    offset
-
-let pp_num = Source.pp_phrase (Values.pp_op pp_int32 pp_int64 pp_f32 pp_f64)
-
 (*
   Generate instructions. The following are missing:
   - [VecTest]
@@ -86,72 +72,6 @@ let pp_num = Source.pp_phrase (Values.pp_op pp_int32 pp_int64 pp_f32 pp_f64)
   - [VecExtract]
   - [VecReplace]
   *)
-let pp_instr' out instr =
-  let open Ast in
-  let str s = Format.pp_print_string out s in
-  let var s v = Format.fprintf out "%s %a" s pp_var v in
-  match instr with
-  | Unreachable -> str "Unreachable"
-  | Nop -> str "Nop"
-  | Drop -> str "Drop"
-  | Return -> str "Return"
-  | MemorySize -> str "MemorySize"
-  | MemoryGrow -> str "MemoryGrow"
-  | MemoryFill -> str "MemoryFill"
-  | MemoryCopy -> str "MemoryCopy"
-  | RefIsNull -> str "RefIsNull"
-  | Br v -> var "Br" v
-  | BrIf v -> var "BrIf" v
-  | Call v -> var "Call" v
-  | LocalGet v -> var "LocalGet" v
-  | LocalSet v -> var "LocalSet" v
-  | LocalTee v -> var "LocalTee" v
-  | GlobalGet v -> var "GlobalGet" v
-  | GlobalSet v -> var "GlobalSet" v
-  | TableGet v -> var "TableGet" v
-  | TableSet v -> var "TableSet" v
-  | TableSize v -> var "TableSize" v
-  | TableGrow v -> var "TableGrow" v
-  | TableFill v -> var "TableFill" v
-  | ElemDrop v -> var "ElemDrop" v
-  | MemoryInit v -> var "MemoryInit" v
-  | DataDrop v -> var "DataDrop" v
-  | RefFunc v -> var "RefFunc" v
-  | Select vt -> Format.fprintf out "Select (%a)" (pp_opt pp_value_type_list) vt
-  | Block (bt, l) ->
-      Format.fprintf out "Block (%a, %a)" pp_block_type bt pp_block_label l
-  | Loop (bt, l) ->
-      Format.fprintf out "Loop (%a, %a)" pp_block_type bt pp_block_label l
-  | If (bt, l1, l2) ->
-      Format.fprintf
-        out
-        "If (%a, %a, %a)"
-        pp_block_type
-        bt
-        pp_block_label
-        l1
-        pp_block_label
-        l2
-  | BrTable (vs, v) ->
-      Format.fprintf out "BrTable(%a, %a)" (pp_list pp_var) vs pp_var v
-  | CallIndirect (v1, v2) ->
-      Format.fprintf out "CallIndirect(%a, %a)" pp_var v1 pp_var v2
-  | Load o -> Format.fprintf out "Load(%a)" pp_loadop o
-  | Store o -> Format.fprintf out "Store(%a)" pp_storeop o
-  | VecLoad o -> Format.fprintf out "VecLoad(%a)" pp_vec_loadop o
-  | VecStore o -> Format.fprintf out "VecSore(%a)" pp_vec_storeop o
-  | VecLoadLane o -> Format.fprintf out "VecLoadLane(%a)" pp_vec_laneop o
-  | VecStoreLane o -> Format.fprintf out "VecSoreLane(%a)" pp_vec_laneop o
-  | RefNull rt -> Format.fprintf out "RefNull (%a)" Types.pp_ref_type rt
-  | Const c -> Format.fprintf out "Const(%a)" pp_num c
-  | Compare c -> Format.fprintf out "Compare(%a)" pp_relop c
-  | Unary c -> Format.fprintf out "Unary (%a)" pp_unop c
-  | Binary c -> Format.fprintf out "Binary (%a)" pp_binop c
-  | Convert c -> Format.fprintf out "Convert(%a)" pp_cvtop c
-  | VecConst c -> Format.fprintf out "VecConst (%a)" pp_vec c
-  | _ -> Stdlib.failwith "Unsupported instruction"
-
-let pp_instr = Source.pp_phrase pp_instr'
 
 let pp_vector pp out v =
   (* Force evaluation of the vector. *)
@@ -259,7 +179,7 @@ let pp_map pp out map =
 
 let pp_elems out ref = pp_vector pp_ref out !ref
 
-let pp_blocks_table = pp_vector (pp_vector pp_instr)
+let pp_blocks_table = pp_vector (pp_vector Ast.pp_instr)
 
 let pp_datas_table = pp_vector pp_chunk_byte_vector
 
@@ -337,7 +257,7 @@ let rec pp_admin_instr' out instr =
         Ast.pp_block_label
         block
         index
-  | Plain instr -> Format.fprintf out "Plain @[<hv 2>%a@]" pp_instr' instr
+  | Plain instr -> Format.fprintf out "Plain @[<hv 2>%a@]" Ast.pp_instr' instr
   | Refer ref_ -> Format.fprintf out "Refer @[<hv 2>%a@]" pp_ref ref_
   | Invoke func -> Format.fprintf out "Invoke @[<hv 2>%a@]" pp_func func
   | Trapping msg ->
@@ -360,7 +280,7 @@ let rec pp_admin_instr' out instr =
         out
         "Label @[<hv 2>(%li,@; %a,@; %a,@; %a)@]"
         index
-        (Format.pp_print_list pp_instr)
+        (Format.pp_print_list Ast.pp_instr)
         final_instrs
         (Format.pp_print_list pp_value)
         values
