@@ -2399,6 +2399,14 @@ module Zk_rollup : sig
     init_state:State.t ->
     (context * Address.t * Z.t) tzresult Lwt.t
 
+  val add_to_pending :
+    context ->
+    Address.t ->
+    (Operation.t * Ticket_hash.t option) list ->
+    (context * Z.t) tzresult Lwt.t
+
+  val assert_exist : context -> t -> context tzresult Lwt.t
+
   val exists : context -> t -> (context * bool) tzresult Lwt.t
 
   module Internal_for_tests : sig
