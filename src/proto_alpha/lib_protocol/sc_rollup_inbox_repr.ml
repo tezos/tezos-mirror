@@ -470,14 +470,14 @@ module type Merkelized_operations = sig
     Raw_level_repr.t * Z.t ->
     history_proof ->
     proof ->
-    Sc_rollup_PVM_sig.input option tzresult Lwt.t
+    Sc_rollup_PVM_sig.inbox_message option tzresult Lwt.t
 
   val produce_proof :
     inbox_context ->
     History.t ->
     history_proof ->
     Raw_level_repr.t * Z.t ->
-    (proof * Sc_rollup_PVM_sig.input option) tzresult Lwt.t
+    (proof * Sc_rollup_PVM_sig.inbox_message option) tzresult Lwt.t
 
   val empty : inbox_context -> Sc_rollup_repr.t -> Raw_level_repr.t -> t Lwt.t
 

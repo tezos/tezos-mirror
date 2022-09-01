@@ -49,32 +49,51 @@ let () =
     (function Sc_rollup_invalid_serialized_inbox_proof -> Some () | _ -> None)
     (fun () -> Sc_rollup_invalid_serialized_inbox_proof)
 
-type inbox_proof = {
-  level : Raw_level_repr.t;
-  message_counter : Z.t;
-  proof : Sc_rollup_inbox_repr.serialized_proof;
-}
+type input_proof =
+  | Inbox_proof of {
+      level : Raw_level_repr.t;
+      message_counter : Z.t;
+      proof : Sc_rollup_inbox_repr.serialized_proof;
+    }
+  | Reveal_proof of string
 
-let inbox_proof_encoding =
+let input_proof_encoding =
   let open Data_encoding in
-  conv
-    (fun {level; message_counter; proof} -> (level, message_counter, proof))
-    (fun (level, message_counter, proof) -> {level; message_counter; proof})
-    (obj3
-       (req "level" Raw_level_repr.encoding)
-       (req "message_counter" Data_encoding.n)
-       (req "proof" Sc_rollup_inbox_repr.serialized_proof_encoding))
+  let case_inbox_proof =
+    case
+      ~title:"inbox proof"
+      (Tag 0)
+      (obj3
+         (req "level" Raw_level_repr.encoding)
+         (req "message_counter" Data_encoding.n)
+         (req "proof" Sc_rollup_inbox_repr.serialized_proof_encoding))
+      (function
+        | Inbox_proof {level; message_counter; proof} ->
+            Some (level, message_counter, proof)
+        | _ -> None)
+      (fun (level, message_counter, proof) ->
+        Inbox_proof {level; message_counter; proof})
+  in
+  let case_reveal_proof =
+    case
+      ~title:"reveal proof"
+      (Tag 1)
+      string
+      (function Reveal_proof s -> Some s | _ -> None)
+      (fun s -> Reveal_proof s)
+  in
+  union [case_inbox_proof; case_reveal_proof]
 
-type t = {pvm_step : Sc_rollups.wrapped_proof; inbox : inbox_proof option}
+type t = {pvm_step : Sc_rollups.wrapped_proof; input_proof : input_proof option}
 
 let encoding =
   let open Data_encoding in
   conv
-    (fun {pvm_step; inbox} -> (pvm_step, inbox))
-    (fun (pvm_step, inbox) -> {pvm_step; inbox})
+    (fun {pvm_step; input_proof} -> (pvm_step, input_proof))
+    (fun (pvm_step, input_proof) -> {pvm_step; input_proof})
     (obj2
        (req "pvm_step" Sc_rollups.wrapped_proof_encoding)
-       (opt "inbox" inbox_proof_encoding))
+       (opt "input_proof" input_proof_encoding))
 
 let pp ppf _ = Format.fprintf ppf "Refutation game proof"
 
@@ -93,9 +112,11 @@ let stop proof =
    correctly---if the message obtained from the inbox proof is at or
    above [commit_level] the [input_given] in the PVM proof should be
    [None]. *)
-let cut_at_level level input =
-  let input_level = Sc_rollup_PVM_sig.(input.inbox_level) in
-  if Raw_level_repr.(level <= input_level) then None else Some input
+let cut_at_level level (input : Sc_rollup_PVM_sig.input) =
+  match input with
+  | Inbox_message {inbox_level = input_level; _} ->
+      if Raw_level_repr.(level <= input_level) then None else Some input
+  | Sc_rollup_PVM_sig.Reveal_revelation _data -> Some input
 
 let proof_error reason =
   let open Lwt_tzresult_syntax in
@@ -116,28 +137,41 @@ let valid snapshot commit_level ~pvm_name proof =
   let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
   let* () = check (String.equal P.name pvm_name) "Incorrect PVM kind" in
   let* input =
-    match proof.inbox with
-    | None -> return None
-    | Some {level; message_counter; proof} ->
-        let+ input =
+    match proof.input_proof with
+    | None -> return_none
+    | Some (Inbox_proof {level; message_counter; proof}) ->
+        let+ inbox_message =
           check_inbox_proof snapshot proof (level, Z.succ message_counter)
         in
-        Option.bind input (cut_at_level commit_level)
+        Option.map (fun i -> Sc_rollup_PVM_sig.Inbox_message i) inbox_message
+    | Some (Reveal_proof data) ->
+        return_some (Sc_rollup_PVM_sig.Reveal_revelation (RawData data))
   in
+  let input = Option.bind input (cut_at_level commit_level) in
   let* input_requested = P.verify_proof input P.proof in
   let* () =
-    match (proof.inbox, input_requested) with
+    match (proof.input_proof, input_requested) with
     | None, No_input_required -> return_unit
-    | Some {level; message_counter; proof = _}, Initial ->
+    | Some (Inbox_proof {level; message_counter; proof = _}), Initial ->
         check
           (Raw_level_repr.(level = root) && Z.(equal message_counter zero))
           "Inbox proof is not about the initial input request."
-    | Some {level; message_counter; proof = _}, First_after (l, n) ->
+    | Some (Inbox_proof {level; message_counter; proof = _}), First_after (l, n)
+      ->
         check
           (Raw_level_repr.(level = l) && Z.(equal message_counter n))
           "Level and index of inbox proof are not equal to the one expected in \
            input request."
-    | Some _, No_input_required | None, Initial | None, First_after _ ->
+    | ( Some (Reveal_proof data),
+        Needs_reveal (RevealRawData expected_hash) ) ->
+        let data_hash = Sc_rollup_PVM_sig.Input_hash.hash_string [data] in
+        check
+          (Sc_rollup_PVM_sig.Input_hash.equal data_hash expected_hash)
+          "Invalid reveal"
+    | None, (Initial | First_after _ | Needs_reveal _)
+    | Some _, No_input_required
+    | Some (Inbox_proof _), Needs_reveal _
+    | Some (Reveal_proof _), (Initial | First_after _) ->
         proof_error "Inbox proof and input request are dissociated."
   in
   return (input, input_requested)
@@ -150,6 +184,8 @@ module type PVM_with_context_and_state = sig
   val state : state
 
   val proof_encoding : proof Data_encoding.t
+
+  val reveal : Sc_rollup_PVM_sig.Input_hash.t -> string option
 
   module Inbox_with_history : sig
     include
@@ -169,7 +205,7 @@ let produce pvm_and_state commit_level =
   let*! (request : Sc_rollup_PVM_sig.input_request) =
     P.is_input_state P.state
   in
-  let* inbox_proof, input_given =
+  let* input_proof, input_given =
     match request with
     | No_input_required -> return (None, None)
     | Initial ->
@@ -179,15 +215,42 @@ let produce pvm_and_state commit_level =
           Inbox_with_history.(
             produce_proof context history inbox (level, message_counter))
         in
-        let proof = Inbox_with_history.to_serialized_proof inbox_proof in
-        return (Some {level; message_counter; proof}, input)
+        let input =
+          Option.map (fun msg -> Sc_rollup_PVM_sig.Inbox_message msg) input
+        in
+        let inbox_proof =
+          Inbox_proof
+            {
+              level;
+              message_counter;
+              proof = Inbox_with_history.to_serialized_proof inbox_proof;
+            }
+        in
+        return (Some inbox_proof, input)
     | First_after (level, message_counter) ->
         let* inbox_proof, input =
           Inbox_with_history.(
             produce_proof context history inbox (level, Z.succ message_counter))
         in
-        let proof = Inbox_with_history.to_serialized_proof inbox_proof in
-        return (Some {level; message_counter; proof}, input)
+        let input =
+          Option.map (fun msg -> Sc_rollup_PVM_sig.Inbox_message msg) input
+        in
+        let inbox_proof =
+          Inbox_proof
+            {
+              level;
+              message_counter;
+              proof = Inbox_with_history.to_serialized_proof inbox_proof;
+            }
+        in
+        return (Some inbox_proof, input)
+    | Sc_rollup_PVM_sig.Needs_reveal (RevealRawData h) -> (
+        match reveal h with
+        | None -> proof_error "No reveal"
+        | Some data ->
+            return
+              ( Some (Reveal_proof data),
+                Some (Sc_rollup_PVM_sig.Reveal_revelation (RawData data)) ))
   in
   let input_given = Option.bind input_given (cut_at_level commit_level) in
   let* pvm_step_proof = P.produce_proof P.context input_given P.state in
@@ -197,5 +260,5 @@ let produce pvm_and_state commit_level =
     let proof = pvm_step_proof
   end in
   match Sc_rollups.wrap_proof (module P_with_proof) with
-  | Some pvm_step -> return {pvm_step; inbox = inbox_proof}
+  | Some pvm_step -> return {pvm_step; input_proof}
   | None -> proof_error "Could not wrap proof"

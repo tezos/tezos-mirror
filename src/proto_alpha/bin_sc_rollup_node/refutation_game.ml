@@ -109,6 +109,9 @@ module Make (Interpreter : Interpreter.S) :
 
       let state = start_state
 
+      (* FIXME: This will be fixed in a forthcoming commit. *)
+      let pre_image _h = None
+
       module Inbox_with_history = struct
         include Context.Inbox
 

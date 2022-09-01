@@ -375,7 +375,7 @@ module type Merkelized_operations = sig
     Raw_level_repr.t * Z.t ->
     history_proof ->
     proof ->
-    Sc_rollup_PVM_sig.input option tzresult Lwt.t
+    Sc_rollup_PVM_sig.inbox_message option tzresult Lwt.t
 
   (** [produce_proof ctxt history inbox (level, counter)] creates an
       inbox proof proving the first message after the index [counter] at
@@ -387,7 +387,7 @@ module type Merkelized_operations = sig
     History.t ->
     history_proof ->
     Raw_level_repr.t * Z.t ->
-    (proof * Sc_rollup_PVM_sig.input option) tzresult Lwt.t
+    (proof * Sc_rollup_PVM_sig.inbox_message option) tzresult Lwt.t
 
   (** [empty ctxt level] is an inbox started at some given [level] with no
       message at all. *)

@@ -136,7 +136,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
           else return (input, failing_ticks)
       | _ -> return (input, failing_ticks)
     in
-    let* state = PVM.set_input input state in
+    let* state = PVM.set_input (Inbox_message input) state in
     let* state, fuel, _tick, _failing_ticks =
       eval_until_input level message_index ~fuel tick failing_ticks state
     in

@@ -918,9 +918,16 @@ let check_proof_stop_state ~stop_state input_given
     (input_request : Sc_rollup_PVM_sig.input_request) proof validate =
   let stop_proof =
     match (input_given, input_request) with
-    | None, No_input_required | Some _, Initial | Some _, First_after _ ->
+    | None, No_input_required
+    | Some _, Initial
+    | Some _, First_after _
+    | Some _, Needs_reveal _ ->
         Some (Sc_rollup_proof_repr.stop proof)
-    | Some _, No_input_required | None, Initial | None, First_after _ -> None
+    | Some _, No_input_required
+    | None, Initial
+    | None, First_after _
+    | None, Needs_reveal _ ->
+        None
   in
   check
     (let b = Option.equal State_hash.equal stop_state stop_proof in

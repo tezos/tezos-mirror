@@ -28,30 +28,24 @@
     game.
 
     This proof is basically a combination of a PVM proof (provided by
-    each implementation of the PVM signature) and an inbox proof. To
+    each implementation of the PVM signature) and an input proof. To
     check the proof we must check each part separately and then also
     check that they match on the two points where they touch:
 
       - the [input_requested] of the PVM proof should match the starting
-      point of the inbox proof ;
+      point of the input proof ;
 
       - the [input_given] of the PVM proof should match the output
-      message of the inbox proof.
+      message of the input proof.
 
     It is also often the case that the PVM proof has [No_input_required]
     for its [input_requested] and [None] for its [input_given]. If this
-    is the case, we don't need the inbox proof at all and the [inbox]
+    is the case, we don't need the input proof at all and the [input_proof]
     parameter in our proof should be [None]. *)
 
 open Sc_rollup_repr
 
-type inbox_proof = {
-  level : Raw_level_repr.t;
-  message_counter : Z.t;
-  proof : Sc_rollup_inbox_repr.serialized_proof;
-}
-
-(** A PVM proof [pvm_step] is combined with an [inbox] proof to provide
+(** A PVM proof [pvm_step] is combined with an [input_proof] to provide
     the proof necessary to validate a single step in the refutation
     game.
 
@@ -60,10 +54,25 @@ type inbox_proof = {
     [No_input_required] and [None] respectively, and in this case
     [inbox] should also be [None].
 
-    In the case that input is involved, [inbox] is a proof of the next
-    message available from the inbox after a given location; this must
-    match up with [pvm_step] to give a valid refutation proof. *)
-type t = {pvm_step : Sc_rollups.wrapped_proof; inbox : inbox_proof option}
+    In the case that input is involved, [input_proof] is either:
+
+    - a proof of the next inbox message available from the inbox
+      after a given location; this must match up with [pvm_step]
+      to give a valid refutation proof ; or
+
+    - a proof of the existence of reveal for a given hash when
+      the [input_requested] is the [Needs_reveal].
+*)
+
+type input_proof =
+  | Inbox_proof of {
+      level : Raw_level_repr.t;
+      message_counter : Z.t;
+      proof : Sc_rollup_inbox_repr.serialized_proof;
+    }
+  | Reveal_proof of string
+
+type t = {pvm_step : Sc_rollups.wrapped_proof; input_proof : input_proof option}
 
 type error += Sc_rollup_proof_check of string
 
@@ -88,14 +97,14 @@ val stop : t -> State_hash.t
     This function requires a few bits of data (available from the
     refutation game record in the storage):
 
-      - a snapshot of the inbox, used by the [inbox] proof ;
+      - a snapshot of the inbox, that may be used by the [input] proof ;
 
       - the inbox level of the commitment, used to determine if an
-      output from the [inbox] proof is too recent to be allowed into the
-      PVM proof ;
+        output from the [input] proof is too recent to be allowed into
+        the PVM proof ;
 
       - the [pvm_name], used to check that the proof given has the right
-      PVM kind.
+        PVM kind.
 
     It also returns the optional input executed during the proof and the
     input_request for the state at the beginning of the proof.
@@ -117,6 +126,8 @@ module type PVM_with_context_and_state = sig
 
   val proof_encoding : proof Data_encoding.t
 
+  val reveal : Sc_rollup_PVM_sig.Input_hash.t -> string option
+
   module Inbox_with_history : sig
     include
       Sc_rollup_inbox_repr.Merkelized_operations
@@ -132,7 +143,9 @@ end
     will construct a full refutation game proof out of the [state] given
     in [pvm_and_state].  It uses the [inbox] if necessary to provide
     input in the proof. If the input is above or at [commit_level] it
-    will block it, and produce a proof that the PVM is blocked.
+    will block it, and produce a proof that the PVM is blocked. If
+    the input requested is a reveal the proof production will also
+    fail.
 
     This will fail if any of the [context], [inbox_context] or
     [inbox_history] given don't have enough data to make the proof. For

@@ -126,7 +126,12 @@ module type S = sig
 
   val get_tick : state -> Sc_rollup_tick_repr.t Lwt.t
 
-  type status = Halted | Waiting_for_input_message | Parsing | Evaluating
+  type status =
+    | Halted
+    | Waiting_for_input_message
+    | Waiting_for_reveal
+    | Parsing
+    | Evaluating
 
   val get_status : state -> status Lwt.t
 
@@ -181,7 +186,12 @@ module Make (Context : P) :
 
   type tree = Tree.tree
 
-  type status = Halted | Waiting_for_input_message | Parsing | Evaluating
+  type status =
+    | Halted
+    | Waiting_for_input_message
+    | Waiting_for_reveal
+    | Parsing
+    | Evaluating
 
   type instruction =
     | IPush : int -> instruction
@@ -570,6 +580,7 @@ module Make (Context : P) :
           [
             ("Halted", Halted);
             ("Waiting_for_input_message", Waiting_for_input_message);
+            ("Waiting_for_reveal", Waiting_for_reveal);
             ("Parsing", Parsing);
             ("Evaluating", Evaluating);
           ]
@@ -579,10 +590,26 @@ module Make (Context : P) :
       let string_of_status = function
         | Halted -> "Halted"
         | Waiting_for_input_message -> "Waiting for input message"
+        | Waiting_for_reveal -> "Waiting for reveal"
         | Parsing -> "Parsing"
         | Evaluating -> "Evaluating"
 
       let pp fmt status = Format.fprintf fmt "%s" (string_of_status status)
+    end)
+
+    module Required_reveal = Make_var (struct
+      type t = PS.Input_hash.t option
+
+      let initial = None
+
+      let encoding = Data_encoding.option PS.Input_hash.encoding
+
+      let name = "required_pre_image_hash"
+
+      let pp fmt v =
+        match v with
+        | None -> Format.fprintf fmt "<none>"
+        | Some h -> PS.Input_hash.pp fmt h
     end)
 
     module Current_level = Make_var (struct
@@ -836,6 +863,11 @@ module Make (Context : P) :
         match counter with
         | Some n -> return (PS.First_after (level, n))
         | None -> return PS.Initial)
+    | Waiting_for_reveal -> (
+        let* h = Required_reveal.get in
+        match h with
+        | None -> internal_error "Internal error: Reveal invariant broken"
+        | Some h -> return (PS.Needs_reveal (RevealRawData h)))
     | _ -> return PS.No_input_required
 
   let is_input_state =
@@ -869,7 +901,7 @@ module Make (Context : P) :
     let* () = Code.clear in
     return ()
 
-  let set_input_monadic {PS.inbox_level; message_counter; payload} =
+  let set_inbox_message_monadic {PS.inbox_level; message_counter; payload} =
     let open Monad.Syntax in
     let payload =
       match Sc_rollup_inbox_message_repr.deserialize payload with
@@ -895,11 +927,40 @@ module Make (Context : P) :
         let* () = Status.set Waiting_for_input_message in
         return ()
 
+  let reveal_reveal_monadic (PS.RawData data) =
+    (*
+
+       The inbox cursor is unchanged as the message comes from the
+       outer world.
+
+       We don't have to check that the data hash is the one we
+       expected as we decided to trust the initial witness.
+
+       It is the responsibility of the rollup node to check it if it
+       does not want to publish a wrong commitment.
+
+       Notice that a multi-page transmission is possible by embedding
+       a continuation encoded as an optional hash in [data].
+
+    *)
+    let open Monad.Syntax in
+    let* () = Next_message.set (Some data) in
+    let* () = start_parsing in
+    return ()
+
   let ticked m =
     let open Monad.Syntax in
     let* tick = Current_tick.get in
     let* () = Current_tick.set (Sc_rollup_tick_repr.next tick) in
     m
+
+  let reveal_reveal data =
+    reveal_reveal_monadic data |> ticked |> state_of
+
+  let set_input_monadic input =
+    match input with
+    | PS.Inbox_message m -> set_inbox_message_monadic m
+    | PS.Reveal_revelation s -> reveal_reveal_monadic s
 
   let set_input input = set_input_monadic input |> ticked |> state_of
 
@@ -949,7 +1010,6 @@ module Make (Context : P) :
     let open Monad.Syntax in
     let* () = Status.set Evaluating in
     let* () = Evaluation_result.set None in
-    let* () = Stack.clear in
     return ()
 
   let stop_parsing outcome =
@@ -984,9 +1044,10 @@ module Make (Context : P) :
     let is_letter d =
       Compare.Char.((d >= 'a' && d <= 'z') || (d >= 'A' && d <= 'Z'))
     in
-    let is_identifier_char = function
-      | '0' .. '9' | 'a' .. 'z' | 'A' .. 'Z' | '%' -> true
-      | _ -> false
+    let is_identifier_char d =
+      is_letter d || is_digit d
+      || Compare.Char.(d = ':')
+      || Compare.Char.(d = '%')
     in
     let* parser_state = Parser_state.get in
     match parser_state with
@@ -998,7 +1059,7 @@ module Make (Context : P) :
             let* () = produce_int in
             let* () = produce_add in
             return ()
-        | Some ' ' ->
+        | Some (' ' | '\n') ->
             let* () = produce_int in
             let* () = next_char in
             return ()
@@ -1014,7 +1075,7 @@ module Make (Context : P) :
             let* () = produce_var in
             let* () = produce_add in
             return ()
-        | Some ' ' ->
+        | Some (' ' | '\n') ->
             let* () = produce_var in
             let* () = next_char in
             return ()
@@ -1025,7 +1086,7 @@ module Make (Context : P) :
     | SkipLayout -> (
         let* char = current_char in
         match char with
-        | Some ' ' -> next_char
+        | Some (' ' | '\n') -> next_char
         | Some '+' -> produce_add
         | Some d when is_digit d ->
             let* _ = lexeme in
@@ -1088,13 +1149,22 @@ module Make (Context : P) :
     | None -> stop_evaluating true
     | Some (IPush x) -> Stack.push x
     | Some (IStore x) -> (
-        let* v = Stack.top in
-        match v with
-        | None -> stop_evaluating false
-        | Some v -> (
-            match identifies_target_contract x with
-            | Some contract_entrypoint -> output contract_entrypoint v
-            | None -> Vars.set x v))
+        let len = String.length x in
+        if Compare.Int.(len > 5) && Compare.String.(String.sub x 0 5 = "hash:")
+        then
+          let hash = String.sub x 5 (len - 5) in
+          let hash = PS.Input_hash.of_b58check_exn hash in
+          let* () = Required_reveal.set (Some hash) in
+          let* () = Status.set Waiting_for_reveal in
+          return ()
+        else
+          let* v = Stack.top in
+          match v with
+          | None -> stop_evaluating false
+          | Some v -> (
+              match identifies_target_contract x with
+              | Some contract_entrypoint -> output contract_entrypoint v
+              | None -> Vars.set x v))
     | Some IAdd -> (
         let* v = Stack.pop in
         match v with
@@ -1121,12 +1191,10 @@ module Make (Context : P) :
         let* status = Status.get in
         match status with
         | Halted -> boot
-        | Waiting_for_input_message -> (
+        | Waiting_for_input_message | Waiting_for_reveal -> (
             let* msg = Next_message.get in
             match msg with
-            | None ->
-                internal_error
-                  "An input state was not provided an input message."
+            | None -> internal_error "An input state was not provided an input."
             | Some _ -> start_parsing)
         | Parsing -> parse
         | Evaluating -> evaluate)
@@ -1139,10 +1207,25 @@ module Make (Context : P) :
     let* state =
       match request with
       | PS.No_input_required -> eval state
-      | _ -> (
+      | PS.Initial | PS.First_after _ -> (
           match input_given with
-          | Some input -> set_input input state
-          | None -> return state)
+          | Some (PS.Inbox_message _ as input_given) ->
+              set_input input_given state
+          | None | Some (PS.Reveal_revelation _) ->
+              state_of
+                (internal_error
+                   "Invalid set_input: expecting inbox message, got a \
+                    reveal.")
+                state)
+      | PS.Needs_reveal _hash -> (
+          match input_given with
+          | Some (PS.Reveal_revelation data) -> reveal_reveal data state
+          | None | Some (PS.Inbox_message _) ->
+              state_of
+                (internal_error
+                   "Invalid set_input: expecting a reveal, got an inbox \
+                    message.")
+                state)
     in
     return (state, request)
 

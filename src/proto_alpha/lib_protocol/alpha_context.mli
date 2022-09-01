@@ -2975,20 +2975,31 @@ module Sc_rollup : sig
     val deserialize : serialized -> t tzresult
   end
 
-  type input = {
+  type inbox_message = {
     inbox_level : Raw_level.t;
     message_counter : Z.t;
     payload : Inbox_message.serialized;
   }
 
+  type reveal_data = RawData of string
+
+  type input =
+    | Inbox_message of inbox_message
+    | Reveal_revelation of reveal_data
+
   val input_equal : input -> input -> bool
 
   val input_encoding : input Data_encoding.t
+
+  module Input_hash : S.HASH
+
+  type reveal = RevealRawData of Input_hash.t
 
   type input_request =
     | No_input_required
     | Initial
     | First_after of Raw_level.t * Z.t
+    | Needs_reveal of reveal
 
   val input_request_encoding : input_request Data_encoding.t
 
@@ -3088,14 +3099,14 @@ module Sc_rollup : sig
         Raw_level.t * Z.t ->
         history_proof ->
         proof ->
-        input option tzresult Lwt.t
+        inbox_message option tzresult Lwt.t
 
       val produce_proof :
         inbox_context ->
         History.t ->
         history_proof ->
         Raw_level.t * Z.t ->
-        (proof * input option) tzresult Lwt.t
+        (proof * inbox_message option) tzresult Lwt.t
 
       val empty : inbox_context -> Sc_rollup_repr.t -> Raw_level.t -> t Lwt.t
 
@@ -3324,7 +3335,12 @@ module Sc_rollup : sig
 
       val get_tick : state -> Tick.t Lwt.t
 
-      type status = Halted | Waiting_for_input_message | Parsing | Evaluating
+      type status =
+        | Halted
+        | Waiting_for_input_message
+        | Waiting_for_reveal
+        | Parsing
+        | Evaluating
 
       val get_status : state -> status Lwt.t
 
@@ -3468,13 +3484,15 @@ module Sc_rollup : sig
   val wrapped_proof_module : wrapped_proof -> (module PVM_with_proof)
 
   module Proof : sig
-    type inbox_proof = {
-      level : Raw_level.t;
-      message_counter : Z.t;
-      proof : Inbox.serialized_proof;
-    }
+    type input_proof =
+      | Inbox_proof of {
+          level : Raw_level.t;
+          message_counter : Z.t;
+          proof : Inbox.serialized_proof;
+        }
+      | Reveal_proof of string
 
-    type t = {pvm_step : wrapped_proof; inbox : inbox_proof option}
+    type t = {pvm_step : wrapped_proof; input_proof : input_proof option}
 
     module type PVM_with_context_and_state = sig
       include PVM.S
@@ -3484,6 +3502,8 @@ module Sc_rollup : sig
       val state : state
 
       val proof_encoding : proof Data_encoding.t
+
+      val reveal : Input_hash.t -> string option
 
       module Inbox_with_history : sig
         include Inbox.Merkelized_operations with type inbox_context = context
