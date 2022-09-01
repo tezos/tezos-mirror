@@ -91,6 +91,9 @@ module Check = Check
 (** Command-line interface options. *)
 module Cli = Cli
 
+(** Compute the difference between two sequences of items. *)
+module Diff = Diff
+
 (** JSON handling (encoding/decoding, accessors, error management, etc). *)
 module JSON = JSON
 
@@ -99,6 +102,9 @@ module Log = Log
 
 (** Managing external processes (spawning them, capturing outputs, exit codes, etc). *)
 module Process = Process
+
+(** Process hooks, in particular for use with regression tests. *)
+module Process_hooks = Process_hooks
 
 (** Regression test helpers (run tests, capture output, etc). *)
 module Regression = Regression

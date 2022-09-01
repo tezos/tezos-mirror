@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,11 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Tests that test Tezt itself. *)
+(** Process hooks. *)
 
-let () =
-  Test_check.register () ;
-  Test_daemon.register () ;
-  Test_retry.register () ;
-  Test_diff.register () ;
-  Test.run ()
+(** Hooks are typically used for regression tests. *)
+
+(** Hooks attached to external processes. *)
+type t = {
+  on_log : string -> unit;
+      (** A hook that is called with every line that is being logged. *)
+  on_spawn : string -> string list -> unit;
+      (** A hook that is called whenever a process is being spawned. The first
+          parameter is the command and the second are its arguments. *)
+}

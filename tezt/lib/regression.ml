@@ -35,16 +35,15 @@ let capture line =
       output_string channel line ;
       output_string channel "\n"
 
-let hooks =
-  Process.
-    {
-      on_spawn =
-        (fun command arguments ->
-          let message = Log.quote_shell_command command arguments in
-          capture "" ;
-          capture message);
-      on_log = capture;
-    }
+let hooks : Process_hooks.t =
+  {
+    on_spawn =
+      (fun command arguments ->
+        let message = Log.quote_shell_command command arguments in
+        capture "" ;
+        capture message);
+    on_log = capture;
+  }
 
 (* Run [f] and capture the output of ran processes into the [output_file]. *)
 let run_and_capture_output ~output_file (f : unit -> 'a Lwt.t) =
@@ -65,22 +64,6 @@ let run_and_capture_output ~output_file (f : unit -> 'a Lwt.t) =
       capture_output := None ;
       close_out channel ;
       unit)
-
-(* Log regression output diff, with colors if enabled. *)
-let log_regression_diff diff =
-  List.iter
-    (fun line ->
-      if String.length line = 0 then Log.log ~level:Error ""
-      else
-        let color =
-          match line.[0] with
-          | '+' -> Log.Color.FG.green
-          | '-' -> Log.Color.FG.red
-          | '@' -> Log.Color.FG.cyan
-          | _ -> Log.Color.reset
-        in
-        Log.log ~level:Error ~color "%s" line)
-    (String.split_on_char '\n' diff)
 
 (* Map from output directories to output files.
    Output directories are directories that are supposed to only contain output files.
@@ -129,64 +112,35 @@ let register ~__FILE__ ~title ~tags ?file f =
       output_dir
       (String_set.add relative_output_file old_relative_output_files)
       !output_dirs_and_files ;
-  Test.register ~__FILE__ ~title ~tags (fun () ->
-      (* when the stored output doesn't already exists, must reset regressions *)
-      if
-        not
-          (Sys.file_exists stored_full_output_file
-          || Cli.options.reset_regressions)
-      then
-        Test.fail
-          "Regression output file not found: %s. To generate it, use: \
-           --reset-regressions --title %s"
-          (Log.quote_shell stored_full_output_file)
-          (Log.quote_shell title) ;
-      let capture_f ~full_output_file =
-        run_and_capture_output ~output_file:full_output_file f
-      in
-      if Cli.options.reset_regressions then
-        capture_f ~full_output_file:stored_full_output_file
-      else
-        (* store the current run into a temp file *)
-        let temp_full_output_file = Temp.file relative_output_file in
-        let* () = capture_f ~full_output_file:temp_full_output_file in
-        (* compare the captured output with the stored output *)
-        let diff_process =
-          Process.spawn
-            ~log_status_on_exit:false
-            ~log_output:false
-            "diff"
-            [
-              "--unified=0";
-              "--label";
-              "stored";
-              "--label";
-              "actual";
-              stored_full_output_file;
-              temp_full_output_file;
-            ]
-        in
-        let* status = Process.wait diff_process in
-        match status with
-        | WEXITED 0 -> unit
-        | _ ->
-            let stream = Lwt_io.read_lines (Process.stdout diff_process) in
-            let buffer = Buffer.create 1024 in
-            let* () =
-              Lwt_stream.iter
-                (fun line ->
-                  Buffer.add_string buffer line ;
-                  Buffer.add_string buffer "\n")
-                stream
-            in
-            let diff = Buffer.contents buffer in
-            Buffer.reset buffer ;
-            log_regression_diff diff ;
-            Test.fail
-              "Regression output file contains differences: %s. To accept the \
-               differences, use: --reset-regressions --title %s"
-              (Log.quote_shell stored_full_output_file)
-              (Log.quote_shell title))
+  Test.register ~__FILE__ ~title ~tags @@ fun () ->
+  (* when the stored output doesn't already exists, must reset regressions *)
+  if
+    not
+      (Sys.file_exists stored_full_output_file || Cli.options.reset_regressions)
+  then
+    Test.fail
+      "Regression output file not found: %s. To generate it, use: \
+       --reset-regressions --title %s"
+      (Log.quote_shell stored_full_output_file)
+      (Log.quote_shell title) ;
+  let capture_f ~full_output_file =
+    run_and_capture_output ~output_file:full_output_file f
+  in
+  if Cli.options.reset_regressions then
+    capture_f ~full_output_file:stored_full_output_file
+  else
+    (* store the current run into a temp file *)
+    let temp_full_output_file = Temp.file relative_output_file in
+    let* () = capture_f ~full_output_file:temp_full_output_file in
+    let diff = Diff.files stored_full_output_file temp_full_output_file in
+    if diff.different then (
+      Diff.log (Diff.reduce_context diff) ;
+      Test.fail
+        "Regression output file contains differences: %s. To accept the \
+         differences, use: --reset-regressions --title %s"
+        (Log.quote_shell stored_full_output_file)
+        (Log.quote_shell title)) ;
+    unit
 
 let check_unknown_output_files output_dir relative_output_files =
   let full_output_files =
@@ -229,7 +183,7 @@ let check_unknown_output_files output_dir relative_output_files =
     in
     Array.iter handle_file (try_to_read_dir ()) ;
     (* Check whether directory is empty now that we may have deleted files. *)
-    match try_to_read_dir () with
+    match Sys.readdir path with
     | exception Sys_error _ -> ()
     | [||] ->
         if mode = Delete then

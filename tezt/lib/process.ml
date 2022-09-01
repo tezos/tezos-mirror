@@ -109,7 +109,10 @@ let get_echo_lwt_channel echo =
       assert false
   | Some lwt_channel -> lwt_channel
 
-type hooks = {on_log : string -> unit; on_spawn : string -> string list -> unit}
+type hooks = Process_hooks.t = {
+  on_log : string -> unit;
+  on_spawn : string -> string list -> unit;
+}
 
 (* Information which is specific to processes that run on remote runners. *)
 type remote = {runner : Runner.t; pid : int Lwt.t}
