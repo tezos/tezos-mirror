@@ -57,7 +57,8 @@ let create_blocks_reception =
   \     block INTEGER NOT NULL,\n\
   \     source INTEGER NOT NULL,\n\
   \     FOREIGN KEY (block) REFERENCES blocks(id),\n\
-  \     FOREIGN KEY (source) REFERENCES nodes(id))"
+  \     FOREIGN KEY (source) REFERENCES nodes(id),\n\
+  \     UNIQUE (block, source))"
 
 let create_operations =
   "   CREATE TABLE operations(\n\
@@ -77,7 +78,8 @@ let create_operations_reception =
   \     source INTEGER NOT NULL,\n\
   \     errors BLOB,\n\
   \     FOREIGN KEY (operation) REFERENCES operations(id),\n\
-  \     FOREIGN KEY (source) REFERENCES nodes(id))"
+  \     FOREIGN KEY (source) REFERENCES nodes(id),\n\
+  \     UNIQUE (operation,source))"
 
 let create_operations_inclusion =
   "   CREATE TABLE operations_inclusion(\n\
@@ -85,7 +87,8 @@ let create_operations_inclusion =
   \      block INTEGER NOT NULL,\n\
   \      operation INTEGER NOT NULL,\n\
   \      FOREIGN KEY (block) REFERENCES blocks(id),\n\
-  \      FOREIGN KEY (operation) REFERENCES operations(id))"
+  \      FOREIGN KEY (operation) REFERENCES operations(id),\n\
+  \      UNIQUE (block, operation))"
 
 let create_endorsing_rights =
   "   CREATE TABLE endorsing_rights(\n\
@@ -228,8 +231,8 @@ let maybe_insert_block hash ~level ~round timestamp delegate =
 let insert_received_operations ~source ~level operations =
   let operations = List.filter (fun (_, l) -> l <> []) operations in
   Format.asprintf
-    "INSERT INTO operations_reception (timestamp, operation, source, errors) \
-     SELECT column1, operations.id, nodes.id, column2 FROM operations, \
+    "INSERT OR IGNORE INTO operations_reception (timestamp, operation, source, \
+     errors) SELECT column1, operations.id, nodes.id, column2 FROM operations, \
      delegates, nodes, (VALUES %a) ON delegates.address = column3 AND \
      operations.endorser = delegates.id AND operations.endorsement = column4 \
      AND ((operations.round IS NULL AND column5 IS NULL) OR operations.round = \
@@ -273,9 +276,9 @@ let insert_received_operations ~source ~level operations =
 
 let insert_included_operations block_hash ~level operations =
   Format.asprintf
-    "INSERT INTO operations_inclusion (block, operation) SELECT blocks.id, \
-     operations.id FROM operations, delegates, blocks, (VALUES %a) ON \
-     delegates.address = column1 AND operations.endorser = delegates.id AND \
+    "INSERT OR IGNORE INTO operations_inclusion (block, operation) SELECT \
+     blocks.id, operations.id FROM operations, delegates, blocks, (VALUES %a) \
+     ON delegates.address = column1 AND operations.endorser = delegates.id AND \
      operations.endorsement = column2 AND ((operations.round IS NULL AND \
      column3 IS NULL) OR operations.round = column3) WHERE blocks.hash = x'%a' \
      AND operations.level = %ld"
@@ -299,9 +302,9 @@ let insert_included_operations block_hash ~level operations =
 
 let insert_received_block ~source hash reception_time =
   Format.asprintf
-    "INSERT INTO blocks_reception (timestamp, block, source) SELECT column1, \
-     blocks.id, nodes.id FROM blocks JOIN (VALUES ('%a', x'%a')) ON \
-     blocks.hash = column2 JOIN nodes ON nodes.name = '%s'"
+    "INSERT OR IGNORE INTO blocks_reception (timestamp, block, source) SELECT \
+     '%a', blocks.id, nodes.id FROM blocks,nodes WHERE blocks.hash = x'%a' AND \
+     nodes.name = '%s'"
     Time.System.pp_hum
     reception_time
     Hex.pp
