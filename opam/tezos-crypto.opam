@@ -12,7 +12,7 @@ depends: [
   "tezos-stdlib"
   "data-encoding" { >= "0.6" & < "0.7" }
   "tezos-lwt-result-stdlib"
-  "lwt" { >= "5.4.0" }
+  "lwt" { >= "5.6.0" }
   "tezos-hacl"
   "secp256k1-internal" { >= "0.3.0" }
   "tezos-error-monad"

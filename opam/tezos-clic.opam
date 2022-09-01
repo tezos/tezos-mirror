@@ -10,7 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "tezos-stdlib"
-  "lwt" { >= "5.4.0" }
+  "lwt" { >= "5.6.0" }
   "re" { >= "1.7.2" }
   "tezos-error-monad"
   "tezos-lwt-result-stdlib"
