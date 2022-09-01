@@ -11,8 +11,8 @@ depends: [
   "dune" { >= "3.0" }
   "tezos-base"
   "tezos-stdlib"
-  "irmin" { >= "3.3.2" & < "3.4.0" }
-  "irmin-pack" { >= "3.3.1" & < "3.4.0" }
+  "irmin" { >= "3.4.0" & < "3.5.0" }
+  "irmin-pack" { >= "3.4.0" & < "3.5.0" }
   "tezos-stdlib-unix"
   "fmt" { >= "0.8.7" }
   "bigstringaf" { >= "0.2.0" }

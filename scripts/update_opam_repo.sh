@@ -100,7 +100,10 @@ echo 'opam-version: "2.0"' > $dummy_opam
 # - Sometime installing mirage-no-xen + mirage-no-solo5
 # - Sometime installing mirage-runtime
 # According to mirage devs, mirage-runtime is the correct dependency to install.
-echo 'depends: [ "mirage-runtime" { >= "4.0.0" } ]' >> $dummy_opam
+# In addition "inotify" is a "{os = linux}" dependency that has to be
+# in the repo for irmin to be installable on linux but is not selected
+# by the solver.
+echo 'depends: [ "mirage-runtime" { >= "4.0.0" } "inotify" ]' >> $dummy_opam
 echo 'conflicts:[' >> $dummy_opam
 grep -r "^flags: *\[ *avoid-version *\]" -l ./ | LC_COLLATE=C sort -u | while read -r f;
 do
