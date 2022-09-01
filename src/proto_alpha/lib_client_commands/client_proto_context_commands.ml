@@ -241,13 +241,10 @@ let commands_ro () =
             contract
         in
         check_smart_contract cctxt v @@ fun storage ->
-            let*! () =
-              cctxt#answer
-                "%a"
-                Michelson_v1_printer.print_expr_unwrapped
-                storage
-            in
-            return_unit);
+        let*! () =
+          cctxt#answer "%a" Michelson_v1_printer.print_expr_unwrapped storage
+        in
+        return_unit);
     command
       ~group
       ~desc:
@@ -334,15 +331,14 @@ let commands_ro () =
             contract
         in
         check_smart_contract cctxt v @@ fun {code; storage = _} ->
-            match Script_repr.force_decode code with
-            | Error errs ->
-                cctxt#error "%a" Environment.Error_monad.pp_trace errs
-            | Ok code ->
-                let {Michelson_v1_parser.source; _} =
-                  Michelson_v1_printer.unparse_toplevel code
-                in
-                let*! () = cctxt#answer "%s" source in
-                return_unit);
+        match Script_repr.force_decode code with
+        | Error errs -> cctxt#error "%a" Environment.Error_monad.pp_trace errs
+        | Ok code ->
+            let {Michelson_v1_parser.source; _} =
+              Michelson_v1_printer.unparse_toplevel code
+            in
+            let*! () = cctxt#answer "%s" source in
+            return_unit);
     command
       ~group
       ~desc:"Get the `BLAKE2B` script hash of a contract."
