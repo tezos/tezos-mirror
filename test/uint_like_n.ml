@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 let expect_fail_serialise ?max_value i =
-  let encoding = Data_encoding.uint_as_n ?max_value () in
+  let encoding = Data_encoding.uint_like_n ?max_value () in
   match Data_encoding.Binary.to_string_opt encoding i with
   | None -> ()
   | Some _ -> raise (Failure "Unexpected success")
@@ -36,7 +36,7 @@ let expect_fail_serialise () =
   expect_fail_serialise ~max_value:2 (-1)
 
 let expect_fail_deserialise ?max_value s =
-  let encoding = Data_encoding.uint_as_n ?max_value () in
+  let encoding = Data_encoding.uint_like_n ?max_value () in
   match Data_encoding.Binary.of_string_opt encoding s with
   | None -> ()
   | Some _ -> raise (Failure "Unexpected success")
@@ -53,7 +53,7 @@ let expect_fail_deserialise () =
   expect_fail_deserialise ~max_value:240 (s @@ Z.of_int 999)
 
 let expect_success_roundtrip ?max_value i =
-  let encoding = Data_encoding.uint_as_n ?max_value () in
+  let encoding = Data_encoding.uint_like_n ?max_value () in
   match Data_encoding.Binary.to_string_opt encoding i with
   | None -> raise (Failure "Cannot serialise")
   | Some s -> (
@@ -68,7 +68,7 @@ let expect_success_roundtrip () =
     [0; 1; 2; 3; 4; 200000; 374289; 1 lsl 20; (1 lsl 30) - 1]
 
 let expect_success_deserilaisation ?max_value s =
-  let encoding = Data_encoding.uint_as_n ?max_value () in
+  let encoding = Data_encoding.uint_like_n ?max_value () in
   match Data_encoding.Binary.of_string_opt encoding s with
   | None -> raise (Failure "Cannot deserialise")
   | Some _ -> ()

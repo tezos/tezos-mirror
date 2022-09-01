@@ -170,7 +170,7 @@ module Encoding : sig
   (** Positive big number, see [z]. *)
   val n : Z.t encoding
 
-  (** [uint_as_n ()] is an encoding for [int] which uses the same representation
+  (** [uint_like_n ()] is an encoding for [int] which uses the same representation
       as {!n}.
 
       For compatibility with 32-bit machines, this encoding supports the same
@@ -189,9 +189,9 @@ module Encoding : sig
 
       @raise [Invalid_argument] if [max_value <= 0] or
       [max_value > (1 lsl 30) - 1] *)
-  val uint_as_n : ?max_value:int -> unit -> int encoding
+  val uint_like_n : ?max_value:int -> unit -> int encoding
 
-  (** [int_as_z ()] is an encoding for [int] which uses the same representation
+  (** [int_like_z ()] is an encoding for [int] which uses the same representation
       as {!z}.
 
       For compatibility with 32-bit machines, this encoding supports the same
@@ -215,7 +215,7 @@ module Encoding : sig
       @raise [Invalid_argument] if [max_value > (1 lsl 30) - 1]
 
       @raise [Invalid_argument] if [min_value < -(1 lsl 30)] *)
-  val int_as_z : ?min_value:int -> ?max_value:int -> unit -> int encoding
+  val int_like_z : ?min_value:int -> ?max_value:int -> unit -> int encoding
 
   (** Encoding of floating point number
       (encoded as a floating point number in JSON and a double in binary). *)

@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 let expect_fail_serialise ?min_value ?max_value i =
-  let encoding = Data_encoding.int_as_z ?min_value ?max_value () in
+  let encoding = Data_encoding.int_like_z ?min_value ?max_value () in
   match Data_encoding.Binary.to_string_opt encoding i with
   | None -> ()
   | Some s ->
@@ -62,7 +62,7 @@ let expect_fail_serialise () =
   expect_fail_serialise ~min_value:(-100) ~max_value:(-50) (-49)
 
 let expect_fail_deserialise ?min_value ?max_value s =
-  let encoding = Data_encoding.int_as_z ?min_value ?max_value () in
+  let encoding = Data_encoding.int_like_z ?min_value ?max_value () in
   match Data_encoding.Binary.of_string_opt encoding s with
   | None -> ()
   | Some _ -> raise (Failure "Unexpected success")
@@ -89,7 +89,7 @@ let expect_fail_deserialise () =
   expect_fail_deserialise ~min_value:(-1) ~max_value:1 (s @@ Z.neg @@ Z.of_int 2)
 
 let expect_success_roundtrip ?min_value ?max_value i =
-  let encoding = Data_encoding.int_as_z ?min_value ?max_value () in
+  let encoding = Data_encoding.int_like_z ?min_value ?max_value () in
   match Data_encoding.Binary.to_string encoding i with
   | Error err ->
       let msg =
@@ -129,7 +129,7 @@ let expect_success_roundtrip () =
     ]
 
 let expect_success_deserilaisation ?min_value ?max_value s =
-  let encoding = Data_encoding.int_as_z ?min_value ?max_value () in
+  let encoding = Data_encoding.int_like_z ?min_value ?max_value () in
   match Data_encoding.Binary.of_string_opt encoding s with
   | None -> raise (Failure "Cannot deserialise")
   | Some _ -> ()

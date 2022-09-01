@@ -538,7 +538,7 @@ let full_uint30_as_n high : int full =
   make_int
     (UInt30_as_N high)
     (Crowbar.range high)
-    (Data_encoding.uint_as_n ~max_value:high ())
+    (Data_encoding.uint_like_n ~max_value:high ())
 
 let full_int31_as_z low high : int full =
   make_int
@@ -548,7 +548,7 @@ let full_int31_as_z low high : int full =
         (* special casing this avoids overflow on 32bit machines *)
         choose [range high; map [range (-low)] (fun v -> -v)]
       else map [range (high - low)] (fun v -> v + low))
-    (Data_encoding.int_as_z ~min_value:low ~max_value:high ())
+    (Data_encoding.int_like_z ~min_value:low ~max_value:high ())
 
 let full_int32 : int32 full =
   (module struct

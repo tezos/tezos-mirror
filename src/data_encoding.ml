@@ -30,21 +30,21 @@ module Encoding = struct
 
   let splitted ~json ~binary = raw_splitted ~json:(Json.convert json) ~binary
 
-  let uint_as_n ?max_value () =
+  let uint_like_n ?max_value () =
     let json =
       let max_value = (1 lsl 30) - 1 in
       ranged_int 0 max_value
     in
-    let binary = uint_as_n ?max_value () in
+    let binary = uint_like_n ?max_value () in
     splitted ~json ~binary
 
-  let int_as_z ?min_value ?max_value () =
+  let int_like_z ?min_value ?max_value () =
     let json =
       let max_value = (1 lsl 30) - 1 in
       let min_value = -(1 lsl 30) in
       ranged_int min_value max_value
     in
-    let binary = int_as_z ?min_value ?max_value () in
+    let binary = int_like_z ?min_value ?max_value () in
     splitted ~json ~binary
 
   let assoc enc =

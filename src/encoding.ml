@@ -542,13 +542,13 @@ let with_decoding_guard guard encoding =
       | Error s -> raise (Binary_error_types.Invariant_guard s))
     encoding
 
-let uint_as_n ?max_value () =
+let uint_like_n ?max_value () =
   let max_value =
     match max_value with
     | None -> (1 lsl 30) - 1
     | Some max_value ->
         if max_value <= 0 || (1 lsl 30) - 1 < max_value then
-          invalid_arg "Data_encoding.uint_as_n" ;
+          invalid_arg "Data_encoding.uint_like_n" ;
         max_value
   in
   let max_size =
@@ -583,22 +583,23 @@ let uint_as_n ?max_value () =
          Z.to_int z)
        n)
 
-let int_as_z ?min_value ?max_value () =
+let int_like_z ?min_value ?max_value () =
   let max_value =
     match max_value with
     | None -> (1 lsl 30) - 1
     | Some max_value ->
-        if (1 lsl 30) - 1 < max_value then invalid_arg "Data_encoding.int_as_z" ;
+        if (1 lsl 30) - 1 < max_value then
+          invalid_arg "Data_encoding.int_like_z" ;
         max_value
   in
   let min_value =
     match min_value with
     | None -> -(1 lsl 30)
     | Some min_value ->
-        if min_value < -(1 lsl 30) then invalid_arg "Data_encoding.int_as_z" ;
+        if min_value < -(1 lsl 30) then invalid_arg "Data_encoding.int_like_z" ;
         min_value
   in
-  if max_value < min_value then invalid_arg "Data_encoding.int_as_z" ;
+  if max_value < min_value then invalid_arg "Data_encoding.int_like_z" ;
   let max_size =
     if max_value < 1 lsl 6 && min_value > -(1 lsl 6) then 1
     else if max_value < 1 lsl 13 && min_value > -(1 lsl 13) then 2

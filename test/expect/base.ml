@@ -66,40 +66,40 @@ let all_int encoding size =
   binary encoding (string_int 12) (max_int size - 1) ;
   binary encoding (string_int 12) (max_int size)
 
-let test_uint_as_n () =
-  binary (uint_as_n ()) (string_int 12) 0 ;
-  binary (uint_as_n ()) (string_int 12) 1 ;
-  binary (uint_as_n ()) (string_int 12) 2 ;
-  binary (uint_as_n ()) (string_int 12) 6 ;
-  binary (uint_as_n ()) (string_int 12) 7 ;
-  binary (uint_as_n ()) (string_int 12) 8 ;
-  binary (uint_as_n ()) (string_int 12) 127 ;
-  binary (uint_as_n ()) (string_int 12) 128 ;
-  binary (uint_as_n ()) (string_int 12) 341234 ;
-  binary (uint_as_n ()) (string_int 12) 34341234
+let test_uint_like_n () =
+  binary (uint_like_n ()) (string_int 12) 0 ;
+  binary (uint_like_n ()) (string_int 12) 1 ;
+  binary (uint_like_n ()) (string_int 12) 2 ;
+  binary (uint_like_n ()) (string_int 12) 6 ;
+  binary (uint_like_n ()) (string_int 12) 7 ;
+  binary (uint_like_n ()) (string_int 12) 8 ;
+  binary (uint_like_n ()) (string_int 12) 127 ;
+  binary (uint_like_n ()) (string_int 12) 128 ;
+  binary (uint_like_n ()) (string_int 12) 341234 ;
+  binary (uint_like_n ()) (string_int 12) 34341234
 
-let test_int_as_z () =
-  binary (int_as_z ()) (string_int 12) 0 ;
-  binary (int_as_z ()) (string_int 12) 1 ;
-  binary (int_as_z ()) (string_int 12) 2 ;
-  binary (int_as_z ()) (string_int 12) 7 ;
-  binary (int_as_z ()) (string_int 12) 8 ;
-  binary (int_as_z ()) (string_int 12) 63 ;
-  binary (int_as_z ()) (string_int 12) 64 ;
-  binary (int_as_z ()) (string_int 12) 127 ;
-  binary (int_as_z ()) (string_int 12) 128 ;
-  binary (int_as_z ()) (string_int 12) 341234 ;
-  binary (int_as_z ()) (string_int 12) 34341234 ;
-  binary (int_as_z ()) (string_int 12) (-1) ;
-  binary (int_as_z ()) (string_int 12) (-2) ;
-  binary (int_as_z ()) (string_int 12) (-7) ;
-  binary (int_as_z ()) (string_int 12) (-8) ;
-  binary (int_as_z ()) (string_int 12) (-63) ;
-  binary (int_as_z ()) (string_int 12) (-64) ;
-  binary (int_as_z ()) (string_int 12) (-127) ;
-  binary (int_as_z ()) (string_int 12) (-256) ;
-  binary (int_as_z ()) (string_int 12) (-341234) ;
-  binary (int_as_z ()) (string_int 12) (-34341234)
+let test_int_like_z () =
+  binary (int_like_z ()) (string_int 12) 0 ;
+  binary (int_like_z ()) (string_int 12) 1 ;
+  binary (int_like_z ()) (string_int 12) 2 ;
+  binary (int_like_z ()) (string_int 12) 7 ;
+  binary (int_like_z ()) (string_int 12) 8 ;
+  binary (int_like_z ()) (string_int 12) 63 ;
+  binary (int_like_z ()) (string_int 12) 64 ;
+  binary (int_like_z ()) (string_int 12) 127 ;
+  binary (int_like_z ()) (string_int 12) 128 ;
+  binary (int_like_z ()) (string_int 12) 341234 ;
+  binary (int_like_z ()) (string_int 12) 34341234 ;
+  binary (int_like_z ()) (string_int 12) (-1) ;
+  binary (int_like_z ()) (string_int 12) (-2) ;
+  binary (int_like_z ()) (string_int 12) (-7) ;
+  binary (int_like_z ()) (string_int 12) (-8) ;
+  binary (int_like_z ()) (string_int 12) (-63) ;
+  binary (int_like_z ()) (string_int 12) (-64) ;
+  binary (int_like_z ()) (string_int 12) (-127) ;
+  binary (int_like_z ()) (string_int 12) (-256) ;
+  binary (int_like_z ()) (string_int 12) (-341234) ;
+  binary (int_like_z ()) (string_int 12) (-34341234)
 
 let test_n () =
   binary n (string_z 12) (Z.of_int 0) ;
@@ -174,7 +174,7 @@ let%expect_test _ =
       536870911 => 1FFFFFFF
      1073741822 => 3FFFFFFE
      1073741823 => 3FFFFFFF |}] ;
-  test_uint_as_n () ;
+  test_uint_like_n () ;
   [%expect
     {|
            0 => 00
@@ -187,7 +187,7 @@ let%expect_test _ =
          128 => 8001
       341234 => F2E914
     34341234 => F282B010 |}] ;
-  test_int_as_z () ;
+  test_int_like_z () ;
   [%expect
     {|
             0 => 00
