@@ -183,7 +183,7 @@ let check_unknown_output_files output_dir relative_output_files =
     in
     Array.iter handle_file (try_to_read_dir ()) ;
     (* Check whether directory is empty now that we may have deleted files. *)
-    match try_to_read_dir () with
+    match Sys.readdir path with
     | exception Sys_error _ -> ()
     | [||] ->
         if mode = Delete then
