@@ -17,7 +17,6 @@
 (rule
  (targets runtime-generated.js)
  (deps gen/api.json gen/gen.exe random.js evercrypt.js)
- (mode promote)
  (action
   (with-stdout-to
    %{targets}
