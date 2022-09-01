@@ -57,6 +57,8 @@ let compare : _ t -> _ t -> _ t = Compare.Int.compare
 
 let saturated = max_int
 
+let ( >! ) : _ t -> int -> bool = Compare.Int.( > )
+
 let of_int_opt t = if t >= 0 && t < saturated then Some t else None
 
 let of_z_opt z =
