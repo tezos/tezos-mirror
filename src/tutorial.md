@@ -860,6 +860,35 @@ In binary it is represented like `n`, except that a bit is reserved for sign.
 
 In JSON it is represented as a string in decimal notation.
 
+`int_like_z : ?min_value:int -> ?max_value:int -> unit -> int encoding`
+(dynamic) is a combinator for ranged integers represented in the same way as
+`z`.
+
+The `min_value` and `max_value` bounds are inclusive. The combinator raises
+an exception if `min_value >= max_value`. It also raises an exception if the
+range extends beyond the range of integers which can be represented by `int31`.
+If not given, `min_value` and `max_value` default to the `int31` range.
+
+Unlike a simple `conv Z.of_int Z.to_int z`, the combinator `int_like_z` provides
+additional safety checks. Specifically, `int_like_z` will compute the maximum
+size of the binary representation and inserts a `check_size` node explicitly.
+
+In JSON, the values are represented as a float.
+
+`uint_like_n : ?max_value:int -> unit -> int encoding` (dynamic) is a combinator
+for ranged positive integers represented in the same way as `n`.
+
+The `max_value` bound is inclusive. The combinator raises an exception if
+`max_value <= 0` or if `max_value` is greater than the upper limit of `int31`.
+If not givem, `max_value` defaults to the `int31` upper bound.
+
+Unlike a simple `conv Z.of_int Z.to_int n`, the combinator `uint_like_n`
+provides additional safety checks. Specifically, `uint_like_n` will compute the
+maximum size of the binary representation and inserts a `check_size` node
+explicitly.
+
+In JSON, the values are represented as a float.
+
 `float : float encoding` (fixed:8) is a ground encoding for the `float` type. In
 binary it is has a fixed size of 8 bytes which carries an IEEE 754
 double-precision floating-point numeral. In JSON it is represented as a JSON
@@ -1613,8 +1642,8 @@ dynamic_size ~kind:`Uint16 (Variable.list …)
 
 You can also be weary of integer sizes. Prefer smaller integer sizes where
 possible. And even if an integer-like type is not guaranteed to always fit
-within a smaller integer representation, you can use `n` and `z` which occupy
-less bytes on small values but more space on bigger values.
+within a smaller integer representation, you can use `uint_as_n` and `int_as_z`
+which occupy less bytes on small values but more space on bigger values.
 
 If you need to find exact cut-off points for various integer ranges for various
 encodings, you can check the code in `misc/eval_numsizes.ml`.
