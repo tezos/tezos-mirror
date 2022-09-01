@@ -19,7 +19,7 @@ depends: [
   "tezos-event-logging"
   "ptime" { >= "1.0.0" }
   "ezjsonm" { >= "1.1.0" }
-  "lwt" { >= "5.4.0" }
+  "lwt" { >= "5.6.0" }
   "ipaddr" { >= "5.0.0" & < "6.0.0" }
   "uri" { >= "2.2.0" }
   "tezos-hacl"

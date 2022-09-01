@@ -178,7 +178,7 @@ let write_value file encoding value =
   trace (Cannot_write_file file)
   @@ protect
   @@ fun () ->
-  Lwt_result.map_err (fun e -> [Io_error e])
+  Lwt_result.map_error (fun e -> [Io_error e])
   @@ Lwt_utils_unix.with_open_out ~overwrite:true file
   @@ fun fd ->
   let block_bytes = Data_encoding.Binary.to_bytes_exn encoding value in

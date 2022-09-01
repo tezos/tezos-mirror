@@ -11,8 +11,8 @@ depends: [
   "dune" { >= "3.0" }
   "data-encoding" { >= "0.6" & < "0.7" }
   "tezos-error-monad"
-  "resto" { >= "0.8" & < "0.9" }
-  "resto-directory" { >= "0.8" & < "0.9" }
+  "resto" { >= "0.10" & < "1.0" }
+  "resto-directory" { >= "0.10" & < "1.0" }
   "uri" { >= "2.2.0" }
 ]
 build: [

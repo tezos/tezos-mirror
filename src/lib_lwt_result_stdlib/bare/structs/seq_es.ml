@@ -113,7 +113,7 @@ let rec fold_left_e f acc seq =
 let fold_left_e f acc seq = fold_left_e f acc @@ protect seq
 
 let rec fold_left_e_discriminated f acc seq =
-  let* n = Lwt_result.map_err Either.left @@ seq () in
+  let* n = Lwt_result.map_error Either.left @@ seq () in
   match n with
   | Nil -> return acc
   | Cons (item, seq) ->
@@ -144,11 +144,11 @@ let rec fold_left_es f acc seq =
 let fold_left_es f acc seq = fold_left_es f acc @@ protect seq
 
 let rec fold_left_es_discriminated f acc seq =
-  let* n = Lwt_result.map_err Either.left @@ seq () in
+  let* n = Lwt_result.map_error Either.left @@ seq () in
   match n with
   | Nil -> return acc
   | Cons (item, seq) ->
-      let* acc = Lwt_result.map_err Either.right @@ f acc item in
+      let* acc = Lwt_result.map_error Either.right @@ f acc item in
       fold_left_es_discriminated f acc seq
 
 let fold_left_es_discriminated f acc seq =
@@ -175,7 +175,7 @@ let rec iter_e f seq =
 let iter_e f seq = iter_e f @@ protect seq
 
 let rec iter_e_discriminated f seq =
-  let* n = Lwt_result.map_err Either.left @@ seq () in
+  let* n = Lwt_result.map_error Either.left @@ seq () in
   match n with
   | Nil -> return_unit
   | Cons (item, seq) ->
@@ -205,11 +205,11 @@ let rec iter_es f seq =
 let iter_es f seq = iter_es f @@ protect seq
 
 let rec iter_es_discriminated f seq =
-  let* n = Lwt_result.map_err Either.left @@ seq () in
+  let* n = Lwt_result.map_error Either.left @@ seq () in
   match n with
   | Nil -> Lwt_result_syntax.return_unit
   | Cons (item, seq) ->
-      let* () = Lwt_result.map_err Either.right @@ f item in
+      let* () = Lwt_result.map_error Either.right @@ f item in
       iter_es_discriminated f seq
 
 let iter_es_discriminated f seq = iter_es_discriminated f @@ protect seq

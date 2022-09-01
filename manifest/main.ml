@@ -194,7 +194,7 @@ let logs = external_lib "logs" V.True
 
 let logs_fmt = external_sublib logs "logs.fmt"
 
-let lwt = external_lib ~js_compatible:true "lwt" V.(at_least "5.4.0")
+let lwt = external_lib ~js_compatible:true "lwt" V.(at_least "5.6.0")
 
 let lwt_canceler =
   external_lib
@@ -275,7 +275,7 @@ let qcheck_core = external_lib "qcheck-core" V.True
 
 let re = external_lib ~js_compatible:true "re" V.(at_least "1.7.2")
 
-let resto_version = V.(at_least "0.8" && less_than "0.9")
+let resto_version = V.(at_least "0.10" && less_than "1.0")
 
 let resto = external_lib ~js_compatible:true "resto" resto_version
 
