@@ -434,6 +434,7 @@ let run ~data_dir (cctxt : Protocol_client_context.full) =
   Random.self_init () (* Initialize random state (for reconnection delays) *) ;
   let*! () = Event.starting_node () in
   let* configuration = Configuration.load ~data_dir in
+  let dal_cctxt = Dal_node_client.make_unix_cctxt configuration in
   let open Configuration in
   let* () =
     (* Check that the operators are valid keys. *)
@@ -449,6 +450,7 @@ let run ~data_dir (cctxt : Protocol_client_context.full) =
   let* node_ctxt =
     Node_context.init
       cctxt
+      dal_cctxt
       l1_ctxt
       configuration.sc_rollup_address
       kind

@@ -4497,6 +4497,7 @@ module Protocol = Protocol
             octez_rpc |> open_;
             octez_rpc_http;
             octez_rpc_http_server;
+            octez_dal_node_services;
             octez_shell_services |> open_;
             sc_rollup |> if_some |> open_;
             data_encoding;

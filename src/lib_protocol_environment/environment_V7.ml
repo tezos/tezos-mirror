@@ -100,6 +100,7 @@ module type T = sig
         Plonk.Main_protocol.verifier_public_parameters
         * Plonk.Main_protocol.transcript
        and type Dal.parameters = Tezos_crypto_dal.Cryptobox.Verifier.parameters
+       and type Dal.commitment = Tezos_crypto_dal.Cryptobox.commitment
 
   type error += Ecoproto_error of Error_monad.error
 

@@ -47,7 +47,7 @@
    portion of the initial slot. *)
 
 module Header : sig
-  type t
+  type t = Dal.commitment
 
   val encoding : t Data_encoding.t
 end

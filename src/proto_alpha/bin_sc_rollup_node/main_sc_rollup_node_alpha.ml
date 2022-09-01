@@ -111,6 +111,19 @@ let rpc_addr_arg =
     ~default
     Client_proto_args.string_parameter
 
+let dal_node_addr_arg =
+  let default = Configuration.default_dal_node_addr in
+  Clic.default_arg
+    ~long:"dal-node-addr"
+    ~placeholder:"dal-node-address|ip"
+    ~doc:
+      (Format.sprintf
+         "The address of the dal node from which the smart-contract rollup \
+          node downloads slots. Default value is %s"
+         default)
+    ~default
+    Client_proto_args.string_parameter
+
 let rpc_port_arg =
   let default = Configuration.default_rpc_port |> string_of_int in
   Clic.default_arg
@@ -120,6 +133,19 @@ let rpc_port_arg =
       (Format.sprintf
          "The port the smart-contract rollup node listens to. Default value is \
           %s"
+         default)
+    ~default
+    Client_proto_args.int_parameter
+
+let dal_node_port_arg =
+  let default = Configuration.default_dal_node_port |> string_of_int in
+  Clic.default_arg
+    ~long:"dal-node-port"
+    ~placeholder:"dal-node-port"
+    ~doc:
+      (Format.sprintf
+         "The port of the dal node from which the smart-contract rollup node \
+          downloads slots from. Default value is %s"
          default)
     ~default
     Client_proto_args.int_parameter
@@ -262,7 +288,7 @@ let config_init_command =
   command
     ~group
     ~desc:"Configure the smart-contract rollup node."
-    (args11
+    (args13
        data_dir_arg
        rpc_addr_arg
        rpc_port_arg
@@ -273,7 +299,9 @@ let config_init_command =
        fee_cap_arg
        burn_cap_arg
        loser_mode
-       reconnection_delay_arg)
+       reconnection_delay_arg
+       dal_node_addr_arg
+       dal_node_port_arg)
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
     @@ sc_rollup_address_param
@@ -289,7 +317,9 @@ let config_init_command =
            fee_cap,
            burn_cap,
            loser_mode,
-           reconnection_delay )
+           reconnection_delay,
+           dal_node_addr,
+           dal_node_port )
          mode
          sc_rollup_address
          sc_rollup_node_operators
@@ -321,6 +351,8 @@ let config_init_command =
           rpc_addr;
           rpc_port;
           reconnection_delay;
+          dal_node_addr;
+          dal_node_port;
           fee_parameter =
             {
               minimal_fees;

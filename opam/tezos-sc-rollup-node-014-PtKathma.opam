@@ -21,6 +21,7 @@ depends: [
   "tezos-rpc"
   "tezos-rpc-http"
   "tezos-rpc-http-server"
+  "tezos-dal-node-services"
   "tezos-shell-services"
   "tezos-sc-rollup-014-PtKathma"
   "data-encoding" { >= "0.6" & < "0.7" }
