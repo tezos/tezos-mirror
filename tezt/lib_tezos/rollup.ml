@@ -557,6 +557,10 @@ module Dal = struct
         ["slot"; "content"; slot_header]
         ~query_string:[("trim", "")]
         JSON.as_string
+
+    let slot_segments slot_header =
+      make GET ["slot"; "segments"; slot_header] (fun segments ->
+          segments |> JSON.as_list |> List.map JSON.as_string)
   end
 
   module Cryptobox = Tezos_crypto_dal.Cryptobox

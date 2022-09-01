@@ -234,6 +234,9 @@ module Dal : sig
 
     (** [slot_content slot_header] gets slot/content of [slot_header] *)
     val slot_content : string -> (Dal_node.t, string) RPC_core.t
+
+    (** [slot_segments slot_header] gets slot/segments of [slot_header] *)
+    val slot_segments : string -> (Dal_node.t, string list) RPC_core.t
   end
 
   module Cryptobox = Tezos_crypto_dal.Cryptobox
