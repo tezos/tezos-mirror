@@ -129,10 +129,32 @@ module No_filter (Proto : Registered_protocol.T) = struct
   end
 end
 
+module type METRICS = sig
+  val hash : Protocol_hash.t
+
+  val update_metrics :
+    protocol_metadata:bytes ->
+    Fitness.t ->
+    (cycle:float -> consumed_gas:float -> round:float -> unit) ->
+    unit Lwt.t
+end
+
+module Undefined_metrics_plugin (Proto : sig
+  val hash : Protocol_hash.t
+end) =
+struct
+  let hash = Proto.hash
+
+  let update_metrics ~protocol_metadata:_ _ _ = Lwt.return_unit
+end
+
 let filter_table : (module FILTER) Protocol_hash.Table.t =
   Protocol_hash.Table.create 5
 
 let rpc_table : (module RPC) Protocol_hash.Table.t =
+  Protocol_hash.Table.create 5
+
+let metrics_table : (module METRICS) Protocol_hash.Table.t =
   Protocol_hash.Table.create 5
 
 let register_filter (module Filter : FILTER) =
@@ -143,6 +165,20 @@ let register_rpc (module Rpc : RPC) =
   assert (not (Protocol_hash.Table.mem rpc_table Rpc.Proto.hash)) ;
   Protocol_hash.Table.add rpc_table Rpc.Proto.hash (module Rpc)
 
+let register_metrics (module Metrics : METRICS) =
+  Protocol_hash.Table.replace metrics_table Metrics.hash (module Metrics)
+
 let find_filter = Protocol_hash.Table.find filter_table
 
 let find_rpc = Protocol_hash.Table.find rpc_table
+
+let find_metrics = Protocol_hash.Table.find metrics_table
+
+let safe_find_metrics hash =
+  match find_metrics hash with
+  | Some proto_metrics -> Lwt.return proto_metrics
+  | None ->
+      let module Metrics = Undefined_metrics_plugin (struct
+        let hash = hash
+      end) in
+      Lwt.return (module Metrics : METRICS)

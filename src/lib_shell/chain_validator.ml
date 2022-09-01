@@ -579,20 +579,19 @@ let collect_proto ~metrics (chain_store, block) =
   match metadata_opt with
   | None -> Lwt.return_unit
   | Some metadata ->
-      let open Shell_metrics.Proto_plugin in
       let protocol_metadata = Block_repr.block_metadata metadata in
       Lwt.catch
         (fun () ->
           (* Return Noop if the protocol does not exist, and
              UndefinedMetric if the plugin for the protocol
              does not exist *)
-          let* (module ProtoMetrics) =
+          let* (module Metrics_plugin) =
             let* protocol = Store.Block.protocol_hash_exn chain_store block in
-            safe_get_prevalidator_proto_metrics protocol
+            Shell_plugin.safe_find_metrics protocol
           in
           let fitness = Store.Block.fitness block in
           let* () =
-            ProtoMetrics.update_metrics
+            Metrics_plugin.update_metrics
               ~protocol_metadata
               fitness
               (Shell_metrics.Chain_validator.update_proto_metrics_callback

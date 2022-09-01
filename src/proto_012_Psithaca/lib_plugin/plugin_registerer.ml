@@ -43,4 +43,4 @@ let () = Shell_plugin.register_filter (module Filter)
 
 let () = Shell_plugin.register_rpc (module RPC)
 
-let () = Shell_metrics.Proto_plugin.register_plugin (module Metrics)
+let () = Shell_plugin.register_metrics (module Metrics)

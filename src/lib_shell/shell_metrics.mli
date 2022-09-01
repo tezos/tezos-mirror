@@ -83,37 +83,6 @@ module Block_validator : sig
   val set_operation_per_pass_collector : (unit -> float list) -> unit
 end
 
-module Proto_plugin : sig
-  (* This is a protocol specific module that is used to collect all the
-   * protocol-specific metrics. It works using the protocol plugin system
-   * and it's very similar to the mempool filter plugin. This module
-   * allows to decode protocol data payload and provide back basic
-   * types that can be used as metrics. *)
-  module type PROTOMETRICS = sig
-    val hash : Protocol_hash.t
-
-    val update_metrics :
-      protocol_metadata:bytes ->
-      Fitness.t ->
-      (cycle:float -> consumed_gas:float -> round:float -> unit) ->
-      unit Lwt.t
-  end
-
-  (** Emtpy metrics module. All metrics are -1. *)
-  module UndefinedProtoMetrics (P : sig
-    val hash : Protocol_hash.t
-  end) : PROTOMETRICS
-
-  (** Register a metrics plugin module *)
-  val register_plugin : (module PROTOMETRICS) -> unit
-
-  (** Find a metrics plugin module associated to a protocol *)
-  val find_plugin : Protocol_hash.t -> (module PROTOMETRICS) option
-
-  val safe_get_prevalidator_proto_metrics :
-    Protocol_hash.t -> (module PROTOMETRICS) Lwt.t
-end
-
 module Chain_validator : sig
   type t = {
     head_level : Prometheus.Gauge.t;

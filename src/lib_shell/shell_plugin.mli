@@ -149,14 +149,42 @@ end
 module No_filter (Proto : Registered_protocol.T) :
   FILTER with module Proto = Proto
 
+(** This is a protocol specific module that is used to collect all the
+   * protocol-specific metrics. This module
+   * allows to decode protocol data payload and provide back basic
+   * types that can be used as metrics. *)
+module type METRICS = sig
+  val hash : Protocol_hash.t
+
+  val update_metrics :
+    protocol_metadata:bytes ->
+    Fitness.t ->
+    (cycle:float -> consumed_gas:float -> round:float -> unit) ->
+    unit Lwt.t
+end
+
+(** Emtpy metrics module. All metrics are -1. *)
+module Undefined_metrics_plugin (P : sig
+  val hash : Protocol_hash.t
+end) : METRICS
+
 (** Registers a mempool filters plug-in for a specific protocol (according to its [Proto.hash]). *)
 val register_filter : (module FILTER) -> unit
 
 (** Registers a RPC plug-in for a specific protocol *)
 val register_rpc : (module RPC) -> unit
 
+(** Register a metrics plugin module *)
+val register_metrics : (module METRICS) -> unit
+
 (** Looks for a mempool filter plug-in for a specific protocol. *)
 val find_filter : Protocol_hash.t -> (module FILTER) option
 
 (** Looks for an rpc plug-in for a specific protocol. *)
 val find_rpc : Protocol_hash.t -> (module RPC) option
+
+(** Looks for a metrics plugin module for a specific protocol *)
+val find_metrics : Protocol_hash.t -> (module METRICS) option
+
+(** Same as [find_metrics] but returns [Undefined_metrics_plugin] if not found *)
+val safe_find_metrics : Protocol_hash.t -> (module METRICS) Lwt.t
