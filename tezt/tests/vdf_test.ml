@@ -165,7 +165,7 @@ let check_n_cycles n constants starting_level client node injected =
   loop n starting_level
 
 (* In total, [test_vdf] bakes `2 * (n_cycles + 1)` cycles *)
-let n_cycles = 5
+let n_cycles = 3
 
 let test_vdf : Protocol.t list -> unit =
   (* [check_n_cycles] requires that the starting_level is the beginning of
@@ -237,10 +237,21 @@ let test_vdf : Protocol.t list -> unit =
     bake_until level ((blocks_per_cycle * (n_cycles + 2)) + 1) client node true
   in
 
-  (* Restart a VDF daemon and check correct behaviour after a RANDAO cycle *)
+  (* Bake through most of a new cycle and restart the VDF daemon right before
+   * the end of the cycle so that the VDF is computed too late for injection. *)
+  let* level =
+    bake_until level ((blocks_per_cycle * (n_cycles + 3)) - 1) client node true
+  in
   let* vdf_baker = Vdf.init ~protocol node in
   init_vdf_event_listener vdf_baker injected ;
 
+  (* Bake to the end of the cycle and check that the VDF was not injected. *)
+  let* level =
+    bake_until level ((blocks_per_cycle * (n_cycles + 3)) + 1) client node true
+  in
+
+  (* Check correct behaviour for another `n_cycles` after the RANDAO cycle and
+   * the failed injection cycle. *)
   let* _level =
     check_n_cycles
       n_cycles
