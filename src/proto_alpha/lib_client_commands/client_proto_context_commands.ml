@@ -106,6 +106,8 @@ let tez_of_string_exn index field s =
 let tez_of_opt_string_exn index field s =
   Option.map_es (tez_of_string_exn index field) s
 
+let check_smart_contract = Managed_contract.check_smart_contract
+
 let commands_ro () =
   let open Clic in
   [
@@ -238,9 +240,7 @@ let commands_ro () =
             ~unparsing_mode
             contract
         in
-        match v with
-        | None -> cctxt#error "This is not a smart contract."
-        | Some storage ->
+        check_smart_contract cctxt v @@ fun storage ->
             let*! () =
               cctxt#answer
                 "%a"
@@ -333,9 +333,7 @@ let commands_ro () =
             ~normalize_types
             contract
         in
-        match v with
-        | None -> cctxt#error "This is not a smart contract."
-        | Some {code; storage = _} -> (
+        check_smart_contract cctxt v @@ fun {code; storage = _} ->
             match Script_repr.force_decode code with
             | Error errs ->
                 cctxt#error "%a" Environment.Error_monad.pp_trace errs
@@ -344,7 +342,7 @@ let commands_ro () =
                   Michelson_v1_printer.unparse_toplevel code
                 in
                 let*! () = cctxt#answer "%s" source in
-                return_unit));
+                return_unit);
     command
       ~group
       ~desc:"Get the `BLAKE2B` script hash of a contract."
@@ -361,8 +359,8 @@ let commands_ro () =
         in
         match r with
         | Error errs -> cctxt#error "%a" pp_print_trace errs
-        | Ok None -> cctxt#error "This is not a smart contract."
-        | Ok (Some hash) ->
+        | Ok hash ->
+            check_smart_contract cctxt hash @@ fun hash ->
             let* () = cctxt#answer "%a" Script_expr_hash.pp hash in
             return_ok_unit);
     command
