@@ -33,6 +33,9 @@ let return_single_manager_result (oph, _, op, result) =
       return (oph, op, result)
   | _ -> assert false
 
+let check_smart_contract (cctxt : #full) opt_res some =
+  Option.fold ~none:(cctxt#error "This is not a smart contract.") ~some opt_res
+
 let get_contract_manager (cctxt : #full) contract =
   let open Micheline in
   let open Michelson_v1_primitives in
@@ -42,9 +45,8 @@ let get_contract_manager (cctxt : #full) contract =
     ~block:cctxt#block
     ~unparsing_mode:Optimized
     contract
-  >>=? function
-  | None -> cctxt#error "This is not a smart contract."
-  | Some storage -> (
+  >>=? fun storage ->
+  check_smart_contract cctxt storage @@ fun storage -> (
       match root storage with
       | Prim (_, D_Pair, Bytes (_, bytes) :: _, _) | Bytes (_, bytes) -> (
           match
