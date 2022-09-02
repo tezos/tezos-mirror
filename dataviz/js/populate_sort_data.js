@@ -10,20 +10,18 @@ function onlyUnique(value, index, self) {
     return self.indexOf(value) === index;
 }
 
-function populate_v1(beg, end, dict_data) { //dès lors qu'on aura accès au nouveau serveur 
+function populate_v1(server_adress, beg, end) { //dès lors qu'on aura accès au nouveau serveur 
+    let dict_data = {};
     var range_bloc = range(beg, end);
-    for (height of range_bloc) {
-        try {
-            axios
-                .get(server_adress + "/" + height + ".json")
-                .then(json_data => { //traitement du round 0
-                    dict_data[height] = json_data;
-                })
-        } catch {
-            console.log("bloc: " + a + " est introuvable");
-        }
-    }
+    return Promise.all(
+        range_bloc.map((height) => {
+            return axios
+                .get(server_adress + height + ".json")
+                .then(json_data => { 
+                    dict_data[height] = json_data.data;
+                }, error => { console.log(error) })
 
+        })).then(_ => { return dict_data })
 }
 
 const populate_v0 = async function (server, beg, end, directories, dict_data) {
@@ -47,96 +45,44 @@ const populate_v0 = async function (server, beg, end, directories, dict_data) {
 }
 
 
-const tri_greeks = async function (dict_data) {
-    t_op_retard = {}; // contient plusieurs dict, chacun associé à un round/type(preendo ou endo)
-    t_op_valide = {}; // t_op_erreur[k]= t_op_erreur_i
-    t_op_pre_retard = {}; // contient plusieurs dict, chacun associé à un round/type(preendo ou endo)
-    t_op_pre_valide = {}; // contient plusieurs dict, chacun associé à un round. Ces dict contiennent 2 listes, qui sont les délais de réception pour les Préendorsement et les endorsmenet invalides 
-
-    try {
-        Object.entries(dict_data).forEach(([k, v]) => {
-            var va = k;
-            var t_op_valide_i = {}; // t_op_erreur[k]= t_op_erreur_i
-            var t_op_pre_valide_i = {}; // t_op_erreur[k]= t_op_erreur_i
-            var t_baker = {};
-            var t_recep = {};// date de réception du bloc 
-            var max_round = 0; // round final du bloc
-            try {
-                dict_data[va]["blocks"].forEach((element) => {
-                    var round = 0;
-                    if (typeof element["round"] !== "undefined") round = element["round"]
-                    else round = 0;
-                    t_baker[round] = new Date(element["timestamp"]);
-                    t_recep[round] = new Date(element["reception_time"]);
-                    t_op_valide_i[round] = []; // t_op_valide[i][t_approbations]
-                    t_op_pre_valide_i[round] = [];//t_op_valide[i][t_pre_approbations]
-                })
-            } catch (e) { console.log(e) }
-
-            if ((dict_data[va]["blocks"]).length == 0 || !("round" in dict_data[va]["blocks"][0])) {
-                max_round = 0;
-            }
-            else {
-                max_round = + dict_data[va]["blocks"][0]["round"];
-                if (isNaN(max_round)) max_round = 0;
-                console.log("Le nombre final de round du bloc est: " + max_round);
-            }
-            Object.entries(dict_data[va]["endorsements"]).forEach(([_k, v]) => {
-                try {
-                    if (!("operations" in v && (v["operations"]).length > 0))
-                        ano_desc["0"]["approbations"]["manque"].push(v["delegate"])
-                    else
-                        for (let i = 0; i < (v["operations"]).length; i++) {
-                            round_cib = v["operations"][i]["round"];
-                            if ("errors" in v["operations"][i]) { // L'OP n'est pas valide ?
-                                if (("kind" in v["operations"][i])) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
-                                    if ("reception_time" in v["operations"][i] && v["operations"][i]["reception_time"] != null) {
-                                        if (("expected_max" in v["operations"][i]["errors"][0] ||
-                                            "expected" in v["operations"][i]["errors"][0] && "provided" in v["operations"][i]["errors"][0]) &&
-                                            v["operations"][i]["errors"][0]["kind"] == "temporary") {
-                                            t_op_pre_valide_i[round_cib].push(0);
-                                        }
-                                    }
-                                }
-                                else {//endo
-                                    if (("reception_time" in v["operations"][i])) {
-                                        if (v["operations"][i]["reception_time"] != null) {
-                                            if (("included_in_blocks" in v["operations"][i])) {
-                                                t_op_valide_i[round_cib].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            else { //L'OP est valide ?
-                                if (("kind" in v["operations"][i])) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
-                                    if (("reception_time" in v["operations"][i])) {
-                                        if (v["operations"][i]["reception_time"] != null) {
-                                            t_op_pre_valide_i[round_cib].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
-                                        }
-                                    }
-                                }
-                                else {//endo
-
-                                    if (("reception_time" in v["operations"][i])) {
-                                        if (v["operations"][i]["reception_time"] != null) {
-                                            if (("included_in_blocks" in v["operations"][i])) {
-                                                t_op_valide[round_cib]["t_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                }
-                catch (error) {
-                }
+function delays_distribution_of_operations(dict_data) { //ex : tri_greeks
+    let t_op_valide = {}; // t_op_erreur[k]= t_op_erreur_i
+    let t_op_pre_valide = {}; // contient plusieurs dict, chacun associé à un round. Ces dict contiennent 2 listes, qui sont les délais de réception pour les Préendorsement et les endorsmenet invalides 
+    console.log(dict_data[179100])
+    Object.entries(dict_data).forEach(([va, v]) => {
+        console.log(v);
+        let t_op_valide_i = {}; // t_op_erreur[k]= t_op_erreur_i
+        let t_op_pre_valide_i = {}; // t_op_erreur[k]= t_op_erreur_i
+        let t_baker = {};
+        if ("blocks" in v) {
+            v["blocks"].forEach((element) => {
+                let round = 0;
+                if ("round" in element) round = element["round"];
+                if ("timestamp" in element) t_baker[round] = new Date(element["timestamp"]);
+                t_op_valide_i[round] = []; // t_op_valide[i][t_approbations]
+                t_op_pre_valide_i[round] = [];//t_op_valide[i][t_pre_approbations]
             })
-            t_op_pre_valide[va] = t_op_pre_valide_i;
+        }
+        Object.entries(v["endorsements"]).forEach(([_k, baker_ops]) => {
+            if ("operations" in baker_ops)
+                baker_ops["operations"].forEach((operation) => {
+                    let round_cib = 0;
+                    if ("round" in operation) round_cib = operation["round"];
+                    if ((round_cib in t_baker) && ("reception_time" in operation) && (operation["reception_time"] != null)) {
+                        let delay = new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds();
+                        if (("kind" in operation)) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
+                            t_op_pre_valide_i[round_cib].push(delay);
+                        }
+                        else {
+                            t_op_valide_i[round_cib].push(delay);
+                        }
+                    }
+                })
         })
-        console.log(t_op_pre_valide)
-    } catch (e) { console.log(e) }
-
+        t_op_pre_valide[va] = t_op_pre_valide_i;
+        t_op_valide[va] = t_op_valide_i;
+    })
+    return [t_op_pre_valide, t_op_valide]
 }
 
 const tri_consensus_operation_specific_address = async function (adress, dict_data) {
@@ -566,9 +512,9 @@ const percIntegration = async function (threshold, t_op_pre_valide) {
     return d3_pI_level
 }
 
-const TimeForPercIntegration = async function (threshold, t_op_pre_valide) {
+const TimeForPercIntegration = function (threshold, t_op_pre_valide) {
     let l_ = threshold / 100;
-    const qd_ = 250; // nombre de slots pour ce block; endorsing power ? 
+    const qd_ = 25; // nombre de slots pour ce block; endorsing power ? 
     var t_min_ = {}; // dict pour relier le temps min pour qu'un bloc soit valide à son #bloc
     var d3_t_min_ = [];
     Object.entries(t_op_pre_valide).forEach(([bloc, v_bloc]) => {
@@ -597,7 +543,6 @@ const TimeForPercIntegration = async function (threshold, t_op_pre_valide) {
     });
     return d3_t_min_
 
-
 }
 
 const SeriesPercIntegration = async function (t_cibles, t_op_pre_valide) {
@@ -616,8 +561,8 @@ const SeriesPercIntegration = async function (t_cibles, t_op_pre_valide) {
                     }
                 }
 
-                if (isNaN(card_valide_tcible / v_level.length ) == false) {
-                    pI_level[bloc][level] = (card_valide_tcible / (v_level.length ))
+                if (isNaN(card_valide_tcible / v_level.length) == false) {
+                    pI_level[bloc][level] = (card_valide_tcible / (v_level.length))
                 }
             })
 

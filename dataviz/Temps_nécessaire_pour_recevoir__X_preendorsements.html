@@ -37,53 +37,36 @@
     </form>
     <script>
 
-        const server_adress = "http://78.193.200.52";
-        var directories = {};
-        var dict_data = {};
-        var directories = {};
-        var t_op_pre_valide = {}; // contient plusieurs dict, chacun associé à un round. Ces dict contiennent 2 listes, qui sont les délais de réception pour les Préendorsement et les endorsmenet invalides 
-        var t_baker; // date de préparation supposé dans le fichier qui correspond au nom et date de publication dans le fichier suivant(c'est à ce moment qu'il est visible pour les délégués)
-        var t_recep; // date de réception du bloc 
+        const server_adress = "http://kathmandunet.kaml.fr:8880/";
+        //var dict_data = {};
+        //var t_op_pre_valide = {}; // contient plusieurs dict, chacun associé à un round. Ces dict contiennent 2 listes, qui sont les délais de réception pour les Préendorsement et les endorsmenet invalides 
+        //var t_baker; // date de préparation supposé dans le fichier qui correspond au nom et date de publication dans le fichier suivant(c'est à ce moment qu'il est visible pour les délégués)
+        //var t_recep; // date de réception du bloc 
         const delay =
             milliseconds =>
                 new Promise(resolve =>
                     setTimeout(resolve, milliseconds));
 
-        async function main() {
+        function main() {
             try {
+                $('#submit_').mouseup(function (e) {
+                    beg_ = document.getElementById('selectedLevel_begin').value;
+                    end_ = document.getElementById('selectedLevel_end').value;
+                    threshold_ = document.getElementById('selectedThreshold').value;
+                    let dict_data= populate_v1(server_adress, beg_, end_).then(dict_data =>{
 
-                $.get(server_adress, null, function (text) {
-                    //directories=$(text).find("a").text(); //fonctionne !!! 
-                    $(text).find("a").each(function () {
-                        let s = $(this).text();
-                        //console.log(typeof(s));
-                        if (s.includes('-') == true) {
-                            //console.log(s);
-                            var minmax = s.split('-');
-                            if (+minmax[0] > 0 && +minmax[1] > 0) { // filtrer les autres fichiers 
-                                directories[s] = [+minmax[0], +minmax[1]]
-                            }
-
-
-                        }
-                    })
-                    $('#submit_').mouseup(async function (e) {
-                        beg_ = document.getElementById('selectedLevel_begin').value;
-                        end_ = document.getElementById('selectedLevel_end').value;
-                        threshold_ = document.getElementById('selectedThreshold').value;
-                        await populate_v0(server_adress, beg_, end_, directories, dict_data);
-                        await delay((end_ - beg_) * 100)
-                        console.log(dict_data)
-                        await tri_greeks(dict_data);
-                        await delay(3000)
-                        const results = await TimeForPercIntegration(threshold_, t_op_pre_valide)
-                        await delay(1000)
-                        console.log(results)
-                        chart_beta(results)
-
-                    });
-
+                    console.log(dict_data)
+                    let t_op_valide_array = delays_distribution_of_operations(dict_data);
+                    console.log(t_op_valide_array)
+                
+                    let results = TimeForPercIntegration(threshold_, t_op_valide_array[0])
+                    console.log(results)
+                    chart_beta(results)
                 })
+
+                });
+
+
             } catch (e) {
                 console.log(e)
             }
