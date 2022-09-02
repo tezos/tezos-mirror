@@ -39,8 +39,8 @@ tokens (and be the destinations of transactions).
 
   - An implicit account is a non programmable account, whose tokens
     are spendable and delegatable by a public key. Its address is
-    directly the public key hash, and starts with ``tz1``, ``tz2`` or
-    ``tz3``.
+    directly the public key hash, and starts with ``tz1``, ``tz2``,
+    ``tz3`` or ``tz4``.
   - A smart contract is a programmable account. A transaction to such
     an address can provide data, and can fail for reasons decided by
     its Michelson code. Its address is a unique hash that depends on
@@ -50,8 +50,8 @@ From Michelson, they are indistinguishable. A safe way to think about
 this is to consider that implicit accounts are smart contracts that
 always succeed to receive tokens, and does nothing else.
 
-Another kind of addresses, prefixed by ``txr1`` and ``tz4``, are
-related to :doc:`transaction rollups <./transaction_rollups>`.
+Another kind of addresses, prefixed by ``txr1``, are related to
+:doc:`transaction rollups <./transaction_rollups>`.
 
 Finally, addresses prefixed with ``scr1`` identify smart rollups.
 

@@ -297,9 +297,10 @@ In more realistic scenarios, you should supply the option ``--encrypted`` when g
 
       $ octez-client gen keys bob --encrypted
 
-Tezos support three different ECC (`Elliptic-Curve Cryptography <https://en.wikipedia.org/wiki/Elliptic-curve_cryptography>`_) schemes: *Ed25519*, *secp256k1* (the
-one used in Bitcoin), and *P-256* (also called *secp256r1*). The two
-latter curves have been added for interoperability with Bitcoin and
+Tezos supports four different ECC (`Elliptic-Curve Cryptography <https://en.wikipedia.org/wiki/Elliptic-curve_cryptography>`_) schemes: *Ed25519*, *secp256k1* (the
+one used in Bitcoin), *P-256* (also called *secp256r1*), and *BLS* (variant
+*MinPk*, for aggregated signatures). The secp256k1 and P256
+curves have been added for interoperability with Bitcoin and
 Hardware Security Modules (*HSMs*) mostly. Unless your use case
 requires those, you should probably use *Ed25519*. We use a verified
 library for Ed25519, and it is generally recommended over other curves
