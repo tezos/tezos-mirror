@@ -36,11 +36,3 @@
 (rule
  (alias runtest_micheline_rewriting_code)
  (action (run %{exe:test_sampling_code.exe} 1234)))
-
-(rule
- (alias runtest)
- (package tezos-benchmark-alpha)
- (deps
-  (alias runtest_micheline_rewriting_data)
-  (alias runtest_micheline_rewriting_code))
- (action (progn)))
