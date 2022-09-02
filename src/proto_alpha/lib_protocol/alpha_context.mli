@@ -1763,6 +1763,8 @@ module Contract : sig
 
   val used_storage_space : context -> t -> Z.t tzresult Lwt.t
 
+  val paid_storage_space : context -> t -> Z.t tzresult Lwt.t
+
   val increment_counter : context -> public_key_hash -> context tzresult Lwt.t
 
   val check_counter_increment :

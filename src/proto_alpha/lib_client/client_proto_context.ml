@@ -40,6 +40,12 @@ let get_storage (rpc : #rpc_context) ~chain ~block ~unparsing_mode contract =
     ~unparsing_mode
     ~contract
 
+let get_used_storage_space (rpc : #rpc_context) ~chain ~block contract =
+  Plugin.RPC.Contract.get_used_storage_space rpc (chain, block) ~contract
+
+let get_paid_storage_space (rpc : #rpc_context) ~chain ~block contract =
+  Plugin.RPC.Contract.get_paid_storage_space rpc (chain, block) ~contract
+
 let get_big_map_value (rpc : #rpc_context) ~chain ~block ~unparsing_mode id key
     =
   Plugin.RPC.Big_map.big_map_get_normalized

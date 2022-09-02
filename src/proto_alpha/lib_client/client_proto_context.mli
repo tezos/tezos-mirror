@@ -42,6 +42,22 @@ val get_storage :
   Contract_hash.t ->
   Script.expr option tzresult Lwt.t
 
+(** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Contract.get_used_storage_space}. *)
+val get_used_storage_space :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Contract_hash.t ->
+  Z.t option tzresult Lwt.t
+
+(** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Contract.get_paid_storage_space}. *)
+val get_paid_storage_space :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Contract_hash.t ->
+  Z.t option tzresult Lwt.t
+
 (** Calls {!Tezos_protocol_alpha.Protocol.Contract_services.contract_big_map_get_opt}. *)
 val get_contract_big_map_value :
   #Protocol_client_context.rpc_context ->

@@ -1666,7 +1666,28 @@ module Contract = struct
         ~query:RPC_query.empty
         ~output:(option Script.encoding)
         RPC_path.(path /: Contract.rpc_arg / "script" / "normalized")
+
+    let get_used_storage_space =
+      let open Data_encoding in
+      RPC_service.get_service
+        ~description:"Access the used storage space of the contract."
+        ~query:RPC_query.empty
+        ~output:(option z)
+        RPC_path.(path /: Contract.rpc_arg / "storage" / "used_space")
+
+    let get_paid_storage_space =
+      let open Data_encoding in
+      RPC_service.get_service
+        ~description:"Access the paid storage space of the contract."
+        ~query:RPC_query.empty
+        ~output:(option z)
+        RPC_path.(path /: Contract.rpc_arg / "storage" / "paid_space")
   end
+
+  let get_contract contract f =
+    match contract with
+    | Contract.Implicit _ -> return_none
+    | Contract.Originated contract -> f contract
 
   let register () =
     (* Patched RPC: get_storage *)
@@ -1674,46 +1695,53 @@ module Contract = struct
       ~chunked:true
       S.get_storage_normalized
       (fun ctxt contract () unparsing_mode ->
-        match contract with
-        | Implicit _ -> return_none
-        | Originated contract -> (
-            Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
-            match script with
-            | None -> return_none
-            | Some script ->
-                let ctxt = Gas.set_unlimited ctxt in
-                let open Script_ir_translator in
-                parse_script
-                  ctxt
-                  ~elab_conf:(elab_conf ~legacy:true ())
-                  ~allow_forged_in_storage:true
-                  script
-                >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt)
-                  ->
-                unparse_data ctxt unparsing_mode storage_type storage
-                >|=? fun (storage, _ctxt) ->
-                Some (Micheline.strip_locations storage))) ;
+        get_contract contract @@ fun contract ->
+        Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+        match script with
+        | None -> return_none
+        | Some script ->
+            let ctxt = Gas.set_unlimited ctxt in
+            let open Script_ir_translator in
+            parse_script
+              ctxt
+              ~elab_conf:(elab_conf ~legacy:true ())
+              ~allow_forged_in_storage:true
+              script
+            >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt) ->
+            unparse_data ctxt unparsing_mode storage_type storage
+            >|=? fun (storage, _ctxt) ->
+            Some (Micheline.strip_locations storage)) ;
     (* Patched RPC: get_script *)
     Registration.register1
       ~chunked:true
       S.get_script_normalized
       (fun ctxt contract () (unparsing_mode, normalize_types) ->
-        match contract with
-        | Implicit _ -> return_none
-        | Originated contract -> (
-            Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
-            match script with
-            | None -> return_none
-            | Some script ->
-                let ctxt = Gas.set_unlimited ctxt in
-                Script_ir_translator.parse_and_unparse_script_unaccounted
-                  ctxt
-                  ~legacy:true
-                  ~allow_forged_in_storage:true
-                  unparsing_mode
-                  ~normalize_types
-                  script
-                >>=? fun (script, _ctxt) -> return_some script))
+        get_contract contract @@ fun contract ->
+        Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
+        match script with
+        | None -> return_none
+        | Some script ->
+            let ctxt = Gas.set_unlimited ctxt in
+            Script_ir_translator.parse_and_unparse_script_unaccounted
+              ctxt
+              ~legacy:true
+              ~allow_forged_in_storage:true
+              unparsing_mode
+              ~normalize_types
+              script
+            >>=? fun (script, _ctxt) -> return_some script) ;
+    Registration.register1
+      ~chunked:false
+      S.get_used_storage_space
+      (fun ctxt contract () () ->
+        get_contract contract @@ fun _ ->
+        Contract.used_storage_space ctxt contract >>=? return_some) ;
+    Registration.register1
+      ~chunked:false
+      S.get_paid_storage_space
+      (fun ctxt contract () () ->
+        get_contract contract @@ fun _ ->
+        Contract.paid_storage_space ctxt contract >>=? return_some)
 
   let get_storage_normalized ctxt block ~contract ~unparsing_mode =
     RPC_context.make_call1
@@ -1733,6 +1761,24 @@ module Contract = struct
       (Contract.Originated contract)
       ()
       (unparsing_mode, normalize_types)
+
+  let get_used_storage_space ctxt block ~contract =
+    RPC_context.make_call1
+      S.get_used_storage_space
+      ctxt
+      block
+      (Contract.Originated contract)
+      ()
+      ()
+
+  let get_paid_storage_space ctxt block ~contract =
+    RPC_context.make_call1
+      S.get_paid_storage_space
+      ctxt
+      block
+      (Contract.Originated contract)
+      ()
+      ()
 end
 
 module Big_map = struct

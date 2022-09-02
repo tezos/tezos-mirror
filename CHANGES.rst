@@ -67,6 +67,14 @@ Client
   guaranteed to be included in the order they are received from the operations
   source.
 
+- Added commands to get the used and paid storage spaces of contracts:
+  ``tezos-client get used storage space for <contract>`` and
+  ``tezos-client get paid storage space for <contract>``.
+
+- Added RPCs to get the used and paid storage spaces of contracts:
+  ``GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/storage/used_space``
+  and ``GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/storage/paid_space``.
+
 Baker
 -----
 

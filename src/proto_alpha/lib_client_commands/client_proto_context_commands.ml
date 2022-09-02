@@ -247,6 +247,48 @@ let commands_ro () =
         return_unit);
     command
       ~group
+      ~desc:"Get the used storage space of a contract."
+      no_options
+      (prefixes ["get"; "contract"; "used"; "storage"; "space"; "for"]
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"source contract"
+      @@ stop)
+      (fun () contract (cctxt : Protocol_client_context.full) ->
+        let open Lwt_result_syntax in
+        let* used_space =
+          get_used_storage_space
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            contract
+        in
+        check_smart_contract cctxt used_space @@ fun used_space ->
+        let*! () = cctxt#answer "%a" Z.pp_print used_space in
+        return_unit);
+    command
+      ~group
+      ~desc:"Get the paid storage space of a contract."
+      no_options
+      (prefixes ["get"; "contract"; "paid"; "storage"; "space"; "for"]
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"source contract"
+      @@ stop)
+      (fun () contract (cctxt : Protocol_client_context.full) ->
+        let open Lwt_result_syntax in
+        let* paid_space =
+          get_paid_storage_space
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            contract
+        in
+        check_smart_contract cctxt paid_space @@ fun paid_space ->
+        let*! () = cctxt#answer "%a" Z.pp_print paid_space in
+        return_unit);
+    command
+      ~group
       ~desc:
         "Get the value associated to a key in the big map storage of a \
          contract (deprecated)."
