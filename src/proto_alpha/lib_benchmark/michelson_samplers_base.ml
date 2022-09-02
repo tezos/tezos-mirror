@@ -98,10 +98,20 @@ end) : S = struct
         match of_bytes_opt bytes with
         | None -> assert false
         | Some s -> Tezos_crypto.Signature.of_p256 s)
-    | _ -> (
-        let open Tezos_crypto.Signature in
+    | 3 -> (
+        let open Tezos_crypto.Bls in
         let bytes = Base_samplers.uniform_bytes ~nbytes:size rng_state in
-        match of_bytes_opt bytes with None -> assert false | Some s -> s)
+        match of_bytes_opt bytes with
+        | None -> assert false
+        | Some s -> Tezos_crypto.Signature.of_bls s)
+    | _ ->
+        let open Tezos_crypto.Signature in
+        let bytes =
+          Base_samplers.uniform_bytes
+            ~nbytes:Tezos_crypto.Ed25519.size
+            rng_state
+        in
+        Unknown bytes
 
   let string rng_state =
     let s =

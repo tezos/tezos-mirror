@@ -2406,6 +2406,8 @@ module Registration_section = struct
             Interpreter_workload.N_ICheck_signature_secp256k1
         | Tezos_crypto.Signature.P256 ->
             Interpreter_workload.N_ICheck_signature_p256
+        | Tezos_crypto.Signature.Bls ->
+            Interpreter_workload.N_ICheck_signature_bls
       in
       benchmark_with_stack_sampler
         ~intercept:for_intercept
@@ -2438,6 +2440,8 @@ module Registration_section = struct
     let () = check_signature Tezos_crypto.Signature.Secp256k1
 
     let () = check_signature Tezos_crypto.Signature.P256
+
+    let () = check_signature Tezos_crypto.Signature.Bls
 
     let () =
       simple_benchmark
