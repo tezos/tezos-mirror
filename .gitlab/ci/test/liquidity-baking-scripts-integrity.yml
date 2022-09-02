@@ -9,3 +9,4 @@ test-liquidity-baking-scripts:
     # However, for the alpha protocol, it is possible to modify the
     # scripts, and therefore to update the hash.
     - scripts/check-liquidity-baking-scripts.sh d98643881fe14996803997f1283e84ebd2067e35 src/proto_alpha
+    - ./scripts/ci/merge_coverage.sh
