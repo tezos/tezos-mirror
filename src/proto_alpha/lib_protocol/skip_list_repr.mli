@@ -52,15 +52,15 @@ module type S = sig
   type ('content, 'ptr) cell
 
   val pp :
-    pp_content:(Format.formatter -> 'content -> unit) ->
     pp_ptr:(Format.formatter -> 'ptr -> unit) ->
+    pp_content:(Format.formatter -> 'content -> unit) ->
     Format.formatter ->
     ('content, 'ptr) cell ->
     unit
 
   val equal :
-    ('content -> 'content -> bool) ->
     ('ptr -> 'ptr -> bool) ->
+    ('content -> 'content -> bool) ->
     ('content, 'ptr) cell ->
     ('content, 'ptr) cell ->
     bool
