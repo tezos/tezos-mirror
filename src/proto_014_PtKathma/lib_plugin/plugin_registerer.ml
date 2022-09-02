@@ -34,6 +34,6 @@ module MetricsPlugin = struct
   let hash = Registerer.Registered.hash
 end
 
-let () = Prevalidator_filters.register (module Plugin)
+let () = Shell_plugin.register (module Plugin)
 
 let () = Shell_metrics.Proto_plugin.register_plugin (module MetricsPlugin)

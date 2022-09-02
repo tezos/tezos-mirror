@@ -306,7 +306,7 @@ type t = (module T)
     this functor doesn't assume a specific chain store implementation,
     which is the crux for having it easily unit-testable. *)
 module Make_s
-    (Filter : Prevalidator_filters.FILTER)
+    (Filter : Shell_plugin.FILTER)
     (Prevalidation_t : Prevalidation.T
                          with type validation_state =
                            Filter.Proto.validation_state
@@ -1078,7 +1078,7 @@ module WorkerGroup = Worker.MakeGroup (Name) (Prevalidator_worker_state.Request)
     Note that, because this functor [include]s {!Make_s}, it is a
     strict extension of [Make_s]. *)
 module Make
-    (Filter : Prevalidator_filters.FILTER)
+    (Filter : Shell_plugin.FILTER)
     (Arg : ARG)
     (Prevalidation_t : Prevalidation.T
                          with type validation_state =
@@ -1670,7 +1670,7 @@ end)
 let chain_proto_registry : t ChainProto_registry.t ref =
   ref ChainProto_registry.empty
 
-let create limits (module Filter : Prevalidator_filters.FILTER) chain_db =
+let create limits (module Filter : Shell_plugin.FILTER) chain_db =
   let open Lwt_result_syntax in
   let chain_store = Distributed_db.chain_store chain_db in
   let chain_id = Store.Chain.chain_id chain_store in
@@ -1846,7 +1846,7 @@ module Internal_for_tests = struct
     }
 
   module Make
-      (Filter : Prevalidator_filters.FILTER)
+      (Filter : Shell_plugin.FILTER)
       (Prevalidation_t : Prevalidation.T
                            with type validation_state =
                              Filter.Proto.validation_state

@@ -359,7 +359,7 @@ let broadcast_head w ~previous block =
 
 let safe_get_prevalidator_filter hash =
   let open Lwt_syntax in
-  match Prevalidator_filters.find hash with
+  match Shell_plugin.find hash with
   | Some filter -> return_ok filter
   | None -> (
       match Registered_protocol.get hash with
@@ -373,8 +373,8 @@ let safe_get_prevalidator_filter hash =
       | Some protocol ->
           let* () = Events.(emit prevalidator_filter_not_found) hash in
           let (module Proto) = protocol in
-          let module Filter = Prevalidator_filters.No_filter (Proto) in
-          return_ok (module Filter : Prevalidator_filters.FILTER))
+          let module Filter = Shell_plugin.No_filter (Proto) in
+          return_ok (module Filter : Shell_plugin.FILTER))
 
 let instantiate_prevalidator parameters set_prevalidator block chain_db =
   let open Lwt_syntax in
