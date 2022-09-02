@@ -1144,8 +1144,7 @@ let originate_contract ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
 
 let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     ?(source_accounts = []) ?seed ?fee ?gas_limit ?transfers ?tps
-    ?(single_op_per_pkh_per_block = false) ?fresh_probability
-    ?smart_contract_parameters client =
+    ?fresh_probability ?smart_contract_parameters client =
   let sources =
     (* [sources] is a string containing all the [source_aliases],
        [source_pkhs], and [source_accounts] in JSON format, as
@@ -1251,12 +1250,10 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
   @ make_int_opt_arg "--tps" tps
   @ make_float_opt_arg "--fresh-probability" fresh_probability
   @ smart_contract_parameters_arg
-  @
-  if single_op_per_pkh_per_block then ["--single-op-per-pkh-per-block"] else []
 
 let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
-    ?fee ?gas_limit ?transfers ?tps ?single_op_per_pkh_per_block
-    ?fresh_probability ?smart_contract_parameters client =
+    ?fee ?gas_limit ?transfers ?tps ?fresh_probability
+    ?smart_contract_parameters client =
   spawn_stresstest
     ?endpoint
     ?source_aliases
@@ -1267,7 +1264,6 @@ let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
     ?gas_limit
     ?transfers
     ?tps
-    ?single_op_per_pkh_per_block
     ?fresh_probability
     ?smart_contract_parameters
     client

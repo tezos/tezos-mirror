@@ -33,15 +33,6 @@
                  debug when called in various contexts. That is why these
                  tests are nice to have. *)
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/2522
-
-   Tests in this file call the stresstest command with
-   [~single_op_per_pkh_per_block:true] in order to be compatible with
-   [precheck]. This argument should be removed once the command has
-   been updated to inject at most one operation per manager per block
-   by default (cf
-   https://gitlab.com/tezos/tezos/-/merge_requests/4100). *)
-
 (** Wait for [n] injection request events. *)
 let wait_for_n_injections n node =
   let filter json =
@@ -234,7 +225,6 @@ let test_stresstest_sources_format =
              ~source_aliases
              ~source_pkhs
              ~source_accounts
-             ~single_op_per_pkh_per_block:true
              ~fresh_probability:0.
              (* Prevent the command from randomly creating fresh
                 accounts, as this would allow more operations than
@@ -302,13 +292,7 @@ let test_stresstest_n_transfers =
   in
   (* Bake some blocks to reach required level for stresstest command. *)
   let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
-  let* () =
-    Client.stresstest
-      ~transfers:n_transfers
-      ~source_aliases
-      ~single_op_per_pkh_per_block:true
-      client
-  in
+  let* () = Client.stresstest ~transfers:n_transfers ~source_aliases client in
   let* _ = check_n_applied_operations_in_mempool n_transfers client in
   let* () = Client.bake_for_and_wait client in
   let* _ = check_n_manager_operations_in_head n_transfers client in
@@ -433,7 +417,6 @@ let test_stresstest_multiple_nodes =
             non_terminating_process
             @@ Client.spawn_stresstest
                  ~source_accounts
-                 ~single_op_per_pkh_per_block:true
                  ~fresh_probability:0.
                  (* Prevent the command from randomly creating fresh
                     accounts, as this would allow more operations than
