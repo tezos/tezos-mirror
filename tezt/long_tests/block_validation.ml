@@ -545,7 +545,7 @@ let register_semantic_regression_test ~executors () =
      generate at most a 30-bit integer*)
   let seed =
     let seeder = Random.State.make_self_init () in
-    Random.State.int seeder (1 lsl 30)
+    Random.State.int seeder ((1 lsl 30) - 1)
   in
 
   Long_test.register
