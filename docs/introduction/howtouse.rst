@@ -23,6 +23,7 @@ After a successful compilation, you should have the following binaries:
 - ``tezos-validator``: a daemon for validating and applying operations in blocks (see `Validator`_)
 - ``tezos-signer``: a client to remotely sign operations or blocks
   (see :ref:`signer`);
+- ``tezos-proxy-server``: a readonly frontend to ``tezos-node`` designed to lower the load of full nodes (see :doc:`../user/proxy-server`)
 - ``tezos-codec``: a utility for documenting the data encodings and for performing data encoding/decoding (see `Codec`_)
 - ``tezos-protocol-compiler``: a domain-specific compiler for Tezos protocols (see `Protocol compiler`_)
 - ``tezos-snoop``: a tool for modeling the performance of any piece of OCaml code, based on benchmarking (see :doc:`../developer/snoop`)
