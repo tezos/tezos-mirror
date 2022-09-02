@@ -334,14 +334,9 @@ let test_transitivity =
  *)
 let test_pack_unpack =
   QCheck.Test.make
-    ~count:100_000
-      (* We run this test on many more cases than the default (100) because this
-         is a very important property. Packing and then unpacking happens each
-         time data is sent from a contract to another and also each time storage
-         is saved at the end of a smart contract call and restored at the next
-         call of the same contract. Also, injectivity of packing (which is a
-         direct consequence of this) is an important property for big maps
-         (because the keys are packed and then hashed). *)
+    ~count:100
+      (* Because this protocol is not in active development, we only test a
+         small number of cases *)
     ~name:"pack_unpack"
     comparable_data_arbitrary
     (fun (Ex_comparable_data (ty, x)) ->

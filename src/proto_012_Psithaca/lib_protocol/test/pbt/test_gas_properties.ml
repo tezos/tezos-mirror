@@ -121,17 +121,17 @@ let gas_cost_arb : Alpha_context.Gas.cost QCheck.arbitrary =
 let tests =
   [
     QCheck.Test.make
-      ~count:1000
+      ~count:100
       ~name:"Consuming commutes"
       QCheck.(triple context_arb gas_cost_arb gas_cost_arb)
       test_consume_commutes;
     QCheck.Test.make
-      ~count:1000
+      ~count:100
       ~name:"Consuming [free] consumes nothing"
       context_arb
       test_free_consumption;
     QCheck.Test.make
-      ~count:1000
+      ~count:100
       ~name:"[free] is the neutral element of Gas addition"
       QCheck.(pair context_arb gas_cost_arb)
       test_free_neutral;
