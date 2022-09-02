@@ -3513,8 +3513,11 @@ end = struct
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~deps:
             [
-              octez_base |> open_ ~m:"TzPervasives"
+              octez_base
+              |> if_ N.(number <= 14)
+              |> open_ ~m:"TzPervasives"
               |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+              octez_base |> if_ N.(number >= 15) |> open_ ~m:"TzPervasives";
               octez_micheline |> open_;
               client |> if_some |> open_;
               main |> open_;

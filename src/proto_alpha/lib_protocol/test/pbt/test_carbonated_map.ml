@@ -35,10 +35,13 @@ open Lib_test.Qcheck2_helpers
 open QCheck2
 open Protocol
 
-let wrap m = m >|= Environment.wrap_tzresult
+let wrap m =
+  let open Lwt_syntax in
+  let+ v = m in
+  Environment.wrap_tzresult v
 
 let new_ctxt () =
-  let ( let* ) m f = m >>=? f in
+  let open Lwt_result_syntax in
   let* block, _contract = Context.init1 () in
   let* incr = Incremental.begin_construction block in
   return @@ Incremental.alpha_ctxt incr
@@ -79,10 +82,10 @@ let pp_int_map fmt map =
     Assert.pp_print_list (fun fmt (k, v) -> Format.fprintf fmt "(%d, %d)" k v)
   in
   Lwt_main.run
-    (let ( let* ) m f = m >>=? f in
-     let* ctxt = new_ctxt () in
-     let* kvs, _ = wrap @@ Lwt.return @@ CM.to_list ctxt map in
-     return kvs)
+    (let open Lwt_result_syntax in
+    let* ctxt = new_ctxt () in
+    let* kvs, _ = wrap @@ Lwt.return @@ CM.to_list ctxt map in
+    return kvs)
   |> Result.value_f ~default:(fun () -> assert false)
   |> Format.fprintf fmt "%a" pp
 
