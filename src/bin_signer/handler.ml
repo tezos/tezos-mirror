@@ -46,7 +46,7 @@ module High_watermark = struct
          (req "level" int32)
          (opt "round" int32)
          (req "hash" raw_hash)
-         (opt "signature" Tezos_crypto.Signature.encoding)
+         (opt "signature" (dynamic_size Tezos_crypto.Signature.encoding))
 
   let get_level_and_round_for_tenderbake_block bytes =
     (* <watermark(1)><chain_id(4)><level(4)><proto_level(1)><predecessor(32)><timestamp(8)><validation_passes(1)><oph(32)><FITNESS>... *)
