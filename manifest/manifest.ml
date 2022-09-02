@@ -347,6 +347,10 @@ module Dune = struct
 
   let pps ?(args = Stdlib.List.[]) name = S "pps" :: S name :: of_atom_list args
 
+  let staged_pps names =
+    let s_exprs = Stdlib.List.map (fun n -> S n) names in
+    S "staged_pps" :: of_list s_exprs
+
   let include_ name = [S "include"; S name]
 
   let targets_rule ?(promote = false) ?deps targets ~action =
@@ -943,7 +947,7 @@ module Target = struct
     extra_authors : string list;
   }
 
-  and preprocessor = PPS of t * string list
+  and preprocessor = PPS of t * string list | Staged_PPS of t list
 
   and inline_tests = Inline_tests_backend of t
 
@@ -975,6 +979,9 @@ module Target = struct
   let pps ?(args = []) = function
     | None -> invalid_arg "Manifest.Target.pps cannot be given no_target"
     | Some target -> PPS (target, args)
+
+  let staged_pps targets =
+    Staged_PPS (Stdlib.List.concat_map Option.to_list targets)
 
   let inline_tests_backend = function
     | None ->
@@ -1628,7 +1635,11 @@ module Target = struct
         Some (Select {package; source_if_present; source_if_absent; target})
 
   let all_internal_deps internal =
-    List.map (fun (PPS (target, _)) -> target) internal.preprocess
+    let extract_targets = function
+      | PPS (target, _) -> [target]
+      | Staged_PPS targets -> targets
+    in
+    List.concat_map extract_targets internal.preprocess
     @ internal.deps @ internal.opam_only_deps
 end
 
@@ -1834,16 +1845,23 @@ let generate_dune (internal : Target.internal) =
   in
 
   let preprocess =
-    let make_pp (PPS (target, args) : Target.preprocessor) =
+    let get_target_name target : string =
       match Target.names_for_dune target with
-      | name, [] -> Dune.pps ~args name
+      | name, [] -> name
       | hd, (_ :: _ as tl) ->
           invalid_arg
             ("preprocessor target has multiple names, don't know which one to \
               choose: "
             ^ String.concat ", " (hd :: tl))
     in
-    List.map make_pp internal.preprocess
+    let make_preprocessors = function
+      | (PPS (target, args) : Target.preprocessor) ->
+          Dune.pps ~args @@ get_target_name target
+      | Staged_PPS targets ->
+          Dune.staged_pps @@ List.map get_target_name targets
+    in
+
+    List.map make_preprocessors internal.preprocess
   in
   let preprocessor_deps =
     let make_pp_dep (Target.File filename) = Dune.file filename in

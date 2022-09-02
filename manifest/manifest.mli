@@ -494,6 +494,12 @@ type preprocessor
     The target's package is also added as a dependency in the [.opam] file. *)
 val pps : ?args:string list -> target -> preprocessor
 
+(** Make a staged preprocessor.
+
+    [staged_pps targets] becomes a [(preprocess (staged_pps target1 target2 ..))] stanza in the [dune] file.
+    The target's package is also added as a dependency in the [.opam] file. *)
+val staged_pps : target list -> preprocessor
+
 (** Inline_tests backend.
 
     Can be used when declaring a library to enable inline_tests with the given backend.
