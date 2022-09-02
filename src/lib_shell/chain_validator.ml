@@ -359,7 +359,7 @@ let broadcast_head w ~previous block =
 
 let safe_get_prevalidator_filter hash =
   let open Lwt_syntax in
-  match Shell_plugin.find hash with
+  match Shell_plugin.find_filter hash with
   | Some filter -> return_ok filter
   | None -> (
       match Registered_protocol.get hash with

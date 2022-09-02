@@ -23,11 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Plugin = struct
+module Filter = struct
   module Proto = Registerer.Registered
   module Default_Filters = Shell_plugin.No_filter (Proto)
   module Mempool = Default_Filters.Mempool
-  include Plugin
 end
 
-let () = Shell_plugin.register (module Plugin)
+module RPC = struct
+  module Proto = Registerer.Registered
+  include Plugin.RPC
+end
+
+let () = Shell_plugin.register_filter (module Filter)
+
+let () = Shell_plugin.register_rpc (module RPC)
