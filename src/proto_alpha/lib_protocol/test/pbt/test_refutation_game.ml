@@ -1293,8 +1293,8 @@ let build_proof ~player_client start_tick (game : Game.t) =
   let open Lwt_result_syntax in
   let inbox_context, messages_tree, history, inbox = player_client.inbox in
   let* history, history_proof =
-    Store_inbox.form_history_proof inbox_context history inbox messages_tree
-    >|= Environment.wrap_tzresult
+    Lwt.map Environment.wrap_tzresult
+    @@ Store_inbox.form_history_proof inbox_context history inbox messages_tree
   in
   (* We start a game on a commitment that starts at [Tick.initial], the fuel
      is necessarily [start_tick]. *)
