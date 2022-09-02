@@ -1036,19 +1036,21 @@ struct
   end
 
   module Wasm_2_0_0 = struct
-    type input = {
+    type input = Tezos_scoru_wasm.Wasm_pvm_sig.input_info = {
       inbox_level : Bounded.Non_negative_int32.t;
       message_counter : Z.t;
     }
 
-    type output = {
+    type output = Tezos_scoru_wasm.Wasm_pvm_sig.output_info = {
       outbox_level : Bounded.Non_negative_int32.t;
       message_index : Z.t;
     }
 
-    type input_request = No_input_required | Input_required
+    type input_request = Tezos_scoru_wasm.Wasm_pvm_sig.input_request =
+      | No_input_required
+      | Input_required
 
-    type info = {
+    type info = Tezos_scoru_wasm.Wasm_pvm_sig.info = {
       current_tick : Z.t;
       last_input_read : input option;
       input_request : input_request;
@@ -1069,38 +1071,14 @@ struct
         let wrap t = PVM_tree t
       end)
 
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3214
-         The rest of the module is pure boilerplate converting between
-         the types of [Tezos_scoru_wasm] and [Environment_V7.Wasm_2_0_0].
-      *)
-
       let compute_step (tree : Tree.tree) = Wasm.compute_step tree
 
-      let set_input_step {inbox_level; message_counter} payload
-          (tree : Tree.tree) =
-        Wasm.set_input_step {inbox_level; message_counter} payload tree
+      let set_input_step input payload (tree : Tree.tree) =
+        Wasm.set_input_step input payload tree
 
-      let get_output {outbox_level; message_index} (tree : Tree.tree) =
-        Wasm.get_output {outbox_level; message_index} tree
+      let get_output output (tree : Tree.tree) = Wasm.get_output output tree
 
-      let convert_input : Tezos_scoru_wasm.Wasm_pvm_sig.input_info -> input =
-        function
-        | {inbox_level; message_counter} -> {inbox_level; message_counter}
-
-      let get_info (tree : Tree.tree) =
-        let open Lwt_syntax in
-        let* info = Wasm.get_info tree in
-        match info with
-        | {current_tick; last_input_read; input_request} ->
-            Lwt.return
-              {
-                current_tick;
-                last_input_read = Option.map convert_input last_input_read;
-                input_request =
-                  (match input_request with
-                  | No_input_required -> No_input_required
-                  | Input_required -> Input_required);
-              }
+      let get_info (tree : Tree.tree) = Wasm.get_info tree
     end
   end
 
