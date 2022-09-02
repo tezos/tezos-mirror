@@ -107,8 +107,8 @@ let int_map_pair_test name f =
     (fun (map1, map2) -> match f map1 map2 with Ok b -> b | Error _ -> false)
 
 let unit_test name f =
-  Test.make ~count:1 ~name (Gen.return ()) (fun () ->
-      match f () with Ok b -> b | _ -> false)
+  Alcotest.test_case name `Quick (fun () ->
+      match f () with Ok b -> assert b | _ -> assert false)
 
 let ( let* ) = Result.bind
 
@@ -487,9 +487,8 @@ let test_size_remove_one =
   | None -> Ok (size' = size)
   | Some _ -> Ok (size' = size - 1)
 
-let tests =
+let qcheck_tests =
   [
-    test_empty;
     test_size;
     test_to_list_of_list;
     test_empty_left_identity_for_merge;
@@ -498,28 +497,35 @@ let tests =
     test_size_add_one;
     test_size_remove_one;
     test_merge_against_list;
-    test_merge_overlaps_left;
-    test_merge_overlaps_right;
-    test_merge_overlaps_add;
     test_merge_fail;
-    test_merge_map_keep_existing;
-    test_merge_map_replace_existing;
     test_find_non_existing;
     test_find_existing;
-    test_update_add;
-    test_update_replace;
-    test_update_merge;
-    test_update_delete;
     test_map;
-    test_fold_empty;
     test_fold;
     test_fold_to_list;
     test_map_fail;
   ]
+
+let unit_tests =
+  [
+    test_empty;
+    test_update_add;
+    test_update_replace;
+    test_merge_overlaps_left;
+    test_merge_overlaps_right;
+    test_merge_overlaps_add;
+    test_update_merge;
+    test_merge_map_keep_existing;
+    test_merge_map_replace_existing;
+    test_update_delete;
+    test_fold_empty;
+  ]
+
+let tests ~rand = qcheck_wrap ~rand qcheck_tests @ unit_tests
 
 let () =
   (* Ensure deterministic results. *)
   let rand = Random.State.make [|0x1337533D; 71287309; 397060904|] in
   Alcotest.run
     "protocol > pbt > carbonated map"
-    [("Carbonated map", qcheck_wrap ~rand tests)]
+    [("Carbonated map", tests ~rand)]
