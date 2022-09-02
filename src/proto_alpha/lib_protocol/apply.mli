@@ -98,18 +98,14 @@ type apply_mode =
           might use it with [None]. *)
 
 (** Apply an operation, i.e. update the given context in accordance
-    with the operation's semantic (or return an error if the operation
-    is not applicable).
-
-    The {!type:Validate.operatin_stamp} argument enforces that an
-    operation needs to be validated by {!Validate} before it
-    can be applied.
+   with the operation's semantic (or return an error if the operation
+   is not applicable).
 
     For non-manager operations, the application of a validated
-    operation should always fully succeed.
+   operation should always fully succeed.
 
     For manager operations, the application has two stages. The first
-    stage consists in updating the context to:
+   stage consists in updating the context to:
 
     - take the fees;
 
@@ -118,28 +114,26 @@ type apply_mode =
     - decrease of the available block gas by operation's [gas_limit].
 
     These updates are mandatory. In particular, taking the fees is
-    critically important. The {!Validate} module (from which
-    we get the {!Validate.operation_stamp} as explained above) is
-    responsible for ensuring that the operation is solvable, i.e. that
-    fees can be taken, i.e. that the first stage of manager operation
-    application cannot fail. If this stage fails nevertheless, the
-    function returns an error.
+   critically important. The {!Validate} module is responsible for
+   ensuring that the operation is solvable, i.e. that fees can be
+   taken, i.e. that the first stage of manager operation application
+   cannot fail. If this stage fails nevertheless, the function returns
+   an error.
 
     The second stage of this function (still in the case of a manager
-    operation) consists in applying all the other effects, in
-    accordance with the semantic of the operation's kind.
+   operation) consists in applying all the other effects, in
+   accordance with the semantic of the operation's kind.
 
     An error may happen during this second phase: in that case, the
-    function returns the context obtained at the end of the first
-    stage, and metadata that contain the error. This means that the
-    operation has no other effects than those described above during
-    the first phase. *)
+   function returns the context obtained at the end of the first
+   stage, and metadata that contain the error. This means that the
+   operation has no other effects than those described above during
+   the first phase. *)
 val apply_operation :
   context ->
   Chain_id.t ->
   apply_mode ->
   payload_producer:public_key_hash ->
-  Validate.operation_stamp ->
   Operation_hash.t ->
   'a operation ->
   (context * 'a operation_metadata) tzresult Lwt.t

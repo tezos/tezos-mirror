@@ -883,8 +883,7 @@ let proto_validate_operation validation_state oph ~nb_successful_prechecks
       operation
   in
   match res with
-  | Ok (validate_state, (_ : Validate.operation_stamp)) ->
-      return {validation_state with validate_state}
+  | Ok validate_state -> return {validation_state with validate_state}
   | Error tztrace ->
       let err = Environment.wrap_tztrace tztrace in
       let error_classification =

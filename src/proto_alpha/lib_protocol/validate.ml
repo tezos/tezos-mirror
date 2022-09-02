@@ -304,9 +304,6 @@ let init_validate_state ctxt =
     manager_state = init_manager_state ctxt;
   }
 
-(* See mli file. *)
-type operation_stamp = Operation_validated_stamp
-
 (** Validation of consensus operations (validation pass [0]):
     preendorsement, endorsement, and dal_slot_availability. *)
 module Consensus = struct
@@ -2023,7 +2020,7 @@ let validate_operation (vi : validate_info) (vs : validate_state)
     ?(should_check_signature = true) oph (type kind)
     (operation : kind operation) =
   let open Lwt_tzresult_syntax in
-  let* vs =
+  let* validate_state =
     match operation.protocol_data.contents with
     | Single (Preendorsement _) ->
         Consensus.validate_preendorsement
@@ -2073,7 +2070,7 @@ let validate_operation (vi : validate_info) (vs : validate_state)
           operation
     | Single (Failing_noop _) -> fail Validate_errors.Failing_noop_error
   in
-  return (vs, Operation_validated_stamp)
+  return validate_state
 
 (* This function will be replaced with a generic remove_operation in
    the future. *)

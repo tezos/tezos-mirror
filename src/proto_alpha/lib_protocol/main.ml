@@ -409,15 +409,8 @@ let apply_operation_with_mode mode ctxt chain_id data op_count operation
     data.validate_state
     oph
     operation
-  >>=? fun (validate_state, op_validated_stamp) ->
-  Apply.apply_operation
-    ctxt
-    chain_id
-    mode
-    ~payload_producer
-    op_validated_stamp
-    oph
-    operation
+  >>=? fun validate_state ->
+  Apply.apply_operation ctxt chain_id mode ~payload_producer oph operation
   >|=? fun (ctxt, result) ->
   let op_count = op_count + 1 in
   ({data with ctxt; op_count; validate_state}, Operation_metadata result)

@@ -87,17 +87,8 @@ val begin_mempool :
 val begin_no_predecessor_info :
   context -> Chain_id.t -> validate_info * validate_state
 
-(** A receipt to guarantee that an operation is always validated
-    before it is applied.
-
-    Indeed, some functions in {!Apply} require a value of this type,
-    which may only be created by calling {!validate_operation} (or a
-    function in {!TMP_for_plugin}). *)
-type operation_stamp
-
 (** Check the validity of the given operation; return an updated
-    {!validate_state}, and a {!operation_stamp} attesting that the
-    operation has been validated.
+    {!validate_state}.
 
     An operation is valid if it may be included in a block without
     causing the block's application to fail. The purpose of this
@@ -166,7 +157,7 @@ val validate_operation :
   ?should_check_signature:bool ->
   Operation_hash.t ->
   'kind operation ->
-  (validate_state * operation_stamp) tzresult Lwt.t
+  validate_state tzresult Lwt.t
 
 (** Remove a manager operation from the {!validate_operation_state}.
 

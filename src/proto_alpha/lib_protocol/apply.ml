@@ -1761,21 +1761,20 @@ let rec mark_skipped :
           mark_skipped ~payload_producer level rest )
 
 (** Return balance updates for fees, and an updated context that
-    accounts for:
+   accounts for:
 
     - fees spending,
 
     - counter incrementation,
 
     - consumption of each operation's [gas_limit] from the available
-      block gas.
+   block gas.
 
-    The {!type:Validate.operation_stamp} argument enforces that the
-    operation has already been validated by {!Validate_operation}. The
-    latter is responsible for ensuring that the operation is solvable,
-    i.e. its fees can be taken, i.e. [take_fees] cannot return an
-    error. *)
-let take_fees ctxt (_ : Validate.operation_stamp) contents_list =
+    The operation should already been validated by
+   {!Validate_operation}. The latter is responsible for ensuring that
+   the operation is solvable, i.e. its fees can be taken, i.e.
+   [take_fees] cannot return an error. *)
+let take_fees ctxt contents_list =
   let open Lwt_tzresult_syntax in
   let rec take_fees_rec :
       type kind.
@@ -1917,7 +1916,7 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
       record_non_consensus_operation_hash ctxt hash
 
 let record_preendorsement ctxt (apply_mode : apply_mode)
-    (_ : Validate.operation_stamp) (content : consensus_content) :
+    (content : consensus_content) :
     (context * Kind.preendorsement contents_result_list) tzresult =
   let open Tzresult_syntax in
   let ctxt =
@@ -1953,7 +1952,7 @@ let is_grandparent_endorsement apply_mode content =
   | _ -> false
 
 let record_endorsement ctxt (apply_mode : apply_mode)
-    (_ : Validate.operation_stamp) (content : consensus_content) :
+    (content : consensus_content) :
     (context * Kind.endorsement contents_result_list) tzresult Lwt.t =
   let open Lwt_tzresult_syntax in
   let mk_endorsement_result delegate endorsement_power =
@@ -1992,12 +1991,10 @@ let apply_manager_contents_list ctxt ~payload_producer chain_id
       Lazy_storage.cleanup_temporaries ctxt >|= fun ctxt -> (ctxt, results)
 
 let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
-    op_validated_stamp contents_list =
+    contents_list =
   let open Lwt_tzresult_syntax in
   let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
-  let* ctxt, fees_updated_contents_list =
-    take_fees ctxt op_validated_stamp contents_list
-  in
+  let* ctxt, fees_updated_contents_list = take_fees ctxt contents_list in
   let*! ctxt, contents_result_list =
     apply_manager_contents_list
       ctxt
@@ -2071,7 +2068,7 @@ let punish_double_baking ctxt (bh1 : Block_header.t) ~payload_producer =
     (fun balance_updates -> Double_baking_evidence_result balance_updates)
 
 let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
-    ~payload_producer op_validated_stamp (contents_list : kind contents_list) :
+    ~payload_producer (contents_list : kind contents_list) :
     (context * kind contents_result_list) tzresult Lwt.t =
   let mempool_mode =
     match apply_mode with
@@ -2080,10 +2077,9 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
   in
   match contents_list with
   | Single (Preendorsement consensus_content) ->
-      record_preendorsement ctxt apply_mode op_validated_stamp consensus_content
-      |> Lwt.return
+      record_preendorsement ctxt apply_mode consensus_content |> Lwt.return
   | Single (Endorsement consensus_content) ->
-      record_endorsement ctxt apply_mode op_validated_stamp consensus_content
+      record_endorsement ctxt apply_mode consensus_content
   | Single (Dal_slot_availability (endorser, slot_availability)) ->
       (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
 
@@ -2144,7 +2140,6 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
         ~payload_producer
         chain_id
         ~mempool_mode
-        op_validated_stamp
         contents_list
   | Cons (Manager_operation _, _) ->
       apply_manager_operations
@@ -2152,11 +2147,10 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
         ~payload_producer
         chain_id
         ~mempool_mode
-        op_validated_stamp
         contents_list
 
 let apply_operation ctxt chain_id (apply_mode : apply_mode) ~payload_producer
-    op_validated_stamp hash operation =
+    hash operation =
   let ctxt = Origination_nonce.init ctxt hash in
   let ctxt = record_operation ctxt hash operation in
   apply_contents_list
@@ -2164,7 +2158,6 @@ let apply_operation ctxt chain_id (apply_mode : apply_mode) ~payload_producer
     chain_id
     apply_mode
     ~payload_producer
-    op_validated_stamp
     operation.protocol_data.contents
   >|=? fun (ctxt, result) ->
   let ctxt = Gas.set_unlimited ctxt in

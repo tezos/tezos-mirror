@@ -859,13 +859,12 @@ module Scripts = struct
       ~should_check_signature:false
       oph
       operation
-    >>=? fun (_validate_operation_state, op_validated_stamp) ->
+    >>=? fun _validate_operation_state ->
     Apply.apply_operation
       ctxt
       chain_id
       (Apply.Partial_construction {predecessor_level = None})
       ~payload_producer:Signature.Public_key_hash.zero
-      op_validated_stamp
       oph
       operation
     >|=? fun (_ctxt, op_metadata) ->
