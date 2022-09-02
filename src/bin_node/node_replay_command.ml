@@ -99,6 +99,12 @@ module Event = struct
       ("expected", Data_encoding.json)
       ~pp3:pp_json
       ("replay_result", Data_encoding.json)
+
+  let strict_emit ~strict e v =
+    let open Lwt_syntax in
+    let* () = emit e v in
+    if strict then Lwt_exit.exit_and_raise 1 ;
+    return_unit
 end
 
 type error += Cannot_replay_orphan
@@ -151,7 +157,7 @@ let () =
     (function Cannot_replay_below_savepoint -> Some () | _ -> None)
     (fun () -> Cannot_replay_below_savepoint)
 
-let replay_one_block main_chain_store validator_process block =
+let replay_one_block strict main_chain_store validator_process block =
   let open Lwt_result_syntax in
   let* block_alias =
     match block with
@@ -210,7 +216,7 @@ let replay_one_block main_chain_store validator_process block =
              expected_context_hash
              result.validation_store.context_hash)
       then
-        Event.(emit inconsistent_context_hash)
+        Event.(strict_emit ~strict inconsistent_context_hash)
           (expected_context_hash, result.validation_store.context_hash)
       else Lwt.return_unit
     in
@@ -228,7 +234,9 @@ let replay_one_block main_chain_store validator_process block =
         in
         let exp = to_json expected_block_receipt_bytes in
         let got = to_json block_metadata_bytes in
-        let*! () = Event.(emit inconsistent_block_receipt) (exp, got) in
+        let*! () =
+          Event.(strict_emit ~strict inconsistent_block_receipt) (exp, got)
+        in
         return_unit
       else return_unit
     in
@@ -276,7 +284,8 @@ let replay_one_block main_chain_store validator_process block =
               let exp = to_json exp in
               let got = to_json got in
               let*! () =
-                Event.(emit inconsistent_operation_receipt) ((i, j), exp, got)
+                Event.(strict_emit ~strict inconsistent_operation_receipt)
+                  ((i, j), exp, got)
               in
               return_unit
             else return_unit
@@ -291,7 +300,7 @@ let replay_one_block main_chain_store validator_process block =
     in
     check_receipts 0 0 expected_operation_receipts actual_receipts
 
-let replay ~singleprocess (config : Node_config_file.t) blocks =
+let replay ~singleprocess ~strict (config : Node_config_file.t) blocks =
   let open Lwt_result_syntax in
   let store_root = Node_data_version.store_dir config.data_dir in
   let context_root = Node_data_version.context_dir config.data_dir in
@@ -357,17 +366,18 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
       List.iter_es
         (function
           | Block_services.Block b ->
-              replay_one_block main_chain_store validator_process b
+              replay_one_block strict main_chain_store validator_process b
           | Range (`Level starts, `Level ends) ->
               if Int32.compare starts ends > 0 then return_unit
               else if Int32.compare starts ends = 0 then
                 replay_one_block
+                  strict
                   main_chain_store
                   validator_process
                   (`Level starts)
               else
                 Seq.iter_es
-                  (replay_one_block main_chain_store validator_process)
+                  (replay_one_block strict main_chain_store validator_process)
                   (Seq.unfold
                      (fun l ->
                        if l <= ends then Some (`Level l, Int32.succ l) else None)
@@ -377,7 +387,7 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
       let*! () = Block_validator_process.close validator_process in
       Store.close_store store)
 
-let run ?verbosity ~singleprocess (config : Node_config_file.t) blocks =
+let run ?verbosity ~singleprocess ~strict (config : Node_config_file.t) blocks =
   let open Lwt_result_syntax in
   let* () = Node_data_version.ensure_data_dir config.data_dir in
   Lwt_lock_file.try_with_lock
@@ -400,7 +410,9 @@ let run ?verbosity ~singleprocess (config : Node_config_file.t) blocks =
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
   Lwt_exit.(
     wrap_and_exit
-    @@ let*! res = protect (fun () -> replay ~singleprocess config blocks) in
+    @@ let*! res =
+         protect (fun () -> replay ~singleprocess ~strict config blocks)
+       in
        let*! () = Tezos_base_unix.Internal_event_unix.close () in
        Lwt.return res)
 
@@ -415,7 +427,7 @@ let check_data_dir dir =
          msg = Some (Format.sprintf "directory '%s' does not exists" dir);
        })
 
-let process verbosity singleprocess blocks args =
+let process verbosity singleprocess strict blocks args =
   let verbosity =
     let open Internal_event in
     match verbosity with [] -> None | [_] -> Some Info | _ -> Some Debug
@@ -425,7 +437,7 @@ let process verbosity singleprocess blocks args =
     let* data_dir = Node_shared_arg.read_data_dir args in
     let* () = check_data_dir data_dir in
     let* config = Node_shared_arg.read_and_patch_config_file args in
-    run ?verbosity ~singleprocess config blocks
+    run ?verbosity ~singleprocess ~strict config blocks
   in
   match Lwt_main.run run with
   | Ok () -> `Ok ()
@@ -484,6 +496,14 @@ module Term = struct
           ~docv:"<level>|<block_hash>|<alias>"
           [])
 
+  let strict =
+    let open Cmdliner in
+    let doc =
+      "If set, the command stops immediately when encoutering any error. \
+       Otherwise the replay continues and errors are logged."
+    in
+    Arg.(value & flag & info ~doc ["strict"])
+
   let singleprocess =
     let open Cmdliner in
     let doc =
@@ -498,7 +518,7 @@ module Term = struct
   let term =
     Cmdliner.Term.(
       ret
-        (const process $ verbosity $ singleprocess $ blocks
+        (const process $ verbosity $ singleprocess $ strict $ blocks
        $ Node_shared_arg.Term.args))
 end
 

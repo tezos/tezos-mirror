@@ -867,6 +867,8 @@ let x86_executor1 = Executor "x86_executor1"
 
 let x86_executor2 = Executor "x86_executor2"
 
+let block_replay_executor = Executor "block-replay-testing-executor1"
+
 let make_tags team executors tags =
   let misc_tags =
     match team with
