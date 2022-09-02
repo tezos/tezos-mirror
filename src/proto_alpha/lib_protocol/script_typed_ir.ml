@@ -85,7 +85,7 @@ module Script_signature = struct
 
   let compare (Signature_tag x) (Signature_tag y) = Signature.compare x y
 
-  let size = Signature.size
+  let size (Signature_tag s) = Signature.size s
 end
 
 type signature = Script_signature.t
