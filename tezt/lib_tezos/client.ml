@@ -2069,3 +2069,5 @@ let convert_script ~script ~src_format ~dst_format client =
       fmt_to_string dst_format;
     ]
   |> Process.check_and_read_stdout
+
+let bootstrapped client = spawn_command client ["bootstrapped"] |> Process.check

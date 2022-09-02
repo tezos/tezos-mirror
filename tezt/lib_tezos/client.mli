@@ -1522,3 +1522,6 @@ val convert_script :
   dst_format:[`Michelson | `Json | `Binary] ->
   t ->
   string Lwt.t
+
+(** Run [tezos-client bootstrapped]. *)
+val bootstrapped : t -> unit Lwt.t
