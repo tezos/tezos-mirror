@@ -560,7 +560,64 @@ module Dry_run = struct
   let register protocols = test_gas_consumed protocols
 end
 
+module Signatures = struct
+  open Helpers
+
+  let test_check_signature =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test client signatures and on chain check"
+      ~tags:["client"; "signature"; "check"; "bls"]
+    @@ fun protocol ->
+    let* _node, client = Client.init_with_protocol `Client ~protocol () in
+    let prg = "file:./tezt/tests/contracts/proto_alpha/check_signature.tz" in
+    let contract = "check_sig_contract" in
+    let* _hash =
+      Client.originate_contract
+        ~alias:contract
+        ~amount:Tez.zero
+        ~src:Constant.bootstrap2.alias
+        ~burn_cap:(Tez.of_int 10)
+        ~prg
+        client
+    in
+    Log.info "Generating new accounts" ;
+    let* accounts =
+      Lwt_list.map_s
+        (fun sig_alg ->
+          Client.gen_and_show_keys
+            ~alias:(sf "account_%s" sig_alg)
+            ~sig_alg
+            client)
+        (supported_signature_schemes protocol)
+    in
+    let* () = airdrop_and_reveal client accounts in
+    let test (account : Account.key) =
+      let msg = "0x" ^ Hex.show (Hex.of_string "Some nerdy quote") in
+      let* signature =
+        Client.sign_bytes ~signer:account.alias ~data:msg client
+      in
+      Client.transfer
+        client
+        ~amount:Tez.zero
+        ~giver:account.public_key_hash
+        ~receiver:contract
+        ~arg:(sf "Pair %S %S %s" account.public_key signature msg)
+    in
+    let* () = Lwt_list.iter_s test accounts in
+    let* () = Client.bake_for_and_wait client in
+    let* block = RPC.Client.call client @@ RPC.get_chain_block () in
+    let ops = JSON.(block |-> "operations" |=> 3 |> as_list) in
+    Check.(
+      (List.length ops = List.length (supported_signature_schemes protocol)) int)
+      ~error_msg:"Block contains %L operations but should have %R" ;
+    unit
+
+  let register protocols = test_check_signature protocols
+end
+
 let register ~protocols =
   Simulation.register protocols ;
   Transfer.register protocols ;
-  Dry_run.register protocols
+  Dry_run.register protocols ;
+  Signatures.register protocols
