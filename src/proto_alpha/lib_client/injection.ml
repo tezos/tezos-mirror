@@ -259,7 +259,10 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
     {shell = {branch}; protocol_data = {contents; signature}}
   in
   let oph = Operation.hash op in
-  let size = Bytes.length bytes + Tezos_crypto.Signature.size in
+  let packed_op =
+    {shell = {branch}; protocol_data = Operation_data {contents; signature}}
+  in
+  let size = Data_encoding.Binary.length Operation.encoding packed_op in
   (match fee_parameter with
   | Some fee_parameter -> check_fees cctxt fee_parameter contents size
   | None -> Lwt.return_unit)
@@ -631,6 +634,12 @@ let detect_script_failure : type kind. kind operation_metadata -> _ =
   in
   fun {contents} -> detect_script_failure contents
 
+let signature_size_of_algo : Tezos_crypto.Signature.algo -> int = function
+  | Ed25519 -> Ed25519.size
+  | Secp256k1 -> Secp256k1.size
+  | P256 -> P256.size
+  | Bls -> Bls.size
+
 (* This value is used as a safety guard for gas limit. *)
 let safety_guard = Gas.Arith.(integral_of_int_exn 100)
 
@@ -658,8 +667,8 @@ let safety_guard = Gas.Arith.(integral_of_int_exn 100)
 *)
 
 let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
-    ~fee_parameter ~chain ~block ?successor_level ?branch ?(force = false)
-    ?(simulation = false)
+    ~fee_parameter ~signature_algo ~chain ~block ?successor_level ?branch
+    ?(force = false) ?(simulation = false)
     (annotated_contents : kind Annotated_manager_operation.annotated_list) :
     kind Kind.manager contents_list tzresult Lwt.t =
   Tezos_client_base.Client_confirmations.wait_for_bootstrapped cctxt
@@ -793,7 +802,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
             + Data_encoding.Binary.length
                 Operation.contents_encoding
                 (Contents op)
-            + Tezos_crypto.Signature.size
+            + signature_size_of_algo signature_algo
           else
             Data_encoding.Binary.length
               Operation.contents_encoding
@@ -1369,9 +1378,9 @@ let may_replace_operation (type kind) (cctxt : #full) chain from
     Lwt.return_ok contents
 
 let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
-    ?confirmations ?dry_run ?verbose_signing ?simulation ?force ~source ~src_pk
-    ~src_sk ~fee ~gas_limit ~storage_limit ?counter ?(replace_by_fees = false)
-    ~fee_parameter (type kind)
+    ?confirmations ?dry_run ?verbose_signing ?simulation ?force ~source
+    ~(src_pk : public_key) ~src_sk ~fee ~gas_limit ~storage_limit ?counter
+    ?(replace_by_fees = false) ~fee_parameter (type kind)
     (operations : kind Annotated_manager_operation.annotated_list) :
     (Tezos_crypto.Operation_hash.t
     * packed_operation
@@ -1396,6 +1405,13 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
     | Single_manager (Manager_info {operation = Reveal _; _}) -> true
     | Cons_manager (Manager_info {operation = Reveal _; _}, _) -> true
     | _ -> false
+  in
+  let signature_algo =
+    match src_pk with
+    | Ed25519 _ -> Tezos_crypto.Signature.Ed25519
+    | Secp256k1 _ -> Secp256k1
+    | P256 _ -> P256
+    | Bls _ -> Bls
   in
   let apply_specified_options counter op =
     Annotated_manager_operation.set_source source op >>? fun op ->
@@ -1438,6 +1454,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
       may_patch_limits
         cctxt
         ~fee_parameter
+        ~signature_algo
         ~chain
         ~block
         ?force
@@ -1479,6 +1496,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
       may_patch_limits
         cctxt
         ~fee_parameter
+        ~signature_algo
         ~chain
         ~block
         ?force
