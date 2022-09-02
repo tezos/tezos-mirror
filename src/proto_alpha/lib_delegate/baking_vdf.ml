@@ -45,7 +45,7 @@ type 'a state = {
   constants : Constants.t;
   mutable block_stream : (block_info, 'a) result Lwt_stream.t;
   mutable stream_stopper : RPC_context.stopper option;
-  mutable cycle : Cycle_repr.t option;
+  mutable cycle : Cycle.t option;
   mutable computation_status : status;
   mutable vdf_setup : vdf_setup option;
 }
@@ -91,39 +91,40 @@ let log_errors_and_continue ~name p =
   | Ok () -> return_unit
   | Error errs -> Events.(emit vdf_daemon_error) (name, errs)
 
-let cycle_of_level state level =
-  let {Constants.parametric = {blocks_per_cycle; _}; _} = state.constants in
-  let level = Raw_level.to_int32 level in
-  Int32.(div (pred level) blocks_per_cycle)
-
 let get_seed_computation cctxt chain_id hash =
   let chain = `Hash chain_id in
   let block = `Hash (hash, 0) in
   Alpha_services.Seed_computation.get cctxt (chain, block)
 
-let is_in_nonce_revelation_period state level =
-  let {
-    Constants.parametric = {blocks_per_cycle; nonce_revelation_threshold; _};
-    _;
-  } =
+let get_level_info cctxt level =
+  let open Lwt_result_syntax in
+  let level = Raw_level.to_int32 level in
+  let* {protocol_data = {level_info; _}; _} =
+    Protocol_client_context.Alpha_block_services.metadata
+      cctxt
+      ~chain:cctxt#chain
+      ~block:(`Level level)
+      ()
+  in
+  return level_info
+
+let is_in_nonce_revelation_period state (level_info : Level.t) =
+  let open Lwt_result_syntax in
+  let {Constants.parametric = {nonce_revelation_threshold; _}; _} =
     state.constants
   in
-  let current_cycle = cycle_of_level state level in
-  let level = Raw_level.to_int32 level in
-  let position_in_cycle =
-    Int32.(sub level (mul current_cycle blocks_per_cycle))
-  in
-  Int32.compare position_in_cycle nonce_revelation_threshold <= 0
+  let position_in_cycle = level_info.cycle_position in
+  return (Int32.compare position_in_cycle nonce_revelation_threshold < 0)
 
-let check_new_cycle state level =
+let check_new_cycle state (level_info : Level.t) =
   let open Lwt_result_syntax in
-  let current_cycle = Cycle_repr.of_int32_exn (cycle_of_level state level) in
+  let current_cycle = level_info.cycle in
   match state.cycle with
   | None ->
       state.cycle <- Some current_cycle ;
       return_unit
   | Some cycle ->
-      if Cycle_repr.(succ cycle <= current_cycle) then (
+      if Cycle.(succ cycle <= current_cycle) then (
         (* The cycle of this block is different from the cycle of the last
          * processed block. Emit an event if the VDF for the previous cycle
          * has not been injected and reset the computation status. *)
@@ -131,7 +132,7 @@ let check_new_cycle state level =
           match state.computation_status with
           | Injected -> return_unit
           | _ ->
-              let cycle_str = Int32.to_string (Cycle_repr.to_int32 cycle) in
+              let cycle_str = Int32.to_string (Cycle.to_int32 cycle) in
               let*! () =
                 Events.(emit vdf_info)
                   ("VDF revelation was NOT injected for cycle " ^ cycle_str)
@@ -178,134 +179,138 @@ let eq_vdf_setup state seed_discriminant seed_challenge =
 let process_new_block (cctxt : #Protocol_client_context.full) state
     {hash; chain_id; protocol; next_protocol; level; _} =
   let open Lwt_result_syntax in
+  let* level_info = get_level_info cctxt level in
   let level_str = Int32.to_string (Raw_level.to_int32 level) in
-  let* () = check_new_cycle state level in
+  let* () = check_new_cycle state level_info in
   if Protocol_hash.(protocol <> next_protocol) then
     let*! () = D_Events.(emit protocol_change_detected) () in
     return_unit
-  else if is_in_nonce_revelation_period state level then
-    let*! () =
-      Events.(emit vdf_info)
-        ("Skipping, still in nonce revelation period (level " ^ level_str ^ ")")
-    in
-    return_unit
-    (* enter main loop if we are not in the nonce revelation period and
-       the expected protocol has been activated *)
   else
-    match state.computation_status with
-    | Started ->
-        let*! () =
-          Events.(emit vdf_info)
-            ("Skipping, already started VDF (level " ^ level_str ^ ")")
-        in
-        return_unit
-    | Not_started -> (
-        let chain = `Hash chain_id in
-        let* seed_computation = get_seed_computation cctxt chain_id hash in
-        match seed_computation with
-        | Vdf_revelation_stage {seed_discriminant; seed_challenge} ->
-            state.computation_status <- Started ;
-            let*! () =
-              Events.(emit vdf_info)
-                ("Started to compute VDF (level " ^ level_str ^ ")")
-            in
-            let vdf_setup =
-              Seed.generate_vdf_setup ~seed_discriminant ~seed_challenge
-            in
-            state.vdf_setup <- Some vdf_setup ;
-            stop_block_stream state ;
-            let* () =
-              Lwt.catch
-                (fun () ->
-                  let discriminant, challenge = vdf_setup in
-                  (* `Vdf.prove` is a long computation. We reset the block
-                   * stream in order to not process all the blocks added
-                   * to the chain during this time and skip straight to
-                   * the current head. *)
-                  let solution =
-                    Environment.Vdf.prove
-                      discriminant
-                      challenge
-                      state.constants.parametric.vdf_difficulty
-                  in
-                  state.computation_status <- Finished solution ;
-                  let*! () = Events.(emit vdf_info) "VDF solution computed" in
-                  return_unit)
-                (fun _ ->
-                  (* VDF computation failed with an error thrown by the external
-                   * library. We set the status back to Not_started in order to
-                   * retry computing it if still possible. *)
-                  state.computation_status <- Not_started ;
-                  let*! () =
-                    Events.(emit vdf_info)
-                      ("Failed to compute VDF solution (level " ^ level_str
-                     ^ ")")
-                  in
-                  return_unit)
-            in
-            restart_block_stream cctxt chain state
-        | Nonce_revelation_stage | Computation_finished ->
-            (* Daemon started too early or too late in a cycle, skipping. *)
-            return_unit)
-    | Finished solution -> (
-        let*! () =
-          Events.(emit vdf_info) ("Finished VDF (level " ^ level_str ^ ")")
-        in
-        let chain = `Hash chain_id in
-        let* seed_computation = get_seed_computation cctxt chain_id hash in
-        match seed_computation with
-        | Vdf_revelation_stage {seed_discriminant; seed_challenge} ->
-            (* If a solution has been computed that is consistent with the VDF
-             * setup for the current cycle and we are still in the VDF
-             * revelation stage, inject the operation. *)
-            if eq_vdf_setup state seed_discriminant seed_challenge then (
-              let* op_hash =
-                inject_vdf_revelation cctxt hash chain_id solution
-              in
-              state.computation_status <- Injected ;
-              let*! () =
-                Events.(emit vdf_revelation_injected)
-                  ( cycle_of_level state level,
-                    Chain_services.to_string chain,
-                    op_hash )
-              in
-              return_unit)
-            else (
-              state.computation_status <- Invalid ;
+    let* out = is_in_nonce_revelation_period state level_info in
+    if out then
+      let*! () =
+        Events.(emit vdf_info)
+          ("Skipping, still in nonce revelation period (level " ^ level_str
+         ^ ")")
+      in
+      return_unit
+      (* enter main loop if we are not in the nonce revelation period and
+         the expected protocol has been activated *)
+    else
+      match state.computation_status with
+      | Started ->
+          let*! () =
+            Events.(emit vdf_info)
+              ("Skipping, already started VDF (level " ^ level_str ^ ")")
+          in
+          return_unit
+      | Not_started -> (
+          let chain = `Hash chain_id in
+          let* seed_computation = get_seed_computation cctxt chain_id hash in
+          match seed_computation with
+          | Vdf_revelation_stage {seed_discriminant; seed_challenge} ->
+              state.computation_status <- Started ;
               let*! () =
                 Events.(emit vdf_info)
-                  ("Error injecting VDF: setup has been updated (level "
-                 ^ level_str ^ ")")
+                  ("Started to compute VDF (level " ^ level_str ^ ")")
+              in
+              let vdf_setup =
+                Seed.generate_vdf_setup ~seed_discriminant ~seed_challenge
+              in
+              state.vdf_setup <- Some vdf_setup ;
+              stop_block_stream state ;
+              let* () =
+                Lwt.catch
+                  (fun () ->
+                    let discriminant, challenge = vdf_setup in
+                    (* `Vdf.prove` is a long computation. We reset the block
+                     * stream in order to not process all the blocks added
+                     * to the chain during this time and skip straight to
+                     * the current head. *)
+                    let solution =
+                      Environment.Vdf.prove
+                        discriminant
+                        challenge
+                        state.constants.parametric.vdf_difficulty
+                    in
+                    state.computation_status <- Finished solution ;
+                    let*! () = Events.(emit vdf_info) "VDF solution computed" in
+                    return_unit)
+                  (fun _ ->
+                    (* VDF computation failed with an error thrown by the external
+                     * library. We set the status back to Not_started in order to
+                     * retry computing it if still possible. *)
+                    state.computation_status <- Not_started ;
+                    let*! () =
+                      Events.(emit vdf_info)
+                        ("Failed to compute VDF solution (level " ^ level_str
+                       ^ ")")
+                    in
+                    return_unit)
+              in
+              restart_block_stream cctxt chain state
+          | Nonce_revelation_stage | Computation_finished ->
+              (* Daemon started too early or too late in a cycle, skipping. *)
+              return_unit)
+      | Finished solution -> (
+          let*! () =
+            Events.(emit vdf_info) ("Finished VDF (level " ^ level_str ^ ")")
+          in
+          let chain = `Hash chain_id in
+          let* seed_computation = get_seed_computation cctxt chain_id hash in
+          match seed_computation with
+          | Vdf_revelation_stage {seed_discriminant; seed_challenge} ->
+              (* If a solution has been computed that is consistent with the VDF
+               * setup for the current cycle and we are still in the VDF
+               * revelation stage, inject the operation. *)
+              if eq_vdf_setup state seed_discriminant seed_challenge then (
+                let* op_hash =
+                  inject_vdf_revelation cctxt hash chain_id solution
+                in
+                state.computation_status <- Injected ;
+                let*! () =
+                  Events.(emit vdf_revelation_injected)
+                    ( Cycle.to_int32 level_info.cycle,
+                      Chain_services.to_string chain,
+                      op_hash )
+                in
+                return_unit)
+              else (
+                state.computation_status <- Invalid ;
+                let*! () =
+                  Events.(emit vdf_info)
+                    ("Error injecting VDF: setup has been updated (level "
+                   ^ level_str ^ ")")
+                in
+                return_unit)
+          | Nonce_revelation_stage ->
+              state.computation_status <- Not_started ;
+              let*! () =
+                Events.(emit vdf_info)
+                  ("Error injecting VDF: new cycle started (level " ^ level_str
+                 ^ ")")
+              in
+              return_unit
+          | Computation_finished ->
+              state.computation_status <- Injected ;
+              let*! () =
+                Events.(emit vdf_info)
+                  ("Error injecting VDF: already injected (level " ^ level_str
+                 ^ ")")
               in
               return_unit)
-        | Nonce_revelation_stage ->
-            state.computation_status <- Not_started ;
-            let*! () =
-              Events.(emit vdf_info)
-                ("Error injecting VDF: new cycle started (level " ^ level_str
-               ^ ")")
-            in
-            return_unit
-        | Computation_finished ->
-            state.computation_status <- Injected ;
-            let*! () =
-              Events.(emit vdf_info)
-                ("Error injecting VDF: already injected (level " ^ level_str
-               ^ ")")
-            in
-            return_unit)
-    | Injected ->
-        let*! () =
-          Events.(emit vdf_info)
-            ("Skipping, already injected VDF (level " ^ level_str ^ ")")
-        in
-        return_unit
-    | Invalid ->
-        let*! () =
-          Events.(emit vdf_info)
-            ("Skipping, failed to compute VDF (level " ^ level_str ^ ")")
-        in
-        return_unit
+      | Injected ->
+          let*! () =
+            Events.(emit vdf_info)
+              ("Skipping, already injected VDF (level " ^ level_str ^ ")")
+          in
+          return_unit
+      | Invalid ->
+          let*! () =
+            Events.(emit vdf_info)
+              ("Skipping, failed to compute VDF (level " ^ level_str ^ ")")
+          in
+          return_unit
 
 let start_vdf_worker (cctxt : Protocol_client_context.full) ~canceler constants
     chain =
