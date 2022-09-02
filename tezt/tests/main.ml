@@ -154,10 +154,18 @@ let register_K_plus_tests () =
   Testnet_dictator.register ~protocols ;
   Vdf_test.register ~protocols
 
+let register_L_plus_tests () =
+  (* Relies on a feature only available since L.
+     Move these to [register_protocol_agnostic_tests] once L is the smallest
+     protocol. *)
+  let protocols = Protocol.[Alpha] in
+  Used_paid_storage_spaces.register ~protocols
+
 let () =
   register_protocol_independent_tests () ;
   register_protocol_migration_tests () ;
   register_protocol_agnostic_tests () ;
   register_K_plus_tests () ;
+  register_L_plus_tests () ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()
