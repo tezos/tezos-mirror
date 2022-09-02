@@ -59,7 +59,7 @@ let new_context_with_stakers nb_stakers =
   in
   let+ inc = Incremental.begin_construction b in
   let state = Incremental.validation_state inc in
-  let ctxt = state.ctxt in
+  let ctxt = state.application_state.ctxt in
   (* Necessary to originate rollups. *)
   let ctxt = Alpha_context.Origination_nonce.init ctxt Operation_hash.zero in
   let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in

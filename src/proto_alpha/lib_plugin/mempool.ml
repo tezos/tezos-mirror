@@ -243,7 +243,7 @@ let init config ?(validation_state : validation_state option) ~predecessor () =
   ignore config ;
   (match validation_state with
   | None -> return empty
-  | Some {ctxt; _} ->
+  | Some {application_state = {ctxt; _}; _} ->
       let {
         Tezos_base.Block_header.fitness = predecessor_fitness;
         timestamp = predecessor_timestamp;
@@ -448,7 +448,7 @@ let size_of_operation op =
 let weight_and_resources_manager_operation ~validation_state ?size ~fee ~gas op
     =
   let hard_gas_limit_per_block =
-    Constants.hard_gas_limit_per_block validation_state.ctxt
+    Constants.hard_gas_limit_per_block validation_state.application_state.ctxt
   in
   let max_size = managers_quota.max_size in
   let size = match size with None -> size_of_operation op | Some s -> s in
@@ -768,8 +768,8 @@ let pre_filter_far_future_consensus_ops config
   | ( Some grandparent_level_start,
       Some validation_state_before,
       Some round_zero_duration ) -> (
-      let ctxt : t = validation_state_before.ctxt in
-      match validation_state_before.mode with
+      let ctxt : t = validation_state_before.application_state.ctxt in
+      match validation_state_before.application_state.mode with
       | Application _ | Partial_application _ | Full_construction _ ->
           assert false
       (* Prefilter is always applied in mempool mode aka Partial_construction *)
@@ -871,19 +871,20 @@ let pre_filter config ~(filter_state : state) ?validation_state_before
     The signature check is skipped when the operation has previously
     been validated successfully, ie. [nb_successful_prechecks > 0]. *)
 let proto_validate_operation validation_state oph ~nb_successful_prechecks
-    (operation : 'kind operation) :
+    (operation : packed_operation) :
     (validation_state, error trace * error_classification) result Lwt.t =
   let open Lwt_result_syntax in
   let*! res =
     Validate.validate_operation
-      validation_state.validate_info
-      validation_state.validate_state
+      validation_state.validity_state
       ~should_check_signature:(nb_successful_prechecks <= 0)
       oph
       operation
   in
   match res with
-  | Ok validate_state -> return {validation_state with validate_state}
+  | Ok state ->
+      let validity_state = {validation_state.validity_state with state} in
+      return {validation_state with validity_state}
   | Error tztrace ->
       let err = Environment.wrap_tztrace tztrace in
       let error_classification =
@@ -925,7 +926,7 @@ let proto_validate_manager_operation validation_state oph
       validation_state
       oph
       ~nb_successful_prechecks
-      operation
+      (Operation.pack operation)
   in
   match res with
   | Ok validation_state -> return (`Success validation_state)
@@ -940,13 +941,11 @@ let proto_validate_manager_operation validation_state oph
 
 (** Remove a manager operation from the protocol's [validation_state]. *)
 let remove_from_validation_state validation_state (Manager_op op) =
-  let validate_state =
-    Validate.remove_manager_operation
-      validation_state.validate_info
-      validation_state.validate_state
-      op
+  let state =
+    Validate.remove_manager_operation validation_state.validity_state op
   in
-  {validation_state with validate_state}
+  let validity_state = {validation_state.validity_state with state} in
+  {validation_state with validity_state}
 
 (** Call the protocol validation on a manager operation and handle
     potential conflicts: if either the 1M restriction is triggered or
@@ -1264,8 +1263,9 @@ let precheck :
      ~filter_state
      ~validation_state
      oph
-     {shell = shell_header; protocol_data = Operation_data protocol_data}
+     operation
      ~nb_successful_prechecks ->
+  let {protocol_data = Operation_data protocol_data; _} = operation in
   let call_precheck_manager (protocol_data : _ Kind.manager protocol_data) =
     precheck_manager
       config
@@ -1273,7 +1273,7 @@ let precheck :
       validation_state
       oph
       ~nb_successful_prechecks
-      {shell = shell_header; protocol_data}
+      {shell = operation.shell; protocol_data}
   in
   match protocol_data.contents with
   | Single (Manager_operation _) -> call_precheck_manager protocol_data
@@ -1284,7 +1284,7 @@ let precheck :
         validation_state
         oph
         ~nb_successful_prechecks
-        {shell = shell_header; protocol_data}
+        operation
 
 open Apply_results
 
@@ -1358,7 +1358,8 @@ let rec post_filter_manager :
       | `Refused _ as errs -> errs)
 
 let post_filter config ~(filter_state : state) ~validation_state_before:_
-    ~validation_state_after:({ctxt; _} : validation_state) (_op, receipt) =
+    ~validation_state_after:
+      ({application_state = {ctxt; _}; _} : validation_state) (_op, receipt) =
   match receipt with
   | No_operation_metadata -> assert false (* only for multipass validator *)
   | Operation_metadata {contents} -> (

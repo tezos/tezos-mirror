@@ -99,7 +99,7 @@ let context_gen : Alpha_context.t QCheck2.Gen.t =
        let+ inc = Incremental.begin_construction b in
        let state = Incremental.validation_state inc in
        Alpha_context.Gas.set_limit
-         state.ctxt
+         state.application_state.ctxt
          Alpha_context.Gas.Arith.(fp (integral_of_int_exn 100_000_000)))
      |> function
      | Ok a -> a

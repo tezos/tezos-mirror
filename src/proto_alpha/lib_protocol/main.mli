@@ -40,75 +40,9 @@
     {{:https://tezos.gitlab.io/shell/the_big_picture.html} this overview}.
  *)
 
-(** [validation_mode] permits to differenciate [!type:validation_state]
-    values.
-
-    There are four validation modes:
-    - [Application]
-    - [Partial_application]
-    - [Partial_construction]
-    - [Full_construction]
-
-    For the meaning and typical uses of each mode, refer to the
-    comments attached to the corresponding type constructors below.
-*)
-type validation_mode =
-  | Application of {
-      block_header : Alpha_context.Block_header.t;
-      fitness : Alpha_context.Fitness.t;
-      payload_producer : Alpha_context.public_key_hash;
-      block_producer : Alpha_context.public_key_hash;
-      predecessor_round : Alpha_context.Round.t;
-      predecessor_level : Alpha_context.Level.t;
-    }
-      (** Full Validation of a block. See
-          {!val:Tezos_protocol_environment_sigs.V5.T.Updater.PROTOCOL.begin_application}**)
-  | Partial_application of {
-      block_header : Alpha_context.Block_header.t;
-      fitness : Alpha_context.Fitness.t;
-      payload_producer : Alpha_context.public_key_hash;
-      block_producer : Alpha_context.public_key_hash;
-      predecessor_level : Alpha_context.Level.t;
-      predecessor_round : Alpha_context.Round.t;
-    }
-      (** [Partial_application] is used in pre-checking of blocks - not all checks
-         are done. Special case of [Application] to allow quick rejection of bad
-         blocks. See
-         {!val:Tezos_protocol_environment_sigs.V5.T.Updater.PROTOCOL.begin_partial_application}
-       *)
-  | Partial_construction of {
-      predecessor : Block_hash.t;
-      predecessor_fitness : Fitness.t;
-      predecessor_level : Alpha_context.Level.t;
-      predecessor_round : Alpha_context.Round.t;
-    }
-      (** Shell/mempool-only construction of a virtual block. See
-          {!val:Tezos_protocol_environment_sigs.V5.T.Updater.PROTOCOL.begin_construction} *)
-  | Full_construction of {
-      predecessor : Block_hash.t;
-      payload_producer : Alpha_context.public_key_hash;
-      block_producer : Alpha_context.public_key_hash;
-      protocol_data_contents : Alpha_context.Block_header.contents;
-      level : Int32.t;
-      round : Alpha_context.Round.t;
-      predecessor_level : Alpha_context.Level.t;
-      predecessor_round : Alpha_context.Round.t;
-    }
-      (** Baker-only block construction for baking in. See
-          {!val:Tezos_protocol_environment_sigs.V5.T.Updater.PROTOCOL.begin_construction}
-       *)
-
 type validation_state = {
-  mode : validation_mode;
-  chain_id : Chain_id.t;
-  ctxt : Alpha_context.t;
-  op_count : int;
-  migration_balance_updates : Alpha_context.Receipt.balance_updates;
-  liquidity_baking_toggle_ema : Alpha_context.Liquidity_baking.Toggle_EMA.t;
-  implicit_operations_results :
-    Apply_results.packed_successful_manager_operation_result list;
-  validate_info : Validate.validate_info;
-  validate_state : Validate.validate_state;
+  validity_state : Validate.validation_state;
+  application_state : Apply.application_state;
 }
 
 type operation_data = Alpha_context.packed_protocol_data

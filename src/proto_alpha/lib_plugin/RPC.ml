@@ -839,36 +839,52 @@ module Scripts = struct
       Return the unchanged operation protocol data, and the operation
       receipt ie. metadata containing balance updates, consumed gas,
       application success or failure, etc. *)
-  let run_operation_service ctxt ()
-      ({shell; protocol_data = Operation_data protocol_data}, chain_id) =
-    (match protocol_data.contents with
-    | Single (Preendorsement _)
-    | Single (Endorsement _)
-    | Single (Dal_slot_availability _) ->
+  let run_operation_service ctxt () (packed_operation, chain_id) =
+    (match packed_operation.protocol_data with
+    | Operation_data {contents = Single (Preendorsement _); _}
+    | Operation_data {contents = Single (Endorsement _); _}
+    | Operation_data {contents = Single (Dal_slot_availability _); _} ->
         error Run_operation_does_not_support_consensus_operations
     | _ -> ok ())
     >>?= fun () ->
-    let operation : _ operation = {shell; protocol_data} in
-    let oph = Operation.hash operation in
-    let validate_operation_info, validate_operation_state =
-      Validate.begin_no_predecessor_info ctxt chain_id
-    in
+    let oph = Operation.hash_packed packed_operation in
+    let validity_state = Validate.begin_no_predecessor_info ctxt chain_id in
     Validate.validate_operation
-      validate_operation_info
-      validate_operation_state
+      validity_state
       ~should_check_signature:false
       oph
-      operation
+      packed_operation
     >>=? fun _validate_operation_state ->
-    Apply.apply_operation
-      ctxt
-      chain_id
-      (Apply.Partial_construction {predecessor_level = None})
-      ~payload_producer:Signature.Public_key_hash.zero
-      oph
-      operation
+    let predecessor_level = Level.(current ctxt).level in
+    Alpha_context.Fitness.create
+      ~level:predecessor_level
+      ~locked_round:None
+      ~predecessor_round:Round.zero
+      ~round:Round.zero
+    >>?= fun dummy_fitness ->
+    let dummy_application_mode =
+      Apply.Partial_construction
+        {
+          predecessor_level;
+          predecessor_round = Round.zero;
+          predecessor_fitness = Fitness.to_raw dummy_fitness;
+        }
+    in
+    let application_state =
+      Apply.
+        {
+          ctxt;
+          chain_id;
+          mode = dummy_application_mode;
+          op_count = 0;
+          migration_balance_updates = [];
+          liquidity_baking_toggle_ema = Liquidity_baking.Toggle_EMA.zero;
+          implicit_operations_results = [];
+        }
+    in
+    Apply.apply_operation application_state oph packed_operation
     >|=? fun (_ctxt, op_metadata) ->
-    (Operation_data protocol_data, Apply_results.Operation_metadata op_metadata)
+    (packed_operation.protocol_data, op_metadata)
 
   (*
 

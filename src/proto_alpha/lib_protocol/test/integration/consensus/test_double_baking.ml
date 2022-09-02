@@ -246,7 +246,7 @@ let test_payload_producer_gets_evidence_rewards () =
     ~payload_round:(Some Round.zero)
     ~locked_round:(Some Round.zero)
     ~policy:(By_account baker1)
-    ~operations:(db_evidence :: preendos)
+    ~operations:(preendos @ [db_evidence])
     b1
   >>=? fun b' ->
   (* the frozen deposits of the double-signer [baker1] are slashed *)

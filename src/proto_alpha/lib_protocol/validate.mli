@@ -34,79 +34,90 @@
    validation.
 
     It lives in memory, not in the storage. *)
-type validate_info
+type info
 
 (** State used and modified by {!validate_operation} or by a block
    validation.
 
     It lives in memory, not in the storage. *)
-type validate_state
+type state
+
+type validation_state = {info : info; state : state}
 
 open Alpha_context
 
-(** Initialize the {!validate_info} and {!validate_state} for the
-    validation of an existing block (in preparation for its future
-    application). *)
-val begin_block_validation :
+(** Initialize the {!info} and {!state} for the validation of an
+    existing block (in preparation for its future application). *)
+val begin_application :
   context ->
   Chain_id.t ->
   predecessor_level:Level.t ->
-  predecessor_round:Round.t ->
-  predecessor_hash:Block_hash.t ->
+  predecessor_timestamp:Time.t ->
+  Block_header.t ->
   Fitness.t ->
-  Block_payload_hash.t ->
-  validate_info * validate_state
+  validation_state tzresult Lwt.t
 
-(** Initialize the {!validate_info} and {!validate_state} for the
+(** Initialize the {!info} and {!state} for the partial validation of
+    an existing block. *)
+val begin_partial_application :
+  ancestor_context:context ->
+  Chain_id.t ->
+  predecessor_level:Level.t ->
+  predecessor_timestamp:Time.t ->
+  Block_header.t ->
+  Fitness.t ->
+  validation_state tzresult Lwt.t
+
+(** Initialize the {!info} and {!state} for the full
     construction of a fresh block. *)
-val begin_block_construction :
+val begin_full_construction :
   context ->
   Chain_id.t ->
   predecessor_level:Level.t ->
   predecessor_round:Round.t ->
+  predecessor_timestamp:Time.t ->
   predecessor_hash:Block_hash.t ->
   Round.t ->
-  Block_payload_hash.t ->
-  validate_info * validate_state
+  Block_header.contents ->
+  validation_state tzresult Lwt.t
 
-(** Initialize the {!validate_info} and {!validate_state} for a
-    mempool. *)
-val begin_mempool :
+(** Initialize the {!info} and {!state} for the partial
+    construction use mainly to implement the mempool. *)
+val begin_partial_construction :
   context ->
   Chain_id.t ->
   predecessor_level:Level.t ->
   predecessor_round:Round.t ->
   predecessor_hash:Block_hash.t ->
   grandparent_round:Round.t ->
-  validate_info * validate_state
+  validation_state tzresult Lwt.t
 
-(** Initialize the {!validate_info} and {!validate_state} without
-   providing any predecessor information. This will cause any
-   preendorsement or endorsement operation to fail, since we lack the
-   information needed to validate it. *)
-val begin_no_predecessor_info :
-  context -> Chain_id.t -> validate_info * validate_state
+(** Initialize the {!info} and {!state} without providing any
+   predecessor information. This will cause any preendorsement or
+   endorsement operation to fail, since we lack the information needed
+   to validate it. *)
+val begin_no_predecessor_info : context -> Chain_id.t -> validation_state
 
 (** Check the validity of the given operation; return an updated
-    {!validate_state}.
+    {!state}.
 
     An operation is valid if it may be included in a block without
     causing the block's application to fail. The purpose of this
     function is to decide validity quickly, that is, without trying to
     actually apply the operation (ie. compute modifications to the
-    context: see {!Apply.apply_operation}) and see whether it causes an
-    error.
+    context: see {!Apply.apply_operation}) and see whether it causes
+    an error.
 
     An operation's validity may be checked in different situations:
     when we receive a block from a peer or we are constructing a fresh
     block, we validate each operation in the block right before trying
     to apply it; when a mempool receives an operation, it validates it
-    to decide whether the operation should be propagated (note that for
-    now, this only holds for manager operations, since
-    [validate_operation] is not impleted yet for other operations: see
-    below). See {!type:mode}.
+    to decide whether the operation should be propagated (note that
+    for now, this only holds for manager operations, since
+    [validate_operation] is not implemented yet for other operations:
+    see below). See {!type:mode}.
 
-    The [validate_info] contains every information we need
+    The [info] contains every information we need
     about the status of the chain to validate an operation, notably the
     context (of type {!Alpha_context.t}) at the end of the previous
     block. This context is never updated by the validation of
@@ -119,7 +130,7 @@ val begin_no_predecessor_info :
     [Error Manager_restriction] if another operation by the same
     manager has already been validated in the same block or mempool. In
     order to track this kind of operation incompatibilities, we use a
-    [validate_state] with minimal information that gets
+    [state] with minimal information that gets
     updated during validation.
 
     For a manager operation, validity is solvability, ie. it must be
@@ -152,12 +163,16 @@ val begin_no_predecessor_info :
       excludes signature checks: see its documentation in
       [lib_plugin/RPC.Scripts.S.run_operation]. *)
 val validate_operation :
-  validate_info ->
-  validate_state ->
+  validation_state ->
   ?should_check_signature:bool ->
   Operation_hash.t ->
-  'kind operation ->
-  validate_state tzresult Lwt.t
+  Alpha_context.packed_operation ->
+  state tzresult Lwt.t
+
+(** Check the consistency of the block_header information with the one
+    computed (Endorsement power, payload hash, etc) while validating
+    the block operations. Checks vary depending on the mode. *)
+val finalize_block : validation_state -> unit tzresult Lwt.t
 
 (** Remove a manager operation from the {!validate_operation_state}.
 
@@ -170,4 +185,4 @@ val validate_operation :
     This function will be replaced with a generic function
     [remove_operation] in the future. *)
 val remove_manager_operation :
-  validate_info -> validate_state -> 'a Kind.manager operation -> validate_state
+  validation_state -> 'a Kind.manager operation -> state

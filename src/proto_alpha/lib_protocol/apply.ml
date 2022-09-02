@@ -1222,8 +1222,7 @@ let apply_manager_operation :
         proof
         ~agreed:previous_message_result
         ~rejected:message_result_hash
-        ~max_proof_size:
-          (Alpha_context.Constants.tx_rollup_rejection_max_proof_size ctxt)
+        ~max_proof_size:(Constants.tx_rollup_rejection_max_proof_size ctxt)
       >>=? fun ctxt ->
       (* Proof is correct, removing *)
       Tx_rollup_commitment.reject_commitment ctxt tx_rollup state level
@@ -1770,8 +1769,8 @@ let rec mark_skipped :
     - consumption of each operation's [gas_limit] from the available
    block gas.
 
-    The operation should already been validated by
-   {!Validate_operation}. The latter is responsible for ensuring that
+    The operation should already have been validated by
+   {!Validate.validate_operation}. The latter is responsible for ensuring that
    the operation is solvable, i.e. its fees can be taken, i.e.
    [take_fees] cannot return an error. *)
 let take_fees ctxt contents_list =
@@ -1890,16 +1889,48 @@ let mark_backtracked results =
   in
   traverse_apply_results results
 
-type apply_mode =
-  | Application  (** Both partial and normal *)
-  | Full_construction
-  | Partial_construction of {predecessor_level : Level.t option}
-      (** This mode is intended to be used by a mempool. In this case,
-          [predecessor_level] has a value and is used to identify
-          grandparent endorsements (see [record_endorsement]
-          below). However, the [option] allows this mode to be hijacked in
-          other situations with no access to the predecessor level,
-          e.g. during an RPC call. *)
+type mode =
+  | Application of {
+      block_header : Block_header.t;
+      fitness : Fitness.t;
+      payload_producer : public_key_hash;
+      block_producer : public_key_hash;
+      predecessor_level : Level.t;
+      predecessor_round : Round.t;
+    }
+  | Partial_application of {
+      block_header : Block_header.t;
+      fitness : Fitness.t;
+      payload_producer : public_key_hash;
+      block_producer : public_key_hash;
+      predecessor_level : Level.t;
+      predecessor_round : Round.t;
+    }
+  | Full_construction of {
+      predecessor : Block_hash.t;
+      payload_producer : public_key_hash;
+      block_producer : public_key_hash;
+      block_data_contents : Block_header.contents;
+      round : Round.t;
+      predecessor_level : Level.t;
+      predecessor_round : Round.t;
+    }
+  | Partial_construction of {
+      predecessor_level : Raw_level.t;
+      predecessor_round : Round.t;
+      predecessor_fitness : Fitness.raw;
+    }
+
+type application_state = {
+  ctxt : t;
+  chain_id : Chain_id.t;
+  mode : mode;
+  op_count : int;
+  migration_balance_updates : Receipt.balance_updates;
+  liquidity_baking_toggle_ema : Liquidity_baking.Toggle_EMA.t;
+  implicit_operations_results :
+    Apply_results.packed_successful_manager_operation_result list;
+}
 
 let record_operation (type kind) ctxt hash (operation : kind operation) :
     context =
@@ -1915,17 +1946,16 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
   | Cons (Manager_operation _, _) ->
       record_non_consensus_operation_hash ctxt hash
 
-let record_preendorsement ctxt (apply_mode : apply_mode)
-    (content : consensus_content) :
+let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
     (context * Kind.preendorsement contents_result_list) tzresult =
   let open Tzresult_syntax in
   let ctxt =
-    match apply_mode with
-    | Full_construction -> (
+    match mode with
+    | Full_construction _ -> (
         match Consensus.get_preendorsements_quorum_round ctxt with
         | None -> Consensus.set_preendorsements_quorum_round ctxt content.round
         | Some _ -> ctxt)
-    | Application | Partial_construction _ -> ctxt
+    | Partial_application _ | Application _ | Partial_construction _ -> ctxt
   in
   match Slot.Map.find content.slot (Consensus.allowed_preendorsements ctxt) with
   | None ->
@@ -1945,21 +1975,20 @@ let record_preendorsement ctxt (apply_mode : apply_mode)
             (Preendorsement_result
                {balance_updates = []; delegate; preendorsement_power}) )
 
-let is_grandparent_endorsement apply_mode content =
-  match apply_mode with
-  | Partial_construction {predecessor_level = Some predecessor_level} ->
-      Raw_level.(succ content.level = predecessor_level.Level.level)
+let is_grandparent_endorsement mode content =
+  match mode with
+  | Partial_construction {predecessor_level; _} ->
+      Raw_level.(succ content.level = predecessor_level)
   | _ -> false
 
-let record_endorsement ctxt (apply_mode : apply_mode)
-    (content : consensus_content) :
+let record_endorsement ctxt (mode : mode) (content : consensus_content) :
     (context * Kind.endorsement contents_result_list) tzresult Lwt.t =
   let open Lwt_tzresult_syntax in
   let mk_endorsement_result delegate endorsement_power =
     Single_result
       (Endorsement_result {balance_updates = []; delegate; endorsement_power})
   in
-  if is_grandparent_endorsement apply_mode content then
+  if is_grandparent_endorsement mode content then
     let level = Level.from_raw ctxt content.level in
     let* ctxt, (_delegate_pk, delegate) =
       Stake_distribution.slot_owner ctxt level content.slot
@@ -2067,19 +2096,19 @@ let punish_double_baking ctxt (bh1 : Block_header.t) ~payload_producer =
     ~payload_producer
     (fun balance_updates -> Double_baking_evidence_result balance_updates)
 
-let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
+let apply_contents_list (type kind) ctxt chain_id (mode : mode)
     ~payload_producer (contents_list : kind contents_list) :
     (context * kind contents_result_list) tzresult Lwt.t =
   let mempool_mode =
-    match apply_mode with
+    match mode with
     | Partial_construction _ -> true
-    | Full_construction | Application -> false
+    | Full_construction _ | Application _ | Partial_application _ -> false
   in
   match contents_list with
   | Single (Preendorsement consensus_content) ->
-      record_preendorsement ctxt apply_mode consensus_content |> Lwt.return
+      record_preendorsement ctxt mode consensus_content |> Lwt.return
   | Single (Endorsement consensus_content) ->
-      record_endorsement ctxt apply_mode consensus_content
+      record_endorsement ctxt mode consensus_content
   | Single (Dal_slot_availability (endorser, slot_availability)) ->
       (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
 
@@ -2149,20 +2178,56 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode)
         ~mempool_mode
         contents_list
 
-let apply_operation ctxt chain_id (apply_mode : apply_mode) ~payload_producer
-    hash operation =
-  let ctxt = Origination_nonce.init ctxt hash in
-  let ctxt = record_operation ctxt hash operation in
-  apply_contents_list
-    ctxt
-    chain_id
-    apply_mode
-    ~payload_producer
-    operation.protocol_data.contents
-  >|=? fun (ctxt, result) ->
-  let ctxt = Gas.set_unlimited ctxt in
-  let ctxt = Origination_nonce.unset ctxt in
-  (ctxt, {contents = result})
+let apply_operation application_state operation_hash operation =
+  let open Lwt_tzresult_syntax in
+  let apply_operation application_state packed_operation ~payload_producer =
+    let {shell; protocol_data = Operation_data unpacked_protocol_data} =
+      packed_operation
+    in
+    let operation : _ Operation.t =
+      {shell; protocol_data = unpacked_protocol_data}
+    in
+    let ctxt = Origination_nonce.init application_state.ctxt operation_hash in
+    let ctxt = record_operation ctxt operation_hash operation in
+    let* ctxt, result =
+      apply_contents_list
+        ctxt
+        application_state.chain_id
+        application_state.mode
+        ~payload_producer
+        operation.protocol_data.contents
+    in
+    let ctxt = Gas.set_unlimited ctxt in
+    let ctxt = Origination_nonce.unset ctxt in
+    let op_count = succ application_state.op_count in
+    return
+      ( {application_state with ctxt; op_count},
+        Operation_metadata {contents = result} )
+  in
+  match application_state.mode with
+  | Partial_application {payload_producer; _} -> (
+      match Operation.acceptable_pass operation with
+      | None ->
+          (* Only occurs with Failing_noop *)
+          fail Validate_errors.Failing_noop_error
+      | Some n ->
+          if
+            (* Multipass validation only considers operations in
+               consensus pass. *)
+            Compare.Int.(n = Operation_repr.consensus_pass)
+          then apply_operation application_state operation ~payload_producer
+          else
+            let op_count = application_state.op_count + 1 in
+            return ({application_state with op_count}, No_operation_metadata))
+  | Application {payload_producer; _} ->
+      apply_operation application_state operation ~payload_producer
+  | Full_construction {payload_producer; _} ->
+      apply_operation application_state operation ~payload_producer
+  | Partial_construction _ ->
+      apply_operation
+        application_state
+        operation
+        ~payload_producer:Signature.Public_key_hash.zero
 
 let may_start_new_cycle ctxt =
   match Level.dawn_of_a_new_cycle ctxt with
@@ -2172,29 +2237,6 @@ let may_start_new_cycle ctxt =
       >>=? fun (ctxt, balance_updates, deactivated) ->
       Bootstrap.cycle_end ctxt last_cycle >|=? fun ctxt ->
       (ctxt, balance_updates, deactivated)
-
-let init_allowed_consensus_operations ctxt ~endorsement_level
-    ~preendorsement_level =
-  Delegate.prepare_stake_distribution ctxt >>=? fun ctxt ->
-  (if Level.(endorsement_level = preendorsement_level) then
-   Baking.endorsing_rights_by_first_slot ctxt endorsement_level
-   >>=? fun (ctxt, slots) ->
-   let consensus_operations = slots in
-   return (ctxt, consensus_operations, consensus_operations)
-  else
-    Baking.endorsing_rights_by_first_slot ctxt endorsement_level
-    >>=? fun (ctxt, endorsements_slots) ->
-    let endorsements = endorsements_slots in
-    Baking.endorsing_rights_by_first_slot ctxt preendorsement_level
-    >>=? fun (ctxt, preendorsements_slots) ->
-    let preendorsements = preendorsements_slots in
-    return (ctxt, endorsements, preendorsements))
-  >>=? fun (ctxt, allowed_endorsements, allowed_preendorsements) ->
-  return
-    (Consensus.initialize_consensus_operation
-       ctxt
-       ~allowed_endorsements
-       ~allowed_preendorsements)
 
 let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
   Liquidity_baking.on_subsidy_allowed
@@ -2350,126 +2392,6 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
           let ctxt = Gas.set_unlimited backtracking_ctxt in
           Ok (ctxt, []))
 
-type 'a full_construction = {
-  ctxt : t;
-  protocol_data : 'a;
-  payload_producer : Signature.public_key_hash;
-  block_producer : Signature.public_key_hash;
-  round : Round.t;
-  implicit_operations_results : packed_successful_manager_operation_result list;
-  liquidity_baking_toggle_ema : Liquidity_baking.Toggle_EMA.t;
-}
-
-let begin_full_construction ctxt ~predecessor_timestamp ~predecessor_level
-    ~predecessor_round ~round protocol_data =
-  let round_durations = Constants.round_durations ctxt in
-  let timestamp = Timestamp.current ctxt in
-  Block_header.check_timestamp
-    round_durations
-    ~timestamp
-    ~round
-    ~predecessor_timestamp
-    ~predecessor_round
-  >>?= fun () ->
-  let current_level = Level.current ctxt in
-  Stake_distribution.baking_rights_owner ctxt current_level ~round
-  >>=? fun (ctxt, _slot, (_block_producer_pk, block_producer)) ->
-  Delegate.frozen_deposits ctxt block_producer >>=? fun frozen_deposits ->
-  fail_unless
-    Tez.(frozen_deposits.current_amount > zero)
-    (Zero_frozen_deposits block_producer)
-  >>=? fun () ->
-  Stake_distribution.baking_rights_owner
-    ctxt
-    current_level
-    ~round:protocol_data.Block_header.payload_round
-  >>=? fun (ctxt, _slot, (_payload_producer_pk, payload_producer)) ->
-  init_allowed_consensus_operations
-    ctxt
-    ~endorsement_level:predecessor_level
-    ~preendorsement_level:current_level
-  >>=? fun ctxt ->
-  let toggle_vote = protocol_data.liquidity_baking_toggle_vote in
-  apply_liquidity_baking_subsidy ctxt ~toggle_vote
-  >|=? fun ( ctxt,
-             liquidity_baking_operations_results,
-             liquidity_baking_toggle_ema ) ->
-  {
-    ctxt;
-    protocol_data;
-    payload_producer;
-    block_producer;
-    round;
-    implicit_operations_results = liquidity_baking_operations_results;
-    liquidity_baking_toggle_ema;
-  }
-
-let begin_partial_construction ctxt ~predecessor_level ~toggle_vote =
-  (* In the mempool, only consensus operations for [predecessor_level]
-     (that is, head's level) are allowed, contrary to block validation
-     where endorsements are for the previous level and
-     preendorsements, if any, for the block's level. *)
-  init_allowed_consensus_operations
-    ctxt
-    ~endorsement_level:predecessor_level
-    ~preendorsement_level:predecessor_level
-  >>=? fun ctxt -> apply_liquidity_baking_subsidy ctxt ~toggle_vote
-
-let begin_application ctxt chain_id (block_header : Block_header.t) fitness
-    ~predecessor_timestamp ~predecessor_level ~predecessor_round =
-  let round = Fitness.round fitness in
-  let current_level = Level.current ctxt in
-  Stake_distribution.baking_rights_owner ctxt current_level ~round
-  >>=? fun (ctxt, _slot, (block_producer_pk, block_producer)) ->
-  let timestamp = block_header.shell.timestamp in
-  Block_header.begin_validate_block_header
-    ~block_header
-    ~chain_id
-    ~predecessor_timestamp
-    ~predecessor_round
-    ~fitness
-    ~timestamp
-    ~delegate_pk:block_producer_pk
-    ~round_durations:(Constants.round_durations ctxt)
-    ~proof_of_work_threshold:(Constants.proof_of_work_threshold ctxt)
-    ~expected_commitment:current_level.expected_commitment
-  >>?= fun () ->
-  Delegate.frozen_deposits ctxt block_producer >>=? fun frozen_deposits ->
-  fail_unless
-    Tez.(frozen_deposits.current_amount > zero)
-    (Zero_frozen_deposits block_producer)
-  >>=? fun () ->
-  Stake_distribution.baking_rights_owner
-    ctxt
-    current_level
-    ~round:block_header.protocol_data.contents.payload_round
-  >>=? fun (ctxt, _slot, (payload_producer_pk, _payload_producer)) ->
-  init_allowed_consensus_operations
-    ctxt
-    ~endorsement_level:predecessor_level
-    ~preendorsement_level:current_level
-  >>=? fun ctxt ->
-  let toggle_vote =
-    block_header.Block_header.protocol_data.contents
-      .liquidity_baking_toggle_vote
-  in
-  apply_liquidity_baking_subsidy ctxt ~toggle_vote
-  >|=? fun ( ctxt,
-             liquidity_baking_operations_results,
-             liquidity_baking_toggle_ema ) ->
-  ( ctxt,
-    payload_producer_pk,
-    block_producer,
-    liquidity_baking_operations_results,
-    liquidity_baking_toggle_ema )
-
-type finalize_application_mode =
-  | Finalize_full_construction of {
-      level : Raw_level.t;
-      predecessor_round : Round.t;
-    }
-  | Finalize_application of Fitness.t
-
 let compute_payload_hash (ctxt : context) ~(predecessor : Block_hash.t)
     ~(payload_round : Round.t) : Block_payload_hash.t =
   let non_consensus_operations = non_consensus_operations ctxt in
@@ -2483,65 +2405,6 @@ let are_endorsements_required ctxt ~level =
      next level cannot contain endorsements. *)
   let level_position_in_protocol = Raw_level.diff level first_level in
   Compare.Int32.(level_position_in_protocol > 1l)
-
-let check_minimum_endorsements ~endorsing_power ~minimum =
-  error_when
-    Compare.Int.(endorsing_power < minimum)
-    (Not_enough_endorsements {required = minimum; provided = endorsing_power})
-
-let finalize_application_check_validity ctxt (mode : finalize_application_mode)
-    protocol_data ~round ~predecessor ~endorsing_power ~consensus_threshold
-    ~required_endorsements =
-  (if required_endorsements then
-   check_minimum_endorsements ~endorsing_power ~minimum:consensus_threshold
-  else Result.return_unit)
-  >>?= fun () ->
-  let block_payload_hash =
-    compute_payload_hash
-      ctxt
-      ~predecessor
-      ~payload_round:protocol_data.Block_header.payload_round
-  in
-  let locked_round_evidence =
-    Option.map
-      (fun (preendorsement_round, preendorsement_count) ->
-        Block_header.{preendorsement_round; preendorsement_count})
-      (Consensus.locked_round_evidence ctxt)
-  in
-  (match mode with
-  | Finalize_application fitness -> ok fitness
-  | Finalize_full_construction {level; predecessor_round} ->
-      let locked_round =
-        match locked_round_evidence with
-        | None -> None
-        | Some {preendorsement_round; _} -> Some preendorsement_round
-      in
-      Fitness.create ~level ~round ~predecessor_round ~locked_round)
-  >>?= fun fitness ->
-  let checkable_payload_hash : Block_header.checkable_payload_hash =
-    match mode with
-    | Finalize_application _ -> Expected_payload_hash block_payload_hash
-    | Finalize_full_construction _ -> (
-        match locked_round_evidence with
-        | Some _ -> Expected_payload_hash block_payload_hash
-        | None ->
-            (* In full construction, when there is no locked round
-               evidence (and thus no preendorsements), the baker cannot
-               know the payload hash before selecting the operations. We
-               may dismiss checking the initially given
-               payload_hash. However, to be valid, the baker must patch
-               the resulting block header with the actual payload
-               hash. *)
-            No_check)
-  in
-  Block_header.finalize_validate_block_header
-    ~block_header_contents:protocol_data
-    ~round
-    ~fitness
-    ~checkable_payload_hash
-    ~locked_round_evidence
-    ~consensus_threshold
-  >>?= fun () -> return (fitness, block_payload_hash)
 
 let record_endorsing_participation ctxt =
   let validators = Consensus.allowed_endorsements ctxt in
@@ -2560,71 +2423,263 @@ let record_endorsing_participation ctxt =
     validators
     ctxt
 
-let finalize_application ctxt (mode : finalize_application_mode) protocol_data
-    ~payload_producer ~block_producer liquidity_baking_toggle_ema
-    implicit_operations_results ~round ~predecessor ~migration_balance_updates =
-  (* Then we finalize the consensus. *)
+let begin_application ctxt chain_id ~migration_balance_updates
+    ~migration_operation_results ~(predecessor_fitness : Fitness.raw)
+    (block_header : Block_header.t) : application_state tzresult Lwt.t =
+  let open Lwt_tzresult_syntax in
+  let*? fitness = Fitness.from_raw block_header.shell.fitness in
+  let level = block_header.shell.level in
+  let*? predecessor_round = Fitness.round_from_raw predecessor_fitness in
+  let*? predecessor_level = Raw_level.of_int32 (Int32.pred level) in
+  let predecessor_level = Level.from_raw ctxt predecessor_level in
+  let round = Fitness.round fitness in
+  let current_level = Level.current ctxt in
+  let* ctxt, _slot, (_block_producer_pk, block_producer) =
+    Stake_distribution.baking_rights_owner ctxt current_level ~round
+  in
+  let* ctxt, _slot, (payload_producer, _payload_producer) =
+    Stake_distribution.baking_rights_owner
+      ctxt
+      current_level
+      ~round:block_header.protocol_data.contents.payload_round
+  in
+  let toggle_vote =
+    block_header.Block_header.protocol_data.contents
+      .liquidity_baking_toggle_vote
+  in
+  let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
+    apply_liquidity_baking_subsidy ctxt ~toggle_vote
+  in
+  let mode =
+    Application
+      {
+        block_header;
+        fitness;
+        predecessor_round;
+        predecessor_level;
+        payload_producer = Signature.Public_key.hash payload_producer;
+        block_producer;
+      }
+  in
+  return
+    {
+      mode;
+      chain_id;
+      ctxt;
+      op_count = 0;
+      migration_balance_updates;
+      liquidity_baking_toggle_ema;
+      implicit_operations_results =
+        Apply_results.pack_migration_operation_results
+          migration_operation_results
+        @ liquidity_baking_operations_results;
+    }
+
+let begin_partial_application ~ancestor_context chain_id
+    ~migration_balance_updates ~migration_operation_results
+    ~(predecessor_fitness : Fitness.raw) (block_header : Block_header.t) =
+  let open Lwt_tzresult_syntax in
+  let*? fitness = Fitness.from_raw block_header.shell.fitness in
+  let level = block_header.shell.level in
+  let*? predecessor_round = Fitness.round_from_raw predecessor_fitness in
+  let*? predecessor_level = Raw_level.of_int32 (Int32.pred level) in
+  let predecessor_level = Level.(from_raw ancestor_context predecessor_level) in
+  (* Note: we don't have access to the predecessor context. *)
+  let round = Fitness.round fitness in
+  let current_level = Level.current ancestor_context in
+  let* ctxt, _slot, (_block_producer_pk, block_producer) =
+    Stake_distribution.baking_rights_owner ancestor_context current_level ~round
+  in
+  let* ctxt, _slot, (payload_producer_pk, _payload_producer) =
+    Stake_distribution.baking_rights_owner
+      ctxt
+      current_level
+      ~round:block_header.protocol_data.contents.payload_round
+  in
+  let toggle_vote =
+    block_header.Block_header.protocol_data.contents
+      .liquidity_baking_toggle_vote
+  in
+  let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
+    apply_liquidity_baking_subsidy ctxt ~toggle_vote
+  in
+  let mode =
+    Partial_application
+      {
+        block_header;
+        fitness;
+        predecessor_level;
+        predecessor_round;
+        payload_producer = Signature.Public_key.hash payload_producer_pk;
+        block_producer;
+      }
+  in
+  return
+    {
+      mode;
+      chain_id;
+      ctxt;
+      op_count = 0;
+      migration_balance_updates;
+      liquidity_baking_toggle_ema;
+      implicit_operations_results =
+        Apply_results.pack_migration_operation_results
+          migration_operation_results
+        @ liquidity_baking_operations_results;
+    }
+
+let begin_full_construction ctxt chain_id ~migration_balance_updates
+    ~migration_operation_results ~predecessor_timestamp ~predecessor_level
+    ~predecessor_round ~predecessor ~timestamp
+    (block_data_contents : Block_header.contents) =
+  let open Lwt_tzresult_syntax in
+  let round_durations = Constants.round_durations ctxt in
+  let*? round =
+    Round.round_of_timestamp
+      round_durations
+      ~predecessor_timestamp
+      ~predecessor_round
+      ~timestamp
+  in
+  (* The endorsement/preendorsement validation rules for construction are the
+     same as for application. *)
+  let current_level = Level.current ctxt in
+  let* ctxt, _slot, (_block_producer_pk, block_producer) =
+    Stake_distribution.baking_rights_owner ctxt current_level ~round
+  in
+  let* ctxt, _slot, (_payload_producer_pk, payload_producer) =
+    Stake_distribution.baking_rights_owner
+      ctxt
+      current_level
+      ~round:block_data_contents.payload_round
+  in
+  let toggle_vote = block_data_contents.liquidity_baking_toggle_vote in
+  let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
+    apply_liquidity_baking_subsidy ctxt ~toggle_vote
+  in
+  let mode =
+    Full_construction
+      {
+        predecessor;
+        payload_producer;
+        block_producer;
+        round;
+        block_data_contents;
+        predecessor_round;
+        predecessor_level;
+      }
+  in
+  return
+    {
+      mode;
+      chain_id;
+      ctxt;
+      op_count = 0;
+      migration_balance_updates;
+      liquidity_baking_toggle_ema;
+      implicit_operations_results =
+        Apply_results.pack_migration_operation_results
+          migration_operation_results
+        @ liquidity_baking_operations_results;
+    }
+
+let begin_partial_construction ctxt chain_id ~migration_balance_updates
+    ~migration_operation_results ~predecessor_level
+    ~(predecessor_fitness : Fitness.raw) : application_state tzresult Lwt.t =
+  let open Lwt_tzresult_syntax in
+  let*? predecessor_round = Fitness.round_from_raw predecessor_fitness in
+  let toggle_vote = Liquidity_baking.LB_pass in
+  let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
+    apply_liquidity_baking_subsidy ctxt ~toggle_vote
+  in
+  let mode =
+    Partial_construction
+      {predecessor_level; predecessor_round; predecessor_fitness}
+  in
+  return
+    {
+      mode;
+      chain_id;
+      ctxt;
+      op_count = 0;
+      migration_balance_updates;
+      liquidity_baking_toggle_ema;
+      implicit_operations_results =
+        Apply_results.pack_migration_operation_results
+          migration_operation_results
+        @ liquidity_baking_operations_results;
+    }
+
+let finalize_application ctxt block_data_contents ~round ~predecessor
+    ~liquidity_baking_toggle_ema ~implicit_operations_results
+    ~migration_balance_updates ~block_producer ~payload_producer =
+  let open Lwt_result_syntax in
   let level = Level.current ctxt in
-  let block_endorsing_power = Consensus.current_endorsement_power ctxt in
-  let consensus_threshold = Constants.consensus_threshold ctxt in
-  are_endorsements_required ctxt ~level:level.level
-  >>=? fun required_endorsements ->
-  finalize_application_check_validity
-    ctxt
-    mode
-    protocol_data
-    ~round
-    ~predecessor
-    ~endorsing_power:block_endorsing_power
-    ~consensus_threshold
-    ~required_endorsements
-  >>=? fun (fitness, block_payload_hash) ->
+  let endorsing_power = Consensus.current_endorsement_power ctxt in
+  let* required_endorsements =
+    are_endorsements_required ctxt ~level:level.level
+  in
+  let block_payload_hash =
+    compute_payload_hash
+      ctxt
+      ~predecessor
+      ~payload_round:block_data_contents.Block_header.payload_round
+  in
   (* from this point nothing should fail *)
   (* We mark the endorsement branch as the grand parent branch when
      accessible. This will not be present before the first two blocks
      of tenderbake. *)
-  (match Consensus.endorsement_branch ctxt with
-  | Some predecessor_branch ->
-      Consensus.store_grand_parent_branch ctxt predecessor_branch >>= return
-  | None -> return ctxt)
-  >>=? fun ctxt ->
+  let level = Level.current ctxt in
+  let*! ctxt =
+    match Consensus.endorsement_branch ctxt with
+    | Some predecessor_branch ->
+        Consensus.store_grand_parent_branch ctxt predecessor_branch
+    | None -> Lwt.return ctxt
+  in
   (* We mark the current payload hash as the predecessor one => this
      will only be accessed by the successor block now. *)
-  Consensus.store_endorsement_branch ctxt (predecessor, block_payload_hash)
-  >>= fun ctxt ->
-  Round.update ctxt round >>=? fun ctxt ->
+  let*! ctxt =
+    Consensus.store_endorsement_branch ctxt (predecessor, block_payload_hash)
+  in
+  let* ctxt = Round.update ctxt round in
   (* end of level  *)
-  (match protocol_data.Block_header.seed_nonce_hash with
-  | None -> return ctxt
-  | Some nonce_hash ->
-      Nonce.record_hash ctxt {nonce_hash; delegate = block_producer})
-  >>=? fun ctxt ->
-  (if required_endorsements then
-   record_endorsing_participation ctxt >>=? fun ctxt ->
-   Baking.bonus_baking_reward ctxt ~endorsing_power:block_endorsing_power
-   >>?= fun rewards_bonus -> return (ctxt, Some rewards_bonus)
-  else return (ctxt, None))
-  >>=? fun (ctxt, reward_bonus) ->
+  let* ctxt =
+    match block_data_contents.Block_header.seed_nonce_hash with
+    | None -> return ctxt
+    | Some nonce_hash ->
+        Nonce.record_hash ctxt {nonce_hash; delegate = block_producer}
+  in
+  let* ctxt, reward_bonus =
+    if required_endorsements then
+      let* ctxt = record_endorsing_participation ctxt in
+      let*? rewards_bonus = Baking.bonus_baking_reward ctxt ~endorsing_power in
+      return (ctxt, Some rewards_bonus)
+    else return (ctxt, None)
+  in
   let baking_reward = Constants.baking_reward_fixed_portion ctxt in
-  Delegate.record_baking_activity_and_pay_rewards_and_fees
-    ctxt
-    ~payload_producer
-    ~block_producer
-    ~baking_reward
-    ~reward_bonus
-  >>=? fun (ctxt, baking_receipts) ->
+  let* ctxt, baking_receipts =
+    Delegate.record_baking_activity_and_pay_rewards_and_fees
+      ctxt
+      ~payload_producer
+      ~block_producer
+      ~baking_reward
+      ~reward_bonus
+  in
   (* if end of nonce revelation period, compute seed *)
-  (if Level.may_compute_randao ctxt then Seed.compute_randao ctxt
-  else return ctxt)
-  >>=? fun ctxt ->
-  (if Level.may_snapshot_stake_distribution ctxt then
-   Stake_distribution.snapshot ctxt
-  else return ctxt)
-  >>=? fun ctxt ->
-  may_start_new_cycle ctxt
-  >>=? fun (ctxt, cycle_end_balance_updates, deactivated) ->
-  Amendment.may_start_new_voting_period ctxt >>=? fun ctxt ->
-  Dal_apply.dal_finalisation ctxt >>=? fun (ctxt, dal_slot_availability) ->
+  let* ctxt =
+    if Level.may_compute_randao ctxt then Seed.compute_randao ctxt
+    else return ctxt
+  in
+  let* ctxt =
+    if Level.may_snapshot_stake_distribution ctxt then
+      Stake_distribution.snapshot ctxt
+    else return ctxt
+  in
+  let* ctxt, cycle_end_balance_updates, deactivated =
+    may_start_new_cycle ctxt
+  in
+  let* ctxt = Amendment.may_start_new_voting_period ctxt in
+  let* ctxt, dal_slot_availability = Dal_apply.dal_finalisation ctxt in
   let balance_updates =
     migration_balance_updates @ baking_receipts @ cycle_end_balance_updates
   in
@@ -2633,7 +2688,7 @@ let finalize_application ctxt (mode : finalize_application_mode) protocol_data
       (Gas.Arith.fp @@ Constants.hard_gas_limit_per_block ctxt)
       (Gas.block_level ctxt)
   in
-  Voting_period.get_rpc_current_info ctxt >|=? fun voting_period_info ->
+  let+ voting_period_info = Voting_period.get_rpc_current_info ctxt in
   let receipt =
     Apply_results.
       {
@@ -2641,7 +2696,7 @@ let finalize_application ctxt (mode : finalize_application_mode) protocol_data
         baker = block_producer;
         level_info = level;
         voting_period_info;
-        nonce_hash = protocol_data.seed_nonce_hash;
+        nonce_hash = block_data_contents.seed_nonce_hash;
         consumed_gas;
         deactivated;
         balance_updates;
@@ -2650,6 +2705,178 @@ let finalize_application ctxt (mode : finalize_application_mode) protocol_data
         dal_slot_availability;
       }
   in
-  (ctxt, fitness, receipt)
+  (ctxt, receipt)
+
+type error += Missing_shell_header
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"apply.missing_shell_header"
+    ~title:"Missing shell_header during finalisation of a block"
+    ~description:
+      "During finalisation of a block header in Application mode or Full \
+       construction mode, a shell header should be provided so that a cache \
+       nonce can be computed."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "No shell header provided during the finalisation of a block.")
+    Data_encoding.unit
+    (function Missing_shell_header -> Some () | _ -> None)
+    (fun () -> Missing_shell_header)
+
+let finalize_with_commit_message ctxt ~cache_nonce fitness round op_count =
+  let open Lwt_syntax in
+  let* ctxt = Cache.Admin.sync ctxt cache_nonce in
+  let raw_level = Raw_level.to_int32 (Level.current ctxt).level in
+  let commit_message =
+    Format.asprintf
+      "lvl %ld, fit:%a, round %a, %d ops"
+      raw_level
+      Fitness.pp
+      fitness
+      Round.pp
+      round
+      op_count
+  in
+  let validation_result =
+    finalize ~commit_message ctxt (Fitness.to_raw fitness)
+  in
+  return validation_result
+
+let finalize_block (application_state : application_state) shell_header_opt =
+  let open Lwt_tzresult_syntax in
+  let {
+    ctxt;
+    liquidity_baking_toggle_ema;
+    implicit_operations_results;
+    migration_balance_updates;
+    op_count;
+    _;
+  } =
+    application_state
+  in
+  match application_state.mode with
+  | Full_construction
+      {
+        predecessor;
+        predecessor_level = _;
+        block_data_contents;
+        predecessor_round;
+        block_producer;
+        payload_producer;
+        round;
+      } ->
+      let*? (shell_header : Block_header.shell_header) =
+        Option.value_e
+          shell_header_opt
+          ~error:(Error_monad.trace_of_error Missing_shell_header)
+      in
+      let cache_nonce =
+        Cache.cache_nonce_from_block_header shell_header block_data_contents
+      in
+      let locked_round_evidence =
+        Option.map
+          (fun (preendorsement_round, preendorsement_count) ->
+            Block_header.{preendorsement_round; preendorsement_count})
+          (Consensus.locked_round_evidence ctxt)
+      in
+      let locked_round =
+        match locked_round_evidence with
+        | None -> None
+        | Some {preendorsement_round; _} -> Some preendorsement_round
+      in
+      let level = (Level.current ctxt).level in
+      let*? fitness =
+        Fitness.create ~level ~round ~predecessor_round ~locked_round
+      in
+      let* ctxt, receipt =
+        finalize_application
+          ctxt
+          block_data_contents
+          ~round
+          ~predecessor
+          ~liquidity_baking_toggle_ema
+          ~implicit_operations_results
+          ~migration_balance_updates
+          ~block_producer
+          ~payload_producer
+      in
+      let*! result =
+        finalize_with_commit_message ctxt ~cache_nonce fitness round op_count
+      in
+      return (result, receipt)
+  | Partial_construction {predecessor_fitness; _} ->
+      let* voting_period_info = Voting_period.get_rpc_current_info ctxt in
+      let level_info = Level.current ctxt in
+      let result = finalize ctxt predecessor_fitness in
+      return
+        ( result,
+          Apply_results.
+            {
+              proposer = Signature.Public_key_hash.zero;
+              baker = Signature.Public_key_hash.zero;
+              level_info;
+              voting_period_info;
+              nonce_hash = None;
+              consumed_gas = Gas.Arith.zero;
+              deactivated = [];
+              balance_updates = migration_balance_updates;
+              liquidity_baking_toggle_ema;
+              implicit_operations_results;
+              dal_slot_availability = None;
+            } )
+  | Application
+      {
+        fitness;
+        block_header = {shell; protocol_data};
+        payload_producer;
+        block_producer;
+        _;
+      } ->
+      let round = Fitness.round fitness in
+      let cache_nonce =
+        Cache.cache_nonce_from_block_header shell protocol_data.contents
+      in
+      let* ctxt, receipt =
+        finalize_application
+          ctxt
+          protocol_data.contents
+          ~round
+          ~predecessor:shell.predecessor
+          ~liquidity_baking_toggle_ema
+          ~implicit_operations_results
+          ~migration_balance_updates
+          ~block_producer
+          ~payload_producer
+      in
+      let*! result =
+        finalize_with_commit_message ctxt ~cache_nonce fitness round op_count
+      in
+      return (result, receipt)
+  | Partial_application {block_producer; fitness; _} ->
+      let* voting_period_info = Voting_period.get_rpc_current_info ctxt in
+      let level_info = Level.current ctxt in
+      let ctxt = finalize ctxt (Fitness.to_raw fitness) in
+      return
+        ( ctxt,
+          Apply_results.
+            {
+              proposer = Signature.Public_key_hash.zero;
+              (* We cannot retrieve the proposer as it requires the
+                 frozen deposit that might not be available depending on
+                 the context given to the partial application. *)
+              baker = block_producer;
+              level_info;
+              voting_period_info;
+              nonce_hash = None;
+              consumed_gas = Gas.Arith.zero;
+              deactivated = [];
+              balance_updates = migration_balance_updates;
+              liquidity_baking_toggle_ema;
+              implicit_operations_results;
+              dal_slot_availability = None;
+            } )
 
 let value_of_key ctxt k = Cache.Admin.value_of_key ctxt k

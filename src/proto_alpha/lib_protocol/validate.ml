@@ -25,17 +25,14 @@
 
 open Alpha_context
 
-(** {2 Definition and initialization of [validate_info] and
-    [validate_operation_state]}
+(** {2 Definition and initialization of [info] and [state]}
 
     These live in memory during the validation of a block, or until a
-    change of head block in mempool mode; they are never put in the
-    storage. *)
+    change of head block; they are never put in the storage. *)
 
 (** Since the expected features of preendorsement and endorsement are
-    the same for all operations in the considered block and mempool, we
-    compute them once and for all at the beginning of the
-    block/mempool.
+    the same for all operations in the considered block, we compute
+    them once and for all at the begining of the block.
 
     See [expected_features_for_block_validation],
     [expected_features_for_block_construction], and
@@ -182,7 +179,7 @@ end)
     These fields are used to enforce that we do not validate the same
     operation multiple times.
 
-    Note that as part of {!validate_operation_state}, these maps live
+    Note that as part of {!state}, these maps live
     in memory. They are not explicitly bounded here, however:
 
     - In block validation mode, they are bounded by the number of
@@ -227,7 +224,7 @@ type manager_state = {
           (1M). The operation hash lets us indicate the conflicting
           operation in the {!Manager_restriction} error.
 
-          Note that as part of {!validate_operation_state}, this map
+          Note that as part of {!state}, this map
           lives in memory. It is not explicitly bounded here, however:
 
           - In block validation mode, it is bounded by the number of
@@ -246,25 +243,50 @@ let init_manager_state ctxt =
     remaining_block_gas = Gas.Arith.fp (Constants.hard_gas_limit_per_block ctxt);
   }
 
+(** Mode-dependent information needed in final checks. *)
+type application_info = {
+  fitness : Fitness.t;
+  block_producer : public_key_hash;
+  payload_producer : public_key_hash;
+  predecessor_hash : Block_hash.t;
+  block_data_contents : Block_header.contents;
+}
+
 (** Circumstances in which operations are validated:
 
-    - [Block]: covers both the (full or partial) validation of a
-      preexisting block, and the construction of a new block. Corresponds
-      to [Application], [Partial_application], and [Full_construction] of
-      {!Main.validation_mode}.
+    - [Application] is used for the validation of preexisting block.
+   Corresponds to [Application] of {!Main.validation_mode}.
 
-    - [Mempool]: is used by the mempool (either directly or through
-      the plugin). Corresponds to [Partial_construction] of
-      {!Main.validation_mode}.
+    - [Partial_application] is used to partially validate preexisting
+   block. Corresponds to [Partial_application] of
+   {!Main.validation_mode}.
+
+    - [Construction] is used for the construction of a new block.
+   Corresponds to [Full_construction] of {!Main.validation_mode}.
+
+    - [Mempool] is used by the mempool (either directly or through the
+   plugin). Corresponds to [Partial_construction] of
+   {!Main.validation_mode}.
 
     If you add a new mode, please make sure that it has a way to bound
-    the size of the map {!recfield:managers_seen}. *)
-type mode = Block | Mempool
+   the size of the map {!recfield:managers_seen}. *)
+type mode =
+  | Application of application_info
+  | Partial_application of application_info
+  | Construction of {
+      predecessor_round : Round.t;
+      predecessor_hash : Block_hash.t;
+      round : Round.t;
+      block_data_contents : Block_header.contents;
+      block_producer : public_key_hash;
+      payload_producer : public_key_hash;
+    }
+  | Mempool
 
-(** {2 Definition and initialization of [validate_info] and
-    [validate_state]} *)
+(** {2 Definition and initialization of [info] and
+    [state]} *)
 
-type validate_info = {
+type info = {
   ctxt : t;  (** The context at the beginning of the block or mempool. *)
   mode : mode;
   chain_id : Chain_id.t;  (** Needed for signature checks. *)
@@ -273,35 +295,41 @@ type validate_info = {
   manager_info : manager_info;
 }
 
-type validate_state = {
+type state = {
   consensus_state : consensus_state;
   voting_state : voting_state;
   anonymous_state : anonymous_state;
   manager_state : manager_state;
+  op_count : int;
+  recorded_operations_rev : Operation_hash.t list;
+  last_op_validation_pass : int option;
 }
 
-let init_validate_info ctxt mode chain_id all_expected_consensus_characteritics
-    =
+type validation_state = {info : info; state : state}
+
+let init_info ctxt mode chain_id all_expected_consensus_characteristics =
   {
     ctxt;
     mode;
     chain_id;
     current_level = Level.current ctxt;
     consensus_info =
-      init_consensus_info ctxt all_expected_consensus_characteritics;
+      init_consensus_info ctxt all_expected_consensus_characteristics;
     manager_info = init_manager_info ctxt;
   }
 
-let init_validate_info ctxt mode chain_id all_expected_consensus_characteritics
-    =
-  init_validate_info ctxt mode chain_id all_expected_consensus_characteritics
+let init_info ctxt mode chain_id all_expected_consensus_characteristics =
+  init_info ctxt mode chain_id all_expected_consensus_characteristics
 
-let init_validate_state ctxt =
+let init_state ctxt =
   {
     consensus_state = empty_consensus_state;
     voting_state = empty_voting_state;
     anonymous_state = empty_anonymous_state;
     manager_state = init_manager_state ctxt;
+    op_count = 0;
+    recorded_operations_rev = [];
+    last_op_validation_pass = None;
   }
 
 (** Validation of consensus operations (validation pass [0]):
@@ -1600,7 +1628,7 @@ module Manager = struct
   let check_gas_limit_and_consume_from_block_gas vi ~remaining_block_gas
       ~gas_limit =
     (match vi.mode with
-    | Block -> fun res -> res
+    | Application _ | Partial_application _ | Construction _ -> fun res -> res
     | Mempool ->
         (* [Gas.check_limit_and_consume_from_block_gas] will only
            raise a "temporary" error, however when
@@ -1843,7 +1871,7 @@ module Manager = struct
       contents_list] if [contents_list] were an ordinary [list]. *)
   let rec validate_contents_list :
       type kind.
-      validate_info ->
+      info ->
       batch_state ->
       kind Kind.manager contents_list ->
       batch_state tzresult Lwt.t =
@@ -1856,7 +1884,7 @@ module Manager = struct
         validate_contents_list vi batch_state tail
 
   (** Return the new value that [remaining_block_gas] should have in
-      [validate_operation_state] after the validation of a manager
+      [state] after the validation of a manager
       operation:
 
       - In [Block] (ie. block validation or block full construction)
@@ -1864,12 +1892,13 @@ module Manager = struct
         the gas from the validated operation has been subtracted.
 
       - In [Mempool] mode, the [remaining_block_gas] in
-        [validate_operation_state] should remain unchanged. Indeed, we
+        [state] should remain unchanged. Indeed, we
         only want each batch to not exceed the block limit individually,
         without taking other operations into account. *)
   let maybe_update_remaining_block_gas vi vs batch_state =
     match vi.mode with
-    | Block -> batch_state.remaining_block_gas
+    | Application _ | Partial_application _ | Construction _ ->
+        batch_state.remaining_block_gas
     | Mempool -> vs.manager_state.remaining_block_gas
 
   let validate_manager_operation vi vs ~should_check_signature source oph
@@ -1945,7 +1974,7 @@ module Manager = struct
         in
         let remaining_block_gas =
           match vi.mode with
-          | Block ->
+          | Application _ | Partial_application _ | Construction _ ->
               let gas_limit =
                 sum_batch_gas_limit
                   Gas.Arith.zero
@@ -1962,14 +1991,63 @@ module Manager = struct
 end
 
 let init_info_and_state ctxt mode chain_id all_expected_consensus_features =
-  let vi =
-    init_validate_info ctxt mode chain_id all_expected_consensus_features
-  in
-  let vs = init_validate_state ctxt in
-  (vi, vs)
+  let info = init_info ctxt mode chain_id all_expected_consensus_features in
+  let state = init_state ctxt in
+  {info; state}
 
-let begin_block_validation ctxt chain_id ~predecessor_level ~predecessor_round
-    ~predecessor_hash fitness payload_hash =
+(* Pre-condition: Shell block headers' checks have already been done.
+   These checks must ensure that:
+   - the block header level is the succ of the predecessor block level
+   - the timestamp of the predecessor is lower than the current block's
+   - the fitness of the block is greater than its predecessor's
+   - the number of operations by validation passes does not exceed the quota
+     established by the protocol
+   - the size of an operation does not exceed [max_operation_data_length]
+*)
+let begin_application ctxt chain_id ~predecessor_level ~predecessor_timestamp
+    (block_header : Block_header.t) fitness ~is_partial =
+  let open Lwt_result_syntax in
+  let predecessor_round = Fitness.predecessor_round fitness in
+  let round = Fitness.round fitness in
+  let current_level = Level.current ctxt in
+  let* ctxt, _slot, (block_producer_pk, block_producer) =
+    Stake_distribution.baking_rights_owner ctxt current_level ~round
+  in
+  let*? () =
+    Block_header.begin_validate_block_header
+      ~block_header
+      ~chain_id
+      ~predecessor_timestamp
+      ~predecessor_round
+      ~fitness
+      ~timestamp:block_header.shell.timestamp
+      ~delegate_pk:block_producer_pk
+      ~round_durations:(Constants.round_durations ctxt)
+      ~proof_of_work_threshold:(Constants.proof_of_work_threshold ctxt)
+      ~expected_commitment:current_level.expected_commitment
+  in
+  let* () = Consensus.check_frozen_deposits_are_positive ctxt block_producer in
+  let* ctxt, _slot, (_payload_producer_pk, payload_producer) =
+    Stake_distribution.baking_rights_owner
+      ctxt
+      current_level
+      ~round:block_header.protocol_data.contents.payload_round
+  in
+  let payload_hash = block_header.protocol_data.contents.payload_hash in
+  let predecessor_hash = block_header.shell.predecessor in
+  let application_info =
+    {
+      fitness;
+      block_producer;
+      payload_producer;
+      predecessor_hash;
+      block_data_contents = block_header.protocol_data.contents;
+    }
+  in
+  let mode =
+    if is_partial then Partial_application application_info
+    else Application application_info
+  in
   let all_expected_consensus_features =
     Consensus.expected_features_for_block_validation
       ctxt
@@ -1979,23 +2057,85 @@ let begin_block_validation ctxt chain_id ~predecessor_level ~predecessor_round
       ~predecessor_round
       ~predecessor_hash
   in
-  init_info_and_state ctxt Block chain_id all_expected_consensus_features
+  return
+    (init_info_and_state ctxt mode chain_id all_expected_consensus_features)
 
-let begin_block_construction ctxt chain_id ~predecessor_level ~predecessor_round
-    ~predecessor_hash round payload_hash =
+let begin_partial_application ~ancestor_context chain_id ~predecessor_level
+    ~predecessor_timestamp (block_header : Block_header.t) fitness =
+  begin_application
+    ancestor_context
+    chain_id
+    ~predecessor_level
+    ~predecessor_timestamp
+    block_header
+    fitness
+    ~is_partial:true
+
+let begin_application ctxt chain_id ~predecessor_level ~predecessor_timestamp
+    (block_header : Block_header.t) fitness =
+  begin_application
+    ctxt
+    chain_id
+    ~predecessor_level
+    ~predecessor_timestamp
+    block_header
+    fitness
+    ~is_partial:false
+
+let begin_full_construction ctxt chain_id ~predecessor_level ~predecessor_round
+    ~predecessor_timestamp ~predecessor_hash round
+    (header_contents : Block_header.contents) =
+  let open Lwt_result_syntax in
+  let round_durations = Constants.round_durations ctxt in
+  let timestamp = Timestamp.current ctxt in
+  let*? () =
+    Block_header.check_timestamp
+      round_durations
+      ~timestamp
+      ~round
+      ~predecessor_timestamp
+      ~predecessor_round
+  in
+  let current_level = Level.current ctxt in
+  let* ctxt, _slot, (_block_producer_pk, block_producer) =
+    Stake_distribution.baking_rights_owner ctxt current_level ~round
+  in
+  let* () = Consensus.check_frozen_deposits_are_positive ctxt block_producer in
+  let* ctxt, _slot, (_payload_producer_pk, payload_producer) =
+    Stake_distribution.baking_rights_owner
+      ctxt
+      current_level
+      ~round:header_contents.payload_round
+  in
   let all_expected_consensus_features =
     Consensus.expected_features_for_block_construction
       ctxt
       round
-      payload_hash
+      header_contents.payload_hash
       ~predecessor_level
       ~predecessor_round
       ~predecessor_hash
   in
-  init_info_and_state ctxt Block chain_id all_expected_consensus_features
+  let validation_state =
+    init_info_and_state
+      ctxt
+      (Construction
+         {
+           predecessor_round;
+           predecessor_hash;
+           round;
+           block_data_contents = header_contents;
+           block_producer;
+           payload_producer;
+         })
+      chain_id
+      all_expected_consensus_features
+  in
+  return validation_state
 
-let begin_mempool ctxt chain_id ~predecessor_level ~predecessor_round
-    ~predecessor_hash:_ ~grandparent_round =
+let begin_partial_construction ctxt chain_id ~predecessor_level
+    ~predecessor_round ~predecessor_hash:_ ~grandparent_round =
+  let open Lwt_result_syntax in
   let all_expected_consensus_features =
     Consensus.expected_features_for_mempool
       ctxt
@@ -2003,7 +2143,10 @@ let begin_mempool ctxt chain_id ~predecessor_level ~predecessor_round
       ~predecessor_round
       ~grandparent_round
   in
-  init_info_and_state ctxt Mempool chain_id all_expected_consensus_features
+  let validation_state =
+    init_info_and_state ctxt Mempool chain_id all_expected_consensus_features
+  in
+  return validation_state
 
 let begin_no_predecessor_info ctxt chain_id =
   let all_expected_consensus_features =
@@ -2016,62 +2159,262 @@ let begin_no_predecessor_info ctxt chain_id =
   in
   init_info_and_state ctxt Mempool chain_id all_expected_consensus_features
 
-let validate_operation (vi : validate_info) (vs : validate_state)
-    ?(should_check_signature = true) oph (type kind)
-    (operation : kind operation) =
+(** Increment [vs.op_count] for all operations, and record
+   non-consensus operation hashes in [vs.recorded_operations_rev]. *)
+let record_operation vs ophash validation_pass_opt =
+  let op_count = vs.op_count + 1 in
+  match validation_pass_opt with
+  | Some n when Compare.Int.(n = Operation_repr.consensus_pass) ->
+      {vs with op_count}
+  | _ ->
+      {
+        vs with
+        op_count;
+        recorded_operations_rev = ophash :: vs.recorded_operations_rev;
+      }
+
+let check_validation_pass_consistency vi vs validation_pass =
   let open Lwt_tzresult_syntax in
-  let* validate_state =
-    match operation.protocol_data.contents with
-    | Single (Preendorsement _) ->
-        Consensus.validate_preendorsement
-          vi
-          vs
-          ~should_check_signature
-          operation
-    | Single (Endorsement _) ->
-        Consensus.validate_endorsement vi vs ~should_check_signature operation
-    | Single (Dal_slot_availability _) ->
-        Consensus.validate_dal_slot_availability
-          vi
-          vs
-          ~should_check_signature
-          operation
-    | Single (Proposals _) ->
-        Voting.validate_proposals vi vs ~should_check_signature oph operation
-    | Single (Ballot _) ->
-        Voting.validate_ballot vi vs ~should_check_signature oph operation
-    | Single (Activate_account _ as contents) ->
-        Anonymous.validate_activate_account vi vs oph contents
-    | Single (Double_preendorsement_evidence _ as contents) ->
-        Anonymous.validate_double_preendorsement_evidence vi vs oph contents
-    | Single (Double_endorsement_evidence _ as contents) ->
-        Anonymous.validate_double_endorsement_evidence vi vs oph contents
-    | Single (Double_baking_evidence _ as contents) ->
-        Anonymous.validate_double_baking_evidence vi vs oph contents
-    | Single (Seed_nonce_revelation _ as contents) ->
-        Anonymous.validate_seed_nonce_revelation vi vs contents
-    | Single (Vdf_revelation _ as contents) ->
-        Anonymous.validate_vdf_revelation vi vs contents
-    | Single (Manager_operation {source; _}) ->
-        Manager.validate_manager_operation
-          vi
-          vs
-          ~should_check_signature
-          source
-          oph
-          operation
-    | Cons (Manager_operation {source; _}, _) ->
-        Manager.validate_manager_operation
-          vi
-          vs
-          ~should_check_signature
-          source
-          oph
-          operation
-    | Single (Failing_noop _) -> fail Validate_errors.Failing_noop_error
+  match vi.mode with
+  | Mempool | Construction _ -> return vs
+  | Application _ | Partial_application _ -> (
+      match (vs.last_op_validation_pass, validation_pass) with
+      | None, validation_pass ->
+          return {vs with last_op_validation_pass = validation_pass}
+      | Some previous_vp, Some validation_pass ->
+          let* () =
+            fail_unless
+              Compare.Int.(previous_vp <= validation_pass)
+              (Validate_errors.Block.Inconsistent_validation_passes_in_block
+                 {expected = previous_vp; provided = validation_pass})
+          in
+          return {vs with last_op_validation_pass = Some validation_pass}
+      | Some _, None -> fail Validate_errors.Failing_noop_error)
+
+let validate_operation {info; state} ?(should_check_signature = true) oph
+    (packed_operation : packed_operation) =
+  let open Lwt_tzresult_syntax in
+  let validation_pass_opt =
+    Alpha_context.Operation.acceptable_pass packed_operation
   in
-  return validate_state
+  let {shell; protocol_data = Operation_data protocol_data} =
+    packed_operation
+  in
+  let* state =
+    check_validation_pass_consistency info state validation_pass_opt
+  in
+  let state = record_operation state oph validation_pass_opt in
+  let operation : _ Alpha_context.operation = {shell; protocol_data} in
+  let* state =
+    match (info.mode, validation_pass_opt) with
+    | Partial_application _, Some n
+      when Compare.Int.(n <> Operation_repr.consensus_pass) ->
+        (* Do not validate non consensus operation in [Partial_application] mode *)
+        return state
+    | Partial_application _, _
+    | Mempool, _
+    | Construction _, _
+    | Application _, _ -> (
+        match operation.protocol_data.contents with
+        | Single (Preendorsement _) ->
+            Consensus.validate_preendorsement
+              info
+              state
+              ~should_check_signature
+              operation
+        | Single (Endorsement _) ->
+            Consensus.validate_endorsement
+              info
+              state
+              ~should_check_signature
+              operation
+        | Single (Dal_slot_availability _) ->
+            Consensus.validate_dal_slot_availability
+              info
+              state
+              ~should_check_signature
+              operation
+        | Single (Proposals _) ->
+            Voting.validate_proposals
+              info
+              state
+              ~should_check_signature
+              oph
+              operation
+        | Single (Ballot _) ->
+            Voting.validate_ballot
+              info
+              state
+              ~should_check_signature
+              oph
+              operation
+        | Single (Activate_account _ as contents) ->
+            Anonymous.validate_activate_account info state oph contents
+        | Single (Double_preendorsement_evidence _ as contents) ->
+            Anonymous.validate_double_preendorsement_evidence
+              info
+              state
+              oph
+              contents
+        | Single (Double_endorsement_evidence _ as contents) ->
+            Anonymous.validate_double_endorsement_evidence
+              info
+              state
+              oph
+              contents
+        | Single (Double_baking_evidence _ as contents) ->
+            Anonymous.validate_double_baking_evidence info state oph contents
+        | Single (Seed_nonce_revelation _ as contents) ->
+            Anonymous.validate_seed_nonce_revelation info state contents
+        | Single (Vdf_revelation _ as contents) ->
+            Anonymous.validate_vdf_revelation info state contents
+        | Single (Manager_operation {source; _}) ->
+            Manager.validate_manager_operation
+              info
+              state
+              ~should_check_signature
+              source
+              oph
+              operation
+        | Cons (Manager_operation {source; _}, _) ->
+            Manager.validate_manager_operation
+              info
+              state
+              ~should_check_signature
+              source
+              oph
+              operation
+        | Single (Failing_noop _) -> fail Validate_errors.Failing_noop_error)
+  in
+  return state
+
+let are_endorsements_required vi =
+  let open Lwt_result_syntax in
+  let+ first_level = First_level_of_protocol.get vi.ctxt in
+  (* [Comment from Legacy_apply] NB: the first level is the level
+     of the migration block. There are no endorsements for this
+     block. Therefore the block at the next level cannot contain
+     endorsements. *)
+  let level_position_in_protocol =
+    Raw_level.diff vi.current_level.level first_level
+  in
+  Compare.Int32.(level_position_in_protocol > 1l)
+
+let check_endorsement_power vi vs =
+  let required = Constants.consensus_threshold vi.ctxt
+  and provided = vs.consensus_state.endorsement_power in
+  error_unless
+    Compare.Int.(provided >= required)
+    (Validate_errors.Block.Not_enough_endorsements {required; provided})
+
+let finalize_validate_block_header vi vs checkable_payload_hash
+    (block_header_contents : Alpha_context.Block_header.contents) round fitness
+    =
+  let locked_round_evidence =
+    Option.map
+      (fun (preendorsement_round, preendorsement_count) ->
+        Block_header.{preendorsement_round; preendorsement_count})
+      vs.consensus_state.locked_round_evidence
+  in
+  Block_header.finalize_validate_block_header
+    ~block_header_contents
+    ~round
+    ~fitness
+    ~checkable_payload_hash
+    ~locked_round_evidence
+    ~consensus_threshold:(Constants.consensus_threshold vi.ctxt)
+
+let compute_payload_hash (vs : state)
+    (block_header_contents : Alpha_context.Block_header.contents) predecessor =
+  let operations_hash =
+    Operation_list_hash.compute (List.rev vs.recorded_operations_rev)
+  in
+  Block_payload.hash
+    ~predecessor
+    block_header_contents.payload_round
+    operations_hash
+
+let finalize_block {info; state} =
+  let open Lwt_tzresult_syntax in
+  match info.mode with
+  | Application {fitness; predecessor_hash; block_data_contents; _} ->
+      let* are_endorsements_required = are_endorsements_required info in
+      let*? () =
+        if are_endorsements_required then check_endorsement_power info state
+        else ok ()
+      in
+      let block_payload_hash =
+        compute_payload_hash state block_data_contents predecessor_hash
+      in
+      let round = Fitness.round fitness in
+      let*? () =
+        finalize_validate_block_header
+          info
+          state
+          (Block_header.Expected_payload_hash block_payload_hash)
+          block_data_contents
+          round
+          fitness
+      in
+      return_unit
+  | Partial_application _ ->
+      let* are_endorsements_required = are_endorsements_required info in
+      let*? () =
+        if are_endorsements_required then check_endorsement_power info state
+        else ok ()
+      in
+      return_unit
+  | Construction
+      {predecessor_round; predecessor_hash; round; block_data_contents; _} ->
+      let block_payload_hash =
+        compute_payload_hash state block_data_contents predecessor_hash
+      in
+      let locked_round_evidence = state.consensus_state.locked_round_evidence in
+      let checkable_payload_hash =
+        match locked_round_evidence with
+        | Some _ -> Block_header.Expected_payload_hash block_payload_hash
+        | None ->
+            (* In full construction, when there is no locked round
+               evidence (and thus no preendorsements), the baker cannot
+               know the payload hash before selecting the operations. We
+               may dismiss checking the initially given
+               payload_hash. However, to be valid, the baker must patch
+               the resulting block header with the actual payload
+               hash. *)
+            Block_header.No_check
+      in
+      let* are_endorsements_required = are_endorsements_required info in
+      let*? () =
+        if are_endorsements_required then check_endorsement_power info state
+        else ok ()
+      in
+      let* fitness =
+        let locked_round =
+          match locked_round_evidence with
+          | None -> None
+          | Some (preendorsement_round, _power) -> Some preendorsement_round
+        in
+        let level = (Level.current info.ctxt).level in
+        let*? fitness =
+          Fitness.create ~level ~round ~predecessor_round ~locked_round
+        in
+        return fitness
+      in
+      let*? () =
+        finalize_validate_block_header
+          info
+          state
+          checkable_payload_hash
+          block_data_contents
+          round
+          fitness
+      in
+      return_unit
+  | Mempool ->
+      (* Nothing to do for the mempool mode*)
+      return_unit
 
 (* This function will be replaced with a generic remove_operation in
    the future. *)
-let remove_manager_operation = Manager.remove_manager_operation
+let remove_manager_operation {info; state} =
+  Manager.remove_manager_operation info state

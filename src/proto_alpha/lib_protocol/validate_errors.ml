@@ -1220,3 +1220,55 @@ let () =
     Data_encoding.empty
     (function Failing_noop_error -> Some () | _ -> None)
     (fun () -> Failing_noop_error)
+
+module Block = struct
+  type error +=
+    | Not_enough_endorsements of {required : int; provided : int}
+    | Inconsistent_validation_passes_in_block of {
+        expected : int;
+        provided : int;
+      }
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"validate.block.not_enough_endorsements"
+      ~title:"Not enough endorsements"
+      ~description:
+        "The block being validated does not include the required minimum \
+         number of endorsements."
+      ~pp:(fun ppf (required, provided) ->
+        Format.fprintf
+          ppf
+          "Wrong number of endorsements (%i), at least %i are expected"
+          provided
+          required)
+      Data_encoding.(obj2 (req "required" int31) (req "provided" int31))
+      (function
+        | Not_enough_endorsements {required; provided} ->
+            Some (required, provided)
+        | _ -> None)
+      (fun (required, provided) -> Not_enough_endorsements {required; provided}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.block.inconsistent_validation_passes_in_block"
+      ~title:"Inconsistent validation passes in block"
+      ~description:
+        "Validation of operation should be ordered by their validation passes \
+         in a block."
+      ~pp:(fun ppf (expected, provided) ->
+        Format.fprintf
+          ppf
+          "Validation of operation should be ordered by their validation \
+           passes in a block. Got an operation with validation pass: %d while \
+           the last validated operation had the validation pass %d."
+          provided
+          expected)
+      Data_encoding.(obj2 (req "expected" int31) (req "provided" int31))
+      (function
+        | Inconsistent_validation_passes_in_block {expected; provided} ->
+            Some (expected, provided)
+        | _ -> None)
+      (fun (expected, provided) ->
+        Inconsistent_validation_passes_in_block {expected; provided})
+end

@@ -90,569 +90,289 @@ let rpc_services =
   Alpha_services.register () ;
   Services_registration.get_rpc_services ()
 
-type validation_mode =
-  | Application of {
-      block_header : Alpha_context.Block_header.t;
-      fitness : Alpha_context.Fitness.t;
-      payload_producer : Alpha_context.public_key_hash;
-      block_producer : Alpha_context.public_key_hash;
-      predecessor_round : Alpha_context.Round.t;
-      predecessor_level : Alpha_context.Level.t;
-    }
-  | Partial_application of {
-      block_header : Alpha_context.Block_header.t;
-      fitness : Alpha_context.Fitness.t;
-      payload_producer : Alpha_context.public_key_hash;
-      block_producer : Alpha_context.public_key_hash;
-      predecessor_level : Alpha_context.Level.t;
-      predecessor_round : Alpha_context.Round.t;
-    }
-  (* Mempool only *)
-  | Partial_construction of {
-      predecessor : Block_hash.t;
-      predecessor_fitness : Fitness.t;
-      predecessor_level : Alpha_context.Level.t;
-      predecessor_round : Alpha_context.Round.t;
-    }
-  (* Baker only *)
-  | Full_construction of {
-      predecessor : Block_hash.t;
-      payload_producer : Alpha_context.public_key_hash;
-      block_producer : Alpha_context.public_key_hash;
-      protocol_data_contents : Alpha_context.Block_header.contents;
-      level : Int32.t;
-      round : Alpha_context.Round.t;
-      predecessor_level : Alpha_context.Level.t;
-      predecessor_round : Alpha_context.Round.t;
-    }
-
 type validation_state = {
-  mode : validation_mode;
-  chain_id : Chain_id.t;
-  ctxt : Alpha_context.t;
-  op_count : int;
-  migration_balance_updates : Alpha_context.Receipt.balance_updates;
-  liquidity_baking_toggle_ema : Alpha_context.Liquidity_baking.Toggle_EMA.t;
-  implicit_operations_results :
-    Apply_results.packed_successful_manager_operation_result list;
-  validate_info : Validate.validate_info;
-  validate_state : Validate.validate_state;
+  validity_state : Validate.validation_state;
+  application_state : Apply.application_state;
 }
 
-let begin_partial_application ~chain_id ~ancestor_context:ctxt
-    ~predecessor_timestamp ~(predecessor_fitness : Fitness.t)
+let prepare_context ctxt ~level ~predecessor_timestamp ~timestamp =
+  Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ctxt
+
+let init_allowed_consensus_operations ctxt ~endorsement_level
+    ~preendorsement_level =
+  let open Lwt_result_syntax in
+  let open Alpha_context in
+  let* ctxt = Delegate.prepare_stake_distribution ctxt in
+  let* ctxt, allowed_endorsements, allowed_preendorsements =
+    if Level.(endorsement_level = preendorsement_level) then
+      let* ctxt, slots =
+        Baking.endorsing_rights_by_first_slot ctxt endorsement_level
+      in
+      let consensus_operations = slots in
+      return (ctxt, consensus_operations, consensus_operations)
+    else
+      let* ctxt, endorsements =
+        Baking.endorsing_rights_by_first_slot ctxt endorsement_level
+      in
+      let* ctxt, preendorsements =
+        Baking.endorsing_rights_by_first_slot ctxt preendorsement_level
+      in
+      return (ctxt, endorsements, preendorsements)
+  in
+  let ctxt =
+    Consensus.initialize_consensus_operation
+      ctxt
+      ~allowed_endorsements
+      ~allowed_preendorsements
+  in
+  return ctxt
+
+let begin_application ~chain_id ~predecessor_context ~predecessor_timestamp
+    ~(predecessor_fitness : Fitness.t)
     (block_header : Alpha_context.Block_header.t) =
-  (* Note: we don't have access to the predecessor context. *)
-  let level = block_header.shell.level in
-  let timestamp = block_header.shell.timestamp in
-  Alpha_context.Fitness.from_raw block_header.shell.fitness >>?= fun fitness ->
-  Alpha_context.Fitness.round_from_raw predecessor_fitness
-  >>?= fun predecessor_round ->
-  Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ctxt
-  >>=? fun (ctxt, migration_balance_updates, migration_operation_results) ->
-  Alpha_context.Raw_level.of_int32 (Int32.pred level)
-  >>?= fun predecessor_level ->
-  let predecessor_level =
-    Alpha_context.Level.(from_raw ctxt predecessor_level)
+  let open Lwt_tzresult_syntax in
+  let open Alpha_context in
+  let* ctxt, migration_balance_updates, migration_operation_results =
+    prepare_context
+      predecessor_context
+      ~level:block_header.shell.level
+      ~predecessor_timestamp
+      ~timestamp:block_header.shell.timestamp
   in
-  Apply.begin_application
-    ctxt
-    chain_id
-    block_header
-    fitness
-    ~predecessor_timestamp
-    ~predecessor_level
-    ~predecessor_round
-  >>=? fun ( ctxt,
-             payload_producer_pk,
-             block_producer,
-             liquidity_baking_operations_results,
-             liquidity_baking_toggle_ema ) ->
-  let mode =
-    Partial_application
-      {
-        block_header;
-        fitness;
-        predecessor_level;
-        predecessor_round;
-        payload_producer = Signature.Public_key.hash payload_producer_pk;
-        block_producer;
-      }
+  let*? predecessor_level =
+    Alpha_context.Raw_level.of_int32 (Int32.pred block_header.shell.level)
   in
-  let validate_info, validate_state =
-    Validate.begin_block_validation
-      ctxt
-      chain_id
-      ~predecessor_level
-      ~predecessor_round
-      ~predecessor_hash:block_header.shell.predecessor
-      fitness
-      block_header.protocol_data.contents.payload_hash
-  in
-  return
-    {
-      mode;
-      chain_id;
-      ctxt;
-      op_count = 0;
-      migration_balance_updates;
-      liquidity_baking_toggle_ema;
-      implicit_operations_results =
-        Apply_results.pack_migration_operation_results
-          migration_operation_results
-        @ liquidity_baking_operations_results;
-      validate_info;
-      validate_state;
-    }
-
-(* During applications the valid consensus operations are:
- * Endorsements on previous block with the right round, level, payload_hash (of the predecessor block)
- * Preendorsements on current level, previous round, and the payload_hash of the current block
-   Those endorsements justify that the previous block was finalized.
-   Those preendorsements justify the locked_round part of the fitness of the current block
- *)
-let begin_application ~chain_id ~predecessor_context:ctxt ~predecessor_timestamp
-    ~predecessor_fitness (block_header : Alpha_context.Block_header.t) =
-  let level = block_header.shell.level in
-  let timestamp = block_header.shell.timestamp in
-  Alpha_context.Fitness.from_raw block_header.shell.fitness >>?= fun fitness ->
-  Alpha_context.Fitness.round_from_raw predecessor_fitness
-  >>?= fun predecessor_round ->
-  Alpha_context.Raw_level.of_int32 (Int32.pred level)
-  >>?= fun predecessor_level ->
-  Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ctxt
-  >>=? fun (ctxt, migration_balance_updates, migration_operation_results) ->
   let predecessor_level = Alpha_context.Level.from_raw ctxt predecessor_level in
-  Apply.begin_application
-    ctxt
-    chain_id
-    block_header
-    fitness
-    ~predecessor_timestamp
-    ~predecessor_level
-    ~predecessor_round
-  >>=? fun ( ctxt,
-             payload_producer,
-             block_producer,
-             liquidity_baking_operations_results,
-             liquidity_baking_toggle_ema ) ->
-  let mode =
-    Application
-      {
-        block_header;
-        fitness;
-        predecessor_round;
-        predecessor_level;
-        payload_producer = Signature.Public_key.hash payload_producer;
-        block_producer;
-      }
+  let current_level = Level.current ctxt in
+  let* ctxt =
+    init_allowed_consensus_operations
+      ctxt
+      ~endorsement_level:predecessor_level
+      ~preendorsement_level:current_level
   in
-  let validate_info, validate_state =
-    Validate.begin_block_validation
+  let*? fitness = Alpha_context.Fitness.from_raw block_header.shell.fitness in
+  let* validity_state =
+    Validate.begin_application
+      ctxt
+      chain_id
+      ~predecessor_level
+      ~predecessor_timestamp
+      block_header
+      fitness
+  in
+  let* application_state =
+    Apply.begin_application
+      ctxt
+      chain_id
+      ~migration_balance_updates
+      ~migration_operation_results
+      ~predecessor_fitness
+      (block_header : Alpha_context.Block_header.t)
+  in
+  return {validity_state; application_state}
+
+let begin_partial_application ~chain_id ~ancestor_context ~predecessor_timestamp
+    ~(predecessor_fitness : Fitness.t)
+    (block_header : Alpha_context.Block_header.t) =
+  let open Lwt_tzresult_syntax in
+  let open Alpha_context in
+  let* ancestor_context, migration_balance_updates, migration_operation_results
+      =
+    prepare_context
+      ancestor_context
+      ~level:block_header.shell.level
+      ~predecessor_timestamp
+      ~timestamp:block_header.shell.timestamp
+  in
+  let*? predecessor_level =
+    Raw_level.of_int32 (Int32.pred block_header.shell.level)
+  in
+  let predecessor_level = Level.from_raw ancestor_context predecessor_level in
+  let current_level = Level.current ancestor_context in
+  let* ancestor_context =
+    init_allowed_consensus_operations
+      ancestor_context
+      ~endorsement_level:predecessor_level
+      ~preendorsement_level:current_level
+  in
+  let*? fitness = Fitness.from_raw block_header.shell.fitness in
+  let* validity_state =
+    Validate.begin_partial_application
+      ~ancestor_context
+      chain_id
+      ~predecessor_level
+      ~predecessor_timestamp
+      block_header
+      fitness
+  in
+  let* application_state =
+    Apply.begin_partial_application
+      chain_id
+      ~ancestor_context
+      ~migration_balance_updates
+      ~migration_operation_results
+      ~predecessor_fitness
+      block_header
+  in
+  return {validity_state; application_state}
+
+let begin_full_construction ~chain_id ~predecessor_context
+    ~predecessor_timestamp ~predecessor_level ~(predecessor_fitness : Fitness.t)
+    ~predecessor ~timestamp
+    (block_header_contents : Alpha_context.Block_header.contents) =
+  let open Lwt_tzresult_syntax in
+  let open Alpha_context in
+  let level = Int32.succ predecessor_level in
+  let* ctxt, migration_balance_updates, migration_operation_results =
+    prepare_context ~level ~predecessor_timestamp ~timestamp predecessor_context
+  in
+  let*? predecessor_level = Raw_level.of_int32 predecessor_level in
+  let predecessor_level = Level.from_raw ctxt predecessor_level in
+  let current_level = Level.current ctxt in
+  let* ctxt =
+    init_allowed_consensus_operations
+      ctxt
+      ~endorsement_level:predecessor_level
+      ~preendorsement_level:current_level
+  in
+  let round_durations = Constants.round_durations ctxt in
+  let*? predecessor_round = Fitness.round_from_raw predecessor_fitness in
+  let*? round =
+    Round.round_of_timestamp
+      round_durations
+      ~predecessor_timestamp
+      ~predecessor_round
+      ~timestamp
+  in
+  let* validity_state =
+    Validate.begin_full_construction
       ctxt
       chain_id
       ~predecessor_level
       ~predecessor_round
-      ~predecessor_hash:block_header.shell.predecessor
-      fitness
-      block_header.protocol_data.contents.payload_hash
+      ~predecessor_timestamp
+      ~predecessor_hash:predecessor
+      round
+      block_header_contents
   in
-  return
-    {
-      mode;
-      chain_id;
-      ctxt;
-      op_count = 0;
-      migration_balance_updates;
-      liquidity_baking_toggle_ema;
-      implicit_operations_results =
-        Apply_results.pack_migration_operation_results
-          migration_operation_results
-        @ liquidity_baking_operations_results;
-      validate_info;
-      validate_state;
-    }
+  let* application_state =
+    Apply.begin_full_construction
+      ctxt
+      chain_id
+      ~migration_balance_updates
+      ~migration_operation_results
+      ~predecessor_timestamp
+      ~predecessor_level
+      ~predecessor_round
+      ~predecessor
+      ~timestamp
+      block_header_contents
+  in
+  return {validity_state; application_state}
 
-let begin_construction ~chain_id ~predecessor_context:ctxt
+let begin_partial_construction ~chain_id ~predecessor_context
     ~predecessor_timestamp ~predecessor_level ~predecessor_fitness ~predecessor
-    ~timestamp ?(protocol_data : block_header_data option) () =
+    ~timestamp =
+  let open Lwt_tzresult_syntax in
+  let open Alpha_context in
   let level = Int32.succ predecessor_level in
-  Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ctxt
-  >>=? fun (ctxt, migration_balance_updates, migration_operation_results) ->
-  Alpha_context.Raw_level.of_int32 predecessor_level
-  >>?= fun predecessor_level ->
-  let predecessor_level =
-    Alpha_context.Level.(from_raw ctxt predecessor_level)
+  let* ctxt, migration_balance_updates, migration_operation_results =
+    prepare ~level ~predecessor_timestamp ~timestamp predecessor_context
   in
-  (match protocol_data with
-  | None ->
-      Alpha_context.Fitness.round_from_raw predecessor_fitness
-      >>?= fun predecessor_round ->
-      let toggle_vote = Alpha_context.Liquidity_baking.LB_pass in
-      Apply.begin_partial_construction ctxt ~predecessor_level ~toggle_vote
-      >>=? fun ( ctxt,
-                 liquidity_baking_operations_results,
-                 liquidity_baking_toggle_ema ) ->
-      let mode =
-        Partial_construction
-          {
-            predecessor;
-            predecessor_fitness;
-            predecessor_level;
-            predecessor_round;
-          }
-      in
-      Alpha_context.Fitness.predecessor_round_from_raw predecessor_fitness
-      >>?= fun grandparent_round ->
-      let validate_info, validate_state =
-        Validate.begin_mempool
-          ctxt
-          chain_id
-          ~predecessor_level
-          ~predecessor_round
-          ~predecessor_hash:predecessor
-          ~grandparent_round
-      in
-      return
-        ( mode,
-          ctxt,
-          liquidity_baking_operations_results,
-          liquidity_baking_toggle_ema,
-          validate_info,
-          validate_state )
-  | Some proto_header ->
-      Alpha_context.Fitness.round_from_raw predecessor_fitness
-      >>?= fun predecessor_round ->
-      let round_durations = Alpha_context.Constants.round_durations ctxt in
-      Alpha_context.Round.round_of_timestamp
-        round_durations
-        ~predecessor_timestamp
-        ~predecessor_round
-        ~timestamp
-      >>?= fun round ->
-      (* The endorsement/preendorsement validation rules for construction are the
-         same as for application. *)
-      Apply.begin_full_construction
-        ctxt
-        ~predecessor_timestamp
-        ~predecessor_round
-        ~predecessor_level
-        ~round
-        proto_header.contents
-      >>=? fun {
-                 ctxt;
-                 protocol_data = protocol_data_contents;
-                 payload_producer;
-                 block_producer;
-                 round;
-                 liquidity_baking_toggle_ema;
-                 implicit_operations_results =
-                   liquidity_baking_operations_results;
-               } ->
-      let mode =
-        Full_construction
-          {
-            predecessor;
-            payload_producer;
-            block_producer;
-            level;
-            round;
-            protocol_data_contents;
-            predecessor_round;
-            predecessor_level;
-          }
-      in
-      let validate_info, validate_state =
-        Validate.begin_block_construction
-          ctxt
-          chain_id
-          ~predecessor_level
-          ~predecessor_round
-          ~predecessor_hash:predecessor
-          round
-          proto_header.contents.payload_hash
-      in
-      return
-        ( mode,
-          ctxt,
-          liquidity_baking_operations_results,
-          liquidity_baking_toggle_ema,
-          validate_info,
-          validate_state ))
-  >|=? fun ( mode,
-             ctxt,
-             liquidity_baking_operations_results,
-             liquidity_baking_toggle_ema,
-             validate_info,
-             validate_state ) ->
-  {
-    mode;
-    chain_id;
-    ctxt;
-    op_count = 0;
-    migration_balance_updates;
-    liquidity_baking_toggle_ema;
-    implicit_operations_results =
-      Apply_results.pack_migration_operation_results migration_operation_results
-      @ liquidity_baking_operations_results;
-    validate_info;
-    validate_state;
-  }
+  let*? predecessor_raw_level = Raw_level.of_int32 predecessor_level in
+  let predecessor_level = Level.from_raw ctxt predecessor_raw_level in
+  (* In the mempool, only consensus operations for [predecessor_level]
+     (that is, head's level) are allowed, contrary to block validation
+     where endorsements are for the previous level and
+     preendorsements, if any, for the block's level. *)
+  let* ctxt =
+    init_allowed_consensus_operations
+      ctxt
+      ~endorsement_level:predecessor_level
+      ~preendorsement_level:predecessor_level
+  in
+  let*? predecessor_round = Fitness.round_from_raw predecessor_fitness in
+  let*? grandparent_round =
+    Alpha_context.Fitness.predecessor_round_from_raw predecessor_fitness
+  in
+  let* validity_state =
+    Validate.begin_partial_construction
+      ctxt
+      chain_id
+      ~predecessor_level
+      ~predecessor_round
+      ~predecessor_hash:predecessor
+      ~grandparent_round
+  in
+  let* application_state =
+    Apply.begin_partial_construction
+      ctxt
+      chain_id
+      ~migration_balance_updates
+      ~migration_operation_results
+      ~predecessor_level:predecessor_raw_level
+      ~predecessor_fitness
+  in
+  return {validity_state; application_state}
 
-let apply_operation_with_mode mode ctxt chain_id data op_count operation
-    ~payload_producer =
-  let {shell; protocol_data = Operation_data protocol_data} = operation in
+(* Updater's signature compliant function *)
+let begin_construction ~chain_id ~predecessor_context ~predecessor_timestamp
+    ~predecessor_level ~(predecessor_fitness : Fitness.t) ~predecessor
+    ~timestamp ?(protocol_data : block_header_data option) () =
+  match protocol_data with
+  | None ->
+      begin_partial_construction
+        ~chain_id
+        ~predecessor_context
+        ~predecessor_timestamp
+        ~predecessor_level
+        ~predecessor_fitness
+        ~predecessor
+        ~timestamp
+  | Some protocol_data ->
+      begin_full_construction
+        ~chain_id
+        ~predecessor_context
+        ~predecessor_timestamp
+        ~predecessor_level
+        ~predecessor_fitness
+        ~predecessor
+        ~timestamp
+        protocol_data.contents
+
+let validate_operation validity_state
+    (packed_operation : Alpha_context.packed_operation) =
+  let {shell; protocol_data = Operation_data protocol_data} =
+    packed_operation
+  in
   let operation : _ Alpha_context.operation = {shell; protocol_data} in
   let oph = Alpha_context.Operation.hash operation in
-  Validate.validate_operation
-    data.validate_info
-    data.validate_state
-    oph
-    operation
-  >>=? fun validate_state ->
-  Apply.apply_operation ctxt chain_id mode ~payload_producer oph operation
-  >|=? fun (ctxt, result) ->
-  let op_count = op_count + 1 in
-  ({data with ctxt; op_count; validate_state}, Operation_metadata result)
+  Validate.validate_operation validity_state oph packed_operation
 
-let apply_operation ({mode; chain_id; ctxt; op_count; _} as data)
-    (operation : Alpha_context.packed_operation) =
-  match mode with
-  | Partial_application {payload_producer; _} -> (
-      match acceptable_pass operation with
-      | None ->
-          (* Only occurs with Failing_noop *)
-          fail Validate_errors.Failing_noop_error
-      | Some n ->
-          (* Multipass validation only considers operations in
-             consensus pass. *)
-          if Compare.Int.(n = Operation_repr.consensus_pass) then
-            apply_operation_with_mode
-              Apply.Application
-              ctxt
-              chain_id
-              data
-              op_count
-              operation
-              ~payload_producer
-          else
-            let op_count = op_count + 1 in
-            return ({data with ctxt; op_count}, No_operation_metadata))
-  | Application {payload_producer; _} ->
-      apply_operation_with_mode
-        Apply.Application
-        ctxt
-        chain_id
-        data
-        op_count
-        operation
-        ~payload_producer
-  | Partial_construction {predecessor_level; _} ->
-      apply_operation_with_mode
-        (Apply.Partial_construction {predecessor_level = Some predecessor_level})
-        ctxt
-        chain_id
-        data
-        op_count
-        operation
-        ~payload_producer:Signature.Public_key_hash.zero
-  | Full_construction {payload_producer; _} ->
-      apply_operation_with_mode
-        Apply.Full_construction
-        ctxt
-        chain_id
-        data
-        op_count
-        operation
-        ~payload_producer
-
-let finalize_block_application ctxt round cache_nonce finalize_application_mode
-    protocol_data payload_producer block_producer liquidity_baking_toggle_ema
-    implicit_operations_results predecessor migration_balance_updates op_count =
-  Apply.finalize_application
-    ctxt
-    finalize_application_mode
-    protocol_data
-    ~payload_producer
-    ~block_producer
-    liquidity_baking_toggle_ema
-    implicit_operations_results
-    ~round
-    ~predecessor
-    ~migration_balance_updates
-  >>=? fun (ctxt, fitness, receipt) ->
-  Alpha_context.Cache.Admin.sync ctxt cache_nonce >>= fun ctxt ->
-  let level = Alpha_context.Level.current ctxt in
-  let raw_level = Alpha_context.Raw_level.to_int32 level.level in
-  let commit_message =
-    Format.asprintf
-      "lvl %ld, fit:%a, round %a, %d ops"
-      raw_level
-      Alpha_context.Fitness.pp
-      fitness
-      Alpha_context.Round.pp
-      round
-      op_count
+let apply_operation (state : validation_state)
+    (packed_operation : Alpha_context.packed_operation) =
+  let open Lwt_result_syntax in
+  let* validate_state =
+    validate_operation state.validity_state packed_operation
   in
-  let validation_result =
-    Alpha_context.finalize
-      ~commit_message
-      ctxt
-      (Alpha_context.Fitness.to_raw fitness)
+  let operation_hash = Alpha_context.Operation.hash_packed packed_operation in
+  let* application_state, operation_receipt =
+    Apply.apply_operation
+      state.application_state
+      operation_hash
+      packed_operation
   in
-  return (validation_result, receipt)
+  return
+    ( {
+        validity_state = {state.validity_state with state = validate_state};
+        application_state;
+      },
+      operation_receipt )
 
-type error += Missing_shell_header
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"main.missing_shell_header"
-    ~title:"Missing shell_header during finalisation of a block"
-    ~description:
-      "During finalisation of a block header in Application mode or Full \
-       construction mode, a shell header should be provided so that a cache \
-       nonce can be computed."
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "No shell header provided during the finalisation of a block.")
-    Data_encoding.unit
-    (function Missing_shell_header -> Some () | _ -> None)
-    (fun () -> Missing_shell_header)
-
-let finalize_block
-    {
-      mode;
-      ctxt;
-      op_count;
-      migration_balance_updates;
-      liquidity_baking_toggle_ema;
-      implicit_operations_results;
-      _;
-    } shell_header =
-  match mode with
-  | Partial_construction {predecessor_fitness; _} ->
-      Alpha_context.Voting_period.get_rpc_current_info ctxt
-      >>=? fun voting_period_info ->
-      let level_info = Alpha_context.Level.current ctxt in
-      let fitness = predecessor_fitness in
-      let ctxt = Alpha_context.finalize ctxt fitness in
-      return
-        ( ctxt,
-          Apply_results.
-            {
-              proposer = Signature.Public_key_hash.zero;
-              baker = Signature.Public_key_hash.zero;
-              level_info;
-              voting_period_info;
-              nonce_hash = None;
-              consumed_gas = Alpha_context.Gas.Arith.zero;
-              deactivated = [];
-              balance_updates = migration_balance_updates;
-              liquidity_baking_toggle_ema;
-              implicit_operations_results;
-              dal_slot_availability = None;
-            } )
-  | Partial_application {fitness; block_producer; _} ->
-      (* For partial application we do not completely check the block validity.
-         Validating the endorsements is sufficient for a good precheck *)
-      let level = Alpha_context.Level.current ctxt in
-      let included_endorsements =
-        Alpha_context.Consensus.current_endorsement_power ctxt
-      in
-      let minimum = Alpha_context.Constants.consensus_threshold ctxt in
-      Apply.are_endorsements_required ctxt ~level:level.level
-      >>=? fun endorsements_required ->
-      (if endorsements_required then
-       Apply.check_minimum_endorsements
-         ~endorsing_power:included_endorsements
-         ~minimum
-      else Result.return_unit)
-      >>?= fun () ->
-      Alpha_context.Voting_period.get_rpc_current_info ctxt
-      >|=? fun voting_period_info ->
-      let level_info = Alpha_context.Level.current ctxt in
-      let ctxt =
-        Alpha_context.finalize ctxt (Alpha_context.Fitness.to_raw fitness)
-      in
-      ( ctxt,
-        Apply_results.
-          {
-            proposer = Signature.Public_key_hash.zero;
-            (* We cannot retrieve the proposer as it requires the
-               frozen deposit that might not be available depending on
-               the context given to the partial application. *)
-            baker = block_producer;
-            level_info;
-            voting_period_info;
-            nonce_hash = None;
-            consumed_gas = Alpha_context.Gas.Arith.zero;
-            deactivated = [];
-            balance_updates = migration_balance_updates;
-            liquidity_baking_toggle_ema;
-            implicit_operations_results;
-            dal_slot_availability = None;
-          } )
-  | Application
-      {
-        payload_producer;
-        fitness;
-        block_producer;
-        block_header = {protocol_data = {contents = protocol_data; _}; shell};
-        _;
-      } ->
-      let round = Alpha_context.Fitness.round fitness in
-      let cache_nonce =
-        Alpha_context.Cache.cache_nonce_from_block_header shell protocol_data
-      in
-      finalize_block_application
-        ctxt
-        round
-        cache_nonce
-        (Finalize_application fitness)
-        protocol_data
-        payload_producer
-        block_producer
-        liquidity_baking_toggle_ema
-        implicit_operations_results
-        shell.predecessor
-        migration_balance_updates
-        op_count
-  | Full_construction
-      {
-        predecessor;
-        predecessor_round;
-        protocol_data_contents;
-        round;
-        level;
-        payload_producer;
-        block_producer;
-        _;
-      } ->
-      Option.value_e
-        shell_header
-        ~error:(Error_monad.trace_of_error Missing_shell_header)
-      >>?= fun shell_header ->
-      let cache_nonce =
-        Alpha_context.Cache.cache_nonce_from_block_header
-          shell_header
-          protocol_data_contents
-      in
-      Alpha_context.Raw_level.of_int32 level >>?= fun level ->
-      finalize_block_application
-        ctxt
-        round
-        cache_nonce
-        (Finalize_full_construction {level; predecessor_round})
-        protocol_data_contents
-        payload_producer
-        block_producer
-        liquidity_baking_toggle_ema
-        implicit_operations_results
-        predecessor
-        migration_balance_updates
-        op_count
+let finalize_block state shell_header =
+  let open Lwt_result_syntax in
+  let* () = Validate.finalize_block state.validity_state in
+  Apply.finalize_block state.application_state shell_header
 
 let compare_operations (oph1, op1) (oph2, op2) =
   Alpha_context.Operation.compare (oph1, op1) (oph2, op2)

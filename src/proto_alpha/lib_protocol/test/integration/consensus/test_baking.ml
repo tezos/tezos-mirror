@@ -218,7 +218,7 @@ let test_rewards_block_and_payload_producer () =
   let fee = Tez.one in
   Op.transaction (B b1) ~fee baker_b1_contract baker_b1_contract Tez.zero
   >>=? fun tx ->
-  Block.bake ~policy:(By_round 0) ~operations:(tx :: endos) b1 >>=? fun b2 ->
+  Block.bake ~policy:(By_round 0) ~operations:(endos @ [tx]) b1 >>=? fun b2 ->
   Context.get_baker (B b1) ~round:0 >>=? fun baker_b2 ->
   get_contract_for_pkh contracts baker_b2 >>=? fun baker_b2_contract ->
   Context.Contract.balance (B b2) baker_b2_contract >>=? fun bal ->
@@ -262,7 +262,7 @@ let test_rewards_block_and_payload_producer () =
     ~payload_round:(Some Round.zero)
     ~locked_round:(Some Round.zero)
     ~policy:(By_account baker_b2')
-    ~operations:((tx :: preendos) @ endos)
+    ~operations:(preendos @ endos @ [tx])
     b1
   >>=? fun b2' ->
   (* [baker_b2], as payload producer, gets the block reward and the fees *)
