@@ -117,7 +117,9 @@ integration:static-binaries:
 integration:pytest:
   extends:
     - .pytest_integration
-  parallel: 9
+  # WARNING: if you increase the number of parallel jobs, you need to
+  # update test_coverage.yml with the new list of jobs.
+  parallel: 20
   variables:
     TESTS: "tests_alpha"
 

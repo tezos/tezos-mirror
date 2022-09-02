@@ -3471,26 +3471,43 @@ end = struct
           ~dep_globs:(if N.(number >= 015) then ["wasm_kernel/*.wasm"] else [])
       in
       let _pbt =
+        let list =
+          (* The first item of each tuple is the index N for the runtestN alias.
+             Those aliases are used to split into multiple CI jobs. *)
+          [
+            (1, "liquidity_baking_pbt", true);
+            (1, "saturation_fuzzing", true);
+            (1, "test_merkle_list", N.(number >= 013));
+            (1, "test_gas_properties", true);
+            (2, "test_sampler", N.(number >= 012));
+            (2, "test_script_comparison", true);
+            (2, "test_tez_repr", true);
+            (2, "test_tx_rollup_l2_encoding", N.(number >= 013));
+            (2, "test_tx_rollup_l2_withdraw_storage", N.(number <= 010));
+            (2, "test_bitset", N.(number >= 013));
+            (2, "test_sc_rollup_tick_repr", N.(number >= 013));
+            (2, "test_sc_rollup_encoding", N.(number >= 015));
+            (3, "refutation_game_pbt", N.(number == 013));
+            (3, "test_refutation_game", N.(number >= 014));
+            (3, "test_carbonated_map", N.(number >= 013));
+            (3, "test_zk_rollup_encoding", N.(number >= 015));
+          ]
+          |> List.filter_map (fun (i, n, b) -> if b then Some (i, n) else None)
+        in
+        let dune =
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1265
+             Once those tests are ported to Tezt we can remove those aliases
+             and just use Tezt's auto-balancing. But this requires making QCheck
+             work with Tezt first. *)
+          let make_alias (index, test) =
+            Dune.alias_rule
+              ~action:(Dune.run_exe test [])
+              (sf "runtest%d" index)
+          in
+          Dune.of_list (List.map make_alias list)
+        in
         tests
-          (conditional_list
-             [
-               ("liquidity_baking_pbt", true);
-               ("saturation_fuzzing", true);
-               ("test_merkle_list", N.(number >= 013));
-               ("test_gas_properties", true);
-               ("test_sampler", N.(number >= 012));
-               ("test_script_comparison", true);
-               ("test_tez_repr", true);
-               ("test_tx_rollup_l2_encoding", N.(number >= 013));
-               ("test_tx_rollup_l2_withdraw_storage", N.(number <= 010));
-               ("test_bitset", N.(number >= 013));
-               ("test_sc_rollup_tick_repr", N.(number >= 013));
-               ("test_sc_rollup_encoding", N.(number >= 015));
-               ("refutation_game_pbt", N.(number == 013));
-               ("test_refutation_game", N.(number >= 014));
-               ("test_carbonated_map", N.(number >= 013));
-               ("test_zk_rollup_encoding", N.(number >= 015));
-             ])
+          (List.map snd list)
           ~synopsis:"Tezos/Protocol: tests for economic-protocol definition"
           ~path:(path // "lib_protocol/test/pbt")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
@@ -3512,6 +3529,7 @@ end = struct
               benchmark_type_inference |> if_some |> open_;
               sc_rollup |> if_some |> if_ N.(number >= 015) |> open_;
             ]
+          ~dune
       in
       let _unit =
         test

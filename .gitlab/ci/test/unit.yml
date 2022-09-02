@@ -154,9 +154,14 @@ unit:alpha:
         @src/proto_alpha/lib_protocol/test/integration/operations/runtest
         @src/proto_alpha/lib_protocol/test/integration/validate/runtest
     proto_alpha__lib_protocol__3: >
-        @src/proto_alpha/lib_protocol/test/pbt/runtest
         @src/proto_alpha/lib_protocol/test/unit/runtest
         @src/proto_alpha/lib_protocol/runtezt
+    proto_alpha__lib_protocol__pbt1: >
+        @src/proto_alpha/lib_protocol/test/pbt/runtest1
+    proto_alpha__lib_protocol__pbt2: >
+        @src/proto_alpha/lib_protocol/test/pbt/runtest2
+    proto_alpha__lib_protocol__pbt3: >
+        @src/proto_alpha/lib_protocol/test/pbt/runtest3
     proto_alpha: >
         @src/proto_alpha/lib_benchmark/runtest
         @src/proto_alpha/lib_client/runtest
@@ -168,6 +173,9 @@ unit:alpha:
           - proto_alpha__lib_protocol__1
           - proto_alpha__lib_protocol__2
           - proto_alpha__lib_protocol__3
+          - proto_alpha__lib_protocol__pbt1
+          - proto_alpha__lib_protocol__pbt2
+          - proto_alpha__lib_protocol__pbt3
           - proto_alpha
   script:
     - scripts/test_wrapper.sh $TEST_TARGETS ${!TEST_TARGETS}

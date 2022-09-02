@@ -63,3 +63,15 @@
  (alias runtest)
  (package tezos-protocol-012-Psithaca-tests)
  (action (run %{dep:./test_tez_repr.exe})))
+
+(rule (alias runtest1) (action (run %{exe:liquidity_baking_pbt.exe})))
+
+(rule (alias runtest1) (action (run %{exe:saturation_fuzzing.exe})))
+
+(rule (alias runtest1) (action (run %{exe:test_gas_properties.exe})))
+
+(rule (alias runtest2) (action (run %{exe:test_sampler.exe})))
+
+(rule (alias runtest2) (action (run %{exe:test_script_comparison.exe})))
+
+(rule (alias runtest2) (action (run %{exe:test_tez_repr.exe})))

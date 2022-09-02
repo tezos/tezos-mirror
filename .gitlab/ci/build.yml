@@ -48,6 +48,9 @@ build_x86_64:
   extends:
     - .build
     - .rules_template__development_and_extended
+    # This job is the main bottleneck since a lot of tests depend on it.
+    # So we start it even before sanity_ci.
+    - .needs_template__wait_for_trigger_job
   variables:
     ARCH: "x86_64"
 
@@ -100,6 +103,10 @@ build:static-x86_64-linux-binaries:
   extends:
     - .build_static_binaries_template
     - .rules_template__not_on_latest_release
+    # Even though not many tests depend on static executables, some of those that do
+    # are limiting factors in the total duration of pipelines.
+    # So we start this job as early as possible, without waiting for sanity_ci.
+    - .needs_template__wait_for_trigger_job
   variables:
     ARCH: "x86_64"
 
