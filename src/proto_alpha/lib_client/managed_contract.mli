@@ -26,6 +26,13 @@ open Protocol
 open Alpha_context
 open Protocol_client_context
 
+(** [check_smart_contract cctxt opt_value f_value] returns an error if
+    [opt_value] is [None], and [f_value value] if [opt_value = Some value].
+    It can typically be used when [opt_value] is [None] for implicit accounts
+    and [Some _] for smart contracts, as the message in the raised error is that
+    a smart contract is expected. *)
+val check_smart_contract : #full -> 'a option -> ('a -> 'b Lwt.t) -> 'b Lwt.t
+
 (** Retrieve the manager key in a contract storage.
     The storage has to be of type `pair key_hash 'a`.
 *)
