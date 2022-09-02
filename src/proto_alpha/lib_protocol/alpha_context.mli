@@ -2398,6 +2398,8 @@ module Bond_id : sig
   end
 end
 
+(** This module re-exports definitions from {!Zk_rollup_repr} and
+    {!Zk_rollup_storage}. *)
 module Zk_rollup : sig
   module Address : S.HASH
 
@@ -2407,12 +2409,14 @@ module Zk_rollup : sig
 
   val to_scalar : t -> scalar
 
+  (** This module re-exports definitions from {!Zk_rollup_state_repr}. *)
   module State : sig
     type t = scalar array
 
     val encoding : t Data_encoding.t
   end
 
+  (** This module re-exports definitions from {!Zk_rollup_account_repr}. *)
   module Account : sig
     module SMap : Map.S with type key = string
 
@@ -2430,6 +2434,7 @@ module Zk_rollup : sig
     val encoding : t Data_encoding.t
   end
 
+  (** This module re-exports definitions from {!Zk_rollup_operation_repr}. *)
   module Operation : sig
     type t = {
       op_code : int;
