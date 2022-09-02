@@ -2793,7 +2793,9 @@ module Vote : sig
   val clear_current_proposal : context -> context Lwt.t
 end
 
+(** This module exposes definitions for the data-availability layer. *)
 module Dal : sig
+  (** This module re-exports definitions from {!Dal_slot_repr.Index}. *)
   module Slot_index : sig
     type t
 
@@ -2808,6 +2810,8 @@ module Dal : sig
     val compare : t -> t -> int
   end
 
+  (** This module re-exports definitions from {!Dal_endorsement_repr} and
+      {!Raw_context.Dal}. *)
   module Endorsement : sig
     type t
 
@@ -2824,6 +2828,8 @@ module Dal : sig
     val record_available_shards : context -> t -> int list -> context
   end
 
+  (** This module re-exports definitions from {!Dal_slot_repr},
+      {!Dal_slot_storage} and {!Raw_context.Dal}. *)
   module Slot : sig
     type header = Dal.commitment
 
