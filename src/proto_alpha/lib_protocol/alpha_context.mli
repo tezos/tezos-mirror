@@ -2846,6 +2846,7 @@ module Dal : sig
   end
 end
 
+(** This module re-exports definitions from {!Dal_errors_repr}. *)
 module Dal_errors : sig
   (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3168
      do not expose these errors and return them in functions
