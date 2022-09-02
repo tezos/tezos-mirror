@@ -71,6 +71,7 @@ type argument =
   | Singleprocess  (** [--singleprocess] *)
   | Bootstrap_threshold of int  (** [--bootstrap-threshold] (deprecated) *)
   | Synchronisation_threshold of int  (** [--synchronisation-threshold] *)
+  | Sync_latency of int  (** [--sync-latency] *)
   | Connections of int  (** [--connections] *)
   | Private_mode  (** [--private-mode] *)
   | Peer of string  (** [--peer] *)
