@@ -4745,14 +4745,6 @@ module Protocol = Protocol
               alias_rule
                 "runtest_micheline_rewriting_code"
                 ~action:(run_exe "test_sampling_code" ["1234"]);
-              alias_rule
-                "runtest"
-                ~package:(sf "tezos-benchmark-%s" name_dash)
-                ~alias_deps:
-                  [
-                    "runtest_micheline_rewriting_data";
-                    "runtest_micheline_rewriting_code";
-                  ];
             ]
     in
     let benchmarks_proto : Manifest.target option =
