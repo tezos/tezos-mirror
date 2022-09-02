@@ -284,10 +284,14 @@ val get_chain_block_header : ?chain:string -> ?block:string -> unit -> JSON.t t
     use [patch_chain_bootstrapped true]. *)
 val patch_chain_bootstrapped : ?chain:string -> bool -> unit t
 
+type sync_state = Synced | Unsynced | Stuck
+
+type is_bootstrapped = {bootstrapped : bool; sync_state : sync_state}
+
 (** RPC: [GET /chains/[chain]/is_bootstrapped]
 
     Returns the value of [sync_state], e.g. ["synced"]. *)
-val get_chain_is_bootstrapped : ?chain:string -> unit -> string t
+val get_chain_is_bootstrapped : ?chain:string -> unit -> is_bootstrapped t
 
 (** A level and its hash *)
 type block_descriptor = {block_hash : string; level : int}

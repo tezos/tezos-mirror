@@ -52,10 +52,10 @@ let wait_for_sync node =
      whether the node is (already) synchronized via an RPC. *)
   let is_synchronised =
     let* client = Client.init ~endpoint:(Node node) () in
-    let* sync_state =
+    let* is_bootstrapped =
       RPC.Client.call client @@ RPC.get_chain_is_bootstrapped ()
     in
-    if String.equal sync_state "synced" then Lwt.return_unit
+    if is_bootstrapped.sync_state = Synced then Lwt.return_unit
     else fst @@ Lwt.task ()
   in
   Lwt.pick [event; is_synchronised]
