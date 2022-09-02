@@ -52,8 +52,7 @@ module Impl : Pvm.S = struct
     match status with
     | Halted -> "Halted"
     | Waiting_for_input_message -> "Waiting for input message"
-    | Waiting_for_pre_image h ->
-        Format.asprintf "Waiting for pre image of %a" Sc_rollup.Input_hash.pp h
+    | Waiting_for_reveal -> "Waiting for reveal"
     | Parsing -> "Parsing"
     | Evaluating -> "Evaluating"
 end

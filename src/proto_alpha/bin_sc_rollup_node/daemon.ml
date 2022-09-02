@@ -201,7 +201,7 @@ module Make (PVM : Pvm.S) = struct
     in
     return_unit
 
-  let process_head node_ctxt head_state =
+  let process_head configuration node_ctxt head_state =
     let open Lwt_result_syntax in
     let {finalized; seen_before; head} = head_state in
     let* () =
@@ -232,7 +232,7 @@ module Make (PVM : Pvm.S) = struct
       (* At each block, there may be some refutation related actions to
          be performed. *)
       when_ finalized @@ fun () ->
-      Components.Refutation_game.process head node_ctxt
+      Components.Refutation_game.process head configuration node_ctxt
     in
     when_ finalized (fun () ->
         let*! () = Layer1.mark_processed_head node_ctxt.store head in
@@ -267,7 +267,7 @@ module Make (PVM : Pvm.S) = struct
      Because heads that still have not been processed as finalized are
      persisted to disk, this function is robust against interruptions.
   *)
-  let on_layer_1_chain_event node_ctxt chain_event =
+  let on_layer_1_chain_event configuration node_ctxt chain_event =
     let open Lwt_result_syntax in
     let*! old_heads =
       Layer1.get_heads_not_finalized node_ctxt.Node_context.store
@@ -289,7 +289,9 @@ module Make (PVM : Pvm.S) = struct
             Daemon_event.processing_heads_iteration old_heads new_heads
           in
           let head_states = categorise_heads node_ctxt old_heads new_heads in
-          let* () = List.iter_es (process_head node_ctxt) head_states in
+          let* () =
+            List.iter_es (process_head configuration node_ctxt) head_states
+          in
           (* Return new_head to be processed as finalized head if the
              next chain event is of type SameBranch.
           *)
@@ -320,6 +322,7 @@ module Make (PVM : Pvm.S) = struct
             List.iter_es
               (fun head ->
                 process_head
+                  configuration
                   node_ctxt
                   {head; finalized = true; seen_before = true})
               final_heads
@@ -353,7 +356,7 @@ module Make (PVM : Pvm.S) = struct
         Lwt_stream.iter_s
           (fun event ->
             let open Lwt_syntax in
-            let* res = on_layer_1_chain_event node_ctxt event in
+            let* res = on_layer_1_chain_event configuration node_ctxt event in
             match res with
             | Ok () -> return_unit
             | Error trace when is_connection_error trace ->
@@ -483,6 +486,7 @@ let run ~data_dir (cctxt : Protocol_client_context.full) =
     Node_context.init
       cctxt
       dal_cctxt
+      ~data_dir
       l1_ctxt
       configuration.sc_rollup_address
       kind
