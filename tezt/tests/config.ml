@@ -23,13 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let config_reset args =
-  let* () = Process.run Constant.tezos_node (["config"; "reset"] @ args) in
-  Process.run Constant.tezos_node ["config"; "show"] ~hooks:Regression.hooks
+let config_reset node args =
+  let* () = Node.config_reset node args in
+  Node.config_show node
 
 let register () =
-  Regression.register ~__FILE__ ~title:"config reset" ~tags:["config"]
-  @@ fun () ->
-  let* () = config_reset [] in
-  let* () = config_reset ["--rpc-addr=:1234"] in
-  config_reset []
+  Test.register ~__FILE__ ~title:"config reset" ~tags:["config"] @@ fun () ->
+  let node = Node.create [] in
+  let* c1 = config_reset node [] in
+  let* c2 = config_reset node ["--rpc-addr=:1234"] in
+  let c2_addr = JSON.(c2 |-> "rpc" |-> "listen-addrs" |=> 0 |> as_string) in
+  Check.((c2_addr = ":1234") string)
+    ~error_msg:"config.rpc.listen-addrs[0] contains %L but should contain %R." ;
+  let* c3 = config_reset node [] in
+  Check.((JSON.encode c1 = JSON.encode c3) string)
+    ~error_msg:
+      "Configs after reset should be identical. Was %L before, and now %R." ;
+  unit
