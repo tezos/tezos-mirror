@@ -55,24 +55,6 @@ let pp_unit out () = Format.pp_print_string out "()"
 
 let pp_pair pp1 pp2 out (x, y) = Format.fprintf out "(%a, %a)" pp1 x pp2 y
 
-(*
-  Generate instructions. The following are missing:
-  - [VecTest]
-  - [VecCompare]
-  - [VecUnary]
-  - [VecBinary]
-  - [VecConvert]
-  - [VecShift]
-  - [VecBitmask]
-  - [VecTestBits]
-  - [VecUnaryBits]
-  - [VecBinaryBits]
-  - [VecTernaryBits]
-  - [VecSplat]
-  - [VecExtract]
-  - [VecReplace]
-  *)
-
 let pp_vector pp out v =
   (* Force evaluation of the vector. *)
   let _ = Lwt_main.run @@ Lazy_vector.Int32Vector.to_list v in
