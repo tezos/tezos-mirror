@@ -195,6 +195,5 @@ of their nodes on a regular basis (usually daily) and make them available for
 download. These include:
 
 * `Giga Node <https://snapshots-tezos.giganode.io/>`_
-* `XTZ-Shots <https://mainnet.xtz-shots.io/>`_
+* `XTZ-Shots <https://xtz-shots.io/mainnet/>`_
 * `Lambs on acid <https://lambsonacid.nl/>`_
-
