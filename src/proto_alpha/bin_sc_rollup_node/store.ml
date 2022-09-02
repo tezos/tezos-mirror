@@ -324,3 +324,35 @@ module Dal_confirmed_slots = Make_nested_map (struct
 
   include Block_slot_map_parameter
 end)
+
+(** Confirmed DAL slots history. See documentation of
+    {Dal_slot_repr.Slots_history} for more details. *)
+module Dal_confirmed_slots_history = Make_append_only_map (struct
+  let path = ["dal"; "confirmed_slots_history"]
+
+  let keep_last_n_entries_in_memory = 10
+
+  type key = Block_hash.t
+
+  let string_of_key = Block_hash.to_b58check
+
+  type value = Dal.Slots_history.t
+
+  let value_encoding = Dal.Slots_history.encoding
+end)
+
+(** Confirmed DAL slots histories cache. See documentation of
+    {Dal_slot_repr.Slots_history} for more details. *)
+module Dal_confirmed_slots_histories = Make_append_only_map (struct
+  let path = ["dal"; "confirmed_slots_histories_cache"]
+
+  let keep_last_n_entries_in_memory = 10
+
+  type key = Block_hash.t
+
+  let string_of_key = Block_hash.to_b58check
+
+  type value = Dal.Slots_history.Cache.t
+
+  let value_encoding = Dal.Slots_history.Cache.encoding
+end)
