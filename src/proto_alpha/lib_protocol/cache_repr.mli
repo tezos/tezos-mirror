@@ -56,6 +56,10 @@ type size = int
 (** Index type to index caches. *)
 type index = int
 
+(** Type used to identifies the block that introduced new cache
+     entries *)
+type cache_nonce
+
 (**
 
      The following module acts on the whole cache, not on a specific
@@ -64,7 +68,7 @@ type index = int
      with respect to the chain. This module is typically used by
      low-level layers of the protocol and by the shell.
 
-  *)
+*)
 module Admin : sig
   (** A key uniquely identifies a cached [value] in some subcache. *)
   type key
@@ -75,7 +79,7 @@ module Admin : sig
   (** [pp fmt ctxt] is a pretty printer for the [cache] of [ctxt]. *)
   val pp : Format.formatter -> Raw_context.t -> unit
 
-  (** [sync ctxt ~cache_nonce] updates the context with the domain of
+  (** [sync ctxt cache_nonce] updates the context with the domain of
      the cache computed so far. Such function is expected to be called
      at the end of the validation of a block, when there is no more
      accesses to the cache.
@@ -87,7 +91,7 @@ module Admin : sig
      consequently influences the context hash of the very same
      block. Such nonce cannot be determined by the shell and its
      computation is delegated to the economic protocol. *)
-  val sync : Raw_context.t -> cache_nonce:Bytes.t -> Raw_context.t Lwt.t
+  val sync : Raw_context.t -> cache_nonce -> Raw_context.t Lwt.t
 
   (** {3 Cache helpers for RPCs} *)
 
@@ -125,7 +129,7 @@ module Admin : sig
   val cache_size_limit : Raw_context.t -> cache_index:int -> size option
 
   (** [value_of_key ctxt k] interprets the functions introduced by
-     [register] to construct a cacheable value for a key [k]. 
+     [register] to construct a cacheable value for a key [k].
 
      [value_of_key] is a maintenance operation: it is typically run
      when a node reboots. For this reason, this operation is not
@@ -233,3 +237,8 @@ end
 val register_exn :
   (module CLIENT with type cached_value = 'a) ->
   (module INTERFACE with type cached_value = 'a)
+
+(** [cache_nonce_from_block_header shell_header contents] computes a
+   {!cache_nonce} from the [shell_header] and its [contents]. *)
+val cache_nonce_from_block_header :
+  Block_header_repr.shell_header -> Block_header_repr.contents -> cache_nonce

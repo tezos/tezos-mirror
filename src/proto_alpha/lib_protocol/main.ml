@@ -466,34 +466,7 @@ let apply_operation ({mode; chain_id; ctxt; op_count; _} as data)
         operation
         ~payload_producer
 
-let cache_nonce_from_block_header shell contents =
-  let open Alpha_context.Block_header in
-  let shell =
-    Block_header.
-      {
-        level = 0l;
-        proto_level = 0;
-        predecessor = shell.predecessor;
-        timestamp = Time.of_seconds 0L;
-        validation_passes = 0;
-        operations_hash = shell.operations_hash;
-        fitness = [];
-        context = Context_hash.zero;
-      }
-  in
-  let contents =
-    {
-      contents with
-      payload_hash = Block_payload_hash.zero;
-      proof_of_work_nonce =
-        Bytes.make Constants_repr.proof_of_work_nonce_size '0';
-    }
-  in
-  let protocol_data = {signature = Signature.zero; contents} in
-  let x = {shell; protocol_data} in
-  Block_hash.to_bytes (hash x)
-
-let finalize_block_application ctxt round ~cache_nonce finalize_application_mode
+let finalize_block_application ctxt round cache_nonce finalize_application_mode
     protocol_data payload_producer block_producer liquidity_baking_toggle_ema
     implicit_operations_results predecessor migration_balance_updates op_count =
   Apply.finalize_application
@@ -508,7 +481,7 @@ let finalize_block_application ctxt round ~cache_nonce finalize_application_mode
     ~predecessor
     ~migration_balance_updates
   >>=? fun (ctxt, fitness, receipt) ->
-  Alpha_context.Cache.Admin.sync ctxt ~cache_nonce >>= fun ctxt ->
+  Alpha_context.Cache.Admin.sync ctxt cache_nonce >>= fun ctxt ->
   let level = Alpha_context.Level.current ctxt in
   let raw_level = Alpha_context.Raw_level.to_int32 level.level in
   let commit_message =
@@ -630,11 +603,13 @@ let finalize_block
         _;
       } ->
       let round = Alpha_context.Fitness.round fitness in
-      let cache_nonce = cache_nonce_from_block_header shell protocol_data in
+      let cache_nonce =
+        Alpha_context.Cache.cache_nonce_from_block_header shell protocol_data
+      in
       finalize_block_application
         ctxt
-        ~cache_nonce
         round
+        cache_nonce
         (Finalize_application fitness)
         protocol_data
         payload_producer
@@ -660,13 +635,15 @@ let finalize_block
         ~error:(Error_monad.trace_of_error Missing_shell_header)
       >>?= fun shell_header ->
       let cache_nonce =
-        cache_nonce_from_block_header shell_header protocol_data_contents
+        Alpha_context.Cache.cache_nonce_from_block_header
+          shell_header
+          protocol_data_contents
       in
       Alpha_context.Raw_level.of_int32 level >>?= fun level ->
       finalize_block_application
         ctxt
         round
-        ~cache_nonce
+        cache_nonce
         (Finalize_full_construction {level; predecessor_round})
         protocol_data_contents
         payload_producer
@@ -728,18 +705,19 @@ let init chain_id ctxt block_header =
   Alpha_context.prepare_first_block chain_id ~typecheck ~level ~timestamp ctxt
   >>=? fun ctxt ->
   let cache_nonce =
-    cache_nonce_from_block_header
+    Alpha_context.Cache.cache_nonce_from_block_header
       block_header
-      {
-        payload_hash = Block_payload_hash.zero;
-        payload_round = Alpha_context.Round.zero;
-        liquidity_baking_toggle_vote = Alpha_context.Liquidity_baking.LB_pass;
-        seed_nonce_hash = None;
-        proof_of_work_nonce =
-          Bytes.make Constants_repr.proof_of_work_nonce_size '0';
-      }
+      ({
+         payload_hash = Block_payload_hash.zero;
+         payload_round = Alpha_context.Round.zero;
+         liquidity_baking_toggle_vote = Alpha_context.Liquidity_baking.LB_pass;
+         seed_nonce_hash = None;
+         proof_of_work_nonce =
+           Bytes.make Constants_repr.proof_of_work_nonce_size '0';
+       }
+        : Alpha_context.Block_header.contents)
   in
-  Alpha_context.Cache.Admin.sync ctxt ~cache_nonce >>= fun ctxt ->
+  Alpha_context.Cache.Admin.sync ctxt cache_nonce >>= fun ctxt ->
   return
     (Alpha_context.finalize ctxt (Alpha_context.Fitness.to_raw init_fitness))
 

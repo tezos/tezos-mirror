@@ -1127,74 +1127,6 @@ module Internal_for_tests : sig
   val to_raw : context -> Raw_context.t
 end
 
-(** This module re-exports definitions from {!Cache_repr}. *)
-module Cache : sig
-  type size = int
-
-  type index = int
-
-  module Admin : sig
-    type key
-
-    type value
-
-    val pp : Format.formatter -> context -> unit
-
-    val sync : context -> cache_nonce:Bytes.t -> context Lwt.t
-
-    val future_cache_expectation :
-      ?blocks_before_activation:int32 ->
-      context ->
-      time_in_blocks:int ->
-      context tzresult Lwt.t
-
-    val cache_size : context -> cache_index:int -> size option
-
-    val cache_size_limit : context -> cache_index:int -> size option
-
-    val value_of_key :
-      context -> Context.Cache.key -> Context.Cache.value tzresult Lwt.t
-  end
-
-  type namespace = private string
-
-  val create_namespace : string -> namespace
-
-  type identifier = string
-
-  module type CLIENT = sig
-    type cached_value
-
-    val cache_index : index
-
-    val namespace : namespace
-
-    val value_of_identifier :
-      context -> identifier -> cached_value tzresult Lwt.t
-  end
-
-  module type INTERFACE = sig
-    type cached_value
-
-    val update :
-      context -> identifier -> (cached_value * size) option -> context tzresult
-
-    val find : context -> identifier -> cached_value option tzresult Lwt.t
-
-    val list_identifiers : context -> (string * int) list
-
-    val identifier_rank : context -> string -> int option
-
-    val size : context -> int
-
-    val size_limit : context -> int
-  end
-
-  val register_exn :
-    (module CLIENT with type cached_value = 'a) ->
-    (module INTERFACE with type cached_value = 'a)
-end
-
 (** This module re-exports definitions from {!Level_repr} and
     {!Level_storage}. *)
 module Level : sig
@@ -3804,6 +3736,79 @@ module Block_header : sig
     locked_round_evidence:locked_round_evidence option ->
     consensus_threshold:int ->
     unit tzresult
+end
+
+(** This module re-exports definitions from {!Cache_repr}. *)
+module Cache : sig
+  type size = int
+
+  type index = int
+
+  type cache_nonce
+
+  module Admin : sig
+    type key
+
+    type value
+
+    val pp : Format.formatter -> context -> unit
+
+    val sync : context -> cache_nonce -> context Lwt.t
+
+    val future_cache_expectation :
+      ?blocks_before_activation:int32 ->
+      context ->
+      time_in_blocks:int ->
+      context tzresult Lwt.t
+
+    val cache_size : context -> cache_index:int -> size option
+
+    val cache_size_limit : context -> cache_index:int -> size option
+
+    val value_of_key :
+      context -> Context.Cache.key -> Context.Cache.value tzresult Lwt.t
+  end
+
+  type namespace = private string
+
+  val create_namespace : string -> namespace
+
+  type identifier = string
+
+  module type CLIENT = sig
+    type cached_value
+
+    val cache_index : index
+
+    val namespace : namespace
+
+    val value_of_identifier :
+      context -> identifier -> cached_value tzresult Lwt.t
+  end
+
+  module type INTERFACE = sig
+    type cached_value
+
+    val update :
+      context -> identifier -> (cached_value * size) option -> context tzresult
+
+    val find : context -> identifier -> cached_value option tzresult Lwt.t
+
+    val list_identifiers : context -> (string * int) list
+
+    val identifier_rank : context -> string -> int option
+
+    val size : context -> int
+
+    val size_limit : context -> int
+  end
+
+  val register_exn :
+    (module CLIENT with type cached_value = 'a) ->
+    (module INTERFACE with type cached_value = 'a)
+
+  val cache_nonce_from_block_header :
+    Block_header.shell_header -> Block_header.contents -> cache_nonce
 end
 
 (** This module re-exports definitions from {!Lazy_storage_kind}. *)

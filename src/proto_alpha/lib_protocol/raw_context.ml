@@ -1257,7 +1257,7 @@ module Cache = struct
 
   let update c k v = Context.Cache.update (context c) k v |> update_context c
 
-  let sync c ~cache_nonce =
+  let sync c cache_nonce =
     Context.Cache.sync (context c) ~cache_nonce >>= fun ctxt ->
     Lwt.return (update_context c ctxt)
 

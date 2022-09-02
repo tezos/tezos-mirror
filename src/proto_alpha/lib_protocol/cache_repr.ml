@@ -61,6 +61,8 @@ type identifier = string
 
 type namespace = string
 
+type cache_nonce = Bytes.t
+
 let compare_namespace = Compare.String.compare
 
 type internal_identifier = {namespace : namespace; id : identifier}
@@ -289,3 +291,30 @@ let register_exn (type cvalue)
 
     let identifier_rank ctxt id = Admin.key_rank ctxt (mk ~id)
   end)
+
+let cache_nonce_from_block_header (shell : Block_header.shell_header) contents :
+    cache_nonce =
+  let open Block_header_repr in
+  let shell : Block_header.shell_header =
+    {
+      level = 0l;
+      proto_level = 0;
+      predecessor = shell.predecessor;
+      timestamp = Time.of_seconds 0L;
+      validation_passes = 0;
+      operations_hash = shell.operations_hash;
+      fitness = [];
+      context = Context_hash.zero;
+    }
+  in
+  let contents =
+    {
+      contents with
+      payload_hash = Block_payload_hash.zero;
+      proof_of_work_nonce =
+        Bytes.make Constants_repr.proof_of_work_nonce_size '0';
+    }
+  in
+  let protocol_data = {signature = Signature.zero; contents} in
+  let x = {shell; protocol_data} in
+  Block_hash.to_bytes (hash x)
