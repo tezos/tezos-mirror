@@ -124,13 +124,23 @@ let script_nat_size n = Script_int.to_zint n |> z_size
 
 let script_int_size n = Script_int.to_zint n |> z_size
 
-let signature_size = !!96 (* By Obj.reachable_words. *)
+let signature_size (Script_signature.Signature_tag x) =
+  match x with
+  (* By Obj.reachable_words. *)
+  | Ed25519 _ | Secp256k1 _ | P256 _ | Unknown _ -> !!96
+  | Bls _ -> !!128
 
 let key_hash_size (_x : Signature.public_key_hash) = !!64
 (* By Obj.reachable_words. *)
 
 let public_key_size (x : public_key) =
-  h1w +? match x with Ed25519 _ -> 64 | Secp256k1 _ -> 72 | P256 _ -> 96
+  h1w
+  +?
+  match x with
+  | Ed25519 _ -> 64
+  | Secp256k1 _ -> 72
+  | P256 _ -> 96
+  | Bls _ -> 64
 
 let mutez_size = h2w
 
@@ -264,7 +274,7 @@ let rec value_size :
     | Unit_t -> ret_succ accu
     | Int_t -> ret_succ_adding accu (script_int_size x)
     | Nat_t -> ret_succ_adding accu (script_nat_size x)
-    | Signature_t -> ret_succ_adding accu signature_size
+    | Signature_t -> ret_succ_adding accu (signature_size x)
     | String_t -> ret_succ_adding accu (script_string_size x)
     | Bytes_t -> ret_succ_adding accu (bytes_size x)
     | Mutez_t -> ret_succ_adding accu mutez_size
