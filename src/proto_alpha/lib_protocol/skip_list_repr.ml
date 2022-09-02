@@ -27,15 +27,15 @@ module type S = sig
   type ('content, 'ptr) cell
 
   val pp :
-    pp_content:(Format.formatter -> 'content -> unit) ->
     pp_ptr:(Format.formatter -> 'ptr -> unit) ->
+    pp_content:(Format.formatter -> 'content -> unit) ->
     Format.formatter ->
     ('content, 'ptr) cell ->
     unit
 
   val equal :
-    ('content -> 'content -> bool) ->
     ('ptr -> 'ptr -> bool) ->
+    ('content -> 'content -> bool) ->
     ('content, 'ptr) cell ->
     ('content, 'ptr) cell ->
     bool
@@ -122,7 +122,7 @@ end) : S = struct
     index : int;
   }
 
-  let equal equal_content equal_ptr cell1 cell2 =
+  let equal equal_ptr equal_content cell1 cell2 =
     let equal_back_pointers b1 b2 =
       let open FallbackArray in
       Compare.Int.(length b1 = length b2)
@@ -149,7 +149,7 @@ end) : S = struct
       []
     |> List.rev
 
-  let pp ~pp_content ~pp_ptr fmt {content; back_pointers; index} =
+  let pp ~pp_ptr ~pp_content fmt {content; back_pointers; index} =
     Format.fprintf
       fmt
       {|
@@ -233,7 +233,7 @@ end) : S = struct
   (*
     [back_pointers] are sorted in decreasing order of their pointing cell index
     in the list. So we can do a [binary_search] to find the [cell] with the
-    smallest index that is greater than [target] in the list. 
+    smallest index that is greater than [target] in the list.
 
     More formally, min({c : cell | c.index >= target.index}) where [c] is one of
     the pointed cells in the array of back pointers of the [cell] parameter.
@@ -256,9 +256,9 @@ end) : S = struct
           else if Compare.Int.(prev_mid_cell_index < target_index) then
             (*
               If (mid_cell_index > target_index) &&
-                 (prev_mid_cell_index < target_index) 
-              then we found the closest cell to the target, which is mid_cell. 
-              so we return its index [mid_idx] in the array of back_pointers. 
+                 (prev_mid_cell_index < target_index)
+              then we found the closest cell to the target, which is mid_cell,
+              so we return its index [mid_idx] in the array of back_pointers.
             *)
             Some mid_idx
           else binary_search (mid_idx + 1) end_idx
