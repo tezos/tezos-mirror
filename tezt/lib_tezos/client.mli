@@ -277,6 +277,15 @@ module Admin : sig
   (** Same as [kick_peer], but do not wait for the process to exit. *)
   val spawn_kick_peer : ?endpoint:endpoint -> peer:string -> t -> Process.t
 
+  (** Ban a peer.
+
+      [peer] is the identity of the peer to ban.
+      You can get it with [Node.wait_for_identity] for instance. *)
+  val ban_peer : ?endpoint:endpoint -> peer:string -> t -> unit Lwt.t
+
+  (** Same as [ban_peer], but do not wait for the process to exit. *)
+  val spawn_ban_peer : ?endpoint:endpoint -> peer:string -> t -> Process.t
+
   (** Run [tezos-admin-client inject protocol <protocol_path>].
 
       Returns the hash of the injected protocol. *)
