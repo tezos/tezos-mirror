@@ -222,15 +222,13 @@ let test_set_input () =
   in
   let host_funcs = Tezos_webassembly_interpreter.Host_funcs.empty () in
   let tick_state =
-    let open Instance in
     Eval.
       {
-        frame = {inst = Module_key "main"; locals = []};
         input = Input_buffer.alloc ();
         output = Output_buffer.alloc ();
-        code = ([], []);
         host_funcs;
-        budget = 1000;
+        frame_kont = Frame_result [];
+        stack_size_limit = 1000;
       }
   in
   let* tree = encode_tick_state ~host_funcs tick_state tree in
@@ -276,15 +274,13 @@ let test_get_output () =
   Output_buffer.set_level output 0l ;
   let* () = Output_buffer.set_value output @@ Bytes.of_string "hello" in
   let tick_state =
-    let open Instance in
     Eval.
       {
-        frame = {inst = Module_key "main"; locals = []};
         input = Input_buffer.alloc ();
         output;
-        code = ([], []);
         host_funcs;
-        budget = 1000;
+        frame_kont = Frame_result [];
+        stack_size_limit = 1000;
       }
   in
   let* tree = encode_tick_state ~host_funcs tick_state tree in

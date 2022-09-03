@@ -23,9 +23,7 @@ exception Init_step_error of init_state
 
 type frame = {inst : module_key; locals : value ref list}
 
-type code = value list * admin_instr list
-
-and admin_instr = admin_instr' Source.phrase
+type admin_instr = admin_instr' Source.phrase
 
 and admin_instr' =
   | From_block of Ast.block_label * int32
@@ -35,16 +33,42 @@ and admin_instr' =
   | Trapping of string
   | Returning of value list
   | Breaking of int32 * value list
-  | Label of int32 * Ast.instr list * code
-  | Frame of int32 * frame * code
+
+type code = value list * admin_instr list
+
+type label = {
+  label_arity : int32 option;
+  label_frame_specs : frame;
+  label_break : Ast.instr option;
+  label_code : code;
+}
+
+type ongoing = Ongoing_kind
+
+type finished = Finished_kind
+
+type _ label_kont =
+  | Label_stack : label * label Vector.t -> ongoing label_kont
+  | Label_result : value list -> finished label_kont
+  | Label_trapped : string Source.phrase -> finished label_kont
+
+type 'a frame_stack = {
+  frame_arity : int32 option;
+  frame_specs : frame;
+  frame_label_kont : 'a label_kont;
+}
+
+type frame_kont =
+  | Frame_stack : 'a frame_stack * ongoing frame_stack Vector.t -> frame_kont
+  | Frame_result of value list
+  | Frame_trapped of string Source.phrase
 
 type config = {
-  frame : frame;
   input : input_inst;
   output : output_inst;
-  code : code;
+  frame_kont : frame_kont;
   host_funcs : Host_funcs.registry;
-  budget : int; (* to model stack overflow *)
+  stack_size_limit : int;
 }
 
 type ('a, 'b, 'acc) fold_right2_kont = {
@@ -163,6 +187,7 @@ val config :
   ?input:input_inst ->
   ?output:output_inst ->
   Host_funcs.registry ->
+  ?n:int32 ->
   module_key ->
   value list ->
   admin_instr list ->

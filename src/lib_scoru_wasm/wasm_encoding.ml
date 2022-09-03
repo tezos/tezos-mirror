@@ -764,34 +764,6 @@ let rec admin_instr'_encoding () =
         (function
           | Breaking (index, values) -> Some (index, values) | _ -> None)
         (fun (index, values) -> Breaking (index, values));
-      case
-        "Label"
-        (tup4
-           ~flatten:false
-           (value [] Data_encoding.int32)
-           (list_encoding instruction_encoding)
-           values_encoding
-           (list_encoding (admin_instr_encoding ())))
-        (function
-          | Label (index, final_instrs, (values, instrs)) ->
-              Some (index, final_instrs, values, instrs)
-          | _ -> None)
-        (fun (index, final_instrs, values, instrs) ->
-          Label (index, final_instrs, (values, instrs)));
-      case
-        "Frame"
-        (tup4
-           ~flatten:false
-           (value [] Data_encoding.int32)
-           frame_encoding
-           values_encoding
-           (list_encoding (admin_instr_encoding ())))
-        (function
-          | Frame (index, frame, (values, instrs)) ->
-              Some (index, frame, values, instrs)
-          | _ -> None)
-        (fun (index, frame, values, instrs) ->
-          Frame (index, frame, (values, instrs)));
     ]
 
 and admin_instr_encoding () =
@@ -838,6 +810,110 @@ let input_buffer_encoding =
              input_buffer_message_encoding))
        (value ["num-messages"] Data_encoding.z))
 
+let label_encoding =
+  conv
+    (fun (label_arity, label_frame_specs, label_break, vs, es) ->
+      Eval.{label_arity; label_frame_specs; label_break; label_code = (vs, es)})
+    (fun {label_arity; label_frame_specs; label_break; label_code = vs, es} ->
+      (label_arity, label_frame_specs, label_break, vs, es))
+    (tup5
+       ~flatten:true
+       (value_option ["arity"] Data_encoding.int32)
+       (scope ["frame"] frame_encoding)
+       (scope ["label_break"] (option instruction_encoding))
+       (scope ["values"] values_encoding)
+       (scope ["instructions"] (list_encoding admin_instr_encoding)))
+
+let ongoing_label_kont_encoding : Eval.ongoing Eval.label_kont t =
+  tagged_union
+    string_tag
+    [
+      case
+        "Label_stack"
+        (tup2
+           ~flatten:true
+           (scope ["top"] label_encoding)
+           (lazy_vector_encoding "rst" label_encoding))
+        (function Eval.Label_stack (label, stack) -> Some (label, stack))
+        (fun (label, stack) -> Label_stack (label, stack));
+    ]
+
+type packed_label_kont = Packed : 'a Eval.label_kont -> packed_label_kont
+
+let packed_label_kont_encoding : packed_label_kont t =
+  tagged_union
+    string_tag
+    [
+      case
+        "Label_stack"
+        ongoing_label_kont_encoding
+        (function Packed (Label_stack (_, _) as s) -> Some s | _ -> None)
+        (fun s -> Packed s);
+      case
+        "Label_result"
+        values_encoding
+        (function Packed (Label_result vs0) -> Some vs0 | _ -> None)
+        (fun vs0 -> Packed (Label_result vs0));
+      case
+        "Label_trapped"
+        (value [] Data_encoding.string)
+        (function Packed (Label_trapped msg) -> Some msg.it | _ -> None)
+        (fun msg -> Packed (Label_trapped Source.(msg @@ no_region)));
+    ]
+
+let ongoing_frame_stack_encoding =
+  conv
+    (fun (frame_arity, frame_specs, frame_label_kont) ->
+      Eval.{frame_arity; frame_specs; frame_label_kont})
+    (fun {frame_arity; frame_specs; frame_label_kont} ->
+      (frame_arity, frame_specs, frame_label_kont))
+    (tup3
+       ~flatten:true
+       (value_option ["arity"] Data_encoding.int32)
+       (scope ["frame"] frame_encoding)
+       (scope ["label_kont"] ongoing_label_kont_encoding))
+
+type packed_frame_stack =
+  | Packed_fs : 'a Eval.frame_stack -> packed_frame_stack
+
+let packed_frame_stack_encoding =
+  conv
+    (fun (frame_arity, frame_specs, Packed frame_label_kont) ->
+      Packed_fs Eval.{frame_arity; frame_specs; frame_label_kont})
+    (function
+      | Packed_fs Eval.{frame_arity; frame_specs; frame_label_kont} ->
+          (frame_arity, frame_specs, Packed frame_label_kont))
+    (tup3
+       ~flatten:true
+       (value_option ["arity"] Data_encoding.int32)
+       (scope ["frame"] frame_encoding)
+       (scope ["label_kont"] packed_label_kont_encoding))
+
+let frame_kont_encoding =
+  tagged_union
+    string_tag
+    [
+      case
+        "Frame_stack"
+        (tup2
+           ~flatten:true
+           (scope ["top"] packed_frame_stack_encoding)
+           (lazy_vector_encoding "rst" ongoing_frame_stack_encoding))
+        (function
+          | Eval.Frame_stack (f, rst) -> Some (Packed_fs f, rst) | _ -> None)
+        (fun (Packed_fs f, rst) -> Frame_stack (f, rst));
+      case
+        "Frame_result"
+        values_encoding
+        (function Eval.Frame_result vs -> Some vs | _ -> None)
+        (fun vs -> Frame_result vs);
+      case
+        "Frame_trapped"
+        (value [] Data_encoding.string)
+        (function Eval.Frame_trapped msg -> Some msg.it | _ -> None)
+        (fun msg -> Frame_trapped Source.(msg @@ no_region));
+    ]
+
 let index_vector_encoding =
   conv
     (fun index -> Output_buffer.Index_Vector.of_immutable index)
@@ -852,15 +928,13 @@ let output_buffer_encoding =
 
 let config_encoding ~host_funcs =
   conv
-    (fun (frame, input, output, instrs, values, budget) ->
-      Eval.{frame; input; output; code = (values, instrs); host_funcs; budget})
-    (fun Eval.{frame; input; output; code = values, instrs; budget; _} ->
-      (frame, input, output, instrs, values, budget))
-    (tup6
+    (fun (input, output, frame_kont, stack_size_limit) ->
+      Eval.{input; output; frame_kont; host_funcs; stack_size_limit})
+    (fun Eval.{input; output; frame_kont; stack_size_limit; _} ->
+      (input, output, frame_kont, stack_size_limit))
+    (tup4
        ~flatten:true
-       (scope ["frame"] frame_encoding)
        (scope ["input"] input_buffer_encoding)
        (scope ["output"] output_buffer_encoding)
-       (scope ["instructions"] (list_encoding admin_instr_encoding))
-       (scope ["values"] values_encoding)
-       (value ["budget"] Data_encoding.int31))
+       (scope ["frame_kont"] frame_kont_encoding)
+       (value ["stack_size_limit"] Data_encoding.int31))

@@ -174,9 +174,36 @@ struct
       | Decode m ->
           let+ m = Tezos_webassembly_interpreter.Decode.module_step kernel m in
           Decode m
-      | Init {self; ast_module = _; init_kont = IK_Stop _module_inst} ->
-          let eval_config = Wasm.Eval.config host_funcs self [] [] in
-          Lwt.return (Eval eval_config)
+      | Init {self; ast_module = _; init_kont = IK_Stop _module_inst} -> (
+          let* module_inst =
+            Wasm.Instance.ModuleMap.get wasm_main_module_name module_reg
+          in
+          let* main_name =
+            Wasm.Instance.Vector.to_list @@ Wasm.Utf8.decode wasm_entrypoint
+          in
+          let* extern =
+            Wasm.Instance.NameMap.get
+              main_name
+              module_inst.Wasm.Instance.exports
+          in
+          match extern with
+          | Wasm.Instance.ExternFunc main_func ->
+              let admin_instr' = Wasm.Eval.Invoke main_func in
+              let admin_instr =
+                Wasm.Source.{it = admin_instr'; at = no_region}
+              in
+              (* Clear the values and the locals in the frame. *)
+              let eval_config =
+                Wasm.Eval.config host_funcs self [] [admin_instr]
+              in
+              Lwt.return (Eval eval_config)
+          | _ ->
+              (* We require a function with the name [main] to be exported
+                 rather than any other structure. *)
+              Lwt.return
+                (Stuck
+                   (Invalid_state "Invalid_module: no `main` function exported"))
+          )
       | Init {self; ast_module; init_kont} ->
           let* init_kont =
             Wasm.Eval.init_step
@@ -188,50 +215,9 @@ struct
               init_kont
           in
           Lwt.return (Init {self; ast_module; init_kont})
-      | Eval ({Wasm.Eval.frame; code; _} as eval_config) -> (
-          match code with
-          | _values, [] -> (
-              (* We have an empty set of admin instructions so we create one
-                 that invokes the main function. *)
-              let* module_inst =
-                Wasm.Instance.ModuleMap.get wasm_main_module_name module_reg
-              in
-              let* main_name =
-                Wasm.Instance.Vector.to_list @@ Wasm.Utf8.decode wasm_entrypoint
-              in
-              let* extern =
-                Wasm.Instance.NameMap.get
-                  main_name
-                  module_inst.Wasm.Instance.exports
-              in
-
-              match extern with
-              | Wasm.Instance.ExternFunc main_func ->
-                  let admin_instr' = Wasm.Eval.Invoke main_func in
-                  let admin_instr =
-                    Wasm.Source.{it = admin_instr'; at = no_region}
-                  in
-                  (* Clear the values and the locals in the frame. *)
-                  let code = ([], [admin_instr]) in
-                  let eval_config =
-                    {
-                      eval_config with
-                      Wasm.Eval.frame = {frame with locals = []};
-                      code;
-                    }
-                  in
-                  Lwt.return (Eval eval_config)
-              | _ ->
-                  (* We require a function with the name [main] to be exported
-                     rather than any other structure. *)
-                  Lwt.return
-                    (Stuck
-                       (Invalid_state
-                          "Invalid_module: no `main` function exported")))
-          | _ ->
-              (* Continue execution. *)
-              let* eval_config = Wasm.Eval.step module_reg eval_config in
-              Lwt.return (Eval eval_config))
+      | Eval eval_config ->
+          let+ eval_config = Wasm.Eval.step module_reg eval_config in
+          Eval eval_config
       | Stuck e -> Lwt.return (Stuck e)
 
     let next_tick_state pvm_state =
@@ -255,13 +241,22 @@ struct
       let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
       (* Calculate the next tick state. *)
       let* tick_state = next_tick_state pvm_state in
-      let input_request =
-        match pvm_state.tick_state with
-        | Eval {code = _, []; _} | Stuck _ ->
+      let input_request, tick_state =
+        match tick_state with
+        | Eval {frame_kont = Wasm.Eval.(Frame_result _); _} ->
             (* Ask for more input if the kernel has yielded (empty admin
-               instructions). *)
-            Wasm_pvm_sig.Input_required
-        | _ -> Wasm_pvm_sig.No_input_required
+               instructions, or error). *)
+            (Wasm_pvm_sig.Input_required, tick_state)
+        | Eval {frame_kont = Wasm.Eval.(Frame_trapped msg); _} ->
+            ( Wasm_pvm_sig.Input_required,
+              Stuck
+                (Wasm_pvm_errors.Eval_error
+                   {
+                     raw_exception = "trapped execution";
+                     explanation = Some msg.it;
+                   }) )
+        | Stuck _ -> (Wasm_pvm_sig.Input_required, tick_state)
+        | _ -> (Wasm_pvm_sig.No_input_required, tick_state)
       in
       (* Update the tick state and input-request and increment the current tick *)
       let pvm_state =
@@ -323,7 +318,13 @@ struct
                     payload = String.to_bytes message;
                   })
             in
-            pvm_state.tick_state
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/3608
+               The goal is to (1) clean-up correctly the PVM state,
+               and (2) to read a complete inbox. *)
+            (* Go back to decoding *)
+            Decode
+              (Tezos_webassembly_interpreter.Decode.initial_decode_kont
+                 ~name:wasm_main_module_name)
         | Decode _ ->
             Lwt.return
               (Stuck (Invalid_state "No input required during decoding"))

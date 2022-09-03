@@ -66,9 +66,7 @@ type 'a stack = 'a list
 
 type frame = {inst : module_key; locals : value ref list}
 
-type code = value stack * admin_instr list
-
-and admin_instr = admin_instr' phrase
+type admin_instr = admin_instr' phrase
 
 and admin_instr' =
   | From_block of block_label * int32
@@ -78,29 +76,75 @@ and admin_instr' =
   | Trapping of string
   | Returning of value stack
   | Breaking of int32 * value stack
-  | Label of int32 * instr list * code
-  | Frame of int32 * frame * code
+
+type code = value stack * admin_instr list
+
+type label = {
+  label_arity : int32 option;
+  label_frame_specs : frame;
+  label_break : instr option;
+  label_code : code;
+}
+
+type ongoing = Ongoing_kind
+
+type finished = Finished_kind
+
+type _ label_kont =
+  | Label_stack : label * label Vector.t -> ongoing label_kont
+  | Label_result : value list -> finished label_kont
+  | Label_trapped : string phrase -> finished label_kont
+
+let label_kont label = Label_stack (label, Vector.empty ())
+
+type 'a frame_stack = {
+  frame_arity : int32 option;
+  frame_specs : frame;
+  frame_label_kont : 'a label_kont;
+}
+
+type frame_kont =
+  | Frame_stack : 'a frame_stack * ongoing frame_stack Vector.t -> frame_kont
+  | Frame_result of value list
+  | Frame_trapped of string phrase
+
+let get_frame = function
+  | Frame_stack (frame, _) -> frame.frame_specs
+  | _ -> assert false
+
+let frame_kont frame = Frame_stack (frame, Vector.empty ())
 
 type config = {
-  frame : frame;
   input : input_inst;
   output : output_inst;
-  code : code;
+  frame_kont : frame_kont;
   host_funcs : Host_funcs.registry;
-  budget : int; (* to model stack overflow *)
+  stack_size_limit : int;
 }
 
 let frame inst locals = {inst; locals}
 
 let config ?(input = Input_buffer.alloc ()) ?(output = Output_buffer.alloc ())
-    host_funcs inst vs es =
+    host_funcs ?n inst vs es =
+  let frame = frame inst [] in
+  let label_kont =
+    label_kont
+      {
+        label_arity = n;
+        label_frame_specs = frame;
+        label_code = (vs, es);
+        label_break = None;
+      }
+  in
+  let frame_stack =
+    {frame_arity = n; frame_specs = frame; frame_label_kont = label_kont}
+  in
   {
-    frame = frame inst [];
     input;
     output;
-    code = (vs, es);
-    budget = 300;
+    frame_kont = frame_kont frame_stack;
     host_funcs;
+    stack_size_limit = 300;
   }
 
 let plain e = Plain e.it @@ e.at
@@ -170,8 +214,55 @@ let block_type inst bt =
 let take n (vs : 'a stack) at =
   try Lib.List32.take n vs with Failure _ -> Crash.error at "stack underflow"
 
+let mtake n vs at = match n with Some n -> take n vs at | None -> vs
+
 let drop n (vs : 'a stack) at =
   try Lib.List32.drop n vs with Failure _ -> Crash.error at "stack underflow"
+
+let invoke (module_reg : module_reg) ?config func (vs, es) at =
+  let (FuncType (ins, out)) = func_type_of func in
+  let n1, n2 =
+    (Instance.Vector.num_elements ins, Instance.Vector.num_elements out)
+  in
+  let args, vs' = (take n1 vs at, drop n1 vs at) in
+  match (func, config) with
+  | Func.AstFunc (_, inst', f), _ ->
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3366 &
+         https://gitlab.com/tezos/tezos/-/issues/3082
+
+         This conversion to list can probably be avoided by using
+         Lazy_vector in the config for local variables. *)
+      let+ locals = Lazy_vector.Int32Vector.to_list f.it.locals in
+      let locals' = List.rev args @ List.map default_value locals in
+      let frame' = {inst = inst'; locals = List.map ref locals'} in
+      ( (vs', es),
+        Some
+          {
+            frame_arity = Some n2;
+            frame_specs = frame';
+            frame_label_kont =
+              label_kont
+                {
+                  label_arity = Some n2;
+                  label_frame_specs = frame';
+                  label_break = None;
+                  label_code = ([], [From_block (f.it.body, 0l) @@ f.at]);
+                };
+          } )
+  | Func.HostFunc (_, global_name), Some c ->
+      Lwt.catch
+        (fun () ->
+          let (Host_funcs.Host_func f) =
+            Host_funcs.lookup ~global_name c.host_funcs
+          in
+          let* inst =
+            resolve_module_ref module_reg (get_frame c.frame_kont).inst
+          in
+          let+ res = f c.input c.output inst.memories (List.rev args) in
+          ((List.rev res @ vs', es), None))
+        (function Crash (_, msg) -> Crash.error at msg | exn -> raise exn)
+  | Func.HostFunc (_, _), None ->
+      Crash.error at "Cannot invoke host functions without a config"
 
 (* Evaluation *)
 
@@ -213,76 +304,112 @@ let elem_oob module_reg frame x i n =
     (I64.add (I64_convert.extend_i32_u i) (I64_convert.extend_i32_u n))
     (Int64.of_int32 (Instance.Vector.num_elements !elem))
 
-let step_instr module_reg frame vs e e' =
+(** [step_instr module_reg label vs at e es stack] returns the new
+    state of the label stack [label, stack] for a given [frame], by
+    executing the WASM instruction [e] on top of the admin instr
+    stack [es] and value stack [vs]. *)
+let step_instr module_reg label vs at e' es_rst stack : 'a label_kont Lwt.t =
+  let label_kont_with_code vs es' =
+    Label_stack ({label with label_code = (vs, es' @ es_rst)}, stack)
+  in
+
+  let return_label_kont_with_code vs es' =
+    Lwt.return (label_kont_with_code vs es')
+  in
+
+  let frame = label.label_frame_specs in
+
   match (e', vs) with
-  | Unreachable, vs -> Lwt.return (vs, [Trapping "unreachable executed" @@ e.at])
-  | Nop, vs -> Lwt.return (vs, [])
+  | Unreachable, _ ->
+      return_label_kont_with_code vs [Trapping "unreachable executed" @@ at]
+  | Nop, vs -> return_label_kont_with_code vs []
   | Block (bt, es'), vs ->
       let* inst = resolve_module_ref module_reg frame.inst in
       let+ (FuncType (ts1, ts2)) = block_type inst bt in
       let n1 = Lazy_vector.Int32Vector.num_elements ts1 in
       let n2 = Lazy_vector.Int32Vector.num_elements ts2 in
-      let args, vs' = (take n1 vs e.at, drop n1 vs e.at) in
-      (vs', [Label (n2, [], (args, [From_block (es', 0l) @@ e.at])) @@ e.at])
+      let args, vs' = (take n1 vs at, drop n1 vs at) in
+      let label' =
+        {
+          label_arity = Some n2;
+          label_break = None;
+          label_code = (args, [From_block (es', 0l) @@ at]);
+          label_frame_specs = frame;
+        }
+      in
+      Label_stack
+        (label', Vector.cons {label with label_code = (vs', es_rst)} stack)
   | Loop (bt, es'), vs ->
       let* inst = resolve_module_ref module_reg frame.inst in
       let+ (FuncType (ts1, _)) = block_type inst bt in
       let n1 = Lazy_vector.Int32Vector.num_elements ts1 in
-      let args, vs' = (take n1 vs e.at, drop n1 vs e.at) in
-      ( vs',
-        [
-          Label (n1, [e' @@ e.at], (args, [From_block (es', 0l) @@ e.at]))
-          @@ e.at;
-        ] )
+      let args, vs' = (take n1 vs at, drop n1 vs at) in
+      let label' =
+        {
+          label_arity = Some n1;
+          label_break = Some (e' @@ at);
+          label_code = (args, [From_block (es', 0l) @@ at]);
+          label_frame_specs = frame;
+        }
+      in
+      Label_stack
+        (label', Vector.cons {label with label_code = (vs', es_rst)} stack)
   | If (bt, es1, es2), Num (I32 i) :: vs' ->
-      Lwt.return
-        (if i = 0l then (vs', [Plain (Block (bt, es2)) @@ e.at])
-        else (vs', [Plain (Block (bt, es1)) @@ e.at]))
-  | Br x, vs -> Lwt.return ([], [Breaking (x.it, vs) @@ e.at])
+      return_label_kont_with_code
+        vs'
+        [
+          (if i = 0l then Plain (Block (bt, es2)) @@ at
+          else Plain (Block (bt, es1)) @@ at);
+        ]
+  | Br x, vs -> return_label_kont_with_code [] [Breaking (x.it, vs) @@ at]
   | BrIf x, Num (I32 i) :: vs' ->
-      Lwt.return (if i = 0l then (vs', []) else (vs', [Plain (Br x) @@ e.at]))
+      return_label_kont_with_code
+        vs'
+        (if i = 0l then [] else [Plain (Br x) @@ at])
   | BrTable (xs, x), Num (I32 i) :: vs' ->
-      Lwt.return
-        (if I32.ge_u i (Lib.List32.length xs) then (vs', [Plain (Br x) @@ e.at])
-        else (vs', [Plain (Br (Lib.List32.nth xs i)) @@ e.at]))
-  | Return, vs -> Lwt.return ([], [Returning vs @@ e.at])
+      return_label_kont_with_code
+        vs'
+        (if I32.ge_u i (Lib.List32.length xs) then [Plain (Br x) @@ at]
+        else [Plain (Br (Lib.List32.nth xs i)) @@ at])
+  | Return, vs -> return_label_kont_with_code [] [Returning vs @@ at]
   | Call x, vs ->
       let* inst = resolve_module_ref module_reg frame.inst in
       let+ func = func inst x in
-      (vs, [Invoke func @@ e.at])
+      label_kont_with_code vs [Invoke func @@ at]
   | CallIndirect (x, y), Num (I32 i) :: vs ->
       let* inst = resolve_module_ref module_reg frame.inst in
-      let* func = func_ref inst x i e.at and* type_ = type_ inst y in
+      let* func = func_ref inst x i at in
+      let* type_ = type_ inst y in
       let+ check_eq = Types.func_types_equal type_ (Func.type_of func) in
-      if not check_eq then (vs, [Trapping "indirect call type mismatch" @@ e.at])
-      else (vs, [Invoke func @@ e.at])
-  | Drop, _ :: vs' -> Lwt.return (vs', [])
+      label_kont_with_code
+        vs
+        (if not check_eq then [Trapping "indirect call type mismatch" @@ at]
+        else [Invoke func @@ at])
+  | Drop, _ :: vs' -> return_label_kont_with_code vs' []
   | Select _, Num (I32 i) :: v2 :: v1 :: vs' ->
-      Lwt.return (if i = 0l then (v2 :: vs', []) else (v1 :: vs', []))
-  | LocalGet x, vs -> Lwt.return (!(local frame x) :: vs, [])
+      return_label_kont_with_code (if i = 0l then v2 :: vs' else v1 :: vs') []
+  | LocalGet x, vs -> return_label_kont_with_code (!(local frame x) :: vs) []
   | LocalSet x, v :: vs' ->
-      Lwt.return
-        (local frame x := v ;
-         (vs', []))
+      local frame x := v ;
+      return_label_kont_with_code vs' []
   | LocalTee x, v :: vs' ->
-      Lwt.return
-        (local frame x := v ;
-         (v :: vs', []))
+      local frame x := v ;
+      return_label_kont_with_code (v :: vs') []
   | GlobalGet x, vs ->
       let* inst = resolve_module_ref module_reg frame.inst in
       let+ glob = global inst x in
       let value = Global.load glob in
-      (value :: vs, [])
+      label_kont_with_code (value :: vs) []
   | GlobalSet x, v :: vs' ->
       Lwt.catch
         (fun () ->
           let* inst = resolve_module_ref module_reg frame.inst in
           let+ glob = global inst x in
           Global.store glob v ;
-          (vs', []))
+          label_kont_with_code vs' [])
         (function
-          | Global.NotMutable -> Crash.error e.at "write to immutable global"
-          | Global.Type -> Crash.error e.at "type mismatch at global write"
+          | Global.NotMutable -> Crash.error at "write to immutable global"
+          | Global.Type -> Crash.error at "type mismatch at global write"
           | exn -> Lwt.fail exn)
   | TableGet x, Num (I32 i) :: vs' ->
       Lwt.catch
@@ -290,20 +417,22 @@ let step_instr module_reg frame vs e e' =
           let* inst = resolve_module_ref module_reg frame.inst in
           let* tbl = table inst x in
           let+ value = Table.load tbl i in
-          (Ref value :: vs', []))
-        (fun exn -> Lwt.return (vs', [Trapping (table_error e.at exn) @@ e.at]))
+          label_kont_with_code (Ref value :: vs') [])
+        (fun exn ->
+          return_label_kont_with_code vs' [Trapping (table_error at exn) @@ at])
   | TableSet x, Ref r :: Num (I32 i) :: vs' ->
       Lwt.catch
         (fun () ->
           let* inst = resolve_module_ref module_reg frame.inst in
           let+ tbl = table inst x in
           Table.store tbl i r ;
-          (vs', []))
-        (fun exn -> Lwt.return (vs', [Trapping (table_error e.at exn) @@ e.at]))
+          label_kont_with_code vs' [])
+        (fun exn ->
+          return_label_kont_with_code vs' [Trapping (table_error at exn) @@ at])
   | TableSize x, vs ->
       let* inst = resolve_module_ref module_reg frame.inst in
       let+ tbl = table inst x in
-      (Num (I32 (Table.size tbl)) :: vs, [])
+      label_kont_with_code (Num (I32 (Table.size tbl)) :: vs) []
   | TableGrow x, Num (I32 delta) :: Ref r :: vs' ->
       let* inst = resolve_module_ref module_reg frame.inst in
       let+ tab = table inst x in
@@ -314,94 +443,98 @@ let step_instr module_reg frame vs e e' =
           old_size
         with Table.SizeOverflow | Table.SizeLimit | Table.OutOfMemory -> -1l
       in
-      (Num (I32 result) :: vs', [])
+      label_kont_with_code (Num (I32 result) :: vs') []
   | TableFill x, Num (I32 n) :: Ref r :: Num (I32 i) :: vs' ->
       let+ oob = table_oob module_reg frame x i n in
-      if oob then (vs', [Trapping (table_error e.at Table.Bounds) @@ e.at])
-      else if n = 0l then (vs', [])
+      if oob then
+        label_kont_with_code vs' [Trapping (table_error at Table.Bounds) @@ at]
+      else if n = 0l then label_kont_with_code vs' []
       else
         let _ = assert (I32.lt_u i 0xffff_ffffl) in
-        ( vs',
-          List.map
-            (at e.at)
-            [
-              Plain (Const (I32 i @@ e.at));
-              Refer r;
-              Plain (TableSet x);
-              Plain (Const (I32 (I32.add i 1l) @@ e.at));
-              Refer r;
-              Plain (Const (I32 (I32.sub n 1l) @@ e.at));
-              Plain (TableFill x);
-            ] )
+        label_kont_with_code
+          vs'
+          (List.map
+             (Source.at at)
+             [
+               Plain (Const (I32 i @@ at));
+               Refer r;
+               Plain (TableSet x);
+               Plain (Const (I32 (I32.add i 1l) @@ at));
+               Refer r;
+               Plain (Const (I32 (I32.sub n 1l) @@ at));
+               Plain (TableFill x);
+             ])
   | TableCopy (x, y), Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' ->
       let+ oob_d = table_oob module_reg frame x d n
       and+ oob_s = table_oob module_reg frame y s n in
-      if oob_d || oob_s then
-        (vs', [Trapping (table_error e.at Table.Bounds) @@ e.at])
-      else if n = 0l then (vs', [])
-      else if I32.le_u d s then
-        ( vs',
+      label_kont_with_code
+        vs'
+        (if oob_d || oob_s then [Trapping (table_error at Table.Bounds) @@ at]
+        else if n = 0l then []
+        else if I32.le_u d s then
           List.map
-            (at e.at)
+            (Source.at at)
             [
-              Plain (Const (I32 d @@ e.at));
-              Plain (Const (I32 s @@ e.at));
+              Plain (Const (I32 d @@ at));
+              Plain (Const (I32 s @@ at));
               Plain (TableGet y);
               Plain (TableSet x);
-              Plain (Const (I32 (I32.add d 1l) @@ e.at));
-              Plain (Const (I32 (I32.add s 1l) @@ e.at));
-              Plain (Const (I32 (I32.sub n 1l) @@ e.at));
+              Plain (Const (I32 (I32.add d 1l) @@ at));
+              Plain (Const (I32 (I32.add s 1l) @@ at));
+              Plain (Const (I32 (I32.sub n 1l) @@ at));
               Plain (TableCopy (x, y));
-            ] )
-      else
-        (* d > s *)
-        ( vs',
+            ]
+        else
+          (* d > s *)
           List.map
-            (at e.at)
+            (Source.at at)
             [
-              Plain (Const (I32 (I32.add d 1l) @@ e.at));
-              Plain (Const (I32 (I32.add s 1l) @@ e.at));
-              Plain (Const (I32 (I32.sub n 1l) @@ e.at));
+              Plain (Const (I32 (I32.add d 1l) @@ at));
+              Plain (Const (I32 (I32.add s 1l) @@ at));
+              Plain (Const (I32 (I32.sub n 1l) @@ at));
               Plain (TableCopy (x, y));
-              Plain (Const (I32 d @@ e.at));
-              Plain (Const (I32 s @@ e.at));
+              Plain (Const (I32 d @@ at));
+              Plain (Const (I32 s @@ at));
               Plain (TableGet y);
               Plain (TableSet x);
-            ] )
+            ])
   | TableInit (x, y), Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' ->
       let* oob_d = table_oob module_reg frame x d n in
       let* oob_s = elem_oob module_reg frame y s n in
       if oob_d || oob_s then
-        Lwt.return (vs', [Trapping (table_error e.at Table.Bounds) @@ e.at])
-      else if n = 0l then Lwt.return (vs', [])
+        return_label_kont_with_code
+          vs'
+          [Trapping (table_error at Table.Bounds) @@ at]
+      else if n = 0l then return_label_kont_with_code vs' []
       else
         let* inst = resolve_module_ref module_reg frame.inst in
         let* seg = elem inst y in
         let+ value = Instance.Vector.get s !seg in
-        ( vs',
-          List.map
-            (at e.at)
-            [
-              Plain (Const (I32 d @@ e.at));
-              (* Note, the [Instance.Vector.get] is logarithmic in the number of
-                 contained elements in [seg]. However, in a scenario where the PVM
-                 runs, only the element that will be looked up is in the map
-                 making the look up cheap. *)
-              Refer value;
-              Plain (TableSet x);
-              Plain (Const (I32 (I32.add d 1l) @@ e.at));
-              Plain (Const (I32 (I32.add s 1l) @@ e.at));
-              Plain (Const (I32 (I32.sub n 1l) @@ e.at));
-              Plain (TableInit (x, y));
-            ] )
+        label_kont_with_code
+          vs'
+          (List.map
+             (Source.at at)
+             [
+               Plain (Const (I32 d @@ at));
+               (* Note, the [Instance.Vector.get] is logarithmic in the number of
+                  contained elements in [seg]. However, in a scenario where the PVM
+                  runs, only the element that will be looked up is in the map
+                  making the look up cheap. *)
+               Refer value;
+               Plain (TableSet x);
+               Plain (Const (I32 (I32.add d 1l) @@ at));
+               Plain (Const (I32 (I32.add s 1l) @@ at));
+               Plain (Const (I32 (I32.sub n 1l) @@ at));
+               Plain (TableInit (x, y));
+             ])
   | ElemDrop x, vs ->
       let* inst = resolve_module_ref module_reg frame.inst in
       let+ seg = elem inst x in
       seg := Instance.Vector.create 0l ;
-      (vs, [])
+      label_kont_with_code vs []
   | Load {offset; ty; pack; _}, Num (I32 i) :: vs' ->
       let* inst = resolve_module_ref module_reg frame.inst in
-      let* mem = memory inst (0l @@ e.at) in
+      let* mem = memory inst (0l @@ at) in
       Lwt.catch
         (fun () ->
           let+ n =
@@ -409,12 +542,12 @@ let step_instr module_reg frame vs e e' =
             | None -> Memory.load_num mem i offset ty
             | Some (sz, ext) -> Memory.load_num_packed sz ext mem i offset ty
           in
-          (Num n :: vs', []))
+          label_kont_with_code (Num n :: vs') [])
         (fun exn ->
-          Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
+          return_label_kont_with_code vs' [Trapping (memory_error at exn) @@ at])
   | Store {offset; pack; _}, Num n :: Num (I32 i) :: vs' ->
       let* inst = resolve_module_ref module_reg frame.inst in
-      let* mem = memory inst (0l @@ e.at) in
+      let* mem = memory inst (0l @@ at) in
       Lwt.catch
         (fun () ->
           let+ () =
@@ -422,12 +555,12 @@ let step_instr module_reg frame vs e e' =
             | None -> Memory.store_num mem i offset n
             | Some sz -> Memory.store_num_packed sz mem i offset n
           in
-          (vs', []))
+          label_kont_with_code vs' [])
         (fun exn ->
-          Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
+          return_label_kont_with_code vs' [Trapping (memory_error at exn) @@ at])
   | VecLoad {offset; ty; pack; _}, Num (I32 i) :: vs' ->
       let* inst = resolve_module_ref module_reg frame.inst in
-      let* mem = memory inst (0l @@ e.at) in
+      let* mem = memory inst (0l @@ at) in
       Lwt.catch
         (fun () ->
           let+ v =
@@ -435,21 +568,21 @@ let step_instr module_reg frame vs e e' =
             | None -> Memory.load_vec mem i offset ty
             | Some (sz, ext) -> Memory.load_vec_packed sz ext mem i offset ty
           in
-          (Vec v :: vs', []))
+          label_kont_with_code (Vec v :: vs') [])
         (fun exn ->
-          Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
+          return_label_kont_with_code vs' [Trapping (memory_error at exn) @@ at])
   | VecStore {offset; _}, Vec v :: Num (I32 i) :: vs' ->
       let* inst = resolve_module_ref module_reg frame.inst in
-      let* mem = memory inst (0l @@ e.at) in
+      let* mem = memory inst (0l @@ at) in
       Lwt.catch
         (fun () ->
           let+ () = Memory.store_vec mem i offset v in
-          (vs', []))
+          label_kont_with_code vs' [])
         (fun exn ->
-          Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
+          return_label_kont_with_code vs' [Trapping (memory_error at exn) @@ at])
   | VecLoadLane ({offset; pack; _}, j), Vec (V128 v) :: Num (I32 i) :: vs' ->
       let* inst = resolve_module_ref module_reg frame.inst in
-      let* mem = memory inst (0l @@ e.at) in
+      let* mem = memory inst (0l @@ at) in
       Lwt.catch
         (fun () ->
           let+ v =
@@ -471,12 +604,12 @@ let step_instr module_reg frame vs e e' =
                 let+ mem = Memory.load_num mem i offset I64Type in
                 V128.I64x2.replace_lane j v (I64Num.of_num 0 mem)
           in
-          (Vec (V128 v) :: vs', []))
+          label_kont_with_code (Vec (V128 v) :: vs') [])
         (fun exn ->
-          Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
+          return_label_kont_with_code vs' [Trapping (memory_error at exn) @@ at])
   | VecStoreLane ({offset; pack; _}, j), Vec (V128 v) :: Num (I32 i) :: vs' ->
       let* inst = resolve_module_ref module_reg frame.inst in
-      let* mem = memory inst (0l @@ e.at) in
+      let* mem = memory inst (0l @@ at) in
       Lwt.catch
         (fun () ->
           let+ () =
@@ -508,16 +641,16 @@ let step_instr module_reg frame vs e e' =
                   offset
                   (I64 (V128.I64x2.extract_lane_s j v))
           in
-          (vs', []))
+          label_kont_with_code vs' [])
         (fun exn ->
-          Lwt.return (vs', [Trapping (memory_error e.at exn) @@ e.at]))
+          return_label_kont_with_code vs' [Trapping (memory_error at exn) @@ at])
   | MemorySize, vs ->
       let* inst = resolve_module_ref module_reg frame.inst in
-      let+ mem = memory inst (0l @@ e.at) in
-      (Num (I32 (Memory.size mem)) :: vs, [])
+      let+ mem = memory inst (0l @@ at) in
+      label_kont_with_code (Num (I32 (Memory.size mem)) :: vs) []
   | MemoryGrow, Num (I32 delta) :: vs' ->
       let* inst = resolve_module_ref module_reg frame.inst in
-      let+ mem = memory inst (0l @@ e.at) in
+      let+ mem = memory inst (0l @@ at) in
       let old_size = Memory.size mem in
       let result =
         try
@@ -526,38 +659,39 @@ let step_instr module_reg frame vs e e' =
         with Memory.SizeOverflow | Memory.SizeLimit | Memory.OutOfMemory ->
           -1l
       in
-      (Num (I32 result) :: vs', [])
+      label_kont_with_code (Num (I32 result) :: vs') []
   | MemoryFill, Num (I32 n) :: Num k :: Num (I32 i) :: vs' ->
-      let+ oob = mem_oob module_reg frame (0l @@ e.at) i n in
-      if oob then (vs', [Trapping (memory_error e.at Memory.Bounds) @@ e.at])
-      else if n = 0l then (vs', [])
-      else
-        ( vs',
+      let+ oob = mem_oob module_reg frame (0l @@ at) i n in
+      label_kont_with_code
+        vs'
+        (if oob then [Trapping (memory_error at Memory.Bounds) @@ at]
+        else if n = 0l then []
+        else
           List.map
-            (at e.at)
+            (Source.at at)
             [
-              Plain (Const (I32 i @@ e.at));
-              Plain (Const (k @@ e.at));
+              Plain (Const (I32 i @@ at));
+              Plain (Const (k @@ at));
               Plain
                 (Store {ty = I32Type; align = 0; offset = 0l; pack = Some Pack8});
-              Plain (Const (I32 (I32.add i 1l) @@ e.at));
-              Plain (Const (k @@ e.at));
-              Plain (Const (I32 (I32.sub n 1l) @@ e.at));
+              Plain (Const (I32 (I32.add i 1l) @@ at));
+              Plain (Const (k @@ at));
+              Plain (Const (I32 (I32.sub n 1l) @@ at));
               Plain MemoryFill;
-            ] )
+            ])
   | MemoryCopy, Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' ->
-      let+ oob_s = mem_oob module_reg frame (0l @@ e.at) s n
-      and+ oob_d = mem_oob module_reg frame (0l @@ e.at) d n in
-      if oob_s || oob_d then
-        (vs', [Trapping (memory_error e.at Memory.Bounds) @@ e.at])
-      else if n = 0l then (vs', [])
-      else if I32.le_u d s then
-        ( vs',
+      let+ oob_s = mem_oob module_reg frame (0l @@ at) s n
+      and+ oob_d = mem_oob module_reg frame (0l @@ at) d n in
+      label_kont_with_code
+        vs'
+        (if oob_s || oob_d then [Trapping (memory_error at Memory.Bounds) @@ at]
+        else if n = 0l then []
+        else if I32.le_u d s then
           List.map
-            (at e.at)
+            (Source.at at)
             [
-              Plain (Const (I32 d @@ e.at));
-              Plain (Const (I32 s @@ e.at));
+              Plain (Const (I32 d @@ at));
+              Plain (Const (I32 s @@ at));
               Plain
                 (Load
                    {
@@ -568,23 +702,22 @@ let step_instr module_reg frame vs e e' =
                    });
               Plain
                 (Store {ty = I32Type; align = 0; offset = 0l; pack = Some Pack8});
-              Plain (Const (I32 (I32.add d 1l) @@ e.at));
-              Plain (Const (I32 (I32.add s 1l) @@ e.at));
-              Plain (Const (I32 (I32.sub n 1l) @@ e.at));
+              Plain (Const (I32 (I32.add d 1l) @@ at));
+              Plain (Const (I32 (I32.add s 1l) @@ at));
+              Plain (Const (I32 (I32.sub n 1l) @@ at));
               Plain MemoryCopy;
-            ] )
-      else
-        (* d > s *)
-        ( vs',
+            ]
+        else
+          (* d > s *)
           List.map
-            (at e.at)
+            (Source.at at)
             [
-              Plain (Const (I32 (I32.add d 1l) @@ e.at));
-              Plain (Const (I32 (I32.add s 1l) @@ e.at));
-              Plain (Const (I32 (I32.sub n 1l) @@ e.at));
+              Plain (Const (I32 (I32.add d 1l) @@ at));
+              Plain (Const (I32 (I32.add s 1l) @@ at));
+              Plain (Const (I32 (I32.sub n 1l) @@ at));
               Plain MemoryCopy;
-              Plain (Const (I32 d @@ e.at));
-              Plain (Const (I32 s @@ e.at));
+              Plain (Const (I32 d @@ at));
+              Plain (Const (I32 s @@ at));
               Plain
                 (Load
                    {
@@ -595,237 +728,334 @@ let step_instr module_reg frame vs e e' =
                    });
               Plain
                 (Store {ty = I32Type; align = 0; offset = 0l; pack = Some Pack8});
-            ] )
+            ])
   | MemoryInit x, Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' ->
-      let* mem_oob = mem_oob module_reg frame (0l @@ e.at) d n in
+      let* mem_oob = mem_oob module_reg frame (0l @@ at) d n in
       let* data_oob = data_oob module_reg frame x s n in
       if mem_oob || data_oob then
-        Lwt.return (vs', [Trapping (memory_error e.at Memory.Bounds) @@ e.at])
-      else if n = 0l then Lwt.return (vs', [])
+        return_label_kont_with_code
+          vs'
+          [Trapping (memory_error at Memory.Bounds) @@ at]
+      else if n = 0l then return_label_kont_with_code vs' []
       else
         let* inst = resolve_module_ref module_reg frame.inst in
         let* seg = data inst x in
         let* seg = Ast.get_data !seg inst.allocations.datas in
         let+ b = Chunked_byte_vector.load_byte seg (Int64.of_int32 s) in
         let b = Int32.of_int b in
-        ( vs',
-          List.map
-            (at e.at)
-            [
-              Plain (Const (I32 d @@ e.at));
-              Plain (Const (I32 b @@ e.at));
-              Plain
-                (Store {ty = I32Type; align = 0; offset = 0l; pack = Some Pack8});
-              Plain (Const (I32 (I32.add d 1l) @@ e.at));
-              Plain (Const (I32 (I32.add s 1l) @@ e.at));
-              Plain (Const (I32 (I32.sub n 1l) @@ e.at));
-              Plain (MemoryInit x);
-            ] )
+        label_kont_with_code
+          vs'
+          (List.map
+             (Source.at at)
+             [
+               Plain (Const (I32 d @@ at));
+               Plain (Const (I32 b @@ at));
+               Plain
+                 (Store
+                    {ty = I32Type; align = 0; offset = 0l; pack = Some Pack8});
+               Plain (Const (I32 (I32.add d 1l) @@ at));
+               Plain (Const (I32 (I32.add s 1l) @@ at));
+               Plain (Const (I32 (I32.sub n 1l) @@ at));
+               Plain (MemoryInit x);
+             ])
   | DataDrop x, vs ->
       let* inst = resolve_module_ref module_reg frame.inst in
       let+ seg = data inst x in
       seg := Data_label 0l ;
-      (vs, [])
-  | RefNull t, vs' -> Lwt.return (Ref (NullRef t) :: vs', [])
-  | RefIsNull, Ref r :: vs' ->
-      Lwt.return
-        (match r with
-        | NullRef _ -> (Num (I32 1l) :: vs', [])
-        | _ -> (Num (I32 0l) :: vs', []))
+      label_kont_with_code vs []
+  | RefNull t, vs' -> return_label_kont_with_code (Ref (NullRef t) :: vs') []
+  | RefIsNull, Ref r :: vs' -> (
+      match r with
+      | NullRef _ -> return_label_kont_with_code (Num (I32 1l) :: vs') []
+      | _ -> return_label_kont_with_code (Num (I32 0l) :: vs') [])
   | RefFunc x, vs' ->
       let* inst = resolve_module_ref module_reg frame.inst in
       let+ f = func inst x in
-      (Ref (FuncRef f) :: vs', [])
-  | Const n, vs -> Lwt.return (Num n.it :: vs, [])
+      label_kont_with_code (Ref (FuncRef f) :: vs') []
+  | Const n, vs -> return_label_kont_with_code (Num n.it :: vs) []
   | Test testop, Num n :: vs' ->
       Lwt.return
-        (try (value_of_bool (Eval_num.eval_testop testop n) :: vs', [])
-         with exn -> (vs', [Trapping (numeric_error e.at exn) @@ e.at]))
+        (try
+           label_kont_with_code
+             (value_of_bool (Eval_num.eval_testop testop n) :: vs')
+             []
+         with exn ->
+           label_kont_with_code vs' [Trapping (numeric_error at exn) @@ at])
   | Compare relop, Num n2 :: Num n1 :: vs' ->
       Lwt.return
-        (try (value_of_bool (Eval_num.eval_relop relop n1 n2) :: vs', [])
-         with exn -> (vs', [Trapping (numeric_error e.at exn) @@ e.at]))
+        (try
+           label_kont_with_code
+             (value_of_bool (Eval_num.eval_relop relop n1 n2) :: vs')
+             []
+         with exn ->
+           label_kont_with_code vs' [Trapping (numeric_error at exn) @@ at])
   | Unary unop, Num n :: vs' ->
       Lwt.return
-        (try (Num (Eval_num.eval_unop unop n) :: vs', [])
-         with exn -> (vs', [Trapping (numeric_error e.at exn) @@ e.at]))
+        (try label_kont_with_code (Num (Eval_num.eval_unop unop n) :: vs') []
+         with exn ->
+           label_kont_with_code vs' [Trapping (numeric_error at exn) @@ at])
   | Binary binop, Num n2 :: Num n1 :: vs' ->
       Lwt.return
-        (try (Num (Eval_num.eval_binop binop n1 n2) :: vs', [])
-         with exn -> (vs', [Trapping (numeric_error e.at exn) @@ e.at]))
+        (try
+           label_kont_with_code
+             (Num (Eval_num.eval_binop binop n1 n2) :: vs')
+             []
+         with exn ->
+           label_kont_with_code vs' [Trapping (numeric_error at exn) @@ at])
   | Convert cvtop, Num n :: vs' ->
       Lwt.return
-        (try (Num (Eval_num.eval_cvtop cvtop n) :: vs', [])
-         with exn -> (vs', [Trapping (numeric_error e.at exn) @@ e.at]))
-  | VecConst v, vs -> Lwt.return (Vec v.it :: vs, [])
+        (try label_kont_with_code (Num (Eval_num.eval_cvtop cvtop n) :: vs') []
+         with exn ->
+           label_kont_with_code vs' [Trapping (numeric_error at exn) @@ at])
+  | VecConst v, vs -> return_label_kont_with_code (Vec v.it :: vs) []
   | VecTest testop, Vec n :: vs' ->
       Lwt.return
-        (try (value_of_bool (Eval_vec.eval_testop testop n) :: vs', [])
-         with exn -> (vs', [Trapping (numeric_error e.at exn) @@ e.at]))
+        (try
+           label_kont_with_code
+             (value_of_bool (Eval_vec.eval_testop testop n) :: vs')
+             []
+         with exn ->
+           label_kont_with_code vs' [Trapping (numeric_error at exn) @@ at])
   | VecUnary unop, Vec n :: vs' ->
       Lwt.return
-        (try (Vec (Eval_vec.eval_unop unop n) :: vs', [])
-         with exn -> (vs', [Trapping (numeric_error e.at exn) @@ e.at]))
+        (try label_kont_with_code (Vec (Eval_vec.eval_unop unop n) :: vs') []
+         with exn ->
+           label_kont_with_code vs' [Trapping (numeric_error at exn) @@ at])
   | VecBinary binop, Vec n2 :: Vec n1 :: vs' ->
       Lwt.return
-        (try (Vec (Eval_vec.eval_binop binop n1 n2) :: vs', [])
-         with exn -> (vs', [Trapping (numeric_error e.at exn) @@ e.at]))
+        (try
+           label_kont_with_code
+             (Vec (Eval_vec.eval_binop binop n1 n2) :: vs')
+             []
+         with exn ->
+           label_kont_with_code vs' [Trapping (numeric_error at exn) @@ at])
   | VecCompare relop, Vec n2 :: Vec n1 :: vs' ->
       Lwt.return
-        (try (Vec (Eval_vec.eval_relop relop n1 n2) :: vs', [])
-         with exn -> (vs', [Trapping (numeric_error e.at exn) @@ e.at]))
+        (try
+           label_kont_with_code
+             (Vec (Eval_vec.eval_relop relop n1 n2) :: vs')
+             []
+         with exn ->
+           label_kont_with_code vs' [Trapping (numeric_error at exn) @@ at])
   | VecConvert cvtop, Vec n :: vs' ->
       Lwt.return
-        (try (Vec (Eval_vec.eval_cvtop cvtop n) :: vs', [])
-         with exn -> (vs', [Trapping (numeric_error e.at exn) @@ e.at]))
+        (try label_kont_with_code (Vec (Eval_vec.eval_cvtop cvtop n) :: vs') []
+         with exn ->
+           label_kont_with_code vs' [Trapping (numeric_error at exn) @@ at])
   | VecShift shiftop, Num s :: Vec v :: vs' ->
       Lwt.return
-        (try (Vec (Eval_vec.eval_shiftop shiftop v s) :: vs', [])
-         with exn -> (vs', [Trapping (numeric_error e.at exn) @@ e.at]))
+        (try
+           label_kont_with_code
+             (Vec (Eval_vec.eval_shiftop shiftop v s) :: vs')
+             []
+         with exn ->
+           label_kont_with_code vs' [Trapping (numeric_error at exn) @@ at])
   | VecBitmask bitmaskop, Vec v :: vs' ->
       Lwt.return
-        (try (Num (Eval_vec.eval_bitmaskop bitmaskop v) :: vs', [])
-         with exn -> (vs', [Trapping (numeric_error e.at exn) @@ e.at]))
+        (try
+           label_kont_with_code
+             (Num (Eval_vec.eval_bitmaskop bitmaskop v) :: vs')
+             []
+         with exn ->
+           label_kont_with_code vs' [Trapping (numeric_error at exn) @@ at])
   | VecTestBits vtestop, Vec n :: vs' ->
       Lwt.return
-        (try (value_of_bool (Eval_vec.eval_vtestop vtestop n) :: vs', [])
-         with exn -> (vs', [Trapping (numeric_error e.at exn) @@ e.at]))
+        (try
+           label_kont_with_code
+             (value_of_bool (Eval_vec.eval_vtestop vtestop n) :: vs')
+             []
+         with exn ->
+           label_kont_with_code vs' [Trapping (numeric_error at exn) @@ at])
   | VecUnaryBits vunop, Vec n :: vs' ->
       Lwt.return
-        (try (Vec (Eval_vec.eval_vunop vunop n) :: vs', [])
-         with exn -> (vs', [Trapping (numeric_error e.at exn) @@ e.at]))
+        (try label_kont_with_code (Vec (Eval_vec.eval_vunop vunop n) :: vs') []
+         with exn ->
+           label_kont_with_code vs' [Trapping (numeric_error at exn) @@ at])
   | VecBinaryBits vbinop, Vec n2 :: Vec n1 :: vs' ->
       Lwt.return
-        (try (Vec (Eval_vec.eval_vbinop vbinop n1 n2) :: vs', [])
-         with exn -> (vs', [Trapping (numeric_error e.at exn) @@ e.at]))
+        (try
+           label_kont_with_code
+             (Vec (Eval_vec.eval_vbinop vbinop n1 n2) :: vs')
+             []
+         with exn ->
+           label_kont_with_code vs' [Trapping (numeric_error at exn) @@ at])
   | VecTernaryBits vternop, Vec v3 :: Vec v2 :: Vec v1 :: vs' ->
       Lwt.return
-        (try (Vec (Eval_vec.eval_vternop vternop v1 v2 v3) :: vs', [])
-         with exn -> (vs', [Trapping (numeric_error e.at exn) @@ e.at]))
+        (try
+           label_kont_with_code
+             (Vec (Eval_vec.eval_vternop vternop v1 v2 v3) :: vs')
+             []
+         with exn ->
+           label_kont_with_code vs' [Trapping (numeric_error at exn) @@ at])
   | VecSplat splatop, Num n :: vs' ->
       Lwt.return
-        (try (Vec (Eval_vec.eval_splatop splatop n) :: vs', [])
-         with exn -> (vs', [Trapping (numeric_error e.at exn) @@ e.at]))
+        (try
+           label_kont_with_code
+             (Vec (Eval_vec.eval_splatop splatop n) :: vs')
+             []
+         with exn ->
+           label_kont_with_code vs' [Trapping (numeric_error at exn) @@ at])
   | VecExtract extractop, Vec v :: vs' ->
       Lwt.return
-        (try (Num (Eval_vec.eval_extractop extractop v) :: vs', [])
-         with exn -> (vs', [Trapping (numeric_error e.at exn) @@ e.at]))
+        (try
+           label_kont_with_code
+             (Num (Eval_vec.eval_extractop extractop v) :: vs')
+             []
+         with exn ->
+           label_kont_with_code vs' [Trapping (numeric_error at exn) @@ at])
   | VecReplace replaceop, Num r :: Vec v :: vs' ->
       Lwt.return
-        (try (Vec (Eval_vec.eval_replaceop replaceop v r) :: vs', [])
-         with exn -> (vs', [Trapping (numeric_error e.at exn) @@ e.at]))
+        (try
+           label_kont_with_code
+             (Vec (Eval_vec.eval_replaceop replaceop v r) :: vs')
+             []
+         with exn ->
+           label_kont_with_code vs' [Trapping (numeric_error at exn) @@ at])
   | _ ->
       let s1 = string_of_values (List.rev vs) in
       let s2 = string_of_value_types (List.map type_of_value (List.rev vs)) in
       Crash.error
-        e.at
+        at
         ("missing or ill-typed operand on stack (" ^ s1 ^ " : " ^ s2 ^ ")")
 
-let rec step (module_reg : module_reg) (c : config) : config Lwt.t =
-  let {frame; code = vs, es; _} = c in
-  match es with
-  | {it = From_block (Block_label b, i); at} :: es ->
-      let* inst = resolve_module_ref module_reg frame.inst in
-      let* block = Vector.get b inst.allocations.blocks in
-      let length = Vector.num_elements block in
-      if i = length then Lwt.return {c with code = (vs, es)}
-      else
-        let+ instr = Vector.get i block in
-        {
-          c with
-          code =
-            ( vs,
-              (Plain instr.it @@ instr.at)
-              :: {it = From_block (Block_label b, Int32.succ i); at}
-              :: es );
-        }
-  | e :: es -> step_resolved module_reg c frame vs e es
-  | [] -> Lwt.return c
+type label_step_ret =
+  | Push_frame of ongoing label_kont * ongoing frame_stack
+  | Modify_top : 'a label_kont -> label_step_ret
 
-and step_resolved module_reg (c : config) frame vs e es : config Lwt.t =
-  let+ vs', es' =
-    match (e.it, vs) with
-    | From_block _, _ -> assert false (* resolved by [step] *)
-    | Plain e', vs -> step_instr module_reg frame vs e e'
-    | Refer r, vs -> Lwt.return (Ref r :: vs, [])
-    | Trapping msg, _ -> Trap.error e.at msg
-    | Returning _, _ -> Crash.error e.at "undefined frame"
-    | Breaking _, _ -> Crash.error e.at "undefined label"
-    | Label (_, _, (vs', [])), vs -> Lwt.return (vs' @ vs, [])
-    | Label (_, _, (_, {it = Trapping msg; at} :: _)), vs ->
-        Lwt.return (vs, [Trapping msg @@ at])
-    | Label (_, _, (_, {it = Returning vs0; at} :: _)), vs ->
-        Lwt.return (vs, [Returning vs0 @@ at])
-    | Label (n, es0, (_, {it = Breaking (0l, vs0); _} :: _)), vs ->
-        Lwt.return (take n vs0 e.at @ vs, List.map plain es0)
-    | Label (_, _, (_, {it = Breaking (k, vs0); at} :: _)), vs ->
-        Lwt.return (vs, [Breaking (Int32.sub k 1l, vs0) @@ at])
-    | Label (n, es0, code'), vs ->
-        let+ c' = step module_reg {c with code = code'} in
-        (vs, [Label (n, es0, c'.code) @@ e.at])
-    | Frame (_, _, (vs', [])), vs -> Lwt.return (vs' @ vs, [])
-    | Frame (_, _, (_, {it = Trapping msg; at} :: _)), vs ->
-        Lwt.return (vs, [Trapping msg @@ at])
-    | Frame (n, _, (_, {it = Returning vs0; _} :: _)), vs ->
-        Lwt.return (take n vs0 e.at @ vs, [])
-    | Frame (n, frame', code'), vs ->
-        let+ c' =
-          step
-            module_reg
-            {
-              frame = frame';
-              code = code';
-              budget = c.budget - 1;
-              output = c.output;
-              input = c.input;
-              host_funcs = c.host_funcs;
-            }
-        in
-        (vs, [Frame (n, c'.frame, c'.code) @@ e.at])
-    | Invoke _, _ when c.budget = 0 ->
-        Exhaustion.error e.at "call stack exhausted"
-    | Invoke func, vs -> (
-        let (FuncType (ins, out)) = func_type_of func in
-        let n1, n2 =
-          (Instance.Vector.num_elements ins, Instance.Vector.num_elements out)
-        in
-        let args, vs' = (take n1 vs e.at, drop n1 vs e.at) in
-        match func with
-        | Func.AstFunc (_, inst', f) ->
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/3366 &
-               https://gitlab.com/tezos/tezos/-/issues/3082
+let label_step :
+    type a. module_reg -> config -> a label_kont -> label_step_ret Lwt.t =
+ fun module_reg c -> function
+  | Label_stack (label, stack) -> (
+      let frame = label.label_frame_specs in
+      let vs, es = label.label_code in
+      match es with
+      | e :: es -> (
+          match e.it with
+          | Plain e' ->
+              let+ kont = step_instr module_reg label vs e.at e' es stack in
+              Modify_top kont
+          | From_block (Block_label b, i) ->
+              let* inst = resolve_module_ref module_reg frame.inst in
+              let* block = Vector.get b inst.allocations.blocks in
+              let length = Vector.num_elements block in
+              if i = length then
+                Lwt.return
+                  (Modify_top
+                     (Label_stack ({label with label_code = (vs, es)}, stack)))
+              else
+                let+ instr = Vector.get i block in
+                Modify_top
+                  (Label_stack
+                     ( {
+                         label with
+                         label_code =
+                           ( vs,
+                             (Plain instr.it @@ instr.at)
+                             :: (From_block (Block_label b, Int32.succ i)
+                                @@ e.at)
+                             :: es );
+                       },
+                       stack ))
+          | Refer r ->
+              Lwt.return
+                (Modify_top
+                   (Label_stack
+                      ({label with label_code = (Ref r :: vs, es)}, stack)))
+          | Trapping msg ->
+              Lwt.return (Modify_top (Label_trapped (msg @@ e.at)))
+          | Returning vs0 -> Lwt.return (Modify_top (Label_result vs0))
+          | Breaking (0l, vs0) ->
+              let vs0 = mtake label.label_arity vs0 e.at in
+              if Vector.num_elements stack = 0l then
+                Lwt.return (Modify_top (Label_result vs0))
+              else
+                let+ label', stack = Vector.pop stack in
+                let vs, es = label'.label_code in
+                Modify_top
+                  (Label_stack
+                     ( {
+                         label' with
+                         label_code =
+                           ( vs0 @ vs,
+                             List.map plain (Option.to_list label.label_break)
+                             @ es );
+                       },
+                       stack ))
+          | Breaking (k, vs0) ->
+              if Vector.num_elements stack = 0l then
+                Crash.error e.at "undefined label" ;
+              let+ label', stack = Vector.pop stack in
+              let vs', es' = label'.label_code in
+              Modify_top
+                (Label_stack
+                   ( {
+                       label' with
+                       label_code =
+                         (vs', (Breaking (Int32.pred k, vs0) @@ e.at) :: es');
+                     },
+                     stack ))
+          | Invoke func -> (
+              let+ label_code, frame_stack =
+                invoke module_reg ~config:c func (vs, es) e.at
+              in
+              let label_kont = Label_stack ({label with label_code}, stack) in
+              match frame_stack with
+              | Some frame_stack -> Push_frame (label_kont, frame_stack)
+              | None -> Modify_top label_kont))
+      | [] ->
+          if Vector.num_elements stack = 0l then
+            Lwt.return (Modify_top (Label_result vs))
+          else
+            let+ label', stack = Vector.pop stack in
+            let vs', es' = label'.label_code in
+            Modify_top
+              (Label_stack ({label' with label_code = (vs @ vs', es')}, stack)))
+  | Label_result _ | Label_trapped _ -> assert false
 
-               This conversion to list can probably be avoided by using
-               Lazy_vector in the config for local variables. *)
-            let+ locals = Lazy_vector.Int32Vector.to_list f.it.locals in
-            let locals' = List.rev args @ List.map default_value locals in
-            let frame' = {inst = inst'; locals = List.map ref locals'} in
-            let instr' =
-              [
-                Label (n2, [], ([], [From_block (f.it.body, 0l) @@ f.at]))
-                @@ f.at;
-              ]
-            in
-            (vs', [Frame (n2, frame', ([], instr')) @@ e.at])
-        | Func.HostFunc (_, global_name) ->
-            Lwt.catch
-              (fun () ->
-                let (Host_funcs.Host_func f) =
-                  Host_funcs.lookup ~global_name c.host_funcs
+let step module_reg c =
+  let+ frame_kont =
+    match c.frame_kont with
+    | Frame_result _ | Frame_trapped _ -> assert false
+    | Frame_stack (frame, stack) -> (
+        match frame.frame_label_kont with
+        | Label_trapped msg -> Lwt.return (Frame_trapped msg)
+        | Label_result vs0 ->
+            if Vector.num_elements stack = 0l then
+              let vs0 = mtake frame.frame_arity vs0 no_region in
+              Lwt.return (Frame_result vs0)
+            else
+              let+ frame', stack = Vector.pop stack in
+              let label, lstack =
+                match frame'.frame_label_kont with
+                | Label_stack (label, lstack) -> (label, lstack)
+              in
+              let vs, es = label.label_code in
+              let label_kont =
+                Label_stack ({label with label_code = (vs0 @ vs, es)}, lstack)
+              in
+              Frame_stack ({frame' with frame_label_kont = label_kont}, stack)
+        | Label_stack _ as label -> (
+            let+ res = label_step module_reg c label in
+            match res with
+            | Modify_top label_kont ->
+                let frame = {frame with frame_label_kont = label_kont} in
+                Frame_stack (frame, stack)
+            | Push_frame (label_kont, frame') ->
+                let stack_size =
+                  Int32.(succ (Vector.num_elements stack) |> to_int)
                 in
-                let* inst = resolve_module_ref module_reg frame.inst in
-                let+ res = f c.input c.output inst.memories (List.rev args) in
-                (List.rev res @ vs', []))
-              (function
-                | Crash (_, msg) -> Crash.error e.at msg | exn -> raise exn))
+                if c.stack_size_limit <= stack_size then
+                  Exhaustion.error no_region "call stack exhausted" ;
+                let frame = {frame with frame_label_kont = label_kont} in
+                Frame_stack (frame', Vector.cons frame stack)))
   in
-  {c with code = (vs', es' @ es)}
+  {c with frame_kont}
 
 let rec eval module_reg (c : config) : value stack Lwt.t =
-  match c.code with
-  | vs, [] -> Lwt.return vs
-  | _, {it = Trapping msg; at} :: _ -> Trap.error at msg
-  | _, _ ->
+  match c.frame_kont with
+  | Frame_result vs -> Lwt.return vs
+  | Frame_trapped {it = msg; at} -> Trap.error at msg
+  | _ ->
       let* c = step module_reg c in
       eval module_reg c
 
@@ -835,7 +1065,7 @@ let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ())
     ?(output = Output_buffer.alloc ()) host_funcs (func : func_inst)
     (vs : value list) : value list Lwt.t =
   let at = match func with Func.AstFunc (_, _, f) -> f.at | _ -> no_region in
-  let (FuncType (ins, _out)) = Func.type_of func in
+  let (FuncType (ins, out)) = Func.type_of func in
   let* ins_l = Lazy_vector.Int32Vector.to_list ins in
   if List.length vs <> (Lazy_vector.Int32Vector.num_elements ins |> Int32.to_int)
   then Crash.error at "wrong number of arguments" ;
@@ -849,8 +1079,9 @@ let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ())
     | Func.AstFunc (_, inst, _) -> inst
     | Func.HostFunc (_, _) -> caller
   in
+  let n = Vector.num_elements out in
   let c =
-    config ~input ~output host_funcs inst (List.rev vs) [Invoke func @@ at]
+    config ~input ~output host_funcs ~n inst (List.rev vs) [Invoke func @@ at]
   in
   Lwt.catch
     (fun () ->
@@ -871,7 +1102,7 @@ let eval_const_kont inst (const : const) =
 let eval_const_completed = function EC_Stop v -> Some v | _ -> None
 
 let eval_const_step module_reg = function
-  | EC_Next {code = vs, []; _} -> (
+  | EC_Next {frame_kont = Frame_result vs; _} -> (
       match vs with
       | [v] -> Lwt.return (EC_Stop v)
       | _ -> Crash.error Source.no_region "wrong number of results on stack")
@@ -1438,11 +1669,11 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
       | None ->
           let+ tick = join_step tick in
           IK_Join_admin (inst0, tick))
-  | IK_Eval (inst, {code = _, []; _}) ->
+  | IK_Eval (inst, {frame_kont = Frame_result _; _}) ->
       (* No more admin instr, which means that we have returned from
          the _start function. *)
       Lwt.return (IK_Stop inst)
-  | IK_Eval (_, {code = _, {it = Trapping msg; at} :: _; _}) ->
+  | IK_Eval (_, {frame_kont = Frame_trapped {it = msg; at}; _}) ->
       Trap.error at msg
   | IK_Eval (inst, config) ->
       let+ config = step module_reg config in

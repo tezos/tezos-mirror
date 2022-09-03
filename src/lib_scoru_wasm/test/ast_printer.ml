@@ -276,30 +276,73 @@ let rec pp_admin_instr' out instr =
         index
         (Format.pp_print_list Values.pp_value)
         values
-  | Label (index, final_instrs, (values, instrs)) ->
-      Format.fprintf
-        out
-        "Label @[<hv 2>(%li,@; %a,@; %a,@; %a)@]"
-        index
-        (Format.pp_print_list Ast.pp_instr)
-        final_instrs
-        (Format.pp_print_list Values.pp_value)
-        values
-        (Format.pp_print_list pp_admin_instr)
-        instrs
-  | Frame (index, frame, (values, instrs)) ->
-      Format.fprintf
-        out
-        "Frame @[<hv 2>(%li,@; %a,@; %a,@; %a)@]"
-        index
-        pp_frame
-        frame
-        (Format.pp_print_list Values.pp_value)
-        values
-        (Format.pp_print_list pp_admin_instr)
-        instrs
 
 and pp_admin_instr out instr = pp_admin_instr' out instr.Source.it
+
+let pp_label out
+    Eval.{label_arity; label_frame_specs; label_break; label_code = vs, es} =
+  Format.fprintf
+    out
+    "@[<v 2>{label_arity = %a;@;\
+     label_frame_specs = %a;@;\
+     label_break = %a;@;\
+     instructions = %a; values = %a}@]"
+    (pp_opt (fun out x -> Format.fprintf out "%ld" x))
+    label_arity
+    pp_frame
+    label_frame_specs
+    (pp_opt Ast.pp_instr)
+    label_break
+    (Format.pp_print_list pp_admin_instr)
+    es
+    (Format.pp_print_list Values.pp_value)
+    vs
+
+let pp_label_kont : type a. Format.formatter -> a Eval.label_kont -> unit =
+ fun out -> function
+  | Label_stack (label, stack) ->
+      Format.fprintf
+        out
+        "@[<v 2>Label_stack (@;%a,@;%a@;)@]"
+        pp_label
+        label
+        (pp_vector pp_label)
+        stack
+  | Label_result res ->
+      Format.fprintf
+        out
+        "@[<v 2>Label_result %a@]"
+        (Format.pp_print_list Values.pp_value)
+        res
+  | Label_trapped msg -> Format.fprintf out "@[<v 2>Label_trapped %s@]" msg.it
+
+let pp_frame_stack out Eval.{frame_arity; frame_specs; frame_label_kont} =
+  Format.fprintf
+    out
+    "@[<v 2>{frame_arity = %a;@;frame_specs = %a;@;frame_label_kont = %a}@]"
+    (pp_opt (fun out x -> Format.fprintf out "%ld" x))
+    frame_arity
+    pp_frame
+    frame_specs
+    pp_label_kont
+    frame_label_kont
+
+let pp_frame_kont out = function
+  | Eval.Frame_stack (frame, stack) ->
+      Format.fprintf
+        out
+        "@[<v 2>Frame_stack (%a; %a)@]"
+        pp_frame_stack
+        frame
+        (pp_vector pp_frame_stack)
+        stack
+  | Frame_result vs ->
+      Format.fprintf
+        out
+        "@[<v 2>Frame_result %a@]"
+        (Format.pp_print_list Values.pp_value)
+        vs
+  | Frame_trapped msg -> Format.fprintf out "@[<v 2>Frame_trapped %s@]" msg.it
 
 let pp_input_buffer out input =
   let open Input_buffer in
@@ -325,24 +368,14 @@ let pp_output_buffer out (output : Output_buffer.t) =
     (Output_buffer.Level_Vector.snapshot output)
 
 let pp_config out
-    Eval.{frame; input; output; code = values, instrs; host_funcs = _; budget} =
+    Eval.{input; output; frame_kont; host_funcs = _; stack_size_limit} =
   Format.fprintf
     out
-    "@[<v 2>{frame = %a;@;\
-     input = %a;@;\
-     output = %a;@;\
-     instructions = %a;@;\
-     values = %a;@;\
-     budget = %i;@;\
-     }@]"
-    pp_frame
-    frame
+    "@[<v 2>{input = %a;@;output = %a;@;frame_kont = %a;@;budget = %i;@;}@]"
     pp_input_buffer
     input
     pp_output_buffer
     output
-    (Format.pp_print_list pp_admin_instr)
-    instrs
-    (Format.pp_print_list Values.pp_value)
-    values
-    budget
+    pp_frame_kont
+    frame_kont
+    stack_size_limit
