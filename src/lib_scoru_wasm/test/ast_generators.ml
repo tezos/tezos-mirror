@@ -26,6 +26,9 @@
 open Tezos_webassembly_interpreter
 open Lazy_containers
 open QCheck2.Gen
+module Vector = Lazy_containers.Lazy_vector.Int32Vector
+
+let small_vector_gen gen = Vector.of_list <$> small_list gen
 
 let no_region it = Source.{it; at = no_region}
 
@@ -296,7 +299,7 @@ let block_label_gen =
   let+ n = int32 in
   Ast.Block_label n
 
-let func_gen =
+let ast_func_gen =
   let* ftype = var_gen in
   let* locals = vector_gen value_type_gen in
   let* body = block_label_gen in
@@ -305,7 +308,7 @@ let func_gen =
 let func_gen current_module =
   let ast_func () =
     let* func_type = func_type_gen in
-    let* func = func_gen in
+    let* func = ast_func_gen in
     return @@ Func.AstFunc (func_type, current_module, func)
   in
   oneof
@@ -510,7 +513,7 @@ let module_gen ?module_reg () =
 
 let frame_gen ~module_reg =
   let* inst, _ = module_key_and_instance_gen ~module_reg () in
-  let+ locals = small_list (map ref value_gen) in
+  let+ locals = small_vector_gen (map ref value_gen) in
   Eval.{inst; locals}
 
 let rec admin_instr'_gen ~module_reg =
@@ -603,10 +606,6 @@ let label_gen ~module_reg =
   let+ vs = small_list value_gen in
   Eval.{label_arity; label_frame_specs; label_break; label_code = (vs, es)}
 
-module Vector = Lazy_containers.Lazy_vector.Int32Vector
-
-let small_vector_gen gen = Vector.of_list <$> small_list gen
-
 let label_stack_gen ~module_reg =
   let* label = label_gen ~module_reg in
   let+ stack = small_vector_gen (label_gen ~module_reg) in
@@ -646,21 +645,130 @@ let packed_frame_stack_gen ~module_reg =
   let+ (Packed_lk frame_label_kont) = packed_label_kont_gen ~module_reg in
   Packed_fs {frame_arity; frame_specs; frame_label_kont}
 
-let frame_stack_gen ~module_reg =
+let map_kont_gen gen gen' =
+  let* origin = small_vector_gen gen in
+  let* destination = small_vector_gen gen' in
+  let+ offset = Int32.of_int <$> small_nat in
+  Eval.{origin; destination; offset}
+
+let concat_kont_gen gen =
+  let* lv = small_vector_gen gen in
+  let* rv = small_vector_gen gen in
+  let* res = small_vector_gen gen in
+  let+ offset = Int32.of_int <$> small_nat in
+  Eval.{lv; rv; res; offset}
+
+let inv_start_gen ~module_reg =
+  let* module_name = string_printable in
+  let module_key = Instance.Module_key module_name in
+  let* func = func_gen module_key in
+  let* es = small_list (admin_instr_gen ~module_reg) in
+  let+ vs = small_list value_gen in
+  Eval.Inv_start {func; code = (vs, es)}
+
+let inv_prepare_locals_gen ~module_reg =
+  let* arity = Int32.of_int <$> small_nat in
+  let* args = small_list value_gen in
+  let* vs = small_list value_gen in
+  let* instructions = small_list (admin_instr_gen ~module_reg) in
+  let* module_name = string_printable in
+  let inst = Instance.Module_key module_name in
+  let* func = ast_func_gen in
+  let+ locals_kont = map_kont_gen value_type_gen (ref <$> value_gen) in
+  Eval.Inv_prepare_locals
+    {arity; args; vs; instructions; inst; func; locals_kont}
+
+let inv_prepare_args_gen ~module_reg =
+  let* arity = Int32.of_int <$> small_nat in
+  let* vs = small_list value_gen in
+  let* instructions = small_list (admin_instr_gen ~module_reg) in
+  let* module_name = string_printable in
+  let inst = Instance.Module_key module_name in
+  let* func = ast_func_gen in
+  let* locals = small_vector_gen (ref <$> value_gen) in
+  let+ args_kont = map_kont_gen value_gen (ref <$> value_gen) in
+  Eval.Inv_prepare_args {arity; vs; instructions; inst; func; locals; args_kont}
+
+let inv_concat_gen ~module_reg =
+  let* arity = Int32.of_int <$> small_nat in
+  let* vs = small_list value_gen in
+  let* instructions = small_list (admin_instr_gen ~module_reg) in
+  let* module_name = string_printable in
+  let inst = Instance.Module_key module_name in
+  let* func = ast_func_gen in
+  let+ concat_kont = concat_kont_gen (ref <$> value_gen) in
+  Eval.Inv_concat {arity; vs; instructions; inst; func; concat_kont}
+
+let inv_stop_gen ~module_reg =
+  let* vs = small_list value_gen in
+  let* es = small_list (admin_instr_gen ~module_reg) in
+  let+ fresh_frame = option (ongoing_frame_stack_gen ~module_reg) in
+  Eval.Inv_stop {code = (vs, es); fresh_frame}
+
+let invoke_step_gen ~module_reg =
+  oneof
+    [
+      inv_start_gen ~module_reg;
+      inv_prepare_locals_gen ~module_reg;
+      inv_prepare_args_gen ~module_reg;
+      inv_concat_gen ~module_reg;
+      inv_stop_gen ~module_reg;
+    ]
+
+let ls_start_gen ~module_reg =
+  let+ label = label_stack_gen ~module_reg in
+  Eval.LS_Start label
+
+let ls_craft_frame_gen ~module_reg =
+  let* kont = label_stack_gen ~module_reg in
+  let+ invoke_step = invoke_step_gen ~module_reg in
+  Eval.LS_Craft_frame (kont, invoke_step)
+
+let ls_push_frame_gen ~module_reg =
+  let* kont = label_stack_gen ~module_reg in
+  let+ frame = ongoing_frame_stack_gen ~module_reg in
+  Eval.LS_Push_frame (kont, frame)
+
+let ls_modify_top_gen ~module_reg =
+  let+ (Packed_lk kont) = packed_label_kont_gen ~module_reg in
+  Eval.LS_Modify_top kont
+
+let label_step_kont_gen ~module_reg =
+  oneof
+    [
+      ls_start_gen ~module_reg;
+      ls_craft_frame_gen ~module_reg;
+      ls_push_frame_gen ~module_reg;
+      ls_modify_top_gen ~module_reg;
+    ]
+
+let sk_start_gen ~module_reg =
   let* (Packed_fs top) = packed_frame_stack_gen ~module_reg in
   let+ stack = small_vector_gen (ongoing_frame_stack_gen ~module_reg) in
-  Eval.Frame_stack (top, stack)
+  Eval.SK_Start (top, stack)
 
-let frame_result_gen =
+let sk_next_gen ~module_reg =
+  let* (Packed_fs top) = packed_frame_stack_gen ~module_reg in
+  let* stack = small_vector_gen (ongoing_frame_stack_gen ~module_reg) in
+  let+ label_kont = label_step_kont_gen ~module_reg in
+  Eval.SK_Next (top, stack, label_kont)
+
+let sk_result_gen =
   let+ values = small_list value_gen in
-  Eval.Frame_result values
+  Eval.SK_Result values
 
-let frame_trapped_gen =
+let sk_trapped_gen =
   let+ msg = small_string ~gen:char in
-  Eval.Frame_trapped (no_region @@ msg)
+  Eval.SK_Trapped (no_region @@ msg)
 
-let frame_kont_gen ~module_reg =
-  oneof [frame_stack_gen ~module_reg; frame_result_gen; frame_trapped_gen]
+let step_kont_gen ~module_reg =
+  oneof
+    [
+      sk_start_gen ~module_reg;
+      sk_next_gen ~module_reg;
+      sk_result_gen;
+      sk_trapped_gen;
+    ]
 
 let config_gen ~host_funcs ~module_reg =
   let* input = input_buffer_gen in
@@ -670,5 +778,5 @@ let config_gen ~host_funcs ~module_reg =
   in
   let* output = output_buffer_gen in
   let* stack_size_limit = small_int in
-  let+ frame_kont = frame_kont_gen ~module_reg in
-  Eval.{input; output; frame_kont; host_funcs; stack_size_limit}
+  let+ step_kont = step_kont_gen ~module_reg in
+  Eval.{input; output; step_kont; host_funcs; stack_size_limit}

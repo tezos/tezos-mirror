@@ -240,12 +240,15 @@ let pp_module out
 let pp_frame out frame =
   let open Eval in
   let (Module_key key) = frame.inst in
+  let locals =
+    Lwt_main.run (Lazy_containers.Lazy_vector.Int32Vector.to_list frame.locals)
+  in
   Format.fprintf
     out
     "@[<v 2>{module = %s;@;locals = %a;@;}@]"
     key
     (Format.pp_print_list Values.pp_value)
-    (List.map ( ! ) frame.locals)
+    (List.map ( ! ) locals)
 
 let rec pp_admin_instr' out instr =
   let open Eval in
@@ -327,22 +330,172 @@ let pp_frame_stack out Eval.{frame_arity; frame_specs; frame_label_kont} =
     pp_label_kont
     frame_label_kont
 
-let pp_frame_kont out = function
-  | Eval.Frame_stack (frame, stack) ->
+let pp_map_kont pp_origin pp_destination out Eval.{origin; destination; offset}
+    =
+  Format.fprintf
+    out
+    "@[<v 2>{origin = %a;@;destination = %a;@;offset = %ld}@]"
+    (pp_vector pp_origin)
+    origin
+    (pp_vector pp_destination)
+    destination
+    offset
+
+let pp_concat_kont pp out Eval.{lv; rv; res; offset} =
+  Format.fprintf
+    out
+    "@[<v 2>{lv = %a;@;rv = %a;@;res = %a;@;offset = %ld;@;}@]"
+    (pp_vector pp)
+    lv
+    (pp_vector pp)
+    rv
+    (pp_vector pp)
+    res
+    offset
+
+let pp_invoke_step_kont out = function
+  | Eval.Inv_start {func; code = vs, es} ->
       Format.fprintf
         out
-        "@[<v 2>Frame_stack (%a; %a)@]"
+        "@[<v 2>Inv_start {func = %a;@;instructions = %a;@;values = %a}@]"
+        Instance.pp_func_inst
+        func
+        (Format.pp_print_list pp_admin_instr)
+        es
+        (Format.pp_print_list Values.pp_value)
+        vs
+  | Inv_prepare_locals
+      {arity; args; vs; instructions; inst = Module_key inst; func; locals_kont}
+    ->
+      Format.fprintf
+        out
+        "@[<v 2>Inv_prepare_locals {arity = %ld;@;\
+         args = %a;@;\
+         values = %a;@;\
+         instructions = %a;@;\
+         inst = %s;@;\
+         func = %a;@;\
+         locals_kont = %a;@;\
+         }"
+        arity
+        (Format.pp_print_list Values.pp_value)
+        args
+        (Format.pp_print_list Values.pp_value)
+        vs
+        (Format.pp_print_list pp_admin_instr)
+        instructions
+        inst
+        Ast.pp_func
+        func
+        (pp_map_kont Types.pp_value_type (fun out x -> Values.pp_value out !x))
+        locals_kont
+  | Inv_prepare_args
+      {arity; vs; instructions; inst = Module_key inst; func; locals; args_kont}
+    ->
+      Format.fprintf
+        out
+        "@[<v 2>Inv_prepare_locals {arity = %ld;@;\
+         values = %a;@;\
+         instructions = %a;@;\
+         inst = %s;@;\
+         func = %a;@;\
+         locals = %a;@;\
+         args_kont = %a;@;\
+         }"
+        arity
+        (Format.pp_print_list Values.pp_value)
+        vs
+        (Format.pp_print_list pp_admin_instr)
+        instructions
+        inst
+        Ast.pp_func
+        func
+        (pp_vector (fun out x -> Values.pp_value out !x))
+        locals
+        (pp_map_kont Values.pp_value (fun out x -> Values.pp_value out !x))
+        args_kont
+  | Inv_concat
+      {arity; vs; instructions; inst = Module_key inst; func; concat_kont} ->
+      Format.fprintf
+        out
+        "@[<v 2>Inv_prepare_locals {arity = %ld;@;\
+         values = %a;@;\
+         instructions = %a;@;\
+         inst = %s;@;\
+         func = %a;@;\
+         concat_kont = %a;@;\
+         }"
+        arity
+        (Format.pp_print_list Values.pp_value)
+        vs
+        (Format.pp_print_list pp_admin_instr)
+        instructions
+        inst
+        Ast.pp_func
+        func
+        (pp_concat_kont (fun out x -> Values.pp_value out !x))
+        concat_kont
+  | Inv_stop {code = vs, es; fresh_frame} ->
+      Format.fprintf
+        out
+        "%@[<v 2>Inv_stop {values = %a;@;\
+         instructions = %a;@;\
+         fresh_frame = %a}@]"
+        (Format.pp_print_list Values.pp_value)
+        vs
+        (Format.pp_print_list pp_admin_instr)
+        es
+        (pp_opt pp_frame_stack)
+        fresh_frame
+
+let pp_label_step_kont out = function
+  | Eval.LS_Start label_kont ->
+      Format.fprintf out "@[<v 2>LS_Start %a@]" pp_label_kont label_kont
+  | LS_Craft_frame (label_kont, kont) ->
+      Format.fprintf
+        out
+        "@[<v 2>LS_Craft_frame (%a, %a)@]"
+        pp_label_kont
+        label_kont
+        pp_invoke_step_kont
+        kont
+  | LS_Push_frame (label_kont, frame) ->
+      Format.fprintf
+        out
+        "@[<v 2>LS_Push_frame (%a, %a)@]"
+        pp_label_kont
+        label_kont
+        pp_frame_stack
+        frame
+  | LS_Modify_top label_kont ->
+      Format.fprintf out "@[<v 2>LS_Modify_top %a@]" pp_label_kont label_kont
+
+let pp_step_kont out = function
+  | Eval.SK_Start (frame, stack) ->
+      Format.fprintf
+        out
+        "@[<v 2>SK_Start (%a; %a)@]"
         pp_frame_stack
         frame
         (pp_vector pp_frame_stack)
         stack
-  | Frame_result vs ->
+  | SK_Next (frame_stack, stack, kont) ->
       Format.fprintf
         out
-        "@[<v 2>Frame_result %a@]"
+        "@[<v 2>SK_Next (%a, %a, %a)@]"
+        pp_frame_stack
+        frame_stack
+        (pp_vector pp_frame_stack)
+        stack
+        pp_label_step_kont
+        kont
+  | SK_Result vs ->
+      Format.fprintf
+        out
+        "@[<v 2>SK_Result %a@]"
         (Format.pp_print_list Values.pp_value)
         vs
-  | Frame_trapped msg -> Format.fprintf out "@[<v 2>Frame_trapped %s@]" msg.it
+  | SK_Trapped msg -> Format.fprintf out "@[<v 2>SK_Trapped %s@]" msg.it
 
 let pp_input_buffer out input =
   let open Input_buffer in
@@ -368,7 +521,7 @@ let pp_output_buffer out (output : Output_buffer.t) =
     (Output_buffer.Level_Vector.snapshot output)
 
 let pp_config out
-    Eval.{input; output; frame_kont; host_funcs = _; stack_size_limit} =
+    Eval.{input; output; step_kont; host_funcs = _; stack_size_limit} =
   Format.fprintf
     out
     "@[<v 2>{input = %a;@;output = %a;@;frame_kont = %a;@;budget = %i;@;}@]"
@@ -376,6 +529,6 @@ let pp_config out
     input
     pp_output_buffer
     output
-    pp_frame_kont
-    frame_kont
+    pp_step_kont
+    step_kont
     stack_size_limit

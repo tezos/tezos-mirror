@@ -243,11 +243,11 @@ struct
       let* tick_state = next_tick_state pvm_state in
       let input_request, tick_state =
         match tick_state with
-        | Eval {frame_kont = Wasm.Eval.(Frame_result _); _} ->
+        | Eval {step_kont = Wasm.Eval.(SK_Result _); _} ->
             (* Ask for more input if the kernel has yielded (empty admin
                instructions, or error). *)
             (Wasm_pvm_sig.Input_required, tick_state)
-        | Eval {frame_kont = Wasm.Eval.(Frame_trapped msg); _} ->
+        | Eval {step_kont = Wasm.Eval.(SK_Trapped msg); _} ->
             ( Wasm_pvm_sig.Input_required,
               Stuck
                 (Wasm_pvm_errors.Eval_error

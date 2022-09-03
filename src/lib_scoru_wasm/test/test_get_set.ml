@@ -227,7 +227,7 @@ let test_set_input () =
         input = Input_buffer.alloc ();
         output = Output_buffer.alloc ();
         host_funcs;
-        frame_kont = Frame_result [];
+        step_kont = SK_Result [];
         stack_size_limit = 1000;
       }
   in
@@ -279,7 +279,7 @@ let test_get_output () =
         input = Input_buffer.alloc ();
         output;
         host_funcs;
-        frame_kont = Frame_result [];
+        step_kont = SK_Result [];
         stack_size_limit = 1000;
       }
   in

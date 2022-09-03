@@ -1,6 +1,21 @@
 open Values
 open Instance
 
+(* Kontinuation *)
+
+type ('a, 'b) map_kont = {
+  origin : 'a Vector.t;
+  destination : 'b Vector.t;
+  offset : int32;
+}
+
+type 'a concat_kont = {
+  lv : 'a Vector.t;
+  rv : 'a Vector.t;
+  res : 'a Vector.t;
+  offset : int32;
+}
+
 exception Link of Source.region * string
 
 exception Trap of Source.region * string
@@ -21,7 +36,7 @@ type init_state =
     initialization. *)
 exception Init_step_error of init_state
 
-type frame = {inst : module_key; locals : value ref list}
+type frame = {inst : module_key; locals : value ref Vector.t}
 
 type admin_instr = admin_instr' Source.phrase
 
@@ -58,15 +73,54 @@ type 'a frame_stack = {
   frame_label_kont : 'a label_kont;
 }
 
-type frame_kont =
-  | Frame_stack : 'a frame_stack * ongoing frame_stack Vector.t -> frame_kont
-  | Frame_result of value list
-  | Frame_trapped of string Source.phrase
+type invoke_step_kont =
+  | Inv_start of {func : func_inst; code : code}
+  | Inv_prepare_locals of {
+      arity : int32;
+      args : value list;
+      vs : value list;
+      instructions : admin_instr list;
+      inst : module_key;
+      func : Ast.func;
+      locals_kont : (Types.value_type, value ref) map_kont;
+    }
+  | Inv_prepare_args of {
+      arity : int32;
+      vs : value list;
+      instructions : admin_instr list;
+      inst : module_key;
+      func : Ast.func;
+      locals : value ref Vector.t;
+      args_kont : (value, value ref) map_kont;
+    }
+  | Inv_concat of {
+      arity : int32;
+      vs : value list;
+      instructions : admin_instr list;
+      inst : module_key;
+      func : Ast.func;
+      concat_kont : value ref concat_kont;
+    }
+  | Inv_stop of {code : code; fresh_frame : ongoing frame_stack option}
+
+type label_step_kont =
+  | LS_Start : ongoing label_kont -> label_step_kont
+  | LS_Craft_frame of ongoing label_kont * invoke_step_kont
+  | LS_Push_frame of ongoing label_kont * ongoing frame_stack
+  | LS_Modify_top : 'a label_kont -> label_step_kont
+
+type step_kont =
+  | SK_Start : 'a frame_stack * ongoing frame_stack Vector.t -> step_kont
+  | SK_Next :
+      'a frame_stack * ongoing frame_stack Vector.t * label_step_kont
+      -> step_kont
+  | SK_Result of value list
+  | SK_Trapped of string Source.phrase
 
 type config = {
   input : input_inst;
   output : output_inst;
-  frame_kont : frame_kont;
+  step_kont : step_kont;
   host_funcs : Host_funcs.registry;
   stack_size_limit : int;
 }
@@ -75,19 +129,6 @@ type ('a, 'b, 'acc) fold_right2_kont = {
   acc : 'acc;
   lv : 'a Vector.t;
   rv : 'b Vector.t;
-  offset : int32;
-}
-
-type ('a, 'b) map_kont = {
-  origin : 'a Vector.t;
-  destination : 'b Vector.t;
-  offset : int32;
-}
-
-type 'a concat_kont = {
-  lv : 'a Vector.t;
-  rv : 'a Vector.t;
-  res : 'a Vector.t;
   offset : int32;
 }
 
