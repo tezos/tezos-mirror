@@ -541,12 +541,12 @@ let rec admin_instr'_gen ~module_reg =
     Trapping msg
   in
   let returning_gen =
-    let+ values = small_list value_gen in
+    let+ values = small_vector_gen value_gen in
     Returning values
   in
   let breaking_gen =
     let* index = int32 in
-    let+ values = small_list value_gen in
+    let+ values = small_vector_gen value_gen in
     Breaking (index, values)
   in
   oneof
@@ -603,7 +603,7 @@ let label_gen ~module_reg =
   let* label_frame_specs = frame_gen ~module_reg in
   let* label_break = option instr_gen in
   let* es = small_vector_gen (admin_instr_gen ~module_reg) in
-  let+ vs = small_list value_gen in
+  let+ vs = small_vector_gen value_gen in
   Eval.{label_arity; label_frame_specs; label_break; label_code = (vs, es)}
 
 let label_stack_gen ~module_reg =
@@ -612,7 +612,7 @@ let label_stack_gen ~module_reg =
   Eval.Label_stack (label, stack)
 
 let label_result_gen =
-  let+ values = small_list value_gen in
+  let+ values = small_vector_gen value_gen in
   Eval.Label_result values
 
 let label_trapped_gen =
@@ -663,13 +663,13 @@ let inv_start_gen ~module_reg =
   let module_key = Instance.Module_key module_name in
   let* func = func_gen module_key in
   let* es = small_vector_gen (admin_instr_gen ~module_reg) in
-  let+ vs = small_list value_gen in
+  let+ vs = small_vector_gen value_gen in
   Eval.Inv_start {func; code = (vs, es)}
 
 let inv_prepare_locals_gen ~module_reg =
   let* arity = Int32.of_int <$> small_nat in
-  let* args = small_list value_gen in
-  let* vs = small_list value_gen in
+  let* args = small_vector_gen value_gen in
+  let* vs = small_vector_gen value_gen in
   let* instructions = small_vector_gen (admin_instr_gen ~module_reg) in
   let* module_name = string_printable in
   let inst = Instance.Module_key module_name in
@@ -680,7 +680,7 @@ let inv_prepare_locals_gen ~module_reg =
 
 let inv_prepare_args_gen ~module_reg =
   let* arity = Int32.of_int <$> small_nat in
-  let* vs = small_list value_gen in
+  let* vs = small_vector_gen value_gen in
   let* instructions = small_vector_gen (admin_instr_gen ~module_reg) in
   let* module_name = string_printable in
   let inst = Instance.Module_key module_name in
@@ -691,7 +691,7 @@ let inv_prepare_args_gen ~module_reg =
 
 let inv_concat_gen ~module_reg =
   let* arity = Int32.of_int <$> small_nat in
-  let* vs = small_list value_gen in
+  let* vs = small_vector_gen value_gen in
   let* instructions = small_vector_gen (admin_instr_gen ~module_reg) in
   let* module_name = string_printable in
   let inst = Instance.Module_key module_name in
@@ -700,7 +700,7 @@ let inv_concat_gen ~module_reg =
   Eval.Inv_concat {arity; vs; instructions; inst; func; concat_kont}
 
 let inv_stop_gen ~module_reg =
-  let* vs = small_list value_gen in
+  let* vs = small_vector_gen value_gen in
   let* es = small_vector_gen (admin_instr_gen ~module_reg) in
   let+ fresh_frame = option (ongoing_frame_stack_gen ~module_reg) in
   Eval.Inv_stop {code = (vs, es); fresh_frame}
@@ -729,6 +729,13 @@ let ls_push_frame_gen ~module_reg =
   let+ frame = ongoing_frame_stack_gen ~module_reg in
   Eval.LS_Push_frame (kont, frame)
 
+let ls_consolidate_top_gen ~module_reg =
+  let* label = label_gen ~module_reg in
+  let* kont = concat_kont_gen value_gen in
+  let* es = small_vector_gen (admin_instr_gen ~module_reg) in
+  let+ stack = small_vector_gen (label_gen ~module_reg) in
+  Eval.LS_Consolidate_top (label, kont, es, stack)
+
 let ls_modify_top_gen ~module_reg =
   let+ (Packed_lk kont) = packed_label_kont_gen ~module_reg in
   Eval.LS_Modify_top kont
@@ -739,6 +746,7 @@ let label_step_kont_gen ~module_reg =
       ls_start_gen ~module_reg;
       ls_craft_frame_gen ~module_reg;
       ls_push_frame_gen ~module_reg;
+      ls_consolidate_top_gen ~module_reg;
       ls_modify_top_gen ~module_reg;
     ]
 
@@ -753,8 +761,17 @@ let sk_next_gen ~module_reg =
   let+ label_kont = label_step_kont_gen ~module_reg in
   Eval.SK_Next (top, stack, label_kont)
 
+let sk_consolidate_label_result_gen ~module_reg =
+  let* frame = ongoing_frame_stack_gen ~module_reg in
+  let* stack = small_vector_gen (ongoing_frame_stack_gen ~module_reg) in
+  let* label = label_gen ~module_reg in
+  let* kont = concat_kont_gen value_gen in
+  let* es = small_vector_gen (admin_instr_gen ~module_reg) in
+  let+ lstack = small_vector_gen (label_gen ~module_reg) in
+  Eval.SK_Consolidate_label_result (frame, stack, label, kont, es, lstack)
+
 let sk_result_gen =
-  let+ values = small_list value_gen in
+  let+ values = small_vector_gen value_gen in
   Eval.SK_Result values
 
 let sk_trapped_gen =

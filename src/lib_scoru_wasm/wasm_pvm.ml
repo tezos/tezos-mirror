@@ -197,7 +197,7 @@ struct
                 Wasm.Eval.config
                   host_funcs
                   self
-                  []
+                  (Lazy_containers.Lazy_vector.Int32Vector.empty ())
                   (Lazy_containers.Lazy_vector.Int32Vector.singleton
                      admin_instr)
               in

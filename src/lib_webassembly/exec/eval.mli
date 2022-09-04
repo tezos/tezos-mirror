@@ -46,10 +46,10 @@ and admin_instr' =
   | Refer of ref_
   | Invoke of func_inst
   | Trapping of string
-  | Returning of value list
-  | Breaking of int32 * value list
+  | Returning of value Vector.t
+  | Breaking of int32 * value Vector.t
 
-type code = value list * admin_instr Vector.t
+type code = value Vector.t * admin_instr Vector.t
 
 type label = {
   label_arity : int32 option;
@@ -64,7 +64,7 @@ type finished = Finished_kind
 
 type _ label_kont =
   | Label_stack : label * label Vector.t -> ongoing label_kont
-  | Label_result : value list -> finished label_kont
+  | Label_result : value Vector.t -> finished label_kont
   | Label_trapped : string Source.phrase -> finished label_kont
 
 type 'a frame_stack = {
@@ -77,8 +77,8 @@ type invoke_step_kont =
   | Inv_start of {func : func_inst; code : code}
   | Inv_prepare_locals of {
       arity : int32;
-      args : value list;
-      vs : value list;
+      args : value Vector.t;
+      vs : value Vector.t;
       instructions : admin_instr Vector.t;
       inst : module_key;
       func : Ast.func;
@@ -86,7 +86,7 @@ type invoke_step_kont =
     }
   | Inv_prepare_args of {
       arity : int32;
-      vs : value list;
+      vs : value Vector.t;
       instructions : admin_instr Vector.t;
       inst : module_key;
       func : Ast.func;
@@ -95,7 +95,7 @@ type invoke_step_kont =
     }
   | Inv_concat of {
       arity : int32;
-      vs : value list;
+      vs : value Vector.t;
       instructions : admin_instr Vector.t;
       inst : module_key;
       func : Ast.func;
@@ -107,6 +107,8 @@ type label_step_kont =
   | LS_Start : ongoing label_kont -> label_step_kont
   | LS_Craft_frame of ongoing label_kont * invoke_step_kont
   | LS_Push_frame of ongoing label_kont * ongoing frame_stack
+  | LS_Consolidate_top of
+      label * value concat_kont * admin_instr Vector.t * label Vector.t
   | LS_Modify_top : 'a label_kont -> label_step_kont
 
 type step_kont =
@@ -114,7 +116,14 @@ type step_kont =
   | SK_Next :
       'a frame_stack * ongoing frame_stack Vector.t * label_step_kont
       -> step_kont
-  | SK_Result of value list
+  | SK_Consolidate_label_result of
+      ongoing frame_stack
+      * ongoing frame_stack Vector.t
+      * label
+      * value concat_kont
+      * admin_instr Vector.t
+      * label Vector.t
+  | SK_Result of value Vector.t
   | SK_Trapped of string Source.phrase
 
 type config = {
@@ -228,8 +237,8 @@ val config :
   ?input:input_inst ->
   ?output:output_inst ->
   Host_funcs.registry ->
-  ?n:int32 ->
+  ?frame_arity:int32 (* The number of values returned by the computation *) ->
   module_key ->
-  value list ->
+  value Vector.t ->
   admin_instr Vector.t ->
   config

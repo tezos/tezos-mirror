@@ -124,7 +124,7 @@ module Prover = Alpha_context.Sc_rollup.Wasm_2_0_0PVM.Make (WASM_P)
    pass. It should be updated to [16 * 1024] once the small ticks
    milestone is completed.
 *)
-let proof_size_limit = 22_433
+let proof_size_limit = 22_443
 
 let check_proof_size ~loc context input_opt s =
   let open Lwt_result_syntax in

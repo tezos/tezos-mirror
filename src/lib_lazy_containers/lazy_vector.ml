@@ -84,6 +84,8 @@ module type S = sig
 
   val cons : 'a -> 'a t -> 'a t
 
+  val split : 'a t -> key -> 'a t * 'a t
+
   val grow : ?default:(unit -> 'a) -> key -> 'a t -> 'a t
 
   val pop : 'a t -> ('a * 'a t) Lwt.t
@@ -177,6 +179,20 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
     let values = Map.set first value map.values in
     let num_elements = Key.succ map.num_elements in
     {first; values; num_elements}
+
+  let split vec at =
+    if
+      Key.(
+        unsigned_compare at zero < 0
+        || unsigned_compare (num_elements vec) at < 0)
+    then raise Bounds
+    else
+      ( {first = vec.first; num_elements = at; values = Map.dup vec.values},
+        {
+          first = Key.(add vec.first at);
+          num_elements = Key.(sub vec.num_elements at);
+          values = Map.dup vec.values;
+        } )
 
   let append_opt elt map =
     let num_elements = map.num_elements in

@@ -247,8 +247,8 @@ let pp_frame out frame =
     out
     "@[<v 2>{module = %s;@;locals = %a;@;}@]"
     key
-    (Format.pp_print_list Values.pp_value)
-    (List.map ( ! ) locals)
+    (pp_vector Values.pp_value)
+    (Lazy_containers.Lazy_vector.Int32Vector.of_list (List.map ( ! ) locals))
 
 let rec pp_admin_instr' out instr =
   let open Eval in
@@ -270,14 +270,14 @@ let rec pp_admin_instr' out instr =
       Format.fprintf
         out
         "Returning @[<hv 2>%a@]"
-        (Format.pp_print_list Values.pp_value)
+        (pp_vector Values.pp_value)
         values
   | Breaking (index, values) ->
       Format.fprintf
         out
         "Breaking @[<hv 2>(%li,@; %a)@]"
         index
-        (Format.pp_print_list Values.pp_value)
+        (pp_vector Values.pp_value)
         values
 
 and pp_admin_instr out instr = pp_admin_instr' out instr.Source.it
@@ -298,7 +298,7 @@ let pp_label out
     label_break
     (pp_vector pp_admin_instr)
     es
-    (Format.pp_print_list Values.pp_value)
+    (pp_vector Values.pp_value)
     vs
 
 let pp_label_kont : type a. Format.formatter -> a Eval.label_kont -> unit =
@@ -315,7 +315,7 @@ let pp_label_kont : type a. Format.formatter -> a Eval.label_kont -> unit =
       Format.fprintf
         out
         "@[<v 2>Label_result %a@]"
-        (Format.pp_print_list Values.pp_value)
+        (pp_vector Values.pp_value)
         res
   | Label_trapped msg -> Format.fprintf out "@[<v 2>Label_trapped %s@]" msg.it
 
@@ -362,7 +362,7 @@ let pp_invoke_step_kont out = function
         func
         (pp_vector pp_admin_instr)
         es
-        (Format.pp_print_list Values.pp_value)
+        (pp_vector Values.pp_value)
         vs
   | Inv_prepare_locals
       {arity; args; vs; instructions; inst = Module_key inst; func; locals_kont}
@@ -378,9 +378,9 @@ let pp_invoke_step_kont out = function
          locals_kont = %a;@;\
          }"
         arity
-        (Format.pp_print_list Values.pp_value)
+        (pp_vector Values.pp_value)
         args
-        (Format.pp_print_list Values.pp_value)
+        (pp_vector Values.pp_value)
         vs
         (pp_vector pp_admin_instr)
         instructions
@@ -403,7 +403,7 @@ let pp_invoke_step_kont out = function
          args_kont = %a;@;\
          }"
         arity
-        (Format.pp_print_list Values.pp_value)
+        (pp_vector Values.pp_value)
         vs
         (pp_vector pp_admin_instr)
         instructions
@@ -426,7 +426,7 @@ let pp_invoke_step_kont out = function
          concat_kont = %a;@;\
          }"
         arity
-        (Format.pp_print_list Values.pp_value)
+        (pp_vector Values.pp_value)
         vs
         (pp_vector pp_admin_instr)
         instructions
@@ -441,7 +441,7 @@ let pp_invoke_step_kont out = function
         "%@[<v 2>Inv_stop {values = %a;@;\
          instructions = %a;@;\
          fresh_frame = %a}@]"
-        (Format.pp_print_list Values.pp_value)
+        (pp_vector Values.pp_value)
         vs
         (pp_vector pp_admin_instr)
         es
@@ -467,6 +467,18 @@ let pp_label_step_kont out = function
         label_kont
         pp_frame_stack
         frame
+  | LS_Consolidate_top (label, kont, es, labels) ->
+      Format.fprintf
+        out
+        "@[<v 2>LS_Consolidate_top (%a, %a, %a, %a)@]"
+        pp_label
+        label
+        (pp_concat_kont Values.pp_value)
+        kont
+        (pp_vector pp_admin_instr)
+        es
+        (pp_vector pp_label)
+        labels
   | LS_Modify_top label_kont ->
       Format.fprintf out "@[<v 2>LS_Modify_top %a@]" pp_label_kont label_kont
 
@@ -489,12 +501,24 @@ let pp_step_kont out = function
         stack
         pp_label_step_kont
         kont
-  | SK_Result vs ->
+  | SK_Consolidate_label_result (frame, stack, label, kont, es, labels) ->
       Format.fprintf
         out
-        "@[<v 2>SK_Result %a@]"
-        (Format.pp_print_list Values.pp_value)
-        vs
+        "@[<v 2>SK_Consolidate_label_result (%a, %a, %a, %a, %a, %a)@]"
+        pp_frame_stack
+        frame
+        (pp_vector pp_frame_stack)
+        stack
+        pp_label
+        label
+        (pp_concat_kont Values.pp_value)
+        kont
+        (pp_vector pp_admin_instr)
+        es
+        (pp_vector pp_label)
+        labels
+  | SK_Result vs ->
+      Format.fprintf out "@[<v 2>SK_Result %a@]" (pp_vector Values.pp_value) vs
   | SK_Trapped msg -> Format.fprintf out "@[<v 2>SK_Trapped %s@]" msg.it
 
 let pp_input_buffer out input =

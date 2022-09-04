@@ -52,6 +52,9 @@ let lazy_vector_encoding field_name tree_encoding =
     [field_name]
     (int32_lazy_vector (value [] Data_encoding.int32) tree_encoding)
 
+let lazy_vector_encoding' tree_encoding =
+  int32_lazy_vector (value [] Data_encoding.int32) tree_encoding
+
 let func_encoding =
   let ftype = value ["ftype"] Interpreter_encodings.Ast.var_encoding in
   let locals =
@@ -548,7 +551,7 @@ let value_encoding =
         (fun r -> Values.Ref r);
     ]
 
-let values_encoding = list_encoding value_encoding
+let values_encoding = lazy_vector_encoding' value_encoding
 
 let name_encoding key = lazy_vector_encoding key (value [] Data_encoding.int31)
 
@@ -928,8 +931,8 @@ let invoke_step_kont_encoding =
         (tup7
            ~flatten:true
            (value ["arity"] Data_encoding.int32)
-           (scope ["args"] (list_encoding value_encoding))
-           (scope ["values"] (list_encoding value_encoding))
+           (lazy_vector_encoding "args" value_encoding)
+           (lazy_vector_encoding "values" value_encoding)
            (lazy_vector_encoding "instructions" admin_instr_encoding)
            (scope ["inst"] module_key_encoding)
            (scope ["func"] func_encoding)
@@ -953,7 +956,7 @@ let invoke_step_kont_encoding =
         (tup7
            ~flatten:true
            (value ["arity"] Data_encoding.int32)
-           (scope ["values"] (list_encoding value_encoding))
+           (lazy_vector_encoding "values" value_encoding)
            (lazy_vector_encoding "instructions" admin_instr_encoding)
            (scope ["inst"] module_key_encoding)
            (scope ["func"] func_encoding)
@@ -976,7 +979,7 @@ let invoke_step_kont_encoding =
         (tup6
            ~flatten:true
            (value ["arity"] Data_encoding.int32)
-           (scope ["values"] (list_encoding value_encoding))
+           (lazy_vector_encoding "values" value_encoding)
            (lazy_vector_encoding "instructions" admin_instr_encoding)
            (scope ["inst"] module_key_encoding)
            (scope ["func"] func_encoding)
@@ -1031,6 +1034,20 @@ let label_step_kont_encoding =
         (function Eval.LS_Push_frame (l, i) -> Some (l, i) | _ -> None)
         (fun (l, i) -> LS_Push_frame (l, i));
       case
+        "LS_Consolidate_top"
+        (tup4
+           ~flatten:true
+           (scope ["label"] label_encoding)
+           (scope
+              ["kont"]
+              (concat_kont_encoding (lazy_vector_encoding' value_encoding)))
+           (lazy_vector_encoding "instructions" admin_instr_encoding)
+           (lazy_vector_encoding "labels-stack" label_encoding))
+        (function
+          | Eval.LS_Consolidate_top (l, k, es, s) -> Some (l, k, es, s)
+          | _ -> None)
+        (fun (l, k, es, s) -> LS_Consolidate_top (l, k, es, s));
+      case
         "LS_Modify_top"
         packed_label_kont_encoding
         (function Eval.LS_Modify_top l -> Some (Packed l) | _ -> None)
@@ -1060,6 +1077,25 @@ let step_kont_encoding =
         (function
           | Eval.SK_Next (f, r, k) -> Some (Packed_fs f, r, k) | _ -> None)
         (fun (Packed_fs f, r, k) -> SK_Next (f, r, k));
+      case
+        "SK_Consolidate_label_result"
+        (tup6
+           ~flatten:true
+           (scope ["top-frame"] ongoing_frame_stack_encoding)
+           (lazy_vector_encoding "frames-stack" ongoing_frame_stack_encoding)
+           (scope ["top-label"] label_encoding)
+           (scope
+              ["kont"]
+              (concat_kont_encoding (lazy_vector_encoding' value_encoding)))
+           (lazy_vector_encoding "instructions" admin_instr_encoding)
+           (lazy_vector_encoding "labels-stack" label_encoding))
+        (function
+          | Eval.SK_Consolidate_label_result
+              (frame', stack, label, vs, es, lstack) ->
+              Some (frame', stack, label, vs, es, lstack)
+          | _ -> None)
+        (fun (frame', stack, label, vs, es, lstack) ->
+          SK_Consolidate_label_result (frame', stack, label, vs, es, lstack));
       case
         "SK_Result"
         values_encoding

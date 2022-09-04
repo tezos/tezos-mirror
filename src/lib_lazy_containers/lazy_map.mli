@@ -95,6 +95,17 @@ module type S = sig
       @raises Exn.Bounds when trying to set an invalid key *)
   val set : key -> 'a -> 'a t -> 'a t
 
+  (** [dup map] duplicates [map].
+
+      {b Note:} the [produce_value] continuation is shared between the
+      resulting map and [map], meaning that if said continuation
+      carries a state, the two maps will interfere with each
+      others. This is safe when used in conjunction with
+      [lib_tree_encoding], because the continuation is pure in the
+      sense it will always returns the same result when called with
+      the same argument. *)
+  val dup : 'a t -> 'a t
+
   (** [loaded_bindings map] returns the [(key * 'a) list] representation of the
       map [map] containing only the loaded values, in order of increasing keys.
       This function is a witness of internal mutations. *)

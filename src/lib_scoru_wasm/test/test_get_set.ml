@@ -37,6 +37,7 @@ open Tezos_scoru_wasm
 
 (* Use context-binary for testing. *)
 module Context = Tezos_context_memory.Context_binary
+module Vector = Lazy_containers.Lazy_vector.Int32Vector
 
 let empty_tree () =
   let open Lwt_syntax in
@@ -227,7 +228,7 @@ let test_set_input () =
         input = Input_buffer.alloc ();
         output = Output_buffer.alloc ();
         host_funcs;
-        step_kont = SK_Result [];
+        step_kont = SK_Result (Vector.empty ());
         stack_size_limit = 1000;
       }
   in
@@ -261,8 +262,8 @@ let test_set_input () =
   assert (result_input = "hello") ;
   Lwt_result_syntax.return_unit
 
-(** Given a [config] whose output has a given payload at position (0,0), if we 
-encode [config] into a tree [get_output output_info tree] produces the same 
+(** Given a [config] whose output has a given payload at position (0,0), if we
+encode [config] into a tree [get_output output_info tree] produces the same
 payload. Here the output_info is { outbox_level = 0; message_index = 0 } *)
 let test_get_output () =
   let open Lwt_syntax in
@@ -279,7 +280,7 @@ let test_get_output () =
         input = Input_buffer.alloc ();
         output;
         host_funcs;
-        step_kont = SK_Result [];
+        step_kont = SK_Result (Vector.empty ());
         stack_size_limit = 1000;
       }
   in
