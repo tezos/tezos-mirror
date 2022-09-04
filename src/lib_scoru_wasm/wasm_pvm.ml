@@ -272,6 +272,23 @@ struct
           current_tick = Z.succ pvm_state.current_tick;
         }
       in
+
+      (* {{Note tick state clean-up}}
+
+         The "wasm" directory in the Irmin tree of the PVM is used to
+         maintain a lot of information across tick, but as of now, it
+         was never cleaned up. It meant that the tree would become
+         crowded with data that were no longer needed.
+
+         It turns out it is very simple to clean up, thanks to subtree
+         move.  Because we keep in the lazy-containers the original
+         subtree, and we inject it prior to updating read keys, the
+         tree-encoding library does not rely on the input tree at
+         encoding time.
+
+         With this, we gain an additional 5% of proof size in the
+         worst tick of the computation.wasm kernel. *)
+      let* tree = T.remove tree ["wasm"] in
       Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
 
     let out_encoding =
@@ -338,6 +355,8 @@ struct
               (Stuck (Invalid_state "No input required during initialization"))
         | Stuck _ -> Lwt.return pvm_state.tick_state
       in
+      (* See {{Note tick state clean-up}} *)
+      let* tree = T.remove tree ["wasm"] in
       (* Encode the input in the tree under [input/level/id]. *)
       let* tree =
         Tree_encoding_runner.encode
