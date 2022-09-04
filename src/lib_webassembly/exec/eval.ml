@@ -149,7 +149,7 @@ and admin_instr' =
   | Returning of value stack
   | Breaking of int32 * value stack
 
-type code = value stack * admin_instr list
+type code = value stack * admin_instr Vector.t
 
 type label = {
   label_arity : int32 option;
@@ -181,7 +181,7 @@ type invoke_step_kont =
       arity : int32;
       args : value list;
       vs : value list;
-      instructions : admin_instr list;
+      instructions : admin_instr Vector.t;
       inst : module_key;
       func : func;
       locals_kont : (value_type, value ref) map_kont;
@@ -189,7 +189,7 @@ type invoke_step_kont =
   | Inv_prepare_args of {
       arity : int32;
       vs : value list;
-      instructions : admin_instr list;
+      instructions : admin_instr Vector.t;
       inst : module_key;
       func : func;
       locals : value ref Vector.t;
@@ -198,7 +198,7 @@ type invoke_step_kont =
   | Inv_concat of {
       arity : int32;
       vs : value list;
-      instructions : admin_instr list;
+      instructions : admin_instr Vector.t;
       inst : module_key;
       func : func;
       concat_kont : value ref concat_kont;
@@ -423,7 +423,10 @@ let invoke_step (module_reg : module_reg) c frame at = function
                          label_arity = Some n2;
                          label_frame_specs = frame';
                          label_break = None;
-                         label_code = ([], [From_block (f.it.body, 0l) @@ f.at]);
+                         label_code =
+                           ( [],
+                             Vector.singleton
+                               (From_block (f.it.body, 0l) @@ f.at) );
                        };
                  };
            })
@@ -477,7 +480,8 @@ let elem_oob module_reg frame x i n =
     stack [es] and value stack [vs]. *)
 let step_instr module_reg label vs at e' es_rst stack : 'a label_kont Lwt.t =
   let label_kont_with_code vs es' =
-    Label_stack ({label with label_code = (vs, es' @ es_rst)}, stack)
+    Label_stack
+      ({label with label_code = (vs, Vector.prepend_list es' es_rst)}, stack)
   in
 
   let return_label_kont_with_code vs es' =
@@ -500,7 +504,7 @@ let step_instr module_reg label vs at e' es_rst stack : 'a label_kont Lwt.t =
         {
           label_arity = Some n2;
           label_break = None;
-          label_code = (args, [From_block (es', 0l) @@ at]);
+          label_code = (args, Vector.singleton (From_block (es', 0l) @@ at));
           label_frame_specs = frame;
         }
       in
@@ -515,7 +519,7 @@ let step_instr module_reg label vs at e' es_rst stack : 'a label_kont Lwt.t =
         {
           label_arity = Some n1;
           label_break = Some (e' @@ at);
-          label_code = (args, [From_block (es', 0l) @@ at]);
+          label_code = (args, Vector.singleton (From_block (es', 0l) @@ at));
           label_frame_specs = frame;
         }
       in
@@ -1094,88 +1098,91 @@ let label_step :
  fun module_reg c frame label_kont ->
   match label_kont with
   | LS_Push_frame _ | LS_Modify_top _ -> assert false
-  | LS_Start (Label_stack (label, stack)) -> (
+  | LS_Start (Label_stack (label, stack)) ->
       let frame = label.label_frame_specs in
       let vs, es = label.label_code in
-      match es with
-      | e :: es -> (
-          match e.it with
-          | Plain e' ->
-              let+ kont = step_instr module_reg label vs e.at e' es stack in
-              LS_Modify_top kont
-          | From_block (Block_label b, i) ->
-              let* inst = resolve_module_ref module_reg frame.inst in
-              let* block = Vector.get b inst.allocations.blocks in
-              let length = Vector.num_elements block in
-              if i = length then
-                Lwt.return
-                  (LS_Modify_top
-                     (Label_stack ({label with label_code = (vs, es)}, stack)))
-              else
-                let+ instr = Vector.get i block in
-                LS_Modify_top
-                  (Label_stack
-                     ( {
-                         label with
-                         label_code =
-                           ( vs,
-                             (Plain instr.it @@ instr.at)
-                             :: (From_block (Block_label b, Int32.succ i)
-                                @@ e.at)
-                             :: es );
-                       },
-                       stack ))
-          | Refer r ->
+      if 0l < Vector.num_elements es then
+        let* e, es = Vector.pop es in
+        match e.it with
+        | Plain e' ->
+            let+ kont = step_instr module_reg label vs e.at e' es stack in
+            LS_Modify_top kont
+        | From_block (Block_label b, i) ->
+            let* inst = resolve_module_ref module_reg frame.inst in
+            let* block = Vector.get b inst.allocations.blocks in
+            let length = Vector.num_elements block in
+            if i = length then
               Lwt.return
                 (LS_Modify_top
-                   (Label_stack
-                      ({label with label_code = (Ref r :: vs, es)}, stack)))
-          | Trapping msg ->
-              Lwt.return (LS_Modify_top (Label_trapped (msg @@ e.at)))
-          | Returning vs0 -> Lwt.return (LS_Modify_top (Label_result vs0))
-          | Breaking (0l, vs0) ->
-              let vs0 = mtake label.label_arity vs0 e.at in
-              if Vector.num_elements stack = 0l then
-                Lwt.return (LS_Modify_top (Label_result vs0))
-              else
-                let+ label', stack = Vector.pop stack in
-                let vs, es = label'.label_code in
-                LS_Modify_top
-                  (Label_stack
-                     ( {
-                         label' with
-                         label_code =
-                           ( vs0 @ vs,
-                             List.map plain (Option.to_list label.label_break)
-                             @ es );
-                       },
-                       stack ))
-          | Breaking (k, vs0) ->
-              if Vector.num_elements stack = 0l then
-                Crash.error e.at "undefined label" ;
+                   (Label_stack ({label with label_code = (vs, es)}, stack)))
+            else
+              let+ instr = Vector.get i block in
+              LS_Modify_top
+                (Label_stack
+                   ( {
+                       label with
+                       label_code =
+                         ( vs,
+                           Vector.prepend_list
+                             [
+                               Plain instr.it @@ instr.at;
+                               From_block (Block_label b, Int32.succ i) @@ e.at;
+                             ]
+                             es );
+                     },
+                     stack ))
+        | Refer r ->
+            Lwt.return
+              (LS_Modify_top
+                 (Label_stack
+                    ({label with label_code = (Ref r :: vs, es)}, stack)))
+        | Trapping msg ->
+            Lwt.return (LS_Modify_top (Label_trapped (msg @@ e.at)))
+        | Returning vs0 -> Lwt.return (LS_Modify_top (Label_result vs0))
+        | Breaking (0l, vs0) ->
+            let vs0 = mtake label.label_arity vs0 e.at in
+            if Vector.num_elements stack = 0l then
+              Lwt.return (LS_Modify_top (Label_result vs0))
+            else
               let+ label', stack = Vector.pop stack in
-              let vs', es' = label'.label_code in
+              let vs, es = label'.label_code in
               LS_Modify_top
                 (Label_stack
                    ( {
                        label' with
                        label_code =
-                         (vs', (Breaking (Int32.pred k, vs0) @@ e.at) :: es');
+                         ( vs0 @ vs,
+                           Vector.prepend_list
+                             (List.map plain (Option.to_list label.label_break))
+                             es );
                      },
                      stack ))
-          | Invoke func ->
-              Lwt.return
-                (LS_Craft_frame
-                   ( Label_stack (label, stack),
-                     Inv_start {func; code = (vs, es)} )))
-      | [] ->
-          if Vector.num_elements stack = 0l then
-            Lwt.return (LS_Modify_top (Label_result vs))
-          else
+        | Breaking (k, vs0) ->
+            if Vector.num_elements stack = 0l then
+              Crash.error e.at "undefined label" ;
             let+ label', stack = Vector.pop stack in
             let vs', es' = label'.label_code in
             LS_Modify_top
-              (Label_stack ({label' with label_code = (vs @ vs', es')}, stack)))
+              (Label_stack
+                 ( {
+                     label' with
+                     label_code =
+                       ( vs',
+                         Vector.cons (Breaking (Int32.pred k, vs0) @@ e.at) es'
+                       );
+                   },
+                   stack ))
+        | Invoke func ->
+            Lwt.return
+              (LS_Craft_frame
+                 (Label_stack (label, stack), Inv_start {func; code = (vs, es)}))
+      else if Vector.num_elements stack = 0l then
+        Lwt.return (LS_Modify_top (Label_result vs))
+      else
+        let+ label', stack = Vector.pop stack in
+        let vs', es' = label'.label_code in
+        LS_Modify_top
+          (Label_stack ({label' with label_code = (vs @ vs', es')}, stack))
   | LS_Craft_frame (Label_stack (label, stack), Inv_stop {code; fresh_frame}) ->
       let label_kont = Label_stack ({label with label_code = code}, stack) in
       Lwt.return
@@ -1258,7 +1265,14 @@ let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ())
   in
   let n = Vector.num_elements out in
   let c =
-    config ~input ~output host_funcs ~n inst (List.rev vs) [Invoke func @@ at]
+    config
+      ~input
+      ~output
+      host_funcs
+      ~n
+      inst
+      (List.rev vs)
+      (Vector.singleton (Invoke func @@ at))
   in
   Lwt.catch
     (fun () ->
@@ -1272,7 +1286,11 @@ type eval_const_kont = EC_Next of config | EC_Stop of value
 
 let eval_const_kont inst (const : const) =
   let c =
-    config (Host_funcs.empty ()) inst [] [From_block (const.it, 0l) @@ const.at]
+    config
+      (Host_funcs.empty ())
+      inst
+      []
+      (Vector.singleton (From_block (const.it, 0l) @@ const.at))
   in
   EC_Next c
 
@@ -1780,11 +1798,7 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
           IK_Es_datas (inst0, tick, es_elem))
   | IK_Join_admin (inst0, tick) -> (
       match join_completed tick with
-      | Some res ->
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
-             [config] should use lazy vector, not lists *)
-          let+ res = Vector.to_list res in
-          IK_Eval (inst0, config host_funcs self [] res)
+      | Some res -> Lwt.return (IK_Eval (inst0, config host_funcs self [] res))
       | None ->
           let+ tick = join_step tick in
           IK_Join_admin (inst0, tick))

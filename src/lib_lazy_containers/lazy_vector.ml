@@ -88,6 +88,8 @@ module type S = sig
 
   val pop : 'a t -> ('a * 'a t) Lwt.t
 
+  val prepend_list : 'a list -> 'a t -> 'a t
+
   val append : 'a -> 'a t -> 'a t * key
 
   val concat : 'a t -> 'a t -> 'a t Lwt.t
@@ -197,6 +199,11 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
     else raise Bounds
 
   let append elt map = append_opt (Some elt) map
+
+  let prepend_list es es0 =
+    let es = List.rev es in
+    let rec aux v = function x :: rst -> aux (cons x v) rst | [] -> v in
+    aux es0 es
 
   let rec grow ?default delta map =
     if Key.(delta <= zero) then map

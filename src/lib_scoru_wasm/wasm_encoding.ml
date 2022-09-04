@@ -836,7 +836,7 @@ let label_encoding =
        (scope ["frame"] frame_encoding)
        (scope ["label_break"] (option instruction_encoding))
        (scope ["values"] values_encoding)
-       (scope ["instructions"] (list_encoding admin_instr_encoding)))
+       (lazy_vector_encoding "instructions" admin_instr_encoding))
 
 let ongoing_label_kont_encoding : Eval.ongoing Eval.label_kont t =
   tagged_union
@@ -918,7 +918,7 @@ let invoke_step_kont_encoding =
            ~flatten:true
            (scope ["func"] function_encoding)
            (scope ["values"] values_encoding)
-           (scope ["instructions"] (list_encoding admin_instr_encoding)))
+           (lazy_vector_encoding "instructions" admin_instr_encoding))
         (function
           | Eval.Inv_start {func; code = vs, es} -> Some (func, vs, es)
           | _ -> None)
@@ -930,7 +930,7 @@ let invoke_step_kont_encoding =
            (value ["arity"] Data_encoding.int32)
            (scope ["args"] (list_encoding value_encoding))
            (scope ["values"] (list_encoding value_encoding))
-           (scope ["instructions"] (list_encoding admin_instr_encoding))
+           (lazy_vector_encoding "instructions" admin_instr_encoding)
            (scope ["inst"] module_key_encoding)
            (scope ["func"] func_encoding)
            (scope
@@ -954,7 +954,7 @@ let invoke_step_kont_encoding =
            ~flatten:true
            (value ["arity"] Data_encoding.int32)
            (scope ["values"] (list_encoding value_encoding))
-           (scope ["instructions"] (list_encoding admin_instr_encoding))
+           (lazy_vector_encoding "instructions" admin_instr_encoding)
            (scope ["inst"] module_key_encoding)
            (scope ["func"] func_encoding)
            (lazy_vector_encoding "locals" (conv ref ( ! ) @@ value_encoding))
@@ -977,7 +977,7 @@ let invoke_step_kont_encoding =
            ~flatten:true
            (value ["arity"] Data_encoding.int32)
            (scope ["values"] (list_encoding value_encoding))
-           (scope ["instructions"] (list_encoding admin_instr_encoding))
+           (lazy_vector_encoding "instructions" admin_instr_encoding)
            (scope ["inst"] module_key_encoding)
            (scope ["func"] func_encoding)
            (scope
@@ -996,7 +996,7 @@ let invoke_step_kont_encoding =
         (tup3
            ~flatten:true
            (scope ["values"] values_encoding)
-           (scope ["instructions"] (list_encoding admin_instr_encoding))
+           (lazy_vector_encoding "instructions" admin_instr_encoding)
            (scope ["fresh_frame"] (option ongoing_frame_stack_encoding)))
         (function
           | Eval.Inv_stop {code = vs, es; fresh_frame} ->

@@ -49,7 +49,7 @@ and admin_instr' =
   | Returning of value list
   | Breaking of int32 * value list
 
-type code = value list * admin_instr list
+type code = value list * admin_instr Vector.t
 
 type label = {
   label_arity : int32 option;
@@ -79,7 +79,7 @@ type invoke_step_kont =
       arity : int32;
       args : value list;
       vs : value list;
-      instructions : admin_instr list;
+      instructions : admin_instr Vector.t;
       inst : module_key;
       func : Ast.func;
       locals_kont : (Types.value_type, value ref) map_kont;
@@ -87,7 +87,7 @@ type invoke_step_kont =
   | Inv_prepare_args of {
       arity : int32;
       vs : value list;
-      instructions : admin_instr list;
+      instructions : admin_instr Vector.t;
       inst : module_key;
       func : Ast.func;
       locals : value ref Vector.t;
@@ -96,7 +96,7 @@ type invoke_step_kont =
   | Inv_concat of {
       arity : int32;
       vs : value list;
-      instructions : admin_instr list;
+      instructions : admin_instr Vector.t;
       inst : module_key;
       func : Ast.func;
       concat_kont : value ref concat_kont;
@@ -231,5 +231,5 @@ val config :
   ?n:int32 ->
   module_key ->
   value list ->
-  admin_instr list ->
+  admin_instr Vector.t ->
   config

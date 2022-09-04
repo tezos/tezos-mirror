@@ -296,7 +296,7 @@ let pp_label out
     label_frame_specs
     (pp_opt Ast.pp_instr)
     label_break
-    (Format.pp_print_list pp_admin_instr)
+    (pp_vector pp_admin_instr)
     es
     (Format.pp_print_list Values.pp_value)
     vs
@@ -360,7 +360,7 @@ let pp_invoke_step_kont out = function
         "@[<v 2>Inv_start {func = %a;@;instructions = %a;@;values = %a}@]"
         Instance.pp_func_inst
         func
-        (Format.pp_print_list pp_admin_instr)
+        (pp_vector pp_admin_instr)
         es
         (Format.pp_print_list Values.pp_value)
         vs
@@ -382,7 +382,7 @@ let pp_invoke_step_kont out = function
         args
         (Format.pp_print_list Values.pp_value)
         vs
-        (Format.pp_print_list pp_admin_instr)
+        (pp_vector pp_admin_instr)
         instructions
         inst
         Ast.pp_func
@@ -405,7 +405,7 @@ let pp_invoke_step_kont out = function
         arity
         (Format.pp_print_list Values.pp_value)
         vs
-        (Format.pp_print_list pp_admin_instr)
+        (pp_vector pp_admin_instr)
         instructions
         inst
         Ast.pp_func
@@ -428,7 +428,7 @@ let pp_invoke_step_kont out = function
         arity
         (Format.pp_print_list Values.pp_value)
         vs
-        (Format.pp_print_list pp_admin_instr)
+        (pp_vector pp_admin_instr)
         instructions
         inst
         Ast.pp_func
@@ -443,7 +443,7 @@ let pp_invoke_step_kont out = function
          fresh_frame = %a}@]"
         (Format.pp_print_list Values.pp_value)
         vs
-        (Format.pp_print_list pp_admin_instr)
+        (pp_vector pp_admin_instr)
         es
         (pp_opt pp_frame_stack)
         fresh_frame

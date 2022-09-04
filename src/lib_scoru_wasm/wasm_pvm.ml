@@ -194,7 +194,12 @@ struct
               in
               (* Clear the values and the locals in the frame. *)
               let eval_config =
-                Wasm.Eval.config host_funcs self [] [admin_instr]
+                Wasm.Eval.config
+                  host_funcs
+                  self
+                  []
+                  (Lazy_containers.Lazy_vector.Int32Vector.singleton
+                     admin_instr)
               in
               Lwt.return (Eval eval_config)
           | _ ->
