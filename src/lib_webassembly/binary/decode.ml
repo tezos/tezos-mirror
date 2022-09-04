@@ -1943,7 +1943,11 @@ type module_kont =
   | MKField : ('a, vec_repr) field_type * size * 'a lazy_vec_kont -> module_kont
       (** Section currently parsed, accumulating each element from the underlying vector. *)
   | MKElaborateFunc :
-      var Vector.t * func Vector.t * func lazy_vec_kont * bool
+      var Vector.t
+      * func Vector.t
+      * func lazy_vec_kont
+      * instr lazy_vec_kont lazy_vec_kont option
+      * bool
       -> module_kont
       (** Elaboration of functions from the code section with their declared type in
       the func section, and accumulating invariants conditions associated to
@@ -2099,6 +2103,7 @@ let module_step bytes state =
                      ( func_types,
                        func_bodies,
                        init_lazy_vec (Vector.num_elements func_types),
+                       None,
                        true )
           | Some ty -> next @@ MKFieldStart ty))
   (* Parsing of fields vector. *)
@@ -2260,24 +2265,91 @@ let module_step bytes state =
       let* code_kont = code_step s allocs code_kont in
       next @@ MKCode (code_kont, pos, size, curr_vec)
   | MKElaborateFunc
-      (_ft, _fb, (LazyVec {vector = func_types; _} as vec), no_datas_in_func)
+      ( _ft,
+        _fb,
+        (LazyVec {vector = func_types; _} as vec),
+        None,
+        no_datas_in_func )
     when is_end_of_vec vec ->
       next @@ MKBuild (Some func_types, no_datas_in_func)
-  | MKElaborateFunc (fts, fbs, (LazyVec {offset; _} as vec), no_datas_in_func)
-    ->
+  | MKElaborateFunc
+      (fts, fbs, (LazyVec {offset; _} as vec), None, no_datas_in_func) ->
       let* ft = Vector.get offset fts in
       let* fb = Vector.get offset fbs in
       let fb' = Source.({fb.it with ftype = ft} @@ fb.at) in
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3387
-         `Free` shouldn't be part of the PVM.
-      *)
-      let* free = Free.func allocs.blocks fb' in
-      next
-      @@ MKElaborateFunc
-           ( fts,
-             fbs,
-             lazy_vec_step fb' vec,
-             no_datas_in_func && free.datas = Free.Set.empty )
+      if no_datas_in_func then
+        let (Block_label body) = fb'.it.body in
+        let* instrs = Vector.get body allocs.blocks in
+        next
+        @@ MKElaborateFunc
+             ( fts,
+               fbs,
+               lazy_vec_step fb' vec,
+               Some
+                 (LazyVec
+                    {
+                      offset = 0l;
+                      vector =
+                        Vector.singleton
+                          (LazyVec {offset = 0l; vector = instrs});
+                    }),
+               no_datas_in_func )
+      else
+        next
+        @@ MKElaborateFunc
+             (fts, fbs, lazy_vec_step fb' vec, None, no_datas_in_func)
+  | MKElaborateFunc (fts, fbs, vec, Some vec', no_datas_in_func)
+    when is_end_of_vec vec' ->
+      next @@ MKElaborateFunc (fts, fbs, vec, None, no_datas_in_func)
+  | MKElaborateFunc
+      (fts, fbs, vec, Some (LazyVec {offset; vector}), no_datas_in_func) ->
+      let* (LazyVec {offset = i; vector = block} as veci) =
+        Vector.get offset vector
+      in
+      if is_end_of_vec veci then
+        next
+        @@ MKElaborateFunc
+             ( fts,
+               fbs,
+               vec,
+               Some (LazyVec {offset = Int32.succ offset; vector}),
+               no_datas_in_func )
+      else
+        let* instr = Vector.get i block in
+
+        let rec push vec = function
+          | Block_label x :: rst ->
+              let* instrs = Vector.get x allocs.blocks in
+              let vec, _ =
+                Vector.append (LazyVec {offset = 0l; vector = instrs}) vec
+              in
+              push vec rst
+          | [] -> Lwt.return vec
+        in
+        let no_data e =
+          match e.Source.it with
+          | MemoryInit _ | DataDrop _ -> (false, [])
+          | Block (_, es) | Loop (_, es) -> (true, [es])
+          | If (_, es1, es2) -> (true, [es1; es2])
+          | _ -> (true, [])
+        in
+        let no_data, new_blocks = no_data instr in
+        let* vector = push vector new_blocks in
+        let vector =
+          Vector.set
+            offset
+            (LazyVec {offset = Int32.succ i; vector = block})
+            vector
+        in
+        let no_datas_in_func = no_data && no_datas_in_func in
+        next
+        @@ MKElaborateFunc
+             ( fts,
+               fbs,
+               vec,
+               (if no_datas_in_func then Some (LazyVec {offset; vector})
+               else None),
+               no_datas_in_func )
   | MKBuild (funcs, no_datas_in_func) ->
       let {
         types;

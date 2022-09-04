@@ -1117,17 +1117,33 @@ module Module = struct
     let func_kont =
       scope ["func_kont"] (Lazy_vec.encoding Code.func_encoding)
     in
+    let instr_kont =
+      scope
+        ["instr_kont"]
+        (option
+           (Lazy_vec.encoding
+              (Lazy_vec.encoding Wasm_encoding.instruction_encoding)))
+    in
     let no_datas_in_func = value ["no-datas-in-funcs"] Data_encoding.bool in
     case
       "MKElaborateFunc"
-      (tup4 ~flatten:true func_types func_bodies func_kont no_datas_in_func)
+      (tup5
+         ~flatten:true
+         func_types
+         func_bodies
+         func_kont
+         instr_kont
+         no_datas_in_func)
       (function
         | Decode.MKElaborateFunc
-            (func_types, func_bodies, func_kont, no_datas_in_func) ->
-            Some (func_types, func_bodies, func_kont, no_datas_in_func)
+            (func_types, func_bodies, func_kont, instr_kont, no_datas_in_func)
+          ->
+            Some
+              (func_types, func_bodies, func_kont, instr_kont, no_datas_in_func)
         | _ -> None)
-      (fun (func_types, func_bodies, func_kont, no_datas_in_func) ->
-        MKElaborateFunc (func_types, func_bodies, func_kont, no_datas_in_func))
+      (fun (func_types, func_bodies, func_kont, instr_kont, no_datas_in_func) ->
+        MKElaborateFunc
+          (func_types, func_bodies, func_kont, instr_kont, no_datas_in_func))
 
   let module_funcs_encoding =
     scope ["module"; "funcs"] (vector_encoding Code.func_encoding)
