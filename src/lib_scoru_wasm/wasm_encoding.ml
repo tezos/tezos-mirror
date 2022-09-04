@@ -39,14 +39,6 @@ module ModuleMap = Lazy_map_encoding.Make (Instance.ModuleMap.Map)
 (** Utility function*)
 let string_tag = value [] Data_encoding.string
 
-let list_encoding item_enc =
-  let vector = int32_lazy_vector (value [] Data_encoding.int32) item_enc in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
-     This should return a [Instance.Vector.t] instead of a list. Once the AST
-     has been sufficiently adapted to lazy vectors and maps, this change can
-     go forward. *)
-  conv_lwt V.to_list (fun list -> Lwt.return (V.of_list list)) vector
-
 let lazy_vector_encoding field_name tree_encoding =
   scope
     [field_name]
@@ -83,7 +75,7 @@ let function_type_encoding =
           (value [] Interpreter_encodings.Types.value_type_encoding)))
 
 let var_list_encoding =
-  list_encoding (value [] Interpreter_encodings.Ast.var_encoding)
+  value [] (Data_encoding.list Interpreter_encodings.Ast.var_encoding)
 
 let block_label_encoding =
   value [] Interpreter_encodings.Ast.block_label_encoding
