@@ -1106,7 +1106,7 @@ module Make (Context : P) :
   type error += Arith_proof_production_failed
 
   let produce_proof context input_given state =
-    let open Lwt_result_syntax in
+    let open Lwt_tzresult_syntax in
     let*! result =
       Context.produce_proof context state (step_transition input_given)
     in

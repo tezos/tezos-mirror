@@ -176,8 +176,7 @@ module type S = sig
 
   val verify_proof : proof -> bool Lwt.t
 
-  val produce_proof :
-    context -> input option -> state -> (proof, error) result Lwt.t
+  val produce_proof : context -> input option -> state -> proof tzresult Lwt.t
 
   val verify_origination_proof : proof -> string -> bool Lwt.t
 

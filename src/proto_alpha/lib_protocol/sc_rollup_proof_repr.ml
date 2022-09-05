@@ -145,11 +145,6 @@ module type PVM_with_context_and_state = sig
   end
 end
 
-let of_lwt_result result =
-  let open Lwt_tzresult_syntax in
-  let*! r = result in
-  match r with Ok x -> return x | Error e -> fail e
-
 let produce pvm_and_state commit_level =
   let open Lwt_tzresult_syntax in
   let (module P : PVM_with_context_and_state) = pvm_and_state in
@@ -173,9 +168,7 @@ let produce pvm_and_state commit_level =
         return (Some (Inbox_with_history.to_serialized_proof p), i)
   in
   let input_given = Option.bind input_given (cut_at_level commit_level) in
-  let* pvm_step_proof =
-    of_lwt_result (P.produce_proof P.context input_given P.state)
-  in
+  let* pvm_step_proof = P.produce_proof P.context input_given P.state in
   let module P_with_proof = struct
     include P
 
