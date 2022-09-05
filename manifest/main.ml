@@ -1363,7 +1363,7 @@ let octez_test_helpers_extra =
 
 let _octez_shell_services_tests =
   test
-    "test"
+    "test_block_services"
     ~path:"src/lib_shell_services/test"
     ~opam:"tezos-shell-services"
     ~deps:

@@ -52,3 +52,5 @@ let tests : (string * _) list =
   [("json-encoding of large directory", test_json_encoding_of_large_directory)]
 
 let tests = List.map (fun (s, f) -> Alcotest.test_case s `Quick f) tests
+
+let () = Alcotest.run "tezos-lib-shell-services" [("block-services", tests)]
