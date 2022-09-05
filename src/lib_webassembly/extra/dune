@@ -1,20 +1,19 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name main)
+(library
+ (name tezos_webassembly_interpreter_extra)
+ (public_name tezos-webassembly-interpreter-extra)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-webassembly-interpreter
-  tezos-webassembly-interpreter-extra
   lwt.unix
-  tree-encoding
   lazy-containers)
  (flags
   (:standard)
   -open Tezos_webassembly_interpreter
-  -open Tezos_webassembly_interpreter_extra
-  -open Tree_encoding
   -open Lazy_containers))
+
+(include_subdirs unqualified)
 
 (include dune.inc)
