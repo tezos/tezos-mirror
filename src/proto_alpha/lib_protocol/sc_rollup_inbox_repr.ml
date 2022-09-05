@@ -383,7 +383,7 @@ let of_versioned = function V1 inbox -> inbox [@@inline]
 let to_versioned inbox = V1 inbox [@@inline]
 
 let key_of_message ix =
-  ["message"; Data_encoding.Binary.to_string_exn Data_encoding.z ix]
+  ["message"; Data_encoding.Binary.to_string_exn Data_encoding.n ix]
 
 let level_key = ["level"]
 
