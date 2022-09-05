@@ -95,14 +95,16 @@ let valid snapshot commit_level ~pvm_name proof =
   let open Lwt_tzresult_syntax in
   let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
   let* () = check (String.equal P.name pvm_name) "Incorrect PVM kind" in
-  let input_requested = P.proof_input_requested P.proof in
+  let (input_requested : Sc_rollup_PVM_sem.input_request) =
+    P.proof_input_requested P.proof
+  in
   let input_given = P.proof_input_given P.proof in
   let* input =
     match (input_requested, proof.inbox) with
-    | Sc_rollup_PVM_sem.No_input_required, None -> return None
-    | Sc_rollup_PVM_sem.Initial, Some inbox_proof ->
+    | No_input_required, None -> return None
+    | Initial, Some inbox_proof ->
         check_inbox_proof snapshot inbox_proof (Raw_level_repr.root, Z.zero)
-    | Sc_rollup_PVM_sem.First_after (level, counter), Some inbox_proof ->
+    | First_after (level, counter), Some inbox_proof ->
         check_inbox_proof snapshot inbox_proof (level, Z.succ counter)
     | _ ->
         proof_error
@@ -152,17 +154,19 @@ let produce pvm_and_state commit_level =
   let open Lwt_tzresult_syntax in
   let (module P : PVM_with_context_and_state) = pvm_and_state in
   let open P in
-  let*! request = P.is_input_state P.state in
+  let*! (request : Sc_rollup_PVM_sem.input_request) =
+    P.is_input_state P.state
+  in
   let* inbox, input_given =
     match request with
-    | Sc_rollup_PVM_sem.No_input_required -> return (None, None)
-    | Sc_rollup_PVM_sem.Initial ->
+    | No_input_required -> return (None, None)
+    | Initial ->
         let* p, i =
           Inbox_with_history.(
             produce_proof context history inbox (Raw_level_repr.root, Z.zero))
         in
         return (Some (Inbox_with_history.to_serialized_proof p), i)
-    | Sc_rollup_PVM_sem.First_after (l, n) ->
+    | First_after (l, n) ->
         let* p, i =
           Inbox_with_history.(produce_proof context history inbox (l, Z.succ n))
         in
