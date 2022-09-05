@@ -175,3 +175,14 @@ let z_encoding = Data_encoding.(check_size 9 (conv to_z t_to_z_exn z))
 let n_encoding = Data_encoding.(check_size 9 (conv to_z t_to_z_exn n))
 
 let pp fmt x = Format.pp_print_int fmt x
+
+module Syntax = struct
+  (* This is a good enough approximation. S.log2 0 = 1 *)
+  let log2 x = safe_int (1 + numbits x)
+
+  let ( + ) = add
+
+  let ( * ) = mul
+
+  let ( lsr ) = shift_right
+end

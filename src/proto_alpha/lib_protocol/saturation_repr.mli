@@ -208,3 +208,14 @@ val n_encoding : _ t Data_encoding.t
 
 (** A pretty-printer for native integers. *)
 val pp : Format.formatter -> _ t -> unit
+
+(** Syntax for simple representations. *)
+module Syntax : sig
+  val log2 : _ t -> may_saturate t
+
+  val ( + ) : _ t -> _ t -> may_saturate t
+
+  val ( * ) : _ t -> _ t -> may_saturate t
+
+  val ( lsr ) : 'a t -> int -> 'a t
+end
