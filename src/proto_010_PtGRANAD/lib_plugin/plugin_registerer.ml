@@ -23,7 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Plugin = struct
+module RPC = struct
   module Proto = Registerer.Registered
-  include Plugin
+  include Plugin.RPC
 end
+
+let () = Shell_plugin.register_rpc (module RPC)
