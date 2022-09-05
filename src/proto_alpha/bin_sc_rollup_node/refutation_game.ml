@@ -123,7 +123,7 @@ module Make (Interpreter : Interpreter.S) :
       @@ (Sc_rollup.Proof.produce (module P) game.level
          >|= Environment.wrap_tzresult)
     in
-    let+ check =
+    let+ check, _ =
       Sc_rollup.Proof.valid history_proof game.level ~pvm_name:game.pvm_name r
       >|= Environment.wrap_tzresult
     in

@@ -183,21 +183,16 @@ module type S = sig
       execution step. *)
   val proof_start_state : proof -> hash
 
-  (** [proof_stop_state proof] returns the final state hash of the [proof]
-      execution step. *)
-  val proof_stop_state : proof -> hash option
+  (** [proof_stop_state input_given proof] returns the final state hash of
+      the [proof] execution step.
+      Returns [None] if the [input_requested] do not match the [input_given].
+  *)
+  val proof_stop_state : input option -> proof -> hash option
 
   (** [proof_input_requested proof] returns the [input_request] status of the
       start state of the proof, as given by [is_input_state]. This must match
       with the inbox proof to complete a valid refutation game proof. *)
   val proof_input_requested : proof -> input_request
-
-  (** [proof_input_given proof] returns the [input], if any, provided to
-      the start state of the proof using the [set_input] function. If
-      [None], the proof is an [eval] step instead, or the machine is
-      blocked because the inbox is fully read. This must match with the
-      inbox proof to complete a valid refutation game proof. *)
-  val proof_input_given : proof -> input option
 
   (** [state_hash state] returns a compressed representation of [state]. *)
   val state_hash : state -> hash Lwt.t
@@ -231,7 +226,7 @@ module type S = sig
 
   (** [verify_proof p] checks the proof [p]. See the doc-string for the [proof]
       type. *)
-  val verify_proof : proof -> bool Lwt.t
+  val verify_proof : input option -> proof -> bool Lwt.t
 
   (** [produce_proof ctxt input_given state] should return a [proof] for
       the PVM step starting from [state], if possible. This may fail for

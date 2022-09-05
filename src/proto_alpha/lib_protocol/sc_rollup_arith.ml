@@ -114,21 +114,16 @@ module type S = sig
   val get_is_stuck : state -> string option Lwt.t
 end
 
-type 'a proof = {
-  tree_proof : 'a;
-  given : Sc_rollup_PVM_sem.input option;
-  requested : Sc_rollup_PVM_sem.input_request;
-}
+type 'a proof = {tree_proof : 'a; requested : Sc_rollup_PVM_sem.input_request}
 
 let proof_encoding : 'a Data_encoding.t -> 'a proof Data_encoding.t =
  fun encoding ->
   let open Data_encoding in
   conv
-    (fun {tree_proof; given; requested} -> (tree_proof, given, requested))
-    (fun (tree_proof, given, requested) -> {tree_proof; given; requested})
-    (obj3
+    (fun {tree_proof; requested} -> (tree_proof, requested))
+    (fun (tree_proof, requested) -> {tree_proof; requested})
+    (obj2
        (req "tree_proof" encoding)
-       (opt "given" PS.input_encoding)
        (req "requested" PS.input_request_encoding))
 
 module Make (Context : P) :
@@ -148,13 +143,11 @@ module Make (Context : P) :
 
   let proof_start_state p = Context.proof_before p.tree_proof
 
-  let proof_stop_state p =
-    match (p.given, p.requested) with
+  let proof_stop_state input_given p =
+    match (input_given, p.requested) with
     | None, PS.No_input_required -> Some (Context.proof_after p.tree_proof)
     | None, _ -> None
     | _ -> Some (Context.proof_after p.tree_proof)
-
-  let proof_input_given p = p.given
 
   let proof_input_requested p = p.requested
 
@@ -1093,10 +1086,10 @@ module Make (Context : P) :
     in
     return (state, request)
 
-  let verify_proof proof =
+  let verify_proof input_given proof =
     let open Lwt_syntax in
     let* result =
-      Context.verify_proof proof.tree_proof (step_transition proof.given)
+      Context.verify_proof proof.tree_proof (step_transition input_given)
     in
     match result with
     | None -> return false
@@ -1111,8 +1104,7 @@ module Make (Context : P) :
       Context.produce_proof context state (step_transition input_given)
     in
     match result with
-    | Some (tree_proof, requested) ->
-        return {tree_proof; given = input_given; requested}
+    | Some (tree_proof, requested) -> return {tree_proof; requested}
     | None -> fail Arith_proof_production_failed
 
   let verify_origination_proof proof boot_sector =
@@ -1138,7 +1130,7 @@ module Make (Context : P) :
     in
     match result with
     | Some (tree_proof, ()) ->
-        return {tree_proof; given = None; requested = No_input_required}
+        return {tree_proof; requested = No_input_required}
     | None -> fail Arith_proof_production_failed
 
   (* TEMPORARY: The following definitions will be extended in a future commit. *)

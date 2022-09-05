@@ -808,12 +808,12 @@ let check_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
     makes the expected claims about start and stop states. The function
     {!play} below has to call {!Sc_rollup_proof_repr.valid} separately
     to ensure the proof is actually valid. *)
-let check_proof_start_stop ~start_chunk ~stop_chunk proof =
+let check_proof_start_stop ~start_chunk ~stop_chunk input_given proof =
   let open Lwt_result_syntax in
   let dist = Sc_rollup_tick_repr.distance start_chunk.tick stop_chunk.tick in
   let* () = check Z.(equal dist one) (Proof_unexpected_section_size dist) in
   let start_proof = Sc_rollup_proof_repr.start proof in
-  let stop_proof = Sc_rollup_proof_repr.stop proof in
+  let stop_proof = Sc_rollup_proof_repr.stop input_given proof in
   let* () =
     check
       (Option.equal State_hash.equal start_chunk.state_hash (Some start_proof))
@@ -849,15 +849,15 @@ let play game refutation =
                default_number_of_sections = game.default_number_of_sections;
              })
     | Proof proof ->
-        let* () = check_proof_start_stop ~start_chunk ~stop_chunk proof in
         let {inbox_snapshot; level; pvm_name; _} = game in
-        let*! (proof_valid_tzresult : bool tzresult) =
+        let*! valid =
           Sc_rollup_proof_repr.valid inbox_snapshot level ~pvm_name proof
         in
         let* () =
-          match proof_valid_tzresult with
-          | Ok true -> return ()
-          | Ok false -> invalid_move (Proof_invalid "no detail given")
+          match valid with
+          | Ok (true, input) ->
+              check_proof_start_stop ~start_chunk ~stop_chunk input proof
+          | Ok (false, _) -> invalid_move (Proof_invalid "no detail given")
           | Error e ->
               invalid_move (Proof_invalid (Format.asprintf "%a" pp_trace e))
         in

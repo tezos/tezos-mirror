@@ -69,9 +69,9 @@ let start proof =
   let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
   P.proof_start_state P.proof
 
-let stop proof =
+let stop input proof =
   let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
-  P.proof_stop_state P.proof
+  P.proof_stop_state input P.proof
 
 (* This takes an [input] and checks if it is at or above the given level.
    It returns [None] if this is the case.
@@ -110,7 +110,6 @@ let valid snapshot commit_level ~pvm_name proof =
   let (input_requested : Sc_rollup_PVM_sem.input_request) =
     P.proof_input_requested P.proof
   in
-  let input_given = P.proof_input_given P.proof in
   let* input =
     match (input_requested, proof.inbox) with
     | No_input_required, None -> return None
@@ -127,15 +126,9 @@ let valid snapshot commit_level ~pvm_name proof =
              (Format.pp_print_option pp_proof)
              proof.inbox)
   in
-  let* () =
-    check
-      (Option.equal
-         Sc_rollup_PVM_sem.input_equal
-         (Option.bind input (cut_at_level commit_level))
-         input_given)
-      "Input given is not what inbox proof expects"
-  in
-  Lwt.map Result.ok (P.verify_proof P.proof)
+  let input = Option.bind input (cut_at_level commit_level) in
+  let*! valid = P.verify_proof input P.proof in
+  return (valid, input)
 
 module type PVM_with_context_and_state = sig
   include Sc_rollups.PVM.S
@@ -164,28 +157,29 @@ let produce pvm_and_state commit_level =
   let*! (request : Sc_rollup_PVM_sem.input_request) =
     P.is_input_state P.state
   in
-  let* inbox, input_given =
+  let* proof, input =
     match request with
     | No_input_required -> return (None, None)
     | Initial ->
-        let* p, i =
+        let* proof, input =
           Inbox_with_history.(
             produce_proof context history inbox (Raw_level_repr.root, Z.zero))
         in
-        return (Some (Inbox_with_history.to_serialized_proof p), i)
+        return (Some proof, input)
     | First_after (l, n) ->
-        let* p, i =
+        let* proof, input =
           Inbox_with_history.(produce_proof context history inbox (l, Z.succ n))
         in
-        return (Some (Inbox_with_history.to_serialized_proof p), i)
+        return (Some proof, input)
   in
-  let input_given = Option.bind input_given (cut_at_level commit_level) in
+  let input_given = Option.bind input (cut_at_level commit_level) in
   let* pvm_step_proof = P.produce_proof P.context input_given P.state in
   let module P_with_proof = struct
     include P
 
     let proof = pvm_step_proof
   end in
+  let inbox = Option.map Inbox_with_history.to_serialized_proof proof in
   match Sc_rollups.wrap_proof (module P_with_proof) with
   | Some pvm_step -> return {pvm_step; inbox}
   | None -> proof_error "Could not wrap proof"

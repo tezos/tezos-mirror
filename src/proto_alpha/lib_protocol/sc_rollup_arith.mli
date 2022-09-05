@@ -126,11 +126,7 @@ module type S = sig
   val get_is_stuck : state -> string option Lwt.t
 end
 
-type 'a proof = {
-  tree_proof : 'a;
-  given : Sc_rollup_PVM_sem.input option;
-  requested : Sc_rollup_PVM_sem.input_request;
-}
+type 'a proof = {tree_proof : 'a; requested : Sc_rollup_PVM_sem.input_request}
 
 module Protocol_implementation :
   S
