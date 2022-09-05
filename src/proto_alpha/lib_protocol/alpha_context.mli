@@ -820,7 +820,11 @@ module Constants : sig
       max_number_of_stored_cemented_commitments : int;
     }
 
-    type zk_rollup = {enable : bool; min_pending_to_process : int}
+    type zk_rollup = {
+      enable : bool;
+      origination_size : int;
+      min_pending_to_process : int;
+    }
 
     type t = {
       preserved_cycles : int;

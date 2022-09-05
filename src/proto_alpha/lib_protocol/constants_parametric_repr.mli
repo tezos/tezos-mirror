@@ -128,6 +128,7 @@ type sc_rollup = {
 
 type zk_rollup = {
   enable : bool;
+  origination_size : int;
   (* Minimum number of pending operations that can be processed by a ZKRU
      update, if available.
      If the length of the pending list is less than [min_pending_to_process],

@@ -236,7 +236,14 @@ let constants_mainnet =
          timeout_period_in_blocks = sc_rollup_timeout_period_in_blocks;
          max_number_of_stored_cemented_commitments = 5;
        });
-    zk_rollup = {enable = false; min_pending_to_process = 10};
+    zk_rollup =
+      {
+        enable = false;
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/3726
+           The following constants need to be refined. *)
+        origination_size = 4_000;
+        min_pending_to_process = 10;
+      };
   }
 
 let default_dal_sandbox =
